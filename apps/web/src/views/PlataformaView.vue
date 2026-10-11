@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
 import InteresadosPlataforma from "@/components/InteresadosPlataforma.vue";
 import ModalidadPlataforma from "@/components/ModalidadPlataforma.vue";
@@ -150,7 +151,8 @@ type Pestana =
   | "configuracion"
   | "operacion"
   | "errores"
-  | "interesados";
+  | "interesados"
+  | "embudo";
 
 const ESTADOS_FACT = [
   "trial",
@@ -931,6 +933,7 @@ function borrar(): void {
             'operacion',
             'errores',
             'interesados',
+            'embudo',
           ] as const"
           :key="p"
           type="button"
@@ -1233,6 +1236,14 @@ function borrar(): void {
       <!-- Errores de la API, la web y la app (ADR 0080) -->
       <ErroresPlataforma
         v-if="pestana === 'errores'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
+
+      <!-- Embudo de la plataforma: de la landing al primer pago (C08) -->
+      <EmbudoPlataforma
+        v-if="pestana === 'embudo'"
         class="mt-5"
         :api-url="apiUrl"
         :token="token"
