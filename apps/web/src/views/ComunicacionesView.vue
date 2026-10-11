@@ -33,6 +33,11 @@ interface Difusion {
   asunto: string;
   total: number;
   enviada_en: string | null;
+  // B08: en qué va (enviando, en pausa o cancelada) y cuánto falta.
+  estado?: "enviando" | "pausada" | "cancelada";
+  enviados?: number;
+  pendientes?: number;
+  descartados?: number;
 }
 
 type Canal = "interno" | "email" | "push" | "whatsapp";
@@ -71,6 +76,34 @@ const puedeAutomaticos = computed(() =>
 );
 const puedeSalida = computed(() => sesion.puede("comunicaciones.ver"));
 const puedeEliminar = computed(() => sesion.puede("comunicaciones.eliminar"));
+// Pausar, reanudar o cancelar una campaña en curso (B08).
+const puedeControlar = computed(() => sesion.puede("comunicaciones.gestionar"));
+const controlando = ref<string | null>(null);
+async function controlar(
+  d: Difusion,
+  accion: "pausar" | "reanudar" | "cancelar",
+): Promise<void> {
+  if (
+    accion === "cancelar" &&
+    !(await confirmar(t("comunicaciones.confirmarCancelar"), { peligro: true }))
+  ) {
+    return;
+  }
+  controlando.value = d.id;
+  try {
+    const { data } = await api.post<{ data: Difusion }>(
+      `${base.value}/comunicaciones/difusiones/${d.id}/${accion}`,
+      {},
+    );
+    difusiones.value = difusiones.value.map((x) =>
+      x.id === d.id ? data.data : x,
+    );
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    controlando.value = null;
+  }
+}
 const pestana = ref<Pestana>("difusion");
 
 const segmentos = ref<Segmento[]>([]);
@@ -726,6 +759,7 @@ onMounted(cargar);
               <th class="text-right">
                 {{ $t("comunicaciones.colTotal") }}
               </th>
+              <th>{{ $t("comunicaciones.colEstado") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -746,6 +780,71 @@ onMounted(cargar);
               </td>
               <td>{{ d.asunto }}</td>
               <td class="text-right font-semibold">{{ d.total }}</td>
+              <td data-prueba="estado-difusion">
+                <span class="inline-flex items-center gap-1.5 text-sm">
+                  <span
+                    class="inline-block size-1.5 rounded-full"
+                    :style="{
+                      background:
+                        d.estado === 'pausada'
+                          ? 'var(--aviso)'
+                          : d.estado === 'cancelada'
+                            ? 'var(--texto-suave)'
+                            : (d.pendientes ?? 0) > 0
+                              ? 'var(--primario)'
+                              : 'var(--exito)',
+                    }"
+                    aria-hidden="true"
+                  />
+                  {{
+                    d.estado === "pausada"
+                      ? $t("comunicaciones.estados.pausada")
+                      : d.estado === "cancelada"
+                        ? $t("comunicaciones.estados.cancelada")
+                        : (d.pendientes ?? 0) > 0
+                          ? $t("comunicaciones.estados.enviando", {
+                              n: d.pendientes ?? 0,
+                            })
+                          : $t("comunicaciones.estados.enviada")
+                  }}
+                </span>
+                <span
+                  v-if="
+                    puedeControlar &&
+                    d.estado !== 'cancelada' &&
+                    (d.pendientes ?? 0) > 0
+                  "
+                  class="mt-1 flex flex-wrap gap-3 text-xs"
+                >
+                  <button
+                    v-if="d.estado !== 'pausada'"
+                    type="button"
+                    class="tu-enlace"
+                    :disabled="controlando === d.id"
+                    @click="controlar(d, 'pausar')"
+                  >
+                    {{ $t("comunicaciones.pausar") }}
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="tu-enlace"
+                    :disabled="controlando === d.id"
+                    @click="controlar(d, 'reanudar')"
+                  >
+                    {{ $t("comunicaciones.reanudar") }}
+                  </button>
+                  <button
+                    type="button"
+                    class="tu-enlace"
+                    :style="{ color: 'var(--error)' }"
+                    :disabled="controlando === d.id"
+                    @click="controlar(d, 'cancelar')"
+                  >
+                    {{ $t("comunicaciones.cancelar") }}
+                  </button>
+                </span>
+              </td>
             </tr>
           </tbody>
         </table>
