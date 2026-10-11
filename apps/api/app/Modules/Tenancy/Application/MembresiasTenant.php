@@ -7,6 +7,8 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Membresias\Aniversario;
+use App\Modules\Tenancy\Membresias\BajaAnticipada;
+use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
@@ -155,10 +157,14 @@ class MembresiasTenant
      * él. Sin paquete vigente se rechaza, salvo que ya se hayan pagado
      * (`$extraAunSinPaquete`, p. ej. una compra en línea): entonces valen como un
      * paquete aparte, con su propia vigencia.
+     *
+     * `$condiciones`: las que aceptó al comprarlo (plan con permanencia; B04).
+     *
+     * @param  array<string, mixed>|null  $condiciones
      */
-    public function venderProducto(PersonaTenant $persona, ProductoTenant $producto, ?string $fechaInicio = null, ?Usuario $actor = null, bool $extraAunSinPaquete = false): AcuerdoTenant
+    public function venderProducto(PersonaTenant $persona, ProductoTenant $producto, ?string $fechaInicio = null, ?Usuario $actor = null, bool $extraAunSinPaquete = false, ?array $condiciones = null): AcuerdoTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($persona, $producto, $fechaInicio, $actor, $extraAunSinPaquete): AcuerdoTenant {
+        return DB::connection('tenant')->transaction(function () use ($persona, $producto, $fechaInicio, $actor, $extraAunSinPaquete, $condiciones): AcuerdoTenant {
             // La fecha de compra es la del negocio (no la del servidor en UTC).
             $inicio = $fechaInicio ?? Carbon::now($this->zona())->toDateString();
 
@@ -193,6 +199,8 @@ class MembresiasTenant
                     ? ($politicaReset === PoliticaReset::Calendario ? 1 : Aniversario::diaDe($inicio))
                     : null,
                 'estado' => 'activo',
+                // Permanencia (B04): lo pactado se congela; editar el plan no lo cambia.
+                ...$this->permanencia($producto, $inicio, $condiciones),
             ]);
 
             // Vigencia del producto → ventana de validez del derecho (feed del radar de
@@ -275,6 +283,29 @@ class MembresiasTenant
             ->orderByDesc('valido_desde')
             ->orderByDesc('id')
             ->first();
+    }
+
+    /**
+     * Lo que se congela de la permanencia al contratar (B04): hasta cuándo, qué paga si da
+     * de baja antes y las condiciones que aceptó (o, en una venta sin constancia, las del
+     * plan en ese momento).
+     *
+     * @param  array<string, mixed>|null  $condiciones
+     * @return array<string, mixed>
+     */
+    private function permanencia(ProductoTenant $producto, string $inicio, ?array $condiciones): array
+    {
+        $meses = (int) ($producto->permanencia_meses ?? 0);
+        if ($meses <= 0 || $producto->politica_reset === PoliticaReset::Ninguno) {
+            return [];
+        }
+
+        return [
+            'permanencia_hasta' => Carbon::parse($inicio)->addMonthsNoOverflow($meses)->toDateString(),
+            'baja_anticipada' => ($producto->baja_anticipada ?? BajaAnticipada::SinPenalizacion)->value,
+            'penalizacion_minor' => $producto->penalizacion_minor,
+            'condiciones' => $condiciones ?? ['texto' => CondicionesDePlan::texto($producto)],
+        ];
     }
 
     /**

@@ -50,7 +50,10 @@ class GenerarCicloEntitlementTenant
 
             while ($ciclos < self::MAX_CICLOS
                 && $bloqueado->ciclo_fin !== null
-                && $bloqueado->ciclo_fin->lt($hoy)) {
+                && $bloqueado->ciclo_fin->lt($hoy)
+                // No se abre un ciclo después de su vigencia (p. ej. una membresía dada de
+                // baja vale hasta su fecha efectiva; B04).
+                && ($bloqueado->valido_hasta === null || $bloqueado->ciclo_fin->lt($bloqueado->valido_hasta))) {
                 $saldo = $this->libro->saldo($bloqueado);
                 $acarreo = $this->rollover($bloqueado, $saldo);
                 $expira = $saldo - $acarreo;

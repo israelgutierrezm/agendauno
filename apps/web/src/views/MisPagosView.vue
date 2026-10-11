@@ -148,14 +148,16 @@ async function pagar(
   }
 }
 
+// Las condiciones que aceptó, por plan (permanencia; B04).
+const aceptadas = ref<Record<string, boolean>>({});
 async function comprar(id: string): Promise<void> {
   const p = cuenta.productos.value.find((x) => x.id === id);
-  if (!p) {
+  if (!p || (p.condiciones && !aceptadas.value[id])) {
     return;
   }
   comprando.value = id;
   mensaje.value = null;
-  if (await cuenta.comprar(p)) {
+  if (await cuenta.comprar(p, !!p.condiciones)) {
     mensaje.value = "comprado";
   }
   comprando.value = null;
@@ -463,6 +465,19 @@ onMounted(() => void cuenta.asegurar());
             >
               {{ vigencia(p) }}
             </p>
+            <!-- La inscripción que se suma, antes de comprar (B04). -->
+            <p
+              v-if="(p.inscripcion_minor ?? 0) > 0"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="inscripcion"
+            >
+              {{
+                $t("miCuenta.comprar.masInscripcion", {
+                  monto: dinero(p.inscripcion_minor ?? 0, p.moneda),
+                })
+              }}
+            </p>
             <!-- La fecha exacta: la vigencia corre desde el pago (M03). -->
             <p
               v-if="p.vence_si_compra_hoy"
@@ -476,10 +491,28 @@ onMounted(() => void cuenta.asegurar());
                 })
               }}
             </p>
+            <!-- Permanencia (B04): las condiciones, aceptadas antes de comprar. -->
+            <div
+              v-if="p.condiciones"
+              class="mt-2 space-y-1 text-xs"
+              data-prueba="condiciones"
+            >
+              <p>{{ p.condiciones }}</p>
+              <label class="flex items-start gap-2">
+                <input
+                  v-model="aceptadas[p.id]"
+                  type="checkbox"
+                  class="mt-0.5"
+                />
+                {{ $t("miCuenta.comprar.aceptoCondiciones") }}
+              </label>
+            </div>
             <button
               class="tu-btn tu-btn-primario mt-auto w-full"
               :class="{ 'mt-3': true }"
-              :disabled="comprando !== null"
+              :disabled="
+                comprando !== null || (!!p.condiciones && !aceptadas[p.id])
+              "
               @click="comprar(p.id)"
             >
               {{

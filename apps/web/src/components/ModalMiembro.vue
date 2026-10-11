@@ -9,6 +9,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import MenuFlotante from "@/components/MenuFlotante.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import RegistrarPagoOrden, {
+  type CuotaPorCobrar,
   type OrdenPorCobrar,
 } from "@/components/RegistrarPagoOrden.vue";
 import { puedeEntrar } from "@/lib/acceso";
@@ -99,6 +100,7 @@ interface Orden {
   total_minor: number;
   moneda: string;
   concepto?: string | null;
+  cuotas?: CuotaPorCobrar[];
 }
 interface Ficha {
   reservas: Reserva[];
@@ -417,6 +419,7 @@ function registrarPago(o: Orden): void {
     concepto: o.concepto ?? null,
     total_minor: o.total_minor,
     moneda: o.moneda,
+    cuotas: o.cuotas ?? [],
   };
 }
 function alRegistrar(): void {

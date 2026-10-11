@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Cuotas\ConceptoCuota;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Linea de una orden tenant-local: un producto, su cantidad y el precio unitario
  * congelado. El beneficiario (participante) puede diferir del comprador.
+ *
+ * O una cuota (B04): sin producto, con su `concepto` (inscripción, anualidad,
+ * penalización por baja) y, si se generó sola, una `referencia` única. No da clases.
+ *
+ * @property ConceptoCuota|null $concepto
+ * @property string|null $referencia
+ * @property array<string, mixed>|null $condiciones las que aceptó el cliente (plan con permanencia; B04)
  */
 class LineaOrdenTenant extends Model
 {
@@ -23,6 +31,7 @@ class LineaOrdenTenant extends Model
     protected $fillable = [
         'orden_id', 'producto_comercial_id', 'beneficiario_id',
         'cantidad', 'precio_unitario_minor', 'subtotal_minor',
+        'concepto', 'referencia', 'condiciones',
     ];
 
     /**
@@ -32,7 +41,33 @@ class LineaOrdenTenant extends Model
         'cantidad' => 'integer',
         'precio_unitario_minor' => 'integer',
         'subtotal_minor' => 'integer',
+        'concepto' => ConceptoCuota::class,
+        'condiciones' => 'array',
     ];
+
+    /**
+     * Si es una cuota, lo que se necesita para exentarla por separado (B04); si no, null.
+     *
+     * @return array{id: string, concepto: string, nombre: string, monto_minor: int}|null
+     */
+    public function comoCuota(): ?array
+    {
+        return $this->concepto === null ? null : [
+            'id' => (string) $this->ulid,
+            'concepto' => $this->concepto->value,
+            'nombre' => $this->nombre(),
+            'monto_minor' => (int) $this->subtotal_minor,
+        ];
+    }
+
+    /** Cómo se nombra: el producto o, si es una cuota, su concepto. */
+    public function nombre(): string
+    {
+        // Una cuota no tiene producto (`producto_comercial_id` null).
+        $producto = $this->producto_comercial_id === null ? null : $this->producto;
+
+        return $producto !== null ? $producto->nombre : ($this->concepto?->etiqueta() ?? 'Producto');
+    }
 
     /**
      * @return BelongsTo<OrdenTenant, $this>

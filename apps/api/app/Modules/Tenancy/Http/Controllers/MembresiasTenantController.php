@@ -10,6 +10,8 @@ use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Membresias\BajaAnticipada;
+use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
@@ -22,6 +24,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\Exceptions\CondicionesNoAceptadas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -87,6 +90,10 @@ class MembresiasTenantController
             'descripcion' => ['nullable', 'string', 'max:300'],
             'destacado' => ['sometimes', 'boolean'],
             'primera_vez' => ['sometimes', 'boolean'],
+            // Cuotas del negocio (B04).
+            'cobra_inscripcion' => ['sometimes', 'boolean'],
+            'cobra_anualidad' => ['sometimes', 'boolean'],
+            ...self::reglasPermanencia(),
         ]);
 
         $producto = $this->membresias->crearProducto(
@@ -112,6 +119,9 @@ class MembresiasTenantController
             'descripcion' => self::texto($validado['descripcion'] ?? null),
             'destacado' => (bool) ($validado['destacado'] ?? false),
             'primera_vez' => (bool) ($validado['primera_vez'] ?? false),
+            'cobra_inscripcion' => (bool) ($validado['cobra_inscripcion'] ?? false),
+            'cobra_anualidad' => (bool) ($validado['cobra_anualidad'] ?? false),
+            ...self::permanencia($validado),
         ]);
 
         return response()->json(['data' => $this->presentarProducto($producto)], 201);
@@ -150,6 +160,9 @@ class MembresiasTenantController
             'descripcion' => ['sometimes', 'nullable', 'string', 'max:300'],
             'destacado' => ['sometimes', 'boolean'],
             'primera_vez' => ['sometimes', 'boolean'],
+            'cobra_inscripcion' => ['sometimes', 'boolean'],
+            'cobra_anualidad' => ['sometimes', 'boolean'],
+            ...self::reglasPermanencia(),
         ]);
 
         $actor = $request->attributes->get('usuario_tenant');
@@ -157,7 +170,7 @@ class MembresiasTenantController
         abort_if($archiva && ! ($actor instanceof Usuario && $actor->puede('productos.eliminar')), 403);
 
         $atributos = [];
-        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado', 'destacado', 'primera_vez'] as $campo) {
+        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado', 'destacado', 'primera_vez', 'cobra_inscripcion', 'cobra_anualidad'] as $campo) {
             if ($request->has($campo)) {
                 $atributos[$campo] = $validado[$campo] ?? null;
             }
@@ -167,6 +180,9 @@ class MembresiasTenantController
         }
         if ($request->has('descripcion')) {
             $atributos['descripcion'] = self::texto($validado['descripcion'] ?? null);
+        }
+        if ($request->has('permanencia_meses')) {
+            $atributos = [...$atributos, ...self::permanencia($validado)];
         }
         if ($request->has('tipo')) {
             $atributos['tipo'] = TipoProducto::from($validado['tipo']);
@@ -217,17 +233,25 @@ class MembresiasTenantController
             'persona_id' => ['required', 'string'],
             'producto_id' => ['required', 'string'],
             'fecha_inicio' => ['nullable', 'date'],
+            'acepta_condiciones' => ['sometimes', 'boolean'],
         ]);
 
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
         $producto = ProductoTenant::query()->where('ulid', $validado['producto_id'])->firstOrFail();
 
         $actor = $request->attributes->get('usuario_tenant');
+        $actor = $actor instanceof Usuario ? $actor : null;
+        // Permanencia (B04): el negocio registra que el cliente aceptó sus condiciones.
+        $aceptada = ($validado['acepta_condiciones'] ?? false) === true;
+        if (CondicionesDePlan::aplica($producto) && ! $aceptada) {
+            throw new CondicionesNoAceptadas("«{$producto->nombre}» tiene permanencia: acepta sus condiciones para venderlo.");
+        }
         $acuerdo = $this->membresias->venderProducto(
             $persona,
             $producto,
             $validado['fecha_inicio'] ?? null,
-            $actor instanceof Usuario ? $actor : null,
+            $actor,
+            condiciones: $aceptada ? CondicionesDePlan::aceptadas($producto, 'negocio', $actor, $request->ip()) : null,
         );
         $derecho = $acuerdo->derechos()->firstOrFail();
 
@@ -336,6 +360,13 @@ class MembresiasTenantController
             'descripcion' => $producto->descripcion,
             'destacado' => $producto->destacado,
             'primera_vez' => $producto->primera_vez,
+            'cobra_inscripcion' => $producto->cobra_inscripcion,
+            'cobra_anualidad' => $producto->cobra_anualidad,
+            // Permanencia (B04) y las condiciones que se aceptan al comprarlo.
+            'permanencia_meses' => $producto->permanencia_meses,
+            'baja_anticipada' => $producto->baja_anticipada?->value,
+            'penalizacion_minor' => $producto->penalizacion_minor,
+            'condiciones' => CondicionesDePlan::texto($producto),
             'politica_reset' => $producto->politica_reset->value,
             'unidades_por_ciclo' => $producto->unidades_por_ciclo,
             'politica_rollover' => $producto->politica_rollover->value,
@@ -398,6 +429,40 @@ class MembresiasTenantController
             'ilimitado' => $derecho->ilimitado,
             'saldo' => $derecho->ilimitado ? null : $this->libro->saldo($derecho),
             'disponible' => $derecho->ilimitado ? null : $this->libro->disponible($derecho),
+        ];
+    }
+
+    /**
+     * Permanencia (B04): meses (0 o vacío = sin permanencia) y qué paga si da de baja
+     * antes; el monto fijo solo cuando es por monto.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private static function reglasPermanencia(): array
+    {
+        return [
+            'permanencia_meses' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:60'],
+            'baja_anticipada' => ['sometimes', 'nullable', Rule::enum(BajaAnticipada::class)],
+            'penalizacion_minor' => ['sometimes', 'nullable', 'required_if:baja_anticipada,monto_fijo', 'integer', 'min:0', 'max:100000000'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $validado
+     * @return array{permanencia_meses: int|null, baja_anticipada: string|null, penalizacion_minor: int|null}
+     */
+    private static function permanencia(array $validado): array
+    {
+        $meses = (int) ($validado['permanencia_meses'] ?? 0);
+        if ($meses <= 0) {
+            return ['permanencia_meses' => null, 'baja_anticipada' => null, 'penalizacion_minor' => null];
+        }
+        $modo = BajaAnticipada::tryFrom((string) ($validado['baja_anticipada'] ?? '')) ?? BajaAnticipada::SinPenalizacion;
+
+        return [
+            'permanencia_meses' => $meses,
+            'baja_anticipada' => $modo->value,
+            'penalizacion_minor' => $modo === BajaAnticipada::MontoFijo ? (int) ($validado['penalizacion_minor'] ?? 0) : null,
         ];
     }
 

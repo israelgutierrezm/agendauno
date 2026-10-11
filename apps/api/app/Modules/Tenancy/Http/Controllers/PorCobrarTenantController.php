@@ -60,7 +60,7 @@ class PorCobrarTenantController
     private function presentar(OrdenTenant $orden): array
     {
         $sesion = $orden->sesion;
-        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): ?string => $l->producto?->nombre)->filter()->values();
+        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->values();
 
         return [
             'id' => $orden->ulid,
@@ -69,6 +69,9 @@ class PorCobrarTenantController
             'concepto' => $productos->isNotEmpty() ? $productos->implode(', ') : $sesion?->oferta?->nombre,
             'total_minor' => $orden->total_minor,
             'moneda' => $orden->moneda,
+            // Las cuotas que lleva (inscripción, anualidad, penalización; B04), para
+            // exentarlas por separado.
+            'cuotas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): ?array => $l->comoCuota())->filter()->values()->all(),
             'creada_en' => $orden->created_at?->toIso8601String(),
             'sesion' => $sesion instanceof SesionTenant ? [
                 'tipo' => $sesion->tipo->value,

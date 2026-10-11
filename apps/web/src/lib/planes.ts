@@ -36,6 +36,15 @@ export interface Plan {
   descripcion?: string | null;
   destacado?: boolean;
   primera_vez?: boolean;
+  // Cuotas del negocio (B04).
+  cobra_inscripcion?: boolean;
+  cobra_anualidad?: boolean;
+  // Permanencia (B04) y las condiciones que se aceptan al comprarlo.
+  permanencia_meses?: number | null;
+  baja_anticipada?:
+    "sin_penalizacion" | "monto_fijo" | "meses_restantes" | null;
+  penalizacion_minor?: number | null;
+  condiciones?: string | null;
 }
 
 /** 1000 unidades = 1 clase. */

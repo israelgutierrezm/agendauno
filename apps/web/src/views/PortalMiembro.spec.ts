@@ -795,6 +795,47 @@ describe("portal del alumno", () => {
     w.unmount();
   });
 
+  it("comprar un plan con permanencia pide aceptar sus condiciones", async () => {
+    api.post.mockResolvedValue({ data: { data: {} } });
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/mi/productos")
+            ? [
+                {
+                  id: "p9",
+                  nombre: "Mensualidad",
+                  tipo: "membresia",
+                  precio_minor: 120000,
+                  moneda: "MXN",
+                  ilimitado: true,
+                  creditos_incluidos: null,
+                  disponible: true,
+                  condiciones: "Permanencia mínima de 6 meses.",
+                },
+              ]
+            : (datos[url.replace("/api/v1/app/demo", "")] ?? []),
+        },
+      }),
+    );
+    const w = montar(MisPagosView);
+    await flushPromises();
+    const tarjeta = w.get('[data-prueba="comprable"]');
+    expect(tarjeta.get('[data-prueba="condiciones"]').text()).toContain(
+      "Permanencia mínima de 6 meses.",
+    );
+    const comprar = tarjeta.findAll("button").at(-1)!;
+    expect(comprar.attributes("disabled")).toBeDefined();
+    await tarjeta.get('[data-prueba="condiciones"] input').setValue(true);
+    await comprar.trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/mi/ordenes", {
+      items: [{ producto_id: "p9", cantidad: 1 }],
+      acepta_condiciones: true,
+    });
+    w.unmount();
+  });
+
   it("al volver de pagar, el siguiente paso es reservar con su plan", async () => {
     retorno.valor = "exito";
     const w = montar(MisPagosView);

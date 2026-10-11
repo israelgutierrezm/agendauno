@@ -28,7 +28,7 @@ final class DatosDeOrden
 
         $renglones = $orden->lineas
             ->map(static function (LineaOrdenTenant $linea) use ($moneda): string {
-                $nombre = (string) $linea->producto?->nombre ?: 'Producto';
+                $nombre = (string) $linea->nombre() ?: 'Producto';
                 $cantidad = (int) $linea->cantidad > 1 ? ' × '.$linea->cantidad : '';
 
                 return $nombre.$cantidad.' · '.self::dinero((int) $linea->subtotal_minor, $moneda);

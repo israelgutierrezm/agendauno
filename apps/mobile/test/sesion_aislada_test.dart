@@ -61,7 +61,8 @@ class _Repo extends CuentaRepository {
   }
 
   @override
-  Future<void> comprar(String productoId) => compra?.future ?? Future.value();
+  Future<void> comprar(String productoId, {bool aceptaCondiciones = false}) =>
+      compra?.future ?? Future.value();
 }
 
 ProviderContainer contenedor({Completer<void>? compra}) {

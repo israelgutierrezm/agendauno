@@ -56,6 +56,34 @@ function montar() {
   });
 }
 
+describe("permanencia de una membresía (B04)", () => {
+  it("guarda los meses, qué paga si da de baja antes y el monto fijo", async () => {
+    sesion.esCitas = false;
+    api.post.mockResolvedValue({});
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="tipo-membresia"]').trigger("click");
+    await w.get("#ep-nombre").setValue("Mensualidad");
+    await w.get("#ep-precio").setValue("1200");
+    await w.get("#ep-permanencia").setValue("12");
+    await w
+      .get('[data-prueba="permanencia-plan"] input[value="monto_fijo"]')
+      .setValue(true);
+    await w.get("#ep-penalizacion").setValue("1500");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/productos",
+      expect.objectContaining({
+        permanencia_meses: 12,
+        baja_anticipada: "monto_fijo",
+        penalizacion_minor: 150000,
+      }),
+    );
+    sesion.esCitas = true;
+  });
+});
+
 describe("planes de un negocio de citas", () => {
   it("exige elegir sedes y guarda la selección sin convertirla en cobertura total", async () => {
     api.get.mockImplementation((url: string) =>

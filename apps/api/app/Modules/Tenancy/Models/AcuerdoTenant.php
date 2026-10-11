@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Membresias\BajaAnticipada;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Acuerdo tenant-local: la compra de un producto comercial por una persona.
+ *
+ * Con permanencia (B04) congela lo pactado: hasta cuándo, qué paga si da de baja antes
+ * y las condiciones que aceptó. `baja_efectiva_el`: su último día, si se dio de baja.
+ *
+ * @property array<string, mixed>|null $condiciones
  */
 class AcuerdoTenant extends Model
 {
@@ -22,7 +28,10 @@ class AcuerdoTenant extends Model
 
     protected $table = 'acuerdos';
 
-    protected $fillable = ['persona_id', 'producto_comercial_id', 'linea_orden_id', 'fecha_inicio', 'proxima_cobro_en', 'dia_ancla', 'estado'];
+    protected $fillable = [
+        'persona_id', 'producto_comercial_id', 'linea_orden_id', 'fecha_inicio', 'proxima_cobro_en', 'dia_ancla', 'estado',
+        'permanencia_hasta', 'baja_anticipada', 'penalizacion_minor', 'condiciones', 'baja_efectiva_el',
+    ];
 
     /**
      * @var array<string, string>
@@ -33,6 +42,11 @@ class AcuerdoTenant extends Model
         // Día del mes de sus aniversarios (ciclos y cobro), ver Aniversario.
         'dia_ancla' => 'integer',
         'estado' => EstadoAcuerdo::class,
+        'permanencia_hasta' => 'date',
+        'baja_anticipada' => BajaAnticipada::class,
+        'penalizacion_minor' => 'integer',
+        'condiciones' => 'array',
+        'baja_efectiva_el' => 'date',
     ];
 
     /**

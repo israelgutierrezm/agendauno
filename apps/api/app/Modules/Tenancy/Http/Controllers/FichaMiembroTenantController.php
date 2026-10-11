@@ -116,6 +116,10 @@ class FichaMiembroTenantController
                 // Para pausar/reanudar desde la ficha.
                 'acuerdo_id' => $derecho->acuerdo?->ulid,
                 'pausa_hasta' => $derecho->acuerdo?->pausaAbierta?->hasta->toDateString(),
+                // Membresía que se renueva: se puede dar de baja (B04); su baja programada.
+                'recurrente' => $derecho->acuerdo?->dia_ancla !== null,
+                'permanencia_hasta' => $derecho->acuerdo?->permanencia_hasta?->toDateString(),
+                'baja_efectiva_el' => $derecho->acuerdo?->baja_efectiva_el?->toDateString(),
                 'proxima_cobro_en' => $derecho->acuerdo?->proxima_cobro_en?->toDateString(),
                 'ilimitado' => $derecho->ilimitado,
                 'saldo_creditos' => $saldo !== null ? intdiv($saldo, 1000) : null,
@@ -198,7 +202,7 @@ class FichaMiembroTenantController
     private function presentarOrden(OrdenTenant $orden): array
     {
         $sesion = $orden->sesion;
-        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): ?string => $l->producto?->nombre)->filter()->values();
+        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->values();
 
         return [
             'id' => $orden->ulid,
@@ -206,6 +210,9 @@ class FichaMiembroTenantController
             'estado' => $orden->estado->value,
             'total_minor' => $orden->total_minor,
             'moneda' => $orden->moneda,
+            // Las cuotas que lleva (inscripción, anualidad, penalización; B04), para
+            // exentarlas por separado.
+            'cuotas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): ?array => $l->comoCuota())->filter()->values()->all(),
             'metodo_pago' => $orden->metodo_pago,
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
             // Qué se pagó: sus productos o, si es una cita, el servicio, con quién y cuándo.

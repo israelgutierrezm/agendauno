@@ -839,6 +839,31 @@ export const pausaMembresia = {
   reanudada: "Membresía reanudada.",
 };
 
+// Dar de baja una membresía (B04): lo que pasará, antes de confirmar.
+export const bajaMembresia = {
+  dar: "Dar de baja",
+  termina: "Termina el {fecha} (al acabar lo que ya pagó).",
+  enPermanencia:
+    "Tiene permanencia hasta el {fecha}: falta 1 mes. | Tiene permanencia hasta el {fecha}: faltan {n} meses.",
+  penalizacionMeses:
+    "Paga las mensualidades que faltan: {n} × {precio} = {total}.",
+  penalizacionFija: "Paga la penalización pactada: {total}.",
+  sinPenalizacion: "Su plan no tiene penalización por baja anticipada.",
+  cumplida: "Ya cumplió su permanencia: no hay penalización.",
+  condiciones: "Condiciones que aceptó",
+  adeudo: "Cobrar aparte la mensualidad vencida ({monto})",
+  adeudoAyuda: "Si lo quitas, esa deuda se anula.",
+  exentar: "Exentar la penalización",
+  motivo: "Motivo (opcional)",
+  motivoObligatorio: "Por qué se exenta",
+  aCobrar: "Queda por cobrar: {monto}.",
+  nadaQueCobrar: "No queda nada por cobrar.",
+  confirmar: "Confirmar baja",
+  hecha: "«{producto}» termina el {fecha}.",
+  programada: "Baja programada: termina el {fecha}",
+  permanenciaHasta: "Permanencia hasta el {fecha}",
+};
+
 export const paseEntrada = {
   titulo: "Mi pase de entrada",
   ayuda:

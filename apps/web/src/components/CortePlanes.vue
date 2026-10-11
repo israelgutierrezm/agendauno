@@ -32,6 +32,11 @@ interface PlanCorte {
   comprado: string | null;
   desde: string | null;
   hasta: string | null;
+  // Membresía (B04): su permanencia, lo que aceptó y su baja programada.
+  recurrente?: boolean;
+  permanencia_hasta?: string | null;
+  condiciones?: string | null;
+  baja_efectiva_el?: string | null;
   estado: string;
   ilimitado: boolean;
   aplica_a: string[];
@@ -302,6 +307,39 @@ defineExpose({ cargar });
               · {{ aplicaA(p) }}</template
             >
           </p>
+          <p
+            v-if="p.baja_efectiva_el"
+            class="mt-0.5 text-sm"
+            :style="{ color: 'var(--aviso)' }"
+            data-prueba="baja-programada"
+          >
+            {{
+              $t("planes.corte.bajaProgramada", {
+                fecha: fechaCorta(p.baja_efectiva_el),
+              })
+            }}
+          </p>
+          <p
+            v-else-if="p.permanencia_hasta"
+            class="mt-0.5 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="permanencia"
+          >
+            {{
+              $t("planes.corte.permanencia", {
+                fecha: fechaCorta(p.permanencia_hasta),
+              })
+            }}
+          </p>
+          <details v-if="p.condiciones" class="mt-1 text-xs">
+            <summary
+              class="cursor-pointer"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("planes.corte.condiciones") }}
+            </summary>
+            <p class="mt-1">{{ p.condiciones }}</p>
+          </details>
           <button
             v-if="esAnterior(p)"
             type="button"

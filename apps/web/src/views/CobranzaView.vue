@@ -12,6 +12,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import RegistrarPagoOrden, {
+  type CuotaPorCobrar,
   type OrdenPorCobrar,
 } from "@/components/RegistrarPagoOrden.vue";
 import TarjetasIndicadores, {
@@ -30,6 +31,8 @@ interface Pendiente {
   concepto: string | null;
   total_minor: number;
   moneda: string;
+  // Sus cuotas (B04), para exentarlas por separado.
+  cuotas?: CuotaPorCobrar[];
   creada_en: string | null;
   sesion: {
     tipo: "clase" | "cita";
@@ -261,6 +264,7 @@ function abrirCobro(p: Pendiente): void {
     concepto: p.concepto,
     total_minor: p.total_minor,
     moneda: p.moneda,
+    cuotas: p.cuotas ?? [],
   };
 }
 async function alRegistrar(aviso: string): Promise<void> {

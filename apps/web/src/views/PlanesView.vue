@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CuotasNegocio from "@/components/CuotasNegocio.vue";
 import EditorPlan from "@/components/EditorPlan.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -36,6 +37,8 @@ const error = ref<string | null>(null);
 const verArchivados = ref(false);
 const editando = ref<Plan | null>(null);
 const abierto = ref(false);
+// Cuotas del negocio (inscripción y anualidad; B04).
+const cuotasAbiertas = ref(false);
 
 const busqueda = ref("");
 const seccion = ref<string>("");
@@ -174,6 +177,15 @@ onMounted(cargar);
       :subtitulo="$t('planes.subtitulo')"
     >
       <template #acciones>
+        <button
+          v-if="puedeEditar && !sesion.esCitas"
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          data-prueba="abrir-cuotas"
+          @click="cuotasAbiertas = true"
+        >
+          {{ $t("planes.cuotas.titulo") }}
+        </button>
         <button
           v-if="puedeEditar"
           type="button"
@@ -348,6 +360,19 @@ onMounted(cargar);
         :plan="editando"
         @guardado="guardado"
         @cerrar="abierto = false"
+      />
+    </ModalDialogo>
+
+    <ModalDialogo
+      :abierto="cuotasAbiertas"
+      :titulo="$t('planes.cuotas.titulo')"
+      icono="dinero"
+      @cerrar="cuotasAbiertas = false"
+    >
+      <CuotasNegocio
+        v-if="cuotasAbiertas"
+        @guardado="cuotasAbiertas = false"
+        @cerrar="cuotasAbiertas = false"
       />
     </ModalDialogo>
   </section>

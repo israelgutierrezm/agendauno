@@ -155,6 +155,50 @@ export default {
     primeraVezAyuda:
       "Solo la compra, una vez, quien nunca ha venido: sin planes antes y sin asistencias registradas.",
   },
+  // Permanencia de una membresía (B04).
+  permanencia: {
+    titulo: "Permanencia",
+    meses: "Permanencia mínima (meses)",
+    sin: "Sin permanencia",
+    siDaDeBaja: "Si da de baja antes de cumplirla:",
+    modos: {
+      sin_penalizacion: "Sin penalización",
+      monto_fijo: "Paga un monto fijo",
+      meses_restantes: "Paga las mensualidades que falten",
+    },
+    monto: "Monto de la penalización",
+    ayuda:
+      "Quien lo compra acepta estas condiciones antes de pagar; lo pactado no cambia si editas el plan después. La baja aplica al terminar el periodo pagado. La redacción legal de tu contrato la debe revisar un profesional.",
+  },
+  // Cuotas del negocio (B04): inscripción y anualidad, aparte de los planes.
+  cuotas: {
+    titulo: "Cuotas",
+    ayuda:
+      "Lo que se cobra aparte de los planes. No da clases. Un monto vacío o en 0 no se cobra.",
+    inscripcion: "Inscripción",
+    anualidad: "Anualidad",
+    monto: "Monto ({simbolo})",
+    sinCobro: "No se cobra",
+    reingreso: "Se vuelve a cobrar tras (meses sin plan)",
+    inscripcionAyuda:
+      "Se suma al vender un plan que la cobra, en la primera alta y al regresar tras esos meses sin plan. Quien tiene permiso puede exentarla.",
+    modos: {
+      aniversario: "En el aniversario de su alta",
+      fecha_fija: "En una fecha fija",
+    },
+    mes: "Mes",
+    dia: "Día",
+    aniversarioAyuda:
+      "Cada año en la fecha en que contrató; quien entró un 29 de febrero paga el 28 en los años que no son bisiestos.",
+    fechaFijaAyuda:
+      "La misma fecha para todos los que tienen un plan que la cobra. El 29 de febrero se cobra el 28 en los años que no son bisiestos.",
+    enElPlan: "Cuotas",
+    cobraInscripcion: "Cobra la inscripción",
+    cobraInscripcionAyuda:
+      "Al venderlo se suma la inscripción si es su primera alta o regresa tras un tiempo sin plan.",
+    cobraAnualidad: "Cobra la anualidad",
+    cobraAnualidadAyuda: "Quien lo tiene paga la anualidad del negocio.",
+  },
   vender: {
     configurar: "Configurar planes y paquetes →",
     venceHoy: "Si se vende hoy, se puede usar hasta el {hasta}.",
@@ -176,6 +220,10 @@ export default {
     comprado: "Comprado el {fecha}",
     vigencia: "Del {desde} al {hasta}",
     sinVencimiento: "Desde el {desde}, no vence",
+    // Membresía con permanencia o dada de baja (B04).
+    permanencia: "Permanencia hasta el {fecha}",
+    bajaProgramada: "Dada de baja: termina el {fecha}",
+    condiciones: "Condiciones aceptadas",
     aplicaA: "Sirve para: {clases}",
     numeros: {
       incluidas: "Incluidas",

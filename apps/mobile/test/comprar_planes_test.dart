@@ -16,7 +16,11 @@ class _CuentaFalsa extends CuentaController {
       const MiCuenta(derechos: [], reservas: [], clases: []);
 
   @override
-  Future<void> comprar(String productoId) async => compras.add(productoId);
+  Future<void> comprar(
+    String productoId, {
+    bool aceptaCondiciones = false,
+  }) async =>
+      compras.add(aceptaCondiciones ? '$productoId+condiciones' : productoId);
 }
 
 ProductoComprable producto(Map<String, dynamic> extra) =>
@@ -132,6 +136,50 @@ void main() {
 
     expect(cuenta.compras, ['p1']);
     expect(find.textContaining('Págala en "Por pagar"'), findsOneWidget);
+  });
+
+  testWidgets('con permanencia, se aceptan las condiciones antes de comprar', (
+    tester,
+  ) async {
+    final cuenta = _CuentaFalsa();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          cuentaProvider.overrideWith(() => cuenta),
+          productosProvider.overrideWith(
+            (ref) async => [
+              producto({
+                'condiciones':
+                    'Permanencia mínima de 6 meses desde la fecha de compra.',
+              }),
+            ],
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: ComprarPlanesSeccion()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Cancelar no compra.
+    await tester.tap(find.widgetWithText(FilledButton, 'Comprar'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Permanencia mínima de 6 meses'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(cuenta.compras, isEmpty);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Comprar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Acepto y compro'));
+    await tester.pumpAndSettle();
+    expect(cuenta.compras, ['p1+condiciones']);
   });
 
   testWidgets('sin planes no se muestra la sección', (tester) async {

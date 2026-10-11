@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -12,6 +13,7 @@ use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Ordenes\Exceptions\CondicionesNoAceptadas;
 use App\Modules\Tenancy\Ordenes\Exceptions\ExtraSinPaquete;
 use App\Modules\Tenancy\Ordenes\Exceptions\MonedaMixta;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
@@ -33,6 +35,7 @@ class OrdenesTenant
         private readonly GestionarPromocionesTenant $promociones,
         private readonly CobrarOrdenTenant $cobrar,
         private readonly MembresiasTenant $membresias,
+        private readonly CuotasTenant $cuotas,
     ) {}
 
     /**
@@ -40,9 +43,18 @@ class OrdenesTenant
      * renovación de lo que la persona ya tiene (su acuerdo sigue aunque el producto ya
      * no se ofrezca).
      *
+     * `$exencionInscripcion`: vender sin la inscripción que tocaría (B04); quien la
+     * exenta (con `cuotas.exentar`, lo revisa quien llama) y por qué quedan en la bitácora.
+     *
+     * `$aceptacion`: un plan con permanencia (B04) se compra aceptando sus condiciones
+     * (`via`: `cliente` en su cuenta, `negocio` si lo registra el equipo); se guardan en la
+     * línea con el texto, su versión, cuándo y quién.
+     *
      * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
+     * @param  array{actor: Usuario|null, motivo: string}|null  $exencionInscripcion
+     * @param  array{via: string, usuario: Usuario|null, ip: string|null}|null  $aceptacion
      */
-    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false): OrdenTenant
+    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false, ?array $exencionInscripcion = null, ?array $aceptacion = null): OrdenTenant
     {
         $moneda = $items[0]['producto']->moneda; // Una sola moneda por orden.
 
@@ -60,6 +72,10 @@ class OrdenesTenant
             if ($item['producto']->moneda !== $moneda) {
                 throw new MonedaMixta('Una orden no puede mezclar monedas.');
             }
+            // Permanencia (B04): sin aceptar sus condiciones no se compra.
+            if (! $renovacion && $aceptacion === null && CondicionesDePlan::aplica($item['producto'])) {
+                throw new CondicionesNoAceptadas("«{$item['producto']->nombre}» tiene permanencia: acepta sus condiciones para comprarlo.");
+            }
             // Clases extra: quien las recibe debe tener un paquete vigente al cual sumarlas.
             $recibe = $item['beneficiario'] ?? $comprador;
             if ($item['producto']->tipo === TipoProducto::AddOn && $this->membresias->paqueteParaExtras($recibe) === null) {
@@ -67,7 +83,7 @@ class OrdenesTenant
             }
         }
 
-        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId): OrdenTenant {
+        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId, $renovacion, $exencionInscripcion, $aceptacion): OrdenTenant {
             $subtotal = 0;
 
             $orden = OrdenTenant::query()->create([
@@ -91,6 +107,9 @@ class OrdenesTenant
                     'cantidad' => $cantidad,
                     'precio_unitario_minor' => $producto->precio_minor,
                     'subtotal_minor' => $lineaSubtotal,
+                    // Las condiciones que aceptó (plan con permanencia; B04).
+                    'condiciones' => $aceptacion === null ? null
+                        : CondicionesDePlan::aceptadas($producto, $aceptacion['via'], $aceptacion['usuario'], $aceptacion['ip']),
                 ]);
             }
 
@@ -102,14 +121,59 @@ class OrdenesTenant
                 $promocionId = $promocion->getKey();
             }
 
+            // Inscripción (B04): al vender un plan que la cobra, si a quien lo recibe le
+            // toca (primera alta o reingreso). Se bloquea a la persona para que dos
+            // ventas a la vez no la cobren dos veces. No la toca la promoción.
+            $cuotas = $renovacion ? 0 : $this->sumarInscripciones($orden, $comprador, $items, $exencionInscripcion);
+
             $orden->update([
-                'total_minor' => $subtotal - $descuento,
+                'total_minor' => $subtotal - $descuento + $cuotas,
                 'descuento_minor' => $descuento,
                 'promocion_id' => $promocionId,
             ]);
 
             return $orden;
         });
+    }
+
+    /**
+     * Suma a la orden la inscripción de cada persona que la deba, si alguno de sus
+     * productos la cobra. Devuelve lo sumado.
+     *
+     * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
+     * @param  array{actor: Usuario|null, motivo: string}|null  $exencion
+     */
+    private function sumarInscripciones(OrdenTenant $orden, PersonaTenant $comprador, array $items, ?array $exencion): int
+    {
+        $personas = [];
+        foreach ($items as $item) {
+            if ($item['producto']->cobra_inscripcion) {
+                $quien = $item['beneficiario'] ?? $comprador;
+                $personas[(int) $quien->getKey()] = $quien;
+            }
+        }
+
+        $total = 0;
+        foreach ($personas as $id => $persona) {
+            PersonaTenant::query()->whereKey($id)->lockForUpdate()->first();
+            if (! $this->cuotas->debeInscripcion($persona)) {
+                continue;
+            }
+            $linea = $this->cuotas->lineaDeInscripcion($persona);
+            if ($exencion !== null) {
+                app(RegistrarAuditoria::class)->registrar($exencion['actor'], 'cuota.exentada', 'orden', (string) $orden->ulid, [
+                    'concepto' => $linea['concepto'],
+                    'monto_minor' => $linea['subtotal_minor'],
+                    'persona_id' => $persona->ulid,
+                ], null, $exencion['motivo'] !== '' ? $exencion['motivo'] : null);
+
+                continue;
+            }
+            $orden->lineas()->create($linea);
+            $total += $linea['subtotal_minor'];
+        }
+
+        return $total;
     }
 
     /**

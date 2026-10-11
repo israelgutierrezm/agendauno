@@ -23,10 +23,36 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
   String? _comprando;
 
   Future<void> _comprar(ProductoComprable p) async {
+    // Permanencia (B04): se leen y se aceptan las condiciones antes de comprar.
+    final condiciones = p.condiciones;
+    if (condiciones != null) {
+      final acepta = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Condiciones del plan'),
+          content: Text(condiciones),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Acepto y compro'),
+            ),
+          ],
+        ),
+      );
+      if (acepta != true || !mounted) {
+        return;
+      }
+    }
     setState(() => _comprando = p.id);
     await hacerConAviso(
       context,
-      () => ref.read(cuentaProvider.notifier).comprar(p.id),
+      () => ref
+          .read(cuentaProvider.notifier)
+          .comprar(p.id, aceptaCondiciones: condiciones != null),
       exito: 'Compra creada. Págala en "Por pagar" para activar tus créditos.',
     );
     if (mounted) {

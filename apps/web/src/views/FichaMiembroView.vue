@@ -6,12 +6,14 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
+import DarDeBajaMembresia from "@/components/DarDeBajaMembresia.vue";
 import ExpedientePersona from "@/components/ExpedientePersona.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import RegistrarPagoOrden, {
+  type CuotaPorCobrar,
   type OrdenPorCobrar,
 } from "@/components/RegistrarPagoOrden.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -64,6 +66,10 @@ interface Derecho {
   // Para pausar/reanudar la membresía a la que pertenece.
   acuerdo_id: string | null;
   pausa_hasta: string | null;
+  // Membresía que se renueva: se puede dar de baja (B04); su baja programada.
+  recurrente?: boolean;
+  permanencia_hasta?: string | null;
+  baja_efectiva_el?: string | null;
 }
 interface Movimiento {
   id: string;
@@ -100,6 +106,8 @@ interface Orden {
   pagada_en: string | null;
   // Qué se pagó y, si es una cita, con quién y cuándo.
   concepto?: string | null;
+  // Sus cuotas (B04), para exentarlas por separado.
+  cuotas?: CuotaPorCobrar[];
   sesion?: {
     profesional: string | null;
     inicia_en: string;
@@ -197,6 +205,7 @@ function abrirCobro(o: Orden): void {
     concepto: o.concepto ?? null,
     total_minor: o.total_minor,
     moneda: o.moneda,
+    cuotas: o.cuotas ?? [],
   };
 }
 async function alRegistrar(aviso: string): Promise<void> {
@@ -278,6 +287,23 @@ async function recargar(d: Derecho): Promise<void> {
   } finally {
     guardandoRecarga.value = false;
   }
+}
+
+// Dar de baja una membresía (B04): con la simulación a la vista.
+const dandoDeBaja = ref<string | null>(null);
+function puedeDarDeBaja(d: Derecho): boolean {
+  return (
+    puedeRecargar.value &&
+    d.acuerdo_id !== null &&
+    d.recurrente === true &&
+    !d.baja_efectiva_el &&
+    d.estado !== "cancelado"
+  );
+}
+async function bajaHecha(aviso: string): Promise<void> {
+  dandoDeBaja.value = null;
+  toast.exito(aviso);
+  await cargar();
 }
 
 // Pausar (congelar) la membresía por vacaciones, lesión, etc.
@@ -960,6 +986,36 @@ const regreso = useRegreso({
                             </button>
                           </div>
                         </form>
+                        <!-- Baja de la membresía (B04) -->
+                        <p
+                          v-if="d.baja_efectiva_el"
+                          class="w-full text-sm"
+                          :style="{ color: 'var(--aviso)' }"
+                          data-prueba="baja-programada"
+                        >
+                          {{
+                            $t("bajaMembresia.programada", {
+                              fecha: fecha(d.baja_efectiva_el),
+                            })
+                          }}
+                        </p>
+                        <button
+                          v-else-if="puedeDarDeBaja(d) && dandoDeBaja !== d.id"
+                          type="button"
+                          class="tu-enlace text-sm"
+                          data-prueba="dar-de-baja-abrir"
+                          @click="dandoDeBaja = d.id"
+                        >
+                          {{ $t("bajaMembresia.dar") }}
+                        </button>
+                        <DarDeBajaMembresia
+                          v-if="dandoDeBaja === d.id && d.acuerdo_id"
+                          :base="base"
+                          :acuerdo-id="d.acuerdo_id"
+                          :producto="d.producto ?? '—'"
+                          @hecho="bajaHecha"
+                          @cerrar="dandoDeBaja = null"
+                        />
                         <form
                           v-if="recargando === d.id"
                           class="flex w-full flex-wrap items-end gap-3 rounded-xl border p-4"

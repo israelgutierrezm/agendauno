@@ -1146,6 +1146,8 @@ export default {
       vence: "Si lo pagas hoy, se puede usar hasta el {fecha}",
       renueva: "Se renueva cada mes mientras la pagues",
       loQuiero: "Lo quiero",
+      permanencia:
+        "Permanencia mínima de 1 mes | Permanencia mínima de {n} meses",
       grupos: {
         primera_vez: "Para tu primera vez",
         sesion_individual: "Clase suelta",
@@ -1526,6 +1528,10 @@ export default {
       comprada: "Comprada el {fecha}",
       registrar: "Registrar pago",
       registrarTitulo: "Registrar pago",
+      // Exentar una cuota por cobrar (B04).
+      exentar: "Exentar",
+      exentadaTodo:
+        "Se exentó «{cuota}»: ya no hay nada por cobrar en esa orden.",
       referencia: "Referencia (opcional)",
       registrado: "Pago de {nombre} registrado: {monto}.",
     },
@@ -1655,6 +1661,11 @@ export default {
       promoPlaceholder: "CUPÓN",
       promoAplicar: "Aplicar",
       promoDescuento: "Descuento {monto}",
+      // Inscripción (B04): se suma si es su alta o regresa tras un tiempo sin plan.
+      inscripcion: "Inscripción (no da clases)",
+      exentarInscripcion: "Exentar la inscripción",
+      motivoExencion: "Por qué se exenta",
+      aceptaCondiciones: "El cliente leyó y aceptó estas condiciones",
       promoTotal: "Total {monto}",
     },
     metodos: {
@@ -2854,6 +2865,8 @@ export default {
       destacado: "Recomendado",
       primeraVez: "Para tu primera vez",
       vence: "Si la pagas hoy, se puede usar hasta el {fecha}.",
+      masInscripcion: "Más {monto} de inscripción (no da clases).",
+      aceptoCondiciones: "Leí y acepto estas condiciones",
       creditos: "1 crédito | {n} créditos",
       tipos: {
         membresia: "Membresía",
