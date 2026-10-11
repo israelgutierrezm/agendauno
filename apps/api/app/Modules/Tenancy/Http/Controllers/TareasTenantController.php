@@ -6,12 +6,14 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
 use App\Modules\Tenancy\Automatizacion\EstadoTarea;
+use App\Modules\Tenancy\Automatizacion\ResultadoSeguimiento;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 
 /**
  * Bandeja de tareas de seguimiento del estudio, tenant-local (R16): pendientes
@@ -39,6 +41,10 @@ class TareasTenantController
         $q = trim((string) $request->query('q', ''));
         if ($q !== '') {
             $consulta->where('titulo', 'like', "%{$q}%");
+        }
+        // Solo los seguimientos (M09): las que tienen un motivo.
+        if ($request->query('tipo') === 'seguimiento') {
+            $consulta->whereNotNull('motivo');
         }
 
         $tareas = $consulta
@@ -100,6 +106,27 @@ class TareasTenantController
         return response()->json(['data' => $this->presentar($tarea->fresh(['persona', 'responsable']) ?? $tarea)]);
     }
 
+    /**
+     * Con qué terminó un seguimiento (M09): lo cierra y, si no desea contacto, deja de
+     * recibir promociones.
+     */
+    public function resultado(Request $request): JsonResponse
+    {
+        $tarea = $this->resolver($request);
+        $validado = $request->validate([
+            'resultado' => ['required', Rule::enum(ResultadoSeguimiento::class)],
+            'nota' => ['nullable', 'string', 'max:500'],
+        ]);
+        $tarea = $this->tareas->registrarResultado(
+            $tarea,
+            ResultadoSeguimiento::from((string) $validado['resultado']),
+            $validado['nota'] ?? null,
+            $this->actor($request),
+        );
+
+        return response()->json(['data' => $this->presentar($tarea->fresh(['persona', 'responsable']) ?? $tarea)]);
+    }
+
     private function resolver(Request $request): TareaTenant
     {
         $tarea = TareaTenant::query()->where('ulid', (string) $request->route('tarea'))->firstOrFail();
@@ -138,6 +165,12 @@ class TareasTenantController
             'estado' => $tarea->estado->value,
             'vence_en' => $tarea->vence_en?->toIso8601String(),
             'persona' => $tarea->persona?->nombreCompleto(),
+            // Para ir a su ficha y escribirle (seguimiento; M09).
+            'persona_id' => $tarea->persona?->ulid,
+            'celular' => $tarea->persona?->celular,
+            'motivo' => $tarea->motivo?->value,
+            'resultado' => $tarea->resultado?->value,
+            'contactado_en' => $tarea->contactado_en?->toIso8601String(),
             'responsable' => $tarea->responsable?->name,
             'automatica' => $tarea->regla_id !== null,
             'completada_en' => $tarea->completada_en?->toIso8601String(),

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import EmbudoNegocio, { type Embudo } from "@/components/EmbudoNegocio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -198,6 +199,7 @@ const tendencias = ref<Tendencias | null>(null);
 const agrupacion = ref<"dia" | "semana" | "mes">("dia");
 const exportando = ref(false);
 const cohortes = ref<Cohortes | null>(null);
+const embudo = ref<Embudo | null>(null);
 // Porcentaje de cada origen sobre quienes dijeron cómo nos conocieron.
 function pctOrigen(total: number): string {
   const conDato = (cohortes.value?.origenes ?? []).reduce(
@@ -484,6 +486,19 @@ async function cargarCohortes(): Promise<void> {
   }
 }
 
+async function cargarEmbudo(): Promise<void> {
+  error.value = null;
+  try {
+    const { data } = await api.get<{ data: Embudo }>(
+      `${base.value}/reportes/embudo`,
+      { params: { desde: desde.value, hasta: hasta.value } },
+    );
+    embudo.value = data.data;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+
 async function cargarSucursales(): Promise<void> {
   const s = await api.get<{ data: ReporteSucursales }>(
     `${base.value}/reportes/sucursales`,
@@ -500,6 +515,7 @@ const CARGAS: Record<Pestana, () => Promise<unknown>[]> = {
   ingresos: () => [cargarTendencias(), cargarRentabilidad()],
   ocupacion: () => [cargarDemanda()],
   clientes: () => [cargarCohortes()],
+  embudo: () => [cargarEmbudo()],
   equipo: () => [cargarEquipo(), cargarSucursales()],
 };
 const cargadas = new Set<Pestana>();
@@ -526,15 +542,17 @@ async function cargar(): Promise<void> {
  * El selector de periodo solo aparece donde cuenta, y cada sección dice de qué son
  * sus cifras.
  */
-type Pestana = "resumen" | "ingresos" | "ocupacion" | "clientes" | "equipo";
+type Pestana =
+  "resumen" | "ingresos" | "ocupacion" | "clientes" | "embudo" | "equipo";
 const PESTANAS: Pestana[] = [
   "resumen",
   "ingresos",
   "ocupacion",
   "clientes",
+  "embudo",
   "equipo",
 ];
-// Ingresos, ocupación y clientes son reportes avanzados: en citas, del plan Pro
+// Ingresos, ocupación, clientes y el embudo son reportes avanzados: en citas, del plan Pro
 // (ADR 0107; el servidor ya los niega).
 const pestanas = computed<Pestana[]>(() =>
   sesion.estudio?.plan?.sin.includes("reportes_avanzados") === true
@@ -547,6 +565,7 @@ const usaPeriodo = computed(
     pestana.value === "resumen" ||
     pestana.value === "ingresos" ||
     pestana.value === "ocupacion" ||
+    pestana.value === "embudo" ||
     pestana.value === "equipo",
 );
 const periodoTexto = computed(() => {
@@ -569,7 +588,13 @@ function esteMes(): void {
 
 // Otro periodo: lo que dependía de él se vuelve a pedir (Clientes, no).
 watch([desde, hasta], () => {
-  for (const p of ["resumen", "ingresos", "ocupacion", "equipo"] as const) {
+  for (const p of [
+    "resumen",
+    "ingresos",
+    "ocupacion",
+    "embudo",
+    "equipo",
+  ] as const) {
     cargadas.delete(p);
   }
   void cargar();
@@ -1092,6 +1117,13 @@ onMounted(cargar);
           {{ $t("reportes.cohortes.leyenda") }}
         </p>
       </template>
+
+      <!-- Embudo del negocio (C08) -->
+      <EmbudoNegocio
+        v-if="pestana === 'embudo' && embudo"
+        :embudo="embudo"
+        :citas="porAgenda"
+      />
 
       <!-- Por sucursal -->
       <!-- Agenda del equipo (ADR 0081) -->

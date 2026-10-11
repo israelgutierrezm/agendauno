@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Automatizacion\EstadoTarea;
+use App\Modules\Tenancy\Automatizacion\MotivoSeguimiento;
+use App\Modules\Tenancy\Automatizacion\ResultadoSeguimiento;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $responsable_id
  * @property int|null $regla_id
  * @property int|null $completada_por
+ * @property MotivoSeguimiento|null $motivo por qué existe, si es un seguimiento (M09)
+ * @property ResultadoSeguimiento|null $resultado con qué terminó el contacto (M09)
  */
 class TareaTenant extends Model
 {
@@ -30,6 +34,7 @@ class TareaTenant extends Model
     protected $fillable = [
         'titulo', 'detalle', 'persona_id', 'responsable_id', 'regla_id', 'evento_ulid',
         'vence_en', 'estado', 'completada_en', 'completada_por',
+        'motivo', 'resultado', 'contactado_en',
     ];
 
     /**
@@ -39,6 +44,9 @@ class TareaTenant extends Model
         'estado' => EstadoTarea::class,
         'vence_en' => 'datetime',
         'completada_en' => 'datetime',
+        'motivo' => MotivoSeguimiento::class,
+        'resultado' => ResultadoSeguimiento::class,
+        'contactado_en' => 'datetime',
     ];
 
     /**
