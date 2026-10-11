@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
 use App\Modules\Tenancy\Application\PresupuestosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Exceptions\PresupuestoNoPermitido;
@@ -144,7 +145,9 @@ class PresupuestosTenantController
         return response()->json(['data' => [
             'servicios' => OfertaTenant::query()->orderBy('nombre')->get()
                 ->map(fn (OfertaTenant $o): array => ['id' => $o->ulid, 'nombre' => $o->nombre, 'precio_minor' => (int) $o->precio_clase_minor, 'duracion_minutos' => $o->duracion_minutos])->all(),
-            'productos' => ProductoTenant::query()->where('archivado', false)->orderBy('nombre')->get()
+            // Bonos y paquetes: en citas no hay membresías (ADR 0130).
+            'productos' => app(MembresiasPorModalidadTenant::class)
+                ->vendibles(ProductoTenant::query()->where('archivado', false))->orderBy('nombre')->get()
                 ->map(fn (ProductoTenant $p): array => ['id' => $p->ulid, 'nombre' => $p->nombre, 'precio_minor' => (int) $p->precio_minor])->all(),
             'articulos' => ArticuloTenant::query()->where('activo', true)->orderBy('nombre')->get()
                 ->map(fn (ArticuloTenant $a): array => ['id' => $a->ulid, 'nombre' => $a->nombre, 'precio_minor' => (int) $a->precio_minor])->all(),

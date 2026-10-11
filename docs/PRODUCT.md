@@ -31,8 +31,8 @@ que el negocio opere. La modalidad decide qué flujos existen (el servidor niega
 la otra), cómo se ve el panel y cómo se cobra el SaaS.
 
 Lo que comparten las dos es el núcleo: clientes, equipo, sucursales, recursos,
-agenda, reservas, asistencia, cancelaciones y comercio. Las membresías y los bonos
-también se venden en citas (ADR 0091).
+agenda, reservas, asistencia, cancelaciones y comercio. En citas se venden bonos de
+sesiones (ADR 0091), no membresías ni planes que se renuevan (ADR 0130).
 
 ## Cobro del SaaS
 

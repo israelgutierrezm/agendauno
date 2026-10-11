@@ -77,6 +77,32 @@ class ProductoTenant extends Model
     ];
 
     /**
+     * ¿Es (o funciona como) una membresía? Una membresía, o un plan que se renueva, es
+     * ilimitado, tiene permanencia o cobra inscripción o anualidad. Los negocios de citas
+     * no las venden: venden bonos de sesiones (ADR 0130).
+     *
+     * @param  array<string, mixed>  $atributos  los del producto (enums o sus valores)
+     */
+    public static function esMembresiaSegun(array $atributos): bool
+    {
+        $tipo = $atributos['tipo'] ?? null;
+        $reset = $atributos['politica_reset'] ?? null;
+        $reset = $reset instanceof PoliticaReset ? $reset : PoliticaReset::tryFrom((string) $reset);
+
+        return ($tipo instanceof TipoProducto ? $tipo : TipoProducto::tryFrom((string) $tipo)) === TipoProducto::Membresia
+            || ($reset !== null && $reset !== PoliticaReset::Ninguno)
+            || (bool) ($atributos['ilimitado'] ?? false)
+            || (int) ($atributos['permanencia_meses'] ?? 0) > 0
+            || (bool) ($atributos['cobra_inscripcion'] ?? false)
+            || (bool) ($atributos['cobra_anualidad'] ?? false);
+    }
+
+    public function esMembresia(): bool
+    {
+        return self::esMembresiaSegun($this->only(['tipo', 'politica_reset', 'ilimitado', 'permanencia_meses', 'cobra_inscripcion', 'cobra_anualidad']));
+    }
+
+    /**
      * @return BelongsTo<ActividadTenant, $this>
      */
     public function actividad(): BelongsTo

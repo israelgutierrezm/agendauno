@@ -245,6 +245,15 @@ La primera vez que uses el script, la versión en marcha aún no tiene
 `agendauno:respaldar-plataforma`: respalda MySQL con la herramienta del proveedor y corre
 `SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
 
+**Una sola vez, al desplegar el ADR 0130 (TurnoUno sin membresías):** revisa qué
+membresías tienen los negocios de citas y retíralas (ya no se venden; las vendidas
+terminan en su fecha, sin renovarse ni cobrarse solas):
+
+```bash
+docker compose --env-file web.env exec -u www-data api php artisan agendauno:retirar-membresias-citas --simular
+docker compose --env-file web.env exec -u www-data api php artisan agendauno:retirar-membresias-citas
+```
+
 ### Imágenes del CI y despliegue desde GitHub
 
 Con `REGISTRO=ghcr.io/<dueño>` en `web.env` (y `docker login ghcr.io` con un token de

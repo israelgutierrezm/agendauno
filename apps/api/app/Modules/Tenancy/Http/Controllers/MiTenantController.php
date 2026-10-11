@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
@@ -216,10 +217,10 @@ class MiTenantController
             'pago_en_linea' => $this->pasarelas->enLinea() !== null,
             // La pasarela está en pruebas: se le dice que no se cobra de verdad (M07).
             'pago_en_linea_prueba' => $this->pasarelas->enPrueba(),
-            // La pasarela admite pago automático (domiciliar membresías al pagarlas) y el
-            // plan del negocio lo incluye (ADR 0107).
+            // La pasarela admite pago automático (domiciliar membresías al pagarlas). En
+            // citas no: no hay nada que se renueve (ADR 0130).
             'pago_automatico' => $this->domiciliaciones->proveedor() !== null
-                && app(FuncionesPlan::class)->tiene($this->estudioDe($request), 'cobro_automatico'),
+                && ! app(MembresiasPorModalidadTenant::class)->enCitas(),
             'derechos' => $derechos,
             'reservas' => $reservas,
             // Qué partes de su cuenta le sirven y su asistencia reciente (ADR 0091).
@@ -848,7 +849,10 @@ class MiTenantController
         if (! app(FuncionesPlan::class)->tiene($this->estudioDe($request), 'venta_en_linea')) {
             return response()->json(['data' => []]);
         }
-        $productos = ProductoTenant::query()->with('actividad')->where('archivado', false)->orderBy('precio_minor')->get();
+        // En citas, sin membresías (ADR 0130).
+        $productos = app(MembresiasPorModalidadTenant::class)
+            ->vendibles(ProductoTenant::query()->with('actividad')->where('archivado', false))
+            ->orderBy('precio_minor')->get();
         // La clase de prueba solo se ofrece a quien nunca vino (B03).
         $persona = $this->persona($request);
         $primeraVez = $persona instanceof PersonaTenant && app(PrimeraVezTenant::class)->elegible($persona);
@@ -1029,11 +1033,9 @@ class MiTenantController
         // Por una persona a cargo, el responsable la paga con su tarjeta: es el comprador
         // y la pasarela la guarda a su nombre (ADR 0129).
         $domiciliar = $request->boolean('domiciliar');
-        if ($domiciliar) {
-            // Es del plan Pro (ADR 0107); pagar sin él sigue igual.
-            app(FuncionesPlan::class)->exigir($this->estudioDe($request), 'cobro_automatico');
-        }
-        if ($domiciliar && ($this->domiciliaciones->proveedor() !== $validado['proveedor'] || ! self::seRenueva($orden))) {
+        // En citas no hay nada que se renueve (ADR 0130).
+        if ($domiciliar && ($this->domiciliaciones->proveedor() !== $validado['proveedor'] || ! self::seRenueva($orden)
+            || app(MembresiasPorModalidadTenant::class)->enCitas())) {
             throw ValidationException::withMessages([
                 'domiciliar' => ['Esta compra no admite pago automático.'],
             ]);

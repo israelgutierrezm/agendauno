@@ -28,15 +28,14 @@ class PagosTab extends ConsumerWidget {
         else
           for (final o in cuenta.porPagar)
             PorPagarTile(o, pagoEnLinea: cuenta.pagoEnLinea),
-        // Comprar un paquete o membresía: crea la orden y queda en "Por pagar".
+        // Comprar un plan (en citas, un bono): crea la orden y queda en "Por pagar".
         const ComprarPlanesSeccion(),
         // El corte de cada plan: qué incluía, cómo lo usó y lo que le queda.
         const TituloSeccion('Mis planes'),
         const CortePlanesSeccion(),
-        // Si el negocio lo ofrece y su plan lo incluye (ADR 0107).
+        // Si el negocio lo ofrece; en citas no hay nada que se renueve (ADR 0130).
         if (cuenta.pagoAutomatico &&
-            (ref.watch(sesionProvider)?.tieneFuncion('cobro_automatico') ??
-                true)) ...[
+            !(ref.watch(sesionProvider)?.esCitas ?? false)) ...[
           const TituloSeccion('Pago automático'),
           Card(
             child: ListTile(

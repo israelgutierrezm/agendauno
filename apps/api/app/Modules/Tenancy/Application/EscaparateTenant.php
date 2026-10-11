@@ -250,6 +250,8 @@ class EscaparateTenant
         return ProductoTenant::query()
             ->with('actividad')
             ->where('archivado', false)
+            // En citas, sin membresías (ADR 0130).
+            ->tap(fn ($q) => app(MembresiasPorModalidadTenant::class)->vendibles($q))
             ->orderBy('precio_minor')
             ->get()
             ->map(static fn (ProductoTenant $p): array => [

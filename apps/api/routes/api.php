@@ -413,7 +413,7 @@ Route::prefix('v1')->group(function (): void {
             // quitar o cambiar la tarjeta (se autoriza en la página de la pasarela).
             Route::get('/mi/pago-automatico', [MiPagoAutomaticoTenantController::class, 'mostrar'])->name('mi.pago-automatico');
             Route::post('/mi/pago-automatico/tarjeta', [MiPagoAutomaticoTenantController::class, 'cambiarTarjeta'])->middleware('throttle:login')->name('mi.pago-automatico.tarjeta');
-            Route::post('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'activar'])->middleware(['throttle:login', 'plan:cobro_automatico'])->name('mi.pago-automatico.activar');
+            Route::post('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'activar'])->middleware('throttle:login')->name('mi.pago-automatico.activar');
             Route::delete('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'desactivar'])->name('mi.pago-automatico.desactivar');
 
             // Invitación de personal (crea usuario tenant-local con rol + activación).
@@ -732,11 +732,12 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/productos', [MembresiasTenantController::class, 'crearProducto'])->middleware(['puede:productos.gestionar', 'plan:paquetes'])->name('productos.store');
             // Editor completo de membresías (Etapa 2): editar plantilla / archivar-reactivar.
             Route::put('/productos/{producto}', [MembresiasTenantController::class, 'actualizarProducto'])->middleware('puede:productos.gestionar')->name('productos.update');
-            // Cuotas del negocio (B04): inscripción y anualidad; exentar una por cobrar.
-            Route::get('/cuotas', [CuotasTenantController::class, 'mostrar'])->middleware('puede:productos.ver')->name('cuotas.show');
-            Route::put('/cuotas', [CuotasTenantController::class, 'guardar'])->middleware('puede:productos.gestionar')->name('cuotas.update');
-            Route::post('/ordenes/{orden}/lineas/{linea}/exentar', [CuotasTenantController::class, 'exentar'])->middleware('puede:cuotas.exentar')->name('ordenes.lineas.exentar');
-            Route::get('/miembros/{persona}/cuotas', [CuotasTenantController::class, 'dePersona'])->middleware('puede:ordenes.gestionar')->name('miembros.cuotas');
+            // Cuotas del negocio (B04): inscripción y anualidad; exentar una por cobrar. Son
+            // de las membresías: solo en clases (ADR 0130).
+            Route::get('/cuotas', [CuotasTenantController::class, 'mostrar'])->middleware(['puede:productos.ver', 'modalidad:clases'])->name('cuotas.show');
+            Route::put('/cuotas', [CuotasTenantController::class, 'guardar'])->middleware(['puede:productos.gestionar', 'modalidad:clases'])->name('cuotas.update');
+            Route::post('/ordenes/{orden}/lineas/{linea}/exentar', [CuotasTenantController::class, 'exentar'])->middleware(['puede:cuotas.exentar', 'modalidad:clases'])->name('ordenes.lineas.exentar');
+            Route::get('/miembros/{persona}/cuotas', [CuotasTenantController::class, 'dePersona'])->middleware(['puede:ordenes.gestionar', 'modalidad:clases'])->name('miembros.cuotas');
             // Familias y responsables (B05, ADR 0123).
             Route::get('/familias', [FamiliasTenantController::class, 'configuracion'])->middleware(['puede:miembros.ver', 'modulo:familias'])->name('familias.show');
             Route::put('/familias', [FamiliasTenantController::class, 'guardarConfiguracion'])->middleware(['puede:estudio.gestionar', 'modulo:familias'])->name('familias.update');
@@ -864,7 +865,7 @@ Route::prefix('v1')->group(function (): void {
             // Suscripciones recurrentes: próximas renovaciones que cobrará el scheduler (Etapa 2).
             Route::get('/suscripciones', [SuscripcionesTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('suscripciones.index');
             // Pago automático: invitar al alumno a activarlo (correo) o quitarlo a petición suya.
-            Route::post('/suscripciones/{acuerdo}/pago-automatico/solicitar', [SuscripcionesTenantController::class, 'solicitarPagoAutomatico'])->middleware(['puede:ordenes.gestionar', 'throttle:login', 'plan:cobro_automatico'])->name('suscripciones.pago-automatico.solicitar');
+            Route::post('/suscripciones/{acuerdo}/pago-automatico/solicitar', [SuscripcionesTenantController::class, 'solicitarPagoAutomatico'])->middleware(['puede:ordenes.gestionar', 'throttle:login'])->name('suscripciones.pago-automatico.solicitar');
             Route::delete('/suscripciones/{acuerdo}/pago-automatico', [SuscripcionesTenantController::class, 'quitarPagoAutomatico'])->middleware('puede:ordenes.gestionar')->name('suscripciones.pago-automatico.quitar');
             // Corregir la forma de pago de un cobro en caja (ADR 0086): quien cobra en caja.
             Route::put('/pagos/{pago}/metodo', [PagosTenantController::class, 'corregirMetodo'])->middleware('puede:ordenes.gestionar')->name('pagos.metodo.update');

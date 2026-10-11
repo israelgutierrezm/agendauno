@@ -105,6 +105,11 @@ function rutasExclusivasPorModalidad(): array
         'presupuestos.aceptar' => 'citas',
         'presupuestos.rechazar' => 'citas',
         'presupuestos.convertir' => 'citas',
+        // Cuotas de las membresías (ADR 0130).
+        'cuotas.show' => 'clases',
+        'cuotas.update' => 'clases',
+        'ordenes.lineas.exentar' => 'clases',
+        'miembros.cuotas' => 'clases',
     ];
 }
 
@@ -131,6 +136,8 @@ function patronesDeRutasExclusivas(): array
         '/^horarios-atencion\./' => 'citas',
         // Presupuestos (ADR 0127).
         '/^presupuestos\./' => 'citas',
+        // Cuotas de las membresías (ADR 0130).
+        '/cuotas/' => 'clases',
         '/^disponibilidad\./' => 'citas',
     ];
 }

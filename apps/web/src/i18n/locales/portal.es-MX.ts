@@ -73,7 +73,7 @@ export default {
       misCitas: "Mis citas",
       cambiarCancelar: "Cambiar o cancelar",
       volverAgendar: "Volver a agendar",
-      bono: "Mi bono o membresía",
+      bono: "Mi bono",
       vence: "{valor} · vence el {fecha}",
       // Clases: su asistencia reciente.
       asistencia: "Mi asistencia",

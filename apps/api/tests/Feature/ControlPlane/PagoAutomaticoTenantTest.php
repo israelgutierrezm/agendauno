@@ -380,27 +380,29 @@ it('con el aviso de Stripe la sesión queda resuelta y una que venció se deja d
         ->toBe(['completada', 'expirada']);
 });
 
-it('sin pago automático en el plan (citas en Premium) no se ofrece, no se activa al pagar y la renovación no va a la tarjeta', function (): void {
+it('en un negocio de citas no hay pago automático: no se ofrece, no se activa al pagar y la membresía que traía termina sin cobrarse', function (): void {
     $m = alumnoConMembresia();
     autorizarTarjeta($m);
     $orden = (string) $this->postJson("/api/v1/app/{$m['slug']}/mi/ordenes", [
         'items' => [['producto_id' => $m['producto'], 'cantidad' => 1]],
     ], conBearer($m['alumno']))->assertCreated()->json('data.id');
-    // El negocio es de citas y quedó en Premium (ADR 0107): el pago automático es de Pro.
+    // El negocio pasa a citas: vende bonos, nada se renueva (ADR 0130).
     pasarNegocioACitas($m);
-    terminarPrueba($m);
-    Estudio::query()->where('slug', $m['slug'])->update(['plan_nivel' => 'premium', 'plan_profesionales' => 2]);
 
+    $this->getJson("/api/v1/app/{$m['slug']}/mi/perfil", conBearer($m['alumno']))->assertOk()->assertJsonPath('data.pago_automatico', false);
     $this->postJson("/api/v1/app/{$m['slug']}/suscripciones/{$m['acuerdo']}/pago-automatico/solicitar", [], conBearer($m['bearer']))
-        ->assertStatus(403)->assertJsonPath('meta.funcion', 'cobro_automatico');
+        ->assertStatus(422)->assertJsonPath('code', 'DIRECT_DEBIT_NOT_ALLOWED');
+    $this->postJson("/api/v1/app/{$m['slug']}/mi/pago-automatico/{$m['acuerdo']}", [], conBearer($m['alumno']))
+        ->assertStatus(422)->assertJsonPath('code', 'DIRECT_DEBIT_NOT_ALLOWED');
     $this->postJson("/api/v1/app/{$m['slug']}/mi/ordenes/{$orden}/cobrar", ['domiciliar' => true], conBearer($m['alumno']))
-        ->assertStatus(403)->assertJsonPath('code', 'PLAN_FEATURE_NOT_INCLUDED')->assertJsonPath('meta.funcion', 'cobro_automatico');
+        ->assertUnprocessable()->assertJsonPath('meta.errors.domiciliar.0', 'Esta compra no admite pago automático.');
     // Pagar sin él, sí.
     $this->postJson("/api/v1/app/{$m['slug']}/mi/ordenes/{$orden}/cobrar", [], conBearer($m['alumno']))
         ->assertSuccessful()->assertJsonPath('data.estado', 'pendiente');
 
-    // La tarjeta que autorizó en la prueba ya no se cobra sola: se le avisa para pagar.
-    expect(renovarHoy($m))->toBe('pendiente')
+    // La tarjeta que autorizó ya no se cobra: la membresía termina en su fecha.
+    expect(renovarHoy($m))->toBe('omitido')
         ->and($this->stripe->cargos)->toBe(0);
     Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), '/payment_intents'));
+    expect(enEstudioPago($m, fn () => DomiciliacionTenant::query()->where('estado', DomiciliacionTenant::ACTIVA)->count()))->toBe(0);
 });

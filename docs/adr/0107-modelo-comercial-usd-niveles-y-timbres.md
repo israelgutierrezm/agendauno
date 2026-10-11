@@ -79,9 +79,9 @@ Pago y OpenPay para la renta quedan pendientes. Hasta ahora:
 | Agenda y citas, app, recordatorios por correo y app, página con URL propia, agendar sin cuenta | ✓ | ✓ | ✓ |
 | Pagar al agendar en línea y cobro en caja; clientes, reseñas y reportes básicos | ✓ | ✓ | ✓ |
 | Equipo (quien no atiende), varias sucursales, cabinas y recursos | — | ✓ | ✓ |
-| Paquetes y membresías, mostrador e inventario, comisiones y nómina, promociones | — | ✓ | ✓ |
+| Bonos de sesiones (antes «paquetes y membresías», ADR 0130), mostrador e inventario, comisiones y nómina, promociones | — | ✓ | ✓ |
 | Documentos y consentimientos (el aviso de privacidad del negocio, en todos) | — | ✓ | ✓ |
-| Facturación electrónica (timbres), pago automático de membresías, venta en línea de paquetes | — | — | ✓ |
+| Facturación electrónica (timbres), venta en línea de bonos (el pago automático de membresías salió con el ADR 0130) | — | — | ✓ |
 | Formularios, lealtad, mensajes masivos y plantillas | — | — | ✓ |
 | Integraciones, llaves de API y webhooks, roles propios, reportes avanzados | — | — | ✓ |
 

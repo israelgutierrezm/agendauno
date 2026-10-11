@@ -344,6 +344,18 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## TurnoUno sin membresías (ADR 0130)
+
+- En un negocio de citas, crear, editar, vender u ofrecer algo que funcione como
+  membresía responde 422 `MEMBERSHIP_NOT_AVAILABLE`: tipo `membresia`, que se renueve
+  (`politica_reset`), ilimitado, con permanencia o con inscripción o anualidad. Se
+  vende el bono de sesiones (`tipo: paquete`).
+- `/mi/productos`, el escaparate y el catálogo de presupuestos no listan membresías
+  en citas.
+- Pago automático en citas: 422 `DIRECT_DEBIT_NOT_ALLOWED`; `/mi/perfil` trae
+  `pago_automatico: false`.
+- `/cuotas`, `/miembros/{persona}/cuotas` y exentar una cuota son `modalidad:clases`.
+
 ## Presupuestos (negocios de citas, ADR 0127)
 
 - `GET /presupuestos?estado=&q=` (`presupuestos.ver`; `estado` admite `vencido`) y

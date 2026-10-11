@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
@@ -46,6 +47,7 @@ class MembresiasTenantController
         private readonly MembresiasTenant $membresias,
         private readonly LibroMayorTenant $libro,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly MembresiasPorModalidadTenant $modalidades,
     ) {}
 
     public function productos(Request $request): JsonResponse
@@ -95,6 +97,8 @@ class MembresiasTenantController
             'cobra_anualidad' => ['sometimes', 'boolean'],
             ...self::reglasPermanencia(),
         ]);
+        // Un negocio de citas vende bonos de sesiones, no membresías (ADR 0130).
+        $this->modalidades->exigirAtributos($validado);
 
         $producto = $this->membresias->crearProducto(
             $validado['nombre'],
@@ -208,6 +212,12 @@ class MembresiasTenantController
             $atributos['sucursales_ids'] = isset($validado['sucursal_ids']) ? $this->sucursalesDe($validado['sucursal_ids']) : null;
         }
 
+        // Como queda: en citas no puede quedar a la venta como membresía (ADR 0130).
+        $this->modalidades->exigirAtributos([
+            ...$producto->only(['tipo', 'politica_reset', 'ilimitado', 'permanencia_meses', 'cobra_inscripcion', 'cobra_anualidad', 'archivado']),
+            ...$atributos,
+        ]);
+
         $antes = $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado', 'actividad_id', 'sucursal_id', 'sucursales_ids']);
         $this->membresias->actualizarProducto(
             $producto,
@@ -238,6 +248,7 @@ class MembresiasTenantController
 
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
         $producto = ProductoTenant::query()->where('ulid', $validado['producto_id'])->firstOrFail();
+        $this->modalidades->exigirQueSeVenda($producto);
 
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;

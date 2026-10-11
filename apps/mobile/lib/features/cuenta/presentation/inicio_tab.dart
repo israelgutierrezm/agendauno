@@ -221,7 +221,7 @@ class InicioTab extends ConsumerWidget {
             plan: (usa?.creditos ?? tienePlan) && (tienePlan || !esCitas)
                 ? TarjetaAcceso(
                     icono: Icons.local_offer_outlined,
-                    titulo: esCitas ? 'Mi bono o membresía' : 'Mis créditos',
+                    titulo: esCitas ? 'Mi bono' : 'Mis créditos',
                     tono: TonosAcceso.creditos,
                     valor: vence != null && tienePlan
                         ? '$creditos · vence el ${Formato.diaMes(vence)}'

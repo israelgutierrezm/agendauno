@@ -44,6 +44,10 @@ class AvisarRenovacionesTenant
 
     public function ejecutar(?CarbonImmutable $hoy = null): int
     {
+        // Un negocio de citas no tiene membresías que se renueven (ADR 0130).
+        if (app(MembresiasPorModalidadTenant::class)->enCitas()) {
+            return 0;
+        }
         $hoy = ($hoy ?? app(FechasNegocioTenant::class)->dia())->startOfDay();
         $enLinea = $this->pasarelas->enLinea() !== null;
         $avisados = 0;

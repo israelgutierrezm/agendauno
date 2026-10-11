@@ -51,6 +51,10 @@ Cada modalidad tiene sus propios indicadores; no son los mismos con otro nombre.
 
 ### Servicios, combos, bonos y membresías en citas
 
+> **Reemplazado en parte por el ADR 0130 (2026-10-11):** los negocios de citas ya no
+> venden membresías ni planes que se renuevan; venden bonos de sesiones. Lo de abajo
+> sobre membresías en citas queda como historia.
+
 En citas se separan cuatro cosas:
 
 - **Servicio:** una atención, como un corte de cabello. Se da de alta en Catálogo,

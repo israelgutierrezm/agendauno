@@ -123,12 +123,17 @@ const indicadores = computed<Indicador[]>(() => {
       valor: String(aLaVenta.length),
       icono: "etiqueta",
     },
-    {
-      clave: "membresias",
-      etiqueta: t("planes.secciones.membresia"),
-      valor: String(contar("membresia")),
-      icono: "reloj",
-    },
+    // Los negocios de citas no tienen membresías (ADR 0130).
+    ...(sesion.esCitas
+      ? []
+      : [
+          {
+            clave: "membresias",
+            etiqueta: t("planes.secciones.membresia"),
+            valor: String(contar("membresia")),
+            icono: "reloj",
+          },
+        ]),
     {
       clave: "paquetes",
       etiqueta: nombreSeccion("paquete"),

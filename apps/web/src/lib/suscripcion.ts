@@ -61,7 +61,6 @@ export type FuncionPlan =
   | "promociones"
   | "documentos"
   | "facturacion"
-  | "cobro_automatico"
   | "venta_en_linea"
   | "formularios"
   | "lealtad"
@@ -91,14 +90,13 @@ export const ETIQUETAS_FUNCION: Record<FuncionPlan, string> = {
   equipo: "Equipo y roles",
   sucursales: "Varias sucursales",
   recursos: "Cabinas y recursos",
-  paquetes: "Paquetes y membresías",
+  paquetes: "Bonos de sesiones",
   promociones: "Promociones",
   inventario: "Mostrador e inventario",
   comisiones: "Comisiones y nómina",
   documentos: "Documentos y consentimientos",
   facturacion: "Facturación electrónica*",
-  cobro_automatico: "Cobro automático de membresías*",
-  venta_en_linea: "Venta en línea de paquetes*",
+  venta_en_linea: "Venta en línea de bonos*",
   formularios: "Formularios personalizables",
   lealtad: "Programa de lealtad",
   mensajes: "Mensajes masivos por correo",
@@ -121,7 +119,6 @@ export const NIVEL_POR_OMISION: Record<FuncionPlan, NivelPlan> = {
   comisiones: "premium",
   documentos: "premium",
   facturacion: "pro",
-  cobro_automatico: "pro",
   venta_en_linea: "pro",
   formularios: "pro",
   lealtad: "pro",

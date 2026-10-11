@@ -36,6 +36,7 @@ class OrdenesTenant
         private readonly CobrarOrdenTenant $cobrar,
         private readonly MembresiasTenant $membresias,
         private readonly CuotasTenant $cuotas,
+        private readonly MembresiasPorModalidadTenant $modalidades,
     ) {}
 
     /**
@@ -61,6 +62,9 @@ class OrdenesTenant
         foreach ($items as $item) {
             if (! $renovacion && $item['producto']->archivado) {
                 throw new ProductoArchivado("«{$item['producto']->nombre}» ya no está a la venta.");
+            }
+            if (! $renovacion) {
+                $this->modalidades->exigirQueSeVenda($item['producto']);
             }
             // Clase de prueba (B03): una sola, para quien nunca vino.
             if (! $renovacion && $item['producto']->primera_vez) {

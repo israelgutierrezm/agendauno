@@ -36,7 +36,7 @@ it('siembra la barbería con citas, bonos que se descuentan y datos en cada apar
         ->and($resultado['estudio']->modalidad()->value)->toBe('citas');
 
     app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'barberia')->sole(), function (): void {
-        // El bono y la membresía se venden en caja y sus cortes se descuentan al agendar.
+        // Los bonos se venden en caja y sus cortes se descuentan al agendar.
         $jorge = PersonaTenant::query()->where('email', 'jorge.pineda@correo.test')->sole();
         expect(AcuerdoTenant::query()->where('persona_id', $jorge->getKey())->exists())->toBeTrue()
             // Y siempre tiene su siguiente cita.

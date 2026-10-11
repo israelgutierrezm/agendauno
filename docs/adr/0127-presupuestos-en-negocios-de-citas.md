@@ -13,7 +13,7 @@ El dueño decidió cuatro cosas:
   su tasa.
 - El negocio marca si el cliente aceptó o rechazó. No hay aceptación en línea.
 - Aceptado, el presupuesto se convierte en cobro.
-- Los conceptos pueden ser servicios del catálogo, paquetes, bonos y membresías,
+- Los conceptos pueden ser servicios del catálogo, bonos (sin membresías desde el ADR 0130),
   artículos del inventario y conceptos libres.
 
 ## Decisión
@@ -53,7 +53,8 @@ negocio. También hay una vista para imprimir o guardar como PDF.
 precio del presupuesto.
 - El descuento general pasa a la orden.
 - Desglosados: el impuesto va como su propio concepto, para que la orden sume lo mismo.
-- Paquetes, bonos y membresías van como producto: al pagarse se conceden como siempre.
+- Los bonos van como producto: al pagarse se conceden como siempre. En citas no hay
+  membresías (ADR 0130).
 - Servicios y conceptos libres van como concepto escrito (`lineas_orden.descripcion`).
 - Un artículo sale del inventario de la sede de la orden al pagarse
   (`lineas_orden.articulo_id`).
