@@ -300,6 +300,17 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Cobros comprensibles (M07)
+
+- `GET /pasarelas`: cada pasarela en línea suma `confirma_pagos` (tiene las llaves de sus
+  avisos: `webhook_secret`, o `webhook_user` y `webhook_password` en OpenPay) y
+  `en_prueba`. En producción, `lista` exige `confirma_pagos`.
+- `PUT /pasarelas/{proveedor}`: 422 en `modo` si las llaves delatan el otro modo (Stripe
+  `sk_test_`/`sk_live_`; Mercado Pago `TEST-`).
+- `/mi/perfil` suma `pago_en_linea_prueba`; las órdenes pendientes de `/mi/*` traen
+  `pago_en_proceso` {`metodo`, `iniciado_en`} si hay un intento en línea sin confirmar.
+- Una devolución deja `pago.reembolso_solicitado` en la bitácora.
+
 ## Acciones del equipo desde el inicio y la sesión (M08)
 
 - `GET /inicio/hoy` suma `atencion` {`solicitudes` (prospectos nuevos, con

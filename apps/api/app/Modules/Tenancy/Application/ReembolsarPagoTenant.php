@@ -143,6 +143,12 @@ class ReembolsarPagoTenant
                 ],
             ]);
 
+            // Queda en la bitácora del negocio quién devolvió cuánto y por qué (M07).
+            app(RegistrarAuditoria::class)->registrar($actor, 'pago.reembolso_solicitado', 'pago', (string) $bloqueado->ulid, null, [
+                'reembolso' => $reembolso->ulid, 'monto_minor' => $monto, 'moneda' => $bloqueado->moneda,
+                'via' => $via, 'total' => $esTotal, 'revertir_creditos' => $revertirCreditos,
+            ], $motivo);
+
             // En caja o declarada manual el dinero ya se devolvió: se aplica ahora.
             if ($via !== 'pasarela') {
                 $this->aplicarAprobado($bloqueado, $reembolso, $actor);
@@ -180,7 +186,9 @@ class ReembolsarPagoTenant
         } catch (RequestException $e) {
             if ($e->response->status() < 500) {
                 // La pasarela respondió que no (p. ej. ya estaba devuelto): es definitivo.
-                $motivo = 'La pasarela no aceptó la devolución: '.$e->getMessage();
+                // Su respuesta técnica va al registro de errores, no a la pantalla (M07).
+                ReporteDeErrores::reportarAtrapado($e);
+                $motivo = 'La pasarela no aceptó la devolución ('.$e->response->status().').';
                 $this->resolver($reembolso, EstadoReembolso::Fallido, null, $motivo, $actor);
 
                 throw new PagoNoReembolsable($motivo.' Si ya devolviste el dinero por otro medio, regístralo como devolución manual.');

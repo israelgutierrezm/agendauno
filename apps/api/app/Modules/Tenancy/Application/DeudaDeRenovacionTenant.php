@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use Illuminate\Support\Facades\DB;
 
 /**
  * La deuda del periodo de una membresía: su orden de renovación pendiente. Se
@@ -33,20 +34,26 @@ class DeudaDeRenovacionTenant
             return null;
         }
 
-        $pendiente = OrdenTenant::query()
-            ->where('renueva_acuerdo_id', $acuerdo->getKey())
-            ->where('estado', EstadoOrden::Pendiente->value)
-            ->latest('id')
-            ->first();
-        if ($pendiente instanceof OrdenTenant) {
-            return $pendiente;
-        }
+        // Con la membresía bloqueada: dos cobros a la vez (el proceso diario y un
+        // reintento) no abren dos deudas por el mismo periodo (M07).
+        return DB::connection('tenant')->transaction(function () use ($acuerdo, $persona, $producto): OrdenTenant {
+            AcuerdoTenant::query()->whereKey($acuerdo->getKey())->lockForUpdate()->first();
 
-        // Renovación de lo que ya tiene: aunque el producto se haya archivado.
-        $orden = $this->ordenes->crear($persona, [['producto' => $producto, 'cantidad' => 1, 'beneficiario' => null]], renovacion: true);
-        $orden->update(['renueva_acuerdo_id' => $acuerdo->getKey()]);
+            $pendiente = OrdenTenant::query()
+                ->where('renueva_acuerdo_id', $acuerdo->getKey())
+                ->where('estado', EstadoOrden::Pendiente->value)
+                ->latest('id')
+                ->first();
+            if ($pendiente instanceof OrdenTenant) {
+                return $pendiente;
+            }
 
-        return $orden;
+            // Renovación de lo que ya tiene: aunque el producto se haya archivado.
+            $orden = $this->ordenes->crear($persona, [['producto' => $producto, 'cantidad' => 1, 'beneficiario' => null]], renovacion: true);
+            $orden->update(['renueva_acuerdo_id' => $acuerdo->getKey()]);
+
+            return $orden;
+        });
     }
 
     /**
