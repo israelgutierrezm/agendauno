@@ -36,6 +36,9 @@ export interface Plan {
   descripcion?: string | null;
   destacado?: boolean;
   primera_vez?: boolean;
+  // Cuotas del negocio (B04).
+  cobra_inscripcion?: boolean;
+  cobra_anualidad?: boolean;
 }
 
 /** 1000 unidades = 1 clase. */

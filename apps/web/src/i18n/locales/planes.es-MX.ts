@@ -155,6 +155,35 @@ export default {
     primeraVezAyuda:
       "Solo la compra, una vez, quien nunca ha venido: sin planes antes y sin asistencias registradas.",
   },
+  // Cuotas del negocio (B04): inscripción y anualidad, aparte de los planes.
+  cuotas: {
+    titulo: "Cuotas",
+    ayuda:
+      "Lo que se cobra aparte de los planes. No da clases. Un monto vacío o en 0 no se cobra.",
+    inscripcion: "Inscripción",
+    anualidad: "Anualidad",
+    monto: "Monto ({simbolo})",
+    sinCobro: "No se cobra",
+    reingreso: "Se vuelve a cobrar tras (meses sin plan)",
+    inscripcionAyuda:
+      "Se suma al vender un plan que la cobra, en la primera alta y al regresar tras esos meses sin plan. Quien tiene permiso puede exentarla.",
+    modos: {
+      aniversario: "En el aniversario de su alta",
+      fecha_fija: "En una fecha fija",
+    },
+    mes: "Mes",
+    dia: "Día",
+    aniversarioAyuda:
+      "Cada año en la fecha en que contrató; quien entró un 29 de febrero paga el 28 en los años que no son bisiestos.",
+    fechaFijaAyuda:
+      "La misma fecha para todos los que tienen un plan que la cobra. El 29 de febrero se cobra el 28 en los años que no son bisiestos.",
+    enElPlan: "Cuotas",
+    cobraInscripcion: "Cobra la inscripción",
+    cobraInscripcionAyuda:
+      "Al venderlo se suma la inscripción si es su primera alta o regresa tras un tiempo sin plan.",
+    cobraAnualidad: "Cobra la anualidad",
+    cobraAnualidadAyuda: "Quien lo tiene paga la anualidad del negocio.",
+  },
   vender: {
     configurar: "Configurar planes y paquetes →",
     venceHoy: "Si se vende hoy, se puede usar hasta el {hasta}.",

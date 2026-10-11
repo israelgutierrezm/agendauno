@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -69,6 +69,12 @@ const venta = ref<{
 }>({ compradorId: "", productoId: "", metodo: "efectivo", codigoPromo: "" });
 const vendiendo = ref(false);
 const promoPreview = ref<{ descuento: number; total: number } | null>(null);
+// Inscripción (B04): la que se sumaría a esta venta, dicha antes de cobrar; quien
+// puede la exenta con un motivo (queda en la bitácora).
+const inscripcion = ref(0);
+const exentarInscripcion = ref(false);
+const motivoExencion = ref("");
+const puedeExentar = computed(() => sesion.puede("cuotas.exentar"));
 const validandoPromo = ref(false);
 
 // Solo los vendibles (no archivados), agrupados por tipo.
@@ -175,8 +181,36 @@ async function validarPromo(): Promise<void> {
   }
 }
 
+const cobraInscripcion = computed(
+  () => inscripcion.value > 0 && !exentarInscripcion.value,
+);
 const total = computed(
-  () => promoPreview.value?.total ?? productoSel.value?.precio_minor ?? 0,
+  () =>
+    (promoPreview.value?.total ?? productoSel.value?.precio_minor ?? 0) +
+    (cobraInscripcion.value ? inscripcion.value : 0),
+);
+let pedidoInscripcion = 0;
+watch(
+  () => [venta.value.compradorId, productoSel.value?.id] as const,
+  async ([compradorId]) => {
+    const mio = ++pedidoInscripcion;
+    inscripcion.value = 0;
+    exentarInscripcion.value = false;
+    motivoExencion.value = "";
+    if (compradorId === "" || !productoSel.value?.cobra_inscripcion) {
+      return;
+    }
+    try {
+      const { data } = await api.get<{ data: { inscripcion_minor: number } }>(
+        `${base.value}/miembros/${compradorId}/cuotas`,
+      );
+      if (mio === pedidoInscripcion) {
+        inscripcion.value = data.data.inscripcion_minor;
+      }
+    } catch {
+      // Sin el dato, la orden la suma igual si toca: el recibo lo dirá.
+    }
+  },
 );
 
 // Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra).
@@ -217,6 +251,12 @@ async function vender(): Promise<void> {
           venta.value.codigoPromo.trim() !== ""
             ? venta.value.codigoPromo
             : undefined,
+        ...(inscripcion.value > 0 && exentarInscripcion.value
+          ? {
+              exentar_inscripcion: true,
+              motivo_exencion: motivoExencion.value.trim(),
+            }
+          : {}),
       },
       venta.value.metodo,
     );
@@ -454,6 +494,46 @@ onMounted(cargar);
               </p>
             </div>
 
+            <!-- Inscripción (B04): se suma si es su alta o regresa tras un tiempo. -->
+            <div
+              v-if="inscripcion > 0"
+              class="space-y-2 text-sm"
+              data-prueba="inscripcion-venta"
+            >
+              <div class="flex justify-between">
+                <span>{{ $t("ventas.vender.inscripcion") }}</span>
+                <span
+                  class="tabular-nums"
+                  :style="
+                    exentarInscripcion
+                      ? {
+                          textDecoration: 'line-through',
+                          color: 'var(--texto-suave)',
+                        }
+                      : {}
+                  "
+                  >{{
+                    dinero(inscripcion, productoSel?.moneda ?? sesion.moneda)
+                  }}</span
+                >
+              </div>
+              <template v-if="puedeExentar">
+                <label class="flex items-center gap-2">
+                  <input v-model="exentarInscripcion" type="checkbox" />
+                  {{ $t("ventas.vender.exentarInscripcion") }}
+                </label>
+                <input
+                  v-if="exentarInscripcion"
+                  v-model="motivoExencion"
+                  class="tu-input"
+                  maxlength="300"
+                  :placeholder="$t('ventas.vender.motivoExencion')"
+                  :aria-label="$t('ventas.vender.motivoExencion')"
+                  data-prueba="motivo-exencion"
+                />
+              </template>
+            </div>
+
             <div class="vv-total">
               <span>{{ $t("pos.total") }}</span>
               <span class="tabular-nums">{{
@@ -465,7 +545,10 @@ onMounted(cargar);
               type="submit"
               data-prueba="cobrar-plan"
               :disabled="
-                vendiendo || venta.compradorId === '' || venta.productoId === ''
+                vendiendo ||
+                venta.compradorId === '' ||
+                venta.productoId === '' ||
+                (exentarInscripcion && motivoExencion.trim() === '')
               "
             >
               {{

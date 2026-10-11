@@ -74,6 +74,10 @@ const form = reactive({
   descripcion: p?.descripcion ?? "",
   destacado: p?.destacado ?? false,
   primeraVez: p?.primera_vez ?? false,
+  // Cuotas del negocio (B04): si al venderlo se suma la inscripción y si quien lo
+  // tiene paga la anualidad.
+  cobraInscripcion: p?.cobra_inscripcion ?? false,
+  cobraAnualidad: p?.cobra_anualidad ?? false,
 });
 const guardando = ref(false);
 const error = ref<string | null>(null);
@@ -198,6 +202,12 @@ async function guardar(): Promise<void> {
     descripcion: form.descripcion.trim() || null,
     destacado: form.destacado,
     primera_vez: admitePrimeraVez.value && form.primeraVez,
+    ...(esCitas.value
+      ? {}
+      : {
+          cobra_inscripcion: form.cobraInscripcion,
+          cobra_anualidad: form.cobraAnualidad,
+        }),
   };
   try {
     if (p) {
@@ -562,6 +572,37 @@ onMounted(async () => {
             class="block text-xs"
             :style="{ color: 'var(--texto-suave)' }"
             >{{ tx("primeraVezAyuda") }}</span
+          >
+        </span>
+      </label>
+    </fieldset>
+
+    <!-- Cuotas del negocio (B04): el monto se configura en «Cuotas». -->
+    <fieldset
+      v-if="!esCitas && !esExtra"
+      class="space-y-2"
+      data-prueba="cuotas-plan"
+    >
+      <legend class="tu-label">{{ $t("planes.cuotas.enElPlan") }}</legend>
+      <label class="flex items-start gap-2 text-sm">
+        <input v-model="form.cobraInscripcion" type="checkbox" class="mt-1" />
+        <span>
+          {{ $t("planes.cuotas.cobraInscripcion") }}
+          <span
+            class="block text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ $t("planes.cuotas.cobraInscripcionAyuda") }}</span
+          >
+        </span>
+      </label>
+      <label class="flex items-start gap-2 text-sm">
+        <input v-model="form.cobraAnualidad" type="checkbox" class="mt-1" />
+        <span>
+          {{ $t("planes.cuotas.cobraAnualidad") }}
+          <span
+            class="block text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ $t("planes.cuotas.cobraAnualidadAyuda") }}</span
           >
         </span>
       </label>

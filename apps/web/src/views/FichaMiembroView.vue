@@ -12,6 +12,7 @@ import PanelEditarMiembro, {
 } from "@/components/PanelEditarMiembro.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import RegistrarPagoOrden, {
+  type CuotaPorCobrar,
   type OrdenPorCobrar,
 } from "@/components/RegistrarPagoOrden.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -100,6 +101,8 @@ interface Orden {
   pagada_en: string | null;
   // Qué se pagó y, si es una cita, con quién y cuándo.
   concepto?: string | null;
+  // Sus cuotas (B04), para exentarlas por separado.
+  cuotas?: CuotaPorCobrar[];
   sesion?: {
     profesional: string | null;
     inicia_en: string;
@@ -197,6 +200,7 @@ function abrirCobro(o: Orden): void {
     concepto: o.concepto ?? null,
     total_minor: o.total_minor,
     moneda: o.moneda,
+    cuotas: o.cuotas ?? [],
   };
 }
 async function alRegistrar(aviso: string): Promise<void> {

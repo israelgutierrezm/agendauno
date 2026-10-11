@@ -141,6 +141,7 @@ export default {
         reembolsar: "Hacer reembolsos",
         configurar: "Configurar pasarelas de pago",
       },
+      cuotas: { exentar: "Exentar inscripción, anualidad o penalización" },
       facturacion: { ver: "Ver facturación e ingresos" },
       pos: { vender: "Vender en mostrador" },
       inventario: {

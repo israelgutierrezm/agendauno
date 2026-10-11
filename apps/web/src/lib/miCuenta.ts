@@ -92,6 +92,8 @@ export interface Producto {
   actividad?: string | null;
   // ¿La puede comprar? (la clase de prueba, solo la primera vez).
   disponible?: boolean;
+  // Lo que se suma de inscripción si lo compra hoy (B04; 0 = nada).
+  inscripcion_minor?: number;
 }
 export interface Orden {
   id: string;

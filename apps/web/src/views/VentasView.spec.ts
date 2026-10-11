@@ -125,6 +125,59 @@ describe("vender un plan", () => {
     );
   });
 
+  it("la inscripción se suma al total antes de cobrar; quien puede la exenta con motivo", async () => {
+    const base = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation((url: string) =>
+      url.endsWith("/productos")
+        ? Promise.resolve({
+            data: {
+              data: [
+                {
+                  ...plan("p2", "Mensualidad", "membresia", 150000),
+                  cobra_inscripcion: true,
+                },
+              ],
+            },
+          })
+        : url.endsWith("/miembros/m1/cuotas")
+          ? Promise.resolve({ data: { data: { inscripcion_minor: 50000 } } })
+          : base(url),
+    );
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    await w.findAll('[data-prueba="plan"]')[0]!.trigger("click");
+    const buscador = w.findComponent(BuscarPersona);
+    buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+    buscador.vm.$emit("update:modelValue", "m1");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="inscripcion-venta"]').text()).toContain(
+      "$500.00",
+    );
+    expect(w.get(".vv-total").text()).toContain("$2,000.00");
+
+    // Exentarla pide un motivo; el total vuelve al del plan.
+    await w
+      .get('[data-prueba="inscripcion-venta"] input[type="checkbox"]')
+      .setValue(true);
+    expect(w.get(".vv-total").text()).toContain("$1,500.00");
+    expect(
+      w.get('[data-prueba="cobrar-plan"]').attributes("disabled"),
+    ).toBeDefined();
+    await w
+      .get('[data-prueba="motivo-exencion"]')
+      .setValue("Reingreso pactado");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/ordenes", {
+      comprador_id: "m1",
+      items: [{ producto_id: "p2", cantidad: 1 }],
+      codigo_promo: undefined,
+      exentar_inscripcion: true,
+      motivo_exencion: "Reingreso pactado",
+    });
+  });
+
   it("«Vendido hoy» va en la moneda del negocio, no en pesos", async () => {
     sesion.moneda = "EUR";
     sesion.pais = "ES";

@@ -463,6 +463,19 @@ onMounted(() => void cuenta.asegurar());
             >
               {{ vigencia(p) }}
             </p>
+            <!-- La inscripción que se suma, antes de comprar (B04). -->
+            <p
+              v-if="(p.inscripcion_minor ?? 0) > 0"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="inscripcion"
+            >
+              {{
+                $t("miCuenta.comprar.masInscripcion", {
+                  monto: dinero(p.inscripcion_minor ?? 0, p.moneda),
+                })
+              }}
+            </p>
             <!-- La fecha exacta: la vigencia corre desde el pago (M03). -->
             <p
               v-if="p.vence_si_compra_hoy"
