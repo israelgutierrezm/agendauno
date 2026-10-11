@@ -9,8 +9,10 @@ use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ClientePasarelaTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SesionTarjetaTenant;
+use App\Modules\Tenancy\Models\TutelaTenant;
 use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
 use App\Modules\Tenancy\Pasarelas\PasarelaDomiciliable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
@@ -33,10 +35,18 @@ use Throwable;
  *   autoriza ({@see ConciliarSuscripcionTenant}).
  *
  * Cada membresía decide si se domicilia (se puede activar o quitar por separado).
+ *
+ * Quien paga (`persona_id` de la domiciliación) es el titular de la membresía o un
+ * responsable con autorización vigente por él (familias, ADR 0129): la tarjeta y el
+ * cliente en la pasarela son de quien paga; la membresía sigue siendo del participante.
+ * Si la autorización se retira, esos pagos automáticos se quitan.
  */
 class DomiciliacionesTenant
 {
-    public function __construct(private readonly RegistroDePasarelasTenant $registro) {}
+    public function __construct(
+        private readonly RegistroDePasarelasTenant $registro,
+        private readonly FamiliasTenant $familias,
+    ) {}
 
     /**
      * La pasarela en línea del negocio, si admite pagos automáticos.
@@ -92,51 +102,118 @@ class DomiciliacionesTenant
     }
 
     /**
-     * Activa el pago automático de una membresía. Si la persona ya autorizó una
+     * Activa el pago automático de una membresía. Si quien paga ya autorizó una
      * tarjeta, queda activo al momento; si no, devuelve la página de la pasarela para
      * autorizarla (al terminar, el webhook la registra y lo activa). Con suscripción,
      * la pasarela puede pedir primero capturar la tarjeta (`formulario`).
      *
+     * Quien paga es el titular o, si se da, un responsable con autorización vigente por
+     * él: con su tarjeta (ADR 0129).
+     *
      * @param  array<string, string>  $datos  la tarjeta tokenizada en el navegador (OpenPay)
      * @return array{estado: string, url?: string, formulario?: array<string, mixed>}
      */
-    public function activar(AcuerdoTenant $acuerdo, ?string $retorno, array $datos = []): array
+    public function activar(AcuerdoTenant $acuerdo, ?string $retorno, array $datos = [], ?PersonaTenant $pagador = null): array
     {
         $proveedor = $this->proveedor()
             ?? throw new DomiciliacionNoPermitida('Este negocio todavía no cobra en línea con tarjeta.');
         if (! self::renovable($acuerdo)) {
             throw new DomiciliacionNoPermitida('Esta membresía no se renueva; no necesita pago automático.');
         }
-        $persona = $acuerdo->persona ?? throw new DomiciliacionNoPermitida('La membresía no tiene titular.');
+        $pagador ??= $acuerdo->persona ?? throw new DomiciliacionNoPermitida('La membresía no tiene titular.');
+        if (! $this->puedePagar($pagador, $acuerdo)) {
+            throw new DomiciliacionNoPermitida('No tienes autorización vigente para pagar por esa persona.');
+        }
 
         $vigente = $acuerdo->domiciliacion()->first();
-        if ($vigente instanceof DomiciliacionTenant && $vigente->proveedor === $proveedor) {
+        if ($vigente instanceof DomiciliacionTenant && $vigente->proveedor === $proveedor
+            && (int) $vigente->persona_id === (int) $pagador->getKey()) {
             return ['estado' => 'activa'];
         }
 
         $pasarela = $this->registro->resolver($proveedor);
         if ($pasarela instanceof PasarelaConSuscripcion) {
-            return $this->suscribir($acuerdo, $proveedor, $pasarela, $retorno, $datos);
+            return $this->suscribir($acuerdo, $proveedor, $pasarela, $retorno, $datos, $pagador);
         }
 
-        $tarjeta = $this->tarjetaDe($persona, $proveedor);
+        $tarjeta = $this->tarjetaDe($pagador, $proveedor);
         if ($tarjeta instanceof DomiciliacionTenant) {
             $this->domiciliar($acuerdo, $proveedor, new TarjetaGuardada(
                 (string) $tarjeta->metodo_externo, $tarjeta->marca, $tarjeta->ultimos4, $tarjeta->expira_mes, $tarjeta->expira_anio,
-            ));
+            ), $pagador);
 
             return ['estado' => 'activa'];
         }
 
         $checkout = $this->pasarela($proveedor)->iniciarGuardado(
-            $persona,
+            $pagador,
             $retorno,
-            ['persona' => (string) $persona->ulid, 'acuerdos' => (string) $acuerdo->ulid],
+            ['persona' => (string) $pagador->ulid, 'acuerdos' => (string) $acuerdo->ulid],
             $this->registro->llaves($proveedor),
         );
-        $this->recordarSesion($persona, $proveedor, $checkout);
+        $this->recordarSesion($pagador, $proveedor, $checkout);
 
         return ['estado' => 'redirect', 'url' => $checkout['url']];
+    }
+
+    /**
+     * A nombre de quién se guarda la tarjeta al pagar una compra con pago automático:
+     * de quien la pagó desde su cuenta, si es un responsable con la autorización vigente
+     * por el comprador (p. ej. la renovación de su hijo, ADR 0129); si no, del comprador.
+     */
+    public function pagadorDeCompra(OrdenTenant $orden, ?int $usuarioQuePaga): ?PersonaTenant
+    {
+        $comprador = $orden->persona;
+        if ($usuarioQuePaga === null || ! $comprador instanceof PersonaTenant) {
+            return $comprador;
+        }
+        $quienPaga = PersonaTenant::query()->where('usuario_id', $usuarioQuePaga)->first();
+
+        return $quienPaga instanceof PersonaTenant
+            && $this->familias->participantesAutorizados($quienPaga)->contains('id', (int) $comprador->getKey())
+            ? $quienPaga
+            : $comprador;
+    }
+
+    /**
+     * ¿Puede pagar esta persona la membresía? Es suya o de alguien a su cargo con la
+     * autorización vigente (ADR 0129).
+     */
+    public function puedePagar(PersonaTenant $pagador, AcuerdoTenant $acuerdo): bool
+    {
+        return (int) $acuerdo->persona_id === (int) $pagador->getKey()
+            || $this->familias->participantesAutorizados($pagador)->contains('id', (int) $acuerdo->persona_id);
+    }
+
+    /**
+     * ¿Sigue pudiendo cobrarse a la tarjeta de quien paga? Si es un responsable y ya no
+     * tiene la autorización (la retiró, el negocio apagó familias), no.
+     */
+    public function sigueAutorizada(DomiciliacionTenant $domiciliacion, AcuerdoTenant $acuerdo): bool
+    {
+        if ((int) $domiciliacion->persona_id === (int) $acuerdo->persona_id) {
+            return true;
+        }
+        $pagador = $domiciliacion->persona;
+
+        return $pagador instanceof PersonaTenant && $this->puedePagar($pagador, $acuerdo);
+    }
+
+    /**
+     * Se retiró la autorización de un responsable: su tarjeta deja de pagar las
+     * membresías de esa persona (vuelven a avisarse para pagarlas a mano).
+     */
+    public function alRetirarTutela(TutelaTenant $tutela): void
+    {
+        $domiciliaciones = DomiciliacionTenant::query()
+            ->where('persona_id', $tutela->responsable_id)
+            ->whereIn('estado', [DomiciliacionTenant::ACTIVA, DomiciliacionTenant::PENDIENTE])
+            ->whereIn('acuerdo_id', AcuerdoTenant::query()->where('persona_id', $tutela->participante_id)->select('id'))
+            ->get();
+
+        foreach ($domiciliaciones as $domiciliacion) {
+            $this->cerrar($domiciliacion);
+        }
     }
 
     /**
@@ -180,8 +257,9 @@ class DomiciliacionesTenant
 
     /**
      * La pasarela confirmó una tarjeta autorizada: pasa a ser la de todos los pagos
-     * automáticos de la persona y se activan las membresías indicadas (suyas y que se
-     * renuevan). Idempotente. La tarjeta anterior se desliga.
+     * automáticos de la persona y se activan las membresías indicadas que se renuevan:
+     * suyas o de alguien a su cargo con la autorización vigente (ADR 0129).
+     * Idempotente. La tarjeta anterior se desliga.
      *
      * @param  list<int>  $acuerdoIds
      */
@@ -206,13 +284,14 @@ class DomiciliacionesTenant
                 $domiciliacion->update([...$tarjeta->atributos(), 'ultimo_error' => null, 'ultimo_error_en' => null]);
             }
 
+            $titulares = [(int) $persona->getKey(), ...$this->familias->participantesAutorizados($persona)->modelKeys()];
             $acuerdos = AcuerdoTenant::query()
                 ->whereIn('id', $acuerdoIds)
-                ->where('persona_id', $persona->getKey())
+                ->whereIn('persona_id', $titulares)
                 ->get();
             foreach ($acuerdos as $acuerdo) {
                 if (self::renovable($acuerdo)) {
-                    $this->domiciliar($acuerdo, $proveedor, $tarjeta);
+                    $this->domiciliar($acuerdo, $proveedor, $tarjeta, $persona);
                 }
             }
 
@@ -308,12 +387,14 @@ class DomiciliacionesTenant
      * @param  array<string, string>  $datos
      * @return array{estado: string, url?: string, formulario?: array<string, mixed>}
      */
-    private function suscribir(AcuerdoTenant $acuerdo, string $proveedor, PasarelaConSuscripcion $pasarela, ?string $retorno, array $datos): array
+    private function suscribir(AcuerdoTenant $acuerdo, string $proveedor, PasarelaConSuscripcion $pasarela, ?string $retorno, array $datos, PersonaTenant $pagador): array
     {
-        $domiciliacion = DomiciliacionTenant::query()->firstOrCreate(
-            ['acuerdo_id' => $acuerdo->getKey(), 'proveedor' => $proveedor, 'estado' => DomiciliacionTenant::PENDIENTE],
-            ['persona_id' => $acuerdo->persona_id],
-        );
+        $domiciliacion = DomiciliacionTenant::query()->firstOrCreate([
+            'acuerdo_id' => $acuerdo->getKey(),
+            'proveedor' => $proveedor,
+            'estado' => DomiciliacionTenant::PENDIENTE,
+            'persona_id' => $pagador->getKey(),
+        ]);
 
         $resultado = $pasarela->suscribir($domiciliacion, $acuerdo, $retorno, $datos, $this->registro->llaves($proveedor));
         if ($resultado['estado'] === 'activa') {
@@ -354,9 +435,10 @@ class DomiciliacionesTenant
     }
 
     /**
-     * Domicilia la membresía con la tarjeta dada (la deja como única activa).
+     * Domicilia la membresía con la tarjeta de quien paga (la deja como única activa).
+     * Si la pagaba otra persona, su tarjeta se desliga cuando ya no paga nada más.
      */
-    private function domiciliar(AcuerdoTenant $acuerdo, string $proveedor, TarjetaGuardada $tarjeta): void
+    private function domiciliar(AcuerdoTenant $acuerdo, string $proveedor, TarjetaGuardada $tarjeta, PersonaTenant $pagador): void
     {
         DomiciliacionTenant::query()
             ->where('acuerdo_id', $acuerdo->getKey())
@@ -364,16 +446,27 @@ class DomiciliacionesTenant
             ->where('proveedor', '!=', $proveedor)
             ->update(['estado' => DomiciliacionTenant::CANCELADA, 'cancelada_en' => Carbon::now()]);
 
+        $anterior = DomiciliacionTenant::query()
+            ->where('acuerdo_id', $acuerdo->getKey())
+            ->where('proveedor', $proveedor)
+            ->where('estado', DomiciliacionTenant::ACTIVA)
+            ->where('persona_id', '!=', $pagador->getKey())
+            ->first();
+
         DomiciliacionTenant::query()->updateOrCreate(
             ['acuerdo_id' => $acuerdo->getKey(), 'proveedor' => $proveedor, 'estado' => DomiciliacionTenant::ACTIVA],
             [
                 ...$tarjeta->atributos(),
-                'persona_id' => $acuerdo->persona_id,
+                'persona_id' => $pagador->getKey(),
                 'ultimo_error' => null,
                 'ultimo_error_en' => null,
                 'activada_en' => Carbon::now(),
             ],
         );
+
+        if ($anterior instanceof DomiciliacionTenant) {
+            $this->olvidar((int) $anterior->persona_id, $proveedor, (string) $anterior->metodo_externo);
+        }
     }
 
     /**

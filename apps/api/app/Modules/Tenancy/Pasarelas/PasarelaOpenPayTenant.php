@@ -150,7 +150,8 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, 
 
         $cliente = (string) $domiciliacion->cliente_externo;
         if ($cliente === '') {
-            $cliente = $api->crearCliente($this->cliente($acuerdo->persona), (string) $domiciliacion->ulid);
+            // Quien paga: el titular o su responsable (ADR 0129).
+            $cliente = $api->crearCliente($this->cliente($domiciliacion->persona ?? $acuerdo->persona), (string) $domiciliacion->ulid);
             $domiciliacion->update(['cliente_externo' => $cliente]);
         }
         $tarjeta = $api->guardarTarjeta($cliente, $token, $dispositivo);

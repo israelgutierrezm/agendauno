@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
+use App\Modules\Tenancy\Application\FamiliasTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
@@ -19,6 +20,10 @@ use Illuminate\Http\Request;
  * se cobran solas y con qué tarjeta. Activa o quita el cobro automático de cada una y
  * cambia la tarjeta (se autoriza en la página de la pasarela o, con OpenPay, se
  * tokeniza en el navegador: aquí nunca llegan datos de tarjeta).
+ *
+ * Un responsable ve también las membresías de las personas a su cargo con la
+ * autorización vigente (`para`) y las paga con su tarjeta (ADR 0129). Es siempre la
+ * cuenta del titular: no actúa por un participante (`X-Participante`).
  */
 class MiPagoAutomaticoTenantController
 {
@@ -27,6 +32,7 @@ class MiPagoAutomaticoTenantController
     public function __construct(
         private readonly PersonaDeUsuarioTenant $personas,
         private readonly DomiciliacionesTenant $domiciliaciones,
+        private readonly FamiliasTenant $familias,
     ) {}
 
     public function mostrar(Request $request): JsonResponse
@@ -36,10 +42,11 @@ class MiPagoAutomaticoTenantController
         $tarjeta = $this->domiciliaciones->tarjetaCompartida($persona);
 
         $membresias = AcuerdoTenant::query()
-            ->where('persona_id', $persona->getKey())
+            ->whereIn('persona_id', $this->pagables($persona))
             ->whereNotNull('proxima_cobro_en')
             ->where('estado', '!=', EstadoAcuerdo::Cancelado->value)
-            ->with(['producto', 'domiciliacion'])
+            ->with(['producto', 'domiciliacion', 'persona'])
+            ->orderByRaw('persona_id = ? desc', [$persona->getKey()])
             ->orderBy('proxima_cobro_en')
             ->get();
         // Suscripciones creadas que el alumno aún no autoriza en la pasarela.
@@ -54,6 +61,10 @@ class MiPagoAutomaticoTenantController
             'tarjeta' => $tarjeta instanceof DomiciliacionTenant ? $tarjeta->tarjeta() : null,
             'membresias' => $membresias->map(static fn (AcuerdoTenant $a): array => [
                 'id' => $a->ulid,
+                // De una persona a su cargo: se paga con la tarjeta del responsable.
+                'para' => (int) $a->persona_id !== (int) $persona->getKey() && $a->persona instanceof PersonaTenant
+                    ? ['id' => $a->persona->ulid, 'nombre' => $a->persona->nombreCompleto()]
+                    : null,
                 'pendiente' => in_array($a->getKey(), $porAutorizar, false),
                 'tarjeta' => $a->domiciliacion?->marca !== null ? $a->domiciliacion->tarjeta() : null,
                 'producto' => $a->producto?->nombre,
@@ -80,7 +91,7 @@ class MiPagoAutomaticoTenantController
             'device_session_id' => ['sometimes', 'string', 'max:255'],
         ]);
 
-        $resultado = $this->domiciliaciones->activar($acuerdo, self::RETORNO, $datos);
+        $resultado = $this->domiciliaciones->activar($acuerdo, self::RETORNO, $datos, $this->persona($request));
 
         return response()->json(['data' => [
             'estado' => $resultado['estado'],
@@ -107,14 +118,26 @@ class MiPagoAutomaticoTenantController
     }
 
     /**
-     * Una membresía del propio alumno (la de otro no existe para él).
+     * Una membresía del propio alumno o de alguien a su cargo con la autorización
+     * vigente (la de otro no existe para él).
      */
     private function acuerdo(Request $request): AcuerdoTenant
     {
         return AcuerdoTenant::query()
             ->where('ulid', (string) $request->route('acuerdo'))
-            ->where('persona_id', $this->persona($request)->getKey())
+            ->whereIn('persona_id', $this->pagables($this->persona($request)))
             ->firstOrFail();
+    }
+
+    /**
+     * Las personas cuyas membresías paga: él y las que tiene a su cargo con la
+     * autorización vigente.
+     *
+     * @return list<int>
+     */
+    private function pagables(PersonaTenant $persona): array
+    {
+        return [(int) $persona->getKey(), ...$this->familias->participantesAutorizados($persona)->modelKeys()];
     }
 
     private function persona(Request $request): PersonaTenant

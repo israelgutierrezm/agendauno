@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\ClientePasarelaTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
@@ -35,8 +37,11 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConsultable, P
         $orden = $pago->orden()->with(['lineas.producto', 'persona'])->first();
         $retorno = RetornoPago::urls($pago->retorno);
 
-        // Compra con pago automático: la tarjeta queda autorizada para las renovaciones.
-        $persona = $orden?->persona;
+        // Compra con pago automático: la tarjeta queda autorizada para las renovaciones, a
+        // nombre de quien paga (el comprador o su responsable, ADR 0129).
+        $persona = $orden instanceof OrdenTenant && $orden->domiciliar === true
+            ? app(DomiciliacionesTenant::class)->pagadorDeCompra($orden, $pago->registrado_por !== null ? (int) $pago->registrado_por : null)
+            : $orden?->persona;
         $domiciliar = $orden?->domiciliar === true && $persona instanceof PersonaTenant;
 
         $sesion = $api->crearSesionCheckout(

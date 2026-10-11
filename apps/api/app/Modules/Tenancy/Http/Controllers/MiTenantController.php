@@ -1026,13 +1026,9 @@ class MiTenantController
 
         // Pago automático: al pagar se autoriza la tarjeta para cobrar sola la membresía
         // cada periodo. Solo para lo que se renueva y con una pasarela que lo admite.
+        // Por una persona a cargo, el responsable la paga con su tarjeta: es el comprador
+        // y la pasarela la guarda a su nombre (ADR 0129).
         $domiciliar = $request->boolean('domiciliar');
-        // El pago automático de una persona a cargo se activa en el negocio (B05).
-        if ($domiciliar && $this->cuenta->tutela($request) !== null) {
-            throw ValidationException::withMessages([
-                'domiciliar' => ['El pago automático de una persona a tu cargo se activa en el negocio.'],
-            ]);
-        }
         if ($domiciliar) {
             // Es del plan Pro (ADR 0107); pagar sin él sigue igual.
             app(FuncionesPlan::class)->exigir($this->estudioDe($request), 'cobro_automatico');

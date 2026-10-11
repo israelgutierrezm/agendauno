@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
+use App\Modules\Tenancy\Application\FamiliasTenant;
 use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\DomiciliacionNoPermitida;
@@ -22,7 +23,8 @@ use Illuminate\Http\Request;
  * para pagar a mano. El cobro lo ejecuta el comando `agendauno:cobrar-suscripciones`.
  *
  * El negocio no captura tarjetas: invita al alumno a activar su pago automático (él
- * lo autoriza en la pasarela) y puede quitarlo si el alumno lo pide.
+ * lo autoriza en la pasarela) y puede quitarlo si el alumno lo pide. La de una persona
+ * a cargo la puede pagar su responsable con su tarjeta (`paga`, ADR 0129).
  */
 class SuscripcionesTenantController
 {
@@ -32,6 +34,7 @@ class SuscripcionesTenantController
         private readonly DomiciliacionesTenant $domiciliaciones,
         private readonly RegistrarEventoTenant $eventos,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly FamiliasTenant $familias,
     ) {}
 
     public function index(): JsonResponse
@@ -39,7 +42,7 @@ class SuscripcionesTenantController
         $acuerdos = AcuerdoTenant::query()
             ->whereNotNull('proxima_cobro_en')
             ->where('estado', '!=', EstadoAcuerdo::Cancelado->value)
-            ->with(['persona', 'producto', 'domiciliacion'])
+            ->with(['persona', 'producto', 'domiciliacion.persona'])
             ->orderBy('proxima_cobro_en')
             ->limit(self::LIMITE)
             ->get();
@@ -54,7 +57,14 @@ class SuscripcionesTenantController
                 'proxima_cobro_en' => $a->proxima_cobro_en?->toDateString(),
                 'estado' => $a->estado->value,
                 'pago_automatico' => $a->domiciliacion instanceof DomiciliacionTenant
-                    ? [...$a->domiciliacion->tarjeta(), 'error' => $a->domiciliacion->ultimo_error]
+                    ? [
+                        ...$a->domiciliacion->tarjeta(),
+                        'error' => $a->domiciliacion->ultimo_error,
+                        // La paga su responsable con su tarjeta (ADR 0129).
+                        'paga' => (int) $a->domiciliacion->persona_id !== (int) $a->persona_id
+                            ? $a->domiciliacion->persona?->nombreCompleto()
+                            : null,
+                    ]
                     : null,
             ])->all(),
             'pago_automatico_disponible' => $this->domiciliaciones->proveedor() !== null,
@@ -73,7 +83,9 @@ class SuscripcionesTenantController
         if (! DomiciliacionesTenant::renovable($acuerdo)) {
             throw new DomiciliacionNoPermitida('Esta membresía no se renueva; no necesita pago automático.');
         }
-        if ((string) $acuerdo->persona?->email === '') {
+        // Sin correo propio, le llega a su responsable con autorización vigente (ADR 0129).
+        $persona = $acuerdo->persona;
+        if ((string) $persona?->email === '' && ($persona === null || $this->familias->responsablesDe($persona)->isEmpty())) {
             throw new DomiciliacionNoPermitida('El alumno no tiene correo registrado.');
         }
 

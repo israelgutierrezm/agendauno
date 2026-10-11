@@ -144,5 +144,6 @@ El dueño decidió:
   comerciales, solo si el responsable acepta promociones.
 - Siguen fuera, por decisión pendiente del dueño:
   - el pago automático de un participante con la tarjeta del responsable (hoy la tarjeta
-    queda a nombre del participante);
+    queda a nombre del participante). **Resuelto en el ADR 0129:** la tarjeta queda a
+    nombre del responsable;
   - WhatsApp a responsables, que requiere plantillas aprobadas por Meta.

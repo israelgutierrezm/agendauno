@@ -93,6 +93,8 @@ interface Suscripcion {
     ultimos4: string | null;
     expira: string | null;
     error: string | null;
+    // La paga su responsable con su tarjeta (familias, ADR 0129).
+    paga?: string | null;
   } | null;
 }
 
@@ -1090,6 +1092,17 @@ watch(vista, cargar, { immediate: true });
                     >
                       {{ $t("pagoAutomatico.quitar") }}
                     </button>
+                    <p
+                      v-if="s.pago_automatico.paga"
+                      class="text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{
+                        $t("pagoAutomatico.paga", {
+                          nombre: s.pago_automatico.paga,
+                        })
+                      }}
+                    </p>
                     <p
                       v-if="s.pago_automatico.error"
                       class="text-xs"

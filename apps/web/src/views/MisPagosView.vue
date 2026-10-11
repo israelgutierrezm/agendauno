@@ -9,6 +9,7 @@ import HistorialCompras from "@/components/HistorialCompras.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { participanteEnUso } from "@/lib/participanteEnUso";
 import { textoCobertura } from "@/lib/cobertura";
 import {
   cuandoCorto,
@@ -70,6 +71,8 @@ const voucher = ref<Voucher | null>(null);
 const mensaje = ref<string | null>(null);
 const error = ref<string | null>(null);
 const domiciliar = ref<Record<string, boolean>>({});
+// Por una persona a cargo, el pago automático va a la tarjeta del responsable (ADR 0129).
+const porPersonaACargo = participanteEnUso() !== null;
 
 // Las clases extra se suman a un paquete: solo se ofrecen a quien tiene uno.
 const tienePaquete = computed(() =>
@@ -403,7 +406,11 @@ onMounted(() => void cuenta.asegurar());
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   <input v-model="domiciliar[o.id]" type="checkbox" />
-                  {{ $t("pagoAutomatico.alPagar") }}
+                  {{
+                    porPersonaACargo
+                      ? $t("pagoAutomatico.alPagarACargo")
+                      : $t("pagoAutomatico.alPagar")
+                  }}
                 </label>
               </div>
             </li>
