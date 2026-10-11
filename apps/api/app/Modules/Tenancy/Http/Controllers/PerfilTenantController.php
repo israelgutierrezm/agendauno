@@ -45,6 +45,8 @@ class PerfilTenantController
             'nombre' => ['required', 'string', 'max:80'],
             'primer_apellido' => ['nullable', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
+            // Lo que la página del negocio cuenta de quien da clases (opcional).
+            'semblanza' => ['sometimes', 'nullable', 'string', 'max:600'],
             // Único en el negocio, comparado como número («+52 5512345678» = «55 1234 5678»).
             'celular' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:/^[0-9 +()-]*$/',
                 $this->celulares->reglaUnico('Ese celular ya es de otra persona en este negocio.', $persona !== null ? (int) $persona->getKey() : null)],
@@ -81,6 +83,10 @@ class PerfilTenantController
             // `name` sigue siendo el nombre completo (lo usan listados y correos).
             'name' => implode(' ', array_filter($partes)),
         ]);
+        if (array_key_exists('semblanza', $validado)) {
+            $semblanza = trim((string) $validado['semblanza']);
+            $usuario->update(['semblanza' => $semblanza !== '' ? $semblanza : null]);
+        }
 
         return $this->responder($usuario);
     }

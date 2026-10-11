@@ -20,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * `precio_minor` (BIGINT) + `moneda`. Creditos: enteros escalados.
  *
  * @property list<int>|null $sucursales_ids sedes donde vale (null = todas, ADR 0017)
+ * @property string|null $descripcion qué incluye, en una línea (para el público)
+ * @property bool $destacado el que la página muestra primero
+ * @property bool $primera_vez solo lo compra quien nunca vino (clase de prueba)
  */
 class ProductoTenant extends Model
 {
@@ -34,6 +37,8 @@ class ProductoTenant extends Model
         'nombre', 'tipo', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos',
         'vigencia_tipo', 'vigencia_cantidad', 'archivado', 'actividad_id', 'sucursal_id', 'sucursales_ids', 'politica_reset',
         'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
+        // Para el público (plan de mejoras M03/B03).
+        'descripcion', 'destacado', 'primera_vez',
     ];
 
     /**
@@ -48,6 +53,8 @@ class ProductoTenant extends Model
         'vigencia_tipo' => TipoVigencia::class,
         'vigencia_cantidad' => 'integer',
         'archivado' => 'boolean',
+        'destacado' => 'boolean',
+        'primera_vez' => 'boolean',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,
         'unidades_por_ciclo' => 'integer',

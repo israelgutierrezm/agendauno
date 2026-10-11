@@ -295,6 +295,134 @@ describe("página pública del estudio", () => {
     expect(w.find('img[src="https://cdn/caro.jpg"]').exists()).toBe(true);
   });
 
+  it("para quien llega por primera vez: planes comparables, clases para principiantes y el equipo", async () => {
+    const base = escaparate({ promedio: null, total: 0, recientes: [] });
+    const plan = (extra: Record<string, unknown>) => ({
+      tipo: "paquete",
+      precio_minor: 100000,
+      moneda: "MXN",
+      ilimitado: false,
+      creditos_incluidos: 8000,
+      ...extra,
+    });
+    Object.assign(base.data.data, {
+      captacion: { activa: true, formulario: "f1" },
+      productos: [
+        plan({
+          id: "p1",
+          nombre: "Clase muestra",
+          primera_vez: true,
+          precio_minor: 15000,
+          creditos_incluidos: 1000,
+          vence_si_compra_hoy: "2026-10-08",
+        }),
+        plan({ id: "p2", nombre: "Pack 4", creditos_incluidos: 4000 }),
+        plan({
+          id: "p3",
+          nombre: "Pack 8",
+          destacado: true,
+          descripcion: "8 clases en un mes.",
+          actividad: "Pole",
+          vence_si_compra_hoy: "2026-11-01",
+        }),
+      ],
+      servicios: [
+        {
+          id: "o1",
+          nombre: "Pole Básico",
+          descripcion: null,
+          categoria: null,
+          grupal: true,
+          duracion_minutos: 60,
+          precio_minor: null,
+          moneda: "MXN",
+          agendable: false,
+          niveles: [],
+          para_principiantes: true,
+          requisitos: "Ninguno",
+          que_llevar: "Short y top",
+        },
+        {
+          id: "o2",
+          nombre: "Pole Avanzado",
+          descripcion: null,
+          categoria: null,
+          grupal: true,
+          duracion_minutos: 60,
+          precio_minor: null,
+          moneda: "MXN",
+          agendable: false,
+          niveles: [],
+        },
+      ],
+      instructores: [
+        {
+          nombre: "Diana",
+          foto_url: null,
+          semblanza: "Instructora desde 2015.",
+        },
+      ],
+    });
+    mocks.get.mockResolvedValue(base);
+    const w = mount(EstudioPublicoView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { ...es, perfilPublico, sitioWeb } },
+          }),
+        ],
+        stubs: {
+          FormularioCaptacion: {
+            props: ["interes"],
+            template:
+              '<div data-prueba="form-captacion">{{ interes?.producto }}</div>',
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    // El recomendado primero, luego la clase de prueba; con la fecha exacta.
+    const precios = w.findAll('[data-prueba="precio"]');
+    // Agrupados: primero lo de la primera vez; en cada grupo, el recomendado primero.
+    expect(
+      w.findAll('[data-prueba="grupo-precios"] h3').map((h) => h.text()),
+    ).toEqual(["Para tu primera vez", "Paquetes de clases"]);
+    expect(precios.map((p) => p.find(".font-light").text())).toEqual([
+      "Clase muestra",
+      "Pack 8",
+      "Pack 4",
+    ]);
+    expect(precios[1]!.find('[data-prueba="destacado"]').exists()).toBe(true);
+    expect(precios[1]!.text()).toContain("8 clases en un mes.");
+    expect(precios[1]!.text()).toContain("Para Pole");
+    expect(precios[0]!.get('[data-prueba="vence"]').text()).toBe(
+      "Si lo pagas hoy, se puede usar hasta el 8 de octubre",
+    );
+    expect(precios[0]!.text()).toContain(
+      "Solo para quien viene por primera vez",
+    );
+    await precios[0]!.get('[data-prueba="lo-quiero"]').trigger("click");
+    expect(w.get('[data-prueba="form-captacion"]').text()).toBe("p1");
+
+    // Clases para principiantes: qué saber, qué llevar y su filtro.
+    const servicios = w.get('[data-prueba="servicios"]');
+    expect(servicios.findAll('[data-prueba="principiantes"]')).toHaveLength(1);
+    expect(servicios.get('[data-prueba="primera-vez-clase"]').text()).toContain(
+      "Short y top",
+    );
+    await servicios
+      .get('[data-prueba="solo-principiantes"] input')
+      .setValue(true);
+    expect(servicios.text()).not.toContain("Pole Avanzado");
+
+    expect(w.get('[data-prueba="integrante"]').text()).toContain(
+      "Instructora desde 2015.",
+    );
+  });
+
   it("su sitio decide el orden, lo que se ve, sus textos, banners y color (ADR 0114)", async () => {
     const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
     Object.assign(respuesta.data.data, {

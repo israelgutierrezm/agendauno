@@ -621,6 +621,55 @@ describe("portal del alumno", () => {
     w.unmount();
   });
 
+  it("comprar: el recomendado primero, la fecha exacta si paga hoy y la clase de prueba solo si le toca", async () => {
+    const producto = (extra: Record<string, unknown>) => ({
+      tipo: "paquete",
+      precio_minor: 100000,
+      moneda: "MXN",
+      ilimitado: false,
+      creditos_incluidos: 8000,
+      disponible: true,
+      ...extra,
+    });
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/mi/productos")
+            ? [
+                producto({
+                  id: "p1",
+                  nombre: "Clase muestra",
+                  primera_vez: true,
+                  disponible: false,
+                }),
+                producto({ id: "p2", nombre: "Pack 4" }),
+                producto({
+                  id: "p3",
+                  nombre: "Pack 8",
+                  destacado: true,
+                  descripcion: "8 clases en un mes.",
+                  vence_si_compra_hoy: "2026-11-01",
+                }),
+              ]
+            : (datos[url.replace("/api/v1/app/demo", "")] ?? []),
+        },
+      }),
+    );
+    const w = montar(MisPagosView);
+    await flushPromises();
+    const tarjetas = w.findAll('[data-prueba="comprable"]');
+    expect(tarjetas.map((t) => t.find(".font-semibold").text())).toEqual([
+      "Pack 8",
+      "Pack 4",
+    ]);
+    expect(tarjetas[0]!.text()).toContain("Recomendado");
+    expect(tarjetas[0]!.text()).toContain("8 clases en un mes.");
+    expect(tarjetas[0]!.get('[data-prueba="vence"]').text()).toBe(
+      "Si la pagas hoy, se puede usar hasta el 1 de noviembre.",
+    );
+    w.unmount();
+  });
+
   it("una cuenta de citas sin plan no muestra un acceso de planes vacío", async () => {
     sesion.esCitas = true;
     api.get.mockImplementation((url: string) =>

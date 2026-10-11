@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\AvisoPrivacidadNegocioController;
 use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
+use App\Modules\Tenancy\Http\Controllers\CalendarioPublicoController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
 use App\Modules\Tenancy\Http\Controllers\CaptacionPublicaController;
@@ -260,6 +261,9 @@ Route::prefix('v1')->group(function (): void {
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
+        // Calendario público de clases (plan de mejoras M02): sesiones reales por fecha,
+        // con sus lugares (regla única de cupo, ADR 0116).
+        Route::get('/calendario', CalendarioPublicoController::class)->middleware(['throttle:negocio-publico', 'modalidad:clases'])->name('calendario');
         // El aviso de privacidad del negocio para sus clientes (antes de dar sus datos).
         Route::get('/aviso-privacidad', AvisoPrivacidadNegocioController::class)->middleware('throttle:negocio-publico')->name('aviso-privacidad');
         // Captación (ADR 0117): quien todavía no es cliente deja sus datos (la página

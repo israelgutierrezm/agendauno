@@ -56,6 +56,11 @@ class CobrarOrdenTenant
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
                 throw new OrdenNoLiquidable('La orden no admite cobro.');
             }
+            // Una clase de prueba se revalida antes de cobrar: otra orden pudo pagarse antes.
+            // La renovación de lo que ya tiene no es una compra nueva.
+            if ($bloqueada->renueva_acuerdo_id === null) {
+                app(PrimeraVezTenant::class)->exigirEnOrden($bloqueada);
+            }
 
             // Reintento: el intento anterior aún abierto se anula antes de abrir otro,
             // para que no queden dos formas de pagar lo mismo. Si ya se pagó, se espera

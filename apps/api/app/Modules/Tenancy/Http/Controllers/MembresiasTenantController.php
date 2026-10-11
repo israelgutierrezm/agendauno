@@ -83,6 +83,10 @@ class MembresiasTenantController
             'sucursal_ids.*' => ['string', 'distinct'],
             'ofertas' => ['sometimes', 'array', 'max:200'],
             'ofertas.*' => ['string', 'distinct'],
+            // Para el público (M03/B03).
+            'descripcion' => ['nullable', 'string', 'max:300'],
+            'destacado' => ['sometimes', 'boolean'],
+            'primera_vez' => ['sometimes', 'boolean'],
         ]);
 
         $producto = $this->membresias->crearProducto(
@@ -104,6 +108,11 @@ class MembresiasTenantController
             $this->ofertasDe($validado['ofertas'] ?? []),
             isset($validado['sucursal_ids']) ? $this->sucursalesDe($validado['sucursal_ids']) : null,
         );
+        $producto->update([
+            'descripcion' => self::texto($validado['descripcion'] ?? null),
+            'destacado' => (bool) ($validado['destacado'] ?? false),
+            'primera_vez' => (bool) ($validado['primera_vez'] ?? false),
+        ]);
 
         return response()->json(['data' => $this->presentarProducto($producto)], 201);
     }
@@ -138,6 +147,9 @@ class MembresiasTenantController
             'sucursal_ids.*' => ['string', 'distinct'],
             'ofertas' => ['sometimes', 'array', 'max:200'],
             'ofertas.*' => ['string', 'distinct'],
+            'descripcion' => ['sometimes', 'nullable', 'string', 'max:300'],
+            'destacado' => ['sometimes', 'boolean'],
+            'primera_vez' => ['sometimes', 'boolean'],
         ]);
 
         $actor = $request->attributes->get('usuario_tenant');
@@ -145,13 +157,16 @@ class MembresiasTenantController
         abort_if($archiva && ! ($actor instanceof Usuario && $actor->puede('productos.eliminar')), 403);
 
         $atributos = [];
-        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado'] as $campo) {
+        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado', 'destacado', 'primera_vez'] as $campo) {
             if ($request->has($campo)) {
                 $atributos[$campo] = $validado[$campo] ?? null;
             }
         }
         if (isset($atributos['moneda'])) {
             $atributos['moneda'] = mb_strtoupper((string) $atributos['moneda']);
+        }
+        if ($request->has('descripcion')) {
+            $atributos['descripcion'] = self::texto($validado['descripcion'] ?? null);
         }
         if ($request->has('tipo')) {
             $atributos['tipo'] = TipoProducto::from($validado['tipo']);
@@ -318,6 +333,9 @@ class MembresiasTenantController
             // Para mostrar la vigencia sin adivinar: hasta cuándo, si se compra hoy.
             'vence_si_compra_hoy' => VigenciaProducto::de($producto)?->hasta(now($this->membresias->zona())->toDateString()),
             'archivado' => $producto->archivado,
+            'descripcion' => $producto->descripcion,
+            'destacado' => $producto->destacado,
+            'primera_vez' => $producto->primera_vez,
             'politica_reset' => $producto->politica_reset->value,
             'unidades_por_ciclo' => $producto->unidades_por_ciclo,
             'politica_rollover' => $producto->politica_rollover->value,
@@ -381,5 +399,11 @@ class MembresiasTenantController
             'saldo' => $derecho->ilimitado ? null : $this->libro->saldo($derecho),
             'disponible' => $derecho->ilimitado ? null : $this->libro->disponible($derecho),
         ];
+    }
+
+    /** Un texto opcional sin espacios sobrantes (vacío = null). */
+    private static function texto(mixed $valor): ?string
+    {
+        return is_string($valor) && trim($valor) !== '' ? trim($valor) : null;
     }
 }

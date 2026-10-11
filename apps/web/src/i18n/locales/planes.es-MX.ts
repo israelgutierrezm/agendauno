@@ -55,6 +55,10 @@ export default {
     irCatalogo: "Catálogo",
     sinServiciosConBono:
       "Para usar un bono, el servicio debe tomarse «con bono o membresía». Se cambia en",
+    descripcionPh: "Cinco masajes de 60 minutos, para usar en tres meses.",
+    primeraVez: "Es para la primera visita",
+    primeraVezAyuda:
+      "Solo lo compra, una vez, quien nunca ha venido: sin planes antes y sin visitas registradas.",
   },
   tiposAyuda: {
     paquete: "Un número de clases por un precio (p. ej. 8 clases).",
@@ -141,6 +145,15 @@ export default {
     cancelar: "Cancelar",
     soloFuturo:
       "Los cambios aplican a las ventas nuevas; lo ya vendido no cambia.",
+    descripcion: "Qué incluye, en una línea",
+    descripcionPh: "8 clases para usar en un mes, en cualquier horario.",
+    enTuPagina: "En tu página",
+    destacado: "Destacarlo",
+    destacadoAyuda:
+      "Se muestra primero y marcado como recomendado en tu página y en la app.",
+    primeraVez: "Es una clase de prueba",
+    primeraVezAyuda:
+      "Solo la compra, una vez, quien nunca ha venido: sin planes antes y sin asistencias registradas.",
   },
   vender: {
     configurar: "Configurar planes y paquetes →",

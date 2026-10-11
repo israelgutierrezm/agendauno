@@ -70,6 +70,15 @@ export interface Producto {
   // Cuánto dura lo que se compra (ADR 0050).
   vigencia_tipo?: "dias" | "meses" | "fin_de_mes" | null;
   vigencia_cantidad?: number | null;
+  // Para comparar antes de pagar (M03/B03): la fecha exacta si se paga hoy, qué
+  // incluye, el destacado y la clase de prueba (solo para quien nunca vino).
+  vence_si_compra_hoy?: string | null;
+  descripcion?: string | null;
+  destacado?: boolean;
+  primera_vez?: boolean;
+  actividad?: string | null;
+  // ¿La puede comprar? (la clase de prueba, solo la primera vez).
+  disponible?: boolean;
 }
 export interface Orden {
   id: string;

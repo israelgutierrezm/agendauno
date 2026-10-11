@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $primer_apellido
  * @property string|null $segundo_apellido
  * @property string|null $foto_ruta
+ * @property string|null $semblanza lo que la página del negocio cuenta de un instructor
  */
 class Usuario extends Authenticatable
 {
@@ -46,6 +47,8 @@ class Usuario extends Authenticatable
         'name', 'email', 'password', 'google_id', 'activo', 'activation_token', 'rol', 'roles',
         'tema', 'tema_personalizacion', 'fuente', 'nombre', 'primer_apellido', 'segundo_apellido', 'foto_ruta',
         'ultimo_rol',
+        // Lo que la página del negocio cuenta de un instructor.
+        'semblanza',
     ];
 
     /**

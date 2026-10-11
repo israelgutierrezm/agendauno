@@ -32,6 +32,10 @@ export interface Plan {
   todas_sucursales?: boolean;
   archivado: boolean;
   ofertas: { id: string; nombre: string }[];
+  // Para el público (M03/B03).
+  descripcion?: string | null;
+  destacado?: boolean;
+  primera_vez?: boolean;
 }
 
 /** 1000 unidades = 1 clase. */

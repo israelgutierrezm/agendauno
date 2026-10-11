@@ -120,4 +120,33 @@ describe("planes de un negocio de citas", () => {
       .filter((t) => t === "Corte" || t === "Masaje");
     expect(servicios).toEqual(["Masaje"]);
   });
+
+  it("para la página: qué incluye, destacado y primera visita (no en una membresía)", async () => {
+    api.post.mockResolvedValue({});
+    const w = montar();
+    await flushPromises();
+    await w.get("#ep-nombre").setValue("Primera visita");
+    await w.get("#ep-precio").setValue("150");
+    await w.get("#ep-descripcion").setValue("  Un masaje para conocernos.  ");
+    const destacado = w
+      .findAll('input[type="checkbox"]')
+      .find((c) =>
+        c.element.closest("label")?.textContent?.includes("Destacarlo"),
+      )!;
+    await destacado.setValue(true);
+    await w.get('[data-prueba="primera-vez"] input').setValue(true);
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/productos",
+      expect.objectContaining({
+        descripcion: "Un masaje para conocernos.",
+        destacado: true,
+        primera_vez: true,
+      }),
+    );
+
+    await w.get('[data-prueba="tipo-membresia"]').trigger("click");
+    expect(w.find('[data-prueba="primera-vez"]').exists()).toBe(false);
+  });
 });

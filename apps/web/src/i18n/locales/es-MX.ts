@@ -1071,6 +1071,25 @@ export default {
     duenoDescPrelanzamiento:
       "AgendaUno abre pronto. Déjanos tus datos y te avisamos en cuanto puedas registrar tu negocio.",
   },
+  // Calendario público de clases (plan de mejoras M02).
+  calendarioPublico: {
+    dias: "Días de la semana",
+    semanaAnterior: "Semana anterior",
+    semanaSiguiente: "Semana siguiente",
+    sede: "Sede",
+    actividad: "Actividad",
+    instructor: "Instructor",
+    todasSedes: "Todas las sedes",
+    todasActividades: "Todas las clases",
+    todosInstructores: "Todos los instructores",
+    sinClasesDia: "No hay clases este día.",
+    verDia: "Ver el {fecha}",
+    siguiente: "Siguiente fecha con clases: {fecha}",
+    minutos: "{n} min",
+    lugares: "{libres} de {total} lugares",
+    llena: "Llena",
+    cupoAbierto: "Cupo abierto",
+  },
   escaparate: {
     cargando: "Cargando el negocio…",
     noDisponible: "Este negocio no está disponible por ahora.",
@@ -1117,6 +1136,33 @@ export default {
     cupoAbierto: "Cupo abierto",
     creditos: "1 crédito | {n} créditos",
     ilimitado: "Ilimitado",
+    // Planes para comparar antes de comprar (M03/B03).
+    planes: {
+      destacado: "Recomendado",
+      primeraVez: "Para tu primera vez",
+      primeraVezAyuda: "Solo para quien viene por primera vez, una vez.",
+      porMes: "1 crédito al mes | {n} créditos al mes",
+      paraActividad: "Para {actividad}",
+      vence: "Si lo pagas hoy, se puede usar hasta el {fecha}",
+      renueva: "Se renueva cada mes mientras la pagues",
+      loQuiero: "Lo quiero",
+      grupos: {
+        primera_vez: "Para tu primera vez",
+        sesion_individual: "Clase suelta",
+        paquete: "Paquetes de clases",
+        membresia: "Membresías",
+        otro: "Talleres y pases",
+        add_on: "Clases extra",
+      },
+      gruposCitas: {
+        primera_vez: "Para tu primera visita",
+        sesion_individual: "Sesión suelta",
+        paquete: "Bonos de sesiones",
+        membresia: "Membresías",
+        otro: "Otros",
+        add_on: "Extras",
+      },
+    },
     registro: {
       tipos: {
         membresia: "Membresía",
@@ -2805,6 +2851,9 @@ export default {
       comprar: "Comprar",
       comprando: "Creando…",
       creada: "Compra creada. Completa el pago para activar tus créditos.",
+      destacado: "Recomendado",
+      primeraVez: "Para tu primera vez",
+      vence: "Si la pagas hoy, se puede usar hasta el {fecha}.",
       creditos: "1 crédito | {n} créditos",
       tipos: {
         membresia: "Membresía",

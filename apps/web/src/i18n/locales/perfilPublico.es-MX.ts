@@ -91,6 +91,14 @@ export default {
     fotoArrastra: "Arrastra la foto aquí o",
     fotoAyuda: "La ven tus clientes al elegir. PNG, JPG o WebP de hasta 4 MB.",
     fotoQuitar: "Quitar foto",
+    // Para quien llega por primera vez (C03): lo que el negocio valida.
+    principiantes: "Apta para principiantes",
+    principiantesAyuda:
+      "Se marca en tu página para quien nunca ha tomado esta clase.",
+    requisitos: "Qué necesita saber",
+    requisitosPh: "Ninguno: empezamos desde cero.",
+    queLlevar: "Qué llevar",
+    queLlevarPh: "Ropa cómoda y una botella de agua.",
   },
   // Cómo conoció el cliente al negocio (se guarda en su ficha).
   origenes: {
@@ -130,6 +138,11 @@ export default {
     todos: "Todos",
     duracion: "{n} min",
     niveles: "Niveles: {lista}",
+    // Para quien llega por primera vez (C03).
+    principiantes: "Para principiantes",
+    soloPrincipiantes: "Solo para principiantes",
+    requisitos: "Qué necesitas saber",
+    queLlevar: "Qué llevar",
     horarioClases: "Horario de clases",
     sinHorarioClases: "Aún no hay clases en el horario.",
     agendar: "Agendar",

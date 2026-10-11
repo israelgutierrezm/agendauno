@@ -318,6 +318,24 @@ describe("perfil unificado", () => {
     w.unmount();
   });
 
+  it("quien da clases escribe su semblanza para la página; un alumno no", async () => {
+    expect(montar().find("#mp-semblanza").exists()).toBe(false);
+
+    sesion.usuario.rol = "instructor";
+    sesion.usuario.roles_disponibles = [
+      { clave: "instructor", faceta: "instructor" },
+    ];
+    api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });
+    const w = montar();
+    await w.get("#mp-semblanza").setValue("  Instructora desde 2015.  ");
+    await w.findAll("form")[0].trigger("submit");
+    await flushPromises();
+    expect(api.put.mock.calls[0][1]).toMatchObject({
+      semblanza: "Instructora desde 2015.",
+    });
+    w.unmount();
+  });
+
   it("reacciona al rol activo, incluyendo roles personalizados", async () => {
     const w = montar();
     sesion.usuario.rol = "propietario";

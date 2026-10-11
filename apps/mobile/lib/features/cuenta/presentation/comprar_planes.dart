@@ -55,7 +55,7 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          p.tipoTexto,
+                          p.etiqueta,
                           style: const TextStyle(
                             fontSize: 12,
                             color: TemaAgendaUno.textoSuave,
@@ -75,8 +75,10 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
                         ),
                         // Si no vale en todas las sucursales, en cuáles.
                         for (final dato in [
+                          p.descripcion,
                           p.creditosTexto,
                           p.vigenciaTexto,
+                          p.venceTexto,
                           p.cobertura.texto,
                         ])
                           if (dato != null)

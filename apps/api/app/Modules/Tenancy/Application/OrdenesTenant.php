@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\ExtraSinPaquete;
 use App\Modules\Tenancy\Ordenes\Exceptions\MonedaMixta;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
+use App\Modules\Tenancy\Ordenes\Exceptions\PrimeraVezNoDisponible;
 use App\Modules\Tenancy\Ordenes\Exceptions\ProductoArchivado;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,13 @@ class OrdenesTenant
         foreach ($items as $item) {
             if (! $renovacion && $item['producto']->archivado) {
                 throw new ProductoArchivado("«{$item['producto']->nombre}» ya no está a la venta.");
+            }
+            // Clase de prueba (B03): una sola, para quien nunca vino.
+            if (! $renovacion && $item['producto']->primera_vez) {
+                $quien = $item['beneficiario'] ?? $comprador;
+                if (max(1, $item['cantidad']) > 1 || ! app(PrimeraVezTenant::class)->elegible($quien)) {
+                    throw new PrimeraVezNoDisponible(PrimeraVezTenant::MENSAJE);
+                }
             }
             if ($item['producto']->moneda !== $moneda) {
                 throw new MonedaMixta('Una orden no puede mezclar monedas.');
