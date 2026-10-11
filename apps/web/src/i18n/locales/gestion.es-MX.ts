@@ -478,6 +478,20 @@ export const instructorClase = {
 };
 
 export const plataformaAdmin = {
+  // Módulos que se encienden por negocio (ADR 0123).
+  modulos: {
+    titulo: "Módulos",
+    estadoEncendido: "encendido",
+    estadoApagado: "apagado",
+    encender: "Encender",
+    apagar: "Apagar",
+    confirmarEncender:
+      "¿Encender «{modulo}» en {estudio}? El negocio y sus clientes lo verán desde ahora.",
+    confirmarApagar:
+      "¿Apagar «{modulo}» en {estudio}? Deja de estar disponible para el negocio y sus clientes; lo que ya registró se conserva.",
+    encendido: "{modulo}: encendido",
+    apagado: "{modulo}: apagado",
+  },
   pestanas: {
     estudios: "Estudios",
     cobros: "Cobros",

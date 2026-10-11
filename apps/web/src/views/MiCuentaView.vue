@@ -8,6 +8,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
+import PersonasACargo from "@/components/PersonasACargo.vue";
 import TarjetaOperacion, {
   type Ilustracion,
 } from "@/components/TarjetaOperacion.vue";
@@ -21,6 +22,7 @@ import {
   type Derecho,
 } from "@/lib/miCuenta";
 import { marcarPwa } from "@/lib/pwa";
+import { useParticipantes } from "@/lib/participantes";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -38,6 +40,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const cuenta = useMiCuenta();
+const participantes = useParticipantes();
 const retornoPago = useRetornoPago();
 const verPase = ref(false);
 
@@ -357,8 +360,16 @@ onMounted(() => {
       }}
     </h1>
     <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+      <!-- En la cuenta de una persona a su cargo, de quién es el resumen (ADR 0123). -->
       {{
-        $t("portal.inicio.resumen", { estudio: sesion.estudio?.nombre ?? "" })
+        participantes.nombreActual
+          ? $t("familias.resumenDe", {
+              nombre: participantes.nombreActual,
+              estudio: sesion.estudio?.nombre ?? "",
+            })
+          : $t("portal.inicio.resumen", {
+              estudio: sesion.estudio?.nombre ?? "",
+            })
       }}
     </p>
     <InstalarApp
@@ -545,6 +556,9 @@ onMounted(() => {
           }}</RouterLink
         >
       </div>
+
+      <!-- Personas a su cargo: autorizar, ver su cuenta o retirar (ADR 0123). -->
+      <PersonasACargo class="mt-5" />
 
       <!-- Accesos directos -->
       <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
