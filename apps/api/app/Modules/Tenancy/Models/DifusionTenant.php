@@ -19,12 +19,20 @@ class DifusionTenant extends Model
 {
     use HasPublicId;
 
+    // B08: se pausa, se reanuda o se cancela sin tocar los avisos de operación.
+    public const ENVIANDO = 'enviando';
+
+    public const PAUSADA = 'pausada';
+
+    public const CANCELADA = 'cancelada';
+
     protected $connection = 'tenant';
 
     protected $table = 'difusiones';
 
     protected $fillable = [
         'segmento', 'canal', 'asunto', 'cuerpo', 'total', 'enviada_en',
+        'estado', 'pausada_en', 'cancelada_en', 'huella',
     ];
 
     /**
@@ -35,6 +43,8 @@ class DifusionTenant extends Model
         'canal' => CanalComunicacion::class,
         'total' => 'integer',
         'enviada_en' => 'datetime',
+        'pausada_en' => 'datetime',
+        'cancelada_en' => 'datetime',
     ];
 
     /**

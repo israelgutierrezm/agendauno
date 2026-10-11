@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Automatizacion\EstadoTarea;
 use App\Modules\Tenancy\Automatizacion\MotivoSeguimiento;
+use App\Modules\Tenancy\Automatizacion\ResultadoSeguimiento;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
@@ -59,11 +60,45 @@ class SeguimientoTenant
         }
         // Todo se cuenta en días del negocio (su zona horaria).
         $hoy = CarbonImmutable::parse($this->fechas->hoy(), $this->fechas->zona());
+        // Quien ya renovó sale del seguimiento de su vencimiento (B08).
+        $this->cerrarRenovados($hoy);
 
         return $this->primerasAsistencias($hoy)
             + $this->planes($hoy)
             + $this->sinAsistir($hoy)
             + $this->comprasSinReservar($hoy);
+    }
+
+    /**
+     * Cierra el seguimiento de «plan por vencer» o «vencido» de quien ya tiene un plan
+     * vigente más allá de los días de aviso (renovó o compró otro): resultado «renovó»,
+     * sin que nadie tenga que marcarlo (B08). Devuelve cuántos cerró.
+     */
+    public function cerrarRenovados(CarbonImmutable $hoy): int
+    {
+        $aviso = $this->parametros->entero('membresias.dias_por_vencer');
+        $abiertas = TareaTenant::query()
+            ->whereIn('motivo', [MotivoSeguimiento::PlanPorVencer->value, MotivoSeguimiento::PlanVencido->value])
+            ->where('estado', EstadoTarea::Pendiente->value)
+            ->whereNotNull('persona_id')
+            ->get();
+
+        $cerradas = 0;
+        foreach ($abiertas as $tarea) {
+            $renovo = DerechoTenant::query()
+                ->join('acuerdos', 'acuerdos.id', '=', 'derechos.acuerdo_id')
+                ->where('acuerdos.persona_id', $tarea->persona_id)
+                ->where('acuerdos.estado', EstadoAcuerdo::Activo->value)
+                ->where(fn ($q) => $q->whereNull('derechos.valido_hasta')
+                    ->orWhereDate('derechos.valido_hasta', '>', $hoy->addDays($aviso)->toDateString()))
+                ->exists();
+            if ($renovo) {
+                $this->tareas->registrarResultado($tarea, ResultadoSeguimiento::Renovo, 'Renovó su plan (cerrado automáticamente).');
+                $cerradas++;
+            }
+        }
+
+        return $cerradas;
     }
 
     private function primerasAsistencias(CarbonImmutable $hoy): int
