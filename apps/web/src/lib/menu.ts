@@ -627,6 +627,7 @@ export function rutasDelMenu(): string[] {
 const AREA_DE_AUXILIAR: Record<string, { area: string; vista: string }> = {
   "ficha-miembro": { area: "clientes", vista: "directorio" },
   importar: { area: "clientes", vista: "directorio" },
+  "importar-saldos": { area: "clientes", vista: "directorio" },
   "ficha-instructor": { area: "equipo", vista: "personas" },
   "importar-instructores": { area: "equipo", vista: "personas" },
   "importar-clases": { area: "agenda", vista: "calendario" },

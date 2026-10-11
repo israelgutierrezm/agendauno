@@ -24,6 +24,7 @@ const PASO: Record<string, string> = {
   "ficha-miembro": "nav.paso.ficha",
   "ficha-instructor": "nav.paso.ficha",
   importar: "nav.importar",
+  "importar-saldos": "importarSaldos.titulo",
   "importar-instructores": "nav.importar",
   "importar-clases": "importarClases.titulo",
   onboarding: "onboarding.titulo",

@@ -1,25 +1,34 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoFilaImportacion from "@/components/EstadoFilaImportacion.vue";
+import ResumenImportacion, {
+  type ResumenCarga,
+} from "@/components/ResumenImportacion.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface FilaPreview {
   fila: number;
   datos: Record<string, unknown>;
   errores: string[];
+  estado?: string;
 }
 interface Resultado {
   ok?: boolean;
-  resumen: { total: number; validas: number; invalidas: number };
+  resumen: ResumenCarga;
   filas: FilaPreview[];
   creados?: number;
+  invitados?: number;
 }
 
 const sesion = useSesionTenantStore();
+const { t } = useI18n();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const archivo = ref<File | null>(null);
@@ -28,13 +37,13 @@ const preview = ref<Resultado | null>(null);
 const analizando = ref(false);
 const importando = ref(false);
 const creados = ref<number | null>(null);
+const invitados = ref(0);
+const porCorregir = ref(0);
 const error = ref<string | null>(null);
 
+// Hay algo nuevo que crear; con filas por corregir, solo las listas (se confirma).
 const puedeImportar = computed(
-  () =>
-    preview.value !== null &&
-    preview.value.resumen.invalidas === 0 &&
-    preview.value.resumen.total > 0,
+  () => preview.value !== null && preview.value.resumen.validas > 0,
 );
 
 function texto(v: unknown): string {
@@ -71,8 +80,22 @@ async function previsualizar(): Promise<void> {
   }
 }
 
-async function importar(): Promise<void> {
-  if (archivo.value === null) {
+/**
+ * Las invitaciones por correo salen solo si se confirma (C07); si no, se invita
+ * después desde Equipo.
+ */
+async function importar(invitar: boolean): Promise<void> {
+  if (archivo.value === null || preview.value === null) {
+    return;
+  }
+  const { validas, invalidas } = preview.value.resumen;
+  const avisos = [
+    invalidas > 0
+      ? t("importar.confirmarListas", { n: validas, m: invalidas })
+      : null,
+    invitar ? t("importarInstructores.confirmarInvitar", { n: validas }) : null,
+  ].filter((x): x is string => x !== null);
+  if (avisos.length > 0 && !(await confirmar(avisos.join(" ")))) {
     return;
   }
   importando.value = true;
@@ -80,11 +103,17 @@ async function importar(): Promise<void> {
   try {
     const fd = new FormData();
     fd.append("archivo", archivo.value);
+    fd.append("invitar", invitar ? "1" : "0");
+    if (invalidas > 0) {
+      fd.append("parcial", "1");
+    }
     const { data } = await api.post<{ data: Resultado }>(
       `${base.value}/importaciones/instructores`,
       fd,
     );
     creados.value = data.data.creados ?? 0;
+    invitados.value = data.data.invitados ?? 0;
+    porCorregir.value = data.data.resumen.invalidas;
     preview.value = null;
     archivo.value = null;
     nombreArchivo.value = "";
@@ -120,6 +149,24 @@ function descargarPlantilla(): void {
     <div v-if="creados !== null" class="mt-6 tu-card p-6 text-center">
       <p class="text-2xl font-semibold" :style="{ color: 'var(--exito)' }">
         {{ $t("importarInstructores.creados", { n: creados }) }}
+      </p>
+      <p
+        class="mt-2 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+        data-prueba="invitaciones"
+      >
+        {{
+          invitados > 0
+            ? $t("importarInstructores.invitados", { n: invitados })
+            : $t("importarInstructores.sinInvitar")
+        }}
+      </p>
+      <p
+        v-if="porCorregir > 0"
+        class="mt-1 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("importar.porCorregir", { n: porCorregir }) }}
       </p>
       <RouterLink
         :to="{ name: 'instructores' }"
@@ -175,43 +222,7 @@ function descargarPlantilla(): void {
 
       <!-- Preview -->
       <template v-if="preview">
-        <div class="mt-6 grid grid-cols-3 gap-3">
-          <div class="tu-card p-4 text-center">
-            <div class="text-xl font-semibold">
-              {{ preview.resumen.total }}
-            </div>
-            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("importar.total") }}
-            </div>
-          </div>
-          <div class="tu-card p-4 text-center">
-            <div
-              class="text-xl font-semibold"
-              :style="{ color: 'var(--exito)' }"
-            >
-              {{ preview.resumen.validas }}
-            </div>
-            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("importar.validas") }}
-            </div>
-          </div>
-          <div class="tu-card p-4 text-center">
-            <div
-              class="text-xl font-semibold"
-              :style="{
-                color:
-                  preview.resumen.invalidas > 0
-                    ? 'var(--error)'
-                    : 'var(--texto-suave)',
-              }"
-            >
-              {{ preview.resumen.invalidas }}
-            </div>
-            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("importar.invalidas") }}
-            </div>
-          </div>
-        </div>
+        <ResumenImportacion class="mt-6" :resumen="preview.resumen" />
 
         <p
           v-if="preview.resumen.invalidas > 0"
@@ -221,20 +232,16 @@ function descargarPlantilla(): void {
           {{ $t("importar.corrige") }}
         </p>
 
-        <div class="mt-4 tu-card overflow-x-auto">
+        <div class="mt-4 tu-card overflow-x-auto relative">
           <table class="tu-tabla">
             <thead>
               <tr>
                 <th>#</th>
-                <th>
-                  {{ $t("importar.colNombre") }}
-                </th>
+                <th>{{ $t("importar.colNombre") }}</th>
                 <th class="hidden sm:table-cell">
                   {{ $t("importar.colCorreo") }}
                 </th>
-                <th>
-                  {{ $t("importar.colEstado") }}
-                </th>
+                <th>{{ $t("importar.colEstado") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -242,9 +249,7 @@ function descargarPlantilla(): void {
                 <td :style="{ color: 'var(--texto-suave)' }">
                   {{ f.fila }}
                 </td>
-                <td class="font-medium">
-                  {{ texto(f.datos.nombre) }}
-                </td>
+                <td class="font-medium">{{ texto(f.datos.nombre) }}</td>
                 <td
                   class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
@@ -252,38 +257,44 @@ function descargarPlantilla(): void {
                   {{ texto(f.datos.email) }}
                 </td>
                 <td>
-                  <span
-                    v-if="f.errores.length === 0"
-                    class="tu-badge tu-badge-exito"
-                    >{{ $t("importar.ok") }}</span
-                  >
-                  <span
-                    v-for="(er, i) in f.errores"
-                    :key="i"
-                    class="tu-badge block sm:inline mb-1 sm:mb-0 sm:mr-1"
-                    :style="{
-                      background: 'var(--error-suave)',
-                      color: 'var(--error)',
-                    }"
-                    >{{ er }}</span
-                  >
+                  <EstadoFilaImportacion
+                    :estado="f.estado"
+                    :errores="f.errores"
+                  />
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div class="mt-4 flex justify-end">
+        <p
+          v-if="puedeImportar"
+          class="mt-4 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("importarInstructores.ayudaInvitar") }}
+        </p>
+        <div class="mt-3 flex flex-wrap justify-end gap-2">
+          <button
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            data-prueba="importar-sin-invitar"
+            :disabled="!puedeImportar || importando"
+            @click="importar(false)"
+          >
+            {{ $t("importarInstructores.importarSinInvitar") }}
+          </button>
           <button
             class="tu-btn tu-btn-primario"
             type="button"
+            data-prueba="importar-e-invitar"
             :disabled="!puedeImportar || importando"
-            @click="importar"
+            @click="importar(true)"
           >
             {{
               importando
                 ? $t("importar.importando")
-                : $t("importarInstructores.importar", {
+                : $t("importarInstructores.importarInvitar", {
                     n: preview.resumen.validas,
                   })
             }}
