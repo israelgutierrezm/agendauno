@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FamiliasTenant;
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
 use App\Modules\Tenancy\Automatizacion\EstadoTarea;
 use App\Modules\Tenancy\Automatizacion\ResultadoSeguimiento;
@@ -26,7 +27,10 @@ use Illuminate\Validation\Rule;
  */
 class TareasTenantController
 {
-    public function __construct(private readonly GestionarTareasTenant $tareas) {}
+    public function __construct(
+        private readonly GestionarTareasTenant $tareas,
+        private readonly FamiliasTenant $familias,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -154,6 +158,23 @@ class TareasTenantController
     }
 
     /**
+     * @return array{nombre: string, celular: string}|null
+     */
+    private function contactoDe(TareaTenant $tarea): ?array
+    {
+        $persona = $tarea->persona;
+        if ($tarea->motivo === null || ! $persona instanceof PersonaTenant || trim((string) $persona->celular) !== '') {
+            return null;
+        }
+        $responsable = $this->familias->responsablesDe($persona)
+            ->first(static fn (PersonaTenant $r): bool => trim((string) $r->celular) !== '');
+
+        return $responsable instanceof PersonaTenant
+            ? ['nombre' => $responsable->nombreCompleto(), 'celular' => (string) $responsable->celular]
+            : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function presentar(TareaTenant $tarea): array
@@ -168,6 +189,8 @@ class TareasTenantController
             // Para ir a su ficha y escribirle (seguimiento; M09).
             'persona_id' => $tarea->persona?->ulid,
             'celular' => $tarea->persona?->celular,
+            // Sin celular propio, a quién escribirle: su responsable (familias, ADR 0123).
+            'contacto' => $this->contactoDe($tarea),
             'motivo' => $tarea->motivo?->value,
             'resultado' => $tarea->resultado?->value,
             'contactado_en' => $tarea->contactado_en?->toIso8601String(),

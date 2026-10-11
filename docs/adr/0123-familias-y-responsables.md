@@ -135,3 +135,14 @@ El dueño decidió:
 - La redacción del texto base y su validez con menores requieren revisión legal del
   negocio.
 - Nuevos módulos se agregan al catálogo `ModuloNegocio` con su middleware en las rutas.
+
+## Actualización (2026-10-11)
+
+- Seguimiento (ADR 0122): si el participante no tiene celular propio, la tarea le habla
+  a su responsable con autorización vigente y celular. El mensaje es para él («el plan de
+  Sofía vence…»). La tarea trae `contacto` y WhatsApp abre su número. En los motivos
+  comerciales, solo si el responsable acepta promociones.
+- Siguen fuera, por decisión pendiente del dueño:
+  - el pago automático de un participante con la tarjeta del responsable (hoy la tarjeta
+    queda a nombre del participante);
+  - WhatsApp a responsables, que requiere plantillas aprobadas por Meta.

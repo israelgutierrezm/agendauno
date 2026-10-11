@@ -454,6 +454,8 @@ export default {
     guardar: "Guardar resultado",
     registrado: "Resultado guardado",
     copiar: "Copiar mensaje",
+    // Sin celular propio, se le escribe a su responsable (familias).
+    via: "Se le escribe a {nombre}, su responsable",
     copiado: "Mensaje copiado",
     noSeCopio: "No se pudo copiar; selecciona el texto y cópialo.",
     whatsapp: "Escribir por WhatsApp",

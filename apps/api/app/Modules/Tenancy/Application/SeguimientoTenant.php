@@ -50,6 +50,7 @@ class SeguimientoTenant
         private readonly ParametrosTenant $parametros,
         private readonly GestionarTareasTenant $tareas,
         private readonly ModalidadNegocioTenant $modalidad,
+        private readonly FamiliasTenant $familias,
     ) {}
 
     /** Crea las tareas de seguimiento de hoy; devuelve cuántas. */
@@ -252,14 +253,35 @@ class SeguimientoTenant
         $nombre = (string) ($persona->nombre ?: $persona->nombreCompleto());
         $fecha = $dato === null ? null : CarbonImmutable::parse($dato)->locale('es')->isoFormat('D [de] MMMM');
         $citas = $this->modalidad->esCitas();
+        // Sin celular propio, el mensaje es para su responsable (familias, ADR 0123).
+        $responsable = $this->responsableAQuienEscribir($persona, $motivo);
+        $mensaje = $responsable instanceof PersonaTenant
+            ? $motivo->mensajeParaResponsable((string) ($responsable->nombre ?: $responsable->nombreCompleto()), $nombre, $fecha, $citas)
+                ."\n\nNo tiene celular propio: escríbele a {$responsable->nombreCompleto()}, su responsable."
+            : $motivo->mensajeSugerido($nombre, $fecha, $citas);
         $this->tareas->crear([
             'titulo' => $motivo->etiqueta($citas).': '.$persona->nombreCompleto(),
-            'detalle' => self::PREFIJO_MENSAJE.$motivo->mensajeSugerido($nombre, $fecha, $citas),
+            'detalle' => self::PREFIJO_MENSAJE.$mensaje,
             'persona_id' => $personaId,
             'motivo' => $motivo->value,
             'vence_en' => $hoy->addDay()->utc(),
         ]);
 
         return 1;
+    }
+
+    /**
+     * El responsable con celular de quien no tiene uno propio, si el negocio usa
+     * familias. Para un motivo comercial, solo si el responsable acepta promociones.
+     */
+    private function responsableAQuienEscribir(PersonaTenant $persona, MotivoSeguimiento $motivo): ?PersonaTenant
+    {
+        if (trim((string) $persona->celular) !== '') {
+            return null;
+        }
+
+        return $this->familias->responsablesDe($persona)
+            ->first(static fn (PersonaTenant $r): bool => trim((string) $r->celular) !== ''
+                && (! $motivo->comercial() || $r->recibe_promociones));
     }
 }
