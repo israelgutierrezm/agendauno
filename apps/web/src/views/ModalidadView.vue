@@ -161,7 +161,11 @@ const preguntas = computed(() =>
   contenido.value.preguntas.map((clave) => ({
     clave,
     pregunta: t(k(`faq.${clave}.q`)),
-    respuesta: t(k(`faq.${clave}.a`)),
+    // El canal de soporte de la marca (C01); a las demás respuestas no les afecta.
+    respuesta: t(
+      k(`faq.${clave}.a`),
+      PRODUCTOS[productoDeModalidad(props.modo)].soporte,
+    ),
   })),
 );
 

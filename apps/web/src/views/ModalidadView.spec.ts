@@ -534,6 +534,19 @@ describe("landing de una modalidad (/clases y /citas)", () => {
     },
   );
 
+  it("la pregunta de soporte da el correo de cada marca y el WhatsApp (C01)", () => {
+    const clases = montar("clases");
+    expect(
+      clases.get('#preguntas [data-pregunta="soporte"] p').text(),
+    ).toContain("soporte@agendauno.mx o por WhatsApp al 555555555");
+    clases.unmount();
+    const citas = montar("citas");
+    expect(
+      citas.get('#preguntas [data-pregunta="soporte"] p').text(),
+    ).toContain("soporte@turnouno.mx");
+    citas.unmount();
+  });
+
   it.each(MODOS_PRUEBA)(
     "%s: pregunta quién cambia la modalidad (ya no lo dice el registro)",
     (modo) => {
