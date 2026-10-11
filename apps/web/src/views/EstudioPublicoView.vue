@@ -63,6 +63,8 @@ interface Producto {
   unidades_por_ciclo?: number | null;
   // La fecha exacta: la vigencia corre desde el pago.
   vence_si_compra_hoy?: string | null;
+  // Permanencia mínima (B04).
+  permanencia_meses?: number | null;
 }
 type NombreRed = "instagram" | "facebook" | "tiktok" | "youtube" | "sitio_web";
 interface Red {
@@ -1261,6 +1263,18 @@ onMounted(cargar);
                         </li>
                         <li v-if="p.primera_vez">
                           {{ $t("escaparate.planes.primeraVezAyuda") }}
+                        </li>
+                        <li
+                          v-if="(p.permanencia_meses ?? 0) > 0"
+                          data-prueba="permanencia"
+                        >
+                          {{
+                            $t(
+                              "escaparate.planes.permanencia",
+                              { n: p.permanencia_meses },
+                              p.permanencia_meses ?? 0,
+                            )
+                          }}
                         </li>
                       </ul>
                       <button

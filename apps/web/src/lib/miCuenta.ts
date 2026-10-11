@@ -94,6 +94,9 @@ export interface Producto {
   disponible?: boolean;
   // Lo que se suma de inscripción si lo compra hoy (B04; 0 = nada).
   inscripcion_minor?: number;
+  // Permanencia (B04): las condiciones que acepta al comprarlo.
+  permanencia_meses?: number | null;
+  condiciones?: string | null;
 }
 export interface Orden {
   id: string;
@@ -411,10 +414,12 @@ export function useMiCuenta() {
       accion(() => api.post(`${base.value}/mi/reservas/${r.id}/aceptar`, {})),
     aceptarWaiver: (w: Waiver) =>
       accion(() => api.post(`${base.value}/mi/waivers/${w.id}/aceptar`, {})),
-    comprar: (p: Producto) =>
+    // Con permanencia (B04), aceptando sus condiciones.
+    comprar: (p: Producto, aceptaCondiciones = false) =>
       accion(() =>
         api.post(`${base.value}/mi/ordenes`, {
           items: [{ producto_id: p.id, cantidad: 1 }],
+          ...(aceptaCondiciones ? { acepta_condiciones: true } : {}),
         }),
       ),
   };

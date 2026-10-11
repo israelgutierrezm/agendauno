@@ -59,8 +59,11 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
   ) => _hacer((repo) => repo.calificar(reservaId, calificacion, comentario));
 
   /// Compra un plan: la orden aparece en "Por pagar" al recargar.
-  Future<void> comprar(String productoId) =>
-      _hacer((repo) => repo.comprar(productoId));
+  Future<void> comprar(String productoId, {bool aceptaCondiciones = false}) =>
+      _hacer(
+        (repo) =>
+            repo.comprar(productoId, aceptaCondiciones: aceptaCondiciones),
+      );
 
   /// Tras agendar una cita (la agenda el formulario de citas).
   Future<void> recargar() => _hacer((_) async {});

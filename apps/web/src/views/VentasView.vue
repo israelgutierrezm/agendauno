@@ -75,6 +75,11 @@ const inscripcion = ref(0);
 const exentarInscripcion = ref(false);
 const motivoExencion = ref("");
 const puedeExentar = computed(() => sesion.puede("cuotas.exentar"));
+// Permanencia (B04): el cliente acepta las condiciones del plan antes de cobrar.
+const aceptaCondiciones = ref(false);
+const pideCondiciones = computed(
+  () => (productoSel.value?.permanencia_meses ?? 0) > 0,
+);
 const validandoPromo = ref(false);
 
 // Solo los vendibles (no archivados), agrupados por tipo.
@@ -195,6 +200,7 @@ watch(
   async ([compradorId]) => {
     const mio = ++pedidoInscripcion;
     inscripcion.value = 0;
+    aceptaCondiciones.value = false;
     exentarInscripcion.value = false;
     motivoExencion.value = "";
     if (compradorId === "" || !productoSel.value?.cobra_inscripcion) {
@@ -257,6 +263,7 @@ async function vender(): Promise<void> {
               motivo_exencion: motivoExencion.value.trim(),
             }
           : {}),
+        ...(pideCondiciones.value ? { acepta_condiciones: true } : {}),
       },
       venta.value.metodo,
     );
@@ -534,6 +541,24 @@ onMounted(cargar);
               </template>
             </div>
 
+            <!-- Permanencia (B04): las condiciones que acepta el cliente. -->
+            <div
+              v-if="pideCondiciones && productoSel?.condiciones"
+              class="space-y-2 rounded-lg p-3 text-sm"
+              :style="{ background: 'var(--superficie-2)' }"
+              data-prueba="condiciones-venta"
+            >
+              <p>{{ productoSel.condiciones }}</p>
+              <label class="flex items-start gap-2">
+                <input
+                  v-model="aceptaCondiciones"
+                  type="checkbox"
+                  class="mt-1"
+                />
+                {{ $t("ventas.vender.aceptaCondiciones") }}
+              </label>
+            </div>
+
             <div class="vv-total">
               <span>{{ $t("pos.total") }}</span>
               <span class="tabular-nums">{{
@@ -548,7 +573,8 @@ onMounted(cargar);
                 vendiendo ||
                 venta.compradorId === '' ||
                 venta.productoId === '' ||
-                (exentarInscripcion && motivoExencion.trim() === '')
+                (exentarInscripcion && motivoExencion.trim() === '') ||
+                (pideCondiciones && !aceptaCondiciones)
               "
             >
               {{

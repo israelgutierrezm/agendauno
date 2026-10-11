@@ -79,14 +79,17 @@ class CuentaRepository {
   }
 
   /// Compra un plan: crea la orden pendiente (se activa al pagarla).
-  Future<void> comprar(String productoId) => _dio.post<Map<String, dynamic>>(
-    '$_base/mi/ordenes',
-    data: {
-      'items': [
-        {'producto_id': productoId, 'cantidad': 1},
-      ],
-    },
-  );
+  /// Con permanencia (B04), aceptando sus condiciones.
+  Future<void> comprar(String productoId, {bool aceptaCondiciones = false}) =>
+      _dio.post<Map<String, dynamic>>(
+        '$_base/mi/ordenes',
+        data: {
+          'items': [
+            {'producto_id': productoId, 'cantidad': 1},
+          ],
+          if (aceptaCondiciones) 'acepta_condiciones': true,
+        },
+      );
 
   /// Las clases del periodo que ve el calendario (fechas locales, fin incluido)
   /// y, si eligió una, de esa sucursal.
@@ -343,11 +346,7 @@ class CuentaRepository {
   Future<void> reservar(String sesionId, {bool esperar = false, int? lugar}) =>
       _dio.post<Map<String, dynamic>>(
         '$_base/mi/reservas',
-        data: {
-          'sesion_id': sesionId,
-          'esperar': esperar,
-          'lugar': ?lugar,
-        },
+        data: {'sesion_id': sesionId, 'esperar': esperar, 'lugar': ?lugar},
       );
 
   Future<void> cancelar(String reservaId) =>

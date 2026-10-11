@@ -78,6 +78,13 @@ const form = reactive({
   // tiene paga la anualidad.
   cobraInscripcion: p?.cobra_inscripcion ?? false,
   cobraAnualidad: p?.cobra_anualidad ?? false,
+  // Permanencia de una membresía (B04): meses (vacío = sin) y qué paga si da de baja
+  // antes. Lo pactado se congela en cada venta.
+  permanencia: p?.permanencia_meses ? String(p.permanencia_meses) : "",
+  bajaAnticipada: (p?.baja_anticipada ?? "sin_penalizacion") as
+    "sin_penalizacion" | "monto_fijo" | "meses_restantes",
+  penalizacion:
+    p?.penalizacion_minor != null ? String(p.penalizacion_minor / 100) : "",
 });
 const guardando = ref(false);
 const error = ref<string | null>(null);
@@ -208,6 +215,16 @@ async function guardar(): Promise<void> {
           cobra_inscripcion: form.cobraInscripcion,
           cobra_anualidad: form.cobraAnualidad,
         }),
+    ...(esMembresia.value && !esCitas.value
+      ? {
+          permanencia_meses: numero(form.permanencia) ?? 0,
+          baja_anticipada: form.bajaAnticipada,
+          penalizacion_minor:
+            form.bajaAnticipada === "monto_fijo"
+              ? Math.round((numero(form.penalizacion) ?? 0) * 100)
+              : null,
+        }
+      : {}),
   };
   try {
     if (p) {
@@ -575,6 +592,63 @@ onMounted(async () => {
           >
         </span>
       </label>
+    </fieldset>
+
+    <!-- Permanencia (B04): solo en membresías. -->
+    <fieldset
+      v-if="esMembresia && !esCitas"
+      class="space-y-3"
+      data-prueba="permanencia-plan"
+    >
+      <legend class="tu-label">{{ $t("planes.permanencia.titulo") }}</legend>
+      <div class="sm:w-1/2">
+        <label class="tu-label" for="ep-permanencia">{{
+          $t("planes.permanencia.meses")
+        }}</label>
+        <input
+          id="ep-permanencia"
+          v-model="form.permanencia"
+          class="tu-input"
+          type="number"
+          min="0"
+          max="60"
+          :placeholder="$t('planes.permanencia.sin')"
+        />
+      </div>
+      <template v-if="(numero(form.permanencia) ?? 0) > 0">
+        <p class="text-sm">{{ $t("planes.permanencia.siDaDeBaja") }}</p>
+        <div class="flex flex-wrap gap-2" role="radiogroup">
+          <label
+            v-for="m in [
+              'sin_penalizacion',
+              'monto_fijo',
+              'meses_restantes',
+            ] as const"
+            :key="m"
+            class="ep-opcion"
+          >
+            <input v-model="form.bajaAnticipada" type="radio" :value="m" />
+            {{ $t(`planes.permanencia.modos.${m}`) }}
+          </label>
+        </div>
+        <div v-if="form.bajaAnticipada === 'monto_fijo'" class="sm:w-1/2">
+          <label class="tu-label" for="ep-penalizacion">{{
+            $t("planes.permanencia.monto")
+          }}</label>
+          <input
+            id="ep-penalizacion"
+            v-model="form.penalizacion"
+            class="tu-input"
+            type="number"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+          />
+        </div>
+        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("planes.permanencia.ayuda") }}
+        </p>
+      </template>
     </fieldset>
 
     <!-- Cuotas del negocio (B04): el monto se configura en «Cuotas». -->

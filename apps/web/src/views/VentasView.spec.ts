@@ -178,6 +178,48 @@ describe("vender un plan", () => {
     });
   });
 
+  it("un plan con permanencia pide que el cliente acepte sus condiciones", async () => {
+    const base = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation((url: string) =>
+      url.endsWith("/productos")
+        ? Promise.resolve({
+            data: {
+              data: [
+                {
+                  ...plan("p2", "Mensualidad", "membresia", 150000),
+                  permanencia_meses: 6,
+                  condiciones: "Permanencia mínima de 6 meses.",
+                },
+              ],
+            },
+          })
+        : base(url),
+    );
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    await w.findAll('[data-prueba="plan"]')[0]!.trigger("click");
+    const buscador = w.findComponent(BuscarPersona);
+    buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+    buscador.vm.$emit("update:modelValue", "m1");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="condiciones-venta"]').text()).toContain(
+      "Permanencia mínima de 6 meses.",
+    );
+    expect(
+      w.get('[data-prueba="cobrar-plan"]').attributes("disabled"),
+    ).toBeDefined();
+    await w
+      .get('[data-prueba="condiciones-venta"] input[type="checkbox"]')
+      .setValue(true);
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/ordenes",
+      expect.objectContaining({ acepta_condiciones: true }),
+    );
+  });
+
   it("«Vendido hoy» va en la moneda del negocio, no en pesos", async () => {
     sesion.moneda = "EUR";
     sesion.pais = "ES";

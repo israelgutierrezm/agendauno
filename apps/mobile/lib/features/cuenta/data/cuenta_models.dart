@@ -1013,6 +1013,7 @@ class ProductoComprable {
     this.primeraVez = false,
     this.disponible = true,
     this.venceSiCompraHoy,
+    this.condiciones,
   });
 
   factory ProductoComprable.desdeJson(
@@ -1034,6 +1035,7 @@ class ProductoComprable {
     primeraVez: (j['primera_vez'] ?? false) as bool,
     disponible: (j['disponible'] ?? true) as bool,
     venceSiCompraHoy: j['vence_si_compra_hoy'] as String?,
+    condiciones: j['condiciones'] as String?,
   );
 
   final String id;
@@ -1067,6 +1069,9 @@ class ProductoComprable {
   /// Hasta cuándo se puede usar si se paga hoy (AAAA-MM-DD): la vigencia corre
   /// desde el pago.
   final String? venceSiCompraHoy;
+
+  /// Permanencia (B04): las condiciones que acepta antes de comprarlo (null = no hay).
+  final String? condiciones;
 
   bool get esExtra => tipo == 'add_on';
 
