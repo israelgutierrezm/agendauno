@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 
 import AvisoRegion from "@/components/AvisoRegion.vue";
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -163,10 +164,10 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-5xl px-4 py-10">
-    <h1 class="text-xl font-semibold">{{ $t("pasarelas.titulo") }}</h1>
-    <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("pasarelas.subtitulo") }}
-    </p>
+    <EncabezadoSeccion
+      :titulo="$t('pasarelas.titulo')"
+      :subtitulo="$t('pasarelas.subtitulo')"
+    />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

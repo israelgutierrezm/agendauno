@@ -250,7 +250,13 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
   display: flex;
   align-items: flex-start;
   gap: 1.5rem;
-  padding: 1.25rem 1rem 0;
+  /* Los mismos márgenes que cualquier pantalla del panel (.tu-pagina). */
+  padding: 1.5rem 1rem 0;
+}
+@media (min-width: 640px) {
+  .lc {
+    padding-inline: 1.5rem;
+  }
 }
 .lc-lateral {
   display: none;
@@ -259,11 +265,27 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
   flex: 1;
   min-width: 0;
 }
+/* Cada pantalla de Configuración ocupa todo el ancho que queda, sin márgenes propios
+   encima de los del marco (antes cada una tenía su ancho máximo). */
+.lc-contenido > :deep(.tu-pagina),
+.lc-contenido > :deep(.mx-auto) {
+  max-width: none;
+  margin-inline: 0;
+  padding: 0 0 2.5rem;
+}
+/* Su encabezado, en tarjeta, como el resto del contenido. */
+.lc-contenido :deep(.tu-encabezado) {
+  padding: 1.1rem 1.35rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-tarjeta);
+}
 .lc-boton {
-  margin: 0.75rem 1rem 0;
+  margin: 0 0 1rem;
 }
 .lc-panel {
-  margin: 0.75rem 1rem 0;
+  margin: 0 0 1rem;
   padding: 1rem;
 }
 .lc-panel-rejilla {
@@ -282,15 +304,14 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
 }
 /* Con ancho de sobra: la navegación como columna fija a la izquierda. */
 @media (min-width: 1280px) {
-  .lc {
-    padding: 1.25rem 1.5rem 0;
-  }
   .lc-lateral {
     display: block;
     position: sticky;
     top: 5rem;
-    width: 15.5rem;
+    width: 16rem;
     flex-shrink: 0;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
   }
   .lc-boton,
   .lc-panel {
@@ -301,48 +322,66 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
   border: 1px solid var(--borde);
   border-radius: var(--radio-tarjeta);
   background: var(--superficie);
-  padding: 0.75rem;
+  box-shadow: var(--sombra-tarjeta);
+  padding: 0.6rem;
 }
 .lc-buscar {
   display: flex;
   width: 100%;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 .lc-buscar input {
   width: 100%;
 }
-.lc-categorias > li + li {
-  border-top: 1px solid var(--borde);
+.lc-categorias {
+  display: grid;
+  gap: 0.15rem;
 }
 .lc-categoria {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   width: 100%;
-  padding: 0.7rem 0.4rem;
+  padding: 0.55rem 0.6rem;
   border: 0;
+  border-radius: 0.55rem;
   background: transparent;
-  color: var(--texto);
+  color: color-mix(in srgb, var(--texto) 86%, var(--superficie));
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.lc-categoria:hover {
+  background: var(--superficie-2);
+}
+.lc-categoria :deep(svg:first-child) {
+  color: var(--texto-suave);
 }
 .lc-categoria[aria-expanded="true"] {
-  font-weight: 700;
+  color: var(--texto);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--acento) 6%, transparent);
 }
+/* Las opciones cuelgan de su categoría con una guía fina a la izquierda. */
 .lc-opciones {
-  padding: 0 0 0.5rem;
+  margin: 0.2rem 0 0.45rem 1.15rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--borde);
 }
 .lc-opcion {
   display: block;
-  padding: 0.45rem 0.75rem 0.45rem 2.1rem;
-  border-left: 3px solid transparent;
+  margin-left: -0.65rem;
+  padding: 0.42rem 0.7rem 0.42rem 1.1rem;
+  border-left: 2px solid transparent;
   border-radius: 0 0.5rem 0.5rem 0;
   color: var(--texto-suave);
-  font-size: 0.88rem;
+  font-size: 0.875rem;
+  line-height: 1.3;
   text-decoration: none;
 }
 .lc-panel .lc-opcion {
+  margin-left: 0;
   padding-left: 0.75rem;
 }
 .lc-opcion:hover {

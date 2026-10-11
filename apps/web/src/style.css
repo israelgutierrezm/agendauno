@@ -307,6 +307,47 @@
     border-color: var(--acento);
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 18%, transparent);
   }
+  /* Bloqueado (p. ej. la moneda con cobros registrados): se ve apagado y no invita a
+   escribir. Solo el color de fondo: las listas conservan sus íconos. */
+  .tu-input:disabled {
+    background-color: var(--superficie-2);
+    border-color: var(--borde);
+    color: var(--texto-suave);
+    cursor: not-allowed;
+    opacity: 1;
+    -webkit-text-fill-color: var(--texto-suave);
+  }
+
+  /* «Volver»: un botón claro con su flecha, no un enlace suelto. */
+  .tu-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.5rem;
+    padding: 0.45rem 0.95rem 0.45rem 0.7rem;
+    border: 1px solid var(--borde);
+    border-radius: 0.75rem;
+    background: var(--superficie);
+    box-shadow: var(--sombra-tarjeta);
+    color: color-mix(in srgb, var(--texto) 86%, var(--superficie));
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .tu-volver:hover {
+    background: var(--superficie-2);
+    border-color: color-mix(in srgb, var(--texto) 22%, var(--borde));
+    color: var(--texto);
+  }
+  .tu-volver:focus-visible {
+    outline: 2px solid var(--acento);
+    outline-offset: 2px;
+  }
 
   /* Listas desplegables: un ícono genérico a la izquierda y la flecha propia a la
    derecha, en todas. Dentro de .tu-select-icono el ícono es el del campo. */

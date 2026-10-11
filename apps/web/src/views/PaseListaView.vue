@@ -419,8 +419,8 @@ watch(
 <template>
   <section class="tu-pagina pl" data-prueba="pase-lista">
     <div class="pl-barra">
-      <button type="button" class="tu-enlace pl-volver" @click="volver">
-        <IconoNav nombre="chevron" :tam="16" class="pl-volver-icono" />
+      <button type="button" class="tu-volver" @click="volver">
+        <IconoNav nombre="atras" :tam="16" />
         {{ $t("paseLista.volver") }}
       </button>
     </div>
@@ -754,16 +754,6 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-.pl-volver {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-height: 44px;
-  font-size: 0.875rem;
-}
-.pl-volver-icono {
-  transform: rotate(180deg);
 }
 .pl-encabezado {
   margin-top: 0.25rem;

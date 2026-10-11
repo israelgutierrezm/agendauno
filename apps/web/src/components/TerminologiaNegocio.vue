@@ -97,9 +97,9 @@ onMounted(async () => {
       <div
         v-for="t in TERMINOS"
         :key="t"
-        class="flex flex-wrap items-center justify-between gap-3 text-sm"
+        class="grid items-center gap-2 text-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] sm:gap-4"
       >
-        <label :for="`term-${t}`" class="min-w-0 flex-1">
+        <label :for="`term-${t}`" class="min-w-0">
           <span class="block font-medium">{{
             $t(`terminologiaNegocio.terminos.${t}`)
           }}</span>
@@ -107,7 +107,7 @@ onMounted(async () => {
         <select
           :id="`term-${t}`"
           v-model="elegidos[t]"
-          class="tu-input w-auto"
+          class="tu-input w-full"
           :disabled="!puedeGestionar"
         >
           <option value="">

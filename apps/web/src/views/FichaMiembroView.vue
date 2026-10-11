@@ -534,8 +534,8 @@ const regreso = useRegreso({
 
 <template>
   <section class="tu-pagina">
-    <RouterLink :to="regreso.destino.value" class="tu-enlace text-sm"
-      ><IconoNav nombre="atras" :tam="14" class="inline align-[-0.15em]" />
+    <RouterLink :to="regreso.destino.value" class="tu-volver"
+      ><IconoNav nombre="atras" :tam="16" />
       {{ regreso.etiqueta.value }}</RouterLink
     >
 
