@@ -10,6 +10,9 @@ interface Pasarela {
   proveedor: string;
   activa: boolean;
   modo: string;
+  // M07: si puede confirmar los pagos y si cobra de verdad.
+  confirma_pagos?: boolean | null;
+  en_prueba?: boolean | null;
   llaves_configuradas: string[];
   // ¿Existe de verdad? y ¿ya cobra?
   disponible?: boolean;
@@ -224,6 +227,25 @@ onMounted(cargar);
         </p>
         <p v-else-if="p.lista" class="mt-2 text-sm" style="color: var(--exito)">
           {{ $t("pasarelasEstado.lista") }}
+        </p>
+        <!-- M07: sin confirmación de pagos (secreto del webhook) y modo de prueba. -->
+        <p
+          v-if="p.activa && p.confirma_pagos === false"
+          class="mt-1 text-sm"
+          role="status"
+          style="color: var(--aviso)"
+          data-prueba="sin-confirmacion"
+        >
+          {{ $t("pasarelasEstado.sinConfirmacion") }}
+        </p>
+        <p
+          v-if="p.activa && p.en_prueba"
+          class="mt-1 text-sm"
+          role="status"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="en-prueba"
+        >
+          {{ $t("pasarelasEstado.enPrueba") }}
         </p>
 
         <div class="mt-3 grid sm:grid-cols-2 gap-3">

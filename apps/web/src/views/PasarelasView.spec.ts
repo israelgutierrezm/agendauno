@@ -54,3 +54,31 @@ describe("pasarelas fuera de pesos mexicanos", () => {
     expect(w.text()).toContain("Solo con pesos mexicanos (MXN)");
   });
 });
+
+describe("pasarela lista de verdad (M07)", () => {
+  it("avisa si falta la confirmación de pagos y si está en modo de prueba", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            ...pasarela("stripe"),
+            activa: true,
+            lista: true,
+            confirma_pagos: false,
+            en_prueba: true,
+          },
+        ],
+        meta: { en_linea_disponible: true },
+      },
+    });
+    const w = mount(PasarelasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    expect(w.get('[data-prueba="sin-confirmacion"]').text()).toContain(
+      "secreto del webhook",
+    );
+    expect(w.get('[data-prueba="en-prueba"]').text()).toContain(
+      "no se cobra de verdad",
+    );
+  });
+});

@@ -30,6 +30,18 @@ class RegistroDePasarelasTenant
         'openpay' => ['merchant_id', 'private_key'],
     ];
 
+    /**
+     * Llaves con que se verifican los avisos de la pasarela (webhooks): sin ellas, en
+     * producción el aviso se rechaza y un pago nunca se confirma (M07).
+     *
+     * @var array<string, list<string>>
+     */
+    private const LLAVES_CONFIRMACION = [
+        'stripe' => ['webhook_secret'],
+        'mercadopago' => ['webhook_secret'],
+        'openpay' => ['webhook_user', 'webhook_password'],
+    ];
+
     public function __construct(
         private readonly PasarelaStripeTenant $stripe,
         private readonly PasarelaMercadoPagoTenant $mercadoPago,
@@ -81,7 +93,70 @@ class RegistroDePasarelasTenant
             }
         }
 
+        // En producción, sin cómo confirmar los pagos no se promete cobrar en línea:
+        // el cliente pagaría y su compra nunca se activaría (M07).
+        return ! app()->environment('production') || $this->confirmaPagos($proveedor, $llaves);
+    }
+
+    /**
+     * ¿Tiene las llaves para verificar los avisos de la pasarela (confirmar pagos)?
+     *
+     * @param  array<string, string>|null  $llaves  las del proveedor (si ya se leyeron)
+     */
+    public function confirmaPagos(string $proveedor, ?array $llaves = null): bool
+    {
+        $llaves ??= $this->llaves($proveedor);
+        foreach (self::LLAVES_CONFIRMACION[$proveedor] ?? [] as $llave) {
+            if (($llaves[$llave] ?? '') === '') {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    /**
+     * El modo que delatan las llaves (`test` o `live`), si el proveedor lo marca en
+     * ellas: Stripe con `sk_test_`/`sk_live_`; Mercado Pago solo con `TEST-` (sus
+     * cuentas de prueba también usan `APP_USR-`). Null si no se puede saber (OpenPay
+     * usa el modo elegido).
+     *
+     * @param  array<string, string>  $llaves
+     */
+    public static function modoDeLlaves(string $proveedor, array $llaves): ?string
+    {
+        $llave = match ($proveedor) {
+            'stripe' => $llaves['secret_key'] ?? '',
+            'mercadopago' => $llaves['access_token'] ?? '',
+            default => '',
+        };
+        if ($llave === '') {
+            return null;
+        }
+
+        return match (true) {
+            str_starts_with($llave, 'sk_test_'), str_starts_with($llave, 'rk_test_'), str_starts_with($llave, 'TEST-') => 'test',
+            str_starts_with($llave, 'sk_live_'), str_starts_with($llave, 'rk_live_') => 'live',
+            default => null,
+        };
+    }
+
+    /**
+     * ¿La pasarela en línea con que cobra el negocio está en modo de prueba? Así se
+     * dice al cliente que no se le cobra de verdad (M07).
+     */
+    public function enPrueba(?string $proveedor = null): bool
+    {
+        $proveedor ??= $this->enLinea();
+        if ($proveedor === null) {
+            return false;
+        }
+        $config = ConfiguracionPasarelaTenant::query()->where('proveedor', $proveedor)->first();
+        if (! $config instanceof ConfiguracionPasarelaTenant) {
+            return false;
+        }
+
+        return (self::modoDeLlaves($proveedor, $config->llaves()) ?? $config->modo) === 'test';
     }
 
     /**

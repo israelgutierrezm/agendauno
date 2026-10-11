@@ -43,6 +43,7 @@ use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
@@ -52,6 +53,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -212,6 +214,8 @@ class MiTenantController
             'persona' => ['nombre' => $persona->nombreCompleto(), 'email' => $persona->email],
             // Si el estudio cobra en línea, el alumno puede pagar aquí sus compras.
             'pago_en_linea' => $this->pasarelas->enLinea() !== null,
+            // La pasarela está en pruebas: se le dice que no se cobra de verdad (M07).
+            'pago_en_linea_prueba' => $this->pasarelas->enPrueba(),
             // La pasarela admite pago automático (domiciliar membresías al pagarlas) y el
             // plan del negocio lo incluye (ADR 0107).
             'pago_automatico' => $this->domiciliaciones->proveedor() !== null
@@ -1089,6 +1093,9 @@ class MiTenantController
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
             // Se renueva (membresía o su renovación): se puede pagar con pago automático.
             'recurrente' => self::seRenueva($orden),
+            // Ya inició un pago en línea que espera confirmación (p. ej. OXXO): se dice
+            // para no pagar dos veces (M07).
+            'pago_en_proceso' => $orden->estado === EstadoOrden::Pendiente ? self::pagoEnProceso($orden) : null,
             'lineas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): array => [
                 'producto' => $l->nombre(),
                 // Una cuota (inscripción, anualidad, penalización; B04) no es un producto.
@@ -1101,6 +1108,26 @@ class MiTenantController
                     : null,
             ])->all(),
         ];
+    }
+
+    /**
+     * El intento de pago en línea que sigue abierto, si lo hay: con qué medio y desde
+     * cuándo.
+     *
+     * @return array{metodo: string|null, iniciado_en: string|null}|null
+     */
+    private static function pagoEnProceso(OrdenTenant $orden): ?array
+    {
+        $pago = PagoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->where('estado', EstadoPago::Pendiente->value)
+            ->whereNotIn('proveedor', ['manual', 'efectivo', 'ventanilla'])
+            ->latest('id')
+            ->first();
+
+        return $pago instanceof PagoTenant
+            ? ['metodo' => $pago->metodo?->value, 'iniciado_en' => $pago->created_at?->toIso8601String()]
+            : null;
     }
 
     /**

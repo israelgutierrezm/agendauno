@@ -403,6 +403,13 @@ export const miCuentaExtra = {
   pagando: "Abriendo pago…",
   pagoEnProceso:
     "Tu pago está en proceso. Se confirmará en cuanto la pasarela lo apruebe.",
+  // M07: lo que ya inició y el modo de prueba, dicho con palabras.
+  enProceso:
+    "Ya iniciaste un pago en línea. Si ya pagaste, espera la confirmación antes de volver a pagar.",
+  enProcesoOxxo:
+    "Ya pediste tu ficha para pagar en OXXO. Si ya pagaste, la confirmación puede tardar hasta un día.",
+  modoPrueba:
+    "Este negocio está probando su cobro en línea: por ahora no se cobra de verdad.",
 };
 
 export const reembolsosPago = {
@@ -899,6 +906,9 @@ export const pasarelasEstado = {
   proximamente: "Próximamente",
   noDisponible: "Aún no está disponible.",
   faltaLlave: "Faltan llaves: sin ellas no se cobra en línea.",
+  sinConfirmacion:
+    "Falta el secreto del webhook: sin él la pasarela no puede confirmar los pagos y, en producción, no se cobra en línea.",
+  enPrueba: "Modo de prueba: no se cobra de verdad.",
   lista: "Lista para cobrar",
   webhook: "URL para avisos (webhook)",
   copiar: "Copiar",

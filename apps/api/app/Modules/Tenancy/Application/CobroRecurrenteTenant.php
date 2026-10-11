@@ -50,6 +50,9 @@ use Throwable;
  */
 class CobroRecurrenteTenant
 {
+    /** Lo que se le dice al cliente cuando el cargo no se pudo intentar. */
+    public const MOTIVO_SIN_COBRO = 'No pudimos cobrar en línea. Puedes pagar desde tu cuenta o en el negocio.';
+
     /**
      * Días de espera, tras la fecha de renovación, al cobro de una suscripción.
      */
@@ -92,8 +95,9 @@ class CobroRecurrenteTenant
 
         try {
             $pago = $this->cobrar->ejecutar($orden, $proveedor);
-        } catch (PasarelaNoDisponible|OrdenNoLiquidable $e) {
-            $this->dunning->registrarFallo($acuerdo, $e->getMessage());
+        } catch (PasarelaNoDisponible|OrdenNoLiquidable) {
+            // Al cliente le llega este motivo: en sus palabras, no el detalle interno (M07).
+            $this->dunning->registrarFallo($acuerdo, self::MOTIVO_SIN_COBRO);
 
             return 'fallido';
         }
@@ -137,8 +141,9 @@ class CobroRecurrenteTenant
             $pago = $this->cobrar->domiciliado($orden, $domiciliacion);
         } catch (CobroNoConcluyente) {
             return 'fallido';
-        } catch (PasarelaNoDisponible|OrdenNoLiquidable $e) {
-            $this->dunning->registrarFallo($acuerdo, $e->getMessage());
+        } catch (PasarelaNoDisponible|OrdenNoLiquidable) {
+            // Al cliente le llega este motivo: en sus palabras, no el detalle interno (M07).
+            $this->dunning->registrarFallo($acuerdo, self::MOTIVO_SIN_COBRO);
 
             return 'fallido';
         }

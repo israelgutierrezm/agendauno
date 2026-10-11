@@ -78,6 +78,13 @@ class PasarelasTenantController
             'disponible' => ProveedorPasarela::disponible($proveedor),
             // ¿Ya cobra? (activa y con sus llaves)
             'lista' => $this->registro->activa($proveedor),
+            // ¿Puede confirmar los pagos? (las llaves de sus avisos; sin ellas, en
+            // producción no se cobra en línea; M07).
+            'confirma_pagos' => $enLinea ? $this->registro->confirmaPagos($proveedor) : null,
+            // Cobra de verdad o en pruebas (lo que dicen sus llaves o, si no, el modo).
+            'en_prueba' => $enLinea && $config instanceof ConfiguracionPasarelaTenant
+                ? (RegistroDePasarelasTenant::modoDeLlaves($proveedor, $config->llaves()) ?? $config->modo) === 'test'
+                : null,
             // A dónde manda sus avisos la pasarela (se registra en su tablero).
             'webhook_url' => $enLinea ? route('api.v1.webhooks.tenant', [
                 'estudio' => (string) $this->gestor->actual()?->slug,
@@ -128,6 +135,14 @@ class PasarelasTenantController
                 }
             }
             $config->credenciales = array_merge($config->llaves(), $nuevas);
+        }
+
+        // Llaves de prueba con modo real (o al revés): se dice antes de guardar (M07).
+        $modoLlaves = RegistroDePasarelasTenant::modoDeLlaves($proveedor, $config->llaves());
+        if ($modoLlaves !== null && $modoLlaves !== $config->modo) {
+            throw ValidationException::withMessages(['modo' => [$modoLlaves === 'test'
+                ? 'Estas llaves son de prueba: elige el modo de prueba o usa las llaves reales.'
+                : 'Estas llaves son reales: elige el modo real o usa las de prueba.']]);
         }
 
         $config->save();

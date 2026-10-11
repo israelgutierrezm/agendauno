@@ -123,6 +123,11 @@ export interface Orden {
     cantidad: number;
     subtotal_minor: number;
   }[];
+  // Ya inició un pago en línea que espera confirmación (p. ej. OXXO; M07).
+  pago_en_proceso?: {
+    metodo: string | null;
+    iniciado_en: string | null;
+  } | null;
 }
 /**
  * Si su plan cubre una clase, dicho por el servidor con la misma regla que al
@@ -200,6 +205,8 @@ const personaId = ref<string | null>(null);
 const portal = ref<PortalCuenta | null>(null);
 const asistencias = ref(0);
 const pagoEnLinea = ref(false);
+// La pasarela del negocio está en pruebas: no se cobra de verdad (M07).
+const pagoEnLineaPrueba = ref(false);
 const pagoAutomatico = ref(false);
 const cargando = ref(false);
 const cargado = ref(false);
@@ -226,6 +233,7 @@ export function reiniciarMiCuenta(): void {
   portal.value = null;
   asistencias.value = 0;
   pagoEnLinea.value = false;
+  pagoEnLineaPrueba.value = false;
   pagoAutomatico.value = false;
   cargando.value = false;
   cargado.value = false;
@@ -302,6 +310,7 @@ export function useMiCuenta() {
             portal?: PortalCuenta;
             asistencias_30_dias?: number;
             pago_en_linea?: boolean;
+            pago_en_linea_prueba?: boolean;
             pago_automatico?: boolean;
           };
         }>(`${base.value}/mi/perfil`),
@@ -323,6 +332,7 @@ export function useMiCuenta() {
       portal.value = p.data.data.portal ?? null;
       asistencias.value = p.data.data.asistencias_30_dias ?? 0;
       pagoEnLinea.value = p.data.data.pago_en_linea === true;
+      pagoEnLineaPrueba.value = p.data.data.pago_en_linea_prueba === true;
       pagoAutomatico.value = p.data.data.pago_automatico === true;
       clases.value = a.data.data;
       waivers.value = w.data.data;
@@ -399,6 +409,7 @@ export function useMiCuenta() {
     portal,
     asistencias,
     pagoEnLinea,
+    pagoEnLineaPrueba,
     pagoAutomatico,
     cargado,
     cargando,
