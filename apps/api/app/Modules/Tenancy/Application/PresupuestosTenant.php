@@ -353,6 +353,9 @@ class PresupuestosTenant
         if ($modelo === null) {
             throw new PresupuestoNoPermitido('Uno de los conceptos ya no está en el catálogo.', 'concepto_inexistente');
         }
+        if ($modelo instanceof ProductoTenant) {
+            app(MembresiasPorModalidadTenant::class)->exigirQueSeVenda($modelo);
+        }
 
         return match (true) {
             $modelo instanceof OfertaTenant => [(int) $modelo->getKey(), (string) $modelo->nombre, (int) $modelo->precio_clase_minor],

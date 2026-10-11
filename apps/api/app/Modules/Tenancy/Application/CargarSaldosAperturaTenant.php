@@ -171,7 +171,8 @@ class CargarSaldosAperturaTenant
         $inicio = (string) $datos['inicio'];
         $vence = (string) $datos['vence'];
         $reset = $producto->politica_reset ?? PoliticaReset::Ninguno;
-        $recurrente = $reset !== PoliticaReset::Ninguno;
+        // En citas no se renueva: vale hasta `vence` (ADR 0130).
+        $recurrente = $reset !== PoliticaReset::Ninguno && ! app(MembresiasPorModalidadTenant::class)->enCitas();
         $siguiente = CarbonImmutable::parse($vence)->addDay()->toDateString();
 
         // Recurrente: el ciclo en curso termina en `vence` y el siguiente se cobra al día

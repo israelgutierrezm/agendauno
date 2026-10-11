@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FamiliasTenant;
+use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
 use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\DomiciliacionNoPermitida;
@@ -77,6 +78,9 @@ class SuscripcionesTenantController
     public function solicitarPagoAutomatico(Request $request): JsonResponse
     {
         $acuerdo = $this->acuerdo($request);
+        if (app(MembresiasPorModalidadTenant::class)->enCitas()) {
+            throw new DomiciliacionNoPermitida('En un negocio de citas no hay pago automático: los bonos se pagan al comprarlos.');
+        }
         if ($this->domiciliaciones->proveedor() === null) {
             throw new DomiciliacionNoPermitida('Para ofrecer pago automático, conecta primero una pasarela en línea.');
         }

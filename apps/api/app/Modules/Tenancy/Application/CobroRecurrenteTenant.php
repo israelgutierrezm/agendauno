@@ -64,7 +64,8 @@ class CobroRecurrenteTenant
         private readonly ConciliarSuscripcionTenant $suscripciones,
         private readonly RegistroDePasarelasTenant $registro,
         private readonly ParametrosTenant $parametros,
-        private readonly FuncionesPlan $funciones,
+        private readonly MembresiasPorModalidadTenant $modalidades,
+        private readonly RetirarMembresiasCitasTenant $retiro,
     ) {}
 
     /**
@@ -74,6 +75,13 @@ class CobroRecurrenteTenant
     public function renovar(AcuerdoTenant $acuerdo, string $proveedor): string
     {
         if (in_array($acuerdo->estado, [EstadoAcuerdo::Cancelado, EstadoAcuerdo::Pausado], true)) {
+            return 'omitido';
+        }
+        // Un negocio de citas no tiene membresías (ADR 0130): en vez de cobrarla, termina
+        // al acabar su periodo pagado.
+        if ($this->modalidades->enCitas() && $acuerdo->dia_ancla !== null && $acuerdo->baja_efectiva_el === null) {
+            $this->retiro->terminarEnSuFecha($acuerdo);
+
             return 'omitido';
         }
 
@@ -93,9 +101,7 @@ class CobroRecurrenteTenant
             return 'omitido';
         }
 
-        // Sin pago automático en el plan del negocio (ADR 0107) no se cobra a la tarjeta:
-        // se le avisa para pagar a mano, como a quien no lo activó.
-        if ($domiciliacion instanceof DomiciliacionTenant && $this->funciones->tieneElNegocioActual('cobro_automatico')) {
+        if ($domiciliacion instanceof DomiciliacionTenant) {
             return $this->cargoAutomatico($acuerdo, $orden, $domiciliacion);
         }
 

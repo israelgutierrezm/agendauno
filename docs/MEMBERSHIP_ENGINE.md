@@ -24,7 +24,9 @@ entitlements, ledger (`movimientos_credito`) and holds (`retenciones_credito`):
 
 - **Classes:** memberships, class packs, passes, extra classes, top-ups.
 - **Appointments:** a session bundle (bono, e.g. five massages) is a pack whose units
-  are visits; a membership gives recurring services for a fee. A service is booked
+  are visits. Appointment businesses do not sell memberships or anything that renews,
+  is unlimited, has a minimum term or charges enrollment/annual fees (ADR 0130); the
+  ones they had end at their date. A service is booked
   either by paying its price or with an entitlement that covers it, never both: the
   client account lists covered services as "with your bundle", and the booking holds
   and consumes units exactly like a class booking.

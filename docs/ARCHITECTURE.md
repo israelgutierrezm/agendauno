@@ -46,7 +46,7 @@ control plane. Un solo código sirve a los dos modelos, con una frontera explíc
   base (retención, política de cancelación, asistencia, reprogramar, reseñas); el
   comercio (productos, derechos con su ledger, órdenes, pagos, pasarelas), y lo
   transversal (outbox, comunicaciones, parámetros, auditoría). Membresías y bonos son
-  núcleo: Citas también los vende.
+  núcleo: Citas vende bonos con el mismo ledger (sin membresías, ADR 0130).
 - **Clases**: series, grupos, niveles, cupo por canal, lista de espera, lugares, pase
   de lista, check-ins, integraciones e importación de clases.
 - **Citas**: horario de atención y disponibilidad, agendar (también sin cuenta),

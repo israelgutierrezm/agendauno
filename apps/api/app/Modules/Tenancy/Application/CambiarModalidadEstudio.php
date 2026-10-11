@@ -85,9 +85,14 @@ class CambiarModalidadEstudio
         Log::info('plataforma.estudio.modalidad', ['estudio' => $estudio->slug, 'antes' => $antes, 'despues' => $despues]);
         if ($this->gestor->baseDeDatosExiste($estudio)) {
             try {
-                $this->gestor->ejecutarEn($estudio, fn () => $this->auditoria->registrar(
-                    null, 'estudio.modalidad', 'estudio', null, $antes, $despues, 'Cambio hecho por AgendaUno.',
-                ));
+                $this->gestor->ejecutarEn($estudio, function () use ($antes, $despues, $otraModalidad, $modalidad): void {
+                    $this->auditoria->registrar(null, 'estudio.modalidad', 'estudio', null, $antes, $despues, 'Cambio hecho por la plataforma.');
+                    // A citas: sus membresías ya no se venden y las vendidas terminan en su
+                    // fecha (ADR 0130).
+                    if ($otraModalidad && $modalidad === ModalidadServicio::Citas) {
+                        app(RetirarMembresiasCitasTenant::class)->retirar();
+                    }
+                });
             } catch (QueryException) {
                 // Base aún sin esquema (aprovisionándose): basta el log de la plataforma.
             }

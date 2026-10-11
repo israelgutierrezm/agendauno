@@ -46,7 +46,8 @@ class AnualidadesTenant
     public function generar(): int
     {
         $config = ConfiguracionCuotasTenant::actual();
-        if ($config->anualidad_minor <= 0) {
+        // Las cuotas son de las membresías: un negocio de citas no las cobra (ADR 0130).
+        if ($config->anualidad_minor <= 0 || app(MembresiasPorModalidadTenant::class)->enCitas()) {
             return 0;
         }
         $hoy = CarbonImmutable::parse($this->fechas->hoy());

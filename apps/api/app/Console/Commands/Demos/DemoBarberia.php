@@ -67,10 +67,11 @@ use RuntimeException;
  * algunos clientes dejan su reseña. Hacia adelante quedan dos semanas de citas.
  *
  * Algunos clientes de corte compran en caja un bono de cinco cortes (o, el último mes,
- * la membresía de dos cortes al mes) y sus siguientes visitas se descuentan de él
- * (ADR 0091). Además, cada apartado tiene datos ({@see ApartadosDemo}): tareas, notas,
- * expedientes, preferencias de corte, promociones, lealtad, comunicaciones, facturas,
- * una devolución y una solicitud de privacidad.
+ * el de diez) y sus siguientes visitas se descuentan de él (ADR 0091). Un negocio de
+ * citas vende bonos, no membresías (ADR 0130). Además, cada apartado tiene datos
+ * ({@see ApartadosDemo}): tareas, notas, expedientes, preferencias de corte,
+ * promociones, lealtad, comunicaciones, facturas, una devolución y una solicitud de
+ * privacidad.
  */
 final class DemoBarberia extends DemoBase
 {
@@ -123,7 +124,7 @@ final class DemoBarberia extends DemoBase
      * Clientes con su costumbre: persona, barbero, servicio, cada cuántos días, franja
      * preferida, próxima visita y desde/hasta cuándo viene.
      *
-     * Con `bono`, sus cortes se descuentan de su bono o membresía; con `quiereBono`,
+     * Con `bono`, sus cortes se descuentan de su bono; con `quiereBono`,
      * compra uno en caja en alguna visita.
      *
      * @var list<array{persona: PersonaTenant, barbero: int, servicio: string, cada: int, franja: string, proxima: CarbonImmutable, deja: CarbonImmutable|null, bono: bool, quiereBono: bool}>
@@ -136,10 +137,10 @@ final class DemoBarberia extends DemoBase
     /** @var list<ArticuloTenant> */
     private array $articulos = [];
 
-    /** El bono de cinco cortes y la membresía de dos cortes al mes (ADR 0091). */
+    /** Los bonos de cinco y de diez cortes (ADR 0091, 0130). */
     private ProductoTenant $bono;
 
-    private ProductoTenant $membresia;
+    private ProductoTenant $bonoDiez;
 
     protected function datos(): array
     {
@@ -285,9 +286,9 @@ final class DemoBarberia extends DemoBase
             ]);
         }
 
-        // El corte que se toma con bono o membresía: sin precio, se descuenta de su saldo.
+        // El corte que se toma con bono: sin precio, se descuenta de su saldo.
         $this->servicios['corte_bono'] = $actividades['Cortes']->ofertas()->create([
-            'nombre' => 'Corte con bono', 'descripcion' => 'Corte de cabello que se descuenta de tu bono o de tu membresía.',
+            'nombre' => 'Corte con bono', 'descripcion' => 'Corte de cabello que se descuenta de tu bono.',
             'modalidad' => ModalidadOfertaTenant::Individual->value, 'capacidad' => 1,
             'politica_reserva' => PoliticaReservaTenant::Entitlement->value, 'duracion_minutos' => 30,
         ]);
@@ -300,8 +301,8 @@ final class DemoBarberia extends DemoBase
         $conBono = [(int) $this->servicios['corte_bono']->getKey()];
         $this->bono = $membresias->crearProducto('Bono 5 cortes', TipoProducto::Paquete, 110000, 'MXN', false, 5000,
             vigencia: new VigenciaProducto(TipoVigencia::Meses, 4), ofertaIds: $conBono);
-        $this->membresia = $membresias->crearProducto('Membresía La Navaja', TipoProducto::Membresia, 45000, 'MXN', false, 2000,
-            vigencia: new VigenciaProducto(TipoVigencia::Meses, 1), ofertaIds: $conBono);
+        $this->bonoDiez = $membresias->crearProducto('Bono 10 cortes', TipoProducto::Paquete, 200000, 'MXN', false, 10000,
+            vigencia: new VigenciaProducto(TipoVigencia::Meses, 6), ofertaIds: $conBono);
     }
 
     private function horarios(): void
@@ -752,12 +753,12 @@ final class DemoBarberia extends DemoBase
     }
 
     /**
-     * Al pagar su corte compra el bono de cinco cortes (o, el último mes, la
-     * membresía): sus siguientes cortes se descuentan de él.
+     * Al pagar su corte compra el bono de cinco cortes (o, el último mes, el de diez):
+     * sus siguientes cortes se descuentan de él.
      */
     private function venderBono(int $cliente, CarbonImmutable $dia, Usuario $cajero, ?int $sucursalId): void
     {
-        $producto = $dia->greaterThanOrEqualTo($this->hoy->subDays(30)) && $this->prob(40) ? $this->membresia : $this->bono;
+        $producto = $dia->greaterThanOrEqualTo($this->hoy->subDays(30)) && $this->prob(40) ? $this->bonoDiez : $this->bono;
         try {
             $ordenes = app(OrdenesTenant::class);
             $orden = $ordenes->crear($this->clientes[$cliente]['persona'], [['producto' => $producto, 'cantidad' => 1]], sucursalId: $sucursalId);
@@ -766,7 +767,7 @@ final class DemoBarberia extends DemoBase
             return;
         }
         $this->clientes[$cliente]['bono'] = true;
-        $this->sumar($producto === $this->bono ? 'bonos vendidos' : 'membresías vendidas');
+        $this->sumar('bonos vendidos');
     }
 
     /** Quién cobra: recepción en Roma (lun a sáb), caja en Del Valle (mar a sáb); si no, el barbero. */

@@ -14,11 +14,11 @@ use App\Modules\Tenancy\Models\Estudio;
  *
  * - Individual: agenda y citas, app, recordatorios, página con URL propia, agendar
  *   sin cuenta, pagar al agendar y cobro en caja, clientes, reseñas, reportes básicos.
- * - Premium suma: equipo, varias sucursales, cabinas y recursos, paquetes y
- *   membresías, mostrador e inventario, comisiones, promociones, documentos.
- * - Pro suma: facturación (timbres), cobro automático de membresías, venta en línea
- *   de paquetes, formularios, lealtad, mensajes masivos y WhatsApp, integraciones y
- *   API, roles propios, reportes avanzados.
+ * - Premium suma: equipo, varias sucursales, cabinas y recursos, bonos de sesiones,
+ *   mostrador e inventario, comisiones, promociones, documentos.
+ * - Pro suma: facturación (timbres), venta en línea de bonos, formularios, lealtad,
+ *   mensajes masivos y WhatsApp, integraciones y API, roles propios, reportes
+ *   avanzados. Sin cobro automático: en citas no hay membresías (ADR 0130).
  *
  * Los negocios de clases, los de cuota fija y los que aún tienen una tarifa anterior
  * tienen todas. En la prueba gratis, las de Pro.
@@ -40,7 +40,6 @@ class FuncionesPlan
         'promociones' => 'premium',
         'documentos' => 'premium',
         'facturacion' => 'pro',
-        'cobro_automatico' => 'pro',
         'venta_en_linea' => 'pro',
         'formularios' => 'pro',
         'lealtad' => 'pro',

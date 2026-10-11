@@ -65,8 +65,9 @@ Producto comercial → Orden (comprador) → Pago aprobado
 ```
 
 - Productos: membresía (ilimitada o limitada por ciclo), paquete de clases, pase,
-  clase extra, servicio. En citas, el bono de sesiones y la membresía son los mismos
-  productos con el mismo ledger (ADR 0091): el comercio es núcleo, no de Clases.
+  clase extra, servicio. En citas, el bono de sesiones es el mismo producto con el
+  mismo ledger (ADR 0091): el comercio es núcleo, no de Clases. Citas no vende
+  membresías ni planes que se renuevan (ADR 0130).
 - Comprador ≠ beneficiario: una línea de orden puede beneficiar a otra persona.
 - Los créditos se mueven en un ledger con holds; el saldo se suma, nunca se guarda
   (ADR 0009, 0011).

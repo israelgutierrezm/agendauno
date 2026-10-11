@@ -115,6 +115,9 @@ class DomiciliacionesTenant
      */
     public function activar(AcuerdoTenant $acuerdo, ?string $retorno, array $datos = [], ?PersonaTenant $pagador = null): array
     {
+        if (app(MembresiasPorModalidadTenant::class)->enCitas()) {
+            throw new DomiciliacionNoPermitida('En un negocio de citas no hay pago automático: los bonos se pagan al comprarlos.');
+        }
         $proveedor = $this->proveedor()
             ?? throw new DomiciliacionNoPermitida('Este negocio todavía no cobra en línea con tarjeta.');
         if (! self::renovable($acuerdo)) {
