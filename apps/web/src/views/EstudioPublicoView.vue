@@ -9,6 +9,7 @@ import CalendarioPublico from "@/components/CalendarioPublico.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
+import { textoCobertura } from "@/lib/cobertura";
 import { trackEvent } from "@/lib/analytics";
 import {
   capacidadesDeNegocio,
@@ -82,6 +83,7 @@ interface Sucursal {
   zona_horaria: string | null;
   region: string | null;
   direccion?: string | null;
+  foto_url?: string | null;
   mapa_url?: string | null;
   telefono?: string | null;
   whatsapp_url?: string | null;
@@ -331,10 +333,25 @@ function grupoDe(p: Producto): GrupoPrecio {
     ? (p.tipo as GrupoPrecio)
     : "otro";
 }
+// La sede que eligió en el calendario (M06): los planes muestran solo los que valen
+// ahí; sin elegir, todos.
+const sedeElegida = ref("");
+const nombreSedeElegida = computed(
+  () =>
+    escaparate.value?.sucursales.find((s) => s.id === sedeElegida.value)
+      ?.nombre ?? null,
+);
+function valeEnSede(p: Producto): boolean {
+  return (
+    sedeElegida.value === "" ||
+    p.todas_sucursales !== false ||
+    (p.sucursales ?? []).some((s) => s.id === sedeElegida.value)
+  );
+}
 const gruposPrecios = computed(() =>
   GRUPOS_PRECIO.map((clave) => ({
     clave,
-    lista: precios.value.filter((p) => grupoDe(p) === clave),
+    lista: precios.value.filter((p) => grupoDe(p) === clave && valeEnSede(p)),
   })).filter((g) => g.lista.length > 0),
 );
 // Con semblanzas, el equipo se presenta en tarjetas; si no, en una línea.
@@ -864,6 +881,7 @@ onMounted(cargar);
                  página cerrada), la lista de próximas clases de siempre. -->
             <CalendarioPublico
               v-if="!props.vistaPrevia && !calendarioFallo"
+              v-model:sucursal="sedeElegida"
               class="mt-6"
               :slug="slug"
               :puede-pedir="!!formularioAcceso"
@@ -1157,6 +1175,25 @@ onMounted(cargar);
                 {{ $t("escaparate.sinPrecios") }}
               </p>
               <template v-else>
+                <p
+                  v-if="variasSedes && nombreSedeElegida"
+                  class="mt-3 text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  data-prueba="planes-de-sede"
+                >
+                  {{
+                    $t("escaparate.planes.deSede", {
+                      sede: nombreSedeElegida,
+                    })
+                  }}
+                  <button
+                    type="button"
+                    class="tu-enlace ml-1"
+                    @click="sedeElegida = ''"
+                  >
+                    {{ $t("escaparate.planes.verTodos") }}
+                  </button>
+                </p>
                 <div
                   v-for="g in gruposPrecios"
                   :key="g.clave"
@@ -1208,11 +1245,7 @@ onMounted(cargar);
                         class="mt-1 text-sm"
                         style="color: var(--texto-suave)"
                       >
-                        {{
-                          p.todas_sucursales
-                            ? $t("sucursalOperativa.todas")
-                            : p.sucursales?.map((s) => s.nombre).join(" · ")
-                        }}
+                        {{ textoCobertura(p, $t) }}
                       </p>
                       <p class="mt-1 text-2xl font-extrabold">
                         {{ dinero(p.precio_minor, p.moneda) }}
@@ -1451,13 +1484,20 @@ onMounted(cargar);
                   class="tu-card p-4"
                   data-prueba="sede"
                 >
+                  <img
+                    v-if="su.foto_url"
+                    :src="su.foto_url"
+                    alt=""
+                    class="mb-3 h-32 w-full rounded-lg object-cover"
+                    loading="lazy"
+                  />
                   <p class="font-semibold">{{ su.nombre }}</p>
                   <p
                     v-if="su.direccion || su.region"
                     class="text-sm"
                     :style="{ color: 'var(--texto-suave)' }"
                   >
-                    {{ su.direccion ?? su.region }}
+                    {{ [su.region, su.direccion].filter(Boolean).join(" · ") }}
                   </p>
                   <div
                     v-if="su.mapa_url || su.whatsapp_url || su.telefono"

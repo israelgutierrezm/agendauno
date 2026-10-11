@@ -13,12 +13,15 @@ import { api } from "@/lib/api";
  * (`pedir`) para que la persona deje sus datos con esa clase.
  */
 const props = withDefaults(
-  defineProps<{ slug: string; puedePedir?: boolean }>(),
-  { puedePedir: false },
+  // `sucursal`: la sede que eligió el visitante (v-model), para que la página la
+  // conserve en sus planes (M06).
+  defineProps<{ slug: string; puedePedir?: boolean; sucursal?: string }>(),
+  { puedePedir: false, sucursal: "" },
 );
 const emit = defineEmits<{
   pedir: [{ sesion: string; etiqueta: string }];
   error: [];
+  "update:sucursal": [string];
 }>();
 
 interface SesionCalendario {
@@ -56,7 +59,21 @@ const datos = ref<Calendario | null>(null);
 const cargando = ref(true);
 const inicioSemana = ref<string | null>(null);
 const diaElegido = ref<string | null>(null);
-const filtros = reactive({ sucursal: "", actividad: "", instructor: "" });
+const filtros = reactive({
+  sucursal: props.sucursal,
+  actividad: "",
+  instructor: "",
+});
+watch(
+  () => props.sucursal,
+  (valor) => {
+    filtros.sucursal = valor;
+  },
+);
+watch(
+  () => filtros.sucursal,
+  (valor) => emit("update:sucursal", valor),
+);
 
 function fechaLocal(iso: string, zona: string): string {
   return new Intl.DateTimeFormat("en-CA", {

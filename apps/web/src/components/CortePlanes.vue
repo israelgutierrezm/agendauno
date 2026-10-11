@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { textoCobertura } from "@/lib/cobertura";
 import { fechaCorta } from "@/lib/planes";
 
 /**
@@ -279,11 +280,7 @@ defineExpose({ cargar });
               v-if="p.todas_sucursales !== undefined"
               class="text-xs"
               style="color: var(--texto-suave)"
-              >{{
-                p.todas_sucursales
-                  ? $t("sucursalOperativa.todas")
-                  : p.sucursales?.map((s) => s.nombre).join(" · ")
-              }}</span
+              >{{ textoCobertura(p, $t) }}</span
             >
             <span class="inline-flex items-center gap-1.5 text-sm">
               <span
