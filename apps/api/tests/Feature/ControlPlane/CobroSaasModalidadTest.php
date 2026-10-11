@@ -205,7 +205,7 @@ it('cobra mes vencido: congela la medición del mes cerrado y no cambia después
     $this->travelTo(now('America/Mexico_City')->subMonthNoOverflow()->startOfMonth()->addDays(14)->setTime(12, 0));
     compraPagadaTenant($e, crearMiembroTenant($e, 'Ana'));
     $pasado = now('America/Mexico_City')->format('Y-m');
-    $this->travelBack();
+    alRelojDePrueba();
 
     // Sin --periodo: el mes anterior.
     $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();

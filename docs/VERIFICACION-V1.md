@@ -241,7 +241,7 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
 
 ### 10. Renta del SaaS (la plataforma cobra al negocio)
 
-- [ ] En `/splataformadm1n` (superadmin) activa Stripe con llaves de prueba, captura el
+- [ ] En `/plataforma` (superadmin: correo, contraseña, token y código por correo) activa Stripe con llaves de prueba, captura el
   secreto del webhook y registra en Stripe el webhook
   `APP_URL/api/v1/webhooks/plataforma/stripe` con `checkout.session.completed`,
   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`,

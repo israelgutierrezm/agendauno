@@ -30,6 +30,7 @@ class CatalogoDePermisosTenant
                 'membresias.gestionar', 'creditos.gestionar', 'derechos.ver',
                 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar', 'checkins.excepcion',
                 'ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar',
+                'presupuestos.ver', 'presupuestos.gestionar',
                 'facturacion.ver', 'usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'auditoria.ver',
                 'comunicaciones.gestionar', 'comunicaciones.ver', 'comunicaciones.eliminar',
                 'automatizaciones.gestionar', 'automatizaciones.eliminar', 'tareas.ver', 'tareas.gestionar', 'tareas.equipo',
@@ -44,6 +45,8 @@ class CatalogoDePermisosTenant
                 'productos.ver', 'membresias.gestionar', 'creditos.gestionar', 'derechos.ver',
                 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar',
                 'ordenes.ver', 'ordenes.gestionar', 'comunicaciones.ver',
+                // Presupuestos (negocios de citas; ADR 0127): los arma y los da seguimiento.
+                'presupuestos.ver', 'presupuestos.gestionar',
                 // Recepción atiende los seguimientos de todos (las tareas automáticas no
                 // tienen responsable).
                 'tareas.ver', 'tareas.gestionar', 'tareas.equipo',
@@ -82,7 +85,7 @@ class CatalogoDePermisosTenant
             'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
             'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             // Exentar una cuota (inscripción, anualidad, penalización; B04) va aparte.
-            'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar', 'facturacion.ver'],
+            'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar', 'facturacion.ver', 'presupuestos.ver', 'presupuestos.gestionar'],
             'punto_venta' => ['pos.vender', 'inventario.ver', 'inventario.gestionar'],
             'equipo' => ['usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'roles.gestionar', 'tareas.ver', 'tareas.gestionar', 'tareas.equipo'],
             'marketing' => ['comunicaciones.ver', 'comunicaciones.gestionar', 'comunicaciones.eliminar', 'automatizaciones.gestionar', 'automatizaciones.eliminar', 'lealtad.ver', 'lealtad.gestionar'],
@@ -128,6 +131,8 @@ class CatalogoDePermisosTenant
             'promociones.eliminar' => ['promociones.gestionar'],
             'ordenes.gestionar' => ['ordenes.ver', 'productos.ver', 'miembros.ver', 'derechos.ver'],
             'pagos.reembolsar' => ['ordenes.ver'],
+            'presupuestos.ver' => ['miembros.ver'],
+            'presupuestos.gestionar' => ['presupuestos.ver', 'miembros.ver', 'catalogo.ver', 'productos.ver'],
             'cuotas.exentar' => ['ordenes.ver', 'ordenes.gestionar', 'productos.ver', 'miembros.ver', 'derechos.ver'],
             'inventario.ver' => ['sucursales.ver'],
             'inventario.gestionar' => ['inventario.ver', 'sucursales.ver'],

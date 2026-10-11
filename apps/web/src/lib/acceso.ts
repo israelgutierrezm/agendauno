@@ -78,6 +78,9 @@ export const POLITICAS: Record<string, Politica> = {
   ventas: { permiso: ["productos.ver", "ordenes.ver", "miembros.ver"] },
   pos: { permiso: ["inventario.ver", "pos.vender"], funcion: "inventario" },
   inventario: { permiso: "inventario.gestionar", funcion: "inventario" },
+  // Presupuestos (ADR 0127): de los negocios de citas.
+  presupuestos: { permiso: "presupuestos.ver", modalidad: "citas" },
+  "presupuesto-impreso": { permiso: "presupuestos.ver", modalidad: "citas" },
   comunicaciones: { permiso: "comunicaciones.gestionar", funcion: "mensajes" },
   promociones: { permiso: "promociones.gestionar", funcion: "promociones" },
   lealtad: { permiso: "lealtad.ver", funcion: "lealtad" },

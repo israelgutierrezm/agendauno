@@ -120,7 +120,7 @@ describe("SEO comercial de AgendaUno", () => {
       "/negocios",
       "/panel",
       "/miembros/123",
-      "/splataformadm1n",
+      "/plataforma",
       "/clases",
       "/citas",
     ]) {

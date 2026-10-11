@@ -9,6 +9,7 @@ use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TipoCambio;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -492,4 +493,14 @@ function emitirCargoDelMesEnCurso(): string
     test()->artisan('agendauno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
 
     return $periodo;
+}
+
+/**
+ * De vuelta al reloj fijo de las pruebas (TestCase::AHORA) tras un `travel`. No usar
+ * `travelBack()` salvo con fechas de archivos en disco: ese vuelve al reloj REAL, y lo
+ * que se compara con «hace N días» falla en cuanto pasan los días.
+ */
+function alRelojDePrueba(): void
+{
+    test()->travelTo(CarbonImmutable::parse(TestCase::AHORA, TestCase::ZONA_AHORA));
 }

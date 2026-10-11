@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\HealthController;
+use App\Modules\Tenancy\Http\Controllers\AccesoPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\AccesosTenantController;
 use App\Modules\Tenancy\Http\Controllers\AgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AparienciaTenantController;
@@ -92,6 +93,7 @@ use App\Modules\Tenancy\Http\Controllers\PlataformaWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PorCobrarTenantController;
 use App\Modules\Tenancy\Http\Controllers\PreciosPublicosController;
+use App\Modules\Tenancy\Http\Controllers\PresupuestosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ProspectosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
@@ -187,9 +189,15 @@ Route::prefix('v1')->group(function (): void {
     // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
     Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
 
-    // Administracion de plataforma (PlatformAdmin): token global, sin tenant. Ve todos
-    // los estudios y gestiona credenciales globales (cuenta FacturAPI).
+    // Entrar al superadmin (ADR 0126): correo, contraseña y token; luego el código por correo.
+    Route::post('/plataforma/entrar', [AccesoPlataformaController::class, 'entrar'])->middleware('throttle:plataforma-acceso')->name('api.v1.plataforma.entrar');
+    Route::post('/plataforma/entrar/verificar', [AccesoPlataformaController::class, 'verificar'])->middleware('throttle:plataforma-acceso')->name('api.v1.plataforma.entrar.verificar');
+
+    // Administracion de plataforma (PlatformAdmin): sesión de operador, sin tenant. Ve
+    // todos los estudios y gestiona credenciales globales (cuenta FacturAPI).
     Route::prefix('plataforma')->middleware(['plataforma.auth', 'throttle:plataforma'])->name('api.v1.plataforma.')->group(function (): void {
+        Route::get('/yo', [AccesoPlataformaController::class, 'yo'])->name('yo');
+        Route::post('/salir', [AccesoPlataformaController::class, 'salir'])->name('salir');
         Route::get('/estudios', [PlataformaController::class, 'estudios'])->name('estudios');
         Route::get('/estudios/{estudio}', [PlataformaEstudiosController::class, 'show'])->name('estudios.show');
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
@@ -909,6 +917,20 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/comunicaciones/difusiones/{difusion}/pausar', [DifusionesTenantController::class, 'pausar'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.pausar');
             Route::post('/comunicaciones/difusiones/{difusion}/reanudar', [DifusionesTenantController::class, 'reanudar'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.reanudar');
             Route::post('/comunicaciones/difusiones/{difusion}/cancelar', [DifusionesTenantController::class, 'cancelar'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.cancelar');
+            // Presupuestos de los negocios de citas (ADR 0127).
+            Route::get('/presupuestos', [PresupuestosTenantController::class, 'index'])->middleware(['puede:presupuestos.ver', 'modalidad:citas'])->name('presupuestos.index');
+            Route::get('/presupuestos/catalogo', [PresupuestosTenantController::class, 'catalogo'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.catalogo');
+            Route::get('/presupuestos/configuracion', [PresupuestosTenantController::class, 'configuracion'])->middleware(['puede:presupuestos.ver', 'modalidad:citas'])->name('presupuestos.configuracion');
+            Route::put('/presupuestos/configuracion', [PresupuestosTenantController::class, 'guardarConfiguracion'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.configuracion.guardar');
+            Route::post('/presupuestos', [PresupuestosTenantController::class, 'store'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.store');
+            Route::get('/presupuestos/{presupuesto}', [PresupuestosTenantController::class, 'show'])->middleware(['puede:presupuestos.ver', 'modalidad:citas'])->name('presupuestos.show');
+            Route::put('/presupuestos/{presupuesto}', [PresupuestosTenantController::class, 'update'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.update');
+            Route::delete('/presupuestos/{presupuesto}', [PresupuestosTenantController::class, 'destroy'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.destroy');
+            Route::post('/presupuestos/{presupuesto}/enviar', [PresupuestosTenantController::class, 'enviar'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.enviar');
+            Route::post('/presupuestos/{presupuesto}/aceptar', [PresupuestosTenantController::class, 'aceptar'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.aceptar');
+            Route::post('/presupuestos/{presupuesto}/rechazar', [PresupuestosTenantController::class, 'rechazar'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.rechazar');
+            Route::post('/presupuestos/{presupuesto}/convertir', [PresupuestosTenantController::class, 'convertir'])->middleware(['puede:presupuestos.gestionar', 'modalidad:citas'])->name('presupuestos.convertir');
+
             // Check-ins de Wellhub / TotalPass en las clases.
             Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('checkins.store');
             Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('sesiones.checkins.index');

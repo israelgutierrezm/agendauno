@@ -34,6 +34,9 @@
   plataforma): el negocio no puede capturar una propia. Del token de TotalPass solo se
   guarda su huella; los cambios de credenciales van a la bitácora sin sus valores y una
   visita que el proveedor no pudo verificar nunca se registra como aprobada (ADR 0124).
+- Superadmin (`/plataforma`): cada operador entra con su correo, su contraseña, el
+  token de la plataforma y un código de un solo uso que le llega por correo; la sesión
+  vence y salir la cierra. En producción el token solo no abre la API (ADR 0126).
 - Lo que la API responde con credenciales no se guarda en cachés compartidas ni en el
   navegador (`Cache-Control: no-store, private`) y ninguna respuesta de la API se indexa.
   Al salir, la página se recarga: nada de la sesión queda en la memoria de la pestaña.

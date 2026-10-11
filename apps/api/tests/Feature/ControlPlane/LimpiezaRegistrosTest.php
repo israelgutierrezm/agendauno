@@ -48,7 +48,7 @@ function registrosDeHace(array $e, int $dias, string $sufijo): void
             'estado' => SesionTarjetaTenant::COMPLETADA,
         ]);
     });
-    test()->travelBack();
+    alRelojDePrueba();
 }
 
 /**

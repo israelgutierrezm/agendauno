@@ -132,6 +132,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Superadmin: va antes de validar su token (para frenar a quien lo adivina).
         RateLimiter::for('plataforma', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
+        // Entrar al superadmin (ADR 0126): pocos intentos por IP y por correo.
+        RateLimiter::for('plataforma-acceso', fn (Request $request): array => [
+            Limit::perMinute(20)->by('ip|'.$request->ip()),
+            Limit::perMinute(10)->by('correo|'.mb_strtolower((string) $request->input('email', $request->input('desafio', '')))),
+        ]);
 
         // Consumidores del outbox: los eventos de dominio publicados por el relay se
         // entregan a los webhooks salientes del estudio (R40) y generan las

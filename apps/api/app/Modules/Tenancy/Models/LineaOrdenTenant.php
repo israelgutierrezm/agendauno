@@ -32,6 +32,8 @@ class LineaOrdenTenant extends Model
         'orden_id', 'producto_comercial_id', 'beneficiario_id',
         'cantidad', 'precio_unitario_minor', 'subtotal_minor',
         'concepto', 'referencia', 'condiciones',
+        // De un presupuesto (ADR 0127): un concepto escrito y, si es un artículo, cuál.
+        'descripcion', 'articulo_id',
     ];
 
     /**
@@ -60,13 +62,17 @@ class LineaOrdenTenant extends Model
         ];
     }
 
-    /** Cómo se nombra: el producto o, si es una cuota, su concepto. */
+    /** Cómo se nombra: el producto, su descripción (de un presupuesto) o, si es una cuota, su concepto. */
     public function nombre(): string
     {
         // Una cuota no tiene producto (`producto_comercial_id` null).
         $producto = $this->producto_comercial_id === null ? null : $this->producto;
+        if ($producto !== null) {
+            return $producto->nombre;
+        }
+        $descripcion = $this->getAttribute('descripcion');
 
-        return $producto !== null ? $producto->nombre : ($this->concepto?->etiqueta() ?? 'Producto');
+        return is_string($descripcion) && $descripcion !== '' ? $descripcion : ($this->concepto?->etiqueta() ?? 'Producto');
     }
 
     /**

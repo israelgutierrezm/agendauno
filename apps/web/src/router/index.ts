@@ -199,6 +199,20 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Presupuestos de los negocios de citas (ADR 0127).
+      path: "/presupuestos",
+      name: "presupuestos",
+      component: () => import("@/views/PresupuestosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // Un presupuesto listo para imprimir o guardar como PDF.
+      path: "/presupuestos/:id/imprimir",
+      name: "presupuesto-impreso",
+      component: () => import("@/views/PresupuestoImpresoView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/importar-instructores",
       name: "importar-instructores",
       component: () => import("@/views/ImportarInstructoresView.vue"),
@@ -518,11 +532,14 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
-      // Superadmin de AgendaUno: una dirección que no se adivina (no hay enlace a ella).
-      path: "/splataformadm1n",
+      // Superadmin de AgendaUno (ADR 0126): correo, contraseña, el token de la
+      // plataforma y un código por correo. No hay enlace a ella.
+      path: "/plataforma",
       name: "plataforma",
       component: () => import("@/views/PlataformaView.vue"),
     },
+    // La dirección anterior lleva a la nueva.
+    { path: "/splataformadm1n", redirect: { name: "plataforma" } },
     {
       // Enlace corto público del estudio (agendauno.mx/mi-estudio). Va al FINAL, antes
       // del catch-all: solo captura rutas de UN segmento que no sean una ruta con nombre.

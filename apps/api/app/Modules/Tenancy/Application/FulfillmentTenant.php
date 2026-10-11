@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
+use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -27,6 +28,7 @@ class FulfillmentTenant
         private readonly RegistrarEventoTenant $eventos,
         private readonly EmitirReservaConfirmadaTenant $confirmada,
         private readonly RenovacionPagadaTenant $renovacion,
+        private readonly InventarioTenant $inventario,
     ) {}
 
     public function cumplir(OrdenTenant $orden): void
@@ -69,6 +71,14 @@ class FulfillmentTenant
         $orden->loadMissing(['lineas.producto', 'lineas.beneficiario', 'persona']);
 
         foreach ($orden->lineas as $linea) {
+            // Un artículo cobrado (de un presupuesto; ADR 0127) sale del inventario de la
+            // sede de la orden.
+            $articuloId = $linea->getAttribute('articulo_id');
+            if ($articuloId !== null && $orden->sucursal_id !== null) {
+                $this->inventario->registrar((int) $articuloId, (int) $orden->sucursal_id, -max(1, (int) $linea->cantidad), TipoMovimientoInventario::Salida, 'Cobro '.$orden->ulid);
+
+                continue;
+            }
             $beneficiario = $linea->beneficiario ?? $orden->persona;
             $producto = $linea->producto;
 

@@ -12,7 +12,8 @@ Scramble en `/docs/api`. Rutas en `apps/api/routes/api.php`.
 | `/api/v1/errores` | Errores de la web y la app para el monitoreo (ADR 0080) | — (tope por IP y diario) |
 | `/api/v1/webhooks/tenant/{slug}/{proveedor}` | Pasarelas de cada negocio | Verificación con la pasarela |
 | `/api/v1/webhooks/plataforma/{proveedor}` | Pasarela de la plataforma (renta) | Verificación con la pasarela |
-| `/api/v1/plataforma/*` | Superadmin | `PLATFORM_ADMIN_TOKEN` |
+| `/api/v1/plataforma/entrar`, `/entrar/verificar` | Entrada del superadmin (ADR 0126) | Correo, contraseña y `PLATFORM_ADMIN_TOKEN`; luego el código por correo |
+| `/api/v1/plataforma/*` | Superadmin | Sesión del operador (en producción el token solo no basta) |
 | `/api/v1/app/{slug}/*` | Un negocio: equipo, profesionales y alumnos | Bearer del negocio |
 | `{slug}.agendauno.mx/api/v1/*` | Lo mismo por subdominio | Bearer del negocio |
 | `/api/v1/app/{slug}/integracion/*` | Terceros (solo lectura) | Llave de API con alcances |
@@ -342,6 +343,26 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   apertura` y una concesión de créditos con origen `apertura`, sin orden ni pago, y
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
+
+## Presupuestos (negocios de citas, ADR 0127)
+
+- `GET /presupuestos?estado=&q=` (`presupuestos.ver`; `estado` admite `vencido`) y
+  `GET /presupuestos/{id}`.
+- `POST /presupuestos` y `PUT /presupuestos/{id}` (`presupuestos.gestionar`):
+  - el cliente va como `persona_id`, o como `nombre_contacto`, `email_contacto` y
+    `celular_contacto`;
+  - también admiten `sucursal_id`, `valido_hasta`, `descuento_minor` y `notas`;
+  - cada elemento de `lineas` lleva `tipo` (`servicio|producto|articulo|libre`),
+    `referencia`, `descripcion`, `cantidad`, `precio_unitario_minor` y
+    `descuento_minor`.
+- `DELETE /presupuestos/{id}` borra solo borradores.
+- `POST /presupuestos/{id}/enviar|aceptar|rechazar` (`rechazar` admite `motivo`).
+- `POST /presupuestos/{id}/convertir` (además `ordenes.gestionar`) devuelve la orden de
+  cobro.
+- `GET /presupuestos/catalogo` y `GET|PUT /presupuestos/configuracion` (`impuestos`,
+  `tasa_impuesto_bp`, `vigencia_dias`, `notas`).
+- Errores: `QUOTE_NOT_ALLOWED` con `meta.motivo` (`respondido`, `vencido`,
+  `no_aceptado`, `no_borrador`, `sin_correo`, `sin_cliente`, `sin_conceptos`…).
 
 ## Respuestas privadas (M11)
 
