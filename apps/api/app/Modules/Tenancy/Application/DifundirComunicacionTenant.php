@@ -43,6 +43,8 @@ class DifundirComunicacionTenant
                 'asunto' => $asunto,
                 'cuerpo' => $cuerpo,
                 'total' => 0,
+                'estado' => DifusionTenant::ENVIANDO,
+                'huella' => self::huella($segmento, $canal, $asunto, $cuerpo),
             ]);
 
             $total = 0;
@@ -81,6 +83,15 @@ class DifundirComunicacionTenant
 
             return $difusion;
         });
+    }
+
+    /**
+     * Identifica una campaña por su contenido y a quién va: la misma no se manda dos
+     * veces el mismo día (B08).
+     */
+    public static function huella(SegmentoComunicacion $segmento, CanalComunicacion $canal, string $asunto, string $cuerpo): string
+    {
+        return hash('sha256', implode('|', [$segmento->value, $canal->value, trim($asunto), trim($cuerpo)]));
     }
 
     /**

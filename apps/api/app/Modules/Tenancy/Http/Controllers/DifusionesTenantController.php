@@ -7,11 +7,15 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\DifundirComunicacionTenant;
 use App\Modules\Tenancy\Application\ResolverSegmentoTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Models\DifusionTenant;
+use App\Modules\Tenancy\Models\MensajeTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Comunicaciones segmentadas (difusiones): envío puntual de un asunto/cuerpo a un
@@ -57,14 +61,64 @@ class DifusionesTenantController
             'cuerpo' => ['required', 'string', 'max:5000'],
         ]);
 
-        $difusion = $difundir->ejecutar(
-            SegmentoComunicacion::from($validado['segmento']),
-            CanalComunicacion::from($validado['canal']),
-            $validado['asunto'],
-            $validado['cuerpo'],
-        );
+        $segmento = SegmentoComunicacion::from($validado['segmento']);
+        $canal = CanalComunicacion::from($validado['canal']);
+        // La misma campaña no se manda dos veces el mismo día (B08).
+        $repetida = DifusionTenant::query()
+            ->where('huella', DifundirComunicacionTenant::huella($segmento, $canal, $validado['asunto'], $validado['cuerpo']))
+            ->where('estado', '!=', DifusionTenant::CANCELADA)
+            ->where('created_at', '>=', now()->subDay())
+            ->exists();
+        if ($repetida) {
+            throw ValidationException::withMessages(['cuerpo' => ['Ya mandaste esta misma difusión en las últimas 24 horas.']]);
+        }
+
+        $difusion = $difundir->ejecutar($segmento, $canal, $validado['asunto'], $validado['cuerpo']);
 
         return response()->json(['data' => $this->presentar($difusion)], 201);
+    }
+
+    /**
+     * Pausa una campaña: lo que falta por enviar espera. Los avisos de operación
+     * (recordatorios, pagos) siguen saliendo (B08).
+     */
+    public function pausar(Request $request): JsonResponse
+    {
+        $difusion = $this->difusion($request);
+        abort_unless($difusion->estado === DifusionTenant::ENVIANDO, 422, 'Esta difusión no se está enviando.');
+        $difusion->update(['estado' => DifusionTenant::PAUSADA, 'pausada_en' => now()]);
+
+        return response()->json(['data' => $this->presentar($difusion->refresh())]);
+    }
+
+    public function reanudar(Request $request): JsonResponse
+    {
+        $difusion = $this->difusion($request);
+        abort_unless($difusion->estado === DifusionTenant::PAUSADA, 422, 'Esta difusión no está en pausa.');
+        $difusion->update(['estado' => DifusionTenant::ENVIANDO, 'pausada_en' => null]);
+
+        return response()->json(['data' => $this->presentar($difusion->refresh())]);
+    }
+
+    /** Cancela lo que falta por enviar; lo enviado, enviado está. */
+    public function cancelar(Request $request): JsonResponse
+    {
+        $difusion = $this->difusion($request);
+        abort_if($difusion->estado === DifusionTenant::CANCELADA, 422, 'Esta difusión ya se canceló.');
+        DB::connection('tenant')->transaction(function () use ($difusion): void {
+            $difusion->update(['estado' => DifusionTenant::CANCELADA, 'cancelada_en' => now()]);
+            MensajeTenant::query()
+                ->where('difusion_id', $difusion->getKey())
+                ->whereIn('estado', [EstadoMensaje::Encolado->value, EstadoMensaje::Fallido->value])
+                ->update(['estado' => EstadoMensaje::Descartado->value, 'ultimo_error' => 'Difusión cancelada.']);
+        });
+
+        return response()->json(['data' => $this->presentar($difusion->refresh())]);
+    }
+
+    private function difusion(Request $request): DifusionTenant
+    {
+        return DifusionTenant::query()->where('ulid', (string) $request->route('difusion'))->firstOrFail();
     }
 
     /**
@@ -81,6 +135,11 @@ class DifusionesTenantController
             'cuerpo' => $difusion->cuerpo,
             'total' => $difusion->total,
             'enviada_en' => $difusion->enviada_en?->toIso8601String(),
+            // B08: en qué va y cuánto falta.
+            'estado' => $difusion->estado ?? DifusionTenant::ENVIANDO,
+            'enviados' => $difusion->mensajes()->where('estado', EstadoMensaje::Enviado->value)->count(),
+            'pendientes' => $difusion->mensajes()->whereIn('estado', [EstadoMensaje::Encolado->value, EstadoMensaje::Fallido->value])->count(),
+            'descartados' => $difusion->mensajes()->where('estado', EstadoMensaje::Descartado->value)->count(),
         ];
     }
 }

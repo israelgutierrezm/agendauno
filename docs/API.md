@@ -300,6 +300,16 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Campañas controladas (B08)
+
+- Las difusiones traen `estado` (enviando, pausada, cancelada), `enviados`, `pendientes`
+  y `descartados`. `POST /comunicaciones/difusiones/{difusion}/pausar|reanudar|cancelar`
+  (`comunicaciones.gestionar`). La misma campaña (segmento, canal, asunto y cuerpo) en
+  menos de 24 horas: 422.
+- Al enviar, un mensaje de campaña a quien no recibe promociones se descarta.
+- `GET /promociones/baja/{persona}` (enlace firmado y con vencimiento, en los correos de
+  campaña): deja de recibir promociones.
+
 ## Embudo de la plataforma (C02, C08)
 
 - `POST /metricas/visita-landing` (público, `text/plain` con `{"producto"}`): una visita

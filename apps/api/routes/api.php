@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Http\Controllers\AuthTenantController;
 use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\AvisoPrivacidadNegocioController;
 use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
+use App\Modules\Tenancy\Http\Controllers\BajaPromocionesController;
 use App\Modules\Tenancy\Http\Controllers\BajasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioPublicoController;
@@ -273,6 +274,8 @@ Route::prefix('v1')->group(function (): void {
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
+        // Dejar de recibir promociones desde el enlace firmado de una campaña (B08).
+        Route::get('/promociones/baja/{persona}', BajaPromocionesController::class)->middleware(['signed', 'throttle:negocio-publico'])->name('promociones.baja');
         // Calendario público de clases (plan de mejoras M02): sesiones reales por fecha,
         // con sus lugares (regla única de cupo, ADR 0116).
         Route::get('/calendario', CalendarioPublicoController::class)->middleware(['throttle:negocio-publico', 'modalidad:clases'])->name('calendario');
@@ -899,6 +902,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/comunicaciones/segmentos', [DifusionesTenantController::class, 'segmentos'])->middleware('puede:comunicaciones.ver')->name('difusiones.segmentos');
             Route::get('/comunicaciones/difusiones', [DifusionesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('difusiones.index');
             Route::post('/comunicaciones/difusiones', [DifusionesTenantController::class, 'difundir'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes'])->name('difusiones.store');
+            // Pausar, reanudar o cancelar una campaña sin tocar los avisos de operación (B08).
+            Route::post('/comunicaciones/difusiones/{difusion}/pausar', [DifusionesTenantController::class, 'pausar'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.pausar');
+            Route::post('/comunicaciones/difusiones/{difusion}/reanudar', [DifusionesTenantController::class, 'reanudar'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.reanudar');
+            Route::post('/comunicaciones/difusiones/{difusion}/cancelar', [DifusionesTenantController::class, 'cancelar'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.cancelar');
             // Check-ins de Wellhub / TotalPass en las clases.
             Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('checkins.store');
             Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('sesiones.checkins.index');

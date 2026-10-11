@@ -11,6 +11,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 
 /**
  * Correo de una comunicacion (R28): lleva el asunto y el cuerpo YA renderizados desde
@@ -27,6 +28,8 @@ class MensajeMailable extends Mailable
         public readonly string $negocio = '',
         public readonly ?string $responderA = null,
         public ?ProductoComercial $producto = null,
+        // Campaña: cómo dejar de recibirlas, también para el cliente de correo (B08).
+        public readonly ?string $enlaceBaja = null,
     ) {
         $this->producto ??= MarcaProducto::actual();
     }
@@ -40,6 +43,11 @@ class MensajeMailable extends Mailable
             replyTo: is_string($this->responderA) && $this->responderA !== '' ? [new Address($this->responderA, $this->negocio)] : [],
             subject: $this->asuntoMensaje,
         );
+    }
+
+    public function headers(): Headers
+    {
+        return new Headers(text: $this->enlaceBaja !== null ? ['List-Unsubscribe' => "<{$this->enlaceBaja}>"] : []);
     }
 
     public function content(): Content

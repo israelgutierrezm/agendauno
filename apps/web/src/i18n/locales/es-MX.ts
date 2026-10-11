@@ -1485,6 +1485,19 @@ export default {
     colSegmento: "Segmento",
     colAsunto: "Asunto",
     colTotal: "Destinatarios",
+    // B08: controlar una campaña sin tocar los avisos de operación.
+    colEstado: "Estado",
+    estados: {
+      enviando: "Enviando · faltan {n}",
+      enviada: "Enviada",
+      pausada: "En pausa",
+      cancelada: "Cancelada",
+    },
+    pausar: "Pausar",
+    reanudar: "Reanudar",
+    cancelar: "Cancelar el resto",
+    confirmarCancelar:
+      "¿Cancelar lo que falta por enviar de esta difusión? Lo ya enviado no se puede deshacer.",
   },
   enlace: {
     titulo: "Enlace público",

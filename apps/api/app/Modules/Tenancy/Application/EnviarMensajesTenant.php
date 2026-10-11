@@ -11,10 +11,13 @@ use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\DifusionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -49,10 +52,23 @@ class EnviarMensajesTenant
         MensajeTenant::query()
             ->whereIn('estado', [EstadoMensaje::Encolado->value, EstadoMensaje::Fallido->value])
             ->where('intentos', '<', self::MAX_INTENTOS)
+            // Una campaña en pausa espera; los avisos de operación siguen (B08).
+            ->where(fn ($q) => $q->whereNull('difusion_id')
+                ->orWhereNotIn('difusion_id', DifusionTenant::query()->where('estado', DifusionTenant::PAUSADA)->select('id')))
             ->orderBy('id')
             ->limit(self::LOTE)
             ->get()
             ->each(function (MensajeTenant $mensaje) use (&$enviados): void {
+                // Una campaña no le llega a quien pidió no recibir promociones, aunque
+                // lo pidiera después de encolarla (B08).
+                if ($mensaje->difusion_id !== null && $mensaje->persona_id !== null
+                    && PersonaTenant::query()->whereKey($mensaje->persona_id)->where('recibe_promociones', false)->exists()) {
+                    $mensaje->estado = EstadoMensaje::Descartado;
+                    $mensaje->ultimo_error = 'No desea recibir promociones.';
+                    $mensaje->save();
+
+                    return;
+                }
                 if ($mensaje->canal === CanalComunicacion::WhatsApp && ! $this->whatsapp->activoPara($this->gestor->actual())) {
                     $mensaje->estado = EstadoMensaje::Descartado;
                     $mensaje->ultimo_error = $this->whatsapp->activoParaNegocios()
@@ -126,12 +142,26 @@ class EnviarMensajesTenant
         }
 
         $estudio = $this->gestor->actual();
+        // Una campaña lleva cómo dejar de recibirlas (enlace firmado y encabezado; B08).
+        $baja = $mensaje->difusion_id !== null && $mensaje->persona_id !== null && $estudio !== null
+            ? $this->enlaceDeBaja((string) $estudio->slug, (int) $mensaje->persona_id)
+            : null;
 
         Mail::to($destinatario)->send(new MensajeMailable(
             $mensaje->asunto,
-            $mensaje->cuerpo,
+            $baja === null ? $mensaje->cuerpo : $mensaje->cuerpo."\n\nSi ya no quieres recibir promociones de {$estudio->nombre}: {$baja}",
             (string) $estudio?->nombre,
             $estudio?->contacto_email,
+            enlaceBaja: $baja,
         ));
+    }
+
+    private function enlaceDeBaja(string $slug, int $personaId): ?string
+    {
+        $persona = PersonaTenant::query()->find($personaId);
+
+        return $persona instanceof PersonaTenant
+            ? URL::temporarySignedRoute('api.v1.app.promociones.baja', now()->addDays(90), ['estudio' => $slug, 'persona' => $persona->ulid])
+            : null;
     }
 }
