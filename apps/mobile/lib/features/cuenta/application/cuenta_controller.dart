@@ -28,8 +28,8 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
   /// una cita (lo dicen las capacidades de la sesión).
   bool get _conClases => ref.read(sesionProvider)?.capacidades.clases ?? true;
 
-  Future<void> reservar(String sesionId, {bool esperar = false}) =>
-      _hacer((repo) => repo.reservar(sesionId, esperar: esperar));
+  Future<void> reservar(String sesionId, {bool esperar = false, int? lugar}) =>
+      _hacer((repo) => repo.reservar(sesionId, esperar: esperar, lugar: lugar));
 
   Future<void> cancelar(String reservaId) =>
       _hacer((repo) => repo.cancelar(reservaId));

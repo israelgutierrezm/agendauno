@@ -267,11 +267,15 @@ class ReservaMiembro {
     this.clase,
     this.ocupacion,
     this.cita,
+    this.lugar,
   });
 
   final String id;
   final String estado;
   final String? sesionId;
+
+  /// Su lugar numerado, si la clase los numera y lo eligió (B06).
+  final int? lugar;
 
   /// Cómo llegar a la sucursal (enlace del mapa), si el negocio lo tiene.
   final String? mapaUrl;
@@ -332,6 +336,7 @@ class ReservaMiembro {
       ordenId: j['orden_id'] as String?,
       asiste: j['asiste'] as String?,
       mapaUrl: j['mapa_url'] as String?,
+      lugar: (j['lugar'] as num?)?.toInt(),
       clase: tipo == TipoSesion.clase && j['clase'] is Map<String, dynamic>
           ? BloqueClase.desdeJson(j['clase'])
           : null,
@@ -1163,10 +1168,13 @@ class AntesDeReservar {
     this.penalizaTarde = true,
     this.cancelaTarde = true,
     this.queLlevar,
+    this.lugaresTotal = 0,
+    this.lugaresOcupados = const [],
   });
 
   factory AntesDeReservar.desdeJson(Map<String, dynamic> j) {
     final plan = j['plan'];
+    final lugares = j['lugares'];
     final dePago = j['de_pago'];
     final cancelacion = j['cancelacion'];
     return AntesDeReservar(
@@ -1196,8 +1204,22 @@ class AntesDeReservar {
           ? (cancelacion['cancela_tarde'] ?? true) as bool
           : true,
       queLlevar: j['que_llevar'] as String?,
+      lugaresTotal: lugares is Map<String, dynamic>
+          ? (lugares['total'] as num? ?? 0).toInt()
+          : 0,
+      lugaresOcupados: lugares is Map<String, dynamic>
+          ? ((lugares['ocupados'] ?? const []) as List)
+                .whereType<num>()
+                .map((n) => n.toInt())
+                .toList()
+          : const [],
     );
   }
+
+  /// Lugares numerados de la clase (0 = no numera) y los ya tomados, sin decir por
+  /// quién (B06).
+  final int lugaresTotal;
+  final List<int> lugaresOcupados;
 
   /// `reserva`, `lista_espera` o `no_disponible`.
   final String resultado;

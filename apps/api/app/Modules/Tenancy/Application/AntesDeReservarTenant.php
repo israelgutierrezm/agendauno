@@ -79,9 +79,10 @@ class AntesDeReservarTenant
         if (! $decision->permitida && $decision->codigo === 'CAPACITY_FULL') {
             $conEspera = $this->reservas->evaluar($sesion, $persona, null, true);
             if ($conEspera->permitida) {
+                // En la lista de espera no se aparta lugar: se elige al confirmar.
                 return [...$base, 'resultado' => self::LISTA_ESPERA, 'codigo' => null, 'motivo' => null,
                     'accion' => null, 'mensaje' => null, 'unidades' => 0,
-                    'plan' => $this->plan($conEspera->derecho, 0), 'de_pago' => null];
+                    'plan' => $this->plan($conEspera->derecho, 0), 'de_pago' => null, 'lugares' => null];
             }
         }
         if (! $decision->permitida) {
@@ -92,7 +93,9 @@ class AntesDeReservarTenant
 
         return [...$base, 'resultado' => self::RESERVA, 'codigo' => null, 'motivo' => null, 'accion' => null,
             'mensaje' => null, 'unidades' => $decision->costoCreditos,
-            'plan' => $this->plan($decision->derecho, $decision->costoCreditos), 'de_pago' => null];
+            'plan' => $this->plan($decision->derecho, $decision->costoCreditos), 'de_pago' => null,
+            // Si la clase numera lugares, cuáles están libres para elegir el suyo (B06).
+            'lugares' => $this->reservas->lugaresDeSesion($sesion)];
     }
 
     /**
@@ -122,7 +125,7 @@ class AntesDeReservarTenant
         }
 
         return ['resultado' => self::RESERVA, 'codigo' => null, 'motivo' => null, 'accion' => null,
-            'mensaje' => null, 'unidades' => 0, 'plan' => null,
+            'mensaje' => null, 'unidades' => 0, 'plan' => null, 'lugares' => null,
             'de_pago' => [
                 'precio_minor' => (int) ($sesion->oferta->precio_clase_minor ?? 0),
                 'moneda' => $this->parametros->monedaDe($sesion->sucursal),
@@ -167,7 +170,8 @@ class AntesDeReservarTenant
     private function noDisponible(string $codigo, string $motivo, string $mensaje, ?string $accion = null): array
     {
         return ['resultado' => self::NO_DISPONIBLE, 'codigo' => $codigo, 'motivo' => $motivo,
-            'accion' => $accion, 'mensaje' => $mensaje, 'unidades' => 0, 'plan' => null, 'de_pago' => null];
+            'accion' => $accion, 'mensaje' => $mensaje, 'unidades' => 0, 'plan' => null, 'de_pago' => null,
+            'lugares' => null];
     }
 
     /**

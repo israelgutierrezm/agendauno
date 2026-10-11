@@ -112,4 +112,5 @@ y su documentación. El estado vive en la sección 5.
 | 2 | Hecho: Prospectos, captación activable y formularios embebibles (ADR 0117); PR #11 |
 | 3 | Hecho: calendario público por fecha; planes agrupados con destacado, fecha exacta y clase de prueba solo para quien nunca vino; clases para principiantes con qué saber y qué llevar; semblanza del equipo (ADR 0118) |
 | 4 | Hecho: antes de reservar (plan, consumo, sede, límite de cancelación, motivo y acción), confirmación con la reserva real, estados con palabras en el calendario, plazo para aceptar un lugar, cancelación que no promete un crédito vencido y «Reserva una clase de tu plan» tras pagar (ADR 0119). El seguimiento de quien compró y no reservó pasa al bloque 8 |
-| 5–8 | Pendiente |
+| 5 | Hecho: el alumno ve los lugares libres (sin datos de nadie), elige el suyo al reservar o después y dos personas no se quedan con el mismo; accesible y sin depender del color (ADR 0120) |
+| 6–8 | Pendiente |

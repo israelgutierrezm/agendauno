@@ -52,6 +52,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Reservas\CanalReserva;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\Reservas\QuienCancela;
@@ -388,6 +389,8 @@ class MiTenantController
         $validado = $request->validate([
             'sesion_id' => ['required', 'string'],
             'esperar' => ['boolean'],
+            // El lugar numerado que eligió (B06); el motor lo valida bajo el candado.
+            'lugar' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $sesion = SesionTenant::query()->where('ulid', $validado['sesion_id'])->with('oferta')->firstOrFail();
@@ -417,9 +420,59 @@ class MiTenantController
             return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden']))], 201);
         }
 
-        $reserva = $this->reservas->crear($sesion, $persona, null, (bool) ($validado['esperar'] ?? false));
+        $reserva = $this->reservas->crear(
+            $sesion,
+            $persona,
+            null,
+            (bool) ($validado['esperar'] ?? false),
+            null,
+            CanalReserva::Directo->value,
+            isset($validado['lugar']) ? (int) $validado['lugar'] : null,
+        );
 
         return response()->json(['data' => $this->presentarReserva($reserva->load('sesion.oferta'))], 201);
+    }
+
+    /**
+     * Los lugares numerados de una clase (B06): cuántos hay, cuáles están tomados (sin
+     * decir por quién) y el suyo, si tiene. Null en `data` si la clase no los numera.
+     */
+    public function lugares(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $lugares = $this->reservas->lugaresDeSesion($sesion);
+        if ($lugares === null) {
+            return response()->json(['data' => null]);
+        }
+        $mio = ReservaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->where('persona_id', $persona->getKey())
+            ->whereIn('estado', CupoDeSesionTenant::OCUPAN_LUGAR)
+            ->value('lugar');
+
+        return response()->json(['data' => [...$lugares, 'mio' => $mio === null ? null : (int) $mio]]);
+    }
+
+    /**
+     * Elige o cambia el lugar de su reserva (B06): por ejemplo, quien llegó desde la
+     * lista de espera. Si ya lo tomó otra persona, 422 SPOT_UNAVAILABLE.
+     */
+    public function elegirLugar(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403);
+        $validado = $request->validate(['lugar' => ['required', 'integer', 'min:1']]);
+
+        $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        abort_unless((int) $reserva->persona_id === (int) $persona->getKey(), 403, 'Esta reserva no es tuya.');
+
+        $actor = $request->attributes->get('usuario_tenant');
+        $reserva = $this->reservas->cambiarLugar($reserva, (int) $validado['lugar'], $actor instanceof Usuario ? $actor : null);
+
+        return response()->json(['data' => $this->presentarReserva($reserva->load('sesion.oferta'))]);
     }
 
     /**
@@ -689,6 +742,9 @@ class MiTenantController
             'cancelacion' => $this->cancelacionDeReserva($reserva),
             // Para llegar preparado (ADR 0118).
             'que_llevar' => $reserva->sesion?->oferta?->que_llevar,
+            // Su lugar numerado y cuántos tiene la clase (0 = no numera; B06).
+            'lugar' => $reserva->lugar === null ? null : (int) $reserva->lugar,
+            'lugares' => (int) ($reserva->sesion?->oferta->lugares ?? 0),
             // Orden a pagar para confirmar (cita o clase de pago por clase), si aplica.
             'orden_id' => $reserva->orden?->ulid,
             // Lo de su clase (cupo, lista de espera, pago por clase); null si es cita.

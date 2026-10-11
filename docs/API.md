@@ -229,6 +229,12 @@ pasará al reservar (ADR 0119): `resultado` (`reserva`, `lista_espera` o `no_dis
 `que_llevar`. Las reservas suman `plan`, `unidades`, `cancelacion` (null en lista de
 espera) y `que_llevar`; la vista previa de cancelar suma `plan_vencio`.
 
+Lugares numerados (ADR 0120): la vista previa trae `lugares` (`total`, `ocupados`; null si
+la clase no los numera), `POST /mi/reservas` acepta `lugar`, `GET
+/mi/sesiones/{sesion}/lugares` da `{total, ocupados, mio}` y `PUT
+/mi/reservas/{reserva}/lugar` (`lugar`) elige o cambia el suyo; un lugar tomado o fuera del
+catálogo responde 422 `SPOT_UNAVAILABLE`. Las reservas suman `lugar` y `lugares`.
+
 Sus reservas (`GET /mi/perfil` → `reservas[]`, y la reserva que responden
 `POST /mi/reservas`, `POST /mi/citas`, `POST /mi/reservas/{reserva}/cancelar` y
 `/aceptar`) suman `clase` (el bloque de su clase), `cita` y `ocupacion`. Su cita:

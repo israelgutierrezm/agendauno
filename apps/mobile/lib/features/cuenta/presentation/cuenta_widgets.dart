@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/calendario/agregar_calendario.dart';
 import '../../../core/formato.dart';
+import '../../../core/network/mensaje_error.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
@@ -308,6 +310,11 @@ class _DetalleReserva extends ConsumerWidget {
                 color: aviso ? TemaAgendaUno.aviso : TemaAgendaUno.exito,
               ),
             ),
+            if (r.lugar != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('Tu lugar: ${r.lugar}'),
+              ),
             // Un lugar ofrecido se acepta a tiempo o pasa al siguiente.
             if (r.estado == 'ofrecida' && r.ofertaExpiraEn != null)
               Padding(
@@ -400,25 +407,47 @@ Future<void> mostrarDetalleClase(BuildContext context, ClaseMiembro c) =>
       builder: (_) => _DetalleClase(c),
     );
 
-class _DetalleClase extends ConsumerWidget {
+class _DetalleClase extends ConsumerStatefulWidget {
   const _DetalleClase(this.c);
 
   final ClaseMiembro c;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DetalleClase> createState() => _DetalleClaseState();
+}
+
+class _DetalleClaseState extends ConsumerState<_DetalleClase> {
+  /// El lugar numerado que eligió (opcional; B06).
+  int? _lugar;
+
+  ClaseMiembro get c => widget.c;
+
+  @override
+  Widget build(BuildContext context) {
     final notifier = ref.read(cuentaProvider.notifier);
     // Lo que pasará al reservar (M05); sin respuesta, se puede intentar igual.
     final antes = ref.watch(antesDeReservarProvider(c.id)).value;
+    // Si alguien tomó el lugar (u otra cosa cambió), se dice y se vuelve a pedir la
+    // vista previa: nunca se cambia a otro lugar en silencio.
     Future<void> reservar({bool esperar = false}) async {
       final nav = Navigator.of(context);
-      await hacerConAviso(
-        context,
-        () => notifier.reservar(c.id, esperar: esperar),
-        exito: esperar ? 'Te anotamos en la lista de espera.' : 'Reservado.',
-      );
-      if (nav.mounted) {
-        nav.pop();
+      final messenger = ScaffoldMessenger.of(context);
+      try {
+        await notifier.reservar(c.id, esperar: esperar, lugar: _lugar);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              esperar ? 'Te anotamos en la lista de espera.' : 'Reservado.',
+            ),
+          ),
+        );
+        if (nav.mounted) {
+          nav.pop();
+        }
+      } on DioException catch (e) {
+        messenger.showSnackBar(SnackBar(content: Text(mensajeDeError(e))));
+        setState(() => _lugar = null);
+        ref.invalidate(antesDeReservarProvider(c.id));
       }
     }
 
@@ -481,6 +510,56 @@ class _DetalleClase extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(dato),
                   ),
+            if (antes != null &&
+                antes.lugaresTotal > 0 &&
+                antes.resultado == 'reserva') ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Elige tu lugar (opcional)',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (var n = 1; n <= antes.lugaresTotal; n++)
+                    Semantics(
+                      label: antes.lugaresOcupados.contains(n)
+                          ? 'Lugar $n, ocupado'
+                          : _lugar == n
+                          ? 'Lugar $n, el tuyo'
+                          : 'Lugar $n, libre',
+                      child: ChoiceChip(
+                        label: Text(
+                          '$n',
+                          style: antes.lugaresOcupados.contains(n)
+                              ? const TextStyle(
+                                  decoration: TextDecoration.lineThrough,
+                                )
+                              : null,
+                        ),
+                        selected: _lugar == n,
+                        onSelected: antes.lugaresOcupados.contains(n)
+                            ? null
+                            : (si) => setState(() => _lugar = si ? n : null),
+                      ),
+                    ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _lugar == null
+                      ? 'Tachados: ocupados. Si no eliges, el negocio te asigna uno.'
+                      : 'Elegiste el lugar $_lugar.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: TemaAgendaUno.textoSuave,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             if (antes != null && !antes.puedeReservar)
               const SizedBox.shrink()

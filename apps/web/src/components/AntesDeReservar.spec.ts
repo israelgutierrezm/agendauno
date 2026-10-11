@@ -98,7 +98,7 @@ describe("antes de reservar", () => {
     expect(w.text()).toContain("Roma Norte");
 
     await w.get('[data-prueba="confirmar-reserva"]').trigger("click");
-    expect(w.emitted("confirmar")?.[0]).toEqual([false]);
+    expect(w.emitted("confirmar")?.[0]).toEqual([false, null]);
   });
 
   it("sin plan vigente dice el motivo y lleva a revisar su plan, sin botón de reservar", async () => {
@@ -143,6 +143,24 @@ describe("antes de reservar", () => {
     expect(w.emitted("accion")?.[0]).toEqual(["cambiar_sucursal"]);
   });
 
+  it("con lugares numerados elige el suyo; los ocupados no se eligen y lo dicen", async () => {
+    api.get.mockResolvedValueOnce(
+      antes({ lugares: { total: 4, ocupados: [2] } }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    const ocupado = w.get('[data-lugar="2"]');
+    expect(ocupado.attributes("disabled")).toBeDefined();
+    expect(ocupado.attributes("aria-label")).toBe("Lugar 2, ocupado");
+    await w.get('[data-lugar="3"]').trigger("click");
+    expect(w.get('[data-lugar="3"]').attributes("aria-pressed")).toBe("true");
+    expect(w.text()).toContain("Elegiste el lugar 3.");
+
+    await w.get('[data-prueba="confirmar-reserva"]').trigger("click");
+    expect(w.emitted("confirmar")?.[0]).toEqual([false, 3]);
+  });
+
   it("sin vista previa se puede intentar reservar (el servidor valida)", async () => {
     api.get.mockRejectedValueOnce(new Error("red"));
     const w = montar();
@@ -150,6 +168,6 @@ describe("antes de reservar", () => {
 
     expect(w.text()).toContain("Sin conexión");
     await w.get("button").trigger("click");
-    expect(w.emitted("confirmar")?.[0]).toEqual([false]);
+    expect(w.emitted("confirmar")?.[0]).toEqual([false, null]);
   });
 });

@@ -164,6 +164,27 @@ export default {
       otras_clases: "Ver otras fechas de esta clase",
     },
   },
+  // Lugares numerados de la clase (B06).
+  lugares: {
+    titulo: "Tu lugar",
+    opcional:
+      "Elige tu lugar (opcional). Si no eliges, el negocio te asigna uno.",
+    leyenda:
+      "Tachados: ocupados. Quedan {libres} libres. Toca un número para elegirlo.",
+    elegido: "Elegiste el lugar {n}.",
+    actual: "Es tu lugar actual: el {n}.",
+    aria: {
+      libre: "Lugar {n}, libre",
+      ocupado: "Lugar {n}, ocupado",
+      tuyo: "Lugar {n}, el tuyo",
+    },
+    tuLugar: "Tu lugar: {n}",
+    sinElegir: "Sin lugar elegido: el negocio te asigna uno.",
+    elegir: "Elegir lugar",
+    cambiar: "Cambiar lugar",
+    guardar: "Guardar lugar",
+    cambiado: "Tu lugar ahora es el {n}.",
+  },
   // Su reserva, después de reservar (C05) y en su detalle.
   miReserva: {
     lista: "Listo: tu clase está reservada.",
