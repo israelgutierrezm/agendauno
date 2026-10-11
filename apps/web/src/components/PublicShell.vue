@@ -233,6 +233,13 @@ defineEmits<{ alternarTema: [] }>();
           <RouterLink class="tu-public-footer-link" to="/terminos">
             Términos y condiciones
           </RouterLink>
+          <a
+            class="tu-public-footer-link"
+            :href="`mailto:${PRODUCTOS[producto].soporte.correo}`"
+            data-prueba="soporte"
+          >
+            Soporte
+          </a>
           <RouterLink
             v-if="!esRutaPublicaDeNegocio"
             class="tu-public-footer-link"

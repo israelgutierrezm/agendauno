@@ -26,6 +26,8 @@ export interface DatosProducto {
   dominio: string;
   /** La modalidad de sus negocios (ADR 0104). */
   modalidad: "clases" | "citas";
+  /** A dónde escriben los dueños que necesitan ayuda (plan de mejoras C01). */
+  soporte: { correo: string; whatsapp: string };
 }
 
 function env(clave: string): string | undefined {
@@ -37,19 +39,37 @@ function env(clave: string): string | undefined {
     : undefined;
 }
 
+const DOMINIO_AGENDAUNO = (
+  env("VITE_DOMINIO_PUBLICO") ?? "agendauno.mx"
+).toLowerCase();
+const DOMINIO_TURNOUNO = (
+  env("VITE_DOMINIO_TURNOUNO") ?? "turnouno.mx"
+).toLowerCase();
+// El WhatsApp de soporte es el mismo para las dos marcas; se cambia al compilar.
+const WHATSAPP_SOPORTE = env("VITE_SOPORTE_WHATSAPP") ?? "555555555";
+
 export const PRODUCTOS: Record<Producto, DatosProducto> = {
   agendauno: {
     id: "agendauno",
     nombre: "AgendaUno",
-    dominio: (env("VITE_DOMINIO_PUBLICO") ?? "agendauno.mx").toLowerCase(),
+    dominio: DOMINIO_AGENDAUNO,
     modalidad: "clases",
+    soporte: {
+      correo: env("VITE_SOPORTE_CORREO") ?? `soporte@${DOMINIO_AGENDAUNO}`,
+      whatsapp: WHATSAPP_SOPORTE,
+    },
   },
   turnouno: {
     id: "turnouno",
     // La identidad de TurnoUno aún no es definitiva: su nombre es configurable.
     nombre: env("VITE_TURNOUNO_NOMBRE") ?? "TurnoUno",
-    dominio: (env("VITE_DOMINIO_TURNOUNO") ?? "turnouno.mx").toLowerCase(),
+    dominio: DOMINIO_TURNOUNO,
     modalidad: "citas",
+    soporte: {
+      correo:
+        env("VITE_TURNOUNO_SOPORTE_CORREO") ?? `soporte@${DOMINIO_TURNOUNO}`,
+      whatsapp: WHATSAPP_SOPORTE,
+    },
   },
 };
 

@@ -491,6 +491,11 @@ export default {
           q: "¿Cuánto tarda dejarlo listo?",
           a: "Depende de cuánto cargues. El asistente de inicio te lleva paso a paso: tu sucursal, tus clases y horarios, tus planes y tu equipo. Con lo básico ya puedes publicar tu página y compartir tu enlace; lo demás lo completas mientras operas.",
         },
+        // El correo y el WhatsApp llegan como parámetros (lib/producto: soporte).
+        soporte: {
+          q: "¿Quién me ayuda si tengo dudas?",
+          a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
+        },
         pagos: {
           q: "¿Mis alumnos pueden pagar en línea?",
           a: "Sí, si conectas tu propia pasarela (Stripe, Mercado Pago u OpenPay, en México): tus alumnos compran y pagan su plan desde su cuenta y el dinero llega a tu cuenta de la pasarela. También registras en recepción los pagos en efectivo o por transferencia.",
@@ -697,6 +702,10 @@ export default {
         preparacion: {
           q: "¿Cuánto tarda dejarlo listo?",
           a: "Depende de cuánto cargues. El asistente de inicio te lleva paso a paso: tu sucursal, tus servicios, tus horarios de atención y tu equipo. Con lo básico ya puedes publicar tu página y compartir tu enlace; lo demás lo completas mientras operas.",
+        },
+        soporte: {
+          q: "¿Quién me ayuda si tengo dudas?",
+          a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
         },
         // Sin nombrar la otra modalidad ni el otro producto: esta página habla solo de
         // citas (ADR 0104 y 0108, como en `landing.clases.faq.modalidad`).

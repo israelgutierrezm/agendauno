@@ -350,6 +350,7 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
       "migracion",
       "preparacion",
       "pagos",
+      "soporte",
       "modalidad",
       "precio",
     ],
@@ -416,6 +417,7 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
       // Objeciones de quien ya opera con otro sistema (plan de mejoras C01).
       "migracion",
       "preparacion",
+      "soporte",
       "modalidad",
       "precio",
     ],

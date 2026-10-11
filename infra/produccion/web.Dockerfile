@@ -23,6 +23,10 @@ ARG VITE_GOOGLE_CLIENT_ID=""
 ARG VITE_RECAPTCHA_SITE_KEY=""
 ARG VITE_ANALYTICS_ENDPOINT=""
 ARG VITE_VENTAS_WHATSAPP=""
+# Canal de soporte de las landings (por omisión, soporte@{dominio} y el WhatsApp provisional).
+ARG VITE_SOPORTE_CORREO=""
+ARG VITE_TURNOUNO_SOPORTE_CORREO=""
+ARG VITE_SOPORTE_WHATSAPP=""
 ARG VITE_APP_VERSION="dev"
 ARG GOOGLE_SITE_VERIFICATION=""
 # Los mapas de origen salen de lo que se publica (ADR 0082); quedan en mapas/app/…, como
