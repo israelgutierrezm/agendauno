@@ -215,6 +215,8 @@ class FamiliasTenant
         ]);
         $this->auditoria->registrar($actor, 'tutela.retirada', 'tutela', $tutela->ulid,
             ['estado' => $antes], ['estado' => EstadoTutela::Retirada->value], $tutela->motivo_retiro);
+        // Su tarjeta deja de pagar las membresías de esa persona (ADR 0129).
+        app(DomiciliacionesTenant::class)->alRetirarTutela($tutela);
 
         return $tutela->refresh();
     }
@@ -253,6 +255,29 @@ class FamiliasTenant
         }
 
         return $tutela;
+    }
+
+    /**
+     * Las personas por las que un responsable puede pagar (pago automático, ADR 0129): a
+     * su cargo, con la autorización vigente y aún alumnos del negocio.
+     *
+     * @return Collection<int, PersonaTenant>
+     */
+    public function participantesAutorizados(PersonaTenant $responsable): Collection
+    {
+        if (! $this->activas()) {
+            return new Collection;
+        }
+
+        return PersonaTenant::query()
+            ->whereIn('id', TutelaTenant::query()
+                ->where('responsable_id', $responsable->getKey())
+                ->where('estado', EstadoTutela::Activa->value)
+                ->select('participante_id'))
+            ->where('tipo', TipoPersonaTenant::Miembro->value)
+            ->where('archivado', false)
+            ->orderBy('id')
+            ->get();
     }
 
     /**

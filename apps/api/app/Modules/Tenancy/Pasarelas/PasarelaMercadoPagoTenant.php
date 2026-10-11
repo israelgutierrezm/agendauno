@@ -148,7 +148,8 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultab
     public function suscribir(DomiciliacionTenant $domiciliacion, AcuerdoTenant $acuerdo, ?string $retorno, array $datos, array $llaves): array
     {
         $acuerdo->loadMissing(['producto', 'persona']);
-        $email = (string) $acuerdo->persona?->email;
+        // Quien paga: el titular o su responsable (ADR 0129).
+        $email = (string) ($domiciliacion->persona ?? $acuerdo->persona)?->email;
         if ($email === '') {
             throw new DomiciliacionNoPermitida('Para el pago automático con Mercado Pago necesitas un correo registrado.');
         }

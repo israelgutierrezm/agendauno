@@ -78,6 +78,12 @@ class CobroRecurrenteTenant
         }
 
         $domiciliacion = $acuerdo->domiciliacion()->first();
+        // Lo pagaba un responsable que ya no tiene la autorización (ADR 0129): no se cobra
+        // a su tarjeta; la renovación se avisa para pagarla a mano.
+        if ($domiciliacion instanceof DomiciliacionTenant && ! $this->domiciliaciones->sigueAutorizada($domiciliacion, $acuerdo)) {
+            $this->domiciliaciones->desactivar($acuerdo);
+            $domiciliacion = null;
+        }
         if ($domiciliacion instanceof DomiciliacionTenant && $this->esSuscripcion($domiciliacion)) {
             return $this->suscripcion($acuerdo, $domiciliacion);
         }

@@ -449,6 +449,13 @@ trae `modulos[]`). Apagado, sus rutas responden 403 `MODULE_NOT_ENABLED`. La ses
 - `X-Participante: <ulid>` en `/mi/*` (reservas, planes, pagos y documentos): actúa por
   esa persona; 403 `GUARDIAN_NOT_AUTHORIZED` si no hay autorización vigente. Las líneas de
   orden traen `para` (el participante, si no es quien compró).
+- Pago automático del responsable (ADR 0129): `GET /mi/pago-automatico` trae también
+  las membresías de sus participantes con autorización vigente, con `para {id, nombre}`,
+  y `POST|DELETE /mi/pago-automatico/{acuerdo}` las activa o las quita con su tarjeta.
+  `POST /mi/ordenes/{orden}/cobrar` con `X-Participante` admite `domiciliar`: la tarjeta
+  queda a nombre del responsable. Retirar la autorización quita esos pagos automáticos.
+  En `GET /suscripciones`, `pago_automatico.paga` dice qué responsable la paga; invitar
+  al pago automático a quien no tiene correo le llega a su responsable.
 
 ## Sitio del negocio (ADR 0114)
 
