@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
-import { computed, ref, type Component } from "vue";
+import { computed, onMounted, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -20,6 +20,7 @@ import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
 import TextoDestacado from "@/components/TextoDestacado.vue";
 import { trackEvent } from "@/lib/analytics";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
+import { contarVisitaLanding } from "@/lib/visitaLanding";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useRevelar } from "@/lib/revelar";
 import {
@@ -45,6 +46,8 @@ import "@/marketing/landing.css";
 */
 const props = defineProps<{ modo: Modo }>();
 const { t } = useI18n();
+// Embudo de la plataforma (C08): una visita anónima por día a esta landing.
+onMounted(() => contarVisitaLanding(productoDeModalidad(props.modo)));
 
 // Los días de prueba de su modalidad: los que publica el superadmin (con respaldo).
 const precios = usePreciosPublicos();

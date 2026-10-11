@@ -142,6 +142,10 @@ class OnboardingController
             'publicado' => (bool) $validado['publicado'],
             'privado' => (bool) ($validado['privado'] ?? false),
         ]);
+        // La primera vez que publica: un hito de su puesta en marcha (C02).
+        if ($estudio->publicado && $estudio->publicado_en === null) {
+            $estudio->forceFill(['publicado_en' => now()])->save();
+        }
 
         return response()->json(['data' => [
             'publicado' => $estudio->publicado,

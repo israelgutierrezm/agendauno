@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
+import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
@@ -1580,6 +1581,8 @@ onMounted(cargar);
                 >
               </div>
             </div>
+            <!-- Para compartirla con sus clientes desde hoy: enlace y QR (C02). -->
+            <EnlaceEstudio data-prueba="qr-publicacion" />
 
             <fieldset class="space-y-2">
               <legend class="mb-2 text-sm font-medium">

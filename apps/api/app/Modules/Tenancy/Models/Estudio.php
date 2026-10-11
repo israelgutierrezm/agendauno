@@ -30,6 +30,9 @@ use Illuminate\Support\Carbon;
  * @property array<string, string>|null $redes
  * @property bool $whatsapp_habilitado los avisos por WhatsApp a sus clientes; solo los activa el superadministrador (ADR 0083)
  * @property list<string>|null $modulos los módulos que el superadministrador encendió (ADR 0123)
+ * @property Carbon|null $publicado_en la primera vez que publicó su página (C02)
+ * @property Carbon|null $primera_operacion_en su primera operación real (C02/C08)
+ * @property bool $es_demo negocio de demostración: no cuenta en el embudo de la plataforma
  * @property string|null $plan_nivel el nivel contratado de un negocio de citas (ADR 0107): individual, premium o pro
  * @property int|null $plan_profesionales los profesionales contratados
  * @property string $plan_periodicidad mensual o anual
@@ -115,6 +118,9 @@ class Estudio extends Model
         'redes' => 'array',
         'estado_facturacion' => EstadoFacturacion::class,
         'publicado' => 'boolean',
+        'publicado_en' => 'datetime',
+        'primera_operacion_en' => 'datetime',
+        'es_demo' => 'boolean',
         'privado' => 'boolean',
         'aprovisionado_en' => 'datetime',
         'trial_inicia_en' => 'date',

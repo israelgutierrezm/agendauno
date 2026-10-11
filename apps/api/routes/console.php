@@ -78,6 +78,9 @@ Schedule::command('agendauno:generar-cuotas')->dailyAt('13:00')->withoutOverlapp
 // (primera clase, plan por vencer o vencido, días sin asistir, compró y no reservó).
 Schedule::command('agendauno:generar-seguimientos')->dailyAt('14:00')->withoutOverlapping();
 
+// Hitos de la puesta en marcha de cada negocio (C02/C08): su primera operación real.
+Schedule::command('agendauno:registrar-hitos')->dailyAt('09:30')->withoutOverlapping();
+
 // Cobro del SaaS (ADR 0019, 0032 y 0107): a diario a las 02:00 de CDMX se emiten los
 // cargos de los meses que ya cerraron en la zona de cada negocio (congelando su
 // medición) y los periodos de los planes de citas que empiezan (por adelantado); un

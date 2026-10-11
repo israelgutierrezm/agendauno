@@ -30,6 +30,7 @@ use App\Modules\Tenancy\Http\Controllers\DirectorioController;
 use App\Modules\Tenancy\Http\Controllers\DisponibilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\DocumentosController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
+use App\Modules\Tenancy\Http\Controllers\EmbudoPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\ErroresClienteController;
 use App\Modules\Tenancy\Http\Controllers\EscaparateController;
 use App\Modules\Tenancy\Http\Controllers\ExcepcionesHorarioTenantController;
@@ -180,6 +181,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:publico')->name('api.v1.legales');
     // Precios de la suscripción para la landing (ADR 0107): lo que publica el superadmin.
     Route::get('/precios', PreciosPublicosController::class)->middleware('throttle:publico')->name('api.v1.precios');
+    // Visita anónima a la landing de un producto (embudo de la plataforma, C08).
+    Route::post('/metricas/visita-landing', [EmbudoPlataformaController::class, 'visita'])->middleware('throttle:publico')->name('api.v1.metricas.visita-landing');
     // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
     Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
 
@@ -207,6 +210,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
         // Quienes esperan el lanzamiento de un producto (ADR 0108).
         Route::get('/interesados', [InteresadosController::class, 'index'])->name('interesados');
+        // Embudo de la plataforma: de la landing al primer pago (C08).
+        Route::get('/embudo', [EmbudoPlataformaController::class, 'reporte'])->name('embudo');
         // Condonar un cargo de renta pendiente (queda cancelado; reactiva si ya no debe).
         Route::post('/cargos/{cargo}/condonar', [PlataformaCobrosController::class, 'condonar'])->name('cargos.condonar');
         // Estado de la operación: versión, procesos, verificación, respaldos y alertas.

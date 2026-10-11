@@ -485,6 +485,22 @@ export const instructorClase = {
 };
 
 export const plataformaAdmin = {
+  // Embudo de la plataforma (C08).
+  embudo: {
+    texto:
+      "Negocios que se registraron en el periodo (sin los demos) y hasta dónde llegaron, por producto. Las visitas son a la landing en esas fechas.",
+    desde: "Desde",
+    hasta: "Hasta",
+    visitas: "Visitas a la landing",
+    registros: "Registros",
+    verificados: "Activaron su cuenta",
+    publicados: "Publicaron su página",
+    primeraOperacion: "Primera operación real",
+    primerPago: "Primer pago de la renta",
+    deRegistros: "{n} de {de}",
+    diasPublicar: "Días hasta publicar (mediana)",
+    diasOperar: "Días hasta operar (mediana)",
+  },
   // Módulos que se encienden por negocio (ADR 0123).
   modulos: {
     titulo: "Módulos",
@@ -508,6 +524,7 @@ export const plataformaAdmin = {
     operacion: "Operación",
     errores: "Errores",
     interesados: "Interesados",
+    embudo: "Embudo",
   },
   // Monitoreo de errores (ADR 0080).
   errores: {
