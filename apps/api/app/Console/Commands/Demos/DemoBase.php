@@ -160,7 +160,8 @@ abstract class DemoBase
             'redes' => RedesSociales::normalizar(['instagram' => $d['instagram']]),
         ]);
         // Rehecho desde cero (sin sesiones): su modalidad es la de su giro (ADR 0104).
-        $estudio->forceFill(['modalidad' => ModalidadServicio::paraPerfil($d['perfil'])])->save();
+        // Un demo no cuenta en el embudo de la plataforma (C08).
+        $estudio->forceFill(['modalidad' => ModalidadServicio::paraPerfil($d['perfil']), 'es_demo' => true])->save();
         $this->logo($estudio, $d['color']);
         $this->estudio = $estudio;
 

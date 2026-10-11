@@ -300,6 +300,16 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Embudo de la plataforma (C02, C08)
+
+- `POST /metricas/visita-landing` (público, `text/plain` con `{"producto"}`): una visita
+  anónima por visitante y día a la landing de un producto; 204 siempre.
+- `GET /plataforma/embudo?desde&hasta` (superadmin): por producto, `visitas_landing`,
+  `registros` (negocios creados en el periodo, sin demos), `verificados`, `publicados`,
+  `primera_operacion`, `primer_pago`, `dias_a_publicar` y `dias_a_operar` (medianas).
+- `estudios.publicado_en` se anota al publicar por primera vez; `primera_operacion_en`,
+  con `agendauno:registrar-hitos` (diario); `es_demo` lo pone la siembra de demos.
+
 ## Cobros comprensibles (M07)
 
 - `GET /pasarelas`: cada pasarela en línea suma `confirma_pagos` (tiene las llaves de sus
