@@ -827,10 +827,15 @@ class MembresiaRenovable {
     this.proximaCobroEn,
     this.error,
     this.tarjeta,
+    this.para,
   });
 
   final String id;
   final bool automatico;
+
+  /// De una persona a su cargo (su nombre): se cobra a la tarjeta del responsable
+  /// (ADR 0129).
+  final String? para;
 
   /// Suscripción creada en la pasarela que falta autorizar.
   final bool pendiente;
@@ -860,6 +865,9 @@ class MembresiaRenovable {
     moneda: Formato.moneda(j['moneda'], moneda),
     proximaCobroEn: j['proxima_cobro_en'] as String?,
     error: j['error'] as String?,
+    para: j['para'] is Map<String, dynamic>
+        ? (j['para'] as Map<String, dynamic>)['nombre'] as String?
+        : null,
   );
 }
 

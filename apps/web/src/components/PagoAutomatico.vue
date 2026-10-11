@@ -15,6 +15,9 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * solas y con qué tarjeta. La tarjeta se autoriza en la página de la pasarela
  * (Stripe, Mercado Pago) o en el formulario de OpenPay.js (OpenPay); AgendaUno nunca
  * la ve. Al volver, el aviso de la pasarela la registra en segundos.
+ *
+ * Un responsable ve también las membresías de las personas a su cargo (`para`): se
+ * cobran a su tarjeta (ADR 0129).
  */
 interface Tarjeta {
   marca: string | null;
@@ -23,6 +26,8 @@ interface Tarjeta {
 }
 interface Membresia {
   id: string;
+  // De una persona a su cargo: se cobra a la tarjeta de quien ve la cuenta.
+  para?: { id: string; nombre: string } | null;
   producto: string | null;
   monto_minor: number | null;
   moneda: string | null;
@@ -43,6 +48,7 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const disponible = ref(false);
 const tarjeta = ref<Tarjeta | null>(null);
 const membresias = ref<Membresia[]>([]);
+const deOtros = computed(() => membresias.value.some((m) => m.para));
 const accionando = ref<string | null>(null);
 const error = ref<string | null>(null);
 // OpenPay: la tarjeta se captura aquí con OpenPay.js antes de suscribir.
@@ -173,6 +179,13 @@ onMounted(async () => {
       {{ $t("pagoAutomatico.ayuda") }}
     </p>
     <p
+      v-if="deOtros"
+      class="mt-1 text-sm"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("pagoAutomatico.aCargo") }}
+    </p>
+    <p
       v-if="retorno"
       class="mt-2 text-sm"
       role="status"
@@ -224,6 +237,14 @@ onMounted(async () => {
       >
         <div class="min-w-0">
           <p class="font-medium">{{ m.producto ?? "—" }}</p>
+          <p
+            v-if="m.para"
+            class="text-xs"
+            data-prueba="pago-para"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("pagoAutomatico.para", { nombre: m.para.nombre }) }}
+          </p>
           <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
             {{
               $t("pagoAutomatico.renueva", {

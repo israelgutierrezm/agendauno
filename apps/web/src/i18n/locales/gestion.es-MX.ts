@@ -1062,6 +1062,12 @@ export const pagoAutomatico = {
     "Tarjeta autorizada. En unos segundos verás el pago automático activo.",
   tarjetaCancelado: "No se autorizó la tarjeta; puedes intentarlo de nuevo.",
   alPagar: "Cobrar automáticamente cada renovación",
+  // Familias (ADR 0129): el responsable paga con su tarjeta.
+  alPagarACargo: "Cobrar automáticamente cada renovación a tu tarjeta",
+  aCargo:
+    "Las membresías de las personas a tu cargo se cobran a tu tarjeta. Si retiras la autorización, dejan de cobrarse solas.",
+  para: "Para {nombre}",
+  paga: "Con la tarjeta de {nombre}, su responsable",
   // Cobranza (negocio)
   colCobro: "Cobro",
   pagoManual: "Pago manual",

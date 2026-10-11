@@ -210,6 +210,13 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
+                                    if (m.para != null)
+                                      Text(
+                                        'Para ${m.para} · se cobra a tu tarjeta',
+                                        style: const TextStyle(
+                                          color: TemaAgendaUno.textoSuave,
+                                        ),
+                                      ),
                                     Text(
                                       'Se renueva el ${Formato.fechaLarga(m.proximaCobroEn)}'
                                       '${m.montoMinor != null ? ' · ${Formato.dinero(m.montoMinor!, m.moneda)}' : ''}',

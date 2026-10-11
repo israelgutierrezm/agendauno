@@ -108,4 +108,19 @@ describe("pago automático del alumno", () => {
 
     expect(vista.text()).toBe("");
   });
+
+  it("las membresías de una persona a cargo dicen para quién son y se cobran a su tarjeta", async () => {
+    const r = respuesta(false);
+    Object.assign(r.data.data.membresias[0]!, {
+      para: { id: "p2", nombre: "Sofía" },
+    });
+    api.get.mockResolvedValue(r);
+    const vista = montar();
+    await flushPromises();
+
+    expect(vista.get('[data-prueba="pago-para"]').text()).toBe("Para Sofía");
+    expect(vista.text()).toContain(
+      "Las membresías de las personas a tu cargo se cobran a tu tarjeta.",
+    );
+  });
 });

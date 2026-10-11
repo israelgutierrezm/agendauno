@@ -50,6 +50,15 @@ void main() {
     expect(sinMoneda.moneda, 'EUR');
   });
 
+  test('la membresía de una persona a cargo dice para quién es', () {
+    final m = MembresiaRenovable.desdeJson({
+      'id': 'a4',
+      'para': {'id': 'p2', 'nombre': 'Sofía'},
+    });
+    expect(m.para, 'Sofía');
+    expect(MembresiaRenovable.desdeJson({'id': 'a5'}).para, isNull);
+  });
+
   test('el dinero se forma desde centavos, con miles', () {
     expect(Formato.dinero(5, 'MXN'), r'$0.05');
     expect(Formato.dinero(123456789, 'MXN'), r'$1,234,567.89');
