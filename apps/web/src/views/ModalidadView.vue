@@ -270,6 +270,7 @@ function medirOtra(): void {
             titulo: t(k('hero.avisoTitulo')),
             detalle: t(k('hero.avisoDetalle')),
           }"
+          :nota="t('landing.modalidad.heroNota')"
         />
       </div>
     </section>
@@ -572,6 +573,13 @@ function medirOtra(): void {
           </div>
           <div class="tu-modalidad-demo reveal">
             <component :is="DEMO_PAGINA[modo]" />
+            <p
+              class="mt-2 text-xs text-center"
+              :style="SUAVE"
+              data-prueba="demo-pagina-nota"
+            >
+              {{ t("landing.modalidad.demoPaginaNota") }}
+            </p>
           </div>
         </div>
       </div>

@@ -18,6 +18,8 @@ export interface FotoCollage {
 defineProps<{
   fotos: readonly FotoCollage[];
   aviso: { titulo: string; detalle: string };
+  /** Que se lea como ejemplo, no como un cliente real (C01). */
+  nota?: string;
 }>();
 </script>
 
@@ -62,10 +64,17 @@ defineProps<{
         </span>
       </div>
     </div>
+    <figcaption v-if="nota" class="tu-hero-nota">{{ nota }}</figcaption>
   </figure>
 </template>
 
 <style scoped>
+.tu-hero-nota {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--texto-suave);
+}
 .tu-hero-visual {
   min-width: 0;
   margin: 0;

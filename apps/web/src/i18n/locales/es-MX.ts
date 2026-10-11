@@ -242,6 +242,9 @@ export default {
       probar: "Probar AgendaUno gratis",
       verAgenda: "Ver la agenda de ejemplo",
       demoEtiqueta: "AgendaUno en acción",
+      // Las demos se identifican como demos (plan de mejoras C01).
+      demoPaginaNota: "Página de ejemplo con datos ficticios.",
+      heroNota: "Imágenes y avisos de ejemplo.",
       demoPie: "{dias} días para probarlo. Sin tarjeta.",
       pasosTitulo: "Empieza en solo tres pasos",
       ejemplo: "Ejemplo",
@@ -480,6 +483,18 @@ export default {
           q: "¿Sirve para varias sucursales?",
           a: "Sí. Cada sucursal tiene sus clases, sus horarios, sus salas y su equipo, y tú ves todo desde el mismo panel.",
         },
+        migracion: {
+          q: "¿Puedo traer a mis alumnos desde otro sistema?",
+          a: "Sí. Importas a tus alumnos, instructores y clases con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los planes y créditos que trae cada alumno se cargan a la fecha de corte que elijas, sin registrar ventas; las reservas futuras se hacen de nuevo aquí.",
+        },
+        preparacion: {
+          q: "¿Cuánto tarda dejarlo listo?",
+          a: "Depende de cuánto cargues. El asistente de inicio te lleva paso a paso: tu sucursal, tus clases y horarios, tus planes y tu equipo. Con lo básico ya puedes publicar tu página y compartir tu enlace; lo demás lo completas mientras operas.",
+        },
+        pagos: {
+          q: "¿Mis alumnos pueden pagar en línea?",
+          a: "Sí, si conectas tu propia pasarela (Stripe, Mercado Pago u OpenPay, en México): tus alumnos compran y pagan su plan desde su cuenta y el dinero llega a tu cuenta de la pasarela. También registras en recepción los pagos en efectivo o por transferencia.",
+        },
         // Sin nombrar la otra modalidad ni el otro producto: esta página habla solo de
         // clases. Cada modalidad es un producto (ADR 0108): cambiarla cambia el
         // producto, y solo la cambia el superadmin antes de operar (ADR 0104).
@@ -674,6 +689,14 @@ export default {
         salud: {
           q: "¿Sirve para consultorios o profesionales de la salud?",
           a: "Sí, para organizar citas, disponibilidad, recordatorios y cobros. AgendaUno no sustituye un expediente clínico ni un sistema médico especializado.",
+        },
+        migracion: {
+          q: "¿Puedo traer a mis clientes desde otro sistema?",
+          a: "Sí. Importas a tus clientes y a tu equipo con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los bonos y membresías que trae cada cliente se cargan a la fecha de corte que elijas, sin registrar ventas; las citas futuras se agendan de nuevo aquí.",
+        },
+        preparacion: {
+          q: "¿Cuánto tarda dejarlo listo?",
+          a: "Depende de cuánto cargues. El asistente de inicio te lleva paso a paso: tu sucursal, tus servicios, tus horarios de atención y tu equipo. Con lo básico ya puedes publicar tu página y compartir tu enlace; lo demás lo completas mientras operas.",
         },
         // Sin nombrar la otra modalidad ni el otro producto: esta página habla solo de
         // citas (ADR 0104 y 0108, como en `landing.clases.faq.modalidad`).
@@ -946,6 +969,8 @@ export default {
     paisAyuda:
       "Con él te proponemos la lada de los celulares y la zona horaria. Puedes cambiarlo después.",
     subtitulo: "En un minuto tendrás tu agenda lista para configurar.",
+    // Lo mismo que anuncia la landing, del mismo dato (C01).
+    pruebaSinTarjeta: "Tienes {dias} días de prueba gratis, sin tarjeta.",
     nombre: "Nombre del negocio",
     nombrePh: "Distrito 27",
     perfil: "Tipo de negocio",

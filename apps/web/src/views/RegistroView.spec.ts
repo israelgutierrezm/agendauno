@@ -77,6 +77,18 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("presentación del registro", () => {
+  it("dice los días de prueba y que no pide tarjeta, del mismo dato que la landing (C01)", async () => {
+    aplicarPreciosPublicos({
+      clases: { ...PRECIOS_POR_OMISION.clases, dias_prueba: 21 },
+    });
+    const vista = montar();
+    await vista.vm.$nextTick();
+
+    expect(vista.get('[data-prueba="prueba-sin-tarjeta"]').text()).toBe(
+      "Tienes 21 días de prueba gratis, sin tarjeta.",
+    );
+    aplicarPreciosPublicos({});
+  });
   it("ofrece el aviso antes de capturar datos sin perder el registro", () => {
     const vista = montar();
     const enlace = vista.get(".registro-aviso");

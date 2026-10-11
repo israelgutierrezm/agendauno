@@ -50,6 +50,8 @@ const producto = productoActual();
 const modoDelProducto: Modo = PRODUCTOS[producto].modalidad;
 const precios = usePreciosPublicos();
 const registroAbierto = computed(() => precios.datos.registro[producto]);
+// Los días de prueba del producto: el mismo dato que anuncia su landing (C01).
+const diasPrueba = computed(() => precios.datos[modoDelProducto].dias_prueba);
 
 // Alta por pasos: filtra interesados reales y captura datos de contacto útiles.
 const paso = ref(1);
@@ -1126,6 +1128,13 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                 {{ enviando ? $t("registro.creando") : $t("registro.crear") }}
               </button>
             </div>
+            <p
+              class="mt-3 text-sm text-center"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="prueba-sin-tarjeta"
+            >
+              {{ $t("registro.pruebaSinTarjeta", { dias: diasPrueba }) }}
+            </p>
           </form>
         </template>
 
