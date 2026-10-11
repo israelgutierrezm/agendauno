@@ -9,6 +9,7 @@ import {
   type ModalidadServicio,
 } from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { updateSeo } from "@/lib/seo";
 
 /**
@@ -20,6 +21,11 @@ interface Sucursal {
   id: string;
   nombre: string;
   zona_horaria: string | null;
+  // Para elegir con información (M06): zona, dirección, foto y cómo llegar.
+  region?: string | null;
+  direccion?: string | null;
+  foto_url?: string | null;
+  mapa_url?: string | null;
 }
 interface Opciones {
   estudio: {
@@ -71,7 +77,7 @@ async function cargar(): Promise<void> {
       pais: data.data.estudio.pais ?? null,
     });
     updateSeo({
-      title: `${data.data.estudio.nombre} | Sucursales en AgendaUno`,
+      title: `${data.data.estudio.nombre} | Sucursales en ${PRODUCTOS[productoActual()].nombre}`,
       description: `Elige la sucursal de ${data.data.estudio.nombre} y agenda en línea.`,
       path: `/sucursales/${data.data.estudio.slug}`,
       image: data.data.estudio.logo_url ?? undefined,
@@ -165,13 +171,26 @@ onMounted(cargar);
       </p>
 
       <ul class="mt-4 space-y-3">
-        <li v-for="s in opciones.sucursales" :key="s.id">
+        <li
+          v-for="s in opciones.sucursales"
+          :key="s.id"
+          class="tu-card overflow-hidden"
+          data-prueba="sucursal"
+        >
           <RouterLink
             :to="destinoSucursal(s)"
-            class="tu-card p-5 flex items-center justify-between gap-3 transition hover:-translate-y-0.5"
+            class="p-5 flex items-center justify-between gap-3 transition hover:-translate-y-0.5"
           >
             <span class="flex items-center gap-3 min-w-0">
+              <img
+                v-if="s.foto_url"
+                :src="s.foto_url"
+                alt=""
+                class="h-14 w-14 rounded-xl object-cover shrink-0"
+                loading="lazy"
+              />
               <span
+                v-else
                 class="h-10 w-10 rounded-xl inline-flex items-center justify-center shrink-0"
                 :style="{
                   background: 'var(--primario-suave)',
@@ -193,7 +212,17 @@ onMounted(cargar);
                   <circle cx="12" cy="11" r="2.2" />
                 </svg>
               </span>
-              <span class="font-semibold truncate">{{ s.nombre }}</span>
+              <span class="min-w-0">
+                <span class="block font-semibold truncate">{{ s.nombre }}</span>
+                <span
+                  v-if="s.region || s.direccion"
+                  class="block text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{
+                    [s.region, s.direccion].filter(Boolean).join(" · ")
+                  }}</span
+                >
+              </span>
             </span>
             <span
               class="shrink-0 text-lg"
@@ -202,6 +231,15 @@ onMounted(cargar);
               >›</span
             >
           </RouterLink>
+          <!-- Dónde queda, sin salir de la elección (M06). -->
+          <a
+            v-if="s.mapa_url"
+            :href="s.mapa_url"
+            target="_blank"
+            rel="noopener"
+            class="tu-enlace block px-5 pb-4 -mt-2 text-sm"
+            >{{ $t("sucursalesPub.comoLlegar") }}</a
+          >
         </li>
       </ul>
     </section>

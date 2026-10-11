@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -180,19 +181,62 @@ class ResolverDerechoTenant
 
     /**
      * Por qué no se puede reservar con lo que tiene: si un plan vigente y con saldo
-     * cubre la actividad pero no esa sucursal, se lo dice (para elegir otra sede o un
-     * plan multisucursal); si no, que no tiene un derecho con saldo.
+     * cubre la actividad pero no esa sucursal, se lo dice con los nombres de las sedes
+     * (M06: en cuáles vale y en cuál es la sesión); si no, que no tiene un derecho con
+     * saldo.
      */
     public function motivoSinDerecho(PersonaTenant $persona, SesionTenant $sesion, int $unidades): string
     {
-        $otraSucursal = DerechoTenant::query()->whereHas('acuerdo', fn ($q) => $q
+        $deOtraSucursal = DerechoTenant::query()->whereHas('acuerdo', fn ($q) => $q
             ->where('persona_id', $persona->getKey())->where('estado', EstadoAcuerdo::Activo->value))
-            ->with('ofertas:id')->get()->contains(fn (DerechoTenant $d): bool => $this->vigente($d, $sesion->inicia_en) && $this->cubre($d, $sesion, false)
+            ->with('ofertas:id')->get()->first(fn (DerechoTenant $d): bool => $this->vigente($d, $sesion->inicia_en) && $this->cubre($d, $sesion, false)
                 && ! $this->cubre($d, $sesion)
                 && ($d->ilimitado || $this->libro->disponible($d) >= $unidades));
+        if (! $deOtraSucursal instanceof DerechoTenant) {
+            return 'No hay un derecho con saldo para esta sesion.';
+        }
 
-        return $otraSucursal ? 'Tu plan cubre esta actividad, pero no esta sucursal. Elige una sucursal incluida o un plan multisucursal.'
-            : 'No hay un derecho con saldo para esta sesion.';
+        $ids = $deOtraSucursal->sucursales_ids ?? ($deOtraSucursal->sucursal_id !== null ? [(int) $deOtraSucursal->sucursal_id] : []);
+        $incluidas = SucursalTenant::query()->whereKey($ids)->orderBy('nombre')->pluck('nombre')->all();
+        $aqui = SucursalTenant::query()->whereKey($sesion->sucursal_id)->value('nombre');
+        if ($incluidas === [] || ! is_string($aqui)) {
+            return 'Tu plan cubre esta actividad, pero no esta sucursal. Elige una sucursal incluida o un plan que la incluya.';
+        }
+
+        return 'Tu plan vale solo en '.self::lista($incluidas).", no en {$aqui}. Elige una fecha en una sucursal incluida o un plan que incluya {$aqui}.";
+    }
+
+    /**
+     * «Roma», «Roma y Polanco», «Roma, Polanco y Condesa».
+     *
+     * @param  list<string>  $nombres
+     */
+    private static function lista(array $nombres): string
+    {
+        $ultimo = array_pop($nombres);
+
+        return $nombres === [] ? (string) $ultimo : implode(', ', $nombres).' y '.$ultimo;
+    }
+
+    /**
+     * ¿Alcanza este derecho para llevar una reserva a otra sesión (reprogramar)? La misma
+     * regla que al reservar, sin volver a cobrar: que incluya la clase, que valga en su
+     * sucursal y que esté vigente ese día (M06). Null si alcanza; si no, el motivo.
+     */
+    public function motivoParaMover(DerechoTenant $derecho, SesionTenant $sesion): ?string
+    {
+        $derecho->loadMissing('ofertas:id');
+        if (! $this->cubre($derecho, $sesion, false)) {
+            return 'Tu plan no incluye esa clase.';
+        }
+        if (! $this->cubre($derecho, $sesion)) {
+            return 'Tu plan no vale en la sucursal de esa clase. Elige una fecha en una sucursal que incluya.';
+        }
+        if (! $this->vigente($derecho, $sesion->inicia_en)) {
+            return 'Tu plan ya no está vigente ese día.';
+        }
+
+        return null;
     }
 
     /**

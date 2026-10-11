@@ -423,6 +423,80 @@ describe("página pública del estudio", () => {
     );
   });
 
+  it("con varias sedes: cada plan dice dónde vale y la sede elegida en el calendario filtra los planes (M06)", async () => {
+    const base = escaparate({ promedio: null, total: 0, recientes: [] });
+    const plan = (extra: Record<string, unknown>) => ({
+      tipo: "paquete",
+      precio_minor: 100000,
+      moneda: "MXN",
+      ilimitado: false,
+      creditos_incluidos: 8000,
+      ...extra,
+    });
+    Object.assign(base.data.data, {
+      sucursales: [
+        {
+          id: "roma",
+          nombre: "Roma",
+          zona_horaria: null,
+          region: "Roma Norte",
+          direccion: "Calle 1",
+          foto_url: "/f.jpg",
+        },
+        { id: "polanco", nombre: "Polanco", zona_horaria: null, region: null },
+      ],
+      productos: [
+        plan({
+          id: "p1",
+          nombre: "Todas",
+          todas_sucursales: true,
+          sucursales: [],
+        }),
+        plan({
+          id: "p2",
+          nombre: "Solo Roma",
+          todas_sucursales: false,
+          sucursales: [{ id: "roma", nombre: "Roma" }],
+        }),
+      ],
+    });
+    mocks.get.mockResolvedValue(base);
+    const w = mount(EstudioPublicoView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { ...es, perfilPublico, sitioWeb } },
+          }),
+        ],
+        stubs: {
+          CalendarioPublico: {
+            props: ["sucursal"],
+            emits: ["update:sucursal"],
+            template: `<button data-prueba="elegir-polanco" @click="$emit('update:sucursal', 'polanco')" />`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const textos = () =>
+      w.findAll('[data-prueba="precio"]').map((p) => p.text());
+    expect(textos()[0]).toContain("Todas las sedes incluidas");
+    expect(textos()[1]).toContain("Solo en Roma");
+    // La sede con su foto, zona y dirección.
+    const sede = w.findAll('[data-prueba="sede"]')[0]!;
+    expect(sede.text()).toContain("Roma Norte · Calle 1");
+    expect(sede.find("img").exists()).toBe(true);
+
+    await w.get('[data-prueba="elegir-polanco"]').trigger("click");
+    expect(textos()).toHaveLength(1);
+    expect(w.get('[data-prueba="planes-de-sede"]').text()).toContain(
+      "Planes que valen en Polanco.",
+    );
+  });
+
   it("su sitio decide el orden, lo que se ve, sus textos, banners y color (ADR 0114)", async () => {
     const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
     Object.assign(respuesta.data.data, {

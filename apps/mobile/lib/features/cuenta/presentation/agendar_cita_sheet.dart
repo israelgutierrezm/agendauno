@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/network/mensaje_error.dart';
@@ -450,6 +451,12 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                     ),
                   ],
                   const SizedBox(height: 16),
+                  // Dónde será (M06): la sede, su dirección y cómo llegar, siempre a la
+                  // vista antes de confirmar.
+                  if (_sede != null) ...[
+                    _DondeSera(sede: _sede!),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: _nota,
                     maxLength: 500,
@@ -502,4 +509,55 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       onChanged: alCambiar,
     ),
   );
+}
+
+/// La sede de la cita con su dirección y cómo llegar (M06).
+class _DondeSera extends StatelessWidget {
+  const _DondeSera({required this.sede});
+
+  final OpcionCita sede;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('donde-sera'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.place_outlined, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sede.nombre,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                if (sede.ubicacion != null)
+                  Text(
+                    sede.ubicacion!,
+                    style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                  ),
+                if (sede.mapaUrl != null)
+                  TextButton(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    onPressed: () => launchUrl(
+                      Uri.parse(sede.mapaUrl!),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    child: const Text('Cómo llegar'),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -9,6 +9,7 @@ import HistorialCompras from "@/components/HistorialCompras.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { textoCobertura } from "@/lib/cobertura";
 import {
   cuandoCorto,
   dinero,
@@ -437,11 +438,7 @@ onMounted(() => void cuenta.asegurar());
               class="mt-1 text-xs"
               style="color: var(--texto-suave)"
             >
-              {{
-                p.todas_sucursales
-                  ? $t("sucursalOperativa.todas")
-                  : p.sucursales?.map((s) => s.nombre).join(" · ")
-              }}
+              {{ textoCobertura(p, $t) }}
             </p>
             <p class="mt-1 text-xl font-semibold">
               {{ dinero(p.precio_minor, p.moneda) }}

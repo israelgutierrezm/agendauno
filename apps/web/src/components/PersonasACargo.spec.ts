@@ -119,3 +119,11 @@ describe("personas a cargo en la cuenta", () => {
     useParticipantes().elegir(null);
   });
 });
+
+describe("al salir de la cuenta", () => {
+  it("no queda guardada la persona a cargo elegida", () => {
+    sessionStorage.setItem("agendauno:participante:demo", "p-sofia");
+    useParticipantes().reiniciar();
+    expect(sessionStorage.getItem("agendauno:participante:demo")).toBeNull();
+  });
+});

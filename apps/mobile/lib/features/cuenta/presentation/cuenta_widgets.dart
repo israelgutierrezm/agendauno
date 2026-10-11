@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/calendario/agregar_calendario.dart';
 import '../../../core/formato.dart';
@@ -302,6 +303,18 @@ class _DetalleReserva extends ConsumerWidget {
               ].whereType<String>().join(' · '),
               style: const TextStyle(color: TemaAgendaUno.textoSuave),
             ),
+            // Dónde es (M06): cómo llegar a la sede, en clases y en citas.
+            if (r.mapaUrl != null)
+              TextButton.icon(
+                key: const Key('como-llegar'),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                icon: const Icon(Icons.place_outlined, size: 18),
+                label: const Text('Cómo llegar'),
+                onPressed: () => launchUrl(
+                  Uri.parse(r.mapaUrl!),
+                  mode: LaunchMode.externalApplication,
+                ),
+              ),
             const SizedBox(height: 8),
             Text(
               r.estadoTexto,

@@ -49,7 +49,7 @@ it('conserva las sucursales compradas y comparte el saldo entre ellas sin inclui
     }
     $noCubierta = crearSesionTenant($e, ['oferta' => $semilla['oferta'], 'sucursal' => $futura], 10);
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$noCubierta}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))
-        ->assertUnprocessable()->assertJsonPath('code', 'ENTITLEMENT_REQUIRED')->assertJsonPath('message', 'Tu plan cubre esta actividad, pero no esta sucursal. Elige una sucursal incluida o un plan multisucursal.');
+        ->assertUnprocessable()->assertJsonPath('code', 'ENTITLEMENT_REQUIRED')->assertJsonPath('message', 'Tu plan vale solo en Polanco y Roma Norte, no en Nueva. Elige una fecha en una sucursal incluida o un plan que incluya Nueva.');
     $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/derechos", conBearer($e['bearer']))
         ->assertJsonPath('data.0.disponible', 6000);
     $nuevaPersona = crearMiembroTenant($e, 'Beto');

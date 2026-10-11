@@ -120,13 +120,22 @@ async function retirar(tutela: string): Promise<void> {
   await cargar();
 }
 
-/** Al salir o cambiar de cuenta: nada de la anterior. */
+/** Al salir o cambiar de cuenta: nada de la anterior, tampoco lo guardado en la pestaña. */
 function reiniciar(): void {
   lista.value = [];
   activo.value = false;
   cargado.value = false;
   actual.value = null;
   fijarParticipante(null);
+  try {
+    for (const llave of Object.keys(sessionStorage)) {
+      if (llave.startsWith(`${LLAVE}:`)) {
+        sessionStorage.removeItem(llave);
+      }
+    }
+  } catch {
+    // Sin almacenamiento no hay nada guardado.
+  }
 }
 
 // El servidor ya no la reconoce (retirada o familias apagadas): de vuelta a la suya.

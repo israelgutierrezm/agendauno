@@ -1141,6 +1141,11 @@ export default {
       destacado: "Recomendado",
       primeraVez: "Para tu primera vez",
       primeraVezAyuda: "Solo para quien viene por primera vez, una vez.",
+      // Dónde vale (M06): nunca «multisucursal» sin decir cuáles.
+      todasLasSedes: "Todas las sedes incluidas",
+      soloEn: "Solo en {sedes}",
+      deSede: "Planes que valen en {sede}.",
+      verTodos: "Ver todos",
       porMes: "1 crédito al mes | {n} créditos al mes",
       paraActividad: "Para {actividad}",
       vence: "Si lo pagas hoy, se puede usar hasta el {fecha}",
@@ -1857,6 +1862,7 @@ export default {
     cargando: "Cargando…",
     noDisponible: "Este negocio no está disponible por ahora.",
     volver: "Ver otros negocios",
+    comoLlegar: "Cómo llegar",
   },
   sedes: {
     titulo: "Sucursales",

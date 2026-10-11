@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -669,6 +670,12 @@ class ReservasTenant
 
         if ((int) $nueva->oferta_id !== (int) $origen->oferta_id) {
             throw new SesionNoReservable('Solo se puede mover a otra fecha de la misma clase.');
+        }
+        // El plan con que se reservó debe valer en el destino, como al reservar: en su
+        // sucursal y vigente ese día (M06). Un plan local no se lleva a otra sede.
+        $derecho = $reserva->derecho_id !== null ? DerechoTenant::query()->find($reserva->derecho_id) : null;
+        if ($derecho instanceof DerechoTenant && ($motivo = $this->resolver->motivoParaMover($derecho, $nueva)) !== null) {
+            throw new SesionNoReservable($motivo);
         }
         if ($nueva->estado !== EstadoSesionTenant::Programada || ! $nueva->inicia_en->isFuture()) {
             throw new SesionNoReservable('Esa clase ya no se puede reservar.');
