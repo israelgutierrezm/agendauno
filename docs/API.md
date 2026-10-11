@@ -344,6 +344,16 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Cada producto habla como sus negocios (ADR 0131)
+
+- `GET /terminologia` trae en `opciones` solo las de la modalidad del negocio; otra
+  responde 422.
+- `GET /parametros` lista solo los de su modalidad (cada definición trae `modalidad`:
+  `clases`, `citas` o null); guardar uno de la otra modalidad responde 422.
+- `GET /roles` trae en `catalogo` solo los permisos de su modalidad.
+- `GET /plataforma/whatsapp`: las plantillas de los negocios traen `modalidad` (las de
+  citas son `turnouno_*`). Los avisos al dueño llevan `{{marca}}`.
+
 ## TurnoUno sin membresías (ADR 0130)
 
 - En un negocio de citas, crear, editar, vender u ofrecer algo que funcione como

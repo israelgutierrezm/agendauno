@@ -42,7 +42,7 @@ class RegistrarCheckin
         $validador = $this->registro->resolver($proveedor);
 
         if ($validador === null || ! $this->registro->activa($proveedor)) {
-            throw new IntegracionNoDisponible('La integracion no esta activa en este estudio.');
+            throw new IntegracionNoDisponible('La integración no está activa en este negocio.');
         }
 
         $resultado = $validador->validar($codigo, $this->registro->credenciales($proveedor));

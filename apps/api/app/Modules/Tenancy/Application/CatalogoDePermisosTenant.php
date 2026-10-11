@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\ModalidadServicio;
+
 /**
  * Catálogo de permisos y roles del data plane (por tenant). Los roles viven en la
  * BD del estudio: la misma persona puede tener roles distintos en dos estudios.
@@ -91,6 +93,33 @@ class CatalogoDePermisosTenant
             'marketing' => ['comunicaciones.ver', 'comunicaciones.gestionar', 'comunicaciones.eliminar', 'automatizaciones.gestionar', 'automatizaciones.eliminar', 'lealtad.ver', 'lealtad.gestionar'],
             'negocio' => ['estudio.gestionar', 'sucursales.ver', 'sucursales.gestionar', 'organizaciones.ver', 'organizaciones.gestionar', 'integraciones.configurar', 'pagos.configurar', 'auditoria.ver'],
         ];
+    }
+
+    /** Permisos de una sola modalidad (ADR 0131): el editor de roles no ofrece los de la otra. */
+    private const SOLO_DE = [
+        'checkins.registrar' => 'clases',
+        'checkins.excepcion' => 'clases',
+        'cuotas.exentar' => 'clases',
+        'presupuestos.ver' => 'citas',
+        'presupuestos.gestionar' => 'citas',
+    ];
+
+    /**
+     * El catálogo para el editor de roles de un negocio: sin los permisos de la otra
+     * modalidad.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function catalogoPara(?ModalidadServicio $modalidad): array
+    {
+        if ($modalidad === null) {
+            return self::catalogo();
+        }
+
+        return array_map(static fn (array $permisos): array => array_values(array_filter(
+            $permisos,
+            static fn (string $p): bool => (self::SOLO_DE[$p] ?? $modalidad->value) === $modalidad->value,
+        )), self::catalogo());
     }
 
     /**

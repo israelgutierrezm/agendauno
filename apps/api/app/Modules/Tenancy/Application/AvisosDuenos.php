@@ -277,6 +277,8 @@ class AvisosDuenos
         $contexto = [
             'nombre' => (string) ($estudio->contacto_nombre ?: $estudio->nombre),
             'negocio' => (string) $estudio->nombre,
+            // La marca del negocio: AgendaUno o TurnoUno (ADR 0131).
+            'marca' => $estudio->producto()->nombre(),
             'enlace' => MarcaProducto::urlWeb($estudio).'/entrar?estudio='.rawurlencode((string) $estudio->slug).'&volver='.rawurlencode('/renta'),
             ...$datos,
         ];

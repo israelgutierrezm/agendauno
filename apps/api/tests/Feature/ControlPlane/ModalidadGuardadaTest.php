@@ -166,7 +166,7 @@ it('el superadmin cambia la modalidad antes de operar y queda en la bitácora de
     expect($asiento)->toMatchArray([
         'actor' => null,
         'categoria' => 'configuracion',
-        'descripcion' => 'AgendaUno cambió el negocio a citas (giro: general_citas)',
+        'descripcion' => 'La plataforma cambió el negocio a citas (giro: general_citas)',
         'antes' => ['modalidad' => 'clases', 'perfil' => 'general'],
         'despues' => ['modalidad' => 'citas', 'perfil' => 'general_citas'],
     ]);

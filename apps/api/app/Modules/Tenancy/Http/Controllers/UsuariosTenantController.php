@@ -429,7 +429,7 @@ class UsuariosTenantController
 
             if ($this->contarPropietarios() <= 1) {
                 throw ValidationException::withMessages([
-                    'roles' => ['Debe existir al menos un dueño en el estudio.'],
+                    'roles' => ['Debe existir al menos un dueño en el negocio.'],
                 ]);
             }
         }

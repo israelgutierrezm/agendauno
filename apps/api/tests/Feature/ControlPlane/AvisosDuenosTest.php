@@ -97,7 +97,7 @@ it('avisa que la prueba termina: por correo siempre y por WhatsApp a quien lo ac
     expect($envio['to'])->toBe('525512345678')
         ->and($envio['template']['name'])->toBe('agendauno_prueba_por_terminar')
         ->and(array_column($envio['template']['components'][0]['parameters'], 'text'))
-        ->toBe(['Dueño', 'Estudio estudio-b', '12 de octubre', 'https://agendauno.mx/entrar?estudio=estudio-b&volver=%2Frenta']);
+        ->toBe(['Dueño', 'Estudio estudio-b', 'AgendaUno', '12 de octubre', 'https://agendauno.mx/entrar?estudio=estudio-b&volver=%2Frenta']);
 
     // Correrlo otra vez no repite nada.
     $this->artisan('agendauno:avisar-duenos')->assertSuccessful();
@@ -107,6 +107,20 @@ it('avisa que la prueba termina: por correo siempre y por WhatsApp a quien lo ac
     Estudio::query()->where('slug', 'estudio-a')->update(['trial_termina_en' => '2026-10-13']);
     $this->artisan('agendauno:avisar-duenos')->assertSuccessful();
     expect(asuntosA('a@correo.mx'))->toHaveCount(2);
+});
+
+it('a un negocio de citas le habla con la marca de TurnoUno (ADR 0131)', function (): void {
+    $this->travelTo('2026-10-10 17:00:00');
+    Config::set('agendauno.productos.turnouno.url_web', 'https://turnouno.mx');
+    estudioConSesion('barberia-a', 'b@correo.mx', 'barberia');
+    Estudio::query()->where('slug', 'barberia-a')->update(['trial_termina_en' => '2026-10-12']);
+
+    $this->artisan('agendauno:avisar-duenos')->assertSuccessful();
+
+    expect(asuntosA('b@correo.mx'))->toBe(['Tu prueba gratis de TurnoUno termina el 12 de octubre']);
+    Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $m): bool => $m->hasTo('b@correo.mx')
+        && str_contains($m->cuerpoMensaje, 'la prueba gratis de Estudio barberia-a en TurnoUno termina el 12 de octubre')
+        && ! str_contains($m->cuerpoMensaje, 'AgendaUno'));
 });
 
 it('avisa la renta lista, la vencida y el pago recibido', function (): void {

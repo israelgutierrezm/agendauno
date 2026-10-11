@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Comunicaciones\WhatsApp;
 
+use App\Modules\Tenancy\ModalidadServicio;
+
 /**
  * Avisos que se pueden mandar por WhatsApp (ADR 0069). Meta solo deja iniciar una
  * conversación con plantillas aprobadas, así que el texto es fijo (el negocio solo
@@ -24,8 +26,8 @@ final class PlantillasWhatsApp
 
     /**
      * Avisos de la plataforma a los dueños (ADR 0071). Marcadores: {{nombre}} (del
-     * dueño), {{negocio}}, {{fecha}}, {{periodo}}, {{monto}} y {{enlace}} (a la renta
-     * en su panel).
+     * dueño), {{negocio}}, {{marca}} (AgendaUno o TurnoUno, la del negocio; ADR 0131),
+     * {{fecha}}, {{periodo}}, {{monto}} y {{enlace}} (a la renta en su panel).
      *
      * @var array<string, array{nombre: string, titulo: string, asunto: string, texto: string}>
      */
@@ -33,14 +35,14 @@ final class PlantillasWhatsApp
         'prueba_por_terminar' => [
             'nombre' => 'agendauno_prueba_por_terminar',
             'titulo' => 'Prueba gratis por terminar',
-            'asunto' => 'Tu prueba gratis de AgendaUno termina el {{fecha}}',
-            'texto' => 'Hola {{nombre}}, la prueba gratis de {{negocio}} en AgendaUno termina el {{fecha}}. Desde ese día lo que uses cuenta para tu renta mensual; revisa tu plan aquí: {{enlace}} Gracias por usar AgendaUno.',
+            'asunto' => 'Tu prueba gratis de {{marca}} termina el {{fecha}}',
+            'texto' => 'Hola {{nombre}}, la prueba gratis de {{negocio}} en {{marca}} termina el {{fecha}}. Desde ese día lo que uses cuenta para tu renta mensual; revisa tu plan aquí: {{enlace}} Gracias por tu confianza.',
         ],
         'renta_emitida' => [
             'nombre' => 'agendauno_renta_emitida',
             'titulo' => 'Renta lista para pagar',
             'asunto' => 'Tu renta de {{periodo}} está lista',
-            'texto' => 'Hola {{nombre}}, ya está la renta de {{negocio}} de {{periodo}}: {{monto}}, con vencimiento el {{fecha}}. Puedes pagarla aquí: {{enlace}} Gracias por usar AgendaUno.',
+            'texto' => 'Hola {{nombre}}, ya está la renta de {{negocio}} en {{marca}} de {{periodo}}: {{monto}}, con vencimiento el {{fecha}}. Puedes pagarla aquí: {{enlace}} Gracias por tu confianza.',
         ],
         'renta_vencida' => [
             'nombre' => 'agendauno_renta_vencida',
@@ -58,13 +60,13 @@ final class PlantillasWhatsApp
             'nombre' => 'agendauno_cuenta_suspendida',
             'titulo' => 'Negocio suspendido por renta',
             'asunto' => 'Suspendimos {{negocio}} por la renta sin pagar',
-            'texto' => 'Hola {{nombre}}, suspendimos {{negocio}} en AgendaUno porque la renta de {{periodo}} por {{monto}} sigue sin pagarse. Entra y págala aquí para reactivarlo al momento: {{enlace}} Tu información está a salvo.',
+            'texto' => 'Hola {{nombre}}, suspendimos {{negocio}} en {{marca}} porque la renta de {{periodo}} por {{monto}} sigue sin pagarse. Entra y págala aquí para reactivarlo al momento: {{enlace}} Tu información está a salvo.',
         ],
         'pago_recibido' => [
             'nombre' => 'agendauno_pago_recibido',
             'titulo' => 'Pago de la renta recibido',
             'asunto' => 'Recibimos tu pago de {{periodo}}',
-            'texto' => 'Hola {{nombre}}, recibimos el pago de la renta de {{negocio}} de {{periodo}} por {{monto}}. Puedes ver tu recibo y pedir tu factura aquí: {{enlace}} Gracias por usar AgendaUno.',
+            'texto' => 'Hola {{nombre}}, recibimos el pago de la renta de {{negocio}} en {{marca}} de {{periodo}} por {{monto}}. Puedes ver tu recibo y pedir tu factura aquí: {{enlace}} Gracias por tu confianza.',
         ],
     ];
 
@@ -110,10 +112,60 @@ final class PlantillasWhatsApp
     ];
 
     /**
+     * Los avisos de un negocio de citas hablan de su cita, no de su lugar (ADR 0131):
+     * otras plantillas en Meta, con los mismos marcadores.
+     *
+     * @var array<string, array{nombre: string, titulo: string, texto: string}>
+     */
+    private const CATALOGO_CITAS = [
+        'reserva.confirmada' => [
+            'nombre' => 'turnouno_cita_confirmada',
+            'titulo' => 'Cita confirmada',
+            'texto' => 'Hola {{persona_nombre}}, {{negocio}} confirmó tu cita de {{actividad}} el {{fecha}} a las {{hora}} en {{sucursal}}. Si no puedes asistir, cancela con tiempo desde tu cuenta.',
+        ],
+        'reserva.apartada' => [
+            'nombre' => 'turnouno_cita_apartada',
+            'titulo' => 'Cita apartada',
+            'texto' => 'Hola {{persona_nombre}}, {{negocio}} apartó tu cita de {{actividad}} el {{fecha}} a las {{hora}}. Para confirmarla, paga {{total}} antes de las {{vence}} en este enlace: {{enlace}} Si no se paga a tiempo, el horario se libera.',
+        ],
+        'reserva.recordatorio_24h' => [
+            'nombre' => 'turnouno_recordatorio_24h',
+            'titulo' => 'Recordatorio un día antes',
+            'texto' => 'Hola {{persona_nombre}}, te recordamos tu cita de {{actividad}} el {{fecha}} a las {{hora}} en {{sucursal}} de {{negocio}}. Si no puedes asistir, cancela con tiempo desde tu cuenta.',
+        ],
+        'reserva.recordatorio_2h' => [
+            'nombre' => 'turnouno_recordatorio_2h',
+            'titulo' => 'Recordatorio unas horas antes',
+            'texto' => 'Hola {{persona_nombre}}, en un rato es tu cita de {{actividad}} a las {{hora}} en {{sucursal}} de {{negocio}}. Te esperamos.',
+        ],
+        'reserva.reprogramada' => [
+            'nombre' => 'turnouno_cita_reprogramada',
+            'titulo' => 'Cita reprogramada',
+            'texto' => 'Hola {{persona_nombre}}, tu cita de {{actividad}} cambió al {{fecha}} a las {{hora}} en {{sucursal}}. Si el nuevo horario no te queda, avísale a {{negocio}} lo antes posible.',
+        ],
+        'reserva.cancelada' => [
+            'nombre' => 'turnouno_cita_cancelada',
+            'titulo' => 'Cita cancelada',
+            'texto' => 'Hola {{persona_nombre}}, se canceló tu cita de {{actividad}} del {{fecha}} a las {{hora}} en {{negocio}}. Puedes volver a agendar cuando quieras.',
+        ],
+        'reserva.sesion_cancelada' => [
+            'nombre' => 'turnouno_cita_cancelada_negocio',
+            'titulo' => 'El negocio canceló la cita',
+            'texto' => 'Hola {{persona_nombre}}, {{negocio}} canceló tu cita de {{actividad}} del {{fecha}} a las {{hora}}. Lamentamos el cambio; puedes elegir otro horario desde tu cuenta.',
+        ],
+    ];
+
+    /**
+     * La plantilla de un evento; en un negocio de citas, la de citas si la hay.
+     *
      * @return array{nombre: string, titulo: string, texto: string}|null
      */
-    public static function para(string $evento): ?array
+    public static function para(string $evento, ?ModalidadServicio $modalidad = null): ?array
     {
+        if ($modalidad === ModalidadServicio::Citas && isset(self::CATALOGO_CITAS[$evento])) {
+            return self::CATALOGO_CITAS[$evento];
+        }
+
         return self::CATALOGO[$evento] ?? null;
     }
 
@@ -167,22 +219,25 @@ final class PlantillasWhatsApp
 
     /**
      * Para el superadministrador: qué registrar en Meta para los avisos de los
-     * negocios a sus clientes.
+     * negocios a sus clientes: los de clases (AgendaUno) y los de citas (TurnoUno).
      *
-     * @return list<array{evento: string, nombre: string, titulo: string, texto: string, idioma: string, categoria: string}>
+     * @return list<array{evento: string, modalidad: string, nombre: string, titulo: string, texto: string, idioma: string, categoria: string}>
      */
     public static function paraNegocios(): array
     {
         $lista = [];
-        foreach (self::CATALOGO as $evento => $plantilla) {
-            $lista[] = [
-                'evento' => $evento,
-                'nombre' => $plantilla['nombre'],
-                'titulo' => $plantilla['titulo'],
-                'texto' => self::textoParaMeta($plantilla['texto']),
-                'idioma' => ClienteWhatsApp::IDIOMA,
-                'categoria' => 'UTILITY',
-            ];
+        foreach ([ModalidadServicio::Clases->value => self::CATALOGO, ModalidadServicio::Citas->value => self::CATALOGO_CITAS] as $modalidad => $catalogo) {
+            foreach ($catalogo as $evento => $plantilla) {
+                $lista[] = [
+                    'evento' => $evento,
+                    'modalidad' => $modalidad,
+                    'nombre' => $plantilla['nombre'],
+                    'titulo' => $plantilla['titulo'],
+                    'texto' => self::textoParaMeta($plantilla['texto']),
+                    'idioma' => ClienteWhatsApp::IDIOMA,
+                    'categoria' => 'UTILITY',
+                ];
+            }
         }
 
         return $lista;

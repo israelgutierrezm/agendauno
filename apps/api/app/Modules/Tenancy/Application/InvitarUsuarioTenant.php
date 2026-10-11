@@ -40,7 +40,7 @@ class InvitarUsuarioTenant
         // ese correo es suyo y se reactiva su cuenta).
         $existente = Usuario::withTrashed()->where('email', $email)->first();
         if ($existente instanceof Usuario && ! $existente->trashed()) {
-            throw ValidationException::withMessages(['email' => ['Ya existe un usuario con ese correo en este estudio.']]);
+            throw ValidationException::withMessages(['email' => ['Ya existe un usuario con ese correo en este negocio.']]);
         }
 
         $datos = [

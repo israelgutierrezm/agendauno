@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\PlantillasWhatsApp;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
+use App\Modules\Tenancy\ModalidadServicio;
 
 /*
 | Plantillas y números de WhatsApp (ADR 0069): lo que Meta acepta.
@@ -15,7 +16,8 @@ it('cada plantilla es válida para Meta: no abre ni cierra con un valor y no rep
             ->and($plantilla['texto'])->not->toMatch('/^\s*\{\{/')
             ->and($plantilla['texto'])->not->toMatch('/\}\}[\s.]*$/');
 
-        $original = PlantillasWhatsApp::para($plantilla['evento']);
+        $original = PlantillasWhatsApp::para($plantilla['evento'], ModalidadServicio::from($plantilla['modalidad']));
+        expect($original['nombre'])->toBe($plantilla['nombre']);
         preg_match_all('/\{\{(\w+)\}\}/', (string) $original['texto'], $todos);
         expect($todos[1])->toBe(array_values(array_unique($todos[1])));
     }

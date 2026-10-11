@@ -276,14 +276,14 @@ class PublicoCitasController
         $validado['proveedor'] = ($validado['proveedor'] ?? '') !== '' ? $validado['proveedor'] : $this->pasarelas->enLinea();
         if ($validado['proveedor'] === null) {
             throw ValidationException::withMessages([
-                'proveedor' => ['Este negocio todavía no cobra en línea; paga en el estudio.'],
+                'proveedor' => ['Este negocio todavía no cobra en línea; paga en el negocio.'],
             ]);
         }
 
         // El pago público solo admite pasarelas en línea (no efectivo/ventanilla/manual).
         if (in_array($validado['proveedor'], ['manual', 'efectivo', 'ventanilla'], true)) {
             throw ValidationException::withMessages([
-                'proveedor' => ['El pago en efectivo se hace en el estudio; en línea usa una tarjeta.'],
+                'proveedor' => ['El pago en efectivo se hace en el negocio; en línea usa una tarjeta.'],
             ]);
         }
 
