@@ -357,7 +357,8 @@ async function agendar(): Promise<void> {
         </select>
       </label>
 
-      <label class="block">
+      <!-- Con una sola persona que atiende, no hay a quién elegir (M08). -->
+      <label v-if="profesionales.length > 1" class="block">
         <span class="tu-label">{{
           $t("agendaVisual.nuevaCita.profesional")
         }}</span>

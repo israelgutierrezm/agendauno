@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import axios from "axios";
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import { useI18n } from "vue-i18n";
 
@@ -95,7 +95,11 @@ const familiasAbiertas = ref(false);
 const puedeInvitar = computed(() => sesion.puede("usuarios.invitar"));
 
 const tipo = ref<"miembro" | "instructor">("miembro");
-const q = ref("");
+// Llega filtrado desde otra pantalla (Prospectos, el inicio): `?q=`.
+const rutaActual = useRoute();
+const q = ref(
+  typeof rutaActual?.query.q === "string" ? rutaActual.query.q : "",
+);
 const facturable = ref("");
 const estado = ref("");
 const archivado = ref("no");

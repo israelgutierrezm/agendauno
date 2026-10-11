@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\ProspectoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\TareaTenant;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -235,4 +237,23 @@ it('cada cita del día está en un solo estado; «por atender» no cuenta las qu
         // la atención.
         'por_atender' => 1,
     ]);
+});
+
+it('lo que espera al equipo: solicitudes nuevas y seguimientos abiertos, solo a quien le toca (M08)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-a')->firstOrFail(), function (): void {
+        ProspectoTenant::query()->create(['nombre' => 'Interesada', 'origen' => 'formulario', 'estado' => 'nuevo']);
+        ProspectoTenant::query()->create(['nombre' => 'Atendida', 'origen' => 'formulario', 'estado' => 'en_seguimiento']);
+        TareaTenant::query()->create(['titulo' => 'Plan por vencer: Ana', 'estado' => 'pendiente', 'motivo' => 'plan_por_vencer']);
+        TareaTenant::query()->create(['titulo' => 'Comprar toallas', 'estado' => 'pendiente']);
+    });
+
+    $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.atencion.solicitudes', 1)
+        ->assertJsonPath('data.atencion.seguimientos', 1);
+
+    // Un instructor no ve solicitudes de acceso.
+    $instructor = personalConSesion($e['slug'], $e['bearer'], 'inst@correo.mx', 'instructor');
+    $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy", conBearer($instructor))->assertOk()
+        ->assertJsonPath('data.atencion.solicitudes', null);
 });

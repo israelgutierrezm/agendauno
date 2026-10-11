@@ -250,6 +250,10 @@ export default {
       "1 membresía vence en {dias} días o menos | {n} membresías vencen en {dias} días o menos",
     vencidas:
       "1 membresía vencida por recuperar | {n} membresías vencidas por recuperar",
+    // Lo que espera al equipo (M08).
+    solicitudes:
+      "1 solicitud de acceso sin atender | {n} solicitudes de acceso sin atender",
+    seguimientos: "1 seguimiento por hacer | {n} seguimientos por hacer",
     // Negocio de citas: quién viene, quién llegó, qué falta y dónde hay espacio.
     citas: {
       vieneDespues: "Quién viene después",

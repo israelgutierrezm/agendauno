@@ -19,6 +19,13 @@ export interface ReservaLista {
   asistencia: string | null;
   retardo?: boolean;
   asistencia_automatica?: boolean;
+  // Lo que falta pagar de su reserva: se cobra desde la sesión (M08).
+  orden?: {
+    id: string;
+    total_minor: number;
+    moneda: string;
+    concepto: string | null;
+  } | null;
 }
 
 /**

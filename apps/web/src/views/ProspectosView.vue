@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -39,7 +39,13 @@ const lista = ref<Prospecto[]>([]);
 const resumen = ref({ nuevos: 0, seguimientos_vencidos: 0, abiertos: 0 });
 const cargando = ref(true);
 const error = ref<string | null>(null);
-const filtros = reactive({ estado: "abiertos", responsable: "", q: "" });
+// El inicio abre las solicitudes nuevas ya filtradas (`?estado=nuevo`; M08).
+const estadoInicial = useRoute()?.query.estado;
+const filtros = reactive({
+  estado: typeof estadoInicial === "string" ? estadoInicial : "abiertos",
+  responsable: "",
+  q: "",
+});
 const ESTADOS: EstadoProspecto[] = [
   "nuevo",
   "en_seguimiento",

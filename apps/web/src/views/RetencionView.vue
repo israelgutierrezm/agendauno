@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -31,7 +31,24 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const miembros = ref<Miembro[]>([]);
 const resumen = ref<Resumen | null>(null);
-const dias = ref(14);
+// El inicio abre la lista ya filtrada (M08): `?estado=por_vencer|vencida&dias=`.
+const rutaActual = useRoute();
+const diasPedidos = Number(rutaActual?.query.dias);
+const dias = ref(
+  Number.isInteger(diasPedidos) && diasPedidos > 0 ? diasPedidos : 14,
+);
+const VENTANAS = [7, 14, 30, 90];
+const estado = ref<"" | "por_vencer" | "vencida">(
+  rutaActual?.query.estado === "por_vencer" ||
+    rutaActual?.query.estado === "vencida"
+    ? rutaActual.query.estado
+    : "",
+);
+const visibles = computed(() =>
+  estado.value === ""
+    ? miembros.value
+    : miembros.value.filter((m) => m.estado === estado.value),
+);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 // "No pudimos consultar" y "no hay pendientes" nunca deben verse igual.
@@ -145,10 +162,27 @@ onMounted(cargar);
           $t("retencion.ventanaLabel")
         }}</span>
         <select v-model.number="dias" class="tu-input w-auto">
+          <option v-if="!VENTANAS.includes(dias)" :value="dias">
+            {{ $t("retencion.ventana", { n: dias }) }}
+          </option>
           <option :value="7">{{ $t("retencion.ventana", { n: 7 }) }}</option>
           <option :value="14">{{ $t("retencion.ventana", { n: 14 }) }}</option>
           <option :value="30">{{ $t("retencion.ventana", { n: 30 }) }}</option>
           <option :value="90">{{ $t("retencion.ventana", { n: 90 }) }}</option>
+        </select>
+      </label>
+      <label class="flex items-center gap-2 text-sm">
+        <span :style="{ color: 'var(--texto-suave)' }">{{
+          $t("retencion.mostrar")
+        }}</span>
+        <select
+          v-model="estado"
+          class="tu-input w-auto"
+          data-prueba="filtro-estado"
+        >
+          <option value="">{{ $t("retencion.todas") }}</option>
+          <option value="por_vencer">{{ $t("retencion.porVencer") }}</option>
+          <option value="vencida">{{ $t("retencion.vencidas") }}</option>
         </select>
       </label>
       <button
@@ -187,7 +221,7 @@ onMounted(cargar);
 
     <template v-else>
       <EstadoVacio
-        v-if="miembros.length === 0"
+        v-if="visibles.length === 0"
         class="tu-card mt-6"
         icono="pulso"
         :titulo="$t('operacion.renovaciones.vacio')"
@@ -209,7 +243,7 @@ onMounted(cargar);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="m in miembros" :key="m.id">
+            <tr v-for="m in visibles" :key="m.id">
               <td>
                 <RouterLink
                   :to="{ name: 'ficha-miembro', params: { id: m.id } }"

@@ -300,6 +300,14 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Acciones del equipo desde el inicio y la sesión (M08)
+
+- `GET /inicio/hoy` suma `atencion` {`solicitudes` (prospectos nuevos, con
+  `prospectos.ver`), `seguimientos` (tareas de seguimiento abiertas, con `tareas.ver`)};
+  null en lo que no le toca ver.
+- `GET /sesiones/{sesion}/reservas`: cada reserva trae `orden` {`id`, `total_minor`,
+  `moneda`, `concepto`} si falta pagarla, para cobrarla desde la sesión.
+
 ## Seguimiento y embudo (ADR 0122)
 
 - `GET /tareas?tipo=seguimiento`: solo las de seguimiento. Cada tarea suma `persona_id`

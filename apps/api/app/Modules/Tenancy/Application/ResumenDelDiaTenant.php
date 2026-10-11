@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Automatizacion\EstadoTarea;
+use App\Modules\Tenancy\Captacion\EstadoProspecto;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
+use App\Modules\Tenancy\Models\ProspectoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -55,7 +59,7 @@ class ResumenDelDiaTenant
     ) {}
 
     /**
-     * @return array{fecha: string, modalidad: string, agenda: array<string, mixed>|null, libres: list<array<string, mixed>>|null, cobros: array<string, mixed>|null, renovaciones: array<string, mixed>|null}
+     * @return array{fecha: string, modalidad: string, agenda: array<string, mixed>|null, libres: list<array<string, mixed>>|null, cobros: array<string, mixed>|null, renovaciones: array<string, mixed>|null, atencion: array{solicitudes: int|null, seguimientos: int|null}}
      */
     public function para(Usuario $usuario, CarbonImmutable $fecha, ModalidadServicio $modalidad = ModalidadServicio::Clases): array
     {
@@ -69,6 +73,19 @@ class ResumenDelDiaTenant
             'libres' => $veAgenda && $modalidad === ModalidadServicio::Citas ? $this->libres($usuario, $fecha, $permitidas) : null,
             'cobros' => $usuario->puede('facturacion.ver') ? $this->cobros($permitidas) : null,
             'renovaciones' => $usuario->puede('miembros.gestionar') ? $this->renovaciones($permitidas) : null,
+            // Lo que espera a alguien del equipo (M08): solicitudes de acceso nuevas y
+            // seguimientos abiertos; null = no le toca verlo.
+            'atencion' => [
+                'solicitudes' => $usuario->puede('prospectos.ver')
+                    ? ProspectoTenant::query()
+                        ->where('estado', EstadoProspecto::Nuevo->value)
+                        ->when($permitidas !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('sucursal_id')->orWhereIn('sucursal_id', $permitidas)))
+                        ->count()
+                    : null,
+                'seguimientos' => $usuario->puede('tareas.ver')
+                    ? TareaTenant::query()->whereNotNull('motivo')->where('estado', EstadoTarea::Pendiente->value)->count()
+                    : null,
+            ],
         ];
     }
 

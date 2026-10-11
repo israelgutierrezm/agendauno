@@ -84,7 +84,10 @@ describe("agenda con solo «ver agenda»", () => {
           data: url.endsWith("/sesiones")
             ? [clase("s1", "o1", "su1"), clase("s2", "o2", "su2")]
             : url.endsWith("/instructores")
-              ? [{ id: "i1", nombre: "Ana" }]
+              ? [
+                  { id: "i1", nombre: "Ana" },
+                  { id: "i2", nombre: "Beto" },
+                ]
               : [],
         },
       }),
@@ -106,6 +109,7 @@ describe("agenda con solo «ver agenda»", () => {
         "Servicio o1",
         "Servicio o2",
         "Ana",
+        "Beto",
       ]),
     );
     expect(w.text()).not.toContain("Error");

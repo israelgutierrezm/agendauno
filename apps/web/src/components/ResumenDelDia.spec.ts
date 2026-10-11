@@ -142,6 +142,64 @@ describe("el día de hoy en el Inicio", () => {
     expect(texto).toContain("3 membresías vencen en 7 días o menos");
   });
 
+  it("cada indicador y pendiente abre su listado ya filtrado; también solicitudes y seguimientos (M08)", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          agenda: {
+            totales: {
+              sesiones: 1,
+              esperados: 1,
+              llegaron: 0,
+              sin_marcar: 0,
+              capacidad: 10,
+              listas_pendientes: 0,
+              en_espera: 0,
+            },
+            sesiones: [sesion({})],
+          },
+          cobros: {
+            ordenes_pendientes: 0,
+            por_cobrar: [],
+            en_mora: 1,
+          },
+          renovaciones: { por_vencer: 3, vencidas: 2, dias: 7 },
+          atencion: { solicitudes: 2, seguimientos: 1 },
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    const destinos = w.findAll("a").map((a) => a.attributes("data-to") ?? "");
+    const porVencer = JSON.stringify({
+      name: "retencion",
+      query: { estado: "por_vencer", dias: "7" },
+    });
+    // La tarjeta y el pendiente de planes por vencer: la lista ya filtrada.
+    expect(
+      w.get('[data-prueba="indicador-porVencer"] a').attributes("data-to"),
+    ).toBe(porVencer);
+    expect(destinos).toContain(porVencer);
+    expect(destinos).toContain(
+      JSON.stringify({
+        name: "retencion",
+        query: { estado: "vencida", dias: "7" },
+      }),
+    );
+    expect(destinos).toContain(
+      JSON.stringify({ name: "cobranza", hash: "#morosos" }),
+    );
+    expect(
+      w.get('[data-prueba="pendiente-solicitudes"]').attributes("data-to"),
+    ).toBe(JSON.stringify({ name: "prospectos", query: { estado: "nuevo" } }));
+    expect(w.text()).toContain("2 solicitudes de acceso sin atender");
+    expect(
+      w.get('[data-prueba="pendiente-seguimientos"]').attributes("data-to"),
+    ).toBe(JSON.stringify({ name: "tareas", query: { tipo: "seguimiento" } }));
+  });
+
   it("se pone al día con «Actualizar» y al volver a la pestaña, sin quitar lo que se ve", async () => {
     const dia = (sesiones: number) => ({
       data: {
