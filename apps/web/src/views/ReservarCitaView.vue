@@ -16,7 +16,9 @@ import { separarTelefono } from "@/lib/ladas";
 import { esDeOtraModalidad } from "@/lib/modalidad";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import { PRODUCTOS } from "@/lib/producto";
 import { updateSeo } from "@/lib/seo";
+import { urlCanonicaEstudio } from "@/lib/tenant";
 import { puedeEntrar } from "@/lib/acceso";
 import { esMiembro, nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -445,10 +447,16 @@ async function cargar(): Promise<void> {
     opciones.value = data.data;
     paisNegocio.value = data.data.estudio.pais ?? null;
     ladaNegocio.value = data.data.estudio.lada ?? null;
+    // Agendar es de los negocios de citas (TurnoUno) y su dirección canónica vive en su
+    // subdominio, aunque el enlace llegue por el dominio principal (M12).
     updateSeo({
-      title: `Agenda en ${data.data.estudio.nombre} | AgendaUno`,
+      title: `Agenda en ${data.data.estudio.nombre} | ${PRODUCTOS.turnouno.nombre}`,
       description: `Elige servicio, profesional y horario, y agenda tu cita en ${data.data.estudio.nombre}.`,
-      path: `/agendar/${data.data.estudio.slug}`,
+      path: urlCanonicaEstudio(
+        data.data.estudio.slug,
+        `/agendar/${data.data.estudio.slug}`,
+        "turnouno",
+      ),
       image: data.data.estudio.logo_url ?? undefined,
     });
     recordarNegocio({

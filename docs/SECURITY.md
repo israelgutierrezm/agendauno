@@ -34,6 +34,9 @@
   plataforma): el negocio no puede capturar una propia. Del token de TotalPass solo se
   guarda su huella; los cambios de credenciales van a la bitácora sin sus valores y una
   visita que el proveedor no pudo verificar nunca se registra como aprobada (ADR 0124).
+- Lo que la API responde con credenciales no se guarda en cachés compartidas ni en el
+  navegador (`Cache-Control: no-store, private`) y ninguna respuesta de la API se indexa.
+  Al salir, la página se recarga: nada de la sesión queda en la memoria de la pestaña.
 - Archivos del negocio en su propio espacio; los documentos privados se descargan
   solo por la API, con sesión y permiso.
 - Bitácora (`auditorias`) de lo sensible: dinero, roles, bajas, cambios de

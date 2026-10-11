@@ -9,8 +9,9 @@ import {
   type ModalidadServicio,
 } from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
-import { PRODUCTOS, productoActual } from "@/lib/producto";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { updateSeo } from "@/lib/seo";
+import { urlCanonicaEstudio } from "@/lib/tenant";
 
 /**
  * Entrada pública del negocio (la raíz de su subdominio). Con citas, elige la sede y
@@ -76,10 +77,19 @@ async function cargar(): Promise<void> {
       ciudad: data.data.estudio.ciudad ?? null,
       pais: data.data.estudio.pais ?? null,
     });
+    // La marca y el subdominio son los del negocio (clases → AgendaUno, citas →
+    // TurnoUno), no los del dominio desde el que se abrió (M12).
+    const producto = productoDeModalidad(
+      capacidadesDeNegocio(data.data.estudio).citas ? "citas" : "clases",
+    );
     updateSeo({
-      title: `${data.data.estudio.nombre} | Sucursales en ${PRODUCTOS[productoActual()].nombre}`,
+      title: `${data.data.estudio.nombre} | Sucursales en ${PRODUCTOS[producto].nombre}`,
       description: `Elige la sucursal de ${data.data.estudio.nombre} y agenda en línea.`,
-      path: `/sucursales/${data.data.estudio.slug}`,
+      path: urlCanonicaEstudio(
+        data.data.estudio.slug,
+        `/sucursales/${data.data.estudio.slug}`,
+        producto,
+      ),
       image: data.data.estudio.logo_url ?? undefined,
     });
     // Con clases (o sin sede) no hay cita que agendar: su página. Con citas y una

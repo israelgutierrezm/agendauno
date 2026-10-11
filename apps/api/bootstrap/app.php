@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\CorrelationId;
+use App\Http\Middleware\RespuestaPrivadaSinCache;
 use App\Modules\Platform\Operacion\ErroresPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AlcanceLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarLlaveApi;
@@ -41,6 +42,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Correlation id runs first so every log line for the request is tagged.
         $middleware->api(prepend: [
             CorrelationId::class,
+            // Lo que se responde con credenciales no se guarda en ninguna caché (M11).
+            RespuestaPrivadaSinCache::class,
         ]);
 
         $middleware->alias([
