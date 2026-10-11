@@ -417,6 +417,10 @@ export const MENU_NEGOCIO: GrupoMenu[] = [
           v("paquetes", "ventas", "nav.vistas.paquetesCitas", {
             modalidad: "citas",
           }),
+          // Presupuestos (ADR 0127): solo los negocios de citas.
+          v("presupuestos", "presupuestos", "nav.vistas.presupuestos", {
+            modalidad: "citas",
+          }),
         ],
       },
       {
@@ -627,6 +631,7 @@ export function rutasDelMenu(): string[] {
 const AREA_DE_AUXILIAR: Record<string, { area: string; vista: string }> = {
   "ficha-miembro": { area: "clientes", vista: "directorio" },
   importar: { area: "clientes", vista: "directorio" },
+  "presupuesto-impreso": { area: "ventas", vista: "presupuestos" },
   "importar-saldos": { area: "clientes", vista: "directorio" },
   "ficha-instructor": { area: "equipo", vista: "personas" },
   "importar-instructores": { area: "equipo", vista: "personas" },

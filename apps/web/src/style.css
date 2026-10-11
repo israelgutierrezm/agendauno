@@ -840,3 +840,15 @@
     }
   }
 }
+
+/* Al imprimir (p. ej. un presupuesto) solo sale el contenido: sin el menú ni la barra
+   del panel, ni lo que cada pantalla marque con `tu-sin-imprimir`. */
+@media print {
+  .tu-sin-imprimir {
+    display: none !important;
+  }
+  body,
+  main {
+    background: #fff !important;
+  }
+}

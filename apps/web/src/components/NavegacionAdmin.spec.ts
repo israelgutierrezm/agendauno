@@ -125,8 +125,14 @@ describe("pestañas del área", () => {
 
     entrar(["*"], "citas");
     const citas = await montar(PestanasArea, { name: "pos" });
-    expect(rutas(citas.w)).toEqual(["/pos", "/inventario", "/ventas"]);
-    expect(citas.w.findAll(".pa-pestanas a").at(-1)!.text()).toBe(
+    // Con citas, además, los presupuestos (ADR 0127).
+    expect(rutas(citas.w)).toEqual([
+      "/pos",
+      "/inventario",
+      "/ventas",
+      "/presupuestos",
+    ]);
+    expect(citas.w.findAll(".pa-pestanas a").at(2)!.text()).toBe(
       "Bonos y membresías",
     );
     const lateral = await montar(NavLateral, { name: "pos" });

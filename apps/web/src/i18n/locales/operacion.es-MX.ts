@@ -103,6 +103,10 @@ export default {
         gestionar: "Reservar, cancelar y mover reservas",
       },
       asistencia: { marcar: "Pasar asistencia" },
+      presupuestos: {
+        ver: "Ver presupuestos",
+        gestionar: "Hacer, enviar y convertir presupuestos",
+      },
       checkins: {
         registrar: "Registrar entradas",
         excepcion: "Autorizar entradas que la plataforma no pudo verificar",

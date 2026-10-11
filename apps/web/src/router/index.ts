@@ -199,6 +199,20 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Presupuestos de los negocios de citas (ADR 0127).
+      path: "/presupuestos",
+      name: "presupuestos",
+      component: () => import("@/views/PresupuestosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // Un presupuesto listo para imprimir o guardar como PDF.
+      path: "/presupuestos/:id/imprimir",
+      name: "presupuesto-impreso",
+      component: () => import("@/views/PresupuestoImpresoView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/importar-instructores",
       name: "importar-instructores",
       component: () => import("@/views/ImportarInstructoresView.vue"),

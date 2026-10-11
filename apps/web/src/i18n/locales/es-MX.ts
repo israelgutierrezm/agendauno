@@ -153,6 +153,7 @@ export default {
       disponibilidad: "Disponibilidad",
       membresias: "Membresías y paquetes",
       paquetesCitas: "Bonos y membresías",
+      presupuestos: "Presupuestos",
       suscripcion: "Suscripción y pagos",
       usoFacturable: "Uso facturable",
       prospectos: "Prospectos",

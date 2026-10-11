@@ -108,12 +108,14 @@ import {
   comunicacionesVisual,
 } from "./locales/mostradorInventario.es-MX";
 import planes from "./locales/planes.es-MX";
+import presupuestos from "./locales/presupuestos.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
 
 // Textos base (sin adaptar a ningún negocio).
 const mensajesBase = {
   ...esMX,
+  presupuestos,
   importarClases,
   agendaVisual,
   apariencia,

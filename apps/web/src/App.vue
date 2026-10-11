@@ -184,7 +184,7 @@ onMounted(() => {
     <!-- Barra lateral (oscura) -->
     <aside
       v-show="!agendaAmpliada"
-      class="fixed lg:sticky top-0 z-50 h-screen w-64 shrink-0 flex flex-col transition-all duration-200"
+      class="tu-sin-imprimir fixed lg:sticky top-0 z-50 h-screen w-64 shrink-0 flex flex-col transition-all duration-200"
       :class="[
         compacto ? 'lg:w-16' : 'lg:w-64',
         menuLateral ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
@@ -293,7 +293,7 @@ onMounted(() => {
       <!-- Encabezado (claro, translúcido) -->
       <header
         v-show="!agendaAmpliada"
-        class="tu-barra-superior sticky top-0 z-30 h-16 flex items-center justify-between gap-3 px-4 sm:px-6 border-b backdrop-blur"
+        class="tu-sin-imprimir tu-barra-superior sticky top-0 z-30 h-16 flex items-center justify-between gap-3 px-4 sm:px-6 border-b backdrop-blur"
         :style="{
           background: 'color-mix(in srgb, var(--superficie) 85%, transparent)',
           borderColor: 'var(--borde)',
@@ -435,7 +435,7 @@ onMounted(() => {
 
       <main class="flex-1" :style="{ background: 'var(--fondo)' }">
         <!-- Las vistas del área (Agenda: Calendario, Recepción…), bajo la barra -->
-        <PestanasArea v-show="!agendaAmpliada" />
+        <PestanasArea v-show="!agendaAmpliada" class="tu-sin-imprimir" />
         <div
           class="tu-lienzo"
           :class="{ 'tu-lienzo-ampliado': agendaAmpliada }"
