@@ -135,6 +135,10 @@ export const POLITICAS: Record<string, Politica> = {
   "ficha-miembro": { permiso: "miembros.ver" },
   "ficha-instructor": { permiso: "usuarios.gestionar" },
   importar: { permiso: "miembros.gestionar" },
+  // Concede planes y créditos: pide las dos cosas (C07).
+  "importar-saldos": {
+    permiso: ["membresias.gestionar", "creditos.gestionar"],
+  },
   "importar-instructores": { permiso: "usuarios.invitar" },
   "importar-clases": { permiso: "agenda.gestionar", modalidad: "clases" },
   // Cada paso crea algo distinto: sede, catálogo, planes, equipo.

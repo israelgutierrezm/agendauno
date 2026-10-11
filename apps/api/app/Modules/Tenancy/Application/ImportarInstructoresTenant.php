@@ -13,10 +13,14 @@ use Illuminate\Support\Facades\Validator;
  * Importación masiva de instructores por CSV (R37), tenant-local. Espejo del
  * importador de miembros, pero los instructores son USUARIOS con rol instructor
  * (cuenta inactiva + token de activación), no personas. Valida fila por fila
- * (preview) y, al importar, es todo-o-nada: si alguna fila es inválida no crea
- * ninguna cuenta (rollback). Tras crear, envía la invitación de activación a cada
- * uno (igual que el alta individual). El correo es obligatorio (sin él no hay
- * forma de activar la cuenta) y debe ser único dentro del estudio.
+ * (preview) y, al importar, sin `parcial` es todo-o-nada: si alguna fila es inválida
+ * o está en conflicto no crea ninguna cuenta (rollback). El correo es obligatorio
+ * (sin él no hay forma de activar la cuenta) y debe ser único dentro del estudio.
+ *
+ * Migración guiada (C07): la fila de alguien que ya es usuario con ese correo y ese
+ * nombre queda `existente` (repetir el archivo no lo duplica). La invitación por correo
+ * sale solo si quien importa lo confirma (`invitar`); si no, las cuentas quedan sin
+ * activar y se invita después desde Equipo.
  */
 class ImportarInstructoresTenant
 {
@@ -26,30 +30,36 @@ class ImportarInstructoresTenant
      * Valida las filas sin escribir. Devuelve el resultado por fila + un resumen.
      *
      * @param  list<array<string, string>>  $filas
-     * @return array{resumen: array{total: int, validas: int, invalidas: int}, filas: list<array{fila: int, datos: array<string, mixed>, errores: list<string>}>}
+     * @return array{resumen: array{total: int, validas: int, invalidas: int, rechazadas: int, conflictos: int, existentes: int}, filas: list<array{fila: int, datos: array<string, mixed>, errores: list<string>, estado: string}>}
      */
     public function analizar(array $filas): array
     {
         // Con los dados de baja: su correo es suyo (se reactivan invitándolos de nuevo).
         $existentes = Usuario::withTrashed()
             ->whereNotNull('email')
-            ->pluck('email')
-            ->map(static fn ($e): string => mb_strtolower((string) $e))
-            ->flip();
+            ->get(['email', 'name', 'deleted_at'])
+            ->keyBy(static fn (Usuario $u): string => mb_strtolower((string) $u->email));
 
         $vistos = [];
         $salida = [];
-        $validas = 0;
 
         foreach ($filas as $indice => $cruda) {
             $datos = $this->normalizar($cruda);
             $errores = $this->validar($datos);
+            $estado = $errores === [] ? ImportarMiembrosTenant::VALIDA : ImportarMiembrosTenant::INVALIDA;
 
             $email = $datos['email'] !== '' ? mb_strtolower($datos['email']) : null;
-            if ($email !== null && $errores === []) {
-                if ($existentes->has($email)) {
-                    $errores[] = "Ya existe un usuario con el correo {$email}.";
+            if ($email !== null && $estado === ImportarMiembrosTenant::VALIDA) {
+                $previo = $existentes->get($email);
+                if ($previo instanceof Usuario) {
+                    if ($previo->deleted_at === null && ImportarMiembrosTenant::nombre($previo->name) === ImportarMiembrosTenant::nombre($datos['nombre'])) {
+                        $estado = ImportarMiembrosTenant::EXISTENTE;
+                    } else {
+                        $estado = ImportarMiembrosTenant::CONFLICTO;
+                        $errores[] = "Ya existe un usuario con el correo {$email}.";
+                    }
                 } elseif (isset($vistos[$email])) {
+                    $estado = ImportarMiembrosTenant::CONFLICTO;
                     $errores[] = "El correo {$email} está repetido en el archivo.";
                 }
             }
@@ -57,33 +67,26 @@ class ImportarInstructoresTenant
                 $vistos[$email] = true;
             }
 
-            if ($errores === []) {
-                $validas++;
-            }
-
-            $salida[] = ['fila' => $indice + 1, 'datos' => $datos, 'errores' => $errores];
+            $salida[] = ['fila' => $indice + 1, 'datos' => $datos, 'errores' => $errores, 'estado' => $estado];
         }
 
-        return [
-            'resumen' => ['total' => count($filas), 'validas' => $validas, 'invalidas' => count($filas) - $validas],
-            'filas' => $salida,
-        ];
+        return ['resumen' => ImportarMiembrosTenant::resumen($salida), 'filas' => $salida];
     }
 
     /**
-     * Importa las filas todo-o-nada. Si alguna es inválida, no crea nada y devuelve
-     * el análisis con `ok=false`. Si todas son válidas, crea las cuentas inactivas en
-     * una transacción y, ya confirmadas, envía la invitación de activación a cada
-     * instructor.
+     * Importa las filas válidas. Sin `$parcial` es todo-o-nada: si alguna es inválida
+     * o está en conflicto, no crea nada y devuelve el análisis con `ok=false`. Crea las
+     * cuentas inactivas en una transacción y, solo con `$invitar`, envía la invitación
+     * de activación a cada instructor nuevo.
      *
      * @param  list<array<string, string>>  $filas
-     * @return array{ok: bool, resumen: array{total: int, validas: int, invalidas: int}, filas: list<array{fila: int, datos: array<string, mixed>, errores: list<string>}>, creados?: int, activaciones?: list<array{email: string, token: string}>|null}
+     * @return array{ok: bool, resumen: array{total: int, validas: int, invalidas: int, rechazadas: int, conflictos: int, existentes: int}, filas: list<array{fila: int, datos: array<string, mixed>, errores: list<string>, estado: string}>, creados?: int, invitados?: int, activaciones?: list<array{email: string, token: string}>|null}
      */
-    public function importar(array $filas, Estudio $estudio): array
+    public function importar(array $filas, Estudio $estudio, bool $invitar = true, bool $parcial = false): array
     {
         $analisis = $this->analizar($filas);
 
-        if ($analisis['resumen']['invalidas'] > 0 || $analisis['resumen']['total'] === 0) {
+        if ($analisis['resumen']['total'] === 0 || (! $parcial && $analisis['resumen']['invalidas'] > 0)) {
             return ['ok' => false] + $analisis;
         }
 
@@ -91,6 +94,9 @@ class ImportarInstructoresTenant
         $correos = DB::connection('tenant')->transaction(function () use ($analisis): array {
             $correos = [];
             foreach ($analisis['filas'] as $fila) {
+                if ($fila['estado'] !== ImportarMiembrosTenant::VALIDA) {
+                    continue;
+                }
                 $usuario = Usuario::query()->create([
                     'name' => $fila['datos']['nombre'],
                     'email' => $fila['datos']['email'],
@@ -105,16 +111,20 @@ class ImportarInstructoresTenant
             return $correos;
         });
 
-        // Fuera de la transacción: genera el token y encola la invitación por correo.
+        // Fuera de la transacción y solo si se confirmó: genera el token y encola la
+        // invitación por correo.
         $activaciones = [];
-        foreach ($correos as $correo) {
-            $token = $this->enviarActivacion->enviar($estudio, $correo);
-            $activaciones[] = ['email' => $correo, 'token' => $token];
+        if ($invitar) {
+            foreach ($correos as $correo) {
+                $token = $this->enviarActivacion->enviar($estudio, $correo);
+                $activaciones[] = ['email' => $correo, 'token' => $token];
+            }
         }
 
         return [
             'ok' => true,
             'creados' => count($correos),
+            'invitados' => count($activaciones),
             'activaciones' => app()->environment('production') ? null : $activaciones,
         ] + $analisis;
     }

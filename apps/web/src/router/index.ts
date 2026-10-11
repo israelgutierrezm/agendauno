@@ -191,6 +191,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Saldos de apertura al migrar de otro sistema (C07).
+      path: "/importar/saldos",
+      name: "importar-saldos",
+      component: () => import("@/views/ImportarSaldosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/importar-instructores",
       name: "importar-instructores",
       component: () => import("@/views/ImportarInstructoresView.vue"),

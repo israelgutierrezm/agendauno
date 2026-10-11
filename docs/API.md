@@ -327,6 +327,22 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   los nombres de las llaves cambiadas, nunca sus valores. Alcance: validación de
   check-in; no sincroniza reservas, membresías ni pagos (ADR 0124).
 
+## Migración guiada (C07)
+
+- Las vistas previas e importaciones de `miembros` e `instructores` devuelven `estado` por
+  fila (`valida`, `invalida`, `existente`, `conflicto`) y en el resumen `existentes`,
+  `conflictos` y `rechazadas`. `parcial=1` carga solo las válidas. Lo que ya estaba no se
+  repite.
+- Miembros acepta además `celular`, `fecha_nacimiento` (AAAA-MM-DD) y `genero`.
+- `POST /importaciones/instructores` exige `invitar` (`1` envía las invitaciones, `0`
+  deja las cuentas sin invitar) y devuelve `invitados`.
+- `POST /importaciones/saldos/preview` y `POST /importaciones/saldos`
+  (`membresias.gestionar` y `creditos.gestionar`): `corte`, `evidencia`, `parcial` y un
+  CSV con `email`, `plan`, `creditos`, `vence` e `inicio`. Crean el plan con `origen =
+  apertura` y una concesión de créditos con origen `apertura`, sin orden ni pago, y
+  devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
+  (ADR 0125).
+
 ## Embudo de la plataforma (C02, C08)
 
 - `POST /metricas/visita-landing` (público, `text/plain` con `{"producto"}`): una visita

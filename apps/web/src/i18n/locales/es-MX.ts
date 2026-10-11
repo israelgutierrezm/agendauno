@@ -1435,16 +1435,28 @@ export default {
   importar: {
     titulo: "Importar miembros",
     instrucciones:
-      "Sube un archivo CSV con una fila por alumno. Primero validamos todo (sin guardar) y te mostramos los errores; solo importamos si todo está correcto.",
+      "Sube un archivo CSV con una fila por alumno. Primero lo revisamos sin guardar: te decimos qué filas están listas, cuáles ya estaban (no se repiten) y cuáles hay que corregir.",
     columnas: "Columnas",
     elegir: "Elegir archivo CSV",
     plantilla: "Descargar plantilla",
     analizando: "Analizando el archivo…",
     total: "Filas",
-    validas: "Válidas",
-    invalidas: "Con errores",
+    validas: "Listas",
+    invalidas: "Por corregir",
+    existentes: "Ya estaban",
     corrige:
-      "Corrige las filas con errores y vuelve a subir el archivo: la importación es todo-o-nada.",
+      "Hay filas por corregir. Puedes cargar ahora solo las listas y subir después el archivo corregido: lo que ya se cargó no se repite.",
+    estados: {
+      valida: "Lista",
+      existente: "Ya está",
+      conflicto: "Conflicto",
+      invalida: "Con errores",
+    },
+    importarListas: "Cargar solo las {n} listas",
+    confirmarListas:
+      "Se cargarán {n} filas listas y quedarán {m} por corregir.",
+    porCorregir:
+      "Quedaron {n} filas por corregir: corrígelas en tu archivo y vuelve a subirlo; lo que ya se cargó no se repite.",
     colNombre: "Nombre",
     colCorreo: "Correo",
     colEstado: "Estado",
@@ -1454,11 +1466,46 @@ export default {
     creados: "{n} miembros importados",
     verMiembros: "Ver miembros",
   },
+  importarSaldos: {
+    titulo: "Saldos de apertura",
+    ir: "Cargar saldos de apertura",
+    instrucciones:
+      "Si vienes de otro sistema, carga aquí el plan, los créditos y la vigencia que cada alumno trae al corte acordado. No se registran ventas ni pagos: el saldo aparece en su estado de cuenta como «Saldo de apertura», con la evidencia que indiques.",
+    pasoMiembros: "Primero importa a los alumnos (con su correo).",
+    pasoPlanes: "Crea los planes con el mismo nombre que usarás en el archivo.",
+    pasoCorte:
+      "Acuerda una fecha de corte: desde ese día los saldos se operan solo aquí, no en los dos sistemas.",
+    pasoReservas:
+      "Las reservas futuras no se copian: tras el corte, reserva aquí las clases de cada alumno (o que lo hagan ellos).",
+    corte: "Fecha de corte",
+    evidencia: "De dónde salen los saldos",
+    evidenciaEjemplo:
+      "Ej.: reporte de saldos exportado del sistema anterior el 30/09",
+    faltan:
+      "Indica la fecha de corte y de dónde salen los saldos para revisar el archivo.",
+    revisar: "Revisar archivo",
+    colAlumno: "Alumno",
+    colPlan: "Plan",
+    colCreditos: "Créditos",
+    colVence: "Vence",
+    cargar: "Cargar {n} saldos",
+    confirmar:
+      "Se cargarán {n} saldos de apertura al corte del {corte}, sin ventas ni pagos.",
+    cargados: "{n} saldos de apertura cargados",
+  },
   importarInstructores: {
     titulo: "Importar instructores",
     instrucciones:
-      "Sube un archivo CSV con una fila por instructor (nombre y correo). Primero validamos todo; si está correcto, creamos las cuentas y les enviamos la invitación para activar su acceso.",
+      "Sube un archivo CSV con una fila por instructor (nombre y correo). Primero lo revisamos sin guardar; después eliges si les enviamos ya la invitación para activar su acceso o si los invitas más tarde desde Equipo.",
     importar: "Importar {n} instructores",
+    ayudaInvitar:
+      "Las invitaciones salen por correo solo si lo eliges. Sin invitar, las cuentas quedan sin activar y las invitas cuando quieras desde Equipo.",
+    importarInvitar: "Importar e invitar a {n}",
+    importarSinInvitar: "Importar sin invitar",
+    confirmarInvitar:
+      "Se enviará un correo de invitación a {n} instructores. ¿Continuar?",
+    invitados: "Se enviaron {n} invitaciones.",
+    sinInvitar: "Quedaron sin invitar: invítalos cuando quieras desde Equipo.",
     creados: "{n} instructores importados",
     verInstructores: "Ver instructores",
   },

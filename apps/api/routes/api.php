@@ -456,6 +456,9 @@ Route::prefix('v1')->group(function (): void {
             // Importacion CSV de instructores (R37): crea cuentas de usuario rol instructor + activacion.
             Route::post('/importaciones/instructores/preview', [ImportacionesTenantController::class, 'previewInstructores'])->middleware('puede:usuarios.invitar')->name('importaciones.instructores.preview');
             Route::post('/importaciones/instructores', [ImportacionesTenantController::class, 'importarInstructores'])->middleware('puede:usuarios.invitar')->name('importaciones.instructores.store');
+            // Saldos de apertura al migrar (C07): planes y créditos al corte, sin venta.
+            Route::post('/importaciones/saldos/preview', [ImportacionesTenantController::class, 'previewSaldos'])->middleware('puede:membresias.gestionar')->name('importaciones.saldos.preview');
+            Route::post('/importaciones/saldos', [ImportacionesTenantController::class, 'importarSaldos'])->middleware('puede:membresias.gestionar')->name('importaciones.saldos.store');
 
             // Importación de clases por fecha o programación semanal (ADR 0092).
             Route::get('/importaciones/clases/catalogos', [ImportarClasesTenantController::class, 'catalogos'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.catalogos');

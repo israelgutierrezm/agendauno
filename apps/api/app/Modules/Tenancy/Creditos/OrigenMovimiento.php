@@ -18,4 +18,6 @@ enum OrigenMovimiento: string
     case Ajuste = 'ajuste';
     case Reembolso = 'reembolso';
     case Anulacion = 'anulacion';
+    // Saldo que la persona traía de otro sistema al migrar, al corte acordado (C07).
+    case Apertura = 'apertura';
 }
