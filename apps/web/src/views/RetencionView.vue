@@ -137,7 +137,13 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('operacion.renovaciones.titulo')" />
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("operacion.renovaciones.subtitulo") }}
+      {{
+        $t(
+          sesion.esCitas
+            ? "operacion.renovaciones.subtituloCitas"
+            : "operacion.renovaciones.subtitulo",
+        )
+      }}
     </p>
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
@@ -224,7 +230,13 @@ onMounted(cargar);
         v-if="visibles.length === 0"
         class="tu-card mt-6"
         icono="pulso"
-        :titulo="$t('operacion.renovaciones.vacio')"
+        :titulo="
+          $t(
+            sesion.esCitas
+              ? 'operacion.renovaciones.vacioCitas'
+              : 'operacion.renovaciones.vacio',
+          )
+        "
       />
       <div v-else class="mt-4 tu-card overflow-x-auto">
         <table class="tu-tabla">

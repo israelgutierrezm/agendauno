@@ -152,7 +152,7 @@ export default {
       caja: "Caja",
       disponibilidad: "Disponibilidad",
       membresias: "Membresías y paquetes",
-      paquetesCitas: "Bonos y membresías",
+      paquetesCitas: "Bonos",
       presupuestos: "Presupuestos",
       suscripcion: "Suscripción y pagos",
       usoFacturable: "Uso facturable",
@@ -180,7 +180,7 @@ export default {
       negocio:
         "Datos, imagen y página pública del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
       servicios:
-        "Qué se ofrece y a qué precio: servicios, bonos y membresías, y los espacios que usan.",
+        "Qué se ofrece y a qué precio: servicios, combos y bonos, y los espacios que usan.",
       serviciosClases:
         "Qué se ofrece y a qué precio: clases, planes y paquetes, y los espacios que usan.",
       agenda:
@@ -200,6 +200,7 @@ export default {
       fiscales: "Datos fiscales",
       terminologia: "Terminología",
       planes: "Planes y paquetes",
+      planesCitas: "Bonos",
       recursos: "Espacios y recursos",
       politicas: "Políticas de reserva y cancelación",
       cierres: "Días de cierre",
@@ -686,7 +687,7 @@ export default {
         },
         paquetes: {
           q: "¿Puedo vender paquetes de servicios?",
-          a: "Sí, en los planes Premium y Pro. Un paquete junta varios servicios de tu catálogo con un solo precio y se agenda en una sola cita; tu cliente ve qué incluye antes de agendar. También puedes vender bonos y membresías; venderlos en línea es del plan Pro.",
+          a: "Sí, en los planes Premium y Pro. Un paquete junta varios servicios de tu catálogo con un solo precio y se agenda en una sola cita; tu cliente ve qué incluye antes de agendar. También puedes vender bonos de sesiones (por ejemplo, 5 cortes); venderlos en línea es del plan Pro.",
         },
         espacios: {
           q: "¿Puedo manejar cabinas, sillones o consultorios?",
@@ -698,7 +699,7 @@ export default {
         },
         migracion: {
           q: "¿Puedo traer a mis clientes desde otro sistema?",
-          a: "Sí. Importas a tus clientes y a tu equipo con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los bonos y membresías que trae cada cliente se cargan a la fecha de corte que elijas, sin registrar ventas; las citas futuras se agendan de nuevo aquí.",
+          a: "Sí. Importas a tus clientes y a tu equipo con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los bonos que trae cada cliente se cargan a la fecha de corte que elijas, sin registrar ventas; las citas futuras se agendan de nuevo aquí.",
         },
         preparacion: {
           q: "¿Cuánto tarda dejarlo listo?",
@@ -1894,16 +1895,17 @@ export default {
     guardadoClases: "Clase actualizada.",
     badgePago: "Cita con pago",
     badgeEntitlement: "Con membresía",
+    badgeEntitlementCitas: "Con bono",
     // Negocio de citas: un servicio se paga o se toma con bono (ADR 0091).
     politicaCitas: {
       pago: "Se paga",
       pagoAyuda:
         "Aparece con su precio en tu página para agendar; se paga en línea o en la sucursal.",
-      entitlement: "Con bono o membresía",
+      entitlement: "Con bono",
       entitlementAyuda:
-        "No aparece en tu página pública: lo agendan desde su cuenta quienes tienen un bono o membresía que lo incluye, o tú desde la agenda.",
+        "No aparece en tu página pública: lo agendan desde su cuenta quienes tienen un bono que lo incluye, o tú desde la agenda.",
       dejaDeAparecer:
-        "Al guardar, «{servicio}» deja de aparecer en tu página para agendar: solo lo podrán tomar quienes tengan un bono o membresía que lo incluya.",
+        "Al guardar, «{servicio}» deja de aparecer en tu página para agendar: solo lo podrán tomar quienes tengan un bono que lo incluya.",
       apareceConPrecio:
         "Al guardar, «{servicio}» aparece en tu página para agendar con su precio.",
     },

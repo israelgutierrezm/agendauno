@@ -41,7 +41,7 @@ export default {
     porCobrar: "Por cobrar",
     porPagar: "Pago en línea pendiente",
     pagada: "Pagada",
-    membresia: "Con su membresía",
+    membresia: "Con su bono",
     sinCobro: "No lleva cobro",
     movimientos: "Movimientos del pago",
     sinMovimientos: "Aún no hay cobros registrados.",

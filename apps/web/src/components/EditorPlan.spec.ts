@@ -122,13 +122,13 @@ describe("planes de un negocio de citas", () => {
       expect.objectContaining({ sucursal_ids: null }),
     );
   });
-  it("son bono de sesiones o membresía; el servicio suelto o el combo, en Catálogo", async () => {
+  it("solo son bonos de sesiones (sin membresías, ADR 0130); el servicio suelto o el combo, en Catálogo", async () => {
     const w = montar();
     await flushPromises();
 
     expect(
       w.findAll(".ep-tipo").map((b) => b.find(".font-medium").text()),
-    ).toEqual(["Bono de sesiones", "Membresía"]);
+    ).toEqual(["Bono de sesiones"]);
     expect(w.get('[data-prueba="servicio-o-combo"]').text()).toContain(
       "Catálogo",
     );
@@ -149,7 +149,7 @@ describe("planes de un negocio de citas", () => {
     expect(servicios).toEqual(["Masaje"]);
   });
 
-  it("para la página: qué incluye, destacado y primera visita (no en una membresía)", async () => {
+  it("para la página: qué incluye, destacado y primera visita", async () => {
     api.post.mockResolvedValue({});
     const w = montar();
     await flushPromises();
@@ -174,7 +174,6 @@ describe("planes de un negocio de citas", () => {
       }),
     );
 
-    await w.get('[data-prueba="tipo-membresia"]').trigger("click");
-    expect(w.find('[data-prueba="primera-vez"]').exists()).toBe(false);
+    expect(w.find('[data-prueba="tipo-membresia"]').exists()).toBe(false);
   });
 });

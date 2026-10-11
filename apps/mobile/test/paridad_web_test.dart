@@ -169,7 +169,7 @@ void main() {
     expect(find.text('Volver a agendar'), findsOneWidget);
     // «Cambiar o cancelar» en la tarjeta grande y en «Mis citas».
     expect(find.text('Cambiar o cancelar'), findsNWidgets(2));
-    expect(find.text('Mi bono o membresía'), findsNothing);
+    expect(find.text('Mi bono'), findsNothing);
     expect(find.text('Sin paquete activo'), findsNothing);
     expect(find.text('Pase de entrada'), findsNothing);
     expect(find.text('Documentos del negocio'), findsNothing);
@@ -309,7 +309,7 @@ void main() {
     expect(find.byKey(const Key('pago-con-bono')), findsOneWidget);
     expect(
       find.text(
-        'Se descuenta una sesión de tu bono o membresía; no pagas al agendar.',
+        'Se descuenta una sesión de tu bono; no pagas al agendar.',
       ),
       findsOneWidget,
     );

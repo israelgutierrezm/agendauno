@@ -206,7 +206,7 @@ class _InicioNegocio extends ConsumerWidget {
               ],
               if (hoy != null &&
                   (hoy.cobros != null || hoy.renovaciones != null))
-                _Pendientes(hoy: hoy),
+                _Pendientes(hoy: hoy, esCitas: esCitas),
               // Los números del mes, para quien los ve (ADR 0081).
               ...switch (ref.watch(resumenMesProvider)) {
                 AsyncData(:final value?) => [
@@ -433,7 +433,10 @@ class _Libres extends StatelessWidget {
 
 /// Lo pendiente de cobro y de renovación (se atiende desde la web).
 class _Pendientes extends StatelessWidget {
-  const _Pendientes({required this.hoy});
+  const _Pendientes({required this.hoy, this.esCitas = false});
+
+  /// En citas se venden bonos, no membresías (ADR 0130).
+  final bool esCitas;
 
   final ResumenHoy hoy;
 
@@ -475,14 +478,14 @@ class _Pendientes extends StatelessWidget {
               if (r != null && r.porVencer > 0)
                 linea(
                   r.porVencer == 1
-                      ? '1 membresía vence en ${r.dias} días o menos'
-                      : '${r.porVencer} membresías vencen en ${r.dias} días o menos',
+                      ? '1 ${esCitas ? 'bono' : 'membresía'} vence en ${r.dias} días o menos'
+                      : '${r.porVencer} ${esCitas ? 'bonos' : 'membresías'} vencen en ${r.dias} días o menos',
                 ),
               if (r != null && r.vencidas > 0)
                 linea(
                   r.vencidas == 1
-                      ? '1 membresía vencida por recuperar'
-                      : '${r.vencidas} membresías vencidas por recuperar',
+                      ? '1 ${esCitas ? 'bono vencido' : 'membresía vencida'} por recuperar'
+                      : '${r.vencidas} ${esCitas ? 'bonos vencidos' : 'membresías vencidas'} por recuperar',
                   aviso: true,
                 ),
             ],

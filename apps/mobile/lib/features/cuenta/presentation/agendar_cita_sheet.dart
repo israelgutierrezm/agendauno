@@ -15,7 +15,7 @@ import 'elegir_profesional.dart';
 /// Agendar una cita desde la cuenta: servicio, sede, de quién ver horarios (todo el
 /// equipo o alguien, por su foto, como en la web), día y hora libre. Si el servicio
 /// se paga para reservar, la cita queda apartada hasta pagarla. Los servicios de
-/// su bono o membresía aparecen «Con tu bono» y no se pagan (ADR 0091).
+/// su bono aparecen «Con tu bono» y no se pagan (ADR 0091).
 class AgendarCitaSheet extends ConsumerStatefulWidget {
   const AgendarCitaSheet({super.key});
 
@@ -342,7 +342,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       key: Key('pago-con-bono'),
                       padding: EdgeInsets.only(bottom: 12),
                       child: Text(
-                        'Se descuenta una sesión de tu bono o membresía; no pagas al agendar.',
+                        'Se descuenta una sesión de tu bono; no pagas al agendar.',
                         style: TextStyle(color: TemaAgendaUno.textoSuave),
                       ),
                     ),

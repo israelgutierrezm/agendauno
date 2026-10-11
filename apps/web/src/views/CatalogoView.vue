@@ -536,7 +536,9 @@ onMounted(cargar);
                     >{{
                       o.politica_reserva === "pago"
                         ? $t("catalogo.badgePago")
-                        : $t("catalogo.badgeEntitlement")
+                        : esCitas
+                          ? $t("catalogo.badgeEntitlementCitas")
+                          : $t("catalogo.badgeEntitlement")
                     }}</span
                   >
                 </td>

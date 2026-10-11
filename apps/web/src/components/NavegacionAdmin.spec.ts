@@ -133,7 +133,7 @@ describe("pestañas del área", () => {
       "/presupuestos",
     ]);
     expect(citas.w.findAll(".pa-pestanas a").at(2)!.text()).toBe(
-      "Bonos y membresías",
+      "Bonos",
     );
     const lateral = await montar(NavLateral, { name: "pos" });
     expect(

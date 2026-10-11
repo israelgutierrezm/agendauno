@@ -71,7 +71,7 @@ export const inventarioVisual = {
 // Membresías y paquetes (views/VentasView.vue): vender un plan.
 export const ventasVisual = {
   titulo: "Membresías y paquetes",
-  tituloCitas: "Bonos y membresías",
+  tituloCitas: "Bonos",
   ventaActual: "Venta",
   eligePlan: "Elige un plan de la lista.",
   verTodas: "Ver todas en Cobros",

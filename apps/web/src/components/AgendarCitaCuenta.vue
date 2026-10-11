@@ -37,7 +37,7 @@ interface Servicio {
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
-  // Se descuenta de su bono o membresía (ADR 0091).
+  // Se descuenta de su bono (ADR 0091).
   con_plan?: boolean;
 }
 interface Opcion {

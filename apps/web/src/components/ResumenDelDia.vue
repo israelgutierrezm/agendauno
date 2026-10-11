@@ -876,7 +876,9 @@ onMounted(() => {
                 </span>
                 <span class="hoy-texto">{{
                   $t(
-                    "operacion.hoy.porVencer",
+                    esCitas
+                      ? "operacion.hoy.porVencerCitas"
+                      : "operacion.hoy.porVencer",
                     {
                       n: hoy.renovaciones.por_vencer,
                       dias: hoy.renovaciones.dias,
@@ -895,7 +897,12 @@ onMounted(() => {
                   <IconoNav nombre="pulso" :tam="18" />
                 </span>
                 <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
-                  $t("operacion.hoy.vencidas", hoy.renovaciones.vencidas)
+                  $t(
+                    esCitas
+                      ? "operacion.hoy.vencidasCitas"
+                      : "operacion.hoy.vencidas",
+                    hoy.renovaciones.vencidas,
+                  )
                 }}</span>
               </RouterLink>
             </li>

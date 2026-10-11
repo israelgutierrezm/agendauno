@@ -20,10 +20,10 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * clases extra u otro), su precio, cuántas clases incluye, cuánto dura (con el
  * ejemplo de "hasta cuándo" si se comprara hoy) y para qué clases sirve.
  *
- * Con citas (ADR 0091) solo hay dos: bono de sesiones (varias visitas prepagadas) y
- * membresía (una cuota con servicios o beneficios); un servicio suelto o un combo se
- * dan de alta en Catálogo. Un bono sirve para los servicios que se toman «con bono o
- * membresía», que son los que se pueden elegir aquí.
+ * Con citas (ADR 0091, 0130) solo hay bonos de sesiones (varias visitas prepagadas):
+ * sin membresías ni planes que se renuevan. Un servicio suelto o un combo se dan de
+ * alta en Catálogo. Un bono sirve para los servicios que se toman «con bono», que son
+ * los que se pueden elegir aquí.
  */
 const props = defineProps<{ plan: Plan | null }>();
 const emit = defineEmits<{ guardado: []; cerrar: [] }>();
@@ -92,7 +92,7 @@ const error = ref<string | null>(null);
 const esCitas = computed(() => sesion.esCitas === true);
 const TIPOS_PRINCIPALES = computed<TipoPlan[]>(() =>
   esCitas.value
-    ? ["paquete", "membresia"]
+    ? ["paquete"]
     : ["paquete", "membresia", "sesion_individual", "add_on"],
 );
 // Los textos del editor en citas hablan de servicios y sesiones, no de clases.
@@ -143,7 +143,7 @@ const ejemplo = computed(() => {
   });
 });
 
-// Con citas, un bono solo sirve para lo que se toma con bono o membresía.
+// Con citas, un bono solo sirve para lo que se toma con bono.
 const ofertasElegibles = computed(() =>
   esCitas.value
     ? ofertas.value.filter((o) => o.politica_reserva !== "pago")

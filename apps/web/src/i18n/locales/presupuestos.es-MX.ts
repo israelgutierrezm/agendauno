@@ -45,7 +45,7 @@ export default {
     tipo: "Tipo",
     tipos: {
       servicio: "Servicio",
-      producto: "Paquete, bono o membresía",
+      producto: "Bono",
       articulo: "Artículo",
       libre: "Concepto libre",
     },

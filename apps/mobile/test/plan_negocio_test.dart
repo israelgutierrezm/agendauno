@@ -12,16 +12,16 @@ void main() {
   );
 
   test(
-    'un negocio Premium no ofrece la venta en línea ni el cobro automático',
+    'un negocio Premium no ofrece la venta en línea ni los formularios',
     () {
       final sesion = conPlan({
         'nivel': 'premium',
-        'sin': ['venta_en_linea', 'cobro_automatico', 'facturacion'],
+        'sin': ['venta_en_linea', 'formularios', 'facturacion'],
       });
 
       expect(sesion.nivelPlan, 'premium');
       expect(sesion.tieneFuncion('venta_en_linea'), isFalse);
-      expect(sesion.tieneFuncion('cobro_automatico'), isFalse);
+      expect(sesion.tieneFuncion('formularios'), isFalse);
       expect(sesion.tieneFuncion('inventario'), isTrue);
     },
   );
@@ -45,6 +45,6 @@ void main() {
 
     expect(sesion.nivelPlan, isNull);
     expect(sesion.tieneFuncion('venta_en_linea'), isTrue);
-    expect(sesion.tieneFuncion('cobro_automatico'), isTrue);
+    expect(sesion.tieneFuncion('formularios'), isTrue);
   });
 }

@@ -1193,7 +1193,7 @@ describe("cliente con cuenta", () => {
   });
 });
 
-describe("bono o membresía", () => {
+describe("bono (sin membresías en citas, ADR 0130)", () => {
   // Un negocio con servicios que se toman con bono (ADR 0091/0093).
   function conBono() {
     const op = opciones(1);
@@ -1233,7 +1233,7 @@ describe("bono o membresía", () => {
     await flushPromises();
 
     const aviso = vista.get('[data-prueba="aviso-bono"]');
-    expect(aviso.text()).toContain("¿Tienes un bono o membresía?");
+    expect(aviso.text()).toContain("¿Tienes un bono?");
     await vista.get('[data-prueba="entrar-bono"]').trigger("click");
     expect(mocks.push).toHaveBeenCalledWith({
       name: "entrar",
@@ -1292,7 +1292,7 @@ describe("bono o membresía", () => {
     await elegirHora(vista, "09:00");
     await continuar(vista);
     expect(vista.text()).toContain(
-      "Se descuenta una sesión de tu bono o membresía",
+      "Se descuenta una sesión de tu bono",
     );
     // No se paga al agendar: el botón solo agenda.
     expect(

@@ -257,6 +257,11 @@ export default {
       "1 membresía vence en {dias} días o menos | {n} membresías vencen en {dias} días o menos",
     vencidas:
       "1 membresía vencida por recuperar | {n} membresías vencidas por recuperar",
+    // Citas: bonos, no membresías (ADR 0130).
+    porVencerCitas:
+      "1 bono vence en {dias} días o menos | {n} bonos vencen en {dias} días o menos",
+    vencidasCitas:
+      "1 bono vencido por recuperar | {n} bonos vencidos por recuperar",
     // Lo que espera al equipo (M08).
     solicitudes:
       "1 solicitud de acceso sin atender | {n} solicitudes de acceso sin atender",
@@ -314,7 +319,7 @@ export default {
     // Invitar a su cuenta: el correo para activarla y ver sus citas y pagos.
     invitar: "Invitar a su cuenta",
     invitarAyuda:
-      "Le enviamos un correo para que active su cuenta y vea sus citas, pagos y membresía.",
+      "Le enviamos un correo para que active su cuenta y vea sus citas, pagos y bonos.",
     invitacionPendiente: "Invitación enviada",
     reenviar: "Reenviar invitación",
     reenviando: "Reenviando…",
@@ -485,6 +490,9 @@ export default {
     subtitulo:
       "Membresías y paquetes por vencer o recién vencidos, para contactar a tiempo.",
     vacio: "No hay membresías por vencer ni recién vencidas.",
+    subtituloCitas:
+      "Bonos por vencer o recién vencidos, para contactar a tiempo.",
+    vacioCitas: "No hay bonos por vencer ni recién vencidos.",
     errorCarga:
       "No pudimos consultar las renovaciones. Intenta de nuevo en un momento.",
   },
