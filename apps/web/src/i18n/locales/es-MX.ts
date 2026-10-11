@@ -2107,11 +2107,24 @@ export default {
   plataforma: {
     titulo: "Administración de plataforma",
     subtitulo: "Todos los estudios y la configuración global de AgendaUno.",
-    token: "Token de operador",
+    token: "Token de la plataforma",
     tokenAyuda: "Solo para el equipo de AgendaUno.",
     entrar: "Entrar",
     salir: "Salir",
-    tokenInvalido: "Token inválido o sin acceso.",
+    tokenInvalido: "Tu sesión terminó o no tiene acceso. Vuelve a entrar.",
+    // Entrada en dos pasos (ADR 0126).
+    correo: "Correo",
+    contrasena: "Contraseña",
+    accesoAyuda:
+      "Solo para el equipo de AgendaUno: tu correo, tu contraseña y el token de la plataforma. Después te enviamos un código por correo.",
+    codigoTitulo: "Revisa tu correo",
+    codigoAyuda:
+      "Te enviamos un código de 6 dígitos a {correo}. Vence en unos minutos y sirve una sola vez.",
+    codigo: "Código",
+    verificar: "Verificar y entrar",
+    empezarDeNuevo: "Empezar de nuevo",
+    codigoDesarrollo: "Solo en desarrollo, el código es {codigo}.",
+    operador: "Operador: {nombre}",
     facturapi: {
       titulo: "Cuenta FacturAPI",
       subtitulo:

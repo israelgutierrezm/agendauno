@@ -518,11 +518,14 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
-      // Superadmin de AgendaUno: una dirección que no se adivina (no hay enlace a ella).
-      path: "/splataformadm1n",
+      // Superadmin de AgendaUno (ADR 0126): correo, contraseña, el token de la
+      // plataforma y un código por correo. No hay enlace a ella.
+      path: "/plataforma",
       name: "plataforma",
       component: () => import("@/views/PlataformaView.vue"),
     },
+    // La dirección anterior lleva a la nueva.
+    { path: "/splataformadm1n", redirect: { name: "plataforma" } },
     {
       // Enlace corto público del estudio (agendauno.mx/mi-estudio). Va al FINAL, antes
       // del catch-all: solo captura rutas de UN segmento que no sean una ruta con nombre.

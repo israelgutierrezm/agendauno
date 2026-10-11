@@ -179,6 +179,14 @@ const cliente = axios.create({
 
 const token = ref<string>(leer());
 const tokenInput = ref("");
+// Entrada en dos pasos (ADR 0126): correo, contraseña y token; luego el código.
+const emailInput = ref("");
+const passwordInput = ref("");
+const codigoInput = ref("");
+const desafio = ref<string | null>(null);
+const correoDestino = ref("");
+const codigoDesarrollo = ref<string | null>(null);
+const operador = ref<string | null>(null);
 const autenticado = ref(false);
 const cargando = ref(false);
 // Con un token guardado no se pinta la puerta mientras se comprueba (sin parpadeo).
@@ -767,7 +775,15 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    await Promise.all([cargarEstudios(), cargarConfiguracion()]);
+    const [, , yo] = await Promise.all([
+      cargarEstudios(),
+      cargarConfiguracion(),
+      cliente.get<{ data: { administrador: { nombre: string } | null } }>(
+        "/api/v1/plataforma/yo",
+        encabezados(),
+      ),
+    ]);
+    operador.value = yo.data.data.administrador?.nombre ?? null;
     autenticado.value = true;
   } catch (err) {
     autenticado.value = false;
@@ -794,14 +810,69 @@ function irPestana(p: Pestana): void {
   }
 }
 
-function entrar(): void {
-  token.value = tokenInput.value.trim();
-  guardar(token.value);
-  void cargar();
+// Paso 1: correo, contraseña y token. Si coinciden, llega un código por correo.
+async function entrar(): Promise<void> {
+  cargando.value = true;
+  error.value = null;
+  try {
+    const { data } = await cliente.post<{
+      data: { desafio: string; correo: string; codigo: string | null };
+    }>("/api/v1/plataforma/entrar", {
+      email: emailInput.value.trim(),
+      password: passwordInput.value,
+      token: tokenInput.value.trim(),
+    });
+    desafio.value = data.data.desafio;
+    correoDestino.value = data.data.correo;
+    codigoDesarrollo.value = data.data.codigo;
+    codigoInput.value = "";
+    passwordInput.value = "";
+  } catch (err) {
+    error.value = mensajeDeError(err);
+  } finally {
+    cargando.value = false;
+  }
 }
 
-function salir(): void {
+// Paso 2: el código abre la sesión del operador (su propio token).
+async function verificar(): Promise<void> {
+  if (desafio.value === null) {
+    return;
+  }
+  cargando.value = true;
+  error.value = null;
+  try {
+    const { data } = await cliente.post<{ data: { token: string } }>(
+      "/api/v1/plataforma/entrar/verificar",
+      { desafio: desafio.value, codigo: codigoInput.value.trim() },
+    );
+    token.value = data.data.token;
+    guardar(token.value);
+    desafio.value = null;
+    tokenInput.value = "";
+    await cargar();
+  } catch (err) {
+    error.value = mensajeDeError(err);
+    cargando.value = false;
+  }
+}
+
+function empezarDeNuevo(): void {
+  desafio.value = null;
+  codigoInput.value = "";
+  codigoDesarrollo.value = null;
+  error.value = null;
+}
+
+async function salir(): Promise<void> {
+  // Cierra la sesión en el servidor; aunque falle, aquí se olvida.
+  try {
+    await cliente.post("/api/v1/plataforma/salir", {}, encabezados());
+  } catch {
+    // sin red: el token vence solo
+  }
   token.value = "";
+  operador.value = null;
   autenticado.value = false;
   estudios.value = [];
   borrar();
@@ -867,13 +938,94 @@ function borrar(): void {
       {{ $t("comun.cargando") }}
     </p>
 
-    <!-- Puerta por token -->
-    <div v-else-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
-      <h1 class="font-light text-xl">{{ $t("plataforma.titulo") }}</h1>
+    <!-- Paso 2: el código que llegó por correo -->
+    <div
+      v-else-if="!autenticado && desafio !== null"
+      class="mx-auto max-w-sm tu-card p-6"
+      data-prueba="paso-codigo"
+    >
+      <h1 class="font-semibold text-xl">{{ $t("plataforma.codigoTitulo") }}</h1>
       <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("plataforma.tokenAyuda") }}
+        {{ $t("plataforma.codigoAyuda", { correo: correoDestino }) }}
+      </p>
+      <p
+        v-if="codigoDesarrollo"
+        class="mt-2 text-sm"
+        :style="{ color: 'var(--aviso)' }"
+        data-prueba="codigo-desarrollo"
+      >
+        {{ $t("plataforma.codigoDesarrollo", { codigo: codigoDesarrollo }) }}
+      </p>
+      <form class="mt-4 space-y-3" @submit.prevent="verificar">
+        <div>
+          <label class="tu-label" for="pl-codigo">{{
+            $t("plataforma.codigo")
+          }}</label>
+          <input
+            id="pl-codigo"
+            v-model="codigoInput"
+            class="tu-input tracking-[0.3em] text-lg"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            required
+          />
+        </div>
+        <p v-if="error" class="text-sm" style="color: var(--error)">
+          {{ error }}
+        </p>
+        <button
+          class="tu-btn tu-btn-primario w-full"
+          type="submit"
+          :disabled="cargando || codigoInput.trim().length !== 6"
+        >
+          {{ $t("plataforma.verificar") }}
+        </button>
+        <button
+          class="tu-btn tu-btn-fantasma w-full"
+          type="button"
+          :disabled="cargando"
+          @click="empezarDeNuevo"
+        >
+          {{ $t("plataforma.empezarDeNuevo") }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Paso 1: correo, contraseña y token de la plataforma -->
+    <div v-else-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
+      <h1 class="font-semibold text-xl">{{ $t("plataforma.titulo") }}</h1>
+      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("plataforma.accesoAyuda") }}
       </p>
       <form class="mt-4 space-y-3" @submit.prevent="entrar">
+        <div>
+          <label class="tu-label" for="pl-correo">{{
+            $t("plataforma.correo")
+          }}</label>
+          <input
+            id="pl-correo"
+            v-model="emailInput"
+            class="tu-input"
+            type="email"
+            autocomplete="username"
+            required
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="pl-contrasena">{{
+            $t("plataforma.contrasena")
+          }}</label>
+          <input
+            id="pl-contrasena"
+            v-model="passwordInput"
+            class="tu-input"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
         <div>
           <label class="tu-label" for="tk">{{ $t("plataforma.token") }}</label>
           <input
@@ -881,6 +1033,7 @@ function borrar(): void {
             v-model="tokenInput"
             class="tu-input"
             type="password"
+            autocomplete="off"
             required
           />
         </div>
@@ -915,6 +1068,9 @@ function borrar(): void {
           </h1>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("plataforma.subtitulo") }}
+            <template v-if="operador">
+              · {{ $t("plataforma.operador", { nombre: operador }) }}</template
+            >
           </p>
         </div>
         <button class="tu-btn tu-btn-fantasma" type="button" @click="salir">
