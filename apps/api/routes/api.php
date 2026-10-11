@@ -102,6 +102,7 @@ use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
 use App\Modules\Tenancy\Http\Controllers\RegistroWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\ReporteCohortesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteDemandaTenantController;
+use App\Modules\Tenancy\Http\Controllers\ReporteEmbudoTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteRentabilidadTenantController;
@@ -474,6 +475,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/tareas', [TareasTenantController::class, 'store'])->middleware('puede:tareas.gestionar')->name('tareas.store');
             Route::post('/tareas/{tarea}/completar', [TareasTenantController::class, 'completar'])->middleware('puede:tareas.gestionar')->name('tareas.completar');
             Route::post('/tareas/{tarea}/reabrir', [TareasTenantController::class, 'reabrir'])->middleware('puede:tareas.gestionar')->name('tareas.reabrir');
+            // Con qué terminó un seguimiento (M09).
+            Route::post('/tareas/{tarea}/resultado', [TareasTenantController::class, 'resultado'])->middleware('puede:tareas.gestionar')->name('tareas.resultado');
 
             // Motor de automatizacion (R16): reglas trigger->condicion->retraso->accion (crear tarea).
             Route::get('/automatizaciones', [AutomatizacionesTenantController::class, 'index'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.index');
@@ -624,6 +627,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/reportes/tendencias', ReporteTendenciasTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.tendencias');
             // Cohortes de retención + embudo de conversión (Etapa 2): triángulo por mes de alta.
             Route::get('/reportes/cohortes', ReporteCohortesTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.cohortes');
+            // El embudo del negocio (C08): de la visita a la renovación.
+            Route::get('/reportes/embudo', ReporteEmbudoTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.embudo');
             // Retención (Etapa 2): radar de membresías por vencer / vencidas para renovar.
             // Es operativo (recepción hace la gestión), por eso `miembros.ver`. `?formato=csv`.
             Route::get('/retencion/por-vencer', [RetencionTenantController::class, 'porVencer'])->middleware('puede:miembros.ver')->name('retencion.por-vencer');

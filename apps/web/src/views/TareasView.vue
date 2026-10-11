@@ -6,8 +6,10 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { whatsappDe } from "@/lib/captacion";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 const { t } = useI18n();
 
@@ -29,6 +31,11 @@ interface Tarea {
   responsable: string | null;
   automatica: boolean;
   completada_en: string | null;
+  // Seguimiento (M09): a quién, por qué y con qué terminó.
+  persona_id?: string | null;
+  celular?: string | null;
+  motivo?: string | null;
+  resultado?: string | null;
 }
 interface Regla {
   id: string;
@@ -42,6 +49,7 @@ interface Regla {
 }
 
 const sesion = useSesionTenantStore();
+const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeReglas = computed(() => sesion.puede("automatizaciones.gestionar"));
 const puedeEliminarReglas = computed(() =>
@@ -60,6 +68,80 @@ const cargandoTareas = ref(true);
 const accionando = ref(false);
 const mostrarNueva = ref(false);
 const nueva = ref({ titulo: "", detalle: "", vence_en: "" });
+// Solo las de seguimiento (las que crea el sistema por una señal; M09).
+const soloSeguimiento = ref(false);
+
+// ---- Seguimiento: mensaje sugerido y resultado ----
+const RESULTADOS = [
+  "contactado",
+  "renovo",
+  "no_respondio",
+  "no_desea_contacto",
+  "requiere_atencion",
+] as const;
+type Resultado = (typeof RESULTADOS)[number];
+// El servidor antepone esto al mensaje sugerido (SeguimientoTenant::PREFIJO_MENSAJE).
+const PREFIJO_MENSAJE = "Mensaje sugerido (edítalo antes de enviarlo): ";
+const conResultado = ref<Tarea | null>(null);
+const resultado = ref<{ valor: Resultado; nota: string }>({
+  valor: "contactado",
+  nota: "",
+});
+
+/** El mensaje sugerido de un seguimiento, sin el aviso ni el resultado. */
+function mensajeDe(tarea: Tarea): string | null {
+  const d = tarea.detalle ?? "";
+  return tarea.motivo && d.startsWith(PREFIJO_MENSAJE)
+    ? d.slice(PREFIJO_MENSAJE.length).split("\n\n")[0]
+    : null;
+}
+function whatsappCon(tarea: Tarea): string | null {
+  const url = whatsappDe(tarea.celular ?? null);
+  const mensaje = mensajeDe(tarea);
+  return url === null
+    ? null
+    : mensaje !== null
+      ? `${url}?text=${encodeURIComponent(mensaje)}`
+      : url;
+}
+async function copiarMensaje(tarea: Tarea): Promise<void> {
+  const mensaje = mensajeDe(tarea);
+  if (mensaje === null) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(mensaje);
+    toast.exito(t("operacion.seguimiento.copiado"));
+  } catch {
+    toast.error(t("operacion.seguimiento.noSeCopio"));
+  }
+}
+function abrirResultado(tarea: Tarea): void {
+  resultado.value = { valor: "contactado", nota: "" };
+  conResultado.value = tarea;
+}
+async function guardarResultado(): Promise<void> {
+  const tarea = conResultado.value;
+  if (tarea === null) {
+    return;
+  }
+  accionando.value = true;
+  error.value = null;
+  try {
+    await api.post(`${base.value}/tareas/${tarea.id}/resultado`, {
+      resultado: resultado.value.valor,
+      nota:
+        resultado.value.nota.trim() !== "" ? resultado.value.nota.trim() : null,
+    });
+    conResultado.value = null;
+    toast.exito(t("operacion.seguimiento.registrado"));
+    await cargarTareas();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    accionando.value = false;
+  }
+}
 
 // ---- Reglas ----
 const reglas = ref<Regla[]>([]);
@@ -106,7 +188,10 @@ async function cargarTareas(): Promise<void> {
       pendientes: number;
       alcance?: "mias" | "equipo";
     }>(`${base.value}/tareas`, {
-      params: { estado: estadoFiltro.value },
+      params: {
+        estado: estadoFiltro.value,
+        ...(soloSeguimiento.value ? { tipo: "seguimiento" } : {}),
+      },
     });
     tareas.value = data.data;
     pendientes.value = data.pendientes;
@@ -313,6 +398,11 @@ function alternarEstado(): void {
   void cargarTareas();
 }
 
+function alternarSeguimiento(): void {
+  soloSeguimiento.value = !soloSeguimiento.value;
+  void cargarTareas();
+}
+
 onMounted(cargarTareas);
 </script>
 
@@ -357,13 +447,31 @@ onMounted(cargarTareas);
     <!-- ===== Pestaña: Pendientes ===== -->
     <div v-if="tab === 'pendientes'" class="mt-6">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <button class="tu-enlace text-sm" type="button" @click="alternarEstado">
-          {{
-            estadoFiltro === "pendiente"
-              ? $t("tareas.verCompletadas")
-              : $t("tareas.verPendientes")
-          }}
-        </button>
+        <div class="flex flex-wrap items-center gap-4">
+          <button
+            class="tu-enlace text-sm"
+            type="button"
+            @click="alternarEstado"
+          >
+            {{
+              estadoFiltro === "pendiente"
+                ? $t("tareas.verCompletadas")
+                : $t("tareas.verPendientes")
+            }}
+          </button>
+          <button
+            class="tu-enlace text-sm"
+            type="button"
+            data-prueba="solo-seguimiento"
+            @click="alternarSeguimiento"
+          >
+            {{
+              soloSeguimiento
+                ? $t("operacion.seguimiento.todas")
+                : $t("operacion.seguimiento.soloSeguimiento")
+            }}
+          </button>
+        </div>
         <button
           v-if="puedeGestionar"
           class="tu-btn tu-btn-primario tu-btn-crear"
@@ -468,29 +576,87 @@ onMounted(cargarTareas);
               <span v-if="tarea.automatica" class="tu-badge">{{
                 $t("tareas.automatica")
               }}</span>
+              <span v-if="tarea.motivo" class="tu-badge">{{
+                $t("operacion.seguimiento.etiqueta")
+              }}</span>
             </div>
             <p
               v-if="tarea.detalle"
-              class="text-sm mt-1"
+              class="text-sm mt-1 whitespace-pre-line"
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{ tarea.detalle }}
             </p>
             <div
-              class="flex items-center gap-1.5 mt-1 text-xs"
+              class="flex flex-wrap items-center gap-1.5 mt-1 text-xs"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              <span v-if="tarea.persona">{{ tarea.persona }}</span>
+              <RouterLink
+                v-if="tarea.persona && tarea.persona_id"
+                class="tu-enlace"
+                :to="{
+                  name: 'ficha-miembro',
+                  params: { id: tarea.persona_id },
+                }"
+                >{{ tarea.persona }}</RouterLink
+              >
+              <span v-else-if="tarea.persona">{{ tarea.persona }}</span>
               <span v-if="tarea.persona" aria-hidden="true">·</span>
               <span>{{
                 tarea.vence_en
                   ? fecha(tarea.vence_en)
                   : $t("tareas.sinVencimiento")
               }}</span>
+              <template v-if="tarea.resultado">
+                <span aria-hidden="true">·</span>
+                <span class="inline-flex items-center gap-1.5">
+                  <span
+                    class="inline-block size-1.5 rounded-full"
+                    :style="{ background: 'var(--texto-suave)' }"
+                    aria-hidden="true"
+                  />
+                  {{
+                    $t(`operacion.seguimiento.resultados.${tarea.resultado}`)
+                  }}
+                </span>
+              </template>
+            </div>
+            <!-- Seguimiento pendiente: escribirle con el mensaje sugerido -->
+            <div
+              v-if="tarea.motivo && tarea.estado === 'pendiente'"
+              class="flex flex-wrap items-center gap-3 mt-2 text-sm"
+            >
+              <button
+                v-if="mensajeDe(tarea)"
+                class="tu-enlace"
+                type="button"
+                @click="copiarMensaje(tarea)"
+              >
+                {{ $t("operacion.seguimiento.copiar") }}
+              </button>
+              <a
+                v-if="whatsappCon(tarea)"
+                class="tu-enlace"
+                :href="whatsappCon(tarea) ?? undefined"
+                target="_blank"
+                rel="noopener"
+                >{{ $t("operacion.seguimiento.whatsapp") }}</a
+              >
             </div>
           </div>
           <button
-            v-if="puedeGestionar && tarea.estado === 'pendiente'"
+            v-if="
+              puedeGestionar && tarea.estado === 'pendiente' && tarea.motivo
+            "
+            class="tu-btn tu-btn-fantasma shrink-0"
+            type="button"
+            :disabled="accionando"
+            @click="abrirResultado(tarea)"
+          >
+            {{ $t("operacion.seguimiento.registrar") }}
+          </button>
+          <button
+            v-else-if="puedeGestionar && tarea.estado === 'pendiente'"
             class="tu-btn tu-btn-fantasma shrink-0"
             type="button"
             :disabled="accionando"
@@ -509,6 +675,78 @@ onMounted(cargarTareas);
           </button>
         </li>
       </ul>
+
+      <!-- Con qué terminó un seguimiento (M09) -->
+      <PanelLateral
+        :abierto="conResultado !== null"
+        :titulo="$t('operacion.seguimiento.panelTitulo')"
+        @cerrar="conResultado = null"
+      >
+        <form
+          v-if="conResultado"
+          class="grid gap-4"
+          @submit.prevent="guardarResultado"
+        >
+          <p class="text-sm font-medium">{{ conResultado.titulo }}</p>
+          <fieldset class="grid gap-2">
+            <legend class="tu-label">
+              {{ $t("operacion.seguimiento.resultado") }}
+            </legend>
+            <label
+              v-for="r in RESULTADOS"
+              :key="r"
+              class="flex items-center gap-2 text-sm"
+            >
+              <input
+                v-model="resultado.valor"
+                type="radio"
+                name="resultado-seguimiento"
+                :value="r"
+              />
+              {{ $t(`operacion.seguimiento.resultados.${r}`) }}
+            </label>
+            <p
+              v-if="resultado.valor === 'no_desea_contacto'"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("operacion.seguimiento.ayudaNoDesea") }}
+            </p>
+          </fieldset>
+          <div>
+            <label class="tu-label" for="s-nota">{{
+              $t("operacion.seguimiento.nota")
+            }}</label>
+            <textarea
+              id="s-nota"
+              v-model="resultado.nota"
+              class="tu-input"
+              rows="3"
+              maxlength="500"
+            />
+          </div>
+        </form>
+
+        <template #pie>
+          <div class="flex justify-end gap-2">
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="button"
+              @click="conResultado = null"
+            >
+              {{ $t("tareas.cancelar") }}
+            </button>
+            <button
+              class="tu-btn tu-btn-primario"
+              type="button"
+              :disabled="accionando"
+              @click="guardarResultado"
+            >
+              {{ $t("operacion.seguimiento.guardar") }}
+            </button>
+          </div>
+        </template>
+      </PanelLateral>
     </div>
 
     <!-- ===== Pestaña: Reglas ===== -->
