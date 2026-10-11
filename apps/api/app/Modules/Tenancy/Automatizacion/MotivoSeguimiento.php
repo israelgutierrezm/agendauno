@@ -57,4 +57,21 @@ enum MotivoSeguimiento: string
             self::CompraSinReservar => "Hola {$nombre}, ya tienes tu plan listo. ¿Te ayudamos a reservar tu primera clase?",
         };
     }
+
+    /**
+     * El mensaje sugerido para el responsable de un participante sin celular propio
+     * (familias, ADR 0123): le habla al responsable de su participante.
+     */
+    public function mensajeParaResponsable(string $responsable, string $participante, ?string $dato = null, bool $citas = false): string
+    {
+        $sesion = $citas ? 'cita' : 'clase';
+
+        return match ($this) {
+            self::PrimeraAsistencia => "Hola {$responsable}, gracias por traer a {$participante} a su primera {$sesion}. ¿Cómo le fue? Si quieren, les ayudamos con la siguiente.",
+            self::PlanPorVencer => "Hola {$responsable}, el plan de {$participante} vence el {$dato}. Si quieren seguir, les ayudamos a renovarlo.",
+            self::PlanVencido => "Hola {$responsable}, el plan de {$participante} venció el {$dato}. Los esperamos de vuelta cuando quieran; les ayudamos a elegir un plan.",
+            self::SinAsistir => "Hola {$responsable}, extrañamos a {$participante}: su última {$sesion} fue el {$dato}. ¿Les ayudamos con la próxima?",
+            self::CompraSinReservar => "Hola {$responsable}, el plan de {$participante} ya está listo. ¿Les ayudamos a ".($citas ? 'agendar su primera cita' : 'reservar su primera clase').'?',
+        };
+    }
 }

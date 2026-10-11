@@ -65,6 +65,54 @@ function montar() {
 beforeEach(() => vi.clearAllMocks());
 
 describe("seguimiento en tareas", () => {
+  it("sin celular propio, escribe por WhatsApp a su responsable y lo dice", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            ...seguimiento,
+            persona: "Sofía Ríos",
+            celular: null,
+            contacto: { nombre: "Laura Ríos", celular: "5511112222" },
+            detalle:
+              "Mensaje sugerido (edítalo antes de enviarlo): Hola Laura, el plan de Sofía vence el 15 de octubre. Si quieren seguir, les ayudamos a renovarlo.\n\nNo tiene celular propio: escríbele a Laura Ríos, su responsable.",
+          },
+        ],
+        pendientes: 1,
+        alcance: "equipo",
+      },
+    });
+    api.post.mockResolvedValue({ data: { data: {} } });
+    const w = mount(TareasView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { ...esMX, operacion } },
+          }),
+        ],
+        stubs: {
+          EncabezadoSeccion: true,
+          RouterLink: { props: ["to"], template: "<a><slot /></a>" },
+          PanelLateral: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    const wa = w.get('a[target="_blank"]').attributes("href") ?? "";
+    expect(wa).toMatch(/^https:\/\/wa\.me\/\d*5511112222\?text=/);
+    expect(decodeURIComponent(wa.split("text=")[1])).toBe(
+      "Hola Laura, el plan de Sofía vence el 15 de octubre. Si quieren seguir, les ayudamos a renovarlo.",
+    );
+    expect(w.get('[data-prueba="contacto-responsable"]').text()).toBe(
+      "Se le escribe a Laura Ríos, su responsable",
+    );
+  });
+
   it("ofrece escribirle por WhatsApp con el mensaje sugerido y copiarlo", async () => {
     const escribir = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: escribir } });

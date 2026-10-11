@@ -35,6 +35,8 @@ interface Tarea {
   // Seguimiento (M09): a quién, por qué y con qué terminó.
   persona_id?: string | null;
   celular?: string | null;
+  // Sin celular propio: su responsable (familias, ADR 0123).
+  contacto?: { nombre: string; celular: string } | null;
   motivo?: string | null;
   resultado?: string | null;
 }
@@ -98,7 +100,7 @@ function mensajeDe(tarea: Tarea): string | null {
     : null;
 }
 function whatsappCon(tarea: Tarea): string | null {
-  const url = whatsappDe(tarea.celular ?? null);
+  const url = whatsappDe(tarea.celular ?? tarea.contacto?.celular ?? null);
   const mensaje = mensajeDe(tarea);
   return url === null
     ? null
@@ -643,6 +645,16 @@ onMounted(cargarTareas);
                 target="_blank"
                 rel="noopener"
                 >{{ $t("operacion.seguimiento.whatsapp") }}</a
+              >
+              <span
+                v-if="!tarea.celular && tarea.contacto"
+                :style="{ color: 'var(--texto-suave)' }"
+                data-prueba="contacto-responsable"
+                >{{
+                  $t("operacion.seguimiento.via", {
+                    nombre: tarea.contacto.nombre,
+                  })
+                }}</span
               >
             </div>
           </div>
