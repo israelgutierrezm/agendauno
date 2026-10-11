@@ -66,6 +66,7 @@ function rutasExclusivasPorModalidad(): array
         'reservas.aceptar' => 'clases',
         'mi.reservas.aceptar' => 'clases',
         'checkins.store' => 'clases',
+        'checkins.excepcion' => 'clases',
         'sesiones.checkins.index' => 'clases',
         'integraciones.index' => 'clases',
         'integraciones.upsert' => 'clases',

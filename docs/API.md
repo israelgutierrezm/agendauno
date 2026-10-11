@@ -310,6 +310,23 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
 - `GET /promociones/baja/{persona}` (enlace firmado y con vencimiento, en los correos de
   campaña): deja de recibir promociones.
 
+## Check-ins de Wellhub y TotalPass (M10)
+
+- `POST /checkins` contesta 201 si el proveedor aprobó la visita y 422 `CHECKIN_INVALID`
+  si la rechazó (no se guarda). Contesta 409 `CHECKIN_UNVERIFIABLE` si no la pudo
+  verificar: sin conexión, error de su lado (5xx, 429) o credenciales que no aceptó. En
+  ese caso la visita queda `no_verificable` (`meta.checkin`), nunca aprobada. Reintentar
+  con el mismo código en la misma clase la retoma. La visita del día ya registrada en otra
+  clase: 422 con la hora de esa clase.
+- `GET /sesiones/{sesion}/checkins`: `estado` (`validado`, `no_verificable`,
+  `excepcion`), `motivo`, `registrado_por`, `autorizado_por`, `autorizado_en`,
+  `motivo_excepcion` y `evidencia`.
+- `POST /checkins/{checkin}/excepcion {motivo, evidencia}` (`checkins.excepcion`): solo
+  sobre una visita sin verificar. Queda en la bitácora (`checkin.excepcion`).
+- `PUT /integraciones/{proveedor}` registra en la bitácora `integracion.actualizada` con
+  los nombres de las llaves cambiadas, nunca sus valores. Alcance: validación de
+  check-in; no sincroniza reservas, membresías ni pagos (ADR 0124).
+
 ## Embudo de la plataforma (C02, C08)
 
 - `POST /metricas/visita-landing` (público, `text/plain` con `{"producto"}`): una visita

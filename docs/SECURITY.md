@@ -29,8 +29,11 @@
   (ADR 0013, 0053, 0106).
 - Llaves de pasarelas y de integraciones cifradas en la base; la web nunca las
   vuelve a mostrar.
-- Webhooks salientes y direcciones propias de Wellhub/TotalPass solo a destinos
-  públicos por https (bloquea redes internas).
+- Webhooks salientes solo a destinos públicos por https (bloquea redes internas).
+  Wellhub y TotalPass usan la dirección fija de cada proveedor (configuración de la
+  plataforma): el negocio no puede capturar una propia. Del token de TotalPass solo se
+  guarda su huella; los cambios de credenciales van a la bitácora sin sus valores y una
+  visita que el proveedor no pudo verificar nunca se registra como aprobada (ADR 0124).
 - Archivos del negocio en su propio espacio; los documentos privados se descargan
   solo por la API, con sesión y permiso.
 - Bitácora (`auditorias`) de lo sensible: dinero, roles, bajas, cambios de

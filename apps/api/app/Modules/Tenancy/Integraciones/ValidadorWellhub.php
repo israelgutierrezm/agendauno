@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Integraciones;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -13,7 +14,9 @@ use Throwable;
  * API: `POST {base}/access/v1/validate {gympass_id}` con el token del negocio
  * (`Authorization: Bearer`) y su gimnasio (`X-Gym-Id`). El usuario hace check-in en
  * la app de Wellhub (vale 20 minutos) y el negocio lo valida con su Wellhub ID de 13
- * dígitos. Solo hay una visita por día: ya validada, vale como la misma.
+ * dígitos. Solo hay una visita por día (del negocio): ya validada, vale como la misma.
+ * Sin conexión, un error de su lado (5xx, 429) o el token rechazado (401/403) no
+ * dicen nada de la persona: la visita queda no verificable, nunca aprobada (M10).
  *
  * @see https://developers.wellhub.com/product/access-control-api/1.0/endpoints
  */
@@ -25,6 +28,8 @@ class ValidadorWellhub implements ValidadorPartner
         'checkin.validation.cancelled' => 'La persona canceló su check-in en Wellhub.',
         'checkin.validation.expired' => 'El check-in venció: en Wellhub dura 20 minutos. Pide que lo haga de nuevo.',
     ];
+
+    public function __construct(private readonly FechasNegocioTenant $fechas) {}
 
     public function nombre(): string
     {
@@ -53,16 +58,19 @@ class ValidadorWellhub implements ValidadorPartner
                     'gympass_id' => $wellhubId,
                 ]);
         } catch (Throwable) {
-            return ResultadoCheckin::invalido('No se pudo contactar a Wellhub. Intenta de nuevo.');
+            return ResultadoCheckin::noVerificable('No se pudo contactar a Wellhub: no respondió a tiempo o no hubo conexión.', $wellhubId);
         }
 
-        // Una visita por día: la de hoy (o la que ya se validó hoy) es la misma.
-        $referencia = 'wellhub:'.$gimnasio.':'.$wellhubId.':'.now()->toDateString();
+        // Una visita por día del negocio: la de hoy (o la que ya se validó hoy) es la misma.
+        $referencia = 'wellhub:'.$gimnasio.':'.$wellhubId.':'.$this->fechas->hoy();
         if ($respuesta->successful() || self::clave($respuesta) === 'checkin.already.validated') {
             return ResultadoCheckin::valido($referencia, $wellhubId);
         }
         if (in_array($respuesta->status(), [401, 403], true)) {
-            return ResultadoCheckin::invalido('Wellhub no aceptó el token o el Gym ID de la integración.');
+            return ResultadoCheckin::noVerificable('Wellhub no aceptó el token o el Gym ID de la integración: revisa las credenciales.', $wellhubId);
+        }
+        if ($respuesta->status() === 429 || $respuesta->serverError()) {
+            return ResultadoCheckin::noVerificable('Wellhub no está respondiendo (error de su lado). Intenta de nuevo en unos minutos.', $wellhubId);
         }
 
         return ResultadoCheckin::invalido(self::MOTIVOS[self::clave($respuesta)] ?? 'Wellhub no validó la visita.');

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Exceptions\IntegracionSoloMexico;
 use App\Modules\Tenancy\Models\IntegracionTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,11 +17,15 @@ use Illuminate\Http\Request;
  * Configuracion de integraciones de bienestar del estudio (Wellhub / TotalPass): el
  * propietario conecta sus credenciales. Se guardan cifradas y NUNCA se devuelven:
  * solo se informa que llaves estan configuradas. Solo propietario, solo negocios de
- * clases (ADR 0104) y solo en México, donde operan.
+ * clases (ADR 0104) y solo en México, donde operan. Encenderla, apagarla o cambiar
+ * una llave queda en la bitácora con los NOMBRES de las llaves, nunca sus valores (M10).
  */
 class IntegracionesTenantController
 {
-    public function __construct(private readonly RegionNegocioTenant $region) {}
+    public function __construct(
+        private readonly RegionNegocioTenant $region,
+        private readonly RegistrarAuditoria $auditoria,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -55,7 +61,9 @@ class IntegracionesTenantController
         ]);
 
         $config = IntegracionTenant::query()->firstOrNew(['proveedor' => $proveedor->value]);
+        $antes = ['activa' => $config->exists && $config->activa, 'llaves' => array_keys($config->llaves())];
         $config->activa = (bool) $validado['activa'];
+        $cambiadas = [];
 
         // Merge: solo actualiza las llaves provistas con valor; conserva las demas.
         $credenciales = $validado['credenciales'] ?? null;
@@ -66,10 +74,24 @@ class IntegracionesTenantController
                     $nuevas[(string) $nombre] = trim($valor);
                 }
             }
-            $config->credenciales = array_merge($config->llaves(), $nuevas);
+            $actuales = $config->llaves();
+            $cambiadas = array_keys(array_filter($nuevas, static fn (string $valor, string $nombre): bool => ($actuales[$nombre] ?? null) !== $valor, ARRAY_FILTER_USE_BOTH));
+            $config->credenciales = array_merge($actuales, $nuevas);
         }
 
         $config->save();
+
+        if ($antes['activa'] !== $config->activa || $cambiadas !== []) {
+            $usuario = $request->attributes->get('usuario_tenant');
+            $this->auditoria->registrar(
+                $usuario instanceof Usuario ? $usuario : null,
+                'integracion.actualizada',
+                'integracion',
+                $proveedor->value,
+                $antes,
+                ['activa' => $config->activa, 'llaves' => array_keys($config->llaves()), 'llaves_cambiadas' => $cambiadas],
+            );
+        }
 
         return response()->json(['data' => [
             'proveedor' => $proveedor->value,

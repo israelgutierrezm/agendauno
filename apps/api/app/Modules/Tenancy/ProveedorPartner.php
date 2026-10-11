@@ -21,6 +21,15 @@ enum ProveedorPartner: string
         return array_map(static fn (self $p): string => $p->value, self::cases());
     }
 
+    /** Su nombre, como lo escribe la plataforma. */
+    public function nombre(): string
+    {
+        return match ($this) {
+            self::Wellhub => 'Wellhub',
+            self::TotalPass => 'TotalPass',
+        };
+    }
+
     /**
      * Las credenciales que pide cada una (las da el proveedor al negocio): Wellhub,
      * su token de API y su Gym ID; TotalPass, su llave de API, el código de su

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Integraciones;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -11,7 +12,9 @@ use Throwable;
  * Valida la visita de un usuario de TotalPass con su API de uso del token
  * (`POST {base}/service/v1/track_usages`, cabecera `x-api-key`): el usuario muestra
  * el token del día en su app y el negocio lo valida (se consume al validarse). Con
- * el código del gimnasio y, si tiene varios planes, el del plan.
+ * el código del gimnasio y, si tiene varios planes, el del plan. Del token solo se
+ * guarda su huella. Sin conexión, un error de su lado (5xx, 429) o la llave rechazada
+ * (401/403) dejan la visita no verificable, nunca aprobada (M10).
  *
  * @see https://dev.totalpass.com/reference/post_track-usages-1
  */
@@ -26,6 +29,8 @@ class ValidadorTotalPass implements ValidadorPartner
         'gym_with_more_than_one_plan' => 'Tu gimnasio tiene varios planes en TotalPass: captura el código del plan en la integración.',
         'suspended_employee' => 'La cuenta de TotalPass de esta persona está suspendida.',
     ];
+
+    public function __construct(private readonly FechasNegocioTenant $fechas) {}
 
     public function nombre(): string
     {
@@ -59,17 +64,21 @@ class ValidadorTotalPass implements ValidadorPartner
                     'data' => ['attributes' => $atributos],
                 ]);
         } catch (Throwable) {
-            return ResultadoCheckin::invalido('No se pudo contactar a TotalPass. Intenta de nuevo.');
+            return ResultadoCheckin::noVerificable('No se pudo contactar a TotalPass: no respondió a tiempo o no hubo conexión.');
         }
 
-        $referencia = 'totalpass:'.$token.':'.now()->toDateString();
+        // El token es de un solo uso: se guarda su huella, no el token.
+        $referencia = 'totalpass:'.substr(hash('sha256', $token), 0, 40).':'.$this->fechas->hoy();
         $etiqueta = (string) ($respuesta->json('errors.0.label') ?? $respuesta->json('label') ?? '');
         // Ya usado aquí: es la misma visita (se valida una sola vez).
         if ($respuesta->successful() || $etiqueta === 'already_used') {
             return ResultadoCheckin::valido($referencia, null);
         }
         if (in_array($respuesta->status(), [401, 403], true)) {
-            return ResultadoCheckin::invalido('TotalPass no aceptó la llave de API de la integración.');
+            return ResultadoCheckin::noVerificable('TotalPass no aceptó la llave de API de la integración: revisa las credenciales.');
+        }
+        if ($respuesta->status() === 429 || $respuesta->serverError()) {
+            return ResultadoCheckin::noVerificable('TotalPass no está respondiendo (error de su lado). Intenta de nuevo en unos minutos.');
         }
 
         return ResultadoCheckin::invalido(self::MOTIVOS[$etiqueta] ?? 'TotalPass no validó la visita.');
