@@ -586,7 +586,7 @@ watch(vista, cargar, { immediate: true });
           {{ avisoCobro }}
         </p>
         <!-- Lo que ya se debe: compras sin pagar y citas o clases ya pasadas -->
-        <h2 class="cb-seccion mt-6">
+        <h2 id="pendientes" class="cb-seccion mt-6">
           <IconoNav nombre="dinero" :tam="21" />
           {{ $t("cobranza.pendientes.titulo") }}
         </h2>
@@ -675,6 +675,7 @@ watch(vista, cargar, { immediate: true });
         <!-- Morosos (dunning) -->
         <h2
           v-if="!sesion.esCitas || morosos.length > 0"
+          id="morosos"
           class="cb-seccion mt-8"
         >
           <IconoNav nombre="facturas" :tam="21" />{{ $t("cobranza.morosos") }}

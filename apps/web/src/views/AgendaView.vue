@@ -23,6 +23,9 @@ import IconoNav from "@/components/IconoNav.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelCita from "@/components/PanelCita.vue";
+import RegistrarPagoOrden, {
+  type OrdenPorCobrar,
+} from "@/components/RegistrarPagoOrden.vue";
 import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
 import {
   kpisCitas,
@@ -113,6 +116,13 @@ interface Reserva {
   unidades: number;
   asistencia: string | null;
   retardo?: boolean;
+  // Lo que falta pagar de su reserva: se cobra desde la sesión (M08).
+  orden?: {
+    id: string;
+    total_minor: number;
+    moneda: string;
+    concepto: string | null;
+  } | null;
 }
 interface ReglaCanal {
   id: string;
@@ -230,11 +240,16 @@ const filtrosActivos = computed(
       ofertaFiltro.value,
     ].filter((v) => v !== "").length,
 );
-// Hay algo que filtrar (varias sucursales, profesionales o clases/servicios).
+// Hay algo que filtrar (varias sucursales, profesionales o clases/servicios). Con
+// una sola persona en el equipo no hay a quién filtrar (M08: el independiente no
+// administra una cadena).
+const filtroEquipo = computed(
+  () => instructores.value.length > 1 && !soloLoSuyo.value,
+);
 const hayFiltros = computed(
   () =>
     elegirSucursal.value ||
-    (instructores.value.length > 0 && !soloLoSuyo.value) ||
+    filtroEquipo.value ||
     ofertasAgenda.value.length > 1,
 );
 function quitarFiltros(): void {
@@ -1303,6 +1318,29 @@ async function alAgendarCita(): Promise<void> {
 // Detalle: una cita abre su panel (llegó, cobrar, cancelar); una clase, el de clase.
 const citaAbierta = ref<Sesion | null>(null);
 const puedeCobrar = computed(() => sesion.puede("ordenes.gestionar"));
+// Cobrar desde la sesión lo que falta de una reserva (M08), con el mismo recorrido
+// que «Por cobrar».
+const cobrandoReserva = ref<OrdenPorCobrar | null>(null);
+const sesionCobrada = ref<string | null>(null);
+function abrirCobroReserva(r: Reserva, sesionId: string): void {
+  if (!r.orden) {
+    return;
+  }
+  sesionCobrada.value = sesionId;
+  cobrandoReserva.value = {
+    id: r.orden.id,
+    persona: r.persona,
+    concepto: r.orden.concepto,
+    total_minor: r.orden.total_minor,
+    moneda: r.orden.moneda,
+  };
+}
+async function alCobrarReserva(): Promise<void> {
+  cobrandoReserva.value = null;
+  if (sesionCobrada.value !== null) {
+    await refrescarTras(sesionCobrada.value);
+  }
+}
 function abrirDesdeAgenda(s: SesionAgenda): void {
   const original = sesiones.value.find((x) => x.id === s.id);
   if (original === undefined) {
@@ -1996,10 +2034,7 @@ onMounted(async () => {
             </option>
           </select>
         </span>
-        <span
-          v-if="instructores.length > 0 && !soloLoSuyo"
-          class="tu-select-icono max-sm:w-full"
-        >
+        <span v-if="filtroEquipo" class="tu-select-icono max-sm:w-full">
           <IconoNav nombre="instructores" :tam="18" />
           <select
             v-model="instructorFiltro"
@@ -2888,6 +2923,15 @@ onMounted(async () => {
                     </span>
                     <span class="flex items-center gap-2 shrink-0">
                       <button
+                        v-if="r.orden && puedeCobrar"
+                        class="tu-enlace"
+                        data-prueba="cobrar-reserva"
+                        :disabled="accionando"
+                        @click="abrirCobroReserva(r, detalle.id)"
+                      >
+                        {{ $t("agenda.roster.cobrar") }}
+                      </button>
+                      <button
                         v-if="r.estado === 'ofrecida' && puedeReservar"
                         class="tu-enlace"
                         :disabled="accionando"
@@ -3649,6 +3693,12 @@ onMounted(async () => {
       </template>
     </ModalDialogo>
 
+    <RegistrarPagoOrden
+      :base="base"
+      :orden="cobrandoReserva"
+      @cerrar="cobrandoReserva = null"
+      @registrado="alCobrarReserva"
+    />
     <PanelCita
       :abierto="citaAbierta !== null"
       :base="base"

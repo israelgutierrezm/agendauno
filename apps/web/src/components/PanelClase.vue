@@ -9,6 +9,9 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import MoverReserva from "@/components/MoverReserva.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
+import RegistrarPagoOrden, {
+  type OrdenPorCobrar,
+} from "@/components/RegistrarPagoOrden.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import {
@@ -47,6 +50,24 @@ const puedePasarLista = computed(
     sesionStore.puede("asistencia.marcar") && sesionStore.puede("reservas.ver"),
 );
 const puedeGestionar = computed(() => sesionStore.puede("reservas.gestionar"));
+// Cobrar aquí lo que falta de una reserva (M08), con el recorrido de «Por cobrar».
+const puedeCobrar = computed(() => sesionStore.puede("ordenes.gestionar"));
+const cobrando = ref<OrdenPorCobrar | null>(null);
+function abrirCobro(r: Reserva): void {
+  if (r.orden) {
+    cobrando.value = {
+      id: r.orden.id,
+      persona: r.persona,
+      concepto: r.orden.concepto,
+      total_minor: r.orden.total_minor,
+      moneda: r.orden.moneda,
+    };
+  }
+}
+async function alCobrar(): Promise<void> {
+  cobrando.value = null;
+  await cargar();
+}
 
 const roster = ref<Reserva[]>([]);
 const cargando = ref(true);
@@ -390,9 +411,19 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             >
           </div>
           <div
-            v-if="puedeGestionar"
+            v-if="puedeGestionar || (r.orden && puedeCobrar)"
             class="mt-2 flex flex-wrap items-center gap-2"
           >
+            <button
+              v-if="r.orden && puedeCobrar"
+              type="button"
+              class="tu-btn tu-btn-primario text-xs px-3 py-1.5"
+              data-prueba="cobrar-reserva"
+              :disabled="accionando"
+              @click="abrirCobro(r)"
+            >
+              {{ $t("agenda.roster.cobrar") }}
+            </button>
             <button
               v-if="r.estado === 'ofrecida' && puedeGestionar"
               type="button"
@@ -490,6 +521,12 @@ watch(() => props.sesion.id, cargar, { immediate: true });
         </ul>
       </div>
     </template>
+    <RegistrarPagoOrden
+      :base="base"
+      :orden="cobrando"
+      @cerrar="cobrando = null"
+      @registrado="alCobrar"
+    />
   </MarcoDetalle>
 </template>
 

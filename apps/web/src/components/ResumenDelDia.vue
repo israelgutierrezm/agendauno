@@ -84,6 +84,8 @@ interface Hoy {
     en_mora: number;
   } | null;
   renovaciones: { por_vencer: number; vencidas: number; dias: number } | null;
+  // Lo que espera al equipo (M08); null = no le toca verlo.
+  atencion?: { solicitudes: number | null; seguimientos: number | null };
 }
 
 const { t } = useI18n();
@@ -321,6 +323,24 @@ const porCobrar = computed(() =>
     .join(" + "),
 );
 
+// A dónde lleva cada indicador (M08): el listado ya filtrado, si puede entrar.
+function destino(
+  ruta: string,
+  lugar: RouteLocationRaw,
+): RouteLocationRaw | undefined {
+  return puedeEntrar(ruta, sesion) ? lugar : undefined;
+}
+const aRenovaciones = (estado: "por_vencer" | "vencida") =>
+  destino("retencion", {
+    name: "retencion",
+    query: {
+      estado,
+      ...(hoy.value?.renovaciones
+        ? { dias: String(hoy.value.renovaciones.dias) }
+        : {}),
+    },
+  });
+
 // Los indicadores del día: cada tipo de negocio, sus preguntas (no el mismo
 // indicador con otro nombre).
 const indicadores = computed<Indicador[]>(() => {
@@ -331,33 +351,51 @@ const indicadores = computed<Indicador[]>(() => {
   if (esCitas.value) {
     const porCobrar = tot.por_cobrar ?? 0;
     return [
-      { clave: "citas", valor: String(tot.sesiones), icono: "agenda" },
-      { clave: "llegaron", valor: String(tot.llegaron), icono: "hecho" },
+      {
+        clave: "citas",
+        valor: String(tot.sesiones),
+        icono: "agenda",
+        to: destino("agenda", { name: "agenda" }),
+      },
+      {
+        clave: "llegaron",
+        valor: String(tot.llegaron),
+        icono: "hecho",
+        to: destino("recepcion", { name: "recepcion" }),
+      },
       // Por atender: aún no terminan. Sin registrar: ya terminaron y nadie dijo si
       // vino (no se cuentan como pendientes de atención).
       {
         clave: "porAtender",
         valor: String(tot.por_atender ?? 0),
         icono: "reloj",
+        to: destino("recepcion", { name: "recepcion" }),
       },
       {
         clave: "sinRegistrar",
         valor: String(tot.pendientes_registrar ?? 0),
         icono: "lista",
         aviso: (tot.pendientes_registrar ?? 0) > 0,
+        to: destino("recepcion", { name: "recepcion" }),
       },
       {
         clave: "porCobrar",
         valor: String(porCobrar),
         icono: "dinero",
         aviso: porCobrar > 0,
+        to: destino("cobranza", { name: "cobranza", hash: "#pendientes" }),
       },
     ].map((i) => ({ ...i, etiqueta: t(`operacion.hoy.citas.kpi.${i.clave}`) }));
   }
   const capacidad = tot.capacidad ?? 0;
   const listas = tot.listas_pendientes ?? 0;
   const lista: Omit<Indicador, "etiqueta">[] = [
-    { clave: "clases", valor: String(tot.sesiones), icono: "agenda" },
+    {
+      clave: "clases",
+      valor: String(tot.sesiones),
+      icono: "agenda",
+      to: destino("agenda", { name: "agenda" }),
+    },
     {
       clave: "ocupados",
       valor:
@@ -365,14 +403,21 @@ const indicadores = computed<Indicador[]>(() => {
           ? t("operacion.hoy.cupo", { n: tot.esperados, total: capacidad })
           : String(tot.esperados),
       icono: "personas",
+      to: destino("recepcion", { name: "recepcion" }),
     },
     {
       clave: "listas",
       valor: String(listas),
       icono: "lista",
       aviso: listas > 0,
+      to: destino("recepcion", { name: "recepcion" }),
     },
-    { clave: "enEspera", valor: String(tot.en_espera ?? 0), icono: "reloj" },
+    {
+      clave: "enEspera",
+      valor: String(tot.en_espera ?? 0),
+      icono: "reloj",
+      to: destino("agenda", { name: "agenda" }),
+    },
   ];
   const r = hoy.value?.renovaciones;
   if (r) {
@@ -380,6 +425,7 @@ const indicadores = computed<Indicador[]>(() => {
       clave: "porVencer",
       valor: String(r.por_vencer),
       icono: "pulso",
+      to: aRenovaciones("por_vencer"),
     });
   }
   return lista.map((i) => ({
@@ -397,11 +443,14 @@ const libres = computed(() => hoy.value?.libres ?? null);
 const hayPendientes = computed(() => {
   const c = hoy.value?.cobros;
   const r = hoy.value?.renovaciones;
+  const a = hoy.value?.atencion;
   return (
     (c !== null &&
       c !== undefined &&
       (c.ordenes_pendientes > 0 || c.en_mora > 0)) ||
-    (r !== null && r !== undefined && (r.por_vencer > 0 || r.vencidas > 0))
+    (r !== null && r !== undefined && (r.por_vencer > 0 || r.vencidas > 0)) ||
+    (a?.solicitudes ?? 0) > 0 ||
+    (a?.seguimientos ?? 0) > 0
   );
 });
 
@@ -787,7 +836,10 @@ onMounted(() => {
           />
           <ul v-else class="mt-3 space-y-2 text-sm">
             <li v-if="hoy.cobros && hoy.cobros.ordenes_pendientes > 0">
-              <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
+              <RouterLink
+                :to="{ name: 'cobranza', hash: '#pendientes' }"
+                class="hoy-pendiente"
+              >
                 <span class="tu-icono-tono tu-tono-naranja" aria-hidden="true">
                   <IconoNav nombre="dinero" :tam="18" />
                 </span>
@@ -798,7 +850,10 @@ onMounted(() => {
               </RouterLink>
             </li>
             <li v-if="hoy.cobros && hoy.cobros.en_mora > 0">
-              <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
+              <RouterLink
+                :to="{ name: 'cobranza', hash: '#morosos' }"
+                class="hoy-pendiente"
+              >
                 <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
                   <IconoNav nombre="facturas" :tam="18" />
                 </span>
@@ -808,7 +863,14 @@ onMounted(() => {
               </RouterLink>
             </li>
             <li v-if="hoy.renovaciones && hoy.renovaciones.por_vencer > 0">
-              <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
+              <RouterLink
+                :to="
+                  aRenovaciones('por_vencer') ?? {
+                    name: 'retencion',
+                  }
+                "
+                class="hoy-pendiente"
+              >
                 <span class="tu-icono-tono tu-tono-morado" aria-hidden="true">
                   <IconoNav nombre="reloj" :tam="18" />
                 </span>
@@ -825,12 +887,59 @@ onMounted(() => {
               </RouterLink>
             </li>
             <li v-if="hoy.renovaciones && hoy.renovaciones.vencidas > 0">
-              <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
+              <RouterLink
+                :to="aRenovaciones('vencida') ?? { name: 'retencion' }"
+                class="hoy-pendiente"
+              >
                 <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
                   <IconoNav nombre="pulso" :tam="18" />
                 </span>
                 <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
                   $t("operacion.hoy.vencidas", hoy.renovaciones.vencidas)
+                }}</span>
+              </RouterLink>
+            </li>
+            <li
+              v-if="
+                (hoy.atencion?.solicitudes ?? 0) > 0 &&
+                puedeEntrar('prospectos', sesion)
+              "
+            >
+              <RouterLink
+                :to="{ name: 'prospectos', query: { estado: 'nuevo' } }"
+                class="hoy-pendiente"
+                data-prueba="pendiente-solicitudes"
+              >
+                <span class="tu-icono-tono tu-tono-azul" aria-hidden="true">
+                  <IconoNav nombre="personas" :tam="18" />
+                </span>
+                <span class="hoy-texto">{{
+                  $t(
+                    "operacion.hoy.solicitudes",
+                    hoy.atencion?.solicitudes ?? 0,
+                  )
+                }}</span>
+              </RouterLink>
+            </li>
+            <li
+              v-if="
+                (hoy.atencion?.seguimientos ?? 0) > 0 &&
+                puedeEntrar('tareas', sesion)
+              "
+            >
+              <RouterLink
+                :to="{ name: 'tareas', query: { tipo: 'seguimiento' } }"
+                class="hoy-pendiente"
+                data-prueba="pendiente-seguimientos"
+              >
+                <span class="tu-icono-tono tu-tono-cielo" aria-hidden="true">
+                  <IconoNav nombre="tareas" :tam="18" />
+                </span>
+                <span class="hoy-texto">{{
+                  $t(
+                    "operacion.hoy.seguimientos",
+                    hoy.atencion?.seguimientos ?? 0,
+                  )
                 }}</span>
               </RouterLink>
             </li>

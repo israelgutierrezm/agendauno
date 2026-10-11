@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
 
@@ -28,6 +29,8 @@ export interface Indicador {
   tono?: Tono;
   aviso?: boolean;
   tendencia?: Tendencia;
+  // A dónde lleva (M08): el listado ya filtrado; toda la tarjeta es el enlace.
+  to?: RouteLocationRaw;
 }
 
 const props = withDefaults(
@@ -84,9 +87,19 @@ const columnasMedio = computed(() =>
           {{ k.etiqueta }}
         </dt>
         <dd class="ti-valor">
-          <span :style="k.aviso ? { color: 'var(--aviso)' } : undefined">{{
-            k.valor
-          }}</span>
+          <RouterLink
+            v-if="k.to"
+            :to="k.to"
+            class="ti-enlace"
+            :aria-label="`${k.etiqueta}: ${k.valor}`"
+            :style="k.aviso ? { color: 'var(--aviso)' } : undefined"
+            >{{ k.valor }}</RouterLink
+          >
+          <span
+            v-else
+            :style="k.aviso ? { color: 'var(--aviso)' } : undefined"
+            >{{ k.valor }}</span
+          >
           <span
             v-if="k.tendencia"
             class="ti-tendencia"
@@ -229,5 +242,29 @@ const columnasMedio = computed(() =>
 }
 .ti-neutra {
   color: var(--texto-suave);
+}
+/* Con destino (M08): toda la tarjeta lleva al listado filtrado. */
+.ti-celda {
+  position: relative;
+}
+.ti-enlace {
+  color: inherit;
+  text-decoration: none;
+}
+.ti-enlace::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.ti-celda:has(.ti-enlace):hover {
+  background: var(--fondo);
+}
+.ti-enlace:focus-visible {
+  outline: none;
+}
+.ti-celda:has(.ti-enlace:focus-visible) {
+  outline: 2px solid var(--primario);
+  outline-offset: -2px;
 }
 </style>

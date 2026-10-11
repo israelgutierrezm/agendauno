@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -69,7 +70,8 @@ const accionando = ref(false);
 const mostrarNueva = ref(false);
 const nueva = ref({ titulo: "", detalle: "", vence_en: "" });
 // Solo las de seguimiento (las que crea el sistema por una señal; M09).
-const soloSeguimiento = ref(false);
+// El inicio abre los seguimientos ya filtrados (`?tipo=seguimiento`; M08).
+const soloSeguimiento = ref(useRoute()?.query.tipo === "seguimiento");
 
 // ---- Seguimiento: mensaje sugerido y resultado ----
 const RESULTADOS = [
