@@ -154,6 +154,8 @@ abstract class DemoBase
             'onboarding_pasos' => ['reglas' => true, 'publicacion' => true],
             'publicado' => true,
             'privado' => $d['privado'] ?? false,
+            // Desde cero: sin módulos encendidos (p. ej. Familias, que se pide aparte).
+            'modulos' => [],
             'pais' => 'MX',
             'ciudad' => 'Ciudad de México',
             'descripcion' => $d['descripcion'],

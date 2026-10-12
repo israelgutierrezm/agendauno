@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace App\Console\Commands\Demos;
 
 use App\Modules\Tenancy\Application\AsistenciaTenant;
+use App\Modules\Tenancy\Application\BajaDeMembresiaTenant;
+use App\Modules\Tenancy\Application\CobroRecurrenteTenant;
+use App\Modules\Tenancy\Application\DeudaDeRenovacionTenant;
+use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
+use App\Modules\Tenancy\Application\GestionarDunningTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
@@ -14,10 +19,13 @@ use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
+use App\Modules\Tenancy\Captacion\MotivoCierreProspecto;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
+use App\Modules\Tenancy\Membresias\BajaAnticipada;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Membresias\TipoVigencia;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
@@ -25,7 +33,10 @@ use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
+use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
+use App\Modules\Tenancy\Models\ConfiguracionCuotasTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
+use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
 use App\Modules\Tenancy\Models\NivelTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
@@ -43,6 +54,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pasarelas\TarjetaGuardada;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Recursos\ModoRecurso;
@@ -52,6 +64,7 @@ use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\TipoCampo;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -87,6 +100,7 @@ use RuntimeException;
 final class DemoGrecon extends DemoBase
 {
     use ApartadosDemo;
+    use CompletarDemo;
 
     /** La agenda pública de octubre (instantánea). */
     private const AGENDA = 'demo/grecon-octubre-2026.json';
@@ -149,6 +163,9 @@ final class DemoGrecon extends DemoBase
 
     private SucursalTenant $sede;
 
+    /** La membresía con permanencia (la del estudio real; ADR 0121 y 0137). */
+    private ProductoTenant $membresia;
+
     private Usuario $dueno;
 
     private Usuario $recepcion;
@@ -198,11 +215,11 @@ final class DemoGrecon extends DemoBase
     public function cuentas(): array
     {
         return [
-            'constantino@grecon.test' => 'Constantino Escobar: dueño, instructor y alumno (elige con qué rol entrar)',
+            'constantino@grecon.test' => 'Constantino Escobar: dueño, instructor y alumno con Membresía Ilimitada y pago automático (elige con qué rol entrar). La cuenta para revisar todo.',
             'admin@grecon.test' => 'Administración: catálogo, agenda, miembros, ventas y configuración',
             'recepcion@grecon.test' => 'Recepción',
             'abril@grecon.test' => 'Instructora (Abril Von)',
-            'valeria.rios@correo.test' => 'Miembro con Paquete 8 clases («Mi cuenta»)',
+            'valeria.rios@correo.test' => 'Miembro con Paquete 8 clases; fue prospecto y ve lo que le interesó («Mi cuenta»)',
             'renata.soto@correo.test' => 'Miembro con Ilimitada, incluye Open Training («Mi cuenta»)',
         ];
     }
@@ -333,6 +350,33 @@ final class DemoGrecon extends DemoBase
                 ofertaIds: $clave === 'ilimitada' ? [] : $sinOpen,
             );
         }
+
+        // La membresía del estudio (docs/DEMO_GRECON.md): ilimitada con Open Training,
+        // se renueva cada mes en su aniversario y pide 12 meses de permanencia; quien
+        // da de baja antes paga el 50 % de lo que falte (ADR 0137). Con inscripción y
+        // anualidad, como las cobra el estudio (montos de prueba).
+        $this->membresia = $membresias->crearProducto('Membresía Ilimitada', TipoProducto::Membresia, 200000, 'MXN', true, null, PoliticaReset::Aniversario);
+        $this->membresia->update([
+            'descripcion' => 'Clases ilimitadas y Open Training. Se renueva cada mes; permanencia de 12 meses.',
+            'permanencia_meses' => 12, 'baja_anticipada' => BajaAnticipada::MesesRestantes->value, 'penalizacion_porcentaje' => 50,
+            'cobra_inscripcion' => true, 'cobra_anualidad' => true,
+        ]);
+        ConfiguracionCuotasTenant::query()->updateOrCreate([], [
+            'inscripcion_minor' => 50000, 'reingreso_meses' => 6, 'anualidad_minor' => 90000, 'anualidad_modo' => 'aniversario',
+        ]);
+    }
+
+    /** Los días que el estudio cierra (los próximos feriados): la agenda no tiene clases en ellos. */
+    private function diasCerrados(): void
+    {
+        foreach ([[11, 2, 'Día de Muertos'], [11, 16, 'Día de la Revolución'], [12, 25, 'Navidad'], [1, 1, 'Año nuevo']] as [$mes, $dia, $motivo]) {
+            $fecha = $this->hoy->setDate($this->hoy->year, $mes, $dia);
+            if ($fecha->lessThanOrEqualTo($this->hoy)) {
+                $fecha = $fecha->addYear();
+            }
+            ExcepcionHorarioTenant::query()->create(['fecha' => $fecha->toDateString(), 'motivo' => $motivo]);
+        }
+        $this->sumar('días cerrados', 4);
     }
 
     /**
@@ -353,6 +397,7 @@ final class DemoGrecon extends DemoBase
             $bloques[$clave]['profes'][$profe] = ($bloques[$clave]['profes'][$profe] ?? 0) + 1;
         }
 
+        $this->diasCerrados();
         $hasta = $this->hoy->addDays(21);
         $generar = app(GenerarAgendaTenant::class);
         foreach ($bloques as $b) {
@@ -972,6 +1017,166 @@ final class DemoGrecon extends DemoBase
 
         $this->llaveDeApi('Sitio web (horario de clases)', ['agenda.ver']);
         $this->unaPausa();
+
+        // Lo que la historia no crea (bloque 32): cada apartado con datos.
+        $this->membresiasConPermanencia();
+        $this->bloqueosDeAgenda();
+        $this->avisoDePrivacidad('clases', 'membresías, paquetes', 'Ciudad de México (dirección de prueba)', 'hola@grecon.test', 85);
+        $this->prospectosDelEstudio();
+        $this->porConciliar();
+        $this->webhookPausado('https://hooks.example.test/grecon', ['orden.pagada', 'reserva.confirmada']);
+    }
+
+    /**
+     * La Membresía Ilimitada (con permanencia) que se vende en las últimas semanas, en
+     * recepción: dos con pago automático, una en mora (su renovación venció sin
+     * cobrarse) y una dada de baja antes de cumplir, con su penalización del 50 %. El
+     * dueño, como alumno, también la tiene con pago automático.
+     */
+    private function membresiasConPermanencia(): void
+    {
+        $candidatas = [];
+        foreach ($this->mezclar(array_keys($this->alumnas)) as $i) {
+            $a = $this->alumnas[$i];
+            if ($a['plan'] === 'ilimitada' && $a['persona']->usuario_id === null && $a['deja'] === null && ! $a['nueva']) {
+                $candidatas[] = $a['persona'];
+            }
+        }
+        // [hace cuántos días, cómo paga, qué le pasa después]
+        $ventas = [[36, 'efectivo', 'mora'], [27, 'manual', 'automatico'], [22, 'transferencia', 'baja'], [16, 'manual', 'automatico'], [10, 'efectivo', null], [5, 'transferencia', null]];
+        foreach ($ventas as $n => [$dias, $metodo, $caso]) {
+            $persona = $candidatas[$n] ?? null;
+            if (! $persona instanceof PersonaTenant) {
+                break;
+            }
+            $momento = $this->hoy->subDays($dias)->setTime($this->azar(10, 19), $this->azar(0, 59));
+            $acuerdo = $this->venderMembresia($persona, $momento, $metodo, $this->recepcion);
+            if ($acuerdo instanceof AcuerdoTenant) {
+                match ($caso) {
+                    'mora' => $this->enMora($acuerdo),
+                    'automatico' => $this->conPagoAutomatico($persona, $acuerdo, $momento),
+                    'baja' => $this->bajaAnticipada($acuerdo),
+                    default => null,
+                };
+            }
+        }
+
+        // El dueño, como alumno: la contrata él desde su cuenta, con su tarjeta guardada.
+        $dueno = PersonaTenant::query()->where('usuario_id', $this->dueno->getKey())->first();
+        if ($dueno instanceof PersonaTenant) {
+            $momento = $this->hoy->subDays(12)->setTime(9, 40);
+            $acuerdo = $this->venderMembresia($dueno, $momento, 'manual', $this->dueno);
+            if ($acuerdo instanceof AcuerdoTenant) {
+                $this->conPagoAutomatico($dueno, $acuerdo, $momento);
+            }
+        }
+    }
+
+    /** Vende la membresía aceptando sus condiciones (quien la contrata); la cobra recepción. */
+    private function venderMembresia(PersonaTenant $persona, CarbonImmutable $momento, string $metodo, Usuario $acepta): ?AcuerdoTenant
+    {
+        $this->en($momento);
+        try {
+            $ordenes = app(OrdenesTenant::class);
+            $orden = $ordenes->crear($persona, [['producto' => $this->membresia, 'cantidad' => 1]], sucursalId: (int) $this->sede->getKey(),
+                aceptacion: ['via' => $acepta->is($this->dueno) ? 'cliente' : 'negocio', 'usuario' => $acepta, 'ip' => null]);
+            $ordenes->liquidar($orden, $metodo, null, $this->recepcion);
+        } catch (RuntimeException|ValidationException) {
+            return null;
+        }
+        $this->sumar('membresías con permanencia');
+
+        return AcuerdoTenant::query()->where('persona_id', $persona->getKey())
+            ->where('producto_comercial_id', $this->membresia->getKey())->latest('id')->first();
+    }
+
+    /** Su renovación venció sin cobrarse: la orden queda por pagar y entra en mora. */
+    private function enMora(AcuerdoTenant $acuerdo): void
+    {
+        if ($acuerdo->proxima_cobro_en === null) {
+            return;
+        }
+        $vence = CarbonImmutable::parse($acuerdo->proxima_cobro_en->toDateString(), $this->zona)->setTime(7, 0);
+        if ($vence->greaterThan($this->ahora)) {
+            return;
+        }
+        $this->en($vence);
+        app(DeudaDeRenovacionTenant::class)->de($acuerdo);
+        app(GestionarDunningTenant::class)->registrarFallo($acuerdo->refresh(), CobroRecurrenteTenant::MOTIVO_SIN_COBRO);
+        $this->sumar('membresías en mora');
+    }
+
+    /** Guarda su tarjeta (de prueba) para que la membresía se cobre sola (ADR 0134). */
+    private function conPagoAutomatico(PersonaTenant $persona, AcuerdoTenant $acuerdo, CarbonImmutable $momento): void
+    {
+        $this->en($momento->addMinutes(6));
+        $tarjeta = new TarjetaGuardada('pm_demo_'.Str::lower(Str::random(14)), (string) $this->uno(['visa', 'mastercard']), (string) $this->azar(1000, 9999), $this->azar(1, 12), $this->hoy->year + $this->azar(1, 4));
+        app(DomiciliacionesTenant::class)->registrarTarjeta($persona, 'stripe', $tarjeta, [(int) $acuerdo->getKey()]);
+        $this->sumar('pagos automáticos');
+    }
+
+    /** Da de baja antes de cumplir la permanencia: paga el 50 % de lo que falta. */
+    private function bajaAnticipada(AcuerdoTenant $acuerdo): void
+    {
+        $this->en($this->ahora->subDays(2)->setTime(18, 15));
+        try {
+            app(BajaDeMembresiaTenant::class)->ejecutar($acuerdo, 'Se cambia de ciudad.', false, true, $this->admin);
+            $this->sumar('bajas con penalización');
+        } catch (RuntimeException|ValidationException) {
+            return;
+        }
+    }
+
+    /** La sala apartada para la sesión de fotos y una cita médica de una coach. */
+    private function bloqueosDeAgenda(): void
+    {
+        $sala = RecursoTenant::query()->where('nombre', 'Sala principal')->first();
+        $domingo = $this->hoy->next('Sunday');
+        $miercoles = $this->hoy->next('Wednesday');
+        $bloqueos = [
+            ['recurso_id' => $sala?->getKey(), 'desde' => $domingo->setTime(13, 0), 'hasta' => $domingo->setTime(17, 0), 'motivo' => 'Sesión de fotos del estudio'],
+            ['instructor_id' => $this->profes['ABRIL VON']->getKey(), 'desde' => $miercoles->setTime(8, 0), 'hasta' => $miercoles->setTime(9, 30), 'motivo' => 'Cita médica'],
+        ];
+        $this->en($this->ahora->subDays(3));
+        foreach ($bloqueos as $b) {
+            BloqueoAgendaTenant::query()->create([
+                ...$b, 'desde' => $b['desde']->utc(), 'hasta' => $b['hasta']->utc(), 'todo_el_dia' => false,
+                'zona_horaria' => $this->zona, 'creado_por' => $this->admin->getKey(),
+            ]);
+        }
+        $this->sumar('bloqueos de agenda', count($bloqueos));
+    }
+
+    /**
+     * Quienes preguntaron por el estudio (página, Instagram, recepción), en cada etapa;
+     * y Valeria, que pidió informes de la membresía y una clase de Exotic: al entrar a
+     * su cuenta los ve para continuar (ADR 0137).
+     */
+    private function prospectosDelEstudio(): void
+    {
+        $proximas = SesionTenant::query()->with('oferta')->where('estado', 'programada')
+            ->where('inicia_en', '>', $this->ahora->addDay()->utc())->orderBy('inicia_en')->get();
+        $deClase = fn (string $prefijo, int $n = 0): ?string => $proximas->filter(fn (SesionTenant $s): bool => str_starts_with((string) $s->oferta?->nombre, $prefijo))->values()->get($n)?->ulid;
+        $interes = fn (?string $sesion = null, ?ProductoTenant $plan = null): array => array_filter(['sesion' => $sesion, 'producto' => $plan?->ulid]);
+
+        $this->prospectos([
+            ['nombre' => 'Daniela Ortega', 'email' => 'daniela.ortega@prospecto.test', 'telefono' => '5531204411', 'dias' => 1, 'fuente' => 'instagram', 'interes' => $interes($deClase('POLE LEVEL 1')), 'estado' => 'nuevo'],
+            ['nombre' => 'Mónica Herrera', 'email' => 'monica.herrera@prospecto.test', 'telefono' => '5531204412', 'dias' => 2, 'fuente' => 'tiktok', 'interes' => $interes(null, $this->planes['p4']), 'estado' => 'nuevo'],
+            ['nombre' => 'Regina Torres', 'email' => 'regina.torres@prospecto.test', 'telefono' => '5531204413', 'dias' => 3, 'fuente' => 'instagram', 'interes' => $interes(null, $this->membresia), 'estado' => 'nuevo'],
+            ['nombre' => 'Andrea Campos', 'email' => 'andrea.campos@prospecto.test', 'telefono' => '5531204414', 'dias' => 4, 'fuente' => 'google', 'interes' => $interes($deClase('EXOTIC')), 'estado' => 'en_seguimiento', 'nota' => 'Pregunta si hay clase para principiantes absolutas. Le mandé el horario de Level 1.'],
+            ['nombre' => 'Sofía Lara', 'email' => 'sofia.lara@prospecto.test', 'telefono' => '5531204415', 'dias' => 6, 'fuente' => null, 'interes' => [], 'estado' => 'en_seguimiento', 'nota' => 'Llamó por teléfono: quiere horario de mañana. Llamarle el lunes.'],
+            ['nombre' => 'Lucía Méndez', 'email' => 'lucia.mendez@prospecto.test', 'telefono' => '5531204416', 'dias' => 9, 'fuente' => 'instagram', 'interes' => $interes(null, $this->membresia), 'estado' => 'aprobado', 'nota' => 'Vino a conocer el estudio; decide entre Ilimitada y la membresía.'],
+            ['nombre' => 'Karen Ibarra', 'email' => 'karen.ibarra@prospecto.test', 'telefono' => '5531204417', 'dias' => 12, 'fuente' => 'una amiga', 'interes' => $interes($deClase('FLEXY')), 'estado' => 'en_seguimiento', 'nota' => 'Viene recomendada por una alumna de los martes.'],
+            ['nombre' => 'Itzel Vargas', 'email' => 'itzel.vargas@prospecto.test', 'telefono' => '5531204418', 'dias' => 18, 'fuente' => 'facebook', 'interes' => $interes(null, $this->planes['p8']), 'estado' => 'descartado', 'nota' => 'Le pareció caro; volver a escribirle con la promoción de enero.', 'motivo' => MotivoCierreProspecto::Precio],
+            ['nombre' => 'Fernanda Gil', 'email' => 'fernanda.gil@prospecto.test', 'telefono' => '5531204419', 'dias' => 24, 'fuente' => null, 'interes' => [], 'estado' => 'descartado', 'nota' => 'Solo puede los domingos por la tarde.', 'motivo' => MotivoCierreProspecto::SinHorario],
+        ], [$this->recepcion, $this->admin]);
+
+        $valeria = PersonaTenant::query()->where('email', 'valeria.rios@correo.test')->first();
+        if ($valeria instanceof PersonaTenant) {
+            $reservadas = ReservaTenant::query()->where('persona_id', $valeria->getKey())->pluck('sesion_id')->all();
+            $clase = $proximas->first(fn (SesionTenant $s): bool => str_starts_with((string) $s->oferta?->nombre, 'EXOTIC') && ! in_array($s->getKey(), $reservadas, false));
+            $this->prospectoConvertido($valeria, $interes($clase?->ulid, $this->membresia), 7, $this->recepcion, 'Preguntó por la Membresía Ilimitada y una clase de Exotic. Ya es alumna: se le ligó su ficha.');
+        }
     }
 
     /** Una alumna con Ilimitada pausó su membresía por un viaje. */
