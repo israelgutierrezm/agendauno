@@ -11,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
 
 /*
 | Captación del negocio (plan de mejoras B01 y C04, ADR 0117): quien todavía no es
@@ -312,7 +313,7 @@ it('los prospectos se filtran como Miembros (origen, formulario, seguimiento, se
     $this->travelTo(now()->subDays(10));
     $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['nombre' => 'Viejo', 'email' => 'viejo@correo.mx', 'telefono' => '5599998888']))->assertCreated();
     $this->travelBack();
-    $this->travelTo(CarbonImmutable::parse(Tests\TestCase::AHORA, Tests\TestCase::ZONA_AHORA));
+    $this->travelTo(CarbonImmutable::parse(TestCase::AHORA, TestCase::ZONA_AHORA));
     $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion([
         'atribucion' => ['ultimo_toque' => ['fuente' => 'instagram', 'campana' => 'octubre', 'en' => now()->toIso8601String()]],
     ]))->assertCreated();
@@ -329,7 +330,7 @@ it('los prospectos se filtran como Miembros (origen, formulario, seguimiento, se
     // Su seguimiento era para ayer: vencido.
     $lucia = collect(prospectosDelNegocioCaptacion($e)['data'])->firstWhere('nombre', 'Lucía Prospecto')['id'];
     $this->putJson("/api/v1/app/{$e['slug']}/prospectos/{$lucia}/seguimiento", ['cuando' => '2026-10-01T10:00:00-06:00'], conBearer($e['bearer']))->assertOk();
-    $this->travelTo(CarbonImmutable::parse('2026-10-02 09:00', Tests\TestCase::ZONA_AHORA));
+    $this->travelTo(CarbonImmutable::parse('2026-10-02 09:00', TestCase::ZONA_AHORA));
     expect($nombres('?seguimiento=vencido'))->toBe(['Lucía Prospecto']);
 
     $pagina = prospectosDelNegocioCaptacion($e, '?per_page=2&page=2');
