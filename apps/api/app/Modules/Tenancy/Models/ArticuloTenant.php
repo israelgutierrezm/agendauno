@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Artículo minorista tenant-local (R21): producto de venta en caja (agua, ropa,
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  * productos comerciales (membresías/paquetes).
  *
  * @property int $precio_minor
+ * @property string $moneda
  */
 class ArticuloTenant extends Model
 {
@@ -31,4 +33,14 @@ class ArticuloTenant extends Model
         'precio_minor' => 'integer',
         'activo' => 'boolean',
     ];
+
+    /**
+     * Lo que se le puede agregar, con su precio (ADR 0139).
+     *
+     * @return HasMany<ExtraArticuloTenant, $this>
+     */
+    public function extras(): HasMany
+    {
+        return $this->hasMany(ExtraArticuloTenant::class, 'articulo_id')->orderBy('orden')->orderBy('id');
+    }
 }

@@ -20,6 +20,9 @@ use Illuminate\Support\Carbon;
  *
  * @property int $sucursal_id
  * @property int $total_minor
+ * @property int $propina_minor aparte de lo vendido: no es ingreso del negocio (ADR 0139)
+ * @property int|null $propina_para_id
+ * @property int|null $recibido_minor lo que entregó en efectivo (para el cambio)
  * @property Carbon|null $anulada_en
  */
 class VentaPosTenant extends Model
@@ -30,13 +33,18 @@ class VentaPosTenant extends Model
 
     protected $table = 'ventas_pos';
 
-    protected $fillable = ['sucursal_id', 'total_minor', 'moneda', 'metodo_pago', 'usuario_id', 'anulada_en', 'anulada_por', 'motivo_anulacion'];
+    protected $fillable = [
+        'sucursal_id', 'total_minor', 'moneda', 'metodo_pago', 'usuario_id', 'anulada_en', 'anulada_por', 'motivo_anulacion',
+        'propina_minor', 'propina_para_id', 'recibido_minor',
+    ];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
         'total_minor' => 'integer',
+        'propina_minor' => 'integer',
+        'recibido_minor' => 'integer',
         'anulada_en' => 'datetime',
     ];
 
@@ -54,5 +62,21 @@ class VentaPosTenant extends Model
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(SucursalTenant::class, 'sucursal_id');
+    }
+
+    /**
+     * A quién se le deja la propina, si se dijo (ADR 0139).
+     *
+     * @return BelongsTo<Usuario, $this>
+     */
+    public function propinaPara(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'propina_para_id');
+    }
+
+    /** Lo que se cobró en total: lo vendido más la propina. */
+    public function cobradoMinor(): int
+    {
+        return $this->total_minor + $this->propina_minor;
     }
 }

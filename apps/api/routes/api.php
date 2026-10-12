@@ -853,6 +853,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimiento'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.movimientos.store');
             Route::get('/pos/ventas', [PuntoDeVentaTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('pos.ventas.index');
             Route::post('/pos/ventas', [PuntoDeVentaTenantController::class, 'vender'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.store');
+            // A quién se le deja la propina (ADR 0139).
+            Route::get('/pos/propina-para', [PuntoDeVentaTenantController::class, 'propinaPara'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.propina-para');
             // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
             Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.metodo');
             Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');
