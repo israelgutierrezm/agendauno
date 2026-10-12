@@ -42,6 +42,8 @@ negocio desde el servidor.
 | SaaS | Activación operativa | Su primera operación real con un cliente | `negocio_activado` (servidor) | `ActivacionOperativa` (servidor) |
 | SaaS | Primera suscripción pagada | Primer cargo realmente pagado (sin timbres ni ceros) | `purchase` (servidor) | `Purchase` (servidor) |
 | Negocio | Visita | Su página, su agenda, sus sucursales y enlaces | `page_view` (navegador) | — |
+| Negocio | Ver planes / elegir uno | Su página muestra sus planes; toca uno | `view_item_list` / `select_item` (navegador) | — |
+| Negocio | Inicio de pago | Agendar y pagar en línea (sin el nombre del servicio) | `begin_checkout` (navegador) | — |
 | Negocio | Contacto | Clic en WhatsApp o teléfono: **no** es un prospecto | `contacto` (navegador) | — |
 | Negocio | Solicitud | Prospecto nuevo de su formulario (un reenvío no cuenta) | `generate_lead` (servidor) | `Lead` (servidor) |
 | Negocio | Cuenta activada | El invitado activó su cuenta (la invitación sola no cuenta) | `sign_up` (servidor) | `CompleteRegistration` (servidor) |
@@ -52,6 +54,12 @@ negocio desde el servidor.
 | Negocio | Renovación | Solo si el negocio la enciende | `renovacion_pagada` | `RenovacionPagada` |
 
 Lo que **no** se manda:
+
+- `InitiateCheckout` de Meta en los negocios: su píxel no se carga y el servidor no
+  tiene un «pago iniciado» confirmado. Del SaaS tampoco, porque el pago de la
+  suscripción es dentro del panel, donde no se mide;
+- `StartTrial` por la clase de prueba de un negocio: esa clase es una compra (`purchase`
+  / `Purchase`). `StartTrial` es solo la prueba del SaaS;
 
 - un pago pendiente, el regreso de la pasarela o un pago con llaves de prueba;
 - una prueba gratuita como venta;
