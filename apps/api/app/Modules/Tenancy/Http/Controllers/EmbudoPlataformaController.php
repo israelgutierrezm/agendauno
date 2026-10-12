@@ -48,6 +48,8 @@ class EmbudoPlataformaController
             'desde' => $desde,
             'hasta' => $hasta,
             'productos' => $this->embudo->calcular($desde, $hasta),
+            // Por la campaña de su registro (ADR 0144).
+            'campanas' => $this->embudo->porCampana($desde, $hasta),
         ]]);
     }
 }

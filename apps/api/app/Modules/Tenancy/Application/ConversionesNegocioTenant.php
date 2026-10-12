@@ -196,8 +196,9 @@ class ConversionesNegocioTenant
             ? ContextoMedicionTenant::query()->find($orden->contexto_medicion_id)
             : $this->contextoDe($orden->persona_id);
         $renovacion = $orden->renueva_acuerdo_id !== null;
-        $previa = OrdenTenant::query()->where('persona_id', $orden->persona_id)->where('estado', EstadoOrden::Pagada->value)
-            ->whereNull('renueva_acuerdo_id')->where('id', '<', $orden->getKey())->exists();
+        // Ya había comprado antes (aunque después se le devolviera): es recurrente.
+        $previa = OrdenTenant::query()->where('persona_id', $orden->persona_id)->whereNotNull('pagada_en')
+            ->whereNull('renueva_acuerdo_id')->where('total_minor', '>', 0)->where('id', '<', $orden->getKey())->exists();
         $items = $orden->lineas->map(fn (LineaOrdenTenant $l): array => [
             'id' => (string) ($l->producto->ulid ?? $l->getKey()),
             'nombre' => $l->producto->nombre ?? $l->getAttribute('descripcion'),

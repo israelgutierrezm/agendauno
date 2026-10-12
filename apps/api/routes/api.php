@@ -111,6 +111,7 @@ use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
 use App\Modules\Tenancy\Http\Controllers\RegionNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
 use App\Modules\Tenancy\Http\Controllers\RegistroWhatsAppController;
+use App\Modules\Tenancy\Http\Controllers\ReporteCampanasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteCohortesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteDemandaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteEmbudoTenantController;
@@ -700,6 +701,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/reportes/cohortes', ReporteCohortesTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.cohortes');
             // El embudo del negocio (C08): de la visita a la renovación.
             Route::get('/reportes/embudo', ReporteEmbudoTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.embudo');
+            // Por campaña (ADR 0144): la atribución propia, con la adquisición aparte de las renovaciones.
+            Route::get('/reportes/campanas', ReporteCampanasTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.campanas');
             // Retención (Etapa 2): radar de membresías por vencer / vencidas para renovar.
             // Es operativo (recepción hace la gestión), por eso `miembros.ver`. `?formato=csv`.
             Route::get('/retencion/por-vencer', [RetencionTenantController::class, 'porVencer'])->middleware('puede:miembros.ver')->name('retencion.por-vencer');

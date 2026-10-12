@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Models\ContextoMedicionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\ProductoComercial;
 use Carbon\CarbonImmutable;
@@ -90,6 +91,50 @@ class EmbudoPlataforma
         }
 
         return $filas;
+    }
+
+    /**
+     * El embudo por campaña de cada producto (ADR 0144): de los negocios registrados en
+     * el periodo (sin demos), por la campaña que se acreditó en su registro (ADR 0142):
+     * cuántos se registraron, cuántos tuvieron su primera operación real y cuántos
+     * pagaron su primera suscripción (sin timbres ni cargos en cero). Sin campaña, «sin
+     * atribución». Es la atribución propia, no la de Google ni la de Meta.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function porCampana(string $desde, string $hasta): array
+    {
+        $cohorte = Estudio::query()
+            ->where('es_demo', false)
+            ->whereBetween('created_at', [CarbonImmutable::parse($desde)->startOfDay(), CarbonImmutable::parse($hasta)->endOfDay()])
+            ->get();
+        $campanas = ContextoMedicionPlataforma::query()->whereIn('estudio_id', $cohorte->modelKeys())->get()->keyBy('estudio_id');
+        $pagaron = CargoRenta::query()
+            ->whereIn('estudio_id', $cohorte->modelKeys())
+            ->where('estado', EstadoCargoRenta::Pagado->value)
+            ->where('concepto', '!=', 'timbres')
+            ->where('monto_minor', '>', 0)
+            ->distinct()
+            ->pluck('estudio_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $filas = [];
+        foreach ($cohorte as $estudio) {
+            $c = $campanas->get($estudio->getKey());
+            $campana = $c instanceof ContextoMedicionPlataforma && ($c->campana ?? $c->fuente ?? $c->referente) !== null
+                ? ['campana' => $c->campana, 'fuente' => $c->fuente, 'medio' => $c->medio, 'referente' => $c->campana === null && $c->fuente === null ? $c->referente : null]
+                : null;
+            $clave = $estudio->producto()->value.'|'.($campana === null ? 'sin_atribucion' : implode('|', array_map(static fn (?string $v): string => $v ?? '', $campana)));
+            $filas[$clave] ??= ['producto' => $estudio->producto()->value, 'campana' => $campana, 'registros' => 0, 'primera_operacion' => 0, 'primera_suscripcion' => 0];
+            $filas[$clave]['registros']++;
+            $filas[$clave]['primera_operacion'] += $estudio->primera_operacion_en !== null ? 1 : 0;
+            $filas[$clave]['primera_suscripcion'] += in_array((int) $estudio->getKey(), $pagaron, true) ? 1 : 0;
+        }
+        uasort($filas, static fn (array $a, array $b): int => [$a['producto'], $a['campana'] === null ? 1 : 0, -$a['registros']]
+            <=> [$b['producto'], $b['campana'] === null ? 1 : 0, -$b['registros']]);
+
+        return array_values($filas);
     }
 
     /**
