@@ -347,6 +347,22 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Mostrador: extras, propina y cambio (ADR 0139)
+
+- Extras de un artículo:
+  - `POST/PUT /articulos` aceptan `extras` (`[{id?, nombre, precio_minor}]`): los que
+    traen `id` se actualizan, los nuevos se crean y los que faltan se apagan;
+  - el artículo trae sus `extras` vigentes.
+- `POST /pos/ventas`:
+  - acepta `items.*.extras` (ulids de extras del artículo), `propina_minor`,
+    `propina_para_id` (de `GET /pos/propina-para`) y `recibido_minor` (en efectivo);
+  - lo recibido debe alcanzar para lo vendido y la propina (si no, 422
+    `recibido_minor`).
+- La venta trae `propina_minor`, `propina_para`, `cobrado_minor`, `recibido_minor`,
+  `cambio_minor` y, por línea, `extras` (nombres).
+- `GET /pagos/movimientos`: las ventas traen `propina_minor`, y los totales
+  `propinas_minor` y `propinas_por_metodo`, aparte de `cobrado_minor`.
+
 ## Quién atiende a un prospecto (ADR 0138)
 
 - `GET /prospectos/responsables` (`prospectos.ver`): el equipo activo que puede
