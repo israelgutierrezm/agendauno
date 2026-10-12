@@ -125,6 +125,29 @@ export default {
       renovacion: "Renovaciones pagadas",
     },
   },
+  reporte: {
+    titulo: "Por campaña",
+    ayuda:
+      "La campaña que se acredita es la del último toque vigente (su enlace con UTM, el anuncio o el sitio de donde llegó). Es la atribución de este sistema, no la de Google ni la de Meta.",
+    vacio: "Aún no hay solicitudes, compras ni reservas en este periodo.",
+    sinAtribucion: "Sin atribución",
+    columnas: {
+      solicitudes: "Solicitudes",
+      nuevos: "Compradores nuevos",
+      compras: "Compras",
+      devoluciones: "Devoluciones",
+      reservas: "Primeras reservas",
+      renovaciones: "Renovaciones (aparte)",
+    },
+    leyenda:
+      "Las renovaciones van aparte para no mezclarlas con la adquisición. Sin gasto publicitario capturado, no se calcula costo por resultado.",
+    tituloPlataforma: "Por campaña",
+    ayudaPlataforma:
+      "De los negocios registrados en el periodo (sin demos), por la campaña de su registro. Es la atribución de este sistema, no la de Google ni la de Meta.",
+    vacioPlataforma: "Aún no hay registros en este periodo.",
+    cifrasPlataforma:
+      "{registros} registros · {operacion} operando · {pago} con suscripción pagada",
+  },
   guiaGa4: [
     "En GA4, crea (o elige) una propiedad y un flujo web para el dominio.",
     "Copia el ID de medición (G-…) y crea un API secret de Measurement Protocol.",

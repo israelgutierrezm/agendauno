@@ -12,7 +12,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { api, mensajeDeError, noEncontrado } from "@/lib/api";
-import { camposDeMedicion } from "@/lib/etiquetas";
+import { camposDeMedicion, eventoComercio } from "@/lib/etiquetas";
 import { separarTelefono } from "@/lib/ladas";
 import { esDeOtraModalidad } from "@/lib/modalidad";
 import { useRetornoPago } from "@/lib/retornoPago";
@@ -933,6 +933,22 @@ async function pagar(ordenId: string | null | undefined): Promise<void> {
   }
   pagando.value = true;
   error.value = null;
+  // Inicia el pago (GA4 del negocio, ADR 0143): solo el servicio y su precio, sin su
+  // nombre (puede revelar algo de salud). La compra la confirma el servidor.
+  const servicio = servicioSel.value;
+  if (servicio !== null && servicio.precio_minor !== null) {
+    eventoComercio(
+      "begin_checkout",
+      [
+        {
+          id: servicio.id,
+          precio_minor: servicio.precio_minor,
+          moneda: servicio.moneda,
+        },
+      ],
+      false,
+    );
+  }
   try {
     const { data } = await api.post<{
       data: { checkout?: { tipo?: string; url?: string } | null };

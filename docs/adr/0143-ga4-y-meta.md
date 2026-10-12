@@ -149,6 +149,14 @@ Documentación oficial revisada el 2026-10-12:
 - **Negocios de salud:** `sensible` quita los nombres de los productos (GA4) y los
   `content_ids` (Meta), y deja solo eventos estándar o sin parámetros que revelen el
   servicio.
+- **Navegador (solo GA4, en su página):** `page_view`; `view_item_list` y
+  `select_item` de sus planes (en salud sin nombres); `begin_checkout` al pagar una cita
+  (sin el nombre del servicio); `contacto` por WhatsApp o teléfono.
+  - Lo que la página mide antes de saber si hay destinos espera y se manda al saberlo.
+  - `InitiateCheckout` no se manda: el píxel no se carga en el negocio y no hay un
+    «pago iniciado» confirmado en el servidor.
+  - La clase de prueba de un negocio es una compra; `StartTrial` es solo la prueba del
+    SaaS.
 - **Asistencia y renovación** siempre se quedan en el seguimiento interno. Mandarlas es
   decisión del negocio, por destino (`eventos_extra`).
 - Su página pide su propio permiso («Este negocio usa medición…») y lo manda a

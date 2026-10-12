@@ -188,7 +188,7 @@ No hay una propiedad conectada automáticamente. Si se utiliza verificación por
 
 La integración interna emite eventos al evento local `agendauno:analytics` y, si se configura, a `VITE_ANALYTICS_ENDPOINT` (y a `window.dataLayer` mientras gtag no esté cargado).
 
-**GA4 y Meta (ADR 0143).** Los IDs de cada producto se configuran en el superadmin → Medición, no al compilar.
+**GA4 y Meta (ADR 0143; guía de operación en `docs/MEDICION.md`).** Los IDs de cada producto se configuran en el superadmin → Medición, no al compilar.
 
 - Solo se cargan con la autorización de quien visita, pedida en «Tu privacidad»: analítica para GA4, publicidad para Meta.
 - Se manda una `page_view` por navegación, desde el router.

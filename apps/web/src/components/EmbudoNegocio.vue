@@ -2,6 +2,8 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CampanasNegocio from "@/components/CampanasNegocio.vue";
+
 /**
  * El embudo del negocio (plan de mejoras C08): de la visita a su página hasta que su
  * cliente renueva. Cada paso dice la cantidad y su denominador («3 de 40»), no solo un
@@ -172,5 +174,8 @@ const mediana = computed(() => {
     <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("operacion.reportes.embudo.leyenda") }}
     </p>
+
+    <!-- Por campaña (ADR 0144) -->
+    <CampanasNegocio :desde="embudo.desde" :hasta="embudo.hasta" />
   </div>
 </template>

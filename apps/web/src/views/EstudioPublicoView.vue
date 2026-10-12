@@ -12,6 +12,7 @@ import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
 import { volverConInteres } from "@/lib/destinoSeguro";
+import { eventoComercio } from "@/lib/etiquetas";
 import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -454,6 +455,23 @@ const formularioAcceso = computed(() =>
     : null,
 );
 
+// Eligió un plan (GA4 del negocio): qué plan, no quién.
+function elegirPlan(p: Producto): void {
+  if (!p.id) return;
+  eventoComercio(
+    "select_item",
+    [
+      {
+        id: String(p.id),
+        nombre: p.nombre,
+        precio_minor: p.precio_minor,
+        moneda: p.moneda,
+      },
+    ],
+    escaparate.value?.estudio.perfil !== "salud",
+  );
+}
+
 function abrirAcceso(
   origen: string,
   interes: {
@@ -485,6 +503,19 @@ async function cargar(): Promise<void> {
     if (props.vistaPrevia) {
       return;
     }
+    // Sus planes a la vista (GA4 del negocio, ADR 0143); en salud, sin nombres.
+    eventoComercio(
+      "view_item_list",
+      data.data.productos
+        .filter((p) => p.id)
+        .map((p) => ({
+          id: String(p.id),
+          nombre: p.nombre,
+          precio_minor: p.precio_minor,
+          moneda: p.moneda,
+        })),
+      estudio.perfil !== "salud",
+    );
     // Su app instalable (en su subdominio): nombre, ícono y color.
     marcarPwa(estudio);
     recordarNegocio({
@@ -1258,10 +1289,11 @@ onMounted(cargar);
                         :marcar-primera-vez="gruposPrecios.length === 1"
                         :boton="tn('escaparate.planes.loQuiero')"
                         @elegir="
+                          elegirPlan(p);
                           abrirAcceso('price_card', {
                             producto: p.id ?? null,
                             etiqueta: p.nombre,
-                          })
+                          });
                         "
                       />
                     </li>
