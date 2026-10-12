@@ -67,7 +67,7 @@ final class CatalogoTemas
             'nombre' => 'Océano',
             'oscuro' => false,
             'tokens' => [
-                'barra' => '#0A6EBD', 'barra_suave' => '#1C7FCC', 'barra_texto' => '#E3F4FF',
+                'barra' => '#0A6EBD', 'barra_suave' => '#07528F', 'barra_texto' => '#E3F4FF',
                 'barra_activo' => '#FFFFFF', 'barra_activo_texto' => '#0A6EBD',
                 'barra_borde' => 'rgb(255 255 255 / 16%)', 'barra_titulo' => '#FFFFFF',
                 'acento' => '#0A6EBD', 'acento_texto' => '#FFFFFF',
