@@ -6,7 +6,7 @@ import CobranzaView from "./CobranzaView.vue";
 
 /*
 | Cobros con el patrón de los listados: indicadores de cada vista, y en movimientos
-| búsqueda por cliente y filtro por estado.
+| búsqueda por cliente, filtro por estado y por fechas y páginas (las resuelve el API).
 */
 
 const mocks = vi.hoisted(() => ({
@@ -45,20 +45,34 @@ const pago = (id: string, persona: string, estado: string) => ({
   reembolsable_minor: estado === "reembolsado" ? 0 : 10000,
 });
 
+// El resumen de todo lo encontrado, como lo da el API.
+const resumen = (
+  cobrado: { moneda: string; total_minor: number }[],
+  extra: Record<string, unknown> = {},
+) => ({
+  total: 2,
+  page: 1,
+  per_page: 25,
+  ultima_pagina: 1,
+  resumen: { cobros: 1, cobrado, reembolsado: [], sin_aprobar: 1, ...extra },
+  ...extra,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.ruta.query = { vista: "movimientos" };
   mocks.esCitas = false;
   mocks.get.mockImplementation((url: string) =>
     Promise.resolve({
-      data: {
-        data: url.endsWith("/pagos")
-          ? [
+      data: url.endsWith("/pagos")
+        ? {
+            data: [
               pago("1", "Ana López", "aprobado"),
               pago("2", "Bea Ruiz", "reembolsado"),
-            ]
-          : [],
-      },
+            ],
+            meta: resumen([{ moneda: "MXN", total_minor: 10000 }]),
+          }
+        : { data: [] },
     }),
   );
 });
@@ -71,6 +85,10 @@ describe("cobros: movimientos", () => {
           pago("1", "Ana", "aprobado"),
           { ...pago("2", "Bea", "aprobado"), moneda: "USD", monto_minor: 2000 },
         ],
+        meta: resumen([
+          { moneda: "MXN", total_minor: 10000 },
+          { moneda: "USD", total_minor: 2000 },
+        ]),
       },
     });
     const w = mount(CobranzaView, {
@@ -104,28 +122,87 @@ describe("cobros: movimientos", () => {
     expect(w.text()).toContain("Ana");
     expect(mocks.post).not.toHaveBeenCalled();
   });
-  it("resume lo cobrado y filtra por cliente y por estado", async () => {
+  it("resume lo cobrado y pide al API por cliente, por estado y por fechas", async () => {
+    vi.useFakeTimers();
     const w = mount(CobranzaView, {
       global: { plugins: [i18n], stubs: { teleport: true } },
     });
     await flushPromises();
 
     expect(w.text()).toContain("Cobros aprobados");
-    expect(w.text()).toContain("$100.00");
-    const filas = () => w.findAll("tbody > tr").map((f) => f.text());
-    expect(filas()).toHaveLength(2);
+    expect(w.get('[data-prueba="indicador-cobrado"]').text()).toContain(
+      "$100.00",
+    );
+    expect(w.findAll("tbody > tr")).toHaveLength(2);
 
     await w.get('[data-prueba="buscar-pago"]').setValue("bea");
-    expect(filas()).toHaveLength(1);
-    expect(filas()[0]).toContain("Bea Ruiz");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/pagos", {
+      params: { page: 1, q: "bea" },
+    });
 
     await w.get('[data-prueba="buscar-pago"]').setValue("");
+    await vi.advanceTimersByTimeAsync(300);
     await w
       .findAll("button")
       .find((b) => b.text() === "Aprobados")!
       .trigger("click");
-    expect(filas()).toHaveLength(1);
-    expect(filas()[0]).toContain("Ana López");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/pagos", {
+      params: { page: 1, estado: "aprobado" },
+    });
+
+    await w.get('[data-prueba="pagos-desde"]').setValue("2026-10-01");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/pagos", {
+      params: { page: 1, estado: "aprobado", desde: "2026-10-01" },
+    });
+    vi.useRealTimers();
+  });
+
+  it("pagina los movimientos y, sin resultados con filtros, deja quitarlos", async () => {
+    mocks.get.mockImplementation(
+      (url: string, config?: { params?: Record<string, unknown> }) =>
+        Promise.resolve({
+          data: url.endsWith("/pagos")
+            ? config?.params?.q
+              ? { data: [], meta: { ...resumen([]), total: 0 } }
+              : {
+                  data: [pago("1", "Ana López", "aprobado")],
+                  meta: { ...resumen([]), total: 60, ultima_pagina: 3 },
+                }
+            : { data: [] },
+        }),
+    );
+    vi.useFakeTimers();
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+    expect(w.text()).toContain("1–25 de 60");
+
+    await w
+      .findAll("nav button")
+      .find((b) => b.text() === "2")!
+      .trigger("click");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/pagos", {
+      params: { page: 2 },
+    });
+
+    await w.get('[data-prueba="buscar-pago"]').setValue("zz");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(w.text()).toContain("Ningún movimiento coincide");
+    // La barra sigue a la vista: se puede limpiar la búsqueda.
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Limpiar")!
+      .trigger("click");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/pagos", {
+      params: { page: 1 },
+    });
+    vi.useRealTimers();
   });
 });
 

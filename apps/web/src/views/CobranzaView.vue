@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
@@ -114,6 +114,27 @@ const metaPendientes = ref<MetaPendientes | null>(null);
 const paginaPendientes = ref(1);
 const morosos = ref<Moroso[]>([]);
 const pagos = ref<Pago[]>([]);
+// Movimientos por páginas (el API busca, filtra y resume todo lo encontrado).
+interface TotalMoneda {
+  moneda: string;
+  total_minor: number;
+}
+interface MetaMovimientos {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  resumen: {
+    cobros: number;
+    cobrado: TotalMoneda[];
+    reembolsado: TotalMoneda[];
+    sin_aprobar: number;
+  };
+}
+const metaPagos = ref<MetaMovimientos | null>(null);
+const paginaPagos = ref(1);
+const desdePagos = ref("");
+const hastaPagos = ref("");
 const suscripciones = ref<Suscripcion[]>([]);
 const pagoAutomaticoDisponible = ref(false);
 const avisoRenovacion = ref<string | null>(null);
@@ -191,8 +212,7 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   try {
     if (vista.value === "movimientos") {
-      const p = await api.get<{ data: Pago[] }>(`${base.value}/pagos`);
-      pagos.value = p.data.data;
+      await cargarPagos();
     } else {
       const [pe, d, s] = await Promise.all([
         api.get<{ data: Pendiente[]; meta: MetaPendientes }>(
@@ -218,6 +238,38 @@ async function cargar(): Promise<void> {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
+  }
+}
+
+// Los movimientos de la página, con la búsqueda, el estado y las fechas elegidos.
+let peticionPagos = 0;
+async function cargarPagos(): Promise<void> {
+  const mia = ++peticionPagos;
+  const q = busqueda.value.trim();
+  const { data } = await api.get<{ data: Pago[]; meta?: MetaMovimientos }>(
+    `${base.value}/pagos`,
+    {
+      params: {
+        page: paginaPagos.value,
+        ...(q !== "" ? { q } : {}),
+        ...(filtroEstado.value !== "" ? { estado: filtroEstado.value } : {}),
+        ...(desdePagos.value !== "" ? { desde: desdePagos.value } : {}),
+        ...(hastaPagos.value !== "" ? { hasta: hastaPagos.value } : {}),
+      },
+    },
+  );
+  if (mia === peticionPagos) {
+    pagos.value = data.data;
+    metaPagos.value = data.meta ?? null;
+  }
+}
+async function recargarPagos(pagina = 1): Promise<void> {
+  paginaPagos.value = pagina;
+  error.value = null;
+  try {
+    await cargarPagos();
+  } catch (e) {
+    error.value = mensajeDeError(e);
   }
 }
 
@@ -434,58 +486,72 @@ async function reembolsar(): Promise<void> {
 // ---- Indicadores y filtros (patrón de los listados) ----
 const busqueda = ref("");
 const filtroEstado = ref<"" | "aprobado" | "otros">("");
-const pagosVisibles = computed(() => {
-  const q = busqueda.value.trim().toLowerCase();
-  return pagos.value.filter(
-    (p) =>
-      (q === "" || (p.persona ?? "").toLowerCase().includes(q)) &&
-      (filtroEstado.value === "" ||
-        (filtroEstado.value === "aprobado") === (p.estado === "aprobado")),
-  );
+// La búsqueda espera a que se deje de escribir; el estado y las fechas recargan ya.
+let esperaBusqueda: ReturnType<typeof setTimeout> | undefined;
+watch(busqueda, () => {
+  clearTimeout(esperaBusqueda);
+  esperaBusqueda = setTimeout(() => void recargarPagos(), 300);
 });
-function suma(
-  lista: Pago[],
-  campo: "monto_minor" | "reembolsado_minor",
-): string {
-  const porMoneda = new Map<string, number>();
-  for (const p of lista) {
-    porMoneda.set(p.moneda, (porMoneda.get(p.moneda) ?? 0) + p[campo]);
+watch([filtroEstado, desdePagos, hastaPagos], () => {
+  if (
+    desdePagos.value === "" ||
+    hastaPagos.value === "" ||
+    hastaPagos.value >= desdePagos.value
+  ) {
+    void recargarPagos();
   }
-  return porMoneda.size > 0
-    ? [...porMoneda]
-        .map(([moneda, minor]) => `${dinero(minor, moneda)} ${moneda}`)
+});
+onBeforeUnmount(() => clearTimeout(esperaBusqueda));
+const conFiltrosPagos = computed(
+  () =>
+    busqueda.value.trim() !== "" ||
+    filtroEstado.value !== "" ||
+    desdePagos.value !== "" ||
+    hastaPagos.value !== "",
+);
+function limpiarFiltrosPagos(): void {
+  busqueda.value = "";
+  filtroEstado.value = "";
+  desdePagos.value = "";
+  hastaPagos.value = "";
+}
+/** «$1,234.00 MXN · $20.00 USD»: cada moneda por separado, nunca sumadas. */
+function porMoneda(lista: TotalMoneda[]): string {
+  return lista.length > 0
+    ? lista
+        .map((m) => `${dinero(m.total_minor, m.moneda)} ${m.moneda}`)
         .join(" · ")
-    : dinero(0, pagos.value[0]?.moneda ?? sesion.moneda);
+    : dinero(0, sesion.moneda);
 }
 const indicadores = computed<Indicador[]>(() => {
   if (vista.value === "movimientos") {
-    const aprobados = pagos.value.filter((p) => p.estado === "aprobado");
-    const otros = pagos.value.length - aprobados.length;
+    // De todo lo encontrado (no solo de esta página), sin el filtro de estado.
+    const r = metaPagos.value?.resumen;
     return [
       {
         clave: "cobros",
         etiqueta: t("cobranzaVisual.kpi.cobros"),
-        valor: String(aprobados.length),
+        valor: String(r?.cobros ?? 0),
         icono: "ventas",
       },
       {
         clave: "cobrado",
         etiqueta: t("cobranzaVisual.kpi.cobrado"),
-        valor: suma(aprobados, "monto_minor"),
+        valor: porMoneda(r?.cobrado ?? []),
         icono: "dinero",
       },
       {
         clave: "reembolsado",
         etiqueta: t("cobranzaVisual.kpi.reembolsado"),
-        valor: suma(pagos.value, "reembolsado_minor"),
+        valor: porMoneda(r?.reembolsado ?? []),
         icono: "intercambio",
       },
       {
         clave: "revisar",
         etiqueta: t("cobranzaVisual.kpi.sinAprobar"),
-        valor: String(otros),
+        valor: String(r?.sin_aprobar ?? 0),
         icono: "reloj",
-        aviso: otros > 0,
+        aviso: (r?.sin_aprobar ?? 0) > 0,
       },
     ];
   }
@@ -788,7 +854,7 @@ watch(vista, cargar, { immediate: true });
       <!-- Pagos / reembolsos -->
       <template v-if="vista === 'movimientos'">
         <EstadoVacio
-          v-if="pagos.length === 0"
+          v-if="pagos.length === 0 && !conFiltrosPagos"
           class="tu-card mt-5"
           icono="dinero"
           :titulo="$t('cobranza.sinPagos')"
@@ -817,6 +883,37 @@ watch(vista, cargar, { immediate: true });
                 {{ $t(`cobranzaVisual.filtro.${f || "todos"}`) }}
               </button>
             </div>
+            <!-- Las fechas del cobro, en días del negocio -->
+            <fieldset class="cv-rango">
+              <legend class="sr-only">
+                {{ $t("cobranzaVisual.fechas") }}
+              </legend>
+              <input
+                v-model="desdePagos"
+                type="date"
+                class="tu-input"
+                :max="hastaPagos || undefined"
+                :aria-label="$t('cobranzaVisual.desde')"
+                data-prueba="pagos-desde"
+              />
+              <span aria-hidden="true">–</span>
+              <input
+                v-model="hastaPagos"
+                type="date"
+                class="tu-input"
+                :min="desdePagos || undefined"
+                :aria-label="$t('cobranzaVisual.hasta')"
+                data-prueba="pagos-hasta"
+              />
+            </fieldset>
+            <button
+              v-if="conFiltrosPagos"
+              type="button"
+              class="tu-enlace text-sm"
+              @click="limpiarFiltrosPagos"
+            >
+              {{ $t("tabla.limpiar") }}
+            </button>
           </div>
           <table class="tu-tabla">
             <thead>
@@ -837,7 +934,7 @@ watch(vista, cargar, { immediate: true });
               </tr>
             </thead>
             <tbody>
-              <template v-for="p in pagosVisibles" :key="p.id">
+              <template v-for="p in pagos" :key="p.id">
                 <tr>
                   <td
                     class="whitespace-nowrap"
@@ -1000,9 +1097,17 @@ watch(vista, cargar, { immediate: true });
               </template>
             </tbody>
           </table>
-          <p v-if="pagosVisibles.length === 0" class="tu-sin-resultados">
+          <p v-if="pagos.length === 0" class="tu-sin-resultados">
             {{ $t("cobranzaVisual.sinResultados") }}
           </p>
+          <PaginacionListado
+            v-if="metaPagos && metaPagos.ultima_pagina > 1"
+            :page="metaPagos.page"
+            :ultima-pagina="metaPagos.ultima_pagina"
+            :total="metaPagos.total"
+            :per-page="metaPagos.per_page"
+            @ir="recargarPagos"
+          />
         </div>
       </template>
 
@@ -1276,6 +1381,19 @@ watch(vista, cargar, { immediate: true });
 </template>
 
 <style scoped>
+.cv-rango {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--texto-suave);
+}
+.cv-rango .tu-input {
+  width: auto;
+  min-height: 2.5rem;
+  padding-block: 0.35rem;
+  font-size: 0.85rem;
+}
 .cb-seccion {
   display: flex;
   align-items: center;

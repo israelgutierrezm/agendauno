@@ -177,6 +177,9 @@ export const planesVisual = {
 export const cobranzaVisual = {
   buscar: "Buscar por cliente",
   sinResultados: "Ningún movimiento coincide con los filtros.",
+  fechas: "Fechas del cobro",
+  desde: "Desde",
+  hasta: "Hasta",
   deTotal: "{n} de {total}",
   filtro: {
     todos: "Todos",

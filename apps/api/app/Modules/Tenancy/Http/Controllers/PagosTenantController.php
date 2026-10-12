@@ -6,14 +6,18 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Pagos capturados del estudio (data plane del tenant): base de la pantalla de
@@ -24,32 +28,85 @@ use Illuminate\Validation\Rule;
  */
 class PagosTenantController
 {
-    private const LIMITE = 200;
+    private const POR_PAGINA = 25;
 
-    public function __construct(private readonly ResolverAccesoTenant $acceso) {}
+    public function __construct(
+        private readonly ResolverAccesoTenant $acceso,
+        private readonly FechasNegocioTenant $fechas,
+    ) {}
 
+    /**
+     * Los movimientos de cobro, por páginas y del más reciente al más antiguo: se busca
+     * por persona y se acotan por estado (aprobados u otros) y por fechas (días del
+     * negocio). `meta.resumen` cuenta y suma todo lo encontrado (no solo la página),
+     * sin el filtro de estado: así los indicadores no cambian al elegirlo.
+     */
     public function index(Request $request, AnularCobroTenant $anular, CorregirMetodoPagoTenant $corregir): JsonResponse
     {
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'estado' => ['nullable', Rule::in(['aprobado', 'otros'])],
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $desde = $filtros['desde'] ?? null;
+        $hasta = $filtros['hasta'] ?? null;
+        if ($desde !== null && $hasta !== null && $hasta < $desde) {
+            throw ValidationException::withMessages(['hasta' => ['La fecha final no puede ser antes que la inicial.']]);
+        }
+
         $actor = $request->attributes->get('usuario_tenant');
         $sedes = $actor instanceof Usuario ? $this->acceso->sucursalesPermitidas($actor) : null;
-        $pagos = PagoTenant::query()
-            ->when($sedes !== null, fn ($q) => $q->whereHas('orden', fn ($o) => $o->whereIn('sucursal_id', $sedes)))
+        $q = trim((string) ($filtros['q'] ?? ''));
+        $encontrados = fn (): Builder => PagoTenant::query()
+            ->when($sedes !== null, fn ($c) => $c->whereHas('orden', fn ($o) => $o->whereIn('sucursal_id', $sedes)))
             ->whereIn('estado', [
                 EstadoPago::Aprobado->value,
                 EstadoPago::ParcialmenteReembolsado->value,
                 EstadoPago::Reembolsado->value,
             ])
+            ->when($q !== '', fn ($c) => $c->whereHas('orden.persona', fn ($p) => $p->where(fn ($w) => $w
+                ->where('nombre', 'like', "%{$q}%")
+                ->orWhere('primer_apellido', 'like', "%{$q}%")
+                ->orWhere('segundo_apellido', 'like', "%{$q}%"))))
+            ->when($desde !== null, fn ($c) => $c->where('created_at', '>=', $this->fechas->inicioDelDia((string) $desde)))
+            ->when($hasta !== null, fn ($c) => $c->where('created_at', '<=', $this->fechas->finDelDia((string) $hasta)));
+
+        $estado = $filtros['estado'] ?? null;
+        $pagina = $encontrados()
+            ->when($estado === 'aprobado', fn ($c) => $c->where('estado', EstadoPago::Aprobado->value))
+            ->when($estado === 'otros', fn ($c) => $c->where('estado', '!=', EstadoPago::Aprobado->value))
             ->with(['orden.persona', 'registradoPor'])
             // Devuelto de verdad (aprobado) y lo comprometido (incluye lo que está en curso);
             // una devolución fallida no cuenta.
-            ->withSum(['reembolsos as reembolsado_minor' => fn ($q) => $q->where('estado', EstadoReembolso::Aprobado->value)], 'monto_minor')
-            ->withSum(['reembolsos as comprometido_minor' => fn ($q) => $q->whereIn('estado', EstadoReembolso::comprometidos())], 'monto_minor')
+            ->withSum(['reembolsos as reembolsado_minor' => fn ($c) => $c->where('estado', EstadoReembolso::Aprobado->value)], 'monto_minor')
+            ->withSum(['reembolsos as comprometido_minor' => fn ($c) => $c->whereIn('estado', EstadoReembolso::comprometidos())], 'monto_minor')
             ->withCount('reembolsos')
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
-            ->get();
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+        $pagos = collect($pagina->items());
+
+        $aprobados = $encontrados()->where('estado', EstadoPago::Aprobado->value);
+        $resumen = [
+            'cobros' => (clone $aprobados)->count(),
+            'cobrado' => $this->porMoneda((clone $aprobados)->toBase()),
+            'reembolsado' => $this->porMoneda(ReembolsoTenant::query()
+                ->where('estado', EstadoReembolso::Aprobado->value)
+                ->whereIn('pago_id', $encontrados()->select('id'))
+                ->toBase()),
+            'sin_aprobar' => $encontrados()->where('estado', '!=', EstadoPago::Aprobado->value)->count(),
+        ];
 
         return response()->json([
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'resumen' => $resumen,
+            ],
             'data' => $pagos->map(function (PagoTenant $pago) use ($anular, $corregir): array {
                 $reembolsado = (int) ($pago->getAttribute('reembolsado_minor') ?? 0);
                 $comprometido = (int) ($pago->getAttribute('comprometido_minor') ?? 0);
@@ -75,6 +132,19 @@ class PagosTenantController
                 ];
             })->all(),
         ]);
+    }
+
+    /**
+     * Total por moneda de una consulta con `monto_minor` y `moneda`.
+     *
+     * @return list<array{moneda: string, total_minor: int}>
+     */
+    private function porMoneda(\Illuminate\Database\Query\Builder $consulta): array
+    {
+        return $consulta->selectRaw('moneda, COALESCE(SUM(monto_minor), 0) as total')
+            ->groupBy('moneda')->orderBy('moneda')->get()
+            ->map(fn (object $fila): array => ['moneda' => (string) $fila->moneda, 'total_minor' => (int) $fila->total])
+            ->values()->all();
     }
 
     /**
