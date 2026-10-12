@@ -363,6 +363,8 @@ export const MENU_NEGOCIO: GrupoMenu[] = [
             "captacion-formularios",
             "nav.vistas.formulariosCaptacion",
           ),
+          // Widgets de calendario y planes para su web (ADR 0141).
+          v("integrar-web", "captacion-integrar", "captacion.widgets.nav"),
         ],
       },
       {

@@ -68,6 +68,7 @@ const esAcceso = computed(() => route.name === "entrar");
 
 const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
   "formulario-captacion",
+  "widget",
   "estudio-publico",
   "estudio-corto",
   "agendar-cita",
@@ -75,9 +76,11 @@ const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
   "enlaces-estudio",
   "enlaces-subdominio",
 ]);
-// Un formulario de captación dentro del sitio del negocio: solo el formulario.
+// Un formulario de captación o un widget dentro del sitio del negocio: solo eso.
 const esEmbebido = computed(
-  () => route.name === "formulario-captacion" && route.query.embed === "1",
+  () =>
+    (route.name === "formulario-captacion" && route.query.embed === "1") ||
+    route.name === "widget",
 );
 const esRutaPublicaDeNegocio = computed(
   () =>

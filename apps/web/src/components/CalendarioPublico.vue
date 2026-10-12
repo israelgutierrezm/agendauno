@@ -15,8 +15,14 @@ import { api } from "@/lib/api";
 const props = withDefaults(
   // `sucursal`: la sede que eligió el visitante (v-model), para que la página la
   // conserve en sus planes (M06).
-  defineProps<{ slug: string; puedePedir?: boolean; sucursal?: string }>(),
-  { puedePedir: false, sucursal: "" },
+  // `actividad`: la que ya viene elegida (p. ej. un widget en la web del negocio; ADR 0141).
+  defineProps<{
+    slug: string;
+    puedePedir?: boolean;
+    sucursal?: string;
+    actividad?: string;
+  }>(),
+  { puedePedir: false, sucursal: "", actividad: "" },
 );
 const emit = defineEmits<{
   pedir: [{ sesion: string; etiqueta: string }];
@@ -61,7 +67,7 @@ const inicioSemana = ref<string | null>(null);
 const diaElegido = ref<string | null>(null);
 const filtros = reactive({
   sucursal: props.sucursal,
-  actividad: "",
+  actividad: props.actividad,
   instructor: "",
 });
 watch(

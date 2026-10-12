@@ -60,6 +60,7 @@ export const POLITICAS: Record<string, Politica> = {
   // Captación (ADR 0117): aparte de Miembros.
   prospectos: { permiso: "prospectos.ver" },
   "captacion-formularios": { permiso: "prospectos.ver" },
+  "captacion-integrar": { permiso: "prospectos.ver" },
   retencion: { permiso: "miembros.gestionar" },
   documentos: { permiso: "documentos.subir" },
   formularios: { permiso: "formularios.gestionar", funcion: "formularios" },
