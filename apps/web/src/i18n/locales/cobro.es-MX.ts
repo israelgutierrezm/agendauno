@@ -61,8 +61,9 @@ export default {
     ayuda:
       "Precios mensuales sin IVA. Publicar crea una versión nueva: los cargos ya generados conservan la suya.",
     version: "Versión {n} · vigente desde {fecha}",
-    clases: "Clases (por alumnos activos)",
-    citas: "Citas (por plan, nivel y profesionales)",
+    // Con su producto (ADR 0132); la marca va como valor, no en el texto.
+    clases: "{marca} · clases, por alumnos activos",
+    citas: "{marca} · citas, por plan, nivel y profesionales",
     hasta: "Hasta",
     sinTope: "Sin tope (techo)",
     monto: "Precio mensual",

@@ -2142,9 +2142,11 @@ export default {
   },
   plataforma: {
     titulo: "Administración de plataforma",
-    subtitulo: "Todos los estudios y la configuración global de AgendaUno.",
+    // Sin marca: la plataforma es de los dos productos (ADR 0132).
+    subtitulo:
+      "Todos los negocios de los dos productos y la configuración de la plataforma.",
     token: "Token de la plataforma",
-    tokenAyuda: "Solo para el equipo de AgendaUno.",
+    tokenAyuda: "Solo para el equipo de la plataforma.",
     entrar: "Entrar",
     salir: "Salir",
     tokenInvalido: "Tu sesión terminó o no tiene acceso. Vuelve a entrar.",
@@ -2152,7 +2154,7 @@ export default {
     correo: "Correo",
     contrasena: "Contraseña",
     accesoAyuda:
-      "Solo para el equipo de AgendaUno: tu correo, tu contraseña y el token de la plataforma. Después te enviamos un código por correo.",
+      "Solo para el equipo de la plataforma: tu correo, tu contraseña y el token de la plataforma. Después te enviamos un código por correo.",
     codigoTitulo: "Revisa tu correo",
     codigoAyuda:
       "Te enviamos un código de 6 dígitos a {correo}. Vence en unos minutos y sirve una sola vez.",
@@ -2164,7 +2166,7 @@ export default {
     facturapi: {
       titulo: "Cuenta FacturAPI",
       subtitulo:
-        "La llave que la plataforma usa para timbrar por todos los estudios.",
+        "La llave que la plataforma usa para timbrar por todos los negocios.",
       configurada: "Configurada",
       noConfigurada: "Sin configurar",
       llave: "Llave secreta de FacturAPI",
@@ -2172,7 +2174,12 @@ export default {
       guardando: "Guardando…",
       guardado: "Configuración guardada.",
       ayuda:
-        "Se guarda cifrada y nunca se vuelve a mostrar. Deja vacío para borrarla.",
+        "Se guarda cifrada y nunca se vuelve a mostrar.",
+      // Quitarla detiene la facturación de todos: se confirma (ADR 0132).
+      quitar: "Quitar llave",
+      confirmarQuitar:
+        "¿Quitar la llave de FacturAPI? Ningún negocio podrá facturar hasta que pongas otra.",
+      quitada: "Llave de FacturAPI quitada.",
     },
     legales: {
       titulo: "Documentos legales",

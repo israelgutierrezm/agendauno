@@ -3,7 +3,9 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import BitacoraPlataforma from "@/components/BitacoraPlataforma.vue";
 import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
+import EquipoPlataforma from "@/components/EquipoPlataforma.vue";
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
 import InteresadosPlataforma from "@/components/InteresadosPlataforma.vue";
 import ModalidadPlataforma from "@/components/ModalidadPlataforma.vue";
@@ -27,14 +29,21 @@ import PlanEstudioPlataforma from "@/components/PlanEstudioPlataforma.vue";
 import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import {
+  PRODUCTOS,
+  PRODUCTOS_LISTA,
+  productoDeModalidad,
+} from "@/lib/producto";
+import { urlCanonicaEstudio } from "@/lib/tenant";
 import type { DatosTerminologia } from "@/lib/terminologia";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Súper admin de AgendaUno (operador de la plataforma). Entra con un token propio,
- * no con la sesión de un estudio. Pestañas: los estudios (con su ficha: estado, uso,
- * cargos, contacto y acciones de soporte), los cobros de la renta, las tarifas y la
- * configuración global (FacturAPI, pasarelas y documentos legales).
+ * Súper admin de la plataforma (AgendaUno y TurnoUno). Entra cada operador con su
+ * cuenta (ADR 0126), no con la sesión de un negocio. Pestañas: los negocios (con su
+ * producto y su ficha: estado, uso, cargos, contacto y acciones de soporte), los
+ * cobros de la renta, las tarifas, la configuración global, el equipo de operadores y
+ * la bitácora de lo que cada uno cambió (ADR 0132).
  */
 interface Estudio {
   slug: string;
@@ -66,7 +75,8 @@ interface Estudio {
   ciudad: string | null;
   creado_en: string | null;
   uso?: { cantidad: number; metrica: string } | null;
-  adeudo_minor?: number;
+  // Lo que debe, por moneda: no se suman pesos con dólares (ADR 0132).
+  adeudos?: { moneda: string; minor: number }[];
 }
 interface Cargo {
   id: string;
@@ -98,6 +108,12 @@ interface FichaApi extends Omit<Estudio, "uso"> {
     whatsapp_verificado?: boolean;
   };
   onboarding_completo: boolean;
+  // Quién lo suspendió por última vez, cuándo y por qué (ADR 0132).
+  ultima_suspension?: {
+    fecha: string;
+    operador: string | null;
+    motivo: string | null;
+  } | null;
   // Solo clases o solo citas (ADR 0104): se cambia mientras no tenga sesiones ni
   // reservas, como la moneda antes de cobrar.
   modalidad_cambiable?: boolean;
@@ -152,7 +168,9 @@ type Pestana =
   | "operacion"
   | "errores"
   | "interesados"
-  | "embudo";
+  | "embudo"
+  | "equipo"
+  | "bitacora";
 
 const ESTADOS_FACT = [
   "trial",
@@ -254,12 +272,48 @@ function colorEstado(estado: string): string {
 const estudios = ref<Estudio[]>([]);
 const columnas = computed(() => [
   { clave: "nombre", etiqueta: t("plataformaAdmin.estudios.colEstudio") },
+  { clave: "producto", etiqueta: t("plataformaAdmin.estudios.colProducto") },
   { clave: "estado", etiqueta: t("plataformaAdmin.estudios.colEstado") },
   { clave: "cobro", etiqueta: t("plataformaAdmin.estudios.colCobro") },
   { clave: "uso", etiqueta: t("plataformaAdmin.estudios.colUso") },
-  { clave: "adeudo_minor", etiqueta: t("plataformaAdmin.estudios.colAdeudo") },
+  { clave: "adeudo", etiqueta: t("plataformaAdmin.estudios.colAdeudo") },
   { clave: "acciones", etiqueta: "" },
 ]);
+// Por producto, estado y adeudo (ADR 0132): la plataforma tiene dos productos.
+const filtrosEstudios = computed(() => [
+  {
+    clave: "producto",
+    etiqueta: t("plataformaAdmin.estudios.filtroProducto"),
+    opciones: PRODUCTOS_LISTA.map((p) => ({
+      valor: p,
+      texto: PRODUCTOS[p].nombre,
+    })),
+  },
+  {
+    clave: "estado",
+    etiqueta: t("plataformaAdmin.estudios.filtroEstado"),
+    opciones: ["trialing", "active", "suspended", "cancelled"].map((e) => ({
+      valor: e,
+      texto: t(`plataformaAdmin.estados.${e}`),
+    })),
+  },
+  {
+    clave: "adeudo",
+    etiqueta: t("plataformaAdmin.estudios.filtroAdeudo"),
+    tipo: "booleano" as const,
+  },
+]);
+function filtrarEstudio(
+  fila: Estudio,
+  valores: Record<string, string>,
+): boolean {
+  return (
+    (!valores.producto ||
+      productoDeModalidad(fila.modalidad) === valores.producto) &&
+    (!valores.estado || fila.estado === valores.estado) &&
+    (!valores.adeudo || (fila.adeudos ?? []).some((a) => a.minor > 0))
+  );
+}
 
 async function cargarEstudios(): Promise<void> {
   const { data } = await cliente.get<{ data: Estudio[] }>(
@@ -648,19 +702,36 @@ async function cargarConfiguracion(): Promise<void> {
   }
 }
 
-async function guardarLlave(): Promise<void> {
+async function guardarLlave(quitar = false): Promise<void> {
+  // Guardar vacío la borraba sin avisar; quitarla detiene la facturación de todos
+  // (ADR 0132).
+  if (!quitar && llaveInput.value.trim() === "") {
+    return;
+  }
+  if (
+    quitar &&
+    !(await confirmar(t("plataforma.facturapi.confirmarQuitar"), {
+      peligro: true,
+    }))
+  ) {
+    return;
+  }
   guardando.value = "facturapi";
   try {
     const { data } = await cliente.put<{
       data: { facturapi_configurada: boolean };
     }>(
       "/api/v1/plataforma/configuracion",
-      { facturapi_llave: llaveInput.value || null },
+      { facturapi_llave: quitar ? null : llaveInput.value.trim() },
       encabezados(),
     );
     facturapiConfigurada.value = data.data.facturapi_configurada;
     llaveInput.value = "";
-    toast.exito(t("plataforma.facturapi.guardado"));
+    toast.exito(
+      quitar
+        ? t("plataforma.facturapi.quitada")
+        : t("plataforma.facturapi.guardado"),
+    );
   } catch (err) {
     toast.error(mensajeDeError(err));
   } finally {
@@ -751,12 +822,40 @@ async function guardarPasarela(proveedor: string): Promise<void> {
     return;
   }
   guardando.value = proveedor;
-  try {
-    const { data } = await cliente.put<{ data: Pasarela }>(
+  const enviar = (confirmado: boolean) =>
+    cliente.put<{ data: Pasarela }>(
       `/api/v1/plataforma/pasarelas/${proveedor}`,
-      { activa: draft.activa, modo: draft.modo, credenciales: draft.llaves },
+      {
+        activa: draft.activa,
+        modo: draft.modo,
+        credenciales: draft.llaves,
+        confirmar_cambio_modo: confirmado,
+      },
       encabezados(),
     );
+  try {
+    let respuesta;
+    try {
+      respuesta = await enviar(false);
+    } catch (err) {
+      // Cambiar de prueba a real (o al revés) quita las tarjetas de todos los
+      // negocios: el servidor pide confirmarlo (ADR 0132).
+      if (
+        !axios.isAxiosError(err) ||
+        err.response?.data?.code !== "GATEWAY_MODE_CHANGE_UNCONFIRMED"
+      ) {
+        throw err;
+      }
+      if (
+        !(await confirmar(String(err.response.data.message ?? ""), {
+          peligro: true,
+        }))
+      ) {
+        return;
+      }
+      respuesta = await enviar(true);
+    }
+    const { data } = respuesta;
     const i = pasarelas.value.findIndex((p) => p.proveedor === proveedor);
     if (i >= 0) {
       pasarelas.value[i] = data.data;
@@ -775,9 +874,8 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [, , yo] = await Promise.all([
+    const [, yo] = await Promise.all([
       cargarEstudios(),
-      cargarConfiguracion(),
       cliente.get<{ data: { administrador: { nombre: string } | null } }>(
         "/api/v1/plataforma/yo",
         encabezados(),
@@ -785,6 +883,10 @@ async function cargar(): Promise<void> {
     ]);
     operador.value = yo.data.data.administrador?.nombre ?? null;
     autenticado.value = true;
+    // La configuración no impide entrar: si falla, se ve en su pestaña (ADR 0132).
+    void cargarConfiguracion().catch((err: unknown) => {
+      toast.error(mensajeDeError(err));
+    });
   } catch (err) {
     autenticado.value = false;
     const estado = axios.isAxiosError(err) ? err.response?.status : undefined;
@@ -877,6 +979,23 @@ async function salir(): Promise<void> {
   estudios.value = [];
   borrar();
 }
+
+// Una sesión que vence a media tarea (12 h) vuelve a la entrada en lugar de dejar la
+// pantalla a medias (ADR 0132).
+cliente.interceptors.response.use(undefined, (err: unknown) => {
+  if (
+    axios.isAxiosError(err) &&
+    err.response?.status === 401 &&
+    autenticado.value
+  ) {
+    token.value = "";
+    operador.value = null;
+    autenticado.value = false;
+    error.value = t("plataforma.tokenInvalido");
+    borrar();
+  }
+  return Promise.reject(err);
+});
 
 onMounted(() => {
   if (token.value !== "") {
@@ -1090,6 +1209,8 @@ function borrar(): void {
             'errores',
             'interesados',
             'embudo',
+            'equipo',
+            'bitacora',
           ] as const"
           :key="p"
           type="button"
@@ -1113,6 +1234,8 @@ function borrar(): void {
         :columnas="columnas"
         :filas="estudios"
         :buscar-en="['slug', 'nombre', 'ciudad']"
+        :filtros="filtrosEstudios"
+        :filtrar-fila="(f, v) => filtrarEstudio(f as Estudio, v)"
         :vacio="$t('plataforma.estudios.vacio')"
         clave-vista="plataforma-estudios"
       >
@@ -1123,6 +1246,11 @@ function borrar(): void {
             :style="{ color: 'var(--texto-suave)' }"
             >{{ (fila as Estudio).slug }}</span
           >
+        </template>
+        <template #col-producto="{ fila }">
+          <span class="text-sm">{{
+            PRODUCTOS[productoDeModalidad((fila as Estudio).modalidad)].nombre
+          }}</span>
         </template>
         <template #col-estado="{ fila }">
           <span
@@ -1159,12 +1287,16 @@ function borrar(): void {
             {{ $t("plataformaAdmin.estudios.sinUso") }}
           </span>
         </template>
-        <template #col-adeudo_minor="{ fila }">
+        <template #col-adeudo="{ fila }">
           <span
-            v-if="((fila as Estudio).adeudo_minor ?? 0) > 0"
+            v-if="((fila as Estudio).adeudos ?? []).some((a) => a.minor > 0)"
             class="text-sm font-medium tabular-nums"
             :style="{ color: 'var(--error)' }"
-            >{{ dinero((fila as Estudio).adeudo_minor ?? 0) }}</span
+            >{{
+              ((fila as Estudio).adeudos ?? [])
+                .map((a) => dinero(a.minor, a.moneda))
+                .join(" · ")
+            }}</span
           >
           <span v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("plataformaAdmin.estudios.alCorriente") }}
@@ -1413,6 +1545,20 @@ function borrar(): void {
         :token="token"
       />
 
+      <!-- Equipo de operadores y bitácora (ADR 0132) -->
+      <EquipoPlataforma
+        v-if="pestana === 'equipo'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
+      <BitacoraPlataforma
+        v-if="pestana === 'bitacora'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
+
       <!-- Parámetros de plataforma (ADR 0042) -->
       <ParametrosPlataforma
         v-if="pestana === 'parametros'"
@@ -1459,7 +1605,7 @@ function borrar(): void {
           </div>
           <form
             class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end"
-            @submit.prevent="guardarLlave"
+            @submit.prevent="guardarLlave()"
           >
             <div class="flex-1">
               <label class="tu-label" for="lk">{{
@@ -1477,9 +1623,19 @@ function borrar(): void {
             <button
               class="tu-btn tu-btn-primario"
               type="submit"
-              :disabled="guardando === 'facturapi'"
+              :disabled="guardando === 'facturapi' || llaveInput.trim() === ''"
             >
               {{ $t("plataforma.facturapi.guardar") }}
+            </button>
+            <button
+              v-if="facturapiConfigurada"
+              class="tu-btn tu-btn-fantasma"
+              type="button"
+              data-prueba="quitar-facturapi"
+              :disabled="guardando === 'facturapi'"
+              @click="guardarLlave(true)"
+            >
+              {{ $t("plataforma.facturapi.quitar") }}
             </button>
           </form>
           <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -1803,11 +1959,35 @@ function borrar(): void {
               data-prueba="suspendido-por-renta"
               >{{ $t("plataformaAdmin.cobros.suspendidoPorRenta") }}</span
             >
+            <span
+              v-if="ficha.estado === 'suspended' && ficha.ultima_suspension"
+              class="basis-full text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="ultima-suspension"
+              >{{ $t("plataformaAdmin.ficha.ultimaSuspension") }}:
+              {{
+                $t("plataformaAdmin.ficha.ultimaSuspensionDetalle", {
+                  fecha: fecha(ficha.ultima_suspension.fecha),
+                  operador: ficha.ultima_suspension.operador ?? "—",
+                })
+              }}
+              ·
+              {{
+                ficha.ultima_suspension.motivo ??
+                $t("plataformaAdmin.ficha.sinMotivo")
+              }}</span
+            >
             <span :style="{ color: 'var(--texto-suave)' }">{{
               $t(`panel.estados.${ficha.estado_facturacion}`)
             }}</span>
             <a
-              :href="`/estudio/${ficha.slug}`"
+              :href="
+                urlCanonicaEstudio(
+                  ficha.slug,
+                  '/',
+                  productoDeModalidad(ficha.modalidad),
+                )
+              "
               target="_blank"
               rel="noopener"
               class="tu-enlace ml-auto"
