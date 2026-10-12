@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import { trackEvent } from "@/lib/analytics";
+import { facetaActiva } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
@@ -44,7 +45,16 @@ async function enviar(): Promise<void> {
       password.value,
       passwordConfirm.value,
     );
-    trackEvent("tenant_activated");
+    // Solo la cuenta de quien registró el negocio es un negocio activado: el equipo o
+    // un cliente invitados activan su cuenta, no un negocio (no inflan las altas).
+    const usuario = sesion.usuario;
+    if ((usuario?.roles ?? [usuario?.rol]).includes("propietario")) {
+      trackEvent("tenant_activated");
+    } else {
+      trackEvent("account_activated", {
+        faceta: facetaActiva(usuario) ?? "equipo",
+      });
+    }
     void router.push({ name: "onboarding" });
   } catch {
     // El error queda en sesion.error.
