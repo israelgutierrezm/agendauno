@@ -44,6 +44,9 @@ export default {
         "Tienes 1 documento por firmar | Tienes {n} documentos por firmar",
       lugar:
         "Se liberó un lugar en {clase}: acéptalo antes de que se ofrezca a alguien más.",
+      // Lo que pidió como prospecto (ADR 0137); no aparta lugar.
+      interesClase: "Te interesó {clase} ({cuando}): resérvala aquí.",
+      interesPlan: "Te interesó {plan}: lo puedes comprar aquí.",
     },
     tarjetas: {
       reservar: "Reservar",

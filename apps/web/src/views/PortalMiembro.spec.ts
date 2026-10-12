@@ -202,6 +202,42 @@ describe("portal del alumno", () => {
     expect(texto).toContain("1 por pagar");
   });
 
+  it("muestra a la mano lo que le interesó como prospecto (ADR 0137)", async () => {
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const cuerpo =
+        ruta === "/mi/interes"
+          ? {
+              plan: { id: "p1", nombre: "Mensual 8 clases" },
+              clase: {
+                id: "s1",
+                nombre: "Pole Nivel 1",
+                inicia_en: "2030-01-15T19:00:00-06:00",
+                zona_horaria: "America/Mexico_City",
+              },
+            }
+          : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+
+    expect(w.find('[data-prueba="interes-plan"]').text()).toContain(
+      "Te interesó Mensual 8 clases",
+    );
+    expect(w.find('[data-prueba="interes-clase"]').text()).toContain(
+      "Te interesó Pole Nivel 1",
+    );
+  });
+
+  it("sin nada pendiente de cuando era prospecto, no muestra el aviso", async () => {
+    const w = montar(MiCuentaView);
+    await flushPromises();
+
+    expect(w.find('[data-prueba="interes-plan"]').exists()).toBe(false);
+    expect(w.find('[data-prueba="interes-clase"]').exists()).toBe(false);
+  });
+
   it("en clases: reservar, su plan con vencimiento y su asistencia, en ese orden", async () => {
     const perfil = datos["/mi/perfil"] as { derechos: object[] };
     api.get.mockImplementation((url: string) => {
