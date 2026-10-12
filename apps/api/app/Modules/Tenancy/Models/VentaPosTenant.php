@@ -18,12 +18,16 @@ use Illuminate\Support\Carbon;
  * Se puede anular si se registró por error (ADR 0089): queda con `anulada_en`, quién
  * y el motivo, y no cuenta en el corte ni en los movimientos.
  *
+ * Se le vende a una persona del negocio (alumno, instructor o alguien del equipo) o a
+ * público en general, sin persona (ADR 0145).
+ *
  * @property int $sucursal_id
  * @property int $total_minor
  * @property int $propina_minor aparte de lo vendido: no es ingreso del negocio (ADR 0139)
- * @property int|null $propina_para_id
+ * @property int|null $persona_id a quién se le vendió; null = público en general
  * @property int|null $recibido_minor lo que entregó en efectivo (para el cambio)
  * @property Carbon|null $anulada_en
+ * @property Carbon|null $ticket_enviado_en
  */
 class VentaPosTenant extends Model
 {
@@ -35,7 +39,7 @@ class VentaPosTenant extends Model
 
     protected $fillable = [
         'sucursal_id', 'total_minor', 'moneda', 'metodo_pago', 'usuario_id', 'anulada_en', 'anulada_por', 'motivo_anulacion',
-        'propina_minor', 'propina_para_id', 'recibido_minor',
+        'propina_minor', 'recibido_minor', 'persona_id', 'ticket_enviado_en',
     ];
 
     /**
@@ -46,6 +50,7 @@ class VentaPosTenant extends Model
         'propina_minor' => 'integer',
         'recibido_minor' => 'integer',
         'anulada_en' => 'datetime',
+        'ticket_enviado_en' => 'datetime',
     ];
 
     /**
@@ -65,13 +70,14 @@ class VentaPosTenant extends Model
     }
 
     /**
-     * A quién se le deja la propina, si se dijo (ADR 0139).
+     * A quién se le vendió (ADR 0145); sin persona, a público en general. Con las dadas
+     * de baja: la venta no cambia de comprador.
      *
-     * @return BelongsTo<Usuario, $this>
+     * @return BelongsTo<PersonaTenant, $this>
      */
-    public function propinaPara(): BelongsTo
+    public function persona(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class, 'propina_para_id');
+        return $this->belongsTo(PersonaTenant::class, 'persona_id')->withTrashed();
     }
 
     /** Lo que se cobró en total: lo vendido más la propina. */

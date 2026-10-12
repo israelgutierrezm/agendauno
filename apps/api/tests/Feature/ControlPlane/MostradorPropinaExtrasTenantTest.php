@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Mostrador (ADR 0139): un producto con extras (una proteína con fresas o leche de
-| soya), la propina aparte de lo vendido y para quién, y lo que entregó el cliente en
-| efectivo para el cambio. En el corte, las propinas van aparte: están en la caja pero
+| soya), la propina aparte de lo vendido y lo que entregó el cliente en efectivo para
+| el cambio. La propina ya no lleva «para quién» (ADR 0145). En el corte, las propinas van aparte: están en la caja pero
 | no son ingreso del negocio.
 */
 
@@ -72,33 +72,25 @@ it('los extras del producto se editan con él y se cobran con su precio, guardad
         ->toBe(['Fresas', 'Leche de soya']);
 });
 
-it('la propina va aparte y para quien se diga; en efectivo, lo recibido da el cambio', function (): void {
+it('la propina va aparte; en efectivo, lo recibido da el cambio', function (): void {
     $c = cafeteriaMostrador();
-    personalConSesion($c['e']['slug'], $c['e']['bearer'], 'barista@cafe.mx', 'recepcionista');
-    $equipo = collect($this->getJson("{$c['base']}/pos/propina-para", conBearer($c['e']['bearer']))->assertOk()->json('data'));
-    $barista = (string) $equipo->firstWhere('nombre', 'Personal')['id'];
 
     // $60 de proteína + $10 de propina, paga con $100: cambio de $30.
     $venta = $this->postJson("{$c['base']}/pos/ventas", [
         'sucursal_id' => $c['sede'], 'metodo_pago' => 'efectivo',
         'items' => [['articulo_id' => $c['proteina'], 'cantidad' => 1]],
-        'propina_minor' => 1000, 'propina_para_id' => $barista, 'recibido_minor' => 10000,
+        'propina_minor' => 1000, 'recibido_minor' => 10000,
     ], conBearer($c['e']['bearer']))->assertCreated();
     expect($venta->json('data'))->toMatchArray([
-        'total_minor' => 6000, 'propina_minor' => 1000, 'propina_para' => 'Personal',
+        'total_minor' => 6000, 'propina_minor' => 1000,
         'cobrado_minor' => 7000, 'recibido_minor' => 10000, 'cambio_minor' => 3000,
-    ]);
+    ])->not->toHaveKey('propina_para');
 
     // Lo recibido no alcanza: no se cobra.
     $this->postJson("{$c['base']}/pos/ventas", [
         'sucursal_id' => $c['sede'], 'metodo_pago' => 'efectivo',
         'items' => [['articulo_id' => $c['proteina'], 'cantidad' => 1]], 'propina_minor' => 1000, 'recibido_minor' => 6500,
     ], conBearer($c['e']['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['recibido_minor'], 'meta.errors');
-    // Solo alguien del equipo recibe propina.
-    $this->postJson("{$c['base']}/pos/ventas", [
-        'sucursal_id' => $c['sede'], 'metodo_pago' => 'efectivo',
-        'items' => [['articulo_id' => $c['proteina'], 'cantidad' => 1]], 'propina_minor' => 500, 'propina_para_id' => 'no-existe',
-    ], conBearer($c['e']['bearer']))->assertUnprocessable();
 
     // En el corte: lo cobrado es lo vendido; las propinas, aparte y por forma de pago.
     $corte = $this->getJson("{$c['base']}/pagos/movimientos", conBearer($c['e']['bearer']))->assertOk()->json();

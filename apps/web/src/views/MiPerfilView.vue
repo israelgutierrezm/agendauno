@@ -6,6 +6,7 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
+import ComprasMostrador from "@/components/ComprasMostrador.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import FondoDecorado from "@/components/FondoDecorado.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -888,6 +889,9 @@ const aparienciaAbierta = ref(false);
           />
         </div>
       </section>
+
+      <!-- Lo que compró en el mostrador (ADR 0145); el alumno lo ve en Pagos. -->
+      <ComprasMostrador v-if="!mostrarPrivacidad" class="mp-bloque" />
     </template>
 
     <PanelApariencia

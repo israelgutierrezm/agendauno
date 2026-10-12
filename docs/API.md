@@ -451,12 +451,39 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
     traen `id` se actualizan, los nuevos se crean y los que faltan se apagan;
   - el artículo trae sus `extras` vigentes.
 - `POST /pos/ventas`:
-  - acepta `items.*.extras` (ulids de extras del artículo), `propina_minor`,
-    `propina_para_id` (de `GET /pos/propina-para`) y `recibido_minor` (en efectivo);
+  - acepta `items.*.extras` (ulids de extras del artículo), `propina_minor` y
+    `recibido_minor` (en efectivo);
   - lo recibido debe alcanzar para lo vendido y la propina (si no, 422
     `recibido_minor`).
-- La venta trae `propina_minor`, `propina_para`, `cobrado_minor`, `recibido_minor`,
-  `cambio_minor` y, por línea, `extras` (nombres).
+- La venta trae `propina_minor`, `cobrado_minor`, `recibido_minor`, `cambio_minor` y,
+  por línea, `extras` (nombres).
+- La propina ya no lleva «para quién» (ADR 0145).
+
+## Mostrador: a quién se le vende (ADR 0145)
+
+- `GET /pos/compradores?q=` (`pos.vender`, al menos 2 letras): hasta 8 personas del
+  negocio con `id` (`persona:<ulid>` o, si es del equipo sin ficha, `usuario:<ulid>`),
+  `nombre`, `tipo` (`miembro`, `instructor`, `staff`), `genero`, `email` y `celular`.
+  - Quien vende acotado a sucursales solo encuentra a los alumnos de las suyas.
+- `POST /pos/ventas` acepta además:
+  - `comprador_id`: el `id` de arriba; sin él, venta a público en general. Uno que no
+    es del negocio (o de otra sede, para un acotado) da 422 `comprador_id`;
+  - `enviar_ticket`: manda el ticket por correo a la persona. A público en general se
+    ignora; a una persona sin correo, 422 `enviar_ticket`.
+- La venta trae `folio`, `comprador` (`{id, nombre, tipo, genero}` o `null`) y
+  `ticket_enviado_en`.
+- `GET /pos/ventas`:
+  - por páginas: `page`, `per_page` (hasta 100; 20 por omisión);
+  - filtros: `desde` y `hasta` (días del negocio), `sucursal_id` y `persona_id`.
+    `hasta` antes que `desde` da 422;
+  - `meta`: `total`, `page`, `per_page`, `ultima_pagina`, `resumen` (lo filtrado) y
+    `hoy` (hoy en esas sucursales). Los dos traen `{ventas, vendido_minor,
+    propinas_minor}` sin anuladas.
+- `GET /mi/compras-mostrador` (cualquier sesión, por páginas): los tickets de quien
+  tiene la sesión o de la persona a su cargo (`X-Participante`). Cada uno con `folio`,
+  `creado_en`, `sucursal`, `lineas` (`articulo`, `cantidad`, `extras`,
+  `subtotal_minor`), `total_minor`, `propina_minor`, `cobrado_minor`, `recibido_minor`,
+  `cambio_minor`, `moneda`, `metodo_pago` y `anulada`.
 - `GET /pagos/movimientos`: las ventas traen `propina_minor`, y los totales
   `propinas_minor` y `propinas_por_metodo`, aparte de `cobrado_minor`.
 

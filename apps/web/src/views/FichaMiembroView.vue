@@ -17,6 +17,7 @@ import RegistrarPagoOrden, {
   type CuotaPorCobrar,
   type OrdenPorCobrar,
 } from "@/components/RegistrarPagoOrden.vue";
+import VentasMostrador from "@/components/VentasMostrador.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
@@ -166,6 +167,12 @@ const puedeGestionar = computed(() => sesion.puede("miembros.gestionar"));
 // El corte de cada plan y los movimientos de créditos piden ver derechos.
 const puedeVerDerechos = computed(() => sesion.puede("derechos.ver"));
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
+// Lo que compró en el mostrador (ADR 0145): a quien ve el inventario, si su plan lo trae.
+const verComprasMostrador = computed(
+  () =>
+    sesion.puede("inventario.ver") &&
+    sesion.estudio?.plan?.sin.includes("inventario") !== true,
+);
 const puedeRecargar = computed(() => sesion.puede("membresias.gestionar"));
 
 // Negocio de citas: el cliente paga cada servicio; sin bono ni membresía no le
@@ -1264,6 +1271,19 @@ const regreso = useRegreso({
                     </div>
                   </li>
                 </ul>
+              </section>
+
+              <!-- Compras en mostrador (ADR 0145) -->
+              <section
+                v-if="verComprasMostrador"
+                class="px-5 py-5 border-t max-lg:order-2"
+                :style="{ borderColor: 'var(--borde)' }"
+              >
+                <VentasMostrador
+                  :persona-id="personaId"
+                  :por-pagina="5"
+                  :titulo="$t('mostradorVisual.ventas.enFicha')"
+                />
               </section>
             </template>
           </div>

@@ -358,6 +358,13 @@ export default {
     sinHistorial: "Aún no hay pagos.",
     con: "Con {nombre}",
   },
+  // Lo que compró en el mostrador del negocio (ADR 0145).
+  comprasMostrador: {
+    titulo: "Compras en mostrador",
+    folio: "Ticket {folio}",
+    propina: "Incluye {monto} de propina",
+    anulada: "Anulada",
+  },
   expediente: {
     titulo: "Expediente",
     descripcion:

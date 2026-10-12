@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import CorregirCobro from "@/components/CorregirCobro.vue";
+import BuscarPersona, {
+  type PersonaBuscable,
+} from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
-import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
+import VentasMostrador, {
+  type ResumenVentas,
+} from "@/components/VentasMostrador.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { terminoComprador } from "@/lib/mostrador";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -25,8 +30,12 @@ import { useToastStore } from "@/stores/toast";
  * se administran en Inventario.
  *
  * ADR 0139: un producto con extras (a una proteína, fresas o leche de soya) pregunta
- * cuáles lleva al tocarlo; la propina va aparte de lo vendido, para alguien del equipo
- * si se dice; en efectivo, «Recibe» calcula el cambio.
+ * cuáles lleva al tocarlo; la propina va aparte de lo vendido; en efectivo, «Recibe»
+ * calcula el cambio.
+ *
+ * ADR 0145: se le vende a una persona del negocio (alumno, instructor o alguien del
+ * equipo) o, sin elegir a nadie, a público en general; a la persona se le puede mandar
+ * su ticket por correo. Las ventas recientes van por páginas y con fechas.
  */
 interface Extra {
   id: string;
@@ -53,21 +62,6 @@ interface Sucursal {
   id: string;
   nombre: string;
 }
-interface Venta {
-  id: string;
-  sucursal: string | null;
-  total_minor: number;
-  propina_minor?: number;
-  moneda: string;
-  metodo_pago: string;
-  creado_en: string | null;
-  lineas?: { articulo: string | null; cantidad: number }[];
-  // Venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
-  anulada_en?: string | null;
-  motivo_anulacion?: string | null;
-  corregible?: boolean;
-  anulable?: boolean;
-}
 
 const METODOS = ["efectivo", "tarjeta", "transferencia"] as const;
 
@@ -77,48 +71,38 @@ const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeVender = computed(() => sesion.puede("pos.vender"));
 
-// Forma de pago a la vista (no el valor interno) y la venta que se corrige.
-function nombreMetodo(m: string): string {
-  return te(`pos.metodos.${m}`) ? t(`pos.metodos.${m}`) : m;
-}
-const corrigiendo = ref<string | null>(null);
-async function alCorregirVenta(): Promise<void> {
-  corrigiendo.value = null;
-  await cargar();
-}
-
 const articulos = ref<Articulo[]>([]);
 const sucursales = ref<Sucursal[]>([]);
-const ventas = ref<Venta[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const cobrando = ref(false);
 
 const sucursalSel = ref("");
 // Con una sucursal fija (la de la barra o la única), se vende ahí sin preguntar.
-const { mostrarSelect: elegirSucursal, actual: sucursalActual } =
-  useSucursalOperativa({ campo: sucursalSel });
-const ventasVisibles = computed(() =>
-  sucursalActual.value
-    ? ventas.value.filter((v) => v.sucursal === sucursalActual.value!.nombre)
-    : ventas.value,
-);
+const {
+  mostrarSelect: elegirSucursal,
+  actual: sucursalActual,
+  fija: sucursalFija,
+} = useSucursalOperativa({ campo: sucursalSel });
+
+// Las ventas recientes (con su paginación y fechas) y lo vendido hoy.
+const listaVentas = ref<InstanceType<typeof VentasMostrador> | null>(null);
+const hoy = ref<ResumenVentas>({
+  ventas: 0,
+  vendido_minor: 0,
+  propinas_minor: 0,
+});
 
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [a, s, v] = await Promise.all([
+    const [a, s] = await Promise.all([
       api.get<{ data: Articulo[] }>(`${base.value}/articulos`),
       api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
-      api.get<{ data: Venta[] }>(`${base.value}/pos/ventas`),
     ]);
     articulos.value = a.data.data;
     sucursales.value = s.data.data;
-    ventas.value = v.data.data;
-    if (puedeVender.value && equipo.value.length === 0) {
-      void cargarEquipo();
-    }
     if (sucursalSel.value === "" && sucursales.value.length > 0) {
       sucursalSel.value = sucursales.value[0]!.id;
     }
@@ -146,19 +130,6 @@ function iniciales(nombre: string): string {
     .slice(0, 2)
     .map((p) => p[0]!.toUpperCase())
     .join("");
-}
-function hora(iso: string | null): string {
-  if (!iso) {
-    return "—";
-  }
-  const d = new Date(iso);
-  const hoy = new Date().toDateString() === d.toDateString();
-  return new Intl.DateTimeFormat(
-    "es-MX",
-    hoy
-      ? { hour: "numeric", minute: "2-digit" }
-      : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" },
-  ).format(d);
 }
 
 // ---- Productos a la venta ----
@@ -270,22 +241,35 @@ function quitar(clave: string): void {
   carrito.value = carrito.value.filter((l) => l.clave !== clave);
 }
 
+// ---- A quién se le vende (ADR 0145) ----
+// Sin elegir a nadie, a público en general (sin ticket por correo).
+const comprador = ref("");
+const compradorElegido = ref<PersonaBuscable | null>(null);
+const enviarTicket = ref(false);
+// En su género y con las palabras del negocio: «Alumna», «Maestro», «Equipo».
+function tipoComprador(p: PersonaBuscable): string {
+  return terminoComprador(p.tipo, p.genero, t, te);
+}
+// Debajo de su nombre: qué es en el negocio y su correo o celular.
+function describirComprador(p: PersonaBuscable): string | null {
+  return [tipoComprador(p), p.detalle].filter(Boolean).join(" · ") || null;
+}
+// Con correo, el ticket se le manda salvo que se desmarque.
+function alElegirComprador(p: PersonaBuscable): void {
+  compradorElegido.value = p;
+  enviarTicket.value = Boolean(p.email);
+}
+watch(comprador, (id) => {
+  if (id === "") {
+    compradorElegido.value = null;
+    enviarTicket.value = false;
+  }
+});
+
 // ---- Propina y cambio (ADR 0139) ----
 const PORCENTAJES = [10, 15, 20] as const;
 const propinaModo = ref<"sin" | "otra" | (typeof PORCENTAJES)[number]>("sin");
 const propinaOtra = ref("");
-const propinaPara = ref("");
-const equipo = ref<{ id: string; nombre: string }[]>([]);
-async function cargarEquipo(): Promise<void> {
-  try {
-    const { data } = await api.get<{ data: { id: string; nombre: string }[] }>(
-      `${base.value}/pos/propina-para`,
-    );
-    equipo.value = data.data;
-  } catch {
-    equipo.value = [];
-  }
-}
 const propinaMinor = computed(() => {
   if (propinaModo.value === "sin") {
     return 0;
@@ -308,8 +292,8 @@ const cambio = computed(() =>
 function reiniciarCobro(): void {
   propinaModo.value = "sin";
   propinaOtra.value = "";
-  propinaPara.value = "";
   recibido.value = "";
+  comprador.value = "";
 }
 // Al cambiar de sucursal, la venta empieza de nuevo (otro stock).
 function cambiarSucursal(): void {
@@ -321,12 +305,17 @@ async function cobrar(): Promise<void> {
   if (carrito.value.length === 0 || sucursalSel.value === "") {
     return;
   }
+  const a = compradorElegido.value;
   if (
     !(await confirmar(
       t("confirmaciones.pos", {
         total: dinero(totalCobrar.value),
         metodo: t(`pos.metodos.${metodo.value}`),
-      }),
+      }) +
+        " " +
+        (a
+          ? t("mostradorVisual.comprador.confirmarA", { nombre: a.nombre })
+          : t("mostradorVisual.comprador.confirmarPublico")),
       { aceptar: t("confirmaciones.cobrar") },
     ))
   ) {
@@ -335,33 +324,35 @@ async function cobrar(): Promise<void> {
   cobrando.value = true;
   error.value = null;
   try {
-    const { data } = await api.post<{ data: { cambio_minor: number | null } }>(
-      `${base.value}/pos/ventas`,
-      {
-        sucursal_id: sucursalSel.value,
-        metodo_pago: metodo.value,
-        items: carrito.value.map((l) => ({
-          articulo_id: l.id,
-          cantidad: l.cantidad,
-          extras: l.extras.map((e) => e.id),
-        })),
-        propina_minor: propinaMinor.value,
-        propina_para_id:
-          propinaMinor.value > 0 && propinaPara.value !== ""
-            ? propinaPara.value
-            : null,
-        recibido_minor: recibidoMinor.value,
-      },
-    );
+    const { data } = await api.post<{
+      data: { cambio_minor: number | null; ticket_enviado_en?: string | null };
+    }>(`${base.value}/pos/ventas`, {
+      sucursal_id: sucursalSel.value,
+      metodo_pago: metodo.value,
+      items: carrito.value.map((l) => ({
+        articulo_id: l.id,
+        cantidad: l.cantidad,
+        extras: l.extras.map((e) => e.id),
+      })),
+      propina_minor: propinaMinor.value,
+      recibido_minor: recibidoMinor.value,
+      comprador_id: comprador.value !== "" ? comprador.value : null,
+      enviar_ticket: comprador.value !== "" && enviarTicket.value,
+    });
     const vuelto = data?.data?.cambio_minor ?? null;
+    const ticket =
+      data?.data?.ticket_enviado_en && a?.email
+        ? " " +
+          t("mostradorVisual.comprador.ticketEnviadoA", { correo: a.email })
+        : "";
     toast.exito(
-      vuelto !== null && vuelto > 0
+      (vuelto !== null && vuelto > 0
         ? t("mostradorVisual.vendidoCambio", { cambio: dinero(vuelto) })
-        : t("pos.vendido"),
+        : t("pos.vendido")) + ticket,
     );
     carrito.value = [];
     reiniciarCobro();
-    await cargar();
+    await Promise.all([cargar(), listaVentas.value?.cargar()]);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -369,18 +360,9 @@ async function cobrar(): Promise<void> {
   }
 }
 
-// ---- Indicadores del día ----
-const deHoy = computed(() => {
-  const hoy = new Date().toDateString();
-  return ventasVisibles.value.filter(
-    (v) =>
-      !v.anulada_en &&
-      v.creado_en !== null &&
-      new Date(v.creado_en).toDateString() === hoy,
-  );
-});
+// ---- Indicadores del día (del servidor: hoy en el negocio, sin anuladas) ----
 const indicadores = computed<Indicador[]>(() => {
-  const total = deHoy.value.reduce((s, v) => s + v.total_minor, 0);
+  const total = hoy.value.vendido_minor;
   const sinStock = articulos.value.filter(
     (a) => a.activo && stockEn(a) <= 0,
   ).length;
@@ -388,7 +370,7 @@ const indicadores = computed<Indicador[]>(() => {
     {
       clave: "ventas",
       etiqueta: t("mostradorVisual.kpi.ventasHoy"),
-      valor: String(deHoy.value.length),
+      valor: String(hoy.value.ventas),
       icono: "ventas",
     },
     {
@@ -401,8 +383,8 @@ const indicadores = computed<Indicador[]>(() => {
       clave: "ticket",
       etiqueta: t("mostradorVisual.kpi.ticket"),
       valor:
-        deHoy.value.length > 0
-          ? dinero(Math.round(total / deHoy.value.length))
+        hoy.value.ventas > 0
+          ? dinero(Math.round(total / hoy.value.ventas))
           : "—",
       icono: "etiqueta",
     },
@@ -596,6 +578,53 @@ onMounted(cargar);
               </li>
             </ul>
 
+            <div class="mt-4" data-prueba="comprador">
+              <label class="tu-label" for="pos-comprador">{{
+                $t("mostradorVisual.comprador.titulo")
+              }}</label>
+              <BuscarPersona
+                v-model="comprador"
+                campo-id="pos-comprador"
+                :buscar-en="`${base}/pos/compradores`"
+                :placeholder="$t('mostradorVisual.comprador.buscar')"
+                :describir="describirComprador"
+                :deshabilitado="!puedeVender"
+                @elegir="alElegirComprador"
+              />
+              <p
+                v-if="comprador === ''"
+                class="mt-1 text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("mostradorVisual.comprador.publicoAyuda") }}
+              </p>
+              <label
+                v-else
+                class="mt-2 flex items-start gap-2 text-sm"
+                data-prueba="enviar-ticket"
+              >
+                <input
+                  v-model="enviarTicket"
+                  type="checkbox"
+                  class="mt-0.5"
+                  :disabled="!compradorElegido?.email"
+                />
+                <span>
+                  {{ $t("mostradorVisual.comprador.enviarTicket") }}
+                  <span
+                    class="block text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{
+                      compradorElegido?.email
+                        ? $t("mostradorVisual.comprador.aCorreo", {
+                            correo: compradorElegido.email,
+                          })
+                        : $t("mostradorVisual.comprador.sinCorreo")
+                    }}</span
+                  >
+                </span>
+              </label>
+            </div>
             <div class="mt-4">
               <p class="tu-label">{{ $t("pos.metodo") }}</p>
               <div class="tu-segmentado w-full" role="group">
@@ -653,22 +682,6 @@ onMounted(cargar);
                 :aria-label="$t('mostradorVisual.propina.monto')"
                 :placeholder="$t('mostradorVisual.propina.monto')"
               />
-              <label
-                v-if="propinaMinor > 0 && equipo.length > 0"
-                class="mt-2 block text-sm"
-              >
-                <span class="tu-label">{{
-                  $t("mostradorVisual.propina.para")
-                }}</span>
-                <select v-model="propinaPara" class="tu-input">
-                  <option value="">
-                    {{ $t("mostradorVisual.propina.paraNadie") }}
-                  </option>
-                  <option v-for="u in equipo" :key="u.id" :value="u.id">
-                    {{ u.nombre }}
-                  </option>
-                </select>
-              </label>
             </div>
             <dl
               v-if="propinaMinor > 0"
@@ -750,116 +763,15 @@ onMounted(cargar);
           </aside>
         </div>
 
-        <!-- Ventas recientes -->
-        <h2 class="mt-8 font-medium">{{ $t("pos.ventas.titulo") }}</h2>
-        <EstadoVacio
-          v-if="ventasVisibles.length === 0"
-          class="mt-3 py-6"
-          icono="ventas"
-          compacto
-          :titulo="$t('pos.ventas.vacio')"
+        <!-- Ventas recientes: a quién, por páginas y con fechas (ADR 0145). -->
+        <VentasMostrador
+          ref="listaVentas"
+          class="mt-8"
+          :sucursal-id="sucursalFija"
+          :mostrar-sucursal="!sucursalActual"
+          corregir
+          @hoy="hoy = $event"
         />
-        <div v-else class="relative tu-card mt-3 overflow-x-auto">
-          <table class="mo-tabla">
-            <thead>
-              <tr>
-                <th>{{ $t("mostradorVisual.col.cuando") }}</th>
-                <th>{{ $t("mostradorVisual.col.productos") }}</th>
-                <th v-if="!sucursalActual" class="hidden md:table-cell">
-                  {{ $t("pos.ventas.colSucursal") }}
-                </th>
-                <th class="hidden sm:table-cell">
-                  {{ $t("pos.ventas.colMetodo") }}
-                </th>
-                <th class="text-right">{{ $t("pos.ventas.colTotal") }}</th>
-                <th>
-                  <span class="sr-only">{{
-                    $t("mostradorVisual.col.acciones")
-                  }}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-for="v in ventasVisibles" :key="v.id">
-                <tr>
-                  <td class="whitespace-nowrap mo-suave">
-                    {{ hora(v.creado_en) }}
-                  </td>
-                  <td>
-                    {{
-                      (v.lineas ?? [])
-                        .map((l) => `${l.cantidad} × ${l.articulo ?? ""}`)
-                        .join(", ") || "—"
-                    }}
-                  </td>
-                  <td v-if="!sucursalActual" class="hidden md:table-cell">
-                    {{ v.sucursal ?? "—" }}
-                  </td>
-                  <td class="hidden sm:table-cell">
-                    <span
-                      v-if="v.anulada_en"
-                      class="tu-pildora"
-                      :style="{ '--tono': 'var(--error)' }"
-                      :title="v.motivo_anulacion ?? undefined"
-                      data-prueba="venta-anulada"
-                      >{{ $t("corregirCobro.anulada") }}</span
-                    >
-                    <template v-else>{{
-                      nombreMetodo(v.metodo_pago)
-                    }}</template>
-                  </td>
-                  <td
-                    class="text-right font-medium tabular-nums"
-                    :class="{ 'line-through mo-suave': v.anulada_en }"
-                  >
-                    {{ dinero(v.total_minor, v.moneda) }}
-                    <span
-                      v-if="(v.propina_minor ?? 0) > 0"
-                      class="block text-xs font-normal"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{
-                        $t("mostradorVisual.conPropina", {
-                          monto: dinero(v.propina_minor ?? 0, v.moneda),
-                        })
-                      }}</span
-                    >
-                  </td>
-                  <td class="text-right">
-                    <button
-                      v-if="!v.anulada_en && (v.corregible || v.anulable)"
-                      class="tu-enlace text-sm"
-                      type="button"
-                      data-prueba="corregir-venta"
-                      :aria-expanded="corrigiendo === v.id"
-                      @click="corrigiendo = corrigiendo === v.id ? null : v.id"
-                    >
-                      {{ $t("corregirCobro.corregir") }}
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="corrigiendo === v.id" class="mo-correccion">
-                  <td colspan="6">
-                    <CorregirCobro
-                      :base="base"
-                      :pago="{
-                        id: v.id,
-                        metodo: v.metodo_pago,
-                        corregible: v.corregible === true,
-                        anulable: v.anulable === true,
-                      }"
-                      :url-metodo="`${base}/pos/ventas/${v.id}/metodo`"
-                      :url-anular="`${base}/pos/ventas/${v.id}/anular`"
-                      :metodos="[...METODOS]"
-                      permiso-metodo="pos.vender"
-                      contexto="venta"
-                      @cambiado="alCorregirVenta"
-                    />
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
       </template>
     </template>
     <!-- Extras del producto (ADR 0139): un toque por extra. -->
@@ -1035,32 +947,5 @@ onMounted(cargar);
   border-top: 1px solid var(--borde);
   font-size: 1.05rem;
   font-weight: 600;
-}
-.mo-tabla {
-  width: 100%;
-  font-size: 0.9rem;
-  border-collapse: collapse;
-}
-.mo-tabla th {
-  padding: 0.7rem 1rem;
-  color: var(--texto-suave);
-  font-size: 0.78rem;
-  font-weight: 500;
-  text-align: left;
-}
-.mo-tabla th.text-right {
-  text-align: right;
-}
-.mo-tabla td {
-  padding: 0.7rem 1rem;
-  border-top: 1px solid var(--borde);
-  vertical-align: middle;
-}
-.mo-correccion td {
-  border-top: 0;
-  padding-top: 0;
-}
-.mo-suave {
-  color: var(--texto-suave);
 }
 </style>

@@ -309,6 +309,26 @@ abstract class DemoBase
     }
 
     /**
+     * Uno de la lista, `$porciento` de las veces, sin tocar la semilla: un detalle que
+     * se agregó después (a quién se le vendió en el mostrador, ADR 0145) no cambia el
+     * resto de la historia de la demo.
+     *
+     * @template T
+     *
+     * @param  list<T>  $lista
+     * @return T|null
+     */
+    protected function unoSinSemilla(array $lista, string $clave, int $porciento): mixed
+    {
+        $tiro = crc32($clave);
+        if ($lista === [] || $tiro % 100 >= $porciento) {
+            return null;
+        }
+
+        return $lista[intdiv($tiro, 100) % count($lista)];
+    }
+
+    /**
      * Uno al azar, con pesos: ['efectivo' => 50, 'manual' => 30, ...].
      *
      * @template T of array-key

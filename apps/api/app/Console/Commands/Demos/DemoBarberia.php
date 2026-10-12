@@ -819,8 +819,14 @@ final class DemoBarberia extends DemoBase
                 if ($inventario->stock((int) $articulo->getKey(), (int) $sede->getKey()) < 2) {
                     $inventario->registrar((int) $articulo->getKey(), (int) $sede->getKey(), 12, TipoMovimientoInventario::Entrada, 'Compra a proveedor', $this->equipo['karla']);
                 }
+                // A la mitad, un cliente que ya venía; a los demás, público en general.
+                $clientes = array_values(array_filter(
+                    array_column($this->clientes, 'persona'),
+                    static fn (PersonaTenant $p): bool => $p->created_at === null || $p->created_at->lessThanOrEqualTo($dia->endOfDay()),
+                ));
+                $comprador = $this->unoSinSemilla($clientes, "{$clave}{$dia->toDateString()}{$n}", 50);
                 try {
-                    $pos->vender($sede, [['articulo' => $articulo, 'cantidad' => $this->prob(85) ? 1 : 2]], (string) $this->elegir(['efectivo' => 55, 'tarjeta' => 35, 'transferencia' => 10]), $cajero);
+                    $pos->vender($sede, [['articulo' => $articulo, 'cantidad' => $this->prob(85) ? 1 : 2]], (string) $this->elegir(['efectivo' => 55, 'tarjeta' => 35, 'transferencia' => 10]), $cajero, 0, $comprador);
                     $this->sumar('ventas de mostrador');
                 } catch (RuntimeException|ValidationException) {
                     // Sin existencias: no se vende.

@@ -27,6 +27,7 @@ Estado: Aceptado (2026-10-12). Pedido del dueño sobre el punto de venta:
 
 - `ventas_pos.propina_minor`, opcionalmente para alguien del equipo
   (`propina_para_id`, de `GET /pos/propina-para`: el equipo activo, no los clientes).
+  El ADR 0145 quitó el «para quién»: la columna queda solo por lo ya registrado.
 - Va aparte de lo vendido: `total_minor` sigue siendo el ingreso del negocio, y los
   reportes de ventas no la cuentan.
 - En el corte de caja va aparte, con su total y por forma de pago (`propinas_minor`,

@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\ExtraArticuloTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
@@ -18,6 +19,8 @@ use Illuminate\Validation\ValidationException;
  * Punto de venta minorista tenant-local (R21): registra un ticket de caja y descuenta
  * stock (movimientos de salida) de forma atómica. Bloquea el artículo (lockForUpdate)
  * para serializar ventas concurrentes del mismo artículo y no vender de más.
+ *
+ * Se le vende a una persona del negocio o, sin ella, a público en general (ADR 0145).
  */
 class PuntoDeVentaTenant
 {
@@ -26,9 +29,9 @@ class PuntoDeVentaTenant
     /**
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras?: list<ExtraArticuloTenant>}>  $items
      */
-    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?Usuario $propinaPara = null, ?int $recibidoMinor = null): VentaPosTenant
+    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null): VentaPosTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $propinaPara, $recibidoMinor): VentaPosTenant {
+        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor): VentaPosTenant {
             $moneda = $items[0]['articulo']->moneda;
 
             // La propina va aparte de lo vendido: no es ingreso del negocio (ADR 0139).
@@ -39,7 +42,7 @@ class PuntoDeVentaTenant
                 'metodo_pago' => $metodo,
                 'usuario_id' => $actor?->getKey(),
                 'propina_minor' => max(0, $propinaMinor),
-                'propina_para_id' => $propinaMinor > 0 ? $propinaPara?->getKey() : null,
+                'persona_id' => $comprador?->getKey(),
             ]);
 
             $total = 0;

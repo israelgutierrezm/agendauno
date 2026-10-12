@@ -1,13 +1,15 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import BuscarPersona from "@/components/BuscarPersona.vue";
 import { i18n } from "@/i18n";
 import PosView from "./PosView.vue";
 
 /*
-| Mostrador: se vende lo que hay en la sucursal y las ventas recientes muestran la
-| forma de pago a la vista (no el valor interno), las anuladas marcadas, y una venta
-| con error se corrige por su propia ruta (ADR 0089).
+| Mostrador: se vende lo que hay en la sucursal, a una persona del negocio (con su
+| ticket por correo si se marca) o a público en general (ADR 0145). Las ventas
+| recientes muestran la forma de pago a la vista (no el valor interno), las anuladas
+| marcadas, y una venta con error se corrige por su propia ruta (ADR 0089).
 */
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   put: vi.fn(),
   post: vi.fn(),
   confirmar: vi.fn(),
+  exito: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, put: mocks.put, post: mocks.post },
@@ -26,18 +29,26 @@ const sesion = vi.hoisted(() => ({
   puede: () => true,
   moneda: "MXN",
   pais: "MX",
+  zonaHoraria: "America/Mexico_City",
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));
 vi.mock("@/stores/toast", () => ({
-  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+  useToastStore: () => ({ exito: mocks.exito, error: vi.fn() }),
 }));
 
 const VENTAS = [
   {
     id: "v1",
     sucursal: "Roma Norte",
+    comprador: {
+      id: "p1",
+      nombre: "Valeria Ríos",
+      tipo: "miembro",
+      genero: "mujer",
+    },
+    ticket_enviado_en: "2026-10-01T18:00:05Z",
     total_minor: 56000,
     moneda: "MXN",
     metodo_pago: "efectivo",
@@ -49,6 +60,7 @@ const VENTAS = [
   {
     id: "v2",
     sucursal: "Roma Norte",
+    comprador: null,
     total_minor: 23000,
     moneda: "MXN",
     metodo_pago: "tarjeta",
@@ -60,6 +72,14 @@ const VENTAS = [
     anulable: false,
   },
 ];
+const META = {
+  total: 2,
+  page: 1,
+  per_page: 20,
+  ultima_pagina: 1,
+  resumen: { ventas: 1, vendido_minor: 56000, propinas_minor: 0 },
+  hoy: { ventas: 3, vendido_minor: 150000, propinas_minor: 0 },
+};
 
 const ARTICULOS = [
   {
@@ -74,25 +94,29 @@ const ARTICULOS = [
   },
 ];
 
+function respuestas(articulos: unknown[], ventas: unknown[] = VENTAS) {
+  mocks.get.mockImplementation((url: string) =>
+    Promise.resolve({
+      data: url.endsWith("/pos/ventas")
+        ? { data: ventas, meta: { ...META, total: ventas.length } }
+        : {
+            data: url.endsWith("/sucursales")
+              ? [{ id: "s1", nombre: "Roma Norte" }]
+              : url.endsWith("/articulos")
+                ? articulos
+                : [],
+          },
+    }),
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   sesion.moneda = "MXN";
   sesion.pais = "MX";
   mocks.confirmar.mockResolvedValue(true);
   mocks.put.mockResolvedValue({ data: {} });
-  mocks.get.mockImplementation((url: string) =>
-    Promise.resolve({
-      data: {
-        data: url.endsWith("/pos/ventas")
-          ? VENTAS
-          : url.endsWith("/sucursales")
-            ? [{ id: "s1", nombre: "Roma Norte" }]
-            : url.endsWith("/articulos")
-              ? ARTICULOS
-              : [],
-      },
-    }),
-  );
+  respuestas(ARTICULOS);
 });
 
 // El diálogo de extras, en línea (sin teleport) para encontrarlo en la prueba.
@@ -128,21 +152,7 @@ const PROTEINA = {
 
 describe("extras, propina y cambio (ADR 0139)", () => {
   beforeEach(() => {
-    mocks.get.mockImplementation((url: string) =>
-      Promise.resolve({
-        data: {
-          data: url.endsWith("/pos/ventas")
-            ? []
-            : url.endsWith("/sucursales")
-              ? [{ id: "s1", nombre: "Roma Norte" }]
-              : url.endsWith("/articulos")
-                ? [PROTEINA]
-                : url.endsWith("/pos/propina-para")
-                  ? [{ id: "u1", nombre: "Toño" }]
-                  : [],
-        },
-      }),
-    );
+    respuestas([PROTEINA], []);
     mocks.post.mockResolvedValue({ data: { data: { cambio_minor: 1500 } } });
   });
 
@@ -164,7 +174,7 @@ describe("extras, propina y cambio (ADR 0139)", () => {
     expect(w.get('[data-prueba="total-cobrar"]').text()).toBe("$75.00");
   });
 
-  it("la propina va aparte, para quien se diga; lo recibido da el cambio", async () => {
+  it("la propina va aparte, sin «para quién»; lo recibido da el cambio", async () => {
     const w = montarConDialogo();
     await flushPromises();
 
@@ -175,7 +185,7 @@ describe("extras, propina y cambio (ADR 0139)", () => {
       .findAll('[data-prueba="propina"] button')
       .find((b) => b.text() === "10 %")!
       .trigger("click");
-    await w.get('[data-prueba="propina"] select').setValue("u1");
+    expect(w.find('[data-prueba="propina"] select').exists()).toBe(false);
     expect(w.get('[data-prueba="total-cobrar"]').text()).toBe("$66.00");
     await w.get('[data-prueba="recibido"]').setValue("50");
     expect(w.get('[data-prueba="cambio"]').text()).toBe("Falta $16.00");
@@ -192,22 +202,137 @@ describe("extras, propina y cambio (ADR 0139)", () => {
       metodo_pago: "efectivo",
       items: [{ articulo_id: "a2", cantidad: 1, extras: [] }],
       propina_minor: 600,
-      propina_para_id: "u1",
       recibido_minor: 10000,
+      comprador_id: null,
+      enviar_ticket: false,
     });
   });
 });
 
-describe("ventas recientes del mostrador", () => {
-  it("muestra la forma de pago con su nombre y marca las anuladas", async () => {
+describe("a quién se le vende (ADR 0145)", () => {
+  async function elegir(
+    w: ReturnType<typeof mount>,
+    persona: Record<string, unknown>,
+  ): Promise<void> {
+    const buscador = w.findComponent(BuscarPersona);
+    buscador.vm.$emit("update:modelValue", persona.id);
+    buscador.vm.$emit("elegir", persona);
+    await flushPromises();
+  }
+
+  it("sin elegir a nadie es público en general y no ofrece ticket", async () => {
+    mocks.post.mockResolvedValue({ data: {} });
     const w = mount(PosView, { global: { plugins: [i18n] } });
     await flushPromises();
 
-    const filas = w.findAll("tbody > tr");
+    expect(w.get('[data-prueba="comprador"]').text()).toContain(
+      "venta a público en general",
+    );
+    expect(w.find('[data-prueba="enviar-ticket"]').exists()).toBe(false);
+    expect(w.findComponent(BuscarPersona).props("buscarEn")).toBe(
+      "/api/v1/app/demo/pos/compradores",
+    );
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+    expect(String(mocks.confirmar.mock.calls[0]![0])).toContain(
+      "Se registra como venta a público en general.",
+    );
+  });
+
+  it("a una persona con correo le manda su ticket, salvo que se desmarque", async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        data: { cambio_minor: null, ticket_enviado_en: "2026-10-01T18:00Z" },
+      },
+    });
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    await elegir(w, {
+      id: "persona:p1",
+      nombre: "Valeria Ríos",
+      email: "vale@correo.mx",
+      tipo: "miembro",
+    });
+    const ticket = w.get('[data-prueba="enviar-ticket"]');
+    expect(ticket.text()).toContain("A vale@correo.mx");
+    expect((ticket.get("input").element as HTMLInputElement).checked).toBe(
+      true,
+    );
+
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+    expect(String(mocks.confirmar.mock.calls[0]![0])).toContain(
+      "Se registra como venta a Valeria Ríos.",
+    );
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/pos/ventas",
+      expect.objectContaining({
+        comprador_id: "persona:p1",
+        enviar_ticket: true,
+      }),
+    );
+    expect(mocks.exito).toHaveBeenCalledWith(
+      "Venta registrada. Le mandamos su ticket a vale@correo.mx.",
+    );
+    // Vendido, la siguiente venta empieza otra vez en público en general.
+    expect(w.find('[data-prueba="enviar-ticket"]').exists()).toBe(false);
+  });
+
+  it("sin correo no se puede marcar el ticket", async () => {
+    mocks.post.mockResolvedValue({ data: {} });
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    await elegir(w, { id: "usuario:u1", nombre: "Toño", tipo: "staff" });
+    const ticket = w.get('[data-prueba="enviar-ticket"]');
+    expect(ticket.text()).toContain("No tiene correo registrado");
+    expect(ticket.get("input").attributes("disabled")).toBeDefined();
+
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/pos/ventas",
+      expect.objectContaining({
+        comprador_id: "usuario:u1",
+        enviar_ticket: false,
+      }),
+    );
+  });
+});
+
+describe("ventas recientes del mostrador", () => {
+  it("dice a quién se le vendió, la forma de pago con su nombre y marca las anuladas", async () => {
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    const filas = w.findAll('[data-prueba="venta"]');
     expect(filas[0]!.text()).toContain("Efectivo");
     expect(filas[0]!.text()).toContain("2 × Pomada mate");
+    expect(filas[0]!.text()).toContain("Valeria Ríos");
+    // Con el término del negocio, en su género.
+    expect(filas[0]!.get('[data-prueba="venta-comprador"]').text()).toContain(
+      "Alumna",
+    );
+    expect(filas[0]!.get('[data-prueba="ticket-enviado"]').text()).toBe(
+      "Ticket enviado",
+    );
+    expect(filas[1]!.text()).toContain("Público en general");
     expect(w.get('[data-prueba="venta-anulada"]').text()).toBe("Anulada");
     expect(w.findAll('[data-prueba="corregir-venta"]')).toHaveLength(1);
+  });
+
+  it("los indicadores del día vienen del servidor (hoy en el negocio)", async () => {
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    const texto = w.text();
+    expect(texto).toContain("Ventas de hoy3");
+    expect(texto).toContain("Vendido hoy$1,500.00");
+    expect(texto).toContain("Ticket promedio$500.00");
   });
 
   it("corrige la forma de pago por la ruta de la venta", async () => {
@@ -255,14 +380,16 @@ describe("ventas recientes del mostrador", () => {
       metodo_pago: "tarjeta",
       items: [{ articulo_id: "a1", cantidad: 2, extras: [] }],
       propina_minor: 0,
-      propina_para_id: null,
       recibido_minor: null,
+      comprador_id: null,
+      enviar_ticket: false,
     });
   });
 
   it("el total y la confirmación van en la moneda del negocio, no en pesos", async () => {
     sesion.moneda = "EUR";
     sesion.pais = "ES";
+    respuestas(ARTICULOS, []);
     mocks.post.mockResolvedValue({ data: {} });
     const w = mount(PosView, { global: { plugins: [i18n] } });
     await flushPromises();

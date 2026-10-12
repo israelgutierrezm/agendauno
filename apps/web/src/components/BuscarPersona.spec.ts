@@ -8,12 +8,13 @@ import BuscarPersona from "./BuscarPersona.vue";
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api }));
 
-function montar() {
+function montar(extra: Record<string, unknown> = {}) {
   return mount(BuscarPersona, {
     props: {
       modelValue: "",
       buscarEn: "/api/v1/app/demo/miembros",
       parametros: { tipo: "miembro" },
+      ...extra,
     },
     global: {
       plugins: [
@@ -83,5 +84,40 @@ describe("buscar persona en el servidor", () => {
     expect(api.get).toHaveBeenCalledTimes(1);
     expect(api.get.mock.calls[0][1].params.q).toBe("Enri");
     expect(w.text()).toContain("Nadie coincide con esa búsqueda.");
+  });
+
+  it("con `describir`, muestra lo que diga quien lo usa y pasa su correo y su tipo", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            id: "persona:p1",
+            nombre: "Valeria Ríos",
+            email: "vale@correo.mx",
+            celular: null,
+            tipo: "miembro",
+          },
+        ],
+      },
+    });
+    const w = montar({
+      describir: (p: { tipo?: string | null; detalle?: string | null }) =>
+        `${p.tipo} · ${p.detalle}`,
+    });
+    await w.get("input").setValue("vale");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    expect(w.text()).toContain("miembro · vale@correo.mx");
+    await w.get(".bp-opcion").trigger("mousedown");
+    expect(w.emitted("elegir")?.at(-1)).toEqual([
+      {
+        id: "persona:p1",
+        nombre: "Valeria Ríos",
+        detalle: "miembro · vale@correo.mx",
+        email: "vale@correo.mx",
+        tipo: "miembro",
+      },
+    ]);
   });
 });
