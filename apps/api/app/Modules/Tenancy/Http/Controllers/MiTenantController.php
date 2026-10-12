@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AntesDeReservarTenant;
+use App\Modules\Tenancy\Application\AtribucionTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\ClimaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
@@ -34,6 +35,7 @@ use App\Modules\Tenancy\Application\VentanaDeReservaTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\SesionTenantPresenter;
+use App\Modules\Tenancy\Medicion\Atribucion;
 use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
@@ -951,7 +953,7 @@ class MiTenantController
      * El alumno compra para SÍ MISMO: crea una orden pendiente (precio congelado). El
      * fulfillment (créditos) ocurre al pagarla en línea (webhook) o en el estudio.
      */
-    public function comprar(Request $request): JsonResponse
+    public function comprar(Request $request, AtribucionTenant $atribucion): JsonResponse
     {
         $persona = $this->persona($request);
         abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
@@ -963,6 +965,8 @@ class MiTenantController
             'codigo_promo' => ['nullable', 'string', 'max:64'],
             // Acepta las condiciones de un plan con permanencia (B04).
             'acepta_condiciones' => ['sometimes', 'boolean'],
+            // De dónde llegó (ADR 0142): se guarda con la orden.
+            ...Atribucion::reglas(),
         ]);
 
         // Para una persona a su cargo (B05): paga y acepta el responsable; los planes, sus
@@ -990,6 +994,11 @@ class MiTenantController
                 ? ['via' => 'cliente', 'usuario' => $actor instanceof Usuario ? $actor : null, 'ip' => $request->ip()]
                 : null,
         );
+
+        $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $titular);
+        if ($contexto !== null) {
+            $orden->update(['contexto_medicion_id' => $contexto->getKey()]);
+        }
 
         return response()->json(['data' => $this->presentarOrden($orden->refresh())], 201);
     }

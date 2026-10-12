@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\AtribucionTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
@@ -14,6 +15,7 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Exceptions\ModalidadNoDisponible;
+use App\Modules\Tenancy\Medicion\Atribucion;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -149,7 +151,7 @@ class PublicoCitasController
         )]);
     }
 
-    public function agendar(Request $request): JsonResponse
+    public function agendar(Request $request, AtribucionTenant $atribucion): JsonResponse
     {
         $this->paginaDeCitas($request);
         // El negocio decide si recibe citas sin cuenta (o solo de sus clientes con cuenta).
@@ -179,6 +181,8 @@ class PublicoCitasController
             'instructor_id' => ['nullable', 'string'],
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
+            // De dónde llegó (ADR 0142): se guarda con su cita y su orden.
+            ...Atribucion::reglas(),
         ]);
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
@@ -200,6 +204,10 @@ class PublicoCitasController
             : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
         $this->anotar($reserva, $validado['nota'] ?? null, $validado['asiste'] ?? null);
         $reserva->load(['orden', 'sesion.instructor']);
+        $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $persona);
+        if ($contexto !== null && $reserva->orden !== null) {
+            $reserva->orden->update(['contexto_medicion_id' => $contexto->getKey()]);
+        }
         $profesional = $reserva->sesion?->instructor;
 
         return response()->json(['data' => [

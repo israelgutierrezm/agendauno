@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
+use App\Modules\Tenancy\Application\AtribucionPlataforma;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
@@ -51,7 +52,7 @@ class RegistroEstudioController
         return response()->json(['data' => ['slug' => $slug, 'disponible' => $disponible]]);
     }
 
-    public function store(RegistrarEstudioRequest $request): JsonResponse
+    public function store(RegistrarEstudioRequest $request, AtribucionPlataforma $atribucion): JsonResponse
     {
         // Anti-bots: reCAPTCHA v3 (se omite si no hay llaves configuradas).
         if (! $this->recaptcha->aprobado($request->string('recaptcha_token')->value(), $request->ip())) {
@@ -110,6 +111,7 @@ class RegistroEstudioController
         ]);
 
         $this->legales->registrarAceptacion($estudio, (string) $estudio->contacto_email, $request->ip(), $request->userAgent());
+        $atribucion->registrar($estudio, $request->validated('atribucion'));
         if ($verificacion !== null) {
             $this->whatsapp->usar($verificacion);
             $estudio->forceFill([

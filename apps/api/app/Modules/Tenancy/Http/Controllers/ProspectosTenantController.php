@@ -262,6 +262,26 @@ class ProspectosTenantController
     }
 
     /**
+     * @return array{fuente: string|null, medio: string|null, campana: string|null, referente: string|null, primer_origen: array<string, string>|null}|null
+     */
+    private function campana(ProspectoTenant $p): ?array
+    {
+        $contexto = $p->contexto;
+        if ($contexto === null) {
+            return null;
+        }
+        $primer = $contexto->primer_toque;
+
+        return [
+            'fuente' => $contexto->fuente,
+            'medio' => $contexto->medio,
+            'campana' => $contexto->campana,
+            'referente' => $contexto->referente,
+            'primer_origen' => $primer !== null && $primer !== $contexto->ultimo_toque ? $primer : null,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function presentar(ProspectoTenant $p, bool $detalle = false): array
@@ -298,6 +318,9 @@ class ProspectosTenantController
             'convertido_en' => $p->convertido_en?->toIso8601String(),
             'creado_en' => $p->created_at->toIso8601String(),
             'respuestas' => $detalle ? ($p->respuestas ?? []) : null,
+            // De dónde llegó (ADR 0142): la campaña acreditada y su primer origen; null =
+            // sin atribución.
+            'campana' => $detalle ? $this->campana($p) : null,
             'eventos' => $detalle ? $p->eventos()->with('autor')->limit(100)->get()->map(fn (EventoProspectoTenant $e): array => [
                 'tipo' => $e->tipo->value,
                 'detalle' => $e->detalle ?? [],
