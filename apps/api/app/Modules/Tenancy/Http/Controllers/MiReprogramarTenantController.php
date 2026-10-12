@@ -176,7 +176,7 @@ class MiReprogramarTenantController
     {
         // La suya o la de una persona a su cargo (B05).
         $persona = $this->cuenta->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->with('sesion.oferta')->firstOrFail();
         abort_unless((int) $reserva->persona_id === (int) $persona->getKey(), 403, 'Esta reserva no es tuya.');
 

@@ -540,7 +540,13 @@ onMounted(cargar);
       <div v-if="pestana === 'cierres'" class="mt-5 tu-card p-5">
         <h2 class="font-medium">{{ $t("reglasAgenda.cerrados") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("reglasAgenda.cerradosAyuda") }}
+          {{
+            $t(
+              sesion.esCitas
+                ? "reglasAgenda.cerradosAyudaCitas"
+                : "reglasAgenda.cerradosAyudaClases",
+            )
+          }}
         </p>
         <form
           class="mt-4 flex flex-wrap items-end gap-3"

@@ -26,11 +26,11 @@ final class CatalogoParametros
                 'Si no se paga en este tiempo, el lugar se libera.', $e, 30, 5, 1440, 'min'),
             // Cuándo reserva el cliente una clase desde su cuenta o la app (el negocio, siempre).
             new DefinicionParametro('reservas.dias_apertura', 'Reservas y lista de espera', 'El cliente reserva una clase desde',
-                'Días antes de la clase. 0 = en cuanto se programa.', $e, 0, 0, 365, 'días'),
+                'Días antes de la clase. 0 = en cuanto se programa.', $e, 0, 0, 365, 'días', modalidad: 'clases'),
             new DefinicionParametro('reservas.minutos_cierre', 'Reservas y lista de espera', 'Las reservas de una clase cierran',
-                'Minutos antes de que empiece. 0 = hasta que empieza.', $e, 0, 0, 1440, 'min'),
+                'Minutos antes de que empiece. 0 = hasta que empieza.', $e, 0, 0, 1440, 'min', modalidad: 'clases'),
             new DefinicionParametro('reservas.minutos_para_aceptar_lugar', 'Reservas y lista de espera', 'Tiempo para aceptar un lugar de la lista de espera',
-                'Si no lo acepta a tiempo, se ofrece al siguiente.', $e, 30, 5, 1440, 'min'),
+                'Si no lo acepta a tiempo, se ofrece al siguiente.', $e, 30, 5, 1440, 'min', modalidad: 'clases'),
 
             // Recordatorios.
             new DefinicionParametro('recordatorios.primero_horas', 'Recordatorios', 'Primer recordatorio',
@@ -48,22 +48,22 @@ final class CatalogoParametros
 
             // Citas.
             new DefinicionParametro('citas.duracion_defecto', 'Citas', 'Duración de una cita si el servicio no la define',
-                'Minutos.', $e, 30, 5, 480, 'min'),
+                'Minutos.', $e, 30, 5, 480, 'min', modalidad: 'citas'),
             // ADR 0065.
             new DefinicionParametro('citas.pago_en_linea_obligatorio', 'Citas', 'Pedir el pago en línea para confirmar una cita',
-                'Si lo apagas, la cita queda confirmada al agendar y el cliente paga en línea o en la sucursal. Sin cobro en línea activo, siempre se paga en la sucursal.', $sn, 1),
+                'Si lo apagas, la cita queda confirmada al agendar y el cliente paga en línea o en la sucursal. Sin cobro en línea activo, siempre se paga en la sucursal.', $sn, 1, modalidad: 'citas'),
             new DefinicionParametro('citas.minutos_anticipacion_minima', 'Citas', 'Anticipación mínima para agendar en línea',
-                'Minutos antes de la cita. 0 = cualquier horario libre que aún no empiece. El negocio agenda sin este límite.', $e, 0, 0, 10080, 'min'),
+                'Minutos antes de la cita. 0 = cualquier horario libre que aún no empiece. El negocio agenda sin este límite.', $e, 0, 0, 10080, 'min', modalidad: 'citas'),
             new DefinicionParametro('citas.dias_maximos_adelante', 'Citas', 'Se agenda en línea hasta',
-                'Días adelante que el cliente ve y puede agendar.', $e, 60, 1, 365, 'días'),
+                'Días adelante que el cliente ve y puede agendar.', $e, 60, 1, 365, 'días', modalidad: 'citas'),
             new DefinicionParametro('citas.agendar_sin_cuenta', 'Citas', 'Se puede agendar sin cuenta',
-                'Si lo apagas, en tu página solo agendan clientes con cuenta (los que tú invitas).', $sn, 1),
+                'Si lo apagas, en tu página solo agendan clientes con cuenta (los que tú invitas).', $sn, 1, modalidad: 'citas'),
             new DefinicionParametro('citas.maximo_por_pagar', 'Citas', 'Citas por pagar que puede tener un cliente',
-                'Con estas citas próximas sin pagar, el cliente ya no puede agendar otra en línea ni desde su cuenta (el negocio sí puede agendarle). 0 = sin límite.', $e, 5, 0, 50, 'citas'),
+                'Con estas citas próximas sin pagar, el cliente ya no puede agendar otra en línea ni desde su cuenta (el negocio sí puede agendarle). 0 = sin límite.', $e, 5, 0, 50, 'citas', modalidad: 'citas'),
 
             // Clases recurrentes (ADR 0045).
             new DefinicionParametro('agenda.dias_a_generar', 'Clases recurrentes', 'Fechas creadas por adelantado',
-                'Días hacia adelante con fechas de las clases recurrentes listas para reservar.', $e, 30, 7, 365, 'días'),
+                'Días hacia adelante con fechas de las clases recurrentes listas para reservar.', $e, 30, 7, 365, 'días', modalidad: 'clases'),
 
             // Asistencia (ADR 0101).
             new DefinicionParametro('asistencia.minutos_antes', 'Asistencia', 'Se puede pasar lista desde',
@@ -83,11 +83,11 @@ final class CatalogoParametros
 
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',
-                'Minutos antes de que empiece su clase o cita.', $e, 30, 0, 240, 'min'),
+                'Minutos antes de que empiece su clase o cita.', $e, 30, 0, 240, 'min', modalidad: 'clases'),
 
             // Membresías (ADR 0047).
             new DefinicionParametro('membresias.dias_aviso_renovacion', 'Membresías', 'Avisar la renovación',
-                'Días antes de que se renueve una membresía.', $e, 3, 1, 30, 'días'),
+                'Días antes de que se renueve una membresía.', $e, 3, 1, 30, 'días', modalidad: 'clases'),
             new DefinicionParametro('membresias.dias_por_vencer', 'Membresías', 'Una membresía está por vencer desde',
                 'Días antes de su vencimiento. Aplica en la ficha del alumno, el radar de retención y las difusiones.', $e, 14, 1, 90, 'días'),
             new DefinicionParametro('membresias.dias_vencida_recuperable', 'Membresías', 'Una membresía vencida se sigue buscando durante',
@@ -108,7 +108,7 @@ final class CatalogoParametros
 
             // Cobranza.
             new DefinicionParametro('cobranza.dias_gracia_pago_automatico', 'Cobranza', 'Espera antes de dar por fallido un pago automático',
-                'Días después de la fecha de cobro sin recibirlo.', $e, 3, 0, 30, 'días'),
+                'Días después de la fecha de cobro sin recibirlo.', $e, 3, 0, 30, 'días', modalidad: 'clases'),
             new DefinicionParametro('cobranza.dias_gracia_adeudo', 'Cobranza', 'Días de gracia con un adeudo',
                 'Antes de suspender la membresía por falta de pago.', $e, 7, 0, 60, 'días'),
             new DefinicionParametro('cobranza.dias_pagar_en_tienda', 'Cobranza', 'Días para pagar en tienda (OXXO)',

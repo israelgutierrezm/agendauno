@@ -185,7 +185,7 @@ class PlataformaEstudiosController
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
         $validado = $request->validate(['motivo' => ['nullable', 'string', 'max:255']]);
         if (! $modelo->estado->operativo()) {
-            throw ValidationException::withMessages(['estado' => ['El estudio no está activo.']]);
+            throw ValidationException::withMessages(['estado' => ['El negocio no está activo.']]);
         }
 
         $modelo->update([
@@ -207,7 +207,7 @@ class PlataformaEstudiosController
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
         if ($modelo->estado !== EstadoEstudio::Suspended) {
-            throw ValidationException::withMessages(['estado' => ['Solo se reactiva un estudio suspendido.']]);
+            throw ValidationException::withMessages(['estado' => ['Solo se reactiva un negocio suspendido.']]);
         }
 
         $enPrueba = $modelo->trial_termina_en !== null && ! $modelo->trial_termina_en->isPast();
@@ -233,7 +233,7 @@ class PlataformaEstudiosController
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
         $validado = $request->validate(['dias' => ['required', 'integer', 'min:1', 'max:90']]);
         if (! $modelo->estado->operativo()) {
-            throw ValidationException::withMessages(['estado' => ['Reactiva el estudio antes de extender su prueba.']]);
+            throw ValidationException::withMessages(['estado' => ['Reactiva el negocio antes de extender su prueba.']]);
         }
 
         $base = $modelo->trial_termina_en !== null && ! $modelo->trial_termina_en->isPast()

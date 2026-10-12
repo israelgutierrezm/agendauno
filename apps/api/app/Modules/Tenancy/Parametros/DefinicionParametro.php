@@ -33,7 +33,15 @@ final readonly class DefinicionParametro
         public array $opciones = [],
         /** @var array<int, string> */
         public array $etiquetas = [],
+        /** Solo para los negocios de esa modalidad (`clases` o `citas`); null = ambas (ADR 0131). */
+        public ?string $modalidad = null,
     ) {}
+
+    /** ¿Aplica a un negocio de esa modalidad? */
+    public function aplicaA(?string $modalidad): bool
+    {
+        return $this->modalidad === null || $modalidad === null || $this->modalidad === $modalidad;
+    }
 
     /**
      * @return array<string, mixed>
@@ -50,6 +58,7 @@ final readonly class DefinicionParametro
             'maximo' => $this->maximo,
             'unidad' => $this->unidad,
             'por_negocio' => $this->porNegocio,
+            'modalidad' => $this->modalidad,
             'opciones' => $this->opciones,
             // Nombre de cada opción (por valor); vacío si el número basta.
             'etiquetas' => (object) $this->etiquetas,

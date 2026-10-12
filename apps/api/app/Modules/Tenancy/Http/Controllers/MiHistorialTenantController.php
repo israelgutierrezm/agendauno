@@ -36,7 +36,7 @@ class MiHistorialTenantController
     {
         // La suya o la de una persona a su cargo (B05).
         $persona = $this->cuenta->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $filtros = $request->validate([
             'desde' => ['nullable', 'date_format:Y-m-d'],

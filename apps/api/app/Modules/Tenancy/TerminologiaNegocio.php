@@ -34,6 +34,25 @@ final class TerminologiaNegocio
         ],
     ];
 
+    /**
+     * Las que puede elegir un negocio según su modalidad (ADR 0131): uno de citas no
+     * llama «clase» a lo que se agenda ni «alumno» a quien la toma, y uno de clases no
+     * habla de «citas» ni de «barberos». Lo que un negocio ya tenía guardado se sigue
+     * mostrando ({@see self::completa()} usa todas).
+     */
+    private const POR_MODALIDAD = [
+        'clases' => [
+            'sesion' => ['Clase', 'Sesión', 'Lección'],
+            'miembro' => ['Alumno', 'Alumna', 'Miembro', 'Socio', 'Cliente'],
+            'instructor' => ['Instructor', 'Coach', 'Maestro', 'Entrenador', 'Profesional'],
+        ],
+        'citas' => [
+            'sesion' => ['Cita', 'Sesión', 'Consulta'],
+            'miembro' => ['Cliente', 'Paciente', 'Miembro', 'Socio'],
+            'instructor' => ['Profesional', 'Barbero', 'Estilista', 'Terapeuta', 'Especialista', 'Entrenador'],
+        ],
+    ];
+
     /** Plural de cada término en la terminología completa. */
     private const PLURALES = ['sesion' => 'sesiones', 'miembro' => 'miembros', 'instructor' => 'instructores'];
 
@@ -59,14 +78,15 @@ final class TerminologiaNegocio
     }
 
     /**
-     * Valida lo que elige el negocio: solo términos conocidos y de sus listas; vacío o
-     * null = vuelve al del perfil.
+     * Valida lo que elige el negocio: solo términos conocidos y de sus listas (las de su
+     * modalidad, si se da); vacío o null = vuelve al del perfil.
      *
      * @param  array<string, mixed>  $valores
      * @return array<string, string>
      */
-    public static function validar(array $valores): array
+    public static function validar(array $valores, ?ModalidadServicio $modalidad = null): array
     {
+        $permitidas = self::opciones($modalidad);
         $limpios = [];
         $errores = [];
         foreach ($valores as $clave => $valor) {
@@ -78,7 +98,7 @@ final class TerminologiaNegocio
             if ($valor === null || $valor === '') {
                 continue;
             }
-            if (! is_string($valor) || ! isset(self::OPCIONES[$clave][$valor])) {
+            if (! is_string($valor) || ! in_array($valor, $permitidas[$clave], true)) {
                 $errores[$clave] = ['Elige una de las opciones.'];
 
                 continue;
@@ -93,12 +113,15 @@ final class TerminologiaNegocio
     }
 
     /**
-     * Opciones para la pantalla: por término, las elegibles.
+     * Opciones para la pantalla: por término, las elegibles (las de su modalidad, si se
+     * da).
      *
      * @return array<string, list<string>>
      */
-    public static function opciones(): array
+    public static function opciones(?ModalidadServicio $modalidad = null): array
     {
-        return array_map(static fn (array $o): array => array_keys($o), self::OPCIONES);
+        return $modalidad === null
+            ? array_map(static fn (array $o): array => array_keys($o), self::OPCIONES)
+            : self::POR_MODALIDAD[$modalidad->value];
     }
 }

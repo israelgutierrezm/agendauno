@@ -8,7 +8,9 @@ use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\DestinatarioMensaje;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\PlantillasWhatsApp;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,7 +45,7 @@ class PlantillasMensajeTenantController
             'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, $canales),
             // Qué avisos pueden ir por WhatsApp y su texto fijo.
             'whatsapp' => $conWhatsApp ? (object) collect(PlantillasWhatsApp::eventos())
-                ->mapWithKeys(fn (string $evento): array => [$evento => PlantillasWhatsApp::para($evento)['texto'] ?? ''])
+                ->mapWithKeys(fn (string $evento): array => [$evento => PlantillasWhatsApp::para($evento, $this->modalidad())['texto'] ?? ''])
                 ->all() : null,
             // Qué eventos se pueden avisar al profesional de la cita y al equipo.
             'destinatarios' => [
@@ -73,7 +75,7 @@ class PlantillasMensajeTenantController
         }
         if ($validado['canal'] === CanalComunicacion::WhatsApp->value) {
             // Texto fijo: la plantilla aprobada por Meta para ese aviso.
-            $whatsapp = PlantillasWhatsApp::para($validado['clave'])
+            $whatsapp = PlantillasWhatsApp::para($validado['clave'], $this->modalidad())
                 ?? throw ValidationException::withMessages(['clave' => ['Ese aviso no se puede mandar por WhatsApp.']]);
             $validado['asunto'] = $whatsapp['titulo'];
             $validado['cuerpo'] = $whatsapp['texto'];
@@ -105,6 +107,12 @@ class PlantillasMensajeTenantController
         return response()->json(status: 204);
     }
 
+    /** La del negocio: sus avisos de WhatsApp hablan como él (ADR 0131). */
+    private function modalidad(): ?ModalidadServicio
+    {
+        return app(GestorDeConexionTenant::class)->actual()?->modalidad();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -118,7 +126,7 @@ class PlantillasMensajeTenantController
             'asunto' => $plantilla->asunto,
             // WhatsApp: siempre el texto vigente de la plantilla de Meta.
             'cuerpo' => $plantilla->canal === CanalComunicacion::WhatsApp
-                ? (PlantillasWhatsApp::para($plantilla->clave)['texto'] ?? $plantilla->cuerpo)
+                ? (PlantillasWhatsApp::para($plantilla->clave, $this->modalidad())['texto'] ?? $plantilla->cuerpo)
                 : $plantilla->cuerpo,
             'activo' => $plantilla->activo,
         ];

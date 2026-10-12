@@ -47,7 +47,7 @@ it('no permite facturar sin datos fiscales cargados', function (): void {
 
     test()->postJson("/api/v1/app/{$e['slug']}/facturas", cfdiValido(), conBearer($e['bearer']))
         ->assertStatus(422)
-        ->assertJsonPath('meta.errors.datos_fiscales.0', 'Carga los datos fiscales del estudio antes de facturar.');
+        ->assertJsonPath('meta.errors.datos_fiscales.0', 'Carga los datos fiscales del negocio antes de facturar.');
 });
 
 it('timbra un CFDI y calcula el desglose (subtotal + IVA 16%)', function (): void {

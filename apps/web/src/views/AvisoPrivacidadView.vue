@@ -2,6 +2,8 @@
 import IconoNav from "@/components/IconoNav.vue";
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+
+import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { api } from "@/lib/api";
 import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 
@@ -31,13 +33,15 @@ async function cargar() {
   }
 }
 onMounted(cargar);
+// La marca del dominio en que se abre (ADR 0131).
+const marca = PRODUCTOS[productoActual()].nombre;
 </script>
 
 <template>
   <article class="aviso-pagina" aria-labelledby="aviso-titulo">
     <RouterLink to="/" class="tu-enlace text-sm"
       ><IconoNav nombre="atras" :tam="14" class="inline align-[-0.15em]" />
-      AgendaUno</RouterLink
+      {{ marca }}</RouterLink
     >
     <header>
       <p class="aviso-etiqueta">Información legal</p>

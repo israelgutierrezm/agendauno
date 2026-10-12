@@ -71,7 +71,7 @@ class FacturasTenantController
         $datos = DatosFiscalesTenant::query()->first();
         if (! $datos instanceof DatosFiscalesTenant) {
             throw ValidationException::withMessages([
-                'datos_fiscales' => ['Carga los datos fiscales del estudio antes de facturar.'],
+                'datos_fiscales' => ['Carga los datos fiscales del negocio antes de facturar.'],
             ]);
         }
 

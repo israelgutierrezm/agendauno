@@ -86,7 +86,9 @@ class ParametrosTenant
             ...$d->toArray(),
             'plataforma' => $plataforma[$d->clave] ?? $d->defecto,
             'valor' => $propios[$d->clave] ?? null,
-        ], array_filter(CatalogoParametros::todos(), fn (DefinicionParametro $d): bool => $d->porNegocio)));
+            // Solo los de su modalidad (ADR 0131): un negocio de citas no ve la lista de
+            // espera ni las clases recurrentes; uno de clases, nada de citas.
+        ], array_filter(CatalogoParametros::todos(), fn (DefinicionParametro $d): bool => $d->porNegocio && $d->aplicaA($this->modalidadActual()))));
     }
 
     /**
@@ -145,6 +147,12 @@ class ParametrosTenant
         $this->plataforma = null;
     }
 
+    /** La modalidad del negocio conectado; null sin negocio. */
+    private function modalidadActual(): ?string
+    {
+        return $this->gestor->actual()?->modalidad()->value;
+    }
+
     /**
      * @param  array<string, mixed>  $valores
      * @return array<string, int|null>
@@ -156,7 +164,8 @@ class ParametrosTenant
         $errores = [];
         foreach ($valores as $clave => $valor) {
             $definicion = $catalogo[$clave] ?? null;
-            if (! $definicion instanceof DefinicionParametro || ($soloNegocio && ! $definicion->porNegocio)) {
+            if (! $definicion instanceof DefinicionParametro
+                || ($soloNegocio && (! $definicion->porNegocio || ! $definicion->aplicaA($this->modalidadActual())))) {
                 $errores[$clave] = ['Este dato no se puede ajustar aquí.'];
 
                 continue;

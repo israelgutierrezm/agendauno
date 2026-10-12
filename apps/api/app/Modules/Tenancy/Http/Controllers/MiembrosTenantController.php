@@ -508,7 +508,7 @@ class MiembrosTenantController
             'acepta_whatsapp' => ['sometimes', 'boolean'],
             ...DatosPersonales::reglas(),
         ], [
-            'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
+            'email.unique' => 'Ya existe una persona con ese correo en este negocio.',
             ...DatosPersonales::mensajes(),
         ]);
 

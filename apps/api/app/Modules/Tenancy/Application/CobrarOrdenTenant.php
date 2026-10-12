@@ -47,7 +47,7 @@ class CobrarOrdenTenant
         }
 
         if (! $this->registro->activa($proveedor)) {
-            throw new PasarelaNoDisponible('La pasarela no esta activa en este estudio.');
+            throw new PasarelaNoDisponible('La pasarela no está activa en este negocio.');
         }
 
         return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor): PagoTenant {
@@ -100,7 +100,7 @@ class CobrarOrdenTenant
     {
         $proveedor = $domiciliacion->proveedor;
         if (! $this->registro->activa($proveedor)) {
-            throw new PasarelaNoDisponible('La pasarela no esta activa en este estudio.');
+            throw new PasarelaNoDisponible('La pasarela no está activa en este negocio.');
         }
         $pasarela = $this->registro->resolver($proveedor);
         if (! $pasarela instanceof PasarelaDomiciliable) {

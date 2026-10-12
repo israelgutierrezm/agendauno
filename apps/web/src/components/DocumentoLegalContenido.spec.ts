@@ -56,7 +56,8 @@ describe("documento legal", () => {
       props: { contenido: null },
     });
     expect(vista.text()).toContain("aún no está disponible");
-    expect(vista.text()).toContain("hola@agendauno.mx");
+    // El soporte del producto del dominio (ADR 0131).
+    expect(vista.text()).toContain("soporte@agendauno.mx");
     expect(vista.find(".legal-texto").exists()).toBe(false);
     vista.unmount();
   });

@@ -3,6 +3,8 @@ import IconoNav from "@/components/IconoNav.vue";
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 
+import { PRODUCTOS, productoActual } from "@/lib/producto";
+
 import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 import { api } from "@/lib/api";
 
@@ -35,18 +37,20 @@ async function cargar(): Promise<void> {
   }
 }
 onMounted(cargar);
+// La marca del dominio en que se abre (ADR 0131).
+const marca = PRODUCTOS[productoActual()].nombre;
 </script>
 
 <template>
   <article class="terminos-pagina" aria-labelledby="terminos-titulo">
     <RouterLink to="/" class="tu-enlace text-sm"
       ><IconoNav nombre="atras" :tam="14" class="inline align-[-0.15em]" />
-      AgendaUno</RouterLink
+      {{ marca }}</RouterLink
     >
     <header>
       <p class="terminos-etiqueta">Información legal</p>
       <h1 id="terminos-titulo">Términos y condiciones</h1>
-      <p>Las condiciones para usar AgendaUno en tu negocio.</p>
+      <p>Las condiciones para usar {{ marca }} en tu negocio.</p>
     </header>
     <p v-if="cargando" role="status">Cargando el documento…</p>
     <div v-else-if="error" role="alert">

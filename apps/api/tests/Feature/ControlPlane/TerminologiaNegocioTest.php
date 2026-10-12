@@ -45,16 +45,21 @@ it('el administrador elige otros términos de cada lista y puede volver a los de
         ->assertOk()
         ->assertJsonPath('data.del_perfil.instructor', 'Barbero')
         ->assertJsonPath('data.propia', [])
-        ->assertJsonPath('data.opciones.sesion', ['Clase', 'Cita', 'Sesión', 'Lección', 'Consulta']);
+        // Solo las de su modalidad (ADR 0131): una barbería no elige «Clase» ni «Alumno».
+        ->assertJsonPath('data.opciones.sesion', ['Cita', 'Sesión', 'Consulta'])
+        ->assertJsonPath('data.opciones.miembro', ['Cliente', 'Paciente', 'Miembro', 'Socio']);
 
     $this->putJson("/api/v1/app/{$e['slug']}/terminologia", ['valores' => ['instructor' => 'Estilista', 'miembro' => 'Socio']], conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.vigente.instructores', 'Estilistas')->assertJsonPath('data.vigente.miembros', 'Socios');
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertJsonPath('data.estudio.perfil_config.terminologia.instructor', 'Estilista');
 
-    // Solo de las listas.
+    // Solo de las listas, y de las de su modalidad.
     $this->putJson("/api/v1/app/{$e['slug']}/terminologia", ['valores' => ['sesion' => 'Turno']], conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonPath('meta.errors.sesion.0', 'Elige una de las opciones.');
+    $this->putJson("/api/v1/app/{$e['slug']}/terminologia", ['valores' => ['sesion' => 'Clase', 'miembro' => 'Alumno']], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonPath('meta.errors.sesion.0', 'Elige una de las opciones.')
+        ->assertJsonPath('meta.errors.miembro.0', 'Elige una de las opciones.');
 
     // Vacío vuelve al del giro; lo demás se conserva.
     $this->putJson("/api/v1/app/{$e['slug']}/terminologia", ['valores' => ['instructor' => null]], conBearer($e['bearer']))

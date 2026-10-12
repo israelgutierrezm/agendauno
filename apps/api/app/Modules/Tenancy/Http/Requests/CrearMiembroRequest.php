@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 
 class CrearMiembroRequest extends FormRequest
 {
-    public const CELULAR_REPETIDO = 'Ya existe una persona con ese teléfono en este estudio.';
+    public const CELULAR_REPETIDO = 'Ya existe una persona con ese teléfono en este negocio.';
 
     public function authorize(): bool
     {
@@ -63,7 +63,7 @@ class CrearMiembroRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
+            'email.unique' => 'Ya existe una persona con ese correo en este negocio.',
             ...DatosPersonales::mensajes(),
         ];
     }

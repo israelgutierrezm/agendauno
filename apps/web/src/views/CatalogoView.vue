@@ -535,7 +535,11 @@ onMounted(cargar);
                     }"
                     >{{
                       o.politica_reserva === "pago"
-                        ? $t("catalogo.badgePago")
+                        ? $t(
+                            esCitas
+                              ? "catalogo.badgePago"
+                              : "catalogo.badgePagoClases",
+                          )
                         : esCitas
                           ? $t("catalogo.badgeEntitlementCitas")
                           : $t("catalogo.badgeEntitlement")
@@ -676,7 +680,7 @@ onMounted(cargar);
         <div class="mt-3 grid sm:grid-cols-2 gap-3">
           <div>
             <label class="tu-label" :for="`precio-${o.id}`">{{
-              $t("catalogo.precio")
+              $t(esCitas ? "catalogo.precio" : "catalogo.precioClases")
             }}</label>
             <div class="flex items-center gap-2">
               <span
@@ -729,7 +733,8 @@ onMounted(cargar);
                 : $t("catalogo.duracionAyudaClases")
             }}</span>
           </div>
-          <div>
+          <!-- Lugares numerados (B06): solo en clases (ADR 0131). -->
+          <div v-if="!esCitas">
             <label class="tu-label" :for="`lugares-${o.id}`">{{
               $t("catalogo.lugares")
             }}</label>

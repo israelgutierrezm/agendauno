@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Comunicaciones\PlantillasPorModalidad;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\ModalidadEnUso;
 use App\Modules\Tenancy\ModalidadServicio;
@@ -87,6 +88,10 @@ class CambiarModalidadEstudio
             try {
                 $this->gestor->ejecutarEn($estudio, function () use ($antes, $despues, $otraModalidad, $modalidad): void {
                     $this->auditoria->registrar(null, 'estudio.modalidad', 'estudio', null, $antes, $despues, 'Cambio hecho por la plataforma.');
+                    if ($otraModalidad) {
+                        // Sus avisos por omisión hablan como la nueva modalidad (ADR 0131).
+                        PlantillasPorModalidad::adaptar($modalidad);
+                    }
                     // A citas: sus membresías ya no se venden y las vendidas terminan en su
                     // fecha (ADR 0130).
                     if ($otraModalidad && $modalidad === ModalidadServicio::Citas) {

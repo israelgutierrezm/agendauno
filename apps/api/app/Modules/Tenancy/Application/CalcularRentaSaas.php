@@ -183,7 +183,7 @@ class CalcularRentaSaas
     public function fija(int $cuotaMinor): array
     {
         $lineas = $cuotaMinor > 0
-            ? [['concepto' => 'Cuota fija mensual', 'detalle' => 'Acordada con AgendaUno (IVA incluido)', 'importe_minor' => $cuotaMinor]]
+            ? [['concepto' => 'Cuota fija mensual', 'detalle' => 'Acordada con la plataforma (IVA incluido)', 'importe_minor' => $cuotaMinor]]
             : [];
 
         return ['lineas' => $lineas, 'subtotal_minor' => $cuotaMinor, 'iva_porcentaje' => 0, 'iva_minor' => 0, 'total_minor' => $cuotaMinor];

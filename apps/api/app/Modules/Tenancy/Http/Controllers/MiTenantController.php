@@ -108,7 +108,7 @@ class MiTenantController
     public function formularios(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         return response()->json(['data' => [
             'persona_id' => $persona->ulid,
@@ -380,7 +380,7 @@ class MiTenantController
     public function antesDeReservar(Request $request, AntesDeReservarTenant $antes): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->with(['oferta', 'sucursal'])->firstOrFail();
         if ($sesion->esCita()) {
@@ -393,7 +393,7 @@ class MiTenantController
     public function reservar(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $validado = $request->validate([
             'sesion_id' => ['required', 'string'],
@@ -449,7 +449,7 @@ class MiTenantController
     public function lugares(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
         $lugares = $this->reservas->lugaresDeSesion($sesion);
@@ -497,7 +497,7 @@ class MiTenantController
     public function opcionesCita(Request $request, OpcionesCitaTenant $opciones): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         return response()->json(['data' => $opciones->listar($persona)]);
     }
@@ -510,7 +510,7 @@ class MiTenantController
      */
     public function diasCita(Request $request, CalcularDisponibilidadTenant $disponibilidad): JsonResponse
     {
-        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $validado = $request->validate([
             'sucursal_id' => ['required', 'string'],
@@ -536,7 +536,7 @@ class MiTenantController
      */
     public function disponibilidadCita(Request $request, CalcularDisponibilidadTenant $disponibilidad): JsonResponse
     {
-        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $validado = $request->validate([
             'instructor_id' => ['nullable', 'string'],
@@ -566,7 +566,7 @@ class MiTenantController
     public function agendarCita(Request $request, AgendarCitaTenant $agendar, WhatsAppTenant $whatsapp): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $validado = $request->validate([
             'oferta_id' => ['required', 'string'],
@@ -954,7 +954,7 @@ class MiTenantController
     public function comprar(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $validado = $request->validate([
             'items' => ['required', 'array', 'min:1'],
@@ -1002,7 +1002,7 @@ class MiTenantController
     public function cobrar(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
-        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
 
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
         abort_unless($this->ordenesDe($request, $persona)->whereKey($orden->getKey())->exists(), 403, 'Esta orden no es tuya.');
@@ -1017,14 +1017,14 @@ class MiTenantController
         $validado['proveedor'] = ($validado['proveedor'] ?? '') !== '' ? $validado['proveedor'] : $this->pasarelas->enLinea();
         if ($validado['proveedor'] === null) {
             throw ValidationException::withMessages([
-                'proveedor' => ['Este negocio todavía no cobra en línea; paga en el estudio.'],
+                'proveedor' => ['Este negocio todavía no cobra en línea; paga en el negocio.'],
             ]);
         }
 
         // El autoservicio solo admite pasarelas en línea (no ventanilla/manual/efectivo).
         if (in_array($validado['proveedor'], ['manual', 'efectivo'], true)) {
             throw ValidationException::withMessages([
-                'proveedor' => ['El pago en efectivo o ventanilla se registra en el estudio.'],
+                'proveedor' => ['El pago en efectivo o ventanilla se registra en el negocio.'],
             ]);
         }
 

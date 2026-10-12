@@ -118,7 +118,7 @@ export const expediente = {
     rechazado: "Rechazado",
   },
   consentimientos: "Consentimientos",
-  sinConsentimientos: "El estudio no tiene consentimientos publicados.",
+  sinConsentimientos: "El negocio no tiene consentimientos publicados.",
   version: "versión {n}",
   firmado: "Firmado el {fecha}",
   pendiente: "Sin firmar",

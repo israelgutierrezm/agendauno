@@ -38,7 +38,7 @@ describe("página de los términos", () => {
     const vista = montar();
     await flushPromises();
     expect(vista.text()).toContain("aún no están publicados");
-    expect(vista.get("a[href^='mailto:']").text()).toBe("hola@agendauno.mx");
+    expect(vista.get("a[href^='mailto:']").text()).toBe("soporte@agendauno.mx");
     vista.unmount();
 
     mocks.get.mockRejectedValueOnce(new Error("red"));

@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\ModoCobroSaas;
+use App\Modules\Tenancy\ProductoComercial;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
@@ -47,14 +48,28 @@ final class ReciboRentaPdf
         return ['subtotal_minor' => $subtotal, 'iva_porcentaje' => $iva, 'impuesto_minor' => $total - $subtotal, 'total_minor' => $total];
     }
 
-    /** Qué se cobró: la suscripción del periodo, un cambio de plan o timbres. */
+    /**
+     * Qué se cobró: la suscripción del periodo, un cambio de plan o timbres, con la
+     * marca del negocio (AgendaUno o TurnoUno, ADR 0131). Es también el concepto del
+     * cargo en la pasarela y de la factura.
+     */
     public static function concepto(CargoRenta $cargo): string
     {
+        $marca = self::marca($cargo);
+
         return match ($cargo->concepto) {
-            'timbres' => 'Timbres de facturación AgendaUno',
-            'ajuste' => "Cambio de plan AgendaUno {$cargo->periodo}",
-            default => "Suscripción AgendaUno {$cargo->periodo}",
+            'timbres' => "Timbres de facturación {$marca}",
+            'ajuste' => "Cambio de plan {$marca} {$cargo->periodo}",
+            default => "Suscripción {$marca} {$cargo->periodo}",
         };
+    }
+
+    /** La marca del negocio del cargo; sin él, la de la plataforma. */
+    private static function marca(CargoRenta $cargo): string
+    {
+        $estudio = $cargo->estudio;
+
+        return $estudio instanceof Estudio ? $estudio->producto()->nombre() : ProductoComercial::AgendaUno->nombre();
     }
 
     public function generar(CargoRenta $cargo, Estudio $estudio): string
@@ -87,7 +102,7 @@ final class ReciboRentaPdf
             ['Moneda', $moneda],
         ];
 
-        $c = $this->texto('F2', 20, 72, 770, 'AgendaUno')
+        $c = $this->texto('F2', 20, 72, 770, $estudio->producto()->nombre())
             .$this->texto('F1', 13, 72, 746, 'Recibo de pago de la suscripción')
             .$this->texto('F2', 11, 72, 726, self::LEYENDA)
             ."0.8 G 0.5 w 72 712 m 523 712 l S\n";

@@ -106,18 +106,20 @@ describe("presentación del registro", () => {
     expect(
       vista.findAll(".registro-foto").map((n) => n.attributes("src")),
     ).toEqual([
-      "/assets/landing/disciplinas/terapeutas-v1.webp",
+      // Una clase en AgendaUno (ADR 0131).
+      "/assets/landing/disciplinas/pilates-v1.jpg",
       "/assets/landing/disciplinas/yoga-v1.jpg",
     ]);
     expect(vista.get('[aria-current="step"]').text()).toBe("1Tu negocio");
     expect(vista.text()).not.toContain("Paso 1 de 3");
     expect(vista.get(".registro-intro").text()).toBe(es.registro.intro1);
     expect(vista.findAll(".registro-mini-cita")).toHaveLength(1);
+    // En AgendaUno, el ejemplo es una clase (ADR 0131).
     expect(vista.get(".registro-mini-cita").text()).toContain(
-      "Sesión de terapia",
+      "Pilates Reformer",
     );
     expect(vista.get(".registro-mini-cita").text()).toContain(
-      "10:30 · Confirmada",
+      "18:00 · 7 de 8 lugares",
     );
     await avanzarADatos(vista);
     expect(vista.get('[aria-current="step"]').text()).toBe("2Tus datos");

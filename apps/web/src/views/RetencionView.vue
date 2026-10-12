@@ -78,7 +78,11 @@ function venceTexto(m: Miembro): string {
 }
 function asistTexto(m: Miembro): string {
   if (m.ultima_asistencia === null || m.dias_sin_asistir === null) {
-    return t("retencion.sinAsistencia");
+    return t(
+      sesion.esCitas
+        ? "retencion.sinAsistenciaCitas"
+        : "retencion.sinAsistencia",
+    );
   }
   return m.dias_sin_asistir === 0
     ? t("retencion.hoy")
@@ -249,7 +253,13 @@ onMounted(cargar);
                 {{ $t("retencion.colVence") }}
               </th>
               <th class="hidden sm:table-cell">
-                {{ $t("retencion.colActividad") }}
+                {{
+                  $t(
+                    sesion.esCitas
+                      ? "retencion.colActividadCitas"
+                      : "retencion.colActividad",
+                  )
+                }}
               </th>
               <th class="text-right"></th>
             </tr>

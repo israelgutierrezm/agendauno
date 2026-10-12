@@ -47,7 +47,7 @@ it('el alumno no puede auto-cobrarse en efectivo/ventanilla (sin créditos grati
 
     $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes/{$orden}/cobrar", [
         'proveedor' => 'manual',
-    ], conBearer($a['bearer']))->assertStatus(422)->assertJsonPath('meta.errors.proveedor.0', 'El pago en efectivo o ventanilla se registra en el estudio.');
+    ], conBearer($a['bearer']))->assertStatus(422)->assertJsonPath('meta.errors.proveedor.0', 'El pago en efectivo o ventanilla se registra en el negocio.');
 
     // Sigue sin créditos.
     $perfil = $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($a['bearer']))->assertOk()->json('data');

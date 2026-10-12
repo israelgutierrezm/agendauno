@@ -7,7 +7,7 @@ AVISO DE PRIVACIDAD DE {negocio}
 2. Datos que tratamos
 
 • Identificación y contacto: nombre, correo, celular, fecha de nacimiento y, si la compartes, fotografía.
-• Tus {servicios}, reservas y asistencia; tus membresías, paquetes, compras y pagos.
+• Tus {servicios}, reservas y asistencia; tus {planes}, compras y pagos.
 • Los documentos, consentimientos y formularios que nos entregues.
 • Si nos pides información o acceso antes de ser cliente: tu nombre, correo, teléfono, lo que te interesa y lo que respondas en nuestro formulario.
 
@@ -16,7 +16,7 @@ Si para darte el servicio necesitamos datos de salud (por ejemplo, lesiones o pa
 3. Para qué los usamos
 
 Finalidades necesarias:
-• Agendar y administrar tus {servicios}, tu membresía y tus pagos, y emitir tus facturas si las pides.
+• Agendar y administrar tus {servicios}, tus {planes} y tus pagos, y emitir tus facturas si las pides.
 • Enviarte confirmaciones, recordatorios y avisos sobre tus {servicios}.
 • Atender tus dudas, quejas y solicitudes, incluida la de información o acceso antes de ser cliente. Si no llegas a ser cliente, puedes pedirnos borrar esos datos.
 

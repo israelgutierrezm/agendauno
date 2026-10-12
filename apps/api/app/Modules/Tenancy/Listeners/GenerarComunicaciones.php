@@ -192,7 +192,7 @@ class GenerarComunicaciones
         array $contexto,
         EventoDeDominioTenant $evento,
     ): void {
-        $meta = PlantillasWhatsApp::para($evento->tipo);
+        $meta = PlantillasWhatsApp::para($evento->tipo, $this->gestor->actual()?->modalidad());
         if ($meta === null || ! $persona instanceof PersonaTenant || $persona->whatsapp_aceptado_en === null || ! $this->whatsapp->activoPara($this->gestor->actual())) {
             return;
         }

@@ -27,7 +27,8 @@ final class TerminologiaEstudio
         }
 
         return [
-            'opciones' => TerminologiaNegocio::opciones(),
+            // Las de su modalidad (ADR 0131).
+            'opciones' => TerminologiaNegocio::opciones($estudio->modalidad()),
             'del_perfil' => $estudio->perfil_negocio->configuracion()['terminologia'],
             'propia' => $propia,
             'vigente' => $estudio->perfilConfig()['terminologia'],
@@ -44,7 +45,7 @@ final class TerminologiaEstudio
     public function guardar(Estudio $estudio, array $valores): array
     {
         $antes = $this->paraEditar($estudio)['propia'];
-        $elegidos = TerminologiaNegocio::validar($valores);
+        $elegidos = TerminologiaNegocio::validar($valores, $estudio->modalidad());
 
         $propia = $antes;
         foreach (array_keys($valores) as $clave) {

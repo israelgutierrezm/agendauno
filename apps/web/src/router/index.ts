@@ -7,7 +7,10 @@ import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
 import { preciosPublicos } from "@/marketing/preciosPublicos";
 import { PRODUCTO_COMERCIAL, seoParaRuta } from "@/marketing/seoConfig";
-import { rutasComerciales } from "@/router/comerciales";
+import {
+  registroDelOtroProducto,
+  rutasComerciales,
+} from "@/router/comerciales";
 import {
   enSubdominioDeEstudio,
   salirA,
@@ -74,6 +77,8 @@ const router = createRouter({
       path: "/registro",
       name: "registro",
       component: () => import("@/views/RegistroView.vue"),
+      // Un giro o una modalidad del otro producto: su registro (ADR 0131).
+      beforeEnter: (to) => registroDelOtroProducto(to.query, to.fullPath),
       props: (r) => ({
         modo: modoDeQuery(r.query.modo),
         giro: giroDeQuery(r.query.giro),

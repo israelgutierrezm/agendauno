@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\GestionarRolesTenant;
 use App\Modules\Tenancy\Application\RolesTenant;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\RolTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -47,7 +48,8 @@ class RolesTenantController
 
         return response()->json([
             'data' => $roles,
-            'catalogo' => CatalogoDePermisosTenant::catalogo(),
+            // Sin los permisos de la otra modalidad (ADR 0131).
+            'catalogo' => CatalogoDePermisosTenant::catalogoPara(app(GestorDeConexionTenant::class)->actual()?->modalidad()),
             'requisitos' => CatalogoDePermisosTenant::requisitos(),
             // Lo que quien arma el rol puede dar (su rol activo).
             'mis_permisos' => $this->roles->permisosDe($actor->rolesVigentes()),

@@ -1026,9 +1026,17 @@ export default {
     terminosTitulo: "Términos y condiciones",
     pasoActual: "Paso {n} de 3",
     progreso: "Progreso del registro",
-    citaEjemplo: "Ejemplo de cita",
-    citaTitulo: "Sesión de terapia",
-    citaDetalle: "10:30 · Confirmada",
+    // El ejemplo de cada producto (ADR 0131).
+    ejemploCita: {
+      etiqueta: "Ejemplo de cita",
+      titulo: "Sesión de terapia",
+      detalle: "10:30 · Confirmada",
+    },
+    ejemploClase: {
+      etiqueta: "Ejemplo de clase",
+      titulo: "Pilates Reformer",
+      detalle: "18:00 · 7 de 8 lugares",
+    },
     paso1: "Tu negocio",
     paso2: "Tus datos",
     paso3: "Contacto",
@@ -1086,7 +1094,10 @@ export default {
     etiqueta: "Acceso a negocios",
     titulo: "Encuentra tu negocio.",
     subtitulo:
-      "Busca el estudio, academia, barbería o profesional que te compartió AgendaUno y abre su página para reservar o entrar.",
+      "Busca el estudio, academia o gimnasio que te compartió AgendaUno y abre su página para reservar tu clase o entrar.",
+    // TurnoUno: negocios de citas (ADR 0131).
+    subtituloCitas:
+      "Busca la barbería, spa, consultorio o profesional que te compartió TurnoUno y abre su página para agendar tu cita o entrar.",
     vacio: "Aún no hay negocios publicados en esta categoría.",
     buscar: "Negocio, servicio, ciudad o país",
     buscarCta: "Buscar",
@@ -1101,7 +1112,9 @@ export default {
     sinResultados: "Sin resultados para “{q}”.",
     duenoTitulo: "¿Administras un negocio con agenda?",
     duenoDesc:
-      "Crea tu cuenta, publica servicios o clases y recibe reservas desde tu propia página.",
+      "Crea tu cuenta, publica tus clases y recibe reservas desde tu propia página.",
+    duenoDescCitas:
+      "Crea tu cuenta, publica tus servicios y recibe citas desde tu propia página.",
     // Producto que aún no recibe registros (ADR 0108): el botón lleva a la lista de
     // interesados.
     duenoDescPrelanzamiento:
@@ -1235,7 +1248,12 @@ export default {
     olvidar: "Olvidar",
     olvidarAria: "Olvidar acceso a {nombre}",
     buscarTitulo: "Busca otro negocio",
-    buscarPlaceholder: "Nombre del estudio, academia o negocio",
+    buscarPlaceholder: "Nombre del estudio, academia o gimnasio",
+    buscarPlaceholderCitas: "Nombre de la barbería, spa o consultorio",
+    selectorVacioClases:
+      "Escribe el nombre de tu estudio, academia o gimnasio para acceder.",
+    selectorVacioCitas:
+      "Escribe el nombre de tu barbería, spa o consultorio para acceder.",
     buscar: "Buscar",
     buscando: "Buscando…",
     sinResultados: "No encontramos negocios con esa búsqueda.",
@@ -1260,12 +1278,23 @@ export default {
     panelTitulo: "Todo tu día, en una sola agenda.",
     panelDesc:
       "Mira lo que sigue, confirma asistencias y cobra sin perder el ritmo del día.",
-    panelCita: "Pilates Reformer",
-    panelCitaDetalle: "10:30 · Andrea · Confirmada",
-    panelClase: "Pole dance básico",
-    panelClaseDetalle: "18:00 · 7 de 8 lugares",
-    panelBarberia: "Corte y barba",
-    panelBarberiaDetalle: "12:30 · Marco · Confirmada",
+    // El collage de cada producto (ADR 0131): clases en AgendaUno, citas en TurnoUno.
+    collageClases: {
+      uno: "Pilates Reformer",
+      unoDetalle: "10:30 · Lugar reservado",
+      dos: "Pole dance básico",
+      dosDetalle: "18:00 · 7 de 8 lugares",
+      tres: "Yoga matutino",
+      tresDetalle: "07:00 · Andrea · Asistió",
+    },
+    collageCitas: {
+      uno: "Corte y barba",
+      unoDetalle: "12:30 · Marco · Confirmada",
+      dos: "Masaje relajante",
+      dosDetalle: "16:00 · 60 min · con Ana",
+      tres: "Consulta de nutrición",
+      tresDetalle: "18:00 · Confirmada",
+    },
     buscarReserva: "¿Buscas reservar? Encuentra tu negocio",
     sinCuentaCliente:
       "¿Aún no tienes cuenta? Pídela a {negocio}: te enviará una invitación a tu correo.",
@@ -1288,7 +1317,7 @@ export default {
     cargoEstimado: "Cargo estimado",
   },
   onboarding: {
-    titulo: "Configura tu estudio",
+    titulo: "Configura tu negocio",
     subtitulo: "Guarda y continua. Puedes volver cuando quieras.",
     progreso: "{hechos} de {total} pasos",
     completo: "¡Configuración completa!",
@@ -1584,7 +1613,7 @@ export default {
   },
   enlace: {
     titulo: "Enlace público",
-    qrAlt: "Código QR del enlace de tu estudio",
+    qrAlt: "Código QR del enlace de tu negocio",
     copiar: "Copiar enlace",
     copiado: "Copiado",
     descargar: "Descargar QR",
@@ -1604,10 +1633,12 @@ export default {
     colAlumno: "Alumno",
     colVence: "Vence",
     colActividad: "Última asistencia",
+    colActividadCitas: "Última visita",
     venceEn: "en {n} días",
     venceHoy: "hoy",
     vencioHace: "hace {n} días",
     sinAsistencia: "Sin asistencias",
+    sinAsistenciaCitas: "Sin visitas",
     haceDias: "hace {n} días",
     hoy: "hoy",
     contactar: "Contactar",
@@ -1872,13 +1903,14 @@ export default {
     politica: {
       etiqueta: "¿Cómo se reserva?",
       entitlement: "Con créditos o membresía",
-      pago: "Pago al agendar (cita)",
+      pago: "Pago por clase",
       entitlementAyuda:
         "El cliente reserva con su membresía o su paquete de créditos.",
       pagoAyuda:
-        "El cliente paga en línea al momento de agendar. Ideal para citas: barbería, estética, servicios.",
+        "El cliente paga la clase en línea al reservarla, sin paquete ni membresía.",
     },
     precio: "Precio por cita",
+    precioClases: "Precio por clase",
     precioReq: "Define un precio mayor a 0 para el pago al agendar.",
     duracion: "Duración (min)",
     duracionReq: "Define la duración de la cita para calcular los huecos.",
@@ -1894,6 +1926,7 @@ export default {
     guardado: "Servicio actualizado.",
     guardadoClases: "Clase actualizada.",
     badgePago: "Cita con pago",
+    badgePagoClases: "Clase con pago",
     badgeEntitlement: "Con membresía",
     badgeEntitlementCitas: "Con bono",
     // Negocio de citas: un servicio se paga o se toma con bono (ADR 0091).
@@ -2474,6 +2507,12 @@ export default {
       colClase: "Clase",
       colSesiones: "Sesiones",
       colAsistentes: "Asistentes",
+      // Citas: por servicio y clientes atendidos (ADR 0131).
+      tituloCitas: "Rentabilidad por servicio",
+      vacioCitas: "No hay citas atendidas en el periodo.",
+      colClaseCitas: "Servicio",
+      colSesionesCitas: "Citas",
+      colAsistentesCitas: "Clientes atendidos",
       colIngreso: "Ingreso",
       colCosto: "Costo instructor",
       colMargen: "Margen",
@@ -2755,7 +2794,7 @@ export default {
       crear: "Programar clase",
       creando: "Programando…",
       conflictos: "Hay un conflicto de horario:",
-      sinOfertas: "Primero crea una oferta (en Configurar mi estudio).",
+      sinOfertas: "Primero crea una clase en el Catálogo.",
       sinSucursales: "Primero crea una sucursal.",
       modoUna: "Una sola clase",
       modoVarias: "Varias que se repiten",
@@ -2998,7 +3037,7 @@ export default {
     },
     compras: {
       titulo: "Mis compras",
-      nota: "Las compras pendientes se activan al completar el pago (en línea o en el estudio).",
+      nota: "Las compras pendientes se activan al completar el pago (en línea o en el negocio).",
       estados: {
         pendiente: "Pendiente de pago",
         pagada: "Pagada",

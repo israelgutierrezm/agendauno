@@ -125,6 +125,28 @@ describe("rutas comerciales", () => {
     });
   });
 
+  it("un registro con giro o modalidad del otro producto lleva a su registro (ADR 0131)", async () => {
+    const router = await routerComercial();
+    await router.push("/entrar");
+
+    // En desarrollo, el mismo sitio con la marca del otro producto.
+    await router.push("/registro?giro=barberia&utm_source=ig");
+    expect(navegador.salirA).toHaveBeenLastCalledWith(
+      "/registro?giro=barberia&utm_source=ig&producto=turnouno",
+    );
+    expect(router.currentRoute.value.name).toBe("entrar");
+    await router.push("/registro?modo=citas");
+    expect(navegador.salirA).toHaveBeenLastCalledWith(
+      "/registro?modo=citas&producto=turnouno",
+    );
+
+    // Uno de su producto se queda.
+    navegador.salirA.mockClear();
+    await router.push("/registro?giro=pilates");
+    expect(router.currentRoute.value.name).toBe("registro");
+    expect(navegador.salirA).not.toHaveBeenCalled();
+  });
+
   it("en el subdominio de un negocio, ninguna página comercial muestra la landing", async () => {
     const router = await routerComercial();
     // En desarrollo, `?estudio=` hace las veces del subdominio.

@@ -14,6 +14,7 @@ import { rutaSolucion, soluciones } from "@/marketing/soluciones";
 import {
   MODOS,
   NOMBRE_RUTA_MODALIDAD,
+  modoDePerfil,
   rutaModalidad,
   type Modo,
 } from "@/marketing/modalidades";
@@ -54,6 +55,35 @@ function alOtroProducto(modo: Modo, ruta: string): NavigationGuardReturn {
         ? `${ruta}?producto=${otro}`
         : `https://${PRODUCTOS[otro].dominio}${ruta}`,
     );
+  }
+  return false;
+}
+
+/**
+ * `/registro` con un giro (`?giro=`) o una modalidad (`?modo=`) del otro producto: el
+ * registro de ese producto, con la misma query (ADR 0131). Antes el giro se ignoraba
+ * sin avisar y el negocio quedaba sin giro elegido.
+ */
+export function registroDelOtroProducto(
+  query: Record<string, unknown>,
+  rutaCompleta: string,
+): NavigationGuardReturn {
+  const delGiro =
+    typeof query.giro === "string" ? modoDePerfil(query.giro) : null;
+  const delModo = MODOS.find((m) => m === query.modo) ?? null;
+  const otro = delGiro ?? delModo;
+  if (otro === null || otro === MODO_COMERCIAL) {
+    return true;
+  }
+  if (typeof window !== "undefined") {
+    const producto = productoDeModalidad(otro);
+    if (productoDelHost(window.location.hostname) === null) {
+      const destino = new URL(rutaCompleta, window.location.origin);
+      destino.searchParams.set("producto", producto);
+      salirA(`${destino.pathname}${destino.search}`);
+    } else {
+      salirA(`https://${PRODUCTOS[producto].dominio}${rutaCompleta}`);
+    }
   }
   return false;
 }
