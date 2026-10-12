@@ -265,6 +265,20 @@ class CuentaRepository {
     return _urlDeCheckout(res.data);
   }
 
+  /// Autoriza el precio nuevo del plan para su pago automático (ADR 0134).
+  /// Devuelve la página de la pasarela para autorizarlo, o null si ya quedó. Lanza
+  /// [RequiereWeb] si la tarjeta se captura con el formulario web (OpenPay.js).
+  Future<String?> autorizarNuevoPrecio(String membresiaId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/pago-automatico/$membresiaId/nuevo-precio',
+    );
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    if (data['estado'] == 'formulario') {
+      throw const RequiereWeb();
+    }
+    return _urlDeCheckout(res.data);
+  }
+
   Future<void> quitarPagoAutomatico(String membresiaId) => _dio
       .delete<Map<String, dynamic>>('$_base/mi/pago-automatico/$membresiaId');
 

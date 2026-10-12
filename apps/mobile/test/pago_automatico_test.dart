@@ -59,6 +59,26 @@ void main() {
     expect(MembresiaRenovable.desdeJson({'id': 'a5'}).para, isNull);
   });
 
+  test('dice si se está cancelando y el precio nuevo del plan (ADR 0134)', () {
+    final m = MembresiaRenovable.desdeJson({
+      'id': 'a6',
+      'automatico': true,
+      'monto_minor': 129900,
+      'precio_nuevo_minor': 149900,
+    });
+    expect(m.montoMinor, 129900);
+    expect(m.precioNuevoMinor, 149900);
+    expect(m.cancelando, isFalse);
+
+    final quitada = MembresiaRenovable.desdeJson({
+      'id': 'a7',
+      'automatico': false,
+      'cancelando': true,
+    });
+    expect(quitada.cancelando, isTrue);
+    expect(quitada.precioNuevoMinor, isNull);
+  });
+
   test('el dinero se forma desde centavos, con miles', () {
     expect(Formato.dinero(5, 'MXN'), r'$0.05');
     expect(Formato.dinero(123456789, 'MXN'), r'$1,234,567.89');
