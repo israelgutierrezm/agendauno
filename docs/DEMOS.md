@@ -16,6 +16,19 @@ php artisan agendauno:sembrar-demos --solo=barberia --rehacer
 existe no se toca. Todas las cuentas usan la contraseña de `--password` (por defecto,
 la del demo). El comando imprime al terminar las cuentas y lo que se sembró.
 
+## Una cuenta por producto para revisarlo todo
+
+Cada demo tiene un dueño que también imparte y también es cliente: una cuenta con tres
+roles (elige con cuál entrar y lo cambia sin salir, ADR 0055). Con ella se ve cada
+apartado del panel, la agenda de quien imparte y «Mi cuenta» con datos.
+
+| Producto | Negocio | Cuenta | Entrar (desarrollo) |
+| --- | --- | --- | --- |
+| AgendaUno (clases) | Grecon Art House (`demo`, solo con enlace) | `constantino@grecon.test` | `http://localhost:5175/entrar?estudio=demo&producto=agendauno` |
+| TurnoUno (citas) | Barbería La Navaja (`barberia`) | `ramon@lanavaja.test` | `http://localhost:5175/entrar?estudio=barberia&producto=turnouno` |
+
+Su página pública: `/demo` y `/barberia` (con `?producto=` en desarrollo).
+
 ## Cómo se siembra
 
 Cada día de la historia pasa por los servicios del dominio con el reloj en ese
@@ -59,17 +72,30 @@ su nombre dice «(demo)».
   - reseñas.
 - **Al día de hoy:** clases apartadas para las próximas dos semanas, órdenes del mes por
   cobrar en recepción y algunos adeudos de quienes dejaron de venir.
-- **Fuera del demo**, porque el sistema aún no lo aplica o el documento no lo da:
-  - permanencia, penalización, inscripción y anualidad;
-  - inventario y nómina.
+- **Membresía Ilimitada** (la del estudio real, ADR 0121 y 0137): se renueva cada mes,
+  pide 12 meses de permanencia y, si se da de baja antes, el 50 % de lo que falte; con
+  inscripción ($500) y anualidad ($900) de prueba. Se vendió en las últimas semanas:
+  - dos con pago automático (tarjeta de prueba);
+  - una en mora: su renovación venció sin cobrarse;
+  - una dada de baja con su penalización por cobrar;
+  - el dueño, como alumno, con pago automático.
+- **Lo que la historia no crea** (bloque 32):
+  - prospectos en cada etapa (nuevos, en seguimiento, aprobado, descartados);
+  - Valeria, que fue prospecto: ve en su Inicio la membresía y la clase que pidió;
+  - aviso de privacidad del negocio (aceptado por la mayoría);
+  - dos cobros por conciliar, días cerrados (feriados), un bloqueo de la sala y otro de
+    una coach, y un webhook pausado con sus entregas.
+- **Fuera del demo:** entradas por QR (en un estudio, entrar es tomar la clase; ADR
+  0105), grupos (el giro de pole no los usa) y Familias (un módulo que se pide aparte:
+  apagado, para el negocio no existe).
 
 | Cuenta | Para revisar |
 | --- | --- |
-| `constantino@grecon.test` | Constantino Escobar: dueño, instructor y alumno (elige con qué rol entrar) |
+| `constantino@grecon.test` | Constantino Escobar: dueño, instructor y alumno con Membresía Ilimitada y pago automático. **La cuenta para revisar todo.** |
 | `admin@grecon.test` | Administración: catálogo, agenda, miembros, ventas y configuración |
 | `recepcion@grecon.test` | Recepción |
 | `abril@grecon.test` | Instructora (Abril Von) |
-| `valeria.rios@correo.test` | Miembro con Paquete 8 clases («Mi cuenta») |
+| `valeria.rios@correo.test` | Miembro con Paquete 8 clases; fue prospecto y ve lo que le interesó («Mi cuenta») |
 | `renata.soto@correo.test` | Miembro con Ilimitada, incluye Open Training («Mi cuenta») |
 
 ## Barbería La Navaja (`/app/barberia`, citas: plan por profesionales contratados)
@@ -90,4 +116,14 @@ su nombre dice «(demo)».
   - cancelaciones (del cliente o del negocio) y reprogramaciones;
   - inasistencias y cobros en efectivo, tarjeta o transferencia;
   - reseñas y días feriados cerrados.
-- **Cliente con cuenta:** Jorge Pineda («Mi cuenta»).
+- **Plan del SaaS:** Pro, el más completo de TurnoUno (lealtad, reportes avanzados y
+  venta en línea a la vista).
+- **Cuentas:**
+  - `ramon@lanavaja.test`: el dueño, que corta y también es cliente (corte y barba con
+    Toño cada dos semanas). **La cuenta para revisar todo.**
+  - `jorge.pineda@correo.test`: cliente con bono y su siguiente cita; fue prospecto (ve
+    el bono que pidió).
+- **Lo que la historia no crea** (bloque 32): prospectos en cada etapa, aviso de
+  privacidad, presupuestos (enviado, convertido en orden por cobrar y borrador), dos
+  bonos apartados por cobrar, dos cobros por conciliar y un webhook pausado. Sin
+  membresías ni permanencia: en citas se venden bonos (ADR 0130). Familias, apagado.
