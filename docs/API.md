@@ -344,6 +344,20 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Equipo y bitácora del superadmin (ADR 0132)
+
+- Toda petición del superadmin que cambia algo queda en `bitacora_plataforma`
+  (operador, acción, negocio, datos sin secretos, IP, resultado).
+  `GET /plataforma/bitacora?operador=&estudio=&accion=&pagina=`.
+- Operadores: `GET`/`POST /plataforma/administradores` y `PUT
+  /plataforma/administradores/{id}` (`nombre`, `activo`, `password` ≥ 12). Siempre queda
+  uno activo; nadie se desactiva a sí mismo.
+- Sesiones: `GET /plataforma/sesiones` (con `actual`) y `DELETE /plataforma/sesiones/{id}`.
+- `GET /plataforma/estudios`: `adeudos[]` por moneda (`{moneda, minor}`). La ficha trae
+  `ultima_suspension`.
+- `PUT /plataforma/pasarelas/stripe`: si las llaves cambian de modo, 409
+  `GATEWAY_MODE_CHANGE_UNCONFIRMED` hasta mandar `confirmar_cambio_modo: true`.
+
 ## Cada producto habla como sus negocios (ADR 0131)
 
 - `GET /terminologia` trae en `opciones` solo las de la modalidad del negocio; otra

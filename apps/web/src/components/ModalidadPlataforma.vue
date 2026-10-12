@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import type { ModalidadServicio } from "@/lib/modalidad";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { useToastStore } from "@/stores/toast";
 
 /**
@@ -44,6 +45,9 @@ async function cambiar(): Promise<void> {
       t("modalidadNegocio.plataforma.confirmar", {
         estudio: props.nombre,
         modalidad: t(`modalidadNegocio.nombres.${nueva}`),
+        de: PRODUCTOS[productoDeModalidad(props.modalidad)].nombre,
+        a: PRODUCTOS[productoDeModalidad(nueva)].nombre,
+        direccion: `${props.slug}.${PRODUCTOS[productoDeModalidad(nueva)].dominio}`,
       }),
       { aceptar: t("modalidadNegocio.plataforma.aceptar"), peligro: true },
     ))

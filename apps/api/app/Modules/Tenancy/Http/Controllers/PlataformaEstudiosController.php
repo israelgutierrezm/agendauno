@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Acceso\BitacoraPlataforma;
 use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
@@ -47,6 +48,10 @@ class PlataformaEstudiosController
     public function show(string $estudio, ClienteWhatsApp $whatsapp, CambiarModalidadEstudio $cambioModalidad, PlanCitasSaas $planes, GestorDeConexionTenant $gestor): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        // Quién la suspendió por última vez, cuándo y por qué (ADR 0132).
+        $suspension = BitacoraPlataforma::query()->with('administrador')
+            ->where('estudio_id', $modelo->getKey())->where('accion', 'estudios.suspender')->where('estado', '<', 300)
+            ->latest('id')->first();
 
         $uso = MedicionUso::query()
             ->where('estudio_id', $modelo->getKey())
@@ -96,6 +101,12 @@ class PlataformaEstudiosController
                 'whatsapp_verificado' => $modelo->contacto_whatsapp_verificado_en !== null,
             ],
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
+            // La última vez que la plataforma lo suspendió: quién, cuándo y por qué (ADR 0132).
+            'ultima_suspension' => $suspension instanceof BitacoraPlataforma ? [
+                'fecha' => $suspension->created_at->toIso8601String(),
+                'operador' => $suspension->administrador?->nombre,
+                'motivo' => is_string($suspension->datos['motivo'] ?? null) ? $suspension->datos['motivo'] : null,
+            ] : null,
             // Clases o citas solo cambia antes de operar (ADR 0104).
             'modalidad_cambiable' => $cambioModalidad->cambiable($modelo),
             'whatsapp_clientes' => self::whatsappClientes($modelo, $whatsapp),

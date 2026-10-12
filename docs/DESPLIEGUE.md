@@ -195,7 +195,8 @@ cp web.env.example web.env
    - `docker compose --env-file web.env logs -f worker scheduler` no muestra errores.
 5. Da de alta a los operadores del superadmin:
    `docker compose --env-file web.env exec -u www-data api php artisan agendauno:admin-plataforma tu@correo.com --nombre="Tu nombre"`
-   (pide la contraseña). En el superadmin (`/plataforma`: correo, contraseña,
+   (pide la contraseña; después se agregan más desde la pestaña «Equipo», ADR 0132).
+   En el superadmin (`/plataforma`: correo, contraseña,
    `PLATFORM_ADMIN_TOKEN` y el código que llega por correo; ADR 0126): tarifas del SaaS,
    parámetros de plataforma, la pasarela con la que cobras la renta (llaves y secreto
    del webhook, ver «Stripe de la plataforma»), los datos comerciales (token de

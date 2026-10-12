@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { ETIQUETAS_FUNCION, NIVELES_PLAN } from "@/lib/suscripcion";
 import { useToastStore } from "@/stores/toast";
 
@@ -307,7 +308,13 @@ onMounted(reintentar);
         @submit.prevent="publicar(m)"
       >
         <div>
-          <h3 class="font-medium">{{ $t(`cobro.tarifas.${m}`) }}</h3>
+          <h3 class="font-medium">
+            {{
+              $t(`cobro.tarifas.${m}`, {
+                marca: PRODUCTOS[productoDeModalidad(m)].nombre,
+              })
+            }}
+          </h3>
           <p
             v-if="vigentes[m]"
             class="text-xs"

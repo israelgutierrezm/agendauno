@@ -43,8 +43,9 @@ export default {
   plataforma: {
     etiqueta: "Modalidad",
     cambiar: "Cambiar a {modalidad}",
+    // Cambiar de modalidad es cambiar de producto (ADR 0132): se dice cuál y dónde.
     confirmar:
-      "¿Cambiar {estudio} a {modalidad}? Cambian su agenda, su menú, lo que ofrece su página y cómo se le cobra la renta. Su tipo de negocio pasa a uno de esa modalidad; el negocio lo ajusta en Configuración.",
+      "¿Cambiar {estudio} a {modalidad}? Pasa de {de} a {a}: su página y sus enlaces quedan en {direccion}, y sus correos y su app son los de {a}. Cambian su agenda, su menú, lo que ofrece su página y cómo se le cobra la renta. Su tipo de negocio pasa a uno de esa modalidad; el negocio lo ajusta en Configuración.",
     aceptar: "Cambiar modalidad",
     cambiada: "Modalidad cambiada.",
     ayuda:

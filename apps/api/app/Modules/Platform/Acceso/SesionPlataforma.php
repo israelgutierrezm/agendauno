@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Platform\Acceso;
 
+use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -20,6 +21,8 @@ use Illuminate\Support\Carbon;
  */
 class SesionPlataforma extends Model
 {
+    use HasPublicId;
+
     protected $table = 'sesiones_plataforma';
 
     protected $fillable = ['administrador_id', 'token_hash', 'expira_en', 'ultimo_uso_en', 'cerrada_en', 'ip', 'agente'];
