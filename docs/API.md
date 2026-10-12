@@ -344,6 +344,31 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Pago automático seguro (ADR 0134)
+
+- Quitar una suscripción (Mercado Pago, OpenPay) la deja en estado `cancelando` hasta
+  que la pasarela confirma.
+  - `agendauno:confirmar-cancelaciones` la reintenta cada 5 minutos.
+  - Tras 5 intentos sin confirmar queda en «Por conciliar».
+- `GET /mi/pago-automatico`, en cada membresía:
+  - `cancelando`;
+  - `monto_minor`: con pago automático, el precio que autorizó;
+  - `precio_nuevo_minor`: el del plan, si cambió.
+- `POST /mi/pago-automatico/{acuerdo}/nuevo-precio` autoriza el precio nuevo:
+  - responde `activa`, `redirect` (otra suscripción que se autoriza en la pasarela) o
+    `formulario` (OpenPay);
+  - al quedar activa, la anterior se cancela.
+- `GET /suscripciones`:
+  - `cancelando_pago_automatico`;
+  - `pago_automatico.monto_minor` y `pago_automatico.precio_nuevo_minor`.
+- `GET /incidencias-cobro`:
+  - tipos nuevos: `cancelacion_sin_confirmar`, `cobro_tras_cancelar` y `monto_distinto`;
+  - campos `domiciliacion {proveedor, referencia, estado}`, `esperado_minor`,
+    `excedente_minor` y `aplicable`.
+- `POST /incidencias-cobro/{id}/resolver`:
+  - `accion: aplicar` («dar por pagada» la renovación con ese cobro);
+  - `accion: devolver`: con excedente, devuelve solo el excedente.
+
 ## Equipo y bitácora del superadmin (ADR 0132)
 
 - Toda petición del superadmin que cambia algo queda en `bitacora_plataforma`

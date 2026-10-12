@@ -255,6 +255,15 @@ docker compose --env-file web.env exec -u www-data api php artisan agendauno:ret
 docker compose --env-file web.env exec -u www-data api php artisan agendauno:retirar-membresias-citas
 ```
 
+**Al desplegar el ADR 0134 (pago automático seguro):**
+- migración de negocio 000128;
+- el programador corre ya `agendauno:confirmar-cancelaciones` cada 5 minutos;
+- nada que correr a mano.
+
+Los pagos automáticos anteriores no tienen guardado el precio que se autorizó: siguen
+con el precio del plan, y la conciliación avisa en «Por conciliar» si la pasarela
+cobra otro importe.
+
 ### Imágenes del CI y despliegue desde GitHub
 
 Con `REGISTRO=ghcr.io/<dueño>` en `web.env` (y `docker login ghcr.io` con un token de
