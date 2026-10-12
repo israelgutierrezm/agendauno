@@ -448,6 +448,8 @@ export const porConciliar = {
   devolucion: "Devolución de {monto}",
   pagoTardio: "Pago tardío de {monto}",
   pagoDuplicado: "Cobro doble de {monto}",
+  // Pagó una clase de prueba que ya había usado (ADR 0137): devolverle el pago.
+  primeraVezRepetida: "Clase de prueba ya usada: {monto}",
   // Pago automático (ADR 0134).
   cancelacionSinConfirmar: "Pago automático sin cancelar en {pasarela}",
   cobroTrasCancelar: "Cobro después de cancelar: {monto}",

@@ -133,6 +133,34 @@ describe("por conciliar", () => {
     );
   });
 
+  it("una clase de prueba pagada de nuevo se nombra y se devuelve (ADR 0137)", async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: "i9",
+            tipo: "primera_vez_repetida",
+            detalle:
+              "Bea ya había usado su clase de prueba: no se concedió otra.",
+            fecha: null,
+            persona: "Bea",
+            monto_minor: 15000,
+            moneda: "MXN",
+            reembolso: null,
+          },
+        ],
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.text()).toContain("Clase de prueba ya usada");
+    await w.get("button.tu-enlace").trigger("click");
+    expect(w.findAll("button").map((b) => b.text())).toContain(
+      "Devolver el pago",
+    );
+  });
+
   it("un monto sin moneda va en la del negocio, no en pesos", async () => {
     api.get.mockResolvedValueOnce({
       data: {

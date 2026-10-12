@@ -2,7 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Support\Facades\File;
 
 /*
@@ -82,6 +88,63 @@ it('la clase de prueba es solo para quien nunca vino, y una sola vez', function 
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
         'comprador_id' => $venta['persona'], 'items' => [['producto_id' => $prueba, 'cantidad' => 1]],
     ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonPath('code', 'FIRST_VISIT_ONLY');
+});
+
+/** Corre en la base del negocio de estas pruebas. */
+function enNegocioPlanesPublico(Closure $hacer): mixed
+{
+    return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-planes')->firstOrFail(), $hacer);
+}
+
+/** Planes y paquetes que tiene quien usa ese correo. */
+function planesDeCorreoPlanesPublico(string $email): int
+{
+    return (int) enNegocioPlanesPublico(fn (): int => AcuerdoTenant::query()
+        ->where('persona_id', PersonaTenant::query()->where('email', $email)->value('id'))
+        ->count());
+}
+
+it('la clase de prueba: una por persona en la orden; junto con un plan, sí; pagada dos veces a la vez, la segunda queda por conciliar', function (): void {
+    $e = estudioConSesion('estudio-planes', 'planes@correo.mx');
+    $prueba = clasePruebaPlanes($e);
+    $pack = crearPackTenant($e);
+    $nueva = alumnoConSesion($e, 'Nueva', 'nueva@correo.mx');
+
+    // En dos líneas de la misma orden, no.
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [
+        ['producto_id' => $prueba, 'cantidad' => 1], ['producto_id' => $prueba, 'cantidad' => 1],
+    ]], conBearer($nueva['bearer']))->assertUnprocessable()->assertJsonPath('code', 'FIRST_VISIT_ONLY');
+
+    // Junto con un plan, sí: se conceden los dos, aunque el plan se conceda primero.
+    $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [
+        ['producto_id' => $pack, 'cantidad' => 1], ['producto_id' => $prueba, 'cantidad' => 1],
+    ]], conBearer($nueva['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    expect(planesDeCorreoPlanesPublico('nueva@correo.mx'))->toBe(2);
+
+    // Dos órdenes pendientes; la segunda la cobra la pasarela cuando la primera ya se
+    // pagó (no pasa por la revisión de antes de cobrar): no se da otra clase de prueba
+    // y el pago queda por conciliar para devolverlo.
+    $otra = alumnoConSesion($e, 'Otra', 'otra@correo.mx');
+    $primera = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($otra['bearer']))
+        ->assertCreated()->json('data.id');
+    $segunda = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($otra['bearer']))
+        ->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$primera}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    enNegocioPlanesPublico(function () use ($segunda): void {
+        $orden = OrdenTenant::query()->where('ulid', $segunda)->firstOrFail();
+        $pago = PagoTenant::query()->create([
+            'orden_id' => $orden->getKey(), 'proveedor' => 'stripe', 'metodo' => 'tarjeta',
+            'estado' => 'pendiente', 'monto_minor' => 15000, 'moneda' => 'MXN', 'referencia_externa' => 'cs_prueba_2',
+        ]);
+        app(ConfirmarPagoTenant::class)->aprobar($pago, 'cs_prueba_2');
+    });
+
+    expect(planesDeCorreoPlanesPublico('otra@correo.mx'))->toBe(1);
+    $incidencias = $this->getJson("/api/v1/app/{$e['slug']}/incidencias-cobro", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($incidencias)->toHaveCount(1)
+        ->and($incidencias[0]['tipo'])->toBe('primera_vez_repetida')
+        ->and($incidencias[0]['detalle'])->toContain('ya había usado su clase de prueba');
 });
 
 it('una clase dice si es para principiantes, qué saber y qué llevar; el instructor, su semblanza', function (): void {
