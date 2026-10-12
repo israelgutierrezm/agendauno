@@ -231,7 +231,7 @@ it('reintenta solo lo que no se puede duplicar; el token vencido avisa al supera
     $estado = fn (string $proveedor, string $evento): array => EnvioMedicionPlataforma::query()->where('evento', $evento)
         ->whereHas('destino', fn ($q) => $q->where('proveedor', $proveedor))->sole()
         ->only(['motivo', 'proximo_intento_en', 'ultimo_error']) + ['estado' => EnvioMedicionPlataforma::query()->where('evento', $evento)
-            ->whereHas('destino', fn ($q) => $q->where('proveedor', $proveedor))->sole()->estado->value];
+        ->whereHas('destino', fn ($q) => $q->where('proveedor', $proveedor))->sole()->estado->value];
 
     // Meta: el token no sirve; no se reintenta y el superadmin se entera.
     expect($estado('meta', 'negocio_creado'))->toMatchArray(['estado' => 'error', 'motivo' => 'credenciales', 'proximo_intento_en' => null])
