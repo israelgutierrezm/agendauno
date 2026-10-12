@@ -329,3 +329,137 @@ describe("bloques propios del sitio (ADR 0146)", () => {
     w.unmount();
   });
 });
+
+describe("páginas del sitio (ADR 0146, fase 2)", () => {
+  const CATALOGO = {
+    bloques: ["texto_imagen", "preguntas", "llamado"],
+    bloques_maximos: 5,
+    fondos: ["normal", "suave"],
+    alineaciones: ["izquierda", "centro"],
+    max_elementos: 12,
+    max_preguntas: 20,
+    formularios: [],
+    paginas_maximas: 2,
+    movibles: ORDEN.slice(1, -1),
+    max_direccion: 40,
+    max_titulo_pagina: 60,
+    max_seo_titulo: 70,
+    max_seo_descripcion: 160,
+    max_pie: 300,
+  };
+  const conPaginas = (cambios: Record<string, unknown> = {}) => {
+    const base = datos();
+    return {
+      ...base,
+      borrador: {
+        ...base.borrador,
+        seo: { titulo: null, descripcion: null, imagen_url: null },
+        paginas: [],
+        pie: { texto: null },
+      },
+      catalogo: { ...base.catalogo, ...CATALOGO },
+      ...cambios,
+    };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.get.mockResolvedValue({ data: { data: conPaginas() } });
+    api.put.mockImplementation((_url: string, cuerpo: unknown) =>
+      Promise.resolve({
+        data: {
+          data: conPaginas({ borrador: cuerpo, cambios_sin_publicar: true }),
+        },
+      }),
+    );
+  });
+
+  function montarPaginas() {
+    return mount(SitioWebView, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18n],
+        stubs: {
+          CargadorImagen: true,
+          ModalDialogo: {
+            props: ["abierto", "titulo"],
+            template: '<div v-if="abierto"><slot /></div>',
+          },
+        },
+      },
+    });
+  }
+  async function crear(w: ReturnType<typeof montarPaginas>, titulo: string) {
+    await w.get('[data-prueba="agregar-pagina"]').trigger("click");
+    await w.get('[data-prueba="titulo-pagina-nueva"]').setValue(titulo);
+    await w.get('[data-prueba="crear-pagina"]').trigger("submit");
+  }
+
+  it("crea una página, le pone secciones del negocio y bloques, y la guarda", async () => {
+    const w = montarPaginas();
+    await flushPromises();
+    await crear(w, "Preguntas frecuentes");
+
+    expect(w.find('[data-prueba="pagina-preguntas-frecuentes"]').exists()).toBe(
+      true,
+    );
+    expect(w.get('[data-prueba="titulo-secciones"]').text()).toBe(
+      "Secciones de «Preguntas frecuentes»",
+    );
+    expect(w.find('[data-prueba="pagina-vacia"]').exists()).toBe(true);
+    expect(w.get("iframe").attributes("src")).toBe(
+      "/estudio/fluo/vista-previa?pagina=preguntas-frecuentes",
+    );
+
+    await w.get('[data-prueba="agregar-bloque"]').trigger("click");
+    await w.get('[data-prueba="nueva-seccion-precios"]').trigger("click");
+    await w.get('[data-prueba="agregar-bloque"]').trigger("click");
+    // Ya no ofrece la que tiene.
+    expect(w.find('[data-prueba="nueva-seccion-precios"]').exists()).toBe(
+      false,
+    );
+    await w.get('[data-prueba="nuevo-preguntas"]').trigger("click");
+
+    await w.get('[data-prueba="guardar-sitio"]').trigger("click");
+    await flushPromises();
+    const enviado = api.put.mock.calls[0][1];
+    expect(enviado.paginas).toHaveLength(1);
+    expect(enviado.paginas[0]).toMatchObject({
+      slug: "preguntas-frecuentes",
+      titulo: "Preguntas frecuentes",
+      en_menu: true,
+    });
+    expect(
+      enviado.paginas[0].secciones.map((s: { tipo: string }) => s.tipo),
+    ).toEqual(["precios", "preguntas"]);
+    // Inicio no cambió.
+    expect(enviado.secciones).toHaveLength(ORDEN.length);
+    w.unmount();
+  });
+
+  it("la dirección se escribe como queda; quitar la página vuelve a Inicio; hasta su tope", async () => {
+    const w = montarPaginas();
+    await flushPromises();
+    await crear(w, "Precios");
+    // Recién creada, su configuración ya está abierta.
+    const direccion = w.get('[data-prueba="direccion-0"]');
+    await direccion.setValue("Mis Precios!");
+    await direccion.trigger("change");
+    expect(w.find('[data-prueba="pagina-mis-precios"]').exists()).toBe(true);
+
+    await crear(w, "Nosotros");
+    expect(w.get('[data-prueba="agregar-pagina"]').attributes()).toHaveProperty(
+      "disabled",
+    );
+    expect(w.text()).toContain(
+      "Tu sitio puede tener hasta 2 páginas, además de Inicio.",
+    );
+
+    await w.get('[data-prueba="quitar-pagina-nosotros"]').trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalled();
+    expect(w.find('[data-prueba="pagina-nosotros"]').exists()).toBe(false);
+    expect(w.get('[data-prueba="titulo-secciones"]').text()).toBe("Secciones");
+    w.unmount();
+  });
+});

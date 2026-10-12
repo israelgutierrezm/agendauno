@@ -82,10 +82,68 @@ export interface BannerSitio {
   foto_url: string | null;
 }
 
+/** Cómo aparece en buscadores y al compartirse (vacío: lo de siempre). */
+export interface SeoSitio {
+  titulo: string | null;
+  descripcion: string | null;
+  imagen_url: string | null;
+}
+
+/**
+ * Una página propia (ADR 0146, fase 2): su dirección (`/p/{slug}`), su título, si va
+ * en el menú, su SEO y sus secciones (las del sistema, una vez; bloques propios).
+ */
+export interface PaginaSitio {
+  id?: string;
+  slug: string;
+  titulo: string;
+  en_menu: boolean;
+  seo: SeoSitio;
+  secciones: SeccionSitio[];
+}
+
 export interface SitioPublico {
   plantilla: PlantillaSitio;
   secciones: SeccionSitio[];
   banners: BannerSitio[];
+  // Fase 2 (ADR 0146); un API anterior no los manda.
+  seo?: SeoSitio;
+  paginas?: PaginaSitio[];
+  pie?: { texto: string | null };
+}
+
+/** La dirección de una página a partir de su título: «Preguntas frecuentes» → preguntas-frecuentes. */
+export function direccionDe(titulo: string, maximo = 40): string {
+  return titulo
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, maximo)
+    .replace(/-+$/g, "");
+}
+
+/** Una dirección que no usa otra página (agrega un número si hace falta). */
+export function direccionLibre(base: string, usadas: string[]): string {
+  const limpia = base || "pagina";
+  let direccion = limpia;
+  for (let n = 2; usadas.includes(direccion); n++) {
+    direccion = `${limpia.slice(0, 37)}-${n}`;
+  }
+  return direccion;
+}
+
+/** Una página nueva, en el menú y vacía. */
+export function nuevaPagina(titulo: string, usadas: string[]): PaginaSitio {
+  return {
+    id: idBloque(),
+    slug: direccionLibre(direccionDe(titulo), usadas),
+    titulo,
+    en_menu: true,
+    seo: { titulo: null, descripcion: null, imagen_url: null },
+    secciones: [],
+  };
 }
 
 /** La portada y el contacto no se mueven ni se ocultan. */
@@ -199,6 +257,9 @@ export function sitioPorDefecto(esCitas: boolean): SitioPublico {
       .filter((t) => !(esCitas && t === "horario"))
       .map((tipo) => ({ tipo, titulo: null, texto: null, foto_url: null })),
     banners: [],
+    seo: { titulo: null, descripcion: null, imagen_url: null },
+    paginas: [],
+    pie: { texto: null },
   };
 }
 

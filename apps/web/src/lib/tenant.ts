@@ -123,9 +123,15 @@ export function esDominioPrincipal(
  * La página del negocio conserva `/estudio/{slug}` (existe en el subdominio): así
  * no se brinca la página de un negocio de citas ni se pierde el ancla (`#precios`).
  */
-const RUTAS_CON_SLUG_EN_SUBDOMINIO: Record<string, (slug: string) => string> = {
+const RUTAS_CON_SLUG_EN_SUBDOMINIO: Record<
+  string,
+  (slug: string, params: Record<string, unknown>) => string
+> = {
   "estudio-corto": () => "/",
   "estudio-publico": (slug) => `/estudio/${slug}`,
+  // Una página propia de su sitio (ADR 0146).
+  "estudio-pagina": (slug, params) =>
+    `/estudio/${slug}/p/${encodeURIComponent(String(params.pagina ?? ""))}`,
   "enlaces-estudio": () => "/enlaces",
   "aviso-negocio": (slug) => `/estudio/${slug}/aviso-de-privacidad`,
 };
@@ -158,7 +164,7 @@ export function urlEnSubdominioDelNegocio(
     return null;
   }
   const queryYAncla = ruta.fullPath.replace(/^[^?#]*/, "");
-  return `https://${slug}.${PRODUCTOS[producto].dominio}${resto(slug)}${queryYAncla}`;
+  return `https://${slug}.${PRODUCTOS[producto].dominio}${resto(slug, ruta.params)}${queryYAncla}`;
 }
 
 /** Sale de la SPA a otra dirección (p. ej. el subdominio del negocio). */

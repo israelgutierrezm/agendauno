@@ -80,8 +80,10 @@ final class CatalogoParametros
                 'Cuántos banners (promociones, avisos) puede tener la página del negocio.', $e, 5, 1, 20, 'banners'),
             new DefinicionParametro('sitio.imagenes_maximas', 'Sitio del negocio', 'Imágenes del sitio',
                 'Cuántas fotos propias puede tener la página del negocio (las de «Nosotros», los banners, las galerías y los bloques).', $e, 40, 5, 200, 'imágenes'),
-            new DefinicionParametro('sitio.bloques_maximos', 'Sitio del negocio', 'Bloques propios del sitio',
-                'Cuántos bloques propios (texto con imagen, galería, preguntas, testimonios, video…) puede tener la página del negocio (ADR 0146).', $e, 20, 1, 60, 'bloques'),
+            new DefinicionParametro('sitio.bloques_maximos', 'Sitio del negocio', 'Bloques propios por página',
+                'Cuántos bloques propios (texto con imagen, galería, preguntas, testimonios, video…) puede tener cada página del sitio (ADR 0146).', $e, 20, 1, 60, 'bloques'),
+            new DefinicionParametro('sitio.paginas_maximas', 'Sitio del negocio', 'Páginas del sitio',
+                'Cuántas páginas propias puede tener el sitio, además de Inicio (ADR 0146).', $e, 8, 1, 30, 'páginas'),
 
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',

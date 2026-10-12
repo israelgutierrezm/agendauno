@@ -114,6 +114,12 @@ const router = createRouter({
       component: () => import("@/views/EstudioPublicoView.vue"),
     },
     {
+      // Una página propia de su sitio (ADR 0146): /estudio/{slug}/p/{pagina}.
+      path: "/estudio/:slug/p/:pagina",
+      name: "estudio-pagina",
+      component: () => import("@/views/EstudioPublicoView.vue"),
+    },
+    {
       // Vista previa del sitio con su borrador (la abre su editor, con la sesión de
       // quien configura el negocio; en el mismo origen que el panel).
       path: "/estudio/:slug/vista-previa",
@@ -715,6 +721,7 @@ router.afterEach((to, _from, failure) => {
 // enlaces. No su panel, la cuenta del cliente, un widget ni la vista previa.
 const RUTAS_DE_NEGOCIO_MEDIBLES = new Set([
   "estudio-publico",
+  "estudio-pagina",
   "estudio-corto",
   "sucursales-estudio",
   "enlaces-estudio",

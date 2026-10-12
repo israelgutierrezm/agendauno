@@ -9,7 +9,13 @@ import sitioWeb from "@/i18n/locales/sitioWeb.es-MX";
 import { updateSeo } from "@/lib/seo";
 import EstudioPublicoView from "./EstudioPublicoView.vue";
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  ruta: {
+    params: { slug: "estudio-a" } as Record<string, string>,
+    query: {} as Record<string, string>,
+  },
+}));
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get },
   mensajeDeError: () => "No disponible",
@@ -17,8 +23,14 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 vi.mock("@/lib/seo", () => ({ updateSeo: vi.fn() }));
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { slug: "estudio-a" }, query: {} }),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRoute: () => mocks.ruta,
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    resolve: (r: { name: string; params?: Record<string, string> }) => ({
+      href: `/${r.name}/${r.params?.pagina ?? ""}`,
+    }),
+  }),
   RouterLink: { template: "<a><slot /></a>" },
 }));
 
@@ -66,6 +78,8 @@ function montar(props: { vistaPrevia?: boolean } = {}) {
 describe("página pública del estudio", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.ruta.params = { slug: "estudio-a" };
+    mocks.ruta.query = {};
   });
 
   it("no deja crear una cuenta: se pide acceso al negocio (ADR 0093)", async () => {
@@ -650,5 +664,111 @@ describe("página pública del estudio", () => {
       }
       w.unmount();
     }
+  });
+
+  describe("varias páginas (ADR 0146)", () => {
+    function conPaginas() {
+      const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
+      Object.assign(respuesta.data.data, {
+        sitio: {
+          plantilla: "esencial",
+          secciones: [
+            { tipo: "inicio", titulo: null, texto: null, foto_url: null },
+            { tipo: "contacto", titulo: null, texto: null, foto_url: null },
+          ],
+          banners: [],
+          seo: { titulo: null, descripcion: null, imagen_url: null },
+          pie: { texto: "Abrimos de lunes a sábado." },
+          paginas: [
+            {
+              id: "p1",
+              slug: "nosotros",
+              titulo: "Nosotros",
+              en_menu: true,
+              seo: {
+                titulo: "Conoce a Estudio A",
+                descripcion: null,
+                imagen_url: null,
+              },
+              secciones: [
+                {
+                  id: "b1",
+                  tipo: "llamado",
+                  titulo: "Visítanos",
+                  texto: "Te esperamos.",
+                  foto_url: null,
+                  estilo: { fondo: "normal", alineacion: "izquierda" },
+                  datos: {},
+                },
+              ],
+            },
+            {
+              id: "p2",
+              slug: "oculta",
+              titulo: "Fuera del menú",
+              en_menu: false,
+              seo: { titulo: null, descripcion: null, imagen_url: null },
+              secciones: [],
+            },
+          ],
+        },
+      });
+      return respuesta;
+    }
+
+    it("en Inicio: el menú con sus páginas y el pie en todas", async () => {
+      mocks.get.mockResolvedValue(conPaginas());
+      const w = montar();
+      await flushPromises();
+
+      const menu = w.get('[data-prueba="menu-sitio"]');
+      expect(menu.text()).toContain("Inicio");
+      expect(menu.text()).toContain("Nosotros");
+      expect(menu.text()).not.toContain("Fuera del menú");
+      expect(w.get('[data-prueba="pie-sitio"]').text()).toContain(
+        "Abrimos de lunes a sábado.",
+      );
+      expect(w.find('[data-prueba="portada"]').exists()).toBe(true);
+    });
+
+    it("una página propia: su encabezado, sus secciones y su SEO", async () => {
+      mocks.ruta.params = { slug: "estudio-a", pagina: "nosotros" };
+      mocks.get.mockResolvedValue(conPaginas());
+      const w = montar();
+      await flushPromises();
+
+      expect(w.get('[data-prueba="pagina-cabecera"]').text()).toContain(
+        "Nosotros",
+      );
+      expect(w.find('[data-prueba="portada"]').exists()).toBe(false);
+      expect(w.get('[data-prueba="bloque-llamado"]').text()).toContain(
+        "Visítanos",
+      );
+      expect(updateSeo).toHaveBeenLastCalledWith(
+        expect.objectContaining({ title: "Conoce a Estudio A" }),
+      );
+    });
+
+    it("una página que no existe lo dice, con el camino a Inicio", async () => {
+      mocks.ruta.params = { slug: "estudio-a", pagina: "no-esta" };
+      mocks.get.mockResolvedValue(conPaginas());
+      const w = montar();
+      await flushPromises();
+
+      expect(w.get('[data-prueba="pagina-no-existe"]').text()).toContain(
+        "Esta página no existe",
+      );
+      expect(w.find('[data-prueba="portada"]').exists()).toBe(false);
+    });
+
+    it("en la vista previa, la página se pide con ?pagina=", async () => {
+      mocks.ruta.query = { pagina: "nosotros" };
+      mocks.get.mockResolvedValue(conPaginas());
+      const w = montar({ vistaPrevia: true });
+      await flushPromises();
+      expect(w.get('[data-prueba="pagina-cabecera"]').text()).toContain(
+        "Nosotros",
+      );
+    });
   });
 });

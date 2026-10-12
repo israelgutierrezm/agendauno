@@ -52,6 +52,20 @@ final class CatalogoSitioWeb
 
     public const MAX_PREGUNTAS = 20;
 
+    /**
+     * Páginas propias (ADR 0146, fase 2): su dirección (`/p/{direccion}`), su título y
+     * su SEO; el texto del pie de página.
+     */
+    public const MAX_DIRECCION = 40;
+
+    public const MAX_TITULO_PAGINA = 60;
+
+    public const MAX_SEO_TITULO = 70;
+
+    public const MAX_SEO_DESCRIPCION = 160;
+
+    public const MAX_PIE = 300;
+
     public static function esBloque(string $tipo): bool
     {
         return in_array($tipo, self::BLOQUES, true);

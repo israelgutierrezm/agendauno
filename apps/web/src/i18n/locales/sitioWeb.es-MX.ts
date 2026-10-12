@@ -138,6 +138,56 @@ export default {
       foto: "Foto (opcional)",
     },
   },
+  // Varias páginas (ADR 0146, fase 2): Inicio y las propias, con su SEO y el pie.
+  paginas: {
+    titulo: "Páginas",
+    ayuda:
+      "Inicio y tus páginas propias. Elige una para editar sus secciones; las que van en el menú aparecen arriba de tu sitio.",
+    inicio: "Inicio",
+    seo: "SEO",
+    configurar: "Configurar",
+    enMenu: "En el menú",
+    fueraMenu: "Fuera del menú",
+    subir: "Subir {pagina}",
+    bajar: "Bajar {pagina}",
+    agregar: "Agregar página",
+    nueva: "Nueva página",
+    crear: "Crear página",
+    ejemplo: "Ej.: Nosotros, Precios, Preguntas frecuentes",
+    direccionAyuda: "Su dirección será /p/{direccion}; la cambias después.",
+    tope: "Tu sitio puede tener hasta {n} páginas, además de Inicio.",
+    quitar: "Quitar página",
+    confirmarQuitar:
+      "¿Quitar la página «{pagina}»? Sus secciones y bloques se pierden al guardar, y su enlace deja de funcionar al publicar.",
+    seccionesDe: "Secciones de «{pagina}»",
+    seccionesAyuda:
+      "Agrega secciones de tu negocio (horarios, precios, equipo…) o bloques propios, y ordénalos.",
+    vacia: "Esta página aún no tiene secciones: agrega la primera.",
+    quitarSeccion: "Quitar de la página",
+    delNegocio: "Secciones de tu negocio",
+    propios: "Bloques propios",
+    campos: {
+      titulo: "Título de la página",
+      direccion: "Dirección",
+      enMenu: "Mostrarla en el menú",
+    },
+  },
+  seo: {
+    titulo: "Buscadores y redes",
+    ayuda:
+      "Cómo aparece en Google y al compartir el enlace. Vacío: el de siempre.",
+    campoTitulo: "Título",
+    campoDescripcion: "Descripción",
+    campoImagen: "Imagen al compartir (opcional)",
+    quedan: "Quedan {n} caracteres.",
+    sinDescripcion: "La descripción de siempre.",
+  },
+  pie: {
+    titulo: "Pie de página",
+    ayuda:
+      "Aparece al final de todas tus páginas, con el menú y tu aviso de privacidad.",
+    ejemplo: "Ej.: Abrimos de lunes a sábado de 7:00 a 21:00.",
+  },
   // Bloques propios (ADR 0146): se agregan, se repiten y tienen su estilo.
   bloques: {
     agregar: "Agregar bloque",
@@ -222,6 +272,12 @@ export default {
     avisoVistaPrevia:
       "Vista previa: así se verá tu página cuando publiques este borrador.",
     nosotros: "Nosotros",
+    // Su menú de páginas y el pie (ADR 0146).
+    menu: "Páginas del sitio",
+    inicio: "Inicio",
+    paginas: "Páginas",
+    noExiste: "Esta página no existe o ya no está publicada.",
+    irAInicio: "Ir a Inicio",
     // El video carga hasta que la persona le da clic (sin cookies hasta entonces).
     verVideo: "Ver video",
     videoAviso: "Al reproducirlo, el video se carga desde {proveedor}.",

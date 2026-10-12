@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   colorDeContraste,
+  direccionDe,
+  direccionLibre,
   duplicarBloque,
   esBloque,
   esEnlaceDeVideo,
   moverSeccion,
+  nuevaPagina,
   nuevoBloque,
   sitioPorDefecto,
   urlReproductor,
@@ -88,5 +91,28 @@ describe("bloques propios (ADR 0146)", () => {
     expect(urlReproductor("otro", "dQw4w9WgXcQ")).toBeNull();
     expect(esEnlaceDeVideo("https://youtu.be/dQw4w9WgXcQ")).toBe(true);
     expect(esEnlaceDeVideo("https://evil.com/video.mp4")).toBe(false);
+  });
+});
+
+describe("páginas propias (ADR 0146, fase 2)", () => {
+  it("la dirección sale del título: minúsculas, sin acentos y con guiones", () => {
+    expect(direccionDe("Preguntas Frecuentes")).toBe("preguntas-frecuentes");
+    expect(direccionDe("  Año nuevo: ¡Promoción!  ")).toBe(
+      "ano-nuevo-promocion",
+    );
+    expect(direccionDe("Nosotros", 3)).toBe("nos");
+    expect(direccionLibre("precios", ["precios", "precios-2"])).toBe(
+      "precios-3",
+    );
+  });
+
+  it("una página nueva va en el menú, vacía y con una dirección libre", () => {
+    expect(nuevaPagina("Precios", ["precios"])).toMatchObject({
+      slug: "precios-2",
+      titulo: "Precios",
+      en_menu: true,
+      secciones: [],
+      seo: { titulo: null, descripcion: null, imagen_url: null },
+    });
   });
 });
