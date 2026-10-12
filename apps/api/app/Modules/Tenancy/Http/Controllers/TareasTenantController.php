@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FamiliasTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
 use App\Modules\Tenancy\Automatizacion\EstadoTarea;
 use App\Modules\Tenancy\Automatizacion\ResultadoSeguimiento;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Bandeja de tareas de seguimiento del estudio, tenant-local (R16): pendientes
@@ -27,46 +30,130 @@ use Illuminate\Validation\Rule;
  */
 class TareasTenantController
 {
+    private const POR_PAGINA = 20;
+
     public function __construct(
         private readonly GestionarTareasTenant $tareas,
         private readonly FamiliasTenant $familias,
+        private readonly FechasNegocioTenant $fechas,
     ) {}
 
+    /**
+     * La bandeja, por páginas: pendientes (la más próxima a vencer primero) o
+     * completadas (la más reciente primero). Se busca por título, detalle o persona y
+     * se acota por tipo, por vencimiento o por fechas (de vencimiento o, en las
+     * completadas, de cuándo se completaron). `meta.conteos` son las pendientes de su
+     * alcance por vencimiento, sin los demás filtros.
+     */
     public function index(Request $request): JsonResponse
     {
-        $estado = (string) $request->query('estado', EstadoTarea::Pendiente->value);
+        $filtros = $request->validate([
+            'estado' => ['nullable', Rule::enum(EstadoTarea::class)],
+            'q' => ['nullable', 'string', 'max:100'],
+            'tipo' => ['nullable', Rule::in(['seguimiento', 'automatica', 'manual'])],
+            'vencimiento' => ['nullable', Rule::in(['vencidas', 'hoy', 'semana', 'sin_fecha'])],
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d'],
+            'mias' => ['nullable', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $desde = $filtros['desde'] ?? null;
+        $hasta = $filtros['hasta'] ?? null;
+        if ($desde !== null && $hasta !== null && $hasta < $desde) {
+            throw ValidationException::withMessages(['hasta' => ['La fecha final no puede ser antes que la inicial.']]);
+        }
+        $estado = EstadoTarea::from((string) ($filtros['estado'] ?? EstadoTarea::Pendiente->value));
+        $completadas = $estado === EstadoTarea::Completada;
 
         $suyas = $this->soloDe($request);
-        $consulta = TareaTenant::query()->with(['persona', 'responsable'])
-            ->when($suyas !== null, fn ($q) => $q->where('responsable_id', $suyas));
-        if (EstadoTarea::tryFrom($estado) !== null) {
-            $consulta->where('estado', $estado);
+        if ($suyas === null && (bool) ($filtros['mias'] ?? false)) {
+            $suyas = (int) $this->actor($request)?->getKey();
         }
-        $q = trim((string) $request->query('q', ''));
-        if ($q !== '') {
-            $consulta->where('titulo', 'like', "%{$q}%");
-        }
-        // Solo los seguimientos (M09): las que tienen un motivo.
-        if ($request->query('tipo') === 'seguimiento') {
-            $consulta->whereNotNull('motivo');
-        }
+        $deSuAlcance = fn (): Builder => TareaTenant::query()
+            ->when($suyas !== null, fn (Builder $q) => $q->where('responsable_id', $suyas));
 
-        $tareas = $consulta
-            ->orderByRaw('vence_en is null')
-            ->orderBy('vence_en')
-            ->orderByDesc('id')
-            ->get();
+        $q = trim((string) ($filtros['q'] ?? ''));
+        $columna = $completadas ? 'completada_en' : 'vence_en';
+        $consulta = $deSuAlcance()->with(['persona', 'responsable'])
+            ->where('estado', $estado->value)
+            ->when($q !== '', fn (Builder $c) => $c->where(fn (Builder $w) => $w
+                ->where('titulo', 'like', "%{$q}%")
+                ->orWhere('detalle', 'like', "%{$q}%")
+                ->orWhereHas('persona', fn (Builder $p) => $p
+                    ->where('nombre', 'like', "%{$q}%")
+                    ->orWhere('primer_apellido', 'like', "%{$q}%")
+                    ->orWhere('segundo_apellido', 'like', "%{$q}%"))))
+            ->when(($filtros['tipo'] ?? null) !== null, fn (Builder $c) => $this->deTipo($c, (string) $filtros['tipo']))
+            ->when(($filtros['vencimiento'] ?? null) !== null, fn (Builder $c) => $this->vencen($c, (string) $filtros['vencimiento']))
+            ->when($desde !== null, fn (Builder $c) => $c->where($columna, '>=', $this->fechas->inicioDelDia((string) $desde)))
+            ->when($hasta !== null, fn (Builder $c) => $c->where($columna, '<=', $this->fechas->finDelDia((string) $hasta)));
 
-        $pendientes = TareaTenant::query()->where('estado', EstadoTarea::Pendiente->value)
-            ->when($suyas !== null, fn ($q) => $q->where('responsable_id', $suyas))
-            ->count();
+        if ($completadas) {
+            $consulta->orderByDesc('completada_en');
+        } else {
+            $consulta->orderByRaw('vence_en is null')->orderBy('vence_en');
+        }
+        $pagina = $consulta->orderByDesc('id')
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+
+        $pendientes = fn (): Builder => $deSuAlcance()->where('estado', EstadoTarea::Pendiente->value);
 
         return response()->json([
-            'data' => $tareas->map(fn (TareaTenant $t): array => $this->presentar($t))->all(),
-            'pendientes' => $pendientes,
+            'data' => collect($pagina->items())->map(fn (TareaTenant $t): array => $this->presentar($t))->all(),
+            'pendientes' => $pendientes()->count(),
             // «mias»: solo las suyas; «equipo»: las de todos.
-            'alcance' => $suyas !== null ? 'mias' : 'equipo',
+            'alcance' => $this->soloDe($request) !== null ? 'mias' : 'equipo',
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'conteos' => [
+                    'vencidas' => $this->vencen($pendientes(), 'vencidas')->count(),
+                    'hoy' => $this->vencen($pendientes(), 'hoy')->count(),
+                    'semana' => $this->vencen($pendientes(), 'semana')->count(),
+                    'sin_fecha' => $this->vencen($pendientes(), 'sin_fecha')->count(),
+                ],
+            ],
         ]);
+    }
+
+    /**
+     * Seguimientos (M09: tienen un motivo), automáticas (de una regla) o manuales.
+     *
+     * @param  Builder<TareaTenant>  $consulta
+     * @return Builder<TareaTenant>
+     */
+    private function deTipo(Builder $consulta, string $tipo): Builder
+    {
+        return match ($tipo) {
+            'seguimiento' => $consulta->whereNotNull('motivo'),
+            'automatica' => $consulta->whereNotNull('regla_id'),
+            default => $consulta->whereNull('regla_id')->whereNull('motivo'),
+        };
+    }
+
+    /**
+     * Por su vencimiento, en días del negocio: vencidas (antes de hoy), hoy, en los
+     * próximos 7 días (desde mañana) o sin fecha.
+     *
+     * @param  Builder<TareaTenant>  $consulta
+     * @return Builder<TareaTenant>
+     */
+    private function vencen(Builder $consulta, string $cuando): Builder
+    {
+        $hoy = $this->fechas->hoy();
+
+        return match ($cuando) {
+            'vencidas' => $consulta->where('vence_en', '<', $this->fechas->inicioDelDia($hoy)),
+            'hoy' => $consulta->whereBetween('vence_en', [$this->fechas->inicioDelDia($hoy), $this->fechas->finDelDia($hoy)]),
+            'semana' => $consulta->whereBetween('vence_en', [
+                $this->fechas->inicioDelDia(Carbon::parse($hoy)->addDay()->toDateString()),
+                $this->fechas->finDelDia(Carbon::parse($hoy)->addDays(7)->toDateString()),
+            ]),
+            default => $consulta->whereNull('vence_en'),
+        };
     }
 
     public function store(Request $request): JsonResponse
@@ -88,7 +175,7 @@ class TareasTenantController
             'detalle' => $validado['detalle'] ?? null,
             'persona_id' => $personaId !== null ? (int) $personaId : null,
             'responsable_id' => $this->actor($request)?->getKey(),
-            'vence_en' => isset($validado['vence_en']) ? Carbon::parse($validado['vence_en']) : null,
+            'vence_en' => $this->vencimiento($validado['vence_en'] ?? null),
         ]);
 
         return response()->json(['data' => $this->presentar($tarea->load(['persona', 'responsable']))], 201);
@@ -129,6 +216,21 @@ class TareasTenantController
         );
 
         return response()->json(['data' => $this->presentar($tarea->fresh(['persona', 'responsable']) ?? $tarea)]);
+    }
+
+    /**
+     * Una fecha sola (`2026-10-11`) vence al terminar ese día en el negocio; una fecha
+     * con hora, en ese momento.
+     */
+    private function vencimiento(?string $valor): ?Carbon
+    {
+        if ($valor === null || trim($valor) === '') {
+            return null;
+        }
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor) === 1
+            ? Carbon::instance($this->fechas->finDelDia($valor))
+            : Carbon::parse($valor);
     }
 
     private function resolver(Request $request): TareaTenant

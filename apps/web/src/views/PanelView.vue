@@ -36,12 +36,17 @@ const nombre = computed(() => {
   const u = sesion.usuario;
   return (u?.nombre_pila ?? u?.nombre ?? "").trim().split(/\s+/)[0] ?? "";
 });
-// "sábado 27 de septiembre": el día que se está viendo.
-const hoyTexto = new Intl.DateTimeFormat("es-MX", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-}).format(new Date());
+// «Lunes, 12 de octubre de 2026»: hoy en el negocio (su zona horaria, ADR 0099).
+const hoyTexto = computed(() => {
+  const texto = new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: sesion.zonaHoraria,
+  }).format(new Date());
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+});
 
 const facturacion = ref<Facturacion | null>(null);
 const quickstart = ref<Quickstart | null>(null);
@@ -125,13 +130,12 @@ onMounted(cargar);
               : $t("portal.inicio.saludoSinNombre")
           }}
         </h1>
-        <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-          {{
-            $t("operacion.hoy.saludo", {
-              estudio: sesion.estudio?.nombre ?? "",
-              fecha: hoyTexto,
-            })
-          }}
+        <p
+          class="mt-1"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="fecha-hoy"
+        >
+          {{ hoyTexto }}
         </p>
       </div>
       <span class="pa-modalidad"
