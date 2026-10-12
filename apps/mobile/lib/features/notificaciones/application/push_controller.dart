@@ -13,11 +13,14 @@ import '../data/dispositivos_repository.dart';
 /// Muestra un aviso que llegó con la app abierta (título y texto).
 typedef MostrarAviso = void Function(String titulo, String cuerpo);
 
+/// Se tocó una notificación: sus datos (`estudio`, `mensaje`, `tipo`).
+typedef AbrirAviso = void Function(Map<String, dynamic> datos);
+
 /// Notificaciones push (Firebase Cloud Messaging): inicia Firebase, pide permiso y
 /// registra el teléfono en el negocio de la sesión; al cerrar sesión lo quita. Con
-/// la app cerrada o en segundo plano, el sistema muestra la notificación solo; con
-/// la app abierta se muestra como aviso. Sin configuración de Firebase (o fuera de
-/// Android/iOS) no hace nada.
+/// la app cerrada o en segundo plano, el sistema muestra la notificación solo, y al
+/// tocarla la app abre lo suyo; con la app abierta se muestra como aviso. Sin
+/// configuración de Firebase (o fuera de Android/iOS) no hace nada.
 class PushController {
   PushController(this._repo, {FirebaseOptions? opciones})
     : _opciones = opciones ?? FirebaseConfig.opciones;
@@ -38,7 +41,7 @@ class PushController {
   static String get plataforma =>
       defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
-  Future<void> iniciar(MostrarAviso mostrar) async {
+  Future<void> iniciar(MostrarAviso mostrar, {AbrirAviso? abrir}) async {
     if (!disponible || _listo) {
       return;
     }
@@ -55,6 +58,18 @@ class PushController {
         mostrar(n.title ?? '', n.body ?? '');
       }
     });
+    if (abrir != null) {
+      // Se tocó con la app en segundo plano, o la abrió desde cerrada.
+      FirebaseMessaging.onMessageOpenedApp.listen((m) => abrir(m.data));
+      try {
+        final inicial = await FirebaseMessaging.instance.getInitialMessage();
+        if (inicial != null) {
+          abrir(inicial.data);
+        }
+      } on Exception {
+        // Sin la notificación inicial, la app abre en su Inicio.
+      }
+    }
     // Firebase puede cambiar el token: se vuelve a registrar con la sesión activa.
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
       final sesion = _sesion;

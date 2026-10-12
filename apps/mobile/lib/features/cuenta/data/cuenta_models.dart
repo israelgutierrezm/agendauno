@@ -630,6 +630,10 @@ class OrdenPorPagar {
     required this.totalMinor,
     this.moneda = 'MXN',
     this.detalle,
+    this.recurrente = false,
+    this.pagoEnProceso,
+    this.estado = 'pendiente',
+    this.fecha,
   });
 
   final String id;
@@ -641,6 +645,36 @@ class OrdenPorPagar {
 
   /// Si es una cita: con quién, cuándo y dónde.
   final String? detalle;
+
+  /// Se renueva (membresía o su renovación): se puede pagar dejando el pago
+  /// automático.
+  final bool recurrente;
+
+  /// Ya inició un pago en línea que espera confirmación: con qué medio (`oxxo`,
+  /// `tarjeta`…; vacío si no se sabe). Null si no hay ninguno (M07).
+  final String? pagoEnProceso;
+
+  /// `pendiente`, `pagada` o `cancelada` (en el historial).
+  final String estado;
+
+  /// Cuándo se pagó (o, si no, cuándo se creó), para el historial.
+  final DateTime? fecha;
+
+  /// Para no pagar dos veces lo que ya se está pagando.
+  String? get avisoEnProceso => pagoEnProceso == null
+      ? null
+      : pagoEnProceso == 'oxxo'
+      ? 'Ya pediste tu ficha para pagar en OXXO. Si ya pagaste, la confirmación '
+            'puede tardar hasta un día.'
+      : 'Ya iniciaste un pago en línea. Si ya pagaste, espera la confirmación '
+            'antes de volver a pagar.';
+
+  /// Cómo va, en el historial.
+  String get estadoTexto => switch (estado) {
+    'pagada' => 'Pagada',
+    'cancelada' => 'Cancelada',
+    _ => 'Pendiente de pago',
+  };
 
   /// Todo lo que debe (GET /mi/ordenes/pendientes, completo): también las citas.
   static List<OrdenPorPagar> pendientes(
@@ -661,11 +695,21 @@ class OrdenPorPagar {
         .map((l) {
           final nombre = (l['producto'] as String?) ?? 'Producto';
           final cantidad = (l['cantidad'] as int?) ?? 1;
-          return cantidad > 1 ? '$nombre × $cantidad' : nombre;
+          // Para una persona a su cargo (B05): se dice para quién.
+          final para = l['para'];
+          return [
+            cantidad > 1 ? '$nombre × $cantidad' : nombre,
+            if (para is String && para.isNotEmpty) '(para $para)',
+          ].join(' ');
         })
         .toList();
     final sesion = j['sesion'];
-    final concepto = (j['concepto'] as String?) ?? lineas.join(', ');
+    final conPara = lineas.any((l) => l.contains('(para '));
+    final concepto = conPara
+        ? lineas.join(', ')
+        : (j['concepto'] as String?) ?? lineas.join(', ');
+    final enProceso = j['pago_en_proceso'];
+    final fecha = (j['pagada_en'] ?? j['fecha']) as String?;
     return OrdenPorPagar(
       id: j['id'] as String,
       concepto: concepto.isEmpty ? '—' : concepto,
@@ -679,8 +723,75 @@ class OrdenPorPagar {
               if (sesion['sucursal'] != null) sesion['sucursal'] as String,
             ].join(' · ')
           : null,
+      recurrente: (j['recurrente'] ?? false) as bool,
+      pagoEnProceso: enProceso is Map
+          ? ((enProceso['metodo'] as String?) ?? '')
+          : null,
+      estado: (j['estado'] as String?) ?? 'pendiente',
+      fecha: fecha == null ? null : DateTime.tryParse(fecha)?.toLocal(),
     );
   }
+}
+
+/// Una página del historial de compras (GET /mi/ordenes, sin lo pendiente).
+class PaginaCompras {
+  const PaginaCompras({
+    required this.ordenes,
+    required this.pagina,
+    required this.ultimaPagina,
+  });
+
+  final List<OrdenPorPagar> ordenes;
+  final int pagina;
+  final int ultimaPagina;
+
+  bool get hayMas => pagina < ultimaPagina;
+}
+
+/// Cómo sigue un pago en línea (POST /mi/ordenes/{id}/cobrar): la página de la
+/// pasarela, una ficha para pagar en tienda o esperar la confirmación.
+sealed class CheckoutPago {
+  const CheckoutPago();
+
+  factory CheckoutPago.desdeJson(Object? checkout) {
+    if (checkout is Map && checkout['tipo'] == 'redirect') {
+      final url = checkout['url'];
+      if (url is String && url.isNotEmpty) {
+        return IrAPagarEnLinea(url);
+      }
+    }
+    if (checkout is Map && checkout['tipo'] == 'voucher') {
+      return FichaDePago(
+        referencia: (checkout['referencia'] ?? '') as String,
+        codigoBarras: checkout['codigo_barras'] as String?,
+        recibo: checkout['recibo'] as String?,
+      );
+    }
+    return const PagoPorConfirmar();
+  }
+}
+
+/// Se paga en la página de la pasarela.
+class IrAPagarEnLinea extends CheckoutPago {
+  const IrAPagarEnLinea(this.url);
+
+  final String url;
+}
+
+/// Se paga en tienda (OXXO) con esta referencia; se confirma solo.
+class FichaDePago extends CheckoutPago {
+  const FichaDePago({required this.referencia, this.codigoBarras, this.recibo});
+
+  final String referencia;
+
+  /// Imagen del código de barras y recibo para imprimir (URLs de la pasarela).
+  final String? codigoBarras;
+  final String? recibo;
+}
+
+/// El pago quedó en proceso: se confirma cuando la pasarela lo apruebe.
+class PagoPorConfirmar extends CheckoutPago {
+  const PagoPorConfirmar();
 }
 
 /// Estado agregado de la pantalla Mi cuenta.
@@ -691,12 +802,16 @@ class MiCuenta {
     required this.clases,
     this.consentimientos = const [],
     this.pagoEnLinea = false,
+    this.pagoEnLineaPrueba = false,
     this.pagoAutomatico = false,
     this.resenasPendientes = const [],
     this.porPagar = const [],
     this.portal,
     this.asistencias30Dias = 0,
   });
+
+  /// La pasarela del negocio está en pruebas: por ahora no se cobra de verdad (M07).
+  final bool pagoEnLineaPrueba;
 
   /// Qué partes de su cuenta le sirven; null si el API no lo dice (ADR 0091).
   final PortalCliente? portal;
@@ -1043,6 +1158,7 @@ class ProductoComprable {
     this.disponible = true,
     this.venceSiCompraHoy,
     this.condiciones,
+    this.inscripcionMinor = 0,
   });
 
   factory ProductoComprable.desdeJson(
@@ -1065,6 +1181,7 @@ class ProductoComprable {
     disponible: (j['disponible'] ?? true) as bool,
     venceSiCompraHoy: j['vence_si_compra_hoy'] as String?,
     condiciones: j['condiciones'] as String?,
+    inscripcionMinor: (j['inscripcion_minor'] as num? ?? 0).toInt(),
   );
 
   final String id;
@@ -1101,6 +1218,14 @@ class ProductoComprable {
 
   /// Permanencia (B04): las condiciones que acepta antes de comprarlo (null = no hay).
   final String? condiciones;
+
+  /// La inscripción que se suma a la orden si aún no la paga (B04); 0 = no hay.
+  final int inscripcionMinor;
+
+  /// "Más $500.00 de inscripción." o null: se dice antes de comprar.
+  String? get inscripcionTexto => inscripcionMinor > 0
+      ? 'Más ${Formato.dinero(inscripcionMinor, moneda)} de inscripción.'
+      : null;
 
   bool get esExtra => tipo == 'add_on';
 

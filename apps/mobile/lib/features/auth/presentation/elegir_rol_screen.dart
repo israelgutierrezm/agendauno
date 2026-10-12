@@ -31,9 +31,10 @@ String detalleDeFaceta(String faceta, Terminologia t, {bool citas = false}) =>
       'miembro' when citas =>
         'Tus ${t.sesiones.toLowerCase()}, tus pagos y tu expediente.',
       'miembro' => 'Tus reservas, tus pagos y tu expediente.',
+      // Lo que la app del equipo hace (el resto, en la web).
       _ =>
-        'El negocio: agenda, ${t.miembros.toLowerCase()}, cobros y reportes, '
-            'según tus permisos.',
+        'El negocio: el día, la agenda y la atención a tus '
+            '${t.miembros.toLowerCase()}, según tus permisos.',
     };
 
 /// Los roles como tarjetas: nombre, qué verá con él y la marca del activo (o del de

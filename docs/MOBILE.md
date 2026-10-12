@@ -12,8 +12,40 @@ pantalla del rol activo:
 | Rol activo | Pantalla | Qué hace |
 |---|---|---|
 | Alumno o cliente (`miembro`) | `CuentaScreen` | Inicio, reservar clases o agendar citas, reprogramar y cancelar, comprar planes, pagos y pago automático, pase QR, expediente y documentos, privacidad |
-| Quien imparte (`instructor`) | `InstructorScreen` | Sus clases y citas, pase de lista |
-| Equipo (dueño, admin, recepción, roles propios) | `EquipoScreen` | Agenda del día y operación permitida por sus permisos |
+| Quien imparte (`instructor`) | `InstructorScreen` | Sus clases y citas, pase de lista, su agenda |
+| Equipo (dueño, admin, recepción, roles propios) | `EquipoScreen` | Inicio del día y la agenda: pase de lista y, en citas, llegada, cobro en caja y cancelación, según sus permisos |
+
+La app del equipo es la operación del día. Crear o reprogramar citas, agregar a una
+clase, escanear el pase QR y registrar Wellhub/TotalPass siguen en la web.
+
+**Cuenta del cliente** (`features/cuenta`, ADR 0133), como en la web:
+- Por pagar:
+  - con tarjeta o con ficha de OXXO;
+  - en una renovación, dejar el pago automático;
+  - avisos del pago en proceso y del modo de prueba.
+- Historial de pagos, de 10 en 10.
+- La inscripción, antes de comprar.
+- Las fichas de datos (formularios) en el Expediente.
+- En citas, la pestaña dice «Citas».
+
+**Pase de lista:** la lista de espera en su orden, «Ofrecer lugares» y aceptar el
+lugar ofrecido a nombre de la persona.
+
+**Agenda del equipo** (`features/agenda`, ADR 0133):
+- La semana se recorre con flechas; «Hoy» regresa. El día vuelve a hoy al cambiar de
+  sesión.
+- En citas, quien imparte abre su propio día, sin elegir a otros. Al resto se le abre
+  el primer profesional con citas ese día.
+- Hoja de la cita:
+  - lo que se cobra es el total de su orden (`cita.total_minor`, fijo desde que se
+    agendó), no el precio de hoy en el catálogo;
+  - cobrar en caja, «Llegó» y «No asistió» se confirman antes, con su efecto, como en
+    la web; corregir la asistencia también;
+  - la asistencia se registra desde `asistencia_desde` (ADR 0101);
+  - al cancelar se elige quién cancela (el negocio no penaliza; si lo pidió el cliente,
+    aplica su política) y se ve el efecto antes de confirmar;
+  - muestra la nota del cliente, quién asiste, su contacto (si se puede ver) y el
+    historial de la cita.
 
 Quien tiene varios roles elige con cuál entrar (`ElegirRolScreen`, con el de la
 última vez marcado) y cambia desde Perfil → «Cambiar de rol» (ADR 0055). Los
@@ -25,7 +57,7 @@ permisos los decide la API con el rol activo.
 lib/
 ├── core/        config, red (Dio + bearer), almacenamiento seguro, tema, calendario
 └── features/
-    ├── auth/           login, registro, elegir rol, sesión
+    ├── auth/           login, elegir rol, sesión (sin registro: ADR 0093)
     ├── cuenta/         la cuenta del alumno
     ├── agenda/         agenda, cita, pase de lista
     ├── instructor/     portal de quien imparte
@@ -84,14 +116,28 @@ La app manda `X-App-Producto` en cada petición: la API no le abre negocios del 
 producto. Si alguien escribe la dirección de un negocio del otro producto, la app le
 dice cuál descargar.
 
-**iOS** (en una Mac, antes de publicar TurnoUno): en Xcode, duplicar las
-configuraciones `Debug`, `Release` y `Profile` como `Debug-turnouno`,
-`Release-turnouno` y `Profile-turnouno` (y las de AgendaUno como `*-agendauno`), crear
-los esquemas `agendauno` y `turnouno` (compartidos) y, en las de TurnoUno, poner
-`PRODUCT_BUNDLE_IDENTIFIER = com.turnouno.app` y el nombre `TurnoUno` en
-`CFBundleDisplayName`. Así `flutter build ipa --flavor turnouno` funciona igual que
-en Android. Mientras tanto, `--dart-define=PRODUCTO=turnouno` elige el producto en
-Dart (no cambia el bundle id).
+**iOS** (ADR 0133): el proyecto de Xcode ya trae los dos sabores, como Android.
+- Configuraciones `Debug-agendauno`, `Release-agendauno` y `Profile-agendauno`, y las
+  mismas con `-turnouno`, en el proyecto y en cada target.
+- Esquemas compartidos `agendauno` y `turnouno`.
+- En cada configuración, su `PRODUCT_BUNDLE_IDENTIFIER` (`com.agendauno.app` o
+  `com.turnouno.app`) y `APP_DISPLAY_NAME`, que es el nombre en el teléfono
+  (`CFBundleDisplayName` en `ios/Runner/Info.plist`).
+- El esquema `Runner` de siempre se queda como AgendaUno.
+
+```bash
+flutter build ipa --flavor agendauno
+flutter build ipa --flavor turnouno
+```
+
+Sin `--flavor`, `default-flavor` elige `agendauno` también en iOS.
+
+Falta probarlo en una Mac: aquí solo se compila Android. La primera vez en Xcode:
+1. elegir el equipo de Apple y la firma en cada configuración;
+2. registrar `com.turnouno.app` en el portal de Apple, con Push Notifications.
+
+Las apps de marca blanca son solo para Android por ahora: en iOS, el sabor
+`agendauno` lleva el id de la app oficial.
 
 ## Marca blanca (solo AgendaUno, preparada, sin publicar)
 
@@ -161,6 +207,16 @@ La app funciona sin Firebase; solo no recibe push. Para activarlas (ADR 0025):
 Al entrar, la app registra el token del teléfono en el negocio
 (`dispositivos_push`); al salir lo borra.
 
+Al tocar una notificación, la app abre lo suyo, según su `tipo` (la clave de su
+plantilla), también cuando la abrió desde cerrada:
+- de una reserva o una cita (`reserva.*`): sus reservas o citas para el cliente, y la
+  agenda para el equipo y quien imparte;
+- de un cobro, un pago o su plan (`orden.*`, `pago.*`, `cobro.*`, `membresia.*`): sus
+  pagos;
+- lo demás, el Inicio.
+
+Una notificación de otro negocio no cambia la pantalla.
+
 ## Firma de release (Android)
 
 Google Play pide una llave de subida propia. Se crea una sola vez y se guarda fuera del
@@ -189,7 +245,8 @@ pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila co
   `Runner.entitlements` con `aps-environment`) y, en Firebase, la llave APNs del
   equipo de Apple; sin ella las notificaciones no llegan a iPhone.
 - Compilar y probar la versión de iOS en una Mac (aquí solo se compila Android),
-  con los esquemas de las dos apps (arriba).
+  con los esquemas de las dos apps (arriba): firma, `com.turnouno.app` en el portal
+  de Apple y sus íconos.
 - Logotipo e íconos definitivos de TurnoUno (hoy son provisionales: su inicial).
 - Íconos de las tiendas: hoy salen del isotipo de 192 px ampliado (el de 1024 px se
   ve suave y con el trazo cortado). Antes de publicar, generarlos desde el isotipo
@@ -200,4 +257,9 @@ pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila co
 
 ```bash
 flutter analyze && flutter test
+flutter test --dart-define=PRODUCTO=turnouno
 ```
+
+La suite no depende del producto con que se compila: CI la corre como AgendaUno y
+como TurnoUno (ADR 0133). Una prueba de clases dice `modalidad: Modalidad.clases`;
+sin ella, la sesión toma la de la app (citas en TurnoUno).

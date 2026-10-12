@@ -39,6 +39,9 @@ const _diasLargos = [
   'Domingo',
 ];
 
+bool _mismoDiaQue(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
 String _hhmm(DateTime d) =>
     '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
@@ -79,6 +82,11 @@ class AgendaScreen extends ConsumerWidget {
         ),
         toolbarHeight: 72,
         actions: [
+          if (!_mismoDiaQue(dia, DateTime.now()))
+            TextButton(
+              onPressed: () => ref.read(fechaAgendaProvider.notifier).hoy(),
+              child: const Text('Hoy'),
+            ),
           IconButton(
             tooltip: 'Actualizar',
             icon: const Icon(Icons.refresh),
@@ -116,7 +124,8 @@ class AgendaScreen extends ConsumerWidget {
   }
 }
 
-/// Semana del día elegido; toca un día para verlo.
+/// Semana del día elegido; toca un día para verlo. Las flechas pasan a la semana
+/// anterior o a la siguiente («Hoy», arriba, regresa).
 class _TiraSemana extends ConsumerWidget {
   const _TiraSemana({required this.dia});
 
@@ -126,10 +135,17 @@ class _TiraSemana extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lunes = dia.subtract(Duration(days: dia.weekday - 1));
     final hoy = DateTime.now();
+    final fecha = ref.read(fechaAgendaProvider.notifier);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
       child: Row(
         children: [
+          IconButton(
+            tooltip: 'Semana anterior',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_left),
+            onPressed: () => fecha.moverSemanas(-1),
+          ),
           for (var i = 0; i < 7; i++)
             Builder(
               builder: (context) {
@@ -196,6 +212,12 @@ class _TiraSemana extends ConsumerWidget {
                 );
               },
             ),
+          IconButton(
+            tooltip: 'Semana siguiente',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_right),
+            onPressed: () => fecha.moverSemanas(1),
+          ),
         ],
       ),
     );
@@ -220,8 +242,14 @@ class _AgendaCitas extends ConsumerWidget {
     if (agenda.profesionales.isEmpty) {
       return const _Vacio('Aún no hay profesionales en el equipo.');
     }
+    // Quien imparte solo recibe sus citas: se le abre su día, sin elegir a otros.
+    // Al resto, el primer profesional con citas ese día (no uno vacío por orden).
+    final acotado = ref.watch(sesionProvider)?.esInstructorAcotado ?? false;
+    final conCitas = agenda.sesiones.firstOrNull?.instructorId;
     final elegido =
-        ref.watch(profesionalAgendaProvider) ?? agenda.profesionales.first.id;
+        (acotado ? null : ref.watch(profesionalAgendaProvider)) ??
+        conCitas ??
+        agenda.profesionales.first.id;
     final indice = math.max(
       0,
       agenda.profesionales.indexWhere((p) => p.id == elegido),
@@ -239,56 +267,58 @@ class _AgendaCitas extends ConsumerWidget {
           ].contains(s.estadoCita),
         )
         .length;
+    // Lo que se cobra es el total de cada cita, fijo desde que se agendó.
     final porCobrar = citas
         .where((s) => s.porCobrar)
-        .fold<int>(0, (a, s) => a + (s.precioMinor ?? 0));
+        .fold<int>(0, (a, s) => a + (s.montoMinor ?? 0));
     // Los precios son de la moneda del negocio (una sola, ADR 0099).
     final moneda = ref.watch(sesionProvider)?.moneda ?? 'MXN';
 
     return Column(
       children: [
-        SizedBox(
-          height: 52,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: agenda.profesionales.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final p = agenda.profesionales[i];
-              final color = coloresProfesional[i % coloresProfesional.length];
-              final sel = p.id == pro.id;
-              final n = agenda.sesiones
-                  .where((s) => s.instructorId == p.id && s.programada)
-                  .length;
-              return ChoiceChip(
-                selected: sel,
-                showCheckmark: false,
-                onSelected: (_) =>
-                    ref.read(profesionalAgendaProvider.notifier).elegir(p.id),
-                avatar: CircleAvatar(
-                  backgroundColor: color,
-                  child: Text(
-                    p.iniciales,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+        if (!acotado)
+          SizedBox(
+            height: 52,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: agenda.profesionales.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final p = agenda.profesionales[i];
+                final color = coloresProfesional[i % coloresProfesional.length];
+                final sel = p.id == pro.id;
+                final n = agenda.sesiones
+                    .where((s) => s.instructorId == p.id && s.programada)
+                    .length;
+                return ChoiceChip(
+                  selected: sel,
+                  showCheckmark: false,
+                  onSelected: (_) =>
+                      ref.read(profesionalAgendaProvider.notifier).elegir(p.id),
+                  avatar: CircleAvatar(
+                    backgroundColor: color,
+                    child: Text(
+                      p.iniciales,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-                label: Text('${p.nombre.split(' ').first} · $n'),
-                labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                side: BorderSide(
-                  color: sel ? color : Colors.transparent,
-                  width: 2,
-                ),
-                backgroundColor: const Color(0xFFEAEDF3),
-                selectedColor: Colors.white,
-              );
-            },
+                  label: Text('${p.nombre.split(' ').first} · $n'),
+                  labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  side: BorderSide(
+                    color: sel ? color : Colors.transparent,
+                    width: 2,
+                  ),
+                  backgroundColor: const Color(0xFFEAEDF3),
+                  selectedColor: Colors.white,
+                );
+              },
+            ),
           ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: _Resumen(

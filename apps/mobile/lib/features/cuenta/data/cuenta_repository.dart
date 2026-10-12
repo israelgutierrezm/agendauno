@@ -6,6 +6,7 @@ import '../../../core/network/participante_en_uso.dart';
 import '../../auth/application/sesion_controller.dart';
 import 'corte_planes.dart';
 import 'cuenta_models.dart';
+import 'formularios.dart';
 
 /// Acceso a los datos del autoservicio del miembro (`/app/{slug}/mi/*`), sobre el
 /// estudio de la sesion activa.
@@ -62,6 +63,7 @@ class CuentaRepository {
       clases: clases,
       consentimientos: consentimientos,
       pagoEnLinea: (data['pago_en_linea'] ?? false) as bool,
+      pagoEnLineaPrueba: (data['pago_en_linea_prueba'] ?? false) as bool,
       pagoAutomatico: (data['pago_automatico'] ?? false) as bool,
       resenasPendientes: await _resenasPendientes(),
       porPagar: await _porPagar(),
@@ -284,21 +286,70 @@ class CuentaRepository {
     return null;
   }
 
-  /// Abre el pago en línea de una orden (p. ej. una cita apartada): devuelve la URL
-  /// de la página de pago de la pasarela, o null si no hay que redirigir.
-  Future<String?> pagarOrden(String ordenId) async {
+  /// Inicia el pago en línea de una orden (p. ej. una cita apartada o su
+  /// renovación): con tarjeta (la página de la pasarela) o en efectivo en OXXO (una
+  /// ficha). Con [domiciliar], la tarjeta queda para el pago automático (como en la
+  /// web; solo con tarjeta).
+  Future<CheckoutPago> pagarOrden(
+    String ordenId, {
+    String metodo = 'tarjeta',
+    bool domiciliar = false,
+  }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/ordenes/$ordenId/cobrar',
-      data: {'metodo': 'tarjeta'},
+      data: {'metodo': metodo, 'domiciliar': metodo == 'tarjeta' && domiciliar},
     );
-    final checkout =
-        ((res.data?['data'] ?? {}) as Map<String, dynamic>)['checkout'];
-    if (checkout is Map && checkout['tipo'] == 'redirect') {
-      final url = checkout['url'];
-      return url is String && url.isNotEmpty ? url : null;
-    }
-    return null;
+    return CheckoutPago.desdeJson(
+      ((res.data?['data'] ?? {}) as Map<String, dynamic>)['checkout'],
+    );
   }
+
+  /// Su historial de compras y cobros, de 10 en 10 (lo pendiente va aparte).
+  Future<PaginaCompras> historialCompras({int pagina = 1}) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/ordenes',
+      queryParameters: {
+        'page': pagina,
+        'per_page': 10,
+        'excluir_pendientes': 1,
+      },
+    );
+    final meta = (res.data?['meta'] as Map<String, dynamic>?) ?? const {};
+    return PaginaCompras(
+      ordenes: ((res.data?['data'] ?? []) as List)
+          .whereType<Map<String, dynamic>>()
+          .map((o) => OrdenPorPagar.desdeJson(o, moneda: _moneda))
+          .toList(),
+      pagina: (meta['page'] as num? ?? pagina).toInt(),
+      ultimaPagina: (meta['ultima_pagina'] as num? ?? pagina).toInt(),
+    );
+  }
+
+  /// Las fichas de datos que le pide el negocio, con lo que ya respondió. Sin
+  /// perfil de cliente (403), no hay nada que llenar.
+  Future<FormulariosDeCuenta> formularios() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('$_base/mi/formularios');
+      return FormulariosDeCuenta.desdeJson(
+        (res.data?['data'] as Map<String, dynamic>?) ?? const {},
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 403) {
+        return FormulariosDeCuenta.vacio;
+      }
+      rethrow;
+    }
+  }
+
+  /// Guarda sus respuestas (reemplaza las anteriores). `valores`: por id de campo.
+  Future<void> responderFormulario(
+    String formularioId,
+    String personaId,
+    Map<String, Object> valores,
+  ) => _dio.post<Map<String, dynamic>>(
+    '$_base/formularios/$formularioId/respuestas',
+    data: {'persona_id': personaId, 'valores': valores},
+  );
 
   /// Los documentos que pide el negocio y cómo va cada uno.
   Future<List<RequisitoDocumento>> misDocumentos() async {

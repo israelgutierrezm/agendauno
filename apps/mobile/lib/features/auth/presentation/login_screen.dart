@@ -242,13 +242,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        terminada.motivo == MotivoFin.negocio
-                            ? 'Este negocio ya no está disponible, así que tu '
-                                  'sesión se cerró.'
-                            : 'Tu sesión terminó. Vuelve a iniciar sesión para '
-                                  'continuar.',
-                      ),
+                      child: Text(switch (terminada.motivo) {
+                        MotivoFin.negocio =>
+                          'Este negocio ya no está disponible, así que tu '
+                              'sesión se cerró.',
+                        MotivoFin.otroProducto =>
+                          'Este negocio ahora usa '
+                              '${terminada.producto?.nombre}. Descarga la app de '
+                              '${terminada.producto?.nombre} para entrar.',
+                        MotivoFin.sesion =>
+                          'Tu sesión terminó. Vuelve a iniciar sesión para '
+                              'continuar.',
+                      }),
                     ),
                     const SizedBox(height: 16),
                   ],

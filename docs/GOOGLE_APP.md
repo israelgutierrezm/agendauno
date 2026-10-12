@@ -12,20 +12,28 @@ En el mismo proyecto del cliente web (el de `GOOGLE_CLIENT_ID` del API y
 `VITE_GOOGLE_CLIENT_ID` de la web), en *APIs y servicios → Credenciales → Crear ID de
 cliente OAuth*:
 
-- **Android:** paquete `com.agendauno.app` (el `applicationId` de
-  `android/app/build.gradle.kts`) y la huella **SHA-1** del certificado de firma. Para
-  las compilaciones locales es la de la llave de depuración (`./gradlew
-  signingReport`); para Play Store, la de la llave de firma de la aplicación (Play
-  Console → Integridad de la app). Puede haber un cliente por cada huella.
-- **iOS:** el *bundle ID* `com.agendauno.app` (PRODUCT_BUNDLE_IDENTIFIER en `ios/Runner.xcodeproj`).
+Uno por cada app oficial (ADR 0111): AgendaUno y TurnoUno son apps distintas para
+Google.
+
+- **Android:** paquete `com.agendauno.app` y, aparte, `com.turnouno.app` (los
+  `applicationId` de cada sabor en `android/app/build.gradle.kts`), cada uno con la
+  huella **SHA-1** del certificado de firma. Para las compilaciones locales es la de
+  la llave de depuración (`./gradlew signingReport`); para Play Store, la de la llave
+  de firma de cada aplicación (Play Console → Integridad de la app). Puede haber un
+  cliente por cada huella.
+- **iOS:** el *bundle ID* `com.agendauno.app` y, aparte, `com.turnouno.app`
+  (`PRODUCT_BUNDLE_IDENTIFIER` de cada configuración en `ios/Runner.xcodeproj`,
+  ADR 0133).
+- Una app de marca blanca lleva el suyo, con su propio paquete.
 
 ## 2. API
 
-Agrega los IDs de cliente de Android e iOS, separados por coma:
+Agrega los IDs de cliente de Android e iOS de las dos apps, separados por coma (sin
+el de TurnoUno, entrar con Google falla en esa app):
 
 ```
 GOOGLE_CLIENT_ID=<cliente web>
-GOOGLE_CLIENT_IDS_APP=<cliente android>,<cliente ios>
+GOOGLE_CLIENT_IDS_APP=<android agendauno>,<ios agendauno>,<android turnouno>,<ios turnouno>
 ```
 
 El API acepta los ID tokens cuyo `aud` sea cualquiera de esos clientes.

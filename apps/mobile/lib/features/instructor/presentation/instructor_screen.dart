@@ -15,6 +15,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
 import '../../cuenta/presentation/tarjeta_principal.dart';
+import '../../notificaciones/application/aviso_abierto.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../application/mis_clases_controller.dart';
@@ -44,6 +45,17 @@ class _InstructorScreenState extends ConsumerState<InstructorScreen> {
       _version++;
     }
   });
+
+  @override
+  void initState() {
+    super.initState();
+    // Una notificación de una reserva o una cita abre su agenda.
+    escucharAvisos(this, (destino) {
+      if (destino == DestinoPush.reservas) {
+        _ir(PestanaInstructor.agenda);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

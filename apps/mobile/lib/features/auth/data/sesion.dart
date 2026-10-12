@@ -1,3 +1,4 @@
+import '../../../core/config/producto_app.dart';
 import '../../../core/version/version_app.dart';
 
 /// Cómo atiende el negocio a su gente: clases con cupo o citas 1 a 1 con un
@@ -8,8 +9,17 @@ enum Modalidad {
   clases,
   citas;
 
-  static Modalidad desde(Object? valor) =>
-      valor == 'citas' ? Modalidad.citas : Modalidad.clases;
+  /// La de los negocios de esta app (ADR 0111): citas en TurnoUno, clases en
+  /// AgendaUno. Solo cuando el servidor no la dice.
+  static const porOmision = ProductoApp.esTurnoUno
+      ? Modalidad.citas
+      : Modalidad.clases;
+
+  static Modalidad desde(Object? valor) => switch (valor) {
+    'citas' => Modalidad.citas,
+    'clases' => Modalidad.clases,
+    _ => porOmision,
+  };
 }
 
 /// Lo que el negocio opera, dicho por el servidor (ADR 0104): solo clases o solo
@@ -182,7 +192,7 @@ class Sesion {
     this.celular,
     this.fechaNacimiento,
     this.genero,
-    this.modalidad = Modalidad.clases,
+    this.modalidad = Modalidad.porOmision,
     this._capacidades,
     this.versionMinima = versionMinimaDesconocida,
     this.terminologia = const Terminologia(),

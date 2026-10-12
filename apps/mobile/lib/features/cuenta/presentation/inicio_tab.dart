@@ -154,7 +154,9 @@ class InicioTab extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Elige tu próxima $clase y aparta tu lugar.',
+                    // En citas no hay lugares: se aparta un horario (como en la web).
+                    'Elige tu próxima $clase y aparta tu '
+                    '${esCitas ? 'horario' : 'lugar'}.',
                     style: const TextStyle(color: TemaAgendaUno.textoSuave),
                   ),
                   const SizedBox(height: 14),

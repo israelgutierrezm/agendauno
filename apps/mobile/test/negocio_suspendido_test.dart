@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agendauno/core/config/producto_app.dart';
 import 'package:agendauno/core/network/auth_token.dart';
 import 'package:agendauno/core/network/dio_client.dart';
 import 'package:agendauno/core/storage/almacen_sesion.dart';
@@ -39,6 +40,9 @@ class _ApiYo implements HttpClientAdapter {
   List<String> permisos = const [];
   List<String> sin = const [];
   bool negocioBorrado = false;
+
+  /// La plataforma lo pasó al otro producto: su /marca responde allá.
+  bool enElOtroProducto = false;
   bool sinRed = false;
   int? errorServidor;
 
@@ -55,6 +59,17 @@ class _ApiYo implements HttpClientAdapter {
       );
     }
     final yo = options.path.endsWith('/yo');
+    if (enElOtroProducto && options.path.endsWith('/marca')) {
+      return ResponseBody.fromString(
+        jsonEncode({
+          'data': {'nombre': 'Estudio Demo'},
+        }),
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
     final (
       int codigo,
       Object cuerpo,
@@ -190,7 +205,7 @@ void main() {
     expect(
       find.text(
         'Tu negocio está suspendido por falta de pago. Paga tu suscripción en '
-        'agendauno.mx para reactivarlo.',
+        '${ProductoApp.actual.dominio} para reactivarlo.',
       ),
       findsOneWidget,
     );
@@ -248,6 +263,27 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(
       find.textContaining('Este negocio ya no está disponible'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('/yo 404 de un negocio que pasó al otro producto: dice con qué '
+      'app entrar', (tester) async {
+    final (c, api) = await _contenedor();
+    addTearDown(c.dispose);
+    api
+      ..negocioBorrado = true
+      ..enElOtroProducto = true;
+
+    await _montarApp(tester, c);
+
+    expect(c.read(sesionProvider), isNull);
+    expect(c.read(sesionTerminadaProvider)?.motivo, MotivoFin.otroProducto);
+    expect(
+      find.text(
+        'Este negocio ahora usa ${ProductoApp.actual.otro.nombre}. Descarga la '
+        'app de ${ProductoApp.actual.otro.nombre} para entrar.',
+      ),
       findsOneWidget,
     );
   });
