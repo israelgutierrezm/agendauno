@@ -67,12 +67,13 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
                 ->and($real->estado->value)->toBe($s['estado_publicado'] === 'programada' ? 'programada' : 'cancelada');
         }
 
-        // Los planes de prueba: los paquetes no incluyen Open Training; la Ilimitada, todo.
+        // Los planes de prueba: los paquetes no incluyen Open Training; la Ilimitada y la
+        // membresía, todo.
         $open = OfertaTenant::query()->where('nombre', 'like', 'OPEN TRAINING%')->pluck('id')->all();
         expect($open)->toHaveCount(2);
         foreach (ProductoTenant::query()->with('ofertas')->get() as $plan) {
             $ofertas = $plan->ofertas->pluck('id')->all();
-            if ($plan->nombre === 'Ilimitada') {
+            if (in_array($plan->nombre, ['Ilimitada', 'Membresía Ilimitada'], true)) {
                 expect($ofertas)->toBe([]);
             } else {
                 expect($ofertas)->not->toBe([])->and(array_intersect($ofertas, $open))->toBe([]);
@@ -80,7 +81,12 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
         }
         expect(ProductoTenant::query()->pluck('precio_minor', 'nombre')->all())->toEqual([
             'Paquete 4 clases' => 80000, 'Paquete 8 clases' => 140000, 'Paquete 12 clases' => 180000, 'Ilimitada' => 220000,
+            'Membresía Ilimitada' => 200000,
         ]);
+        // La membresía del estudio: se renueva cada mes, 12 meses de permanencia y, si se
+        // da de baja antes, el 50 % de lo que falte (ADR 0137).
+        expect(ProductoTenant::query()->where('nombre', 'Membresía Ilimitada')->sole())
+            ->toMatchArray(['permanencia_meses' => 12, 'penalizacion_porcentaje' => 50, 'cobra_inscripcion' => true]);
 
         // Una operación con historia: miembros, ventas cobradas, por cobrar, asistencia
         // y clases apartadas para las próximas semanas.
@@ -127,7 +133,29 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
         }
         expect(PersonaTenant::query()->whereNull('genero')->count())->toBe(0)
             ->and(DB::connection('tenant')->table('mensajes')->where('estado', 'encolado')->count())->toBe(0);
+
+        // Lo que la historia no crea, también con datos (bloque 32): membresías que se
+        // renuevan (una en mora, una dada de baja con penalización, con pago automático
+        // la del dueño), prospectos, cobros por conciliar, aviso de privacidad, días
+        // cerrados, bloqueos y un webhook pausado. Familias queda apagado: para el
+        // negocio no existe hasta que lo pide.
+        $dueno = PersonaTenant::query()->where('email', 'constantino@grecon.test')->sole();
+        $tablas = DB::connection('tenant');
+        expect(AcuerdoTenant::query()->whereNotNull('proxima_cobro_en')->count())->toBeGreaterThanOrEqual(5)
+            ->and($tablas->table('domiciliaciones')->where('estado', 'activa')->where('persona_id', $dueno->getKey())->exists())->toBeTrue()
+            ->and($tablas->table('domiciliaciones')->where('estado', 'activa')->count())->toBeGreaterThanOrEqual(3)
+            ->and($tablas->table('procesos_dunning')->where('estado', 'en_mora')->count())->toBe(1)
+            ->and($tablas->table('bajas_acuerdo')->count())->toBe(1)
+            ->and($tablas->table('prospectos')->count())->toBe(10)
+            ->and($tablas->table('prospectos')->where('estado', 'convertido')->count())->toBe(1)
+            ->and($tablas->table('incidencias_cobro')->where('estado', 'abierta')->count())->toBe(2)
+            ->and($tablas->table('waivers')->where('clave', 'aviso-privacidad')->where('activo', true)->exists())->toBeTrue()
+            ->and($tablas->table('excepciones_horario')->count())->toBe(4)
+            ->and($tablas->table('bloqueos_agenda')->count())->toBe(2)
+            ->and($tablas->table('webhooks_salientes')->where('activo', false)->count())->toBe(1)
+            ->and($tablas->table('tutelas')->count())->toBe(0);
     });
+    expect(Estudio::query()->where('slug', 'demo')->sole()->modulosHabilitados())->toBe([]);
 
     // Lo que paga a la plataforma: el mes ya cerrado, medido y pagado (sin tarifas en
     // las pruebas, queda sin cargo); ninguno se queda pendiente.
@@ -136,4 +164,10 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
 
     $this->postJson('/api/v1/app/demo/login', ['email' => 'admin@grecon.test', 'password' => 'password'])
         ->assertOk()->assertJsonStructure(['data' => ['token']]);
+
+    // Valeria fue prospecto: al entrar ve la membresía y la clase que pidió (ADR 0137).
+    $this->travelTo($ahora);
+    $valeria = (string) $this->postJson('/api/v1/app/demo/login', ['email' => 'valeria.rios@correo.test', 'password' => 'password'])->json('data.token');
+    $this->getJson('/api/v1/app/demo/mi/interes', ['Authorization' => "Bearer {$valeria}"])
+        ->assertOk()->assertJsonPath('data.plan.nombre', 'Membresía Ilimitada');
 });

@@ -60,5 +60,35 @@ it('siembra la barbería con citas, bonos que se descuentan y datos en cada apar
             // Con dos sedes, todo el personal (menos dueño y administradora) tiene la suya
             // (ADR 0098): sin sucursal no vería nada.
             ->and(DB::connection('tenant')->table('asignaciones_personal')->distinct()->count('usuario_id'))->toBe(7);
+
+        // El dueño corta y también es cliente, con su siguiente cita (bloque 32).
+        $ramon = Usuario::query()->where('email', 'ramon@lanavaja.test')->sole();
+        $comoCliente = PersonaTenant::query()->where('usuario_id', $ramon->getKey())->sole();
+        expect($ramon->roles)->toBe(['propietario', 'instructor', 'miembro'])
+            ->and(ReservaTenant::query()->where('persona_id', $comoCliente->getKey())
+                ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', CarbonImmutable::parse('2026-10-03 13:00', 'America/Mexico_City')->utc()))
+                ->exists())->toBeTrue();
+
+        // Lo que la historia no crea, también con datos.
+        $tablas = DB::connection('tenant');
+        expect($tablas->table('prospectos')->count())->toBe(8)
+            ->and($tablas->table('incidencias_cobro')->where('estado', 'abierta')->count())->toBe(2)
+            ->and($tablas->table('waivers')->where('clave', 'aviso-privacidad')->where('activo', true)->exists())->toBeTrue()
+            ->and($tablas->table('webhooks_salientes')->where('activo', false)->count())->toBe(1)
+            ->and($tablas->table('tutelas')->count())->toBe(0)
+            ->and($tablas->table('presupuestos')->pluck('estado')->sort()->values()->all())->toBe(['borrador', 'convertido', 'enviado'])
+            // Por cobrar: lo que ya venció sin pagarse (el presupuesto convertido y bonos apartados).
+            ->and($tablas->table('ordenes')->where('estado', 'pendiente')->whereNull('sesion_id')->count())->toBeGreaterThanOrEqual(2)
+            // En citas no hay membresías ni permanencia (ADR 0130).
+            ->and(AcuerdoTenant::query()->whereNotNull('proxima_cobro_en')->count())->toBe(0);
     });
+
+    // El plan más completo de TurnoUno: lealtad y reportes avanzados a la vista.
+    expect(Estudio::query()->where('slug', 'barberia')->sole()->plan_nivel)->toBe('pro');
+
+    // Jorge fue prospecto: al entrar ve el bono que pidió (ADR 0137).
+    $this->travelTo($ahora);
+    $jorge = (string) $this->postJson('/api/v1/app/barberia/login', ['email' => 'jorge.pineda@correo.test', 'password' => 'password'])->json('data.token');
+    $this->getJson('/api/v1/app/barberia/mi/interes', ['Authorization' => "Bearer {$jorge}"])
+        ->assertOk()->assertJsonPath('data.plan.nombre', fn (string $nombre): bool => str_starts_with($nombre, 'Bono'));
 });
