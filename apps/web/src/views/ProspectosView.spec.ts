@@ -1,0 +1,208 @@
+import { flushPromises, mount } from "@vue/test-utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { i18n } from "@/i18n";
+import ProspectosView from "./ProspectosView.vue";
+
+/*
+| Prospectos (ADR 0138): el responsable se elige con un buscador entre el equipo que
+| atiende prospectos y se cambia cuando se quiera; escribirle por WhatsApp (con su
+| botón) queda en su historia; la historia distingue cada cosa con su ícono; los que
+| nadie atendió a tiempo se marcan y se filtran.
+*/
+
+const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
+vi.mock("@/lib/api", () => ({
+  api,
+  mensajeDeError: (e: unknown) => String(e),
+}));
+vi.mock("@/stores/sesionTenant", () => ({
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    puede: () => true,
+    zonaHoraria: "America/Mexico_City",
+    usuario: { ulid: "u-dueno" },
+  }),
+}));
+const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
+vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
+vi.mock("vue-router", () => ({
+  RouterLink: { props: ["to"], template: "<a><slot /></a>" },
+  useRoute: () => ({ query: {} }),
+}));
+
+const prospecto = {
+  id: "p1",
+  nombre: "Andrea Campos",
+  email: "andrea@correo.mx",
+  telefono: "5531204414",
+  estado: "en_seguimiento",
+  origen: "manual",
+  fuente: null,
+  formulario: null,
+  interes: {
+    sucursal: null,
+    actividad: null,
+    sesion: null,
+    producto: null,
+  },
+  responsable: { id: "u-admin", nombre: "Administración" },
+  proximo_seguimiento_en: null,
+  primer_contacto_en: null,
+  sin_atender_desde: "2026-10-09T15:00:00+00:00",
+  motivo_cierre: null,
+  comentario_cierre: null,
+  persona: null,
+  convertido_en: null,
+  creado_en: "2026-10-07T16:00:00+00:00",
+  respuestas: [],
+  eventos: [
+    {
+      tipo: "sin_atender",
+      detalle: { responsable: "Administración", horas: 24 },
+      autor: null,
+      en: "2026-10-09T15:00:00+00:00",
+    },
+    {
+      tipo: "nota",
+      detalle: { texto: "Le mandé el horario." },
+      autor: "Administración",
+      en: "2026-10-07T17:00:00+00:00",
+    },
+    {
+      tipo: "asignado",
+      detalle: { responsable: "Administración", anterior: "Fernanda Ruiz" },
+      autor: "Constantino",
+      en: "2026-10-07T16:30:00+00:00",
+    },
+  ],
+};
+
+function montar() {
+  api.get.mockImplementation((url: string) => {
+    if (url.endsWith("/prospectos/responsables")) {
+      return Promise.resolve({
+        data: {
+          data: [
+            { id: "u-dueno", nombre: "Constantino", email: "c@correo.mx" },
+            { id: "u-admin", nombre: "Administración", email: "a@correo.mx" },
+            { id: "u-rec", nombre: "Fernanda Ruiz", email: "f@correo.mx" },
+          ],
+        },
+      });
+    }
+    if (url.endsWith("/prospectos/p1")) {
+      return Promise.resolve({ data: { data: prospecto } });
+    }
+    return Promise.resolve({
+      data: {
+        data: [prospecto],
+        meta: {
+          resumen: {
+            nuevos: 0,
+            seguimientos_vencidos: 0,
+            abiertos: 1,
+            sin_atender: 1,
+          },
+        },
+      },
+    });
+  });
+  api.put.mockResolvedValue({ data: { data: prospecto } });
+  api.post.mockResolvedValue({ data: { data: prospecto } });
+  return mount(ProspectosView, {
+    global: {
+      plugins: [i18n],
+      stubs: {
+        EncabezadoSeccion: true,
+        PanelLateral: {
+          props: ["abierto", "titulo"],
+          template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
+        },
+      },
+    },
+  });
+}
+
+async function abrirDetalle(w: ReturnType<typeof montar>) {
+  await flushPromises();
+  await w.get("button.prospecto-fila").trigger("click");
+  await flushPromises();
+}
+
+beforeEach(() => vi.clearAllMocks());
+
+describe("prospectos: responsable, contacto e historia", () => {
+  it("marca y filtra los que nadie atendió a tiempo", async () => {
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="chip-sin-atender"]').text()).toContain(
+      "Sin atender",
+    );
+    expect(w.find('[data-prueba="fila-sin-atender"]').exists()).toBe(true);
+    await w.get('[data-prueba="chip-sin-atender"]').trigger("click");
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/prospectos",
+      expect.objectContaining({
+        params: expect.objectContaining({ atencion: "sin_atender" }),
+      }),
+    );
+  });
+
+  it("busca a alguien del equipo para pasárselo; quien ya lo tiene no aparece", async () => {
+    const w = montar();
+    await abrirDetalle(w);
+
+    const buscar = w.get('[data-prueba="buscar-responsable"]');
+    await buscar.trigger("focus");
+    await buscar.setValue("fer");
+    const opciones = w.findAll('[data-prueba="opciones-responsable"] button');
+    expect(opciones.map((o) => o.text())).toEqual([
+      expect.stringContaining("Fernanda Ruiz"),
+    ]);
+    await opciones[0].trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/prospectos/p1/responsable",
+      { responsable_id: "u-rec" },
+    );
+  });
+
+  it("escribirle por WhatsApp (botón verde) queda en su historia", async () => {
+    const w = montar();
+    await abrirDetalle(w);
+
+    const wa = w.get('[data-prueba="whatsapp"]');
+    expect(wa.attributes("href")).toBe("https://wa.me/5531204414");
+    await wa.trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/prospectos/p1/contactos",
+      { canal: "whatsapp" },
+    );
+  });
+
+  it("la historia distingue cada cosa: sin atender, nota y cambio de responsable", async () => {
+    const w = montar();
+    await abrirDetalle(w);
+
+    const eventos = w.findAll('[data-prueba="historial-prospecto"] li');
+    expect(eventos.map((e) => e.attributes("data-tipo"))).toEqual([
+      "sin_atender",
+      "nota",
+      "asignado",
+    ]);
+    expect(eventos[0].text()).toContain(
+      "Sin atender: Administración no lo atendió en 24 h",
+    );
+    expect(eventos[1].find(".pr-nota").text()).toBe("Le mandé el horario.");
+    expect(eventos[2].text()).toContain(
+      "Pasó de Fernanda Ruiz a Administración",
+    );
+    expect(w.get('[data-prueba="aviso-sin-atender"]').text()).toContain(
+      "Sin atender desde",
+    );
+  });
+});

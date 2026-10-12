@@ -1023,6 +1023,7 @@ final class DemoGrecon extends DemoBase
         $this->bloqueosDeAgenda();
         $this->avisoDePrivacidad('clases', 'membresías, paquetes', 'Ciudad de México (dirección de prueba)', 'hola@grecon.test', 85);
         $this->prospectosDelEstudio();
+        $this->prospectosSinAtender();
         $this->porConciliar();
         $this->webhookPausado('https://hooks.example.test/grecon', ['orden.pagada', 'reserva.confirmada']);
     }

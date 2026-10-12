@@ -315,13 +315,17 @@ function descargarQr(): void {
           {{ $t("captacion.formularios.predeterminado") }}
         </p>
         <div class="flex flex-wrap gap-2">
-          <button type="button" class="tu-btn" @click="compartir(f)">
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="compartir(f)"
+          >
             {{ $t("captacion.formularios.compartir") }}
           </button>
           <button
             v-if="puedeGestionar"
             type="button"
-            class="tu-btn"
+            class="tu-btn tu-btn-fantasma"
             @click="editar(f)"
           >
             {{ $t("captacion.formularios.editar") }}
@@ -484,7 +488,7 @@ function descargarQr(): void {
           </div>
           <button
             type="button"
-            class="tu-btn justify-self-start"
+            class="tu-btn tu-btn-fantasma justify-self-start"
             @click="agregarPregunta"
           >
             {{ $t("captacion.formularios.editor.agregarPregunta") }}
@@ -550,7 +554,7 @@ function descargarQr(): void {
           >
           <button
             type="button"
-            class="tu-btn justify-self-start"
+            class="tu-btn tu-btn-fantasma justify-self-start"
             @click="copiar(enlace, 'enlace')"
           >
             {{
@@ -574,7 +578,7 @@ function descargarQr(): void {
           />
           <button
             type="button"
-            class="tu-btn justify-self-start"
+            class="tu-btn tu-btn-fantasma justify-self-start"
             @click="descargarQr"
           >
             {{ $t("captacion.formularios.compartirPanel.descargarQr") }}
@@ -595,7 +599,7 @@ function descargarQr(): void {
           />
           <button
             type="button"
-            class="tu-btn justify-self-start"
+            class="tu-btn tu-btn-fantasma justify-self-start"
             @click="copiar(codigo, 'codigo')"
           >
             {{

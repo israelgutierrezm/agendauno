@@ -30,6 +30,8 @@ final class AvisosAlEquipo
         'pago.duplicado' => 'facturacion.ver',
         // Alguien dejó sus datos en un formulario de captación (ADR 0117).
         'prospecto.creado' => 'prospectos.ver',
+        // Nadie lo atendió a tiempo: a quien puede reasignarlo (ADR 0138).
+        'prospecto.sin_atender' => 'prospectos.gestionar',
     ];
 
     /**

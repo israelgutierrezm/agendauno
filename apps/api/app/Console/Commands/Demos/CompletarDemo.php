@@ -7,6 +7,7 @@ namespace App\Console\Commands\Demos;
 use App\Modules\Tenancy\Application\CaptacionTenant;
 use App\Modules\Tenancy\Application\FormulariosCaptacionTenant;
 use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
+use App\Modules\Tenancy\Application\ProspectosSinAtenderTenant;
 use App\Modules\Tenancy\Application\ProspectosTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Captacion\EstadoProspecto;
@@ -130,6 +131,13 @@ trait CompletarDemo
     private function despuesDeLlegar(CarbonImmutable $llega, int $minutos): CarbonImmutable
     {
         return $llega->addMinutes($minutos)->min($this->ahora->subMinutes(5));
+    }
+
+    /** Los que nadie tomó a tiempo quedan «sin atender», con su tarea (ADR 0138). */
+    protected function prospectosSinAtender(): void
+    {
+        $this->en($this->ahora->subMinutes(10));
+        $this->sumar('prospectos sin atender', app(ProspectosSinAtenderTenant::class)->revisar());
     }
 
     /**

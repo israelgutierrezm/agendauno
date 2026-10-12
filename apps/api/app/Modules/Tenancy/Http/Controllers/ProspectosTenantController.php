@@ -41,6 +41,8 @@ class ProspectosTenantController
             'estado' => ['nullable', 'string', Rule::in(['abiertos', 'todos', ...array_map(static fn (EstadoProspecto $e): string => $e->value, EstadoProspecto::cases())])],
             // `yo`, `sin` o el ulid de alguien del equipo.
             'responsable' => ['nullable', 'string', 'max:40'],
+            // `sin_atender`: su responsable no lo atendió a tiempo (ADR 0138).
+            'atencion' => ['nullable', 'string', Rule::in(['sin_atender'])],
             'q' => ['nullable', 'string', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
@@ -61,6 +63,9 @@ class ProspectosTenantController
             $consulta->whereNull('responsable_id');
         } elseif (is_string($responsable) && $responsable !== '') {
             $consulta->where('responsable_id', Usuario::query()->where('ulid', $responsable)->value('id') ?? 0);
+        }
+        if (($validado['atencion'] ?? null) === 'sin_atender') {
+            $consulta->whereNotNull('sin_atender_desde');
         }
         $q = trim((string) ($validado['q'] ?? ''));
         if ($q !== '') {
@@ -87,6 +92,7 @@ class ProspectosTenantController
                 'resumen' => [
                     'nuevos' => (clone $base)->where('estado', EstadoProspecto::Nuevo->value)->count(),
                     'seguimientos_vencidos' => (clone $base)->where('proximo_seguimiento_en', '<=', now())->count(),
+                    'sin_atender' => (clone $base)->whereNotNull('sin_atender_desde')->count(),
                     'abiertos' => (clone $base)->count(),
                 ],
             ],
@@ -149,6 +155,25 @@ class ProspectosTenantController
         abort_if($responsable instanceof Usuario && ! $responsable->puede('prospectos.ver'), 422, 'Esa persona no atiende prospectos.');
 
         $prospecto = $this->prospectos->asignar($this->prospecto($request), $responsable, $this->actor($request));
+
+        return response()->json(['data' => $this->presentar($prospecto, detalle: true)]);
+    }
+
+    /** Quiénes pueden atender prospectos, para elegir responsable (ADR 0138). */
+    public function responsables(): JsonResponse
+    {
+        return response()->json(['data' => $this->prospectos->responsables()->map(static fn (Usuario $u): array => [
+            'id' => $u->ulid,
+            'nombre' => $u->name,
+            'email' => $u->email,
+        ])->all()]);
+    }
+
+    /** Le escribió o le llamó: queda en su historia (ADR 0138). */
+    public function contacto(Request $request): JsonResponse
+    {
+        $validado = $request->validate(['canal' => ['required', 'string', Rule::in(['whatsapp', 'llamada', 'correo'])]]);
+        $prospecto = $this->prospectos->registrarContacto($this->prospecto($request), (string) $validado['canal'], $this->actor($request));
 
         return response()->json(['data' => $this->presentar($prospecto, detalle: true)]);
     }
@@ -266,6 +291,7 @@ class ProspectosTenantController
             'responsable' => $p->responsable ? ['id' => $p->responsable->ulid, 'nombre' => $p->responsable->name] : null,
             'proximo_seguimiento_en' => $p->proximo_seguimiento_en?->toIso8601String(),
             'primer_contacto_en' => $p->primer_contacto_en?->toIso8601String(),
+            'sin_atender_desde' => $p->sin_atender_desde?->toIso8601String(),
             'motivo_cierre' => $p->motivo_cierre?->value,
             'comentario_cierre' => $p->comentario_cierre,
             'persona' => $p->persona ? ['id' => $p->persona->ulid, 'nombre' => $p->persona->nombre] : null,

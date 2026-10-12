@@ -82,6 +82,9 @@ Schedule::command('agendauno:generar-cuotas')->dailyAt('13:00')->withoutOverlapp
 // (primera clase, plan por vencer o vencido, días sin asistir, compró y no reservó).
 Schedule::command('agendauno:generar-seguimientos')->dailyAt('14:00')->withoutOverlapping();
 
+// Prospectos que nadie atendió a tiempo (ADR 0138): cada hora, con su tarea y su aviso.
+Schedule::command('agendauno:revisar-prospectos-sin-atender')->hourlyAt(25)->withoutOverlapping();
+
 // Hitos de la puesta en marcha de cada negocio (C02/C08): su primera operación real.
 Schedule::command('agendauno:registrar-hitos')->dailyAt('09:30')->withoutOverlapping();
 

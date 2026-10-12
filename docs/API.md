@@ -347,6 +347,23 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Quién atiende a un prospecto (ADR 0138)
+
+- `GET /prospectos/responsables` (`prospectos.ver`): el equipo activo que puede
+  gestionar prospectos (`id`, `nombre`, `email`), para elegir responsable.
+- `PUT /prospectos/{p}/responsable` deja en la historia de quién a quién
+  (`detalle.responsable`, `detalle.anterior`).
+- `POST /prospectos/{p}/contactos` (`prospectos.gestionar`): `canal` = `whatsapp`,
+  `llamada` o `correo`. Registra el evento `contacto` y cuenta como primer contacto.
+- Sin atender:
+  - los prospectos traen `sin_atender_desde`;
+  - `GET /prospectos?atencion=sin_atender` los filtra y `meta.resumen.sin_atender` los
+    cuenta;
+  - la historia suma los eventos `contacto` y `sin_atender` (`detalle.responsable`,
+    `detalle.horas`);
+  - el aviso al equipo es el evento `prospecto.sin_atender`;
+  - el plazo es el parámetro `captacion.horas_para_atender` (0 = no se revisa).
+
 ## Permanencia, clase de prueba y continuidad del prospecto (ADR 0137)
 
 - Planes: `penalizacion_porcentaje` (arriba, en «Cuotas y permanencia»).

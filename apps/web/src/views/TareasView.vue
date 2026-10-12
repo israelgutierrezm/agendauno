@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -638,14 +639,12 @@ onMounted(cargarTareas);
               >
                 {{ $t("operacion.seguimiento.copiar") }}
               </button>
-              <a
+              <BotonWhatsApp
                 v-if="whatsappCon(tarea)"
-                class="tu-enlace"
-                :href="whatsappCon(tarea) ?? undefined"
-                target="_blank"
-                rel="noopener"
-                >{{ $t("operacion.seguimiento.whatsapp") }}</a
-              >
+                :href="whatsappCon(tarea) ?? ''"
+                :texto="$t('operacion.seguimiento.whatsapp')"
+                compacto
+              />
               <span
                 v-if="!tarea.celular && tarea.contacto"
                 :style="{ color: 'var(--texto-suave)' }"

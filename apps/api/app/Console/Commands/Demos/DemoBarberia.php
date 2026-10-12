@@ -960,6 +960,7 @@ final class DemoBarberia extends DemoBase
         // Lo que la historia no crea (bloque 32): cada apartado con datos.
         $this->avisoDePrivacidad('citas', 'bonos', 'Roma Norte y Del Valle, Ciudad de México (direcciones de prueba)', 'hola@lanavaja.test', 70);
         $this->prospectosDeLaBarberia();
+        $this->prospectosSinAtender();
         $this->porConciliar();
         $this->webhookPausado('https://hooks.example.test/lanavaja', ['orden.pagada', 'reserva.confirmada']);
         $this->presupuestos();

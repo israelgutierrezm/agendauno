@@ -147,6 +147,11 @@ export const conexiones = {
       privacidad: { baja_solicitada: "Baja de datos solicitada" },
       resena: { creada: "Reseña recibida" },
       pago_automatico: { solicitado: "Invitación a pago automático" },
+      prospecto: {
+        creado: "Prospecto nuevo (dejó sus datos)",
+        convertido: "Prospecto convertido en cliente",
+        sin_atender: "Prospecto sin atender",
+      },
     },
   },
 };

@@ -52,6 +52,7 @@ class EventoDeDominioTenant
         // Captación (ADR 0117): alguien dejó sus datos; un prospecto pasó a ser miembro.
         'prospecto.creado',
         'prospecto.convertido',
+        'prospecto.sin_atender',
     ];
 
     /**

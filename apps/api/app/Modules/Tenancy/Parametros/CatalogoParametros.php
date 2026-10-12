@@ -149,6 +149,9 @@ final class CatalogoParametros
             // Captación (plan de mejoras B01, ADR 0117).
             new DefinicionParametro('captacion.activa', 'Captación', 'Recibir prospectos',
                 'Quien todavía no es cliente puede dejar sus datos en tus formularios (tu página, un enlace, un QR o tu propio sitio) y llega a Prospectos. Apagado, «Pedir acceso» te contacta por WhatsApp o teléfono.', $sn, 1),
+            // ADR 0138.
+            new DefinicionParametro('captacion.horas_para_atender', 'Captación', 'Horas para atender un prospecto',
+                'Si en este tiempo nadie le escribe ni le da seguimiento, se marca «sin atender», su responsable recibe una tarea y se avisa al equipo para reasignarlo. 0 = no se revisa.', $e, 24, 0, 168, 'h'),
 
             // Inventario del mostrador.
             new DefinicionParametro('inventario.stock_bajo', 'Inventario', 'Stock bajo',

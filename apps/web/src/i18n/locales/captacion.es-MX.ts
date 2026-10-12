@@ -10,7 +10,9 @@ export default {
     vacio: "Aún no hay prospectos.",
     vacioFiltro: "No hay prospectos con estos filtros.",
     resumen: {
-      nuevos: "Sin atender",
+      nuevos: "Nuevos",
+      // Su responsable no lo atendió a tiempo (ADR 0138).
+      sinAtender: "Sin atender",
       vencidos: "Seguimientos vencidos",
       abiertos: "Abiertos",
     },
@@ -22,6 +24,7 @@ export default {
       cualquiera: "Cualquiera",
       yo: "Míos",
       sin: "Sin responsable",
+      sinAtender: "Sin atender",
     },
     estados: {
       nuevo: "Nuevo",
@@ -66,6 +69,8 @@ export default {
       actividad: "{nombre}",
       sinInteres: "No eligió nada en particular.",
       fuente: "Llegó por {fuente}",
+      sinAtenderDesde:
+        "Sin atender desde el {fecha}: escríbele o pásalo a alguien más.",
     },
     acciones: {
       escribir: "Escribir por WhatsApp",
@@ -80,6 +85,9 @@ export default {
       guardarFecha: "Guardar fecha",
       quitarFecha: "Quitar fecha",
       asignarme: "Asignármelo",
+      quitarResponsable: "Quitar responsable",
+      buscarResponsable: "Buscar a alguien del equipo",
+      sinCoincidencias: "Nadie del equipo coincide.",
       eliminar: "Borrar sus datos",
     },
     nota: "Nota",
@@ -125,7 +133,16 @@ export default {
       reenvio: "Volvió a escribir",
       estado: "Cambió a «{estado}»",
       asignado: "Responsable: {responsable}",
+      reasignado: "Pasó de {anterior} a {responsable}",
+      dejoDeAtender: "{anterior} dejó de ser responsable",
       sinAsignar: "Quedó sin responsable",
+      contacto: {
+        whatsapp: "Le escribió por WhatsApp",
+        llamada: "Le llamó",
+        correo: "Le escribió un correo",
+      },
+      sinAtender: "Sin atender: {responsable} no lo atendió en {horas} h",
+      sinAtenderNadie: "Sin atender: nadie lo atendió en {horas} h",
       nota: "Nota",
       seguimiento: "Seguimiento para el {fecha}",
       seguimientoQuitado: "Se quitó la fecha de seguimiento",

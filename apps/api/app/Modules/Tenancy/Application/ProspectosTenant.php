@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProspectoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -84,8 +85,41 @@ class ProspectosTenant
 
     public function asignar(ProspectoTenant $prospecto, ?Usuario $responsable, Usuario $actor): ProspectoTenant
     {
+        // En la historia queda de quién a quién (ADR 0138).
+        $anterior = $prospecto->responsable_id === null ? null : Usuario::query()->whereKey($prospecto->responsable_id)->value('name');
         $prospecto->update(['responsable_id' => $responsable?->getKey()]);
-        $this->evento($prospecto, TipoEventoProspecto::Asignado, $actor, ['responsable' => $responsable?->name]);
+        $this->evento($prospecto, TipoEventoProspecto::Asignado, $actor, array_filter([
+            'responsable' => $responsable?->name,
+            'anterior' => $anterior,
+        ], static fn (mixed $v): bool => $v !== null));
+
+        return $prospecto;
+    }
+
+    /**
+     * Quiénes pueden atender prospectos: el equipo activo con permiso para gestionarlos.
+     * Para elegir responsable (ADR 0138).
+     *
+     * @return Collection<int, Usuario>
+     */
+    public function responsables(): Collection
+    {
+        return Usuario::query()->where('activo', true)->orderBy('name')->get()
+            ->filter(static fn (Usuario $u): bool => $u->puede('prospectos.gestionar'))
+            ->values()
+            ->toBase();
+    }
+
+    /**
+     * El equipo le escribió o le llamó (WhatsApp, llamada o correo): queda en su historia
+     * y cuenta como haberlo atendido (ADR 0138).
+     */
+    public function registrarContacto(ProspectoTenant $prospecto, string $canal, Usuario $actor): ProspectoTenant
+    {
+        $this->evento($prospecto, TipoEventoProspecto::Contacto, $actor, ['canal' => $canal]);
+        if ($prospecto->primer_contacto_en === null) {
+            $prospecto->update(['primer_contacto_en' => now()]);
+        }
 
         return $prospecto;
     }
@@ -212,6 +246,11 @@ class ProspectosTenant
             'detalle' => $detalle,
             'autor_id' => $actor?->getKey(),
         ]);
+        // Atenderlo o reasignarlo le quita lo de «sin atender» (ADR 0138).
+        if ($prospecto->sin_atender_desde !== null
+            && ($tipo === TipoEventoProspecto::Asignado || in_array($tipo, TipoEventoProspecto::atencion(), true))) {
+            $prospecto->update(['sin_atender_desde' => null]);
+        }
     }
 
     private static function corto(?string $texto, int $largo): ?string
