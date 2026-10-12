@@ -141,6 +141,7 @@ use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookWhatsAppController;
+use App\Modules\Tenancy\Http\Controllers\WidgetsTenantController;
 use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Support\Facades\Route;
 
@@ -313,6 +314,8 @@ Route::prefix('v1')->group(function (): void {
         // Solo con la captación encendida; sin cuenta ni reserva.
         Route::get('/captacion', [CaptacionPublicaController::class, 'predeterminado'])->middleware('throttle:negocio-publico')->name('captacion.predeterminado');
         Route::get('/captacion/formularios/{formulario}', [CaptacionPublicaController::class, 'mostrar'])->middleware('throttle:negocio-publico')->name('captacion.formulario');
+        // Un widget en la web del negocio (ADR 0141): su configuración pública.
+        Route::get('/widgets/{widget}', [WidgetsTenantController::class, 'publico'])->middleware('throttle:negocio-publico')->name('widgets.publico');
         Route::post('/captacion/formularios/{formulario}/envios', [CaptacionPublicaController::class, 'enviar'])->middleware('throttle:captacion')->name('captacion.enviar');
 
         // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
@@ -512,6 +515,11 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/prospectos/{prospecto}', [ProspectosTenantController::class, 'destroy'])->middleware('puede:prospectos.eliminar')->name('prospectos.destroy');
             // Sus formularios (el de «Pedir acceso» y los que se comparten o embeben).
             Route::get('/captacion/formularios', [FormulariosCaptacionTenantController::class, 'index'])->middleware('puede:prospectos.ver')->name('captacion.formularios.index');
+            // Integrar en mi web (ADR 0141): widgets de calendario y planes.
+            Route::get('/captacion/widgets', [WidgetsTenantController::class, 'index'])->middleware('puede:prospectos.ver')->name('captacion.widgets.index');
+            Route::post('/captacion/widgets', [WidgetsTenantController::class, 'store'])->middleware('puede:prospectos.gestionar')->name('captacion.widgets.store');
+            Route::put('/captacion/widgets/{widget}', [WidgetsTenantController::class, 'update'])->middleware('puede:prospectos.gestionar')->name('captacion.widgets.update');
+            Route::delete('/captacion/widgets/{widget}', [WidgetsTenantController::class, 'destroy'])->middleware('puede:prospectos.gestionar')->name('captacion.widgets.destroy');
             Route::post('/captacion/formularios', [FormulariosCaptacionTenantController::class, 'store'])->middleware('puede:prospectos.gestionar')->name('captacion.formularios.store');
             Route::put('/captacion/formularios/{formulario}', [FormulariosCaptacionTenantController::class, 'update'])->middleware('puede:prospectos.gestionar')->name('captacion.formularios.update');
 
