@@ -152,6 +152,11 @@ final class CatalogoParametros
             // ADR 0138.
             new DefinicionParametro('captacion.horas_para_atender', 'Captación', 'Horas para atender un prospecto',
                 'Si en este tiempo nadie le escribe ni le da seguimiento, se marca «sin atender», su responsable recibe una tarea y se avisa al equipo para reasignarlo. 0 = no se revisa.', $e, 24, 0, 168, 'h'),
+            // Atribución de campañas (ADR 0142). En la plataforma, la del registro de negocios.
+            new DefinicionParametro('medicion.dias_ultimo_toque', 'Captación', 'Una campaña cuenta durante',
+                'Días desde que alguien llega por una campaña (un enlace con UTM, un anuncio u otro sitio) en que su solicitud, su compra o su cita se le atribuyen. Pasado ese tiempo sin volver por otra, queda «sin atribución».', $e, 30, 1, 90, 'días'),
+            new DefinicionParametro('medicion.dias_primer_toque', 'Captación', 'El primer origen se recuerda durante',
+                'Días en que se guarda por dónde llegó alguien la primera vez, aunque después vuelva por otra campaña.', $e, 90, 1, 365, 'días'),
 
             // Inventario del mostrador.
             new DefinicionParametro('inventario.stock_bajo', 'Inventario', 'Stock bajo',

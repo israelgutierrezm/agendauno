@@ -184,6 +184,33 @@ describe("prospectos: responsable, contacto e historia", () => {
     );
   });
 
+  it("el detalle dice de qué campaña llegó, o que no tiene atribución (ADR 0142)", async () => {
+    const w = montar();
+    await abrirDetalle(w);
+    expect(w.get('[data-prueba="campana-prospecto"]').text()).toBe(
+      "Sin atribución de campaña",
+    );
+
+    Object.assign(prospecto, {
+      campana: {
+        fuente: "instagram",
+        medio: "social",
+        campana: "octubre",
+        referente: null,
+        primer_origen: { fuente: "google", campana: "busqueda" },
+      },
+    });
+    const conCampana = montar();
+    await abrirDetalle(conCampana);
+    expect(conCampana.get('[data-prueba="campana-prospecto"]').text()).toBe(
+      "Campaña: octubre · instagram / social",
+    );
+    expect(conCampana.text()).toContain(
+      "La primera vez llegó por busqueda · google",
+    );
+    delete (prospecto as { campana?: unknown }).campana;
+  });
+
   it("la historia distingue cada cosa: sin atender, nota y cambio de responsable", async () => {
     const w = montar();
     await abrirDetalle(w);

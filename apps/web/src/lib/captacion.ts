@@ -94,6 +94,27 @@ export interface Prospecto {
   creado_en: string;
   respuestas: { campo: string; etiqueta: string; valor: unknown }[] | null;
   eventos: EventoProspecto[] | null;
+  // De dónde llegó (ADR 0142), solo en el detalle: la campaña acreditada y su primer
+  // origen; null = sin atribución.
+  campana?: CampanaProspecto | null;
+}
+
+export interface ToqueCampana {
+  fuente?: string | null;
+  medio?: string | null;
+  campana?: string | null;
+  referente?: string | null;
+}
+
+export interface CampanaProspecto extends ToqueCampana {
+  primer_origen: ToqueCampana | null;
+}
+
+/** «octubre · instagram / social», o el sitio de donde llegó. */
+export function textoCampana(toque: ToqueCampana): string {
+  const fuente = [toque.fuente, toque.medio].filter(Boolean).join(" / ");
+  const partes = [toque.campana, fuente].filter(Boolean);
+  return partes.length > 0 ? partes.join(" · ") : (toque.referente ?? "");
 }
 
 export interface CampoCaptacion {

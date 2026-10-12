@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Requests;
 
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\CatalogoPaises;
+use App\Modules\Tenancy\Medicion\Atribucion;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Foundation\Http\FormRequest;
@@ -81,6 +82,8 @@ class RegistrarEstudioRequest extends FormRequest
             // campo trampa (honeypot) que debe llegar vacío; si un bot lo llena, falla.
             'recaptcha_token' => ['nullable', 'string'],
             'sitio_web' => ['prohibited'],
+            // De dónde llegó quien registra (ADR 0142).
+            ...Atribucion::reglas(),
         ];
     }
 

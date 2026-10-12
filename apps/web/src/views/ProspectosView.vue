@@ -12,6 +12,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import {
   abierto,
   MOTIVOS_CIERRE,
+  textoCampana,
   whatsappDe,
   type EstadoProspecto,
   type EventoProspecto,
@@ -769,6 +770,33 @@ async function crear(): Promise<void> {
               })
             }}
           </p>
+          <!-- De dónde llegó (ADR 0142): lo que se le acredita y su primer origen. -->
+          <template v-if="actual.eventos !== null">
+            <p
+              class="mt-1 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="campana-prospecto"
+            >
+              {{
+                actual.campana && textoCampana(actual.campana)
+                  ? $t("captacion.prospectos.detalle.campana", {
+                      campana: textoCampana(actual.campana),
+                    })
+                  : $t("captacion.prospectos.detalle.sinAtribucion")
+              }}
+            </p>
+            <p
+              v-if="actual.campana?.primer_origen"
+              class="mt-1 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{
+                $t("captacion.prospectos.detalle.primerOrigen", {
+                  origen: textoCampana(actual.campana.primer_origen),
+                })
+              }}
+            </p>
+          </template>
         </section>
 
         <section>

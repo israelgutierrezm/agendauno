@@ -204,6 +204,16 @@ La modalidad viaja siempre como `mode`, con solo dos valores: `clases` o `citas`
 
 Los `placement` de `marketing_cta_clicked`: `navigation` («Probar gratis» del menú), `hero`, `product_demo`, `features` («Probar en mi negocio»), `business_carousel`, `operations`, `pricing`, `pricing_card`, `public_page`, `final`, `solution_hero` y `solution_final`. Comparar `mode_intent` con `mode` de `tenant_created` muestra quién llegó por una modalidad y registró otra.
 
+**Atribución (ADR 0142).** Los UTM ya no se congelan con la primera lectura de la pestaña.
+
+- Cada llegada con campaña se anota en su ámbito, cada producto y cada negocio por
+  separado, antes de cualquier redirección del router (`lib/atribucion.ts`).
+- Se guardan el primer origen y el último toque, y viajan al servidor con el registro
+  del negocio, la solicitud, la cita y la compra.
+- El servidor aplica la ventana de cada negocio y acredita el último toque vigente. Si
+  no hay uno vigente, el registro queda «sin atribución».
+- Son reglas propias: no equivalen a la atribución de Google ni a la de Meta.
+
 Las rutas de activación y operación se agrupan, sin slugs, IDs ni parámetros de URL en `page_path`. No incluir emails, teléfonos, nombres ni datos sensibles en eventos o campañas UTM. El endpoint debe aplicar validación, límites, retención y los controles de privacidad correspondientes; revisar consentimiento antes de activar un proveedor externo.
 
 Para completar el embudo hasta pago: instrumentar la confirmación de suscripción del backend con deduplicación por ID de transacción y primera suscripción pagada por negocio. Usar identificadores internos en un almacén autorizado; no enviarlos a terceros sin revisión. Las cuentas únicas y cohortes requieren esa integración: no calcularlas contando clics. Separar pagos de la suscripción SaaS de cobros que cada negocio recibe de sus propios clientes.

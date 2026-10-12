@@ -34,6 +34,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * - Un envío repetido con el mismo correo o teléfono de un prospecto abierto lo actualiza
  *   (queda «reenvío» en su historial): no abre cinco prospectos iguales.
  * - Lo que le interesaba (sede, actividad, clase o plan) se guarda si es algo público.
+ * - De dónde llegó (su campaña, ADR 0142) se guarda con la primera solicitud; un
+ *   reenvío no la cambia.
  */
 class CaptacionTenant
 {
@@ -45,6 +47,7 @@ class CaptacionTenant
         private readonly WaiversTenant $waivers,
         private readonly RegistrarEventoTenant $eventos,
         private readonly FormulariosCaptacionTenant $formularios,
+        private readonly AtribucionTenant $atribucion,
     ) {}
 
     public function activa(): bool
@@ -75,7 +78,7 @@ class CaptacionTenant
     /**
      * Recibe un envío del formulario.
      *
-     * @param  array{nombre: string, email: string, telefono?: string|null, respuestas?: array<string, mixed>|null, interes?: array<string, string|null>|null, fuente?: string|null, aviso_version?: int|null}  $datos
+     * @param  array{nombre: string, email: string, telefono?: string|null, respuestas?: array<string, mixed>|null, interes?: array<string, string|null>|null, fuente?: string|null, aviso_version?: int|null, atribucion?: mixed}  $datos
      */
     public function recibir(FormularioCaptacionTenant $formulario, array $datos): ProspectoTenant
     {
@@ -119,8 +122,13 @@ class CaptacionTenant
             ];
 
             if ($abierto instanceof ProspectoTenant) {
-                // Mismo interesado: se actualiza lo que trae de nuevo, sin abrir otro.
+                // Mismo interesado: se actualiza lo que trae de nuevo, sin abrir otro. Su
+                // campaña es la de su primera solicitud; si no la tenía, la de esta.
+                $contexto = $abierto->contexto_medicion_id === null
+                    ? $this->atribucion->registrar($datos['atribucion'] ?? null)
+                    : null;
                 $abierto->update(array_filter([
+                    'contexto_medicion_id' => $contexto?->getKey(),
                     'telefono' => $abierto->telefono ?? $telefono,
                     'email' => $abierto->email ?? $email,
                     ...array_filter($interes, static fn (?int $id): bool => $id !== null),
@@ -131,6 +139,7 @@ class CaptacionTenant
                 return $abierto;
             }
 
+            $contexto = $this->atribucion->registrar($datos['atribucion'] ?? null);
             $prospecto = ProspectoTenant::query()->create([
                 'nombre' => trim($datos['nombre']),
                 'email' => $email,
@@ -138,7 +147,9 @@ class CaptacionTenant
                 ...$interes,
                 'formulario_id' => $formulario->getKey(),
                 'origen' => OrigenProspecto::Formulario->value,
-                'fuente' => self::texto($datos['fuente'] ?? null, 120),
+                'fuente' => self::texto($datos['fuente'] ?? null, 120)
+                    ?? self::texto(implode(' / ', array_filter([$contexto?->fuente, $contexto?->campana])) ?: $contexto?->referente, 120),
+                'contexto_medicion_id' => $contexto?->getKey(),
                 'estado' => EstadoProspecto::Nuevo->value,
                 'respuestas' => $respuestas !== [] ? $respuestas : null,
                 ...$comunes,

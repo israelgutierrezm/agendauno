@@ -56,7 +56,7 @@ class ProspectoTenant extends Model
         'nombre', 'email', 'telefono', 'sucursal_id', 'actividad_id', 'sesion_id', 'producto_id',
         'formulario_id', 'origen', 'fuente', 'estado', 'motivo_cierre', 'comentario_cierre',
         'responsable_id', 'proximo_seguimiento_en', 'primer_contacto_en', 'persona_id', 'convertido_en',
-        'respuestas', 'aviso_version', 'acepto_aviso_en', 'sin_atender_desde',
+        'respuestas', 'aviso_version', 'acepto_aviso_en', 'sin_atender_desde', 'contexto_medicion_id',
     ];
 
     /**
@@ -129,6 +129,16 @@ class ProspectoTenant extends Model
     public function persona(): BelongsTo
     {
         return $this->belongsTo(PersonaTenant::class, 'persona_id')->withTrashed();
+    }
+
+    /**
+     * De dónde llegó su primera solicitud (ADR 0142).
+     *
+     * @return BelongsTo<ContextoMedicionTenant, $this>
+     */
+    public function contexto(): BelongsTo
+    {
+        return $this->belongsTo(ContextoMedicionTenant::class, 'contexto_medicion_id');
     }
 
     /**

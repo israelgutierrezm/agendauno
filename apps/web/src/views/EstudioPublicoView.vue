@@ -11,6 +11,7 @@ import TarjetaPlanPublico from "@/components/TarjetaPlanPublico.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
+import { volverConInteres } from "@/lib/destinoSeguro";
 import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -444,6 +445,8 @@ const interesAcceso = ref<{
   producto?: string | null;
   etiqueta?: string | null;
 } | null>(null);
+// Si ya tiene cuenta, entra y sigue con lo que eligió (ADR 0142).
+const volverTrasEntrar = computed(() => volverConInteres(interesAcceso.value));
 // Con la captación encendida, «Pedir acceso» deja sus datos en Prospectos (ADR 0117).
 const formularioAcceso = computed(() =>
   escaparate.value?.captacion?.activa
@@ -1630,9 +1633,17 @@ onMounted(cargar);
                 })
               }}
             </a>
+            <!-- Con lo que eligió (un plan, una clase): su cuenta lo muestra al entrar. -->
             <RouterLink
-              :to="{ name: 'entrar', query: { estudio: slug } }"
+              :to="{
+                name: 'entrar',
+                query: {
+                  estudio: slug,
+                  ...(volverTrasEntrar ? { volver: volverTrasEntrar } : {}),
+                },
+              }"
               class="tu-btn tu-btn-fantasma w-full"
+              data-prueba="ya-tengo-cuenta"
             >
               {{ tn("escaparate.acceso.yaTengo") }}
             </RouterLink>

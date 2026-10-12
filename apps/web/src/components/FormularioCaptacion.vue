@@ -5,6 +5,7 @@ import { RouterLink } from "vue-router";
 
 import { trackEvent } from "@/lib/analytics";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
+import { conAtribucion, leerAtribucion, type Ambito } from "@/lib/atribucion";
 import type { FormularioPublico } from "@/lib/captacion";
 import { tokenRecaptcha } from "@/lib/recaptcha";
 
@@ -76,16 +77,17 @@ async function cargar(): Promise<void> {
   }
 }
 
-// De dónde llegó (la campaña del enlace), sin datos personales.
+// De dónde llegó (ADR 0142): la campaña del último toque en este negocio, anotada al
+// navegar (no solo la de esta dirección), sin datos personales.
+const ambito = computed<Ambito>(() => `negocio:${props.slug.toLowerCase()}`);
 function fuente(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const q = new URLSearchParams(window.location.search);
-  const partes = [q.get("utm_source"), q.get("utm_campaign")].filter(
+  const toque = leerAtribucion(ambito.value).ultimo_toque;
+  const partes = [toque?.fuente, toque?.campana].filter(
     (p): p is string => !!p,
   );
-  return partes.length > 0 ? partes.join(" / ").slice(0, 120) : null;
+  return partes.length > 0
+    ? partes.join(" / ").slice(0, 120)
+    : (toque?.referente ?? null);
 }
 
 const puedeEnviar = computed(
@@ -127,6 +129,7 @@ async function enviar(): Promise<void> {
             }
           : null,
         fuente: fuente(),
+        ...conAtribucion(ambito.value),
         acepta_aviso: datos.acepta,
         aviso_version: definicion.value.aviso?.version ?? null,
         recaptcha_token: await tokenRecaptcha("captacion"),

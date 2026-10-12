@@ -25,7 +25,7 @@ class OrdenTenant extends Model
 
     protected $fillable = [
         'persona_id', 'sucursal_id', 'sesion_id', 'renueva_acuerdo_id', 'estado', 'total_minor', 'descuento_minor', 'promocion_id', 'moneda',
-        'metodo_pago', 'referencia_pago', 'pagada_en', 'domiciliar', 'cancelada_en', 'cancelada_por',
+        'metodo_pago', 'referencia_pago', 'pagada_en', 'domiciliar', 'cancelada_en', 'cancelada_por', 'contexto_medicion_id',
     ];
 
     /**

@@ -1,6 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
 
 import es from "@/i18n/locales/es-MX";
 import perfilPublico from "@/i18n/locales/perfilPublico.es-MX";
@@ -87,6 +88,36 @@ describe("página pública del estudio", () => {
     expect(acceso.get("a[href^='https://wa.me']").text()).toBe(
       "Pedirlo por WhatsApp",
     );
+  });
+
+  it("si ya tiene cuenta, entra y sigue con el plan que eligió (ADR 0142)", async () => {
+    const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
+    const plan = "01J9Z8X7W6V5T4S3R2Q1P0N9M8";
+    Object.assign(respuesta.data.data, {
+      productos: [
+        {
+          id: plan,
+          nombre: "Pack 8",
+          tipo: "paquete",
+          precio_minor: 100000,
+          moneda: "MXN",
+          ilimitado: false,
+          creditos_incluidos: 8000,
+        },
+      ],
+    });
+    mocks.get.mockResolvedValue(respuesta);
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="lo-quiero"]').trigger("click");
+    const enlace = w
+      .findAllComponents(RouterLink)
+      .find((c) => c.attributes("data-prueba") === "ya-tengo-cuenta")!;
+    expect(enlace.vm.$attrs.to).toEqual({
+      name: "entrar",
+      query: { estudio: "estudio-a", volver: `/mi-cuenta?plan=${plan}` },
+    });
   });
 
   it("«Agendar una cita» sale de la modalidad, no de sus ofertas (ADR 0104)", async () => {

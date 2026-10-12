@@ -1,17 +1,9 @@
+import { ambitoEnUso, capturarAtribucion } from "@/lib/atribucion";
 import { rutasMarketing } from "@/marketing/seoConfig";
 
 export type AnalyticsValue = string | number | boolean | null;
 
 export type AnalyticsProperties = Record<string, AnalyticsValue>;
-
-interface Attribution {
-  utm_source?: string;
-  utm_medium?: string;
-  utm_campaign?: string;
-  utm_content?: string;
-  utm_term?: string;
-  referrer?: string;
-}
 
 declare global {
   interface Window {
@@ -19,48 +11,36 @@ declare global {
   }
 }
 
-const ATTRIBUTION_KEY = "agendauno_attribution";
-const UTM_KEYS = [
-  "utm_source",
-  "utm_medium",
-  "utm_campaign",
-  "utm_content",
-  "utm_term",
-] as const;
-
-function readAttribution(): Attribution {
+/**
+ * La campaña de la pantalla actual para los eventos (ADR 0142): el último toque del
+ * ámbito (el producto o el negocio). Sin router (una página suelta), la de esta
+ * dirección.
+ */
+function readAttribution(): Record<string, string> {
   if (typeof window === "undefined") {
     return {};
   }
-
   try {
-    const stored = window.sessionStorage.getItem(ATTRIBUTION_KEY);
-    if (stored !== null) {
-      return JSON.parse(stored) as Attribution;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    const attribution: Attribution = {};
-    for (const key of UTM_KEYS) {
-      const value = params.get(key)?.trim();
-      if (value) {
-        attribution[key] = value.slice(0, 160);
-      }
-    }
-
-    if (document.referrer) {
-      try {
-        attribution.referrer = new URL(document.referrer).hostname.slice(
-          0,
-          160,
-        );
-      } catch {
-        attribution.referrer = "unknown";
-      }
-    }
-
-    window.sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution));
-    return attribution;
+    const { ultimo_toque: toque } = capturarAtribucion(
+      ambitoEnUso(),
+      new URLSearchParams(window.location.search),
+      "",
+      window.location.hostname,
+    );
+    if (toque === null) return {};
+    const campos: Record<string, string | undefined> = {
+      utm_source: toque.fuente,
+      utm_medium: toque.medio,
+      utm_campaign: toque.campana,
+      utm_content: toque.contenido,
+      utm_term: toque.termino,
+      referrer: toque.referente,
+    };
+    return Object.fromEntries(
+      Object.entries(campos).filter(
+        (par): par is [string, string] => par[1] !== undefined,
+      ),
+    );
   } catch {
     return {};
   }
