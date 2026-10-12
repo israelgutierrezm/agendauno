@@ -31,13 +31,20 @@ import {
   slugDeContexto,
   urlEntrarEnDominioRaiz,
 } from "@/lib/tenant";
-import { productoActual } from "@/lib/producto";
+import {
+  PRODUCTOS,
+  productoActual,
+  productoDelHost,
+  type Producto,
+} from "@/lib/producto";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Marca {
   nombre: string;
   logo_url: string | null;
+  // De qué producto es (ADR 0108).
+  producto?: Producto;
 }
 
 interface NegocioDirectorio {
@@ -47,6 +54,7 @@ interface NegocioDirectorio {
   logo_url: string | null;
   ciudad: string | null;
   pais: string | null;
+  producto?: Producto;
 }
 
 const { t } = useI18n();
@@ -87,6 +95,24 @@ watch([slug, () => marca.value?.logo_url], () => {
 });
 
 const recientes = ref<NegocioReciente[]>(leerNegociosRecientes());
+// Cada producto es un sitio aparte (ADR 0136): un negocio del otro no se abre aquí;
+// se dice dónde entrar.
+const otroProducto = ref<{
+  nombre: string;
+  producto: Producto;
+  slug: string;
+} | null>(null);
+const enlaceOtroProducto = computed(() => {
+  const otro = otroProducto.value;
+  if (otro === null) {
+    return "";
+  }
+  const ruta = `/entrar?estudio=${encodeURIComponent(otro.slug)}`;
+  // En desarrollo (sin los dominios de los productos), la misma página con su producto.
+  return productoDelHost(window.location.hostname) === null
+    ? `${ruta}&producto=${otro.producto}`
+    : `https://${PRODUCTOS[otro.producto].dominio}${ruta}`;
+});
 const busqueda = ref("");
 const resultados = ref<NegocioDirectorio[]>([]);
 const buscando = ref(false);
@@ -189,6 +215,22 @@ async function cargarMarca(
     const { data } = await api.get<{ data: Marca }>(
       `/api/v1/app/${slugBuscado}/marca`,
     );
+    const suProducto = data.data.producto ?? productoActual();
+    if (suProducto !== productoActual()) {
+      // De otro producto: aquí no se abre ni se recuerda (ADR 0136).
+      marca.value = null;
+      otroProducto.value = {
+        nombre: data.data.nombre,
+        producto: suProducto,
+        slug: slugBuscado,
+      };
+      if (!estudioFijo) {
+        slug.value = "";
+        await router.replace({ name: "entrar" });
+      }
+      return;
+    }
+    otroProducto.value = null;
     marca.value = data.data;
     recientes.value = recordarNegocio({
       slug: slugBuscado,
@@ -196,6 +238,7 @@ async function cargarMarca(
       logo_url: data.data.logo_url,
       ciudad: null,
       pais: null,
+      producto: suProducto,
     });
     await prepararGoogle();
   } catch (e) {
@@ -220,9 +263,11 @@ async function buscarNegocios(inicial = false): Promise<void> {
   busquedaRealizada.value = !inicial;
   errorBusqueda.value = null;
   try {
-    const params = busqueda.value.trim()
-      ? { q: busqueda.value.trim() }
-      : undefined;
+    // Solo los negocios de este producto (ADR 0108, 0136).
+    const params = {
+      producto: productoActual(),
+      ...(busqueda.value.trim() ? { q: busqueda.value.trim() } : {}),
+    };
     const { data } = await api.get<{ data: NegocioDirectorio[] }>(
       "/api/v1/directorio",
       { params },
@@ -236,12 +281,14 @@ async function buscarNegocios(inicial = false): Promise<void> {
 }
 
 async function seleccionarNegocio(negocio: NegocioDirectorio): Promise<void> {
+  otroProducto.value = null;
   recientes.value = recordarNegocio({
     slug: negocio.slug,
     nombre: negocio.nombre,
     logo_url: negocio.logo_url,
     ciudad: negocio.ciudad,
     pais: negocio.pais,
+    producto: negocio.producto,
   });
   slug.value = negocio.slug;
   marca.value = { nombre: negocio.nombre, logo_url: negocio.logo_url };
@@ -284,6 +331,7 @@ async function enviar(): Promise<void> {
         logo_url: marca.value.logo_url,
         ciudad: null,
         pais: null,
+        producto: marca.value.producto,
       });
     }
     continuar();
@@ -514,6 +562,25 @@ onMounted(async () => {
               </button>
             </form>
 
+            <!-- Un negocio del otro producto: dónde entrar (ADR 0136). -->
+            <p
+              v-if="otroProducto"
+              class="tu-selector-error"
+              role="alert"
+              data-prueba="otro-producto"
+            >
+              {{
+                $t("entrar.otroProducto", {
+                  negocio: otroProducto.nombre,
+                  producto: PRODUCTOS[otroProducto.producto].nombre,
+                })
+              }}
+              <a class="tu-enlace" :href="enlaceOtroProducto">{{
+                $t("entrar.irAlOtroProducto", {
+                  producto: PRODUCTOS[otroProducto.producto].nombre,
+                })
+              }}</a>
+            </p>
             <p v-if="errorBusqueda" class="tu-selector-error" role="alert">
               {{ errorBusqueda }}
             </p>
@@ -779,40 +846,46 @@ onMounted(async () => {
   height: clamp(17rem, 32vh, 25rem);
   margin-top: clamp(2rem, 5vh, 4rem);
 }
+/* Pirámide orgánica: una foto arriba y dos abajo, dentro del mismo alto.
+   Los avisos ocupan los tres huecos del triángulo, fuera de las fotografías. */
 .tu-login-collage > img {
   position: absolute;
-  width: 35%;
-  height: 82%;
-  border: 0.35rem solid rgb(255 255 255 / 66%);
-  border-radius: 1.5rem;
+  width: 31%;
+  height: 57%;
+  border: 0.3rem solid rgb(255 255 255 / 70%);
+  border-radius: 1.25rem;
   object-fit: cover;
-  box-shadow: 0 1.5rem 4rem rgb(45 55 70 / 18%);
+  box-shadow: 0 1.25rem 3.25rem rgb(45 55 70 / 18%);
 }
-.tu-login-collage > img:first-child {
-  left: 1%;
-  bottom: 10%;
-  transform: rotate(-5deg);
-}
-.tu-login-collage > img:nth-child(2) {
+.tu-login-visual .tu-login-collage > img:first-child {
   top: 0;
-  left: 32%;
-  object-position: 65% center;
-  transform: rotate(2deg);
+  left: 34.5%;
+  border-radius: 42% 58% 45% 55% / 48% 44% 56% 52%;
+  object-position: center 20%;
+  transform: rotate(-2deg);
 }
-.tu-login-collage > img:nth-child(3) {
-  right: 0;
-  bottom: 2%;
-  height: 78%;
-  object-position: 47% center;
-  transform: rotate(5deg);
+.tu-login-visual .tu-login-collage > img:nth-child(2) {
+  bottom: 0;
+  left: 1%;
+  border-radius: 38% 52% 42% 48% / 46% 40% 58% 52%;
+  object-position: 60% 25%;
+  transform: rotate(-3deg);
+}
+.tu-login-visual .tu-login-collage > img:nth-child(3) {
+  bottom: 0;
+  right: 1%;
+  border-radius: 54% 40% 48% 42% / 44% 48% 52% 56%;
+  object-position: 47% 20%;
+  transform: rotate(3deg);
 }
 .tu-login-actividad {
   position: absolute;
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.78rem 0.9rem;
+  min-width: 0;
+  gap: 0.4rem;
+  padding: 0.55rem 0.5rem;
   border: 1px solid rgb(255 255 255 / 65%);
   border-radius: 1.1rem;
   background: rgb(255 255 255 / 88%);
@@ -820,16 +893,22 @@ onMounted(async () => {
   backdrop-filter: blur(16px);
 }
 .tu-login-actividad--cita {
-  top: -6%;
+  top: 6%;
   left: 0;
+  width: 31%;
 }
 .tu-login-actividad--clase {
-  left: 17%;
   bottom: 0;
+  left: 33.5%;
+  width: 33%;
 }
 .tu-login-actividad--barberia {
+  top: 9%;
   right: 0;
-  bottom: 3%;
+  width: 31%;
+}
+.tu-login-actividad > span:last-child {
+  min-width: 0;
 }
 .tu-login-actividad strong,
 .tu-login-actividad small {
@@ -837,16 +916,18 @@ onMounted(async () => {
 }
 .tu-login-actividad strong {
   font-size: 0.78rem;
+  line-height: 1.3;
 }
 .tu-login-actividad small {
   margin-top: 0.12rem;
   color: #657180;
   font-size: 0.66rem;
+  line-height: 1.35;
 }
 .tu-login-icono {
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 1.5rem;
+  height: 1.5rem;
   flex: 0 0 auto;
   place-content: center;
   border-radius: 50%;

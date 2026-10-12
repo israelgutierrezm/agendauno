@@ -62,6 +62,9 @@ class OrdenesTenant
     public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false, ?array $exencionInscripcion = null, ?array $aceptacion = null): OrdenTenant
     {
         $moneda = $items[0]['producto']->moneda; // Una sola moneda por orden.
+        // Clases de prueba por persona en esta orden (B03): una sola, aunque vengan en
+        // varias líneas (ADR 0137).
+        $pruebas = [];
 
         foreach ($items as $item) {
             if (! $renovacion && $item['producto']->archivado) {
@@ -73,9 +76,11 @@ class OrdenesTenant
             // Clase de prueba (B03): una sola, para quien nunca vino.
             if (! $renovacion && $item['producto']->primera_vez) {
                 $quien = $item['beneficiario'] ?? $comprador;
-                if (max(1, $item['cantidad']) > 1 || ! app(PrimeraVezTenant::class)->elegible($quien)) {
+                $clave = (int) $quien->getKey();
+                if (max(1, $item['cantidad']) > 1 || isset($pruebas[$clave]) || ! app(PrimeraVezTenant::class)->elegible($quien)) {
                     throw new PrimeraVezNoDisponible(PrimeraVezTenant::MENSAJE);
                 }
+                $pruebas[$clave] = true;
             }
             if ($item['producto']->moneda !== $moneda) {
                 throw new MonedaMixta('Una orden no puede mezclar monedas.');

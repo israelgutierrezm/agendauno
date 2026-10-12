@@ -64,6 +64,7 @@ use App\Modules\Tenancy\Http\Controllers\MensajesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiDispositivosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiembrosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiHistorialTenantController;
+use App\Modules\Tenancy\Http\Controllers\MiInteresTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPagoAutomaticoTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiReprogramarTenantController;
@@ -378,6 +379,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/reservas/{reserva}/cancelacion', [MiTenantController::class, 'previsualizarCancelacion'])->name('mi.reservas.cancelacion');
             // Historial de clases y citas (asistió, faltó, canceló, cambió) con su reseña.
             Route::get('/mi/historial', MiHistorialTenantController::class)->name('mi.historial');
+            // Lo que le interesó cuando era prospecto, para continuar (ADR 0137).
+            Route::get('/mi/interes', MiInteresTenantController::class)->name('mi.interes');
             Route::get('/mi/derechos/{derecho}/movimientos', [MiTenantController::class, 'movimientosDerecho'])->name('mi.derechos.movimientos');
             Route::get('/mi/planes', [MiTenantController::class, 'planes'])->name('mi.planes');
             Route::get('/mi/clima', [MiTenantController::class, 'clima'])->middleware('throttle:clima')->name('mi.clima');

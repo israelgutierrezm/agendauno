@@ -208,7 +208,15 @@ function descargarPlantilla(): void {
           <li>{{ $t("importarSaldos.pasoMiembros") }}</li>
           <li>{{ $t("importarSaldos.pasoPlanes") }}</li>
           <li>{{ $t("importarSaldos.pasoCorte") }}</li>
-          <li>{{ $t("importarSaldos.pasoReservas") }}</li>
+          <li>
+            {{
+              $t(
+                sesion.esCitas
+                  ? "importarSaldos.pasoReservasCitas"
+                  : "importarSaldos.pasoReservas",
+              )
+            }}
+          </li>
         </ul>
         <p class="mt-3 text-sm">
           <span :style="{ color: 'var(--texto-suave)' }"

@@ -7,11 +7,14 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 
 /**
@@ -69,6 +72,7 @@ class FulfillmentTenant
         }
 
         $orden->loadMissing(['lineas.producto', 'lineas.beneficiario', 'persona']);
+        $repetidas = $this->pruebasRepetidas($orden);
 
         foreach ($orden->lineas as $linea) {
             // Un artículo cobrado (de un presupuesto; ADR 0127) sale del inventario de la
@@ -85,6 +89,13 @@ class FulfillmentTenant
             if (! $beneficiario instanceof PersonaTenant || ! $producto instanceof ProductoTenant) {
                 continue;
             }
+            // La clase de prueba (B03) una sola vez, aunque otra orden pagada a la vez ya
+            // se la haya dado: esta no se concede y el pago queda para devolverlo.
+            if (isset($repetidas[$linea->getKey()])) {
+                $this->pruebaRepetida($orden, $beneficiario);
+
+                continue;
+            }
 
             for ($i = 0; $i < $linea->cantidad; $i++) {
                 // Ya pagado: unas clases extra sin paquete vigente valen como paquete aparte.
@@ -93,6 +104,54 @@ class FulfillmentTenant
                 $acuerdo->update(['linea_orden_id' => $linea->getKey()]);
             }
         }
+    }
+
+    /**
+     * Las líneas de clase de prueba que ya no se pueden conceder (ADR 0137), decididas
+     * antes de conceder nada de la orden: otra línea suya (un plan) crearía una
+     * membresía y la haría parecer usada. Con la persona bloqueada, por si otra orden
+     * pagada a la vez ya se la dio; y una sola por persona en la orden.
+     *
+     * @return array<int, true> por id de línea
+     */
+    private function pruebasRepetidas(OrdenTenant $orden): array
+    {
+        $repetidas = [];
+        $vistas = [];
+        foreach ($orden->lineas as $linea) {
+            $beneficiario = $linea->beneficiario ?? $orden->persona;
+            if ($linea->producto?->primera_vez !== true || ! $beneficiario instanceof PersonaTenant) {
+                continue;
+            }
+            $clave = (int) $beneficiario->getKey();
+            if (isset($vistas[$clave]) || ! app(PrimeraVezTenant::class)->aunElegible($beneficiario)) {
+                $repetidas[(int) $linea->getKey()] = true;
+            }
+            $vistas[$clave] = true;
+        }
+
+        return $repetidas;
+    }
+
+    /**
+     * Se pagó una clase de prueba que la persona ya usó: queda «por conciliar» para
+     * devolver el pago (o venderle otro plan).
+     */
+    private function pruebaRepetida(OrdenTenant $orden, PersonaTenant $persona): void
+    {
+        $pago = PagoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->where('estado', EstadoPago::Aprobado->value)
+            ->latest('id')
+            ->first();
+        if (! $pago instanceof PagoTenant) {
+            return;
+        }
+        app(IncidenciasCobroTenant::class)->porPago(
+            IncidenciaCobroTenant::PRIMERA_VEZ_REPETIDA,
+            $pago,
+            "{$persona->nombreCompleto()} ya había usado su clase de prueba: no se concedió otra. Devuelve el pago o véndele otro plan.",
+        );
     }
 
     /**

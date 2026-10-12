@@ -112,6 +112,41 @@ describe("acceso por negocio", () => {
     await flushPromises();
     expect(wrapper.find(".tu-selector-vacio").exists()).toBe(true);
   });
+  it("busca solo negocios de su producto", async () => {
+    const wrapper = montar();
+    await flushPromises();
+    await wrapper.get("#buscar-negocio").setValue("Mi academia");
+    await wrapper.get(".tu-selector-busqueda").trigger("submit");
+    await flushPromises();
+
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/directorio", {
+      params: { producto: "agendauno", q: "Mi academia" },
+    });
+  });
+
+  it("un negocio del otro producto no se abre ni se recuerda: se dice dónde entrar", async () => {
+    mocks.route.query = { estudio: "barberia" };
+    mocks.get.mockResolvedValue({
+      data: {
+        data: {
+          nombre: "Barbería La Navaja",
+          logo_url: null,
+          producto: "turnouno",
+        },
+      },
+    });
+    const wrapper = montar();
+    await flushPromises();
+
+    const aviso = wrapper.get('[data-prueba="otro-producto"]');
+    expect(aviso.text()).toContain("Barbería La Navaja usa TurnoUno.");
+    expect(aviso.get("a").attributes("href")).toBe(
+      "/entrar?estudio=barberia&producto=turnouno",
+    );
+    expect(wrapper.find("#email").exists()).toBe(false);
+    expect(localStorage.getItem("agendauno.negocios-recientes.v2")).toBeNull();
+  });
+
   it("conserva el panel visual y muestra todos los negocios recientes", () => {
     recordarCinco();
     const wrapper = montar();

@@ -85,6 +85,8 @@ const form = reactive({
     "sin_penalizacion" | "monto_fijo" | "meses_restantes",
   penalizacion:
     p?.penalizacion_minor != null ? String(p.penalizacion_minor / 100) : "",
+  // Con «meses restantes», qué parte de lo que falte (p. ej. 50 %).
+  porcentaje: String(p?.penalizacion_porcentaje ?? 100),
 });
 const guardando = ref(false);
 const error = ref<string | null>(null);
@@ -222,6 +224,10 @@ async function guardar(): Promise<void> {
           penalizacion_minor:
             form.bajaAnticipada === "monto_fijo"
               ? Math.round((numero(form.penalizacion) ?? 0) * 100)
+              : null,
+          penalizacion_porcentaje:
+            form.bajaAnticipada === "meses_restantes"
+              ? Math.min(100, Math.max(1, numero(form.porcentaje) ?? 100))
               : null,
         }
       : {}),
@@ -644,6 +650,24 @@ onMounted(async () => {
             step="0.01"
             inputmode="decimal"
           />
+        </div>
+        <div v-if="form.bajaAnticipada === 'meses_restantes'" class="sm:w-1/2">
+          <label class="tu-label" for="ep-porcentaje">{{
+            $t("planes.permanencia.porcentaje")
+          }}</label>
+          <input
+            id="ep-porcentaje"
+            v-model="form.porcentaje"
+            class="tu-input"
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            inputmode="numeric"
+          />
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("planes.permanencia.porcentajeAyuda") }}
+          </p>
         </div>
         <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("planes.permanencia.ayuda") }}

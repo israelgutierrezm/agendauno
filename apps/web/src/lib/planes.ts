@@ -44,6 +44,8 @@ export interface Plan {
   baja_anticipada?:
     "sin_penalizacion" | "monto_fijo" | "meses_restantes" | null;
   penalizacion_minor?: number | null;
+  // Con «meses restantes»: qué porcentaje de lo que falte se cobra (1–100).
+  penalizacion_porcentaje?: number | null;
   condiciones?: string | null;
 }
 

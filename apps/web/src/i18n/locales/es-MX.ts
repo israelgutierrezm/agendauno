@@ -1257,6 +1257,9 @@ export default {
     buscar: "Buscar",
     buscando: "Buscando…",
     sinResultados: "No encontramos negocios con esa búsqueda.",
+    // Un negocio del otro producto (ADR 0136): cada producto es un sitio aparte.
+    otroProducto: "{negocio} usa {producto}.",
+    irAlOtroProducto: "Entra desde {producto}",
     negocioNoDisponible:
       "Ese negocio ya no está disponible. Busca otro para continuar.",
     // El negocio no se pudo consultar (sin red o el servidor no respondió): no es
@@ -1542,6 +1545,9 @@ export default {
       "Acuerda una fecha de corte: desde ese día los saldos se operan solo aquí, no en los dos sistemas.",
     pasoReservas:
       "Las reservas futuras no se copian: tras el corte, reserva aquí las clases de cada alumno (o que lo hagan ellos).",
+    // La agenda futura del sistema anterior no se importa (ADR 0125), tampoco en citas.
+    pasoReservasCitas:
+      "Las citas futuras no se copian: tras el corte, agéndalas aquí (o que las agenden tus clientes desde tu página).",
     corte: "Fecha de corte",
     evidencia: "De dónde salen los saldos",
     evidenciaEjemplo:

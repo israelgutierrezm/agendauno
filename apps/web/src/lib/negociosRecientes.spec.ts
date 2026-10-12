@@ -74,4 +74,35 @@ describe("negocios recientes", () => {
 
     expect(olvidarNegocio("uno").map((item) => item.slug)).toEqual(["dos"]);
   });
+
+  it("cada producto ve solo sus negocios recientes (ADR 0136)", () => {
+    recordarNegocio({
+      slug: "grecon",
+      nombre: "Grecon Art House",
+      logo_url: null,
+      ciudad: null,
+      pais: null,
+      producto: "agendauno",
+    });
+    recordarNegocio({
+      slug: "barberia",
+      nombre: "Barbería La Navaja",
+      logo_url: null,
+      ciudad: null,
+      pais: null,
+      producto: "turnouno",
+    });
+
+    expect(
+      leerNegociosRecientes(undefined, "agendauno").map((n) => n.slug),
+    ).toEqual(["grecon"]);
+    expect(
+      leerNegociosRecientes(undefined, "turnouno").map((n) => n.slug),
+    ).toEqual(["barberia"]);
+    // Sin decir el producto, el de esta página (AgendaUno en las pruebas).
+    expect(leerNegociosRecientes().map((n) => n.slug)).toEqual(["grecon"]);
+    expect(
+      olvidarNegocio("barberia", undefined, "turnouno").map((n) => n.slug),
+    ).toEqual([]);
+  });
 });

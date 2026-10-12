@@ -1,3 +1,12 @@
+import { productoActual, type Producto } from "@/lib/producto";
+
+/**
+ * Los negocios que se abrieron en este dispositivo, para entrar de nuevo con un toque.
+ *
+ * Cada producto guarda su propia lista (ADR 0136): en TurnoUno solo aparecen negocios
+ * de TurnoUno y en AgendaUno solo los de AgendaUno, aunque en desarrollo compartan el
+ * mismo origen. Para quien entra, cada producto es un sitio aparte.
+ */
 export interface NegocioReciente {
   slug: string;
   nombre: string;
@@ -7,8 +16,13 @@ export interface NegocioReciente {
   visitado_en: number;
 }
 
-const CLAVE = "agendauno.negocios-recientes.v1";
+// La v1 no decía de qué producto era cada negocio: ya no se lee.
+const CLAVE = "negocios-recientes.v2";
 const LIMITE = 5;
+
+function clave(producto: Producto): string {
+  return `${producto}.${CLAVE}`;
+}
 
 function almacenamiento(predeterminado?: Storage): Storage | null {
   if (predeterminado !== undefined) return predeterminado;
@@ -34,11 +48,15 @@ function esNegocio(valor: unknown): valor is NegocioReciente {
   );
 }
 
-export function leerNegociosRecientes(store?: Storage): NegocioReciente[] {
+/** Los recientes de un producto (por omisión, el de esta página). */
+export function leerNegociosRecientes(
+  store?: Storage,
+  producto: Producto = productoActual(),
+): NegocioReciente[] {
   const destino = almacenamiento(store);
   if (destino === null) return [];
   try {
-    const guardado = destino.getItem(CLAVE);
+    const guardado = destino.getItem(clave(producto));
     if (guardado === null) return [];
     const datos: unknown = JSON.parse(guardado);
     return Array.isArray(datos)
@@ -52,21 +70,27 @@ export function leerNegociosRecientes(store?: Storage): NegocioReciente[] {
   }
 }
 
+/**
+ * Lo recuerda en la lista de SU producto (`producto`; si no se sabe, el de esta
+ * página). Devuelve la lista del producto de esta página.
+ */
 export function recordarNegocio(
-  negocio: Omit<NegocioReciente, "visitado_en">,
+  negocio: Omit<NegocioReciente, "visitado_en"> & { producto?: Producto },
   store?: Storage,
 ): NegocioReciente[] {
   const destino = almacenamiento(store);
   if (destino === null) return [];
-  const existentes = leerNegociosRecientes(destino);
-  const anterior = existentes.find((item) => item.slug === negocio.slug.trim());
+  const { producto: suyo, ...datos } = negocio;
+  const producto = suyo ?? productoActual();
+  const existentes = leerNegociosRecientes(destino, producto);
+  const anterior = existentes.find((item) => item.slug === datos.slug.trim());
   const actualizado: NegocioReciente = {
-    ...negocio,
-    slug: negocio.slug.trim(),
-    nombre: negocio.nombre.trim(),
-    logo_url: negocio.logo_url ?? anterior?.logo_url ?? null,
-    ciudad: negocio.ciudad ?? anterior?.ciudad ?? null,
-    pais: negocio.pais ?? anterior?.pais ?? null,
+    ...datos,
+    slug: datos.slug.trim(),
+    nombre: datos.nombre.trim(),
+    logo_url: datos.logo_url ?? anterior?.logo_url ?? null,
+    ciudad: datos.ciudad ?? anterior?.ciudad ?? null,
+    pais: datos.pais ?? anterior?.pais ?? null,
     visitado_en: Date.now(),
   };
   const recientes = [
@@ -74,24 +98,25 @@ export function recordarNegocio(
     ...existentes.filter((item) => item.slug !== actualizado.slug),
   ].slice(0, LIMITE);
   try {
-    destino.setItem(CLAVE, JSON.stringify(recientes));
+    destino.setItem(clave(producto), JSON.stringify(recientes));
   } catch {
     // El acceso rápido es opcional: la navegación funciona sin almacenamiento.
   }
-  return recientes;
+  return leerNegociosRecientes(destino);
 }
 
 export function olvidarNegocio(
   slug: string,
   store?: Storage,
+  producto: Producto = productoActual(),
 ): NegocioReciente[] {
   const destino = almacenamiento(store);
   if (destino === null) return [];
-  const recientes = leerNegociosRecientes(destino).filter(
+  const recientes = leerNegociosRecientes(destino, producto).filter(
     (item) => item.slug !== slug,
   );
   try {
-    destino.setItem(CLAVE, JSON.stringify(recientes));
+    destino.setItem(clave(producto), JSON.stringify(recientes));
   } catch {
     // Ignora almacenamiento no disponible.
   }

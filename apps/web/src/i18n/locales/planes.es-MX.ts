@@ -167,6 +167,10 @@ export default {
       meses_restantes: "Paga las mensualidades que falten",
     },
     monto: "Monto de la penalización",
+    // Qué parte de las mensualidades que falten (p. ej. 50 %); 100 = todas.
+    porcentaje: "Porcentaje de lo que falte (%)",
+    porcentajeAyuda:
+      "Ej.: con 50 paga la mitad de las mensualidades que falten. Con 100, todas.",
     ayuda:
       "Quien lo compra acepta estas condiciones antes de pagar; lo pactado no cambia si editas el plan después. La baja aplica al terminar el periodo pagado. La redacción legal de tu contrato la debe revisar un profesional.",
   },

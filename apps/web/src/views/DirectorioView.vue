@@ -147,6 +147,8 @@ function verEstudio(estudio: EstudioDirectorio): void {
     logo_url: estudio.logo_url,
     ciudad: estudio.ciudad,
     pais: estudio.pais,
+    // En la lista de su producto (ADR 0136).
+    producto: productoActual(),
   });
   void router.push({
     name: "estudio-publico",

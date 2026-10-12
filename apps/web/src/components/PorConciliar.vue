@@ -98,6 +98,8 @@ function titulo(i: Incidencia): string {
       });
     case "pago_duplicado":
       return t("porConciliar.pagoDuplicado", { monto });
+    case "primera_vez_repetida":
+      return t("porConciliar.primeraVezRepetida", { monto });
     default:
       return t("porConciliar.pagoTardio", { monto });
   }

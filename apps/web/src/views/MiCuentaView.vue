@@ -13,6 +13,7 @@ import TarjetaOperacion, {
   type Ilustracion,
 } from "@/components/TarjetaOperacion.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
+import { api } from "@/lib/api";
 import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
 import {
@@ -70,6 +71,28 @@ const etiquetaProxima = computed(() => {
 const ofrecida = computed(() =>
   cuenta.reservas.value.find((r) => r.estado === "ofrecida"),
 );
+// Lo que le interesó cuando era prospecto (GET /mi/interes; ADR 0137): el plan o la
+// clase que pidió, si sigue disponible y aún no lo tiene. Si falla, no se muestra.
+interface Interes {
+  plan: { id: string; nombre: string } | null;
+  clase: {
+    id: string;
+    nombre: string | null;
+    inicia_en: string;
+    zona_horaria: string | null;
+  } | null;
+}
+const interes = ref<Interes | null>(null);
+async function cargarInteres(): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: Interes | null }>(
+      `/api/v1/app/${sesion.slug}/mi/interes`,
+    );
+    interes.value = data.data;
+  } catch {
+    interes.value = null;
+  }
+}
 // Las que puede reservar: sin reservar aún y que su plan incluye (o de pago).
 const disponibles = computed(
   () =>
@@ -347,6 +370,7 @@ onMounted(() => {
   }
   void cuenta.asegurar();
   void cargarClima();
+  void cargarInteres();
 });
 </script>
 
@@ -536,7 +560,12 @@ onMounted(() => {
     >
       <!-- Lo que pide atención -->
       <div
-        v-if="ofrecida || cuenta.waivers.value.length > 0"
+        v-if="
+          ofrecida ||
+          cuenta.waivers.value.length > 0 ||
+          interes?.plan ||
+          interes?.clase
+        "
         class="mt-5 space-y-2"
       >
         <RouterLink
@@ -553,6 +582,33 @@ onMounted(() => {
           class="pi-aviso"
           >{{
             $t("portal.inicio.atencion.firmar", cuenta.waivers.value.length)
+          }}</RouterLink
+        >
+        <!-- Lo que le interesó antes de tener cuenta: continuar sin buscarlo. -->
+        <RouterLink
+          v-if="interes?.clase"
+          :to="{ name: 'mis-reservas', query: { vista: 'reservar' } }"
+          class="pi-aviso"
+          data-prueba="interes-clase"
+          >{{
+            $t("portal.inicio.atencion.interesClase", {
+              clase: interes.clase.nombre ?? "",
+              cuando: cuandoCorto(
+                interes.clase.inicia_en,
+                interes.clase.zona_horaria,
+              ),
+            })
+          }}</RouterLink
+        >
+        <RouterLink
+          v-if="interes?.plan"
+          :to="{ name: 'mis-pagos', hash: '#mp-comprar' }"
+          class="pi-aviso"
+          data-prueba="interes-plan"
+          >{{
+            $t("portal.inicio.atencion.interesPlan", {
+              plan: interes.plan.nombre,
+            })
           }}</RouterLink
         >
       </div>

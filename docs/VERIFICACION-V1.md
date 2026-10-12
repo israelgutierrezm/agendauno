@@ -278,3 +278,28 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
 - [ ] Márcalo «Resuelto». Tras publicar otra versión, repítelo: vuelve a «Abiertos»
   con «Volvió después de resolverse» y llega la alerta «Error que volvió».
 - [ ] Márcalo «Ignorar» y repítelo: se cuenta, pero no llega alerta.
+
+### 12. Pago automático seguro (ADR 0134)
+
+Con Mercado Pago u OpenPay en modo Pruebas y una alumna con pago automático activo.
+
+- [ ] **Quitar y confirmar.** El negocio (o la alumna) quita el pago automático: queda
+  «Cancelando en la pasarela». En menos de 5 minutos
+  (`agendauno:confirmar-cancelaciones`) pasa a cancelado, y en el panel de la pasarela
+  la suscripción aparece cancelada.
+- [ ] **La pasarela no responde.** Con llaves inválidas o sin red hacia la pasarela,
+  quítalo: sigue «Cancelando» y se reintenta (5, 15, 60 minutos…). Tras 5 intentos
+  aparece en «Por conciliar» como «Pago automático sin cancelar en {pasarela}». Con
+  las llaves correctas, el siguiente intento lo confirma y la incidencia se cierra.
+- [ ] **Cobro después de cancelar.** Si la pasarela cobra una cuota ya cancelada,
+  aparece en «Por conciliar» («Cobro después de cancelar») con «Devolver el pago».
+- [ ] **Precio contratado.** Sube el precio del plan. La siguiente renovación se cobra
+  al precio que la alumna autorizó. Ella ve «El precio de tu plan ahora es…» con
+  «Autorizar el nuevo precio» (web y app). Al autorizarlo, Mercado Pago u OpenPay le
+  piden autorizar el nuevo importe (con Stripe queda al momento) y, desde entonces, se
+  cobra el nuevo.
+- [ ] **Importe distinto.** Si la pasarela cobra otro importe u otra moneda que la
+  renovación, nada se liquida solo: aparece en «Por conciliar». Si cobró de menos,
+  «Dar por pagada»; si cobró de más, «Devolver el excedente».
+- [ ] **Reactivar.** Con un pago automático pendiente de autorizar, actívalo de nuevo:
+  la referencia anterior se cancela en la pasarela y queda uno solo.

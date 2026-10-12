@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int|null $permanencia_meses permanencia mínima de una membresía (B04)
  * @property BajaAnticipada|null $baja_anticipada qué paga si da de baja antes (B04)
  * @property int|null $penalizacion_minor la penalización fija, si es por monto (B04)
+ * @property int|null $penalizacion_porcentaje con «meses restantes», qué parte de lo que falte (1–100; ADR 0137)
  */
 class ProductoTenant extends Model
 {
@@ -49,6 +50,8 @@ class ProductoTenant extends Model
         'cobra_inscripcion', 'cobra_anualidad',
         // Permanencia y baja anticipada (B04).
         'permanencia_meses', 'baja_anticipada', 'penalizacion_minor',
+        // Con «meses restantes», qué porcentaje de lo que falte (ADR 0137).
+        'penalizacion_porcentaje',
     ];
 
     /**
@@ -70,6 +73,7 @@ class ProductoTenant extends Model
         'permanencia_meses' => 'integer',
         'baja_anticipada' => BajaAnticipada::class,
         'penalizacion_minor' => 'integer',
+        'penalizacion_porcentaje' => 'integer',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,
         'unidades_por_ciclo' => 'integer',

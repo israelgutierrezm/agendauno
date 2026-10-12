@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ProspectoTenant;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -53,6 +54,12 @@ function formularioPredeterminadoCaptacion(array $e): string
 function prospectosDelNegocioCaptacion(array $e, string $filtros = ''): array
 {
     return test()->getJson("/api/v1/app/{$e['slug']}/prospectos{$filtros}", conBearer($e['bearer']))->assertOk()->json();
+}
+
+/** Corre en la base del negocio de estas pruebas. */
+function enNegocioCaptacionInteres(Closure $hacer): mixed
+{
+    return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-capta')->firstOrFail(), $hacer);
 }
 
 it('quien deja sus datos llega a Prospectos, no a Miembros, con lo que le interesaba', function (): void {
@@ -191,6 +198,41 @@ it('darle acceso crea su ficha e invitación; al activar su cuenta queda convert
         ->assertJsonPath('data.estado', 'convertido');
     expect(collect($this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", conBearer($e['bearer']))->json('data.eventos'))->pluck('tipo')->first())
         ->toBe('convertido');
+});
+
+it('ya con cuenta ve lo que le interesó para continuar, hasta que lo reserva o lo compra (ADR 0137)', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $sesion = crearSesionTenant($e, agendaSemilla($e), 10, '2026-10-02 10:00:00');
+    $pack = crearPackTenant($e);
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion([
+        'interes' => ['sesion' => $sesion, 'producto' => $pack],
+    ]))->assertCreated();
+    $id = prospectosDelNegocioCaptacion($e)['data'][0]['id'];
+    $convertido = $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$id}/convertir", ['invitar' => true], conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    $bearer = (string) $this->postJson("/api/v1/app/{$e['slug']}/activar", [
+        'email' => $convertido['activacion']['email'], 'token' => $convertido['activacion']['token'],
+        'password' => 'secreto123', 'password_confirmation' => 'secreto123',
+    ])->assertCreated()->json('data.token');
+
+    $interes = $this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->assertOk()->json('data');
+    expect($interes['clase']['id'])->toBe($sesion)
+        ->and($interes['plan'])->toMatchArray(['id' => $pack, 'nombre' => 'Pack 8 clases']);
+
+    // Comprado el plan, ya no se le recuerda; reservada la clase, tampoco: nada.
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $convertido['persona']['id'], 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
+    expect($this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->json('data'))->toMatchArray(['plan' => null])
+        ->and($this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->json('data.clase.id'))->toBe($sesion);
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $convertido['persona']['id']], conBearer($e['bearer']))->assertCreated();
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->assertOk()->assertJsonPath('data', null);
+
+    // Pasado un mes de convertirse, ya no se le recuerda nada aunque siga disponible.
+    $otro = crearPackTenant($e);
+    enNegocioCaptacionInteres(fn () => ProspectoTenant::query()->where('ulid', $id)->update(['producto_id' => ProductoTenant::query()->where('ulid', $otro)->value('id')]));
+    expect($this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->json('data.plan.id'))->toBe($otro);
+    $this->travelTo('2026-11-02 07:00:00');
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->assertOk()->assertJsonPath('data', null);
 });
 
 it('sin invitación queda convertido con su ficha; con una ficha existente, se enlaza a esa', function (): void {

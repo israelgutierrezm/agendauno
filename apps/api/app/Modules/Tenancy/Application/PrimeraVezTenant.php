@@ -43,15 +43,30 @@ class PrimeraVezTenant
     public function exigirEnOrden(OrdenTenant $orden): void
     {
         $orden->loadMissing(['lineas.producto', 'lineas.beneficiario', 'persona']);
+        $vistas = [];
         foreach ($orden->lineas as $linea) {
             if ($linea->producto?->primera_vez !== true) {
                 continue;
             }
             $quien = $linea->beneficiario ?? $orden->persona;
-            if ($linea->cantidad > 1 || ! $quien instanceof PersonaTenant || ! $this->elegible($quien)) {
+            // Una sola por persona, aunque la orden la traiga en varias líneas.
+            if ($linea->cantidad > 1 || ! $quien instanceof PersonaTenant || isset($vistas[(int) $quien->getKey()]) || ! $this->elegible($quien)) {
                 throw new PrimeraVezNoDisponible(self::MENSAJE);
             }
+            $vistas[(int) $quien->getKey()] = true;
         }
+    }
+
+    /**
+     * Al cumplir una orden ya pagada: ¿esta persona aún puede recibir su clase de
+     * prueba? Con la persona bloqueada, para que dos órdenes pagadas a la vez (cobradas
+     * antes de que se cumpliera la otra) no le den dos (ADR 0137).
+     */
+    public function aunElegible(PersonaTenant $persona): bool
+    {
+        PersonaTenant::query()->whereKey($persona->getKey())->lockForUpdate()->first();
+
+        return $this->elegible($persona);
     }
 
     public const MENSAJE = 'Esta clase de prueba es solo para quien viene por primera vez, y una sola vez.';
