@@ -282,6 +282,10 @@ cobra otro importe.
 negocio 000129; nada que correr a mano. Las membresías ya vendidas quedan al 100 %, como
 se aceptaron.
 
+**Al desplegar el ADR 0138 (quién atiende a un prospecto):** migración de negocio 000130.
+El programador corre cada hora `agendauno:revisar-prospectos-sin-atender`. La primera
+vez marca los prospectos abiertos que nadie atendió en las últimas 24 h, con su tarea.
+
 ### Imágenes del CI y despliegue desde GitHub
 
 Con `REGISTRO=ghcr.io/<dueño>` en `web.env` (y `docker login ghcr.io` con un token de
