@@ -95,7 +95,12 @@ interface Suscripcion {
     error: string | null;
     // La paga su responsable con su tarjeta (familias, ADR 0129).
     paga?: string | null;
+    // Lo que autorizó y el precio nuevo del plan, si cambió (ADR 0134).
+    monto_minor?: number | null;
+    precio_nuevo_minor?: number | null;
   } | null;
+  // Se quitó y la pasarela aún no confirma que dejó de cobrar (ADR 0134).
+  cancelando_pago_automatico?: boolean;
 }
 
 const { t } = useI18n();
@@ -1110,8 +1115,35 @@ watch(vista, cargar, { immediate: true });
                     >
                       {{ s.pago_automatico.error }}
                     </p>
+                    <p
+                      v-if="
+                        s.pago_automatico.precio_nuevo_minor &&
+                        s.pago_automatico.monto_minor
+                      "
+                      class="text-xs"
+                      :style="{ color: 'var(--aviso)' }"
+                    >
+                      {{
+                        $t("pagoAutomatico.precioNuevoNegocio", {
+                          monto: dinero(
+                            s.pago_automatico.monto_minor,
+                            s.moneda,
+                          ),
+                          nuevo: dinero(
+                            s.pago_automatico.precio_nuevo_minor,
+                            s.moneda,
+                          ),
+                        })
+                      }}
+                    </p>
                   </template>
                   <template v-else>
+                    <span
+                      v-if="s.cancelando_pago_automatico"
+                      class="tu-estado mr-2"
+                      :style="{ '--tono': 'var(--aviso)' }"
+                      >{{ $t("pagoAutomatico.cancelando") }}</span
+                    >
                     <span :style="{ color: 'var(--texto-suave)' }">{{
                       $t("pagoAutomatico.pagoManual")
                     }}</span>

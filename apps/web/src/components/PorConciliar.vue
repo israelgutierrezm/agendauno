@@ -11,6 +11,11 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * devolución que la pasarela no confirmó). Una devolución sin confirmar se resuelve
  * diciendo si la pasarela la hizo o no (se ve en su panel), con una nota. Solo se
  * muestra si hay algo pendiente.
+ *
+ * Del pago automático (ADR 0134): una cancelación que la pasarela no confirma (se
+ * cancela en su panel; se cierra sola al confirmarse), un cobro que llegó tras
+ * cancelar o uno con otro importe (se devuelve, o solo el excedente, o se da por
+ * pagada la renovación).
  */
 interface Incidencia {
   id: string;
@@ -27,11 +32,20 @@ interface Incidencia {
     proveedor: string | null;
     motivo_fallo: string | null;
   } | null;
+  // Del pago automático (ADR 0134).
+  domiciliacion?: {
+    proveedor: string;
+    referencia: string | null;
+    estado: string;
+  } | null;
+  esperado_minor?: number | null;
+  excedente_minor?: number | null;
+  aplicable?: boolean;
 }
 
 const emit = defineEmits<{ cambio: [] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeResolver = computed(() => sesion.puede("pagos.reembolsar"));
@@ -59,6 +73,36 @@ async function cargar(): Promise<void> {
   }
 }
 
+// Qué pasó, en una línea.
+function titulo(i: Incidencia): string {
+  if (i.reembolso) {
+    return t("porConciliar.devolucion", {
+      monto: dinero(i.reembolso.monto_minor, i.reembolso.moneda),
+    });
+  }
+  const monto = i.monto_minor !== null ? dinero(i.monto_minor, i.moneda) : "";
+  switch (i.tipo) {
+    case "cancelacion_sin_confirmar": {
+      const p = i.domiciliacion?.proveedor ?? "";
+      const clave = `porConciliar.pasarelas.${p}`;
+      return t("porConciliar.cancelacionSinConfirmar", {
+        pasarela: te(clave) ? t(clave) : p,
+      });
+    }
+    case "cobro_tras_cancelar":
+      return t("porConciliar.cobroTrasCancelar", { monto });
+    case "monto_distinto":
+      return t("porConciliar.montoDistinto", {
+        monto,
+        esperado: dinero(i.esperado_minor ?? 0, i.moneda),
+      });
+    case "pago_duplicado":
+      return t("porConciliar.pagoDuplicado", { monto });
+    default:
+      return t("porConciliar.pagoTardio", { monto });
+  }
+}
+
 function abrir(i: Incidencia): void {
   abierta.value = abierta.value === i.id ? null : i.id;
   nota.value = "";
@@ -68,7 +112,7 @@ function abrir(i: Incidencia): void {
 async function resolver(
   i: Incidencia,
   reembolso: "aprobado" | "fallido" | null,
-  accion: "devolver" | null = null,
+  accion: "devolver" | "aplicar" | null = null,
 ): Promise<void> {
   if (nota.value.trim() === "") {
     error.value = t("porConciliar.faltaNota");
@@ -107,23 +151,7 @@ defineExpose({ cargar });
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <p class="font-medium">
-              <template v-if="i.reembolso">
-                {{
-                  $t("porConciliar.devolucion", {
-                    monto: dinero(i.reembolso.monto_minor, i.reembolso.moneda),
-                  })
-                }}
-              </template>
-              <template v-else-if="i.monto_minor !== null">
-                {{
-                  $t(
-                    i.tipo === "pago_duplicado"
-                      ? "porConciliar.pagoDuplicado"
-                      : "porConciliar.pagoTardio",
-                    { monto: dinero(i.monto_minor, i.moneda) },
-                  )
-                }}
-              </template>
+              {{ titulo(i) }}
               <template v-if="i.persona"> · {{ i.persona }}</template>
             </p>
             <p class="mt-0.5" :style="{ color: 'var(--texto-suave)' }">
@@ -181,14 +209,34 @@ defineExpose({ cargar });
               </button>
             </template>
             <template v-else>
+              <!-- Un cobro con otro importe o tras cancelar paga la renovación. -->
               <button
-                v-if="i.reembolso === null && i.monto_minor !== null"
+                v-if="i.aplicable"
                 type="button"
                 class="tu-btn tu-btn-primario"
                 :disabled="guardando"
+                @click="resolver(i, null, 'aplicar')"
+              >
+                {{ $t("porConciliar.darPorPagada") }}
+              </button>
+              <button
+                v-if="i.reembolso === null && i.monto_minor !== null"
+                type="button"
+                :class="
+                  i.aplicable
+                    ? 'tu-btn tu-btn-fantasma'
+                    : 'tu-btn tu-btn-primario'
+                "
+                :disabled="guardando"
                 @click="resolver(i, null, 'devolver')"
               >
-                {{ $t("porConciliar.devolverPago") }}
+                {{
+                  i.excedente_minor
+                    ? $t("porConciliar.devolverExcedente", {
+                        monto: dinero(i.excedente_minor, i.moneda),
+                      })
+                    : $t("porConciliar.devolverPago")
+                }}
               </button>
               <button
                 type="button"

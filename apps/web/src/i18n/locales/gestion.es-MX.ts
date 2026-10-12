@@ -448,6 +448,17 @@ export const porConciliar = {
   devolucion: "Devolución de {monto}",
   pagoTardio: "Pago tardío de {monto}",
   pagoDuplicado: "Cobro doble de {monto}",
+  // Pago automático (ADR 0134).
+  cancelacionSinConfirmar: "Pago automático sin cancelar en {pasarela}",
+  cobroTrasCancelar: "Cobro después de cancelar: {monto}",
+  montoDistinto: "Cobro de {monto} por una renovación de {esperado}",
+  pasarelas: {
+    mercadopago: "Mercado Pago",
+    openpay: "OpenPay",
+    stripe: "Stripe",
+  },
+  darPorPagada: "Dar por pagada",
+  devolverExcedente: "Devolver el excedente ({monto})",
   devolverPago: "Devolver el pago",
   resolver: "Resolver",
   nota: "Qué revisaste",
@@ -1182,6 +1193,17 @@ export const pagoAutomatico = {
   confirmarQuitarNegocio:
     "¿Quitar el pago automático de esta membresía? La renovación se le avisará para que la pague.",
   porAutorizar: "Falta autorizarlo en la pasarela",
+  // Se quitó y la pasarela aún no confirma que dejó de cobrar (ADR 0134).
+  cancelando: "Cancelando en la pasarela",
+  cancelandoAyuda:
+    "Pedimos a la pasarela que deje de cobrarlo; puede tardar unos minutos en confirmarlo.",
+  // El precio del plan cambió: se cobra el que autorizó hasta que autorice el nuevo.
+  precioNuevo:
+    "El precio de tu plan ahora es {nuevo}. Tu pago automático sigue cobrando {monto} hasta que autorices el nuevo precio.",
+  precioNuevoNegocio: "Autorizó {monto}; el plan ahora cuesta {nuevo}",
+  autorizarPrecio: "Autorizar el nuevo precio",
+  confirmarPrecio:
+    "¿Autorizar que tu pago automático cobre {nuevo} en cada renovación?",
   numeroTarjeta: "Número de tarjeta",
   titular: "Nombre del titular",
   mes: "Mes",
