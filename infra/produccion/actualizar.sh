@@ -21,14 +21,18 @@
 #    migra.
 # 3. Migra (plataforma y cada negocio) y levanta la versión nueva, todavía en
 #    mantenimiento.
-# 4. Solo la abre si atiende: base, caché, esquema al día, el programador nuevo
-#    latiendo (su latido corre también en mantenimiento) y el worker nuevo en marcha
-#    (en mantenimiento no toma trabajos: cuenta su señal de arranque con la versión),
-#    más una petición real por nginx. Si no, se queda en mantenimiento, no se anota
-#    como actual y sale con error.
-# 5. Ya abierta, confirma que la cola procesa (el latido pasa por ella) y corre la
-#    verificación completa: si falta algo para operar en producción, lo dice y sale
-#    con error (no «Listo»).
+# 4. Antes de abrir, lo crítico (ADR 0135): que atienda (base, caché, esquema al día,
+#    el programador nuevo latiendo, el worker nuevo arrancado y una petición real por
+#    nginx) y que su cola procese un trabajo de prueba (un worker de un solo uso, porque
+#    en mantenimiento el de siempre no toma trabajos). También corre la verificación
+#    completa, que informa.
+# 5. Ya abierta, confirma que el worker de siempre procesa (el latido pasa por él).
+#
+# Si algo crítico falla después del cambio de versión (no atiende, su cola no procesa,
+# antes o después de abrir), avisa al equipo de la plataforma y VUELVE SOLA a la
+# versión anterior (./volver.sh): una versión que falla no se queda abierta ni en
+# mantenimiento. Lo que falta de la verificación completa (de la instalación, no de la
+# versión) solo se avisa y sale con error, sin «Listo».
 #
 # Nunca revierte la base sola: las migraciones se escriben para que la versión
 # anterior siga funcionando con el esquema nuevo; si una no lo fuera, se restaura a
@@ -125,17 +129,21 @@ principal() {
   until disponible; do
     intentos=$((intentos + 1))
     if [ "$intentos" -ge 30 ]; then
-      echo "!! $VERSION no quedó lista en 5 minutos. Sigue en MANTENIMIENTO, sin abrir al público:"
+      echo "!! $VERSION no quedó lista en 5 minutos:"
       $COMPOSE exec -T -u www-data api php artisan agendauno:verificar-produccion --disponibilidad || true
-      echo "   - corrige lo de arriba y ábrela: $COMPOSE exec -u www-data api php artisan up"
-      echo "   - o regresa el código a $ANTERIOR: ./volver.sh $ANTERIOR"
-      echo "     (la base no se revierte; si la migración no fuera compatible con $ANTERIOR,"
-      echo "     restaura los respaldos recién tomados: docs/DESPLIEGUE.md → Restaurar)."
-      anotar "$ANTERIOR -> $VERSION (fallida: no se abrió)"
-      exit 1
+      volver_a_la_anterior "no quedó lista para atender en 5 minutos"
     fi
     sleep 10
   done
+
+  echo "==> Probando la cola de $VERSION antes de abrir"
+  if ! $COMPOSE exec -T -u www-data api php artisan agendauno:probar-cola; then
+    volver_a_la_anterior "su cola no procesó un trabajo de prueba"
+  fi
+
+  echo "==> Verificación completa (antes de abrir; informa)"
+  COMPLETA=0
+  $COMPOSE exec -T -u www-data api php artisan agendauno:verificar-produccion || COMPLETA=1
 
   echo "==> Abriendo $VERSION"
   $COMPOSE exec -T -u www-data api php artisan up
@@ -145,21 +153,58 @@ principal() {
   done
   anotar "$ANTERIOR -> $VERSION"
 
-  echo "==> Confirmando que la cola procesa"
+  echo "==> Confirmando que el worker de siempre procesa"
   if ! cola_procesa; then
-    echo "!! $VERSION está abierta, pero la cola no procesó trabajos en 3 minutos (correos,"
-    echo "   avisos y cobros esperan). Revisa: $COMPOSE logs --tail=100 worker scheduler"
-    echo "   Si es de esta versión, regresa con: ./volver.sh $ANTERIOR"
-    exit 2
+    echo "!! $VERSION está abierta, pero su cola no procesó trabajos en 3 minutos (correos,"
+    echo "   avisos y cobros esperan)."
+    $COMPOSE logs --tail=50 worker scheduler || true
+    volver_a_la_anterior "ya abierta, su cola no procesó trabajos en 3 minutos"
   fi
 
-  echo "==> Verificación completa de producción"
-  if ! $COMPOSE exec -T -u www-data api php artisan agendauno:verificar-produccion; then
+  if [ "$COMPLETA" -ne 0 ]; then
     echo "!! $VERSION está abierta y atiende, pero faltan puntos para operar en producción (arriba)."
-    echo "   Corrígelos. Si fueran de esta versión, regresa con: ./volver.sh $ANTERIOR"
+    echo "   Son de la instalación (no de la versión): corrígelos. Si fueran de esta versión,"
+    echo "   regresa con: ./volver.sh $ANTERIOR"
+    avisar "Despliegue de $VERSION abierto, pero faltan puntos de la verificación de producción: revisa agendauno:verificar-produccion."
     exit 2
   fi
   echo "==> Listo: $VERSION en marcha (la anterior era $ANTERIOR; para regresar: ./volver.sh)"
+}
+
+# Algo crítico falló después del cambio de versión (ADR 0135): se avisa al equipo de la
+# plataforma y se vuelve sola a la anterior, que ya funcionaba (la base no se revierte:
+# las migraciones son compatibles con ella). En una primera instalación no hay a cuál
+# volver: se queda en mantenimiento.
+volver_a_la_anterior() {
+  motivo="$1"
+  if [ -z "$EN_MARCHA" ] || [ "$ANTERIOR" = latest ]; then
+    echo "!! $VERSION $motivo. Primera instalación: no hay versión anterior; sigue en MANTENIMIENTO."
+    echo "   Corrige lo de arriba y ábrela: $COMPOSE exec -u www-data api php artisan up"
+    avisar "Despliegue de $VERSION: $motivo. Primera instalación: quedó en mantenimiento."
+    anotar "$ANTERIOR -> $VERSION (fallida: $motivo)"
+    exit 1
+  fi
+
+  echo "!! $VERSION $motivo: se vuelve sola a $ANTERIOR."
+  avisar "Despliegue de $VERSION: $motivo. Se vuelve sola a $ANTERIOR."
+  anotar "$ANTERIOR -> $VERSION (fallida: $motivo; se vuelve a $ANTERIOR)"
+  # Con las versiones de lo que está en marcha (no las de la versión fallida).
+  if ! (unset VERSION VERSION_WEB VERSION_LANDING_AGENDAUNO VERSION_LANDING_TURNOUNO; ./volver.sh "$ANTERIOR"); then
+    echo "!! No se pudo volver a $ANTERIOR (arriba): revisa el servidor ya (docs/DESPLIEGUE.md → Volver)."
+    avisar "No se pudo volver a $ANTERIOR tras el despliegue fallido de $VERSION: revisa el servidor ya."
+    exit 1
+  fi
+  echo "==> $VERSION no se quedó: $ANTERIOR atiende de nuevo. Motivo: $motivo."
+  echo "   Revisa: $COMPOSE logs --tail=200 api worker scheduler"
+  exit 1
+}
+
+# Avisa al equipo de la plataforma (el correo de alertas). Si la versión en marcha no
+# tiene el comando o no responde, el aviso queda solo en la consola (y en el flujo
+# «Desplegar», que falla).
+avisar() {
+  echo "   Aviso: $1"
+  $COMPOSE exec -T -u www-data api php artisan agendauno:avisar-despliegue "$1" >/dev/null 2>&1 || true
 }
 
 # Publica solo un componente sin estado (la aplicación web o una landing, ADR 0112):
