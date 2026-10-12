@@ -17,3 +17,20 @@ export function useAnchoMinimo(px: number): Ref<boolean> {
   onBeforeUnmount(() => consulta?.removeEventListener("change", alCambiar));
   return cumple;
 }
+
+/**
+ * Lleva a la vista el detalle que se abrió junto a una lista (p. ej. el de la clase en
+ * Recepción), justo debajo de la barra superior, si no lo está ya: así no hay que bajar
+ * a buscarlo. Si su parte de arriba ya se ve en el primer tramo de la pantalla, no se
+ * mueve nada (abrir otra clase no hace saltar la página). Va directo, sin animación: el
+ * detalle carga su contenido al abrirse y eso cortaría un desplazamiento suave a medias.
+ */
+export function llevarALaVista(elemento: HTMLElement | null): void {
+  if (elemento === null || typeof window === "undefined") return;
+  const barra =
+    document.querySelector(".tu-barra-superior")?.getBoundingClientRect()
+      .height ?? 0;
+  const arriba = elemento.getBoundingClientRect().top;
+  if (arriba >= barra && arriba <= barra + window.innerHeight * 0.2) return;
+  window.scrollTo({ top: Math.max(0, window.scrollY + arriba - barra - 16) });
+}
