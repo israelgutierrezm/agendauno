@@ -52,7 +52,11 @@ export interface EventoProspecto {
     | "nota"
     | "seguimiento"
     | "invitado"
-    | "convertido";
+    | "convertido"
+    // Le escribió o le llamó (canal: whatsapp, llamada o correo; ADR 0138).
+    | "contacto"
+    // Su responsable no lo atendió a tiempo (ADR 0138).
+    | "sin_atender";
   detalle: Record<string, unknown>;
   autor: string | null;
   en: string;
@@ -81,6 +85,8 @@ export interface Prospecto {
   responsable: { id: string; nombre: string } | null;
   proximo_seguimiento_en: string | null;
   primer_contacto_en: string | null;
+  // Desde cuándo nadie lo atiende a tiempo (ADR 0138).
+  sin_atender_desde?: string | null;
   motivo_cierre: MotivoCierre | null;
   comentario_cierre: string | null;
   persona: { id: string; nombre: string } | null;

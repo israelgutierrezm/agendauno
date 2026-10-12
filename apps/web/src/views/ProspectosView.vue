@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
+import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -23,9 +24,16 @@ import { useToastStore } from "@/stores/toast";
 
 /**
  * Prospectos (ADR 0117): quien todavía no es cliente y dejó sus datos, aparte de
- * Miembros. Primero lo que pide atención (nuevos y seguimientos vencidos); en el detalle,
- * contactarlo, darle seguimiento, descartarlo con un motivo o darle acceso (su ficha en
- * Miembros y la invitación a su cuenta). No reserva hasta que es miembro.
+ * Miembros. Primero lo que pide atención (nuevos, sin atender y seguimientos vencidos);
+ * en el detalle, contactarlo, darle seguimiento, descartarlo con un motivo o darle
+ * acceso (su ficha en Miembros y la invitación a su cuenta). No reserva hasta que es
+ * miembro.
+ *
+ * Responsable (ADR 0138): se elige con un buscador entre el equipo que atiende
+ * prospectos, o «Asignármelo», y se cambia o se quita cuando se quiera. Escribirle o
+ * llamarle queda en su historia; si nadie lo atiende a tiempo, se marca «sin atender».
+ * La historia distingue cada cosa con su ícono: notas, contactos, cambios de estado,
+ * responsable, seguimiento.
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -36,7 +44,12 @@ const puedeConvertir = computed(() => sesion.puede("prospectos.convertir"));
 const puedeEliminar = computed(() => sesion.puede("prospectos.eliminar"));
 
 const lista = ref<Prospecto[]>([]);
-const resumen = ref({ nuevos: 0, seguimientos_vencidos: 0, abiertos: 0 });
+const resumen = ref({
+  nuevos: 0,
+  seguimientos_vencidos: 0,
+  abiertos: 0,
+  sin_atender: 0,
+});
 const cargando = ref(true);
 const error = ref<string | null>(null);
 // El inicio abre las solicitudes nuevas ya filtradas (`?estado=nuevo`; M08).
@@ -44,6 +57,8 @@ const estadoInicial = useRoute()?.query.estado;
 const filtros = reactive({
   estado: typeof estadoInicial === "string" ? estadoInicial : "abiertos",
   responsable: "",
+  // `sin_atender`: su responsable no lo atendió a tiempo.
+  atencion: "",
   q: "",
 });
 const ESTADOS: EstadoProspecto[] = [
@@ -66,6 +81,7 @@ async function cargar(): Promise<void> {
       params: {
         estado: filtros.estado,
         responsable: filtros.responsable || undefined,
+        atencion: filtros.atencion || undefined,
         q: filtros.q.trim() || undefined,
       },
     });
@@ -86,8 +102,56 @@ watch(
     espera = window.setTimeout(cargar, 300);
   },
 );
-watch(() => [filtros.estado, filtros.responsable], cargar);
-onMounted(cargar);
+watch(() => [filtros.estado, filtros.responsable, filtros.atencion], cargar);
+onMounted(() => {
+  void cargar();
+  void cargarResponsables();
+});
+
+// ---------------------------------------------------------------- responsables
+interface Responsable {
+  id: string;
+  nombre: string;
+  email: string | null;
+}
+const responsables = ref<Responsable[]>([]);
+const buscarResponsable = ref("");
+const eligiendo = ref(false);
+async function cargarResponsables(): Promise<void> {
+  if (!puedeGestionar.value) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: Responsable[] }>(
+      `${base.value}/prospectos/responsables`,
+    );
+    responsables.value = data.data;
+  } catch {
+    responsables.value = [];
+  }
+}
+const normalizar = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase();
+// A quién puede pasarlo: el equipo que atiende prospectos, menos quien ya lo tiene.
+// Al salir del buscador (tocar fuera en el teléfono) se cierra, después de dejar que
+// el toque en una opción la elija.
+function cerrarOpciones(): void {
+  window.setTimeout(() => {
+    eligiendo.value = false;
+  }, 200);
+}
+const candidatos = computed(() => {
+  const q = normalizar(buscarResponsable.value.trim());
+  return responsables.value
+    .filter((r) => r.id !== actual.value?.responsable?.id)
+    .filter(
+      (r) => q === "" || normalizar(`${r.nombre} ${r.email ?? ""}`).includes(q),
+    )
+    .slice(0, 8);
+});
 
 // ---------------------------------------------------------------- formato
 function fecha(iso: string | null, conHora = false): string {
@@ -146,11 +210,33 @@ function textoEvento(e: EventoProspecto): string {
         estado: t(`captacion.prospectos.estados.${String(d.a)}`),
       });
     case "asignado":
-      return d.responsable
-        ? t("captacion.prospectos.eventos.asignado", {
-            responsable: String(d.responsable),
+      if (d.responsable && d.anterior) {
+        return t("captacion.prospectos.eventos.reasignado", {
+          anterior: String(d.anterior),
+          responsable: String(d.responsable),
+        });
+      }
+      if (d.responsable) {
+        return t("captacion.prospectos.eventos.asignado", {
+          responsable: String(d.responsable),
+        });
+      }
+      return d.anterior
+        ? t("captacion.prospectos.eventos.dejoDeAtender", {
+            anterior: String(d.anterior),
           })
         : t("captacion.prospectos.eventos.sinAsignar");
+    case "contacto":
+      return t(`captacion.prospectos.eventos.contacto.${String(d.canal)}`);
+    case "sin_atender":
+      return d.responsable
+        ? t("captacion.prospectos.eventos.sinAtender", {
+            responsable: String(d.responsable),
+            horas: Number(d.horas ?? 0),
+          })
+        : t("captacion.prospectos.eventos.sinAtenderNadie", {
+            horas: Number(d.horas ?? 0),
+          });
     case "seguimiento":
       return d.cuando
         ? t("captacion.prospectos.eventos.seguimiento", {
@@ -162,6 +248,30 @@ function textoEvento(e: EventoProspecto): string {
     default:
       return t(`captacion.prospectos.eventos.${e.tipo}`);
   }
+}
+
+// Cada cosa de la historia con su ícono, para distinguirla de un vistazo.
+const ICONO_EVENTO: Record<EventoProspecto["tipo"], string> = {
+  creado: "captacion",
+  reenvio: "formularios",
+  estado: "etiqueta",
+  asignado: "usuarios",
+  nota: "documentos",
+  seguimiento: "agenda",
+  invitado: "correo",
+  convertido: "hecho",
+  contacto: "mensaje",
+  sin_atender: "reloj",
+};
+function iconoEvento(e: EventoProspecto): string {
+  if (e.tipo === "contacto") {
+    return e.detalle.canal === "llamada"
+      ? "telefono"
+      : e.detalle.canal === "correo"
+        ? "correo"
+        : "mensaje";
+  }
+  return ICONO_EVENTO[e.tipo] ?? "punto";
 }
 
 // ---------------------------------------------------------------- detalle
@@ -242,16 +352,40 @@ async function descartar(): Promise<void> {
   );
   descartando.abierto = false;
 }
-function asignarme(): Promise<void> {
+function asignarA(id: string | null): Promise<void> {
   const p = actual.value;
   if (!p) {
     return Promise.resolve();
   }
+  eligiendo.value = false;
+  buscarResponsable.value = "";
   return aplicar(() =>
     api.put(`${base.value}/prospectos/${p.id}/responsable`, {
-      responsable_id: sesion.usuario?.ulid ?? null,
+      responsable_id: id,
     }),
   );
+}
+// Al abrir WhatsApp, llamar o escribir: queda en su historia (ADR 0138). No detiene
+// el enlace; si falla, el contacto se hizo igual.
+async function registrarContacto(
+  canal: "whatsapp" | "llamada" | "correo",
+): Promise<void> {
+  const p = actual.value;
+  if (!p || !puedeGestionar.value) {
+    return;
+  }
+  try {
+    const { data } = await api.post<{ data: Prospecto }>(
+      `${base.value}/prospectos/${p.id}/contactos`,
+      { canal },
+    );
+    if (actual.value?.id === p.id) {
+      actual.value = data.data;
+    }
+    void cargar();
+  } catch {
+    // Sin registro: el contacto ya se abrió.
+  }
 }
 function guardarSeguimiento(quitar = false): Promise<void> {
   const p = actual.value;
@@ -413,6 +547,19 @@ async function crear(): Promise<void> {
           {{ $t("captacion.prospectos.resumen.nuevos") }}:
           <strong>{{ resumen.nuevos }}</strong>
         </button>
+        <button
+          type="button"
+          class="tu-chip"
+          data-prueba="chip-sin-atender"
+          :aria-pressed="filtros.atencion === 'sin_atender'"
+          @click="
+            filtros.atencion =
+              filtros.atencion === 'sin_atender' ? '' : 'sin_atender'
+          "
+        >
+          {{ $t("captacion.prospectos.resumen.sinAtender") }}:
+          <strong>{{ resumen.sin_atender }}</strong>
+        </button>
         <span class="tu-chip">
           {{ $t("captacion.prospectos.resumen.vencidos") }}:
           <strong>{{ resumen.seguimientos_vencidos }}</strong>
@@ -534,6 +681,14 @@ async function crear(): Promise<void> {
               >
                 {{ $t("captacion.prospectos.vencido") }}
               </span>
+              <span
+                v-if="p.sin_atender_desde"
+                class="tu-estado text-xs"
+                :style="{ '--tono': 'var(--aviso)' }"
+                data-prueba="fila-sin-atender"
+              >
+                {{ $t("captacion.prospectos.resumen.sinAtender") }}
+              </span>
               <span class="tu-sub">{{ fecha(p.creado_en) }}</span>
             </span>
           </button>
@@ -576,25 +731,31 @@ async function crear(): Promise<void> {
           <p v-if="actual.email">{{ actual.email }}</p>
           <p v-if="actual.telefono">{{ actual.telefono }}</p>
           <div class="mt-2 flex flex-wrap gap-2">
-            <a
+            <BotonWhatsApp
               v-if="whatsappDe(actual.telefono)"
-              class="tu-btn"
-              :href="whatsappDe(actual.telefono) ?? undefined"
-              target="_blank"
-              rel="noopener"
-              >{{ $t("captacion.prospectos.acciones.escribir") }}</a
-            >
+              :href="whatsappDe(actual.telefono) ?? ''"
+              :texto="$t('captacion.prospectos.acciones.escribir')"
+              @abrir="registrarContacto('whatsapp')"
+            />
             <a
               v-if="actual.telefono"
-              class="tu-btn"
+              class="tu-btn tu-btn-fantasma"
               :href="`tel:${actual.telefono}`"
-              >{{ $t("captacion.prospectos.acciones.llamar") }}</a
+              data-prueba="llamar"
+              @click="registrarContacto('llamada')"
+              ><IconoNav nombre="telefono" :tam="16" />{{
+                $t("captacion.prospectos.acciones.llamar")
+              }}</a
             >
             <a
               v-if="actual.email"
-              class="tu-btn"
+              class="tu-btn tu-btn-fantasma"
               :href="`mailto:${actual.email}`"
-              >{{ $t("captacion.prospectos.acciones.correo") }}</a
+              data-prueba="enviar-correo"
+              @click="registrarContacto('correo')"
+              ><IconoNav nombre="correo" :tam="16" />{{
+                $t("captacion.prospectos.acciones.correo")
+              }}</a
             >
           </div>
           <p
@@ -661,15 +822,79 @@ async function crear(): Promise<void> {
                 $t("captacion.prospectos.sinResponsable")
               }}
             </p>
-            <button
-              v-if="actual.responsable?.id !== sesion.usuario?.ulid"
-              type="button"
-              class="tu-enlace mt-1"
-              :disabled="accionando"
-              @click="asignarme"
+            <p
+              v-if="actual.sin_atender_desde"
+              class="tu-estado mt-1 text-sm"
+              :style="{ '--tono': 'var(--aviso)' }"
+              data-prueba="aviso-sin-atender"
             >
-              {{ $t("captacion.prospectos.acciones.asignarme") }}
-            </button>
+              {{
+                $t("captacion.prospectos.detalle.sinAtenderDesde", {
+                  fecha: fecha(actual.sin_atender_desde, true),
+                })
+              }}
+            </p>
+            <div class="mt-2 grid gap-2 sm:flex sm:flex-wrap sm:items-start">
+              <div class="relative w-full sm:w-72">
+                <input
+                  v-model="buscarResponsable"
+                  class="tu-input"
+                  type="search"
+                  autocomplete="off"
+                  data-prueba="buscar-responsable"
+                  :placeholder="
+                    $t('captacion.prospectos.acciones.buscarResponsable')
+                  "
+                  :aria-label="
+                    $t('captacion.prospectos.acciones.buscarResponsable')
+                  "
+                  @focus="eligiendo = true"
+                  @blur="cerrarOpciones"
+                  @keydown.escape="eligiendo = false"
+                />
+                <ul
+                  v-if="eligiendo"
+                  class="tu-card pr-opciones"
+                  role="listbox"
+                  data-prueba="opciones-responsable"
+                >
+                  <li v-for="r in candidatos" :key="r.id">
+                    <button
+                      type="button"
+                      role="option"
+                      class="pr-opcion"
+                      :disabled="accionando"
+                      @click="asignarA(r.id)"
+                    >
+                      <span>{{ r.nombre }}</span>
+                      <span v-if="r.email" class="tu-sub">{{ r.email }}</span>
+                    </button>
+                  </li>
+                  <li v-if="candidatos.length === 0" class="pr-vacio">
+                    {{ $t("captacion.prospectos.acciones.sinCoincidencias") }}
+                  </li>
+                </ul>
+              </div>
+              <button
+                v-if="actual.responsable?.id !== sesion.usuario?.ulid"
+                type="button"
+                class="tu-btn tu-btn-fantasma"
+                :disabled="accionando"
+                data-prueba="asignarme"
+                @click="asignarA(sesion.usuario?.ulid ?? null)"
+              >
+                {{ $t("captacion.prospectos.acciones.asignarme") }}
+              </button>
+              <button
+                v-if="actual.responsable"
+                type="button"
+                class="tu-enlace self-center"
+                :disabled="accionando"
+                @click="asignarA(null)"
+              >
+                {{ $t("captacion.prospectos.acciones.quitarResponsable") }}
+              </button>
+            </div>
           </section>
 
           <section>
@@ -685,7 +910,7 @@ async function crear(): Promise<void> {
               />
               <button
                 type="button"
-                class="tu-btn"
+                class="tu-btn tu-btn-fantasma"
                 :disabled="accionando"
                 @click="guardarSeguimiento()"
               >
@@ -707,7 +932,7 @@ async function crear(): Promise<void> {
             <button
               v-if="actual.estado === 'nuevo'"
               type="button"
-              class="tu-btn"
+              class="tu-btn tu-btn-fantasma"
               :disabled="accionando"
               @click="cambiarEstado('en_seguimiento')"
             >
@@ -719,7 +944,7 @@ async function crear(): Promise<void> {
                 actual.estado !== 'invitacion_enviada'
               "
               type="button"
-              class="tu-btn"
+              class="tu-btn tu-btn-fantasma"
               :disabled="accionando"
               @click="cambiarEstado('aprobado')"
             >
@@ -736,7 +961,7 @@ async function crear(): Promise<void> {
             </button>
             <button
               type="button"
-              class="tu-btn"
+              class="tu-btn tu-btn-fantasma"
               :disabled="accionando"
               @click="descartando.abierto = !descartando.abierto"
             >
@@ -854,7 +1079,7 @@ async function crear(): Promise<void> {
             />
             <button
               type="submit"
-              class="tu-btn justify-self-start"
+              class="tu-btn tu-btn-fantasma justify-self-start"
               :disabled="accionando || nota.trim() === ''"
             >
               {{ $t("captacion.prospectos.acciones.anotar") }}
@@ -864,7 +1089,7 @@ async function crear(): Promise<void> {
         <button
           v-else-if="puedeGestionar && actual.estado === 'descartado'"
           type="button"
-          class="tu-btn justify-self-start"
+          class="tu-btn tu-btn-fantasma justify-self-start"
           :disabled="accionando"
           @click="cambiarEstado('en_seguimiento')"
         >
@@ -875,13 +1100,38 @@ async function crear(): Promise<void> {
           <h3 class="tu-label">
             {{ $t("captacion.prospectos.detalle.historial") }}
           </h3>
-          <ol class="grid gap-2">
-            <li v-for="(e, i) in actual.eventos" :key="i">
-              <span>{{ textoEvento(e) }}</span>
-              <span class="tu-sub">
-                {{ fecha(e.en, true)
-                }}<template v-if="e.autor"> · {{ e.autor }}</template>
+          <ol class="pr-historia" data-prueba="historial-prospecto">
+            <li
+              v-for="(e, i) in actual.eventos"
+              :key="i"
+              class="pr-evento"
+              :data-tipo="e.tipo"
+            >
+              <span class="pr-icono">
+                <IconoNav :nombre="iconoEvento(e)" :tam="15" />
               </span>
+              <div class="min-w-0">
+                <p
+                  :class="{
+                    'pr-nota': e.tipo === 'nota',
+                    'pr-alerta': e.tipo === 'sin_atender',
+                  }"
+                >
+                  <span
+                    v-if="e.tipo === 'estado'"
+                    class="tu-estado"
+                    :style="{
+                      '--tono': tono(String(e.detalle.a) as EstadoProspecto),
+                    }"
+                    >{{ textoEvento(e) }}</span
+                  >
+                  <template v-else>{{ textoEvento(e) }}</template>
+                </p>
+                <span class="tu-sub">
+                  {{ fecha(e.en, true)
+                  }}<template v-if="e.autor"> · {{ e.autor }}</template>
+                </span>
+              </div>
             </li>
           </ol>
         </section>
@@ -993,5 +1243,64 @@ async function crear(): Promise<void> {
 }
 .tu-chip[aria-pressed="true"] {
   border-color: var(--acento);
+}
+/* Elegir responsable: la lista se abre al enfocar o escribir (sin depender del mouse). */
+.pr-opciones {
+  position: absolute;
+  z-index: 20;
+  margin-top: 0.25rem;
+  width: 100%;
+  max-height: 14rem;
+  overflow: auto;
+  padding: 0.25rem;
+}
+.pr-opcion {
+  display: grid;
+  width: 100%;
+  gap: 0.05rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.6rem;
+  text-align: left;
+}
+.pr-opcion:hover,
+.pr-opcion:focus-visible {
+  background: var(--superficie-2);
+}
+.pr-vacio {
+  padding: 0.55rem 0.75rem;
+  color: var(--texto-suave);
+}
+/* Historia: cada cosa con su ícono; las notas, como nota. */
+.pr-historia {
+  display: grid;
+  gap: 0.75rem;
+}
+.pr-evento {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+}
+.pr-icono {
+  display: inline-flex;
+  width: 1.9rem;
+  height: 1.9rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  color: var(--texto-suave);
+  background: var(--superficie);
+}
+.pr-nota {
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--borde);
+  border-radius: 0.5rem;
+  background: var(--superficie-2);
+  white-space: pre-line;
+}
+.pr-alerta {
+  color: var(--aviso);
+  font-weight: 500;
 }
 </style>

@@ -1730,7 +1730,7 @@ onMounted(cargar);
                   <p>{{ $t("reservar.sinHuecos") }}</p>
                   <button
                     type="button"
-                    class="tu-btn"
+                    class="tu-btn tu-btn-fantasma"
                     :disabled="buscandoSiguiente"
                     data-prueba="siguiente-horario"
                     @click="buscarSiguienteHorario"

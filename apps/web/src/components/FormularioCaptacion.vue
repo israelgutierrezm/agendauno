@@ -178,7 +178,11 @@ onMounted(cargar);
       <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
         {{ mensaje }}
       </p>
-      <button type="button" class="tu-btn mt-4" @click="otraVez">
+      <button
+        type="button"
+        class="tu-btn tu-btn-fantasma mt-4"
+        @click="otraVez"
+      >
         {{ t("captacion.publico.otraVez") }}
       </button>
     </div>

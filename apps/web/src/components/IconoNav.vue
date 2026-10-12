@@ -263,6 +263,11 @@ const RUTAS: Record<string, string[]> = {
   intercambio: ["M7 4 4 7l3 3", "M4 7h13", "M17 20l3-3-3-3", "M20 17H7"],
   // Actualizar: la flecha que vuelve sobre sí misma.
   actualizar: ["M20 12a8 8 0 1 1-2.34-5.66", "M20 4v4.5h-4.5"],
+  // Llamada y correo (historia de un prospecto).
+  telefono: [
+    "M6.5 3.5h3l1.5 4-2 1.25a10.5 10.5 0 0 0 6.25 6.25l1.25-2 4 1.5v3a2 2 0 0 1-2 2A15.5 15.5 0 0 1 4.5 5.5a2 2 0 0 1 2-2z",
+  ],
+  correo: ["M4 6.5h16v11H4z", "M4.5 7l7.5 6 7.5-6"],
 };
 </script>
 
