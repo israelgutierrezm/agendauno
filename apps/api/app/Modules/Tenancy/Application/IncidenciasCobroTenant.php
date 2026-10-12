@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
@@ -75,6 +76,49 @@ class IncidenciasCobroTenant
         }
 
         return $incidencia;
+    }
+
+    /**
+     * Abre la incidencia de un pago automático (ADR 0134): una cancelación que la
+     * pasarela no confirma, o un cobro suyo que no se esperaba o con otro importe. Con
+     * la referencia del cobro, una sola por cobro (aunque ya se haya resuelto); sin
+     * ella, una abierta a la vez.
+     *
+     * @param  array<string, mixed>  $datos
+     */
+    public function porDomiciliacion(
+        string $tipo,
+        DomiciliacionTenant $domiciliacion,
+        string $detalle,
+        array $datos = [],
+        ?PagoTenant $pago = null,
+        ?string $referencia = null,
+    ): IncidenciaCobroTenant {
+        $existente = IncidenciaCobroTenant::query()
+            ->where('tipo', $tipo)
+            ->where('domiciliacion_id', $domiciliacion->getKey())
+            ->when(
+                $referencia !== null,
+                fn ($q) => $q->where('referencia_externa', $referencia),
+                fn ($q) => $q->where('estado', IncidenciaCobroTenant::ABIERTA),
+            )
+            ->first();
+        if ($existente instanceof IncidenciaCobroTenant) {
+            return $existente;
+        }
+
+        $this->alertar($tipo, $detalle);
+
+        return IncidenciaCobroTenant::query()->create([
+            'tipo' => $tipo,
+            'estado' => IncidenciaCobroTenant::ABIERTA,
+            'pago_id' => $pago?->getKey(),
+            'orden_id' => $pago?->orden_id,
+            'domiciliacion_id' => $domiciliacion->getKey(),
+            'referencia_externa' => $referencia,
+            'detalle' => $detalle,
+            'datos' => $datos,
+        ]);
     }
 
     /**

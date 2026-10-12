@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Tenancy\Application\CobroRecurrenteTenant;
+use App\Modules\Tenancy\Application\ConciliarSuscripcionTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
@@ -24,20 +25,24 @@ class CobrarSuscripciones extends Command
 
     protected $description = 'Cobra las renovaciones recurrentes vencidas y reintenta a los morosos';
 
-    public function handle(CobroRecurrenteTenant $cobro, GestorDeConexionTenant $gestor, RegistroDePasarelasTenant $pasarelas): int
+    public function handle(CobroRecurrenteTenant $cobro, GestorDeConexionTenant $gestor, RegistroDePasarelasTenant $pasarelas, ConciliarSuscripcionTenant $suscripciones): int
     {
         $totales = ['cobrados' => 0, 'pendientes' => 0, 'fallidos' => 0];
 
         Estudio::query()
             ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
-            ->chunkById(100, function (Collection $estudios) use (&$totales, $cobro, $gestor, $pasarelas): void {
+            ->chunkById(100, function (Collection $estudios) use (&$totales, $cobro, $gestor, $pasarelas, $suscripciones): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
                     if (! $gestor->baseDeDatosExiste($estudio)) {
                         continue;
                     }
 
-                    $resumen = $gestor->ejecutarAislado($estudio, function () use ($cobro, $pasarelas): array {
+                    $resumen = $gestor->ejecutarAislado($estudio, function () use ($cobro, $pasarelas, $suscripciones): array {
+                        // Lo que cobró una suscripción que se cancela o ya se canceló
+                        // (ADR 0134): aunque el negocio ya no cobre en línea.
+                        $suscripciones->conciliarCanceladas();
+
                         // Pasarela en línea lista del estudio (nunca manual ni ventanilla: no
                         // cobrarían de verdad).
                         $proveedor = $pasarelas->enLinea();

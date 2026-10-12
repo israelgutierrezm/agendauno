@@ -192,7 +192,12 @@ class CobroRecurrenteTenant
             return 'fallido';
         }
         if ($resultado !== 'sin_cambios') {
-            return $resultado;
+            // Un cobro con otro importe espera que el negocio lo revise (ADR 0134).
+            return $resultado === 'por_revisar' ? 'pendiente' : $resultado;
+        }
+        // Ese cobro ya llegó: no se le dice al cliente que no lo hemos recibido.
+        if ($this->suscripciones->enRevision($acuerdo)) {
+            return 'pendiente';
         }
 
         $limite = Carbon::parse(app(FechasNegocioTenant::class)->hoy())->subDays($this->parametros->entero('cobranza.dias_gracia_pago_automatico'));

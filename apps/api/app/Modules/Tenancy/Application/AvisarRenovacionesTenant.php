@@ -23,7 +23,9 @@ use Illuminate\Support\Facades\DB;
  * (`membresias.dias_aviso_renovacion`, ADR 0047) de que se renueve una membresía, el alumno recibe cuándo y cuánto (evento
  * `membresia.renovacion_proxima`, que las plantillas convierten en correo).
  *
- * - Con pago automático, solo se le avisa que se cobrará solo (a su tarjeta).
+ * - Con pago automático, solo se le avisa que se cobrará solo (a su tarjeta), con el
+ *   precio que autorizó; si el del plan cambió, se le dice cuál es y que puede
+ *   autorizarlo en su cuenta (ADR 0134).
  * - Si paga a mano, se genera desde ahora la orden de renovación (la misma que usará
  *   el cobro de ese día), para que pueda pagarla por adelantado en su cuenta o en
  *   recepción; al pagarla, la renovación avanza al siguiente periodo.
@@ -40,6 +42,7 @@ class AvisarRenovacionesTenant
         private readonly RegistroDePasarelasTenant $pasarelas,
         private readonly GestorDeConexionTenant $gestor,
         private readonly ParametrosTenant $parametros,
+        private readonly DomiciliacionesTenant $domiciliaciones,
     ) {}
 
     public function ejecutar(?CarbonImmutable $hoy = null): int
@@ -97,8 +100,16 @@ class AvisarRenovacionesTenant
             if ($domiciliacion instanceof DomiciliacionTenant) {
                 // Se cobra solo ese día: no se abre la deuda antes (una suscripción de la
                 // pasarela cobra por su cuenta y pagarla a mano la cobraría dos veces).
-                $monto = DatosDeOrden::dinero((int) $producto->precio_minor, (string) ($producto->moneda ?: 'MXN'));
+                // Con el precio que autorizó (su precio contratado).
+                $moneda = (string) ($producto->moneda ?: 'MXN');
+                $contratado = $this->domiciliaciones->precioContratado($acuerdo);
+                $monto = DatosDeOrden::dinero($contratado['monto_minor'] ?? (int) $producto->precio_minor, $moneda);
                 $comoPagar = self::comoPagarAutomatico($domiciliacion);
+                $nuevo = $this->domiciliaciones->nuevoPrecio($acuerdo);
+                if ($nuevo !== null) {
+                    $comoPagar .= ' El precio de tu plan ahora es '.DatosDeOrden::dinero($nuevo, $moneda)
+                        .": tu pago automático seguirá cobrando {$monto} hasta que autorices el nuevo precio en tu cuenta.";
+                }
             } else {
                 $orden = $this->deudas->de($acuerdo);
                 if ($orden === null) {

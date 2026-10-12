@@ -199,8 +199,11 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultab
             $estado = (string) ($pago['status'] ?? '');
             $monto = MontoDecimal::aCentavos((float) ($cuota['transaction_amount'] ?? 0));
 
+            $moneda = CobroDeSuscripcion::monedaDe($cuota['currency_id'] ?? null);
+            $fecha = CobroDeSuscripcion::fechaDe($cuota['debit_date'] ?? $cuota['date_created'] ?? null);
+
             if ($estado === 'approved') {
-                $cobros[] = new CobroDeSuscripcion((string) ($pago['id'] ?? $cuota['id'] ?? ''), true, $monto);
+                $cobros[] = new CobroDeSuscripcion((string) ($pago['id'] ?? $cuota['id'] ?? ''), true, $monto, null, $moneda, $fecha);
             } elseif ($estado === 'rejected') {
                 // Cada reintento rechazado cuenta una vez (Mercado Pago reintenta la cuota).
                 $cobros[] = new CobroDeSuscripcion(
@@ -208,6 +211,8 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultab
                     false,
                     $monto,
                     self::motivoRechazo((string) ($pago['status_detail'] ?? '')),
+                    $moneda,
+                    $fecha,
                 );
             }
         }

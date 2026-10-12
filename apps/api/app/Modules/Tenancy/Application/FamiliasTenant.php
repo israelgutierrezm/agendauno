@@ -70,6 +70,7 @@ class FamiliasTenant
     /** Activa o apaga la función y guarda el texto; si el texto cambia, sube la versión. */
     public function guardarConfiguracion(bool $activo, ?string $texto, ?Usuario $actor): ConfiguracionFamiliasTenant
     {
+        $estaban = $this->activas();
         $config = ConfiguracionFamiliasTenant::query()->first() ?? new ConfiguracionFamiliasTenant(['version' => 1]);
         $antes = ['activo' => (bool) $config->activo, 'version' => (int) $config->version];
         $nuevo = trim((string) $texto) !== '' ? trim((string) $texto) : null;
@@ -85,6 +86,12 @@ class FamiliasTenant
 
         $this->auditoria->registrar($actor, 'familias.configuracion', 'configuracion_familias', null, $antes,
             ['activo' => $activo, 'version' => (int) $config->version]);
+
+        // Apagadas: ningún responsable sigue pagando por otro; sus pagos automáticos se
+        // quitan ya, también en la pasarela, sin esperar a la renovación (ADR 0134).
+        if ($estaban && ! $activo) {
+            app(DomiciliacionesTenant::class)->alApagarFamilias();
+        }
 
         return $config;
     }
