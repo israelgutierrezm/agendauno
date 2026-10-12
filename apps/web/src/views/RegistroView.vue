@@ -11,7 +11,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, camposConError, mensajeDeError } from "@/lib/api";
-import { conAtribucion } from "@/lib/atribucion";
+import { camposDeMedicion } from "@/lib/etiquetas";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { tokenRecaptcha } from "@/lib/recaptcha";
 import { ladaDe, separarTelefono, unirTelefono } from "@/lib/ladas";
@@ -432,10 +432,13 @@ async function enviar(): Promise<void> {
   error.value = null;
   try {
     const recaptchaToken = await tokenRecaptcha("registro");
+    // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
+    const medicion = await camposDeMedicion(`plataforma:${producto}`);
     const { data } = await api.post<{
       data: {
         estudio: { slug: string; nombre: string };
         activacion: { email: string; token: string } | null;
+        medicion?: { eventos?: Record<string, string> };
       };
     }>(
       "/api/v1/registro",
@@ -466,8 +469,7 @@ async function enviar(): Promise<void> {
         acepta_terminos: aceptaTerminos.value,
         aviso_version: legales.value.versiones?.aviso_privacidad?.version,
         terminos_version: legales.value.versiones?.terminos?.version,
-        // De dónde llegó a registrarse (ADR 0142): su primer origen y su último toque.
-        ...conAtribucion(`plataforma:${producto}`),
+        ...medicion,
       },
       // Crear el negocio aprovisiona su base completa: puede tardar más que el
       // límite general de 30 s. Se espera más que el servidor (60 s): si la web se
@@ -477,11 +479,20 @@ async function enviar(): Promise<void> {
     creado.value = data.data.estudio;
     activacion.value = data.data.activacion;
     correo.value = contactoEmail.value;
+    // Con los identificadores del servidor: el píxel manda los mismos y Meta los
+    // deduplica con las conversiones del servidor (ADR 0143).
+    const eventos = data.data.medicion?.eventos ?? {};
     trackEvent(
       "tenant_created",
       conIntencion({
         business_profile: perfilNegocio.value,
         mode: modoDelGiro.value,
+        ...(eventos.negocio_creado
+          ? { evento_negocio_creado: eventos.negocio_creado }
+          : {}),
+        ...(eventos.prueba_iniciada
+          ? { evento_prueba_iniciada: eventos.prueba_iniciada }
+          : {}),
       }),
     );
   } catch (e) {

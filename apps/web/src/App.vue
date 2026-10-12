@@ -12,6 +12,7 @@ import LayoutConfiguracion from "@/components/LayoutConfiguracion.vue";
 import NavLateral from "@/components/NavLateral.vue";
 import PestanasArea from "@/components/PestanasArea.vue";
 import AppToaster from "@/components/AppToaster.vue";
+import AvisoMedicion from "@/components/AvisoMedicion.vue";
 import AvisoSinSucursal from "@/components/AvisoSinSucursal.vue";
 import BarraParticipante from "@/components/BarraParticipante.vue";
 import CuentaLateral from "@/components/CuentaLateral.vue";
@@ -521,6 +522,8 @@ onMounted(() => {
 
   <!-- Notificaciones flotantes (toasts), montadas una sola vez para toda la app. -->
   <AppToaster />
+  <!-- Preferencias de medición de las páginas públicas (ADR 0143). -->
+  <AvisoMedicion v-if="!esEmbebido" />
   <!-- Confirmaciones dentro de la app (lib/confirmar.ts). -->
   <DialogoConfirmar />
   <PanelApariencia :abierto="menuApariencia" @cerrar="menuApariencia = false" />

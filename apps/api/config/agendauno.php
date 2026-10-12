@@ -204,4 +204,24 @@ return [
         'apertura_comercial' => (bool) env('APERTURA_COMERCIAL', false),
     ],
 
+    /*
+    | Medición con Google Analytics 4 y Meta (ADR 0143). Los IDs y secretos de cada
+    | destino se configuran en el superadmin (los del SaaS, por producto) y en
+    | Integraciones de cada negocio (los suyos), no aquí.
+    | - `meta_version`: versión de la Graph API para la Conversions API.
+    | - `enviar_fuera_de_produccion`: fuera de producción nada sale a un destino real
+    |   (se registra como omitido); encenderlo solo en un entorno de pruebas con
+    |   destinos de prueba.
+    | - `retencion_identificadores_dias`: después, se borran del contexto los
+    |   identificadores del navegador (client_id, fbp, fbc, agente e IP).
+    */
+    'medicion' => [
+        'meta_version' => env('MEDICION_META_VERSION', 'v26.0'),
+        'ga4_url' => env('MEDICION_GA4_URL', 'https://www.google-analytics.com'),
+        'meta_url' => env('MEDICION_META_URL', 'https://graph.facebook.com'),
+        'enviar_fuera_de_produccion' => (bool) env('MEDICION_ENVIAR_FUERA_DE_PRODUCCION', false),
+        'retencion_identificadores_dias' => (int) env('MEDICION_RETENCION_DIAS', 120),
+        'timeout' => 5,
+    ],
+
 ];

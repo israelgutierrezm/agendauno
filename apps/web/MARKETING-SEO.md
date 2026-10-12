@@ -186,7 +186,14 @@ No hay una propiedad conectada automáticamente. Si se utiliza verificación por
 
 ## Embudo y medición
 
-La integración existente emite eventos a `window.dataLayer`, al evento local `agendauno:analytics` y, si se configura, a `VITE_ANALYTICS_ENDPOINT`. Sin un receptor o un gestor de etiquetas configurado no existe un panel de métricas ni almacenamiento persistente. No se instala GA4 ni se envían datos a una cuenta externa nueva.
+La integración interna emite eventos al evento local `agendauno:analytics` y, si se configura, a `VITE_ANALYTICS_ENDPOINT` (y a `window.dataLayer` mientras gtag no esté cargado).
+
+**GA4 y Meta (ADR 0143).** Los IDs de cada producto se configuran en el superadmin → Medición, no al compilar.
+
+- Solo se cargan con la autorización de quien visita, pedida en «Tu privacidad»: analítica para GA4, publicidad para Meta.
+- Se manda una `page_view` por navegación, desde el router.
+- Del navegador salen `inicio_registro` y, en Meta, `CompleteRegistration` y `StartTrial` con el `event_id` del servidor.
+- El servidor manda lo confirmado: negocio creado, prueba iniciada, activación operativa y primera suscripción pagada.
 
 La modalidad viaja siempre como `mode`, con solo dos valores: `clases` o `citas` (nunca `modo`).
 
@@ -200,7 +207,7 @@ La modalidad viaja siempre como `mode`, con solo dos valores: `clases` o `citas`
 | Error             | `studio_registration_failed`            | `step`, `mode_intent`, `business_profile_intent`                                                             |
 | Registro          | `tenant_created`                        | `business_profile`, `mode` (la modalidad del giro elegido), `mode_intent`, `business_profile_intent`         |
 | Activación        | `tenant_activated`                      | API confirma activación                                                                                      |
-| Pago              | Pendiente de conectar del lado servidor | Confirmación real de la pasarela, no clic ni retorno del navegador                                          |
+| Pago              | `purchase` / `Purchase` desde el servidor (ADR 0143) | Primer cargo de la suscripción realmente pagado, no clic ni retorno del navegador                     |
 
 Los `placement` de `marketing_cta_clicked`: `navigation` («Probar gratis» del menú), `hero`, `product_demo`, `features` («Probar en mi negocio»), `business_carousel`, `operations`, `pricing`, `pricing_card`, `public_page`, `final`, `solution_hero` y `solution_final`. Comparar `mode_intent` con `mode` de `tenant_created` muestra quién llegó por una modalidad y registró otra.
 
@@ -216,7 +223,7 @@ Los `placement` de `marketing_cta_clicked`: `navigation` («Probar gratis» del 
 
 Las rutas de activación y operación se agrupan, sin slugs, IDs ni parámetros de URL en `page_path`. No incluir emails, teléfonos, nombres ni datos sensibles en eventos o campañas UTM. El endpoint debe aplicar validación, límites, retención y los controles de privacidad correspondientes; revisar consentimiento antes de activar un proveedor externo.
 
-Para completar el embudo hasta pago: instrumentar la confirmación de suscripción del backend con deduplicación por ID de transacción y primera suscripción pagada por negocio. Usar identificadores internos en un almacén autorizado; no enviarlos a terceros sin revisión. Las cuentas únicas y cohortes requieren esa integración: no calcularlas contando clics. Separar pagos de la suscripción SaaS de cobros que cada negocio recibe de sus propios clientes.
+El embudo hasta el pago ya sale del servidor (ADR 0143). La primera suscripción pagada se manda una vez por negocio, con el ulid del cargo como `transaction_id`. Los pagos de la suscripción del SaaS van a los destinos de la plataforma. Los cobros que cada negocio recibe de sus clientes van solo a los destinos de ese negocio (Integraciones → Medición).
 
 ## Validación comercial posterior
 

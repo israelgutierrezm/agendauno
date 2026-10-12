@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Requests;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\Medicion\Atribucion;
+use App\Modules\Tenancy\Medicion\IdentificadoresNavegador;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Foundation\Http\FormRequest;
@@ -84,6 +85,8 @@ class RegistrarEstudioRequest extends FormRequest
             'sitio_web' => ['prohibited'],
             // De dónde llegó quien registra (ADR 0142).
             ...Atribucion::reglas(),
+            // Sus preferencias de medición y los identificadores que permitió (ADR 0143).
+            ...IdentificadoresNavegador::reglas(),
         ];
     }
 

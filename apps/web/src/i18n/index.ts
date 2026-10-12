@@ -88,6 +88,8 @@ import detalleCita from "./locales/detalleCita.es-MX";
 import configuracionInicial from "./locales/configuracionInicial.es-MX";
 import modalidadNegocio from "./locales/modalidad.es-MX";
 import detalleClase from "./locales/detalleClase.es-MX";
+// Medición con GA4 y Meta (ADR 0142 y 0143).
+import medicion from "./locales/medicion.es-MX";
 import paseLista from "./locales/paseLista.es-MX";
 import listadosVisual from "./locales/listadosVisual.es-MX";
 import sucursalOperativa from "./locales/sucursalOperativa.es-MX";
@@ -211,6 +213,7 @@ const mensajesBase = {
   documentosVisual,
   sucursalesVisual,
   comunicacionesVisual,
+  medicion,
 };
 
 export const i18n = createI18n({

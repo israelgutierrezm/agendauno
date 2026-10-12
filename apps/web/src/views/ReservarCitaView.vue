@@ -12,7 +12,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { api, mensajeDeError, noEncontrado } from "@/lib/api";
-import { conAtribucion } from "@/lib/atribucion";
+import { camposDeMedicion } from "@/lib/etiquetas";
 import { separarTelefono } from "@/lib/ladas";
 import { esDeOtraModalidad } from "@/lib/modalidad";
 import { useRetornoPago } from "@/lib/retornoPago";
@@ -878,8 +878,8 @@ async function agendar(): Promise<void> {
           ? { acepta_whatsapp: true }
           : {}),
         ...cita,
-        // De dónde llegó (ADR 0142): se guarda con su cita.
-        ...conAtribucion(`negocio:${slug.value.toLowerCase()}`),
+        // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
+        ...(await camposDeMedicion(`negocio:${slug.value.toLowerCase()}`)),
       });
       resultado.value = data.data;
     }
