@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
@@ -19,7 +19,7 @@ import TarjetasIndicadores, {
 import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
-import { useAnchoMinimo } from "@/lib/pantalla";
+import { llevarALaVista, useAnchoMinimo } from "@/lib/pantalla";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -93,8 +93,18 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const sesionActiva = ref<SesionDia | null>(null);
 
+// En escritorio el detalle va a la derecha, a la altura de la lista (debajo de los
+// indicadores): al abrir una clase se baja hasta él, sin buscarlo con el scroll.
+const detalle = ref<HTMLElement | null>(null);
+async function mostrarDetalle(): Promise<void> {
+  if (!esEscritorio.value) return;
+  await nextTick();
+  llevarALaVista(detalle.value);
+}
+
 function abrir(s: SesionDia): void {
   sesionActiva.value = s;
+  void mostrarDetalle();
 }
 
 /** "Jueves, 24 de septiembre" */
@@ -317,6 +327,8 @@ async function cargar(enSegundoPlano = false): Promise<void> {
       sesionPedida = null;
       if (pedida !== undefined) {
         sesionActiva.value = pedida;
+        // Llegó a esta clase («Pasar lista» desde el Inicio): a la vista.
+        void mostrarDetalle();
       }
     }
     // En escritorio siempre hay una clase a la vista (la que sigue).
@@ -767,8 +779,10 @@ onMounted(async () => {
         <!-- Detalle de la clase (escritorio): al lado, sobre fondo gris -->
         <div
           v-if="esEscritorio"
+          ref="detalle"
           class="border-l"
           :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
+          data-prueba="detalle-clase"
         >
           <PanelClase
             v-if="sesionActiva"
