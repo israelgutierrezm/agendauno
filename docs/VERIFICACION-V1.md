@@ -312,6 +312,38 @@ de GA4 de prueba y un píxel con código de «Eventos de prueba».
 - [ ] **Falla del proveedor.** Con un token inválido el envío queda «Con error: el token
   o el secreto no sirve», aparece la alerta y el registro siguió sin esperar.
 
+### 14. GA4 y Meta de un negocio (ADR 0143)
+
+En el entorno de pruebas del caso 13, con un negocio de clases en el plan con
+integraciones.
+
+- [ ] **Configurar.**
+  - Configuración → Integraciones → Medición: su GA4 y su Meta, con código de eventos
+    de prueba;
+  - una recepcionista no puede verlo;
+  - en Auditoría queda «Se cambió el secreto» sin el valor.
+- [ ] **Su página.**
+  - aparece «Este negocio usa medición…»;
+  - con analítica se carga su GA4 (cookies `n_{slug}_ga…`) y no se carga el píxel de
+    Meta;
+  - en su panel o la cuenta del cliente no se manda nada.
+- [ ] **Solicitud de punta a punta.**
+  - llega con `?utm_campaign=prueba-negocio&fbclid=…` y deja sus datos;
+  - en GA4 aparece `generate_lead` y en «Eventos de prueba» `Lead` (del servidor, con
+    `fbc`);
+  - el prospecto dice «Campaña: prueba-negocio».
+- [ ] **Compra.**
+  - conviértelo e invítalo; al activar su cuenta, `sign_up` / `CompleteRegistration`;
+  - compra un plan desde su cuenta y paga (en caja o con la pasarela en vivo): `purchase`
+    / `Purchase` con el ulid de la orden;
+  - pagado con llaves de prueba queda «Omitido: pago de prueba»;
+  - una orden pendiente no manda nada.
+- [ ] **Devolución.** Reembólsala: GA4 recibe `refund` con la misma transacción.
+- [ ] **Primera reserva.** Reserva una clase: `reserva_confirmada` / `Schedule`. Otra
+  reserva ya no se manda.
+- [ ] **Retirar.** «Privacidad» en su página: lo pendiente queda «Omitido: la persona no
+  lo autorizó». En otro negocio, su elección sigue igual.
+
 ### 12. Pago automático seguro (ADR 0134)
 
 Con Mercado Pago u OpenPay en modo Pruebas y una alumna con pago automático activo.
