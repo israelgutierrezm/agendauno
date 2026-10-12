@@ -53,7 +53,12 @@ vi.mock("@/stores/tema", () => ({
 }));
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.route,
-  useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
+  useRouter: () => ({
+    replace: mocks.replace,
+    push: mocks.push,
+    // El regreso se valida contra las rutas de la app (ADR 0142).
+    resolve: () => ({ matched: [{}], params: {}, query: {} }),
+  }),
   RouterLink: { template: "<a><slot /></a>" },
 }));
 

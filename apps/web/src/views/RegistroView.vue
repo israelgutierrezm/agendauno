@@ -11,7 +11,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, camposConError, mensajeDeError } from "@/lib/api";
-import { atribucionParaEnviar } from "@/lib/atribucion";
+import { conAtribucion } from "@/lib/atribucion";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { tokenRecaptcha } from "@/lib/recaptcha";
 import { ladaDe, separarTelefono, unirTelefono } from "@/lib/ladas";
@@ -467,7 +467,7 @@ async function enviar(): Promise<void> {
         aviso_version: legales.value.versiones?.aviso_privacidad?.version,
         terminos_version: legales.value.versiones?.terminos?.version,
         // De dónde llegó a registrarse (ADR 0142): su primer origen y su último toque.
-        atribucion: atribucionParaEnviar(`plataforma:${producto}`),
+        ...conAtribucion(`plataforma:${producto}`),
       },
       // Crear el negocio aprovisiona su base completa: puede tardar más que el
       // límite general de 30 s. Se espera más que el servidor (60 s): si la web se

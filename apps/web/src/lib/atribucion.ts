@@ -257,6 +257,14 @@ export function atribucionParaEnviar(
   };
 }
 
+/** Para agregar a un registro: `{ atribucion }`, o nada si no hay campaña. */
+export function conAtribucion(ambito: Ambito): {
+  atribucion?: AtribucionParaEnviar;
+} {
+  const atribucion = atribucionParaEnviar(ambito);
+  return atribucion !== null ? { atribucion } : {};
+}
+
 interface RutaParaAmbito {
   name?: unknown;
   params: Record<string, unknown>;

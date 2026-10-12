@@ -5,11 +5,7 @@ import { RouterLink } from "vue-router";
 
 import { trackEvent } from "@/lib/analytics";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
-import {
-  atribucionParaEnviar,
-  leerAtribucion,
-  type Ambito,
-} from "@/lib/atribucion";
+import { conAtribucion, leerAtribucion, type Ambito } from "@/lib/atribucion";
 import type { FormularioPublico } from "@/lib/captacion";
 import { tokenRecaptcha } from "@/lib/recaptcha";
 
@@ -133,7 +129,7 @@ async function enviar(): Promise<void> {
             }
           : null,
         fuente: fuente(),
-        atribucion: atribucionParaEnviar(ambito.value),
+        ...conAtribucion(ambito.value),
         acepta_aviso: datos.acepta,
         aviso_version: definicion.value.aviso?.version ?? null,
         recaptcha_token: await tokenRecaptcha("captacion"),
