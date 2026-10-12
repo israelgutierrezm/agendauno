@@ -54,7 +54,9 @@ it('cada cambio queda en la bitácora con su operador, su negocio y sin secretos
         'negocio' => ['slug' => 'fluo', 'nombre' => 'Estudio fluo', 'producto' => 'agendauno'],
         'datos' => ['motivo' => 'Pidió pausar su cuenta'],
         'estado' => 200,
-    ])->and($bitacora[0]['datos'])->toBe(['facturapi_llave' => '••••', 'correo_alertas' => 'ops@agendauno.mx']);
+    ]);
+    // MySQL guarda el JSON con sus llaves en otro orden: se comparan sin orden.
+    expect($bitacora[0]['datos'])->toEqual(['facturapi_llave' => '••••', 'correo_alertas' => 'ops@agendauno.mx']);
 
     // Por negocio, y la ficha dice quién lo suspendió y por qué.
     expect($this->getJson('/api/v1/plataforma/bitacora?estudio=fluo', conPlataforma($ana))->json('meta.total'))->toBe(1);
