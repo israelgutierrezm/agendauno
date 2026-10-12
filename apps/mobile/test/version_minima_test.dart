@@ -175,7 +175,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ActualizarAppScreen), findsOneWidget);
-    expect(find.text('Actualiza AgendaUno para continuar'), findsOneWidget);
+    expect(
+      find.text('Actualiza ${AppConfig.nombreApp} para continuar'),
+      findsOneWidget,
+    );
     expect(find.textContaining('se necesita la 99.0.0'), findsOneWidget);
     expect(find.byType(CuentaScreen), findsNothing);
     // En Android (el de las pruebas) lleva a su página en Google Play.
@@ -185,7 +188,7 @@ void main() {
   test('la tienda: Google Play en Android; el App Store solo con su id', () {
     expect(
       urlTienda(TargetPlatform.android).toString(),
-      'https://play.google.com/store/apps/details?id=com.agendauno.app',
+      'https://play.google.com/store/apps/details?id=${ProductoApp.actual.idAndroid}',
     );
     expect(urlTienda(TargetPlatform.iOS, appStoreId: ''), isNull);
     expect(
@@ -207,7 +210,7 @@ void main() {
         reason: producto.nombre,
       );
     }
-    expect(AppConfig.idAndroid, ProductoApp.agendaUno.idAndroid);
+    expect(AppConfig.idAndroid, ProductoApp.actual.idAndroid);
   });
 
   testWidgets('con una versión aceptada entra como siempre', (tester) async {

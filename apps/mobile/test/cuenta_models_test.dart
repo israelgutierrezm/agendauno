@@ -56,7 +56,8 @@ void main() {
     expect(s.nombre, 'Ana');
     expect(s.rol, 'miembro');
     // Sin perfil del estudio: clases con la terminología por defecto.
-    expect(s.modalidad, Modalidad.clases);
+    // Sin modalidad del servidor, la de la app (clases en AgendaUno).
+    expect(s.modalidad, Modalidad.porOmision);
     expect(s.terminologia.sesion, 'Clase');
   });
 

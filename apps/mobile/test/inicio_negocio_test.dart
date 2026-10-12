@@ -108,6 +108,7 @@ void main() {
               rol: 'propietario',
               permisos: ['*'],
               estudioNombre: 'Estudio Demo',
+              modalidad: Modalidad.clases,
             ),
           ),
           resumenHoyProvider.overrideWith(
@@ -167,6 +168,7 @@ void main() {
                 nombre: 'Coordinación',
                 rol: 'rol_coordinacion',
                 permisos: permisos,
+                modalidad: Modalidad.clases,
               ),
             ),
             // Sin agenda.ver el servidor no manda el bloque de la agenda.

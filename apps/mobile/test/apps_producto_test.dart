@@ -16,11 +16,14 @@ import 'package:agendauno/features/auth/presentation/login_screen.dart';
 
 /// Dos apps oficiales desde el mismo código (ADR 0111): sin sabor es la de AgendaUno;
 /// cada petición dice de qué app viene; si el negocio es del otro producto, se dice
-/// qué app descargar. Una app de marca blanca abre directo en su negocio. Datos
-/// sintéticos.
+/// qué app descargar. Una app de marca blanca abre directo en su negocio. Corre
+/// igual compilada como cualquiera de las dos (ADR 0133). Datos sintéticos.
 
-/// API falso: el login solo encuentra a «fluo»; «barberia» es de TurnoUno (su
-/// /marca solo responde a esa app). Guarda lo que se le pidió.
+/// El producto con que no se compiló esta prueba.
+final _otro = ProductoApp.actual.otro;
+
+/// API falso: el login solo encuentra a «fluo»; «barberia» es del otro producto
+/// (su /marca solo responde a esa app). Guarda lo que se le pidió.
 class _ApiProductos implements HttpClientAdapter {
   final List<RequestOptions> peticiones = [];
 
@@ -31,15 +34,15 @@ class _ApiProductos implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     peticiones.add(options);
-    final barberiaDeTurnoUno =
-        options.headers['X-App-Producto'] == 'turnouno' &&
+    final barberiaDelOtro =
+        options.headers['X-App-Producto'] == _otro.clave &&
         options.uri.path.contains('/barberia/');
     final (int estado, Object cuerpo) = options.uri.path.endsWith('/marca')
-        ? barberiaDeTurnoUno
+        ? barberiaDelOtro
               ? (
                   200,
                   {
-                    'data': {'producto': 'turnouno'},
+                    'data': {'producto': _otro.clave},
                   },
                 )
               : (404, {'message': 'Estudio no encontrado.'})
@@ -101,10 +104,14 @@ Future<void> _entrar(
 }
 
 void main() {
-  test('sin sabor es la app oficial de AgendaUno', () {
-    expect(AppConfig.producto, same(ProductoApp.agendaUno));
-    expect(AppConfig.nombreApp, 'AgendaUno');
-    expect(AppConfig.idAndroid, 'com.agendauno.app');
+  test('es la app oficial de su producto; sin sabor, AgendaUno', () {
+    expect(AppConfig.producto, same(ProductoApp.actual));
+    expect(AppConfig.nombreApp, ProductoApp.actual.nombre);
+    expect(AppConfig.idAndroid, ProductoApp.actual.idAndroid);
+    if (!ProductoApp.esTurnoUno) {
+      expect(ProductoApp.actual, same(ProductoApp.agendaUno));
+      expect(AppConfig.idAndroid, 'com.agendauno.app');
+    }
     expect(AppConfig.marcaBlanca, isFalse);
     expect(ProductoApp.agendaUno.otro, same(ProductoApp.turnoUno));
     expect(ProductoApp.turnoUno.otro, same(ProductoApp.agendaUno));
@@ -129,7 +136,10 @@ void main() {
         .read(dioProvider)
         .get<Object>('/api/v1/app/demo/marca')
         .catchError((_) => Response<Object>(requestOptions: RequestOptions()));
-    expect(api.peticiones.single.headers['X-App-Producto'], 'agendauno');
+    expect(
+      api.peticiones.single.headers['X-App-Producto'],
+      ProductoApp.actual.clave,
+    );
     // Una app oficial no se ata a un negocio.
     expect(api.peticiones.single.headers.containsKey('X-App-Negocio'), isFalse);
   });
@@ -142,13 +152,14 @@ void main() {
 
     expect(
       find.text(
-        'Este negocio usa TurnoUno. Descarga la app de TurnoUno para entrar.',
+        'Este negocio usa ${_otro.nombre}. Descarga la app de ${_otro.nombre} '
+        'para entrar.',
       ),
       findsOneWidget,
     );
     final consulta = api.peticiones.last;
     expect(consulta.uri.path, '/api/v1/app/barberia/marca');
-    expect(consulta.headers['X-App-Producto'], 'turnouno');
+    expect(consulta.headers['X-App-Producto'], _otro.clave);
     expect(c.read(sesionProvider), isNull);
   });
 
@@ -156,7 +167,7 @@ void main() {
     tester,
   ) async {
     final (c, _) = _contenedor();
-    // Ni en esta app ni en la de TurnoUno.
+    // Ni en esta app ni en la del otro producto.
     await _entrar(tester, c, const LoginScreen(), negocio: 'nadie');
     expect(
       find.text('No encontramos ese negocio. Revisa la dirección.'),

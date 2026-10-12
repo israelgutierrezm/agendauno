@@ -88,6 +88,22 @@ class AgendaRepository {
         .toInt();
   }
 
+  /// Ofrece los lugares libres de una clase a su lista de espera, en su orden.
+  /// Devuelve a cuántos se les ofreció.
+  Future<int> promover(String sesionId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/sesiones/$sesionId/promover',
+    );
+    return ((res.data?['data'] as Map<String, dynamic>?)?['ofrecidas']
+                as num? ??
+            0)
+        .toInt();
+  }
+
+  /// Acepta, a nombre de la persona, el lugar que se le ofreció (usa su plan).
+  Future<void> aceptarLugar(String reservaId) =>
+      _dio.post<Map<String, dynamic>>('$_base/reservas/$reservaId/aceptar');
+
   Future<void> cobrar(String ordenId, String metodo) =>
       _dio.post<Map<String, dynamic>>(
         '$_base/ordenes/$ordenId/liquidar',

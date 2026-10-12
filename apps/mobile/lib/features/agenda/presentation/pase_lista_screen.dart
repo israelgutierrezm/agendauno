@@ -68,6 +68,88 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     }
   }
 
+  /// Pregunta antes de algo que avisa a alguien o usa su plan.
+  Future<bool> _confirmar(String mensaje, String aceptar) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (contexto) => AlertDialog(
+          content: Text(mensaje),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(contexto).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(contexto).pop(true),
+              child: Text(aceptar),
+            ),
+          ],
+        ),
+      ) ==
+      true;
+
+  /// Ejecuta una acción de la lista y la vuelve a leer; si falla, lo dice.
+  Future<void> _hacer(
+    Future<String?> Function(AgendaRepository repo) accion,
+  ) async {
+    final repo = ref.read(agendaRepositoryProvider);
+    if (repo == null) {
+      return;
+    }
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      final ok = await accion(repo);
+      ref.invalidate(rosterProvider(widget.sesion.id));
+      ref.invalidate(agendaProvider);
+      if (ok != null) {
+        mensajero.showSnackBar(SnackBar(content: Text(ok)));
+      }
+    } on DioException catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(mensajeDeError(e, porDefecto: 'No se pudo completar.')),
+        ),
+      );
+    }
+  }
+
+  /// Los lugares libres, a la lista de espera en su orden (se les avisa).
+  Future<void> _promover() async {
+    if (!await _confirmar(
+      '¿Ofrecer los lugares libres a la lista de espera? Se avisa a quienes '
+          'siguen en la fila.',
+      'Ofrecer lugares',
+    )) {
+      return;
+    }
+    await _hacer((r) async {
+      final n = await r.promover(widget.sesion.id);
+      return switch (n) {
+        0 => 'No hay a quién ofrecer en esta clase.',
+        1 => 'Se ofreció 1 lugar a la lista de espera.',
+        _ => 'Se ofrecieron $n lugares a la lista de espera.',
+      };
+    });
+  }
+
+  /// Aceptar a su nombre confirma su lugar y usa su plan: se confirma antes.
+  Future<void> _aceptar(Asistente a) async {
+    final clase =
+        (ref.read(sesionProvider)?.terminologia ?? const Terminologia()).sesion
+            .toLowerCase();
+    if (!await _confirmar(
+      '¿Aceptar el lugar a nombre de ${a.nombre}? Queda confirmado en la $clase '
+          'y se usa su plan, como si lo hubiera aceptado.',
+      'Aceptar el lugar',
+    )) {
+      return;
+    }
+    await _hacer((r) async {
+      await r.aceptarLugar(a.reservaId);
+      return 'Lugar aceptado a nombre de ${a.nombre}.';
+    });
+  }
+
   Future<void> _marcar(
     Asistente a,
     String estado, {
@@ -142,8 +224,12 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
         ),
         data: (lista) {
           final enSala = lista.asistentes.where((a) => a.enSala).toList();
+          final enEspera = lista.asistentes.where((a) => !a.enSala).toList();
           final llegaron = enSala.where((a) => a.llego).length;
           final abierta = lista.abierta(DateTime.now());
+          final gestionar =
+              ref.watch(sesionProvider)?.puede('reservas.gestionar') ?? false;
+          final libres = (s.capacidad ?? 0) - enSala.length;
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
@@ -231,7 +317,14 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-              for (final a in enSala) _fila(a, abierta: abierta),
+              for (final a in enSala)
+                _fila(a, abierta: abierta, gestionar: gestionar),
+              // Lista de espera: en su orden; al liberarse un lugar se ofrece así.
+              if (enEspera.isNotEmpty)
+                _ListaEspera(
+                  personas: enEspera,
+                  onPromover: gestionar && libres > 0 ? _promover : null,
+                ),
               // Ya empezada la clase (lo dice el servidor): quien sigue sin registro
               // queda como «no vino».
               if ((ref.watch(sesionProvider)?.puede('asistencia.marcar') ??
@@ -254,7 +347,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     );
   }
 
-  Widget _fila(Asistente a, {required bool abierta}) {
+  Widget _fila(Asistente a, {required bool abierta, required bool gestionar}) {
     // Sin permiso de marcar asistencia, la lista solo se consulta; y solo se marca a
     // quien tiene su lugar confirmado, desde que se abre la lista.
     final puedeMarcar =
@@ -292,6 +385,12 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                 'Pago pendiente',
                 style: TextStyle(color: Color(0xFF7A5200)),
               ),
+            // Se le ofreció un lugar que aún no acepta.
+            if (a.estado == 'ofrecida')
+              const Text(
+                'Lugar ofrecido',
+                style: TextStyle(color: Color(0xFF7A5200)),
+              ),
             if (a.asistencia == 'ausente')
               Text(
                 a.automatica ? 'No se presentó (automático)' : 'No vino',
@@ -304,55 +403,121 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
               ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Llegó tarde (cuenta como asistencia).
-            if (!(a.llego && a.retardo))
-              IconButton(
-                tooltip: 'Llegó tarde',
-                onPressed: ocupado || !puedeMarcar
-                    ? null
-                    : () => _marcar(a, 'presente', retardo: true),
-                icon: const Icon(Icons.schedule, color: Color(0xFF7A5200)),
-              ),
-            Semantics(
-              button: true,
-              label: a.llego
-                  ? 'Quitar llegada de ${a.nombre}'
-                  : 'Marcar llegada de ${a.nombre}',
-              child: InkResponse(
-                onTap: ocupado || !puedeMarcar
-                    ? null
-                    : () => _marcar(a, a.llego ? 'ausente' : 'presente'),
-                radius: 28,
-                child: Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: a.llego ? const Color(0xFF12B76A) : Colors.white,
-                    border: a.llego
-                        ? null
-                        : Border.all(color: const Color(0xFFC3CAD5), width: 2),
-                  ),
-                  child: ocupado
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          Icons.check,
+        trailing: a.estado == 'ofrecida' && gestionar
+            ? TextButton(
+                onPressed: ocupado ? null : () => _aceptar(a),
+                child: const Text('Aceptar'),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Llegó tarde (cuenta como asistencia).
+                  if (!(a.llego && a.retardo))
+                    IconButton(
+                      tooltip: 'Llegó tarde',
+                      onPressed: ocupado || !puedeMarcar
+                          ? null
+                          : () => _marcar(a, 'presente', retardo: true),
+                      icon: const Icon(
+                        Icons.schedule,
+                        color: Color(0xFF7A5200),
+                      ),
+                    ),
+                  Semantics(
+                    button: true,
+                    label: a.llego
+                        ? 'Quitar llegada de ${a.nombre}'
+                        : 'Marcar llegada de ${a.nombre}',
+                    child: InkResponse(
+                      onTap: ocupado || !puedeMarcar
+                          ? null
+                          : () => _marcar(a, a.llego ? 'ausente' : 'presente'),
+                      radius: 28,
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: a.llego
-                              ? Colors.white
-                              : const Color(0xFFC3CAD5),
+                              ? const Color(0xFF12B76A)
+                              : Colors.white,
+                          border: a.llego
+                              ? null
+                              : Border.all(
+                                  color: const Color(0xFFC3CAD5),
+                                  width: 2,
+                                ),
                         ),
-                ),
+                        child: ocupado
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                Icons.check,
+                                color: a.llego
+                                    ? Colors.white
+                                    : const Color(0xFFC3CAD5),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
+}
+
+/// La lista de espera de la clase, en su orden, y «Ofrecer lugares» si hay libres
+/// y se pueden gestionar reservas.
+class _ListaEspera extends StatelessWidget {
+  const _ListaEspera({required this.personas, this.onPromover});
+
+  final List<Asistente> personas;
+  final VoidCallback? onPromover;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    key: const Key('lista-espera'),
+    elevation: 0,
+    color: Colors.white,
+    margin: const EdgeInsets.only(top: 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Lista de espera · ${personas.length}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (onPromover != null)
+                TextButton(
+                  onPressed: onPromover,
+                  child: const Text('Ofrecer lugares'),
+                ),
+            ],
+          ),
+          const Text(
+            'Si se libera un lugar, se ofrece en este orden.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF5E6B84)),
+          ),
+          const SizedBox(height: 6),
+          for (final (i, a) in personas.indexed)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Text('${i + 1}. ${a.nombre}'),
+            ),
+        ],
+      ),
+    ),
+  );
 }

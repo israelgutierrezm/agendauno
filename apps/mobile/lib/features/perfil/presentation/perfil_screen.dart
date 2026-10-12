@@ -703,11 +703,13 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               leading: const Icon(Icons.calendar_month_outlined),
               title: const Text('Agregar a mi calendario'),
               // Funciona con Google Calendar, Apple Calendar y Outlook (como en la web).
-              subtitle: const Column(
+              subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Sus clases o sus citas, según el negocio (no las dos).
                   Text(
-                    'Tus clases y citas en el calendario del teléfono; se actualiza solo.',
+                    'Tus ${sesion.terminologia.sesiones.toLowerCase()} '
+                    'en el calendario del teléfono; se actualiza solo.',
                   ),
                   SizedBox(height: 6),
                   Row(

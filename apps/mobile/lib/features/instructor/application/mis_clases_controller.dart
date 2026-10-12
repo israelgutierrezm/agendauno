@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/calendario/calendario.dart';
 import '../../agenda/data/agenda_models.dart';
 import '../../agenda/data/agenda_repository.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../../cuenta/data/cuenta_models.dart';
 
 /// Rango de fechas que se ve en "Mis clases" (lo fija el calendario al moverse).
+/// Vuelve al de hoy al cambiar de sesión, como el día de la agenda.
 class RangoMisClases extends Notifier<({DateTime desde, DateTime hasta})> {
   @override
   ({DateTime desde, DateTime hasta}) build() {
+    ref.watch(sesionProvider.select((s) => (s?.slug, s?.bearer)));
     final hoy = Calendario.dia(DateTime.now());
     return (desde: hoy, hasta: Calendario.mas(hoy, 30));
   }

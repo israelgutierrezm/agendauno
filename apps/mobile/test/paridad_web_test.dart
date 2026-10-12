@@ -187,7 +187,13 @@ void main() {
   ) async {
     await _montar(tester, const CuentaScreen(), [
       sesionInicialProvider.overrideWithValue(
-        const Sesion(slug: 'demo', bearer: 't', nombre: 'Vale', rol: 'miembro'),
+        const Sesion(
+          slug: 'demo',
+          bearer: 't',
+          nombre: 'Vale',
+          rol: 'miembro',
+          modalidad: Modalidad.clases,
+        ),
       ),
       cuentaProvider.overrideWith(
         () => _CuentaFalsa(
@@ -232,6 +238,7 @@ void main() {
             bearer: 't',
             nombre: 'Vale',
             rol: 'miembro',
+            modalidad: Modalidad.clases,
           ),
         ),
         cuentaProvider.overrideWith(
@@ -294,7 +301,13 @@ void main() {
     );
     await _montar(tester, const Scaffold(body: AgendarCitaSheet()), [
       sesionInicialProvider.overrideWithValue(
-        const Sesion(slug: 'demo', bearer: 't', nombre: 'Vale', rol: 'miembro'),
+        const Sesion(
+          slug: 'demo',
+          bearer: 't',
+          nombre: 'Vale',
+          rol: 'miembro',
+          modalidad: Modalidad.clases,
+        ),
       ),
       cuentaRepositoryProvider.overrideWithValue(repo),
     ]);
@@ -308,9 +321,7 @@ void main() {
 
     expect(find.byKey(const Key('pago-con-bono')), findsOneWidget);
     expect(
-      find.text(
-        'Se descuenta una sesión de tu bono; no pagas al agendar.',
-      ),
+      find.text('Se descuenta una sesión de tu bono; no pagas al agendar.'),
       findsOneWidget,
     );
   });

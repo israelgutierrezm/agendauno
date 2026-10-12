@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import 'cuenta_screen.dart';
@@ -53,7 +54,10 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
       () => ref
           .read(cuentaProvider.notifier)
           .comprar(p.id, aceptaCondiciones: condiciones != null),
-      exito: 'Compra creada. Págala en "Por pagar" para activar tus créditos.',
+      // En citas se compran bonos (ADR 0130).
+      exito:
+          'Compra creada. Págala en "Por pagar" para activar '
+          '${(ref.read(sesionProvider)?.esCitas ?? false) ? 'tu bono' : 'tus créditos'}.',
     );
     if (mounted) {
       setState(() => _comprando = null);

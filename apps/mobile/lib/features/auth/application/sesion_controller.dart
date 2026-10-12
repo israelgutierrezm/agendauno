@@ -17,14 +17,24 @@ final sesionInicialProvider = Provider<Sesion?>((ref) => null);
 
 /// Por qué el servidor terminó la sesión: el token ya no vale (401) o el negocio
 /// ya no está disponible (cancelado o dado de baja: /yo responde 404).
-enum MotivoFin { sesion, negocio }
+enum MotivoFin {
+  sesion,
+  negocio,
+
+  /// La plataforma pasó el negocio al otro producto (cambio de modalidad): ahora
+  /// se entra con la otra app.
+  otroProducto,
+}
 
 /// La sesión que el servidor dio por terminada: de qué negocio (slug) y por qué.
 class FinDeSesion {
-  const FinDeSesion(this.slug, [this.motivo = MotivoFin.sesion]);
+  const FinDeSesion(this.slug, [this.motivo = MotivoFin.sesion, this.producto]);
 
   final String slug;
   final MotivoFin motivo;
+
+  /// Con [MotivoFin.otroProducto]: la app con la que ahora se entra.
+  final ProductoApp? producto;
 }
 
 /// La sesión que el servidor dio por terminada, o null. El login avisa que la
@@ -34,8 +44,11 @@ class SesionTerminada extends Notifier<FinDeSesion?> {
   @override
   FinDeSesion? build() => null;
 
-  void avisar(String slug, [MotivoFin motivo = MotivoFin.sesion]) =>
-      state = FinDeSesion(slug, motivo);
+  void avisar(
+    String slug, [
+    MotivoFin motivo = MotivoFin.sesion,
+    ProductoApp? producto,
+  ]) => state = FinDeSesion(slug, motivo, producto);
 
   void olvidar() => state = null;
 }
@@ -227,15 +240,16 @@ class SesionController extends Notifier<Sesion?> {
       ).conUsuario(const {}, eligiendoRol: actual.eligiendoRol);
       await ref.read(almacenSesionProvider).guardar(state!.aJson());
     } on DioException catch (e) {
-      _siTerminada(e, actual);
+      await _siTerminada(e, actual);
     }
   }
 
   /// Respaldo del interceptor de la red: un 401 de la misma sesión la termina. Un
-  /// 404 de /yo es que el negocio ya no está (cancelado o dado de baja; suspendido
-  /// por renta, /yo sigue abierto): también se cierra, con su aviso. Lo demás (sin
-  /// red, un error del servidor) no cierra nada.
-  void _siTerminada(DioException e, Sesion actual) {
+  /// 404 de /yo es que el negocio ya no está aquí (cancelado o dado de baja;
+  /// suspendido por renta, /yo sigue abierto): también se cierra, con su aviso. Si
+  /// la plataforma lo pasó al otro producto, el aviso dice con qué app entrar. Lo
+  /// demás (sin red, un error del servidor) no cierra nada.
+  Future<void> _siTerminada(DioException e, Sesion actual) async {
     if (state?.bearer != actual.bearer) {
       return;
     }
@@ -243,21 +257,33 @@ class SesionController extends Notifier<Sesion?> {
       case 401:
         _terminadaEnElServidor();
       case 404:
-        _terminadaEnElServidor(MotivoFin.negocio);
+        final otro = await enOtroProducto(actual.slug);
+        if (state?.bearer != actual.bearer) {
+          return;
+        }
+        _terminadaEnElServidor(
+          otro == null ? MotivoFin.negocio : MotivoFin.otroProducto,
+          otro,
+        );
     }
   }
 
   /// El servidor ya no reconoce el token (se cerró sesión en otro lado, cambió la
   /// contraseña o dieron de baja la cuenta) o el negocio ya no existe: se borra del
   /// teléfono SIN llamar a /logout (ya no serviría) y el login dice por qué.
-  void _terminadaEnElServidor([MotivoFin motivo = MotivoFin.sesion]) {
+  void _terminadaEnElServidor([
+    MotivoFin motivo = MotivoFin.sesion,
+    ProductoApp? producto,
+  ]) {
     final actual = state;
     if (actual == null) {
       return;
     }
     ref.read(pushProvider).soltar();
     ref.read(authTokenProvider.notifier).establecer(null);
-    ref.read(sesionTerminadaProvider.notifier).avisar(actual.slug, motivo);
+    ref
+        .read(sesionTerminadaProvider.notifier)
+        .avisar(actual.slug, motivo, producto);
     state = null;
     unawaited(ref.read(almacenSesionProvider).borrar());
   }

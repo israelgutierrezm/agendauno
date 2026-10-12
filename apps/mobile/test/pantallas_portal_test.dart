@@ -91,7 +91,13 @@ void main() {
     );
     await montar(tester, const CuentaScreen(), [
       sesionInicialProvider.overrideWithValue(
-        const Sesion(slug: 'demo', bearer: 't', nombre: 'Vale', rol: 'miembro'),
+        const Sesion(
+          slug: 'demo',
+          bearer: 't',
+          nombre: 'Vale',
+          rol: 'miembro',
+          modalidad: Modalidad.clases,
+        ),
       ),
       cuentaProvider.overrideWith(() => _CuentaFalsa(cuenta)),
       climaProvider.overrideWith(
@@ -187,6 +193,7 @@ void main() {
             nombre: 'Vale Ruiz',
             rol: 'miembro',
             estudioNombre: 'Estudio Demo',
+            modalidad: Modalidad.clases,
           ),
         ),
         cuentaProvider.overrideWith(
@@ -218,7 +225,13 @@ void main() {
     final cita = DateTime(manana.year, manana.month, manana.day, 10);
     await montar(tester, const CuentaScreen(), [
       sesionInicialProvider.overrideWithValue(
-        const Sesion(slug: 'demo', bearer: 't', nombre: 'Ana', rol: 'miembro'),
+        const Sesion(
+          slug: 'demo',
+          bearer: 't',
+          nombre: 'Ana',
+          rol: 'miembro',
+          modalidad: Modalidad.clases,
+        ),
       ),
       cuentaProvider.overrideWith(
         () => _CuentaFalsa(
@@ -314,6 +327,7 @@ void main() {
           bearer: 't',
           nombre: 'Mariana',
           rol: 'instructor',
+          modalidad: Modalidad.clases,
         ),
       ),
       proximasMisClasesProvider.overrideWith((ref) async => sesiones),
