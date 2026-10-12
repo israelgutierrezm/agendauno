@@ -7,6 +7,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
@@ -22,7 +23,16 @@ import { useToastStore } from "@/stores/toast";
  * productos de la sucursal (con su existencia), a la derecha la venta actual, y
  * debajo las ventas recientes (con su corrección, ADR 0089). Los productos y su stock
  * se administran en Inventario.
+ *
+ * ADR 0139: un producto con extras (a una proteína, fresas o leche de soya) pregunta
+ * cuáles lleva al tocarlo; la propina va aparte de lo vendido, para alguien del equipo
+ * si se dice; en efectivo, «Recibe» calcula el cambio.
  */
+interface Extra {
+  id: string;
+  nombre: string;
+  precio_minor: number;
+}
 interface Existencia {
   sucursal_id: string | null;
   sucursal: string;
@@ -37,6 +47,7 @@ interface Articulo {
   activo: boolean;
   stock_total: number;
   existencias: Existencia[];
+  extras?: Extra[];
 }
 interface Sucursal {
   id: string;
@@ -46,6 +57,7 @@ interface Venta {
   id: string;
   sucursal: string | null;
   total_minor: number;
+  propina_minor?: number;
   moneda: string;
   metodo_pago: string;
   creado_en: string | null;
@@ -104,6 +116,9 @@ async function cargar(): Promise<void> {
     articulos.value = a.data.data;
     sucursales.value = s.data.data;
     ventas.value = v.data.data;
+    if (puedeVender.value && equipo.value.length === 0) {
+      void cargarEquipo();
+    }
     if (sucursalSel.value === "" && sucursales.value.length > 0) {
       sucursalSel.value = sucursales.value[0]!.id;
     }
@@ -161,56 +176,145 @@ const vendibles = computed(() => {
 
 // ---- Venta actual ----
 const metodo = ref<(typeof METODOS)[number]>("efectivo");
-const carrito = ref<
-  Array<{ id: string; nombre: string; precio: number; cantidad: number }>
->([]);
+// Una línea por producto y extras: la misma proteína con y sin fresas son dos líneas.
+interface Linea {
+  clave: string;
+  id: string;
+  nombre: string;
+  precio: number;
+  extras: Extra[];
+  cantidad: number;
+}
+const carrito = ref<Linea[]>([]);
+const precioLinea = (l: Linea) =>
+  l.precio + l.extras.reduce((s, e) => s + e.precio_minor, 0);
 const totalCarrito = computed(() =>
-  carrito.value.reduce((s, l) => s + l.precio * l.cantidad, 0),
+  carrito.value.reduce((s, l) => s + precioLinea(l) * l.cantidad, 0),
 );
 const piezas = computed(() =>
   carrito.value.reduce((s, l) => s + l.cantidad, 0),
 );
 function enCarrito(id: string): number {
-  return carrito.value.find((l) => l.id === id)?.cantidad ?? 0;
+  return carrito.value
+    .filter((l) => l.id === id)
+    .reduce((s, l) => s + l.cantidad, 0);
 }
-function agregar(a: Articulo): void {
+function sumarLinea(a: Articulo, extras: Extra[]): void {
   if (enCarrito(a.id) >= stockEn(a)) {
     return;
   }
-  const linea = carrito.value.find((l) => l.id === a.id);
+  const clave = [a.id, ...extras.map((e) => e.id).sort()].join("|");
+  const linea = carrito.value.find((l) => l.clave === clave);
   if (linea) {
     linea.cantidad++;
   } else {
     carrito.value.push({
+      clave,
       id: a.id,
       nombre: a.nombre,
       precio: a.precio_minor,
+      extras,
       cantidad: 1,
     });
   }
 }
-function restar(id: string): void {
-  const linea = carrito.value.find((l) => l.id === id);
+// Con extras, primero pregunta cuáles lleva (un toque por extra, sin depender del
+// mouse); sin extras, se agrega de una vez.
+const eligiendoExtras = ref<Articulo | null>(null);
+const extrasElegidos = ref<string[]>([]);
+function agregar(a: Articulo): void {
+  if (enCarrito(a.id) >= stockEn(a)) {
+    return;
+  }
+  if ((a.extras ?? []).length > 0) {
+    eligiendoExtras.value = a;
+    extrasElegidos.value = [];
+    return;
+  }
+  sumarLinea(a, []);
+}
+function alternarExtra(id: string): void {
+  extrasElegidos.value = extrasElegidos.value.includes(id)
+    ? extrasElegidos.value.filter((x) => x !== id)
+    : [...extrasElegidos.value, id];
+}
+function confirmarExtras(): void {
+  const a = eligiendoExtras.value;
+  if (!a) {
+    return;
+  }
+  sumarLinea(
+    a,
+    (a.extras ?? []).filter((e) => extrasElegidos.value.includes(e.id)),
+  );
+  eligiendoExtras.value = null;
+}
+function restar(clave: string): void {
+  const linea = carrito.value.find((l) => l.clave === clave);
   if (!linea) {
     return;
   }
   linea.cantidad--;
   if (linea.cantidad <= 0) {
-    quitar(id);
+    quitar(clave);
   }
 }
-function sumar(id: string): void {
-  const a = articulos.value.find((x) => x.id === id);
-  if (a) {
-    agregar(a);
+function sumar(clave: string): void {
+  const linea = carrito.value.find((l) => l.clave === clave);
+  const a = articulos.value.find((x) => x.id === linea?.id);
+  if (linea && a && enCarrito(a.id) < stockEn(a)) {
+    linea.cantidad++;
   }
 }
-function quitar(id: string): void {
-  carrito.value = carrito.value.filter((l) => l.id !== id);
+function quitar(clave: string): void {
+  carrito.value = carrito.value.filter((l) => l.clave !== clave);
+}
+
+// ---- Propina y cambio (ADR 0139) ----
+const PORCENTAJES = [10, 15, 20] as const;
+const propinaModo = ref<"sin" | "otra" | (typeof PORCENTAJES)[number]>("sin");
+const propinaOtra = ref("");
+const propinaPara = ref("");
+const equipo = ref<{ id: string; nombre: string }[]>([]);
+async function cargarEquipo(): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: { id: string; nombre: string }[] }>(
+      `${base.value}/pos/propina-para`,
+    );
+    equipo.value = data.data;
+  } catch {
+    equipo.value = [];
+  }
+}
+const propinaMinor = computed(() => {
+  if (propinaModo.value === "sin") {
+    return 0;
+  }
+  if (propinaModo.value === "otra") {
+    return Math.max(0, Math.round(Number(propinaOtra.value || 0) * 100));
+  }
+  return Math.round((totalCarrito.value * propinaModo.value) / 100);
+});
+const totalCobrar = computed(() => totalCarrito.value + propinaMinor.value);
+const recibido = ref("");
+const recibidoMinor = computed(() =>
+  metodo.value === "efectivo" && recibido.value !== ""
+    ? Math.round(Number(recibido.value) * 100)
+    : null,
+);
+const cambio = computed(() =>
+  recibidoMinor.value === null ? null : recibidoMinor.value - totalCobrar.value,
+);
+function reiniciarCobro(): void {
+  propinaModo.value = "sin";
+  propinaOtra.value = "";
+  propinaPara.value = "";
+  recibido.value = "";
 }
 // Al cambiar de sucursal, la venta empieza de nuevo (otro stock).
 function cambiarSucursal(): void {
   carrito.value = [];
+  reiniciarCobro();
 }
 
 async function cobrar(): Promise<void> {
@@ -220,7 +324,7 @@ async function cobrar(): Promise<void> {
   if (
     !(await confirmar(
       t("confirmaciones.pos", {
-        total: dinero(totalCarrito.value),
+        total: dinero(totalCobrar.value),
         metodo: t(`pos.metodos.${metodo.value}`),
       }),
       { aceptar: t("confirmaciones.cobrar") },
@@ -231,16 +335,32 @@ async function cobrar(): Promise<void> {
   cobrando.value = true;
   error.value = null;
   try {
-    await api.post(`${base.value}/pos/ventas`, {
-      sucursal_id: sucursalSel.value,
-      metodo_pago: metodo.value,
-      items: carrito.value.map((l) => ({
-        articulo_id: l.id,
-        cantidad: l.cantidad,
-      })),
-    });
-    toast.exito(t("pos.vendido"));
+    const { data } = await api.post<{ data: { cambio_minor: number | null } }>(
+      `${base.value}/pos/ventas`,
+      {
+        sucursal_id: sucursalSel.value,
+        metodo_pago: metodo.value,
+        items: carrito.value.map((l) => ({
+          articulo_id: l.id,
+          cantidad: l.cantidad,
+          extras: l.extras.map((e) => e.id),
+        })),
+        propina_minor: propinaMinor.value,
+        propina_para_id:
+          propinaMinor.value > 0 && propinaPara.value !== ""
+            ? propinaPara.value
+            : null,
+        recibido_minor: recibidoMinor.value,
+      },
+    );
+    const vuelto = data?.data?.cambio_minor ?? null;
+    toast.exito(
+      vuelto !== null && vuelto > 0
+        ? t("mostradorVisual.vendidoCambio", { cambio: dinero(vuelto) })
+        : t("pos.vendido"),
+    );
     carrito.value = [];
+    reiniciarCobro();
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -427,18 +547,29 @@ onMounted(cargar);
               {{ $t("mostradorVisual.vacia") }}
             </p>
             <ul v-else class="mo-lineas">
-              <li v-for="l in carrito" :key="l.id">
+              <li v-for="l in carrito" :key="l.clave" data-prueba="linea-venta">
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium">{{ l.nombre }}</p>
+                  <p
+                    v-if="l.extras.length > 0"
+                    class="text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{
+                      $t("mostradorVisual.extras.con", {
+                        extras: l.extras.map((e) => e.nombre).join(", "),
+                      })
+                    }}
+                  </p>
                   <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                    {{ dinero(l.precio) }}
+                    {{ dinero(precioLinea(l)) }}
                   </p>
                 </div>
                 <div class="mo-cantidad">
                   <button
                     type="button"
                     :aria-label="$t('mostradorVisual.menos')"
-                    @click="restar(l.id)"
+                    @click="restar(l.clave)"
                   >
                     −
                   </button>
@@ -446,19 +577,19 @@ onMounted(cargar);
                   <button
                     type="button"
                     :aria-label="$t('mostradorVisual.mas')"
-                    @click="sumar(l.id)"
+                    @click="sumar(l.clave)"
                   >
                     +
                   </button>
                 </div>
                 <span class="w-20 text-right text-sm tabular-nums">{{
-                  dinero(l.precio * l.cantidad)
+                  dinero(precioLinea(l) * l.cantidad)
                 }}</span>
                 <button
                   type="button"
                   class="tu-icono-btn"
                   :aria-label="$t('mostradorVisual.quitar')"
-                  @click="quitar(l.id)"
+                  @click="quitar(l.clave)"
                 >
                   <IconoNav nombre="cerrar" :tam="14" />
                 </button>
@@ -480,15 +611,138 @@ onMounted(cargar);
                 </button>
               </div>
             </div>
+            <div v-if="carrito.length > 0" class="mt-4" data-prueba="propina">
+              <p class="tu-label">{{ $t("mostradorVisual.propina.titulo") }}</p>
+              <div class="tu-segmentado w-full" role="group">
+                <button
+                  type="button"
+                  class="flex-1"
+                  :aria-pressed="propinaModo === 'sin'"
+                  @click="propinaModo = 'sin'"
+                >
+                  {{ $t("mostradorVisual.propina.sin") }}
+                </button>
+                <button
+                  v-for="p in PORCENTAJES"
+                  :key="p"
+                  type="button"
+                  class="flex-1"
+                  :aria-pressed="propinaModo === p"
+                  @click="propinaModo = p"
+                >
+                  {{ p }} %
+                </button>
+                <button
+                  type="button"
+                  class="flex-1"
+                  :aria-pressed="propinaModo === 'otra'"
+                  @click="propinaModo = 'otra'"
+                >
+                  {{ $t("mostradorVisual.propina.otra") }}
+                </button>
+              </div>
+              <input
+                v-if="propinaModo === 'otra'"
+                v-model="propinaOtra"
+                class="tu-input mt-2"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                data-prueba="propina-otra"
+                :aria-label="$t('mostradorVisual.propina.monto')"
+                :placeholder="$t('mostradorVisual.propina.monto')"
+              />
+              <label
+                v-if="propinaMinor > 0 && equipo.length > 0"
+                class="mt-2 block text-sm"
+              >
+                <span class="tu-label">{{
+                  $t("mostradorVisual.propina.para")
+                }}</span>
+                <select v-model="propinaPara" class="tu-input">
+                  <option value="">
+                    {{ $t("mostradorVisual.propina.paraNadie") }}
+                  </option>
+                  <option v-for="u in equipo" :key="u.id" :value="u.id">
+                    {{ u.nombre }}
+                  </option>
+                </select>
+              </label>
+            </div>
+            <dl
+              v-if="propinaMinor > 0"
+              class="mt-3 grid gap-1 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              <div class="flex justify-between">
+                <dt>{{ $t("mostradorVisual.subtotal") }}</dt>
+                <dd class="tabular-nums">{{ dinero(totalCarrito) }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt>{{ $t("mostradorVisual.propina.titulo") }}</dt>
+                <dd class="tabular-nums">{{ dinero(propinaMinor) }}</dd>
+              </div>
+            </dl>
             <div class="mo-total">
-              <span>{{ $t("pos.total") }}</span>
-              <span class="tabular-nums">{{ dinero(totalCarrito) }}</span>
+              <span>{{
+                propinaMinor > 0
+                  ? $t("mostradorVisual.totalCobrar")
+                  : $t("pos.total")
+              }}</span>
+              <span class="tabular-nums" data-prueba="total-cobrar">{{
+                dinero(totalCobrar)
+              }}</span>
+            </div>
+            <div
+              v-if="metodo === 'efectivo' && carrito.length > 0"
+              class="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3"
+            >
+              <label class="block text-sm">
+                <span class="tu-label">{{
+                  $t("mostradorVisual.recibido")
+                }}</span>
+                <input
+                  v-model="recibido"
+                  class="tu-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                  data-prueba="recibido"
+                  :aria-describedby="'mo-recibido-ayuda'"
+                />
+              </label>
+              <p
+                v-if="cambio !== null"
+                class="pb-2 text-sm font-medium tabular-nums"
+                data-prueba="cambio"
+                :style="{ color: cambio < 0 ? 'var(--error)' : 'var(--texto)' }"
+              >
+                {{
+                  cambio < 0
+                    ? $t("mostradorVisual.falta", { monto: dinero(-cambio) })
+                    : `${$t("mostradorVisual.cambio")}: ${dinero(cambio)}`
+                }}
+              </p>
+              <p
+                id="mo-recibido-ayuda"
+                class="col-span-2 text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("mostradorVisual.recibidoAyuda") }}
+              </p>
             </div>
             <button
               class="tu-btn tu-btn-primario mt-3 w-full"
               type="button"
               data-prueba="cobrar"
-              :disabled="!puedeVender || cobrando || carrito.length === 0"
+              :disabled="
+                !puedeVender ||
+                cobrando ||
+                carrito.length === 0 ||
+                (cambio !== null && cambio < 0)
+              "
               @click="cobrar"
             >
               {{ cobrando ? $t("pos.cobrando") : $t("pos.cobrar") }}
@@ -559,6 +813,16 @@ onMounted(cargar);
                     :class="{ 'line-through mo-suave': v.anulada_en }"
                   >
                     {{ dinero(v.total_minor, v.moneda) }}
+                    <span
+                      v-if="(v.propina_minor ?? 0) > 0"
+                      class="block text-xs font-normal"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        $t("mostradorVisual.conPropina", {
+                          monto: dinero(v.propina_minor ?? 0, v.moneda),
+                        })
+                      }}</span
+                    >
                   </td>
                   <td class="text-right">
                     <button
@@ -598,10 +862,49 @@ onMounted(cargar);
         </div>
       </template>
     </template>
+    <!-- Extras del producto (ADR 0139): un toque por extra. -->
+    <ModalDialogo
+      :abierto="eligiendoExtras !== null"
+      :titulo="eligiendoExtras?.nombre ?? $t('mostradorVisual.extras.titulo')"
+      tam="md"
+      @cerrar="eligiendoExtras = null"
+    >
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("mostradorVisual.extras.ayuda") }}
+      </p>
+      <div class="mt-3 flex flex-wrap gap-2" data-prueba="extras-elegir">
+        <button
+          v-for="e in eligiendoExtras?.extras ?? []"
+          :key="e.id"
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          :aria-pressed="extrasElegidos.includes(e.id)"
+          :class="{ 'mo-extra-elegido': extrasElegidos.includes(e.id) }"
+          @click="alternarExtra(e.id)"
+        >
+          {{ e.nombre }} · {{ dinero(e.precio_minor) }}
+        </button>
+      </div>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-primario"
+          data-prueba="extras-agregar"
+          @click="confirmarExtras"
+        >
+          {{ $t("mostradorVisual.extras.agregar") }}
+        </button>
+      </template>
+    </ModalDialogo>
   </section>
 </template>
 
 <style scoped>
+/* Extra elegido (ADR 0139): borde de acento, sin depender del mouse. */
+.mo-extra-elegido {
+  border-color: var(--acento);
+  background: var(--superficie-2);
+}
 .mo-barra {
   display: flex;
   flex-wrap: wrap;

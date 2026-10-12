@@ -29,11 +29,17 @@ interface Existencia {
   stock: number;
   estado?: EstadoStock;
 }
+interface Extra {
+  id?: string;
+  nombre: string;
+  precio_minor: number;
+}
 interface Articulo {
   id: string;
   nombre: string;
   sku: string | null;
   precio_minor: number;
+  extras?: Extra[];
   moneda: string;
   activo: boolean;
   stock_total: number;
@@ -189,9 +195,12 @@ function limpiar(): void {
 const editando = ref<Articulo | null>(null);
 const dialogoProducto = ref(false);
 const form = ref({ nombre: "", sku: "", precio: "", activo: true });
+// Extras del producto (ADR 0139): nombre y precio en pesos, como el producto.
+const extras = ref<{ id?: string; nombre: string; precio: string }[]>([]);
 function nuevoProducto(): void {
   editando.value = null;
   form.value = { nombre: "", sku: "", precio: "", activo: true };
+  extras.value = [];
   dialogoProducto.value = true;
 }
 function editar(a: Articulo): void {
@@ -202,7 +211,18 @@ function editar(a: Articulo): void {
     precio: String(a.precio_minor / 100),
     activo: a.activo,
   };
+  extras.value = (a.extras ?? []).map((e) => ({
+    id: e.id,
+    nombre: e.nombre,
+    precio: String(e.precio_minor / 100),
+  }));
   dialogoProducto.value = true;
+}
+function agregarExtra(): void {
+  extras.value.push({ nombre: "", precio: "" });
+}
+function quitarExtra(i: number): void {
+  extras.value.splice(i, 1);
 }
 const formValido = computed(
   () =>
@@ -217,6 +237,13 @@ async function guardarProducto(): Promise<void> {
     nombre: form.value.nombre.trim(),
     sku: form.value.sku.trim() !== "" ? form.value.sku.trim() : null,
     precio_minor: Math.round(Number(form.value.precio) * 100),
+    extras: extras.value
+      .filter((e) => e.nombre.trim() !== "")
+      .map((e) => ({
+        id: e.id,
+        nombre: e.nombre.trim(),
+        precio_minor: Math.round(Number(e.precio || 0) * 100),
+      })),
   };
   try {
     if (editando.value) {
@@ -526,6 +553,53 @@ onMounted(cargar);
             />
           </div>
         </div>
+        <fieldset class="grid gap-2" data-prueba="extras-producto">
+          <legend class="tu-label">
+            {{ $t("inventarioVisual.extras.titulo") }}
+          </legend>
+          <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("inventarioVisual.extras.ayuda") }}
+          </p>
+          <div
+            v-for="(e, i) in extras"
+            :key="i"
+            class="grid grid-cols-[minmax(0,1fr)_7rem_auto] items-center gap-2"
+          >
+            <input
+              v-model="e.nombre"
+              class="tu-input"
+              maxlength="80"
+              :aria-label="$t('inventarioVisual.extras.nombre')"
+              :placeholder="$t('inventarioVisual.extras.nombre')"
+            />
+            <input
+              v-model="e.precio"
+              class="tu-input"
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              :aria-label="$t('inventarioVisual.extras.precio')"
+              :placeholder="$t('inventarioVisual.extras.precio')"
+            />
+            <button
+              type="button"
+              class="tu-icono-btn"
+              :aria-label="$t('inventarioVisual.extras.quitar')"
+              @click="quitarExtra(i)"
+            >
+              <IconoNav nombre="cerrar" :tam="14" />
+            </button>
+          </div>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma justify-self-start"
+            data-prueba="agregar-extra"
+            @click="agregarExtra"
+          >
+            {{ $t("inventarioVisual.extras.agregar") }}
+          </button>
+        </fieldset>
         <label v-if="editando" class="flex items-center gap-2 text-sm">
           <input v-model="form.activo" type="checkbox" />
           {{ $t("inventarioExtra.activo") }}

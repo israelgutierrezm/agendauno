@@ -83,6 +83,30 @@ describe("inventario", () => {
     expect(w.findAll('[data-prueba="producto"]')).toHaveLength(1);
   });
 
+  it("un producto nuevo se guarda con sus extras y su precio (ADR 0139)", async () => {
+    const w = mount(InventarioView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    await w.get('[data-prueba="nuevo-producto"]').trigger("click");
+    await w.get("#iv-nombre").setValue("Proteína preparada");
+    await w.get("#iv-precio").setValue("60");
+    await w.get('[data-prueba="agregar-extra"]').trigger("click");
+    const [nombre, precio] = w.findAll('[data-prueba="extras-producto"] input');
+    await nombre!.setValue("Fresas");
+    await precio!.setValue("15");
+    await w.get("#iv-producto").trigger("submit");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/articulos", {
+      nombre: "Proteína preparada",
+      sku: null,
+      precio_minor: 6000,
+      extras: [{ id: undefined, nombre: "Fresas", precio_minor: 1500 }],
+    });
+  });
+
   it("registra una entrada de stock en la sucursal", async () => {
     const w = mount(InventarioView, {
       global: { plugins: [i18n], stubs: { teleport: true } },
