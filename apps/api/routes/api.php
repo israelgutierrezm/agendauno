@@ -60,6 +60,8 @@ use App\Modules\Tenancy\Http\Controllers\LealtadTenantController;
 use App\Modules\Tenancy\Http\Controllers\LegalesPublicoController;
 use App\Modules\Tenancy\Http\Controllers\LlavesApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MarcaEstudioController;
+use App\Modules\Tenancy\Http\Controllers\MedicionPlataformaController;
+use App\Modules\Tenancy\Http\Controllers\MedicionPublicaController;
 use App\Modules\Tenancy\Http\Controllers\MembresiasTenantController;
 use App\Modules\Tenancy\Http\Controllers\MensajesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiDispositivosTenantController;
@@ -191,6 +193,10 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/precios', PreciosPublicosController::class)->middleware('throttle:publico')->name('api.v1.precios');
     // Visita anónima a la landing de un producto (embudo de la plataforma, C08).
     Route::post('/metricas/visita-landing', [EmbudoPlataformaController::class, 'visita'])->middleware('throttle:publico')->name('api.v1.metricas.visita-landing');
+    // Medición del SaaS (ADR 0143): los IDs públicos de GA4 y Meta de cada producto, y
+    // las preferencias de quien visita (se aplican a lo que ya registró).
+    Route::get('/medicion/{producto}', [MedicionPublicaController::class, 'configuracion'])->whereIn('producto', ['agendauno', 'turnouno'])->middleware('throttle:publico')->name('api.v1.medicion.configuracion');
+    Route::post('/medicion/consentimiento', [MedicionPublicaController::class, 'consentimiento'])->middleware('throttle:publico')->name('api.v1.medicion.consentimiento');
     // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
     Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
 
@@ -241,6 +247,11 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/interesados', [InteresadosController::class, 'index'])->name('interesados');
         // Embudo de la plataforma: de la landing al primer pago (C08).
         Route::get('/embudo', [EmbudoPlataformaController::class, 'reporte'])->name('embudo');
+        // GA4 y Meta del SaaS, por producto (ADR 0143): destinos, envíos y prueba.
+        Route::get('/medicion', [MedicionPlataformaController::class, 'index'])->name('medicion');
+        Route::put('/medicion/{producto}/{proveedor}', [MedicionPlataformaController::class, 'guardar'])->name('medicion.guardar');
+        Route::delete('/medicion/{producto}/{proveedor}', [MedicionPlataformaController::class, 'desconectar'])->name('medicion.desconectar');
+        Route::post('/medicion/{producto}/{proveedor}/probar', [MedicionPlataformaController::class, 'probar'])->middleware('throttle:10,1,medicion-probar')->name('medicion.probar');
         // Condonar un cargo de renta pendiente (queda cancelado; reactiva si ya no debe).
         Route::post('/cargos/{cargo}/condonar', [PlataformaCobrosController::class, 'condonar'])->name('cargos.condonar');
         // Estado de la operación: versión, procesos, verificación, respaldos y alertas.

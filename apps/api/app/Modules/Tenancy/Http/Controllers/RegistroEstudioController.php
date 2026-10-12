@@ -8,6 +8,7 @@ use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\AtribucionPlataforma;
+use App\Modules\Tenancy\Application\ConversionesPlataforma;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
@@ -111,7 +112,7 @@ class RegistroEstudioController
         ]);
 
         $this->legales->registrarAceptacion($estudio, (string) $estudio->contacto_email, $request->ip(), $request->userAgent());
-        $atribucion->registrar($estudio, $request->validated('atribucion'));
+        $atribucion->registrar($estudio, $request->validated('atribucion'), $request->validated('medicion'), $request->ip(), $request->userAgent());
         if ($verificacion !== null) {
             $this->whatsapp->usar($verificacion);
             $estudio->forceFill([
@@ -138,6 +139,9 @@ class RegistroEstudioController
                     'producto' => $estudio->producto()->value,
                     'url' => url('/app/'.$estudio->slug),
                 ],
+                // Los identificadores con que el servidor manda estas conversiones
+                // (ADR 0143): el píxel del navegador usa los mismos y Meta deduplica.
+                'medicion' => ['eventos' => ConversionesPlataforma::idsDelRegistro($estudio)],
                 'activacion' => app()->environment('production') ? null : [
                     'email' => $estudio->contacto_email,
                     'token' => $token,

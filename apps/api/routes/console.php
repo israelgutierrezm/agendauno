@@ -29,6 +29,10 @@ Schedule::command('agendauno:despachar-outbox')->everyMinute()->withoutOverlappi
 // Reintenta las entregas de webhook fallidas de cada estudio (R40).
 Schedule::command('agendauno:reintentar-webhooks')->everyFiveMinutes()->withoutOverlapping();
 
+// Manda a GA4 y Meta las conversiones confirmadas del SaaS y de los negocios, con sus
+// reintentos (ADR 0143). Aparte de la operación: nada espera a Google ni a Meta.
+Schedule::command('agendauno:enviar-conversiones')->everyMinute()->withoutOverlapping();
+
 // Envia los mensajes encolados (y reintenta los fallidos) de cada estudio (R28).
 Schedule::command('agendauno:enviar-mensajes')->everyMinute()->withoutOverlapping();
 

@@ -52,6 +52,11 @@ final readonly class Atribucion
             foreach ([...array_keys(self::CAMPOS), 'referente', 'en'] as $clave) {
                 $reglas["{$campo}.{$toque}.{$clave}"] = ['nullable', 'string', 'max:200'];
             }
+            // Identificadores de clic: solo llegan con la autorización de publicidad
+            // (ADR 0143) y solo se usan para armar el `fbc` de Meta.
+            foreach (['gclid', 'fbclid'] as $clic) {
+                $reglas["{$campo}.{$toque}.{$clic}"] = ['nullable', 'string', 'max:500'];
+            }
         }
 
         return $reglas;
