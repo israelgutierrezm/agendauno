@@ -66,6 +66,20 @@ final class CatalogoSitioWeb
 
     public const MAX_PIE = 300;
 
+    /**
+     * Estilo global del sitio (ADR 0146, fase 3): su tipografía (de una lista), sus
+     * esquinas y si se ve claro, oscuro o como lo tenga quien lo visita. El color sale
+     * de su marca si no elige otro.
+     */
+    public const TIPOGRAFIAS = ['predeterminada', 'moderna', 'clasica', 'elegante', 'amigable', 'sistema'];
+
+    public const ESQUINAS = ['rectas', 'suaves', 'redondas'];
+
+    public const TEMAS = ['automatico', 'claro', 'oscuro'];
+
+    /** Las versiones publicadas a las que se puede volver (sus fotos se conservan). */
+    public const VERSIONES = 10;
+
     public static function esBloque(string $tipo): bool
     {
         return in_array($tipo, self::BLOQUES, true);

@@ -9,6 +9,7 @@ import { urlReproductor, type SeccionSitio } from "@/lib/sitioWeb";
  * Un bloque propio en la página pública del negocio (ADR 0146): texto con imagen,
  * galería, preguntas, testimonios, llamado a la acción, video, beneficios o su
  * formulario de captación, con su fondo y su alineación. Todo es texto: nada de HTML.
+ * Sus esquinas siguen las del sitio (`--radio-*`, ADR 0146 fase 3).
  *
  * El video no carga nada de YouTube o Vimeo hasta que la persona le da clic (sin
  * cookies de terceros antes); el reproductor se arma con su proveedor y su id.
@@ -250,7 +251,7 @@ const proveedor = computed(() =>
 }
 .bs-foto {
   width: 100%;
-  border-radius: 1rem;
+  border-radius: var(--radio-imagen, 1rem);
   object-fit: cover;
   aspect-ratio: 4 / 3;
 }
@@ -268,7 +269,7 @@ const proveedor = computed(() =>
 .bs-galeria img {
   width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta, 0.75rem);
   object-fit: cover;
 }
 .bs-galeria figcaption {
@@ -288,7 +289,7 @@ const proveedor = computed(() =>
 .bs-preguntas details {
   padding: 0.85rem 1rem;
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta, 0.75rem);
 }
 .bs-preguntas summary {
   cursor: pointer;
@@ -306,7 +307,7 @@ const proveedor = computed(() =>
 .bs-tarjeta {
   padding: 1.1rem 1.2rem;
   border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-  border-radius: 1rem;
+  border-radius: var(--radio-tarjeta, 1rem);
 }
 .bs-video {
   max-width: 48rem;
@@ -320,7 +321,7 @@ const proveedor = computed(() =>
   width: 100%;
   aspect-ratio: 16 / 9;
   border: 0;
-  border-radius: 1rem;
+  border-radius: var(--radio-imagen, 1rem);
 }
 .bs-portada-video {
   position: relative;

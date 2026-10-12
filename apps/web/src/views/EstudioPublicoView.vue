@@ -26,9 +26,12 @@ import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { marcarPwa } from "@/lib/pwa";
 import { updateSeo } from "@/lib/seo";
 import { urlCanonicaEstudio } from "@/lib/tenant";
+import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
 import {
   colorDeContraste,
   esBloque,
+  FAMILIAS_SITIO,
+  RADIOS_SITIO,
   sitioPorDefecto,
   type SitioPublico,
 } from "@/lib/sitioWeb";
@@ -285,14 +288,26 @@ const portada = computed(() => {
   return p === "compacta" ? "compacta" : "esencial";
 });
 // El color de su marca en los botones (con el texto que se lea encima).
+// Su estilo (ADR 0146, fase 3): el color del sitio (o el de su marca) en los botones,
+// su tipografía y sus esquinas.
+const familiaDelSitio = computed(
+  () => FAMILIAS_SITIO[sitio.value.estilo?.tipografia ?? "predeterminada"],
+);
 const estiloMarca = computed<Record<string, string>>(() => {
-  const color = escaparate.value?.estudio.color_marca;
-  const sinColor: Record<string, string> = {};
+  const color =
+    sitio.value.estilo?.color ?? escaparate.value?.estudio.color_marca;
+  const estilo: Record<string, string> = {
+    ...RADIOS_SITIO[sitio.value.estilo?.esquinas ?? "suaves"],
+  };
+  if (familiaDelSitio.value) {
+    estilo.fontFamily = pilaDeFuente(familiaDelSitio.value);
+  }
   if (!color) {
-    return sinColor;
+    return estilo;
   }
   const texto = colorDeContraste(color);
   return {
+    ...estilo,
     "--marketing-cta": color,
     "--marketing-cta-hover": `color-mix(in srgb, ${color} 85%, #000)`,
     "--marketing-cta-contraste": texto,
@@ -300,6 +315,19 @@ const estiloMarca = computed<Record<string, string>>(() => {
     "--primario-contraste": texto,
   };
 });
+// Claro u oscuro fijo; «automático», como lo tenga quien visita.
+const temaDelSitio = computed(() => sitio.value.estilo?.tema ?? "automatico");
+// El botón principal del encabezado, si lo puso.
+const botonPrincipal = computed(() => {
+  const e = sitio.value.encabezado;
+  return e?.boton_texto && e.boton_enlace
+    ? { texto: e.boton_texto, enlace: enlaceDelSitio(e.boton_enlace) }
+    : null;
+});
+// La barra del sitio: con sus páginas en el menú o con su botón principal.
+const conBarra = computed(
+  () => paginasDelMenu.value.length > 0 || botonPrincipal.value !== null,
+);
 
 const ubicacion = computed(() => {
   const e = escaparate.value?.estudio;
@@ -654,6 +682,16 @@ function aplicarSeo(): void {
   });
 }
 
+// Su tipografía, si es de Google Fonts, se carga cuando se usa.
+watch(
+  familiaDelSitio,
+  (familia) => {
+    if (familia) {
+      cargarFuente(familia);
+    }
+  },
+  { immediate: true },
+);
 // Otra página del sitio: arriba, con su SEO.
 watch(paginaActual, async () => {
   aplicarSeo();
@@ -690,7 +728,10 @@ onMounted(cargar);
 
     <div
       v-else-if="escaparate"
-      :class="`ep-sitio ep-plantilla-${sitio.plantilla}`"
+      :class="[
+        `ep-sitio ep-plantilla-${sitio.plantilla}`,
+        `ep-tema-${temaDelSitio}`,
+      ]"
       :style="estiloMarca"
       data-prueba="sitio"
     >
@@ -706,27 +747,48 @@ onMounted(cargar);
         <InstalarApp :negocio="escaparate.estudio.nombre" />
       </div>
 
-      <!-- Su menú: Inicio y sus páginas (ADR 0146) -->
+      <!-- Su barra: Inicio y sus páginas, y su botón principal (ADR 0146) -->
       <nav
-        v-if="paginasDelMenu.length > 0"
+        v-if="conBarra"
         class="ep-menu"
         :aria-label="$t('sitioWeb.publico.menu')"
         data-prueba="menu-sitio"
       >
-        <div class="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-4">
-          <RouterLink
-            :to="aInicio()"
-            class="ep-menu-enlace"
-            :aria-current="paginaActual === null ? 'page' : undefined"
-            >{{ $t("sitioWeb.publico.inicio") }}</RouterLink
-          >
-          <RouterLink
-            v-for="p in paginasDelMenu"
-            :key="p.slug"
-            :to="aPagina(p.slug)"
-            class="ep-menu-enlace"
-            :aria-current="paginaActual?.slug === p.slug ? 'page' : undefined"
-            >{{ p.titulo }}</RouterLink
+        <div class="mx-auto flex max-w-5xl items-center gap-1 px-4">
+          <div class="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+            <RouterLink
+              :to="aInicio()"
+              class="ep-menu-enlace"
+              :aria-current="paginaActual === null ? 'page' : undefined"
+              >{{
+                paginasDelMenu.length > 0
+                  ? $t("sitioWeb.publico.inicio")
+                  : escaparate.estudio.nombre
+              }}</RouterLink
+            >
+            <RouterLink
+              v-for="p in paginasDelMenu"
+              :key="p.slug"
+              :to="aPagina(p.slug)"
+              class="ep-menu-enlace"
+              :aria-current="paginaActual?.slug === p.slug ? 'page' : undefined"
+              >{{ p.titulo }}</RouterLink
+            >
+          </div>
+          <a
+            v-if="botonPrincipal"
+            :href="botonPrincipal.enlace"
+            class="tu-btn tu-btn-primario ep-menu-boton shrink-0"
+            :target="
+              esEnlaceExterno(botonPrincipal.enlace) ? '_blank' : undefined
+            "
+            :rel="
+              esEnlaceExterno(botonPrincipal.enlace)
+                ? 'noopener noreferrer'
+                : undefined
+            "
+            data-prueba="boton-principal"
+            >{{ botonPrincipal.texto }}</a
           >
         </div>
       </nav>
@@ -1882,6 +1944,63 @@ onMounted(cargar);
 </template>
 
 <style scoped>
+/* Claro u oscuro fijo (ADR 0146, fase 3): los colores de las páginas públicas (los de
+   .tu-public-business en style.css), sin seguir el modo de quien visita. */
+.ep-tema-claro {
+  --fondo: #f6f8fc;
+  --superficie: #fff;
+  --superficie-2: #e9edf5;
+  --texto: #182b39;
+  --texto-suave: #59666b;
+  --borde: #dce1de;
+  --acento: #198754;
+  --exito: #198754;
+  --exito-texto: #146c43;
+  --exito-suave: #d1e7dd;
+  --error: #d70015;
+  --error-suave: #fdeaea;
+  --aviso: #b64400;
+  --aviso-suave: #fbe9dd;
+  --primario: #007e91;
+  --primario-fuerte: #006574;
+  --primario-contraste: #fff;
+  --primario-suave: color-mix(in srgb, #007e91 10%, #fff);
+  --enlace: #007487;
+  --marketing-enfasis: #198754;
+  background: var(--fondo);
+  color: var(--texto);
+  color-scheme: light;
+}
+.ep-tema-oscuro {
+  --fondo: #020d24;
+  --superficie: #071a3a;
+  --superficie-2: #0b2854;
+  --texto: #f3f4ef;
+  --texto-suave: #b3bfbf;
+  --borde: #34444c;
+  --acento: #75b798;
+  --exito: #198754;
+  --exito-texto: #75b798;
+  --exito-suave: #051b11;
+  --error: #ff453a;
+  --error-suave: #2a1414;
+  --aviso: #ff9f0a;
+  --aviso-suave: #2a1e0a;
+  --primario: #74d4df;
+  --primario-contraste: #182b39;
+  --primario-fuerte: #a4e8ef;
+  --primario-suave: color-mix(in srgb, #007e91 24%, #071a3a);
+  --enlace: #74d4df;
+  --marketing-enfasis: #75b798;
+  background: var(--fondo);
+  color: var(--texto);
+  color-scheme: dark;
+}
+.ep-menu-boton {
+  min-height: 2.25rem;
+  padding: 0.35rem 1rem;
+  font-size: 0.9rem;
+}
 /* Su menú de páginas, su encabezado y el pie (ADR 0146). */
 .ep-menu {
   position: sticky;

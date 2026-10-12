@@ -463,3 +463,121 @@ describe("páginas del sitio (ADR 0146, fase 2)", () => {
     w.unmount();
   });
 });
+
+describe("estilo del sitio y versiones (ADR 0146, fase 3)", () => {
+  const conEstilo = (cambios: Record<string, unknown> = {}) => {
+    const base = datos();
+    return {
+      ...base,
+      color_marca: "#aa3366",
+      versiones: [
+        {
+          id: "v2",
+          publicada_en: "2026-10-01T18:00:00Z",
+          publicada_por: "Dueña",
+          actual: true,
+        },
+        {
+          id: "v1",
+          publicada_en: "2026-09-20T18:00:00Z",
+          publicada_por: null,
+          actual: false,
+        },
+      ],
+      borrador: {
+        ...base.borrador,
+        seo: { titulo: null, descripcion: null, imagen_url: null },
+        paginas: [],
+        pie: { texto: null },
+        estilo: {
+          color: null,
+          tipografia: "predeterminada",
+          esquinas: "suaves",
+          tema: "automatico",
+        },
+        encabezado: { boton_texto: null, boton_enlace: null },
+      },
+      catalogo: {
+        ...base.catalogo,
+        tipografias: ["predeterminada", "moderna", "elegante"],
+        esquinas: ["rectas", "suaves", "redondas"],
+        temas: ["automatico", "claro", "oscuro"],
+      },
+      ...cambios,
+    };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.get.mockResolvedValue({ data: { data: conEstilo() } });
+    api.put.mockImplementation((_url: string, cuerpo: unknown) =>
+      Promise.resolve({
+        data: {
+          data: conEstilo({ borrador: cuerpo, cambios_sin_publicar: true }),
+        },
+      }),
+    );
+    api.post.mockResolvedValue({
+      data: { data: conEstilo({ cambios_sin_publicar: true }) },
+    });
+  });
+
+  it("elige tipografía, esquinas, fondo y el botón principal, y lo guarda", async () => {
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="tipografia-elegante"]').trigger("click");
+    await w.get('[data-prueba="esquinas-redondas"]').trigger("click");
+    await w.get('[data-prueba="tema-oscuro"]').trigger("click");
+    await w.get('[data-prueba="boton-principal-texto"]').setValue("Agendar");
+    await w.get('[data-prueba="boton-principal-enlace"]').setValue("#agenda");
+    await w.get('[data-prueba="estilo-color"]').setValue("#123456");
+    await w.get('[data-prueba="estilo-color"]').trigger("change");
+
+    await w.get('[data-prueba="guardar-sitio"]').trigger("click");
+    await flushPromises();
+    const enviado = api.put.mock.calls[0][1];
+    expect(enviado.estilo).toEqual({
+      color: "#123456",
+      tipografia: "elegante",
+      esquinas: "redondas",
+      tema: "oscuro",
+    });
+    expect(enviado.encabezado).toEqual({
+      boton_texto: "Agendar",
+      boton_enlace: "#agenda",
+    });
+    w.unmount();
+  });
+
+  it("sin color propio usa el de su marca; con uno, vuelve a la marca", async () => {
+    const w = montar();
+    await flushPromises();
+    const color = w.get('[data-prueba="estilo-color"]');
+    expect((color.element as HTMLInputElement).value).toBe("#aa3366");
+    expect(w.find('[data-prueba="estilo-color-marca"]').exists()).toBe(false);
+
+    await color.setValue("#123456");
+    await color.trigger("change");
+    await w.get('[data-prueba="estilo-color-marca"]').trigger("click");
+    expect((color.element as HTMLInputElement).value).toBe("#aa3366");
+    w.unmount();
+  });
+
+  it("vuelve a una versión publicada: confirma y la deja como borrador", async () => {
+    const w = montar();
+    await flushPromises();
+    const versiones = w.findAll('[data-prueba="version"]');
+    expect(versiones).toHaveLength(2);
+    expect(versiones[0]!.text()).toContain("Publicada ahora");
+    expect(versiones[0]!.text()).toContain("Por Dueña");
+
+    await w.get('[data-prueba="restaurar-v1"]').trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalled();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/fluo/sitio/versiones/v1/restaurar",
+    );
+    w.unmount();
+  });
+});

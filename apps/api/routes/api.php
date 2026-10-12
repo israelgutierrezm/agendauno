@@ -628,6 +628,8 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/sitio', [SitioWebController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('sitio.guardar');
             Route::post('/sitio/publicar', [SitioWebController::class, 'publicar'])->middleware('puede:estudio.gestionar')->name('sitio.publicar');
             Route::post('/sitio/descartar', [SitioWebController::class, 'descartar'])->middleware('puede:estudio.gestionar')->name('sitio.descartar');
+            // Volver a una versión publicada (ADR 0146, fase 3): queda como borrador.
+            Route::post('/sitio/versiones/{version}/restaurar', [SitioWebController::class, 'restaurar'])->middleware('puede:estudio.gestionar')->name('sitio.versiones.restaurar');
             Route::get('/sitio/vista-previa', [SitioWebController::class, 'vistaPrevia'])->middleware('puede:estudio.gestionar')->name('sitio.vista-previa');
             Route::post('/sitio/imagenes', [SitioWebController::class, 'subirImagen'])->middleware('puede:estudio.gestionar')->name('sitio.imagenes.store');
 

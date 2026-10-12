@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\BorradorSitioWebTenant;
 use App\Modules\Tenancy\Models\PublicacionSitioWebTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\SitioWeb\CatalogoSitioWeb;
 use App\Modules\Tenancy\SitioWeb\PlantillaSitio;
 use App\Modules\Tenancy\SitioWeb\VideoSitio;
@@ -37,8 +38,8 @@ use Illuminate\Support\Str;
  */
 class SitioWebTenant
 {
-    /** Versiones publicadas cuyas imágenes se conservan. */
-    private const PUBLICACIONES_CON_IMAGENES = 10;
+    /** Versiones publicadas cuyas imágenes se conservan (a las que se puede volver). */
+    private const PUBLICACIONES_CON_IMAGENES = CatalogoSitioWeb::VERSIONES;
 
     public function __construct(private readonly FechasNegocioTenant $fechas) {}
 
@@ -61,6 +62,8 @@ class SitioWebTenant
             'seo' => self::seo([]),
             'paginas' => [],
             'pie' => ['texto' => null],
+            'estilo' => self::estilo([]),
+            'encabezado' => self::encabezado([]),
         ];
     }
 
@@ -137,7 +140,42 @@ class SitioWebTenant
             'seo' => self::seo(is_array($contenido['seo'] ?? null) ? $contenido['seo'] : []),
             'paginas' => $paginas,
             'pie' => ['texto' => self::texto($pie['texto'] ?? null)],
+            'estilo' => self::estilo(is_array($contenido['estilo'] ?? null) ? $contenido['estilo'] : []),
+            'encabezado' => self::encabezado(is_array($contenido['encabezado'] ?? null) ? $contenido['encabezado'] : []),
         ];
+    }
+
+    /**
+     * Las últimas versiones publicadas, de la más reciente a la más antigua: cuándo y
+     * quién. La primera es la que ve el público.
+     *
+     * @return list<array{id: string, publicada_en: string|null, publicada_por: string|null, actual: bool}>
+     */
+    public function versiones(): array
+    {
+        $versiones = PublicacionSitioWebTenant::query()->orderByDesc('id')->limit(CatalogoSitioWeb::VERSIONES)->get();
+        $nombres = Usuario::query()->whereIn('id', $versiones->pluck('publicada_por_usuario_id')->filter()->all())->pluck('name', 'id');
+
+        return array_values($versiones->values()->map(static fn (PublicacionSitioWebTenant $v, int $i): array => [
+            'id' => (string) $v->ulid,
+            'publicada_en' => $v->created_at?->toIso8601String(),
+            'publicada_por' => $v->publicada_por_usuario_id !== null ? ($nombres[$v->publicada_por_usuario_id] ?? null) : null,
+            'actual' => $i === 0,
+        ])->all());
+    }
+
+    /**
+     * Vuelve el borrador a una versión publicada (de las últimas, cuyas fotos siguen):
+     * no se publica hasta que el negocio publica.
+     *
+     * @return array<string, mixed>
+     */
+    public function restaurar(string $version, ModalidadServicio $modalidad, ?int $usuarioId, int $estudioId): array
+    {
+        $ids = PublicacionSitioWebTenant::query()->orderByDesc('id')->limit(CatalogoSitioWeb::VERSIONES)->pluck('id');
+        $publicacion = PublicacionSitioWebTenant::query()->whereIn('id', $ids)->where('ulid', $version)->firstOrFail();
+
+        return $this->guardarBorrador((array) $publicacion->contenido, $modalidad, $usuarioId, $estudioId);
     }
 
     /**
@@ -255,6 +293,8 @@ class SitioWebTenant
             'secciones' => self::seccionesPublicas((array) $contenido['secciones']),
             'seo' => $contenido['seo'] ?? self::seo([]),
             'pie' => $contenido['pie'] ?? ['texto' => null],
+            'estilo' => $contenido['estilo'] ?? self::estilo([]),
+            'encabezado' => $contenido['encabezado'] ?? self::encabezado([]),
             'paginas' => array_values(array_map(static fn (array $p): array => [
                 ...$p,
                 'secciones' => self::seccionesPublicas((array) $p['secciones']),
@@ -442,6 +482,39 @@ class SitioWebTenant
             'titulo' => self::texto($datos['titulo'] ?? null),
             'descripcion' => self::texto($datos['descripcion'] ?? null),
             'imagen_url' => self::texto($datos['imagen_url'] ?? null),
+        ];
+    }
+
+    /**
+     * El estilo de todo el sitio (fase 3): su color (`#rrggbb`; null, el de su marca),
+     * su tipografía, sus esquinas y si se ve claro, oscuro o como lo tenga quien lo visita.
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array{color: string|null, tipografia: string, esquinas: string, tema: string}
+     */
+    private static function estilo(array $datos): array
+    {
+        $color = self::texto($datos['color'] ?? null);
+
+        return [
+            'color' => $color !== null && preg_match('/^#[0-9a-fA-F]{6}$/', $color) === 1 ? strtolower($color) : null,
+            'tipografia' => in_array($datos['tipografia'] ?? null, CatalogoSitioWeb::TIPOGRAFIAS, true) ? (string) $datos['tipografia'] : 'predeterminada',
+            'esquinas' => in_array($datos['esquinas'] ?? null, CatalogoSitioWeb::ESQUINAS, true) ? (string) $datos['esquinas'] : 'suaves',
+            'tema' => in_array($datos['tema'] ?? null, CatalogoSitioWeb::TEMAS, true) ? (string) $datos['tema'] : 'automatico',
+        ];
+    }
+
+    /**
+     * El encabezado del sitio: el botón principal (p. ej. «Agendar» hacia `#agenda`).
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array{boton_texto: string|null, boton_enlace: string|null}
+     */
+    private static function encabezado(array $datos): array
+    {
+        return [
+            'boton_texto' => self::texto($datos['boton_texto'] ?? null),
+            'boton_enlace' => self::texto($datos['boton_enlace'] ?? null),
         ];
     }
 

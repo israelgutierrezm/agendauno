@@ -29,7 +29,8 @@ Se hace en tres fases, cada una en su bloque con su PR:
    su pie de página y su SEO (título, descripción e imagen para compartir).
 3. **Estilo global y editor visual**: colores, tipografía de una lista, esquinas,
    encabezado y botón principal; vista previa en vivo con clic en un bloque para
-   editarlo; volver a una versión publicada.
+   editarlo; volver a una versión publicada. En dos bloques: el estilo, el botón y las
+   versiones (bloque 49); el editor visual (bloque 50).
 
 ### Fase 1: bloques propios
 
@@ -126,6 +127,31 @@ Se hace en tres fases, cada una en su bloque con su PR:
 **Vista previa.** `/estudio/{slug}/vista-previa?pagina={direccion}`: la regla de marcos
 de nginx ya admite la query.
 
+### Fase 3: estilo global, botón principal y versiones (bloque 49)
+
+**Estilo del sitio** (`estilo`), para todas sus páginas:
+
+- `color`: el de los botones y acentos. Vacío, el de su marca (`estudios.color_marca`),
+  como hasta ahora.
+- `tipografia`: de una lista fija (la de siempre, moderna, clásica, elegante, amigable o
+  la del sistema). Cada una es una familia de Google Fonts que la página carga solo si
+  se eligió; nada de subir fuentes ni escribir su nombre.
+- `esquinas`: rectas, suaves (las de siempre) o redondas. Cambian los radios de botones,
+  tarjetas, fotos y paneles de las páginas públicas.
+- `tema`: automático (como lo tenga quien visita), claro u oscuro fijo.
+
+Son valores de una lista y un color `#rrggbb`: ni CSS ni HTML.
+
+**Botón principal** (`encabezado`): texto (40) y enlace (los mismos que un bloque:
+`https://`, `/…`, `#…` o una página `/p/{direccion}`). Va a la derecha de la barra del
+sitio; sin páginas en el menú, la barra lleva el nombre del negocio y el botón.
+
+**Versiones publicadas.** Cada publicación ya quedaba guardada
+(`publicaciones_sitio_web`). Ahora se listan las últimas 10 (fecha, quién publicó y cuál
+está publicada) y se puede volver a una: se copia al borrador, que queda con cambios sin
+publicar hasta que se publique. El público sigue viendo lo publicado. Las fotos de esas
+10 versiones no se borran al limpiar las que ya no se usan.
+
 ## Consecuencias
 
 - Fase 1 sin migraciones: la configuración del sitio ya era JSON. Un sitio guardado o
@@ -133,5 +159,8 @@ de nginx ya admite la query.
 - Fase 2: una migración del control plane (`estudios.seo_sitio`). Hasta volver a
   publicar, un sitio ya publicado usa su SEO de siempre.
 - Un negocio arma una página con contenido propio sin perder lo que sale del sistema.
-- Fase 3, pendiente: estilo global, editor visual y volver a una versión publicada
-  (pendientes del ADR 0114).
+- Fase 3 sin migraciones: el estilo y el botón van en el mismo JSON y las versiones ya
+  se guardaban. Un sitio de antes queda con el estilo de siempre (color de su marca,
+  esquinas suaves, automático).
+- Pendiente, bloque 50: el editor visual (vista previa en vivo del borrador sin guardar
+  y clic en un bloque para editarlo).

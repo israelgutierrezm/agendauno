@@ -761,6 +761,36 @@ describe("página pública del estudio", () => {
       expect(w.find('[data-prueba="portada"]').exists()).toBe(false);
     });
 
+    it("su estilo: fondo oscuro fijo, su color, su letra y el botón principal arriba", async () => {
+      const respuesta = conPaginas();
+      Object.assign(
+        (respuesta.data.data as unknown as { sitio: Record<string, unknown> })
+          .sitio,
+        {
+          estilo: {
+            color: "#123456",
+            tipografia: "elegante",
+            esquinas: "redondas",
+            tema: "oscuro",
+          },
+          encabezado: { boton_texto: "Agendar", boton_enlace: "#agenda" },
+        },
+      );
+      mocks.get.mockResolvedValue(respuesta);
+      const w = montar();
+      await flushPromises();
+
+      const sitio = w.get('[data-prueba="sitio"]');
+      expect(sitio.classes()).toContain("ep-tema-oscuro");
+      const estilo = sitio.attributes("style") ?? "";
+      expect(estilo).toContain("--primario: #123456");
+      expect(estilo).toContain("Playfair Display");
+      expect(estilo).toContain("--radio-boton: 999px");
+      const boton = w.get('[data-prueba="boton-principal"]');
+      expect(boton.text()).toBe("Agendar");
+      expect(boton.attributes("href")).toBe("#agenda");
+    });
+
     it("en la vista previa, la página se pide con ?pagina=", async () => {
       mocks.ruta.query = { pagina: "nosotros" };
       mocks.get.mockResolvedValue(conPaginas());

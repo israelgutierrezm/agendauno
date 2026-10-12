@@ -764,3 +764,20 @@ en el negocio.
 - `GET /escaparate` suma `seo`, `pie` y `paginas[]`, cada una con solo sus secciones
   visibles que tienen contenido.
 
+### Estilo, botón principal y versiones del sitio (ADR 0146, fase 3)
+
+- El borrador suma:
+  - `estilo`: `color` (`#rrggbb` o `null` para usar el de la marca), `tipografia`
+    (`predeterminada`, `moderna`, `clasica`, `elegante`, `amigable`, `sistema`),
+    `esquinas` (`rectas`, `suaves`, `redondas`) y `tema` (`automatico`, `claro`,
+    `oscuro`);
+  - `encabezado`: `boton_texto` (40) y `boton_enlace` (300; `https://`, `/…` o `#…`).
+- `PUT /sitio` da 422 con un color que no es `#rrggbb`, un valor fuera de la lista o un
+  enlace sin texto (`encabezado.boton_texto`).
+- `GET /sitio` suma `color_marca`, `versiones[]` (las últimas 10 publicaciones: `id`,
+  `publicada_en`, `publicada_por`, `actual`) y, en `catalogo`, `tipografias`, `esquinas`
+  y `temas`.
+- `POST /sitio/versiones/{id}/restaurar`: copia esa versión al borrador (sin publicarla)
+  y devuelve lo mismo que `GET /sitio`. 404 si no está entre las últimas 10.
+- `GET /escaparate` suma `estilo` y `encabezado` en `sitio`.
+
