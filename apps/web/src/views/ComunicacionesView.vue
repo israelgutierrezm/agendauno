@@ -614,7 +614,10 @@ onMounted(cargar);
               class="tu-badge cursor-pointer"
               :style="
                 form.canal === canal
-                  ? { background: 'var(--primario)', color: '#fff' }
+                  ? {
+                      background: 'var(--primario)',
+                      color: 'var(--primario-contraste)',
+                    }
                   : {}
               "
               @click="form.canal = canal"
