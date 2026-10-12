@@ -95,6 +95,109 @@ beforeEach(() => {
   );
 });
 
+// El diálogo de extras, en línea (sin teleport) para encontrarlo en la prueba.
+function montarConDialogo() {
+  return mount(PosView, {
+    global: {
+      plugins: [i18n],
+      stubs: {
+        ModalDialogo: {
+          props: ["abierto", "titulo"],
+          template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
+        },
+      },
+    },
+  });
+}
+
+// Una proteína preparada con sus extras (ADR 0139).
+const PROTEINA = {
+  id: "a2",
+  nombre: "Proteína preparada",
+  sku: null,
+  precio_minor: 6000,
+  moneda: "MXN",
+  activo: true,
+  stock_total: 10,
+  existencias: [{ sucursal_id: "s1", sucursal: "Roma Norte", stock: 10 }],
+  extras: [
+    { id: "e1", nombre: "Fresas", precio_minor: 1500 },
+    { id: "e2", nombre: "Leche de soya", precio_minor: 1000 },
+  ],
+};
+
+describe("extras, propina y cambio (ADR 0139)", () => {
+  beforeEach(() => {
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/pos/ventas")
+            ? []
+            : url.endsWith("/sucursales")
+              ? [{ id: "s1", nombre: "Roma Norte" }]
+              : url.endsWith("/articulos")
+                ? [PROTEINA]
+                : url.endsWith("/pos/propina-para")
+                  ? [{ id: "u1", nombre: "Toño" }]
+                  : [],
+        },
+      }),
+    );
+    mocks.post.mockResolvedValue({ data: { data: { cambio_minor: 1500 } } });
+  });
+
+  it("un producto con extras pregunta cuáles lleva y los cobra con su precio", async () => {
+    const w = montarConDialogo();
+    await flushPromises();
+
+    await w.get('[data-prueba="producto"]').trigger("click");
+    const opciones = w.findAll('[data-prueba="extras-elegir"] button');
+    expect(opciones.map((o) => o.text())).toEqual([
+      "Fresas · $15.00",
+      "Leche de soya · $10.00",
+    ]);
+    await opciones[0]!.trigger("click");
+    await w.get('[data-prueba="extras-agregar"]').trigger("click");
+
+    const linea = w.get('[data-prueba="linea-venta"]');
+    expect(linea.text()).toContain("con Fresas");
+    expect(w.get('[data-prueba="total-cobrar"]').text()).toBe("$75.00");
+  });
+
+  it("la propina va aparte, para quien se diga; lo recibido da el cambio", async () => {
+    const w = montarConDialogo();
+    await flushPromises();
+
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await w.get('[data-prueba="extras-agregar"]').trigger("click");
+    // 10 % de $60 = $6; total a cobrar $66; paga con $100: cambio $34.
+    await w
+      .findAll('[data-prueba="propina"] button')
+      .find((b) => b.text() === "10 %")!
+      .trigger("click");
+    await w.get('[data-prueba="propina"] select').setValue("u1");
+    expect(w.get('[data-prueba="total-cobrar"]').text()).toBe("$66.00");
+    await w.get('[data-prueba="recibido"]').setValue("50");
+    expect(w.get('[data-prueba="cambio"]').text()).toBe("Falta $16.00");
+    expect(
+      w.get('[data-prueba="cobrar"]').attributes("disabled"),
+    ).toBeDefined();
+    await w.get('[data-prueba="recibido"]').setValue("100");
+    expect(w.get('[data-prueba="cambio"]').text()).toBe("Cambio: $34.00");
+
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/pos/ventas", {
+      sucursal_id: "s1",
+      metodo_pago: "efectivo",
+      items: [{ articulo_id: "a2", cantidad: 1, extras: [] }],
+      propina_minor: 600,
+      propina_para_id: "u1",
+      recibido_minor: 10000,
+    });
+  });
+});
+
 describe("ventas recientes del mostrador", () => {
   it("muestra la forma de pago con su nombre y marca las anuladas", async () => {
     const w = mount(PosView, { global: { plugins: [i18n] } });
@@ -150,7 +253,10 @@ describe("ventas recientes del mostrador", () => {
     expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/pos/ventas", {
       sucursal_id: "s1",
       metodo_pago: "tarjeta",
-      items: [{ articulo_id: "a1", cantidad: 2 }],
+      items: [{ articulo_id: "a1", cantidad: 2, extras: [] }],
+      propina_minor: 0,
+      propina_para_id: null,
+      recibido_minor: null,
     });
   });
 

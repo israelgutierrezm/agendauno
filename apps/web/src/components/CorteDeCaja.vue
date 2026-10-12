@@ -33,6 +33,9 @@ interface Totales {
   neto_minor: number;
   // Compras del rango que siguen pendientes de pago.
   por_cobrar_minor?: number;
+  // Propinas del mostrador (ADR 0139): aparte de lo cobrado.
+  propinas_minor?: number;
+  propinas_por_metodo?: Record<string, number>;
   por_metodo: Record<string, number>;
   por_usuario: {
     quien: string;
@@ -258,6 +261,27 @@ onMounted(cargar);
               }}</span>
             </li>
           </ul>
+          <template v-if="(totales.propinas_minor ?? 0) > 0">
+            <p class="tu-label mt-3" data-prueba="corte-propinas">
+              {{ $t("corteCaja.propinas") }}:
+              {{ dinero(totales.propinas_minor ?? 0, totales.moneda) }}
+            </p>
+            <ul class="mt-1 space-y-1">
+              <li
+                v-for="(monto, metodo) in totales.propinas_por_metodo"
+                :key="metodo"
+                class="flex justify-between gap-3"
+              >
+                <span>{{ metodo }}</span>
+                <span class="tabular-nums">{{
+                  dinero(monto, totales.moneda)
+                }}</span>
+              </li>
+            </ul>
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("corteCaja.propinasAyuda") }}
+            </p>
+          </template>
         </div>
         <div class="tu-card p-4">
           <p class="tu-label">{{ $t("corteCaja.porPersona") }}</p>

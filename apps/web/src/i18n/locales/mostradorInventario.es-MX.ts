@@ -11,6 +11,32 @@ export const mostradorVisual = {
   menos: "Quitar uno",
   mas: "Agregar uno",
   quitar: "Quitar de la venta",
+  // Extras de un producto (ADR 0139): p. ej. a una proteína, fresas o leche de soya.
+  extras: {
+    titulo: "¿Con algo extra?",
+    ayuda: "Toca lo que lleva. Cada extra se cobra con su precio.",
+    sinExtras: "Sin extras",
+    agregar: "Agregar a la venta",
+    con: "con {extras}",
+  },
+  // Propina (aparte de lo vendido: no es ingreso del negocio) y el cambio.
+  propina: {
+    titulo: "Propina",
+    sin: "Sin propina",
+    otra: "Otra",
+    monto: "Monto de la propina",
+    para: "Para",
+    paraNadie: "Para el equipo",
+    ayuda: "Va aparte de la venta: no cuenta como ingreso del negocio.",
+  },
+  subtotal: "Productos",
+  totalCobrar: "Total a cobrar",
+  recibido: "Recibe",
+  recibidoAyuda: "Lo que te entrega en efectivo, para darle su cambio.",
+  cambio: "Cambio",
+  falta: "Falta {monto}",
+  vendidoCambio: "Venta registrada. Cambio: {cambio}.",
+  conPropina: "+ {monto} de propina",
   kpi: {
     ventasHoy: "Ventas de hoy",
     vendidoHoy: "Vendido hoy",
@@ -25,6 +51,16 @@ export const mostradorVisual = {
 };
 
 export const inventarioVisual = {
+  // Extras del producto (ADR 0139): lo que se le puede agregar, con su precio.
+  extras: {
+    titulo: "Extras",
+    ayuda:
+      "Lo que se le puede agregar al venderlo, con su precio: a una proteína, fresas o leche de soya.",
+    nombre: "Extra",
+    precio: "Precio",
+    agregar: "Agregar extra",
+    quitar: "Quitar extra",
+  },
   titulo: "Inventario",
   subtitulo:
     "Tus productos de mostrador, su precio y cuántos hay en cada sucursal.",

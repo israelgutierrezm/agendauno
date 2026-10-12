@@ -41,8 +41,11 @@ use Illuminate\Support\Str;
  * exportación solo cuentan lo de esas sedes: cobros y devoluciones por la sucursal de
  * su compra, ventas de mostrador por la suya. Lo que no tiene sede no es de ninguna.
  *
- * @phpstan-type Movimiento array{fecha: string, tipo: string, monto_minor: int, moneda: string, metodo: string|null, persona: string|null, concepto: string, quien: string, quien_id: string|null, referencia: string, orden: string|null, pago: string|null, detalle: string|null}
- * @phpstan-type Totales array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, por_metodo: array<string, int>, por_usuario: list<array{quien: string, cobrado_minor: int, devuelto_minor: int}>}
+ * Propinas del mostrador (ADR 0139): aparte de lo cobrado (no son del negocio), con su
+ * total y por forma de pago, porque sí están en la caja.
+ *
+ * @phpstan-type Movimiento array{fecha: string, tipo: string, monto_minor: int, propina_minor?: int, moneda: string, metodo: string|null, persona: string|null, concepto: string, quien: string, quien_id: string|null, referencia: string, orden: string|null, pago: string|null, detalle: string|null}
+ * @phpstan-type Totales array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, propinas_minor: int, propinas_por_metodo: array<string, int>, por_metodo: array<string, int>, por_usuario: list<array{quien: string, cobrado_minor: int, devuelto_minor: int}>}
  */
 class MovimientosDePagoTenant
 {
@@ -353,6 +356,8 @@ class MovimientosDePagoTenant
                 'fecha' => (string) $v->created_at?->toIso8601String(),
                 'tipo' => 'venta',
                 'monto_minor' => $v->total_minor,
+                // La propina va aparte (ADR 0139): está en la caja, no es del negocio.
+                'propina_minor' => $v->propina_minor,
                 'moneda' => $v->moneda,
                 'metodo' => $v->metodo_pago,
                 'persona' => null,
@@ -418,10 +423,11 @@ class MovimientosDePagoTenant
      */
     private function totales(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, callable $incluye): array
     {
-        /** @var array<string, array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, por_metodo: array<string, int>, por_usuario: array<string, array{quien: string, cobrado_minor: int, devuelto_minor: int}>}> $por */
+        /** @var array<string, array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, propinas_minor: int, propinas_por_metodo: array<string, int>, por_metodo: array<string, int>, por_usuario: array<string, array{quien: string, cobrado_minor: int, devuelto_minor: int}>}> $por */
         $por = [];
-        $sumar = function (string $moneda, ?string $metodo, int $monto, string $quien) use (&$por): void {
-            $por[$moneda] ??= ['moneda' => $moneda, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0, 'por_cobrar_minor' => 0, 'por_metodo' => [], 'por_usuario' => []];
+        $vacio = static fn (string $moneda): array => ['moneda' => $moneda, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0, 'por_cobrar_minor' => 0, 'propinas_minor' => 0, 'propinas_por_metodo' => [], 'por_metodo' => [], 'por_usuario' => []];
+        $sumar = function (string $moneda, ?string $metodo, int $monto, string $quien) use (&$por, $vacio): void {
+            $por[$moneda] ??= $vacio($moneda);
             $etiqueta = MetodoPago::tryFrom((string) $metodo)?->etiqueta() ?? ucfirst($metodo !== null && $metodo !== '' ? $metodo : 'Otro');
             $por[$moneda]['por_metodo'][$etiqueta] = ($por[$moneda]['por_metodo'][$etiqueta] ?? 0) + $monto;
             $por[$moneda]['por_usuario'][$quien] ??= ['quien' => $quien, 'cobrado_minor' => 0, 'devuelto_minor' => 0];
@@ -473,7 +479,7 @@ class MovimientosDePagoTenant
 
         if ($incluye('venta')) {
             $filas = VentaPosTenant::query()
-                ->selectRaw('moneda, metodo_pago, usuario_id, SUM(total_minor) AS total')
+                ->selectRaw('moneda, metodo_pago, usuario_id, SUM(total_minor) AS total, SUM(propina_minor) AS propinas')
                 ->whereNull('anulada_en')
                 ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
                 ->whereBetween('created_at', [$inicio, $fin])
@@ -485,6 +491,13 @@ class MovimientosDePagoTenant
             foreach ($filas as $f) {
                 $quien = $f->usuario_id !== null ? ($nombres[(int) $f->usuario_id]['nombre'] ?? 'Sistema') : 'Sistema';
                 $sumar((string) $f->moneda, $f->metodo_pago ?? null, (int) $f->total, $quien);
+                $propinas = (int) $f->propinas;
+                if ($propinas > 0) {
+                    $moneda = (string) $f->moneda;
+                    $etiqueta = MetodoPago::tryFrom((string) $f->metodo_pago)?->etiqueta() ?? ucfirst((string) ($f->metodo_pago ?: 'Otro'));
+                    $por[$moneda]['propinas_minor'] += $propinas;
+                    $por[$moneda]['propinas_por_metodo'][$etiqueta] = ($por[$moneda]['propinas_por_metodo'][$etiqueta] ?? 0) + $propinas;
+                }
             }
         }
 
@@ -499,7 +512,7 @@ class MovimientosDePagoTenant
             ->get();
         foreach ($pendientes as $f) {
             $moneda = (string) $f->moneda;
-            $por[$moneda] ??= ['moneda' => $moneda, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0, 'por_cobrar_minor' => 0, 'por_metodo' => [], 'por_usuario' => []];
+            $por[$moneda] ??= $vacio($moneda);
             $por[$moneda]['por_cobrar_minor'] = (int) $f->total;
         }
 

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
+use App\Modules\Tenancy\Models\ExtraArticuloTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -46,6 +47,7 @@ class InventarioTenantController
     public function store(Request $request): JsonResponse
     {
         $articulo = ArticuloTenant::query()->create($this->validar($request));
+        $this->guardarExtras($request, $articulo);
 
         return response()->json(['data' => $this->presentar($articulo, $this->mapaSucursales(), $this->permitidas($request))], 201);
     }
@@ -54,6 +56,7 @@ class InventarioTenantController
     {
         $articulo = $this->resolver($request);
         $articulo->update($this->validar($request));
+        $this->guardarExtras($request, $articulo);
 
         return response()->json(['data' => $this->presentar($articulo->refresh(), $this->mapaSucursales(), $this->permitidas($request))]);
     }
@@ -143,6 +146,33 @@ class InventarioTenantController
     }
 
     /**
+     * Los extras del artículo, si vienen (ADR 0139): los que traen `id` se actualizan,
+     * los nuevos se crean y los que ya no vienen se apagan (las ventas guardan los suyos).
+     */
+    private function guardarExtras(Request $request, ArticuloTenant $articulo): void
+    {
+        if (! $request->has('extras')) {
+            return;
+        }
+        $validado = $request->validate([
+            'extras' => ['present', 'array', 'max:30'],
+            'extras.*.id' => ['nullable', 'string'],
+            'extras.*.nombre' => ['required', 'string', 'max:80'],
+            'extras.*.precio_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
+        ]);
+        $vigentes = [];
+        foreach (array_values($validado['extras']) as $orden => $dato) {
+            $extra = isset($dato['id']) && $dato['id'] !== ''
+                ? ExtraArticuloTenant::query()->where('articulo_id', $articulo->getKey())->where('ulid', $dato['id'])->first()
+                : null;
+            $extra ??= new ExtraArticuloTenant(['articulo_id' => $articulo->getKey()]);
+            $extra->fill(['nombre' => trim((string) $dato['nombre']), 'precio_minor' => (int) $dato['precio_minor'], 'activo' => true, 'orden' => $orden])->save();
+            $vigentes[] = $extra->getKey();
+        }
+        ExtraArticuloTenant::query()->where('articulo_id', $articulo->getKey())->whereNotIn('id', $vigentes)->update(['activo' => false]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validar(Request $request): array
@@ -196,6 +226,10 @@ class InventarioTenantController
             'precio_minor' => $articulo->precio_minor,
             'moneda' => $articulo->moneda,
             'activo' => $articulo->activo,
+            // Lo que se le puede agregar (ADR 0139).
+            'extras' => $articulo->extras()->where('activo', true)->get()->map(static fn (ExtraArticuloTenant $e): array => [
+                'id' => $e->ulid, 'nombre' => $e->nombre, 'precio_minor' => $e->precio_minor,
+            ])->all(),
             'stock_total' => $total,
             'estado_stock' => self::estadoStock($total, $umbral),
             'existencias' => $existencias,

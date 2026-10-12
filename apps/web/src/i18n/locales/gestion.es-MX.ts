@@ -1242,6 +1242,9 @@ export const bajas = {
 };
 
 export const corteCaja = {
+  // Propinas del mostrador (ADR 0139): están en la caja, pero no son del negocio.
+  propinas: "Propinas",
+  propinasAyuda: "Están en la caja, pero no son ingreso del negocio.",
   titulo: "Corte de caja",
   descargar: "Descargar CSV",
   desde: "Desde",

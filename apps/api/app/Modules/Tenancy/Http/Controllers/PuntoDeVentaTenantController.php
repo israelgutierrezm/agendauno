@@ -8,12 +8,15 @@ use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
+use App\Modules\Tenancy\Models\ExtraArticuloTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Punto de venta minorista del estudio, tenant-local (R21): cobra un ticket de caja
@@ -34,7 +37,7 @@ class PuntoDeVentaTenantController
         $permitidas = $actor !== null ? $this->acceso->sucursalesPermitidas($actor) : null;
 
         $ventas = VentaPosTenant::query()
-            ->with(['sucursal', 'lineas.articulo'])
+            ->with(['sucursal', 'lineas.articulo', 'propinaPara'])
             ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->orderByDesc('id')
             ->limit(100)
@@ -53,6 +56,14 @@ class PuntoDeVentaTenantController
             'items' => ['required', 'array', 'min:1'],
             'items.*.articulo_id' => ['required', 'string'],
             'items.*.cantidad' => ['required', 'integer', 'min:1'],
+            // Sus extras (ADR 0139): de ese artículo y a la venta.
+            'items.*.extras' => ['nullable', 'array', 'max:30'],
+            'items.*.extras.*' => ['string'],
+            // La propina, aparte de lo vendido, y para quién (alguien del equipo).
+            'propina_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'propina_para_id' => ['nullable', 'string'],
+            // En efectivo: lo que entregó el cliente, para el cambio.
+            'recibido_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
         ]);
 
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
@@ -66,14 +77,50 @@ class PuntoDeVentaTenantController
         );
 
         $items = [];
-        foreach ($validado['items'] as $item) {
+        foreach ($validado['items'] as $n => $item) {
             $articulo = ArticuloTenant::query()->where('ulid', $item['articulo_id'])->firstOrFail();
-            $items[] = ['articulo' => $articulo, 'cantidad' => (int) $item['cantidad']];
+            $pedidos = array_values(array_unique(array_map('strval', $item['extras'] ?? [])));
+            $extras = $pedidos === [] ? [] : ExtraArticuloTenant::query()
+                ->where('articulo_id', $articulo->getKey())->where('activo', true)->whereIn('ulid', $pedidos)->get()->all();
+            if (count($extras) !== count($pedidos)) {
+                throw ValidationException::withMessages(["items.{$n}.extras" => ['Uno de los extras ya no está disponible para este producto.']]);
+            }
+            $items[] = ['articulo' => $articulo, 'cantidad' => (int) $item['cantidad'], 'extras' => $extras];
         }
 
-        $venta = $this->pos->vender($sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $this->actor($request));
+        $propina = (int) ($validado['propina_minor'] ?? 0);
+        $para = null;
+        if (isset($validado['propina_para_id']) && $validado['propina_para_id'] !== '') {
+            $para = $this->equipoParaPropina()->firstWhere('ulid', $validado['propina_para_id'])
+                ?? throw ValidationException::withMessages(['propina_para_id' => ['Elige a alguien del equipo.']]);
+        }
+        $venta = $this->pos->vender(
+            $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $this->actor($request),
+            $propina, $para, isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
+        );
 
-        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo']))], 201);
+        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo', 'propinaPara']))], 201);
+    }
+
+    /** A quién se le puede dejar la propina: el equipo activo (ADR 0139). */
+    public function propinaPara(): JsonResponse
+    {
+        return response()->json(['data' => $this->equipoParaPropina()->map(static fn (Usuario $u): array => [
+            'id' => $u->ulid, 'nombre' => $u->name,
+        ])->values()->all()]);
+    }
+
+    /**
+     * El equipo activo: quien tiene algún rol además de alumno o cliente.
+     *
+     * @return Collection<int, Usuario>
+     */
+    private function equipoParaPropina(): Collection
+    {
+        return Usuario::query()->where('activo', true)->orderBy('name')->get()
+            ->filter(static fn (Usuario $u): bool => array_diff($u->rolesEfectivos(), ['miembro']) !== [])
+            ->values()
+            ->toBase();
     }
 
     /**
@@ -130,6 +177,12 @@ class PuntoDeVentaTenantController
             'id' => $venta->ulid,
             'sucursal' => $venta->sucursal?->nombre,
             'total_minor' => $venta->total_minor,
+            // Aparte de lo vendido (ADR 0139): la propina, lo cobrado y el cambio.
+            'propina_minor' => $venta->propina_minor,
+            'propina_para' => $venta->propinaPara?->name,
+            'cobrado_minor' => $venta->cobradoMinor(),
+            'recibido_minor' => $venta->recibido_minor,
+            'cambio_minor' => $venta->recibido_minor !== null ? $venta->recibido_minor - $venta->cobradoMinor() : null,
             'moneda' => $venta->moneda,
             'metodo_pago' => $venta->metodo_pago,
             'creado_en' => $venta->created_at?->toIso8601String(),
@@ -142,6 +195,7 @@ class PuntoDeVentaTenantController
                 'articulo' => $l->articulo?->nombre,
                 'cantidad' => $l->cantidad,
                 'subtotal_minor' => $l->subtotal_minor,
+                'extras' => array_map(static fn (array $e): string => (string) $e['nombre'], $l->extras ?? []),
             ])->all(),
         ];
     }
