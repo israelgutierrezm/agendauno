@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\CaptacionTenant;
 use App\Modules\Tenancy\Application\VerificarRecaptcha;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Medicion\Atribucion;
+use App\Modules\Tenancy\Medicion\IdentificadoresNavegador;
 use App\Modules\Tenancy\Models\CampoFormularioCaptacionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FormularioCaptacionTenant;
@@ -53,6 +54,7 @@ class CaptacionPublicaController
             'aviso_version' => ['nullable', 'integer', 'min:1'],
             'recaptcha_token' => ['nullable', 'string', 'max:4000'],
             ...Atribucion::reglas(),
+            ...IdentificadoresNavegador::reglas(),
         ]);
 
         if (! $recaptcha->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip())) {
@@ -70,6 +72,10 @@ class CaptacionPublicaController
             'fuente' => $validado['fuente'] ?? null,
             'aviso_version' => isset($validado['aviso_version']) ? (int) $validado['aviso_version'] : null,
             'atribucion' => $validado['atribucion'] ?? null,
+            // Sus preferencias de medición y lo que permitió de su navegador (ADR 0143).
+            'medicion' => $validado['medicion'] ?? null,
+            'ip' => $request->ip(),
+            'agente' => $request->userAgent(),
         ]);
 
         // La misma respuesta si ya lo conocíamos o es nuevo.

@@ -36,6 +36,7 @@ use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Medicion\Atribucion;
+use App\Modules\Tenancy\Medicion\IdentificadoresNavegador;
 use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
@@ -967,6 +968,7 @@ class MiTenantController
             'acepta_condiciones' => ['sometimes', 'boolean'],
             // De dónde llegó (ADR 0142): se guarda con la orden.
             ...Atribucion::reglas(),
+            ...IdentificadoresNavegador::reglas(),
         ]);
 
         // Para una persona a su cargo (B05): paga y acepta el responsable; los planes, sus
@@ -995,7 +997,7 @@ class MiTenantController
                 : null,
         );
 
-        $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $titular);
+        $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $titular, $validado['medicion'] ?? null, $request->ip(), $request->userAgent());
         if ($contexto !== null) {
             $orden->update(['contexto_medicion_id' => $contexto->getKey()]);
         }

@@ -60,6 +60,7 @@ use App\Modules\Tenancy\Http\Controllers\LealtadTenantController;
 use App\Modules\Tenancy\Http\Controllers\LegalesPublicoController;
 use App\Modules\Tenancy\Http\Controllers\LlavesApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MarcaEstudioController;
+use App\Modules\Tenancy\Http\Controllers\MedicionNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\MedicionPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\MedicionPublicaController;
 use App\Modules\Tenancy\Http\Controllers\MembresiasTenantController;
@@ -313,6 +314,9 @@ Route::prefix('v1')->group(function (): void {
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
+        // GA4 de su página (ADR 0143) y las preferencias de quien la visita.
+        Route::get('/medicion', [MedicionNegocioTenantController::class, 'publico'])->middleware('throttle:negocio-publico')->name('medicion.publico');
+        Route::post('/medicion/consentimiento', [MedicionNegocioTenantController::class, 'consentimiento'])->middleware('throttle:negocio-publico')->name('medicion.consentimiento');
         // Dejar de recibir promociones desde el enlace firmado de una campaña (B08).
         Route::get('/promociones/baja/{persona}', BajaPromocionesController::class)->middleware(['signed', 'throttle:negocio-publico'])->name('promociones.baja');
         // Calendario público de clases (plan de mejoras M02): sesiones reales por fecha,
@@ -942,6 +946,11 @@ Route::prefix('v1')->group(function (): void {
             // Webhooks salientes (R40): endpoints firmados que consumen el outbox. El
             // secreto se devuelve solo al crear. Configuracion solo del propietario.
             Route::get('/webhooks-salientes', [WebhooksSalientesTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.index');
+            // GA4 y Meta del negocio (ADR 0143): sus destinos, sus envíos y la prueba.
+            Route::get('/medicion/destinos', [MedicionNegocioTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('medicion.destinos.index');
+            Route::put('/medicion/destinos/{proveedor}', [MedicionNegocioTenantController::class, 'guardar'])->middleware(['puede:integraciones.configurar', 'plan:integraciones'])->name('medicion.destinos.guardar');
+            Route::delete('/medicion/destinos/{proveedor}', [MedicionNegocioTenantController::class, 'desconectar'])->middleware('puede:integraciones.configurar')->name('medicion.destinos.desconectar');
+            Route::post('/medicion/destinos/{proveedor}/probar', [MedicionNegocioTenantController::class, 'probar'])->middleware(['puede:integraciones.configurar', 'plan:integraciones', 'throttle:10,1,medicion-probar'])->name('medicion.destinos.probar');
             Route::post('/webhooks-salientes', [WebhooksSalientesTenantController::class, 'crear'])->middleware(['puede:integraciones.configurar', 'plan:integraciones'])->name('webhooks-salientes.store');
             Route::delete('/webhooks-salientes/{webhook}', [WebhooksSalientesTenantController::class, 'eliminar'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.eliminar');
             Route::get('/webhooks-salientes/{webhook}/entregas', [WebhooksSalientesTenantController::class, 'entregas'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.entregas');
