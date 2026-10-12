@@ -197,9 +197,9 @@ export function leerAtribucion(ambito: Ambito, ahora = new Date()): Atribucion {
 
 function mismoToque(a: Toque | null, b: Toque): boolean {
   if (a === null) return false;
-  const { en: _a, ...restoA } = a;
-  const { en: _b, ...restoB } = b;
-  return JSON.stringify(restoA) === JSON.stringify(restoB);
+  // Sin la fecha (JSON.stringify omite lo indefinido).
+  const sinFecha = (t: Toque) => JSON.stringify({ ...t, en: undefined });
+  return sinFecha(a) === sinFecha(b);
 }
 
 /**
@@ -238,8 +238,10 @@ export function capturarAtribucion(
 /** Quita los identificadores de clic (sin autorización de publicidad no salen). */
 function sinClics(toque: Toque | null): Toque | null {
   if (toque === null) return null;
-  const { gclid: _g, fbclid: _f, ...resto } = toque;
-  return resto;
+  const copia: Toque = { ...toque };
+  delete copia.gclid;
+  delete copia.fbclid;
+  return copia;
 }
 
 /** Lo que se manda al servidor junto con el registro que se crea. */
