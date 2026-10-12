@@ -347,6 +347,22 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Atribución de campañas (ADR 0142)
+
+- `atribucion` (opcional) en `POST /registro`, `POST /captacion/formularios/{f}/envios`,
+  `POST /citas` y `POST /mi/ordenes`:
+  `{primer_toque, ultimo_toque}`, cada uno con `fuente`, `medio`, `campana`,
+  `contenido`, `termino`, `referente` (host) y `en` (ISO 8601).
+- El servidor valida de nuevo y descarta lo que no sirve sin rechazar la solicitud.
+  Aplica `medicion.dias_ultimo_toque` y `medicion.dias_primer_toque` (parámetros del
+  negocio; en el registro, los de la plataforma).
+- Se acredita la campaña del último toque vigente. Sin él, sin atribución.
+- `GET /prospectos/{p}` agrega `campana`: `{fuente, medio, campana, referente,
+  primer_origen}` o `null` (sin atribución).
+- `GET /mi/interes?plan={ulid}` o `?clase={ulid}`: lo que eligió en la página antes de
+  entrar, si es de este negocio y sigue público. Sin esos parámetros, lo del prospecto
+  (ADR 0137).
+
 ## Widgets para la web del negocio (ADR 0141)
 
 - `GET/POST /captacion/widgets` y `PUT/DELETE /captacion/widgets/{widget}`
