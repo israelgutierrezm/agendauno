@@ -334,16 +334,16 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
                         'Incluye: ${_servicio!.incluye.join(' · ')}',
-                        style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                        style: TextStyle(color: context.colores.textoSuave),
                       ),
                     ),
                   if (_servicio?.conPlan ?? false)
-                    const Padding(
-                      key: Key('pago-con-bono'),
-                      padding: EdgeInsets.only(bottom: 12),
+                    Padding(
+                      key: const Key('pago-con-bono'),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
                         'Se descuenta una sesión de tu bono; no pagas al agendar.',
-                        style: TextStyle(color: TemaAgendaUno.textoSuave),
+                        style: TextStyle(color: context.colores.textoSuave),
                       ),
                     ),
                   if (opciones.sucursales.length > 1)
@@ -355,12 +355,12 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       _buscarHorarios();
                     }),
                   if (_profesionalesSede.isEmpty)
-                    const Padding(
+                    Padding(
                       key: Key('sede-sin-profesionales'),
                       padding: EdgeInsets.only(bottom: 12),
                       child: Text(
                         'Por ahora nadie atiende en esta sede.',
-                        style: TextStyle(color: TemaAgendaUno.textoSuave),
+                        style: TextStyle(color: context.colores.textoSuave),
                       ),
                     )
                   else if (_profesionalesSede.length > 1) ...[
@@ -401,9 +401,9 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       ],
                     )
                   else if (_listo && _horarios.isEmpty)
-                    const Text(
+                    Text(
                       'No hay horarios libres ese día. Prueba otro día u otro profesional.',
-                      style: TextStyle(color: TemaAgendaUno.textoSuave),
+                      style: TextStyle(color: context.colores.textoSuave),
                     )
                   else
                     // Horas en cuadrícula pareja, como en la web.
@@ -444,10 +444,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                     ),
                   if (!_buscando && _horarios.any((h) => h.enOtraZona)) ...[
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       textoHorasDeLaSede,
                       key: Key('horas-de-la-sede'),
-                      style: TextStyle(color: TemaAgendaUno.textoSuave),
+                      style: TextStyle(color: context.colores.textoSuave),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -542,7 +542,7 @@ class _DondeSera extends StatelessWidget {
                 if (sede.ubicacion != null)
                   Text(
                     sede.ubicacion!,
-                    style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                    style: TextStyle(color: context.colores.textoSuave),
                   ),
                 if (sede.mapaUrl != null)
                   TextButton(

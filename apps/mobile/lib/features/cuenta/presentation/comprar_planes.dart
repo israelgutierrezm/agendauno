@@ -86,9 +86,9 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
                       children: [
                         Text(
                           p.etiqueta,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: TemaAgendaUno.textoSuave,
+                            color: context.colores.textoSuave,
                           ),
                         ),
                         Text(
@@ -116,9 +116,9 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
                           if (dato != null)
                             Text(
                               dato,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: TemaAgendaUno.textoSuave,
+                                color: context.colores.textoSuave,
                               ),
                             ),
                       ],

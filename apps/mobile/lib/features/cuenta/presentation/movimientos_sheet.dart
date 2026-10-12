@@ -42,9 +42,9 @@ class MovimientosSheet extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 if (lista.isEmpty)
-                  const Text(
+                  Text(
                     'Aún no hay movimientos.',
-                    style: TextStyle(color: TemaAgendaUno.textoSuave),
+                    style: TextStyle(color: context.colores.textoSuave),
                   )
                 else
                   Flexible(
@@ -88,7 +88,7 @@ class _Movimiento extends StatelessWidget {
                 ),
                 Text(
                   detalle,
-                  style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                  style: TextStyle(color: context.colores.textoSuave),
                 ),
               ],
             ),
@@ -102,8 +102,8 @@ class _Movimiento extends StatelessWidget {
               ),
               Text(
                 'Saldo ${MovimientoCredito.creditos(m.saldoPosterior, conSigno: false)}',
-                style: const TextStyle(
-                  color: TemaAgendaUno.textoSuave,
+                style: TextStyle(
+                  color: context.colores.textoSuave,
                   fontSize: 12,
                 ),
               ),

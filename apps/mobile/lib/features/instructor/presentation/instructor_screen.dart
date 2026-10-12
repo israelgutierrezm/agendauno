@@ -193,7 +193,7 @@ class _Inicio extends ConsumerWidget {
                 estudio == null || estudio.isEmpty
                     ? 'Aquí tienes tus $clases.'
                     : 'Aquí tienes tus $clases en $estudio.',
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
               const SizedBox(height: 16),
               // La tarjeta principal: siempre, con o sin algo agendado.
@@ -225,9 +225,7 @@ class _Inicio extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Text(
                           'No tienes $clases asignadas en los próximos días.',
-                          style: const TextStyle(
-                            color: TemaAgendaUno.textoSuave,
-                          ),
+                          style: TextStyle(color: context.colores.textoSuave),
                         ),
                         const SizedBox(height: 14),
                         FilledButton(
@@ -262,8 +260,8 @@ class _Inicio extends ConsumerWidget {
                             detalleSesion(proxima),
                             style: TextStyle(
                               color: proxima.enEspera > 0
-                                  ? TemaAgendaUno.aviso
-                                  : TemaAgendaUno.textoSuave,
+                                  ? context.colores.aviso
+                                  : context.colores.textoSuave,
                             ),
                           ),
                         const SizedBox(height: 14),
@@ -392,11 +390,11 @@ class _MisClases extends ConsumerWidget {
         encabezado: [
           if (estado.isLoading) const LinearProgressIndicator(minHeight: 2),
           if (estado.hasError && !estado.isLoading)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
                 'No se pudo cargar. Desliza hacia abajo para reintentar.',
-                style: TextStyle(color: TemaAgendaUno.error),
+                style: TextStyle(color: context.colores.error),
               ),
             ),
         ],
@@ -413,11 +411,11 @@ class _MisClases extends ConsumerWidget {
                 ],
               ),
             ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 12),
             child: Text(
               'Para ver todo en el calendario del teléfono, conéctalo en Mi perfil.',
-              style: TextStyle(color: TemaAgendaUno.textoSuave, fontSize: 13),
+              style: TextStyle(color: context.colores.textoSuave, fontSize: 13),
             ),
           ),
         ],
@@ -451,7 +449,7 @@ class _MisClases extends ConsumerWidget {
               ),
               Text(
                 [?s.sucursal, ?s.sala].join(' · '),
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
               if (detalleSesion(s).isNotEmpty)
                 Padding(
@@ -461,8 +459,8 @@ class _MisClases extends ConsumerWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: s.enEspera > 0
-                          ? TemaAgendaUno.aviso
-                          : TemaAgendaUno.texto,
+                          ? context.colores.aviso
+                          : context.colores.texto,
                     ),
                   ),
                 ),

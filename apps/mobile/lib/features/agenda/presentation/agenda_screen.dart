@@ -59,9 +59,9 @@ class AgendaScreen extends ConsumerWidget {
     final estado = ref.watch(agendaProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
+      backgroundColor: context.colores.fondo,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF6F7FB),
+        backgroundColor: context.colores.fondo,
         titleSpacing: 20,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,9 +72,9 @@ class AgendaScreen extends ConsumerWidget {
             ),
             Text(
               '${_diasLargos[dia.weekday - 1]} ${dia.day} de ${_meses[dia.month - 1]}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF596275),
+                color: context.colores.textoSuave,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -170,12 +170,12 @@ class _TiraSemana extends ConsumerWidget {
                           height: 60,
                           decoration: BoxDecoration(
                             color: sel
-                                ? TemaAgendaUno.acento
+                                ? context.colores.acento
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(14),
                             border: esHoy && !sel
                                 ? Border.all(
-                                    color: TemaAgendaUno.acento,
+                                    color: context.colores.acento,
                                     width: 1.5,
                                   )
                                 : null,
@@ -189,8 +189,9 @@ class _TiraSemana extends ConsumerWidget {
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: sel
-                                      ? Colors.white70
-                                      : const Color(0xFF667085),
+                                      ? context.colores.acentoContraste
+                                            .withValues(alpha: 0.75)
+                                      : context.colores.textoSuave,
                                 ),
                               ),
                               Text(
@@ -199,8 +200,8 @@ class _TiraSemana extends ConsumerWidget {
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
                                   color: sel
-                                      ? Colors.white
-                                      : const Color(0xFF101828),
+                                      ? context.colores.acentoContraste
+                                      : context.colores.texto,
                                 ),
                               ),
                             ],
@@ -313,8 +314,8 @@ class _AgendaCitas extends ConsumerWidget {
                     color: sel ? color : Colors.transparent,
                     width: 2,
                   ),
-                  backgroundColor: const Color(0xFFEAEDF3),
-                  selectedColor: Colors.white,
+                  backgroundColor: context.colores.superficie2,
+                  selectedColor: context.colores.superficie,
                 );
               },
             ),
@@ -326,13 +327,17 @@ class _AgendaCitas extends ConsumerWidget {
               (
                 '${citas.where((s) => s.programada).length}',
                 '${terminologia.sesiones.toLowerCase()} hoy',
-                const Color(0xFF101828),
+                context.colores.texto,
               ),
-              ('$enLocal', 'en el local', const Color(0xFF5B21B6)),
+              (
+                '$enLocal',
+                'en el local',
+                context.colores.tinta(const Color(0xFF5B21B6)),
+              ),
               (
                 Formato.dinero(porCobrar, moneda),
                 'por cobrar',
-                const Color(0xFF7A5200),
+                context.colores.tinta(const Color(0xFF7A5200)),
               ),
             ],
           ),
@@ -437,9 +442,9 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
         minutoAhora <= fin;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colores.superficie,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: widget.citas.isEmpty
           ? const _Vacio('Sin citas este día.')
@@ -455,20 +460,17 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
                         left: 52,
                         right: 0,
                         top: _y(m),
-                        child: const Divider(
-                          height: 1,
-                          color: Color(0xFFEEF0F5),
-                        ),
+                        child: Divider(height: 1, color: context.colores.borde),
                       ),
                       Positioned(
                         left: 10,
                         top: _y(m) - 8,
                         child: Text(
                           '${m ~/ 60}:00',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF667085),
+                            color: context.colores.textoSuave,
                           ),
                         ),
                       ),
@@ -515,9 +517,11 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
   }
 
   Widget _tarjeta(BuildContext context, SesionAgenda s, Sesion? sesion) {
-    final tono = TonoServicio.de(s.ofertaId);
+    final tono = TonoServicio.de(s.ofertaId).en(context.colores);
     final estado = s.esCita ? s.estadoCita : null;
-    final estilo = estado != null ? estiloEstado(estado) : null;
+    final estilo = estado != null
+        ? estiloEstado(context.colores, estado)
+        : null;
     final top = _y(s.iniciaEn.hour * 60 + s.iniciaEn.minute) + 1;
     final alto = math.max(28.0, s.duracionMin / 60 * _pxHora - 3);
     final tenue =
@@ -617,18 +621,25 @@ String cupoTexto(SesionAgenda s) {
 }
 
 /// Colores (fondo, tinta) del pago pendiente de una cita (por pagar o por cobrar).
-const estiloPago = (Color(0xFFFFF1CC), Color(0xFF7A5200));
+(Color, Color) estiloPago(ColoresAgendaUno c) =>
+    c.par(const Color(0xFFFFF1CC), const Color(0xFF7A5200));
 
-/// Colores (fondo, tinta) de cada estado de cita.
-(Color, Color) estiloEstado(EstadoCita e) => switch (e) {
-  EstadoCita.confirmada => (const Color(0xFFE3F5EB), const Color(0xFF0F6B3E)),
-  EstadoCita.sinRegistrar => (const Color(0xFFFFEAD5), const Color(0xFF9A3412)),
-  EstadoCita.llego => (const Color(0xFFE3EDFF), const Color(0xFF0B4FD1)),
-  EstadoCita.enServicio => (const Color(0xFFEDE7FF), const Color(0xFF5B21B6)),
-  EstadoCita.completada => (const Color(0xFFEEF0F4), const Color(0xFF475063)),
-  EstadoCita.noAsistio => (const Color(0xFFFDE6E6), const Color(0xFFA11B1B)),
-  EstadoCita.cancelada => (const Color(0xFFEEF0F4), const Color(0xFF667085)),
-};
+/// Colores (fondo, tinta) de cada estado de cita (en oscuro, aclarados).
+(Color, Color) estiloEstado(ColoresAgendaUno c, EstadoCita e) {
+  final (fondo, tinta) = switch (e) {
+    EstadoCita.confirmada => (const Color(0xFFE3F5EB), const Color(0xFF0F6B3E)),
+    EstadoCita.sinRegistrar => (
+      const Color(0xFFFFEAD5),
+      const Color(0xFF9A3412),
+    ),
+    EstadoCita.llego => (const Color(0xFFE3EDFF), const Color(0xFF0B4FD1)),
+    EstadoCita.enServicio => (const Color(0xFFEDE7FF), const Color(0xFF5B21B6)),
+    EstadoCita.completada => (const Color(0xFFEEF0F4), const Color(0xFF475063)),
+    EstadoCita.noAsistio => (const Color(0xFFFDE6E6), const Color(0xFFA11B1B)),
+    EstadoCita.cancelada => (const Color(0xFFEEF0F4), const Color(0xFF667085)),
+  };
+  return c.par(fondo, tinta);
+}
 
 // ----------------------------------------------------------------- CLASES
 
@@ -662,10 +673,14 @@ class _AgendaClases extends StatelessWidget {
             (
               '${programadas.length}',
               terminologia.sesiones.toLowerCase(),
-              const Color(0xFF101828),
+              context.colores.texto,
             ),
-            ('$res/$cap', 'lugares', const Color(0xFF0B4FD1)),
-            ('$espera', 'en espera', const Color(0xFF5B21B6)),
+            ('$res/$cap', 'lugares', context.colores.acento),
+            (
+              '$espera',
+              'en espera',
+              context.colores.tinta(const Color(0xFF5B21B6)),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -684,7 +699,7 @@ class _TarjetaClase extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = sesion;
-    final tono = TonoServicio.de(s.ofertaId);
+    final tono = TonoServicio.de(s.ofertaId).en(context.colores);
     final pasada = !s.terminaEn.isAfter(ahora);
     final enCurso =
         !s.iniciaEn.isAfter(ahora) &&
@@ -694,8 +709,8 @@ class _TarjetaClase extends ConsumerWidget {
     final ocupacion = s.ocupacion;
     final pct = ocupacion?.porcentaje ?? 0;
     final color = pct >= 90
-        ? const Color(0xFF079455)
-        : (pct >= 40 ? const Color(0xFF0070FF) : const Color(0xFFDC6803));
+        ? context.colores.exito
+        : (pct >= 40 ? context.colores.acento : context.colores.aviso);
     final libres = s.clase?.libres;
     final enEspera = s.clase?.enEspera ?? 0;
     final estadoCita = s.esCita ? s.estadoCita : null;
@@ -740,9 +755,9 @@ class _TarjetaClase extends ConsumerWidget {
                       ),
                       Text(
                         '${s.duracionMin} min',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF667085),
+                          color: context.colores.textoSuave,
                         ),
                       ),
                     ],
@@ -775,7 +790,7 @@ class _TarjetaClase extends ConsumerWidget {
                                 decoration: BoxDecoration(
                                   color: enCurso
                                       ? const Color(0xFFD92D20)
-                                      : Colors.white,
+                                      : context.colores.superficie,
                                   borderRadius: BorderRadius.circular(99),
                                 ),
                                 child: Text(
@@ -831,11 +846,10 @@ class _TarjetaClase extends ConsumerWidget {
                                   value: ocupacion.fraccion,
                                   strokeWidth: 6,
                                   strokeCap: StrokeCap.round,
-                                  backgroundColor: Colors.white.withValues(
-                                    alpha: 0.8,
-                                  ),
+                                  backgroundColor: context.colores.superficie
+                                      .withValues(alpha: 0.8),
                                   color: pasada
-                                      ? const Color(0xFF98A2B3)
+                                      ? context.colores.textoSuave
                                       : color,
                                 ),
                               ),
@@ -874,7 +888,7 @@ class _Resumen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colores.superficie,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -899,10 +913,10 @@ class _Resumen extends StatelessWidget {
                   ),
                   Text(
                     etiqueta,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF596275),
+                      color: context.colores.textoSuave,
                     ),
                   ),
                 ],
@@ -926,7 +940,7 @@ class _Vacio extends StatelessWidget {
       child: Text(
         texto,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: Color(0xFF596275)),
+        style: TextStyle(color: context.colores.textoSuave),
       ),
     ),
   );

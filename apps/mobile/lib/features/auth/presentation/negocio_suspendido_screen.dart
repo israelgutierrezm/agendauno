@@ -57,7 +57,7 @@ class _NegocioSuspendidoScreenState
                         'suscripción en ${AppConfig.producto.dominio} para '
                         'reactivarlo.'
                   : 'Este negocio no está disponible por ahora.',
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             const SizedBox(height: 20),
             FilledButton(

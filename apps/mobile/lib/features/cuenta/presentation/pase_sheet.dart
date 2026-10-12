@@ -70,10 +70,10 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Muéstralo en recepción. Se renueva solo cada minuto.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             const SizedBox(height: 16),
             if (_codigo != null)
@@ -87,7 +87,7 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
                 ),
               )
             else if (_error != null)
-              Text(_error!, style: const TextStyle(color: TemaAgendaUno.error))
+              Text(_error!, style: TextStyle(color: context.colores.error))
             else
               const SizedBox(
                 height: 240,

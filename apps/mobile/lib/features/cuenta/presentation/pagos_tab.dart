@@ -30,13 +30,13 @@ class PagosTab extends ConsumerWidget {
           const TituloSeccion('Por pagar'),
           // La pasarela del negocio está en pruebas (M07).
           if (cuenta.pagoEnLinea && cuenta.pagoEnLineaPrueba)
-            const Padding(
+            Padding(
               key: Key('modo-prueba'),
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
                 'Este negocio está probando su cobro en línea: por ahora no se '
                 'cobra de verdad.',
-                style: TextStyle(color: TemaAgendaUno.aviso),
+                style: TextStyle(color: context.colores.aviso),
               ),
             ),
           if (cuenta.porPagar.isEmpty)

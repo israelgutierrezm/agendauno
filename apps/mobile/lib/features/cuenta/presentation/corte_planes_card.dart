@@ -38,12 +38,12 @@ class CortePlanesSeccion extends ConsumerWidget {
           children: [
             for (final p in actuales) _PlanCard(p, terminologia),
             if (anteriores.isNotEmpty) ...[
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(4, 12, 4, 4),
                 child: Text(
                   'Planes anteriores',
                   style: TextStyle(
-                    color: TemaAgendaUno.textoSuave,
+                    color: context.colores.textoSuave,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -75,9 +75,9 @@ class _PlanCardState extends State<_PlanCard> {
       iso == null ? '—' : Formato.dia(DateTime.parse(iso));
 
   Color get _colorEstado => switch (widget.p.estado) {
-    'vigente' => TemaAgendaUno.exito,
-    'pausado' || 'suspendido' => TemaAgendaUno.aviso,
-    _ => TemaAgendaUno.textoSuave,
+    'vigente' => context.colores.exito,
+    'pausado' || 'suspendido' => context.colores.aviso,
+    _ => context.colores.textoSuave,
   };
 
   @override
@@ -124,7 +124,7 @@ class _PlanCardState extends State<_PlanCard> {
                 ?p.cobertura.texto,
                 if (p.aplicaA.isNotEmpty) 'Sirve para: ${p.aplicaA.join(', ')}',
               ].join(' · '),
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             const SizedBox(height: 12),
             // Los números del plan.
@@ -146,7 +146,7 @@ class _PlanCardState extends State<_PlanCard> {
               for (final x in p.extras)
                 Text(
                   '${x.producto ?? '—'} · ${_fecha(x.comprado)} · ${PlanCorte.clases(x.usadas)} de ${PlanCorte.clases(x.unidades)} usadas',
-                  style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                  style: TextStyle(color: context.colores.textoSuave),
                 ),
             ],
             const SizedBox(height: 8),
@@ -160,11 +160,11 @@ class _PlanCardState extends State<_PlanCard> {
                     child: Text('Cómo lo usaste (${p.usos.length})'),
                   )
                 else
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'Aún no se ha usado.',
-                      style: TextStyle(color: TemaAgendaUno.textoSuave),
+                      style: TextStyle(color: context.colores.textoSuave),
                     ),
                   ),
                 if (!p.ilimitado && p.derechoId.isNotEmpty)
@@ -198,8 +198,8 @@ class _PlanCardState extends State<_PlanCard> {
                               TextSpan(
                                 text:
                                     ' · ${u.clase ?? '—'}${u.extra ? ' (extra)' : ''}',
-                                style: const TextStyle(
-                                  color: TemaAgendaUno.textoSuave,
+                                style: TextStyle(
+                                  color: context.colores.textoSuave,
                                 ),
                               ),
                             ],
@@ -211,8 +211,8 @@ class _PlanCardState extends State<_PlanCard> {
                         style: TextStyle(
                           fontSize: 12,
                           color: u.pideAtencion
-                              ? TemaAgendaUno.aviso
-                              : TemaAgendaUno.textoSuave,
+                              ? context.colores.aviso
+                              : context.colores.textoSuave,
                         ),
                       ),
                     ],
@@ -229,14 +229,14 @@ class _PlanCardState extends State<_PlanCard> {
     children: [
       Text(
         etiqueta,
-        style: const TextStyle(fontSize: 12, color: TemaAgendaUno.textoSuave),
+        style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
       ),
       Text(
         valor,
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: destacado ? TemaAgendaUno.acento : TemaAgendaUno.texto,
+          color: destacado ? context.colores.acento : context.colores.texto,
         ),
       ),
     ],

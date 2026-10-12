@@ -205,7 +205,7 @@ Future<bool> confirmarCancelacion(
         ),
         if (efecto.cancelable)
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),
+            style: TextButton.styleFrom(foregroundColor: context.colores.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Sí, cancelar'),
           ),
@@ -308,10 +308,10 @@ Future<void> mostrarFichaDePago(BuildContext context, FichaDePago ficha) =>
                 ),
               ],
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Presenta la referencia en la caja. Tu compra se confirma sola '
                 'cuando la tienda reporta el pago.',
-                style: TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
               Wrap(
                 spacing: 8,

@@ -92,7 +92,7 @@ class _HistorialState extends ConsumerState<HistorialScreen> {
               child: ListTile(
                 title: Text(
                   _error!,
-                  style: const TextStyle(color: TemaAgendaUno.error),
+                  style: TextStyle(color: context.colores.error),
                 ),
                 trailing: TextButton(
                   onPressed: () => _cargar(reiniciar: true),
@@ -154,21 +154,18 @@ class _Fila extends StatelessWidget {
             i.oferta ?? '—',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          Text(
-            detalle,
-            style: const TextStyle(color: TemaAgendaUno.textoSuave),
-          ),
+          Text(detalle, style: TextStyle(color: context.colores.textoSuave)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 12,
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              EstadoPunto(i.estadoTexto, color: _color(i)),
+              EstadoPunto(i.estadoTexto, color: _color(context, i)),
               if (i.reprogramada)
-                const Text(
+                Text(
                   'Cambió de horario',
-                  style: TextStyle(color: TemaAgendaUno.textoSuave),
+                  style: TextStyle(color: context.colores.textoSuave),
                 ),
             ],
           ),
@@ -193,8 +190,8 @@ class _Fila extends StatelessWidget {
                                   : Icons.star_border,
                               size: 16,
                               color: n <= i.calificacion!
-                                  ? TemaAgendaUno.aviso
-                                  : TemaAgendaUno.textoSuave,
+                                  ? context.colores.aviso
+                                  : context.colores.textoSuave,
                             ),
                         ],
                       ),
@@ -203,7 +200,7 @@ class _Fila extends StatelessWidget {
                   if (i.comentario != null)
                     Text(
                       i.comentario!,
-                      style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                      style: TextStyle(color: context.colores.textoSuave),
                     ),
                 ],
               ),
@@ -221,13 +218,14 @@ class _Fila extends StatelessWidget {
     );
   }
 
-  static Color _color(ItemHistorial i) => switch (i.estado) {
-    'asistio' => TemaAgendaUno.exito,
-    'no_asistio' => TemaAgendaUno.error,
-    'sin_pagar' => TemaAgendaUno.aviso,
-    'cancelada' when i.canceladaPor != 'cliente' => TemaAgendaUno.aviso,
-    _ => TemaAgendaUno.textoSuave,
-  };
+  static Color _color(BuildContext context, ItemHistorial i) =>
+      switch (i.estado) {
+        'asistio' => context.colores.exito,
+        'no_asistio' => context.colores.error,
+        'sin_pagar' => context.colores.aviso,
+        'cancelada' when i.canceladaPor != 'cliente' => context.colores.aviso,
+        _ => context.colores.textoSuave,
+      };
 }
 
 /// Calificar lo que tomó (1 a 5 y un comentario opcional); al enviarla se cierra.
@@ -302,8 +300,8 @@ class _CalificarSheetState extends ConsumerState<_CalificarSheet> {
                   icon: Icon(
                     n <= _estrellas ? Icons.star : Icons.star_border,
                     color: n <= _estrellas
-                        ? TemaAgendaUno.aviso
-                        : TemaAgendaUno.textoSuave,
+                        ? context.colores.aviso
+                        : context.colores.textoSuave,
                   ),
                 ),
             ],

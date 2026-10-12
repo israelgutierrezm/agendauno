@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import '../../../core/agenda/contrato_agenda.dart';
+import '../../../core/theme/tema_agendauno.dart';
 
 export '../../../core/agenda/contrato_agenda.dart';
 // La vista previa de una cancelación es la misma que ve el cliente.
@@ -413,6 +414,13 @@ class TonoServicio {
     TonoServicio(Color(0xFFDFF3FB), Color(0xFF0B5470)),
     TonoServicio(Color(0xFFE6F4D7), Color(0xFF3B5A12)),
   ];
+
+  /// En el modo del teléfono: en oscuro, la tinta se aclara y el fondo queda suave
+  /// sobre la superficie.
+  TonoServicio en(ColoresAgendaUno c) {
+    final (f, t) = c.par(fondo, tinta);
+    return TonoServicio(f, t);
+  }
 
   /// Tono estable por servicio (hash del id).
   static TonoServicio de(String? ofertaId) {

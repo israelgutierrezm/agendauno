@@ -116,9 +116,9 @@ class _CalendarioVistasState extends State<CalendarioVistas> {
           child: Text(
             Calendario.etiqueta(_vista, _fecha),
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: TemaAgendaUno.textoSuave,
+              color: context.colores.textoSuave,
             ),
           ),
         ),
@@ -137,9 +137,9 @@ class _CalendarioVistasState extends State<CalendarioVistas> {
       child: Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Text(
+          Text(
             'No hay nada en estas fechas.',
-            style: TextStyle(color: TemaAgendaUno.textoSuave),
+            style: TextStyle(color: context.colores.textoSuave),
           ),
           if (siguiente != null)
             TextButton(
@@ -202,10 +202,10 @@ class _CalendarioVistasState extends State<CalendarioVistas> {
                       child: Center(
                         child: Text(
                           d,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: TemaAgendaUno.textoSuave,
+                            color: context.colores.textoSuave,
                           ),
                         ),
                       ),
@@ -242,11 +242,11 @@ class _CalendarioVistasState extends State<CalendarioVistas> {
         ),
       ),
       if (delSeleccionado.isEmpty)
-        const Padding(
+        Padding(
           padding: EdgeInsets.all(4),
           child: Text(
             'Nada este día.',
-            style: TextStyle(color: TemaAgendaUno.textoSuave),
+            style: TextStyle(color: context.colores.textoSuave),
           ),
         )
       else
@@ -262,10 +262,10 @@ class _CalendarioVistasState extends State<CalendarioVistas> {
   }
 }
 
-Color colorTono(TonoEvento t) => switch (t) {
-  TonoEvento.primario => TemaAgendaUno.acento,
-  TonoEvento.aviso => TemaAgendaUno.aviso,
-  TonoEvento.suave => TemaAgendaUno.textoSuave,
+Color colorTono(BuildContext context, TonoEvento t) => switch (t) {
+  TonoEvento.primario => context.colores.acento,
+  TonoEvento.aviso => context.colores.aviso,
+  TonoEvento.suave => context.colores.textoSuave,
 };
 
 /// Un evento en una lista: hora, título con su detalle y su estado.
@@ -320,7 +320,7 @@ class FilaEvento extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: colorTono(e.tono),
+              color: colorTono(context, e.tono),
             ),
           ),
   );
@@ -355,15 +355,18 @@ class _DiaDeSemana extends StatelessWidget {
               '${Calendario.diasSemana[dia.weekday - 1]} ${dia.day}',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: esHoy ? TemaAgendaUno.acento : TemaAgendaUno.texto,
+                color: esHoy ? context.colores.acento : context.colores.texto,
               ),
             ),
           ),
         ),
         if (eventos.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(left: 4, bottom: 4),
-            child: Text('—', style: TextStyle(color: TemaAgendaUno.textoSuave)),
+            child: Text(
+              '—',
+              style: TextStyle(color: context.colores.textoSuave),
+            ),
           )
         else
           for (final e in eventos) ChipEvento(e, onTap: onAbrir),
@@ -383,7 +386,9 @@ class ChipEvento extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 4),
     child: Material(
-      color: e.destacado ? TemaAgendaUno.acentoSuave : TemaAgendaUno.superficie,
+      color: e.destacado
+          ? context.colores.acentoSuave
+          : context.colores.superficie,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -394,7 +399,9 @@ class ChipEvento extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             border: Border(
               left: BorderSide(
-                color: e.destacado ? TemaAgendaUno.acento : TemaAgendaUno.borde,
+                color: e.destacado
+                    ? context.colores.acento
+                    : context.colores.borde,
                 width: 3,
               ),
             ),
@@ -403,8 +410,8 @@ class ChipEvento extends StatelessWidget {
             children: [
               Text(
                 Formato.hora(e.inicio),
-                style: const TextStyle(
-                  color: TemaAgendaUno.textoSuave,
+                style: TextStyle(
+                  color: context.colores.textoSuave,
                   fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),
@@ -422,7 +429,10 @@ class ChipEvento extends StatelessWidget {
               if (e.estado != null && e.estado!.isNotEmpty)
                 Text(
                   e.estado!,
-                  style: TextStyle(fontSize: 12, color: colorTono(e.tono)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorTono(context, e.tono),
+                  ),
                 ),
             ],
           ),
@@ -465,7 +475,7 @@ class _CeldaMes extends StatelessWidget {
           margin: const EdgeInsets.all(1),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: elegido ? TemaAgendaUno.acentoSuave : null,
+            color: elegido ? context.colores.acentoSuave : null,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -475,8 +485,8 @@ class _CeldaMes extends StatelessWidget {
                 height: 26,
                 alignment: Alignment.center,
                 decoration: esHoy
-                    ? const BoxDecoration(
-                        color: TemaAgendaUno.acento,
+                    ? BoxDecoration(
+                        color: context.colores.acento,
                         shape: BoxShape.circle,
                       )
                     : null,
@@ -485,10 +495,10 @@ class _CeldaMes extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: esHoy
-                        ? Colors.white
+                        ? context.colores.acentoContraste
                         : (delMes
-                              ? TemaAgendaUno.texto
-                              : TemaAgendaUno.textoSuave.withValues(
+                              ? context.colores.texto
+                              : context.colores.textoSuave.withValues(
                                   alpha: 0.6,
                                 )),
                   ),
@@ -507,8 +517,8 @@ class _CeldaMes extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: i < propios
-                            ? TemaAgendaUno.acento
-                            : TemaAgendaUno.textoSuave.withValues(alpha: 0.5),
+                            ? context.colores.acento
+                            : context.colores.textoSuave.withValues(alpha: 0.5),
                       ),
                     ),
                 ],

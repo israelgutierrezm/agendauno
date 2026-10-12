@@ -78,11 +78,11 @@ class _ActualizarAppScreenState extends ConsumerState<ActualizarAppScreen> {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Esta versión de la app ya no es compatible. Descarga la más '
               'reciente desde la tienda de tu teléfono y vuelve a abrirla; tu '
               'sesión se conserva.',
-              style: TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             const SizedBox(height: 12),
             Text(
@@ -90,7 +90,7 @@ class _ActualizarAppScreenState extends ConsumerState<ActualizarAppScreen> {
                   ? 'Tienes la versión $versionApp.'
                   : 'Tienes la versión $versionApp; se necesita la $minima o '
                         'una más reciente.',
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             const SizedBox(height: 20),
             if (tienda != null) ...[

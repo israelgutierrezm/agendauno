@@ -108,8 +108,8 @@ class _HistorialComprasSeccionState
                     style: TextStyle(
                       fontSize: 12,
                       color: o.estado == 'pagada'
-                          ? TemaAgendaUno.exito
-                          : TemaAgendaUno.textoSuave,
+                          ? context.colores.exito
+                          : context.colores.textoSuave,
                     ),
                   ),
                 ],

@@ -148,7 +148,7 @@ class _InicioNegocio extends ConsumerWidget {
                 estudio == null || estudio.isEmpty
                     ? 'Esto es lo que pasa hoy.'
                     : 'Esto es lo que pasa hoy en $estudio.',
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
               const SizedBox(height: 16),
               if (agenda != null) ...[
@@ -305,9 +305,9 @@ class _Indicadores extends StatelessWidget {
             children: [
               Text(
                 etiqueta,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: TemaAgendaUno.textoSuave,
+                  color: context.colores.textoSuave,
                 ),
               ),
               Text(
@@ -315,7 +315,7 @@ class _Indicadores extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: aviso ? TemaAgendaUno.aviso : null,
+                  color: aviso ? context.colores.aviso : null,
                 ),
               ),
             ],
@@ -388,11 +388,11 @@ class _Libres extends StatelessWidget {
             ],
           ),
           if (libres.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 6),
               child: Text(
                 'Hoy nadie tiene horario de atención.',
-                style: TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
             ),
           for (final l in libres)
@@ -412,9 +412,7 @@ class _Libres extends StatelessWidget {
                         if (l.sucursal != null)
                           Text(
                             l.sucursal!,
-                            style: const TextStyle(
-                              color: TemaAgendaUno.textoSuave,
-                            ),
+                            style: TextStyle(color: context.colores.textoSuave),
                           ),
                       ],
                     ),
@@ -432,9 +430,7 @@ class _Libres extends StatelessWidget {
                       if (l.huecos > 0 && l.siguiente != null)
                         Text(
                           'desde las ${Formato.hora(l.siguiente!)}',
-                          style: const TextStyle(
-                            color: TemaAgendaUno.textoSuave,
-                          ),
+                          style: TextStyle(color: context.colores.textoSuave),
                         ),
                     ],
                   ),
@@ -464,7 +460,7 @@ class _Pendientes extends StatelessWidget {
       padding: const EdgeInsets.only(top: 6),
       child: Text(
         texto,
-        style: TextStyle(color: aviso ? TemaAgendaUno.aviso : null),
+        style: TextStyle(color: aviso ? context.colores.aviso : null),
       ),
     );
     return Card(

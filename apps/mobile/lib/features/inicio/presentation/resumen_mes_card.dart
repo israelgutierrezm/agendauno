@@ -48,10 +48,7 @@ class ResumenMesCard extends StatelessWidget {
         children: [
           Text(
             etiqueta,
-            style: const TextStyle(
-              fontSize: 12,
-              color: TemaAgendaUno.textoSuave,
-            ),
+            style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
           ),
           Text(
             valor,
@@ -64,9 +61,9 @@ class ResumenMesCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: TemaAgendaUno.superficie,
+        color: context.colores.superficie,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: TemaAgendaUno.borde),
+        border: Border.all(color: context.colores.borde),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,7 +74,7 @@ class ResumenMesCard extends StatelessWidget {
           ),
           Text(
             'Del 1 al ${hoy.day} de ${_meses[hoy.month - 1]}',
-            style: const TextStyle(color: TemaAgendaUno.textoSuave),
+            style: TextStyle(color: context.colores.textoSuave),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -142,7 +139,7 @@ class _FilaProfesional extends StatelessWidget {
                     : '$pct% · ${_horas(p.agendadoMin)} de ${_horas(p.disponibleMin)}',
                 style: TextStyle(
                   fontSize: 13,
-                  color: pct == null ? TemaAgendaUno.textoSuave : null,
+                  color: pct == null ? context.colores.textoSuave : null,
                 ),
               ),
             ],
@@ -154,8 +151,8 @@ class _FilaProfesional extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: pct / 100,
                 minHeight: 4,
-                backgroundColor: TemaAgendaUno.borde,
-                color: TemaAgendaUno.acento,
+                backgroundColor: context.colores.borde,
+                color: context.colores.acento,
               ),
             ),
           ],

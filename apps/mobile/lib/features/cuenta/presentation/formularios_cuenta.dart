@@ -47,8 +47,8 @@ class FormulariosSeccion extends ConsumerWidget {
                         : 'Respondido el ${Formato.dia(f.respondidoEn!)}',
                     style: TextStyle(
                       color: f.respondidoEn == null
-                          ? TemaAgendaUno.aviso
-                          : TemaAgendaUno.textoSuave,
+                          ? context.colores.aviso
+                          : context.colores.textoSuave,
                     ),
                   ),
                   trailing: const Icon(Icons.chevron_right),
@@ -262,7 +262,7 @@ class _FormularioScreenState extends ConsumerState<FormularioScreen> {
             if (f.descripcion != null && f.descripcion!.isNotEmpty) ...[
               Text(
                 f.descripcion!,
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
               const SizedBox(height: 12),
             ],

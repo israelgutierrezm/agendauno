@@ -887,11 +887,11 @@ class RequisitoDocumento {
     _ => 'Falta subirlo',
   };
 
-  Color get color => switch (estado) {
-    'pendiente' => TemaAgendaUno.aviso,
-    'aprobado' => TemaAgendaUno.exito,
-    'rechazado' => TemaAgendaUno.error,
-    _ => TemaAgendaUno.textoSuave,
+  Color colorEn(ColoresAgendaUno c) => switch (estado) {
+    'pendiente' => c.aviso,
+    'aprobado' => c.exito,
+    'rechazado' => c.error,
+    _ => c.textoSuave,
   };
 
   factory RequisitoDocumento.desdeJson(Map<String, dynamic> j) {

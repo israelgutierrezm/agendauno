@@ -135,13 +135,13 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             ),
             if (tieneFoto)
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.delete_outline,
-                  color: TemaAgendaUno.error,
+                  color: context.colores.error,
                 ),
-                title: const Text(
+                title: Text(
                   'Quitar foto',
-                  style: TextStyle(color: TemaAgendaUno.error),
+                  style: TextStyle(color: context.colores.error),
                 ),
                 onTap: () => Navigator.of(context).pop('quitar'),
               ),
@@ -379,9 +379,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                   style: Theme.of(hoja).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Cada rol muestra sus propias opciones y permisos.',
-                  style: TextStyle(color: TemaAgendaUno.textoSuave),
+                  style: TextStyle(color: context.colores.textoSuave),
                 ),
                 const SizedBox(height: 12),
                 ListaRoles(
@@ -437,14 +437,14 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             children: [
               CircleAvatar(
                 radius: 32,
-                backgroundColor: TemaAgendaUno.acentoSuave,
+                backgroundColor: context.colores.acentoSuave,
                 foregroundImage: sesion.fotoUrl != null
                     ? NetworkImage(sesion.fotoUrl!)
                     : null,
                 child: Text(
                   iniciales,
-                  style: const TextStyle(
-                    color: TemaAgendaUno.acento,
+                  style: TextStyle(
+                    color: context.colores.acento,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -461,7 +461,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     if (sesion.email != null)
                       Text(
                         sesion.email!,
-                        style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                        style: TextStyle(color: context.colores.textoSuave),
                       ),
                     TextButton(
                       style: TextButton.styleFrom(padding: EdgeInsets.zero),
@@ -494,7 +494,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Falta confirmar ${sesion.emailPendiente}: abre el enlace que te enviamos (vence en 24 horas).',
-                      style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                      style: TextStyle(color: context.colores.textoSuave),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
@@ -747,7 +747,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             ),
           const SizedBox(height: 8),
           TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),
+            style: TextButton.styleFrom(foregroundColor: context.colores.error),
             icon: const Icon(Icons.logout),
             label: const Text('Cerrar sesión'),
             onPressed: () async {
