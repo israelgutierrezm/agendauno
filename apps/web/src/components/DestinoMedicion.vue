@@ -17,11 +17,13 @@ const props = withDefaults(
   defineProps<{
     destino: DestinoMedicion;
     negocio?: boolean;
+    /** Ofrecer los eventos adicionales (asistencia, renovación): los del negocio. */
+    extras?: boolean;
     alGuardar: (datos: Record<string, unknown>) => Promise<DestinoMedicion>;
     alProbar: () => Promise<{ ok: boolean; mensajes: string[] }>;
     alDesconectar: () => Promise<DestinoMedicion>;
   }>(),
-  { negocio: false },
+  { negocio: false, extras: false },
 );
 const emit = defineEmits<{ cambio: [DestinoMedicion] }>();
 
@@ -34,6 +36,7 @@ const secreto = ref("");
 const codigoPrueba = ref("");
 const activo = ref(false);
 const avisoConfirmado = ref(false);
+const eventosExtra = ref<string[]>([]);
 const guardando = ref(false);
 const probando = ref(false);
 const prueba = ref<{ ok: boolean; mensajes: string[] } | null>(null);
@@ -47,6 +50,7 @@ watch(
     codigoPrueba.value = d.codigo_prueba ?? "";
     activo.value = d.activo;
     avisoConfirmado.value = d.aviso_confirmado_en !== null;
+    eventosExtra.value = [...(d.eventos_extra ?? [])];
   },
   { immediate: true },
 );
@@ -83,6 +87,7 @@ async function guardar(): Promise<void> {
         : {}),
       activo: activo.value,
       aviso_confirmado: avisoConfirmado.value,
+      ...(props.extras ? { eventos_extra: eventosExtra.value } : {}),
     });
     emit("cambio", d);
     toast.exito(t("medicion.destinos.guardado"));
@@ -231,6 +236,25 @@ async function desconectar(): Promise<void> {
         :style="{ color: 'var(--error)' }"
         >{{ errores.aviso_confirmado }}</small
       >
+      <fieldset v-if="extras" class="space-y-1 text-sm">
+        <legend class="tu-label">{{ t("medicion.negocio.extras") }}</legend>
+        <p :style="{ color: 'var(--texto-suave)' }">
+          {{ t("medicion.negocio.extrasAyuda") }}
+        </p>
+        <label
+          v-for="extra in ['asistencia', 'renovacion']"
+          :key="extra"
+          class="flex items-center gap-2"
+        >
+          <input
+            v-model="eventosExtra"
+            type="checkbox"
+            :value="extra"
+            :data-prueba="`extra-${extra}`"
+          />
+          <span>{{ t(`medicion.negocio.extra.${extra}`) }}</span>
+        </label>
+      </fieldset>
       <label class="flex items-center gap-2 text-sm">
         <input v-model="activo" type="checkbox" data-prueba="activo-destino" />
         <span>{{ t("medicion.destinos.encendido") }}</span>

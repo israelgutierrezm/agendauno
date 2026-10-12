@@ -110,6 +110,21 @@ export default {
     embudo:
       "Se envía: negocio creado, prueba iniciada, activación operativa (su primera operación real) y primera suscripción pagada. Una prueba gratuita no es una venta.",
   },
+  negocio: {
+    pestana: "Medición",
+    titulo: "Medición de tus campañas",
+    descripcion:
+      "Conecta tu propia cuenta de Google Analytics 4 y tu píxel de Meta para medir cómo llegan tus alumnos o clientes. Son tuyas: distintas de las de la plataforma y de las de otros negocios.",
+    embudo:
+      "Se envía: visita a tu página (GA4), solicitud, cuenta activada, compra pagada, devolución y primera reserva confirmada, solo con el permiso de cada persona. Nunca nombres, correos, teléfonos ni respuestas de formularios.",
+    extras: "Eventos adicionales",
+    extrasAyuda:
+      "Siempre quedan en tu seguimiento interno. Enciéndelos solo si también quieres mandarlos a este destino.",
+    extra: {
+      asistencia: "Primera asistencia",
+      renovacion: "Renovaciones pagadas",
+    },
+  },
   guiaGa4: [
     "En GA4, crea (o elige) una propiedad y un flujo web para el dominio.",
     "Copia el ID de medición (G-…) y crea un API secret de Measurement Protocol.",

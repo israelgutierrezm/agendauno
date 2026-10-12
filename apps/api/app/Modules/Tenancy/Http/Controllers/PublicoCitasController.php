@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Exceptions\ModalidadNoDisponible;
 use App\Modules\Tenancy\Medicion\Atribucion;
+use App\Modules\Tenancy\Medicion\IdentificadoresNavegador;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -183,6 +184,7 @@ class PublicoCitasController
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
             // De dónde llegó (ADR 0142): se guarda con su cita y su orden.
             ...Atribucion::reglas(),
+            ...IdentificadoresNavegador::reglas(),
         ]);
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
@@ -204,7 +206,7 @@ class PublicoCitasController
             : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
         $this->anotar($reserva, $validado['nota'] ?? null, $validado['asiste'] ?? null);
         $reserva->load(['orden', 'sesion.instructor']);
-        $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $persona);
+        $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $persona, $validado['medicion'] ?? null, $request->ip(), $request->userAgent());
         if ($contexto !== null && $reserva->orden !== null) {
             $reserva->orden->update(['contexto_medicion_id' => $contexto->getKey()]);
         }

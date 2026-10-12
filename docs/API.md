@@ -347,6 +347,24 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## GA4 y Meta de cada negocio (ADR 0143)
+
+- Públicos:
+  - `GET /medicion`: `{ga4, meta: null}`. Es el ID de su GA4 si está encendido, no es
+    demo y su plan tiene `integraciones`. El píxel de Meta no se carga en un negocio;
+  - `POST /medicion/consentimiento`: `{visitante, analitica, publicidad}`. 204.
+- Con `integraciones.configurar`:
+  - `GET /medicion/destinos`: sus destinos y los últimos 50 envíos;
+  - `PUT /medicion/destinos/{ga4|meta}` (además, `plan:integraciones`): lo mismo que
+    en el superadmin, más `eventos_extra` (`asistencia`, `renovacion`). Queda en la
+    auditoría sin el secreto;
+  - `DELETE /medicion/destinos/{proveedor}`;
+  - `POST /medicion/destinos/{proveedor}/probar`.
+- Aceptan `medicion` (como en `POST /registro`):
+  - `POST /captacion/formularios/{f}/envios`;
+  - `POST /citas`;
+  - `POST /mi/ordenes`.
+
 ## GA4 y Meta del SaaS (ADR 0143)
 
 - `GET /medicion/{agendauno|turnouno}` (público): `{ga4, meta}`, los IDs de los destinos

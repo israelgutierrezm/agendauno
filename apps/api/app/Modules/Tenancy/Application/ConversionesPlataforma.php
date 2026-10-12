@@ -6,8 +6,8 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\EstadoCargoRenta;
-use App\Modules\Tenancy\Medicion\ConversionMedicion;
 use App\Modules\Tenancy\Medicion\EnviarConversionMedicion;
+use App\Modules\Tenancy\Medicion\EnviosMedicion;
 use App\Modules\Tenancy\Medicion\EstadoEnvioMedicion;
 use App\Modules\Tenancy\Medicion\IdentificadoresNavegador;
 use App\Modules\Tenancy\Medicion\ProveedorMedicion;
@@ -41,12 +41,6 @@ use Illuminate\Support\Collection;
  */
 class ConversionesPlataforma
 {
-    /** Intentos antes de dejarla en error. */
-    public const MAX_INTENTOS = 6;
-
-    /** Minutos de espera antes de cada reintento. */
-    private const ESPERAS = [1, 5, 15, 60, 180];
-
     /**
      * Cada resultado y cómo se llama en cada proveedor. Los de Meta sin equivalente
      * estándar son personalizados.
@@ -132,12 +126,8 @@ class ConversionesPlataforma
 
     public function enviar(CarbonImmutable $ahora, int $lote = 100): int
     {
-        $envios = EnvioMedicionPlataforma::query()
-            ->where(fn ($q) => $q->where('estado', EstadoEnvioMedicion::Pendiente->value)
-                ->orWhere(fn ($q) => $q->where('estado', EstadoEnvioMedicion::Error->value)->whereNotNull('proximo_intento_en')))
-            ->where(fn ($q) => $q->whereNull('proximo_intento_en')->orWhere('proximo_intento_en', '<=', $ahora))
+        $envios = EnviosMedicion::porMandar(EnvioMedicionPlataforma::query(), $ahora)
             ->with(['destino', 'estudio'])
-            ->orderBy('id')
             ->limit($lote)
             ->get();
 
@@ -151,12 +141,19 @@ class ConversionesPlataforma
                     (string) $destino->identificador,
                     (string) $destino->secreto,
                     $destino->codigo_prueba,
-                    $this->conversion($envio),
+                    EnviosMedicion::conversion($envio, $destino->proveedor),
                     ContextoMedicionPlataforma::query()->where('estudio_id', $envio->estudio_id)->first()?->contexto(),
                     $ahora,
                 ),
             };
-            $this->aplicar($envio, $resultado, $ahora);
+            if (EnviosMedicion::aplicar($envio, $destino, $resultado, $ahora) && $destino instanceof DestinoMedicionPlataforma) {
+                // Al superadmin: un token que ya no sirve o una conversión que ya no se reintenta.
+                $this->alertas->registrar(
+                    'medicion_fallida',
+                    "plataforma:{$destino->producto->value}:{$destino->proveedor->value}",
+                    "{$destino->proveedor->etiqueta()} de {$destino->producto->nombre()}: ".($resultado->mensaje ?? 'no se pudo mandar una conversión.'),
+                );
+            }
         }
 
         return $envios->count();
@@ -229,61 +226,6 @@ class ConversionesPlataforma
         }
 
         return $creadas;
-    }
-
-    private function conversion(EnvioMedicionPlataforma $envio): ConversionMedicion
-    {
-        $proveedor = $envio->destino?->proveedor;
-
-        return new ConversionMedicion(
-            evento: $envio->evento,
-            nombreGa4: $proveedor === ProveedorMedicion::Ga4 ? $envio->nombre : null,
-            nombreMeta: $proveedor === ProveedorMedicion::Meta ? $envio->nombre : null,
-            idEvento: $envio->id_evento,
-            ocurridoEn: CarbonImmutable::parse($envio->ocurrido_en),
-            accion: $envio->accion,
-            metaPersonalizado: $envio->personalizado,
-            valorMinor: $envio->valor_minor,
-            moneda: $envio->moneda,
-            transaccion: $envio->transaccion,
-            items: $envio->items ?? [],
-            parametros: $envio->parametros ?? [],
-        );
-    }
-
-    private function aplicar(EnvioMedicionPlataforma $envio, ResultadoEnvio $resultado, CarbonImmutable $ahora): void
-    {
-        $intento = $resultado->estado !== EstadoEnvioMedicion::Omitido;
-        $intentos = $envio->intentos + ($intento ? 1 : 0);
-        $reintentar = $resultado->reintentar && $intentos < self::MAX_INTENTOS;
-        $envio->update([
-            'estado' => $resultado->estado->value,
-            'motivo' => $resultado->motivo,
-            'intentos' => $intentos,
-            'http_status' => $resultado->http,
-            'ultimo_error' => $resultado->mensaje,
-            'enviado_en' => $resultado->estado === EstadoEnvioMedicion::Enviado ? $ahora : $envio->enviado_en,
-            'proximo_intento_en' => $reintentar ? $ahora->addMinutes(self::ESPERAS[min($intentos, count(self::ESPERAS)) - 1]) : null,
-        ]);
-
-        $destino = $envio->destino;
-        if (! $destino instanceof DestinoMedicionPlataforma || ! $intento) {
-            return;
-        }
-        if ($resultado->estado === EstadoEnvioMedicion::Enviado) {
-            $destino->update(['ultimo_envio_en' => $ahora]);
-
-            return;
-        }
-        $destino->update(['ultimo_error' => $resultado->mensaje, 'ultimo_error_en' => $ahora]);
-        // Al superadmin: un token que ya no sirve o una conversión que ya no se reintenta.
-        if ($resultado->motivo === 'credenciales' || ! $reintentar) {
-            $this->alertas->registrar(
-                'medicion_fallida',
-                "plataforma:{$destino->producto->value}:{$destino->proveedor->value}",
-                "{$destino->proveedor->etiqueta()} de {$destino->producto->nombre()}: ".($resultado->mensaje ?? 'no se pudo mandar una conversión.'),
-            );
-        }
     }
 
     private static function tienePrueba(Estudio $estudio): bool

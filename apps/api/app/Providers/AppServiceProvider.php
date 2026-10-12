@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Listeners\DevolverPagoAlCancelarNegocio;
 use App\Modules\Tenancy\Listeners\EjecutarAutomatizaciones;
 use App\Modules\Tenancy\Listeners\EnviarWebhooksSalientes;
 use App\Modules\Tenancy\Listeners\GenerarComunicaciones;
+use App\Modules\Tenancy\Listeners\RegistrarConversionesMedicion;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\LlaveApiTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -167,6 +168,8 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(EventoDeDominioTenant::class, AcumularPuntos::class);
         // Si el negocio cancela algo ya pagado en línea, lo devuelve (si así lo decide; ADR 0046).
         Event::listen(EventoDeDominioTenant::class, DevolverPagoAlCancelarNegocio::class);
+        // GA4 y Meta del negocio (ADR 0143): anota sus conversiones; se mandan aparte.
+        Event::listen(EventoDeDominioTenant::class, RegistrarConversionesMedicion::class);
     }
 
     /**

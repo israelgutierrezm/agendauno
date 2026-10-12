@@ -20,7 +20,7 @@ Documentación oficial revisada el 2026-10-12:
 
 | | SaaS (plataforma) | Cada negocio |
 | --- | --- | --- |
-| Quién configura | Superadmin → Medición, por producto | Configuración → Integraciones → Medición (ADR 0143, bloque 39) |
+| Quién configura | Superadmin → Medición, por producto | Configuración → Integraciones → Medición (`integraciones.configurar` y la función `integraciones` del plan) |
 | Destinos | GA4 y Meta de AgendaUno; GA4 y Meta de TurnoUno | Su GA4 y su Meta |
 | Dónde se guardan | `destinos_medicion_plataforma` (control plane) | `destinos_medicion` (su base) |
 | Páginas | Comerciales del producto y su registro | Su página, su agenda, sus sucursales y enlaces |
@@ -114,6 +114,49 @@ Documentación oficial revisada el 2026-10-12:
   - `fbc` sale de la cookie o se arma con el `fbclid` del último toque
     (`fb.1.{ms}.{fbclid}`).
 
+### Conversiones de cada negocio
+
+- Salen de sus eventos de dominio por el outbox (`RegistrarConversionesMedicion`):
+  después de que la operación quedó confirmada, sin consultar a Google ni a Meta
+  mientras se registra, se paga o se reserva.
+- El listener solo anota la conversión pendiente: es idempotente (una por destino e
+  `id_evento`) y nunca hace fallar el despacho. `agendauno:enviar-conversiones` las
+  manda negocio por negocio, cada uno en su base y aislado.
+
+| Evento de dominio | Resultado | GA4 | Meta | `id_evento` |
+| --- | --- | --- | --- | --- |
+| `prospecto.creado` | solicitud (un reenvío no es otra) | `generate_lead` (`lead_source: formulario`) | `Lead` | `solicitud-{prospecto}` |
+| `cuenta.creada` | cuenta activada (la invitación sola no) | `sign_up` (`method: invitacion`) | `CompleteRegistration` | `cuenta_activada-{persona}` |
+| `orden.pagada` sin renovación, con monto | compra (`customer_type` new o returning) | `purchase` (`transaction_id` = orden) | `Purchase` | `compra-{orden}` |
+| `pago.reembolsado` (aplicado) o `pago.anulado` | devolución, solo si su compra ya se mandó a ese destino | `refund` | (Meta no tiene) | `devolucion-{reembolso}` / `anulacion-{pago}` |
+| `reserva.confirmada` | la primera de cada persona | `reserva_confirmada` (`tipo`) | `Schedule` | `reserva-{reserva}` |
+| `orden.pagada` de renovación | si lo enciende | `renovacion_pagada` | `RenovacionPagada` | `renovacion-{orden}` |
+| `asistencia.marcada` presente | primera asistencia, si lo enciende | `primera_asistencia` | `PrimeraAsistencia` | `primera_asistencia-{persona}` |
+
+- **Contexto.** El de la solicitud o de la orden; si no tiene, el más reciente de la
+  persona o el de su solicitud convertida. Así la campaña sigue de la solicitud a la
+  cuenta, la compra y la reserva.
+- **Dónde pasó.**
+  - una compra en la pasarela en línea es `website`; en el mostrador,
+    `physical_store`;
+  - lo demás es `website` si su navegador dejó página y agente, y si no,
+    `system_generated`.
+- **Lo que no se manda:**
+  - una compra pagada con las llaves de prueba de la pasarela (`pago_de_prueba`);
+  - lo de un negocio en demostración (`negocio_demo`);
+  - lo que pasó antes de encender el destino;
+  - sin la función en su plan, lo pendiente espera y vence con la ventana.
+- **Negocios de salud:** `sensible` quita los nombres de los productos (GA4) y los
+  `content_ids` (Meta), y deja solo eventos estándar o sin parámetros que revelen el
+  servicio.
+- **Asistencia y renovación** siempre se quedan en el seguimiento interno. Mandarlas es
+  decisión del negocio, por destino (`eventos_extra`).
+- Su página pide su propio permiso («Este negocio usa medición…») y lo manda a
+  `POST /app/{slug}/medicion/consentimiento`. Es otro visitante: no el de la plataforma
+  ni el de otro negocio.
+- Los cambios de su configuración quedan en su auditoría, sin el secreto («Se cambió el
+  secreto»).
+
 ### Duplicados: estrategia explícita
 
 - GA4:
@@ -165,6 +208,8 @@ Documentación oficial revisada el 2026-10-12:
 
 - Migración del control plane `2026_10_12_000200`: destinos y envíos, más las
   preferencias e identificadores en `contextos_medicion_plataforma`.
+- Migración de negocio 000134: `destinos_medicion`, `envios_medicion` y las
+  preferencias e identificadores en `contextos_medicion`.
 - `GET /medicion/{producto}` (IDs públicos), `POST /medicion/consentimiento` y
   `/plataforma/medicion` (superadmin).
 - **Requisitos del aviso de privacidad, antes de encender un destino.** No se capturan

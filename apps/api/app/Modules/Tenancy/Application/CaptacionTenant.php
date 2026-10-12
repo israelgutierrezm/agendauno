@@ -78,7 +78,7 @@ class CaptacionTenant
     /**
      * Recibe un envío del formulario.
      *
-     * @param  array{nombre: string, email: string, telefono?: string|null, respuestas?: array<string, mixed>|null, interes?: array<string, string|null>|null, fuente?: string|null, aviso_version?: int|null, atribucion?: mixed}  $datos
+     * @param  array{nombre: string, email: string, telefono?: string|null, respuestas?: array<string, mixed>|null, interes?: array<string, string|null>|null, fuente?: string|null, aviso_version?: int|null, atribucion?: mixed, medicion?: mixed, ip?: string|null, agente?: string|null}  $datos
      */
     public function recibir(FormularioCaptacionTenant $formulario, array $datos): ProspectoTenant
     {
@@ -125,7 +125,7 @@ class CaptacionTenant
                 // Mismo interesado: se actualiza lo que trae de nuevo, sin abrir otro. Su
                 // campaña es la de su primera solicitud; si no la tenía, la de esta.
                 $contexto = $abierto->contexto_medicion_id === null
-                    ? $this->atribucion->registrar($datos['atribucion'] ?? null)
+                    ? $this->atribucion->registrar($datos['atribucion'] ?? null, null, $datos['medicion'] ?? null, $datos['ip'] ?? null, $datos['agente'] ?? null)
                     : null;
                 $abierto->update(array_filter([
                     'contexto_medicion_id' => $contexto?->getKey(),
@@ -139,7 +139,7 @@ class CaptacionTenant
                 return $abierto;
             }
 
-            $contexto = $this->atribucion->registrar($datos['atribucion'] ?? null);
+            $contexto = $this->atribucion->registrar($datos['atribucion'] ?? null, null, $datos['medicion'] ?? null, $datos['ip'] ?? null, $datos['agente'] ?? null);
             $prospecto = ProspectoTenant::query()->create([
                 'nombre' => trim($datos['nombre']),
                 'email' => $email,
