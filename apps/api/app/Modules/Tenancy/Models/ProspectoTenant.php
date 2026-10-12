@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $primer_contacto_en
  * @property int|null $persona_id
  * @property Carbon|null $convertido_en
+ * @property Carbon|null $sin_atender_desde su responsable no lo atendió a tiempo (ADR 0138)
  * @property list<array{etiqueta: string, valor: mixed}>|null $respuestas
  * @property int|null $aviso_version
  * @property Carbon|null $acepto_aviso_en
@@ -55,7 +56,7 @@ class ProspectoTenant extends Model
         'nombre', 'email', 'telefono', 'sucursal_id', 'actividad_id', 'sesion_id', 'producto_id',
         'formulario_id', 'origen', 'fuente', 'estado', 'motivo_cierre', 'comentario_cierre',
         'responsable_id', 'proximo_seguimiento_en', 'primer_contacto_en', 'persona_id', 'convertido_en',
-        'respuestas', 'aviso_version', 'acepto_aviso_en',
+        'respuestas', 'aviso_version', 'acepto_aviso_en', 'sin_atender_desde',
     ];
 
     /**
@@ -69,6 +70,7 @@ class ProspectoTenant extends Model
         'primer_contacto_en' => 'datetime',
         'convertido_en' => 'datetime',
         'acepto_aviso_en' => 'datetime',
+        'sin_atender_desde' => 'datetime',
         'respuestas' => 'array',
         'aviso_version' => 'integer',
     ];

@@ -499,11 +499,14 @@ Route::prefix('v1')->group(function (): void {
             // Prospectos (ADR 0117): quien todavía no es cliente, aparte de Miembros.
             Route::get('/prospectos', [ProspectosTenantController::class, 'index'])->middleware('puede:prospectos.ver')->name('prospectos.index');
             Route::post('/prospectos', [ProspectosTenantController::class, 'store'])->middleware('puede:prospectos.gestionar')->name('prospectos.store');
+            // Quiénes pueden atenderlos (ADR 0138); antes de {prospecto}.
+            Route::get('/prospectos/responsables', [ProspectosTenantController::class, 'responsables'])->middleware('puede:prospectos.ver')->name('prospectos.responsables');
             Route::get('/prospectos/{prospecto}', [ProspectosTenantController::class, 'show'])->middleware('puede:prospectos.ver')->name('prospectos.show');
             Route::put('/prospectos/{prospecto}/estado', [ProspectosTenantController::class, 'estado'])->middleware('puede:prospectos.gestionar')->name('prospectos.estado');
             Route::put('/prospectos/{prospecto}/responsable', [ProspectosTenantController::class, 'responsable'])->middleware('puede:prospectos.gestionar')->name('prospectos.responsable');
             Route::put('/prospectos/{prospecto}/seguimiento', [ProspectosTenantController::class, 'seguimiento'])->middleware('puede:prospectos.gestionar')->name('prospectos.seguimiento');
             Route::post('/prospectos/{prospecto}/notas', [ProspectosTenantController::class, 'nota'])->middleware('puede:prospectos.gestionar')->name('prospectos.notas');
+            Route::post('/prospectos/{prospecto}/contactos', [ProspectosTenantController::class, 'contacto'])->middleware('puede:prospectos.gestionar')->name('prospectos.contactos');
             Route::post('/prospectos/{prospecto}/convertir', [ProspectosTenantController::class, 'convertir'])->middleware('puede:prospectos.convertir')->name('prospectos.convertir');
             Route::delete('/prospectos/{prospecto}', [ProspectosTenantController::class, 'destroy'])->middleware('puede:prospectos.eliminar')->name('prospectos.destroy');
             // Sus formularios (el de «Pedir acceso» y los que se comparten o embeben).
