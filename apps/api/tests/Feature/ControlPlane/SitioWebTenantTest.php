@@ -189,7 +189,8 @@ it('una foto del sitio es una imagen y tiene un tope por negocio', function (): 
     ], [...conBearer($e['bearer']), 'Accept' => 'application/json'])->assertUnprocessable();
 
     $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
-    foreach (range(1, 30) as $i) {
+    // 40 por omisión (con galerías y bloques, ADR 0146).
+    foreach (range(1, 40) as $i) {
         Storage::disk('public')->put("estudios/{$estudio->getKey()}/sitio/foto{$i}.jpg", 'x');
     }
     $this->post("/api/v1/app/{$e['slug']}/sitio/imagenes", [

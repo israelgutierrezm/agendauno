@@ -8,6 +8,7 @@ import IconoRed from "@/components/IconoRed.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
 import CalendarioPublico from "@/components/CalendarioPublico.vue";
 import TarjetaPlanPublico from "@/components/TarjetaPlanPublico.vue";
+import BloqueSitio from "@/components/BloqueSitio.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
@@ -27,6 +28,7 @@ import { updateSeo } from "@/lib/seo";
 import { urlCanonicaEstudio } from "@/lib/tenant";
 import {
   colorDeContraste,
+  esBloque,
   sitioPorDefecto,
   type SitioPublico,
 } from "@/lib/sitioWeb";
@@ -605,7 +607,7 @@ onMounted(cargar);
 
       <!-- Cada sección donde la puso el negocio (ADR 0114); la portada primero y el
            contacto al final. Lo que muestra cada una sale del sistema. -->
-      <template v-for="sec in sitio.secciones" :key="sec.tipo">
+      <template v-for="sec in sitio.secciones" :key="sec.id ?? sec.tipo">
         <!-- Portada -->
         <template v-if="sec.tipo === 'inicio'">
           <div
@@ -1585,6 +1587,14 @@ onMounted(cargar);
             </p>
           </section>
         </template>
+
+        <!-- Bloques propios del negocio (ADR 0146) -->
+        <BloqueSitio
+          v-else-if="esBloque(sec.tipo)"
+          :bloque="sec"
+          :slug="slug"
+          :captacion-activa="escaparate.captacion?.activa === true"
+        />
       </template>
 
       <!-- Pedir acceso: el negocio da de alta a sus clientes (ADR 0093) -->

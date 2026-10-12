@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Models\BorradorSitioWebTenant;
 use App\Modules\Tenancy\Models\PublicacionSitioWebTenant;
 use App\Modules\Tenancy\SitioWeb\CatalogoSitioWeb;
 use App\Modules\Tenancy\SitioWeb\PlantillaSitio;
+use App\Modules\Tenancy\SitioWeb\VideoSitio;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -20,6 +21,11 @@ use Illuminate\Support\Str;
  *   secciones: [{tipo, visible, titulo, texto, foto_url}] — inicio primero, contacto al
  *              final, cada tipo una vez y solo los de su modalidad
  *   banners:   [{id, titulo, texto, enlace_texto, enlace_url, desde, hasta, foto_url}]
+ *
+ * Entre las secciones van los bloques propios del negocio (ADR 0146), las veces que
+ * quiera: {id, tipo, visible, titulo, texto, foto_url, estilo: {fondo, alineacion},
+ * datos}. Sus `datos` tienen forma fija según el tipo (fotos, preguntas, testimonios,
+ * beneficios, botón, video o formulario).
  *
  * Sin nada publicado, el público ve la plantilla esencial con todo visible (la página
  * de siempre). Las imágenes viven en `estudios/{id}/sitio/` del disco público; al
@@ -61,18 +67,31 @@ class SitioWebTenant
         $plantilla = PlantillaSitio::tryFrom((string) ($contenido['plantilla'] ?? '')) ?? PlantillaSitio::Esencial;
         $permitidos = CatalogoSitioWeb::movibles($modalidad);
 
+        // Las del sistema, una vez cada una; los bloques propios, los que haya, cada uno
+        // con su id (uno repetido, al duplicar, recibe otro).
         $porTipo = [];
+        $movibles = [];
+        $ids = [];
         foreach ((array) ($contenido['secciones'] ?? []) as $seccion) {
             $tipo = is_array($seccion) ? (string) ($seccion['tipo'] ?? '') : '';
+            if (is_array($seccion) && CatalogoSitioWeb::esBloque($tipo)) {
+                $bloque = self::bloque($tipo, $seccion);
+                if (isset($ids[$bloque['id']])) {
+                    $bloque['id'] = self::idNuevo();
+                }
+                $ids[$bloque['id']] = true;
+                $movibles[] = $bloque;
+
+                continue;
+            }
             if ($tipo !== '' && ! isset($porTipo[$tipo])
                 && ($tipo === CatalogoSitioWeb::INICIO || $tipo === CatalogoSitioWeb::CONTACTO || in_array($tipo, $permitidos, true))) {
-                $porTipo[$tipo] = self::seccion($tipo, $seccion);
+                $porTipo[$tipo] = self::seccion($tipo, (array) $seccion);
+                if (! in_array($tipo, [CatalogoSitioWeb::INICIO, CatalogoSitioWeb::CONTACTO], true)) {
+                    $movibles[] = $porTipo[$tipo];
+                }
             }
         }
-        $movibles = array_values(array_filter(
-            $porTipo,
-            static fn (array $s): bool => ! in_array($s['tipo'], [CatalogoSitioWeb::INICIO, CatalogoSitioWeb::CONTACTO], true),
-        ));
         foreach ($plantilla->orden($modalidad) as $tipo) {
             if (! isset($porTipo[$tipo])) {
                 $movibles[] = self::seccion($tipo);
@@ -170,7 +189,8 @@ class SitioWebTenant
 
     /**
      * Para la página pública: solo las secciones visibles (la portada y el contacto
-     * siempre) y los banners vigentes hoy en el negocio.
+     * siempre), los bloques que tienen algo que mostrar y los banners vigentes hoy en
+     * el negocio.
      *
      * @param  array<string, mixed>  $contenido
      * @return array<string, mixed>
@@ -180,7 +200,8 @@ class SitioWebTenant
         $hoy = $this->fechas->hoy();
         $secciones = array_values(array_filter(
             (array) $contenido['secciones'],
-            static fn (array $s): bool => $s['visible'] || in_array($s['tipo'], [CatalogoSitioWeb::INICIO, CatalogoSitioWeb::CONTACTO], true),
+            static fn (array $s): bool => ($s['visible'] || in_array($s['tipo'], [CatalogoSitioWeb::INICIO, CatalogoSitioWeb::CONTACTO], true))
+                && self::tieneContenido($s),
         ));
         $banners = array_values(array_filter(
             (array) $contenido['banners'],
@@ -191,6 +212,10 @@ class SitioWebTenant
             'plantilla' => $contenido['plantilla'],
             'secciones' => array_map(static function (array $s): array {
                 unset($s['visible']);
+                // Del video, solo con qué se arma el reproductor.
+                if ($s['tipo'] === 'video') {
+                    unset($s['datos']['url']);
+                }
 
                 return $s;
             }, $secciones),
@@ -234,8 +259,20 @@ class SitioWebTenant
                 continue;
             }
             foreach ([...(array) ($contenido['secciones'] ?? []), ...(array) ($contenido['banners'] ?? [])] as $parte) {
-                if (is_array($parte) && is_string($parte['foto_url'] ?? null)) {
-                    $usadas[basename($parte['foto_url'])] = true;
+                if (! is_array($parte)) {
+                    continue;
+                }
+                // La suya y las de sus fotos (galería) o sus testimonios.
+                $datos = is_array($parte['datos'] ?? null) ? $parte['datos'] : [];
+                $urls = [
+                    $parte['foto_url'] ?? null,
+                    ...array_map(static fn (mixed $f): mixed => is_array($f) ? ($f['url'] ?? null) : null, (array) ($datos['fotos'] ?? [])),
+                    ...array_map(static fn (mixed $i): mixed => is_array($i) ? ($i['foto_url'] ?? null) : null, (array) ($datos['items'] ?? [])),
+                ];
+                foreach ($urls as $url) {
+                    if (is_string($url)) {
+                        $usadas[basename($url)] = true;
+                    }
                 }
             }
         }
@@ -263,6 +300,121 @@ class SitioWebTenant
             'texto' => in_array($tipo, CatalogoSitioWeb::CON_TEXTO, true) ? self::texto($datos['texto'] ?? null) : null,
             'foto_url' => in_array($tipo, CatalogoSitioWeb::CON_FOTO, true) ? self::texto($datos['foto_url'] ?? null) : null,
         ];
+    }
+
+    /**
+     * Un bloque propio (ADR 0146), con solo los campos de su tipo.
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array{id: string, tipo: string, visible: bool, titulo: string|null, texto: string|null, foto_url: string|null, estilo: array{fondo: string, alineacion: string}, datos: array<string, mixed>}
+     */
+    private static function bloque(string $tipo, array $datos): array
+    {
+        $id = self::texto($datos['id'] ?? null);
+        $estilo = is_array($datos['estilo'] ?? null) ? $datos['estilo'] : [];
+
+        return [
+            'id' => $id !== null && preg_match('/^[a-z0-9]{10,26}$/', $id) === 1 ? $id : self::idNuevo(),
+            'tipo' => $tipo,
+            'visible' => (bool) ($datos['visible'] ?? true),
+            'titulo' => self::texto($datos['titulo'] ?? null),
+            'texto' => in_array($tipo, CatalogoSitioWeb::BLOQUES_CON_TEXTO, true) ? self::texto($datos['texto'] ?? null) : null,
+            'foto_url' => in_array($tipo, CatalogoSitioWeb::BLOQUES_CON_FOTO, true) ? self::texto($datos['foto_url'] ?? null) : null,
+            'estilo' => [
+                'fondo' => in_array($estilo['fondo'] ?? null, CatalogoSitioWeb::FONDOS, true) ? (string) $estilo['fondo'] : 'normal',
+                'alineacion' => in_array($estilo['alineacion'] ?? null, CatalogoSitioWeb::ALINEACIONES, true) ? (string) $estilo['alineacion'] : 'izquierda',
+            ],
+            'datos' => self::datosDe($tipo, is_array($datos['datos'] ?? null) ? $datos['datos'] : []),
+        ];
+    }
+
+    /**
+     * Lo propio de cada tipo de bloque; lo que viene vacío no se guarda.
+     *
+     * @param  array<string, mixed>  $d
+     * @return array<string, mixed>
+     */
+    private static function datosDe(string $tipo, array $d): array
+    {
+        $lista = static fn (string $clave, int $maximo): array => array_slice(
+            array_values(array_filter((array) ($d[$clave] ?? []), 'is_array')),
+            0,
+            $maximo,
+        );
+        $boton = ['boton_texto' => self::texto($d['boton_texto'] ?? null), 'boton_enlace' => self::texto($d['boton_enlace'] ?? null)];
+
+        switch ($tipo) {
+            case 'texto_imagen':
+                return ['lado' => ($d['lado'] ?? null) === 'derecha' ? 'derecha' : 'izquierda', ...$boton];
+            case 'llamado':
+                return $boton;
+            case 'galeria':
+                $fotos = array_map(static fn (array $f): array => [
+                    'url' => self::texto($f['url'] ?? null),
+                    'pie' => self::texto($f['pie'] ?? null),
+                ], $lista('fotos', CatalogoSitioWeb::MAX_ELEMENTOS));
+
+                return ['fotos' => array_values(array_filter($fotos, static fn (array $f): bool => $f['url'] !== null))];
+            case 'preguntas':
+                $items = array_map(static fn (array $i): array => [
+                    'pregunta' => self::texto($i['pregunta'] ?? null),
+                    'respuesta' => self::texto($i['respuesta'] ?? null),
+                ], $lista('items', CatalogoSitioWeb::MAX_PREGUNTAS));
+
+                return ['items' => array_values(array_filter($items, static fn (array $i): bool => $i['pregunta'] !== null))];
+            case 'testimonios':
+                $items = array_map(static fn (array $i): array => [
+                    'nombre' => self::texto($i['nombre'] ?? null),
+                    'texto' => self::texto($i['texto'] ?? null),
+                    'foto_url' => self::texto($i['foto_url'] ?? null),
+                ], $lista('items', CatalogoSitioWeb::MAX_ELEMENTOS));
+
+                return ['items' => array_values(array_filter($items, static fn (array $i): bool => $i['texto'] !== null))];
+            case 'beneficios':
+                $items = array_map(static fn (array $i): array => [
+                    'titulo' => self::texto($i['titulo'] ?? null),
+                    'texto' => self::texto($i['texto'] ?? null),
+                ], $lista('items', CatalogoSitioWeb::MAX_ELEMENTOS));
+
+                return ['items' => array_values(array_filter($items, static fn (array $i): bool => $i['titulo'] !== null))];
+            case 'video':
+                $url = self::texto($d['url'] ?? null);
+                $video = VideoSitio::desdeUrl($url);
+
+                return ['url' => $video !== null ? $url : null, 'proveedor' => $video['proveedor'] ?? null, 'video_id' => $video['id'] ?? null];
+            case 'formulario':
+                return ['formulario_id' => self::texto($d['formulario_id'] ?? null)];
+            default:
+                return [];
+        }
+    }
+
+    /**
+     * ¿Tiene algo que mostrar? Las secciones del sistema, siempre; un bloque vacío (una
+     * galería sin fotos, un video sin enlace) no sale en la página.
+     *
+     * @param  array<string, mixed>  $s
+     */
+    private static function tieneContenido(array $s): bool
+    {
+        if (! CatalogoSitioWeb::esBloque((string) $s['tipo'])) {
+            return true;
+        }
+        $datos = (array) ($s['datos'] ?? []);
+
+        return match ($s['tipo']) {
+            'texto_imagen', 'llamado' => ($s['titulo'] ?? null) !== null || ($s['texto'] ?? null) !== null || ($s['foto_url'] ?? null) !== null,
+            'galeria' => ($datos['fotos'] ?? []) !== [],
+            'preguntas', 'testimonios', 'beneficios' => ($datos['items'] ?? []) !== [],
+            'video' => ($datos['video_id'] ?? null) !== null,
+            'formulario' => ($datos['formulario_id'] ?? null) !== null,
+            default => false,
+        };
+    }
+
+    private static function idNuevo(): string
+    {
+        return Str::lower((string) Str::ulid());
     }
 
     /**

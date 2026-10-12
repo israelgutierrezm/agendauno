@@ -206,3 +206,126 @@ describe("constructor del sitio", () => {
     w.unmount();
   });
 });
+
+describe("bloques propios del sitio (ADR 0146)", () => {
+  const CATALOGO_BLOQUES = {
+    bloques: [
+      "texto_imagen",
+      "galeria",
+      "preguntas",
+      "testimonios",
+      "llamado",
+      "video",
+      "beneficios",
+      "formulario",
+    ],
+    bloques_maximos: 2,
+    fondos: ["normal", "suave", "marca", "oscuro"],
+    alineaciones: ["izquierda", "centro"],
+    max_elementos: 12,
+    max_preguntas: 20,
+    formularios: [{ id: "f1", nombre: "Pedir informes" }],
+  };
+  const conBloques = (cambios: Record<string, unknown> = {}) =>
+    datos({
+      catalogo: { ...datos().catalogo, ...CATALOGO_BLOQUES },
+      ...cambios,
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.get.mockResolvedValue({ data: { data: conBloques() } });
+    api.put.mockImplementation((_url: string, cuerpo: unknown) =>
+      Promise.resolve({
+        data: {
+          data: conBloques({ borrador: cuerpo, cambios_sin_publicar: true }),
+        },
+      }),
+    );
+  });
+
+  function montarBloques() {
+    return mount(SitioWebView, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18n],
+        stubs: {
+          CargadorImagen: true,
+          ModalDialogo: {
+            props: ["abierto", "titulo"],
+            template: '<div v-if="abierto"><slot /></div>',
+          },
+        },
+      },
+    });
+  }
+  async function agregar(w: ReturnType<typeof montarBloques>, tipo: string) {
+    await w.get('[data-prueba="agregar-bloque"]').trigger("click");
+    await w.get(`[data-prueba="nuevo-${tipo}"]`).trigger("click");
+  }
+
+  it("agrega un bloque antes del contacto, ya abierto, y lo guarda con su contenido y estilo", async () => {
+    const w = montarBloques();
+    await flushPromises();
+    await agregar(w, "preguntas");
+
+    const lista = orden(w);
+    expect(lista.at(-1)).toBe("contacto");
+    expect(lista.at(-2)).toMatch(/^[a-z0-9]{20}$/);
+    const editor = w.get('[data-prueba="editor-preguntas"]');
+    await editor
+      .get('[data-prueba="bloque-items"] input')
+      .setValue("¿Necesito experiencia?");
+    await editor
+      .findAll('[data-prueba="bloque-fondo"] button')
+      .find((b) => b.text() === "Suave")!
+      .trigger("click");
+
+    await w.get('[data-prueba="guardar-sitio"]').trigger("click");
+    await flushPromises();
+    const bloque = api.put.mock.calls[0][1].secciones.at(-2);
+    expect(bloque).toMatchObject({
+      tipo: "preguntas",
+      visible: true,
+      estilo: { fondo: "suave", alineacion: "izquierda" },
+      datos: {
+        items: [{ pregunta: "¿Necesito experiencia?", respuesta: null }],
+      },
+    });
+    w.unmount();
+  });
+
+  it("duplica y quita bloques, hasta su tope", async () => {
+    const w = montarBloques();
+    await flushPromises();
+    await agregar(w, "llamado");
+    const id = orden(w).at(-2)!;
+    await w.get(`[data-prueba="duplicar-${id}"]`).trigger("click");
+
+    expect(orden(w).filter((c) => /^[a-z0-9]{20}$/.test(c))).toHaveLength(2);
+    expect(w.get('[data-prueba="agregar-bloque"]').attributes()).toHaveProperty(
+      "disabled",
+    );
+    expect(w.text()).toContain("Tu sitio puede tener hasta 2 bloques propios.");
+
+    await w.get(`[data-prueba="editar-${id}"]`).trigger("click");
+    await w.get(`[data-prueba="quitar-${id}"]`).trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalled();
+    expect(orden(w)).not.toContain(id);
+    w.unmount();
+  });
+
+  it("otra plantilla conserva los bloques, antes del contacto", async () => {
+    const w = montarBloques();
+    await flushPromises();
+    await agregar(w, "galeria");
+    const id = orden(w).at(-2)!;
+
+    await w.get('[data-prueba="plantilla-portada"]').trigger("click");
+    await flushPromises();
+    expect(orden(w).slice(-2)).toEqual([id, "contacto"]);
+    expect(orden(w)[1]).toBe("promociones");
+    w.unmount();
+  });
+});

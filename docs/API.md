@@ -717,3 +717,29 @@ subdominio del negocio):
 visible si no hay ninguna), con solo las secciones visibles y los banners vigentes hoy
 en el negocio.
 
+### Bloques propios del sitio (ADR 0146)
+
+- En `secciones[]` caben, además, bloques propios con `tipo` = `texto_imagen`,
+  `galeria`, `preguntas`, `testimonios`, `llamado`, `video`, `beneficios` o
+  `formulario`. Se repiten y van entre la portada y el contacto.
+- Cada uno lleva:
+  - `id`: lo asigna la API y lo conserva;
+  - `visible`, `titulo`, `texto` y `foto_url`, según el tipo;
+  - `estilo`: `fondo` (`normal`, `suave`, `marca`, `oscuro`) y `alineacion`
+    (`izquierda`, `centro`);
+  - `datos`, con campos fijos por tipo: `lado`, `boton_texto`, `boton_enlace`,
+    `fotos[]` (`url`, `pie`), `items[]` (`pregunta` y `respuesta`, `nombre` y `texto`,
+    o `titulo` y `texto`), `url` (video) o `formulario_id`.
+- `PUT /sitio` da 422:
+  - con un video que no es de YouTube o Vimeo;
+  - con fotos que no se subieron aquí;
+  - con un botón sin texto o con un enlace que no es `https://`, `/…` ni `#…`;
+  - con un formulario que no existe;
+  - con más bloques que `sitio.bloques_maximos` (20 por omisión);
+  - con más de 12 fotos o elementos, o más de 20 preguntas.
+- `catalogo` suma `bloques`, `bloques_con_texto`, `bloques_con_foto`, `bloques_maximos`,
+  `fondos`, `alineaciones`, `max_elementos`, `max_preguntas` y `formularios` (los de
+  captación activos: `id`, `nombre`).
+- En `GET /escaparate` salen solo los visibles que tienen contenido. Del video, solo
+  `proveedor` y `video_id`.
+
