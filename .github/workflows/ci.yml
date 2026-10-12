@@ -324,6 +324,10 @@ jobs:
           # Un formulario de captación se embebe en cualquier sitio (ADR 0117).
           if grep -qi "^x-frame-options:" <<<"$(cabeceras fluo.agendauno.test '/f/fluo/01jz0000000000000000000000?embed=1')"; then exit 1; fi
           grep -qi "^content-security-policy: frame-ancestors \*$" <<<"$(cabeceras fluo.agendauno.test '/f/fluo/01jz0000000000000000000000?embed=1')"
+          # Un widget también, y su vista previa en el panel (ADR 0141); otra ruta de /w/ no.
+          if grep -qi "^x-frame-options:" <<<"$(cabeceras fluo.agendauno.test '/w/fluo/01jz0000000000000000000000')"; then exit 1; fi
+          grep -qi "^content-security-policy: frame-ancestors \*$" <<<"$(cabeceras fluo.turnouno.test '/w/fluo/01jz0000000000000000000000?vista_previa=1')"
+          grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test '/w/fluo/01jz0000000000000000000000/otra')"
           # Sin la landing, la portada es la aplicación (no un 502).
           docker stop landing-turnouno
           test "$(pedir turnouno.test /)" = 200
