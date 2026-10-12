@@ -282,6 +282,9 @@ cobra otro importe.
 negocio 000129; nada que correr a mano. Las membresías ya vendidas quedan al 100 %, como
 se aceptaron.
 
+**Al desplegar el ADR 0141 (widgets para la web del negocio):** migración de negocio
+000132; nada que correr a mano.
+
 **Al desplegar el ADR 0139 (mostrador: extras, propina y cambio):** migración de negocio
 000131; nada que correr a mano.
 

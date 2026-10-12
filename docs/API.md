@@ -347,6 +347,22 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Widgets para la web del negocio (ADR 0141)
+
+- `GET/POST /captacion/widgets` y `PUT/DELETE /captacion/widgets/{widget}`
+  (`prospectos.ver` y `prospectos.gestionar`). Campos:
+  - `tipo`: `calendario` (solo clases) o `planes`;
+  - `nombre`;
+  - `filtros` (`sucursal` y `actividad`, ulids);
+  - `tema`: `claro`, `oscuro` o `auto`;
+  - `acento`: `#rrggbb`;
+  - `dominios`: se guardan como dominio, sin esquema ni ruta;
+  - `activo`.
+- `GET /widgets/{widget}` (público): su configuración, `negocio` y `modalidad`. Apagado
+  o con la página del negocio cerrada, 404.
+- La web los muestra en `/w/{negocio}/{widget}` con el calendario público
+  (`GET /calendario`), el escaparate y el formulario de captación.
+
 ## Complementos que se piden (ADR 0140)
 
 - `GET /renta/complementos` (`facturacion.ver`): los módulos que se activan a pedido,
