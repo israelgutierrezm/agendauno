@@ -93,8 +93,11 @@ function urlDestinos(ambito: Ambito): string {
 export function destinosDe(ambito: Ambito): Promise<DestinosPublicos> {
   let consulta = consultas.get(ambito);
   if (consulta === undefined) {
-    consulta = api
-      .get<{ data: Partial<DestinosPublicos> }>(urlDestinos(ambito))
+    // Cualquier falla (sin red, sin API, una respuesta rara) es «sin destinos».
+    consulta = Promise.resolve()
+      .then(() =>
+        api.get<{ data: Partial<DestinosPublicos> }>(urlDestinos(ambito)),
+      )
       .then(({ data }) => ({
         ga4:
           typeof data.data.ga4 === "string" && GA4.test(data.data.ga4)
@@ -323,6 +326,18 @@ export async function navegar(
   ruta: string | null,
   titulo: string,
 ): Promise<void> {
+  try {
+    await medirNavegacion(ambito, ruta, titulo);
+  } catch {
+    // Medir nunca rompe la navegación.
+  }
+}
+
+async function medirNavegacion(
+  ambito: Ambito | null,
+  ruta: string | null,
+  titulo: string,
+): Promise<void> {
   navegacion++;
   const pausada = ambito === null || ruta === null;
   medicion.pausada = pausada;
@@ -547,9 +562,7 @@ export async function medicionPara(
  * dónde llegó (ADR 0142) y sus preferencias con sus identificadores (ADR 0143). Sin
  * nada que mandar, no agrega nada.
  */
-export async function camposDeMedicion(
-  ambito: Ambito,
-): Promise<{
+export async function camposDeMedicion(ambito: Ambito): Promise<{
   atribucion?: AtribucionParaEnviar;
   medicion?: Record<string, unknown>;
 }> {
