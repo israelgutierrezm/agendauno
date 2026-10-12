@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -46,7 +47,8 @@ interface Entrega {
   ultimo_error: string | null;
   entregado_en: string | null;
 }
-type Pestana = "bienestar" | "llaves" | "webhooks";
+// Medición: su GA4 y su Meta (ADR 0143).
+type Pestana = "bienestar" | "llaves" | "webhooks" | "medicion";
 
 // Lo secreto se captura como contraseña; los códigos (Gym ID, gimnasio, plan), no.
 const SECRETAS = new Set(["api_key"]);
@@ -310,6 +312,14 @@ onMounted(cargar);
         @click="pestana = 'webhooks'"
       >
         {{ $t("conexiones.webhooks") }}
+      </button>
+      <button
+        type="button"
+        :aria-pressed="pestana === 'medicion'"
+        data-prueba="pestana-medicion"
+        @click="pestana = 'medicion'"
+      >
+        {{ $t("medicion.negocio.pestana") }}
       </button>
     </div>
 
@@ -695,6 +705,9 @@ onMounted(cargar);
         </button>
       </form>
     </div>
+
+    <!-- GA4 y Meta del negocio (ADR 0143) -->
+    <MedicionNegocio v-if="!cargando && pestana === 'medicion'" class="mt-5" />
   </section>
 </template>
 
