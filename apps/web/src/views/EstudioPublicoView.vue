@@ -19,7 +19,7 @@ import {
   type ModalidadServicio,
 } from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
-import { PRODUCTOS } from "@/lib/producto";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { marcarPwa } from "@/lib/pwa";
 import { updateSeo } from "@/lib/seo";
 import { urlCanonicaEstudio } from "@/lib/tenant";
@@ -497,6 +497,8 @@ async function cargar(): Promise<void> {
       logo_url: estudio.logo_url,
       ciudad: estudio.ciudad,
       pais: estudio.pais,
+      // En la lista de su producto (ADR 0136).
+      producto: productoDeModalidad(estudio.modalidad ?? "clases"),
     });
     const lugar = [estudio.ciudad, estudio.pais].filter(Boolean).join(", ");
     const esCitas = capacidadesDeNegocio(estudio).citas;

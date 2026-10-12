@@ -1257,6 +1257,9 @@ export default {
     buscar: "Buscar",
     buscando: "Buscando…",
     sinResultados: "No encontramos negocios con esa búsqueda.",
+    // Un negocio del otro producto (ADR 0136): cada producto es un sitio aparte.
+    otroProducto: "{negocio} usa {producto}.",
+    irAlOtroProducto: "Entra desde {producto}",
     negocioNoDisponible:
       "Ese negocio ya no está disponible. Busca otro para continuar.",
     // El negocio no se pudo consultar (sin red o el servidor no respondió): no es
