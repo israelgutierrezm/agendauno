@@ -59,6 +59,13 @@ const router = createRouter({
       component: () => import("@/views/TerminosView.vue"),
     },
     {
+      // Un widget en la web del negocio (calendario o planes; ADR 0141): sin encabezado.
+      path: "/w/:slug/:widget",
+      name: "widget",
+      component: () => import("@/views/WidgetView.vue"),
+      props: true,
+    },
+    {
       // Un formulario de captación por enlace, QR o embebido (`?embed=1`) (ADR 0117).
       path: "/f/:slug/:formulario",
       name: "formulario-captacion",
@@ -337,6 +344,13 @@ const router = createRouter({
       path: "/captacion/formularios",
       name: "captacion-formularios",
       component: () => import("@/views/FormulariosCaptacionView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // Integrar en mi web (ADR 0141): widgets de calendario y planes.
+      path: "/captacion/integrar",
+      name: "captacion-integrar",
+      component: () => import("@/views/IntegrarWebView.vue"),
       meta: { requiereSesion: true },
     },
     {

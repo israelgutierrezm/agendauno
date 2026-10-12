@@ -1,6 +1,66 @@
 // Captación del negocio (ADR 0117): Prospectos, sus formularios y el formulario
 // público (la página del negocio, un enlace, un QR o embebido en otro sitio).
 export default {
+  // Integrar en mi web (ADR 0141): widgets de calendario y planes.
+  widgets: {
+    nav: "Integrar en mi web",
+    titulo: "Integrar en mi web",
+    descripcion:
+      "Muestra tu calendario de clases o tus planes dentro de tu propia web. Cada quien reserva, pide lugar o compra desde ahí.",
+    nuevo: "Nuevo widget",
+    vacio: "Aún no tienes widgets. Crea uno y copia su código en tu web.",
+    tipos: {
+      calendario: "Calendario de clases",
+      planes: "Planes",
+    },
+    tiposAyuda: {
+      calendario:
+        "Fecha, actividad, instructor y lugares libres, con filtros por sucursal y actividad.",
+      planes: "Precio, vigencia, lo que incluye y sus restricciones.",
+    },
+    soloClases: "El calendario es para negocios de clases.",
+    nombre: "Nombre (solo para ti)",
+    filtros: "Filtros iniciales",
+    sucursal: "Sucursal",
+    actividad: "Actividad",
+    todas: "Todas",
+    tema: "Tema",
+    temas: {
+      claro: "Claro",
+      oscuro: "Oscuro",
+      auto: "Como el visitante",
+    },
+    acento: "Color de acento",
+    sinAcento: "El de tu marca",
+    dominios: "Webs donde lo vas a poner",
+    dominiosAyuda:
+      "Escribe la dirección de tu web (por ejemplo www.miestudio.com). Solo se mostrará ahí; sin ninguna, en cualquier web.",
+    agregarDominio: "Agregar web",
+    activo: "Activo",
+    apagado: "Apagado",
+    guardar: "Guardar",
+    guardado: "Widget guardado.",
+    eliminar: "Eliminar",
+    confirmarEliminar: "¿Eliminar este widget? Dejará de verse en tu web.",
+    vistaPrevia: "Vista previa",
+    codigo: "Código para tu web",
+    codigoAyuda:
+      "Pégalo en tu web donde quieras que aparezca. Se ajusta solo a la altura y al ancho.",
+    copiar: "Copiar código",
+    copiado: "Código copiado.",
+    editar: "Editar",
+    publico: {
+      cargando: "Cargando…",
+      noDisponible: "Este widget no está disponible.",
+      noAutorizado:
+        "Este widget no está autorizado para mostrarse en esta web.",
+      comprar: "Comprar",
+      volver: "← Volver",
+      pidiendo: "Déjanos tus datos para {etiqueta}",
+      yaCuenta: "¿Ya tienes cuenta?",
+      entrar: "Entra para reservar o comprar",
+    },
+  },
   prospectos: {
     titulo: "Prospectos",
     descripcion:

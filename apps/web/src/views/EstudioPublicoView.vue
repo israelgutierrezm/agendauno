@@ -7,11 +7,11 @@ import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
 import CalendarioPublico from "@/components/CalendarioPublico.vue";
+import TarjetaPlanPublico from "@/components/TarjetaPlanPublico.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
 import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
-import { textoCobertura } from "@/lib/cobertura";
 import { trackEvent } from "@/lib/analytics";
 import {
   capacidadesDeNegocio,
@@ -363,13 +363,6 @@ const equipoConSemblanza = computed(
   () => escaparate.value?.instructores.some((p) => p.semblanza) ?? false,
 );
 // «8 de octubre» de una fecha AAAA-MM-DD, sin que la zona horaria la mueva.
-function fechaDia(iso: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  }).format(new Date(`${iso}T12:00:00Z`));
-}
 // La página habla con las palabras del negocio, no con las de quien la visita (ADR
 // 0131): los pacientes de un consultorio, los coaches de un estudio de pole, las
 // lecciones de una escuela de natación.
@@ -1253,114 +1246,21 @@ onMounted(cargar);
                     <li
                       v-for="(p, i) in g.lista"
                       :key="p.id ?? i"
-                      class="tu-card flex flex-col p-5"
-                      :class="{ 'ep-precio-destacado': p.destacado }"
                       data-prueba="precio"
                     >
-                      <div class="flex flex-wrap gap-2">
-                        <span class="tu-badge">{{
-                          tn(`escaparate.registro.tipos.${p.tipo}`)
-                        }}</span>
-                        <span
-                          v-if="p.destacado"
-                          class="tu-badge ep-badge-marca"
-                          data-prueba="destacado"
-                          >{{ tn("escaparate.planes.destacado") }}</span
-                        >
-                        <span
-                          v-if="p.primera_vez && gruposPrecios.length === 1"
-                          class="tu-badge"
-                          data-prueba="primera-vez"
-                          >{{ tn("escaparate.planes.primeraVez") }}</span
-                        >
-                      </div>
-                      <p class="mt-2 font-light">{{ p.nombre }}</p>
-                      <p v-if="p.descripcion" class="mt-1 text-sm">
-                        {{ p.descripcion }}
-                      </p>
-                      <p
-                        v-if="variasSedes && p.todas_sucursales !== undefined"
-                        class="mt-1 text-sm"
-                        style="color: var(--texto-suave)"
-                      >
-                        {{ textoCobertura(p, $t) }}
-                      </p>
-                      <p class="mt-1 text-2xl font-extrabold">
-                        {{ dinero(p.precio_minor, p.moneda) }}
-                      </p>
-                      <p
-                        class="mt-1 text-sm"
-                        :style="{ color: 'var(--texto-suave)' }"
-                      >
-                        <template v-if="p.ilimitado">{{
-                          tn("escaparate.ilimitado")
-                        }}</template>
-                        <template v-else-if="p.creditos_incluidos">{{
-                          $t(
-                            "escaparate.creditos",
-                            { n: p.creditos_incluidos / 1000 },
-                            p.creditos_incluidos === 1000 ? 1 : 2,
-                          )
-                        }}</template>
-                        <template v-else-if="p.unidades_por_ciclo">{{
-                          $t(
-                            "escaparate.planes.porMes",
-                            { n: p.unidades_por_ciclo / 1000 },
-                            p.unidades_por_ciclo === 1000 ? 1 : 2,
-                          )
-                        }}</template>
-                      </p>
-                      <!-- Qué cubre y hasta cuándo, sin letra chica (M03). -->
-                      <ul
-                        class="mt-3 mb-4 space-y-1 text-sm"
-                        :style="{ color: 'var(--texto-suave)' }"
-                      >
-                        <li v-if="p.actividad">
-                          {{
-                            tn("escaparate.planes.paraActividad", {
-                              actividad: p.actividad,
-                            })
-                          }}
-                        </li>
-                        <li v-if="p.vence_si_compra_hoy" data-prueba="vence">
-                          {{
-                            tn("escaparate.planes.vence", {
-                              fecha: fechaDia(p.vence_si_compra_hoy),
-                            })
-                          }}
-                        </li>
-                        <li v-else-if="p.tipo === 'membresia'">
-                          {{ tn("escaparate.planes.renueva") }}
-                        </li>
-                        <li v-if="p.primera_vez">
-                          {{ tn("escaparate.planes.primeraVezAyuda") }}
-                        </li>
-                        <li
-                          v-if="(p.permanencia_meses ?? 0) > 0"
-                          data-prueba="permanencia"
-                        >
-                          {{
-                            $t(
-                              "escaparate.planes.permanencia",
-                              { n: p.permanencia_meses },
-                              p.permanencia_meses ?? 0,
-                            )
-                          }}
-                        </li>
-                      </ul>
-                      <button
-                        type="button"
-                        class="tu-btn tu-btn-primario mt-auto w-full"
-                        data-prueba="lo-quiero"
-                        @click="
+                      <TarjetaPlanPublico
+                        :plan="p"
+                        :terminos="terminosPagina"
+                        :varias-sedes="variasSedes"
+                        :marcar-primera-vez="gruposPrecios.length === 1"
+                        :boton="tn('escaparate.planes.loQuiero')"
+                        @elegir="
                           abrirAcceso('price_card', {
                             producto: p.id ?? null,
                             etiqueta: p.nombre,
                           })
                         "
-                      >
-                        {{ tn("escaparate.planes.loQuiero") }}
-                      </button>
+                      />
                     </li>
                   </ul>
                 </div>
@@ -1844,19 +1744,6 @@ onMounted(cargar);
   border-radius: 0.75rem;
   border-left: 3px solid var(--primario);
   background: color-mix(in srgb, var(--primario) 7%, var(--superficie));
-}
-/* El plan que el negocio recomienda: con el color de sus botones (su marca). */
-.ep-precio-destacado {
-  border-color: var(--marketing-cta, var(--primario));
-  box-shadow: inset 0 0 0 1px var(--marketing-cta, var(--primario));
-}
-.ep-badge-marca {
-  color: var(--marketing-cta, var(--primario));
-  border-color: color-mix(
-    in srgb,
-    var(--marketing-cta, var(--primario)) 40%,
-    transparent
-  );
 }
 /* Qué saber y qué llevar: etiqueta y texto, uno debajo del otro. */
 .ep-primera-vez {
