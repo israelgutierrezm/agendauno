@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import ComprasMostrador from "@/components/ComprasMostrador.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import HistorialCompras from "@/components/HistorialCompras.vue";
@@ -562,6 +563,9 @@ onMounted(() => void cuenta.asegurar());
       <div id="mp-historial" :class="citas ? 'order-2' : 'order-6'">
         <HistorialCompras ref="historial" />
       </div>
+
+      <!-- Lo que compró en el mostrador (ADR 0145); sin compras, no aparece. -->
+      <ComprasMostrador class="order-7" />
     </div>
   </section>
 </template>

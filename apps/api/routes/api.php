@@ -72,6 +72,7 @@ use App\Modules\Tenancy\Http\Controllers\MiInteresTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPagoAutomaticoTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiReprogramarTenantController;
+use App\Modules\Tenancy\Http\Controllers\MisComprasMostradorTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisParticipantesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
@@ -437,6 +438,8 @@ Route::prefix('v1')->group(function (): void {
             // línea desde su portal. El fulfillment (créditos) lo confirma el webhook.
             Route::get('/mi/productos', [MiTenantController::class, 'productos'])->name('mi.productos.index');
             Route::get('/mi/ordenes', [MiTenantController::class, 'ordenes'])->name('mi.ordenes.index');
+            // Lo que compró en el mostrador del negocio (ADR 0145).
+            Route::get('/mi/compras-mostrador', MisComprasMostradorTenantController::class)->name('mi.compras-mostrador');
             // Todo lo que debe, aparte del historial paginado: un adeudo antiguo no se pierde.
             Route::get('/mi/ordenes/pendientes', [MiTenantController::class, 'ordenesPendientes'])->name('mi.ordenes.pendientes');
             Route::post('/mi/ordenes', [MiTenantController::class, 'comprar'])->middleware('plan:venta_en_linea')->name('mi.ordenes.store');
@@ -883,8 +886,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimiento'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.movimientos.store');
             Route::get('/pos/ventas', [PuntoDeVentaTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('pos.ventas.index');
             Route::post('/pos/ventas', [PuntoDeVentaTenantController::class, 'vender'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.store');
-            // A quién se le deja la propina (ADR 0139).
-            Route::get('/pos/propina-para', [PuntoDeVentaTenantController::class, 'propinaPara'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.propina-para');
+            // A quién se le vende: una persona del negocio o público en general (ADR 0145).
+            Route::get('/pos/compradores', [PuntoDeVentaTenantController::class, 'compradores'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.compradores');
             // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
             Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.metodo');
             Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');

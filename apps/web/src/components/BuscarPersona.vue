@@ -21,15 +21,21 @@ export interface PersonaBuscable {
   nombre: string;
   // Correo o celular: también se busca por ahí y se muestra debajo del nombre.
   detalle?: string | null;
+  // Del servidor, para quien la elige (p. ej. si tiene a dónde mandarle su ticket).
+  email?: string | null;
+  tipo?: string | null;
+  genero?: string | null;
 }
 
-// Una persona como la devuelve el directorio (GET /miembros).
+// Una persona como la devuelve el directorio (GET /miembros) o el mostrador.
 interface PersonaApi {
   id: string;
   nombre: string;
   nombre_completo?: string | null;
   email?: string | null;
   celular?: string | null;
+  tipo?: string | null;
+  genero?: string | null;
 }
 
 const props = withDefaults(
@@ -42,6 +48,8 @@ const props = withDefaults(
     // Para un <label for>: el id del campo de búsqueda.
     campoId?: string;
     deshabilitado?: boolean;
+    // Lo que se muestra debajo del nombre (por omisión, su correo o celular).
+    describir?: (p: PersonaBuscable) => string | null;
   }>(),
   {
     personas: () => [],
@@ -50,6 +58,7 @@ const props = withDefaults(
     placeholder: undefined,
     campoId: undefined,
     deshabilitado: false,
+    describir: undefined,
   },
 );
 const modelo = defineModel<string>({ required: true });
@@ -75,11 +84,17 @@ const elegida = computed(
 );
 
 function aBuscable(p: PersonaApi): PersonaBuscable {
-  return {
+  const persona: PersonaBuscable = {
     id: p.id,
     nombre: p.nombre_completo || p.nombre,
     detalle: p.email ?? p.celular ?? null,
+    ...(p.email ? { email: p.email } : {}),
+    ...(p.tipo ? { tipo: p.tipo } : {}),
+    ...(p.genero ? { genero: p.genero } : {}),
   };
+  return props.describir
+    ? { ...persona, detalle: props.describir(persona) }
+    : persona;
 }
 
 // En el servidor: espera a que deje de escribir y descarta respuestas viejas.

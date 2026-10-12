@@ -841,8 +841,14 @@ final class DemoGrecon extends DemoBase
             if ($inventario->stock((int) $articulo->getKey(), (int) $this->sede->getKey()) < 2) {
                 $inventario->registrar((int) $articulo->getKey(), (int) $this->sede->getKey(), $cual <= 1 ? 24 : 6, TipoMovimientoInventario::Entrada, 'Compra a proveedor', $this->admin);
             }
+            // Más de la mitad, una alumna que ya venía; las demás, público en general.
+            $alumnas = array_values(array_map(
+                static fn (array $a): PersonaTenant => $a['persona'],
+                array_filter($this->alumnas, static fn (array $a): bool => $a['desde']->lessThanOrEqualTo($dia)),
+            ));
+            $compradora = $this->unoSinSemilla($alumnas, "{$dia->toDateString()}{$n}", 60);
             try {
-                $pos->vender($this->sede, [['articulo' => $articulo, 'cantidad' => $cual <= 1 && $this->prob(25) ? 2 : 1]], (string) $this->elegir(['efectivo' => 50, 'tarjeta' => 40, 'transferencia' => 10]), $this->recepcion);
+                $pos->vender($this->sede, [['articulo' => $articulo, 'cantidad' => $cual <= 1 && $this->prob(25) ? 2 : 1]], (string) $this->elegir(['efectivo' => 50, 'tarjeta' => 40, 'transferencia' => 10]), $this->recepcion, 0, $compradora);
                 $this->sumar('ventas de mostrador');
             } catch (RuntimeException|ValidationException) {
                 // Sin existencias: no se vende.

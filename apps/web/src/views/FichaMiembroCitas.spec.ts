@@ -106,6 +106,7 @@ function montar() {
       plugins: [createI18n({ legacy: false, locale: "es", messages: { es } })],
       stubs: {
         PanelMiembro: true,
+        VentasMostrador: true,
         PanelEditarMiembro: true,
         CortePlanes: true,
         ExpedientePersona: true,

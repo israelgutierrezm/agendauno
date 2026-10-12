@@ -25,9 +25,36 @@ export const mostradorVisual = {
     sin: "Sin propina",
     otra: "Otra",
     monto: "Monto de la propina",
-    para: "Para",
-    paraNadie: "Para el equipo",
     ayuda: "Va aparte de la venta: no cuenta como ingreso del negocio.",
+  },
+  // A quién se le vende (ADR 0145): una persona del negocio o público en general.
+  comprador: {
+    titulo: "Venta a",
+    buscar: "Busca alumno, instructor o alguien del equipo",
+    publico: "Público en general",
+    publicoAyuda:
+      "Si no eliges a nadie, se registra como venta a público en general.",
+    enviarTicket: "Enviar su ticket por correo",
+    aCorreo: "A {correo}",
+    sinCorreo: "No tiene correo registrado: no se le puede mandar.",
+    confirmarA: "Se registra como venta a {nombre}.",
+    confirmarPublico: "Se registra como venta a público en general.",
+    ticketEnviadoA: "Le mandamos su ticket a {correo}.",
+    tipos: {
+      miembro: "Alumno",
+      instructor: "Instructor",
+      staff: "Equipo",
+    },
+  },
+  // Ventas recientes: por páginas y con fechas.
+  ventas: {
+    resumen: "{n} venta · {total} | {n} ventas · {total}",
+    desde: "Desde",
+    hasta: "Hasta",
+    quitarFiltro: "Quitar filtro",
+    sinEnFechas: "No hubo ventas en esas fechas.",
+    ticketEnviado: "Ticket enviado",
+    enFicha: "Compras en mostrador",
   },
   subtotal: "Productos",
   totalCobrar: "Total a cobrar",
@@ -45,6 +72,7 @@ export const mostradorVisual = {
   },
   col: {
     cuando: "Cuándo",
+    ventaA: "Venta a",
     productos: "Productos",
     acciones: "Acciones",
   },

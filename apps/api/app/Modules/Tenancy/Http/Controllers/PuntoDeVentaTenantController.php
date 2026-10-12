@@ -4,48 +4,134 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CompradoresPosTenant;
 use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Application\TicketVentaPosTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\ExtraArticuloTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Punto de venta minorista del estudio, tenant-local (R21): cobra un ticket de caja
  * (descuenta stock) y lista las ventas. Opera SIEMPRE sobre la BD del estudio resuelto.
+ *
+ * Cada venta es a una persona del negocio o a público en general, y a la persona se le
+ * puede mandar su ticket por correo (ADR 0145).
  */
 class PuntoDeVentaTenantController
 {
+    private const POR_PAGINA = 20;
+
     public function __construct(
         private readonly PuntoDeVentaTenant $pos,
         private readonly ResolverAccesoTenant $acceso,
         private readonly CorregirVentaPosTenant $corregir,
+        private readonly CompradoresPosTenant $compradores,
+        private readonly TicketVentaPosTenant $tickets,
+        private readonly FechasNegocioTenant $fechas,
     ) {}
 
+    /**
+     * Las ventas, de la más reciente a la más antigua, por páginas. Se filtran por días
+     * del negocio (`desde` / `hasta`), sucursal y persona. `meta.resumen` suma lo
+     * filtrado y `meta.hoy`, lo de hoy en esas sucursales (sin anuladas).
+     */
     public function index(Request $request): JsonResponse
     {
+        $filtros = $request->validate([
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d'],
+            'sucursal_id' => ['nullable', 'string'],
+            'persona_id' => ['nullable', 'string'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $desde = $filtros['desde'] ?? null;
+        $hasta = $filtros['hasta'] ?? null;
+        if ($desde !== null && $hasta !== null && $hasta < $desde) {
+            throw ValidationException::withMessages(['hasta' => ['La fecha final no puede ser antes que la inicial.']]);
+        }
+
         // Alcance por sucursal (R19): el staff acotado solo ve las ventas de SUS sedes.
         $actor = $this->actor($request);
         $permitidas = $actor !== null ? $this->acceso->sucursalesPermitidas($actor) : null;
+        $sucursal = null;
+        if (($filtros['sucursal_id'] ?? '') !== '') {
+            $sucursal = (int) SucursalTenant::query()->where('ulid', $filtros['sucursal_id'])->value('id');
+        }
+        $persona = null;
+        if (($filtros['persona_id'] ?? '') !== '') {
+            $persona = (int) PersonaTenant::withTrashed()->where('ulid', $filtros['persona_id'])->value('id');
+        }
 
-        $ventas = VentaPosTenant::query()
-            ->with(['sucursal', 'lineas.articulo', 'propinaPara'])
-            ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
+        $deSusSedes = fn (): Builder => VentaPosTenant::query()
+            ->when($permitidas !== null, fn (Builder $q) => $q->whereIn('sucursal_id', $permitidas ?? []))
+            ->when($sucursal !== null, fn (Builder $q) => $q->where('sucursal_id', $sucursal))
+            ->when($persona !== null, fn (Builder $q) => $q->where('persona_id', $persona));
+        $consulta = $deSusSedes()
+            ->when($desde !== null, fn (Builder $q) => $q->where('created_at', '>=', $this->fechas->inicioDelDia((string) $desde)))
+            ->when($hasta !== null, fn (Builder $q) => $q->where('created_at', '<=', $this->fechas->finDelDia((string) $hasta)));
+
+        $hoy = $this->fechas->hoy();
+        $pagina = (clone $consulta)
+            ->with(['sucursal', 'lineas.articulo', 'persona'])
             ->orderByDesc('id')
-            ->limit(100)
-            ->get();
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
         return response()->json([
-            'data' => $ventas->map(fn (VentaPosTenant $v): array => $this->presentar($v))->all(),
+            'data' => collect($pagina->items())->map(fn (VentaPosTenant $v): array => $this->presentar($v))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'resumen' => $this->sumar($consulta),
+                'hoy' => $this->sumar($deSusSedes()
+                    ->where('created_at', '>=', $this->fechas->inicioDelDia($hoy))
+                    ->where('created_at', '<=', $this->fechas->finDelDia($hoy))),
+            ],
         ]);
+    }
+
+    /**
+     * Cuántas ventas y cuánto se vendió (sin anuladas; las propinas, aparte).
+     *
+     * @param  Builder<VentaPosTenant>  $consulta
+     * @return array{ventas: int, vendido_minor: int, propinas_minor: int}
+     */
+    private function sumar(Builder $consulta): array
+    {
+        $fila = (clone $consulta)->whereNull('anulada_en')
+            ->selectRaw('COUNT(*) as ventas, COALESCE(SUM(total_minor), 0) as vendido, COALESCE(SUM(propina_minor), 0) as propinas')
+            ->toBase()->first();
+
+        return [
+            'ventas' => (int) ($fila->ventas ?? 0),
+            'vendido_minor' => (int) ($fila->vendido ?? 0),
+            'propinas_minor' => (int) ($fila->propinas ?? 0),
+        ];
+    }
+
+    /**
+     * A quién se le puede vender: personas del negocio por nombre, correo o celular
+     * (ADR 0145). Sin elegir a nadie, la venta es a público en general.
+     */
+    public function compradores(Request $request): JsonResponse
+    {
+        $validado = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+
+        return response()->json(['data' => $this->compradores->buscar((string) ($validado['q'] ?? ''), $this->actor($request))]);
     }
 
     public function vender(Request $request): JsonResponse
@@ -59,11 +145,14 @@ class PuntoDeVentaTenantController
             // Sus extras (ADR 0139): de ese artículo y a la venta.
             'items.*.extras' => ['nullable', 'array', 'max:30'],
             'items.*.extras.*' => ['string'],
-            // La propina, aparte de lo vendido, y para quién (alguien del equipo).
+            // La propina, aparte de lo vendido.
             'propina_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
-            'propina_para_id' => ['nullable', 'string'],
             // En efectivo: lo que entregó el cliente, para el cambio.
             'recibido_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            // A quién (de `GET /pos/compradores`); sin él, a público en general. A la
+            // persona se le puede mandar su ticket por correo (ADR 0145).
+            'comprador_id' => ['nullable', 'string', 'max:80'],
+            'enviar_ticket' => ['nullable', 'boolean'],
         ]);
 
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
@@ -88,39 +177,25 @@ class PuntoDeVentaTenantController
             $items[] = ['articulo' => $articulo, 'cantidad' => (int) $item['cantidad'], 'extras' => $extras];
         }
 
-        $propina = (int) ($validado['propina_minor'] ?? 0);
-        $para = null;
-        if (isset($validado['propina_para_id']) && $validado['propina_para_id'] !== '') {
-            $para = $this->equipoParaPropina()->firstWhere('ulid', $validado['propina_para_id'])
-                ?? throw ValidationException::withMessages(['propina_para_id' => ['Elige a alguien del equipo.']]);
+        // A público en general no se le manda ticket; a una persona, solo si tiene correo.
+        $comprador = ($validado['comprador_id'] ?? '') !== ''
+            ? $this->compradores->resolver((string) $validado['comprador_id'], $actor)
+            : null;
+        $enviarTicket = $comprador !== null && (bool) ($validado['enviar_ticket'] ?? false);
+        if ($enviarTicket && ($comprador->email ?? '') === '') {
+            throw ValidationException::withMessages(['enviar_ticket' => ['No tiene correo: no se le puede mandar el ticket.']]);
         }
+
         $venta = $this->pos->vender(
-            $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $this->actor($request),
-            $propina, $para, isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
+            $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $actor,
+            (int) ($validado['propina_minor'] ?? 0), $comprador,
+            isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
         );
+        if ($enviarTicket) {
+            $this->tickets->enviar($venta->load('persona'));
+        }
 
-        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo', 'propinaPara']))], 201);
-    }
-
-    /** A quién se le puede dejar la propina: el equipo activo (ADR 0139). */
-    public function propinaPara(): JsonResponse
-    {
-        return response()->json(['data' => $this->equipoParaPropina()->map(static fn (Usuario $u): array => [
-            'id' => $u->ulid, 'nombre' => $u->name,
-        ])->values()->all()]);
-    }
-
-    /**
-     * El equipo activo: quien tiene algún rol además de alumno o cliente.
-     *
-     * @return Collection<int, Usuario>
-     */
-    private function equipoParaPropina(): Collection
-    {
-        return Usuario::query()->where('activo', true)->orderBy('name')->get()
-            ->filter(static fn (Usuario $u): bool => array_diff($u->rolesEfectivos(), ['miembro']) !== [])
-            ->values()
-            ->toBase();
+        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo', 'persona']))], 201);
     }
 
     /**
@@ -135,7 +210,7 @@ class PuntoDeVentaTenantController
         ]);
         $venta = $this->corregir->corregirMetodo($venta, $validado['metodo'], $this->actor($request), $validado['motivo'] ?? null);
 
-        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo']))]);
+        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo', 'persona']))]);
     }
 
     /**
@@ -148,7 +223,7 @@ class PuntoDeVentaTenantController
         $validado = $request->validate(['motivo' => ['required', 'string', 'max:255']]);
         $venta = $this->corregir->anular($venta, $validado['motivo'], $this->actor($request));
 
-        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo']))]);
+        return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo', 'persona']))]);
     }
 
     /** La venta, si es de una sede que le corresponde a quien la toca (R19). */
@@ -173,13 +248,23 @@ class PuntoDeVentaTenantController
      */
     private function presentar(VentaPosTenant $venta): array
     {
+        $persona = $venta->persona;
+
         return [
             'id' => $venta->ulid,
+            'folio' => TicketVentaPosTenant::folio($venta),
             'sucursal' => $venta->sucursal?->nombre,
+            // A quién se le vendió; null = público en general (ADR 0145).
+            'comprador' => $persona !== null ? [
+                'id' => $persona->ulid,
+                'nombre' => $persona->nombreCompleto(),
+                'tipo' => $this->compradores->tipo($persona),
+                'genero' => $persona->genero?->value,
+            ] : null,
+            'ticket_enviado_en' => $venta->ticket_enviado_en?->toIso8601String(),
             'total_minor' => $venta->total_minor,
             // Aparte de lo vendido (ADR 0139): la propina, lo cobrado y el cambio.
             'propina_minor' => $venta->propina_minor,
-            'propina_para' => $venta->propinaPara?->name,
             'cobrado_minor' => $venta->cobradoMinor(),
             'recibido_minor' => $venta->recibido_minor,
             'cambio_minor' => $venta->recibido_minor !== null ? $venta->recibido_minor - $venta->cobradoMinor() : null,
