@@ -1,4 +1,5 @@
 import { ambitoEnUso, capturarAtribucion } from "@/lib/atribucion";
+import { reenviarEvento } from "@/lib/etiquetas";
 import { rutasMarketing } from "@/marketing/seoConfig";
 
 export type AnalyticsValue = string | number | boolean | null;
@@ -51,9 +52,13 @@ function deliver(payload: Record<string, unknown>): void {
     return;
   }
 
-  // Un proveedor bloqueado nunca debe impedir un registro o una activación.
+  // Un proveedor bloqueado nunca debe impedir un registro o una activación. Con la
+  // etiqueta de GA4 cargada, `dataLayer` es suyo: los eventos internos no se mezclan
+  // (a GA4 van solo los que se mapean en lib/etiquetas, con permiso).
   try {
-    window.dataLayer?.push(payload);
+    if (typeof window.gtag !== "function") {
+      window.dataLayer?.push(payload);
+    }
   } catch {
     /* Medición opcional. */
   }
@@ -108,6 +113,7 @@ export function trackEvent(
   name: string,
   properties: AnalyticsProperties = {},
 ): void {
+  reenviarEvento(name, properties);
   deliver({
     event: "agendauno_event",
     event_name: name,

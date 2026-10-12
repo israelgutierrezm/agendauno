@@ -1,7 +1,11 @@
-import { createRouter, createWebHistory } from "vue-router";
+import {
+  createRouter,
+  createWebHistory,
+  type RouteLocationNormalized,
+} from "vue-router";
 
 import ModalidadView from "@/views/ModalidadView.vue";
-import { trackPageView } from "@/lib/analytics";
+import { analyticsPath, trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/acceso";
 import {
   ambitoDeRuta,
@@ -9,6 +13,7 @@ import {
   fijarAmbitoActual,
 } from "@/lib/atribucion";
 import { volverSeguro } from "@/lib/destinoSeguro";
+import { navegar } from "@/lib/etiquetas";
 import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
 import { preciosPublicos } from "@/marketing/preciosPublicos";
@@ -697,6 +702,39 @@ router.afterEach((to, _from, failure) => {
   updateSeo(seo);
   // No enviar slugs, IDs internos ni URLs de activación a la medición comercial.
   if (seo.index || to.name === "registro") trackPageView(to.path, seo.title);
+  // GA4 y Meta (ADR 0143): una vista por navegación, solo en las páginas públicas.
+  const ambito = ambitoDeRuta(to);
+  void navegar(
+    ambito,
+    rutaMedible(to, ambito, seo.index === true),
+    document.title,
+  );
 });
+
+// Las páginas de un negocio que se miden con sus etiquetas: su página, su agenda y sus
+// enlaces. No su panel, la cuenta del cliente, un widget ni la vista previa.
+const RUTAS_DE_NEGOCIO_MEDIBLES = new Set([
+  "estudio-publico",
+  "estudio-corto",
+  "sucursales-estudio",
+  "enlaces-estudio",
+  "agendar-cita",
+]);
+function rutaMedible(
+  to: RouteLocationNormalized,
+  ambito: ReturnType<typeof ambitoDeRuta>,
+  indexable: boolean,
+): string | null {
+  if (ambito === null || to.query.vista_previa !== undefined) return null;
+  const i = to.fullPath.indexOf("?");
+  const query = i >= 0 ? to.fullPath.slice(i).split("#")[0]! : "";
+  if (ambito.startsWith("plataforma:")) {
+    // Lo del producto, agrupado como en la medición interna (sin slugs ni tokens).
+    return indexable || to.name === "registro"
+      ? analyticsPath(to.path) + query
+      : null;
+  }
+  return RUTAS_DE_NEGOCIO_MEDIBLES.has(String(to.name)) ? to.fullPath : null;
+}
 
 export default router;

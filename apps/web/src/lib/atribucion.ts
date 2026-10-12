@@ -4,6 +4,7 @@ import {
   type Producto,
   productoActual,
 } from "@/lib/producto";
+import { leerPreferencias } from "@/lib/consentimiento";
 import { slugDeContexto } from "@/lib/tenant";
 
 /**
@@ -22,8 +23,9 @@ import { slugDeContexto } from "@/lib/tenant";
  * - Aquí se guardan, como máximo, MAXIMO_DIAS_* (higiene); la ventana que vale la
  *   decide el servidor con sus parámetros al recibir una solicitud, una compra o una
  *   cita. Sin un toque vigente, el registro queda «sin atribución».
- * - Por ahora, solo en la pestaña (sessionStorage). Los identificadores de clic no
- *   salen del navegador sin la autorización de publicidad.
+ * - Sin la autorización de analítica, solo en la pestaña (sessionStorage); con ella,
+ *   en el navegador (ADR 0143). Los identificadores de clic no salen del navegador
+ *   sin la autorización de publicidad.
  */
 
 export type Ambito = `plataforma:${Producto}` | `negocio:${string}`;
@@ -156,11 +158,50 @@ export function toqueDeLlegada(
   return toque;
 }
 
-function almacen(): Storage | null {
+function pestana(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.sessionStorage;
   } catch {
     return null;
+  }
+}
+
+function navegador(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dónde se guarda la atribución del ámbito (ADR 0143): con la autorización de
+ * analítica, en el navegador (sobrevive a cerrar la pestaña); sin ella, solo en la
+ * pestaña.
+ */
+function almacen(ambito: Ambito): Storage | null {
+  return leerPreferencias(ambito)?.analitica === true ? navegador() : pestana();
+}
+
+/**
+ * Tras cambiar sus preferencias: con analítica, lo de la pestaña pasa al navegador;
+ * sin ella, se borra del navegador y queda solo en la pestaña.
+ */
+export function moverAtribucionSegunPreferencias(ambito: Ambito): void {
+  try {
+    const enPestana = pestana()?.getItem(CLAVE + ambito) ?? null;
+    const enNavegador = navegador()?.getItem(CLAVE + ambito) ?? null;
+    if (leerPreferencias(ambito)?.analitica === true) {
+      if (enPestana !== null) navegador()?.setItem(CLAVE + ambito, enPestana);
+      pestana()?.removeItem(CLAVE + ambito);
+    } else {
+      if (enNavegador !== null && enPestana === null) {
+        pestana()?.setItem(CLAVE + ambito, enNavegador);
+      }
+      navegador()?.removeItem(CLAVE + ambito);
+    }
+  } catch {
+    // Sin almacenamiento: nada que mover.
   }
 }
 
@@ -175,7 +216,7 @@ function vigente(toque: Toque | null, dias: number, ahora: Date): Toque | null {
 export function leerAtribucion(ambito: Ambito, ahora = new Date()): Atribucion {
   const vacio: Atribucion = { primer_toque: null, ultimo_toque: null };
   try {
-    const crudo = almacen()?.getItem(CLAVE + ambito);
+    const crudo = almacen(ambito)?.getItem(CLAVE + ambito);
     if (crudo === null || crudo === undefined) return vacio;
     const guardado = JSON.parse(crudo) as Partial<Atribucion>;
     return {
@@ -228,7 +269,7 @@ export function capturarAtribucion(
     ultimo_toque: toque,
   };
   try {
-    almacen()?.setItem(CLAVE + ambito, JSON.stringify(nueva));
+    almacen(ambito)?.setItem(CLAVE + ambito, JSON.stringify(nueva));
   } catch {
     // Sin almacenamiento: la medición es opcional.
   }
@@ -249,6 +290,10 @@ export function atribucionParaEnviar(
 ): AtribucionParaEnviar | null {
   const { primer_toque, ultimo_toque } = leerAtribucion(ambito, ahora);
   if (primer_toque === null && ultimo_toque === null) return null;
+  // Con la autorización de publicidad viajan también (para el `fbc` de Meta).
+  if (leerPreferencias(ambito)?.publicidad === true) {
+    return { primer_toque, ultimo_toque };
+  }
   return {
     primer_toque: sinClics(primer_toque),
     ultimo_toque: sinClics(ultimo_toque),

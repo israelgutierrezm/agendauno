@@ -23,6 +23,7 @@ import ModulosNegocio, {
   type ModuloDelNegocio,
 } from "@/components/ModulosNegocio.vue";
 import ComercialPlataforma from "@/components/ComercialPlataforma.vue";
+import MedicionPlataforma from "@/components/MedicionPlataforma.vue";
 import CondonarCargo from "@/components/CondonarCargo.vue";
 import type { PlanCitas } from "@/lib/suscripcion";
 import PlanEstudioPlataforma from "@/components/PlanEstudioPlataforma.vue";
@@ -169,6 +170,7 @@ type Pestana =
   | "errores"
   | "interesados"
   | "embudo"
+  | "medicion"
   | "equipo"
   | "bitacora";
 
@@ -1209,6 +1211,7 @@ function borrar(): void {
             'errores',
             'interesados',
             'embudo',
+            'medicion',
             'equipo',
             'bitacora',
           ] as const"
@@ -1217,7 +1220,11 @@ function borrar(): void {
           :aria-pressed="pestana === p"
           @click="irPestana(p)"
         >
-          {{ $t(`plataformaAdmin.pestanas.${p}`) }}
+          {{
+            p === "medicion"
+              ? $t("medicion.plataforma.pestana")
+              : $t(`plataformaAdmin.pestanas.${p}`)
+          }}
           <span
             v-if="p === 'estudios'"
             class="ml-1 tabular-nums"
@@ -1532,6 +1539,14 @@ function borrar(): void {
       <!-- Embudo de la plataforma: de la landing al primer pago (C08) -->
       <EmbudoPlataforma
         v-if="pestana === 'embudo'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
+
+      <!-- GA4 y Meta del SaaS, por producto (ADR 0143) -->
+      <MedicionPlataforma
+        v-if="pestana === 'medicion'"
         class="mt-5"
         :api-url="apiUrl"
         :token="token"
