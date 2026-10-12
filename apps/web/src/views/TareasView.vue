@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import BarraListado from "@/components/BarraListado.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { whatsappDe } from "@/lib/captacion";
@@ -65,16 +68,240 @@ const tab = ref<"pendientes" | "reglas">("pendientes");
 const error = ref<string | null>(null);
 
 // ---- Tareas ----
+type Vencimiento = "vencidas" | "hoy" | "semana" | "sin_fecha";
+const VENCIMIENTOS: Vencimiento[] = ["vencidas", "hoy", "semana", "sin_fecha"];
+interface MetaTareas {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  conteos: Record<Vencimiento, number>;
+}
+const POR_PAGINA = 20;
 const tareas = ref<Tarea[]>([]);
 const pendientes = ref(0);
+const meta = ref<MetaTareas | null>(null);
+const pagina = ref(1);
 const estadoFiltro = ref<"pendiente" | "completada">("pendiente");
 const cargandoTareas = ref(true);
 const accionando = ref(false);
 const mostrarNueva = ref(false);
 const nueva = ref({ titulo: "", detalle: "", vence_en: "" });
-// Solo las de seguimiento (las que crea el sistema por una señal; M09).
-// El inicio abre los seguimientos ya filtrados (`?tipo=seguimiento`; M08).
-const soloSeguimiento = ref(useRoute()?.query.tipo === "seguimiento");
+
+// Búsqueda y filtros. El inicio abre los seguimientos ya filtrados
+// (`?tipo=seguimiento`; M08) y puede abrir un vencimiento (`?vencimiento=hoy`).
+const consulta = useRoute()?.query ?? {};
+const busqueda = ref("");
+const filtros = ref<Record<"tipo" | "vencimiento" | "mias", string>>({
+  tipo:
+    typeof consulta.tipo === "string" &&
+    ["seguimiento", "automatica", "manual"].includes(consulta.tipo)
+      ? consulta.tipo
+      : "",
+  vencimiento:
+    typeof consulta.vencimiento === "string" &&
+    (VENCIMIENTOS as string[]).includes(consulta.vencimiento)
+      ? consulta.vencimiento
+      : "",
+  mias: "",
+});
+const desde = ref("");
+const hasta = ref("");
+const hayFiltros = computed(
+  () =>
+    busqueda.value.trim() !== "" ||
+    Object.values(filtros.value).some((v) => v !== "") ||
+    desde.value !== "" ||
+    hasta.value !== "",
+);
+const definicionFiltros = computed(() => [
+  {
+    clave: "tipo",
+    etiqueta: t("operacion.bandeja.filtros.tipo"),
+    opciones: (["seguimiento", "automatica", "manual"] as const).map((v) => ({
+      valor: v,
+      texto: t(`operacion.bandeja.tipos.${v}`),
+    })),
+  },
+  ...(estadoFiltro.value === "pendiente"
+    ? [
+        {
+          clave: "vencimiento",
+          etiqueta: t("operacion.bandeja.filtros.vencimiento"),
+          opciones: VENCIMIENTOS.map((v) => ({
+            valor: v,
+            texto: t(`operacion.bandeja.conteos.${v}`),
+          })),
+        },
+      ]
+    : []),
+  ...(alcance.value === "equipo"
+    ? [
+        {
+          clave: "mias",
+          etiqueta: t("operacion.bandeja.filtros.mias"),
+          tipo: "booleano" as const,
+        },
+      ]
+    : []),
+]);
+function cambiarFiltro(clave: string, valor: string): void {
+  if (clave === "tipo" || clave === "vencimiento" || clave === "mias") {
+    filtros.value[clave] = valor;
+    recargarDesdeElInicio();
+  }
+}
+// Un indicador de vencimiento es un atajo de ese filtro: otro clic lo quita.
+function elegirVencimiento(v: Vencimiento): void {
+  cambiarFiltro("vencimiento", filtros.value.vencimiento === v ? "" : v);
+}
+function limpiarFiltros(): void {
+  busqueda.value = "";
+  filtros.value = { tipo: "", vencimiento: "", mias: "" };
+  desde.value = "";
+  hasta.value = "";
+  recargarDesdeElInicio();
+}
+function elegirEstado(estado: "pendiente" | "completada"): void {
+  if (estado === estadoFiltro.value) {
+    return;
+  }
+  estadoFiltro.value = estado;
+  filtros.value.vencimiento = "";
+  recargarDesdeElInicio();
+}
+function recargarDesdeElInicio(): void {
+  pagina.value = 1;
+  void cargarTareas();
+}
+function irAPagina(n: number): void {
+  pagina.value = n;
+  void cargarTareas();
+}
+let esperaBusqueda: ReturnType<typeof setTimeout> | undefined;
+watch(busqueda, () => {
+  clearTimeout(esperaBusqueda);
+  esperaBusqueda = setTimeout(recargarDesdeElInicio, 300);
+});
+watch([desde, hasta], () => {
+  if (desde.value === "" || hasta.value === "" || hasta.value >= desde.value) {
+    recargarDesdeElInicio();
+  }
+});
+onBeforeUnmount(() => clearTimeout(esperaBusqueda));
+
+// ---- Fechas en días del negocio (su zona horaria, ADR 0099) ----
+const zona = computed(() => sesion.zonaHoraria || undefined);
+function diaDelNegocio(fecha: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: zona.value,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(fecha);
+}
+const hoy = diaDelNegocio(new Date());
+/** Cuántos días del negocio faltan (negativo: ya pasaron). */
+function diasHasta(iso: string): number {
+  return Math.round(
+    (Date.parse(`${diaDelNegocio(new Date(iso))}T00:00:00Z`) -
+      Date.parse(`${hoy}T00:00:00Z`)) /
+      86_400_000,
+  );
+}
+function fechaCorta(iso: string): string {
+  const fecha = new Date(iso);
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: zona.value,
+    day: "numeric",
+    month: "short",
+    ...(diaDelNegocio(fecha).slice(0, 4) !== hoy.slice(0, 4)
+      ? { year: "numeric" }
+      : {}),
+  }).format(fecha);
+}
+function fechaConHora(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: zona.value,
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(new Date(iso));
+}
+/** Cuándo vence (o cuándo se completó), con el tono de su punto. */
+function cuandoDe(tarea: Tarea): { texto: string; tono: string } {
+  if (tarea.estado === "completada") {
+    return {
+      texto: tarea.completada_en
+        ? t("operacion.bandeja.completadaEl", {
+            fecha: fechaCorta(tarea.completada_en),
+          })
+        : t("operacion.bandeja.completada"),
+      tono: "var(--exito)",
+    };
+  }
+  if (tarea.vence_en === null) {
+    return { texto: t("tareas.sinVencimiento"), tono: "var(--texto-suave)" };
+  }
+  const dias = diasHasta(tarea.vence_en);
+  const fecha = fechaCorta(tarea.vence_en);
+  if (dias < 0) {
+    return {
+      texto:
+        dias === -1
+          ? t("operacion.bandeja.vence.ayer")
+          : t("operacion.bandeja.vence.vencio", { fecha }),
+      tono: "var(--error)",
+    };
+  }
+  if (dias === 0) {
+    return { texto: t("operacion.bandeja.vence.hoy"), tono: "var(--aviso)" };
+  }
+  return {
+    texto:
+      dias === 1
+        ? t("operacion.bandeja.vence.manana")
+        : t("operacion.bandeja.vence.el", { fecha }),
+    tono: "var(--primario)",
+  };
+}
+// Las pendientes, agrupadas por cuándo vencen (ya vienen en ese orden).
+type Grupo = Vencimiento | "despues" | "completadas";
+const grupos = computed<{ clave: Grupo; tareas: Tarea[] }[]>(() => {
+  if (estadoFiltro.value === "completada") {
+    return [{ clave: "completadas", tareas: tareas.value }];
+  }
+  const lista: { clave: Grupo; tareas: Tarea[] }[] = [];
+  for (const tarea of tareas.value) {
+    const dias = tarea.vence_en === null ? null : diasHasta(tarea.vence_en);
+    const clave: Grupo =
+      dias === null
+        ? "sin_fecha"
+        : dias < 0
+          ? "vencidas"
+          : dias === 0
+            ? "hoy"
+            : dias <= 7
+              ? "semana"
+              : "despues";
+    const ultimo = lista[lista.length - 1];
+    if (ultimo?.clave === clave) {
+      ultimo.tareas.push(tarea);
+    } else {
+      lista.push({ clave, tareas: [tarea] });
+    }
+  }
+  return lista;
+});
+function alMarcar(tarea: Tarea): void {
+  if (tarea.estado !== "pendiente") {
+    void reabrir(tarea);
+  } else if (tarea.motivo) {
+    // Un seguimiento se cierra con su resultado.
+    abrirResultado(tarea);
+  } else {
+    void completar(tarea);
+  }
+}
 
 // ---- Seguimiento: mensaje sugerido y resultado ----
 const RESULTADOS = [
@@ -169,42 +396,53 @@ function etiquetaEvento(ev: string): string {
   return t(`tareas.eventos.${ev.replace(/\./g, "_")}`);
 }
 
-function fecha(iso: string | null): string {
-  if (iso === null) {
-    return "—";
-  }
-  return new Date(iso).toLocaleString("es-MX", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 // «mias»: sin permiso para las del equipo, solo ve y atiende las suyas.
 const alcance = ref<"mias" | "equipo">("equipo");
 
+let peticion = 0;
 async function cargarTareas(): Promise<void> {
+  const mia = ++peticion;
   cargandoTareas.value = true;
   error.value = null;
+  const q = busqueda.value.trim();
   try {
     const { data } = await api.get<{
       data: Tarea[];
       pendientes: number;
       alcance?: "mias" | "equipo";
+      meta?: MetaTareas;
     }>(`${base.value}/tareas`, {
       params: {
         estado: estadoFiltro.value,
-        ...(soloSeguimiento.value ? { tipo: "seguimiento" } : {}),
+        page: pagina.value,
+        per_page: POR_PAGINA,
+        ...(q !== "" ? { q } : {}),
+        ...(filtros.value.tipo !== "" ? { tipo: filtros.value.tipo } : {}),
+        ...(filtros.value.vencimiento !== "" &&
+        estadoFiltro.value === "pendiente"
+          ? { vencimiento: filtros.value.vencimiento }
+          : {}),
+        ...(filtros.value.mias !== "" ? { mias: 1 } : {}),
+        ...(desde.value !== "" ? { desde: desde.value } : {}),
+        ...(hasta.value !== "" ? { hasta: hasta.value } : {}),
       },
     });
+    // Solo la respuesta de la última búsqueda: una anterior que llegue tarde no la pisa.
+    if (mia !== peticion) {
+      return;
+    }
     tareas.value = data.data;
     pendientes.value = data.pendientes;
     alcance.value = data.alcance ?? "equipo";
+    meta.value = data.meta ?? null;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    if (mia === peticion) {
+      error.value = mensajeDeError(e);
+    }
   } finally {
-    cargandoTareas.value = false;
+    if (mia === peticion) {
+      cargandoTareas.value = false;
+    }
   }
 }
 
@@ -397,17 +635,6 @@ function cambiarTab(t: "pendientes" | "reglas"): void {
   }
 }
 
-function alternarEstado(): void {
-  estadoFiltro.value =
-    estadoFiltro.value === "pendiente" ? "completada" : "pendiente";
-  void cargarTareas();
-}
-
-function alternarSeguimiento(): void {
-  soloSeguimiento.value = !soloSeguimiento.value;
-  void cargarTareas();
-}
-
 onMounted(cargarTareas);
 </script>
 
@@ -428,7 +655,7 @@ onMounted(cargarTareas);
         :aria-pressed="tab === 'pendientes'"
         @click="cambiarTab('pendientes')"
       >
-        {{ $t("tareas.tabPendientes")
+        {{ $t("operacion.bandeja.tab")
         }}<span v-if="pendientes > 0" class="tu-badge ml-2">{{
           pendientes
         }}</span>
@@ -450,42 +677,100 @@ onMounted(cargarTareas);
     </p>
 
     <!-- ===== Pestaña: Pendientes ===== -->
-    <div v-if="tab === 'pendientes'" class="mt-6">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="flex flex-wrap items-center gap-4">
+    <div v-if="tab === 'pendientes'" class="mt-6 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div
+          class="tu-segmentado"
+          role="group"
+          :aria-label="$t('operacion.bandeja.estado')"
+        >
           <button
-            class="tu-enlace text-sm"
             type="button"
-            @click="alternarEstado"
+            :aria-pressed="estadoFiltro === 'pendiente'"
+            data-prueba="ver-pendientes"
+            @click="elegirEstado('pendiente')"
           >
-            {{
-              estadoFiltro === "pendiente"
-                ? $t("tareas.verCompletadas")
-                : $t("tareas.verPendientes")
-            }}
+            {{ $t("operacion.bandeja.pendientes") }}
           </button>
           <button
-            class="tu-enlace text-sm"
             type="button"
-            data-prueba="solo-seguimiento"
-            @click="alternarSeguimiento"
+            :aria-pressed="estadoFiltro === 'completada'"
+            data-prueba="ver-completadas"
+            @click="elegirEstado('completada')"
           >
-            {{
-              soloSeguimiento
-                ? $t("operacion.seguimiento.todas")
-                : $t("operacion.seguimiento.soloSeguimiento")
-            }}
+            {{ $t("operacion.bandeja.completadas") }}
           </button>
         </div>
+      </div>
+
+      <!-- Cuántas pendientes por vencimiento: también son atajos de ese filtro -->
+      <div
+        v-if="estadoFiltro === 'pendiente' && meta"
+        class="ta-conteos"
+        data-prueba="conteos-tareas"
+      >
         <button
-          v-if="puedeGestionar"
-          class="tu-btn tu-btn-primario tu-btn-crear"
+          v-for="v in VENCIMIENTOS"
+          :key="v"
           type="button"
-          @click="mostrarNueva = true"
+          class="ta-conteo"
+          :class="`ta-conteo-${v}`"
+          :aria-pressed="filtros.vencimiento === v"
+          :data-prueba="`conteo-${v}`"
+          @click="elegirVencimiento(v)"
         >
-          {{ $t("tareas.nueva") }}
+          <span class="ta-conteo-numero">{{ meta.conteos[v] }}</span>
+          <span class="ta-conteo-texto">{{
+            $t(`operacion.bandeja.conteos.${v}`)
+          }}</span>
         </button>
       </div>
+
+      <BarraListado
+        v-model:busqueda="busqueda"
+        :filtros="definicionFiltros"
+        :valores="filtros"
+        :placeholder="$t('operacion.bandeja.buscar')"
+        :puede-crear="puedeGestionar"
+        :nuevo-texto="$t('tareas.nueva')"
+        @cambio-filtro="cambiarFiltro"
+        @limpiar="limpiarFiltros"
+        @nuevo="mostrarNueva = true"
+      >
+        <template #acciones>
+          <fieldset class="ta-rango">
+            <legend class="sr-only">
+              {{
+                estadoFiltro === "pendiente"
+                  ? $t("operacion.bandeja.rangoVence")
+                  : $t("operacion.bandeja.rangoCompletada")
+              }}
+            </legend>
+            <span class="ta-rango-etiqueta" aria-hidden="true">{{
+              estadoFiltro === "pendiente"
+                ? $t("operacion.bandeja.rangoVence")
+                : $t("operacion.bandeja.rangoCompletada")
+            }}</span>
+            <input
+              v-model="desde"
+              type="date"
+              class="tu-input"
+              :max="hasta || undefined"
+              :aria-label="$t('operacion.bandeja.desde')"
+              data-prueba="tareas-desde"
+            />
+            <span aria-hidden="true">–</span>
+            <input
+              v-model="hasta"
+              type="date"
+              class="tu-input"
+              :min="desde || undefined"
+              :aria-label="$t('operacion.bandeja.hasta')"
+              data-prueba="tareas-hasta"
+            />
+          </fieldset>
+        </template>
+      </BarraListado>
 
       <!-- Nueva tarea (drawer lateral) -->
       <PanelLateral
@@ -545,149 +830,221 @@ onMounted(cargarTareas);
         </template>
       </PanelLateral>
 
-      <p
-        v-if="cargandoTareas"
-        class="mt-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("comun.cargando") }}
-      </p>
-      <p
-        v-else-if="tareas.length === 0"
-        class="mt-10 text-center text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{
-          estadoFiltro === "pendiente"
-            ? $t("tareas.sinPendientes")
-            : $t("tareas.sinCompletadas")
-        }}
-      </p>
-      <ul v-else class="mt-4 space-y-2">
-        <li
-          v-for="tarea in tareas"
-          :key="tarea.id"
-          class="tu-card p-3 flex items-start justify-between gap-3"
+      <!-- La bandeja: agrupada por cuándo vence, con su página -->
+      <div class="tu-card overflow-hidden" :aria-busy="cargandoTareas">
+        <ul
+          v-if="cargandoTareas && tareas.length === 0"
+          class="ta-lista"
+          :aria-label="$t('operacion.bandeja.cargando')"
         >
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span
-                class="font-semibold"
-                :class="{
-                  'line-through opacity-60': tarea.estado === 'completada',
-                }"
-                >{{ tarea.titulo }}</span
-              >
-              <span v-if="tarea.automatica" class="tu-badge">{{
-                $t("tareas.automatica")
-              }}</span>
-              <span v-if="tarea.motivo" class="tu-badge">{{
-                $t("operacion.seguimiento.etiqueta")
-              }}</span>
-            </div>
-            <p
-              v-if="tarea.detalle"
-              class="text-sm mt-1 whitespace-pre-line"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ tarea.detalle }}
-            </p>
-            <div
-              class="flex flex-wrap items-center gap-1.5 mt-1 text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              <RouterLink
-                v-if="tarea.persona && tarea.persona_id"
-                class="tu-enlace"
-                :to="{
-                  name: 'ficha-miembro',
-                  params: { id: tarea.persona_id },
-                }"
-                >{{ tarea.persona }}</RouterLink
-              >
-              <span v-else-if="tarea.persona">{{ tarea.persona }}</span>
-              <span v-if="tarea.persona" aria-hidden="true">·</span>
-              <span>{{
-                tarea.vence_en
-                  ? fecha(tarea.vence_en)
-                  : $t("tareas.sinVencimiento")
-              }}</span>
-              <template v-if="tarea.resultado">
-                <span aria-hidden="true">·</span>
-                <span class="inline-flex items-center gap-1.5">
-                  <span
-                    class="inline-block size-1.5 rounded-full"
-                    :style="{ background: 'var(--texto-suave)' }"
-                    aria-hidden="true"
-                  />
-                  {{
-                    $t(`operacion.seguimiento.resultados.${tarea.resultado}`)
-                  }}
-                </span>
-              </template>
-            </div>
-            <!-- Seguimiento pendiente: escribirle con el mensaje sugerido -->
-            <div
-              v-if="tarea.motivo && tarea.estado === 'pendiente'"
-              class="flex flex-wrap items-center gap-3 mt-2 text-sm"
-            >
-              <button
-                v-if="mensajeDe(tarea)"
-                class="tu-enlace"
-                type="button"
-                @click="copiarMensaje(tarea)"
-              >
-                {{ $t("operacion.seguimiento.copiar") }}
-              </button>
-              <BotonWhatsApp
-                v-if="whatsappCon(tarea)"
-                :href="whatsappCon(tarea) ?? ''"
-                :texto="$t('operacion.seguimiento.whatsapp')"
-                compacto
-              />
-              <span
-                v-if="!tarea.celular && tarea.contacto"
-                :style="{ color: 'var(--texto-suave)' }"
-                data-prueba="contacto-responsable"
-                >{{
-                  $t("operacion.seguimiento.via", {
-                    nombre: tarea.contacto.nombre,
-                  })
-                }}</span
-              >
-            </div>
-          </div>
+          <li v-for="n in 4" :key="n" class="ta-fila" aria-hidden="true">
+            <span class="ta-check ta-esqueleto" />
+            <span class="grid flex-1 gap-2">
+              <span class="ta-esqueleto h-4 w-2/5" />
+              <span class="ta-esqueleto h-3 w-3/5" />
+            </span>
+          </li>
+        </ul>
+
+        <EstadoVacio
+          v-else-if="tareas.length === 0 && hayFiltros"
+          icono="buscar"
+          :titulo="$t('operacion.bandeja.sinResultados')"
+          compacto
+        >
           <button
-            v-if="
-              puedeGestionar && tarea.estado === 'pendiente' && tarea.motivo
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="limpiarFiltros"
+          >
+            {{ $t("operacion.bandeja.quitarFiltros") }}
+          </button>
+        </EstadoVacio>
+        <EstadoVacio
+          v-else-if="tareas.length === 0"
+          icono="tareas"
+          :titulo="
+            estadoFiltro === 'pendiente'
+              ? $t('operacion.bandeja.todoAlDia')
+              : $t('tareas.sinCompletadas')
+          "
+          :texto="
+            estadoFiltro === 'pendiente'
+              ? $t('operacion.bandeja.sinPendientesTexto')
+              : undefined
+          "
+          :mas="estadoFiltro === 'pendiente' && puedeGestionar"
+          compacto
+        />
+
+        <div v-else :class="{ 'ta-recargando': cargandoTareas }">
+          <section
+            v-for="g in grupos"
+            :key="g.clave"
+            :aria-label="
+              g.clave === 'completadas'
+                ? $t('operacion.bandeja.completadas')
+                : $t(`operacion.bandeja.grupos.${g.clave}`)
             "
-            class="tu-btn tu-btn-fantasma shrink-0"
-            type="button"
-            :disabled="accionando"
-            @click="abrirResultado(tarea)"
           >
-            {{ $t("operacion.seguimiento.registrar") }}
-          </button>
-          <button
-            v-else-if="puedeGestionar && tarea.estado === 'pendiente'"
-            class="tu-btn tu-btn-fantasma shrink-0"
-            type="button"
-            :disabled="accionando"
-            @click="completar(tarea)"
-          >
-            {{ $t("tareas.completar") }}
-          </button>
-          <button
-            v-else-if="puedeGestionar"
-            class="tu-enlace shrink-0"
-            type="button"
-            :disabled="accionando"
-            @click="reabrir(tarea)"
-          >
-            {{ $t("tareas.reabrir") }}
-          </button>
-        </li>
-      </ul>
+            <h2
+              v-if="g.clave !== 'completadas'"
+              class="ta-grupo"
+              :class="`ta-grupo-${g.clave}`"
+            >
+              {{ $t(`operacion.bandeja.grupos.${g.clave}`) }}
+            </h2>
+            <ul class="ta-lista">
+              <li
+                v-for="tarea in g.tareas"
+                :key="tarea.id"
+                class="ta-fila"
+                :class="{ 'ta-hecha': tarea.estado === 'completada' }"
+                data-prueba="tarea"
+              >
+                <button
+                  v-if="puedeGestionar"
+                  type="button"
+                  class="ta-check"
+                  :aria-label="
+                    tarea.estado === 'completada'
+                      ? $t('operacion.bandeja.reabrirTarea', {
+                          titulo: tarea.titulo,
+                        })
+                      : $t('operacion.bandeja.marcarCompletada', {
+                          titulo: tarea.titulo,
+                        })
+                  "
+                  :title="
+                    tarea.estado === 'completada'
+                      ? $t('tareas.reabrir')
+                      : $t('tareas.completar')
+                  "
+                  :disabled="accionando"
+                  data-prueba="marcar-tarea"
+                  @click="alMarcar(tarea)"
+                >
+                  <IconoNav
+                    v-if="tarea.estado === 'completada'"
+                    nombre="hecho"
+                    :tam="14"
+                  />
+                </button>
+                <span v-else class="ta-check ta-check-fijo" aria-hidden="true">
+                  <IconoNav
+                    v-if="tarea.estado === 'completada'"
+                    nombre="hecho"
+                    :tam="14"
+                  />
+                </span>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="ta-titulo">{{ tarea.titulo }}</span>
+                    <span v-if="tarea.motivo" class="tu-badge">{{
+                      $t("operacion.seguimiento.etiqueta")
+                    }}</span>
+                    <span v-else-if="tarea.automatica" class="tu-badge">{{
+                      $t("tareas.automatica")
+                    }}</span>
+                  </div>
+                  <p
+                    v-if="tarea.detalle"
+                    class="ta-detalle"
+                    :title="tarea.detalle"
+                  >
+                    {{ tarea.detalle }}
+                  </p>
+                  <div class="ta-meta">
+                    <span
+                      class="tu-estado"
+                      :style="{ '--tono': cuandoDe(tarea).tono }"
+                      :title="
+                        tarea.vence_en
+                          ? fechaConHora(tarea.vence_en)
+                          : undefined
+                      "
+                      data-prueba="cuando-tarea"
+                      >{{ cuandoDe(tarea).texto }}</span
+                    >
+                    <RouterLink
+                      v-if="tarea.persona && tarea.persona_id"
+                      class="tu-enlace"
+                      :to="{
+                        name: 'ficha-miembro',
+                        params: { id: tarea.persona_id },
+                      }"
+                      >{{ tarea.persona }}</RouterLink
+                    >
+                    <span v-else-if="tarea.persona">{{ tarea.persona }}</span>
+                    <span v-if="alcance === 'equipo' && tarea.responsable">{{
+                      $t("operacion.bandeja.asignada", {
+                        nombre: tarea.responsable,
+                      })
+                    }}</span>
+                    <span v-if="tarea.resultado">{{
+                      $t(`operacion.seguimiento.resultados.${tarea.resultado}`)
+                    }}</span>
+                  </div>
+                  <!-- Seguimiento pendiente: escribirle con el mensaje sugerido -->
+                  <div
+                    v-if="tarea.motivo && tarea.estado === 'pendiente'"
+                    class="mt-2 flex flex-wrap items-center gap-3 text-sm"
+                  >
+                    <button
+                      v-if="mensajeDe(tarea)"
+                      class="tu-enlace"
+                      type="button"
+                      @click="copiarMensaje(tarea)"
+                    >
+                      {{ $t("operacion.seguimiento.copiar") }}
+                    </button>
+                    <BotonWhatsApp
+                      v-if="whatsappCon(tarea)"
+                      :href="whatsappCon(tarea) ?? ''"
+                      :texto="$t('operacion.seguimiento.whatsapp')"
+                      compacto
+                    />
+                    <span
+                      v-if="!tarea.celular && tarea.contacto"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      data-prueba="contacto-responsable"
+                      >{{
+                        $t("operacion.seguimiento.via", {
+                          nombre: tarea.contacto.nombre,
+                        })
+                      }}</span
+                    >
+                  </div>
+                </div>
+
+                <button
+                  v-if="
+                    puedeGestionar &&
+                    tarea.estado === 'pendiente' &&
+                    tarea.motivo
+                  "
+                  class="tu-btn tu-btn-fantasma shrink-0"
+                  type="button"
+                  :disabled="accionando"
+                  @click="abrirResultado(tarea)"
+                >
+                  {{ $t("operacion.seguimiento.registrar") }}
+                </button>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <PaginacionListado
+          v-if="meta && meta.ultima_pagina > 1"
+          :page="meta.page"
+          :ultima-pagina="meta.ultima_pagina"
+          :total="meta.total"
+          :per-page="meta.per_page"
+          @ir="irAPagina"
+        />
+      </div>
 
       <!-- Con qué terminó un seguimiento (M09) -->
       <PanelLateral
@@ -967,3 +1324,185 @@ onMounted(cargarTareas);
     </div>
   </section>
 </template>
+
+<style scoped>
+/* La bandeja de tareas: indicadores por vencimiento, grupos y filas. */
+.ta-conteos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+@media (min-width: 768px) {
+  .ta-conteos {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.ta-conteo {
+  --tono: var(--texto-suave);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--superficie);
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.ta-conteo:hover {
+  border-color: var(--tono);
+}
+.ta-conteo[aria-pressed="true"] {
+  border-color: var(--tono);
+  background: color-mix(in srgb, var(--tono) 9%, var(--superficie));
+}
+.ta-conteo-vencidas {
+  --tono: var(--error);
+}
+.ta-conteo-hoy {
+  --tono: var(--aviso);
+}
+.ta-conteo-semana {
+  --tono: var(--primario);
+}
+.ta-conteo-numero {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--texto);
+}
+.ta-conteo-texto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+.ta-conteo-texto::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--tono);
+}
+.ta-rango {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+.ta-rango .tu-input {
+  width: auto;
+  min-height: 2.5rem;
+  padding-block: 0.35rem;
+  font-size: 0.85rem;
+}
+.ta-grupo {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--borde);
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ta-grupo-vencidas {
+  color: var(--error);
+}
+section + section .ta-grupo {
+  border-top: 1px solid var(--borde);
+}
+.ta-lista > li + li {
+  border-top: 1px solid var(--borde);
+}
+.ta-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+}
+@media (min-width: 640px) {
+  .ta-fila {
+    padding-inline: 1.25rem;
+  }
+}
+.ta-check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-top: 0.1rem;
+  border: 2px solid color-mix(in srgb, var(--texto-suave) 55%, transparent);
+  border-radius: 999px;
+  color: var(--primario-contraste);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+button.ta-check:hover:not(:disabled) {
+  border-color: var(--primario);
+  background: color-mix(in srgb, var(--primario) 12%, transparent);
+}
+.ta-hecha .ta-check {
+  border-color: var(--exito);
+  background: var(--exito);
+}
+.ta-titulo {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ta-hecha .ta-titulo {
+  color: var(--texto-suave);
+  text-decoration: line-through;
+}
+.ta-detalle {
+  display: -webkit-box;
+  margin-top: 0.2rem;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--texto-suave);
+  font-size: 0.875rem;
+  white-space: pre-line;
+}
+.ta-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  margin-top: 0.4rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+.ta-esqueleto {
+  display: block;
+  border: 0;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--texto-suave) 16%, transparent);
+  animation: ta-pulso 1.2s ease-in-out infinite;
+}
+.ta-check.ta-esqueleto {
+  border-radius: 999px;
+}
+.ta-recargando {
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+@keyframes ta-pulso {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ta-esqueleto {
+    animation: none;
+  }
+}
+</style>

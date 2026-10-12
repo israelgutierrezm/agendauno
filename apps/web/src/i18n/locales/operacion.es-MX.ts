@@ -220,7 +220,6 @@ export default {
   // Inicio del negocio: el día de hoy.
   hoy: {
     titulo: "Hoy",
-    saludo: "Esto es lo que pasa hoy en {estudio}, {fecha}.",
     enCurso: "En curso",
     loQueSigue: "Lo que sigue hoy",
     diaTerminado: "No quedan clases por comenzar hoy",
@@ -452,6 +451,59 @@ export default {
     },
   },
   // Seguimiento útil en Tareas (plan de mejoras M09).
+  // La bandeja de tareas: por páginas, con búsqueda, filtros y grupos por vencimiento.
+  bandeja: {
+    tab: "Bandeja",
+    estado: "Qué tareas ver",
+    pendientes: "Pendientes",
+    completadas: "Completadas",
+    completada: "Completada",
+    completadaEl: "Completada el {fecha}",
+    conteos: {
+      vencidas: "Vencidas",
+      hoy: "Para hoy",
+      semana: "Próximos 7 días",
+      sin_fecha: "Sin fecha",
+    },
+    grupos: {
+      vencidas: "Vencidas",
+      hoy: "Hoy",
+      semana: "Próximos 7 días",
+      despues: "Más adelante",
+      sin_fecha: "Sin fecha",
+    },
+    vence: {
+      vencio: "Venció el {fecha}",
+      ayer: "Venció ayer",
+      hoy: "Vence hoy",
+      manana: "Vence mañana",
+      el: "Vence el {fecha}",
+    },
+    buscar: "Buscar por tarea, detalle o persona…",
+    filtros: {
+      tipo: "Tipo",
+      vencimiento: "Vencimiento",
+      mias: "Solo las mías",
+    },
+    tipos: {
+      seguimiento: "Seguimientos",
+      automatica: "Automáticas",
+      manual: "Manuales",
+    },
+    rangoVence: "Vencen",
+    rangoCompletada: "Completadas",
+    desde: "Desde",
+    hasta: "Hasta",
+    asignada: "Asignada a {nombre}",
+    marcarCompletada: "Marcar «{titulo}» como completada",
+    reabrirTarea: "Reabrir «{titulo}»",
+    cargando: "Cargando tareas…",
+    todoAlDia: "Todo al día",
+    sinPendientesTexto:
+      "No hay tareas pendientes. Crea una o deja que la automatización las genere.",
+    sinResultados: "Ninguna tarea coincide con tu búsqueda o filtros.",
+    quitarFiltros: "Quitar filtros",
+  },
   seguimiento: {
     soloSeguimiento: "Ver solo seguimiento",
     todas: "Ver todas las tareas",
