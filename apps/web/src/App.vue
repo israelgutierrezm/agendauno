@@ -453,7 +453,10 @@ onMounted(() => {
         <PestanasArea v-show="!agendaAmpliada" class="tu-sin-imprimir" />
         <div
           class="tu-lienzo"
-          :class="{ 'tu-lienzo-ampliado': agendaAmpliada }"
+          :class="{
+            'tu-lienzo-ampliado': agendaAmpliada,
+            'tu-lienzo-compacto': compacto,
+          }"
         >
           <!-- Personal sin sucursal (con varias en el negocio): no ve nada aún. -->
           <AvisoSinSucursal v-if="sesion.usuario?.sin_sucursal" />
@@ -702,23 +705,33 @@ a.tu-miga:hover {
  * deja la mitad del margen que le daba su ancho máximo: su ancho + la mitad de lo
  * que sobraba (calc(50% + ancho/2)). Los formularios angostos (2xl, 3xl) y los de
  * Configuración, que van junto a su navegación, conservan su ancho.
+ *
+ * Con la barra lateral contraída (de 16rem a 4rem) el contenido gana la mitad de lo
+ * que ella deja (`--lienzo-extra`, 6rem): así queda el mismo margen a los lados que
+ * con la barra abierta, en vez de crecer el margen.
  */
 .tu-lienzo {
+  --lienzo-extra: 0rem;
   padding: 0 0.25rem;
+}
+@media (min-width: 1024px) {
+  .tu-lienzo.tu-lienzo-compacto {
+    --lienzo-extra: 6rem;
+  }
 }
 .tu-lienzo > :not([class*="max-w-"]),
 .tu-lienzo > .mx-auto.max-w-7xl {
-  max-width: calc(50% + 40rem);
+  max-width: calc(50% + 40rem + var(--lienzo-extra));
   margin-inline: auto;
 }
 .tu-lienzo > .mx-auto.max-w-6xl {
-  max-width: calc(50% + 36rem);
+  max-width: calc(50% + 36rem + var(--lienzo-extra));
 }
 .tu-lienzo > .mx-auto.max-w-5xl {
-  max-width: calc(50% + 32rem);
+  max-width: calc(50% + 32rem + var(--lienzo-extra));
 }
 .tu-lienzo > .mx-auto.max-w-4xl {
-  max-width: calc(50% + 28rem);
+  max-width: calc(50% + 28rem + var(--lienzo-extra));
 }
 /* En Configuración, la pantalla va junto a su navegación, no centrada en lo que sobra. */
 .lc-contenido > .mx-auto {
