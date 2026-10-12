@@ -279,6 +279,39 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
   con «Volvió después de resolverse» y llega la alerta «Error que volvió».
 - [ ] Márcalo «Ignorar» y repítelo: se cuenta, pero no llega alerta.
 
+### 13. GA4 y Meta del SaaS (ADR 0143)
+
+En un entorno de pruebas con `MEDICION_ENVIAR_FUERA_DE_PRODUCCION=true`, una propiedad
+de GA4 de prueba y un píxel con código de «Eventos de prueba».
+
+- [ ] **Configurar.** Superadmin → Medición:
+  - captura ID y secreto de GA4 y de Meta de AgendaUno; el secreto no se vuelve a
+    mostrar;
+  - sin confirmar el aviso de privacidad no se enciende;
+  - «Probar conexión»: en GA4 aparece `prueba_conexion` en DebugView; en Meta, el
+    evento en «Eventos de prueba».
+- [ ] **Sin elegir, nada.** En la landing aparece «Tu privacidad». Antes de elegir, en
+  la pestaña Red no hay `gtag/js` ni `fbevents.js`. Con «Solo lo necesario» tampoco.
+- [ ] **Con analítica.**
+  - se carga GA4 y cada navegación manda **una** `page_view` (DebugView);
+  - en el panel o el superadmin no se manda nada;
+  - TurnoUno no recibe nada de AgendaUno.
+- [ ] **Registro de punta a punta.** Con todo aceptado, llega con
+  `?utm_source=prueba&utm_campaign=v1&fbclid=…` y registra un negocio:
+  - en «Eventos de prueba», `CompleteRegistration` y `StartTrial` del navegador y del
+    servidor, con el mismo `event_id` (Meta los deduplica);
+  - en GA4, `sign_up` y `prueba_iniciada` del servidor;
+  - en Superadmin → Medición quedan «Aceptado por el proveedor».
+- [ ] **Activación y primer pago.**
+  - con `agendauno:registrar-hitos` (o una primera operación real) se manda
+    `negocio_activado` / `ActivacionOperativa`;
+  - al pagar la primera suscripción, `purchase` / `Purchase` con el ulid del cargo y su
+    monto. Unos timbres no la mandan.
+- [ ] **Retirar.** «Privacidad» → quita publicidad. Las cookies `_fbp`/`_fbc` se borran
+  y lo que estaba pendiente para Meta queda «Omitido: la persona no lo autorizó».
+- [ ] **Falla del proveedor.** Con un token inválido el envío queda «Con error: el token
+  o el secreto no sirve», aparece la alerta y el registro siguió sin esperar.
+
 ### 12. Pago automático seguro (ADR 0134)
 
 Con Mercado Pago u OpenPay en modo Pruebas y una alumna con pago automático activo.

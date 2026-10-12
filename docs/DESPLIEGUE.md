@@ -142,6 +142,15 @@ mismo. Así no hay CORS entre subdominios.
    superadmin → Pasarelas. Al pasar de llaves de prueba a live, el superadmin pide el
    secreto nuevo y borra las tarjetas guardadas en modo prueba (no existen en live):
    los dueños las vuelven a guardar en «Mi suscripción».
+10. **GA4 y Meta del SaaS (opcional, ADR 0143)**:
+    - en GA4, una propiedad con un flujo web por producto (o una para los dos, si así
+      se decide) y su API secret de Measurement Protocol;
+    - en Meta, un píxel por producto y su token de la Conversions API;
+    - antes de encenderlos, publica en el superadmin una versión del aviso de
+      privacidad que informe esta medición (ADR 0143, «Requisitos del aviso»);
+    - se capturan en el superadmin → Medición y se prueban con «Probar conexión»;
+    - el envío corre con el scheduler (`agendauno:enviar-conversiones`, cada minuto);
+    - fuera de producción no sale nada (`MEDICION_ENVIAR_FUERA_DE_PRODUCCION`).
 
 ## Primera instalación
 

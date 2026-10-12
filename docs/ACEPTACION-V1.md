@@ -124,6 +124,12 @@ teléfono, en tema claro y oscuro:
 Verificar a mano, además de sus pruebas automáticas:
 
 - [ ] **Pago automático (ADR 0134):** `VERIFICACION-V1.md`, caso 12.
+- [ ] **GA4 y Meta del SaaS (ADR 0143):** `VERIFICACION-V1.md`, caso 13, con
+  credenciales reales. Las pruebas automáticas usan proveedores simulados: la
+  validación real con Google y Meta queda pendiente hasta hacerla aquí.
+- [ ] **Atribución (ADR 0142):** llega con `?utm_campaign=…` a la página de un negocio
+  y deja una solicitud; el prospecto dice esa campaña. Elige un plan, toca «Ya tengo
+  cuenta» y, al entrar, su cuenta muestra ese plan.
 - [ ] **Despliegue (ADR 0135):** punto 8 de arriba.
 - [ ] **Cada producto, un sitio aparte (ADR 0136):**
   - en la entrada de TurnoUno, «Tus negocios recientes» y la búsqueda solo muestran

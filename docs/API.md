@@ -347,6 +347,28 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## GA4 y Meta del SaaS (ADR 0143)
+
+- `GET /medicion/{agendauno|turnouno}` (público): `{ga4, meta}`, los IDs de los destinos
+  encendidos de ese producto (nunca sus secretos).
+- `POST /medicion/consentimiento` (público): `{visitante, analitica, publicidad}`. Se
+  aplica a lo que ese visitante ya registró: borra lo retirado. 204.
+- `POST /registro` acepta `medicion`: `{visitante, analitica, publicidad, ga_client_id,
+  ga_session_id, fbp, fbc, url}`.
+  - Solo se guarda lo autorizado: GA4 con analítica; `fbp`, `fbc`, agente e IP con
+    publicidad.
+  - La respuesta trae `medicion.eventos`: los `event_id` de `negocio_creado` y
+    `prueba_iniciada`.
+- Superadmin:
+  - `GET /plataforma/medicion`: los destinos por producto y proveedor, y los últimos 50
+    envíos;
+  - `PUT /plataforma/medicion/{producto}/{ga4|meta}` con `identificador`, `secreto`
+    (vacío lo conserva), `codigo_prueba` (Meta), `activo` y `aviso_confirmado`;
+  - `DELETE` desconecta: borra ID y secreto, y lo pendiente queda omitido;
+  - `POST …/probar` responde `{ok, mensajes}`.
+- `agendauno:enviar-conversiones` (cada minuto): detecta, manda, reintenta y vence
+  identificadores.
+
 ## Atribución de campañas (ADR 0142)
 
 - `atribucion` (opcional) en `POST /registro`, `POST /captacion/formularios/{f}/envios`,
