@@ -943,10 +943,19 @@ class MembresiaRenovable {
     this.error,
     this.tarjeta,
     this.para,
+    this.cancelando = false,
+    this.precioNuevoMinor,
   });
 
   final String id;
   final bool automatico;
+
+  /// Se quitó y la pasarela aún no confirma que dejó de cobrar (ADR 0134).
+  final bool cancelando;
+
+  /// El precio del plan cambió: el nuevo. Hasta autorizarlo se cobra [montoMinor]
+  /// (el que autorizó).
+  final int? precioNuevoMinor;
 
   /// De una persona a su cargo (su nombre): se cobra a la tarjeta del responsable
   /// (ADR 0129).
@@ -972,6 +981,8 @@ class MembresiaRenovable {
     id: (j['id'] ?? '') as String,
     automatico: (j['automatico'] ?? false) as bool,
     pendiente: (j['pendiente'] ?? false) as bool,
+    cancelando: (j['cancelando'] ?? false) as bool,
+    precioNuevoMinor: (j['precio_nuevo_minor'] as num?)?.toInt(),
     tarjeta: j['tarjeta'] is Map<String, dynamic>
         ? TarjetaDomiciliada.desdeJson(j['tarjeta'] as Map<String, dynamic>)
         : null,

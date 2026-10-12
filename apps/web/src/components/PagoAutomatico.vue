@@ -18,6 +18,10 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  *
  * Un responsable ve también las membresías de las personas a su cargo (`para`): se
  * cobran a su tarjeta (ADR 0129).
+ *
+ * Seguro (ADR 0134): uno que se quitó y la pasarela aún no confirma dice que se está
+ * cancelando; el monto es el que autorizó y, si el precio del plan cambió, se ofrece
+ * autorizar el nuevo (hasta entonces se cobra el anterior).
  */
 interface Tarjeta {
   marca: string | null;
@@ -36,6 +40,10 @@ interface Membresia {
   automatico: boolean;
   // Suscripción creada en la pasarela que el cliente aún no autoriza.
   pendiente?: boolean;
+  // Se quitó y la pasarela aún no confirma que dejó de cobrar.
+  cancelando?: boolean;
+  // El precio del plan cambió: el nuevo (se cobra `monto_minor` hasta autorizarlo).
+  precio_nuevo_minor?: number | null;
   // Con qué tarjeta se cobra (suscripciones: una por membresía).
   tarjeta?: Tarjeta | null;
   error: string | null;
@@ -51,10 +59,12 @@ const membresias = ref<Membresia[]>([]);
 const deOtros = computed(() => membresias.value.some((m) => m.para));
 const accionando = ref<string | null>(null);
 const error = ref<string | null>(null);
-// OpenPay: la tarjeta se captura aquí con OpenPay.js antes de suscribir.
+// OpenPay: la tarjeta se captura aquí con OpenPay.js antes de suscribir (al activar
+// o al autorizar el nuevo precio).
 const capturando = ref<{
   membresia: string;
   formulario: FormularioOpenPay;
+  precio?: boolean;
 } | null>(null);
 
 const retorno = useRetornoPago("tarjeta");
@@ -109,6 +119,7 @@ async function irA(
   ruta: string,
   clave: string,
   datos: Record<string, string> = {},
+  precio = false,
 ): Promise<void> {
   accionando.value = clave;
   error.value = null;
@@ -120,7 +131,11 @@ async function irA(
       return;
     }
     if (data.data.estado === "formulario" && data.data.formulario) {
-      capturando.value = { membresia: clave, formulario: data.data.formulario };
+      capturando.value = {
+        membresia: clave,
+        formulario: data.data.formulario,
+        precio,
+      };
       return;
     }
     capturando.value = null;
@@ -140,6 +155,28 @@ function activar(
     `${base.value}/mi/pago-automatico/${m.id}`,
     m.id,
     tarjetaTokenizada,
+  );
+}
+async function autorizarPrecio(
+  m: Membresia,
+  tarjetaTokenizada: Record<string, string> = {},
+): Promise<void> {
+  if (
+    Object.keys(tarjetaTokenizada).length === 0 &&
+    !(await confirmar(
+      t("pagoAutomatico.confirmarPrecio", {
+        nuevo: dinero(m.precio_nuevo_minor ?? null, m.moneda),
+      }),
+      { aceptar: t("pagoAutomatico.autorizarPrecio") },
+    ))
+  ) {
+    return;
+  }
+  return irA(
+    `${base.value}/mi/pago-automatico/${m.id}/nuevo-precio`,
+    m.id,
+    tarjetaTokenizada,
+    true,
   );
 }
 function cambiarTarjeta(): Promise<void> {
@@ -256,6 +293,13 @@ onMounted(async () => {
             <span v-if="m.automatico" class="tu-badge tu-badge-exito">{{
               $t("pagoAutomatico.automatico")
             }}</span>
+            <span
+              v-else-if="m.cancelando"
+              class="tu-estado"
+              data-prueba="cancelando"
+              :style="{ '--tono': 'var(--aviso)' }"
+              >{{ $t("pagoAutomatico.cancelando") }}</span
+            >
             <span v-else-if="m.pendiente" class="tu-badge tu-badge-aviso">{{
               $t("pagoAutomatico.porAutorizar")
             }}</span>
@@ -273,10 +317,45 @@ onMounted(async () => {
           <p v-if="m.error" class="mt-0.5 text-xs" style="color: var(--error)">
             {{ m.error }}
           </p>
+          <p
+            v-if="m.cancelando && !m.automatico"
+            class="mt-0.5 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("pagoAutomatico.cancelandoAyuda") }}
+          </p>
+          <!-- El precio cambió: se cobra el que autorizó hasta que autorice el nuevo. -->
+          <div
+            v-if="m.automatico && m.precio_nuevo_minor"
+            class="mt-1 text-xs"
+            data-prueba="precio-nuevo"
+          >
+            <p :style="{ color: 'var(--aviso)' }">
+              {{
+                $t("pagoAutomatico.precioNuevo", {
+                  nuevo: dinero(m.precio_nuevo_minor, m.moneda),
+                  monto: dinero(m.monto_minor, m.moneda),
+                })
+              }}
+            </p>
+            <button
+              type="button"
+              class="tu-enlace mt-0.5"
+              :disabled="accionando !== null"
+              @click="autorizarPrecio(m)"
+            >
+              {{ $t("pagoAutomatico.autorizarPrecio") }}
+            </button>
+          </div>
           <TarjetaOpenPay
             v-if="capturando?.membresia === m.id"
             :formulario="capturando.formulario"
-            @lista="(datos) => activar(m, datos)"
+            @lista="
+              (datos) =>
+                capturando?.precio
+                  ? autorizarPrecio(m, datos)
+                  : activar(m, datos)
+            "
             @cancelar="capturando = null"
           />
         </div>

@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\OpenPay\ClienteOpenPay;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 
 /**
@@ -180,7 +181,15 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, 
 
     public function consultarSuscripcion(DomiciliacionTenant $domiciliacion, array $llaves): array
     {
-        $suscripcion = $this->api($llaves)->suscripcion((string) $domiciliacion->cliente_externo, (string) $domiciliacion->suscripcion_externa);
+        try {
+            $suscripcion = $this->api($llaves)->suscripcion((string) $domiciliacion->cliente_externo, (string) $domiciliacion->suscripcion_externa);
+        } catch (RequestException $e) {
+            // Cancelada, OpenPay la borra: ya no existe, ya no cobra (ADR 0134).
+            if ($e->response->status() === 404) {
+                return ['estado' => 'cancelada', 'tarjeta' => null];
+            }
+            throw $e;
+        }
 
         return [
             // past_due: OpenPay sigue reintentando; unpaid/cancelled: ya no cobra.
@@ -209,6 +218,8 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, 
                 $estado === 'completed',
                 MontoDecimal::aCentavos((float) ($cargo['amount'] ?? 0)),
                 $estado === 'failed' ? 'El banco rechazó el cargo.' : null,
+                CobroDeSuscripcion::monedaDe($cargo['currency'] ?? null),
+                CobroDeSuscripcion::fechaDe($cargo['operation_date'] ?? $cargo['creation_date'] ?? null),
             );
         }
 
@@ -218,7 +229,14 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, 
     public function cancelarSuscripcion(DomiciliacionTenant $domiciliacion, array $llaves): void
     {
         if ((string) $domiciliacion->cliente_externo !== '' && (string) $domiciliacion->suscripcion_externa !== '') {
-            $this->api($llaves)->cancelarSuscripcion((string) $domiciliacion->cliente_externo, (string) $domiciliacion->suscripcion_externa);
+            try {
+                $this->api($llaves)->cancelarSuscripcion((string) $domiciliacion->cliente_externo, (string) $domiciliacion->suscripcion_externa);
+            } catch (RequestException $e) {
+                // Ya no existe: ya estaba cancelada.
+                if ($e->response->status() !== 404) {
+                    throw $e;
+                }
+            }
         }
     }
 

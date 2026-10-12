@@ -24,6 +24,10 @@ use Illuminate\Http\Request;
  * Un responsable ve también las membresías de las personas a su cargo con la
  * autorización vigente (`para`) y las paga con su tarjeta (ADR 0129). Es siempre la
  * cuenta del titular: no actúa por un participante (`X-Participante`).
+ *
+ * Seguro (ADR 0134): una suscripción que se quitó y la pasarela aún no confirma dice
+ * `cancelando`; el monto es el que autorizó (su precio contratado) y, si el del plan
+ * cambió, `precio_nuevo_minor` y la opción de autorizarlo.
  */
 class MiPagoAutomaticoTenantController
 {
@@ -55,21 +59,28 @@ class MiPagoAutomaticoTenantController
             ->where('estado', DomiciliacionTenant::PENDIENTE)
             ->pluck('acuerdo_id')
             ->all();
+        // Las que se quitaron y la pasarela aún no confirma (ADR 0134).
+        $cancelando = DomiciliacionTenant::query()
+            ->whereIn('acuerdo_id', $membresias->modelKeys())
+            ->where('estado', DomiciliacionTenant::CANCELANDO)
+            ->pluck('acuerdo_id')
+            ->all();
+        $domiciliaciones = $this->domiciliaciones;
 
         return response()->json(['data' => [
             'disponible' => $proveedor !== null,
             'tarjeta' => $tarjeta instanceof DomiciliacionTenant ? $tarjeta->tarjeta() : null,
             'membresias' => $membresias->map(static fn (AcuerdoTenant $a): array => [
+                ...self::precio($a, $domiciliaciones),
                 'id' => $a->ulid,
                 // De una persona a su cargo: se paga con la tarjeta del responsable.
                 'para' => (int) $a->persona_id !== (int) $persona->getKey() && $a->persona instanceof PersonaTenant
                     ? ['id' => $a->persona->ulid, 'nombre' => $a->persona->nombreCompleto()]
                     : null,
                 'pendiente' => in_array($a->getKey(), $porAutorizar, false),
+                'cancelando' => in_array($a->getKey(), $cancelando, false),
                 'tarjeta' => $a->domiciliacion?->marca !== null ? $a->domiciliacion->tarjeta() : null,
                 'producto' => $a->producto?->nombre,
-                'monto_minor' => $a->producto?->precio_minor,
-                'moneda' => $a->producto?->moneda,
                 'proxima_cobro_en' => $a->proxima_cobro_en?->toDateString(),
                 'estado' => $a->estado->value,
                 'automatico' => $a->domiciliacion instanceof DomiciliacionTenant,
@@ -98,6 +109,48 @@ class MiPagoAutomaticoTenantController
             'checkout' => isset($resultado['url']) ? ['tipo' => 'redirect', 'url' => $resultado['url']] : null,
             'formulario' => $resultado['formulario'] ?? null,
         ]]);
+    }
+
+    /**
+     * Autoriza el precio nuevo del plan para su pago automático (ADR 0134): con
+     * tarjeta domiciliada, al momento; con suscripción, se autoriza otra en la pasarela
+     * (o, con OpenPay, se captura la tarjeta) y la anterior se cancela al quedar activa.
+     */
+    public function autorizarPrecio(Request $request): JsonResponse
+    {
+        $acuerdo = $this->acuerdo($request);
+        $datos = $request->validate([
+            'token_id' => ['sometimes', 'string', 'max:255'],
+            'device_session_id' => ['sometimes', 'string', 'max:255'],
+        ]);
+        $usuario = $request->attributes->get('usuario_tenant');
+
+        $resultado = $this->domiciliaciones->autorizarNuevoPrecio(
+            $acuerdo, self::RETORNO, $datos, $this->persona($request), $usuario instanceof Usuario ? $usuario : null,
+        );
+
+        return response()->json(['data' => [
+            'estado' => $resultado['estado'],
+            'checkout' => isset($resultado['url']) ? ['tipo' => 'redirect', 'url' => $resultado['url']] : null,
+            'formulario' => $resultado['formulario'] ?? null,
+        ]]);
+    }
+
+    /**
+     * Lo que se cobra de la membresía: con pago automático, el precio que autorizó (y
+     * el nuevo, si el del plan cambió); sin él, el del plan.
+     *
+     * @return array{monto_minor: int|null, moneda: string|null, precio_nuevo_minor: int|null}
+     */
+    private static function precio(AcuerdoTenant $acuerdo, DomiciliacionesTenant $domiciliaciones): array
+    {
+        $contratado = $domiciliaciones->precioContratado($acuerdo);
+
+        return [
+            'monto_minor' => $contratado['monto_minor'] ?? $acuerdo->producto?->precio_minor,
+            'moneda' => $contratado['moneda'] ?? $acuerdo->producto?->moneda,
+            'precio_nuevo_minor' => $domiciliaciones->nuevoPrecio($acuerdo),
+        ];
     }
 
     public function desactivar(Request $request): JsonResponse

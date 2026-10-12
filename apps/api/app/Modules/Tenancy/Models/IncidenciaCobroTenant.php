@@ -27,13 +27,22 @@ class IncidenciaCobroTenant extends Model
 
     public const PAGO_DUPLICADO = 'pago_duplicado';
 
+    /** La pasarela no confirma la cancelación de una suscripción (ADR 0134). */
+    public const CANCELACION_SIN_CONFIRMAR = 'cancelacion_sin_confirmar';
+
+    /** La pasarela cobró una suscripción que ya se había pedido cancelar. */
+    public const COBRO_TRAS_CANCELAR = 'cobro_tras_cancelar';
+
+    /** La pasarela cobró otro importe u otra moneda que la renovación. */
+    public const MONTO_DISTINTO = 'monto_distinto';
+
     protected $connection = 'tenant';
 
     protected $table = 'incidencias_cobro';
 
     protected $fillable = [
         'tipo', 'estado', 'pago_id', 'reembolso_id', 'orden_id', 'detalle', 'datos',
-        'resuelta_por', 'resuelta_en', 'resolucion',
+        'resuelta_por', 'resuelta_en', 'resolucion', 'domiciliacion_id', 'referencia_externa',
     ];
 
     /**
@@ -50,6 +59,14 @@ class IncidenciaCobroTenant extends Model
     public function pago(): BelongsTo
     {
         return $this->belongsTo(PagoTenant::class, 'pago_id');
+    }
+
+    /**
+     * @return BelongsTo<DomiciliacionTenant, $this>
+     */
+    public function domiciliacion(): BelongsTo
+    {
+        return $this->belongsTo(DomiciliacionTenant::class, 'domiciliacion_id');
     }
 
     /**

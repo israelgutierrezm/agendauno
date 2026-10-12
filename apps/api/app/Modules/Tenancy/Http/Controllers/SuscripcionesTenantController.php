@@ -47,6 +47,13 @@ class SuscripcionesTenantController
             ->orderBy('proxima_cobro_en')
             ->limit(self::LIMITE)
             ->get();
+        // Pagos automáticos que se quitaron y la pasarela aún no confirma (ADR 0134).
+        $cancelando = DomiciliacionTenant::query()
+            ->whereIn('acuerdo_id', $acuerdos->modelKeys())
+            ->where('estado', DomiciliacionTenant::CANCELANDO)
+            ->pluck('acuerdo_id')
+            ->all();
+        $domiciliaciones = $this->domiciliaciones;
 
         return response()->json([
             'data' => $acuerdos->map(static fn (AcuerdoTenant $a): array => [
@@ -57,10 +64,14 @@ class SuscripcionesTenantController
                 'moneda' => $a->producto?->moneda,
                 'proxima_cobro_en' => $a->proxima_cobro_en?->toDateString(),
                 'estado' => $a->estado->value,
+                'cancelando_pago_automatico' => in_array($a->getKey(), $cancelando, false),
                 'pago_automatico' => $a->domiciliacion instanceof DomiciliacionTenant
                     ? [
                         ...$a->domiciliacion->tarjeta(),
                         'error' => $a->domiciliacion->ultimo_error,
+                        // Lo que autorizó (su precio contratado) y el nuevo, si cambió.
+                        'monto_minor' => $domiciliaciones->precioContratado($a)['monto_minor'] ?? null,
+                        'precio_nuevo_minor' => $domiciliaciones->nuevoPrecio($a),
                         // La paga su responsable con su tarjeta (ADR 0129).
                         'paga' => (int) $a->domiciliacion->persona_id !== (int) $a->persona_id
                             ? $a->domiciliacion->persona?->nombreCompleto()

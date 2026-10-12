@@ -11,8 +11,10 @@ use App\Modules\Tenancy\Models\ClientePasarelaTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTarjetaTenant;
 use App\Modules\Tenancy\Models\TutelaTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
 use App\Modules\Tenancy\Pasarelas\PasarelaDomiciliable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
@@ -40,12 +42,19 @@ use Throwable;
  * responsable con autorización vigente por él (familias, ADR 0129): la tarjeta y el
  * cliente en la pasarela son de quien paga; la membresía sigue siendo del participante.
  * Si la autorización se retira, esos pagos automáticos se quitan.
+ *
+ * Seguro (ADR 0134): quitar una suscripción la deja `cancelando` hasta que la pasarela
+ * confirma ({@see CancelacionSuscripcionesTenant}); cada reemplazo (otra tarjeta, otro
+ * pagador, otra pasarela) cancela la anterior allá también. La domiciliación guarda el
+ * precio que el cliente autorizó: con ella se abre la renovación hasta que autorice
+ * otro.
  */
 class DomiciliacionesTenant
 {
     public function __construct(
         private readonly RegistroDePasarelasTenant $registro,
         private readonly FamiliasTenant $familias,
+        private readonly CancelacionSuscripcionesTenant $cancelaciones,
     ) {}
 
     /**
@@ -160,6 +169,72 @@ class DomiciliacionesTenant
     }
 
     /**
+     * Lo que el cliente autorizó en su pago automático vigente (ADR 0134): con eso se
+     * abre la renovación. Null si no tiene pago automático, si es anterior a guardar el
+     * precio, o si es de otra moneda que el plan.
+     *
+     * @return array{monto_minor: int, moneda: string}|null
+     */
+    public function precioContratado(AcuerdoTenant $acuerdo): ?array
+    {
+        $domiciliacion = $acuerdo->relationLoaded('domiciliacion') ? $acuerdo->domiciliacion : $acuerdo->domiciliacion()->first();
+        $producto = $acuerdo->producto;
+        if (! $domiciliacion instanceof DomiciliacionTenant || $domiciliacion->monto_minor === null
+            || ! $producto instanceof ProductoTenant || (string) $domiciliacion->moneda !== (string) $producto->moneda) {
+            return null;
+        }
+
+        return ['monto_minor' => (int) $domiciliacion->monto_minor, 'moneda' => (string) $domiciliacion->moneda];
+    }
+
+    /**
+     * El precio del plan cambió y su pago automático sigue con el que autorizó: ¿cuál
+     * es el nuevo? Null si no cambió (o no se sabe).
+     */
+    public function nuevoPrecio(AcuerdoTenant $acuerdo): ?int
+    {
+        $contratado = $this->precioContratado($acuerdo);
+        $actual = $acuerdo->producto?->precio_minor;
+
+        return $contratado !== null && $actual !== null && (int) $actual !== $contratado['monto_minor'] ? (int) $actual : null;
+    }
+
+    /**
+     * El cliente autoriza el precio nuevo del plan para su pago automático. Con tarjeta
+     * domiciliada (Stripe) se actualiza al momento; con suscripción se crea otra al
+     * precio nuevo, que el cliente autoriza en la pasarela, y al quedar activa la
+     * anterior se cancela (con confirmación).
+     *
+     * @param  array<string, string>  $datos  la tarjeta tokenizada en el navegador (OpenPay)
+     * @return array{estado: string, url?: string, formulario?: array<string, mixed>}
+     */
+    public function autorizarNuevoPrecio(AcuerdoTenant $acuerdo, ?string $retorno, array $datos, PersonaTenant $pagador, ?Usuario $actor = null): array
+    {
+        $domiciliacion = $acuerdo->domiciliacion()->first()
+            ?? throw new DomiciliacionNoPermitida('Esta membresía no tiene pago automático.');
+        if ((int) $domiciliacion->persona_id !== (int) $pagador->getKey()) {
+            throw new DomiciliacionNoPermitida('Solo quien paga puede autorizar el nuevo precio.');
+        }
+        $acuerdo->loadMissing('producto');
+        $producto = $acuerdo->producto ?? throw new DomiciliacionNoPermitida('La membresía no tiene producto.');
+        if ($this->nuevoPrecio($acuerdo) === null) {
+            return ['estado' => 'activa'];
+        }
+
+        $pasarela = $this->registro->resolver($domiciliacion->proveedor);
+        if ($pasarela instanceof PasarelaConSuscripcion) {
+            return $this->suscribir($acuerdo, $domiciliacion->proveedor, $pasarela, $retorno, $datos, $pagador);
+        }
+
+        $antes = (int) $domiciliacion->monto_minor;
+        $domiciliacion->update(['monto_minor' => (int) $producto->precio_minor, 'moneda' => (string) $producto->moneda]);
+        app(RegistrarAuditoria::class)->registrar($actor, 'pago_automatico.precio_autorizado', 'acuerdo', (string) $acuerdo->ulid,
+            ['monto_minor' => $antes], ['monto_minor' => (int) $producto->precio_minor]);
+
+        return ['estado' => 'activa'];
+    }
+
+    /**
      * A nombre de quién se guarda la tarjeta al pagar una compra con pago automático:
      * de quien la pagó desde su cuenta, si es un responsable con la autorización vigente
      * por el comprador (p. ej. la renovación de su hijo, ADR 0129); si no, del comprador.
@@ -217,6 +292,25 @@ class DomiciliacionesTenant
         foreach ($domiciliaciones as $domiciliacion) {
             $this->cerrar($domiciliacion);
         }
+    }
+
+    /**
+     * El negocio (o la plataforma) apagó familias: ningún responsable sigue pagando por
+     * otra persona. Sus pagos automáticos se quitan ya, también en la pasarela, sin
+     * esperar a la renovación (ADR 0134).
+     */
+    public function alApagarFamilias(): int
+    {
+        $ajenas = DomiciliacionTenant::query()
+            ->whereIn('estado', [DomiciliacionTenant::ACTIVA, DomiciliacionTenant::PENDIENTE])
+            ->whereHas('acuerdo', fn ($q) => $q->whereColumn('acuerdos.persona_id', '!=', 'domiciliaciones.persona_id'))
+            ->get();
+
+        foreach ($ajenas as $domiciliacion) {
+            $this->cerrar($domiciliacion);
+        }
+
+        return $ajenas->count();
     }
 
     /**
@@ -308,25 +402,28 @@ class DomiciliacionesTenant
 
     /**
      * La pasarela confirmó que el cliente autorizó la suscripción: queda como el pago
-     * automático de la membresía (con la tarjeta, si la pasarela la informa).
+     * automático de la membresía (con la tarjeta, si la pasarela la informa). Las
+     * anteriores de la membresía (otra tarjeta, otro pagador, otra pasarela u otro
+     * precio) se cancelan también en su pasarela (ADR 0134).
      */
     public function activarSuscripcion(DomiciliacionTenant $domiciliacion, ?TarjetaGuardada $tarjeta): void
     {
-        DB::connection('tenant')->transaction(function () use ($domiciliacion, $tarjeta): void {
-            DomiciliacionTenant::query()
-                ->where('acuerdo_id', $domiciliacion->acuerdo_id)
-                ->whereKeyNot($domiciliacion->getKey())
-                ->whereIn('estado', [DomiciliacionTenant::ACTIVA, DomiciliacionTenant::PENDIENTE])
-                ->update(['estado' => DomiciliacionTenant::CANCELADA, 'cancelada_en' => Carbon::now()]);
+        $domiciliacion->update([
+            ...($tarjeta instanceof TarjetaGuardada && (string) $domiciliacion->metodo_externo === '' ? $tarjeta->atributos() : []),
+            'estado' => DomiciliacionTenant::ACTIVA,
+            'activada_en' => Carbon::now(),
+            'ultimo_error' => null,
+            'ultimo_error_en' => null,
+        ]);
 
-            $domiciliacion->update([
-                ...($tarjeta instanceof TarjetaGuardada && (string) $domiciliacion->metodo_externo === '' ? $tarjeta->atributos() : []),
-                'estado' => DomiciliacionTenant::ACTIVA,
-                'activada_en' => Carbon::now(),
-                'ultimo_error' => null,
-                'ultimo_error_en' => null,
-            ]);
-        });
+        $anteriores = DomiciliacionTenant::query()
+            ->where('acuerdo_id', $domiciliacion->acuerdo_id)
+            ->whereKeyNot($domiciliacion->getKey())
+            ->whereIn('estado', [DomiciliacionTenant::ACTIVA, DomiciliacionTenant::PENDIENTE])
+            ->get();
+        foreach ($anteriores as $anterior) {
+            $this->cerrar($anterior);
+        }
     }
 
     /**
@@ -365,21 +462,20 @@ class DomiciliacionesTenant
         }
     }
 
+    /**
+     * Quita un pago automático. Una suscripción queda `cancelando` hasta que su
+     * pasarela confirma (ADR 0134); una tarjeta domiciliada se cancela aquí (el sistema
+     * es quien cobra) y se desliga si ya no paga nada.
+     */
     private function cerrar(DomiciliacionTenant $domiciliacion): void
     {
-        $domiciliacion->update(['estado' => DomiciliacionTenant::CANCELADA, 'cancelada_en' => Carbon::now()]);
-
-        $pasarela = $this->registro->resolver($domiciliacion->proveedor);
-        if ($pasarela instanceof PasarelaConSuscripcion) {
-            try {
-                $pasarela->cancelarSuscripcion($domiciliacion, $this->registro->llaves($domiciliacion->proveedor));
-            } catch (Throwable $e) {
-                ReporteDeErrores::reportarAtrapado($e);
-            }
+        if ($this->registro->resolver($domiciliacion->proveedor) instanceof PasarelaConSuscripcion) {
+            $this->cancelaciones->solicitar($domiciliacion);
 
             return;
         }
 
+        $domiciliacion->update(['estado' => DomiciliacionTenant::CANCELADA, 'cancelada_en' => Carbon::now()]);
         $this->olvidar((int) $domiciliacion->persona_id, $domiciliacion->proveedor, (string) $domiciliacion->metodo_externo);
     }
 
@@ -392,11 +488,26 @@ class DomiciliacionesTenant
      */
     private function suscribir(AcuerdoTenant $acuerdo, string $proveedor, PasarelaConSuscripcion $pasarela, ?string $retorno, array $datos, PersonaTenant $pagador): array
     {
-        $domiciliacion = DomiciliacionTenant::query()->firstOrCreate([
+        $acuerdo->loadMissing('producto');
+        $clave = [
             'acuerdo_id' => $acuerdo->getKey(),
             'proveedor' => $proveedor,
             'estado' => DomiciliacionTenant::PENDIENTE,
             'persona_id' => $pagador->getKey(),
+        ];
+        // Ya había creado una en la pasarela que aún no autoriza (p. ej. cerró la página
+        // y lo intenta de nuevo): esa se cancela allá, por si la autoriza después, y se
+        // crea otra (ADR 0134). Sin referencia allá (OpenPay aún sin tarjeta), se usa.
+        $previa = DomiciliacionTenant::query()->where($clave)->latest('id')->first();
+        if ($previa instanceof DomiciliacionTenant && (string) $previa->suscripcion_externa !== '') {
+            $this->cerrar($previa);
+            $previa = null;
+        }
+        $domiciliacion = $previa ?? DomiciliacionTenant::query()->create($clave);
+        // El precio que la pasarela cobrará cada mes: el que el cliente autoriza.
+        $domiciliacion->update([
+            'monto_minor' => $acuerdo->producto?->precio_minor,
+            'moneda' => $acuerdo->producto?->moneda,
         ]);
 
         $resultado = $pasarela->suscribir($domiciliacion, $acuerdo, $retorno, $datos, $this->registro->llaves($proveedor));
@@ -443,11 +554,17 @@ class DomiciliacionesTenant
      */
     private function domiciliar(AcuerdoTenant $acuerdo, string $proveedor, TarjetaGuardada $tarjeta, PersonaTenant $pagador): void
     {
-        DomiciliacionTenant::query()
+        // La de otra pasarela (p. ej. una suscripción de Mercado Pago) se cancela allá
+        // también: si no, seguiría cobrando (ADR 0134).
+        $deOtraPasarela = DomiciliacionTenant::query()
             ->where('acuerdo_id', $acuerdo->getKey())
-            ->where('estado', DomiciliacionTenant::ACTIVA)
+            ->whereIn('estado', [DomiciliacionTenant::ACTIVA, DomiciliacionTenant::PENDIENTE])
             ->where('proveedor', '!=', $proveedor)
-            ->update(['estado' => DomiciliacionTenant::CANCELADA, 'cancelada_en' => Carbon::now()]);
+            ->get();
+        foreach ($deOtraPasarela as $otra) {
+            $this->cerrar($otra);
+        }
+        $acuerdo->loadMissing('producto');
 
         $anterior = DomiciliacionTenant::query()
             ->where('acuerdo_id', $acuerdo->getKey())
@@ -464,6 +581,9 @@ class DomiciliacionesTenant
                 'ultimo_error' => null,
                 'ultimo_error_en' => null,
                 'activada_en' => Carbon::now(),
+                // El precio que autoriza al domiciliarla (su precio contratado).
+                'monto_minor' => $acuerdo->producto?->precio_minor,
+                'moneda' => $acuerdo->producto?->moneda,
             ],
         );
 

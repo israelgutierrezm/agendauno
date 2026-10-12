@@ -423,6 +423,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/pago-automatico', [MiPagoAutomaticoTenantController::class, 'mostrar'])->name('mi.pago-automatico');
             Route::post('/mi/pago-automatico/tarjeta', [MiPagoAutomaticoTenantController::class, 'cambiarTarjeta'])->middleware('throttle:login')->name('mi.pago-automatico.tarjeta');
             Route::post('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'activar'])->middleware('throttle:login')->name('mi.pago-automatico.activar');
+            // El precio del plan cambió: autorizar el nuevo (ADR 0134).
+            Route::post('/mi/pago-automatico/{acuerdo}/nuevo-precio', [MiPagoAutomaticoTenantController::class, 'autorizarPrecio'])->middleware('throttle:login')->name('mi.pago-automatico.nuevo-precio');
             Route::delete('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'desactivar'])->name('mi.pago-automatico.desactivar');
 
             // Invitación de personal (crea usuario tenant-local con rol + activación).

@@ -51,7 +51,11 @@ class OrdenesTenant
      * (`via`: `cliente` en su cuenta, `negocio` si lo registra el equipo); se guardan en la
      * línea con el texto, su versión, cuándo y quién.
      *
-     * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
+     * `precio_minor` en un item: solo en una renovación, el precio que el cliente
+     * autorizó en su pago automático (su precio contratado, ADR 0134) en lugar del de
+     * hoy.
+     *
+     * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null, precio_minor?: int}>  $items
      * @param  array{actor: Usuario|null, motivo: string}|null  $exencionInscripcion
      * @param  array{via: string, usuario: Usuario|null, ip: string|null}|null  $aceptacion
      */
@@ -102,14 +106,15 @@ class OrdenesTenant
             foreach ($items as $item) {
                 $producto = $item['producto'];
                 $cantidad = max(1, $item['cantidad']);
-                $lineaSubtotal = $producto->precio_minor * $cantidad;
+                $precio = $renovacion && isset($item['precio_minor']) ? (int) $item['precio_minor'] : (int) $producto->precio_minor;
+                $lineaSubtotal = $precio * $cantidad;
                 $subtotal += $lineaSubtotal;
 
                 $orden->lineas()->create([
                     'producto_comercial_id' => $producto->getKey(),
                     'beneficiario_id' => ($item['beneficiario'] ?? null)?->getKey(),
                     'cantidad' => $cantidad,
-                    'precio_unitario_minor' => $producto->precio_minor,
+                    'precio_unitario_minor' => $precio,
                     'subtotal_minor' => $lineaSubtotal,
                     // Las condiciones que aceptó (plan con permanencia; B04).
                     'condiciones' => $aceptacion === null ? null

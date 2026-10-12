@@ -123,4 +123,42 @@ describe("pago automático del alumno", () => {
       "Las membresías de las personas a tu cargo se cobran a tu tarjeta.",
     );
   });
+
+  it("dice que se está cancelando y ofrece autorizar el precio nuevo del plan", async () => {
+    const base = respuesta(true).data.data;
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          ...base,
+          membresias: [
+            {
+              ...base.membresias[0],
+              precio_nuevo_minor: 149900,
+            },
+            {
+              ...base.membresias[0],
+              id: "a2",
+              producto: "Plan Yoga",
+              automatico: false,
+              cancelando: true,
+            },
+          ],
+        },
+      },
+    });
+    api.post.mockResolvedValue({
+      data: {
+        data: { estado: "redirect", checkout: { url: "https://mp/checkout" } },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="cancelando"]').text()).toBe(
+      "Cancelando en la pasarela",
+    );
+    const precio = w.get('[data-prueba="precio-nuevo"]');
+    expect(precio.text()).toContain("$1,499.00");
+    expect(precio.text()).toContain("$1,299.00");
+  });
 });

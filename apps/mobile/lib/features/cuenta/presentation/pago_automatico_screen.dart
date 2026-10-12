@@ -227,17 +227,49 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
                                     Text(
                                       m.automatico
                                           ? 'Cobro automático${m.tarjeta != null && datos.tarjeta == null ? ' · ${m.tarjeta!.texto}' : ''}'
+                                          : m.cancelando
+                                          ? 'Cancelando en la pasarela'
                                           : m.pendiente
                                           ? 'Falta autorizarlo en la pasarela'
                                           : 'Te avisamos para pagar',
                                       style: TextStyle(
                                         color: m.automatico
                                             ? TemaAgendaUno.exito
-                                            : m.pendiente
+                                            : m.pendiente || m.cancelando
                                             ? TemaAgendaUno.aviso
                                             : TemaAgendaUno.textoSuave,
                                       ),
                                     ),
+                                    // El precio cambió: se cobra el que autorizó
+                                    // hasta que autorice el nuevo (ADR 0134).
+                                    if (m.automatico &&
+                                        m.precioNuevoMinor != null &&
+                                        repo != null) ...[
+                                      Text(
+                                        'El precio de tu plan ahora es '
+                                        '${Formato.dinero(m.precioNuevoMinor!, m.moneda)}. '
+                                        'Tu pago automático sigue cobrando '
+                                        '${Formato.dinero(m.montoMinor ?? 0, m.moneda)} '
+                                        'hasta que autorices el nuevo precio.',
+                                        key: const Key('precio-nuevo'),
+                                        style: const TextStyle(
+                                          color: TemaAgendaUno.aviso,
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: _accionando != null
+                                            ? null
+                                            : () => _conPasarela(
+                                                m.id,
+                                                () => repo.autorizarNuevoPrecio(
+                                                  m.id,
+                                                ),
+                                              ),
+                                        child: const Text(
+                                          'Autorizar el nuevo precio',
+                                        ),
+                                      ),
+                                    ],
                                     if (m.error != null)
                                       Text(
                                         m.error!,

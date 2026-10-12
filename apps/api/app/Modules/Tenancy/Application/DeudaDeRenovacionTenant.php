@@ -19,11 +19,16 @@ use Illuminate\Support\Facades\DB;
  */
 class DeudaDeRenovacionTenant
 {
-    public function __construct(private readonly OrdenesTenant $ordenes) {}
+    public function __construct(
+        private readonly OrdenesTenant $ordenes,
+        private readonly DomiciliacionesTenant $domiciliaciones,
+    ) {}
 
     /**
-     * La orden de renovación pendiente del acuerdo, o una nueva con el precio
-     * vigente del producto. Null si la membresía ya no tiene titular o producto.
+     * La orden de renovación pendiente del acuerdo, o una nueva: con el precio que el
+     * cliente autorizó en su pago automático, si lo tiene (su precio contratado, ADR
+     * 0134), o con el vigente del producto. Null si la membresía ya no tiene titular o
+     * producto.
      */
     public function de(AcuerdoTenant $acuerdo): ?OrdenTenant
     {
@@ -49,7 +54,12 @@ class DeudaDeRenovacionTenant
             }
 
             // Renovación de lo que ya tiene: aunque el producto se haya archivado.
-            $orden = $this->ordenes->crear($persona, [['producto' => $producto, 'cantidad' => 1, 'beneficiario' => null]], renovacion: true);
+            $item = ['producto' => $producto, 'cantidad' => 1, 'beneficiario' => null];
+            $contratado = $this->domiciliaciones->precioContratado($acuerdo);
+            if ($contratado !== null) {
+                $item['precio_minor'] = $contratado['monto_minor'];
+            }
+            $orden = $this->ordenes->crear($persona, [$item], renovacion: true);
             $orden->update(['renueva_acuerdo_id' => $acuerdo->getKey()]);
 
             return $orden;

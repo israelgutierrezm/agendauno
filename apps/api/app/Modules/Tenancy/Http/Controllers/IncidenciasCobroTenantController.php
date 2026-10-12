@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FulfillmentTenant;
 use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +27,11 @@ use Illuminate\Validation\ValidationException;
  * resuelve diciendo si la pasarela la hizo o no (se ve en su panel); un pago tardío
  * o doble, devolviéndolo (`accion: devolver`) o marcándolo resuelto (p. ej. se
  * reagendó con el cliente).
+ *
+ * Del pago automático (ADR 0134): un cobro con otro importe o que llegó tras cancelar
+ * se devuelve (si cobró de más, solo el excedente) o se aplica a la renovación que se
+ * debe (`accion: aplicar`, «dar por pagada»); una cancelación que la pasarela no
+ * confirma se cancela en su panel y se marca aquí (se cierra sola al confirmarse).
  */
 class IncidenciasCobroTenantController
 {
@@ -34,7 +43,7 @@ class IncidenciasCobroTenantController
 
         $incidencias = IncidenciaCobroTenant::query()
             ->where('estado', $validado['estado'] ?? IncidenciaCobroTenant::ABIERTA)
-            ->with(['pago.orden.persona', 'reembolso', 'resolvio'])
+            ->with(['pago.orden.persona', 'reembolso', 'resolvio', 'domiciliacion.persona'])
             ->orderByDesc('id')
             ->limit(self::LIMITE)
             ->get();
@@ -44,15 +53,16 @@ class IncidenciasCobroTenantController
         ]);
     }
 
-    public function resolver(Request $request, ReembolsarPagoTenant $reembolsos, IncidenciasCobroTenant $incidencias, RegistrarAuditoria $auditoria): JsonResponse
+    public function resolver(Request $request, ReembolsarPagoTenant $reembolsos, IncidenciasCobroTenant $incidencias, RegistrarAuditoria $auditoria, FulfillmentTenant $fulfillment): JsonResponse
     {
         $incidencia = IncidenciaCobroTenant::query()->where('ulid', (string) $request->route('incidencia'))->firstOrFail();
         $validado = $request->validate([
             'resolucion' => ['required', 'string', 'max:500'],
             // En una devolución incierta: si la pasarela la hizo o no.
             'reembolso' => ['nullable', Rule::in([EstadoReembolso::Aprobado->value, EstadoReembolso::Fallido->value])],
-            // En un pago tardío o doble: devolverlo completo.
-            'accion' => ['nullable', Rule::in(['devolver'])],
+            // En un pago tardío o doble: devolverlo completo (si cobró de más, solo el
+            // excedente). En un cobro con otro importe o tras cancelar: aplicarlo.
+            'accion' => ['nullable', Rule::in(['devolver', 'aplicar'])],
         ]);
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
@@ -75,8 +85,16 @@ class IncidenciasCobroTenantController
             if (! $pago instanceof PagoTenant || $reembolso instanceof ReembolsoTenant) {
                 throw ValidationException::withMessages(['accion' => ['Aquí no hay un pago que devolver.']]);
             }
+            // Si cobró de más, solo el excedente (lo debido ya pagó la renovación).
+            $excedente = $incidencia->datos['excedente_minor'] ?? null;
             // La llave de la incidencia: repetir no devuelve dos veces.
-            $reembolsos->ejecutar($pago, null, 'Devolución: '.$validado['resolucion'], $actor, false, false, 'incidencia_'.$incidencia->ulid);
+            $reembolsos->ejecutar($pago, is_int($excedente) ? $excedente : null, 'Devolución: '.$validado['resolucion'], $actor, false, false, 'incidencia_'.$incidencia->ulid);
+        }
+        if (($validado['accion'] ?? null) === 'aplicar') {
+            $orden = self::aplicable($incidencia)
+                ?? throw ValidationException::withMessages(['accion' => ['Este cobro ya no tiene una renovación por pagar a la cual aplicarse.']]);
+            // «Dar por pagada»: el cobro paga la renovación aunque el importe sea otro.
+            $fulfillment->cumplir($orden);
         }
 
         $incidencias->cerrar($incidencia->refresh(), (string) $validado['resolucion'], $actor);
@@ -86,7 +104,24 @@ class IncidenciasCobroTenantController
             'accion' => $validado['accion'] ?? null,
         ], (string) $validado['resolucion']);
 
-        return response()->json(['data' => $this->presentar($incidencia->refresh()->load(['pago.orden.persona', 'reembolso', 'resolvio']))]);
+        return response()->json(['data' => $this->presentar($incidencia->refresh()->load(['pago.orden.persona', 'reembolso', 'resolvio', 'domiciliacion.persona']))]);
+    }
+
+    /**
+     * La renovación que un cobro del pago automático puede pagar: la de su pago, si
+     * sigue por pagar (un cobro con otro importe o que llegó tras cancelar).
+     */
+    private static function aplicable(IncidenciaCobroTenant $incidencia): ?OrdenTenant
+    {
+        if (! in_array($incidencia->tipo, [IncidenciaCobroTenant::MONTO_DISTINTO, IncidenciaCobroTenant::COBRO_TRAS_CANCELAR], true)
+            || $incidencia->estado !== IncidenciaCobroTenant::ABIERTA) {
+            return null;
+        }
+        $orden = $incidencia->pago?->orden;
+
+        return $orden instanceof OrdenTenant && $orden->estado === EstadoOrden::Pendiente && $orden->renueva_acuerdo_id !== null
+            ? $orden
+            : null;
     }
 
     /**
@@ -102,7 +137,8 @@ class IncidenciasCobroTenantController
             'estado' => $incidencia->estado,
             'detalle' => $incidencia->detalle,
             'fecha' => $incidencia->created_at?->toIso8601String(),
-            'persona' => $incidencia->pago?->orden?->persona?->nombreCompleto(),
+            'persona' => $incidencia->pago?->orden?->persona?->nombreCompleto()
+                ?? $incidencia->domiciliacion?->persona?->nombreCompleto(),
             'pago' => $incidencia->pago?->ulid,
             'monto_minor' => $incidencia->pago?->monto_minor,
             'moneda' => $incidencia->pago?->moneda,
@@ -114,6 +150,16 @@ class IncidenciasCobroTenantController
                 'proveedor' => $reembolso->proveedor,
                 'motivo_fallo' => $reembolso->motivo_fallo,
             ] : null,
+            // Del pago automático (ADR 0134): la pasarela y su referencia, lo esperado y
+            // lo cobrado, y si se puede aplicar a la renovación que se debe.
+            'domiciliacion' => $incidencia->domiciliacion instanceof DomiciliacionTenant ? [
+                'proveedor' => $incidencia->domiciliacion->proveedor,
+                'referencia' => $incidencia->domiciliacion->suscripcion_externa,
+                'estado' => $incidencia->domiciliacion->estado,
+            ] : null,
+            'esperado_minor' => $incidencia->datos['esperado_minor'] ?? null,
+            'excedente_minor' => $incidencia->datos['excedente_minor'] ?? null,
+            'aplicable' => self::aplicable($incidencia) instanceof OrdenTenant,
             'resuelta_en' => $incidencia->resuelta_en?->toIso8601String(),
             'resuelta_por' => $incidencia->resolvio?->name,
             'resolucion' => $incidencia->resolucion,

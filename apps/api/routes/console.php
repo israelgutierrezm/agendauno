@@ -53,6 +53,10 @@ Schedule::command('agendauno:expirar-reservas-pago')->everyMinute()->withoutOver
 // Vuelve a consultar, con la misma llave, las devoluciones que la pasarela no confirmó.
 Schedule::command('agendauno:conciliar-reembolsos')->everyFiveMinutes()->withoutOverlapping();
 
+// Pide y confirma con la pasarela la cancelación de los pagos automáticos que aún no
+// se confirma (ADR 0134): mientras tanto la suscripción podría seguir cobrando.
+Schedule::command('agendauno:confirmar-cancelaciones')->everyFiveMinutes()->withoutOverlapping();
+
 // Pregunta a la pasarela por los cobros cuyo aviso (webhook) no llegó y aplica lo que
 // habría aplicado el aviso. Antes de que venza el apartado de una cita (30 min).
 Schedule::command('agendauno:conciliar-pagos')->everyFiveMinutes()->withoutOverlapping();

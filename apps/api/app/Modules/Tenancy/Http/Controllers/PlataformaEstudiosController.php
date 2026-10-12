@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Acceso\BitacoraPlataforma;
 use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
+use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\SuspensionPorRenta;
@@ -336,7 +337,7 @@ class PlataformaEstudiosController
      * apagado, sus rutas responden 403 y la web y la app no lo muestran; lo que el
      * negocio ya registró se conserva para cuando se vuelva a encender.
      */
-    public function modulos(Request $request, string $estudio): JsonResponse
+    public function modulos(Request $request, string $estudio, GestorDeConexionTenant $gestor): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
         $validado = $request->validate([
@@ -353,6 +354,14 @@ class PlataformaEstudiosController
                 : array_values(array_diff($actuales, [$modulo->value])),
             ])->save();
             Log::info('plataforma.estudio.modulo', ['estudio' => $modelo->slug, 'modulo' => $modulo->value, 'habilitado' => $habilitado]);
+
+            if (! $habilitado && $gestor->baseDeDatosExiste($modelo)) {
+                match ($modulo) {
+                    // Sin familias, ningún responsable sigue pagando por otro: sus pagos
+                    // automáticos se quitan ya, también en la pasarela (ADR 0134).
+                    ModuloNegocio::Familias => $gestor->ejecutarEn($modelo->refresh(), fn () => app(DomiciliacionesTenant::class)->alApagarFamilias()),
+                };
+            }
         }
 
         return response()->json(['data' => self::catalogoModulos($modelo)]);
