@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { atribucionParaEnviar } from "@/lib/atribucion";
 import { participanteEnUso } from "@/lib/participanteEnUso";
 import type { FormularioPersona } from "@/lib/formularios";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -442,6 +443,10 @@ export function useMiCuenta() {
         api.post(`${base.value}/mi/ordenes`, {
           items: [{ producto_id: p.id, cantidad: 1 }],
           ...(aceptaCondiciones ? { acepta_condiciones: true } : {}),
+          // De dónde llegó (ADR 0142): se guarda con la orden.
+          atribucion: atribucionParaEnviar(
+            `negocio:${(sesion.slug ?? "").toLowerCase()}`,
+          ),
         }),
       ),
   };

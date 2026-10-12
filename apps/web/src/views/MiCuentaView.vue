@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -72,7 +72,10 @@ const ofrecida = computed(() =>
   cuenta.reservas.value.find((r) => r.estado === "ofrecida"),
 );
 // Lo que le interesó cuando era prospecto (GET /mi/interes; ADR 0137): el plan o la
-// clase que pidió, si sigue disponible y aún no lo tiene. Si falla, no se muestra.
+// clase que pidió, si sigue disponible y aún no lo tiene. O lo que eligió en la página
+// del negocio justo antes de entrar (`?plan=` o `?clase=`, ADR 0142). Si falla, no se
+// muestra.
+const route = useRoute();
 interface Interes {
   plan: { id: string; nombre: string } | null;
   clase: {
@@ -85,8 +88,17 @@ interface Interes {
 const interes = ref<Interes | null>(null);
 async function cargarInteres(): Promise<void> {
   try {
+    const elegido = Object.fromEntries(
+      (["plan", "clase"] as const)
+        .map((clave) => [clave, route.query[clave]] as const)
+        .filter(
+          (par): par is readonly ["plan" | "clase", string] =>
+            typeof par[1] === "string" && /^[0-9A-Z]{26}$/i.test(par[1]),
+        ),
+    );
     const { data } = await api.get<{ data: Interes | null }>(
       `/api/v1/app/${sesion.slug}/mi/interes`,
+      { params: elegido },
     );
     interes.value = data.data;
   } catch {

@@ -129,6 +129,10 @@ export default {
       actividad: "{nombre}",
       sinInteres: "No eligió nada en particular.",
       fuente: "Llegó por {fuente}",
+      // ADR 0142: la campaña que se le acredita y por dónde llegó la primera vez.
+      campana: "Campaña: {campana}",
+      primerOrigen: "La primera vez llegó por {origen}",
+      sinAtribucion: "Sin atribución de campaña",
       sinAtenderDesde:
         "Sin atender desde el {fecha}: escríbele o pásalo a alguien más.",
     },

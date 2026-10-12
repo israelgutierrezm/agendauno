@@ -37,6 +37,7 @@ import {
   productoDelHost,
   type Producto,
 } from "@/lib/producto";
+import { volverSeguro } from "@/lib/destinoSeguro";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -131,11 +132,13 @@ const urlGoogleRaiz = computed(() =>
 const contenedorGoogle = ref<HTMLElement | null>(null);
 const googleRenderizadoPara = ref("");
 
-// Tras entrar: de vuelta a donde venía (p. ej. agendar una cita) o a su inicio. Solo
-// rutas internas: un enlace no puede mandar a otro sitio.
+// Tras entrar: de vuelta a donde venía (p. ej. agendar una cita o el plan que eligió
+// en su página) o a su inicio. Solo rutas internas de este negocio: un enlace no puede
+// mandar a otro sitio ni a otro negocio (ADR 0142).
 function volverA(): string | null {
-  const volver = String(route.query.volver ?? "");
-  return /^\/(?![/\\])/.test(volver) ? volver : null;
+  return volverSeguro(route.query.volver, slug.value.trim() || null, (r) =>
+    router.resolve(r),
+  );
 }
 function destino(): RouteLocationRaw {
   return volverA() ?? { name: sesion.destinoAlEntrar };

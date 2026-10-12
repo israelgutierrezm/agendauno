@@ -3,6 +3,12 @@ import { createRouter, createWebHistory } from "vue-router";
 import ModalidadView from "@/views/ModalidadView.vue";
 import { trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/acceso";
+import {
+  ambitoDeRuta,
+  capturarAtribucion,
+  fijarAmbitoActual,
+} from "@/lib/atribucion";
+import { volverSeguro } from "@/lib/destinoSeguro";
 import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
 import { preciosPublicos } from "@/marketing/preciosPublicos";
@@ -570,6 +576,24 @@ const router = createRouter({
   ],
 });
 
+// Atribución (ADR 0142): la llegada se anota antes de cualquier redirección (al
+// subdominio del negocio, a su sucursal, al otro producto), que pierden la query. La
+// página de la que se viene solo cuenta en la primera navegación de la carga.
+let referrerDeLaCarga =
+  typeof document === "undefined" ? "" : document.referrer;
+router.beforeEach((to) => {
+  const ambito = ambitoDeRuta(to);
+  if (ambito !== null) {
+    capturarAtribucion(
+      ambito,
+      new URL(to.fullPath, window.location.origin).searchParams,
+      referrerDeLaCarga,
+      window.location.hostname,
+    );
+  }
+  referrerDeLaCarga = "";
+});
+
 router.beforeEach(async (to) => {
   // En el dominio principal no hay rutas con el slug de un negocio: su enlace corto,
   // su página y sus enlaces viven en su subdominio (en desarrollo, no aplica).
@@ -630,9 +654,11 @@ router.beforeEach(async (to) => {
         : null;
     if (otro === null || otro === sesion.slug) {
       // Ya tiene sesión en este negocio: de vuelta a donde venía (p. ej. agendar,
-      // que le explica cómo seguir) o a su inicio. Solo rutas internas.
-      const volver = String(to.query.volver ?? "");
-      if (to.name === "entrar" && /^\/(?![/\\])/.test(volver)) {
+      // que le explica cómo seguir) o a su inicio. Solo rutas internas de este negocio.
+      const volver = volverSeguro(to.query.volver, sesion.slug, (r) =>
+        router.resolve(r),
+      );
+      if (to.name === "entrar" && volver !== null) {
         return volver;
       }
       return { name: sesion.rutaInicio };
@@ -663,6 +689,7 @@ router.beforeEach(async (to) => {
 
 router.afterEach((to, _from, failure) => {
   if (failure) return;
+  fijarAmbitoActual(ambitoDeRuta(to));
   // Con lo que publicó el superadmin, si ya llegó: si el producto recibe registros.
   const seo = seoParaRuta(to.path, {
     registroAbierto: preciosPublicos.datos.registro[PRODUCTO_COMERCIAL],

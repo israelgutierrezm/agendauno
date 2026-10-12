@@ -9,6 +9,7 @@ import TarjetaPlanPublico, {
   type PlanPublico,
 } from "@/components/TarjetaPlanPublico.vue";
 import { api } from "@/lib/api";
+import { volverConInteres } from "@/lib/destinoSeguro";
 import type { TerminosNegocio } from "@/lib/terminologia";
 import {
   contrasteDe,
@@ -63,9 +64,13 @@ const estiloAcento = computed(() => {
       }
     : {};
 });
-const enlaceEntrar = computed(
-  () => `/entrar?estudio=${encodeURIComponent(props.slug)}`,
-);
+// Si ya tiene cuenta, entra y sigue con el plan que eligió (ADR 0142).
+const enlaceEntrar = computed(() => {
+  const query = new URLSearchParams({ estudio: props.slug });
+  const volver = volverConInteres(pidiendo.value);
+  if (volver !== null) query.set("volver", volver);
+  return `/entrar?${query.toString()}`;
+});
 
 function aplicarTema(tema: WidgetPublico["tema"]): void {
   const oscuro =
