@@ -40,6 +40,19 @@ class SitioWebController
     public function guardar(Request $request, ParametrosTenant $parametros): JsonResponse
     {
         $estudio = $this->estudio($request);
+        $validado = $this->validarBorrador($request, $estudio, $parametros);
+        $this->sitio->guardarBorrador($validado, $estudio->modalidad(), $this->usuarioId($request), (int) $estudio->getKey());
+
+        return response()->json(['data' => $this->presentar($estudio)]);
+    }
+
+    /**
+     * El borrador que llega, revisado con las mismas reglas que al guardarlo.
+     *
+     * @return array<string, mixed>
+     */
+    private function validarBorrador(Request $request, Estudio $estudio, ParametrosTenant $parametros): array
+    {
         $modalidad = $estudio->modalidad();
         $foto = $this->reglaFoto($estudio);
         $bloquesMaximos = $parametros->entero('sitio.bloques_maximos');
@@ -108,9 +121,7 @@ class SitioWebController
             }
         }
 
-        $this->sitio->guardarBorrador($validado, $modalidad, $this->usuarioId($request), (int) $estudio->getKey());
-
-        return response()->json(['data' => $this->presentar($estudio)]);
+        return $validado;
     }
 
     public function publicar(Request $request): JsonResponse
@@ -154,6 +165,21 @@ class SitioWebController
         return response()->json(['data' => $escaparate->datos(
             $estudio,
             $this->sitio->paraPublico($this->sitio->borrador($estudio->modalidad())),
+        )]);
+    }
+
+    /**
+     * La vista previa en vivo del editor (ADR 0146, fase 3): lo mismo que la vista previa,
+     * con el borrador que se está editando, sin guardarlo. Se revisa como al guardar.
+     */
+    public function vistaPreviaEnVivo(Request $request, ParametrosTenant $parametros, EscaparateTenant $escaparate): JsonResponse
+    {
+        $estudio = $this->estudio($request);
+        $validado = $this->validarBorrador($request, $estudio, $parametros);
+
+        return response()->json(['data' => $escaparate->datos(
+            $estudio,
+            $this->sitio->paraPublico($this->sitio->normalizar($validado, $estudio->modalidad())),
         )]);
     }
 

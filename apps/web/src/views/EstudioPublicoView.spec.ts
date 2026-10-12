@@ -11,16 +11,23 @@ import EstudioPublicoView from "./EstudioPublicoView.vue";
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
+  post: vi.fn(),
+  // La ventana del editor visual, si la vista previa está en su marco.
+  editor: null as Window | null,
   ruta: {
     params: { slug: "estudio-a" } as Record<string, string>,
     query: {} as Record<string, string>,
   },
 }));
 vi.mock("@/lib/api", () => ({
-  api: { get: mocks.get },
+  api: { get: mocks.get, post: mocks.post },
   mensajeDeError: () => "No disponible",
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
+vi.mock("@/lib/sitioWeb", async (original) => ({
+  ...(await original<typeof import("@/lib/sitioWeb")>()),
+  ventanaDelEditor: () => mocks.editor,
+}));
 vi.mock("@/lib/seo", () => ({ updateSeo: vi.fn() }));
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.ruta,
@@ -78,6 +85,7 @@ function montar(props: { vistaPrevia?: boolean } = {}) {
 describe("página pública del estudio", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.editor = null;
     mocks.ruta.params = { slug: "estudio-a" };
     mocks.ruta.query = {};
   });
@@ -789,6 +797,76 @@ describe("página pública del estudio", () => {
       const boton = w.get('[data-prueba="boton-principal"]');
       expect(boton.text()).toBe("Agendar");
       expect(boton.attributes("href")).toBe("#agenda");
+    });
+
+    it("dentro del editor visual: muestra el borrador sin guardar y pide editar la sección del clic", async () => {
+      const marco = document.createElement("iframe");
+      document.body.appendChild(marco);
+      const editor = marco.contentWindow!;
+      const aEditor = vi.spyOn(editor, "postMessage");
+      mocks.editor = editor;
+      mocks.get.mockResolvedValue(conPaginas());
+      const enVivo = conPaginas();
+      (
+        enVivo.data.data as unknown as {
+          sitio: { secciones: { titulo: string | null }[] };
+        }
+      ).sitio.secciones[0]!.titulo = "Titular sin guardar";
+      mocks.post.mockResolvedValue(enVivo);
+
+      const w = montar({ vistaPrevia: true });
+      await flushPromises();
+      expect(aEditor).toHaveBeenCalledWith(
+        { fuente: "agendauno-sitio", tipo: "lista" },
+        window.location.origin,
+      );
+
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: {
+            fuente: "agendauno-sitio",
+            tipo: "borrador",
+            borrador: { plantilla: "esencial" },
+          },
+          origin: window.location.origin,
+          source: editor,
+        }),
+      );
+      await flushPromises();
+      expect(mocks.post).toHaveBeenCalledWith(
+        "/api/v1/app/estudio-a/sitio/vista-previa",
+        { plantilla: "esencial" },
+      );
+      expect(w.text()).toContain("Titular sin guardar");
+      expect(aEditor).toHaveBeenCalledWith(
+        { fuente: "agendauno-sitio", tipo: "estado", valido: true },
+        window.location.origin,
+      );
+
+      const contacto = w.get('[data-seccion="contacto"]');
+      expect(contacto.classes()).toContain("ep-en-editor");
+      await contacto.get("h2").trigger("click");
+      expect(aEditor).toHaveBeenCalledWith(
+        {
+          fuente: "agendauno-sitio",
+          tipo: "editar",
+          pagina: null,
+          seccion: "contacto",
+        },
+        window.location.origin,
+      );
+      w.unmount();
+      marco.remove();
+    });
+
+    it("fuera del editor, la vista previa no espera mensajes", async () => {
+      mocks.get.mockResolvedValue(conPaginas());
+      const w = montar({ vistaPrevia: true });
+      await flushPromises();
+      expect(w.get('[data-seccion="contacto"]').classes()).not.toContain(
+        "ep-en-editor",
+      );
+      expect(mocks.post).not.toHaveBeenCalled();
     });
 
     it("en la vista previa, la página se pide con ?pagina=", async () => {

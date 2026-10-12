@@ -152,6 +152,31 @@ está publicada) y se puede volver a una: se copia al borrador, que queda con ca
 publicar hasta que se publique. El público sigue viendo lo publicado. Las fotos de esas
 10 versiones no se borran al limpiar las que ya no se usan.
 
+### Fase 3: editor visual (bloque 50)
+
+**Vista previa en vivo.** La vista previa del editor muestra el borrador sin guardar:
+
+- El editor y su vista previa (un marco del mismo origen) se hablan con `postMessage`:
+  la vista previa avisa que está lista; el editor le manda el borrador cada vez que
+  cambia (con una pausa corta).
+- La vista previa no arma el sitio por su cuenta: pide
+  `POST /sitio/vista-previa` con el borrador. El API lo revisa con las mismas reglas que
+  al guardar, lo normaliza y devuelve lo mismo que la vista previa de siempre, sin
+  guardar nada. Así lo que se ve es lo que el API publicaría, sin repetir sus reglas en
+  la web.
+- Si al borrador le falta algo (un enlace a medias), la vista previa se queda con el
+  último que pudo mostrar y el editor lo dice.
+
+**Clic para editar.** Dentro del editor, cada sección de la vista previa se marca al
+pasar el cursor; un clic la abre en el editor (cambiando de página si hace falta). Sus
+enlaces y botones siguen funcionando. Al abrir una sección en el editor, la vista previa
+la lleva a la vista.
+
+**Seguridad.** Solo se aceptan mensajes del mismo origen y de la ventana esperada (el
+marco o el editor); se manda solo a ese origen. El borrador viaja como datos y el API lo
+revisa igual que al guardarlo; nada se ejecuta ni se inserta como HTML. Abierta en otra
+pestaña, la vista previa no espera mensajes.
+
 ## Consecuencias
 
 - Fase 1 sin migraciones: la configuración del sitio ya era JSON. Un sitio guardado o
@@ -162,5 +187,5 @@ publicar hasta que se publique. El público sigue viendo lo publicado. Las fotos
 - Fase 3 sin migraciones: el estilo y el botón van en el mismo JSON y las versiones ya
   se guardaban. Un sitio de antes queda con el estilo de siempre (color de su marca,
   esquinas suaves, automático).
-- Pendiente, bloque 50: el editor visual (vista previa en vivo del borrador sin guardar
-  y clic en un bloque para editarlo).
+- El editor visual pide al API una vista previa por cada pausa al escribir: es solo de
+  quien configura el negocio y no guarda nada.

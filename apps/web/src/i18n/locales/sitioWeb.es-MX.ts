@@ -228,6 +228,15 @@ export default {
       "¿Volver a la versión del {fecha}? Tu borrador se reemplaza por ella; el público sigue viendo lo publicado hasta que publiques.",
     restaurada: "Listo: tu borrador es esa versión. Revísala y publica.",
   },
+  // Editor visual (ADR 0146, fase 3).
+  editor: {
+    ayuda: "Haz clic en una sección de la vista previa para editarla.",
+    enVivo:
+      "En vivo: ves tus cambios aunque aún no los guardes. Haz clic en una sección para editarla.",
+    incompleto:
+      "Hay algo por completar en tu borrador: la vista previa muestra tu último cambio válido.",
+    clicParaEditar: "Clic para editar: {seccion}",
+  },
   pie: {
     titulo: "Pie de página",
     ayuda:

@@ -369,3 +369,54 @@ export function colorDeContraste(hex: string): string {
   const conNegro = (luminancia + 0.05) / 0.0559;
   return conBlanco >= conNegro ? "#ffffff" : "#111111";
 }
+
+/*
+ * Editor visual (ADR 0146, fase 3): el editor y su vista previa (en un marco del mismo
+ * origen) se hablan con mensajes. El editor manda el borrador sin guardar y la vista
+ * previa avisa cuándo está lista, si el borrador se pudo mostrar y qué sección se quiere
+ * editar. Solo se aceptan mensajes del mismo origen y de la ventana esperada.
+ */
+export const FUENTE_EDITOR_SITIO = "agendauno-sitio";
+
+export type MensajeEditorSitio =
+  | { tipo: "lista" }
+  | { tipo: "borrador"; borrador: unknown }
+  | { tipo: "estado"; valido: boolean }
+  | { tipo: "editar"; pagina: string | null; seccion: string }
+  | { tipo: "enfocar"; seccion: string };
+
+/** Manda un mensaje a la otra ventana del editor, solo a este origen. */
+export function avisarEditorSitio(
+  destino: Window | null | undefined,
+  mensaje: MensajeEditorSitio,
+): void {
+  destino?.postMessage(
+    { fuente: FUENTE_EDITOR_SITIO, ...mensaje },
+    window.location.origin,
+  );
+}
+
+/** El mensaje del editor, si viene de este origen y de la ventana esperada. */
+export function mensajeEditorSitio(
+  evento: MessageEvent,
+  de: Window | null | undefined,
+): MensajeEditorSitio | null {
+  const datos = evento.data as { fuente?: unknown; tipo?: unknown } | null;
+  if (
+    !de ||
+    evento.origin !== window.location.origin ||
+    evento.source !== de ||
+    typeof datos !== "object" ||
+    datos === null ||
+    datos.fuente !== FUENTE_EDITOR_SITIO ||
+    typeof datos.tipo !== "string"
+  ) {
+    return null;
+  }
+  return datos as MensajeEditorSitio;
+}
+
+/** La ventana del editor, si esta página se ve dentro de él (en un marco). */
+export function ventanaDelEditor(): Window | null {
+  return window.parent !== window ? window.parent : null;
+}

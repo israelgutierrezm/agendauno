@@ -780,4 +780,7 @@ en el negocio.
 - `POST /sitio/versiones/{id}/restaurar`: copia esa versión al borrador (sin publicarla)
   y devuelve lo mismo que `GET /sitio`. 404 si no está entre las últimas 10.
 - `GET /escaparate` suma `estilo` y `encabezado` en `sitio`.
+- `POST /sitio/vista-previa` (editor visual): recibe el borrador como en `PUT /sitio`,
+  lo revisa con las mismas reglas (422 con `meta.errors`) y devuelve lo mismo que
+  `GET /sitio/vista-previa` con ese borrador, sin guardarlo.
 
