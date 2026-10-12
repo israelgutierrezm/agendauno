@@ -31,7 +31,7 @@ class AcuerdoTenant extends Model
 
     protected $fillable = [
         'persona_id', 'producto_comercial_id', 'linea_orden_id', 'fecha_inicio', 'proxima_cobro_en', 'dia_ancla', 'estado',
-        'permanencia_hasta', 'baja_anticipada', 'penalizacion_minor', 'condiciones', 'baja_efectiva_el',
+        'permanencia_hasta', 'baja_anticipada', 'penalizacion_minor', 'penalizacion_porcentaje', 'condiciones', 'baja_efectiva_el',
         'origen', 'referencia_apertura',
     ];
 
@@ -50,6 +50,7 @@ class AcuerdoTenant extends Model
         'permanencia_hasta' => 'date',
         'baja_anticipada' => BajaAnticipada::class,
         'penalizacion_minor' => 'integer',
+        'penalizacion_porcentaje' => 'integer',
         'condiciones' => 'array',
         'baja_efectiva_el' => 'date',
     ];

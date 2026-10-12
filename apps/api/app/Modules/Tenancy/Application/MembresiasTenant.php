@@ -304,6 +304,7 @@ class MembresiasTenant
             'permanencia_hasta' => Carbon::parse($inicio)->addMonthsNoOverflow($meses)->toDateString(),
             'baja_anticipada' => ($producto->baja_anticipada ?? BajaAnticipada::SinPenalizacion)->value,
             'penalizacion_minor' => $producto->penalizacion_minor,
+            'penalizacion_porcentaje' => $producto->penalizacion_porcentaje,
             'condiciones' => $condiciones ?? ['texto' => CondicionesDePlan::texto($producto)],
         ];
     }

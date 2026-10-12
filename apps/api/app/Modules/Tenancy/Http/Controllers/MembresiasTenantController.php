@@ -377,6 +377,7 @@ class MembresiasTenantController
             'permanencia_meses' => $producto->permanencia_meses,
             'baja_anticipada' => $producto->baja_anticipada?->value,
             'penalizacion_minor' => $producto->penalizacion_minor,
+            'penalizacion_porcentaje' => $producto->penalizacion_porcentaje,
             'condiciones' => CondicionesDePlan::texto($producto),
             'politica_reset' => $producto->politica_reset->value,
             'unidades_por_ciclo' => $producto->unidades_por_ciclo,
@@ -455,18 +456,20 @@ class MembresiasTenantController
             'permanencia_meses' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:60'],
             'baja_anticipada' => ['sometimes', 'nullable', Rule::enum(BajaAnticipada::class)],
             'penalizacion_minor' => ['sometimes', 'nullable', 'required_if:baja_anticipada,monto_fijo', 'integer', 'min:0', 'max:100000000'],
+            // Con «meses restantes», qué porcentaje de lo que falte (vacío = 100; ADR 0137).
+            'penalizacion_porcentaje' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
         ];
     }
 
     /**
      * @param  array<string, mixed>  $validado
-     * @return array{permanencia_meses: int|null, baja_anticipada: string|null, penalizacion_minor: int|null}
+     * @return array{permanencia_meses: int|null, baja_anticipada: string|null, penalizacion_minor: int|null, penalizacion_porcentaje: int|null}
      */
     private static function permanencia(array $validado): array
     {
         $meses = (int) ($validado['permanencia_meses'] ?? 0);
         if ($meses <= 0) {
-            return ['permanencia_meses' => null, 'baja_anticipada' => null, 'penalizacion_minor' => null];
+            return ['permanencia_meses' => null, 'baja_anticipada' => null, 'penalizacion_minor' => null, 'penalizacion_porcentaje' => null];
         }
         $modo = BajaAnticipada::tryFrom((string) ($validado['baja_anticipada'] ?? '')) ?? BajaAnticipada::SinPenalizacion;
 
@@ -474,6 +477,7 @@ class MembresiasTenantController
             'permanencia_meses' => $meses,
             'baja_anticipada' => $modo->value,
             'penalizacion_minor' => $modo === BajaAnticipada::MontoFijo ? (int) ($validado['penalizacion_minor'] ?? 0) : null,
+            'penalizacion_porcentaje' => $modo === BajaAnticipada::MesesRestantes ? (int) ($validado['penalizacion_porcentaje'] ?? 100) : null,
         ];
     }
 

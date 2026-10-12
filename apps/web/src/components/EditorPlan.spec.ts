@@ -82,6 +82,41 @@ describe("permanencia de una membresía (B04)", () => {
     );
     sesion.esCitas = true;
   });
+
+  it("con «meses restantes» guarda qué porcentaje de lo que falte (ADR 0137)", async () => {
+    sesion.esCitas = false;
+    api.post.mockResolvedValue({});
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="tipo-membresia"]').trigger("click");
+    await w.get("#ep-nombre").setValue("Mensualidad");
+    await w.get("#ep-precio").setValue("1200");
+    await w.get("#ep-permanencia").setValue("6");
+    await w
+      .get('[data-prueba="permanencia-plan"] input[value="meses_restantes"]')
+      .setValue(true);
+    // Fuera de 1–100 se ajusta al límite.
+    await w.get("#ep-porcentaje").setValue("150");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/productos",
+      expect.objectContaining({
+        baja_anticipada: "meses_restantes",
+        penalizacion_porcentaje: 100,
+        penalizacion_minor: null,
+      }),
+    );
+
+    await w.get("#ep-porcentaje").setValue("50");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/productos",
+      expect.objectContaining({ penalizacion_porcentaje: 50 }),
+    );
+    sesion.esCitas = true;
+  });
 });
 
 describe("planes de un negocio de citas", () => {

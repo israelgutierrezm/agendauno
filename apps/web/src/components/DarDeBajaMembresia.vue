@@ -19,6 +19,8 @@ interface Simulacion {
   modo: "sin_penalizacion" | "monto_fijo" | "meses_restantes" | null;
   meses_restantes: number;
   precio_base_minor: number | null;
+  // Qué porcentaje de lo que falte se cobra (100 = todo).
+  porcentaje?: number | null;
   penalizacion_minor: number;
   adeudo_minor: number;
   moneda: string;
@@ -136,11 +138,18 @@ async function confirmarBaja(): Promise<void> {
           v-if="sim.modo === 'meses_restantes' && sim.precio_base_minor"
         >
           {{
-            $t("bajaMembresia.penalizacionMeses", {
-              n: sim.meses_restantes,
-              precio: dinero(sim.precio_base_minor),
-              total: dinero(sim.penalizacion_minor),
-            })
+            (sim.porcentaje ?? 100) < 100
+              ? $t("bajaMembresia.penalizacionMesesPorcentaje", {
+                  n: sim.meses_restantes,
+                  precio: dinero(sim.precio_base_minor),
+                  porcentaje: sim.porcentaje,
+                  total: dinero(sim.penalizacion_minor),
+                })
+              : $t("bajaMembresia.penalizacionMeses", {
+                  n: sim.meses_restantes,
+                  precio: dinero(sim.precio_base_minor),
+                  total: dinero(sim.penalizacion_minor),
+                })
           }}
         </template>
         <template v-else-if="sim.modo === 'monto_fijo'">

@@ -32,7 +32,7 @@ final class CondicionesDePlan
         $plazo = $meses === 1 ? '1 mes' : "{$meses} meses";
         $baja = match ($producto->baja_anticipada) {
             BajaAnticipada::MontoFijo => 'pagas una penalización de '.self::dinero((int) ($producto->penalizacion_minor ?? 0), $producto->moneda).'.',
-            BajaAnticipada::MesesRestantes => 'pagas las mensualidades que falten para cumplirla, al precio vigente del plan.',
+            BajaAnticipada::MesesRestantes => self::mesesRestantes($producto),
             default => 'no pagas penalización.',
         };
 
@@ -60,6 +60,19 @@ final class CondicionesDePlan
             'usuario_id' => $usuario?->getKey() === null ? null : (int) $usuario->getKey(),
             'ip' => $ip,
         ];
+    }
+
+    /**
+     * Las mensualidades que falten o, con porcentaje (ADR 0137), esa parte de ellas.
+     * Al 100 % el texto es el de siempre: no cambia la versión de lo ya aceptado.
+     */
+    private static function mesesRestantes(ProductoTenant $producto): string
+    {
+        $porcentaje = (int) ($producto->penalizacion_porcentaje ?? 100);
+
+        return $porcentaje < 100
+            ? "pagas el {$porcentaje} % de las mensualidades que falten para cumplirla, al precio vigente del plan."
+            : 'pagas las mensualidades que falten para cumplirla, al precio vigente del plan.';
     }
 
     private static function dinero(int $minor, string $moneda): string

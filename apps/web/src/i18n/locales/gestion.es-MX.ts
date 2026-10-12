@@ -1002,6 +1002,8 @@ export const bajaMembresia = {
     "Tiene permanencia hasta el {fecha}: falta 1 mes. | Tiene permanencia hasta el {fecha}: faltan {n} meses.",
   penalizacionMeses:
     "Paga las mensualidades que faltan: {n} × {precio} = {total}.",
+  penalizacionMesesPorcentaje:
+    "Paga el {porcentaje} % de las mensualidades que faltan: {n} × {precio} × {porcentaje} % = {total}.",
   penalizacionFija: "Paga la penalización pactada: {total}.",
   sinPenalizacion: "Su plan no tiene penalización por baja anticipada.",
   cumplida: "Ya cumplió su permanencia: no hay penalización.",

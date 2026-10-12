@@ -89,7 +89,7 @@ it('la simulación dice la fecha efectiva y la penalización pactada; la baja ha
     $this->getJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/baja", conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data', [
             'efectiva_el' => '2026-10-31', 'en_permanencia' => true, 'permanencia_hasta' => '2027-04-01',
-            'modo' => 'meses_restantes', 'meses_restantes' => 5, 'precio_base_minor' => 120000,
+            'modo' => 'meses_restantes', 'meses_restantes' => 5, 'precio_base_minor' => 120000, 'porcentaje' => 100,
             'penalizacion_minor' => 600000, 'adeudo_minor' => 0, 'moneda' => 'MXN',
             'condiciones' => 'Permanencia mínima de 6 meses desde la fecha de compra. Si das de baja antes de cumplirla, pagas las mensualidades que falten para cumplirla, al precio vigente del plan. La baja aplica al terminar el periodo pagado.',
         ]);
@@ -114,6 +114,33 @@ it('la simulación dice la fecha efectiva y la penalización pactada; la baja ha
     $this->artisan('agendauno:generar-cuotas')->assertSuccessful();
     $this->getJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/baja", conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonPath('code', 'MEMBERSHIP_CANCEL_NOT_ALLOWED');
+});
+
+it('con porcentaje, paga esa parte de las mensualidades que falten, congelada en su membresía', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    // Fuera de 1–100 no se guarda.
+    foreach ([0, 101] as $fuera) {
+        $this->postJson("/api/v1/app/{$e['slug']}/productos", [
+            'nombre' => 'Mal', 'tipo' => 'membresia', 'precio_minor' => 120000, 'moneda' => 'MXN', 'ilimitado' => true,
+            'politica_reset' => 'aniversario', 'permanencia_meses' => 6, 'baja_anticipada' => 'meses_restantes', 'penalizacion_porcentaje' => $fuera,
+        ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['penalizacion_porcentaje'], 'meta.errors');
+    }
+    $plan = membresiaConPermanencia($e, 6, ['baja_anticipada' => 'meses_restantes', 'penalizacion_porcentaje' => 50]);
+    $ana = crearMiembroTenant($e, 'Ana');
+    $acuerdo = contratarConPermanencia($e, $ana, $plan);
+
+    // Cambiar el plan después no cambia lo que aceptó.
+    $this->putJson("/api/v1/app/{$e['slug']}/productos/{$plan}", [
+        'permanencia_meses' => 6, 'baja_anticipada' => 'meses_restantes', 'penalizacion_porcentaje' => 80,
+    ], conBearer($e['bearer']))->assertOk();
+
+    $this->travelTo('2026-10-15 12:00:00');
+    // Faltan 5 mensualidades de 1,200: el 50 % son 3,000.
+    $simulacion = $this->getJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/baja", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($simulacion)->toMatchArray(['meses_restantes' => 5, 'porcentaje' => 50, 'penalizacion_minor' => 300000])
+        ->and($simulacion['condiciones'])->toContain('pagas el 50 % de las mensualidades que falten');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/baja", [], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.penalizacion_minor', 300000);
 });
 
 it('monto fijo, permanencia cumplida y exentar la penalización con permiso', function (): void {

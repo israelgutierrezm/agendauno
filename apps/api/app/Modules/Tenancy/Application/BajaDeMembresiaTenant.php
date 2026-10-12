@@ -80,9 +80,12 @@ class BajaDeMembresiaTenant
         $enPermanencia = $meses > 0;
         $modo = $enPermanencia ? ($acuerdo->baja_anticipada ?? BajaAnticipada::SinPenalizacion) : null;
         $precio = (int) ($acuerdo->producto->precio_minor ?? 0);
+        // Con «meses restantes», el porcentaje pactado de lo que falte (ADR 0137; vacío =
+        // 100 %), redondeado al centavo.
+        $porcentaje = $modo === BajaAnticipada::MesesRestantes ? (int) ($acuerdo->penalizacion_porcentaje ?? 100) : null;
         $penalizacion = match ($modo) {
             BajaAnticipada::MontoFijo => (int) ($acuerdo->penalizacion_minor ?? 0),
-            BajaAnticipada::MesesRestantes => $meses * $precio,
+            BajaAnticipada::MesesRestantes => intdiv($meses * $precio * (int) $porcentaje + 50, 100),
             default => 0,
         };
 
@@ -93,6 +96,7 @@ class BajaDeMembresiaTenant
             'modo' => $modo?->value,
             'meses_restantes' => $meses,
             'precio_base_minor' => $modo === BajaAnticipada::MesesRestantes ? $precio : null,
+            'porcentaje' => $porcentaje,
             'penalizacion_minor' => $penalizacion,
             'adeudo_minor' => $adeudo,
             'moneda' => (string) ($acuerdo->producto->moneda ?? 'MXN'),

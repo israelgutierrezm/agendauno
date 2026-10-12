@@ -75,6 +75,20 @@ describe("dar de baja una membresía", () => {
     expect(w.emitted("hecho")?.[0]?.[0]).toContain("Mensualidad");
   });
 
+  it("con porcentaje, muestra esa parte de las mensualidades que faltan (ADR 0137)", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: { ...simulacion, porcentaje: 50, penalizacion_minor: 300000 },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="baja-permanencia"]').text()).toContain(
+      "5 × $1,200.00 × 50 % = $3,000.00",
+    );
+  });
+
   it("exentar la penalización pide un motivo y baja lo que se cobra", async () => {
     const w = montar();
     await flushPromises();
