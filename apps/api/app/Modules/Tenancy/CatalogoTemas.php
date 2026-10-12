@@ -59,21 +59,20 @@ final class CatalogoTemas
                 'borde' => '#D5E3EC', 'texto' => '#0B2733', 'texto_suave' => '#4E6672',
             ],
         ],
-        // Paleta «ocean»: Bondi Blue (#0799B6) es el principal y va tal cual en la
-        // barra; Eden (#114C5F) solo en letras e íconos, nunca de fondo (en la barra,
-        // uno más oscuro: Eden no se lee sobre Bondi). Lo activo en Janna (#F2E6CF),
-        // la página en un crema de Janna y los fondos suaves en Sinbad (#9CD2D3).
-        // Botones en un Bondi un poco más profundo: con letra blanca, el puro no se lee.
+        // Océano: un azul vivo (#0A6EBD) es el protagonista. Va en la barra, que en el
+        // panel enmarca el contenido, y en botones y enlaces; con letra blanca llega a
+        // 5.3:1 (AA). Lo activo del menú en blanco con letra azul, la página en un
+        // celeste muy claro y las letras en un azul marino.
         'oceano' => [
             'nombre' => 'Océano',
             'oscuro' => false,
             'tokens' => [
-                'barra' => '#0799B6', 'barra_suave' => '#39ADC5', 'barra_texto' => '#08222B',
-                'barra_activo' => '#F2E6CF', 'barra_activo_texto' => '#114C5F',
-                'barra_borde' => '#068AA4', 'barra_titulo' => '#05171C',
-                'acento' => '#057389', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#FAF5EC', 'superficie' => '#FFFFFF', 'superficie_2' => '#DCEFF0',
-                'borde' => '#CEE6E6', 'texto' => '#114C5F', 'texto_suave' => '#3C6B7A',
+                'barra' => '#0A6EBD', 'barra_suave' => '#1C7FCC', 'barra_texto' => '#E3F4FF',
+                'barra_activo' => '#FFFFFF', 'barra_activo_texto' => '#0A6EBD',
+                'barra_borde' => 'rgb(255 255 255 / 16%)', 'barra_titulo' => '#FFFFFF',
+                'acento' => '#0A6EBD', 'acento_texto' => '#FFFFFF',
+                'fondo' => '#EEF6FD', 'superficie' => '#FFFFFF', 'superficie_2' => '#E1EFFA',
+                'borde' => '#D3E5F4', 'texto' => '#0B2540', 'texto_suave' => '#4A6A85',
             ],
         ],
         'esmeralda' => [

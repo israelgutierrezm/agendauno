@@ -118,7 +118,10 @@ async function enviar(previsualizar: boolean): Promise<void> {
           :aria-label="$t('cambiarSerie.nombresDias').split(',')[i]"
           :style="
             dias.includes(i + 1)
-              ? { background: 'var(--primario)', color: '#fff' }
+              ? {
+                  background: 'var(--primario)',
+                  color: 'var(--primario-contraste)',
+                }
               : { background: 'var(--superficie-2)', color: 'var(--texto)' }
           "
           @click="alternarDia(i + 1)"

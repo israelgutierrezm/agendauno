@@ -49,11 +49,12 @@ it('un usuario nuevo ve el tema predeterminado y el catálogo de temas', functio
         ->assertOk()
         ->assertJsonPath('data.tokens.barra_texto', '#6EBEFA')
         ->assertJsonPath('data.tokens.barra_activo', '#DC5A96');
-    // Océano: Bondi Blue en la barra; Eden solo en la letra.
+    // Océano: el azul vivo en la barra y en los botones; lo activo, en blanco.
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia", ['tema' => 'oceano'], conBearer($e['bearer']))
         ->assertOk()
-        ->assertJsonPath('data.tokens.barra', '#0799B6')
-        ->assertJsonPath('data.tokens.texto', '#114C5F');
+        ->assertJsonPath('data.tokens.barra', '#0A6EBD')
+        ->assertJsonPath('data.tokens.acento', '#0A6EBD')
+        ->assertJsonPath('data.tokens.barra_activo', '#FFFFFF');
     expect($data['personalizables'])->toBe(['acento', 'barra', 'barra_activo']);
 });
 
@@ -82,15 +83,15 @@ it('los ajustes propios sobrescriben el tema y se pueden restablecer', function 
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'barra', 'valor' => '#112233'], conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.tokens.barra', '#112233')
-        ->assertJsonPath('data.tokens.acento', '#057389');
+        ->assertJsonPath('data.tokens.acento', '#0A6EBD');
 
     // Sin valor, ese color vuelve al del tema.
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'barra', 'valor' => null], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.tokens.barra', '#0799B6');
+        ->assertOk()->assertJsonPath('data.tokens.barra', '#0A6EBD');
 
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'acento', 'valor' => '#123456'], conBearer($e['bearer']))->assertOk();
     $this->deleteJson("/api/v1/app/{$e['slug']}/apariencia/personalizacion", [], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.tokens.acento', '#057389');
+        ->assertOk()->assertJsonPath('data.tokens.acento', '#0A6EBD');
 });
 
 it('solo se personalizan colores válidos y ya no hay tema de alto contraste', function (): void {
@@ -132,10 +133,10 @@ function luminanciaTemaContraste(string $hex): float
     return 0.2126 * $canal((int) $r) + 0.7152 * $canal((int) $g) + 0.0722 * $canal((int) $b);
 }
 
-it('en todos los temas el texto de los botones y de lo activo de la barra se lee (AA)', function (): void {
+it('en todos los temas el texto de los botones, del menú y de lo activo de la barra se lee (AA)', function (): void {
     foreach (CatalogoTemas::disponibles() as $tema) {
         $tokens = CatalogoTemas::resolver($tema['clave'], null)['tokens'];
-        foreach ([['acento', 'acento_texto'], ['barra_activo', 'barra_activo_texto']] as [$fondo, $texto]) {
+        foreach ([['acento', 'acento_texto'], ['barra', 'barra_texto'], ['barra_activo', 'barra_activo_texto']] as [$fondo, $texto]) {
             $a = luminanciaTemaContraste($tokens[$fondo]);
             $b = luminanciaTemaContraste($tokens[$texto]);
             $contraste = (max($a, $b) + 0.05) / (min($a, $b) + 0.05);
