@@ -127,6 +127,9 @@ Verificar a mano, además de sus pruebas automáticas:
 - [ ] **GA4 y Meta del SaaS y de un negocio (ADR 0143):** `VERIFICACION-V1.md`,
   casos 13 y 14, con credenciales reales. Las pruebas automáticas usan proveedores simulados: la
   validación real con Google y Meta queda pendiente hasta hacerla aquí.
+- [ ] **Reporte por campaña (ADR 0144):** con la solicitud y la compra de
+  `VERIFICACION-V1.md` caso 14, Reportes → Embudo → «Por campaña» muestra esa campaña
+  con su solicitud, su comprador nuevo y su compra. Una renovación va aparte.
 - [ ] **Atribución (ADR 0142):** llega con `?utm_campaign=…` a la página de un negocio
   y deja una solicitud; el prospecto dice esa campaña. Elige un plan, toca «Ya tengo
   cuenta» y, al entrar, su cuenta muestra ese plan.

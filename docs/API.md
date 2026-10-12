@@ -347,6 +347,21 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Reporte por campaña (ADR 0144)
+
+- `GET /reportes/campanas?desde=&hasta=` (`facturacion.ver`, `reportes_avanzados`;
+  últimos 30 días por omisión, hasta un año): `{desde, hasta, moneda, filas}`.
+- Cada fila trae `campana` (`{campana, fuente, medio, referente}` o `null` = sin
+  atribución) y sus cifras:
+  - `solicitudes`;
+  - `nuevos_compradores`;
+  - `compras` y `compras_minor`;
+  - `devoluciones` y `devoluciones_minor`;
+  - `primeras_reservas`;
+  - `renovaciones` y `renovaciones_minor`, aparte de la adquisición.
+- `GET /plataforma/embudo` agrega `campanas`: por producto y campaña de registro,
+  `registros`, `primera_operacion` y `primera_suscripcion`, sin demos.
+
 ## GA4 y Meta de cada negocio (ADR 0143)
 
 - Públicos:
