@@ -225,20 +225,34 @@ cd agendauno/infra/produccion
    versión anterior y no migra.
 3. Migra (la plataforma y, con `agendauno:migrar-estudios`, cada negocio) y levanta la
    versión nueva **todavía en mantenimiento**.
-4. **Solo la abre si atiende**: base, caché, esquema de la plataforma y de cada negocio
-   al día (`agendauno:verificar-produccion --disponibilidad`) y una petición real por
-   nginx. En mantenimiento ninguna tarea del negocio corre y la cola no toma trabajos,
-   así que los procesos nuevos se comprueban con señales que no los reactivan:
-   - el **programador** late también en mantenimiento (solo `agendauno:latido`);
-   - el **worker** deja al arrancar su señal de arranque (`WorkerStarting`).
+4. **Antes de abrir, lo crítico** (ADR 0135):
+   - **que atienda**: base, caché, esquema de la plataforma y de cada negocio al día
+     (`agendauno:verificar-produccion --disponibilidad`) y una petición real por nginx.
+     En mantenimiento ninguna tarea del negocio corre y la cola no toma trabajos, así
+     que los procesos nuevos se comprueban con señales que no los reactivan:
+     - el **programador** late también en mantenimiento (solo `agendauno:latido`);
+     - el **worker** deja al arrancar su señal de arranque (`WorkerStarting`).
 
-   Ambas señales llevan la versión (`APP_VERSION`, la pone `docker-compose.yml`): solo
-   cuentan las de la versión nueva. Espera hasta 5 minutos; si no, la deja en
-   mantenimiento, no la anota como actual y sale con error, con las opciones para
-   corregir o volver.
-5. Ya abierta, **confirma que la cola procesa** (el latido del minuto pasa por ella; hasta
-   3 minutos) y corre `agendauno:verificar-produccion` completa. Si algo falta, lo dice y
-   sale con error (código 2), sin «Listo».
+     Ambas señales llevan la versión (`APP_VERSION`, la pone `docker-compose.yml`):
+     solo cuentan las de la versión nueva. Espera hasta 5 minutos.
+   - **que su cola procese**: `agendauno:probar-cola` manda un trabajo de prueba a una
+     cola aparte y lo procesa con un worker de un solo uso (`--force`, porque el de
+     siempre no toma trabajos en mantenimiento). Prueba la conexión a Redis y el
+     código nuevo.
+   - la **verificación completa** (`agendauno:verificar-produccion`): solo informa.
+5. La abre y **confirma que el worker de siempre procesa** (el latido del minuto pasa
+   por él; hasta 3 minutos).
+
+**Si algo crítico falla después del cambio de versión** (no atiende, su cola no
+procesa, antes o después de abrir), `actualizar.sh` avisa al correo de alertas de la
+plataforma (`agendauno:avisar-despliegue`) y **vuelve sola a la versión anterior** con
+`./volver.sh`. Una versión que falla no se queda abierta ni en mantenimiento. Después
+sale con error y deja anotado el motivo en `.historial-versiones`. En una primera
+instalación no hay a cuál volver: se queda en mantenimiento.
+
+Si solo falta algo de la verificación completa (algo de la instalación, como el correo
+o los respaldos, no de la versión), queda abierta: avisa y sale con error (código 2),
+sin «Listo».
 
 La base nunca se revierte sola. Si una migración falla, todo queda en mantenimiento y el
 script dice cómo reabrir la versión anterior o restaurar los respaldos recién tomados.
