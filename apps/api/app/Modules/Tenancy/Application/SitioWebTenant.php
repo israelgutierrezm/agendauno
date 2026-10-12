@@ -27,6 +27,10 @@ use Illuminate\Support\Str;
  * datos}. Sus `datos` tienen forma fija según el tipo (fotos, preguntas, testimonios,
  * beneficios, botón, video o formulario).
  *
+ * Varias páginas (ADR 0146, fase 2): Inicio es la de arriba; además, `paginas`
+ * [{id, slug, titulo, en_menu, seo, secciones}] con secciones del sistema (una vez por
+ * página) y bloques propios. `seo` es el de Inicio y `pie`, el texto del pie de página.
+ *
  * Sin nada publicado, el público ve la plantilla esencial con todo visible (la página
  * de siempre). Las imágenes viven en `estudios/{id}/sitio/` del disco público; al
  * guardar y publicar se borran las que ya nadie usa.
@@ -50,7 +54,14 @@ class SitioWebTenant
             [CatalogoSitioWeb::INICIO, ...$plantilla->orden($modalidad), CatalogoSitioWeb::CONTACTO],
         );
 
-        return ['plantilla' => $plantilla->value, 'secciones' => $secciones, 'banners' => []];
+        return [
+            'plantilla' => $plantilla->value,
+            'secciones' => $secciones,
+            'banners' => [],
+            'seo' => self::seo([]),
+            'paginas' => [],
+            'pie' => ['texto' => null],
+        ];
     }
 
     /**
@@ -105,6 +116,16 @@ class SitioWebTenant
             }
         }
 
+        // Las páginas propias, cada una con su dirección única.
+        $paginas = [];
+        $direcciones = [];
+        foreach ((array) ($contenido['paginas'] ?? []) as $pagina) {
+            if (is_array($pagina)) {
+                $paginas[] = self::pagina($pagina, $permitidos, $ids, $direcciones);
+            }
+        }
+        $pie = is_array($contenido['pie'] ?? null) ? $contenido['pie'] : [];
+
         return [
             'plantilla' => $plantilla->value,
             'secciones' => [
@@ -113,6 +134,32 @@ class SitioWebTenant
                 $porTipo[CatalogoSitioWeb::CONTACTO] ?? self::seccion(CatalogoSitioWeb::CONTACTO),
             ],
             'banners' => $banners,
+            'seo' => self::seo(is_array($contenido['seo'] ?? null) ? $contenido['seo'] : []),
+            'paginas' => $paginas,
+            'pie' => ['texto' => self::texto($pie['texto'] ?? null)],
+        ];
+    }
+
+    /**
+     * El SEO publicado de su sitio, para la cabecera del servidor y el sitemap (se copia
+     * al negocio en el control plane al publicar).
+     *
+     * @param  array<string, mixed>  $contenido  normalizado
+     * @return array{inicio: array{titulo: string|null, descripcion: string|null, imagen_url: string|null}, paginas: list<array{slug: string, titulo: string, seo_titulo: string|null, descripcion: string|null, imagen_url: string|null}>}
+     */
+    public function resumenSeo(array $contenido): array
+    {
+        $seo = self::seo((array) ($contenido['seo'] ?? []));
+
+        return [
+            'inicio' => $seo,
+            'paginas' => array_values(array_map(static fn (array $p): array => [
+                'slug' => (string) $p['slug'],
+                'titulo' => (string) $p['titulo'],
+                'seo_titulo' => $p['seo']['titulo'] ?? null,
+                'descripcion' => $p['seo']['descripcion'] ?? null,
+                'imagen_url' => $p['seo']['imagen_url'] ?? null,
+            ], (array) ($contenido['paginas'] ?? []))),
         ];
     }
 
@@ -198,11 +245,6 @@ class SitioWebTenant
     public function paraPublico(array $contenido): array
     {
         $hoy = $this->fechas->hoy();
-        $secciones = array_values(array_filter(
-            (array) $contenido['secciones'],
-            static fn (array $s): bool => ($s['visible'] || in_array($s['tipo'], [CatalogoSitioWeb::INICIO, CatalogoSitioWeb::CONTACTO], true))
-                && self::tieneContenido($s),
-        ));
         $banners = array_values(array_filter(
             (array) $contenido['banners'],
             static fn (array $b): bool => ($b['desde'] === null || $b['desde'] <= $hoy) && ($b['hasta'] === null || $b['hasta'] >= $hoy),
@@ -210,21 +252,44 @@ class SitioWebTenant
 
         return [
             'plantilla' => $contenido['plantilla'],
-            'secciones' => array_map(static function (array $s): array {
-                unset($s['visible']);
-                // Del video, solo con qué se arma el reproductor.
-                if ($s['tipo'] === 'video') {
-                    unset($s['datos']['url']);
-                }
-
-                return $s;
-            }, $secciones),
+            'secciones' => self::seccionesPublicas((array) $contenido['secciones']),
+            'seo' => $contenido['seo'] ?? self::seo([]),
+            'pie' => $contenido['pie'] ?? ['texto' => null],
+            'paginas' => array_values(array_map(static fn (array $p): array => [
+                ...$p,
+                'secciones' => self::seccionesPublicas((array) $p['secciones']),
+            ], (array) ($contenido['paginas'] ?? []))),
             'banners' => array_map(static function (array $b): array {
                 unset($b['desde'], $b['hasta']);
 
                 return $b;
             }, $banners),
         ];
+    }
+
+    /**
+     * Solo las visibles (la portada y el contacto siempre) que tienen algo que mostrar,
+     * sin la marca de visible. Del video, solo con qué se arma el reproductor.
+     *
+     * @param  array<int, array<string, mixed>>  $secciones
+     * @return list<array<string, mixed>>
+     */
+    private static function seccionesPublicas(array $secciones): array
+    {
+        $visibles = array_filter(
+            $secciones,
+            static fn (array $s): bool => ($s['visible'] || in_array($s['tipo'], [CatalogoSitioWeb::INICIO, CatalogoSitioWeb::CONTACTO], true))
+                && self::tieneContenido($s),
+        );
+
+        return array_values(array_map(static function (array $s): array {
+            unset($s['visible']);
+            if ($s['tipo'] === 'video') {
+                unset($s['datos']['url']);
+            }
+
+            return $s;
+        }, $visibles));
     }
 
     /** Carpeta de las imágenes del sitio de un negocio en el disco público. */
@@ -258,7 +323,19 @@ class SitioWebTenant
             if (! is_array($contenido)) {
                 continue;
             }
-            foreach ([...(array) ($contenido['secciones'] ?? []), ...(array) ($contenido['banners'] ?? [])] as $parte) {
+            // Las de Inicio y de cada página, sus banners y las imágenes para compartir.
+            $paginas = array_filter((array) ($contenido['paginas'] ?? []), 'is_array');
+            $partes = [
+                ...(array) ($contenido['secciones'] ?? []),
+                ...(array) ($contenido['banners'] ?? []),
+                ...array_merge([], ...array_map(static fn (array $p): array => (array) ($p['secciones'] ?? []), array_values($paginas))),
+            ];
+            foreach ([$contenido['seo'] ?? null, ...array_map(static fn (array $p): mixed => $p['seo'] ?? null, $paginas)] as $seo) {
+                if (is_array($seo) && is_string($seo['imagen_url'] ?? null)) {
+                    $usadas[basename($seo['imagen_url'])] = true;
+                }
+            }
+            foreach ($partes as $parte) {
                 if (! is_array($parte)) {
                     continue;
                 }
@@ -299,6 +376,72 @@ class SitioWebTenant
             'titulo' => self::texto($datos['titulo'] ?? null),
             'texto' => in_array($tipo, CatalogoSitioWeb::CON_TEXTO, true) ? self::texto($datos['texto'] ?? null) : null,
             'foto_url' => in_array($tipo, CatalogoSitioWeb::CON_FOTO, true) ? self::texto($datos['foto_url'] ?? null) : null,
+        ];
+    }
+
+    /**
+     * Una página propia (ADR 0146, fase 2): su dirección (única; una repetida recibe un
+     * número), su título, si va en el menú, su SEO y sus secciones (las del sistema, una
+     * vez cada una; los bloques, los que haya).
+     *
+     * @param  array<string, mixed>  $datos
+     * @param  list<string>  $permitidos
+     * @param  array<string, bool>  $ids  los ids de bloque ya usados en el sitio
+     * @param  array<string, bool>  $direcciones  las direcciones ya usadas
+     * @return array<string, mixed>
+     */
+    private static function pagina(array $datos, array $permitidos, array &$ids, array &$direcciones): array
+    {
+        $id = self::texto($datos['id'] ?? null);
+        $titulo = (string) (self::texto($datos['titulo'] ?? null) ?? 'Página');
+        $base = Str::slug((string) (self::texto($datos['slug'] ?? null) ?? $titulo));
+        $base = $base !== '' ? Str::limit($base, CatalogoSitioWeb::MAX_DIRECCION, '') : 'pagina';
+        $slug = $base;
+        for ($n = 2; isset($direcciones[$slug]); $n++) {
+            $slug = Str::limit($base, CatalogoSitioWeb::MAX_DIRECCION - 3, '').'-'.$n;
+        }
+        $direcciones[$slug] = true;
+
+        $porTipo = [];
+        $secciones = [];
+        foreach ((array) ($datos['secciones'] ?? []) as $seccion) {
+            $tipo = is_array($seccion) ? (string) ($seccion['tipo'] ?? '') : '';
+            if (is_array($seccion) && CatalogoSitioWeb::esBloque($tipo)) {
+                $bloque = self::bloque($tipo, $seccion);
+                if (isset($ids[$bloque['id']])) {
+                    $bloque['id'] = self::idNuevo();
+                }
+                $ids[$bloque['id']] = true;
+                $secciones[] = $bloque;
+            } elseif (in_array($tipo, $permitidos, true) && ! isset($porTipo[$tipo])) {
+                $porTipo[$tipo] = true;
+                $secciones[] = self::seccion($tipo, (array) $seccion);
+            }
+        }
+
+        return [
+            'id' => $id !== null && preg_match('/^[a-z0-9]{10,26}$/', $id) === 1 ? $id : self::idNuevo(),
+            'slug' => $slug,
+            'titulo' => $titulo,
+            'en_menu' => (bool) ($datos['en_menu'] ?? true),
+            'seo' => self::seo(is_array($datos['seo'] ?? null) ? $datos['seo'] : []),
+            'secciones' => $secciones,
+        ];
+    }
+
+    /**
+     * Cómo aparece en buscadores y al compartirse: título, descripción e imagen (vacíos:
+     * los de siempre).
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array{titulo: string|null, descripcion: string|null, imagen_url: string|null}
+     */
+    private static function seo(array $datos): array
+    {
+        return [
+            'titulo' => self::texto($datos['titulo'] ?? null),
+            'descripcion' => self::texto($datos['descripcion'] ?? null),
+            'imagen_url' => self::texto($datos['imagen_url'] ?? null),
         ];
     }
 

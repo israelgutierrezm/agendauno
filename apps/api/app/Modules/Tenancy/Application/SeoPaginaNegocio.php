@@ -21,6 +21,9 @@ use App\Modules\Tenancy\Support\RedesSociales;
  * etiquetas para que ella las reemplace en lugar de duplicarlas. Se indexa solo si el
  * negocio aparece en el directorio: «solo con enlace» (`privado`) se ve, pero no se
  * indexa. Solo lee el negocio del control plane: no abre su base de datos.
+ *
+ * Su sitio (ADR 0146): el SEO de Inicio y de cada página propia (`/estudio/{slug}/p/…`)
+ * sale de lo que publicó, que se copia al negocio al publicar (`seo_sitio`).
  */
 final class SeoPaginaNegocio
 {
@@ -71,10 +74,15 @@ final class SeoPaginaNegocio
             in_array($camino, ['/enlaces', "/{$slug}/enlaces"], true) => 'enlaces',
             $camino === "/sucursales/{$slug}" => 'sucursales',
             $citas && $camino === "/agendar/{$slug}" => 'agendar',
+            str_starts_with($camino, "/estudio/{$slug}/p/") => 'propia',
             default => null,
         };
         if ($pagina === null) {
             return null;
+        }
+        $seo = is_array($estudio->seo_sitio) ? $estudio->seo_sitio : [];
+        if ($pagina === 'propia') {
+            return $this->paginaPropia($estudio, $seo, substr($camino, strlen("/estudio/{$slug}/p/")));
         }
 
         $nombre = (string) $estudio->nombre;
@@ -84,14 +92,19 @@ final class SeoPaginaNegocio
         $descripcionPropia = trim((string) $estudio->descripcion);
         $logo = $this->absoluta($estudio, $estudio->logo_url);
 
+        // Lo que el negocio escribió para Inicio en su sitio, si lo hizo.
+        $inicio = is_array($seo['inicio'] ?? null) ? $seo['inicio'] : [];
+
         return match ($pagina) {
             'inicio' => [
-                'titulo' => "{$nombre} | ".($citas ? 'Servicios y citas' : 'Horarios y clases')." en {$marca}",
-                'descripcion' => $citas
+                'titulo' => self::propio($inicio['titulo'] ?? null)
+                    ?? "{$nombre} | ".($citas ? 'Servicios y citas' : 'Horarios y clases')." en {$marca}",
+                'descripcion' => self::propio($inicio['descripcion'] ?? null) ?? ($citas
                     ? "Consulta servicios, profesionales y horarios disponibles de {$nombre}{$enLugar}. Reserva tu cita en línea."
-                    : "Consulta próximas clases, instructores y precios de {$nombre}{$enLugar}.",
+                    : "Consulta próximas clases, instructores y precios de {$nombre}{$enLugar}."),
                 'ruta' => '/',
-                'imagen' => $this->absoluta($estudio, $estudio->portada_url) ?? $logo,
+                'imagen' => $this->absoluta($estudio, self::propio($inicio['imagen_url'] ?? null))
+                    ?? $this->absoluta($estudio, $estudio->portada_url) ?? $logo,
                 'tipo' => 'profile',
                 'indexar' => $estudio->enDirectorio(),
                 'json_ld' => array_filter([
@@ -133,6 +146,44 @@ final class SeoPaginaNegocio
                 'json_ld' => null,
             ],
         };
+    }
+
+    /**
+     * Una página propia de su sitio publicado: su título y descripción (los suyos o, sin
+     * ellos, su título con el nombre del negocio) y su imagen. Una que no existe, nada.
+     *
+     * @param  array<string, mixed>  $seo
+     * @return array{titulo: string, descripcion: string, ruta: string, imagen: string|null, tipo: string, indexar: bool, json_ld: array<string, mixed>|null}|null
+     */
+    private function paginaPropia(Estudio $estudio, array $seo, string $direccion): ?array
+    {
+        foreach ((array) ($seo['paginas'] ?? []) as $p) {
+            if (! is_array($p) || ($p['slug'] ?? null) !== $direccion) {
+                continue;
+            }
+            $nombre = (string) $estudio->nombre;
+            $titulo = (string) ($p['titulo'] ?? '');
+
+            return [
+                'titulo' => self::propio($p['seo_titulo'] ?? null) ?? "{$titulo} | {$nombre}",
+                'descripcion' => self::propio($p['descripcion'] ?? null) ?? "{$titulo} de {$nombre}.",
+                'ruta' => "/estudio/{$estudio->slug}/p/{$direccion}",
+                'imagen' => $this->absoluta($estudio, self::propio($p['imagen_url'] ?? null))
+                    ?? $this->absoluta($estudio, $estudio->portada_url)
+                    ?? $this->absoluta($estudio, $estudio->logo_url),
+                'tipo' => 'website',
+                'indexar' => $estudio->enDirectorio(),
+                'json_ld' => null,
+            ];
+        }
+
+        return null;
+    }
+
+    /** Un texto propio con algo escrito, o null. */
+    private static function propio(mixed $texto): ?string
+    {
+        return is_string($texto) && trim($texto) !== '' ? trim($texto) : null;
     }
 
     /**
@@ -188,6 +239,12 @@ final class SeoPaginaNegocio
         $rutas = ['/', '/enlaces'];
         if ($estudio->modalidad() === ModalidadServicio::Citas) {
             $rutas[] = "/agendar/{$estudio->slug}";
+        }
+        // Las páginas propias de su sitio publicado (ADR 0146).
+        foreach ((array) (is_array($estudio->seo_sitio) ? ($estudio->seo_sitio['paginas'] ?? []) : []) as $p) {
+            if (is_array($p) && is_string($p['slug'] ?? null) && preg_match('/^[a-z0-9-]+$/', $p['slug']) === 1) {
+                $rutas[] = "/estudio/{$estudio->slug}/p/{$p['slug']}";
+            }
         }
         $modificado = $estudio->updated_at?->toDateString();
 

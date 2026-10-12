@@ -71,6 +71,7 @@ const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
   "formulario-captacion",
   "widget",
   "estudio-publico",
+  "estudio-pagina",
   "estudio-corto",
   "agendar-cita",
   "sucursales-estudio",

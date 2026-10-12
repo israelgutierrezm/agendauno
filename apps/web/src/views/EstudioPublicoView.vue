@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
@@ -38,6 +38,10 @@ import { perfilVisibleAlPublico } from "@/marketing/modalidades";
  * La página pública del negocio: sus datos salen del sistema y su forma, de su sitio
  * (ADR 0114: plantilla, orden y visibilidad de las secciones, títulos, textos y
  * banners). Con `vistaPrevia`, la ve quien configura el negocio con su borrador.
+ *
+ * Varias páginas (ADR 0146): Inicio y sus páginas propias (`/estudio/{slug}/p/{pagina}`;
+ * en la vista previa, `?pagina=`), con su menú, su encabezado y el pie de página en
+ * todas. Cada una con su SEO.
  */
 const props = defineProps<{ vistaPrevia?: boolean }>();
 
@@ -178,6 +182,7 @@ interface Escaparate {
 }
 
 const route = useRoute();
+const router = useRouter();
 
 const slug = computed(() => String(route.params.slug));
 const escaparate = ref<Escaparate | null>(null);
@@ -213,6 +218,56 @@ const sitio = computed<SitioPublico>(
 );
 function seccion(tipo: string) {
   return sitio.value.secciones.find((x) => x.tipo === tipo);
+}
+
+// ---- Varias páginas (ADR 0146) ----
+// La que se pide: `/p/{pagina}` o, en la vista previa, `?pagina=`; sin ella, Inicio.
+const direccionPedida = computed(() => {
+  const valor = props.vistaPrevia ? route.query.pagina : route.params.pagina;
+  return typeof valor === "string" && valor !== "" ? valor : null;
+});
+const paginaActual = computed(
+  () =>
+    (sitio.value.paginas ?? []).find((p) => p.slug === direccionPedida.value) ??
+    null,
+);
+// Pidió una página que no existe (o ya no): se dice, con el camino a Inicio.
+const paginaNoExiste = computed(
+  () => direccionPedida.value !== null && paginaActual.value === null,
+);
+const seccionesAMostrar = computed(() =>
+  paginaNoExiste.value
+    ? []
+    : (paginaActual.value?.secciones ?? sitio.value.secciones),
+);
+const paginasDelMenu = computed(() =>
+  (sitio.value.paginas ?? []).filter((p) => p.en_menu),
+);
+// A Inicio o a una página, en la vista previa sin salir de ella.
+function aInicio() {
+  return props.vistaPrevia
+    ? { name: "sitio-vista-previa", params: { slug: slug.value } }
+    : { name: "estudio-publico", params: { slug: slug.value } };
+}
+function aPagina(direccion: string) {
+  return props.vistaPrevia
+    ? {
+        name: "sitio-vista-previa",
+        params: { slug: slug.value },
+        query: { pagina: direccion },
+      }
+    : {
+        name: "estudio-pagina",
+        params: { slug: slug.value, pagina: direccion },
+      };
+}
+/**
+ * Un enlace de un bloque o banner: `/p/{pagina}` es una página de su sitio (con o sin
+ * ancla); lo demás (`#…`, `https://…`, otra ruta) queda como está.
+ */
+function enlaceDelSitio(enlace: string): string {
+  const m = /^\/p\/([a-z0-9-]+)(#[a-z0-9-]+)?$/.exec(enlace);
+  return m ? router.resolve(aPagina(m[1]!)).href + (m[2] ?? "") : enlace;
 }
 // La portada: titular y texto propios o, sin ellos, el nombre y la descripción.
 const titular = computed(
@@ -529,30 +584,7 @@ async function cargar(): Promise<void> {
       // En la lista de su producto (ADR 0136).
       producto: productoDeModalidad(estudio.modalidad ?? "clases"),
     });
-    const lugar = [estudio.ciudad, estudio.pais].filter(Boolean).join(", ");
-    const esCitas = capacidadesDeNegocio(estudio).citas;
-    updateSeo({
-      title: `${estudio.nombre} | ${esCitas ? "Servicios y citas" : "Horarios y clases"} en ${PRODUCTOS[esCitas ? "turnouno" : "agendauno"].nombre}`,
-      description: esCitas
-        ? `Consulta servicios, profesionales y horarios disponibles de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}. Reserva tu cita en línea.`
-        : `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`,
-      // La página del negocio vive en su subdominio.
-      path: urlCanonicaEstudio(estudio.slug),
-      image: estudio.portada_url ?? estudio.logo_url ?? undefined,
-      imageAlt: estudio.nombre,
-      type: "profile",
-      index: estudio.en_directorio !== false,
-      jsonLd: {
-        "@context": "https://schema.org",
-        "@type": "LocalBusiness",
-        name: estudio.nombre,
-        url: urlCanonicaEstudio(estudio.slug),
-        image: estudio.logo_url ?? undefined,
-        address: lugar || undefined,
-        description: estudio.descripcion ?? undefined,
-        sameAs: (estudio.redes ?? []).map((r) => r.url),
-      },
-    });
+    aplicarSeo();
     trackEvent("public_studio_viewed", { business_profile: estudio.perfil });
   } catch {
     // 404 (estudio no publicado/privado/inexistente) u otro error: pantalla amable.
@@ -561,6 +593,75 @@ async function cargar(): Promise<void> {
     cargando.value = false;
   }
 }
+
+/**
+ * Su SEO: el de Inicio (lo que escribió en su sitio o, si no, el de siempre) o el de la
+ * página que se ve (el suyo o su título con el nombre del negocio). La vista previa no
+ * toca el SEO.
+ */
+function aplicarSeo(): void {
+  const estudio = escaparate.value?.estudio;
+  if (!estudio || props.vistaPrevia) {
+    return;
+  }
+  const lugar = [estudio.ciudad, estudio.pais].filter(Boolean).join(", ");
+  const esCitas = capacidadesDeNegocio(estudio).citas;
+  const pagina = paginaActual.value;
+  const propio = pagina ? pagina.seo : sitio.value.seo;
+  const imagen =
+    propio?.imagen_url ?? estudio.portada_url ?? estudio.logo_url ?? undefined;
+  if (pagina) {
+    updateSeo({
+      title: propio?.titulo ?? `${pagina.titulo} | ${estudio.nombre}`,
+      description:
+        propio?.descripcion ?? `${pagina.titulo} de ${estudio.nombre}.`,
+      path: urlCanonicaEstudio(
+        estudio.slug,
+        `/estudio/${estudio.slug}/p/${pagina.slug}`,
+      ),
+      image: imagen,
+      imageAlt: estudio.nombre,
+      type: "website",
+      index: estudio.en_directorio !== false,
+    });
+    return;
+  }
+  updateSeo({
+    title:
+      propio?.titulo ??
+      `${estudio.nombre} | ${esCitas ? "Servicios y citas" : "Horarios y clases"} en ${PRODUCTOS[esCitas ? "turnouno" : "agendauno"].nombre}`,
+    description:
+      propio?.descripcion ??
+      (esCitas
+        ? `Consulta servicios, profesionales y horarios disponibles de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}. Reserva tu cita en línea.`
+        : `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`),
+    // La página del negocio vive en su subdominio.
+    path: urlCanonicaEstudio(estudio.slug),
+    image: imagen,
+    imageAlt: estudio.nombre,
+    type: "profile",
+    index: estudio.en_directorio !== false,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      name: estudio.nombre,
+      url: urlCanonicaEstudio(estudio.slug),
+      image: estudio.logo_url ?? undefined,
+      address: lugar || undefined,
+      description: estudio.descripcion ?? undefined,
+      sameAs: (estudio.redes ?? []).map((r) => r.url),
+    },
+  });
+}
+
+// Otra página del sitio: arriba, con su SEO.
+watch(paginaActual, async () => {
+  aplicarSeo();
+  await nextTick();
+  if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+    window.scrollTo({ top: 0 });
+  }
+});
 
 onMounted(cargar);
 </script>
@@ -605,9 +706,58 @@ onMounted(cargar);
         <InstalarApp :negocio="escaparate.estudio.nombre" />
       </div>
 
+      <!-- Su menú: Inicio y sus páginas (ADR 0146) -->
+      <nav
+        v-if="paginasDelMenu.length > 0"
+        class="ep-menu"
+        :aria-label="$t('sitioWeb.publico.menu')"
+        data-prueba="menu-sitio"
+      >
+        <div class="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-4">
+          <RouterLink
+            :to="aInicio()"
+            class="ep-menu-enlace"
+            :aria-current="paginaActual === null ? 'page' : undefined"
+            >{{ $t("sitioWeb.publico.inicio") }}</RouterLink
+          >
+          <RouterLink
+            v-for="p in paginasDelMenu"
+            :key="p.slug"
+            :to="aPagina(p.slug)"
+            class="ep-menu-enlace"
+            :aria-current="paginaActual?.slug === p.slug ? 'page' : undefined"
+            >{{ p.titulo }}</RouterLink
+          >
+        </div>
+      </nav>
+
+      <!-- Una página propia: su nombre arriba -->
+      <header
+        v-if="paginaActual"
+        class="ep-pagina-cabecera"
+        data-prueba="pagina-cabecera"
+      >
+        <div class="mx-auto max-w-5xl px-4 py-10">
+          <RouterLink :to="aInicio()" class="ep-pagina-negocio">{{
+            escaparate.estudio.nombre
+          }}</RouterLink>
+          <h1 class="mt-1 text-3xl font-light">{{ paginaActual.titulo }}</h1>
+        </div>
+      </header>
+      <section
+        v-else-if="paginaNoExiste"
+        class="mx-auto max-w-md px-4 py-20 text-center"
+        data-prueba="pagina-no-existe"
+      >
+        <p>{{ $t("sitioWeb.publico.noExiste") }}</p>
+        <RouterLink :to="aInicio()" class="tu-enlace mt-3 inline-block">{{
+          $t("sitioWeb.publico.irAInicio")
+        }}</RouterLink>
+      </section>
+
       <!-- Cada sección donde la puso el negocio (ADR 0114); la portada primero y el
            contacto al final. Lo que muestra cada una sale del sistema. -->
-      <template v-for="sec in sitio.secciones" :key="sec.id ?? sec.tipo">
+      <template v-for="sec in seccionesAMostrar" :key="sec.id ?? sec.tipo">
         <!-- Portada -->
         <template v-if="sec.tipo === 'inicio'">
           <div
@@ -852,7 +1002,7 @@ onMounted(cargar);
                 </p>
                 <a
                   v-if="b.enlace_url && b.enlace_texto"
-                  :href="b.enlace_url"
+                  :href="enlaceDelSitio(b.enlace_url)"
                   class="tu-btn tu-btn-primario mt-4 px-5"
                   :target="esEnlaceExterno(b.enlace_url) ? '_blank' : undefined"
                   :rel="
@@ -1594,8 +1744,43 @@ onMounted(cargar);
           :bloque="sec"
           :slug="slug"
           :captacion-activa="escaparate.captacion?.activa === true"
+          :enlace="enlaceDelSitio"
         />
       </template>
+
+      <!-- Pie de página: su texto, sus páginas y su aviso de privacidad -->
+      <footer class="ep-pie" data-prueba="pie-sitio">
+        <div class="mx-auto max-w-5xl px-4 py-8 text-sm">
+          <p class="font-medium">{{ escaparate.estudio.nombre }}</p>
+          <p
+            v-if="sitio.pie?.texto"
+            class="mt-1 whitespace-pre-line ep-pie-suave"
+          >
+            {{ sitio.pie.texto }}
+          </p>
+          <nav
+            v-if="paginasDelMenu.length > 0"
+            class="mt-3 flex flex-wrap gap-x-4 gap-y-1"
+            :aria-label="$t('sitioWeb.publico.paginas')"
+          >
+            <RouterLink :to="aInicio()" class="tu-enlace">{{
+              $t("sitioWeb.publico.inicio")
+            }}</RouterLink>
+            <RouterLink
+              v-for="p in paginasDelMenu"
+              :key="p.slug"
+              :to="aPagina(p.slug)"
+              class="tu-enlace"
+              >{{ p.titulo }}</RouterLink
+            >
+          </nav>
+          <RouterLink
+            :to="{ name: 'aviso-negocio', params: { slug } }"
+            class="tu-enlace mt-3 inline-block"
+            >{{ tn("escaparate.avisoPrivacidad") }}</RouterLink
+          >
+        </div>
+      </footer>
 
       <!-- Pedir acceso: el negocio da de alta a sus clientes (ADR 0093) -->
       <div
@@ -1697,6 +1882,47 @@ onMounted(cargar);
 </template>
 
 <style scoped>
+/* Su menú de páginas, su encabezado y el pie (ADR 0146). */
+.ep-menu {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  border-bottom: 1px solid var(--borde);
+  background: color-mix(in srgb, var(--superficie) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+.ep-menu-enlace {
+  flex-shrink: 0;
+  padding: 0.85rem 0.75rem;
+  border-bottom: 2px solid transparent;
+  color: var(--texto-suave);
+  font-size: 0.92rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ep-menu-enlace:hover {
+  color: var(--texto);
+}
+.ep-menu-enlace[aria-current="page"] {
+  border-bottom-color: var(--primario);
+  color: var(--texto);
+  font-weight: 500;
+}
+.ep-pagina-cabecera {
+  background: color-mix(in srgb, var(--primario) 7%, var(--superficie));
+}
+.ep-pagina-negocio {
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.ep-pie {
+  margin-top: 2rem;
+  border-top: 1px solid var(--borde);
+}
+.ep-pie-suave {
+  color: var(--texto-suave);
+}
 .ep-aviso-previa {
   position: sticky;
   top: 0;

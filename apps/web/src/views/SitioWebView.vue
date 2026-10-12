@@ -8,19 +8,24 @@ import EditorBloqueSitio from "@/components/EditorBloqueSitio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import SeoPaginaSitio from "@/components/SeoPaginaSitio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { claveSegunModalidad } from "@/lib/menu";
 import {
   claveSeccion,
+  direccionDe,
   duplicarBloque,
   esBloque,
   esFija,
   moverSeccion,
+  nuevaPagina,
   nuevoBloque,
   type BannerSitio,
+  type PaginaSitio,
   type PlantillaSitio,
   type SeccionSitio,
+  type SeoSitio,
   type TipoBloque,
   type TipoSeccion,
 } from "@/lib/sitioWeb";
@@ -35,11 +40,19 @@ import { useToastStore } from "@/stores/toast";
  * Bloques propios (ADR 0146): «Agregar bloque» pone uno nuevo antes del contacto (texto
  * con imagen, galería, preguntas, testimonios, llamado, video, beneficios o formulario);
  * se duplican, se quitan, se mueven y se editan con su estilo.
+ *
+ * Varias páginas (ADR 0146, fase 2): «Páginas» lista Inicio y las propias (su título,
+ * su dirección, si van en el menú y su SEO); «Secciones» edita la que se elige. En una
+ * página propia caben las secciones del sistema (una vez) y bloques. Más el pie.
  */
+type SeccionBorrador = SeccionSitio & { visible: boolean };
 interface Borrador {
   plantilla: PlantillaSitio;
-  secciones: (SeccionSitio & { visible: boolean })[];
+  secciones: SeccionBorrador[];
   banners: BannerSitio[];
+  seo: SeoSitio;
+  paginas: (PaginaSitio & { secciones: SeccionBorrador[] })[];
+  pie: { texto: string | null };
 }
 interface DatosSitio {
   borrador: Borrador;
@@ -62,6 +75,14 @@ interface DatosSitio {
     max_elementos: number;
     max_preguntas: number;
     formularios: { id: string; nombre: string }[];
+    // Páginas propias (ADR 0146, fase 2).
+    paginas_maximas: number;
+    movibles: TipoSeccion[];
+    max_direccion: number;
+    max_titulo_pagina: number;
+    max_seo_titulo: number;
+    max_seo_descripcion: number;
+    max_pie: number;
   };
 }
 
@@ -83,7 +104,13 @@ const abierta = ref<string | null>(null);
 // Vista previa: en un marco con el ancho de un teléfono o de una computadora.
 const anchoPrevia = ref<"telefono" | "computadora">("telefono");
 const vuelta = ref(0);
-const urlPrevia = computed(() => `/estudio/${sesion.slug}/vista-previa`);
+const urlPrevia = computed(
+  () =>
+    `/estudio/${sesion.slug}/vista-previa` +
+    (paginaEditada.value
+      ? `?pagina=${encodeURIComponent(paginaEditada.value.slug)}`
+      : ""),
+);
 
 const sinGuardar = computed(
   () =>
@@ -128,6 +155,10 @@ function fecha(iso: string): string {
 }
 
 function tomar(d: DatosSitio): void {
+  // Un API anterior a las páginas (ADR 0146) no las manda: se completan vacías.
+  d.borrador.seo ??= { titulo: null, descripcion: null, imagen_url: null };
+  d.borrador.paginas ??= [];
+  d.borrador.pie ??= { texto: null };
   datos.value = d;
   // Una copia para editar: lo guardado queda como referencia de «sin guardar».
   guardadoComo.value = JSON.stringify(d.borrador);
@@ -262,17 +293,127 @@ async function usarPlantilla(clave: PlantillaSitio): Promise<void> {
   ];
 }
 
+// ---- Páginas (ADR 0146, fase 2) ----
+// La que se edita en «Secciones»: Inicio (null) o una propia (su id).
+const paginaSel = ref<string | null>(null);
+const indicePagina = computed(() =>
+  paginaSel.value === null
+    ? -1
+    : (borrador.value?.paginas ?? []).findIndex(
+        (p) => p.id === paginaSel.value,
+      ),
+);
+const paginaEditada = computed(() =>
+  indicePagina.value < 0
+    ? null
+    : (borrador.value?.paginas[indicePagina.value] ?? null),
+);
+// Las secciones de la que se edita y dónde van sus errores.
+const seccionesActuales = computed<SeccionBorrador[]>(
+  () => paginaEditada.value?.secciones ?? borrador.value?.secciones ?? [],
+);
+const prefijo = computed(() =>
+  paginaEditada.value ? `paginas.${indicePagina.value}.secciones` : "secciones",
+);
+function fijarSecciones(lista: SeccionBorrador[]): void {
+  if (paginaEditada.value) {
+    paginaEditada.value.secciones = lista;
+  } else if (borrador.value) {
+    borrador.value.secciones = lista;
+  }
+}
+function elegirPagina(id: string | null): void {
+  paginaSel.value = id;
+  abierta.value = null;
+}
+const cabenPaginas = computed(
+  () =>
+    (borrador.value?.paginas.length ?? 0) <
+    (datos.value?.catalogo.paginas_maximas ?? 0),
+);
+// La de configuración abierta: «inicio» o el id de una página.
+const configAbierta = ref<string | null>(null);
+const agregandoPagina = ref(false);
+const tituloNueva = ref("");
+function crearPagina(): void {
+  const titulo = tituloNueva.value.trim();
+  if (!borrador.value || titulo === "" || !cabenPaginas.value) {
+    return;
+  }
+  const pagina = nuevaPagina(
+    titulo,
+    borrador.value.paginas.map((p) => p.slug),
+  ) as Borrador["paginas"][number];
+  borrador.value.paginas.push(pagina);
+  tituloNueva.value = "";
+  agregandoPagina.value = false;
+  elegirPagina(pagina.id ?? null);
+  configAbierta.value = pagina.id ?? null;
+}
+function moverPagina(indice: number, paso: -1 | 1): void {
+  const lista = borrador.value?.paginas;
+  const destino = indice + paso;
+  if (!lista || destino < 0 || destino >= lista.length) {
+    return;
+  }
+  [lista[indice], lista[destino]] = [lista[destino]!, lista[indice]!];
+}
+async function quitarPagina(indice: number): Promise<void> {
+  const pagina = borrador.value?.paginas[indice];
+  if (!pagina) {
+    return;
+  }
+  if (
+    !(await confirmar(
+      t("sitioWeb.paginas.confirmarQuitar", { pagina: pagina.titulo }),
+      { aceptar: t("sitioWeb.paginas.quitar"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  borrador.value?.paginas.splice(indice, 1);
+  if (paginaSel.value === pagina.id) {
+    elegirPagina(null);
+  }
+}
+// La dirección se escribe como queda en el enlace: minúsculas, números y guiones.
+function cambiarDireccion(pagina: PaginaSitio, valor: string): void {
+  pagina.slug = direccionDe(valor, datos.value?.catalogo.max_direccion ?? 40);
+}
+// En una página propia: las secciones del sistema que aún no tiene.
+const seccionesDisponibles = computed<TipoSeccion[]>(() => {
+  if (!paginaEditada.value) {
+    return [];
+  }
+  const usadas = new Set(paginaEditada.value.secciones.map((s) => s.tipo));
+  return (datos.value?.catalogo.movibles ?? []).filter((t) => !usadas.has(t));
+});
+function agregarSeccion(tipo: TipoSeccion): void {
+  paginaEditada.value?.secciones.push({
+    tipo,
+    visible: true,
+    titulo: null,
+    texto: null,
+    foto_url: null,
+  });
+  abierta.value = tipo;
+  eligiendoBloque.value = false;
+}
+function quitarSeccion(indice: number): void {
+  paginaEditada.value?.secciones.splice(indice, 1);
+}
+
 // ---- Bloques propios (ADR 0146) ----
 const eligiendoBloque = ref(false);
 const cuantosBloques = computed(
-  () => borrador.value?.secciones.filter((s) => esBloque(s.tipo)).length ?? 0,
+  () => seccionesActuales.value.filter((s) => esBloque(s.tipo)).length,
 );
 const caben = computed(
   () => cuantosBloques.value < (datos.value?.catalogo.bloques_maximos ?? 0),
 );
 // Antes del contacto, ya abierto para editarlo.
 function agregarBloque(tipo: TipoBloque): void {
-  const lista = borrador.value?.secciones;
+  const lista = borrador.value ? seccionesActuales.value : null;
   if (!lista || !caben.value) {
     return;
   }
@@ -284,7 +425,7 @@ function agregarBloque(tipo: TipoBloque): void {
 }
 // La copia queda justo después del original.
 function duplicar(indice: number): void {
-  const lista = borrador.value?.secciones;
+  const lista = seccionesActuales.value;
   const original = lista?.[indice];
   if (!lista || !original || !caben.value) {
     return;
@@ -294,9 +435,9 @@ function duplicar(indice: number): void {
   abierta.value = copia.id ?? null;
 }
 async function quitarBloque(indice: number): Promise<void> {
-  const lista = borrador.value?.secciones;
-  const bloque = lista?.[indice];
-  if (!lista || !bloque) {
+  const lista = seccionesActuales.value;
+  const bloque = lista[indice];
+  if (!bloque) {
     return;
   }
   if (
@@ -313,16 +454,10 @@ async function quitarBloque(indice: number): Promise<void> {
 }
 
 function mover(indice: number, paso: -1 | 1): void {
-  if (borrador.value) {
-    borrador.value.secciones = moverSeccion(
-      borrador.value.secciones,
-      indice,
-      paso,
-    );
-  }
+  fijarSecciones(moverSeccion(seccionesActuales.value, indice, paso));
 }
 function puedeMover(indice: number, paso: -1 | 1): boolean {
-  const lista = borrador.value?.secciones ?? [];
+  const lista = seccionesActuales.value;
   const destino = lista[indice + paso];
   return (
     destino !== undefined &&
@@ -504,17 +639,277 @@ onMounted(cargar);
             </p>
           </div>
 
-          <!-- Secciones -->
-          <div class="tu-card p-5">
+          <!-- Páginas (ADR 0146): Inicio y las propias -->
+          <div class="tu-card p-5" data-prueba="paginas-sitio">
             <h2 class="text-lg font-medium">
-              {{ $t("sitioWeb.secciones.titulo") }}
+              {{ $t("sitioWeb.paginas.titulo") }}
             </h2>
             <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("sitioWeb.secciones.ayuda") }}
+              {{ $t("sitioWeb.paginas.ayuda") }}
+            </p>
+            <ol class="mt-4 space-y-2">
+              <li
+                class="sw-seccion"
+                :class="{ 'sw-pagina-activa': paginaSel === null }"
+                data-prueba="pagina-inicio"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    class="min-w-0 flex-1 basis-40 text-left"
+                    :aria-pressed="paginaSel === null"
+                    @click="elegirPagina(null)"
+                  >
+                    <span class="block font-medium">{{
+                      $t("sitioWeb.paginas.inicio")
+                    }}</span>
+                    <span class="block text-xs sw-suave">/</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                    :aria-expanded="configAbierta === 'inicio'"
+                    data-prueba="config-inicio"
+                    @click="
+                      configAbierta =
+                        configAbierta === 'inicio' ? null : 'inicio'
+                    "
+                  >
+                    {{ $t("sitioWeb.paginas.seo") }}
+                  </button>
+                </div>
+                <div v-if="configAbierta === 'inicio'" class="mt-4">
+                  <SeoPaginaSitio
+                    v-model="borrador.seo"
+                    :catalogo="datos.catalogo"
+                    prefijo="seo"
+                    :errores="errores"
+                    :placeholder-titulo="sesion.estudio?.nombre ?? ''"
+                  />
+                </div>
+              </li>
+              <li
+                v-for="(p, n) in borrador.paginas"
+                :key="p.id ?? p.slug"
+                class="sw-seccion"
+                :class="{ 'sw-pagina-activa': paginaSel === p.id }"
+                :data-prueba="`pagina-${p.slug}`"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    class="min-w-0 flex-1 basis-40 text-left"
+                    :aria-pressed="paginaSel === p.id"
+                    @click="elegirPagina(p.id ?? null)"
+                  >
+                    <span class="block font-medium">{{ p.titulo }}</span>
+                    <span class="block text-xs sw-suave"
+                      >/p/{{ p.slug }} ·
+                      {{
+                        p.en_menu
+                          ? $t("sitioWeb.paginas.enMenu")
+                          : $t("sitioWeb.paginas.fueraMenu")
+                      }}</span
+                    >
+                  </button>
+                  <button
+                    type="button"
+                    class="tu-icono-btn shrink-0"
+                    :disabled="n === 0"
+                    :aria-label="
+                      $t('sitioWeb.paginas.subir', { pagina: p.titulo })
+                    "
+                    @click="moverPagina(n, -1)"
+                  >
+                    <IconoNav nombre="arriba" :tam="16" />
+                  </button>
+                  <button
+                    type="button"
+                    class="tu-icono-btn shrink-0"
+                    :disabled="n === borrador.paginas.length - 1"
+                    :aria-label="
+                      $t('sitioWeb.paginas.bajar', { pagina: p.titulo })
+                    "
+                    @click="moverPagina(n, 1)"
+                  >
+                    <IconoNav nombre="abajo" :tam="16" />
+                  </button>
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                    :aria-expanded="configAbierta === p.id"
+                    :data-prueba="`config-${p.slug}`"
+                    @click="
+                      configAbierta =
+                        configAbierta === p.id ? null : (p.id ?? null)
+                    "
+                  >
+                    {{ $t("sitioWeb.paginas.configurar") }}
+                  </button>
+                </div>
+                <div v-if="configAbierta === p.id" class="mt-4 space-y-4">
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label class="tu-label" :for="`sw-pag-titulo-${n}`">{{
+                        $t("sitioWeb.paginas.campos.titulo")
+                      }}</label>
+                      <input
+                        :id="`sw-pag-titulo-${n}`"
+                        v-model="p.titulo"
+                        class="tu-input"
+                        :maxlength="datos.catalogo.max_titulo_pagina"
+                      />
+                    </div>
+                    <div>
+                      <label class="tu-label" :for="`sw-pag-dir-${n}`">{{
+                        $t("sitioWeb.paginas.campos.direccion")
+                      }}</label>
+                      <div class="sw-direccion">
+                        <span class="sw-suave">/p/</span>
+                        <input
+                          :id="`sw-pag-dir-${n}`"
+                          class="tu-input"
+                          :value="p.slug"
+                          :maxlength="datos.catalogo.max_direccion"
+                          :data-prueba="`direccion-${n}`"
+                          @change="
+                            cambiarDireccion(
+                              p,
+                              ($event.target as HTMLInputElement).value,
+                            )
+                          "
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <label class="flex items-center gap-2 text-sm">
+                    <input v-model="p.en_menu" type="checkbox" />
+                    {{ $t("sitioWeb.paginas.campos.enMenu") }}
+                  </label>
+                  <SeoPaginaSitio
+                    v-model="p.seo"
+                    :catalogo="datos.catalogo"
+                    :prefijo="`paginas.${n}.seo`"
+                    :errores="errores"
+                    :placeholder-titulo="p.titulo"
+                  />
+                  <p
+                    v-if="
+                      errorDe(`paginas.${n}.slug`) ||
+                      errorDe(`paginas.${n}.titulo`)
+                    "
+                    class="text-sm"
+                    style="color: var(--error)"
+                  >
+                    {{
+                      errorDe(`paginas.${n}.slug`) ??
+                      errorDe(`paginas.${n}.titulo`)
+                    }}
+                  </p>
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-fantasma text-sm"
+                    style="color: var(--error)"
+                    :data-prueba="`quitar-pagina-${p.slug}`"
+                    @click="quitarPagina(n)"
+                  >
+                    {{ $t("sitioWeb.paginas.quitar") }}
+                  </button>
+                </div>
+              </li>
+            </ol>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma"
+                :disabled="!cabenPaginas"
+                data-prueba="agregar-pagina"
+                @click="agregandoPagina = true"
+              >
+                {{ $t("sitioWeb.paginas.agregar") }}
+              </button>
+              <p v-if="!cabenPaginas" class="text-sm sw-suave">
+                {{
+                  $t("sitioWeb.paginas.tope", {
+                    n: datos.catalogo.paginas_maximas,
+                  })
+                }}
+              </p>
+            </div>
+            <p
+              v-if="errorDe('paginas')"
+              class="mt-2 text-sm"
+              style="color: var(--error)"
+            >
+              {{ errorDe("paginas") }}
+            </p>
+          </div>
+
+          <!-- Nueva página: su título (la dirección sale de él) -->
+          <ModalDialogo
+            :abierto="agregandoPagina"
+            :titulo="$t('sitioWeb.paginas.nueva')"
+            tam="md"
+            @cerrar="agregandoPagina = false"
+          >
+            <form @submit.prevent="crearPagina">
+              <label class="tu-label" for="sw-nueva-pagina">{{
+                $t("sitioWeb.paginas.campos.titulo")
+              }}</label>
+              <input
+                id="sw-nueva-pagina"
+                v-model="tituloNueva"
+                class="tu-input"
+                :maxlength="datos.catalogo.max_titulo_pagina"
+                :placeholder="$t('sitioWeb.paginas.ejemplo')"
+                data-prueba="titulo-pagina-nueva"
+              />
+              <p class="sw-ayuda">
+                {{
+                  $t("sitioWeb.paginas.direccionAyuda", {
+                    direccion: direccionDe(tituloNueva) || "…",
+                  })
+                }}
+              </p>
+              <button
+                type="submit"
+                class="tu-btn tu-btn-primario mt-4"
+                :disabled="tituloNueva.trim() === ''"
+                data-prueba="crear-pagina"
+              >
+                {{ $t("sitioWeb.paginas.crear") }}
+              </button>
+            </form>
+          </ModalDialogo>
+
+          <!-- Secciones -->
+          <div class="tu-card p-5">
+            <h2 class="text-lg font-medium" data-prueba="titulo-secciones">
+              {{
+                paginaEditada
+                  ? $t("sitioWeb.paginas.seccionesDe", {
+                      pagina: paginaEditada.titulo,
+                    })
+                  : $t("sitioWeb.secciones.titulo")
+              }}
+            </h2>
+            <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{
+                paginaEditada
+                  ? $t("sitioWeb.paginas.seccionesAyuda")
+                  : $t("sitioWeb.secciones.ayuda")
+              }}
+            </p>
+            <p
+              v-if="paginaEditada && paginaEditada.secciones.length === 0"
+              class="mt-4 text-sm sw-suave"
+              data-prueba="pagina-vacia"
+            >
+              {{ $t("sitioWeb.paginas.vacia") }}
             </p>
             <ol class="mt-4 space-y-2" data-prueba="secciones">
               <li
-                v-for="(s, i) in borrador.secciones"
+                v-for="(s, i) in seccionesActuales"
                 :key="claveSeccion(s)"
                 class="sw-seccion"
                 :class="{ 'sw-seccion-propia': esBloque(s.tipo) }"
@@ -597,9 +992,9 @@ onMounted(cargar);
                   class="mt-4"
                 >
                   <EditorBloqueSitio
-                    v-model="borrador.secciones[i]"
+                    v-model="seccionesActuales[i]"
                     :catalogo="datos.catalogo"
-                    :prefijo="`secciones.${i}`"
+                    :prefijo="`${prefijo}.${i}`"
                     :errores="errores"
                   />
                   <div class="mt-4 flex flex-wrap gap-2">
@@ -658,7 +1053,11 @@ onMounted(cargar);
                       }}
                     </p>
                   </div>
-                  <div v-if="datos.catalogo.con_texto.includes(s.tipo as TipoSeccion)">
+                  <div
+                    v-if="
+                      datos.catalogo.con_texto.includes(s.tipo as TipoSeccion)
+                    "
+                  >
                     <label class="tu-label" :for="`sw-texto-${s.tipo}`">{{
                       s.tipo === "inicio"
                         ? $t("sitioWeb.secciones.campos.textoInicio")
@@ -680,7 +1079,11 @@ onMounted(cargar);
                       {{ $t("sitioWeb.secciones.campos.textoInicioAyuda") }}
                     </p>
                   </div>
-                  <div v-if="datos.catalogo.con_foto.includes(s.tipo as TipoSeccion)">
+                  <div
+                    v-if="
+                      datos.catalogo.con_foto.includes(s.tipo as TipoSeccion)
+                    "
+                  >
                     <span class="tu-label">{{
                       $t("sitioWeb.secciones.campos.foto")
                     }}</span>
@@ -697,17 +1100,28 @@ onMounted(cargar);
                   </div>
                   <p
                     v-if="
-                      errorDe(`secciones.${i}.titulo`) ||
-                      errorDe(`secciones.${i}.texto`)
+                      errorDe(`${prefijo}.${i}.titulo`) ||
+                      errorDe(`${prefijo}.${i}.texto`)
                     "
                     class="text-sm"
                     style="color: var(--error)"
                   >
                     {{
-                      errorDe(`secciones.${i}.titulo`) ??
-                      errorDe(`secciones.${i}.texto`)
+                      errorDe(`${prefijo}.${i}.titulo`) ??
+                      errorDe(`${prefijo}.${i}.texto`)
                     }}
                   </p>
+                  <!-- En una página propia, la sección del sistema se quita -->
+                  <button
+                    v-if="paginaEditada"
+                    type="button"
+                    class="tu-btn tu-btn-fantasma text-sm"
+                    style="color: var(--error)"
+                    :data-prueba="`quitar-${claveSeccion(s)}`"
+                    @click="quitarSeccion(i)"
+                  >
+                    {{ $t("sitioWeb.paginas.quitarSeccion") }}
+                  </button>
                 </div>
               </li>
             </ol>
@@ -734,12 +1148,28 @@ onMounted(cargar);
               </p>
             </div>
             <p
-              v-if="errorDe('secciones')"
+              v-if="errorDe(prefijo)"
               class="mt-2 text-sm"
               style="color: var(--error)"
             >
-              {{ errorDe("secciones") }}
+              {{ errorDe(prefijo) }}
             </p>
+          </div>
+
+          <!-- Pie de página: en todas las páginas -->
+          <div class="tu-card p-5" data-prueba="pie-editor">
+            <h2 class="text-lg font-medium">
+              {{ $t("sitioWeb.pie.titulo") }}
+            </h2>
+            <p class="mt-1 text-sm sw-suave">{{ $t("sitioWeb.pie.ayuda") }}</p>
+            <textarea
+              v-model="borrador.pie.texto"
+              class="tu-input mt-3"
+              rows="3"
+              :maxlength="datos.catalogo.max_pie"
+              :aria-label="$t('sitioWeb.pie.titulo')"
+              :placeholder="$t('sitioWeb.pie.ejemplo')"
+            ></textarea>
           </div>
 
           <!-- Qué bloque agregar -->
@@ -752,6 +1182,30 @@ onMounted(cargar);
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("sitioWeb.bloques.elegirAyuda") }}
             </p>
+            <!-- En una página propia, también las secciones de tu negocio -->
+            <template v-if="seccionesDisponibles.length > 0">
+              <h3 class="mt-4 text-sm font-medium">
+                {{ $t("sitioWeb.paginas.delNegocio") }}
+              </h3>
+              <ul class="sw-catalogo mt-2" data-prueba="catalogo-secciones">
+                <li v-for="tipo in seccionesDisponibles" :key="tipo">
+                  <button
+                    type="button"
+                    class="sw-opcion-bloque"
+                    :data-prueba="`nueva-seccion-${tipo}`"
+                    @click="agregarSeccion(tipo)"
+                  >
+                    <span class="font-medium">{{ nombreSeccion(tipo) }}</span>
+                    <span class="mt-1 block text-sm sw-suave">{{
+                      tm(`sitioWeb.secciones.contenido.${tipo}`)
+                    }}</span>
+                  </button>
+                </li>
+              </ul>
+              <h3 class="mt-5 text-sm font-medium">
+                {{ $t("sitioWeb.paginas.propios") }}
+              </h3>
+            </template>
             <ul class="sw-catalogo mt-4" data-prueba="catalogo-bloques">
               <li v-for="tipo in datos.catalogo.bloques" :key="tipo">
                 <button
@@ -1088,6 +1542,18 @@ onMounted(cargar);
 /* Un bloque propio se distingue de las secciones del sistema por su borde. */
 .sw-seccion-propia {
   border-left: 3px solid var(--primario);
+}
+.sw-suave {
+  color: var(--texto-suave);
+}
+.sw-pagina-activa {
+  border-color: var(--primario);
+  background: color-mix(in srgb, var(--primario) 5%, var(--superficie));
+}
+.sw-direccion {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 .sw-catalogo {
   display: grid;

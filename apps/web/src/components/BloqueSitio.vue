@@ -18,6 +18,8 @@ const props = defineProps<{
   slug: string;
   // El formulario solo si el negocio recibe prospectos (Captación).
   captacionActiva?: boolean;
+  // Lleva `/p/{pagina}` a la página de su sitio (ADR 0146); sin él, tal cual.
+  enlace?: (enlace: string) => string;
 }>();
 
 const { t } = useI18n();
@@ -28,6 +30,9 @@ const centrado = computed(() => props.bloque.estilo?.alineacion === "centro");
 // Un enlace a otra página se abre aparte; una sección o una ruta del sitio, aquí.
 function externo(enlace: string | null | undefined): boolean {
   return /^https?:\/\//i.test(enlace ?? "");
+}
+function destino(enlace: string): string {
+  return props.enlace ? props.enlace(enlace) : enlace;
 }
 
 const reproduciendo = ref(false);
@@ -70,7 +75,7 @@ const proveedor = computed(() =>
           </p>
           <a
             v-if="datos.boton_texto && datos.boton_enlace"
-            :href="datos.boton_enlace"
+            :href="destino(datos.boton_enlace)"
             class="tu-btn tu-btn-primario bs-boton mt-6"
             :target="externo(datos.boton_enlace) ? '_blank' : undefined"
             :rel="
@@ -91,7 +96,7 @@ const proveedor = computed(() =>
         </p>
         <a
           v-if="datos.boton_texto && datos.boton_enlace"
-          :href="datos.boton_enlace"
+          :href="destino(datos.boton_enlace)"
           class="tu-btn tu-btn-primario bs-boton mt-6"
           :target="externo(datos.boton_enlace) ? '_blank' : undefined"
           :rel="externo(datos.boton_enlace) ? 'noopener noreferrer' : undefined"

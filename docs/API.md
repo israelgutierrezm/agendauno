@@ -743,3 +743,24 @@ en el negocio.
 - En `GET /escaparate` salen solo los visibles que tienen contenido. Del video, solo
   `proveedor` y `video_id`.
 
+### Varias páginas del sitio (ADR 0146, fase 2)
+
+- El borrador suma:
+  - `paginas[]`: `id`, `slug` (la dirección `/p/{slug}`: minúsculas, números y guiones,
+    hasta 40, única), `titulo` (60), `en_menu`, `seo` y `secciones[]`. En las secciones
+    caben las del sistema (sin `inicio` ni `contacto`, una vez cada una) y bloques;
+  - `seo` (de Inicio) y el de cada página: `titulo` (70), `descripcion` (160) e
+    `imagen_url` (subida aquí);
+  - `pie`: `texto` (300).
+- `PUT /sitio` da 422 con una dirección inválida o repetida, una sección del sistema
+  repetida o de Inicio en una página, más páginas que `sitio.paginas_maximas` (8) o una
+  imagen ajena.
+- `catalogo` suma `paginas_maximas`, `movibles` (las secciones del sistema que caben en
+  una página), `max_direccion`, `max_titulo_pagina`, `max_seo_titulo`,
+  `max_seo_descripcion` y `max_pie`.
+- `POST /sitio/publicar` copia el SEO publicado al negocio (`seo_sitio`, control plane).
+  De ahí salen la cabecera de `/estudio/{slug}/p/{direccion}`
+  (`/api/v1/pagina-negocio/cabeza`) y su lugar en el sitemap.
+- `GET /escaparate` suma `seo`, `pie` y `paginas[]`, cada una con solo sus secciones
+  visibles que tienen contenido.
+

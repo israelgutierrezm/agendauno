@@ -44,51 +44,46 @@ class SitioWebController
         $foto = $this->reglaFoto($estudio);
         $bloquesMaximos = $parametros->entero('sitio.bloques_maximos');
         $enlace = $this->reglaEnlace();
+        $movibles = CatalogoSitioWeb::movibles($modalidad);
         $validado = $request->validate([
             'plantilla' => ['required', Rule::enum(PlantillaSitio::class)],
-            'secciones' => ['required', 'array', 'max:'.(count(CatalogoSitioWeb::tipos($modalidad)) + $bloquesMaximos)],
-            'secciones.*.tipo' => ['required', 'string', Rule::in([...CatalogoSitioWeb::tipos($modalidad), ...CatalogoSitioWeb::BLOQUES])],
-            'secciones.*.visible' => ['required', 'boolean'],
-            'secciones.*.titulo' => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO],
-            'secciones.*.texto' => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TEXTO],
-            'secciones.*.foto_url' => ['nullable', 'string', 'max:500', $foto],
-            // Los bloques propios (ADR 0146): su id, su estilo y lo de su tipo.
-            'secciones.*.id' => ['nullable', 'string', 'max:40'],
-            'secciones.*.estilo' => ['nullable', 'array'],
-            'secciones.*.estilo.fondo' => ['nullable', Rule::in(CatalogoSitioWeb::FONDOS)],
-            'secciones.*.estilo.alineacion' => ['nullable', Rule::in(CatalogoSitioWeb::ALINEACIONES)],
-            'secciones.*.datos' => ['nullable', 'array'],
-            'secciones.*.datos.lado' => ['nullable', Rule::in(['izquierda', 'derecha'])],
-            'secciones.*.datos.boton_texto' => ['nullable', 'string', 'max:40'],
-            'secciones.*.datos.boton_enlace' => ['nullable', 'string', 'max:300', $enlace],
-            'secciones.*.datos.fotos' => ['nullable', 'array', 'max:'.CatalogoSitioWeb::MAX_ELEMENTOS],
-            'secciones.*.datos.fotos.*.url' => ['required', 'string', 'max:500', $foto],
-            'secciones.*.datos.fotos.*.pie' => ['nullable', 'string', 'max:120'],
-            'secciones.*.datos.items' => ['nullable', 'array', 'max:'.CatalogoSitioWeb::MAX_PREGUNTAS],
-            'secciones.*.datos.items.*.pregunta' => ['nullable', 'string', 'max:200'],
-            'secciones.*.datos.items.*.respuesta' => ['nullable', 'string', 'max:1000'],
-            'secciones.*.datos.items.*.nombre' => ['nullable', 'string', 'max:80'],
-            'secciones.*.datos.items.*.titulo' => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO],
-            'secciones.*.datos.items.*.texto' => ['nullable', 'string', 'max:500'],
-            'secciones.*.datos.items.*.foto_url' => ['nullable', 'string', 'max:500', $foto],
-            'secciones.*.datos.url' => ['nullable', 'string', 'max:300'],
-            'secciones.*.datos.formulario_id' => ['nullable', 'string', 'max:40'],
+            // Inicio y, cada página propia, con las mismas reglas (ADR 0146).
+            ...$this->reglasSecciones('secciones', CatalogoSitioWeb::tipos($modalidad), $bloquesMaximos, $foto, $enlace),
+            'paginas' => ['nullable', 'array', 'max:'.$parametros->entero('sitio.paginas_maximas')],
+            'paginas.*.id' => ['nullable', 'string', 'max:40'],
+            'paginas.*.slug' => ['required', 'string', 'max:'.CatalogoSitioWeb::MAX_DIRECCION, 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'distinct'],
+            'paginas.*.titulo' => ['required', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO_PAGINA],
+            'paginas.*.en_menu' => ['nullable', 'boolean'],
+            ...$this->reglasSeo('paginas.*.seo', $foto),
+            ...$this->reglasSecciones('paginas.*.secciones', $movibles, $bloquesMaximos, $foto, $enlace, vacia: true),
+            ...$this->reglasSeo('seo', $foto),
+            'pie' => ['nullable', 'array'],
+            'pie.texto' => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_PIE],
             'banners' => ['present', 'array', 'max:'.$parametros->entero('sitio.banners_maximos')],
             'banners.*.id' => ['nullable', 'string', 'max:26'],
             'banners.*.titulo' => ['required', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO],
             'banners.*.texto' => ['nullable', 'string', 'max:240'],
             'banners.*.enlace_texto' => ['nullable', 'string', 'max:40'],
-            'banners.*.enlace_url' => ['nullable', 'string', 'max:300', $this->reglaEnlace()],
+            'banners.*.enlace_url' => ['nullable', 'string', 'max:300', $enlace],
             'banners.*.desde' => ['nullable', 'date_format:Y-m-d'],
             'banners.*.hasta' => ['nullable', 'date_format:Y-m-d'],
             'banners.*.foto_url' => ['nullable', 'string', 'max:500', $foto],
         ], [
             'banners.max' => 'Puedes tener hasta :max banners.',
+            'paginas.max' => 'Tu sitio puede tener hasta :max páginas, además de Inicio.',
+            'paginas.*.slug.regex' => 'La dirección lleva solo minúsculas, números y guiones (p. ej. «nosotros» o «preguntas-frecuentes»).',
+            'paginas.*.slug.distinct' => 'Ya tienes otra página con esa dirección.',
             'secciones.*.tipo.in' => 'Esa sección no existe en tu sitio.',
+            'paginas.*.secciones.*.tipo.in' => 'Esa sección no existe en tu sitio.',
             'secciones.*.datos.fotos.max' => 'Una galería lleva hasta :max fotos.',
+            'paginas.*.secciones.*.datos.fotos.max' => 'Una galería lleva hasta :max fotos.',
             'secciones.*.datos.items.max' => 'Caben hasta :max elementos.',
+            'paginas.*.secciones.*.datos.items.max' => 'Caben hasta :max elementos.',
         ]);
-        $this->validarSecciones((array) $validado['secciones'], $bloquesMaximos);
+        $this->validarSecciones((array) $validado['secciones'], $bloquesMaximos, 'secciones');
+        foreach ((array) ($validado['paginas'] ?? []) as $p => $pagina) {
+            $this->validarSecciones((array) ($pagina['secciones'] ?? []), $bloquesMaximos, "paginas.{$p}.secciones");
+        }
         /** @var list<array<string, mixed>> $banners */
         $banners = $validado['banners'];
         foreach ($banners as $i => $banner) {
@@ -108,7 +103,9 @@ class SitioWebController
     public function publicar(Request $request): JsonResponse
     {
         $estudio = $this->estudio($request);
-        $this->sitio->publicar($estudio->modalidad(), $this->usuarioId($request), (int) $estudio->getKey());
+        $publicacion = $this->sitio->publicar($estudio->modalidad(), $this->usuarioId($request), (int) $estudio->getKey());
+        // Lo que ven buscadores y redes de cada página, sin abrir la base del negocio.
+        $estudio->update(['seo_sitio' => $this->sitio->resumenSeo($this->sitio->normalizar((array) $publicacion->contenido, $estudio->modalidad()))]);
 
         return response()->json(['data' => $this->presentar($estudio)]);
     }
@@ -194,9 +191,72 @@ class SitioWebController
                 'alineaciones' => CatalogoSitioWeb::ALINEACIONES,
                 'max_elementos' => CatalogoSitioWeb::MAX_ELEMENTOS,
                 'max_preguntas' => CatalogoSitioWeb::MAX_PREGUNTAS,
+                // Páginas propias (ADR 0146, fase 2).
+                'paginas_maximas' => $parametros->entero('sitio.paginas_maximas'),
+                'movibles' => CatalogoSitioWeb::movibles($modalidad),
+                'max_direccion' => CatalogoSitioWeb::MAX_DIRECCION,
+                'max_titulo_pagina' => CatalogoSitioWeb::MAX_TITULO_PAGINA,
+                'max_seo_titulo' => CatalogoSitioWeb::MAX_SEO_TITULO,
+                'max_seo_descripcion' => CatalogoSitioWeb::MAX_SEO_DESCRIPCION,
+                'max_pie' => CatalogoSitioWeb::MAX_PIE,
                 'formularios' => FormularioCaptacionTenant::query()->where('activo', true)->orderBy('nombre')->get()
                     ->map(static fn (FormularioCaptacionTenant $f): array => ['id' => $f->ulid, 'nombre' => $f->nombre])->all(),
             ],
+        ];
+    }
+
+    /**
+     * Las reglas de una lista de secciones (la de Inicio o la de una página): sus tipos,
+     * sus textos y lo de cada bloque propio.
+     *
+     * @param  list<string>  $tipos  las secciones del sistema que caben
+     * @return array<string, mixed>
+     */
+    private function reglasSecciones(string $prefijo, array $tipos, int $bloquesMaximos, Closure $foto, Closure $enlace, bool $vacia = false): array
+    {
+        return [
+            $prefijo => [$vacia ? 'present' : 'required', 'array', 'max:'.(count($tipos) + $bloquesMaximos)],
+            "{$prefijo}.*.tipo" => ['required', 'string', Rule::in([...$tipos, ...CatalogoSitioWeb::BLOQUES])],
+            "{$prefijo}.*.visible" => ['required', 'boolean'],
+            "{$prefijo}.*.titulo" => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO],
+            "{$prefijo}.*.texto" => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TEXTO],
+            "{$prefijo}.*.foto_url" => ['nullable', 'string', 'max:500', $foto],
+            // Los bloques propios (ADR 0146): su id, su estilo y lo de su tipo.
+            "{$prefijo}.*.id" => ['nullable', 'string', 'max:40'],
+            "{$prefijo}.*.estilo" => ['nullable', 'array'],
+            "{$prefijo}.*.estilo.fondo" => ['nullable', Rule::in(CatalogoSitioWeb::FONDOS)],
+            "{$prefijo}.*.estilo.alineacion" => ['nullable', Rule::in(CatalogoSitioWeb::ALINEACIONES)],
+            "{$prefijo}.*.datos" => ['nullable', 'array'],
+            "{$prefijo}.*.datos.lado" => ['nullable', Rule::in(['izquierda', 'derecha'])],
+            "{$prefijo}.*.datos.boton_texto" => ['nullable', 'string', 'max:40'],
+            "{$prefijo}.*.datos.boton_enlace" => ['nullable', 'string', 'max:300', $enlace],
+            "{$prefijo}.*.datos.fotos" => ['nullable', 'array', 'max:'.CatalogoSitioWeb::MAX_ELEMENTOS],
+            "{$prefijo}.*.datos.fotos.*.url" => ['required', 'string', 'max:500', $foto],
+            "{$prefijo}.*.datos.fotos.*.pie" => ['nullable', 'string', 'max:120'],
+            "{$prefijo}.*.datos.items" => ['nullable', 'array', 'max:'.CatalogoSitioWeb::MAX_PREGUNTAS],
+            "{$prefijo}.*.datos.items.*.pregunta" => ['nullable', 'string', 'max:200'],
+            "{$prefijo}.*.datos.items.*.respuesta" => ['nullable', 'string', 'max:1000'],
+            "{$prefijo}.*.datos.items.*.nombre" => ['nullable', 'string', 'max:80'],
+            "{$prefijo}.*.datos.items.*.titulo" => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO],
+            "{$prefijo}.*.datos.items.*.texto" => ['nullable', 'string', 'max:500'],
+            "{$prefijo}.*.datos.items.*.foto_url" => ['nullable', 'string', 'max:500', $foto],
+            "{$prefijo}.*.datos.url" => ['nullable', 'string', 'max:300'],
+            "{$prefijo}.*.datos.formulario_id" => ['nullable', 'string', 'max:40'],
+        ];
+    }
+
+    /**
+     * Cómo aparece en buscadores y al compartirse (Inicio o una página).
+     *
+     * @return array<string, mixed>
+     */
+    private function reglasSeo(string $prefijo, Closure $foto): array
+    {
+        return [
+            $prefijo => ['nullable', 'array'],
+            "{$prefijo}.titulo" => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_SEO_TITULO],
+            "{$prefijo}.descripcion" => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_SEO_DESCRIPCION],
+            "{$prefijo}.imagen_url" => ['nullable', 'string', 'max:500', $foto],
         ];
     }
 
@@ -207,7 +267,7 @@ class SitioWebController
      *
      * @param  array<int, array<string, mixed>>  $secciones
      */
-    private function validarSecciones(array $secciones, int $bloquesMaximos): void
+    private function validarSecciones(array $secciones, int $bloquesMaximos, string $prefijo): void
     {
         $vistas = [];
         $bloques = 0;
@@ -215,26 +275,26 @@ class SitioWebController
             $tipo = (string) $s['tipo'];
             if (! CatalogoSitioWeb::esBloque($tipo)) {
                 if (isset($vistas[$tipo])) {
-                    throw ValidationException::withMessages(["secciones.{$i}.tipo" => 'Cada sección va una sola vez.']);
+                    throw ValidationException::withMessages(["{$prefijo}.{$i}.tipo" => 'Cada sección va una sola vez.']);
                 }
                 $vistas[$tipo] = true;
 
                 continue;
             }
             if (++$bloques > $bloquesMaximos) {
-                throw ValidationException::withMessages(['secciones' => "Tu sitio puede tener hasta {$bloquesMaximos} bloques propios."]);
+                throw ValidationException::withMessages([$prefijo => "Cada página puede tener hasta {$bloquesMaximos} bloques propios."]);
             }
             $datos = (array) ($s['datos'] ?? []);
             if (($datos['boton_enlace'] ?? null) !== null && trim((string) ($datos['boton_texto'] ?? '')) === '') {
-                throw ValidationException::withMessages(["secciones.{$i}.datos.boton_texto" => 'Escribe el texto del botón.']);
+                throw ValidationException::withMessages(["{$prefijo}.{$i}.datos.boton_texto" => 'Escribe el texto del botón.']);
             }
             if ($tipo === 'video' && trim((string) ($datos['url'] ?? '')) !== '' && VideoSitio::desdeUrl((string) $datos['url']) === null) {
-                throw ValidationException::withMessages(["secciones.{$i}.datos.url" => 'Pega el enlace de un video de YouTube o de Vimeo.']);
+                throw ValidationException::withMessages(["{$prefijo}.{$i}.datos.url" => 'Pega el enlace de un video de YouTube o de Vimeo.']);
             }
             $formulario = $datos['formulario_id'] ?? null;
             if ($tipo === 'formulario' && $formulario !== null
                 && ! FormularioCaptacionTenant::query()->where('ulid', (string) $formulario)->exists()) {
-                throw ValidationException::withMessages(["secciones.{$i}.datos.formulario_id" => 'Ese formulario ya no existe.']);
+                throw ValidationException::withMessages(["{$prefijo}.{$i}.datos.formulario_id" => 'Ese formulario ya no existe.']);
             }
         }
     }

@@ -128,6 +128,16 @@ describe("los negocios viven en su subdominio", () => {
           host,
         ),
       ).toBe(`https://foo.${DOMINIO_PUBLICO}/estudio/foo?x=1#precios`);
+      // Una página propia de su sitio (ADR 0146), con su dirección.
+      expect(
+        urlEnSubdominioDelNegocio(
+          {
+            ...ruta("estudio-pagina", "foo", "/estudio/foo/p/nosotros?x=1"),
+            params: { slug: "foo", pagina: "nosotros" },
+          },
+          host,
+        ),
+      ).toBe(`https://foo.${DOMINIO_PUBLICO}/estudio/foo/p/nosotros?x=1`);
       // Con el resto de la ruta: sus enlaces viven en /enlaces del subdominio.
       expect(
         urlEnSubdominioDelNegocio(

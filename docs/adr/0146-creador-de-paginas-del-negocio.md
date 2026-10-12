@@ -24,9 +24,9 @@ El dueño eligió:
 
 Se hace en tres fases, cada una en su bloque con su PR:
 
-1. **Bloques propios en la página** (este bloque, 45).
-2. **Varias páginas**: Inicio y páginas propias con su dirección, su menú, su pie de
-   página y su SEO (título, descripción e imagen para compartir).
+1. **Bloques propios en la página** (bloque 45).
+2. **Varias páginas** (bloque 46): Inicio y páginas propias con su dirección, su menú,
+   su pie de página y su SEO (título, descripción e imagen para compartir).
 3. **Estilo global y editor visual**: colores, tipografía de una lista, esquinas,
    encabezado y botón principal; vista previa en vivo con clic en un bloque para
    editarlo; volver a una versión publicada.
@@ -90,10 +90,48 @@ Se hace en tres fases, cada una en su bloque con su PR:
 - `sitio.bloques_maximos`: 20 por omisión, de 1 a 60.
 - `sitio.imagenes_maximas` sube de 30 a 40 por las galerías.
 
+### Fase 2: varias páginas (bloque 46)
+
+**Páginas propias.**
+
+- Además de Inicio, hasta `sitio.paginas_maximas` páginas (8 por omisión).
+- Cada una lleva:
+  - su título;
+  - su dirección (`/estudio/{slug}/p/{direccion}`, también en el subdominio): sale del
+    título, va en minúsculas con guiones y no se repite;
+  - si va en el menú;
+  - su SEO;
+  - sus secciones: las del sistema, una vez por página (precios, horarios, equipo…), y
+    bloques propios. La portada y el contacto son solo de Inicio.
+- `sitio.bloques_maximos` cuenta por página.
+- Una página fuera del menú existe y se enlaza, pero no aparece en el menú.
+
+**Menú y pie.**
+
+- Si hay alguna página en el menú, el sitio muestra arriba Inicio y esas páginas.
+- El pie va en todas: el nombre, un texto propio (`pie.texto`), el menú y el aviso de
+  privacidad.
+- Un botón de un bloque o de un banner con `/p/{direccion}` lleva a esa página (en la
+  vista previa, a su vista previa).
+
+**SEO por página.**
+
+- Inicio y cada página tienen título (70), descripción (160) y una imagen para compartir
+  (subida aquí). Vacíos: los de siempre, o el título de la página con el nombre del
+  negocio.
+- La web lo pone al navegar. La cabecera del servidor para buscadores y redes (ADR 0128)
+  no abre la base del negocio: al publicar se copia el resumen a `estudios.seo_sitio`
+  (control plane). De ahí salen la cabecera de cada página y su lugar en el sitemap.
+
+**Vista previa.** `/estudio/{slug}/vista-previa?pagina={direccion}`: la regla de marcos
+de nginx ya admite la query.
+
 ## Consecuencias
 
-- Sin migraciones: la configuración del sitio ya era JSON. Un sitio guardado o publicado
-  antes sigue igual: no tiene bloques.
+- Fase 1 sin migraciones: la configuración del sitio ya era JSON. Un sitio guardado o
+  publicado antes sigue igual: no tiene bloques ni páginas.
+- Fase 2: una migración del control plane (`estudios.seo_sitio`). Hasta volver a
+  publicar, un sitio ya publicado usa su SEO de siempre.
 - Un negocio arma una página con contenido propio sin perder lo que sale del sistema.
-- Fases 2 y 3: varias páginas, estilo global, editor visual y volver a una versión
-  publicada (pendientes del ADR 0114).
+- Fase 3, pendiente: estilo global, editor visual y volver a una versión publicada
+  (pendientes del ADR 0114).
