@@ -31,6 +31,33 @@ final class CatalogoSitioWeb
     public const MAX_TEXTO = 2000;
 
     /**
+     * Bloques propios del negocio (ADR 0146): se agregan las veces que quiera, entre la
+     * portada y el contacto, con su contenido y su estilo. No hay HTML ni código: cada
+     * bloque tiene campos fijos.
+     */
+    public const BLOQUES = ['texto_imagen', 'galeria', 'preguntas', 'testimonios', 'llamado', 'video', 'beneficios', 'formulario'];
+
+    /** Los bloques que llevan un texto y los que llevan una foto propia. */
+    public const BLOQUES_CON_TEXTO = ['texto_imagen', 'llamado', 'video', 'formulario'];
+
+    public const BLOQUES_CON_FOTO = ['texto_imagen', 'video'];
+
+    /** Fondo y alineación de un bloque. */
+    public const FONDOS = ['normal', 'suave', 'marca', 'oscuro'];
+
+    public const ALINEACIONES = ['izquierda', 'centro'];
+
+    /** Cuántas fotos, testimonios o beneficios caben en un bloque; cuántas preguntas. */
+    public const MAX_ELEMENTOS = 12;
+
+    public const MAX_PREGUNTAS = 20;
+
+    public static function esBloque(string $tipo): bool
+    {
+        return in_array($tipo, self::BLOQUES, true);
+    }
+
+    /**
      * Las secciones que se mueven en un negocio de esta modalidad (ADR 0104): un
      * negocio de citas no tiene horario de clases.
      *

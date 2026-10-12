@@ -4,17 +4,24 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import CargadorImagen from "@/components/CargadorImagen.vue";
+import EditorBloqueSitio from "@/components/EditorBloqueSitio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { claveSegunModalidad } from "@/lib/menu";
 import {
+  claveSeccion,
+  duplicarBloque,
+  esBloque,
   esFija,
   moverSeccion,
+  nuevoBloque,
   type BannerSitio,
   type PlantillaSitio,
   type SeccionSitio,
+  type TipoBloque,
   type TipoSeccion,
 } from "@/lib/sitioWeb";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -24,6 +31,10 @@ import { useToastStore } from "@/stores/toast";
  * El constructor del sitio del negocio (ADR 0114): elegir plantilla, ordenar, mostrar u
  * ocultar secciones, sus títulos y textos, la foto de «Nosotros», los banners, la vista
  * previa y publicar. Lo que se guarda es un borrador: el público ve lo publicado.
+ *
+ * Bloques propios (ADR 0146): «Agregar bloque» pone uno nuevo antes del contacto (texto
+ * con imagen, galería, preguntas, testimonios, llamado, video, beneficios o formulario);
+ * se duplican, se quitan, se mueven y se editan con su estilo.
  */
 interface Borrador {
   plantilla: PlantillaSitio;
@@ -43,6 +54,14 @@ interface DatosSitio {
     max_titulo: number;
     max_texto: number;
     banners_maximos: number;
+    // Bloques propios (ADR 0146).
+    bloques: TipoBloque[];
+    bloques_maximos: number;
+    fondos: string[];
+    alineaciones: string[];
+    max_elementos: number;
+    max_preguntas: number;
+    formularios: { id: string; nombre: string }[];
   };
 }
 
@@ -58,7 +77,8 @@ const cargando = ref(true);
 const ocupado = ref(false);
 const error = ref<string | null>(null);
 const errores = ref<Record<string, string[]>>({});
-const abierta = ref<TipoSeccion | null>(null);
+// La que se edita: su tipo o, si es un bloque propio, su id.
+const abierta = ref<string | null>(null);
 
 // Vista previa: en un marco con el ancho de un teléfono o de una computadora.
 const anchoPrevia = ref<"telefono" | "computadora">("telefono");
@@ -88,8 +108,17 @@ const portadaSubida = computed(() => datos.value?.tiene_portada ?? false);
 function tm(clave: string): string {
   return t(claveSegunModalidad(clave, sesion.esCitas, te));
 }
-function nombreSeccion(tipo: TipoSeccion): string {
-  return tm(`sitioWeb.secciones.nombres.${tipo}`);
+function nombreSeccion(tipo: TipoSeccion | TipoBloque): string {
+  return esBloque(tipo)
+    ? t(`sitioWeb.bloques.nombres.${tipo}`)
+    : tm(`sitioWeb.secciones.nombres.${tipo}`);
+}
+// Debajo del nombre: qué muestra (una sección del sistema) o su título (un bloque).
+function detalleSeccion(s: SeccionSitio): string {
+  if (esBloque(s.tipo)) {
+    return s.titulo ?? t("sitioWeb.bloques.propio");
+  }
+  return tm(`sitioWeb.secciones.contenido.${s.tipo}`);
 }
 function fecha(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", {
@@ -215,13 +244,72 @@ async function usarPlantilla(clave: PlantillaSitio): Promise<void> {
   ) {
     return;
   }
-  // Su orden; cada sección conserva su título, texto, foto y visibilidad.
-  const porTipo = new Map(actual.secciones.map((s) => [s.tipo, s]));
-  const orden: TipoSeccion[] = ["inicio", ...plantilla.orden, "contacto"];
+  // Su orden; cada sección conserva su título, texto, foto y visibilidad. Los bloques
+  // propios se quedan, en su orden, antes del contacto.
+  const porTipo = new Map(
+    actual.secciones.filter((s) => !esBloque(s.tipo)).map((s) => [s.tipo, s]),
+  );
+  const bloques = actual.secciones.filter((s) => esBloque(s.tipo));
   actual.plantilla = clave;
-  actual.secciones = orden
-    .map((tipo) => porTipo.get(tipo))
-    .filter((s): s is Borrador["secciones"][number] => s !== undefined);
+  actual.secciones = [
+    ...(["inicio", ...plantilla.orden] as TipoSeccion[])
+      .map((tipo) => porTipo.get(tipo))
+      .filter((s): s is Borrador["secciones"][number] => s !== undefined),
+    ...bloques,
+    ...[porTipo.get("contacto")].filter(
+      (s): s is Borrador["secciones"][number] => s !== undefined,
+    ),
+  ];
+}
+
+// ---- Bloques propios (ADR 0146) ----
+const eligiendoBloque = ref(false);
+const cuantosBloques = computed(
+  () => borrador.value?.secciones.filter((s) => esBloque(s.tipo)).length ?? 0,
+);
+const caben = computed(
+  () => cuantosBloques.value < (datos.value?.catalogo.bloques_maximos ?? 0),
+);
+// Antes del contacto, ya abierto para editarlo.
+function agregarBloque(tipo: TipoBloque): void {
+  const lista = borrador.value?.secciones;
+  if (!lista || !caben.value) {
+    return;
+  }
+  const bloque = nuevoBloque(tipo);
+  const contacto = lista.findIndex((s) => s.tipo === "contacto");
+  lista.splice(contacto < 0 ? lista.length : contacto, 0, bloque);
+  abierta.value = bloque.id;
+  eligiendoBloque.value = false;
+}
+// La copia queda justo después del original.
+function duplicar(indice: number): void {
+  const lista = borrador.value?.secciones;
+  const original = lista?.[indice];
+  if (!lista || !original || !caben.value) {
+    return;
+  }
+  const copia = duplicarBloque(original);
+  lista.splice(indice + 1, 0, copia);
+  abierta.value = copia.id ?? null;
+}
+async function quitarBloque(indice: number): Promise<void> {
+  const lista = borrador.value?.secciones;
+  const bloque = lista?.[indice];
+  if (!lista || !bloque) {
+    return;
+  }
+  if (
+    !(await confirmar(
+      t("sitioWeb.bloques.confirmarQuitar", {
+        bloque: bloque.titulo ?? nombreSeccion(bloque.tipo),
+      }),
+      { aceptar: t("sitioWeb.bloques.quitar"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  lista.splice(indice, 1);
 }
 
 function mover(indice: number, paso: -1 | 1): void {
@@ -427,15 +515,19 @@ onMounted(cargar);
             <ol class="mt-4 space-y-2" data-prueba="secciones">
               <li
                 v-for="(s, i) in borrador.secciones"
-                :key="s.tipo"
+                :key="claveSeccion(s)"
                 class="sw-seccion"
-                :data-prueba="`seccion-${s.tipo}`"
+                :class="{ 'sw-seccion-propia': esBloque(s.tipo) }"
+                :data-prueba="`seccion-${claveSeccion(s)}`"
               >
-                <div class="flex items-center gap-2">
-                  <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="min-w-0 flex-1 basis-40">
                     <p class="font-medium">{{ nombreSeccion(s.tipo) }}</p>
-                    <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                      {{ tm(`sitioWeb.secciones.contenido.${s.tipo}`) }}
+                    <p
+                      class="truncate text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{ detalleSeccion(s) }}
                     </p>
                   </div>
                   <label
@@ -484,19 +576,58 @@ onMounted(cargar);
                   <button
                     type="button"
                     class="tu-btn tu-btn-fantasma shrink-0 text-sm"
-                    :aria-expanded="abierta === s.tipo"
-                    :data-prueba="`editar-${s.tipo}`"
-                    @click="abierta = abierta === s.tipo ? null : s.tipo"
+                    :aria-expanded="abierta === claveSeccion(s)"
+                    :data-prueba="`editar-${claveSeccion(s)}`"
+                    @click="
+                      abierta =
+                        abierta === claveSeccion(s) ? null : claveSeccion(s)
+                    "
                   >
                     {{
-                      abierta === s.tipo
+                      abierta === claveSeccion(s)
                         ? $t("sitioWeb.secciones.cerrar")
                         : $t("sitioWeb.secciones.editar")
                     }}
                   </button>
                 </div>
 
-                <div v-if="abierta === s.tipo" class="mt-4 space-y-4">
+                <!-- Un bloque propio: sus campos, duplicarlo o quitarlo -->
+                <div
+                  v-if="esBloque(s.tipo) && abierta === claveSeccion(s)"
+                  class="mt-4"
+                >
+                  <EditorBloqueSitio
+                    v-model="borrador.secciones[i]"
+                    :catalogo="datos.catalogo"
+                    :prefijo="`secciones.${i}`"
+                    :errores="errores"
+                  />
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-fantasma text-sm"
+                      :disabled="!caben"
+                      :data-prueba="`duplicar-${claveSeccion(s)}`"
+                      @click="duplicar(i)"
+                    >
+                      {{ $t("sitioWeb.bloques.duplicar") }}
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-fantasma text-sm"
+                      style="color: var(--error)"
+                      :data-prueba="`quitar-${claveSeccion(s)}`"
+                      @click="quitarBloque(i)"
+                    >
+                      {{ $t("sitioWeb.bloques.quitar") }}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-else-if="abierta === claveSeccion(s)"
+                  class="mt-4 space-y-4"
+                >
                   <div>
                     <label class="tu-label" :for="`sw-titulo-${s.tipo}`">{{
                       s.tipo === "inicio"
@@ -527,7 +658,7 @@ onMounted(cargar);
                       }}
                     </p>
                   </div>
-                  <div v-if="datos.catalogo.con_texto.includes(s.tipo)">
+                  <div v-if="datos.catalogo.con_texto.includes(s.tipo as TipoSeccion)">
                     <label class="tu-label" :for="`sw-texto-${s.tipo}`">{{
                       s.tipo === "inicio"
                         ? $t("sitioWeb.secciones.campos.textoInicio")
@@ -549,7 +680,7 @@ onMounted(cargar);
                       {{ $t("sitioWeb.secciones.campos.textoInicioAyuda") }}
                     </p>
                   </div>
-                  <div v-if="datos.catalogo.con_foto.includes(s.tipo)">
+                  <div v-if="datos.catalogo.con_foto.includes(s.tipo as TipoSeccion)">
                     <span class="tu-label">{{
                       $t("sitioWeb.secciones.campos.foto")
                     }}</span>
@@ -580,7 +711,67 @@ onMounted(cargar);
                 </div>
               </li>
             </ol>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                class="tu-btn tu-btn-primario"
+                :disabled="!caben"
+                data-prueba="agregar-bloque"
+                @click="eligiendoBloque = true"
+              >
+                {{ $t("sitioWeb.bloques.agregar") }}
+              </button>
+              <p
+                v-if="!caben"
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{
+                  $t("sitioWeb.bloques.tope", {
+                    n: datos.catalogo.bloques_maximos,
+                  })
+                }}
+              </p>
+            </div>
+            <p
+              v-if="errorDe('secciones')"
+              class="mt-2 text-sm"
+              style="color: var(--error)"
+            >
+              {{ errorDe("secciones") }}
+            </p>
           </div>
+
+          <!-- Qué bloque agregar -->
+          <ModalDialogo
+            :abierto="eligiendoBloque"
+            :titulo="$t('sitioWeb.bloques.elegir')"
+            tam="lg"
+            @cerrar="eligiendoBloque = false"
+          >
+            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("sitioWeb.bloques.elegirAyuda") }}
+            </p>
+            <ul class="sw-catalogo mt-4" data-prueba="catalogo-bloques">
+              <li v-for="tipo in datos.catalogo.bloques" :key="tipo">
+                <button
+                  type="button"
+                  class="sw-opcion-bloque"
+                  :data-prueba="`nuevo-${tipo}`"
+                  @click="agregarBloque(tipo)"
+                >
+                  <span class="font-medium">{{
+                    $t(`sitioWeb.bloques.nombres.${tipo}`)
+                  }}</span>
+                  <span
+                    class="mt-1 block text-sm"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ $t(`sitioWeb.bloques.descripciones.${tipo}`) }}</span
+                  >
+                </button>
+              </li>
+            </ul>
+          </ModalDialogo>
 
           <!-- Banners -->
           <div class="tu-card p-5" data-prueba="banners">
@@ -893,6 +1084,29 @@ onMounted(cargar);
   padding: 0.75rem;
   border: 1px solid var(--borde);
   border-radius: 0.75rem;
+}
+/* Un bloque propio se distingue de las secciones del sistema por su borde. */
+.sw-seccion-propia {
+  border-left: 3px solid var(--primario);
+}
+.sw-catalogo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: 0.75rem;
+}
+.sw-opcion-bloque {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+  background: var(--superficie);
+  text-align: left;
+}
+.sw-opcion-bloque:hover,
+.sw-opcion-bloque:focus-visible {
+  border-color: var(--primario);
 }
 .sw-marco {
   border: 1px solid var(--borde);

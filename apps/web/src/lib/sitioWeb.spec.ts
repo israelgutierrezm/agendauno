@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   colorDeContraste,
+  duplicarBloque,
+  esBloque,
+  esEnlaceDeVideo,
   moverSeccion,
+  nuevoBloque,
   sitioPorDefecto,
+  urlReproductor,
   type TipoSeccion,
 } from "./sitioWeb";
 
@@ -46,5 +51,42 @@ describe("sitio del negocio", () => {
     expect(colorDeContraste("#031b4e")).toBe("#ffffff");
     expect(colorDeContraste("#f5d76e")).toBe("#111111");
     expect(colorDeContraste("no-es-color")).toBe("#ffffff");
+  });
+});
+
+describe("bloques propios (ADR 0146)", () => {
+  it("un bloque nuevo es visible, con el estilo de siempre y un id que la API conserva", () => {
+    const b = nuevoBloque("preguntas");
+    expect(b).toMatchObject({
+      tipo: "preguntas",
+      visible: true,
+      estilo: { fondo: "normal", alineacion: "izquierda" },
+      datos: { items: [{ pregunta: null, respuesta: null }] },
+    });
+    expect(b.id).toMatch(/^[a-z0-9]{20}$/);
+    expect(esBloque("preguntas")).toBe(true);
+    expect(esBloque("equipo")).toBe(false);
+  });
+
+  it("duplicar da otro id y no comparte lo de adentro", () => {
+    const original = nuevoBloque("galeria");
+    original.datos!.fotos!.push({ url: "/storage/a.jpg", pie: null });
+    const copia = duplicarBloque(original);
+    expect(copia.id).not.toBe(original.id);
+    copia.datos!.fotos!.push({ url: "/storage/b.jpg", pie: null });
+    expect(original.datos!.fotos).toHaveLength(1);
+  });
+
+  it("el reproductor sale de su proveedor y su id: YouTube sin cookies o Vimeo sin rastreo", () => {
+    expect(urlReproductor("youtube", "dQw4w9WgXcQ")).toBe(
+      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0",
+    );
+    expect(urlReproductor("vimeo", "76979871")).toBe(
+      "https://player.vimeo.com/video/76979871?autoplay=1&dnt=1",
+    );
+    expect(urlReproductor("youtube", 'x"><script>')).toBeNull();
+    expect(urlReproductor("otro", "dQw4w9WgXcQ")).toBeNull();
+    expect(esEnlaceDeVideo("https://youtu.be/dQw4w9WgXcQ")).toBe(true);
+    expect(esEnlaceDeVideo("https://evil.com/video.mp4")).toBe(false);
   });
 });

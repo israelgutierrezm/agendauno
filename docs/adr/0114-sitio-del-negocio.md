@@ -69,3 +69,5 @@ saliendo del sistema, nunca copiarse al sitio.
 - Volver a una versión publicada anterior desde el editor.
 - Más plantillas y secciones (galería, preguntas frecuentes, testimonios propios).
 - Un editor libre (bloques arbitrarios) queda fuera a propósito.
+  El ADR 0146 cambió esto: bloques prediseñados que se repiten y, después, varias
+  páginas (sigue sin haber un editor de posición libre).
