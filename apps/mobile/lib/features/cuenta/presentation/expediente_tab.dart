@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import 'cuenta_widgets.dart';
+import 'formularios_cuenta.dart';
 import 'mis_documentos_screen.dart';
 
-/// Expediente del portal: lo que el negocio le pide firmar y sus documentos.
+/// Expediente del portal: lo que el negocio le pide firmar, sus fichas de datos
+/// (formularios) y sus documentos.
 class ExpedienteTab extends ConsumerWidget {
   const ExpedienteTab({super.key, required this.cuenta});
 
@@ -14,7 +16,10 @@ class ExpedienteTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => RefreshIndicator(
-    onRefresh: () => ref.refresh(cuentaProvider.future),
+    onRefresh: () {
+      ref.invalidate(formulariosCuentaProvider);
+      return ref.refresh(cuentaProvider.future);
+    },
     child: ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
       children: [
@@ -23,6 +28,8 @@ class ExpedienteTab extends ConsumerWidget {
           const TextoVacio('No tienes nada por firmar.')
         else
           for (final c in cuenta.consentimientos) ConsentimientoCard(c),
+        // Lo que el negocio le pide llenar (como en la web); sin nada, no aparece.
+        const FormulariosSeccion(),
         const TituloSeccion('Documentos'),
         Card(
           child: ListTile(

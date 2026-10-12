@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -222,36 +223,121 @@ Future<bool> confirmarCancelacion(
   return true;
 }
 
-/// Abre la página de pago de la pasarela en el navegador; al volver a la app la
-/// cuenta se actualiza (el webhook confirma el pago).
+/// Paga en línea una orden, como en la web: con tarjeta abre la página de la
+/// pasarela en el navegador (al volver, la cuenta se actualiza: el webhook confirma
+/// el pago); en OXXO muestra la ficha con su referencia; si no, el pago queda en
+/// proceso. Con [domiciliar], la tarjeta queda para el pago automático.
 Future<void> pagarEnLinea(
   BuildContext context,
   WidgetRef ref,
-  String ordenId,
-) async {
+  String ordenId, {
+  String metodo = 'tarjeta',
+  bool domiciliar = false,
+}) async {
   final repo = ref.read(cuentaRepositoryProvider);
   if (repo == null) {
     return;
   }
   final messenger = ScaffoldMessenger.of(context);
   await hacerConAviso(context, () async {
-    final url = await repo.pagarOrden(ordenId);
-    if (url == null) {
-      await ref.read(cuentaProvider.notifier).recargar();
-      return;
-    }
-    final abierto = await launchUrl(
-      Uri.parse(url),
-      mode: LaunchMode.externalApplication,
+    final checkout = await repo.pagarOrden(
+      ordenId,
+      metodo: metodo,
+      domiciliar: domiciliar,
     );
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          abierto
-              ? 'Completa el pago en el navegador; al volver actualizamos tu cuenta.'
-              : 'No se pudo abrir la página de pago.',
+    switch (checkout) {
+      case IrAPagarEnLinea(:final url):
+        final abierto = await launchUrl(
+          Uri.parse(url),
+          mode: LaunchMode.externalApplication,
+        );
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              abierto
+                  ? 'Completa el pago en el navegador; al volver actualizamos tu cuenta.'
+                  : 'No se pudo abrir la página de pago.',
+            ),
+          ),
+        );
+      case FichaDePago ficha:
+        await ref.read(cuentaProvider.notifier).recargar();
+        if (context.mounted) {
+          await mostrarFichaDePago(context, ficha);
+        }
+      case PagoPorConfirmar():
+        await ref.read(cuentaProvider.notifier).recargar();
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Tu pago está en proceso. Se confirmará en cuanto la pasarela lo '
+              'apruebe.',
+            ),
+          ),
+        );
+    }
+  });
+}
+
+/// La ficha para pagar en tienda: la referencia (se puede copiar), el código de
+/// barras y el recibo para imprimir. La compra se confirma sola al pagar.
+Future<void> mostrarFichaDePago(BuildContext context, FichaDePago ficha) =>
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (contexto) => SafeArea(
+        child: Padding(
+          key: const Key('ficha-de-pago'),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Paga en tienda',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              SelectableText('Referencia: ${ficha.referencia}'),
+              if (ficha.codigoBarras != null) ...[
+                const SizedBox(height: 8),
+                Image.network(
+                  ficha.codigoBarras!,
+                  height: 56,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ],
+              const SizedBox(height: 8),
+              const Text(
+                'Presenta la referencia en la caja. Tu compra se confirma sola '
+                'cuando la tienda reporta el pago.',
+                style: TextStyle(color: TemaAgendaUno.textoSuave),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.copy, size: 18),
+                    label: const Text('Copiar referencia'),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: ficha.referencia));
+                      ScaffoldMessenger.of(contexto).showSnackBar(
+                        const SnackBar(content: Text('Referencia copiada.')),
+                      );
+                    },
+                  ),
+                  if (ficha.recibo != null)
+                    TextButton(
+                      onPressed: () => launchUrl(
+                        Uri.parse(ficha.recibo!),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      child: const Text('Ver recibo para imprimir'),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
-  });
-}

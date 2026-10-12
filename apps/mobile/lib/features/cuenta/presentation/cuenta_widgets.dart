@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/calendario/agregar_calendario.dart';
 import '../../../core/formato.dart';
 import '../../../core/network/mensaje_error.dart';
+import '../../../core/network/participante_en_uso.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
@@ -213,32 +214,120 @@ class ConsentimientoCard extends ConsumerWidget {
 
 /// Una orden pendiente: se paga aquí si el negocio cobra en línea; si no, en
 /// recepción.
-class PorPagarTile extends ConsumerWidget {
-  const PorPagarTile(this.o, {super.key, this.pagoEnLinea = false});
+class PorPagarTile extends ConsumerStatefulWidget {
+  const PorPagarTile(
+    this.o, {
+    super.key,
+    this.pagoEnLinea = false,
+    this.pagoAutomatico = false,
+  });
 
   final OrdenPorPagar o;
   final bool pagoEnLinea;
 
+  /// ¿Se puede dejar el pago automático al pagar? (si se renueva; como en la web).
+  final bool pagoAutomatico;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
-    child: ListTile(
-      title: Text(o.concepto),
-      subtitle: Text(
-        [
-          if (o.detalle != null && o.detalle!.isNotEmpty) o.detalle!,
-          pagoEnLinea
-              ? Formato.dinero(o.totalMinor, o.moneda)
-              : '${Formato.dinero(o.totalMinor, o.moneda)} · Págalo en recepción',
-        ].join('\n'),
+  ConsumerState<PorPagarTile> createState() => _PorPagarTileState();
+}
+
+class _PorPagarTileState extends ConsumerState<PorPagarTile> {
+  var _domiciliar = false;
+  var _pagando = false;
+
+  Future<void> _pagar(String metodo) async {
+    setState(() => _pagando = true);
+    await pagarEnLinea(
+      context,
+      ref,
+      widget.o.id,
+      metodo: metodo,
+      domiciliar: _domiciliar,
+    );
+    if (mounted) {
+      setState(() => _pagando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = widget.o;
+    final pagoEnLinea = widget.pagoEnLinea;
+    // Por una persona a su cargo, el pago automático va a la tarjeta del
+    // responsable (ADR 0129).
+    final aCargo = ref.watch(participanteEnUsoProvider) != null;
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            title: Text(o.concepto),
+            subtitle: Text(
+              [
+                if (o.detalle != null && o.detalle!.isNotEmpty) o.detalle!,
+                pagoEnLinea
+                    ? Formato.dinero(o.totalMinor, o.moneda)
+                    : '${Formato.dinero(o.totalMinor, o.moneda)} · Págalo en recepción',
+              ].join('\n'),
+            ),
+            trailing: pagoEnLinea
+                ? FilledButton(
+                    onPressed: _pagando ? null : () => _pagar('tarjeta'),
+                    child: Text(_pagando ? 'Abriendo…' : 'Pagar'),
+                  )
+                : null,
+          ),
+          // Ya inició un pago que espera confirmación: para no pagar dos veces.
+          if (o.avisoEnProceso != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                o.avisoEnProceso!,
+                key: const Key('pago-en-proceso'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: TemaAgendaUno.textoSuave,
+                ),
+              ),
+            ),
+          if (pagoEnLinea)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  TextButton(
+                    onPressed: _pagando ? null : () => _pagar('oxxo'),
+                    child: const Text('o paga en efectivo en OXXO'),
+                  ),
+                  if (widget.pagoAutomatico && o.recurrente)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(
+                          value: _domiciliar,
+                          onChanged: _pagando
+                              ? null
+                              : (v) => setState(() => _domiciliar = v ?? false),
+                        ),
+                        Flexible(
+                          child: Text(
+                            aCargo
+                                ? 'Cobrar automáticamente cada renovación a tu tarjeta'
+                                : 'Cobrar automáticamente cada renovación',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
-      trailing: pagoEnLinea
-          ? FilledButton(
-              onPressed: () => pagarEnLinea(context, ref, o.id),
-              child: const Text('Pagar'),
-            )
-          : null,
-    ),
-  );
+    );
+  }
 }
 
 /// Detalle de una reserva suya: agregar a mi calendario, pagar, aceptar el lugar,

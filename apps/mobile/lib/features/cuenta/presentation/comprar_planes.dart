@@ -105,6 +105,8 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
                           p.creditosTexto,
                           p.vigenciaTexto,
                           p.venceTexto,
+                          // La inscripción que se suma, antes de comprar (B04).
+                          p.inscripcionTexto,
                           p.cobertura.texto,
                         ])
                           if (dato != null)
