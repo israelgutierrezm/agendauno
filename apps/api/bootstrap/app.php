@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Http\Middleware\FuncionDelPlan;
 use App\Modules\Tenancy\Http\Middleware\ModalidadRequerida;
 use App\Modules\Tenancy\Http\Middleware\ModuloRequerido;
 use App\Modules\Tenancy\Http\Middleware\PermisoTenant;
+use App\Modules\Tenancy\Http\Middleware\RegistrarBitacoraPlataforma;
 use App\Modules\Tenancy\Http\Middleware\ResolverEstudio;
 use App\Support\Http\ApiExceptionRenderer;
 use App\Support\ReporteDeErrores;
@@ -57,6 +58,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'alcance' => AlcanceLlaveApi::class,
             // Operador de plataforma (PlatformAdmin): token global.
             'plataforma.auth' => AutenticarPlataforma::class,
+            // Bitácora de lo que cambia cada operador (ADR 0132).
+            'plataforma.bitacora' => RegistrarBitacoraPlataforma::class,
             // Rutas exclusivas de clases o de citas (ADR 0104): modalidad:clases|citas.
             'modalidad' => ModalidadRequerida::class,
             // Funciones que dependen del nivel de un negocio de citas (ADR 0107): plan:lealtad.

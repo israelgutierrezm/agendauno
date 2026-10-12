@@ -9,6 +9,7 @@ use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoFacturacion;
+use App\Modules\Tenancy\Exceptions\CambioDeModoSinConfirmar;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
@@ -47,11 +48,14 @@ class PlataformaController
                 ->on('mediciones_uso.periodo', '=', 'u.periodo'))
             ->get(['mediciones_uso.estudio_id', 'mediciones_uso.cantidad', 'mediciones_uso.metrica'])
             ->keyBy('estudio_id');
-        $adeudo = CargoRenta::query()
+        // Por moneda: un negocio en México debe pesos y uno de fuera, dólares; no se
+        // suman entre sí (ADR 0132).
+        $adeudos = CargoRenta::query()
             ->where('estado', EstadoCargoRenta::Pendiente->value)
-            ->selectRaw('estudio_id, sum(monto_minor) as total')
-            ->groupBy('estudio_id')
-            ->pluck('total', 'estudio_id');
+            ->selectRaw('estudio_id, moneda, sum(monto_minor) as total')
+            ->groupBy('estudio_id', 'moneda')
+            ->get()
+            ->groupBy('estudio_id');
 
         return response()->json([
             'data' => $estudios->map(static fn (Estudio $e): array => [
@@ -59,7 +63,9 @@ class PlataformaController
                 'uso' => $uso->has($e->getKey())
                     ? ['cantidad' => (int) $uso[$e->getKey()]->cantidad, 'metrica' => $uso[$e->getKey()]->metrica]
                     : null,
-                'adeudo_minor' => (int) ($adeudo[$e->getKey()] ?? 0),
+                'adeudos' => ($adeudos[$e->getKey()] ?? collect())
+                    ->map(static fn (CargoRenta $c): array => ['moneda' => (string) $c->moneda, 'minor' => (int) $c->getAttribute('total')])
+                    ->values()->all(),
             ])->all(),
             'total' => $estudios->count(),
         ]);
@@ -172,6 +178,11 @@ class PlataformaController
             }
             if ($proveedor === 'stripe') {
                 $cambioDeModo = $this->validarLlavesStripe($config->llaves(), $nuevas);
+                // Quita las tarjetas guardadas de todos los negocios: solo con confirmación
+                // explícita (ADR 0132).
+                if ($cambioDeModo !== null && ! $request->boolean('confirmar_cambio_modo')) {
+                    throw new CambioDeModoSinConfirmar($cambioDeModo['de'], $cambioDeModo['a']);
+                }
             }
             $config->credenciales = array_merge($config->llaves(), $nuevas);
         }

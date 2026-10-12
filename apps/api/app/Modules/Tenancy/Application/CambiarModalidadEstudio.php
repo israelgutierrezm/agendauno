@@ -76,6 +76,12 @@ class CambiarModalidadEstudio
         }
 
         $cambios = ['modalidad' => $modalidad, 'perfil_negocio' => $perfil];
+        // Al dejar citas, su plan por niveles ya no aplica: no queda uno viejo a la vista
+        // (ADR 0132).
+        if ($otraModalidad && $modalidad === ModalidadServicio::Clases) {
+            $cambios = [...$cambios, 'plan_nivel' => null, 'plan_profesionales' => null, 'plan_periodicidad' => 'mensual',
+                'plan_cubierto_hasta' => null, 'plan_siguiente' => null];
+        }
         $propia = (array) ($estudio->terminologia ?? []);
         if ($otraModalidad && $propia !== []) {
             $cambios['terminologia'] = null;

@@ -8,6 +8,7 @@ use App\Modules\Platform\Acceso\AccesoPlataforma;
 use App\Modules\Platform\Acceso\AdministradorPlataforma;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -34,6 +35,9 @@ class AutenticarPlataforma
         $administrador = $this->acceso->autenticar($enviado);
         if ($administrador instanceof AdministradorPlataforma) {
             $request->attributes->set('administrador_plataforma', $administrador);
+            // Para marcar «esta sesión» en el equipo, y quién fue en cada línea del log.
+            $request->attributes->set('sesion_plataforma_huella', hash('sha256', $enviado));
+            Log::withContext(['operador' => $administrador->email]);
 
             return $next($request);
         }

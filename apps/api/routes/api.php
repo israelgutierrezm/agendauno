@@ -33,6 +33,7 @@ use App\Modules\Tenancy\Http\Controllers\DisponibilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\DocumentosController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
 use App\Modules\Tenancy\Http\Controllers\EmbudoPlataformaController;
+use App\Modules\Tenancy\Http\Controllers\EquipoPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\ErroresClienteController;
 use App\Modules\Tenancy\Http\Controllers\EscaparateController;
 use App\Modules\Tenancy\Http\Controllers\ExcepcionesHorarioTenantController;
@@ -203,9 +204,17 @@ Route::prefix('v1')->group(function (): void {
 
     // Administracion de plataforma (PlatformAdmin): sesión de operador, sin tenant. Ve
     // todos los estudios y gestiona credenciales globales (cuenta FacturAPI).
-    Route::prefix('plataforma')->middleware(['plataforma.auth', 'throttle:plataforma'])->name('api.v1.plataforma.')->group(function (): void {
+    // Cada cambio queda en la bitácora con su operador (ADR 0132).
+    Route::prefix('plataforma')->middleware(['plataforma.auth', 'plataforma.bitacora', 'throttle:plataforma'])->name('api.v1.plataforma.')->group(function (): void {
         Route::get('/yo', [AccesoPlataformaController::class, 'yo'])->name('yo');
         Route::post('/salir', [AccesoPlataformaController::class, 'salir'])->name('salir');
+        // Equipo del superadmin (ADR 0132): operadores, sus sesiones y la bitácora.
+        Route::get('/administradores', [EquipoPlataformaController::class, 'administradores'])->name('administradores');
+        Route::post('/administradores', [EquipoPlataformaController::class, 'crear'])->name('administradores.crear');
+        Route::put('/administradores/{administrador}', [EquipoPlataformaController::class, 'actualizar'])->name('administradores.actualizar');
+        Route::get('/sesiones', [EquipoPlataformaController::class, 'sesiones'])->name('sesiones');
+        Route::delete('/sesiones/{sesion}', [EquipoPlataformaController::class, 'cerrarSesion'])->name('sesiones.cerrar');
+        Route::get('/bitacora', [EquipoPlataformaController::class, 'bitacora'])->name('bitacora');
         Route::get('/estudios', [PlataformaController::class, 'estudios'])->name('estudios');
         Route::get('/estudios/{estudio}', [PlataformaEstudiosController::class, 'show'])->name('estudios.show');
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');

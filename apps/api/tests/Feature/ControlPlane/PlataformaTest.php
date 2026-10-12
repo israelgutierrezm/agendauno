@@ -180,7 +180,8 @@ it('la ficha de un estudio muestra su contacto, su uso y sus cargos; la lista, s
 
     test()->getJson('/api/v1/plataforma/estudios', conTokenPlataforma())
         ->assertOk()
-        ->assertJsonPath('data.0.adeudo_minor', $ficha['cargos'][0]['monto_minor']);
+        // Por moneda (ADR 0132).
+        ->assertJsonPath('data.0.adeudos', [['moneda' => $ficha['cargos'][0]['moneda'], 'minor' => $ficha['cargos'][0]['monto_minor']]]);
 });
 
 it('suspender corta el acceso al estudio y reactivar lo devuelve', function (): void {
@@ -234,8 +235,8 @@ it('los cobros resumen lo pendiente y filtran por estado; exigen token de plataf
 it('al pasar Stripe de prueba a producción exige el secreto del webhook nuevo y quita las tarjetas guardadas', function (): void {
     Config::set('agendauno.plataforma.token', 'token-plataforma');
     estudioConSesion('estudio-a', 'a@correo.mx');
-    $guardar = fn (array $credenciales) => test()->putJson('/api/v1/plataforma/pasarelas/stripe', [
-        'activa' => true, 'modo' => 'live', 'credenciales' => $credenciales,
+    $guardar = fn (array $credenciales, bool $confirmado = false) => test()->putJson('/api/v1/plataforma/pasarelas/stripe', [
+        'activa' => true, 'modo' => 'live', 'credenciales' => $credenciales, 'confirmar_cambio_modo' => $confirmado,
     ], conTokenPlataforma());
     $guardar(['secret_key' => 'sk_test_plataforma', 'webhook_secret' => 'whsec_prueba'])->assertOk();
     Estudio::query()->update([
@@ -250,8 +251,12 @@ it('al pasar Stripe de prueba a producción exige el secreto del webhook nuevo y
     expect(ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->sole()->llaves()['secret_key'])->toBe('sk_test_plataforma')
         ->and(Estudio::query()->sole()->stripe_cliente_id)->toBe('cus_prueba');
 
-    // Con su secreto: se guarda y los clientes y tarjetas de prueba se quitan.
-    $guardar(['secret_key' => 'sk_live_plataforma', 'webhook_secret' => 'whsec_produccion'])->assertOk();
+    // Con su secreto, falta confirmarlo (ADR 0132): quita las tarjetas de todos.
+    $guardar(['secret_key' => 'sk_live_plataforma', 'webhook_secret' => 'whsec_produccion'])
+        ->assertStatus(409)->assertJsonPath('code', 'GATEWAY_MODE_CHANGE_UNCONFIRMED');
+    expect(Estudio::query()->sole()->stripe_cliente_id)->toBe('cus_prueba');
+    // Confirmado: se guarda y los clientes y tarjetas de prueba se quitan.
+    $guardar(['secret_key' => 'sk_live_plataforma', 'webhook_secret' => 'whsec_produccion'], true)->assertOk();
     $estudio = Estudio::query()->sole();
     expect(ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->sole()->llaves()['webhook_secret'])->toBe('whsec_produccion')
         ->and($estudio->stripe_cliente_id)->toBeNull()

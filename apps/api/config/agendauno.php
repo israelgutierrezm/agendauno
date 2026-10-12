@@ -103,7 +103,7 @@ return [
     'plataforma' => [
         'token' => env('PLATFORM_ADMIN_TOKEN'),
         // ¿El token solo abre la API (scripts, pruebas)? En producción, no.
-        'token_directo' => (bool) env('PLATFORM_ADMIN_TOKEN_DIRECTO', env('APP_ENV', 'production') !== 'production'),
+        'token_directo' => (bool) env('PLATFORM_ADMIN_TOKEN_DIRECTO', in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)),
         // El código por correo: minutos que vale e intentos antes de pedir otro.
         'minutos_codigo' => (int) env('PLATFORM_CODIGO_MINUTOS', 10),
         'intentos_codigo' => (int) env('PLATFORM_CODIGO_INTENTOS', 5),

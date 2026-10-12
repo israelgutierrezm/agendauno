@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Acceso\AccesoPlataforma;
 use App\Modules\Platform\Acceso\AdministradorPlataforma;
+use App\Modules\Platform\Acceso\BitacoraPlataforma;
 use App\Modules\Tenancy\Exceptions\AccesoPlataformaInvalido;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,8 @@ class AccesoPlataformaController
             'correo' => $inicio['correo'],
             'expira_en' => $inicio['desafio']->expira_en->toIso8601String(),
             // Fuera de producción el correo va al registro: el código se muestra aquí.
-            'codigo' => app()->environment('production') ? null : $inicio['codigo'],
+            // Solo en local y en pruebas: un staging público no lo debe mostrar (ADR 0132).
+            'codigo' => app()->environment(['local', 'testing']) ? $inicio['codigo'] : null,
         ]]);
     }
 
@@ -51,6 +53,14 @@ class AccesoPlataformaController
         if ($sesion === null) {
             throw new AccesoPlataformaInvalido('El código no es válido o ya venció. Vuelve a entrar para recibir otro.');
         }
+        BitacoraPlataforma::query()->create([
+            'administrador_id' => $sesion['administrador']->getKey(),
+            'accion' => 'entrada',
+            'metodo' => $request->method(),
+            'ruta' => '/'.$request->path(),
+            'estado' => 200,
+            'ip' => $request->ip(),
+        ]);
 
         return response()->json(['data' => [
             'token' => $sesion['token'],

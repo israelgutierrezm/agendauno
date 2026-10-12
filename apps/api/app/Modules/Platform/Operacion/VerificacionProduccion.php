@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Platform\Operacion;
 
+use App\Modules\Platform\Acceso\AdministradorPlataforma;
 use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\ParametrosTenant;
@@ -123,10 +124,22 @@ class VerificacionProduccion
             $this->punto('Entorno', 'APP_KEY definida', (string) config('app.key') !== '', 'Genera una con php artisan key:generate --show.'),
             $this->punto('Entorno', 'APP_URL con https', str_starts_with($url, 'https://'), "Ahora: {$url}"),
             $this->punto('Entorno', 'Token de plataforma robusto', strlen($token) >= 32, 'PLATFORM_ADMIN_TOKEN de al menos 32 caracteres.'),
+            // ADR 0126/0132: en producción se entra solo con cuenta y código por correo.
+            $this->punto('Entorno', 'El token solo no abre el superadmin', ! (bool) config('agendauno.plataforma.token_directo'), 'Quita PLATFORM_ADMIN_TOKEN_DIRECTO=true: se entra con cuenta, token y código.'),
+            $this->punto('Entorno', 'Al menos un operador del superadmin', $this->hayOperador(), 'Da de alta uno: php artisan agendauno:admin-plataforma tu@correo.com --nombre="Tu nombre".'),
             // Cada alta crea una base completa y manda un correo: sin captcha, un bot llena
             // el servidor de bases y usa el remitente para spam.
             $this->punto('Entorno', 'reCAPTCHA en el registro', (string) config('agendauno.recaptcha.secret') !== '', 'Sin RECAPTCHA_SECRET el registro público no filtra bots: cada alta crea una base y manda un correo. Define RECAPTCHA_SECRET (API) y VITE_RECAPTCHA_SITE_KEY (web).'),
         ];
+    }
+
+    private function hayOperador(): bool
+    {
+        try {
+            return AdministradorPlataforma::query()->where('activo', true)->exists();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**

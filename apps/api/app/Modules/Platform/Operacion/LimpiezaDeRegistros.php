@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Platform\Operacion;
 
+use App\Modules\Platform\Acceso\DesafioPlataforma;
+use App\Modules\Platform\Acceso\SesionPlataforma;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -29,6 +31,8 @@ use Illuminate\Support\Carbon;
  *   vez.
  * - Las sesiones de cada negocio que no se usan en su plazo
  *   (`sesion.dias_inactividad`): ya no sirven para entrar.
+ * - Del superadmin (ADR 0132): los códigos por correo vencidos hace más de un día y
+ *   las sesiones vencidas o cerradas hace más de 30 días. La bitácora se queda.
  * Borra por lotes para no bloquear las tablas. No toca historial del negocio: los
  * mensajes, los pagos y la bitácora se quedan.
  */
@@ -42,7 +46,7 @@ class LimpiezaDeRegistros
     ) {}
 
     /**
-     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int, sesiones_vencidas: int}
+     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int, sesiones_vencidas: int, acceso_plataforma: int}
      */
     public function ejecutar(): array
     {
@@ -56,6 +60,10 @@ class LimpiezaDeRegistros
             'sesiones_vencidas' => 0,
             'errores' => $this->borrar(ErrorPlataforma::query()
                 ->where('ultima_en', '<', $this->limite($ahora, 'limpieza.dias_errores'))),
+            'acceso_plataforma' => $this->borrar(DesafioPlataforma::query()->where('expira_en', '<', $ahora->copy()->subDay()))
+                + $this->borrar(SesionPlataforma::query()->where(fn ($q) => $q
+                    ->where('expira_en', '<', $ahora->copy()->subDays(30))
+                    ->orWhere('cerrada_en', '<', $ahora->copy()->subDays(30)))),
         ];
 
         $limiteSesiones = $this->limite($ahora, 'limpieza.dias_sesiones_tarjeta');
