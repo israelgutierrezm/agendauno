@@ -237,8 +237,11 @@ caja, `exentar_inscripcion` + `motivo_exencion` (permiso `cuotas.exentar`). Las 
 orden traen `concepto` (null en un producto). `GET/PUT /cuotas`, `GET
 /miembros/{persona}/cuotas`, `POST /ordenes/{orden}/lineas/{linea}/exentar` y `GET/POST
 /acuerdos/{acuerdo}/baja` (simulación y baja: `efectiva_el`, `en_permanencia`,
-`permanencia_hasta`, `modo`, `meses_restantes`, `precio_base_minor`, `penalizacion_minor`,
-`adeudo_minor`; al dar de baja, `motivo`, `exentar_penalizacion`, `conservar_adeudo`).
+`permanencia_hasta`, `modo`, `meses_restantes`, `precio_base_minor`, `porcentaje`,
+`penalizacion_minor`, `adeudo_minor`; al dar de baja, `motivo`, `exentar_penalizacion`,
+`conservar_adeudo`). Con `baja_anticipada = meses_restantes`, el plan acepta
+`penalizacion_porcentaje` (1–100; vacío = 100), que se congela en cada membresía vendida
+(ADR 0137).
 
 Lugares numerados (ADR 0120): la vista previa trae `lugares` (`total`, `ocupados`; null si
 la clase no los numera), `POST /mi/reservas` acepta `lugar`, `GET
@@ -343,6 +346,21 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   apertura` y una concesión de créditos con origen `apertura`, sin orden ni pago, y
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
+
+## Permanencia, clase de prueba y continuidad del prospecto (ADR 0137)
+
+- Planes: `penalizacion_porcentaje` (arriba, en «Cuotas y permanencia»).
+- Clase de prueba: una orden con dos líneas de clase de prueba para la misma persona
+  responde 422 `FIRST_VISIT_ONLY`. Si una orden pagada trae una que ya no se puede
+  conceder (otra orden pagada a la vez ya se la dio), esa línea no se concede y el pago
+  queda en `GET /incidencias-cobro` con `tipo = primera_vez_repetida`.
+- `GET /mi/interes`: lo que pidió cuando era prospecto. Devuelve `data: {plan, clase}`
+  o `data: null`:
+  - `plan`: `id`, `nombre`, `precio_minor`, `moneda`;
+  - `clase`: `id`, `nombre`, `inicia_en`, `zona_horaria`.
+
+  Cada uno solo si sigue disponible y aún no lo tiene, y durante 30 días después de
+  convertirse. No aparta lugar.
 
 ## Pago automático seguro (ADR 0134)
 

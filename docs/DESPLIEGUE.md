@@ -278,6 +278,10 @@ Los pagos automáticos anteriores no tienen guardado el precio que se autorizó:
 con el precio del plan, y la conciliación avisa en «Por conciliar» si la pasarela
 cobra otro importe.
 
+**Al desplegar el ADR 0137 (permanencia por porcentaje, clase de prueba):** migración de
+negocio 000129; nada que correr a mano. Las membresías ya vendidas quedan al 100 %, como
+se aceptaron.
+
 ### Imágenes del CI y despliegue desde GitHub
 
 Con `REGISTRO=ghcr.io/<dueño>` en `web.env` (y `docker login ghcr.io` con un token de

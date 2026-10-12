@@ -26,10 +26,10 @@ real del establecimiento ni una integración con ReservaClase.
 | Cobro recurrente/domiciliado | Hay motor, pasarelas, conciliación y mora. Requiere configuración, consentimiento y pruebas de la pasarela; esta demo no lo activa. |
 | Open Training reservable solo con ilimitada | Configurable: lista explícita de clases permitidas para cada producto. Los paquetes excluyen las dos ofertas Open Training; la ilimitada las incluye. No dejar vacía la lista del paquete, porque vacío significa todas las clases. |
 | Open Training visible solo con ilimitada | Pendiente: `MiTenantController::agenda` devuelve todas las sesiones grupales del periodo. Bloquear la reserva no oculta su existencia. |
-| Permanencia mínima de 12 meses | Pendiente: el acuerdo no guarda plazo contractual mínimo ni un flujo de baja que lo aplique. Una vigencia de 12 meses no sustituye esa regla. |
-| Baja anticipada: 50% de mensualidades restantes | Pendiente: faltan cotización, base de cálculo congelada, orden de penalización, aprobación y cierre del contrato. No confundir cancelación de una clase con terminación de una membresía. |
-| Inscripción de primera alta | Pendiente como automatismo: registrar un cobro manual no equivale a exigirlo una sola vez antes de activar beneficios. |
-| Anualidad por aniversario | Pendiente como cargo automático separado e idempotente. No basta con renombrar un paquete como anualidad. |
+| Permanencia mínima de 12 meses | Disponible (ADR 0121): `permanencia_meses=12` en la membresía. Se compra aceptando sus condiciones, que quedan congeladas en el acuerdo con la fecha de fin de permanencia. La baja aplica al terminar el periodo pagado. |
+| Baja anticipada: 50% de mensualidades restantes | Disponible (ADR 0121 y 0136): `baja_anticipada=meses_restantes` con `penalizacion_porcentaje=50` (en Planes, «Porcentaje de lo que falte»). Antes de confirmar se ve el cálculo: meses que faltan × mensualidad × 50 %. La penalización queda por cobrar aparte, nunca se carga sola, y quien tiene permiso puede exentarla con motivo. El porcentaje se congela en cada membresía vendida: cambiar el plan después no cambia lo que aceptó. |
+| Inscripción de primera alta | Disponible (ADR 0121): cuota de inscripción configurable (Cuotas). Se cobra con la primera compra de un plan, una sola vez, y otra vez solo tras X meses sin plan. No da clases. |
+| Anualidad por aniversario | Disponible (ADR 0121): cuota de anualidad en el aniversario de la alta (o en una fecha fija), generada una sola vez por periodo y cobrable en caja o en línea. |
 
 ### Ajustes recomendados antes de operar exactamente como Grecon
 
@@ -49,6 +49,9 @@ real del establecimiento ni una integración con ReservaClase.
    Cada vencimiento debe poder generarse una sola vez y admitir pago en caja.
 5. Pruebas de cambio de mes, año bisiesto, alta a mitad de mes, mora, cancelación,
    reintegro de clases ya vencidas y reservas anticipadas para el siguiente mes.
+
+Los puntos 2, 3 y 4 ya están cubiertos (ADR 0121 y 0136; ver la tabla de arriba). Los
+puntos 1 y 5 siguen como recomendación.
 
 Las condiciones contractuales descritas son requisitos del usuario: esta revisión
 no valida su legalidad ni redacta el contrato del estudio.
