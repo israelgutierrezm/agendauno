@@ -135,11 +135,11 @@ class _OpcionModo extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
           decoration: BoxDecoration(
             color: activa
-                ? TemaAgendaUno.acentoSuave
-                : TemaAgendaUno.superficie,
+                ? context.colores.acentoSuave
+                : context.colores.superficie,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: activa ? TemaAgendaUno.acento : TemaAgendaUno.borde,
+              color: activa ? context.colores.acento : context.colores.borde,
               width: activa ? 2 : 1,
             ),
           ),
@@ -148,14 +148,14 @@ class _OpcionModo extends StatelessWidget {
               CircleAvatar(
                 radius: 22,
                 backgroundColor: activa
-                    ? TemaAgendaUno.acento.withValues(alpha: 0.12)
-                    : TemaAgendaUno.fondo,
+                    ? context.colores.acento.withValues(alpha: 0.12)
+                    : context.colores.fondo,
                 child: Icon(
                   icono,
                   size: 22,
                   color: activa
-                      ? TemaAgendaUno.acento
-                      : TemaAgendaUno.textoSuave,
+                      ? context.colores.acento
+                      : context.colores.textoSuave,
                 ),
               ),
               const SizedBox(width: 12),
@@ -170,9 +170,9 @@ class _OpcionModo extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       detalle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
-                        color: TemaAgendaUno.textoSuave,
+                        color: context.colores.textoSuave,
                       ),
                     ),
                   ],
@@ -201,9 +201,9 @@ class _CirculoOpcion extends StatelessWidget {
       height: 22,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: TemaAgendaUno.superficie,
+        color: context.colores.superficie,
         border: Border.all(
-          color: activa ? TemaAgendaUno.acento : TemaAgendaUno.textoSuave,
+          color: activa ? context.colores.acento : context.colores.textoSuave,
           width: activa ? 2 : 1.5,
         ),
       ),
@@ -212,9 +212,9 @@ class _CirculoOpcion extends StatelessWidget {
           ? Container(
               width: 11,
               height: 11,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: TemaAgendaUno.acento,
+                color: context.colores.acento,
               ),
             )
           : null,
@@ -250,11 +250,11 @@ class _TarjetaProfesional extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: activo
-                ? TemaAgendaUno.acentoSuave
-                : TemaAgendaUno.superficie,
+                ? context.colores.acentoSuave
+                : context.colores.superficie,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: activo ? TemaAgendaUno.acento : TemaAgendaUno.borde,
+              color: activo ? context.colores.acento : context.colores.borde,
               width: activo ? 2 : 1,
             ),
           ),
@@ -266,15 +266,15 @@ class _TarjetaProfesional extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 32,
-                    backgroundColor: TemaAgendaUno.acentoSuave,
+                    backgroundColor: context.colores.acentoSuave,
                     foregroundImage: foto != null ? NetworkImage(foto) : null,
                     onForegroundImageError: foto != null ? (_, _) {} : null,
                     child: Text(
                       profesional.nombre.trim().isEmpty
                           ? '?'
                           : profesional.nombre.trim()[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: TemaAgendaUno.acento,
+                      style: TextStyle(
+                        color: context.colores.acento,
                         fontWeight: FontWeight.w700,
                         fontSize: 20,
                       ),
@@ -285,9 +285,9 @@ class _TarjetaProfesional extends StatelessWidget {
                       right: -6,
                       bottom: -6,
                       child: Material(
-                        color: TemaAgendaUno.superficie,
-                        shape: const CircleBorder(
-                          side: BorderSide(color: TemaAgendaUno.borde),
+                        color: context.colores.superficie,
+                        shape: CircleBorder(
+                          side: BorderSide(color: context.colores.borde),
                         ),
                         child: IconButton(
                           tooltip:

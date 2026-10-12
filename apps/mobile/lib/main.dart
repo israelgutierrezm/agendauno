@@ -155,9 +155,11 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: _avisos,
       navigatorKey: _navegador,
-      // El mismo tema claro de la web (los tokens son los mismos en los dos
-      // productos).
+      // Un solo diseño, el del tema AgendaUno de la web (los temas a elegir son solo
+      // de la web), en claro y en oscuro: sigue el modo del teléfono.
       theme: TemaAgendaUno.claro(),
+      darkTheme: TemaAgendaUno.oscuro(),
+      themeMode: ThemeMode.system,
       // En español: los selectores de fecha y hora, sus botones y los textos del
       // sistema (sin esto salen en inglés).
       locale: AgendaUnoApp.idioma,

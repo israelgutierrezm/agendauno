@@ -71,6 +71,14 @@ Dentro de cada feature: `data/` (repositorios y servicios de API), `application/
 menor lógica posible). La app no reimplementa reglas del negocio: pide a la API y
 muestra el motivo cuando se niega (`code` del error).
 
+## Diseño: claro y oscuro (ADR 0147)
+
+La app tiene un solo diseño (los temas a elegir son solo de la web) y sigue el modo del
+teléfono: claro u oscuro. Los colores salen de `context.colores`
+(`ColoresAgendaUno`, en `core/theme/tema_agendauno.dart`), nunca escritos a mano; un
+color pensado para fondo claro (un estado, un servicio) pasa por `par()` o `tinta()`
+para que en oscuro se aclare.
+
 ## Clases o citas y el contrato de la agenda (ADR 0104)
 
 - **Modalidad:** cada negocio es solo de clases o solo de citas. La app la toma de la

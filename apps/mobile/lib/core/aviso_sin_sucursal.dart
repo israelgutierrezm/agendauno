@@ -8,7 +8,7 @@ class AvisoSinSucursal extends StatelessWidget {
   const AvisoSinSucursal({super.key});
 
   @override
-  Widget build(BuildContext context) => const Card(
+  Widget build(BuildContext context) => Card(
     key: Key('sin-sucursal'),
     child: Padding(
       padding: EdgeInsets.all(16),
@@ -19,7 +19,7 @@ class AvisoSinSucursal extends StatelessWidget {
             padding: EdgeInsets.only(top: 6),
             child: CircleAvatar(
               radius: 4,
-              backgroundColor: TemaAgendaUno.aviso,
+              backgroundColor: context.colores.aviso,
             ),
           ),
           SizedBox(width: 12),
@@ -35,7 +35,7 @@ class AvisoSinSucursal extends StatelessWidget {
                 Text(
                   'Mientras tanto no verás agenda, clientes ni cobros. Pide al '
                   'administrador del negocio que te asigne una.',
-                  style: TextStyle(color: TemaAgendaUno.textoSuave),
+                  style: TextStyle(color: context.colores.textoSuave),
                 ),
               ],
             ),

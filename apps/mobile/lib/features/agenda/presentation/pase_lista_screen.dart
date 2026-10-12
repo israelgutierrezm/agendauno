@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_de_carga.dart';
 import '../../../core/network/mensaje_error.dart';
+import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../application/agenda_controller.dart';
@@ -205,16 +206,16 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
   @override
   Widget build(BuildContext context) {
     final s = widget.sesion;
-    final tono = TonoServicio.de(s.ofertaId);
+    final tono = TonoServicio.de(s.ofertaId).en(context.colores);
     final roster = ref.watch(rosterProvider(s.id));
     String hhmm(DateTime d) =>
         '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
+      backgroundColor: context.colores.fondo,
       appBar: AppBar(
         title: const Text('Pase de lista'),
-        backgroundColor: const Color(0xFFF6F7FB),
+        backgroundColor: context.colores.fondo,
       ),
       body: roster.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -288,8 +289,10 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: a.llego
-                                    ? const Color(0xFF079455)
-                                    : Colors.white.withValues(alpha: 0.85),
+                                    ? context.colores.exito
+                                    : context.colores.superficie.withValues(
+                                        alpha: 0.85,
+                                      ),
                                 borderRadius: BorderRadius.circular(99),
                               ),
                             ),
@@ -306,7 +309,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     'La lista se abre a las ${hhmm(lista.asistenciaDesde!)}.',
-                    style: const TextStyle(color: Color(0xFF5E6B84)),
+                    style: TextStyle(color: context.colores.textoSuave),
                   ),
                 ),
               if (enSala.isEmpty)
@@ -357,13 +360,16 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     final ocupado = _marcando.contains(a.reservaId);
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: context.colores.superficie,
       margin: const EdgeInsets.only(bottom: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: a.llego
             ? BorderSide.none
-            : const BorderSide(color: Color(0xFFFEC84B), width: 1.5),
+            : BorderSide(
+                color: context.colores.tinta(const Color(0xFFFEC84B)),
+                width: 1.5,
+              ),
       ),
       child: ListTile(
         title: Text(
@@ -374,32 +380,40 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
           spacing: 6,
           children: [
             if (a.primeraVez)
-              const Text(
+              Text(
                 'Primera vez',
-                style: TextStyle(color: Color(0xFF7A5200)),
+                style: TextStyle(
+                  color: context.colores.tinta(const Color(0xFF7A5200)),
+                ),
               ),
             if (a.adeudo)
-              const Text('Adeudo', style: TextStyle(color: Color(0xFFB42318))),
+              Text('Adeudo', style: TextStyle(color: context.colores.error)),
             if (a.estado == 'pendiente_pago')
-              const Text(
+              Text(
                 'Pago pendiente',
-                style: TextStyle(color: Color(0xFF7A5200)),
+                style: TextStyle(
+                  color: context.colores.tinta(const Color(0xFF7A5200)),
+                ),
               ),
             // Se le ofreció un lugar que aún no acepta.
             if (a.estado == 'ofrecida')
-              const Text(
+              Text(
                 'Lugar ofrecido',
-                style: TextStyle(color: Color(0xFF7A5200)),
+                style: TextStyle(
+                  color: context.colores.tinta(const Color(0xFF7A5200)),
+                ),
               ),
             if (a.asistencia == 'ausente')
               Text(
                 a.automatica ? 'No se presentó (automático)' : 'No vino',
-                style: const TextStyle(color: Color(0xFFA11B1B)),
+                style: TextStyle(color: context.colores.error),
               ),
             if (a.llego && a.retardo)
-              const Text(
+              Text(
                 'Llegó tarde',
-                style: TextStyle(color: Color(0xFF7A5200)),
+                style: TextStyle(
+                  color: context.colores.tinta(const Color(0xFF7A5200)),
+                ),
               ),
           ],
         ),
@@ -418,9 +432,9 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                       onPressed: ocupado || !puedeMarcar
                           ? null
                           : () => _marcar(a, 'presente', retardo: true),
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.schedule,
-                        color: Color(0xFF7A5200),
+                        color: context.colores.tinta(const Color(0xFF7A5200)),
                       ),
                     ),
                   Semantics(
@@ -440,11 +454,11 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                           shape: BoxShape.circle,
                           color: a.llego
                               ? const Color(0xFF12B76A)
-                              : Colors.white,
+                              : context.colores.superficie,
                           border: a.llego
                               ? null
                               : Border.all(
-                                  color: const Color(0xFFC3CAD5),
+                                  color: context.colores.borde,
                                   width: 2,
                                 ),
                         ),
@@ -459,7 +473,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                                 Icons.check,
                                 color: a.llego
                                     ? Colors.white
-                                    : const Color(0xFFC3CAD5),
+                                    : context.colores.textoSuave,
                               ),
                       ),
                     ),
@@ -483,7 +497,7 @@ class _ListaEspera extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     key: const Key('lista-espera'),
     elevation: 0,
-    color: Colors.white,
+    color: context.colores.superficie,
     margin: const EdgeInsets.only(top: 12),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     child: Padding(
@@ -506,9 +520,9 @@ class _ListaEspera extends StatelessWidget {
                 ),
             ],
           ),
-          const Text(
+          Text(
             'Si se libera un lugar, se ofrece en este orden.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF5E6B84)),
+            style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
           ),
           const SizedBox(height: 6),
           for (final (i, a) in personas.indexed)

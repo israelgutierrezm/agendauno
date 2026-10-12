@@ -291,9 +291,9 @@ class _MiPrivacidadScreenState extends ConsumerState<MiPrivacidadScreen> {
                           'El negocio eliminará tus datos personales.',
                       style: TextStyle(
                         color: baja?.estado == 'rechazada'
-                            ? TemaAgendaUno.error
+                            ? context.colores.error
                             : baja != null
-                            ? TemaAgendaUno.aviso
+                            ? context.colores.aviso
                             : null,
                       ),
                     ),

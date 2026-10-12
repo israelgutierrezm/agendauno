@@ -158,13 +158,13 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'Tu membresía se renueva sola: se cobra a tu tarjeta en la '
                       'fecha de renovación y te avisamos si algo falla. La tarjeta '
                       'se autoriza en la página segura de la pasarela.',
-                      style: TextStyle(color: TemaAgendaUno.textoSuave),
+                      style: TextStyle(color: context.colores.textoSuave),
                     ),
                   ),
                   if (!datos.disponible)
@@ -213,15 +213,15 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
                                     if (m.para != null)
                                       Text(
                                         'Para ${m.para} · se cobra a tu tarjeta',
-                                        style: const TextStyle(
-                                          color: TemaAgendaUno.textoSuave,
+                                        style: TextStyle(
+                                          color: context.colores.textoSuave,
                                         ),
                                       ),
                                     Text(
                                       'Se renueva el ${Formato.fechaLarga(m.proximaCobroEn)}'
                                       '${m.montoMinor != null ? ' · ${Formato.dinero(m.montoMinor!, m.moneda)}' : ''}',
-                                      style: const TextStyle(
-                                        color: TemaAgendaUno.textoSuave,
+                                      style: TextStyle(
+                                        color: context.colores.textoSuave,
                                       ),
                                     ),
                                     Text(
@@ -234,10 +234,10 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
                                           : 'Te avisamos para pagar',
                                       style: TextStyle(
                                         color: m.automatico
-                                            ? TemaAgendaUno.exito
+                                            ? context.colores.exito
                                             : m.pendiente || m.cancelando
-                                            ? TemaAgendaUno.aviso
-                                            : TemaAgendaUno.textoSuave,
+                                            ? context.colores.aviso
+                                            : context.colores.textoSuave,
                                       ),
                                     ),
                                     // El precio cambió: se cobra el que autorizó
@@ -252,8 +252,8 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
                                         '${Formato.dinero(m.montoMinor ?? 0, m.moneda)} '
                                         'hasta que autorices el nuevo precio.',
                                         key: const Key('precio-nuevo'),
-                                        style: const TextStyle(
-                                          color: TemaAgendaUno.aviso,
+                                        style: TextStyle(
+                                          color: context.colores.aviso,
                                         ),
                                       ),
                                       TextButton(
@@ -273,8 +273,8 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
                                     if (m.error != null)
                                       Text(
                                         m.error!,
-                                        style: const TextStyle(
-                                          color: TemaAgendaUno.error,
+                                        style: TextStyle(
+                                          color: context.colores.error,
                                         ),
                                       ),
                                   ],

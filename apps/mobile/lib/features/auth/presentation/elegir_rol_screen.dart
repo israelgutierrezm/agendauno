@@ -63,7 +63,7 @@ class ListaRoles extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               side: BorderSide(
                 color: rol.clave == sesion.rol
-                    ? TemaAgendaUno.acento
+                    ? context.colores.acento
                     : Colors.transparent,
               ),
             ),
@@ -93,8 +93,8 @@ class ListaRoles extends StatelessWidget {
                         Container(
                           width: 7,
                           height: 7,
-                          decoration: const BoxDecoration(
-                            color: TemaAgendaUno.acento,
+                          decoration: BoxDecoration(
+                            color: context.colores.acento,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -160,7 +160,7 @@ class _ElegirRolScreenState extends ConsumerState<ElegirRolScreen> {
               'Tienes más de un rol en ${sesion.estudioNombre ?? 'este negocio'}. '
               'Cada uno muestra sus propias opciones; puedes cambiarlo cuando '
               'quieras desde tu perfil.',
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             const SizedBox(height: 20),
             ListaRoles(

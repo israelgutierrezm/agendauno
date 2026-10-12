@@ -46,7 +46,7 @@ Future<bool> _confirmar(
         ),
         TextButton(
           style: peligro
-              ? TextButton.styleFrom(foregroundColor: TemaAgendaUno.error)
+              ? TextButton.styleFrom(foregroundColor: context.colores.error)
               : null,
           onPressed: () => Navigator.of(contexto).pop(true),
           child: Text(aceptar),
@@ -213,7 +213,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     final cita = s.cita!;
     final estado = s.estadoCita;
     final pago = s.porCobrar ? cita.estadoPago : null;
-    final tono = TonoServicio.de(s.ofertaId);
+    final tono = TonoServicio.de(s.ofertaId).en(context.colores);
     // Cancelada, completada o sin asistencia: ya no hay acciones.
     final activa = !(estado?.cerrada ?? false);
     // Lo que se cobra (el total de su orden), con centavos y en su moneda.
@@ -242,11 +242,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     label: Text(
                       estado.etiqueta,
                       style: TextStyle(
-                        color: estiloEstado(estado).$2,
+                        color: estiloEstado(context.colores, estado).$2,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    backgroundColor: estiloEstado(estado).$1,
+                    backgroundColor: estiloEstado(context.colores, estado).$1,
                     side: BorderSide.none,
                   ),
                 if (pago != null)
@@ -254,11 +254,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     label: Text(
                       pago.etiqueta,
                       style: TextStyle(
-                        color: estiloPago.$2,
+                        color: estiloPago(context.colores).$2,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    backgroundColor: estiloPago.$1,
+                    backgroundColor: estiloPago(context.colores).$1,
                     side: BorderSide.none,
                   ),
               ],
@@ -292,8 +292,8 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                       ),
                       Text(
                         '${_hhmm(s.iniciaEn)}–${_hhmm(s.terminaEn)} · ${s.oferta ?? '—'}',
-                        style: const TextStyle(
-                          color: Color(0xFF596275),
+                        style: TextStyle(
+                          color: context.colores.textoSuave,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -318,18 +318,18 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                 key: const Key('nota-cliente'),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF6F7FB),
+                  color: context.colores.fondo,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Nota del cliente',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF596275),
+                        color: context.colores.textoSuave,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -382,7 +382,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     'La asistencia se registra desde las '
                     '${_hhmm(s.asistenciaDesde!)}.',
                     key: const Key('asistencia-abre'),
-                    style: const TextStyle(color: Color(0xFF596275)),
+                    style: TextStyle(color: context.colores.textoSuave),
                   ),
                 ),
               if (puedeMarcar)
@@ -425,7 +425,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                 TextButton(
                   onPressed: _ocupado ? null : () => _cancelar(s),
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFB42318),
+                    foregroundColor: context.colores.error,
                   ),
                   child: const Text('Cancelar cita'),
                 ),
@@ -550,7 +550,7 @@ class _DialogoCancelarState extends State<_DialogoCancelar> {
                     ? 'No se pudo saber qué pasará con su crédito o su pago.'
                     : efecto.mensaje,
                 key: const Key('efecto-cancelar'),
-                style: const TextStyle(color: Color(0xFF596275)),
+                style: TextStyle(color: context.colores.textoSuave),
               );
             },
           ),
@@ -570,7 +570,9 @@ class _DialogoCancelarState extends State<_DialogoCancelar> {
                 foto.connectionState == ConnectionState.done &&
                 (foto.data?.cancelable ?? !foto.hasError);
             return TextButton(
-              style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),
+              style: TextButton.styleFrom(
+                foregroundColor: context.colores.error,
+              ),
               onPressed: listo ? () => Navigator.of(context).pop(_por) : null,
               child: const Text('Sí, cancelar'),
             );

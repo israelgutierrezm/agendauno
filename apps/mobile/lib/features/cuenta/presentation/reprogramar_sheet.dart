@@ -140,11 +140,11 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
             const SizedBox(height: 4),
             Text(
               widget.reserva.oferta ?? '',
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             const SizedBox(height: 16),
             if (_error != null && opciones == null)
-              Text(_error!, style: const TextStyle(color: TemaAgendaUno.error))
+              Text(_error!, style: TextStyle(color: context.colores.error))
             else if (opciones == null)
               const SizedBox(
                 height: 120,
@@ -157,7 +157,7 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
                 opciones.restantes == 1
                     ? 'Te queda 1 cambio para esta reserva.'
                     : 'Te quedan ${opciones.restantes} cambios para esta reserva.',
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
               const SizedBox(height: 12),
               ...switch (opciones.tipo) {
@@ -186,9 +186,9 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
     if (_cargando)
       const Center(child: CircularProgressIndicator())
     else if (opciones.horarios.isEmpty)
-      const Text(
+      Text(
         'No hay horarios libres ese día. Prueba otro.',
-        style: TextStyle(color: TemaAgendaUno.textoSuave),
+        style: TextStyle(color: context.colores.textoSuave),
       )
     else
       Wrap(
@@ -206,18 +206,18 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
       ),
     if (!_cargando && opciones.horarios.any((h) => h.enOtraZona)) ...[
       const SizedBox(height: 8),
-      const Text(
+      Text(
         textoHorasDeLaSede,
         key: Key('horas-de-la-sede'),
-        style: TextStyle(color: TemaAgendaUno.textoSuave),
+        style: TextStyle(color: context.colores.textoSuave),
       ),
     ],
   ];
 
   Widget _clase(OpcionesReprogramar opciones) => opciones.sesiones.isEmpty
-      ? const Text(
+      ? Text(
           'No hay otras fechas con lugar por ahora.',
-          style: TextStyle(color: TemaAgendaUno.textoSuave),
+          style: TextStyle(color: context.colores.textoSuave),
         )
       : RadioGroup<String>(
           groupValue: _elegido,

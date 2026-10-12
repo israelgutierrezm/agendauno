@@ -71,7 +71,7 @@ class InicioTab extends ConsumerWidget {
           estudio == null || estudio.isEmpty
               ? 'Aquí tienes un resumen de tu actividad.'
               : 'Aquí tienes un resumen de tu actividad en $estudio.',
-          style: const TextStyle(color: TemaAgendaUno.textoSuave),
+          style: TextStyle(color: context.colores.textoSuave),
         ),
         const SizedBox(height: 16),
 
@@ -107,9 +107,9 @@ class InicioTab extends ConsumerWidget {
                     ].join(' · '),
                   ),
                   if (proxima.estado == 'pendiente_pago')
-                    const Text(
+                    Text(
                       'Pendiente de pago',
-                      style: TextStyle(color: TemaAgendaUno.aviso),
+                      style: TextStyle(color: context.colores.aviso),
                     ),
                   const SizedBox(height: 14),
                   Wrap(
@@ -157,7 +157,7 @@ class InicioTab extends ConsumerWidget {
                     // En citas no hay lugares: se aparta un horario (como en la web).
                     'Elige tu próxima $clase y aparta tu '
                     '${esCitas ? 'horario' : 'lugar'}.',
-                    style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                    style: TextStyle(color: context.colores.textoSuave),
                   ),
                   const SizedBox(height: 14),
                   FilledButton(

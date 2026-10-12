@@ -36,7 +36,7 @@ class TextoVacio extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Text(texto, style: const TextStyle(color: TemaAgendaUno.textoSuave)),
+    child: Text(texto, style: TextStyle(color: context.colores.textoSuave)),
   );
 }
 
@@ -85,13 +85,16 @@ class TarjetaAcceso extends StatelessWidget {
                 ),
               ),
             ),
-          Padding(padding: const EdgeInsets.all(14), child: _contenido()),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: _contenido(context),
+          ),
         ],
       ),
     ),
   );
 
-  Widget _contenido() => Column(
+  Widget _contenido(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       if (tono != null)
@@ -105,7 +108,7 @@ class TarjetaAcceso extends StatelessWidget {
           child: Icon(icono, color: tono, size: 22),
         )
       else
-        Icon(icono, color: TemaAgendaUno.textoSuave),
+        Icon(icono, color: context.colores.textoSuave),
       const Spacer(),
       Text(
         titulo,
@@ -120,7 +123,7 @@ class TarjetaAcceso extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 13,
-          color: atencion ? TemaAgendaUno.aviso : TemaAgendaUno.textoSuave,
+          color: atencion ? context.colores.aviso : context.colores.textoSuave,
         ),
       ),
     ],
@@ -158,7 +161,7 @@ class AvisoAtencion extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
     child: Material(
-      color: TemaAgendaUno.aviso.withValues(alpha: 0.08),
+      color: context.colores.aviso.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -169,7 +172,7 @@ class AvisoAtencion extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: TemaAgendaUno.aviso.withValues(alpha: 0.35),
+              color: context.colores.aviso.withValues(alpha: 0.35),
             ),
           ),
           child: Text(texto),
@@ -195,7 +198,7 @@ class ConsentimientoCard extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             c.contenido,
-            style: const TextStyle(color: TemaAgendaUno.textoSuave),
+            style: TextStyle(color: context.colores.textoSuave),
           ),
           const SizedBox(height: 12),
           FilledButton(
@@ -285,9 +288,9 @@ class _PorPagarTileState extends ConsumerState<PorPagarTile> {
               child: Text(
                 o.avisoEnProceso!,
                 key: const Key('pago-en-proceso'),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: TemaAgendaUno.textoSuave,
+                  color: context.colores.textoSuave,
                 ),
               ),
             ),
@@ -390,7 +393,7 @@ class _DetalleReserva extends ConsumerWidget {
                 if (r.instructor != null) 'con ${r.instructor}',
                 if (r.asiste != null) 'para ${r.asiste}',
               ].whereType<String>().join(' · '),
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             // Dónde es (M06): cómo llegar a la sede, en clases y en citas.
             if (r.mapaUrl != null)
@@ -409,7 +412,7 @@ class _DetalleReserva extends ConsumerWidget {
               r.estadoTexto,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: aviso ? TemaAgendaUno.aviso : TemaAgendaUno.exito,
+                color: aviso ? context.colores.aviso : context.colores.exito,
               ),
             ),
             if (r.lugar != null)
@@ -424,16 +427,16 @@ class _DetalleReserva extends ConsumerWidget {
                 child: Text(
                   'Acéptalo antes de las '
                   '${Formato.hora(DateTime.parse(r.ofertaExpiraEn!).toLocal())}.',
-                  style: const TextStyle(color: TemaAgendaUno.aviso),
+                  style: TextStyle(color: context.colores.aviso),
                 ),
               ),
             if (r.estado == 'pendiente_pago' && !_sePagaAqui)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 4),
                 child: Text(
                   'Págala en el negocio o desde la web para confirmarla.',
                   style: TextStyle(
-                    color: TemaAgendaUno.textoSuave,
+                    color: context.colores.textoSuave,
                     fontSize: 13,
                   ),
                 ),
@@ -481,7 +484,7 @@ class _DetalleReserva extends ConsumerWidget {
                   ),
                 TextButton(
                   style: TextButton.styleFrom(
-                    foregroundColor: TemaAgendaUno.error,
+                    foregroundColor: context.colores.error,
                   ),
                   onPressed: () async {
                     final nav = Navigator.of(context);
@@ -571,14 +574,14 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                 c.sucursal,
                 if (c.instructor != null) 'con ${c.instructor}',
               ].whereType<String>().join(' · '),
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              style: TextStyle(color: context.colores.textoSuave),
             ),
             if (c.cobertura != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: EstadoPunto(
                   c.cobertura!.texto,
-                  color: colorCobertura(c.cobertura!),
+                  color: colorCobertura(context, c.cobertura!),
                 ),
               ),
             if (c.cobertura?.motivoTexto != null)
@@ -586,7 +589,7 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   '${c.cobertura!.motivoTexto!} Consulta los planes en Pagos.',
-                  style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                  style: TextStyle(color: context.colores.textoSuave),
                 ),
               ),
             if (lugaresTexto(c).isNotEmpty)
@@ -596,7 +599,9 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                   lugaresTexto(c),
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: c.llena ? TemaAgendaUno.aviso : TemaAgendaUno.texto,
+                    color: c.llena
+                        ? context.colores.aviso
+                        : context.colores.texto,
                   ),
                 ),
               ),
@@ -655,9 +660,9 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                   _lugar == null
                       ? 'Tachados: ocupados. Si no eliges, el negocio te asigna uno.'
                       : 'Elegiste el lugar $_lugar.',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: TemaAgendaUno.textoSuave,
+                    color: context.colores.textoSuave,
                   ),
                 ),
               ),
@@ -760,7 +765,7 @@ class _CalificarClaseState extends ConsumerState<CalificarClaseCard> {
             if (detalle.isNotEmpty)
               Text(
                 detalle,
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                style: TextStyle(color: context.colores.textoSuave),
               ),
             Row(
               children: [
@@ -774,8 +779,8 @@ class _CalificarClaseState extends ConsumerState<CalificarClaseCard> {
                     icon: Icon(
                       n <= _estrellas ? Icons.star : Icons.star_border,
                       color: n <= _estrellas
-                          ? TemaAgendaUno.aviso
-                          : TemaAgendaUno.textoSuave,
+                          ? context.colores.aviso
+                          : context.colores.textoSuave,
                     ),
                   ),
               ],
@@ -814,12 +819,13 @@ abstract final class TonosAcceso {
 
 /// Color del punto de la cobertura: incluida en verde, solo con membresía en
 /// ámbar, de pago en el primario y no incluida en gris.
-Color colorCobertura(CoberturaClase c) => switch (c.estado) {
-  'incluida' => TemaAgendaUno.exito,
-  'solo_membresia' => TemaAgendaUno.aviso,
-  'de_pago' => TemaAgendaUno.acento,
-  _ => TemaAgendaUno.textoSuave,
-};
+Color colorCobertura(BuildContext context, CoberturaClase c) =>
+    switch (c.estado) {
+      'incluida' => context.colores.exito,
+      'solo_membresia' => context.colores.aviso,
+      'de_pago' => context.colores.acento,
+      _ => context.colores.textoSuave,
+    };
 
 /// Un estado como punto de color + texto (sin íconos tintados).
 class EstadoPunto extends StatelessWidget {

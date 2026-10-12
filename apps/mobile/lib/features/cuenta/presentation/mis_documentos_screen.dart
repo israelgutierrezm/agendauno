@@ -115,11 +115,11 @@ class _MisDocumentosScreenState extends ConsumerState<MisDocumentosScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Text(
                     'Lo que subas queda en revisión hasta que el equipo lo valide.',
-                    style: TextStyle(color: TemaAgendaUno.textoSuave),
+                    style: TextStyle(color: context.colores.textoSuave),
                   ),
                 ),
                 for (final r in requisitos)
@@ -130,12 +130,12 @@ class _MisDocumentosScreenState extends ConsumerState<MisDocumentosScreen> {
                       ),
                       subtitle: Text(
                         r.estadoTexto,
-                        style: TextStyle(color: r.color),
+                        style: TextStyle(color: r.colorEn(context.colores)),
                       ),
                       trailing: r.estado == 'aprobado'
-                          ? const Icon(
+                          ? Icon(
                               Icons.check_circle_outline,
-                              color: TemaAgendaUno.exito,
+                              color: context.colores.exito,
                             )
                           : TextButton(
                               onPressed: _subiendo != null

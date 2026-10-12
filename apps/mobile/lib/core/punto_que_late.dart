@@ -6,13 +6,10 @@ import 'theme/tema_agendauno.dart';
 /// (p. ej. «Cambiar de rol» cuando se puede entrar con otro rol). Con las animaciones
 /// del sistema apagadas, solo el punto.
 class PuntoQueLate extends StatefulWidget {
-  const PuntoQueLate({
-    super.key,
-    this.color = TemaAgendaUno.acento,
-    this.tam = 8,
-  });
+  const PuntoQueLate({super.key, this.color, this.tam = 8});
 
-  final Color color;
+  // Sin color, el acento de la app (claro u oscuro).
+  final Color? color;
   final double tam;
 
   @override
@@ -47,7 +44,10 @@ class _PuntoQueLateState extends State<PuntoQueLate>
     final punto = Container(
       width: widget.tam,
       height: widget.tam,
-      decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: widget.color ?? context.colores.acento,
+        shape: BoxShape.circle,
+      ),
     );
     return SizedBox(
       width: widget.tam * 2.6,

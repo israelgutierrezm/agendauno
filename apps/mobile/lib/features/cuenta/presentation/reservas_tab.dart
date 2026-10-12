@@ -73,7 +73,7 @@ class ReservasTab extends ConsumerWidget {
               child: ListTile(
                 title: Text(
                   'No se pudieron cargar las $clases de estas fechas.',
-                  style: const TextStyle(color: TemaAgendaUno.error),
+                  style: TextStyle(color: context.colores.error),
                 ),
                 trailing: TextButton(
                   onPressed: () => ref.invalidate(clasesPeriodoProvider),
@@ -105,7 +105,7 @@ class ReservasTab extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 'Hay más $clases en estas fechas de las que caben aquí: elige una sucursal o un periodo más corto.',
-                style: const TextStyle(color: TemaAgendaUno.aviso),
+                style: TextStyle(color: context.colores.aviso),
               ),
             ),
           if (esCitas)
@@ -177,11 +177,11 @@ class ReservasTab extends ConsumerWidget {
             for (final r in cuenta.resenasPendientes)
               CalificarClaseCard(r, key: ValueKey(r.reservaId)),
           ],
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 12),
             child: Text(
               'Para ver todas tus reservas en el calendario del teléfono, conéctalo en Mi perfil.',
-              style: TextStyle(color: TemaAgendaUno.textoSuave, fontSize: 13),
+              style: TextStyle(color: context.colores.textoSuave, fontSize: 13),
             ),
           ),
         ],

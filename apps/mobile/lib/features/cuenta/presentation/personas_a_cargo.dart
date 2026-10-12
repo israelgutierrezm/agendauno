@@ -65,9 +65,9 @@ class SelectorParticipante extends ConsumerWidget {
             if (nombre != null)
               Text(
                 'Estás viendo la cuenta de $nombre: sus reservas, planes, pagos y documentos.',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: TemaAgendaUno.textoSuave,
+                  color: context.colores.textoSuave,
                 ),
               ),
           ],
@@ -124,8 +124,8 @@ class PersonasACargoCard extends ConsumerWidget {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: p.autorizada
-                                      ? TemaAgendaUno.exito
-                                      : TemaAgendaUno.aviso,
+                                      ? context.colores.exito
+                                      : context.colores.aviso,
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -133,9 +133,9 @@ class PersonasACargoCard extends ConsumerWidget {
                                 p.autorizada
                                     ? 'Autorizada'
                                     : 'Falta la autorización',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: TemaAgendaUno.textoSuave,
+                                  color: context.colores.textoSuave,
                                 ),
                               ),
                             ],
@@ -269,10 +269,7 @@ class _DialogoAutorizacionState extends State<_DialogoAutorizacion> {
             const SizedBox(height: 8),
             Text(
               'Versión ${widget.datos.version} del texto del negocio.',
-              style: const TextStyle(
-                fontSize: 12,
-                color: TemaAgendaUno.textoSuave,
-              ),
+              style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
             ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,

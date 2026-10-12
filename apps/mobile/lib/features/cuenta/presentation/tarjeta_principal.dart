@@ -71,7 +71,7 @@ class TarjetaPrincipal extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               // Sin la foto (sin red o en desarrollo), un tinte del color de marca.
-              const ColoredBox(color: TemaAgendaUno.acentoSuave),
+              ColoredBox(color: context.colores.acentoSuave),
               Image.network(
                 foto,
                 fit: BoxFit.cover,
@@ -97,11 +97,11 @@ class TarjetaPrincipal extends StatelessWidget {
             children: [
               Text(
                 etiqueta.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.9,
-                  color: TemaAgendaUno.acento,
+                  color: context.colores.acento,
                 ),
               ),
               ...contenido,
