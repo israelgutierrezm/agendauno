@@ -1,6 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import BarraListado from "@/components/BarraListado.vue";
 import { i18n } from "@/i18n";
 import ProspectosView from "./ProspectosView.vue";
 
@@ -78,7 +79,7 @@ const prospecto = {
   ],
 };
 
-function montar() {
+function montar(paginas: Record<string, number> = {}) {
   api.get.mockImplementation((url: string) => {
     if (url.endsWith("/prospectos/responsables")) {
       return Promise.resolve({
@@ -98,6 +99,7 @@ function montar() {
       data: {
         data: [prospecto],
         meta: {
+          ...paginas,
           resumen: {
             nuevos: 0,
             seguimientos_vencidos: 0,
@@ -131,6 +133,63 @@ async function abrirDetalle(w: ReturnType<typeof montar>) {
 }
 
 beforeEach(() => vi.clearAllMocks());
+
+describe("prospectos: filtros como en Miembros y por páginas", () => {
+  it("filtra con la barra (también de un toque) y vuelve a la primera página", async () => {
+    const w = montar();
+    await flushPromises();
+
+    // Por omisión, los abiertos.
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/prospectos",
+      expect.objectContaining({
+        params: expect.objectContaining({ estado: "abiertos", page: 1 }),
+      }),
+    );
+    const barra = w.findComponent(BarraListado);
+    barra.vm.$emit("cambioFiltro", "origen", "manual");
+    barra.vm.$emit("cambioFiltro", "seguimiento", "1");
+    barra.vm.$emit("cambioFiltro", "periodo", "7");
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/prospectos",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          origen: "manual",
+          seguimiento: "vencido",
+          periodo: "7",
+          page: 1,
+        }),
+      }),
+    );
+    expect(barra.props("valores")).toMatchObject({
+      origen: "manual",
+      seguimiento: "1",
+      periodo: "7",
+    });
+
+    barra.vm.$emit("limpiar");
+    await flushPromises();
+    expect(barra.props("valores")).toMatchObject({ origen: "", periodo: "" });
+  });
+
+  it("con más de una página, se pasa a la siguiente", async () => {
+    const w = montar({ total: 60, ultima_pagina: 3, page: 1, per_page: 25 });
+    await flushPromises();
+
+    await w
+      .findAll("nav button")
+      .find((b) => b.text() === "2")!
+      .trigger("click");
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/prospectos",
+      expect.objectContaining({
+        params: expect.objectContaining({ page: 2, per_page: 25 }),
+      }),
+    );
+  });
+});
 
 describe("prospectos: responsable, contacto e historia", () => {
   it("marca y filtra los que nadie atendió a tiempo", async () => {

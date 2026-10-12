@@ -3,10 +3,12 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
+import BarraListado from "@/components/BarraListado.vue";
 import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
@@ -35,6 +37,10 @@ import { useToastStore } from "@/stores/toast";
  * llamarle queda en su historia; si nadie lo atiende a tiempo, se marca «sin atender».
  * La historia distingue cada cosa con su ícono: notas, contactos, cambios de estado,
  * responsable, seguimiento.
+ *
+ * Filtros como en Miembros (buscador, «Filtros» y lo aplicado): estado, responsable,
+ * sin atender, seguimiento vencido, cuándo llegó, origen y formulario, campaña y sede.
+ * La lista va por páginas.
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -55,13 +61,33 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 // El inicio abre las solicitudes nuevas ya filtradas (`?estado=nuevo`; M08).
 const estadoInicial = useRoute()?.query.estado;
+// `estado` vacío: los abiertos (lo de siempre).
 const filtros = reactive({
-  estado: typeof estadoInicial === "string" ? estadoInicial : "abiertos",
+  estado:
+    typeof estadoInicial === "string" && estadoInicial !== "abiertos"
+      ? estadoInicial
+      : "",
   responsable: "",
   // `sin_atender`: su responsable no lo atendió a tiempo.
   atencion: "",
+  // `vencido`: su próximo seguimiento ya pasó.
+  seguimiento: "",
+  // `hoy`, `7` o `30` días.
+  periodo: "",
+  origen: "",
+  formulario: "",
+  campana: "",
+  sucursal: "",
   q: "",
 });
+const pagina = ref(1);
+const paginacion = ref<{
+  page: number;
+  per_page: number;
+  total: number;
+  ultima_pagina: number;
+} | null>(null);
+const POR_PAGINA = 25;
 const ESTADOS: EstadoProspecto[] = [
   "nuevo",
   "en_seguimiento",
@@ -77,17 +103,40 @@ async function cargar(): Promise<void> {
   try {
     const { data } = await api.get<{
       data: Prospecto[];
-      meta: { resumen: typeof resumen.value };
+      meta: {
+        resumen: typeof resumen.value;
+        page?: number;
+        per_page?: number;
+        total?: number;
+        ultima_pagina?: number;
+      };
     }>(`${base.value}/prospectos`, {
       params: {
-        estado: filtros.estado,
+        estado: filtros.estado || "abiertos",
         responsable: filtros.responsable || undefined,
         atencion: filtros.atencion || undefined,
+        seguimiento: filtros.seguimiento || undefined,
+        periodo: filtros.periodo || undefined,
+        origen: filtros.origen || undefined,
+        formulario_id: filtros.formulario || undefined,
+        campana: filtros.campana || undefined,
+        sucursal_id: filtros.sucursal || undefined,
         q: filtros.q.trim() || undefined,
+        page: pagina.value,
+        per_page: POR_PAGINA,
       },
     });
     lista.value = data.data;
     resumen.value = data.meta.resumen;
+    paginacion.value =
+      data.meta.ultima_pagina !== undefined
+        ? {
+            page: data.meta.page ?? 1,
+            per_page: data.meta.per_page ?? POR_PAGINA,
+            total: data.meta.total ?? 0,
+            ultima_pagina: data.meta.ultima_pagina,
+          }
+        : null;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -100,14 +149,184 @@ watch(
   () => filtros.q,
   () => {
     window.clearTimeout(espera);
-    espera = window.setTimeout(cargar, 300);
+    espera = window.setTimeout(() => {
+      pagina.value = 1;
+      void cargar();
+    }, 300);
   },
 );
-watch(() => [filtros.estado, filtros.responsable, filtros.atencion], cargar);
+// Otro filtro vuelve a la primera página.
+watch(
+  () => [
+    filtros.estado,
+    filtros.responsable,
+    filtros.atencion,
+    filtros.seguimiento,
+    filtros.periodo,
+    filtros.origen,
+    filtros.formulario,
+    filtros.campana,
+    filtros.sucursal,
+  ],
+  () => {
+    pagina.value = 1;
+    void cargar();
+  },
+);
+function irAPagina(n: number): void {
+  pagina.value = n;
+  void cargar();
+}
 onMounted(() => {
   void cargar();
   void cargarResponsables();
+  void cargarOpcionesFiltro();
 });
+
+// ---------------------------------------------------------------- filtros
+// Los formularios de captación y las sedes, para filtrar por ellos (solo si hay más
+// de uno).
+const formularios = ref<{ id: string; nombre: string }[]>([]);
+const sucursales = ref<{ id: string; nombre: string }[]>([]);
+async function cargarOpcionesFiltro(): Promise<void> {
+  const [f, s] = await Promise.allSettled([
+    api.get<{ data: { id: string; nombre: string }[] }>(
+      `${base.value}/captacion/formularios`,
+    ),
+    api.get<{ data: { id: string; nombre: string }[] }>(
+      `${base.value}/sucursales`,
+    ),
+  ]);
+  const lista = (r: typeof f) =>
+    r.status === "fulfilled" && Array.isArray(r.value?.data?.data)
+      ? r.value.data.data.map((x) => ({ id: x.id, nombre: x.nombre }))
+      : [];
+  formularios.value = lista(f);
+  sucursales.value = lista(s);
+}
+const filtrosDef = computed(() => [
+  {
+    clave: "estado",
+    etiqueta: t("captacion.prospectos.filtros.estado"),
+    opciones: [
+      { valor: "todos", texto: t("captacion.prospectos.filtros.todos") },
+      ...ESTADOS.map((e) => ({
+        valor: e,
+        texto: t(`captacion.prospectos.estados.${e}`),
+      })),
+    ],
+  },
+  {
+    clave: "responsable",
+    etiqueta: t("captacion.prospectos.filtros.responsable"),
+    opciones: [
+      { valor: "yo", texto: t("captacion.prospectos.filtros.yo") },
+      { valor: "sin", texto: t("captacion.prospectos.filtros.sin") },
+      ...responsables.value.map((r) => ({ valor: r.id, texto: r.nombre })),
+    ],
+  },
+  {
+    clave: "atencion",
+    etiqueta: t("captacion.prospectos.filtros.sinAtender"),
+    tipo: "booleano" as const,
+  },
+  {
+    clave: "seguimiento",
+    etiqueta: t("captacion.prospectos.filtros.seguimientoVencido"),
+    tipo: "booleano" as const,
+  },
+  {
+    clave: "periodo",
+    etiqueta: t("captacion.prospectos.filtros.llego"),
+    opciones: [
+      { valor: "hoy", texto: t("captacion.prospectos.filtros.hoy") },
+      { valor: "7", texto: t("captacion.prospectos.filtros.ultimos7") },
+      { valor: "30", texto: t("captacion.prospectos.filtros.ultimos30") },
+    ],
+  },
+  {
+    clave: "origen",
+    etiqueta: t("captacion.prospectos.filtros.origen"),
+    opciones: [
+      {
+        valor: "formulario",
+        texto: t("captacion.prospectos.filtros.porFormulario"),
+      },
+      { valor: "manual", texto: t("captacion.prospectos.origen.manual") },
+    ],
+  },
+  ...(formularios.value.length > 1
+    ? [
+        {
+          clave: "formulario",
+          etiqueta: t("captacion.prospectos.filtros.formulario"),
+          opciones: formularios.value.map((f) => ({
+            valor: f.id,
+            texto: f.nombre,
+          })),
+        },
+      ]
+    : []),
+  {
+    clave: "campana",
+    etiqueta: t("captacion.prospectos.filtros.campana"),
+    opciones: [
+      { valor: "con", texto: t("captacion.prospectos.filtros.conCampana") },
+      { valor: "sin", texto: t("captacion.prospectos.filtros.sinCampana") },
+    ],
+  },
+  ...(sucursales.value.length > 1
+    ? [
+        {
+          clave: "sucursal",
+          etiqueta: t("captacion.prospectos.filtros.sede"),
+          opciones: sucursales.value.map((s) => ({
+            valor: s.id,
+            texto: s.nombre,
+          })),
+        },
+      ]
+    : []),
+]);
+// Los de un toque («Sin atender», «Seguimiento vencido») van como «1».
+const valoresFiltro = computed<Record<string, string>>(() => ({
+  estado: filtros.estado,
+  responsable: filtros.responsable,
+  atencion: filtros.atencion ? "1" : "",
+  seguimiento: filtros.seguimiento ? "1" : "",
+  periodo: filtros.periodo,
+  origen: filtros.origen,
+  formulario: filtros.formulario,
+  campana: filtros.campana,
+  sucursal: filtros.sucursal,
+}));
+function cambioFiltro(clave: string, valor: string): void {
+  if (clave === "atencion") {
+    filtros.atencion = valor ? "sin_atender" : "";
+  } else if (clave === "seguimiento") {
+    filtros.seguimiento = valor ? "vencido" : "";
+  } else if (clave in filtros && clave !== "q") {
+    filtros[clave as Exclude<keyof typeof filtros, "q">] = valor;
+  }
+}
+function limpiarFiltros(): void {
+  Object.assign(filtros, {
+    estado: "",
+    responsable: "",
+    atencion: "",
+    seguimiento: "",
+    periodo: "",
+    origen: "",
+    formulario: "",
+    campana: "",
+    sucursal: "",
+  });
+}
+const filtrando = computed(
+  () =>
+    filtros.q.trim() !== "" ||
+    Object.values(valoresFiltro.value).some((v) => v !== ""),
+);
 
 // ---------------------------------------------------------------- responsables
 interface Responsable {
@@ -541,9 +760,7 @@ async function crear(): Promise<void> {
           type="button"
           class="tu-chip"
           :aria-pressed="filtros.estado === 'nuevo'"
-          @click="
-            filtros.estado = filtros.estado === 'nuevo' ? 'abiertos' : 'nuevo'
-          "
+          @click="filtros.estado = filtros.estado === 'nuevo' ? '' : 'nuevo'"
         >
           {{ $t("captacion.prospectos.resumen.nuevos") }}:
           <strong>{{ resumen.nuevos }}</strong>
@@ -561,71 +778,41 @@ async function crear(): Promise<void> {
           {{ $t("captacion.prospectos.resumen.sinAtender") }}:
           <strong>{{ resumen.sin_atender }}</strong>
         </button>
-        <span class="tu-chip">
+        <button
+          type="button"
+          class="tu-chip"
+          data-prueba="chip-vencidos"
+          :aria-pressed="filtros.seguimiento === 'vencido'"
+          @click="
+            filtros.seguimiento =
+              filtros.seguimiento === 'vencido' ? '' : 'vencido'
+          "
+        >
           {{ $t("captacion.prospectos.resumen.vencidos") }}:
           <strong>{{ resumen.seguimientos_vencidos }}</strong>
-        </span>
+        </button>
         <span class="tu-chip">
           {{ $t("captacion.prospectos.resumen.abiertos") }}:
           <strong>{{ resumen.abiertos }}</strong>
         </span>
       </div>
-      <button
-        v-if="puedeGestionar"
-        type="button"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        @click="alta.abierto = true"
-      >
-        {{ $t("captacion.prospectos.nuevo") }}
-      </button>
     </div>
 
-    <div class="tu-card mt-4">
-      <div class="tu-filtros">
-        <label class="tu-buscar">
-          <IconoNav nombre="buscar" :tam="16" />
-          <input
-            v-model="filtros.q"
-            class="tu-input"
-            type="search"
-            :placeholder="$t('captacion.prospectos.buscar')"
-            :aria-label="$t('captacion.prospectos.buscar')"
-          />
-        </label>
-        <label class="text-sm">
-          <span class="sr-only">{{
-            $t("captacion.prospectos.filtros.estado")
-          }}</span>
-          <select v-model="filtros.estado" class="tu-input">
-            <option value="abiertos">
-              {{ $t("captacion.prospectos.filtros.abiertos") }}
-            </option>
-            <option value="todos">
-              {{ $t("captacion.prospectos.filtros.todos") }}
-            </option>
-            <option v-for="e in ESTADOS" :key="e" :value="e">
-              {{ $t(`captacion.prospectos.estados.${e}`) }}
-            </option>
-          </select>
-        </label>
-        <label class="text-sm">
-          <span class="sr-only">{{
-            $t("captacion.prospectos.filtros.responsable")
-          }}</span>
-          <select v-model="filtros.responsable" class="tu-input">
-            <option value="">
-              {{ $t("captacion.prospectos.filtros.cualquiera") }}
-            </option>
-            <option value="yo">
-              {{ $t("captacion.prospectos.filtros.yo") }}
-            </option>
-            <option value="sin">
-              {{ $t("captacion.prospectos.filtros.sin") }}
-            </option>
-          </select>
-        </label>
-      </div>
+    <!-- Buscador, filtros y «Agregar», como en Miembros. -->
+    <BarraListado
+      v-model:busqueda="filtros.q"
+      class="mt-4"
+      :filtros="filtrosDef"
+      :valores="valoresFiltro"
+      :placeholder="$t('captacion.prospectos.buscar')"
+      :puede-crear="puedeGestionar"
+      :nuevo-texto="$t('captacion.prospectos.nuevo')"
+      @cambio-filtro="cambioFiltro"
+      @limpiar="limpiarFiltros"
+      @nuevo="alta.abierto = true"
+    />
 
+    <div class="tu-card mt-4">
       <p
         v-if="error"
         class="p-4 text-sm"
@@ -645,7 +832,7 @@ async function crear(): Promise<void> {
         v-else-if="lista.length === 0"
         icono="captacion"
         :titulo="
-          filtros.q || filtros.estado !== 'abiertos' || filtros.responsable
+          filtrando
             ? $t('captacion.prospectos.vacioFiltro')
             : $t('captacion.prospectos.vacio')
         "
@@ -695,6 +882,14 @@ async function crear(): Promise<void> {
           </button>
         </li>
       </ul>
+      <PaginacionListado
+        v-if="paginacion && paginacion.ultima_pagina > 1"
+        :page="paginacion.page"
+        :ultima-pagina="paginacion.ultima_pagina"
+        :total="paginacion.total"
+        :per-page="paginacion.per_page"
+        @ir="irAPagina"
+      />
     </div>
 
     <!-- Detalle -->

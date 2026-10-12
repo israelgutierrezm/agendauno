@@ -31,6 +31,7 @@ const sesion = useSesionTenantStore();
 
 const TONOS: Record<string, string> = {
   negocio: "azul",
+  sitio: "turquesa",
   servicios: "verde",
   agenda: "morado",
   pagos: "naranja",
@@ -150,6 +151,10 @@ const resultados = computed(() => {
 </template>
 
 <style scoped>
+/* El rubro del sitio web, con su propio tono (los seis globales ya tienen dueño). */
+.tu-tono-turquesa {
+  --tono: #0d9488;
+}
 .cn-buscar {
   display: flex;
   max-width: 28rem;

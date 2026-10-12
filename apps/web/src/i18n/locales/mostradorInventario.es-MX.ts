@@ -211,6 +211,18 @@ export const equipoVisual = {
     sedes: "Sedes",
     acciones: "Acciones",
   },
+  // Filtros de la lista, como en Miembros.
+  filtros: {
+    sede: "Sede",
+    agenda: "Esta semana",
+    conAgenda: "Con agenda",
+    sinAgenda: "Sin agenda",
+    resenas: "Reseñas",
+    cuatroOMas: "4 estrellas o más",
+    conResenas: "Con reseñas",
+    sinResenas: "Sin reseñas",
+    nadie: "Nadie coincide con la búsqueda o los filtros.",
+  },
 };
 
 // Promociones (views/PromocionesView.vue) con el patrón de los listados.
