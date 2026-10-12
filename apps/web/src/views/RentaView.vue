@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
+import ComplementosNegocio from "@/components/ComplementosNegocio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PlanCitasRenta from "@/components/PlanCitasRenta.vue";
@@ -683,6 +684,9 @@ onMounted(() => {
       </div>
 
       <!-- Historial de cargos -->
+      <!-- Complementos que se piden (ADR 0140): p. ej. Familias. -->
+      <ComplementosNegocio />
+
       <h2 class="mt-8 font-medium text-lg">{{ $t("renta.historial") }}</h2>
       <EstadoVacio
         v-if="renta.cargos.length === 0"
