@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -14,12 +21,14 @@ import { confirmar } from "@/lib/confirmar";
 import { claveSegunModalidad } from "@/lib/menu";
 import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
 import {
+  avisarEditorSitio,
   claveSeccion,
   direccionDe,
   FAMILIAS_SITIO,
   duplicarBloque,
   esBloque,
   esFija,
+  mensajeEditorSitio,
   moverSeccion,
   nuevaPagina,
   nuevoBloque,
@@ -587,7 +596,91 @@ function errorDe(clave: string): string | null {
   return errores.value[clave]?.[0] ?? null;
 }
 
-onMounted(cargar);
+// ---- Editor visual (ADR 0146, fase 3) ----
+// La vista previa muestra en vivo el borrador sin guardar (lo revisa y lo arma el API,
+// sin guardarlo) y un clic en una de sus secciones la abre aquí para editarla.
+const marcoPrevia = ref<HTMLIFrameElement | null>(null);
+const previaLista = ref(false);
+const previaValida = ref(true);
+// La que se abrió desde la vista previa ya está a la vista: no hay que llevarla.
+let abiertaDesdePrevia = false;
+let esperaBorrador: ReturnType<typeof setTimeout> | undefined;
+
+function mandarBorrador(): void {
+  if (!previaLista.value || !borrador.value) {
+    return;
+  }
+  avisarEditorSitio(marcoPrevia.value?.contentWindow, {
+    tipo: "borrador",
+    borrador: JSON.parse(JSON.stringify(borrador.value)) as unknown,
+  });
+}
+// Otra página u otra carga del marco: espera a que avise que está lista.
+watch([urlPrevia, vuelta], () => {
+  previaLista.value = false;
+  previaValida.value = true;
+});
+watch(
+  borrador,
+  () => {
+    clearTimeout(esperaBorrador);
+    esperaBorrador = setTimeout(mandarBorrador, 350);
+  },
+  { deep: true },
+);
+watch(abierta, (clave) => {
+  if (clave && !abiertaDesdePrevia) {
+    avisarEditorSitio(marcoPrevia.value?.contentWindow, {
+      tipo: "enfocar",
+      seccion: clave,
+    });
+  }
+  abiertaDesdePrevia = false;
+});
+async function abrirDesdePrevia(
+  pagina: string | null,
+  seccion: string,
+): Promise<void> {
+  const destino =
+    pagina === null
+      ? null
+      : borrador.value?.paginas.find((p) => p.slug === pagina)?.id;
+  if (destino === undefined || !/^[A-Za-z0-9_-]+$/.test(seccion)) {
+    return;
+  }
+  if (destino !== paginaSel.value) {
+    elegirPagina(destino);
+  }
+  abiertaDesdePrevia = true;
+  abierta.value = seccion;
+  await nextTick();
+  document
+    .querySelector(`[data-prueba="seccion-${seccion}"]`)
+    ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+}
+function alMensajeDePrevia(evento: MessageEvent): void {
+  const mensaje = mensajeEditorSitio(evento, marcoPrevia.value?.contentWindow);
+  if (mensaje?.tipo === "lista") {
+    previaLista.value = true;
+    previaValida.value = true;
+    if (sinGuardar.value) {
+      mandarBorrador();
+    }
+  } else if (mensaje?.tipo === "estado") {
+    previaValida.value = mensaje.valido;
+  } else if (mensaje?.tipo === "editar") {
+    void abrirDesdePrevia(mensaje.pagina, mensaje.seccion);
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("message", alMensajeDePrevia);
+  void cargar();
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("message", alMensajeDePrevia);
+  clearTimeout(esperaBorrador);
+});
 </script>
 
 <template>
@@ -1762,14 +1855,23 @@ onMounted(cargar);
             </div>
           </div>
           <p
-            v-if="sinGuardar"
             class="mt-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
+            :style="{
+              color: previaValida ? 'var(--texto-suave)' : 'var(--aviso)',
+            }"
+            data-prueba="previa-estado"
           >
-            {{ $t("sitioWeb.estado.sinGuardar") }}
+            {{
+              !previaValida
+                ? $t("sitioWeb.editor.incompleto")
+                : sinGuardar
+                  ? $t("sitioWeb.editor.enVivo")
+                  : $t("sitioWeb.editor.ayuda")
+            }}
           </p>
           <div class="sw-marco mt-3" :class="`sw-marco-${anchoPrevia}`">
             <iframe
+              ref="marcoPrevia"
               :key="vuelta"
               :src="urlPrevia"
               :title="$t('sitioWeb.acciones.vistaPrevia')"

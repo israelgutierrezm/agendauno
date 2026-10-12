@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
@@ -28,13 +35,18 @@ import { updateSeo } from "@/lib/seo";
 import { urlCanonicaEstudio } from "@/lib/tenant";
 import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
 import {
+  avisarEditorSitio,
+  claveSeccion,
   colorDeContraste,
   esBloque,
   FAMILIAS_SITIO,
+  mensajeEditorSitio,
   RADIOS_SITIO,
   sitioPorDefecto,
+  ventanaDelEditor,
   type SitioPublico,
 } from "@/lib/sitioWeb";
+import { claveSegunModalidad } from "@/lib/menu";
 import { perfilVisibleAlPublico } from "@/marketing/modalidades";
 
 /**
@@ -453,7 +465,7 @@ const equipoConSemblanza = computed(
 // La página habla con las palabras del negocio, no con las de quien la visita (ADR
 // 0131): los pacientes de un consultorio, los coaches de un estudio de pole, las
 // lecciones de una escuela de natación.
-const { t } = useI18n();
+const { t, te } = useI18n();
 const terminosPagina = computed<TerminosNegocio | null>(() => {
   const terminos = escaparate.value?.estudio.perfil_config.terminologia;
   return terminos?.sesion && terminos.miembro && terminos.instructor
@@ -701,7 +713,108 @@ watch(paginaActual, async () => {
   }
 });
 
-onMounted(cargar);
+// ---- Dentro del editor visual (ADR 0146, fase 3) ----
+// La vista previa en el marco del editor: muestra el borrador sin guardar que le manda
+// y, con un clic en una sección, le pide abrirla para editarla.
+const editor = props.vistaPrevia ? ventanaDelEditor() : null;
+const enEditor = editor !== null;
+const resaltada = ref<{ clave: string; tipo: string } | null>(null);
+const enfocada = ref<string | null>(null);
+let peticionEnVivo = 0;
+
+async function mostrarBorrador(borrador: unknown): Promise<void> {
+  const mia = ++peticionEnVivo;
+  try {
+    const { data } = await api.post<{ data: Escaparate }>(
+      `/api/v1/app/${slug.value}/sitio/vista-previa`,
+      borrador,
+    );
+    // Solo la respuesta del último cambio: una anterior que llegue tarde no lo pisa.
+    if (mia === peticionEnVivo) {
+      escaparate.value = data.data;
+      avisarEditorSitio(editor, { tipo: "estado", valido: true });
+    }
+  } catch {
+    // Algo por completar en el borrador: se queda el último que se pudo mostrar.
+    if (mia === peticionEnVivo) {
+      avisarEditorSitio(editor, { tipo: "estado", valido: false });
+    }
+  }
+}
+function seccionDe(evento: Event): HTMLElement | null {
+  const destino = evento.target as HTMLElement | null;
+  return destino?.closest<HTMLElement>("[data-seccion]") ?? null;
+}
+function alPasarEnEditor(evento: MouseEvent): void {
+  const seccion = enEditor ? seccionDe(evento) : null;
+  resaltada.value = seccion
+    ? {
+        clave: seccion.dataset.seccion ?? "",
+        tipo: seccion.dataset.tipo ?? "",
+      }
+    : null;
+}
+// Un clic en una sección la abre en el editor; sus enlaces y botones siguen funcionando.
+function alClicEnEditor(evento: MouseEvent): void {
+  const seccion = enEditor ? seccionDe(evento) : null;
+  const destino = evento.target as HTMLElement | null;
+  if (
+    !seccion ||
+    destino?.closest(
+      "a, button, input, select, textarea, label, summary, iframe, [role='button']",
+    )
+  ) {
+    return;
+  }
+  enfocada.value = seccion.dataset.seccion ?? null;
+  avisarEditorSitio(editor, {
+    tipo: "editar",
+    pagina: paginaActual.value?.slug ?? null,
+    seccion: seccion.dataset.seccion ?? "",
+  });
+}
+// La que se abrió en el editor: se lleva a la vista y se marca.
+function enfocarSeccion(clave: string): void {
+  enfocada.value = clave;
+  const seccion = [
+    ...document.querySelectorAll<HTMLElement>("[data-seccion]"),
+  ].find((e) => e.dataset.seccion === clave);
+  seccion?.firstElementChild?.scrollIntoView?.({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+function nombreEnEditor(tipo: string): string {
+  return esBloque(tipo)
+    ? t(`sitioWeb.bloques.nombres.${tipo}`)
+    : t(
+        claveSegunModalidad(
+          `sitioWeb.secciones.nombres.${tipo}`,
+          usaCitas.value,
+          te,
+        ),
+      );
+}
+function alMensajeDelEditor(evento: MessageEvent): void {
+  const mensaje = mensajeEditorSitio(evento, editor);
+  if (mensaje?.tipo === "borrador") {
+    void mostrarBorrador(mensaje.borrador);
+  } else if (mensaje?.tipo === "enfocar") {
+    enfocarSeccion(mensaje.seccion);
+  }
+}
+
+onMounted(async () => {
+  if (enEditor) {
+    window.addEventListener("message", alMensajeDelEditor);
+  }
+  await cargar();
+  // Lista para recibir el borrador sin guardar.
+  avisarEditorSitio(editor, { tipo: "lista" });
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("message", alMensajeDelEditor);
+});
 </script>
 
 <template>
@@ -734,6 +847,9 @@ onMounted(cargar);
       ]"
       :style="estiloMarca"
       data-prueba="sitio"
+      @mouseover="alPasarEnEditor"
+      @mouseleave="resaltada = null"
+      @click.capture="alClicEnEditor"
     >
       <p
         v-if="props.vistaPrevia"
@@ -819,7 +935,18 @@ onMounted(cargar);
 
       <!-- Cada sección donde la puso el negocio (ADR 0114); la portada primero y el
            contacto al final. Lo que muestra cada una sale del sistema. -->
-      <template v-for="sec in seccionesAMostrar" :key="sec.id ?? sec.tipo">
+      <div
+        v-for="sec in seccionesAMostrar"
+        :key="sec.id ?? sec.tipo"
+        class="contents"
+        :class="{
+          'ep-en-editor': enEditor,
+          'ep-resaltada': enEditor && resaltada?.clave === claveSeccion(sec),
+          'ep-enfocada': enEditor && enfocada === claveSeccion(sec),
+        }"
+        :data-seccion="claveSeccion(sec)"
+        :data-tipo="sec.tipo"
+      >
         <!-- Portada -->
         <template v-if="sec.tipo === 'inicio'">
           <div
@@ -1808,7 +1935,21 @@ onMounted(cargar);
           :captacion-activa="escaparate.captacion?.activa === true"
           :enlace="enlaceDelSitio"
         />
-      </template>
+      </div>
+
+      <!-- En el editor: qué sección se abre con un clic -->
+      <p
+        v-if="enEditor && resaltada"
+        class="ep-editor-aviso"
+        aria-hidden="true"
+        data-prueba="aviso-editar"
+      >
+        {{
+          $t("sitioWeb.editor.clicParaEditar", {
+            seccion: nombreEnEditor(resaltada.tipo),
+          })
+        }}
+      </p>
 
       <!-- Pie de página: su texto, sus páginas y su aviso de privacidad -->
       <footer class="ep-pie" data-prueba="pie-sitio">
@@ -1995,6 +2136,32 @@ onMounted(cargar);
   background: var(--fondo);
   color: var(--texto);
   color-scheme: dark;
+}
+/* En el editor visual: la sección bajo el cursor y la que se está editando. */
+.ep-en-editor > * {
+  cursor: pointer;
+}
+.ep-resaltada > * {
+  outline: 2px dashed var(--primario);
+  outline-offset: -2px;
+}
+.ep-enfocada > * {
+  outline: 2px solid var(--primario);
+  outline-offset: -2px;
+}
+.ep-editor-aviso {
+  position: fixed;
+  bottom: 0.75rem;
+  left: 50%;
+  z-index: 30;
+  transform: translateX(-50%);
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: var(--texto);
+  color: var(--fondo);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .ep-menu-boton {
   min-height: 2.25rem;

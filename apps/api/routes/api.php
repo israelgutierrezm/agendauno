@@ -631,6 +631,8 @@ Route::prefix('v1')->group(function (): void {
             // Volver a una versión publicada (ADR 0146, fase 3): queda como borrador.
             Route::post('/sitio/versiones/{version}/restaurar', [SitioWebController::class, 'restaurar'])->middleware('puede:estudio.gestionar')->name('sitio.versiones.restaurar');
             Route::get('/sitio/vista-previa', [SitioWebController::class, 'vistaPrevia'])->middleware('puede:estudio.gestionar')->name('sitio.vista-previa');
+            // La del editor visual, con el borrador sin guardar (ADR 0146, fase 3).
+            Route::post('/sitio/vista-previa', [SitioWebController::class, 'vistaPreviaEnVivo'])->middleware('puede:estudio.gestionar')->name('sitio.vista-previa.vivo');
             Route::post('/sitio/imagenes', [SitioWebController::class, 'subirImagen'])->middleware('puede:estudio.gestionar')->name('sitio.imagenes.store');
 
             // Documentos: el admin define tipos requeridos; se cargan por persona y

@@ -581,3 +581,102 @@ describe("estilo del sitio y versiones (ADR 0146, fase 3)", () => {
     w.unmount();
   });
 });
+
+describe("editor visual (ADR 0146, fase 3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.get.mockResolvedValue({ data: { data: datos() } });
+  });
+
+  function desdePrevia(
+    w: Vista,
+    data: Record<string, unknown>,
+    fuente?: Window | null,
+  ) {
+    const marco = w.get("iframe").element as HTMLIFrameElement;
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { fuente: "agendauno-sitio", ...data },
+        origin: window.location.origin,
+        source: fuente === undefined ? marco.contentWindow : fuente,
+      }),
+    );
+    return marco;
+  }
+
+  it("un clic en la vista previa abre la sección; lo que se edita llega en vivo", async () => {
+    const w = montar();
+    await flushPromises();
+    const marco = desdePrevia(w, { tipo: "lista" });
+    const enviar = vi.spyOn(marco.contentWindow!, "postMessage");
+
+    desdePrevia(w, { tipo: "editar", pagina: null, seccion: "nosotros" });
+    await flushPromises();
+    expect(
+      w
+        .get('[data-prueba="seccion-nosotros"] [aria-expanded]')
+        .attributes("aria-expanded"),
+    ).toBe("true");
+    // Ya se ve en la vista previa: no hay que llevarla.
+    expect(enviar).not.toHaveBeenCalled();
+
+    await w.get("#sw-titulo-nosotros").setValue("Así somos");
+    await new Promise((r) => setTimeout(r, 400));
+    expect(enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fuente: "agendauno-sitio",
+        tipo: "borrador",
+        borrador: expect.objectContaining({
+          secciones: expect.arrayContaining([
+            expect.objectContaining({ tipo: "nosotros", titulo: "Así somos" }),
+          ]),
+        }),
+      }),
+      window.location.origin,
+    );
+    expect(w.get('[data-prueba="previa-estado"]').text()).toContain("En vivo");
+    w.unmount();
+  });
+
+  it("abrir una sección en el editor la lleva a la vista en la vista previa", async () => {
+    const w = montar();
+    await flushPromises();
+    const marco = desdePrevia(w, { tipo: "lista" });
+    const enviar = vi.spyOn(marco.contentWindow!, "postMessage");
+
+    await w
+      .get('[data-prueba="seccion-nosotros"] [aria-expanded]')
+      .trigger("click");
+    await flushPromises();
+    expect(enviar).toHaveBeenCalledWith(
+      { fuente: "agendauno-sitio", tipo: "enfocar", seccion: "nosotros" },
+      window.location.origin,
+    );
+    w.unmount();
+  });
+
+  it("avisa si el borrador aún no se puede mostrar e ignora mensajes de otra ventana", async () => {
+    const w = montar();
+    await flushPromises();
+    desdePrevia(w, { tipo: "lista" });
+
+    desdePrevia(
+      w,
+      { tipo: "editar", pagina: null, seccion: "nosotros" },
+      window,
+    );
+    await flushPromises();
+    expect(
+      w
+        .get('[data-prueba="seccion-nosotros"] [aria-expanded]')
+        .attributes("aria-expanded"),
+    ).toBe("false");
+
+    desdePrevia(w, { tipo: "estado", valido: false });
+    await flushPromises();
+    expect(w.get('[data-prueba="previa-estado"]').text()).toContain(
+      "por completar",
+    );
+    w.unmount();
+  });
+});
