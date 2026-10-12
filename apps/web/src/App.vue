@@ -319,12 +319,6 @@ onMounted(() => {
             >
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
-            <!-- En el teléfono «Cambiar de rol» está en el menú: el punto lo avisa. -->
-            <span
-              v-if="sesion.tieneVariosRoles"
-              class="tu-rol-punto tu-rol-punto-esquina tu-rol-punto-menu"
-              aria-hidden="true"
-            />
           </button>
           <!-- Con varias sucursales: con cuál se trabaja (en lugar del título). -->
           <SelectorSucursal v-if="selectorEnBarra" />
@@ -432,6 +426,22 @@ onMounted(() => {
             @salir="salir"
           />
         </div>
+        <!-- En el teléfono las acciones van al menú lateral, pero «Cambiar de rol» se
+             queda a la vista con sus flechas animadas, como en escritorio. -->
+        <button
+          v-if="sesion.tieneVariosRoles"
+          type="button"
+          class="tu-icono-btn tu-rol-movil"
+          data-prueba="boton-cambiar-rol-movil"
+          :aria-label="$t('operacion.rolActivo.cambiar')"
+          :title="$t('operacion.rolActivo.cambiar')"
+          @click="
+            menuRoles = true;
+            menuPerfil = false;
+          "
+        >
+          <IconoNav nombre="intercambio" :tam="18" class="tu-rol-flechas" />
+        </button>
       </header>
 
       <!-- El contenido: la tarjeta redondeada dentro del marco -->
@@ -775,14 +785,14 @@ a.tu-miga:hover {
     display: none !important;
   }
 }
+/* «Cambiar de rol» en el teléfono: solo ahí (en escritorio va con las acciones). */
 @media (min-width: 640px) {
-  .tu-barra-menu .tu-rol-punto-menu {
+  .tu-rol-movil {
     display: none;
   }
 }
 /* «Cambiar de rol»: sus flechas van y vienen, siempre, para que se note que se puede
-   entrar con otro rol (en la barra y en el menú lateral). En el teléfono, el botón
-   del menú lleva un punto que late (ahí está «Cambiar de rol»). */
+   entrar con otro rol (en la barra, en el teléfono y en el menú lateral). */
 .tu-rol-flechas path:nth-of-type(-n + 2) {
   animation: tu-rol-flecha-izq 2.4s ease-in-out infinite;
 }
@@ -809,54 +819,9 @@ a.tu-miga:hover {
     transform: translateX(3px);
   }
 }
-.tu-rol-punto {
-  position: relative;
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--primario);
-}
-.tu-rol-punto::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--primario);
-  animation: tu-rol-latido 1.8s ease-out infinite;
-}
-/* En la esquina del botón, fuera del ícono: más adentro tocaba la raya de arriba del
-   menú y se veían como una sola figura. */
-.tu-rol-punto-esquina {
-  position: absolute;
-  top: 0;
-  right: 0;
-  box-shadow: 0 0 0 2px var(--superficie);
-}
-@keyframes tu-rol-latido {
-  0% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  80%,
-  100% {
-    transform: scale(2.6);
-    opacity: 0;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .tu-rol-punto::after,
   .tu-rol-flechas path {
     animation: none;
-  }
-}
-/* Alto contraste del sistema: los fondos se quitan; el punto se pinta como texto. */
-@media (forced-colors: active) {
-  .tu-rol-punto,
-  .tu-rol-punto::after {
-    forced-color-adjust: none;
-    background: CanvasText;
   }
 }
 /* El menú móvil (cajón) no existe en escritorio: ahí el lateral siempre se ve.

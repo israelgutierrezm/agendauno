@@ -14,6 +14,9 @@ import { useToastStore } from "@/stores/toast";
  * Panel lateral de apariencia (al estilo de Acadion): elegir un tema, el tipo y el
  * tamaño de letra y —si el tema lo permite— algunos colores propios. El tema, los
  * colores y el tipo de letra se guardan en la cuenta; el tamaño, en este navegador.
+ *
+ * Los temas se desplazan; el tipo y el tamaño de letra y los colores propios van al
+ * pie, siempre a la vista, sin tener que llegar al final.
  */
 const props = defineProps<{ abierto: boolean }>();
 const emit = defineEmits<{ cerrar: [] }>();
@@ -85,6 +88,11 @@ function elegirFuente(clave: string): void {
     void guardar(() => apariencia.elegirFuente(base.value, clave));
   }
 }
+const nombreFuenteActual = computed(
+  () =>
+    apariencia.fuentes.find((f) => f.clave === fuenteActual.value)?.nombre ??
+    "",
+);
 function restablecer(): void {
   void guardar(() => apariencia.restablecer(base.value));
 }
@@ -174,116 +182,119 @@ function restablecer(): void {
           </button>
         </div>
       </section>
-
-      <!-- Tipo de letra -->
-      <section v-if="apariencia.fuentes.length > 0">
-        <h3 class="pa-seccion">{{ $t("apariencia.fuente") }}</h3>
-        <div
-          class="mt-3 grid grid-cols-2 gap-2"
-          role="radiogroup"
-          :aria-label="$t('apariencia.fuente')"
-        >
-          <button
-            v-for="f in fuentesVisibles"
-            :key="f.clave"
-            type="button"
-            role="radio"
-            class="pa-fuente"
-            :class="{ 'pa-activo': f.clave === fuenteActual }"
-            :style="{ fontFamily: pilaDeFuente(f.nombre) }"
-            :disabled="guardando"
-            :aria-checked="f.clave === fuenteActual"
-            :data-prueba="`fuente-${f.clave}`"
-            @click="elegirFuente(f.clave)"
-          >
-            <span class="block text-base font-medium">{{ f.nombre }}</span>
-            <span
-              class="block text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{
-                f.es_default ? $t("apariencia.fuentePredeterminada") : "Aa 123"
-              }}</span
-            >
-          </button>
-        </div>
-      </section>
-
-      <!-- Tamaño de letra -->
-      <section>
-        <h3 class="pa-seccion">{{ $t("apariencia.letra") }}</h3>
-        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("apariencia.letraAyuda") }}
-        </p>
-        <div class="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            class="pa-letra"
-            :aria-label="$t('apariencia.achicar')"
-            :disabled="tema.densidad === 'compacta'"
-            @click="tema.ajustarDensidad(-1)"
-          >
-            <span class="text-xs font-semibold">A−</span>
-          </button>
-          <span class="w-24 text-center text-sm">{{
-            $t(`apariencia.densidades.${tema.densidad}`)
-          }}</span>
-          <button
-            type="button"
-            class="pa-letra"
-            :aria-label="$t('apariencia.agrandar')"
-            :disabled="tema.densidad === 'comoda'"
-            @click="tema.ajustarDensidad(1)"
-          >
-            <span class="text-base font-semibold">A+</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- Ajustes propios -->
-      <section v-if="apariencia.actual?.permite_personalizar">
-        <h3 class="pa-seccion">{{ $t("apariencia.propios") }}</h3>
-        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("apariencia.propiosAyuda") }}
-        </p>
-        <div class="mt-3 space-y-3">
-          <label
-            v-for="token in apariencia.personalizables"
-            :key="token"
-            class="flex items-center justify-between gap-3 text-sm"
-          >
-            <span>{{ $t(`apariencia.tokens.${token}`) }}</span>
-            <input
-              type="color"
-              class="pa-color"
-              :value="apariencia.actual.tokens[token]"
-              :disabled="guardando"
-              @change="personalizar(token, $event)"
-            />
-          </label>
-        </div>
-        <button
-          type="button"
-          class="tu-btn tu-btn-fantasma w-full mt-4 text-sm"
-          :disabled="
-            guardando ||
-            Object.keys(apariencia.actual.personalizacion).length === 0
-          "
-          @click="restablecer"
-        >
-          {{ $t("apariencia.restablecer") }}
-        </button>
-      </section>
-      <p
-        v-else-if="apariencia.actual"
-        class="rounded-lg p-3 text-xs"
-        :style="{
-          background: 'var(--superficie-2)',
-          color: 'var(--texto-suave)',
-        }"
-      >
-        {{ $t("apariencia.sinPropios") }}
-      </p>
     </div>
+
+    <!-- Siempre a la vista: tipo y tamaño de letra y colores propios -->
+    <template #pie>
+      <div class="space-y-3" data-prueba="apariencia-pie">
+        <label
+          v-if="apariencia.fuentes.length > 0"
+          class="pa-fila"
+          for="pa-fuente"
+        >
+          <span class="pa-seccion">{{ $t("apariencia.fuente") }}</span>
+          <span class="flex min-w-0 items-center gap-2">
+            <span
+              class="pa-muestra-letra"
+              :style="{ fontFamily: pilaDeFuente(nombreFuenteActual) }"
+              aria-hidden="true"
+              >Aa</span
+            >
+            <select
+              id="pa-fuente"
+              class="tu-input pa-select"
+              :value="fuenteActual"
+              :disabled="guardando"
+              data-prueba="fuente"
+              @change="elegirFuente(($event.target as HTMLSelectElement).value)"
+            >
+              <option
+                v-for="f in fuentesVisibles"
+                :key="f.clave"
+                :value="f.clave"
+              >
+                {{
+                  f.es_default
+                    ? `${f.nombre} (${$t("apariencia.fuentePredeterminada")})`
+                    : f.nombre
+                }}
+              </option>
+            </select>
+          </span>
+        </label>
+
+        <div class="pa-fila">
+          <span class="pa-seccion" :title="$t('apariencia.letraAyuda')">{{
+            $t("apariencia.letra")
+          }}</span>
+          <span class="flex items-center gap-1.5">
+            <button
+              type="button"
+              class="pa-letra"
+              :aria-label="$t('apariencia.achicar')"
+              :disabled="tema.densidad === 'compacta'"
+              @click="tema.ajustarDensidad(-1)"
+            >
+              <span class="text-xs font-semibold">A−</span>
+            </button>
+            <span class="w-20 text-center text-sm">{{
+              $t(`apariencia.densidades.${tema.densidad}`)
+            }}</span>
+            <button
+              type="button"
+              class="pa-letra"
+              :aria-label="$t('apariencia.agrandar')"
+              :disabled="tema.densidad === 'comoda'"
+              @click="tema.ajustarDensidad(1)"
+            >
+              <span class="text-base font-semibold">A+</span>
+            </button>
+          </span>
+        </div>
+
+        <div v-if="apariencia.actual?.permite_personalizar">
+          <div class="pa-fila">
+            <span class="pa-seccion" :title="$t('apariencia.propiosAyuda')">{{
+              $t("apariencia.propios")
+            }}</span>
+            <button
+              type="button"
+              class="tu-enlace text-xs"
+              :disabled="
+                guardando ||
+                Object.keys(apariencia.actual.personalizacion).length === 0
+              "
+              @click="restablecer"
+            >
+              {{ $t("apariencia.restablecer") }}
+            </button>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            <label
+              v-for="token in apariencia.personalizables"
+              :key="token"
+              class="flex items-center gap-2 text-sm"
+            >
+              <input
+                type="color"
+                class="pa-color"
+                :value="apariencia.actual.tokens[token]"
+                :disabled="guardando"
+                @change="personalizar(token, $event)"
+              />
+              <span>{{ $t(`apariencia.tokens.${token}`) }}</span>
+            </label>
+          </div>
+        </div>
+        <p
+          v-else-if="apariencia.actual"
+          class="text-xs"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("apariencia.sinPropios") }}
+        </p>
+      </div>
+    </template>
   </PanelLateral>
 </template>
 
@@ -350,15 +361,6 @@ function restablecer(): void {
   border-radius: 999px;
   align-self: flex-end;
 }
-.pa-fuente {
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--borde);
-  background: var(--superficie);
-  color: var(--texto);
-  text-align: left;
-  cursor: pointer;
-}
 .pa-letra {
   display: grid;
   place-items: center;
@@ -374,9 +376,27 @@ function restablecer(): void {
   opacity: 0.4;
   cursor: not-allowed;
 }
+.pa-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.pa-select {
+  width: auto;
+  max-width: 12rem;
+  min-height: 2.25rem;
+  padding-block: 0.3rem;
+  font-size: 0.85rem;
+}
+.pa-muestra-letra {
+  flex-shrink: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
 .pa-color {
-  width: 3.5rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 1.75rem;
   border: none;
   background: transparent;
   cursor: pointer;
