@@ -182,6 +182,52 @@ export default {
     quedan: "Quedan {n} caracteres.",
     sinDescripcion: "La descripción de siempre.",
   },
+  // Estilo de todo el sitio y su botón principal (ADR 0146, fase 3).
+  estilo: {
+    titulo: "Estilo del sitio",
+    ayuda:
+      "El color, la letra y las esquinas de todas tus páginas, y si se ven claras u oscuras.",
+    color: "Color principal",
+    deTuMarca: "El de tu marca",
+    usarMarca: "Usar el de mi marca",
+    tipografia: "Tipografía",
+    tipografias: {
+      predeterminada: "La de siempre",
+      moderna: "Moderna",
+      clasica: "Clásica",
+      elegante: "Elegante",
+      amigable: "Amigable",
+      sistema: "Sencilla",
+    },
+    esquinas: "Esquinas",
+    esquinasOpciones: {
+      rectas: "Rectas",
+      suaves: "Suaves",
+      redondas: "Redondas",
+    },
+    tema: "Fondo",
+    temas: {
+      automatico: "Como lo tenga cada quien",
+      claro: "Claro",
+      oscuro: "Oscuro",
+    },
+    botonTexto: "Botón principal del encabezado",
+    botonEjemplo: "Ej.: Agendar",
+    botonEnlace: "Enlace del botón",
+    botonAyuda:
+      "Aparece arriba en todas tus páginas. Una sección (#agenda), una de tus páginas (/p/precios) o una página web (https://…).",
+  },
+  versiones: {
+    titulo: "Versiones publicadas",
+    ayuda:
+      "Vuelve a una versión anterior: queda como borrador para que la revises antes de publicarla.",
+    actual: "Publicada ahora",
+    volver: "Volver a esta",
+    por: "Por {nombre}",
+    confirmar:
+      "¿Volver a la versión del {fecha}? Tu borrador se reemplaza por ella; el público sigue viendo lo publicado hasta que publiques.",
+    restaurada: "Listo: tu borrador es esa versión. Revísala y publica.",
+  },
   pie: {
     titulo: "Pie de página",
     ayuda:

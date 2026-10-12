@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -12,9 +12,11 @@ import SeoPaginaSitio from "@/components/SeoPaginaSitio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { claveSegunModalidad } from "@/lib/menu";
+import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
 import {
   claveSeccion,
   direccionDe,
+  FAMILIAS_SITIO,
   duplicarBloque,
   esBloque,
   esFija,
@@ -22,11 +24,14 @@ import {
   nuevaPagina,
   nuevoBloque,
   type BannerSitio,
+  type EncabezadoSitio,
+  type EstiloSitio,
   type PaginaSitio,
   type PlantillaSitio,
   type SeccionSitio,
   type SeoSitio,
   type TipoBloque,
+  type TipografiaSitio,
   type TipoSeccion,
 } from "@/lib/sitioWeb";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -44,6 +49,10 @@ import { useToastStore } from "@/stores/toast";
  * Varias páginas (ADR 0146, fase 2): «Páginas» lista Inicio y las propias (su título,
  * su dirección, si van en el menú y su SEO); «Secciones» edita la que se elige. En una
  * página propia caben las secciones del sistema (una vez) y bloques. Más el pie.
+ *
+ * Fase 3: «Estilo del sitio» (color, tipografía de una lista, esquinas y claro u
+ * oscuro), el botón principal del encabezado y «Versiones publicadas» para volver a
+ * una (queda como borrador hasta publicarla).
  */
 type SeccionBorrador = SeccionSitio & { visible: boolean };
 interface Borrador {
@@ -53,6 +62,14 @@ interface Borrador {
   seo: SeoSitio;
   paginas: (PaginaSitio & { secciones: SeccionBorrador[] })[];
   pie: { texto: string | null };
+  estilo: EstiloSitio;
+  encabezado: EncabezadoSitio;
+}
+interface VersionSitio {
+  id: string;
+  publicada_en: string | null;
+  publicada_por: string | null;
+  actual: boolean;
 }
 interface DatosSitio {
   borrador: Borrador;
@@ -60,6 +77,9 @@ interface DatosSitio {
   publicado_en: string | null;
   pagina_publica: boolean;
   tiene_portada: boolean;
+  // Fase 3 (ADR 0146): las versiones publicadas y el color de su marca.
+  versiones?: VersionSitio[];
+  color_marca?: string | null;
   catalogo: {
     plantillas: { clave: PlantillaSitio; orden: TipoSeccion[] }[];
     con_texto: TipoSeccion[];
@@ -83,6 +103,9 @@ interface DatosSitio {
     max_seo_titulo: number;
     max_seo_descripcion: number;
     max_pie: number;
+    tipografias?: TipografiaSitio[];
+    esquinas?: EstiloSitio["esquinas"][];
+    temas?: EstiloSitio["tema"][];
   };
 }
 
@@ -159,6 +182,13 @@ function tomar(d: DatosSitio): void {
   d.borrador.seo ??= { titulo: null, descripcion: null, imagen_url: null };
   d.borrador.paginas ??= [];
   d.borrador.pie ??= { texto: null };
+  d.borrador.estilo ??= {
+    color: null,
+    tipografia: "predeterminada",
+    esquinas: "suaves",
+    tema: "automatico",
+  };
+  d.borrador.encabezado ??= { boton_texto: null, boton_enlace: null };
   datos.value = d;
   // Una copia para editar: lo guardado queda como referencia de «sin guardar».
   guardadoComo.value = JSON.stringify(d.borrador);
@@ -291,6 +321,61 @@ async function usarPlantilla(clave: PlantillaSitio): Promise<void> {
       (s): s is Borrador["secciones"][number] => s !== undefined,
     ),
   ];
+}
+
+// ---- Estilo del sitio (ADR 0146, fase 3) ----
+// El color que se ve: el elegido o el de su marca (o el de siempre).
+const colorDelSitio = computed(
+  () => borrador.value?.estilo.color ?? datos.value?.color_marca ?? "#007e91",
+);
+function elegirColor(e: Event): void {
+  if (borrador.value) {
+    borrador.value.estilo.color = (e.target as HTMLInputElement).value;
+  }
+}
+// Cada tipografía se muestra con su letra.
+watch(
+  () => datos.value?.catalogo.tipografias,
+  (lista) => {
+    (lista ?? []).forEach((t) => {
+      const familia = FAMILIAS_SITIO[t];
+      if (familia) {
+        cargarFuente(familia);
+      }
+    });
+  },
+);
+function letraDe(tipografia: TipografiaSitio): string | undefined {
+  const familia = FAMILIAS_SITIO[tipografia];
+  return familia ? pilaDeFuente(familia) : undefined;
+}
+
+// ---- Versiones publicadas: volver a una (queda como borrador) ----
+async function restaurarVersion(v: VersionSitio): Promise<void> {
+  if (
+    !(await confirmar(
+      t("sitioWeb.versiones.confirmar", {
+        fecha: v.publicada_en ? fecha(v.publicada_en) : "",
+      }),
+      { aceptar: t("sitioWeb.versiones.volver") },
+    ))
+  ) {
+    return;
+  }
+  ocupado.value = true;
+  try {
+    const { data } = await api.post<{ data: DatosSitio }>(
+      `${base.value}/versiones/${v.id}/restaurar`,
+    );
+    tomar(data.data);
+    vuelta.value++;
+    elegirPagina(null);
+    toast.exito(t("sitioWeb.versiones.restaurada"));
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    ocupado.value = false;
+  }
 }
 
 // ---- Páginas (ADR 0146, fase 2) ----
@@ -637,6 +722,167 @@ onMounted(cargar);
             >
               {{ $t("sitioWeb.plantillas.portadaSinFoto") }}
             </p>
+          </div>
+
+          <!-- Estilo del sitio (ADR 0146, fase 3) -->
+          <div class="tu-card p-5" data-prueba="estilo-sitio">
+            <h2 class="text-lg font-medium">
+              {{ $t("sitioWeb.estilo.titulo") }}
+            </h2>
+            <p class="mt-1 text-sm sw-suave">
+              {{ $t("sitioWeb.estilo.ayuda") }}
+            </p>
+            <div class="mt-4 space-y-5">
+              <div>
+                <span class="tu-label">{{ $t("sitioWeb.estilo.color") }}</span>
+                <div class="flex flex-wrap items-center gap-3">
+                  <input
+                    type="color"
+                    class="sw-color"
+                    :value="colorDelSitio"
+                    :aria-label="$t('sitioWeb.estilo.color')"
+                    data-prueba="estilo-color"
+                    @change="elegirColor"
+                  />
+                  <span class="text-sm sw-suave">{{
+                    borrador.estilo.color
+                      ? borrador.estilo.color
+                      : $t("sitioWeb.estilo.deTuMarca")
+                  }}</span>
+                  <button
+                    v-if="borrador.estilo.color"
+                    type="button"
+                    class="tu-enlace text-sm"
+                    data-prueba="estilo-color-marca"
+                    @click="borrador.estilo.color = null"
+                  >
+                    {{ $t("sitioWeb.estilo.usarMarca") }}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <span class="tu-label">{{
+                  $t("sitioWeb.estilo.tipografia")
+                }}</span>
+                <div
+                  class="sw-tipografias"
+                  role="radiogroup"
+                  :aria-label="$t('sitioWeb.estilo.tipografia')"
+                >
+                  <button
+                    v-for="tipo in datos.catalogo.tipografias ?? []"
+                    :key="tipo"
+                    type="button"
+                    role="radio"
+                    class="sw-tipografia"
+                    :class="{
+                      'sw-tipografia-activa':
+                        borrador.estilo.tipografia === tipo,
+                    }"
+                    :aria-checked="borrador.estilo.tipografia === tipo"
+                    :style="{ fontFamily: letraDe(tipo) }"
+                    :data-prueba="`tipografia-${tipo}`"
+                    @click="borrador.estilo.tipografia = tipo"
+                  >
+                    <span class="block text-base">Aa</span>
+                    <span class="block text-xs">{{
+                      $t(`sitioWeb.estilo.tipografias.${tipo}`)
+                    }}</span>
+                  </button>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-x-6 gap-y-4">
+                <div>
+                  <span class="tu-label">{{
+                    $t("sitioWeb.estilo.esquinas")
+                  }}</span>
+                  <div class="tu-segmentado" role="group">
+                    <button
+                      v-for="e in datos.catalogo.esquinas ?? []"
+                      :key="e"
+                      type="button"
+                      :aria-pressed="borrador.estilo.esquinas === e"
+                      :data-prueba="`esquinas-${e}`"
+                      @click="borrador.estilo.esquinas = e"
+                    >
+                      {{ $t(`sitioWeb.estilo.esquinasOpciones.${e}`) }}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <span class="tu-label">{{ $t("sitioWeb.estilo.tema") }}</span>
+                  <div class="tu-segmentado" role="group">
+                    <button
+                      v-for="tm2 in datos.catalogo.temas ?? []"
+                      :key="tm2"
+                      type="button"
+                      :aria-pressed="borrador.estilo.tema === tm2"
+                      :data-prueba="`tema-${tm2}`"
+                      @click="borrador.estilo.tema = tm2"
+                    >
+                      {{ $t(`sitioWeb.estilo.temas.${tm2}`) }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <!-- El botón principal del encabezado -->
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="tu-label" for="sw-boton-principal">{{
+                    $t("sitioWeb.estilo.botonTexto")
+                  }}</label>
+                  <input
+                    id="sw-boton-principal"
+                    class="tu-input"
+                    maxlength="40"
+                    :placeholder="$t('sitioWeb.estilo.botonEjemplo')"
+                    :value="borrador.encabezado.boton_texto ?? ''"
+                    data-prueba="boton-principal-texto"
+                    @input="
+                      borrador.encabezado.boton_texto = texto(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </div>
+                <div>
+                  <label class="tu-label" for="sw-boton-enlace">{{
+                    $t("sitioWeb.estilo.botonEnlace")
+                  }}</label>
+                  <input
+                    id="sw-boton-enlace"
+                    class="tu-input"
+                    maxlength="300"
+                    placeholder="#agenda"
+                    :value="borrador.encabezado.boton_enlace ?? ''"
+                    data-prueba="boton-principal-enlace"
+                    @input="
+                      borrador.encabezado.boton_enlace = texto(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </div>
+                <p class="sw-ayuda sm:col-span-2">
+                  {{ $t("sitioWeb.estilo.botonAyuda") }}
+                </p>
+                <p
+                  v-if="
+                    errorDe('encabezado.boton_texto') ||
+                    errorDe('encabezado.boton_enlace') ||
+                    errorDe('estilo.color')
+                  "
+                  class="text-sm sm:col-span-2"
+                  style="color: var(--error)"
+                >
+                  {{
+                    errorDe("encabezado.boton_texto") ??
+                    errorDe("encabezado.boton_enlace") ??
+                    errorDe("estilo.color")
+                  }}
+                </p>
+              </div>
+            </div>
           </div>
 
           <!-- Páginas (ADR 0146): Inicio y las propias -->
@@ -1156,6 +1402,53 @@ onMounted(cargar);
             </p>
           </div>
 
+          <!-- Versiones publicadas: volver a una -->
+          <div
+            v-if="(datos.versiones ?? []).length > 0"
+            class="tu-card p-5"
+            data-prueba="versiones-sitio"
+          >
+            <h2 class="text-lg font-medium">
+              {{ $t("sitioWeb.versiones.titulo") }}
+            </h2>
+            <p class="mt-1 text-sm sw-suave">
+              {{ $t("sitioWeb.versiones.ayuda") }}
+            </p>
+            <ul class="mt-3 divide-y" :style="{ borderColor: 'var(--borde)' }">
+              <li
+                v-for="v in datos.versiones"
+                :key="v.id"
+                class="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                data-prueba="version"
+              >
+                <span class="min-w-0 text-sm">
+                  <span class="block">{{
+                    v.publicada_en ? fecha(v.publicada_en) : "—"
+                  }}</span>
+                  <span v-if="v.publicada_por" class="block text-xs sw-suave">{{
+                    $t("sitioWeb.versiones.por", { nombre: v.publicada_por })
+                  }}</span>
+                </span>
+                <span
+                  v-if="v.actual"
+                  class="tu-estado text-sm"
+                  :style="{ '--tono': 'var(--exito)' }"
+                  >{{ $t("sitioWeb.versiones.actual") }}</span
+                >
+                <button
+                  v-else
+                  type="button"
+                  class="tu-btn tu-btn-fantasma text-sm"
+                  :disabled="ocupado"
+                  :data-prueba="`restaurar-${v.id}`"
+                  @click="restaurarVersion(v)"
+                >
+                  {{ $t("sitioWeb.versiones.volver") }}
+                </button>
+              </li>
+            </ul>
+          </div>
+
           <!-- Pie de página: en todas las páginas -->
           <div class="tu-card p-5" data-prueba="pie-editor">
             <h2 class="text-lg font-medium">
@@ -1545,6 +1838,31 @@ onMounted(cargar);
 }
 .sw-suave {
   color: var(--texto-suave);
+}
+.sw-color {
+  width: 3rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--borde);
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+.sw-tipografias {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 0.5rem;
+}
+.sw-tipografia {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+  background: var(--superficie);
+  text-align: left;
+}
+.sw-tipografia-activa {
+  border-color: var(--primario);
+  box-shadow: 0 0 0 1px var(--primario);
 }
 .sw-pagina-activa {
   border-color: var(--primario);

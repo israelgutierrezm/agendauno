@@ -59,6 +59,15 @@ class SitioWebController
             ...$this->reglasSeo('seo', $foto),
             'pie' => ['nullable', 'array'],
             'pie.texto' => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_PIE],
+            // Estilo global y encabezado (ADR 0146, fase 3).
+            'estilo' => ['nullable', 'array'],
+            'estilo.color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'estilo.tipografia' => ['nullable', Rule::in(CatalogoSitioWeb::TIPOGRAFIAS)],
+            'estilo.esquinas' => ['nullable', Rule::in(CatalogoSitioWeb::ESQUINAS)],
+            'estilo.tema' => ['nullable', Rule::in(CatalogoSitioWeb::TEMAS)],
+            'encabezado' => ['nullable', 'array'],
+            'encabezado.boton_texto' => ['nullable', 'string', 'max:40'],
+            'encabezado.boton_enlace' => ['nullable', 'string', 'max:300', $enlace],
             'banners' => ['present', 'array', 'max:'.$parametros->entero('sitio.banners_maximos')],
             'banners.*.id' => ['nullable', 'string', 'max:26'],
             'banners.*.titulo' => ['required', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO],
@@ -73,6 +82,7 @@ class SitioWebController
             'paginas.max' => 'Tu sitio puede tener hasta :max páginas, además de Inicio.',
             'paginas.*.slug.regex' => 'La dirección lleva solo minúsculas, números y guiones (p. ej. «nosotros» o «preguntas-frecuentes»).',
             'paginas.*.slug.distinct' => 'Ya tienes otra página con esa dirección.',
+            'estilo.color.regex' => 'Elige un color de la paleta.',
             'secciones.*.tipo.in' => 'Esa sección no existe en tu sitio.',
             'paginas.*.secciones.*.tipo.in' => 'Esa sección no existe en tu sitio.',
             'secciones.*.datos.fotos.max' => 'Una galería lleva hasta :max fotos.',
@@ -81,6 +91,9 @@ class SitioWebController
             'paginas.*.secciones.*.datos.items.max' => 'Caben hasta :max elementos.',
         ]);
         $this->validarSecciones((array) $validado['secciones'], $bloquesMaximos, 'secciones');
+        if (($validado['encabezado']['boton_enlace'] ?? null) !== null && trim((string) ($validado['encabezado']['boton_texto'] ?? '')) === '') {
+            throw ValidationException::withMessages(['encabezado.boton_texto' => 'Escribe el texto del botón.']);
+        }
         foreach ((array) ($validado['paginas'] ?? []) as $p => $pagina) {
             $this->validarSecciones((array) ($pagina['secciones'] ?? []), $bloquesMaximos, "paginas.{$p}.secciones");
         }
@@ -106,6 +119,18 @@ class SitioWebController
         $publicacion = $this->sitio->publicar($estudio->modalidad(), $this->usuarioId($request), (int) $estudio->getKey());
         // Lo que ven buscadores y redes de cada página, sin abrir la base del negocio.
         $estudio->update(['seo_sitio' => $this->sitio->resumenSeo($this->sitio->normalizar((array) $publicacion->contenido, $estudio->modalidad()))]);
+
+        return response()->json(['data' => $this->presentar($estudio)]);
+    }
+
+    /**
+     * Vuelve el borrador a una versión publicada (de las últimas): se revisa y se publica
+     * como cualquier cambio (ADR 0146, fase 3).
+     */
+    public function restaurar(Request $request): JsonResponse
+    {
+        $estudio = $this->estudio($request);
+        $this->sitio->restaurar((string) $request->route('version'), $estudio->modalidad(), $this->usuarioId($request), (int) $estudio->getKey());
 
         return response()->json(['data' => $this->presentar($estudio)]);
     }
@@ -170,6 +195,10 @@ class SitioWebController
             'publicado_en' => $ultima?->created_at?->toIso8601String(),
             // La página se ve en línea solo si el negocio la abrió (Configuración).
             'pagina_publica' => $estudio->paginaPublica(),
+            // Las últimas versiones publicadas, para volver a una (ADR 0146, fase 3).
+            'versiones' => $this->sitio->versiones(),
+            // El color de su marca: el del sitio si no elige otro.
+            'color_marca' => $estudio->color_marca,
             // La plantilla «Portada» necesita la foto de portada (Página pública).
             'tiene_portada' => $estudio->portada_url !== null,
             'catalogo' => [
@@ -199,6 +228,10 @@ class SitioWebController
                 'max_seo_titulo' => CatalogoSitioWeb::MAX_SEO_TITULO,
                 'max_seo_descripcion' => CatalogoSitioWeb::MAX_SEO_DESCRIPCION,
                 'max_pie' => CatalogoSitioWeb::MAX_PIE,
+                // Estilo global (fase 3).
+                'tipografias' => CatalogoSitioWeb::TIPOGRAFIAS,
+                'esquinas' => CatalogoSitioWeb::ESQUINAS,
+                'temas' => CatalogoSitioWeb::TEMAS,
                 'formularios' => FormularioCaptacionTenant::query()->where('activo', true)->orderBy('nombre')->get()
                     ->map(static fn (FormularioCaptacionTenant $f): array => ['id' => $f->ulid, 'nombre' => $f->nombre])->all(),
             ],

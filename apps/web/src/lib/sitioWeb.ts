@@ -102,15 +102,72 @@ export interface PaginaSitio {
   secciones: SeccionSitio[];
 }
 
+export type TipografiaSitio =
+  | "predeterminada"
+  | "moderna"
+  | "clasica"
+  | "elegante"
+  | "amigable"
+  | "sistema";
+export type EsquinasSitio = "rectas" | "suaves" | "redondas";
+export type TemaSitio = "automatico" | "claro" | "oscuro";
+
+/** El estilo de todo el sitio (ADR 0146, fase 3). */
+export interface EstiloSitio {
+  // `#rrggbb`; null: el color de su marca.
+  color: string | null;
+  tipografia: TipografiaSitio;
+  esquinas: EsquinasSitio;
+  tema: TemaSitio;
+}
+
+/** El botón principal del encabezado (p. ej. «Agendar» hacia `#agenda`). */
+export interface EncabezadoSitio {
+  boton_texto: string | null;
+  boton_enlace: string | null;
+}
+
 export interface SitioPublico {
   plantilla: PlantillaSitio;
   secciones: SeccionSitio[];
   banners: BannerSitio[];
-  // Fase 2 (ADR 0146); un API anterior no los manda.
+  // Fases 2 y 3 (ADR 0146); un API anterior no los manda.
   seo?: SeoSitio;
   paginas?: PaginaSitio[];
   pie?: { texto: string | null };
+  estilo?: EstiloSitio;
+  encabezado?: EncabezadoSitio;
 }
+
+/**
+ * La familia de cada tipografía del sitio (null: la de siempre). Las de Google Fonts se
+ * cargan solo si el sitio las usa.
+ */
+export const FAMILIAS_SITIO: Record<TipografiaSitio, string | null> = {
+  predeterminada: null,
+  moderna: "Poppins",
+  clasica: "Lora",
+  elegante: "Playfair Display",
+  amigable: "Nunito",
+  sistema: "Sistema",
+};
+
+/** Los radios de cada estilo de esquinas (las suaves son las de siempre). */
+export const RADIOS_SITIO: Record<EsquinasSitio, Record<string, string>> = {
+  rectas: {
+    "--radio-boton": "4px",
+    "--radio-tarjeta": "6px",
+    "--radio-imagen": "6px",
+    "--radio-panel": "8px",
+  },
+  suaves: {},
+  redondas: {
+    "--radio-boton": "999px",
+    "--radio-tarjeta": "24px",
+    "--radio-imagen": "28px",
+    "--radio-panel": "32px",
+  },
+};
 
 /** La dirección de una página a partir de su título: «Preguntas frecuentes» → preguntas-frecuentes. */
 export function direccionDe(titulo: string, maximo = 40): string {
@@ -260,6 +317,13 @@ export function sitioPorDefecto(esCitas: boolean): SitioPublico {
     seo: { titulo: null, descripcion: null, imagen_url: null },
     paginas: [],
     pie: { texto: null },
+    estilo: {
+      color: null,
+      tipografia: "predeterminada",
+      esquinas: "suaves",
+      tema: "automatico",
+    },
+    encabezado: { boton_texto: null, boton_enlace: null },
   };
 }
 
