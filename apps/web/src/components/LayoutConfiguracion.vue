@@ -273,13 +273,31 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
   margin-inline: 0;
   padding: 0 0 2.5rem;
 }
-/* Su encabezado, en tarjeta, como el resto del contenido. */
+/* Su encabezado, en una tarjeta compacta: el título y su icono, más chicos que en
+   las pantallas de operación (aquí el contenido es lo importante). */
 .lc-contenido :deep(.tu-encabezado) {
-  padding: 1.1rem 1.35rem;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
   background: var(--superficie);
   border: 1px solid var(--borde);
   border-radius: var(--radio-tarjeta);
   box-shadow: var(--sombra-tarjeta);
+}
+.lc-contenido :deep(.tu-encabezado h1) {
+  font-size: 1.15rem;
+}
+.lc-contenido :deep(.tu-encabezado h1 + p) {
+  margin-top: 0.1rem;
+  font-size: 0.8rem;
+}
+.lc-contenido :deep(.tu-encabezado .es-icono) {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.6rem;
+}
+.lc-contenido :deep(.tu-encabezado .es-icono svg) {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 .lc-boton {
   margin: 0 0 1rem;

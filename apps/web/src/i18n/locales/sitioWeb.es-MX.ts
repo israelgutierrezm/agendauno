@@ -2,6 +2,13 @@
 // página pública (views/EstudioPublicoView.vue).
 export default {
   titulo: "Sitio web",
+  // Su rubro en Configuración del negocio.
+  categoria: {
+    titulo: "Sitio web",
+    descripcion:
+      "Tu página en internet: el constructor de páginas y lo que se ve en tu página pública.",
+    constructor: "Constructor del sitio",
+  },
   descripcion:
     "Cómo se ve tu página: la plantilla, qué secciones muestra y en qué orden, tus textos, fotos y banners. Horarios, precios y servicios salen de tu negocio y se actualizan solos.",
   estado: {

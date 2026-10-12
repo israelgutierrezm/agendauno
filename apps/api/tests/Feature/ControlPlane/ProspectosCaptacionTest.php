@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ProspectoTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -299,4 +300,40 @@ it('borrar un prospecto borra sus datos y su historial', function (): void {
     $this->deleteJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", [], conBearer($e['bearer']))->assertNoContent();
     $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", conBearer($e['bearer']))->assertNotFound();
     expect(prospectosDelNegocioCaptacion($e, '?estado=todos')['data'])->toBe([]);
+});
+
+it('los prospectos se filtran como Miembros (origen, formulario, seguimiento, sede, cuándo llegó y campaña) y van por páginas', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $sede = agendaSemilla($e)['sucursal'];
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $nombres = fn (string $filtros): array => collect(prospectosDelNegocioCaptacion($e, $filtros)['data'])->pluck('nombre')->sort()->values()->all();
+
+    // Hace 10 días, sin campaña; hoy, por una campaña de Instagram; y uno capturado a mano en la sede.
+    $this->travelTo(now()->subDays(10));
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['nombre' => 'Viejo', 'email' => 'viejo@correo.mx', 'telefono' => '5599998888']))->assertCreated();
+    $this->travelBack();
+    $this->travelTo(CarbonImmutable::parse(Tests\TestCase::AHORA, Tests\TestCase::ZONA_AHORA));
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion([
+        'atribucion' => ['ultimo_toque' => ['fuente' => 'instagram', 'campana' => 'octubre', 'en' => now()->toIso8601String()]],
+    ]))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/prospectos", ['nombre' => 'Manual', 'telefono' => '5511112222', 'sucursal_id' => $sede], conBearer($e['bearer']))->assertCreated();
+
+    expect($nombres('?origen=manual'))->toBe(['Manual'])
+        ->and($nombres("?formulario_id={$formulario}"))->toBe(['Lucía Prospecto', 'Viejo'])
+        ->and($nombres('?periodo=hoy'))->toBe(['Lucía Prospecto', 'Manual'])
+        ->and($nombres('?periodo=30'))->toBe(['Lucía Prospecto', 'Manual', 'Viejo'])
+        ->and($nombres('?campana=con'))->toBe(['Lucía Prospecto'])
+        ->and($nombres('?campana=sin'))->toBe(['Manual', 'Viejo'])
+        ->and($nombres("?sucursal_id={$sede}"))->toBe(['Manual']);
+
+    // Su seguimiento era para ayer: vencido.
+    $lucia = collect(prospectosDelNegocioCaptacion($e)['data'])->firstWhere('nombre', 'Lucía Prospecto')['id'];
+    $this->putJson("/api/v1/app/{$e['slug']}/prospectos/{$lucia}/seguimiento", ['cuando' => '2026-10-01T10:00:00-06:00'], conBearer($e['bearer']))->assertOk();
+    $this->travelTo(CarbonImmutable::parse('2026-10-02 09:00', Tests\TestCase::ZONA_AHORA));
+    expect($nombres('?seguimiento=vencido'))->toBe(['Lucía Prospecto']);
+
+    $pagina = prospectosDelNegocioCaptacion($e, '?per_page=2&page=2');
+    expect($pagina['meta'])->toMatchArray(['total' => 3, 'page' => 2, 'per_page' => 2, 'ultima_pagina' => 2])
+        ->and($pagina['data'])->toHaveCount(1);
+    $this->getJson("/api/v1/app/{$e['slug']}/prospectos?origen=otro", conBearer($e['bearer']))->assertUnprocessable();
 });

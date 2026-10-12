@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ProspectosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Captacion\EstadoProspecto;
 use App\Modules\Tenancy\Captacion\MotivoCierreProspecto;
+use App\Modules\Tenancy\Captacion\OrigenProspecto;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoProspectoTenant;
+use App\Modules\Tenancy\Models\FormularioCaptacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProspectoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -32,6 +35,7 @@ class ProspectosTenantController
     public function __construct(
         private readonly ProspectosTenant $prospectos,
         private readonly ResolverAccesoTenant $acceso,
+        private readonly FechasNegocioTenant $fechas,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -43,8 +47,19 @@ class ProspectosTenantController
             'responsable' => ['nullable', 'string', 'max:40'],
             // `sin_atender`: su responsable no lo atendió a tiempo (ADR 0138).
             'atencion' => ['nullable', 'string', Rule::in(['sin_atender'])],
+            // `vencido`: su próximo seguimiento ya pasó.
+            'seguimiento' => ['nullable', 'string', Rule::in(['vencido'])],
+            // Por dónde llegó: un formulario (y cuál) o capturado a mano.
+            'origen' => ['nullable', Rule::enum(OrigenProspecto::class)],
+            'formulario_id' => ['nullable', 'string', 'max:40'],
+            'sucursal_id' => ['nullable', 'string', 'max:40'],
+            // Cuándo llegó, en días del negocio: hoy o los últimos 7 o 30.
+            'periodo' => ['nullable', 'string', Rule::in(['hoy', '7', '30'])],
+            // `con`: llegó por una campaña (UTM, anuncio o enlace de otro sitio); `sin`, no.
+            'campana' => ['nullable', 'string', Rule::in(['con', 'sin'])],
             'q' => ['nullable', 'string', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $actor = $this->actor($request);
 
@@ -67,6 +82,31 @@ class ProspectosTenantController
         if (($validado['atencion'] ?? null) === 'sin_atender') {
             $consulta->whereNotNull('sin_atender_desde');
         }
+        if (($validado['seguimiento'] ?? null) === 'vencido') {
+            $consulta->where('proximo_seguimiento_en', '<=', now());
+        }
+        if (($validado['origen'] ?? '') !== '') {
+            $consulta->where('origen', $validado['origen']);
+        }
+        if (($validado['formulario_id'] ?? '') !== '') {
+            $consulta->where('formulario_id', FormularioCaptacionTenant::query()->where('ulid', $validado['formulario_id'])->value('id') ?? 0);
+        }
+        if (($validado['sucursal_id'] ?? '') !== '') {
+            $consulta->where('sucursal_id', SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->value('id') ?? 0);
+        }
+        if (($validado['periodo'] ?? '') !== '') {
+            $dias = $validado['periodo'] === 'hoy' ? 0 : (int) $validado['periodo'] - 1;
+            $consulta->where('created_at', '>=', $this->fechas->inicioDelDia($this->fechas->dia()->subDays($dias)->toDateString()));
+        }
+        if (($validado['campana'] ?? '') !== '') {
+            $conCampana = fn (Builder $c) => $c->where(fn (Builder $w) => $w
+                ->whereNotNull('campana')->orWhereNotNull('fuente')->orWhereNotNull('referente'));
+            if ($validado['campana'] === 'con') {
+                $consulta->whereHas('contexto', $conCampana);
+            } else {
+                $consulta->whereDoesntHave('contexto', $conCampana);
+            }
+        }
         $q = trim((string) ($validado['q'] ?? ''));
         if ($q !== '') {
             $consulta->where(function (Builder $w) use ($q): void {
@@ -78,7 +118,7 @@ class ProspectosTenantController
 
         $pagina = $consulta->orderByRaw('CASE WHEN estado = ? THEN 0 ELSE 1 END', [EstadoProspecto::Nuevo->value])
             ->orderByDesc('created_at')
-            ->paginate(self::POR_PAGINA);
+            ->paginate((int) ($validado['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($validado['page'] ?? 1));
 
         // Lo que pide atención: nuevos sin contactar y seguimientos vencidos (de lo que ve).
         $base = $this->alcance(ProspectoTenant::query(), $actor)->whereIn('estado', EstadoProspecto::abiertos());
@@ -89,6 +129,7 @@ class ProspectosTenantController
                 'page' => $pagina->currentPage(),
                 'per_page' => $pagina->perPage(),
                 'total' => $pagina->total(),
+                'ultima_pagina' => $pagina->lastPage(),
                 'resumen' => [
                     'nuevos' => (clone $base)->where('estado', EstadoProspecto::Nuevo->value)->count(),
                     'seguimientos_vencidos' => (clone $base)->where('proximo_seguimiento_en', '<=', now())->count(),

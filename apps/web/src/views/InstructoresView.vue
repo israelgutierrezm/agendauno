@@ -26,6 +26,8 @@ interface Instructor {
   nombre: string;
   nombre_corto: string;
   foto_url: string | null;
+  // Dónde atiende (ulids); vacío = no tiene sede propia (atiende en todas).
+  sucursales?: string[];
   // Para las tarjetas (`resumen=1`): su agenda de los próximos 7 días y sus sedes.
   resumen?: {
     proxima: {
@@ -58,11 +60,82 @@ const vista = useVistaListado("instructores", "cuadricula");
 const busqueda = ref("");
 
 const instructores = ref<Instructor[]>([]);
+
+// Filtros como en Miembros: sede, agenda de la semana y reseñas.
+const filtros = ref({ sucursal: "", agenda: "", resenas: "" });
+const filtrosDef = computed(() => [
+  ...(hayMultiSucursal.value
+    ? [
+        {
+          clave: "sucursal",
+          etiqueta: t("equipoVisual.filtros.sede"),
+          opciones: sucursales.value.map((s) => ({
+            valor: s.id,
+            texto: s.nombre,
+          })),
+        },
+      ]
+    : []),
+  {
+    clave: "agenda",
+    etiqueta: t("equipoVisual.filtros.agenda"),
+    opciones: [
+      { valor: "con", texto: t("equipoVisual.filtros.conAgenda") },
+      { valor: "sin", texto: t("equipoVisual.filtros.sinAgenda") },
+    ],
+  },
+  // Las reseñas solo las ve quien ve a los clientes.
+  ...(sesion.puede("miembros.ver")
+    ? [
+        {
+          clave: "resenas",
+          etiqueta: t("equipoVisual.filtros.resenas"),
+          opciones: [
+            { valor: "4", texto: t("equipoVisual.filtros.cuatroOMas") },
+            { valor: "con", texto: t("equipoVisual.filtros.conResenas") },
+            { valor: "sin", texto: t("equipoVisual.filtros.sinResenas") },
+          ],
+        },
+      ]
+    : []),
+]);
+function cambioFiltro(clave: string, valor: string): void {
+  filtros.value = { ...filtros.value, [clave]: valor };
+}
+function limpiarFiltros(): void {
+  filtros.value = { sucursal: "", agenda: "", resenas: "" };
+}
+const filtrando = computed(
+  () =>
+    busqueda.value.trim() !== "" ||
+    Object.values(filtros.value).some((v) => v !== ""),
+);
+function pasaFiltros(i: Instructor): boolean {
+  const f = filtros.value;
+  const semana = i.resumen?.semana;
+  const agendado = (semana?.clases ?? 0) + (semana?.citas ?? 0) > 0;
+  const resenas = i.resumen?.resenas ?? null;
+  // Sin sede propia atiende en todas: también aparece en cada una.
+  const sedes = i.sucursales ?? [];
+  return (
+    (f.sucursal === "" || sedes.length === 0 || sedes.includes(f.sucursal)) &&
+    (f.agenda === "" || (f.agenda === "con") === agendado) &&
+    (f.resenas === "" ||
+      (f.resenas === "sin"
+        ? resenas === null
+        : resenas !== null &&
+          (f.resenas === "con" || resenas.promedio >= Number(f.resenas))))
+  );
+}
 const visibles = computed(() => {
   const q = busqueda.value.trim().toLowerCase();
-  return q === ""
-    ? instructores.value
-    : instructores.value.filter((i) => i.nombre.toLowerCase().includes(q));
+  return instructores.value.filter(
+    (i) =>
+      (q === "" ||
+        i.nombre.toLowerCase().includes(q) ||
+        i.nombre_corto.toLowerCase().includes(q)) &&
+      pasaFiltros(i),
+  );
 });
 const sucursales = ref<Sucursal[]>([]);
 const cargando = ref(true);
@@ -267,12 +340,36 @@ onMounted(cargar);
           v-model:busqueda="busqueda"
           v-model:vista="vista"
           class="mt-5"
+          :filtros="filtrosDef"
+          :valores="filtros"
           :placeholder="$t('tabla.buscar')"
+          @cambio-filtro="cambioFiltro"
+          @limpiar="limpiarFiltros"
         />
+
+        <EstadoVacio
+          v-if="visibles.length === 0"
+          class="mt-4 tu-card"
+          icono="buscar"
+          :titulo="$t('equipoVisual.filtros.nadie')"
+          data-prueba="sin-coincidencias"
+        >
+          <button
+            v-if="filtrando"
+            type="button"
+            class="tu-btn tu-btn-fantasma mt-3 text-sm"
+            @click="
+              busqueda = '';
+              limpiarFiltros();
+            "
+          >
+            {{ $t("tabla.limpiar") }}
+          </button>
+        </EstadoVacio>
 
         <!-- Cuadrícula: quién es y cómo viene su semana (sin datos de contacto) -->
         <ul
-          v-if="vista === 'cuadricula'"
+          v-else-if="vista === 'cuadricula'"
           class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           <li v-for="i in visibles" :key="i.id">

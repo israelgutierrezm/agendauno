@@ -178,7 +178,7 @@ export default {
     },
     descripciones: {
       negocio:
-        "Datos, imagen y página pública del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
+        "Datos e imagen del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
       servicios:
         "Qué se ofrece y a qué precio: servicios, combos y bonos, y los espacios que usan.",
       serviciosClases:

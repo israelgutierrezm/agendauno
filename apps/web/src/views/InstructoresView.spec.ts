@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
+import BarraListado from "@/components/BarraListado.vue";
 import esMX from "@/i18n/locales/es-MX";
 import { listados, profesional } from "@/i18n/locales/equipo.es-MX";
 import { tarjetas } from "@/i18n/locales/gestion.es-MX";
@@ -99,6 +100,74 @@ describe("equipo en cuadrícula", () => {
     expect(beto).toContain("4.8 de 5 (12)");
     expect(sofia).toContain("Nada agendado");
     expect(sofia).not.toContain("Reseñas");
+  });
+  it("se filtra como Miembros: agenda de la semana, reseñas y sede", async () => {
+    const conSedes = [
+      { ...equipo[0], sucursales: ["s1"] },
+      { ...equipo[1], sucursales: [] },
+      {
+        ...equipo[1],
+        id: "i3",
+        nombre: "Ana Sur",
+        nombre_corto: "Ana Sur",
+        sucursales: ["s2"],
+      },
+    ];
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/instructores")
+            ? conSedes
+            : url.endsWith("/sucursales")
+              ? [
+                  { id: "s1", nombre: "Condesa" },
+                  { id: "s2", nombre: "Sur" },
+                ]
+              : [],
+        },
+      }),
+    );
+    const w = mount(InstructoresView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { ...esMX, tarjetas, listados, profesional } },
+          }),
+        ],
+        stubs: { PanelLateral: true, BotonImportar: true },
+      },
+    });
+    await flushPromises();
+    const nombres = () => w.findAll("li").map((li) => li.text());
+    const barra = w.findComponent(BarraListado);
+    expect(
+      barra.props("filtros").map((f: { clave: string }) => f.clave),
+    ).toEqual(["sucursal", "agenda", "resenas"]);
+
+    barra.vm.$emit("cambioFiltro", "agenda", "sin");
+    await flushPromises();
+    expect(w.findAll("li")).toHaveLength(2);
+    expect(w.text()).not.toContain("Beto Instructor");
+
+    barra.vm.$emit("cambioFiltro", "agenda", "");
+    barra.vm.$emit("cambioFiltro", "resenas", "4");
+    await flushPromises();
+    expect(w.findAll("li")).toHaveLength(1);
+    expect(nombres()[0]).toContain("Beto Instructor");
+
+    // En «Sur»: quien atiende ahí y quien no tiene sede propia (atiende en todas).
+    barra.vm.$emit("limpiar");
+    barra.vm.$emit("cambioFiltro", "sucursal", "s2");
+    await flushPromises();
+    expect(w.text()).toContain("Ana Sur");
+    expect(w.text()).toContain("Sofía Profesional");
+    expect(w.text()).not.toContain("Beto Instructor");
+
+    barra.vm.$emit("cambioFiltro", "resenas", "4");
+    await flushPromises();
+    expect(w.find('[data-prueba="sin-coincidencias"]').exists()).toBe(true);
   });
 });
 

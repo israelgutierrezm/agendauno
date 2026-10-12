@@ -95,24 +95,6 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         ["logo", "logotipo", "nombre", "imagen", "marca", "contacto"],
         { hash: "#datos" },
       ),
-      o(
-        "pagina",
-        "configuracion",
-        "configNegocio.opciones.pagina",
-        ["página pública", "portada", "directorio", "redes", "enlace"],
-        { hash: "#pagina-publica" },
-      ),
-      // El constructor del sitio (ADR 0114).
-      o("sitio", "sitio-web", "configNegocio.opciones.sitio", [
-        "sitio",
-        "plantilla",
-        "secciones",
-        "banners",
-        "promociones",
-        "nosotros",
-        "vista previa",
-        "publicar",
-      ]),
       o("sedes", "sedes", "configNegocio.opciones.sucursales", [
         "sede",
         "sucursal",
@@ -149,6 +131,34 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         "configNegocio.opciones.terminologia",
         ["nombres", "alumnos", "clientes", "pacientes", "instructores"],
         { hash: "#terminologia" },
+      ),
+    ],
+  },
+  // Su sitio, en un rubro propio: el constructor de páginas y la página pública
+  // (portada, descripción, redes y si aparece en Explorar).
+  {
+    clave: "sitio",
+    etiqueta: "sitioWeb.categoria.titulo",
+    descripcion: "sitioWeb.categoria.descripcion",
+    icono: "contenido",
+    opciones: [
+      // El constructor del sitio (ADR 0114).
+      o("sitio", "sitio-web", "sitioWeb.categoria.constructor", [
+        "sitio",
+        "plantilla",
+        "secciones",
+        "banners",
+        "promociones",
+        "nosotros",
+        "vista previa",
+        "publicar",
+      ]),
+      o(
+        "pagina",
+        "configuracion",
+        "configNegocio.opciones.pagina",
+        ["página pública", "portada", "directorio", "redes", "enlace"],
+        { hash: "#pagina-publica" },
       ),
     ],
   },
