@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agendauno/core/config/firebase_config.dart';
+import 'package:agendauno/features/auth/application/sesion_controller.dart';
 import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/notificaciones/application/aviso_abierto.dart';
 import 'package:agendauno/features/notificaciones/application/push_controller.dart';
 import 'package:agendauno/features/notificaciones/data/dispositivos_repository.dart';
 
@@ -38,5 +41,40 @@ void main() {
     await push.olvidar(sesion);
 
     expect(repo.llamadas, isEmpty);
+  });
+
+  test('tocar una notificación lleva a lo suyo', () {
+    expect(DestinoPush.de('reserva.recordatorio_24h'), DestinoPush.reservas);
+    expect(DestinoPush.de('reserva.sesion_cancelada'), DestinoPush.reservas);
+    expect(DestinoPush.de('orden.pagada'), DestinoPush.pagos);
+    expect(DestinoPush.de('cobro.fallido'), DestinoPush.pagos);
+    expect(DestinoPush.de('membresia.renovacion_proxima'), DestinoPush.pagos);
+    expect(DestinoPush.de('difusion'), DestinoPush.inicio);
+    expect(DestinoPush.de(null), DestinoPush.inicio);
+  });
+
+  test('una notificación de otro negocio no cambia de pantalla', () {
+    final c = ProviderContainer(
+      overrides: [
+        sesionInicialProvider.overrideWithValue(
+          const Sesion(
+            slug: 'estudio-a',
+            bearer: 't',
+            nombre: 'Ana',
+            rol: 'miembro',
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    final aviso = c.read(avisoAbiertoProvider.notifier);
+
+    aviso.abrir({'estudio': 'estudio-b', 'tipo': 'orden.pagada'});
+    expect(c.read(avisoAbiertoProvider), isNull);
+
+    aviso.abrir({'estudio': 'estudio-a', 'tipo': 'orden.pagada'});
+    expect(c.read(avisoAbiertoProvider), DestinoPush.pagos);
+    aviso.atendido();
+    expect(c.read(avisoAbiertoProvider), isNull);
   });
 }

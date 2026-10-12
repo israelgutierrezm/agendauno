@@ -1,17 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/sesion_controller.dart';
 import '../data/agenda_models.dart';
 import '../data/agenda_repository.dart';
 
-/// Día que se está viendo en la agenda (hoy por defecto).
+/// Día que se está viendo en la agenda (hoy por defecto). Vuelve a hoy al cambiar
+/// de sesión: quien entra después no arranca en el día que dejó el anterior.
 class FechaAgenda extends Notifier<DateTime> {
   @override
   DateTime build() {
+    ref.watch(sesionProvider.select((s) => (s?.slug, s?.bearer)));
     final hoy = DateTime.now();
     return DateTime(hoy.year, hoy.month, hoy.day);
   }
 
   void elegir(DateTime dia) => state = DateTime(dia.year, dia.month, dia.day);
+
+  /// La semana anterior o la siguiente (mismo día de la semana).
+  void moverSemanas(int n) => elegir(state.add(Duration(days: 7 * n)));
+
+  void hoy() => elegir(DateTime.now());
 }
 
 final fechaAgendaProvider = NotifierProvider<FechaAgenda, DateTime>(
@@ -69,8 +77,26 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
   Future<void> cobrar(SesionAgenda s, String metodo) =>
       _accion((r) => r.cobrar(s.cita!.ordenId!, metodo));
 
-  Future<void> cancelar(SesionAgenda s) =>
-      _accion((r) => r.cancelarReserva(s.cita!.reservaId));
+  Future<void> cancelar(SesionAgenda s, {String por = 'negocio'}) =>
+      _accion((r) => r.cancelarReserva(s.cita!.reservaId, por: por));
+
+  /// Qué pasaría al cancelarla ahora (no cambia nada).
+  Future<EfectoCancelacion> efectoDeCancelar(
+    SesionAgenda s, {
+    String por = 'negocio',
+  }) async {
+    final repo = ref.read(agendaRepositoryProvider);
+    if (repo == null) {
+      return const EfectoCancelacion(cancelable: false, mensaje: '');
+    }
+    return repo.efectoDeCancelar(s.cita!.reservaId, por: por);
+  }
+
+  /// Lo que ha pasado con la cita (no cambia nada).
+  Future<List<HechoCita>> historial(SesionAgenda s) async {
+    final repo = ref.read(agendaRepositoryProvider);
+    return repo == null ? const [] : repo.historial(s.cita!.reservaId);
+  }
 
   Future<void> _accion(Future<void> Function(AgendaRepository repo) fn) async {
     final repo = ref.read(agendaRepositoryProvider);

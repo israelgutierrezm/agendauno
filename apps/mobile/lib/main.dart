@@ -16,6 +16,7 @@ import 'features/auth/presentation/negocio_suspendido_screen.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
 import 'features/inicio/presentation/equipo_screen.dart';
 import 'features/instructor/presentation/instructor_screen.dart';
+import 'features/notificaciones/application/aviso_abierto.dart';
 import 'features/notificaciones/application/push_controller.dart';
 
 Future<void> main() async {
@@ -91,7 +92,10 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
 
   Future<void> _iniciarPush() async {
     final push = ref.read(pushProvider);
-    await push.iniciar(_mostrarAviso);
+    await push.iniciar(
+      _mostrarAviso,
+      abrir: (datos) => ref.read(avisoAbiertoProvider.notifier).abrir(datos),
+    );
     final sesion = ref.read(sesionProvider);
     if (sesion != null) {
       await push.registrar(sesion);

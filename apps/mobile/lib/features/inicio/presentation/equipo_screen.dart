@@ -10,6 +10,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
 import '../../cuenta/presentation/tarjeta_principal.dart';
+import '../../notificaciones/application/aviso_abierto.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../data/inicio_repository.dart';
@@ -31,6 +32,17 @@ class _EquipoScreenState extends ConsumerState<EquipoScreen> {
   PestanaEquipo _pestana = PestanaEquipo.inicio;
 
   void _ir(PestanaEquipo p) => setState(() => _pestana = p);
+
+  @override
+  void initState() {
+    super.initState();
+    // Una notificación de una reserva o una cita abre la agenda.
+    escucharAvisos(this, (destino) {
+      if (destino == DestinoPush.reservas) {
+        _ir(PestanaEquipo.agenda);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -368,7 +380,11 @@ class _Libres extends StatelessWidget {
                 ),
               ),
               if (onAgenda != null)
-                TextButton(onPressed: onAgenda, child: const Text('Agendar')),
+                // La app no agenda desde aquí: abre la agenda del día (agendar es en la web).
+                TextButton(
+                  onPressed: onAgenda,
+                  child: const Text('Ver agenda'),
+                ),
             ],
           ),
           if (libres.isEmpty)

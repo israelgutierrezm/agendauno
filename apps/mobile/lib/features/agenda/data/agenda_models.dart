@@ -3,6 +3,8 @@ import 'dart:ui';
 import '../../../core/agenda/contrato_agenda.dart';
 
 export '../../../core/agenda/contrato_agenda.dart';
+// La vista previa de una cancelación es la misma que ve el cliente.
+export '../../cuenta/data/cuenta_models.dart' show EfectoCancelacion;
 
 /// Titular de una cita: a quién se atiende, cómo va su reserva y en qué va su
 /// atención y su pago (calculados por el servidor).
@@ -16,6 +18,12 @@ class CitaTitular {
     this.ordenId,
     this.estadoAtencion,
     this.estadoPago,
+    this.totalMinor,
+    this.moneda,
+    this.nota,
+    this.asiste,
+    this.telefono,
+    this.email,
   });
 
   final String reservaId;
@@ -33,6 +41,25 @@ class CitaTitular {
   /// Por pagar en línea, por cobrar o pagada (null: no lleva cobro).
   final EstadoPagoCita? estadoPago;
 
+  /// Lo que se cobra: el total de su orden, fijo desde que se agendó (el precio
+  /// del catálogo puede cambiar después). Null sin orden.
+  final int? totalMinor;
+  final String? moneda;
+
+  /// Lo que el cliente pidió que supiéramos al agendar (ADR 0067).
+  final String? nota;
+
+  /// Si la agendó para otra persona: quién asiste (ADR 0068).
+  final String? asiste;
+
+  /// Su contacto: solo llega a quien puede ver a los clientes.
+  final String? telefono;
+  final String? email;
+
+  /// ¿Se le puede registrar la asistencia? Solo con su lugar confirmado (no con un
+  /// pago en línea pendiente): el servidor rechaza lo demás.
+  bool get marcable => estado == 'confirmada';
+
   factory CitaTitular.desdeJson(Map<String, dynamic> json) => CitaTitular(
     reservaId: json['reserva_id'] as String,
     cliente: json['cliente'] as String?,
@@ -42,6 +69,102 @@ class CitaTitular {
     ordenId: json['orden_id'] as String?,
     estadoAtencion: EstadoCita.desde(json['estado_atencion']),
     estadoPago: EstadoPagoCita.desde(json['estado_pago']),
+    totalMinor: (json['total_minor'] as num?)?.toInt(),
+    moneda: json['moneda'] as String?,
+    nota: _texto(json['nota']),
+    asiste: _texto(json['asiste']),
+    telefono: _texto(json['telefono']),
+    email: _texto(json['email']),
+  );
+
+  static String? _texto(Object? v) =>
+      v is String && v.trim().isNotEmpty ? v.trim() : null;
+}
+
+/// Algo que pasó con una cita (GET /reservas/{id}/historial): agendada,
+/// recordatorio, reprogramada, cobro, asistencia o cancelación, con quién lo hizo.
+class HechoCita {
+  const HechoCita({
+    required this.tipo,
+    required this.fecha,
+    this.actor,
+    this.detalle = const {},
+  });
+
+  final String tipo;
+  final DateTime fecha;
+  final String? actor;
+  final Map<String, dynamic> detalle;
+
+  /// Nombre de una forma de pago, como en la web.
+  static String metodo(Object? m) => switch (m) {
+    'efectivo' => 'Efectivo',
+    'transferencia' || 'spei' => 'Transferencia',
+    'manual' => 'Tarjeta (terminal)',
+    'ventanilla' => 'Ventanilla',
+    'tarjeta' => 'Tarjeta',
+    'oxxo' => 'OXXO',
+    _ => '—',
+  };
+
+  /// Qué pasó, en palabras (los mismos textos que la web).
+  String get titulo {
+    final d = detalle;
+    return switch (tipo) {
+      'agendada' => 'Cita agendada',
+      'recordatorio' => 'Recordatorio enviado (${d['horas']} h antes)',
+      'reprogramada' => 'Reprogramada',
+      'cobrada' =>
+        d['en_caja'] == true
+            ? 'Cobrada en caja · ${metodo(d['metodo'])}'
+            : 'Pagada en línea',
+      'metodo_corregido' => 'Forma de pago corregida',
+      'cobro_anulado' => 'Cobro anulado',
+      'reembolsada' => 'Pago reembolsado',
+      'asistencia' =>
+        d['estado'] == 'ausente'
+            ? 'Se marcó que no asistió'
+            : 'Se marcó su llegada',
+      'asistencia_corregida' =>
+        d['estado'] == 'ausente'
+            ? 'Asistencia corregida: no asistió'
+            : 'Asistencia corregida: llegó',
+      'cancelada' =>
+        d['por'] == 'cliente'
+            ? 'Cancelada por el cliente'
+            : 'Cancelada por el negocio',
+      _ => tipo,
+    };
+  }
+
+  /// El detalle que acompaña al título (de qué a qué, monto, motivo), si hay.
+  String? detalleEn(String moneda, String Function(int, String) dinero) {
+    final d = detalle;
+    String? motivo() =>
+        d['motivo'] is String && (d['motivo'] as String).isNotEmpty
+        ? 'Motivo: ${d['motivo']}'
+        : null;
+    return switch (tipo) {
+      'reprogramada' when d['de'] != null && d['a'] != null =>
+        'De ${d['de']} a ${d['a']}',
+      'cobrada' || 'reembolsada' when d['monto_minor'] is num => dinero(
+        (d['monto_minor'] as num).toInt(),
+        moneda,
+      ),
+      'metodo_corregido' => [
+        'De ${metodo(d['de'])} a ${metodo(d['a'])}',
+        ?motivo(),
+      ].join(' · '),
+      'cobro_anulado' => motivo(),
+      _ => null,
+    };
+  }
+
+  factory HechoCita.desdeJson(Map<String, dynamic> json) => HechoCita(
+    tipo: (json['tipo'] ?? '') as String,
+    fecha: DateTime.parse(json['fecha'] as String).toLocal(),
+    actor: json['actor'] as String?,
+    detalle: (json['detalle'] as Map?)?.cast<String, dynamic>() ?? const {},
   );
 }
 
@@ -69,6 +192,7 @@ class SesionAgenda {
     this.ocupacion,
     this.cita,
     this.marcadas = 0,
+    this.asistenciaDesde,
   });
 
   final String id;
@@ -88,7 +212,13 @@ class SesionAgenda {
   /// A cuántos de los que ocupan lugar ya se les pasó lista.
   final int marcadas;
   final String estado;
+
+  /// Precio del servicio en el catálogo (hoy). Lo que se cobra de una cita es
+  /// [montoMinor].
   final int? precioMinor;
+
+  /// Desde cuándo se registra la asistencia (ADR 0101; null: sin límite).
+  final DateTime? asistenciaDesde;
 
   /// Solo en clases: cupo, libres y lista de espera.
   final BloqueClase? clase;
@@ -102,6 +232,17 @@ class SesionAgenda {
   bool get esCita => tipo == TipoSesion.cita;
   bool get programada => estado == 'programada';
   int get duracionMin => terminaEn.difference(iniciaEn).inMinutes;
+
+  /// Lo que se cobra: el total de la orden de la cita (fijo desde que se agendó);
+  /// sin orden, el precio del catálogo.
+  int? get montoMinor => cita?.totalMinor ?? precioMinor;
+
+  /// La moneda de lo que se cobra (la de su orden; si no, [respaldo]).
+  String monedaDe(String respaldo) => cita?.moneda ?? respaldo;
+
+  /// ¿Ya se puede registrar la asistencia?
+  bool asistenciaAbierta(DateTime ahora) =>
+      asistenciaDesde == null || !ahora.isBefore(asistenciaDesde!);
 
   /// Ya empezó y falta pasar lista (clase) o marcar si llegó (cita), igual que en
   /// el inicio web de quien imparte.
@@ -146,6 +287,9 @@ class SesionAgenda {
       marcadas: (json['marcadas'] ?? 0) as int,
       estado: (json['estado'] ?? 'programada') as String,
       precioMinor: json['oferta_precio_clase'] as int?,
+      asistenciaDesde: json['asistencia_desde'] is String
+          ? DateTime.parse(json['asistencia_desde'] as String).toLocal()
+          : null,
       clase: tipo == TipoSesion.clase
           ? BloqueClase.desdeJson(json['clase'], respaldo: json)
           : null,

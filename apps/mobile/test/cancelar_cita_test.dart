@@ -7,9 +7,9 @@ import 'package:agendauno/features/agenda/presentation/cita_sheet.dart';
 import 'package:agendauno/features/auth/application/sesion_controller.dart';
 import 'package:agendauno/features/auth/data/sesion.dart';
 
-/// Cancelar una cita desde su hoja: se confirma antes y, como la cita cancelada ya
-/// no vuelve en la agenda, la hoja se cierra (antes se quedaba girando). Datos
-/// sintéticos.
+/// Cancelar una cita desde su hoja: se confirma antes, con quién cancela y su
+/// efecto a la vista (como en la web), y, como la cita cancelada ya no vuelve en la
+/// agenda, la hoja se cierra (antes se quedaba girando). Datos sintéticos.
 
 final _hoy = DateTime.now();
 String _a(int h) =>
@@ -48,16 +48,28 @@ final _canceladas = <String>[];
 class _Agenda extends AgendaController {
   @override
   Future<AgendaDia> build() async => AgendaDia(
-    sesiones: _canceladas.contains('r1') ? const [] : [_cita],
+    sesiones: _canceladas.isNotEmpty ? const [] : [_cita],
     profesionales: const [Profesional(id: 'p1', nombre: 'Beto Ramírez')],
   );
 
   @override
-  Future<void> cancelar(SesionAgenda s) async {
-    _canceladas.add(s.cita!.reservaId);
+  Future<void> cancelar(SesionAgenda s, {String por = 'negocio'}) async {
+    _canceladas.add('${s.cita!.reservaId}:$por');
     ref.invalidateSelf();
     await future;
   }
+
+  /// La vista previa del API: lo que pasa depende de quién cancela.
+  @override
+  Future<EfectoCancelacion> efectoDeCancelar(
+    SesionAgenda s, {
+    String por = 'negocio',
+  }) async => EfectoCancelacion(
+    cancelable: true,
+    mensaje: por == 'cliente'
+        ? 'Se cobrará 1 crédito (fuera de tiempo).'
+        : 'Se devolverá 1 crédito.',
+  );
 }
 
 void main() {
@@ -112,12 +124,20 @@ void main() {
     expect(_canceladas, isEmpty);
     expect(find.text('Cancelar cita'), findsOneWidget);
 
+    // Se ve qué pasará según quién cancela, y se cancela por el cliente.
     await tester.tap(find.text('Cancelar cita'));
     await tester.pumpAndSettle();
+    expect(find.text('Se devolverá 1 crédito.'), findsOneWidget);
+    await tester.tap(find.text('Lo pidió el miembro'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Se cobrará 1 crédito (fuera de tiempo).'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Sí, cancelar'));
     await tester.pumpAndSettle();
 
-    expect(_canceladas, ['r1']);
+    expect(_canceladas, ['r1:cliente']);
     expect(find.text('Cancelar cita'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(

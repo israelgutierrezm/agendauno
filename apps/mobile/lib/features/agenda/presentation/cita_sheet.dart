@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/network/mensaje_error.dart';
@@ -11,8 +12,9 @@ import '../data/agenda_models.dart';
 import 'agenda_screen.dart';
 
 /// Abre la hoja de una cita: quién, qué, a qué hora y cómo va (su atención y su
-/// pago, como los calcula el servidor), con las acciones de recepción (llegó, no
-/// asistió, cobrar en caja, cancelar).
+/// pago, como los calcula el servidor), lo que el cliente pidió, su contacto y su
+/// historial, con las acciones de recepción (llegó, no asistió, cobrar en caja,
+/// cancelar). Lo que mueve dinero o créditos se confirma antes, como en la web.
 Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) =>
     showModalBottomSheet<void>(
       context: context,
@@ -20,6 +22,40 @@ Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) =>
       showDragHandle: true,
       builder: (_) => _HojaCita(sesionId: sesion.id),
     );
+
+String _hhmm(DateTime d) =>
+    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+/// Pregunta antes de hacer algo que no se deshace solo. Devuelve si se aceptó.
+Future<bool> _confirmar(
+  BuildContext context, {
+  required String titulo,
+  required String mensaje,
+  required String aceptar,
+  bool peligro = false,
+}) async {
+  final si = await showDialog<bool>(
+    context: context,
+    builder: (contexto) => AlertDialog(
+      title: Text(titulo),
+      content: Text(mensaje),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(contexto).pop(false),
+          child: const Text('Volver'),
+        ),
+        TextButton(
+          style: peligro
+              ? TextButton.styleFrom(foregroundColor: TemaAgendaUno.error)
+              : null,
+          onPressed: () => Navigator.of(contexto).pop(true),
+          child: Text(aceptar),
+        ),
+      ],
+    ),
+  );
+  return si == true;
+}
 
 class _HojaCita extends ConsumerStatefulWidget {
   const _HojaCita({required this.sesionId});
@@ -63,38 +99,86 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     }
   }
 
-  /// Cancelar libera el horario y no se deshace: se confirma antes, como en la
-  /// cuenta del cliente.
-  Future<void> _cancelar(SesionAgenda s, String hora) async {
-    final cliente = s.cita?.cliente;
-    final confirmada = await showDialog<bool>(
-      context: context,
-      builder: (contexto) => AlertDialog(
-        title: const Text('Cancelar cita'),
-        content: Text(
-          cliente == null
-              ? '¿Cancelar esta cita de las $hora? El horario quedará libre.'
-              : '¿Cancelar la cita de $cliente de las $hora? El horario '
-                    'quedará libre.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(contexto).pop(false),
-            child: const Text('Volver'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),
-            onPressed: () => Navigator.of(contexto).pop(true),
-            child: const Text('Sí, cancelar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmada != true || !mounted) {
+  /// Un cobro en caja no se deshace: se confirma monto, forma y a quién.
+  Future<void> _cobrar(SesionAgenda s, String? monto) async {
+    final cliente = s.cita!.cliente ?? 'el cliente';
+    if (!await _confirmar(
+      context,
+      titulo: 'Cobrar cita',
+      mensaje:
+          '¿Registrar el cobro de ${monto ?? ''} en '
+          '${HechoCita.metodo(_metodo)} a $cliente? La cita queda pagada.',
+      aceptar: 'Cobrar ${monto ?? ''}'.trim(),
+    )) {
+      return;
+    }
+    await _hacer((c) => c.cobrar(s, _metodo), 'Cita cobrada.');
+  }
+
+  /// Marcar o corregir la asistencia mueve créditos: se confirma con su efecto a la
+  /// vista. Llegó ↔ llegó tarde no los mueve: se guarda sin preguntar.
+  Future<void> _marcar(
+    SesionAgenda s,
+    String asistencia, {
+    bool retardo = false,
+  }) async {
+    final cita = s.cita!;
+    final cliente = cita.cliente ?? 'el cliente';
+    String nombre(String e) => e == 'presente' ? 'Llegó' : 'No asistió';
+    final ok = cita.asistencia != null && cita.asistencia != asistencia
+        ? 'Asistencia corregida.'
+        : asistencia == 'presente'
+        ? (retardo ? 'Se registró que llegó tarde.' : 'Llegada registrada.')
+        : 'Se marcó como no asistió.';
+    if (cita.asistencia != asistencia) {
+      final mensaje = cita.asistencia != null
+          ? '$cliente está marcado como «${nombre(cita.asistencia!)}». '
+                '¿Cambiarlo a «${nombre(asistencia)}»? Si aplica, el crédito se '
+                'ajusta en su saldo.'
+          : asistencia == 'presente'
+          ? '¿Marcar que $cliente llegó${retardo ? ' tarde' : ''} a su cita?'
+          : '¿Marcar que $cliente no asistió? Según la política del negocio, '
+                'puede perder el crédito o el pago de la cita.';
+      if (!await _confirmar(
+        context,
+        titulo: 'Asistencia',
+        mensaje: mensaje,
+        aceptar: retardo ? 'Llegó tarde' : nombre(asistencia),
+        peligro: asistencia == 'ausente',
+      )) {
+        return;
+      }
+    }
+    if (!mounted) {
       return;
     }
     await _hacer(
-      (c) => c.cancelar(s),
+      (c) => asistencia == 'presente'
+          ? c.marcarLlegada(s, retardo: retardo)
+          : c.marcarNoAsistio(s),
+      ok,
+    );
+  }
+
+  /// Cancelar libera el horario y no se deshace: se elige quién cancela (el
+  /// negocio no penaliza; si lo pidió el cliente, aplica su política) y se ve el
+  /// efecto antes de confirmar, como en la web.
+  Future<void> _cancelar(SesionAgenda s) async {
+    final controlador = ref.read(agendaProvider.notifier);
+    final miembro = ref.read(sesionProvider)?.terminologia.miembro ?? 'cliente';
+    final por = await showDialog<String>(
+      context: context,
+      builder: (_) => _DialogoCancelar(
+        sesion: s,
+        miembro: miembro.toLowerCase(),
+        efecto: (por) => controlador.efectoDeCancelar(s, por: por),
+      ),
+    );
+    if (por == null || !mounted) {
+      return;
+    }
+    await _hacer(
+      (c) => c.cancelar(s, por: por),
       'Cita cancelada; el horario quedó libre.',
       cerrar: true,
     );
@@ -109,6 +193,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     final puedeCobrar = sesion?.puede('ordenes.gestionar') ?? false;
     final puedeMarcar = sesion?.puede('asistencia.marcar') ?? false;
     final puedeCancelar = sesion?.puede('reservas.gestionar') ?? false;
+    final verHistorial = sesion?.puede('reservas.ver') ?? false;
     final s = agenda?.sesiones
         .where((x) => x.id == widget.sesionId)
         .firstOrNull;
@@ -125,28 +210,34 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
         ),
       );
     }
+    final cita = s.cita!;
     final estado = s.estadoCita;
-    final pago = s.porCobrar ? s.cita!.estadoPago : null;
+    final pago = s.porCobrar ? cita.estadoPago : null;
     final tono = TonoServicio.de(s.ofertaId);
     // Cancelada, completada o sin asistencia: ya no hay acciones.
     final activa = !(estado?.cerrada ?? false);
-    // Con centavos y en la moneda del negocio (una sola, ADR 0099).
-    final precio = s.precioMinor != null
-        ? Formato.dinero(s.precioMinor!, sesion?.moneda ?? 'MXN')
+    // Lo que se cobra (el total de su orden), con centavos y en su moneda.
+    final moneda = s.monedaDe(sesion?.moneda ?? 'MXN');
+    final monto = s.montoMinor != null
+        ? Formato.dinero(s.montoMinor!, moneda)
         : null;
-    String hhmm(DateTime d) =>
-        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    // La asistencia se registra desde unos minutos antes (ADR 0101).
+    final abierta = s.asistenciaAbierta(DateTime.now());
+    final marcable = puedeMarcar && cita.marcable && abierta;
+    // Reprogramar o cancelar: aún sin asistencia marcada.
+    final cancelable = puedeCancelar && cita.asistencia == null;
 
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
               children: [
-                if (estado != null) ...[
+                if (estado != null)
                   Chip(
                     label: Text(
                       estado.etiqueta,
@@ -158,8 +249,6 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     backgroundColor: estiloEstado(estado).$1,
                     side: BorderSide.none,
                   ),
-                  const SizedBox(width: 8),
-                ],
                 if (pago != null)
                   Chip(
                     label: Text(
@@ -181,10 +270,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   radius: 26,
                   backgroundColor: tono.fondo,
                   child: Text(
-                    Profesional(
-                      id: '',
-                      nombre: s.cita!.cliente ?? '?',
-                    ).iniciales,
+                    Profesional(id: '', nombre: cita.cliente ?? '?').iniciales,
                     style: TextStyle(
                       color: tono.tinta,
                       fontWeight: FontWeight.w800,
@@ -198,14 +284,14 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        s.cita!.cliente ?? 'Sin cliente',
+                        cita.cliente ?? 'Sin cliente',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       Text(
-                        '${hhmm(s.iniciaEn)}–${hhmm(s.terminaEn)} · ${s.oferta ?? '—'}',
+                        '${_hhmm(s.iniciaEn)}–${_hhmm(s.terminaEn)} · ${s.oferta ?? '—'}',
                         style: const TextStyle(
                           color: Color(0xFF596275),
                           fontWeight: FontWeight.w600,
@@ -218,9 +304,42 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Con ${s.instructor ?? '—'}${precio != null ? ' · $precio' : ''}',
+              'Con ${s.instructor ?? '—'}${monto != null ? ' · $monto' : ''}',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
+            // Si la agendó para otra persona, quién viene (ADR 0068).
+            if (cita.asiste != null && cita.asiste != cita.cliente) ...[
+              const SizedBox(height: 4),
+              Text('Asiste: ${cita.asiste}'),
+            ],
+            if (cita.nota != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                key: const Key('nota-cliente'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6F7FB),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Nota del cliente',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF596275),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(cita.nota!),
+                  ],
+                ),
+              ),
+            ],
+            if (cita.telefono != null || cita.email != null)
+              _Contacto(telefono: cita.telefono, email: cita.email),
             if (activa) ...[
               const SizedBox(height: 16),
               if (s.porCobrar && puedeCobrar)
@@ -249,77 +368,294 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
-                        onPressed: _ocupado
-                            ? null
-                            : () => _hacer(
-                                (c) => c.cobrar(s, _metodo),
-                                'Cita cobrada.',
-                              ),
-                        child: Text('Cobrar ${precio ?? ''}'),
+                        onPressed: _ocupado ? null : () => _cobrar(s, monto),
+                        child: Text('Cobrar ${monto ?? ''}'),
                       ),
                     ),
                   ],
                 ),
               const SizedBox(height: 8),
+              if (puedeMarcar && !abierta && cita.asistencia == null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'La asistencia se registra desde las '
+                    '${_hhmm(s.asistenciaDesde!)}.',
+                    key: const Key('asistencia-abre'),
+                    style: const TextStyle(color: Color(0xFF596275)),
+                  ),
+                ),
               if (puedeMarcar)
                 Row(
                   children: [
-                    if (s.cita!.asistencia != 'presente')
+                    if (cita.asistencia != 'presente')
                       Expanded(
                         child: FilledButton.tonal(
-                          onPressed: _ocupado
+                          onPressed: _ocupado || !marcable
                               ? null
-                              : () => _hacer(
-                                  (c) => c.marcarLlegada(s),
-                                  'Llegada registrada.',
-                                ),
+                              : () => _marcar(s, 'presente'),
                           child: const Text('Llegó'),
                         ),
                       ),
-                    if (s.cita!.asistencia != 'presente')
-                      const SizedBox(width: 8),
+                    if (cita.asistencia != 'presente') const SizedBox(width: 8),
                     // Llegó, pero tarde: cuenta como que llegó.
-                    if (s.cita!.asistencia != 'presente' || !s.cita!.retardo)
+                    if (cita.asistencia != 'presente' || !cita.retardo)
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: _ocupado
+                          onPressed: _ocupado || !marcable
                               ? null
-                              : () => _hacer(
-                                  (c) => c.marcarLlegada(s, retardo: true),
-                                  'Se registró que llegó tarde.',
-                                ),
+                              : () => _marcar(s, 'presente', retardo: true),
                           child: const Text('Llegó tarde'),
                         ),
                       ),
-                    if (s.cita!.asistencia != 'presente' || !s.cita!.retardo)
+                    if (cita.asistencia != 'presente' || !cita.retardo)
                       const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _ocupado
-                            ? null
-                            : () => _hacer(
-                                (c) => c.marcarNoAsistio(s),
-                                'Se marcó como no asistió.',
-                              ),
-                        child: const Text('No asistió'),
+                    if (cita.asistencia != 'ausente')
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _ocupado || !marcable
+                              ? null
+                              : () => _marcar(s, 'ausente'),
+                          child: const Text('No asistió'),
+                        ),
                       ),
-                    ),
                   ],
                 ),
-              if (puedeCancelar)
+              if (cancelable)
                 TextButton(
-                  onPressed: _ocupado
-                      ? null
-                      : () => _cancelar(s, hhmm(s.iniciaEn)),
+                  onPressed: _ocupado ? null : () => _cancelar(s),
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFFB42318),
                   ),
                   child: const Text('Cancelar cita'),
                 ),
             ],
+            if (verHistorial) _HistorialCita(sesion: s, moneda: moneda),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Contacto del cliente: llamar, WhatsApp o correo (solo si se puede ver).
+class _Contacto extends StatelessWidget {
+  const _Contacto({this.telefono, this.email});
+
+  final String? telefono;
+  final String? email;
+
+  @override
+  Widget build(BuildContext context) {
+    final digitos = telefono?.replaceAll(RegExp(r'\D'), '') ?? '';
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 4,
+        children: [
+          if (digitos.isNotEmpty) ...[
+            TextButton.icon(
+              icon: const Icon(Icons.call_outlined, size: 18),
+              label: Text(telefono!),
+              onPressed: () => launchUrl(Uri.parse('tel:$digitos')),
+            ),
+            TextButton(
+              onPressed: () => launchUrl(
+                Uri.parse('https://wa.me/$digitos'),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: const Text('WhatsApp'),
+            ),
+          ],
+          if (email != null)
+            TextButton.icon(
+              icon: const Icon(Icons.mail_outline, size: 18),
+              label: Text(email!),
+              onPressed: () => launchUrl(Uri(scheme: 'mailto', path: email)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Quién cancela y qué pasará (la vista previa del servidor), antes de confirmar.
+/// Devuelve `negocio` o `cliente`, o null si se arrepiente.
+class _DialogoCancelar extends StatefulWidget {
+  const _DialogoCancelar({
+    required this.sesion,
+    required this.miembro,
+    required this.efecto,
+  });
+
+  final SesionAgenda sesion;
+  final String miembro;
+  final Future<EfectoCancelacion> Function(String por) efecto;
+
+  @override
+  State<_DialogoCancelar> createState() => _DialogoCancelarState();
+}
+
+class _DialogoCancelarState extends State<_DialogoCancelar> {
+  var _por = 'negocio';
+  late Future<EfectoCancelacion> _efecto = widget.efecto(_por);
+
+  void _elegir(String por) => setState(() {
+    _por = por;
+    _efecto = widget.efecto(por);
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cliente = widget.sesion.cita?.cliente;
+    final hora = _hhmm(widget.sesion.iniciaEn);
+    return AlertDialog(
+      title: const Text('Cancelar cita'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            cliente == null
+                ? '¿Cancelar esta cita de las $hora? El horario quedará libre.'
+                : '¿Cancelar la cita de $cliente de las $hora? El horario '
+                      'quedará libre.',
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<String>(
+            segments: [
+              const ButtonSegment(
+                value: 'negocio',
+                label: Text('Cancela el negocio'),
+              ),
+              ButtonSegment(
+                value: 'cliente',
+                label: Text('Lo pidió el ${widget.miembro}'),
+              ),
+            ],
+            selected: {_por},
+            showSelectedIcon: false,
+            onSelectionChanged: (v) => _elegir(v.first),
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<EfectoCancelacion>(
+            future: _efecto,
+            builder: (context, foto) {
+              if (foto.connectionState != ConnectionState.done) {
+                return const LinearProgressIndicator();
+              }
+              final efecto = foto.data;
+              return Text(
+                foto.hasError || efecto == null
+                    ? 'No se pudo saber qué pasará con su crédito o su pago.'
+                    : efecto.mensaje,
+                key: const Key('efecto-cancelar'),
+                style: const TextStyle(color: Color(0xFF596275)),
+              );
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Volver'),
+        ),
+        FutureBuilder<EfectoCancelacion>(
+          future: _efecto,
+          builder: (context, foto) {
+            // No se confirma con el efecto de la otra opción a la vista ni con
+            // algo que el servidor no permitiría.
+            final listo =
+                foto.connectionState == ConnectionState.done &&
+                (foto.data?.cancelable ?? !foto.hasError);
+            return TextButton(
+              style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),
+              onPressed: listo ? () => Navigator.of(context).pop(_por) : null,
+              child: const Text('Sí, cancelar'),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Lo que ha pasado con la cita y quién lo hizo; se carga al abrirlo.
+class _HistorialCita extends ConsumerStatefulWidget {
+  const _HistorialCita({required this.sesion, required this.moneda});
+
+  final SesionAgenda sesion;
+  final String moneda;
+
+  @override
+  ConsumerState<_HistorialCita> createState() => _HistorialCitaState();
+}
+
+class _HistorialCitaState extends ConsumerState<_HistorialCita> {
+  Future<List<HechoCita>>? _hechos;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      key: const Key('historial-cita'),
+      tilePadding: EdgeInsets.zero,
+      title: const Text(
+        'Historial',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      onExpansionChanged: (abierto) {
+        if (abierto && _hechos == null) {
+          setState(
+            () => _hechos = ref
+                .read(agendaProvider.notifier)
+                .historial(widget.sesion),
+          );
+        }
+      },
+      children: [
+        FutureBuilder<List<HechoCita>>(
+          future: _hechos,
+          builder: (context, foto) {
+            if (foto.connectionState != ConnectionState.done) {
+              return const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('Cargando historial…'),
+              );
+            }
+            if (foto.hasError) {
+              return const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('No se pudo cargar el historial.'),
+              );
+            }
+            final hechos = foto.data ?? const [];
+            if (hechos.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('Aún no hay movimientos.'),
+              );
+            }
+            return Column(
+              children: [
+                for (final h in hechos)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(h.titulo),
+                    subtitle: Text(
+                      [
+                        h.detalleEn(widget.moneda, Formato.dinero),
+                        '${h.fecha.day}/${h.fecha.month} ${_hhmm(h.fecha)}'
+                            '${h.actor != null ? ' · por ${h.actor}' : ''}',
+                      ].whereType<String>().join('\n'),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }

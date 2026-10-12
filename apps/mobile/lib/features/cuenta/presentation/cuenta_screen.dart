@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/error_de_carga.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
+import '../../notificaciones/application/aviso_abierto.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
@@ -42,10 +44,24 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
     PestanaCuenta.cuenta: 'Cuenta',
   };
 
+  /// En un negocio de citas no se reserva un lugar: se agenda una cita (como en
+  /// la web).
+  static String _titulo(PestanaCuenta p, {required bool esCitas}) =>
+      esCitas && p == PestanaCuenta.reservas ? 'Citas' : _titulos[p]!;
+
   @override
   void initState() {
     super.initState();
     _ciclo;
+    // Al tocar una notificación se abre lo suyo: su reserva o cita, o sus pagos.
+    escucharAvisos(
+      this,
+      (destino) => _ir(switch (destino) {
+        DestinoPush.reservas => PestanaCuenta.reservas,
+        DestinoPush.pagos => PestanaCuenta.pagos,
+        DestinoPush.inicio => PestanaCuenta.inicio,
+      }),
+    );
   }
 
   @override
@@ -61,10 +77,11 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
     final estado = ref.watch(cuentaProvider);
     final firmar = estado.value?.consentimientos.length ?? 0;
     final pagar = estado.value?.porPagar.length ?? 0;
+    final esCitas = ref.watch(sesionProvider)?.esCitas ?? false;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titulos[_pestana]!),
+        title: Text(_titulo(_pestana, esCitas: esCitas)),
         actions: [const BotonMiPerfil()],
       ),
       body: Column(
@@ -101,10 +118,10 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
             selectedIcon: Icon(Icons.home),
             label: 'Inicio',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Reservas',
+          NavigationDestination(
+            icon: const Icon(Icons.calendar_month_outlined),
+            selectedIcon: const Icon(Icons.calendar_month),
+            label: _titulo(PestanaCuenta.reservas, esCitas: esCitas),
           ),
           NavigationDestination(
             icon: Badge(

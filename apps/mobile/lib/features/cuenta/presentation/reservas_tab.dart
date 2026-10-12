@@ -124,9 +124,13 @@ class ReservasTab extends ConsumerWidget {
             ),
         ],
         lista: [
-          const TituloSeccion('Mis reservas'),
+          TituloSeccion(esCitas ? 'Mis citas' : 'Mis reservas'),
           if (mias.isEmpty)
-            const TextoVacio('No tienes reservas próximas.')
+            TextoVacio(
+              esCitas
+                  ? 'No tienes citas próximas.'
+                  : 'No tienes reservas próximas.',
+            )
           else
             Card(
               child: Column(

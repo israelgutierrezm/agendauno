@@ -258,6 +258,36 @@ void main() {
     expect(find.text('Pronóstico para tu cita en Roma Norte'), findsOneWidget);
   });
 
+  testWidgets('en un negocio de citas la pestaña se llama «Citas»', (
+    tester,
+  ) async {
+    await montar(tester, const CuentaScreen(), [
+      sesionInicialProvider.overrideWithValue(
+        const Sesion(
+          slug: 'demo',
+          bearer: 't',
+          nombre: 'Ana',
+          rol: 'miembro',
+          modalidad: Modalidad.citas,
+        ),
+      ),
+      cuentaProvider.overrideWith(
+        () => _CuentaFalsa(
+          const MiCuenta(derechos: [], reservas: [], clases: []),
+        ),
+      ),
+      climaProvider.overrideWith((ref) async => null),
+      cortePlanesProvider.overrideWith((ref) async => const []),
+    ]);
+
+    // Como en la web: en citas no se reserva un lugar, se agenda una cita.
+    expect(find.text('Reservas'), findsNothing);
+    await tester.tap(find.text('Citas').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Mis citas'), findsOneWidget);
+    expect(find.text('No tienes citas próximas.'), findsOneWidget);
+  });
+
   testWidgets('portal del instructor: inicio y mis clases', (tester) async {
     SesionAgenda clase(String id, DateTime cuando, {int espera = 0}) =>
         SesionAgenda.desdeJson({

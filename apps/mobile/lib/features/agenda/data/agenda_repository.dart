@@ -94,8 +94,37 @@ class AgendaRepository {
         data: {'metodo': metodo},
       );
 
-  Future<void> cancelarReserva(String reservaId) =>
-      _dio.post<Map<String, dynamic>>('$_base/reservas/$reservaId/cancelar');
+  /// Cancelar una reserva. `por`: quién cancela; el negocio no penaliza, el
+  /// cliente aplica su política (como en la web).
+  Future<void> cancelarReserva(String reservaId, {String por = 'negocio'}) =>
+      _dio.post<Map<String, dynamic>>(
+        '$_base/reservas/$reservaId/cancelar',
+        data: {'por': por},
+      );
+
+  /// Qué pasaría al cancelar ahora, según quién cancela (vista previa).
+  Future<EfectoCancelacion> efectoDeCancelar(
+    String reservaId, {
+    String por = 'negocio',
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/reservas/$reservaId/cancelacion',
+      queryParameters: {'por': por},
+    );
+    return EfectoCancelacion.desdeJson(
+      (res.data?['data'] as Map<String, dynamic>?) ?? const {},
+    );
+  }
+
+  /// Lo que ha pasado con una cita (solo negocios de citas).
+  Future<List<HechoCita>> historial(String reservaId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/reservas/$reservaId/historial',
+    );
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => HechoCita.desdeJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }
 
 /// Repositorio ligado a la sesión activa (null si no hay sesión).
