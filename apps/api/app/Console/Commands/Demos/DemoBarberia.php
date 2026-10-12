@@ -10,11 +10,13 @@ use App\Modules\Tenancy\Application\AsistenciaTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\PresupuestosTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
+use App\Modules\Tenancy\Captacion\MotivoCierreProspecto;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
@@ -22,6 +24,7 @@ use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Membresias\TipoVigencia;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
@@ -76,6 +79,7 @@ use RuntimeException;
 final class DemoBarberia extends DemoBase
 {
     use ApartadosDemo;
+    use CompletarDemo;
 
     /** clave => [nombre, actividad, minutos, precio (centavos), descripción] */
     private const SERVICIOS = [
@@ -160,14 +164,14 @@ final class DemoBarberia extends DemoBase
     public function cuentas(): array
     {
         return [
-            'ramon@lanavaja.test' => 'Dueño (también corta, rol de barbero)',
+            'ramon@lanavaja.test' => 'Dueño, barbero y cliente (elige con qué rol entrar). La cuenta para revisar todo.',
             'karla@lanavaja.test' => 'Administradora',
             'lupita@lanavaja.test' => 'Recepción en Roma Norte',
             'daniel@lanavaja.test' => 'Caja en Del Valle (rol propio «Caja»)',
             'hector@lanavaja.test' => 'Contador (rol propio «Pagos en línea»: solo pasarelas)',
             'tono@lanavaja.test' => 'Barbero (Roma Norte)',
             'ivan@lanavaja.test' => 'Barbero (Del Valle)',
-            'jorge.pineda@correo.test' => 'Cliente con cuenta («Mi cuenta»)',
+            'jorge.pineda@correo.test' => 'Cliente con bono y su siguiente cita; fue prospecto y ve el bono que pidió',
         ];
     }
 
@@ -212,7 +216,9 @@ final class DemoBarberia extends DemoBase
             ]);
         }
 
-        $dueno = $this->usuario('ramon@lanavaja.test', 'Ramón', 'Salgado', ['propietario', 'instructor']);
+        // El dueño corta y también es cliente (le corta Toño): una cuenta, tres roles
+        // (ADR 0055: entra con uno y lo cambia).
+        $dueno = $this->usuario('ramon@lanavaja.test', 'Ramón', 'Salgado', ['propietario', 'instructor', 'miembro']);
         $this->equipo = [
             'ramon' => $dueno,
             'karla' => $this->usuario('karla@lanavaja.test', 'Karla', 'Domínguez', ['admin']),
@@ -415,6 +421,15 @@ final class DemoBarberia extends DemoBase
         $this->clientes[0] = [...$this->clientes[0], 'servicio' => 'corte', 'cada' => 14, 'proxima' => $this->inicio, 'quiereBono' => true, 'deja' => null];
         $cuenta = $this->usuario('jorge.pineda@correo.test', 'Jorge', 'Pineda', ['miembro']);
         $jorge->update(['usuario_id' => $cuenta->getKey()]);
+
+        // El dueño como cliente: su ficha ligada a su cuenta. Corte y barba con Toño cada
+        // dos semanas, siempre con su siguiente cita.
+        $ramon = $this->clientes[1]['persona'];
+        $ramon->update(['nombre' => 'Ramón', 'primer_apellido' => 'Salgado', 'segundo_apellido' => 'Ortiz', 'email' => 'ramon@lanavaja.test', 'genero' => 'hombre', 'usuario_id' => $this->equipo['ramon']->getKey()]);
+        $this->clientes[1] = [
+            ...$this->clientes[1], 'barbero' => (int) $this->equipo['tono']->getKey(), 'servicio' => 'corte_barba', 'cada' => 14,
+            'franja' => 'manana', 'proxima' => $this->inicio->addDays(2), 'quiereBono' => false, 'deja' => null,
+        ];
     }
 
     // ---------------------------------------------------------------- un día
@@ -831,8 +846,8 @@ final class DemoBarberia extends DemoBase
             foreach ($this->clientes as $i => $c) {
                 if ($c['proxima']->toDateString() !== $dia->toDateString()
                     || ($c['deja'] instanceof CarbonImmutable && $dia->greaterThan($c['deja']))
-                    // El cliente con cuenta siempre tiene su siguiente cita agendada.
-                    || ($i !== 0 && ! $this->prob($yaAgendan))) {
+                    // Los clientes con cuenta (Jorge y el dueño) siempre tienen su siguiente cita.
+                    || ($i > 1 && ! $this->prob($yaAgendan))) {
                     continue;
                 }
                 $conBono = $c['bono'] && $c['servicio'] === 'corte';
@@ -941,5 +956,100 @@ final class DemoBarberia extends DemoBase
             }
         }
         $this->llaveDeApi('Contabilidad (cobros)', ['ordenes.ver']);
+
+        // Lo que la historia no crea (bloque 32): cada apartado con datos.
+        $this->avisoDePrivacidad('citas', 'bonos', 'Roma Norte y Del Valle, Ciudad de México (direcciones de prueba)', 'hola@lanavaja.test', 70);
+        $this->prospectosDeLaBarberia();
+        $this->porConciliar();
+        $this->webhookPausado('https://hooks.example.test/lanavaja', ['orden.pagada', 'reserva.confirmada']);
+        $this->presupuestos();
+        $this->bonosApartados();
+        // El plan más completo de TurnoUno (Pro): lealtad, reportes avanzados y venta en
+        // línea a la vista. Elegido, así que la renta lo respeta.
+        $this->estudio->forceFill(['plan_nivel' => 'pro', 'plan_periodicidad' => 'mensual'])->save();
+    }
+
+    /**
+     * Quienes preguntaron por la barbería (página, Instagram, recepción), en cada
+     * etapa; y Jorge, que pidió informes del bono de diez: al entrar a su cuenta lo ve
+     * para continuar (ADR 0137).
+     */
+    private function prospectosDeLaBarberia(): void
+    {
+        $e = $this->equipo;
+        $this->prospectos([
+            ['nombre' => 'Mauricio Lozano', 'email' => 'mauricio.lozano@prospecto.test', 'telefono' => '5542108811', 'dias' => 1, 'fuente' => 'instagram', 'interes' => ['producto' => $this->bono->ulid], 'estado' => 'nuevo'],
+            ['nombre' => 'Diego Arriaga', 'email' => 'diego.arriaga@prospecto.test', 'telefono' => '5542108812', 'dias' => 2, 'fuente' => 'google', 'interes' => [], 'estado' => 'nuevo'],
+            ['nombre' => 'Óscar Peralta', 'email' => 'oscar.peralta@prospecto.test', 'telefono' => '5542108813', 'dias' => 4, 'fuente' => 'instagram', 'interes' => ['producto' => $this->bonoDiez->ulid], 'estado' => 'en_seguimiento', 'nota' => 'Quiere el bono para él y su hermano. Le expliqué que es personal.'],
+            ['nombre' => 'Emiliano Cruz', 'email' => 'emiliano.cruz@prospecto.test', 'telefono' => '5542108814', 'dias' => 7, 'fuente' => null, 'interes' => [], 'estado' => 'en_seguimiento', 'nota' => 'Pasó a preguntar precios de afeitado clásico.'],
+            ['nombre' => 'Bruno Esquivel', 'email' => 'bruno.esquivel@prospecto.test', 'telefono' => '5542108815', 'dias' => 10, 'fuente' => 'un amigo', 'interes' => ['producto' => $this->bono->ulid], 'estado' => 'aprobado', 'nota' => 'Viene recomendado por un cliente de Toño.'],
+            ['nombre' => 'Alan Robles', 'email' => 'alan.robles@prospecto.test', 'telefono' => '5542108816', 'dias' => 16, 'fuente' => 'facebook', 'interes' => [], 'estado' => 'descartado', 'nota' => 'Busca servicio a domicilio.', 'motivo' => MotivoCierreProspecto::NoCumple],
+            ['nombre' => 'Gael Montes', 'email' => 'gael.montes@prospecto.test', 'telefono' => '5542108817', 'dias' => 22, 'fuente' => 'instagram', 'interes' => [], 'estado' => 'descartado', 'nota' => 'No contestó en dos semanas.', 'motivo' => MotivoCierreProspecto::SinRespuesta],
+        ], [$e['lupita'], $e['karla']]);
+
+        $jorge = $this->clientes[0]['persona'];
+        $tiene = AcuerdoTenant::query()->where('persona_id', $jorge->getKey())->where('producto_comercial_id', $this->bonoDiez->getKey())->exists();
+        $this->prospectoConvertido($jorge, ['producto' => ($tiene ? $this->bono : $this->bonoDiez)->ulid], 6, $e['lupita'], 'Preguntó por el bono de diez cortes. Ya es cliente: se le ligó su ficha.');
+    }
+
+    /**
+     * Presupuestos (ADR 0127): uno enviado para una boda, uno que un cliente aceptó para
+     * el equipo de su oficina y ya es una orden por cobrar, y un borrador.
+     */
+    private function presupuestos(): void
+    {
+        $servicio = app(PresupuestosTenant::class);
+        $e = $this->equipo;
+        $roma = (int) $this->sedes['roma']->getKey();
+        $linea = fn (string $clave, int $cantidad): array => ['tipo' => 'servicio', 'referencia' => $this->servicios[$clave]->ulid, 'cantidad' => $cantidad];
+        try {
+            $this->en($this->hoy->subDays(9)->setTime(12, 30));
+            $boda = $servicio->crear([
+                'nombre_contacto' => 'Rodrigo Treviño (boda del 7 de noviembre)', 'email_contacto' => 'rodrigo.trevino@prospecto.test', 'celular_contacto' => '5542108821',
+                'sucursal_id' => $roma, 'lineas' => [$linea('corte_barba', 6), $linea('afeitado', 1)], 'descuento_minor' => 30000,
+                'notas' => 'El novio y cinco padrinos, el sábado por la mañana. Apartamos dos barberos.',
+            ], $e['karla']);
+            $servicio->marcarEnviado($boda);
+
+            $this->en($this->hoy->subDays(15)->setTime(11, 10));
+            $empresa = $servicio->crear([
+                'persona_id' => $this->clientes[5]['persona']->getKey(),
+                'sucursal_id' => $roma, 'lineas' => [$linea('corte', 8)], 'notas' => 'Cortes para el equipo de su oficina, antes de su sesión de fotos.',
+            ], $e['karla']);
+            $servicio->marcarEnviado($empresa);
+            $this->en($this->hoy->subDays(12)->setTime(16, 45));
+            $servicio->aceptar($empresa, $e['karla']);
+            $this->en($this->hoy->subDays(11)->setTime(10, 5));
+            $servicio->convertir($empresa, $e['karla']);
+
+            $this->en($this->ahora->subHours(5));
+            $servicio->crear([
+                'nombre_contacto' => 'Escuela Benito Juárez (cortes de fin de curso)',
+                'sucursal_id' => (int) $this->sedes['valle']->getKey(), 'lineas' => [$linea('infantil', 20)],
+            ], $e['lupita']);
+            $this->sumar('presupuestos', 3);
+        } catch (RuntimeException|ValidationException) {
+            return;
+        }
+    }
+
+    /** Dos clientes apartaron su bono y lo pagan en su siguiente visita: quedan por cobrar. */
+    private function bonosApartados(): void
+    {
+        $ordenes = app(OrdenesTenant::class);
+        $apartados = 0;
+        foreach ($this->clientes as $i => $c) {
+            if ($i <= 1 || $c['bono'] || $c['deja'] !== null || $c['servicio'] !== 'corte' || $apartados >= 2) {
+                continue;
+            }
+            $this->en($this->hoy->subDays(3 + $apartados * 2)->setTime(18, 20));
+            try {
+                $ordenes->crear($c['persona'], [['producto' => $this->bono, 'cantidad' => 1]], sucursalId: (int) $c['persona']->sucursal_id);
+            } catch (RuntimeException|ValidationException) {
+                continue;
+            }
+            $apartados++;
+        }
+        $this->sumar('bonos por cobrar', $apartados);
     }
 }
