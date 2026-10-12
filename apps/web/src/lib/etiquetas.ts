@@ -266,6 +266,10 @@ function aplicar(ambito: Ambito, d: DestinosPublicos, p: Preferencias): void {
   }
 }
 
+// Lo que la página quiso medir mientras aún no se sabía si el ámbito tiene destinos
+// (p. ej. los planes que cargaron antes que su configuración): se manda al saberlo.
+let enEspera: Array<() => void> = [];
+
 // Una vista de página por navegación: la del router; si las etiquetas cargan después
 // (al aceptar), se manda la de la página actual una sola vez.
 let navegacion = 0;
@@ -363,6 +367,9 @@ async function medirNavegacion(
     aplicar(ambito, d, medicion.preferencias);
     enviarVista();
   }
+  const pendientes = enEspera;
+  enEspera = [];
+  pendientes.forEach((mandar) => mandar());
 }
 
 /** Lo que eligió en el aviso: se guarda, se aplica y se avisa al servidor. */
@@ -408,7 +415,12 @@ export function eventoNavegador(evento: {
   if (ambito === null || medicion.pausada) return;
   const p = leerPreferencias(ambito);
   const d = medicion.destinos;
-  if (p === null || d === null) return;
+  if (d === null) {
+    // Aún no se sabe si hay destinos: se manda (o se descarta) al saberlo.
+    enEspera.push(() => eventoNavegador(evento));
+    return;
+  }
+  if (p === null) return;
   try {
     if (
       evento.ga4 &&
@@ -438,6 +450,50 @@ export function eventoNavegador(evento: {
   } catch {
     // Medir nunca rompe la página.
   }
+}
+
+export interface ArticuloMedido {
+  id: string;
+  nombre?: string | null;
+  precio_minor?: number | null;
+  moneda?: string | null;
+}
+
+/**
+ * Comercio en la página del negocio (GA4, ADR 0143): ver sus planes, elegir uno e
+ * iniciar un pago. Solo ids, precios y moneda; sin datos de la persona. `conNombres`
+ * falso (un negocio de salud, o donde no se sabe) quita el nombre del servicio. La
+ * compra confirmada la manda el servidor, no esto.
+ */
+export function eventoComercio(
+  nombre: "view_item_list" | "select_item" | "begin_checkout",
+  articulos: ArticuloMedido[],
+  conNombres = true,
+): void {
+  if (articulos.length === 0) return;
+  const moneda = articulos.find((a) => a.moneda)?.moneda ?? null;
+  const items = articulos.slice(0, 20).map((a) => ({
+    item_id: a.id,
+    ...(conNombres && a.nombre ? { item_name: a.nombre.slice(0, 100) } : {}),
+    ...(typeof a.precio_minor === "number"
+      ? { price: a.precio_minor / 100 }
+      : {}),
+    quantity: 1,
+  }));
+  const valor =
+    nombre === "begin_checkout"
+      ? articulos.reduce((suma, a) => suma + (a.precio_minor ?? 0), 0) / 100
+      : null;
+  eventoNavegador({
+    ga4: {
+      nombre,
+      parametros: {
+        items,
+        ...(moneda !== null ? { currency: moneda } : {}),
+        ...(valor !== null && moneda !== null ? { value: valor } : {}),
+      },
+    },
+  });
 }
 
 /**
@@ -582,6 +638,7 @@ export function reiniciarEtiquetas(): void {
   navegacion = 0;
   vistaEnviada = -1;
   vista = null;
+  enEspera = [];
   Object.assign(medicion, {
     ambito: null,
     destinos: null,

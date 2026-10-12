@@ -12,6 +12,7 @@ vi.mock("@/lib/api", () => ({ api }));
 
 import {
   elegir,
+  eventoComercio,
   medicion,
   medicionPara,
   navegar,
@@ -225,6 +226,47 @@ describe("etiquetas", () => {
       publicidad: false,
       url: "http://localhost:3000/",
       ga_client_id: "987654321.1700000000",
+    });
+  });
+
+  it("los planes que cargan antes que la configuración se miden al saberla; sin nombres en salud", async () => {
+    window.localStorage.setItem(
+      "tu.preferencias.negocio:grecon",
+      JSON.stringify({
+        analitica: true,
+        publicidad: false,
+        en: "2026-10-12T00:00:00Z",
+        version: 1,
+      }),
+    );
+    let responder: (v: unknown) => void = () => undefined;
+    api.get.mockReturnValue(new Promise((r) => (responder = r)));
+    const navegando = navegar("negocio:grecon", "/estudio/grecon", "Grecon");
+    // La página ya trae sus planes; la configuración aún no llega.
+    eventoComercio(
+      "view_item_list",
+      [{ id: "p1", nombre: "Consulta", precio_minor: 50000, moneda: "MXN" }],
+      false,
+    );
+    responder({ data: { data: { ga4: "G-NEGOCIO123", meta: null } } });
+    await navegando;
+
+    const lista = llamadasGtag().find((l) => l[1] === "view_item_list");
+    expect(lista?.[2]).toEqual({
+      send_to: "G-NEGOCIO123",
+      items: [{ item_id: "p1", price: 500, quantity: 1 }],
+      currency: "MXN",
+    });
+
+    eventoComercio("begin_checkout", [
+      { id: "s1", nombre: "Corte", precio_minor: 25000, moneda: "MXN" },
+    ]);
+    expect(
+      llamadasGtag().find((l) => l[1] === "begin_checkout")?.[2],
+    ).toMatchObject({
+      value: 250,
+      currency: "MXN",
+      items: [{ item_id: "s1", item_name: "Corte", price: 250, quantity: 1 }],
     });
   });
 
