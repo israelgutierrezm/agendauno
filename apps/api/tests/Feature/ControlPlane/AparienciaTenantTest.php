@@ -136,7 +136,7 @@ function luminanciaTemaContraste(string $hex): float
 it('en todos los temas el texto de los botones, del menú y de lo activo de la barra se lee (AA)', function (): void {
     foreach (CatalogoTemas::disponibles() as $tema) {
         $tokens = CatalogoTemas::resolver($tema['clave'], null)['tokens'];
-        foreach ([['acento', 'acento_texto'], ['barra', 'barra_texto'], ['barra_activo', 'barra_activo_texto']] as [$fondo, $texto]) {
+        foreach ([['acento', 'acento_texto'], ['barra', 'barra_texto'], ['barra_suave', 'barra_texto'], ['barra_activo', 'barra_activo_texto']] as [$fondo, $texto]) {
             $a = luminanciaTemaContraste($tokens[$fondo]);
             $b = luminanciaTemaContraste($tokens[$texto]);
             $contraste = (max($a, $b) + 0.05) / (min($a, $b) + 0.05);
