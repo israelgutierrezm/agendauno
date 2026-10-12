@@ -3,6 +3,7 @@ import axios from "axios";
 import { onMounted, ref, watch } from "vue";
 
 import { mensajeDeError } from "@/lib/api";
+import { textoCampana } from "@/lib/captacion";
 import { PRODUCTOS, esProducto } from "@/lib/producto";
 
 /**
@@ -37,6 +38,20 @@ function hace(dias: number): string {
 const desde = ref(hace(89));
 const hasta = ref(hace(0));
 const filas = ref<FilaEmbudo[]>([]);
+// Por la campaña de su registro (ADR 0144).
+interface FilaCampanaPlataforma {
+  producto: string;
+  campana: {
+    campana: string | null;
+    fuente: string | null;
+    medio: string | null;
+    referente: string | null;
+  } | null;
+  registros: number;
+  primera_operacion: number;
+  primera_suscripcion: number;
+}
+const campanas = ref<FilaCampanaPlataforma[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -44,14 +59,14 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await cliente.get<{ data: { productos: FilaEmbudo[] } }>(
-      "/api/v1/plataforma/embudo",
-      {
-        params: { desde: desde.value, hasta: hasta.value },
-        headers: { Authorization: `Bearer ${props.token}` },
-      },
-    );
+    const { data } = await cliente.get<{
+      data: { productos: FilaEmbudo[]; campanas?: FilaCampanaPlataforma[] };
+    }>("/api/v1/plataforma/embudo", {
+      params: { desde: desde.value, hasta: hasta.value },
+      headers: { Authorization: `Bearer ${props.token}` },
+    });
     filas.value = data.data.productos;
+    campanas.value = data.data.campanas ?? [];
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -152,6 +167,53 @@ function dias(d: number | null): string {
           </div>
         </dl>
       </article>
+    </div>
+
+    <!-- Por la campaña de su registro (ADR 0144) -->
+    <div
+      v-if="!cargando && !error"
+      class="mt-6"
+      data-prueba="campanas-plataforma"
+    >
+      <h3 class="font-semibold">
+        {{ $t("medicion.reporte.tituloPlataforma") }}
+      </h3>
+      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("medicion.reporte.ayudaPlataforma") }}
+      </p>
+      <p
+        v-if="campanas.length === 0"
+        class="mt-3 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("medicion.reporte.vacioPlataforma") }}
+      </p>
+      <ul v-else class="mt-3 space-y-2">
+        <li
+          v-for="(c, i) in campanas"
+          :key="i"
+          class="tu-card flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm"
+          data-prueba="fila-campana-plataforma"
+        >
+          <span class="font-medium">
+            {{ nombre(c.producto) }} ·
+            {{
+              c.campana && textoCampana(c.campana)
+                ? textoCampana(c.campana)
+                : $t("medicion.reporte.sinAtribucion")
+            }}
+          </span>
+          <span class="tabular-nums" :style="{ color: 'var(--texto-suave)' }">
+            {{
+              $t("medicion.reporte.cifrasPlataforma", {
+                registros: c.registros,
+                operacion: c.primera_operacion,
+                pago: c.primera_suscripcion,
+              })
+            }}
+          </span>
+        </li>
+      </ul>
     </div>
   </section>
 </template>

@@ -29,6 +29,8 @@ function montar(embudo: Embudo, citas = false) {
           messages: { es: { ...esMX, operacion } },
         }),
       ],
+      // El reporte por campaña (ADR 0144) se prueba aparte.
+      stubs: { CampanasNegocio: true },
     },
   });
 }
