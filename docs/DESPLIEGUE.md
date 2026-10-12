@@ -56,8 +56,10 @@ mismo. Así no hay CORS entre subdominios.
    nginx ya manda `Strict-Transport-Security: max-age=31536000; includeSubDomains`,
    `X-Frame-Options: DENY` y `Content-Security-Policy: frame-ancestors 'none'` (salvo
    en la vista previa del sitio, `/estudio/{slug}/vista-previa`: `SAMEORIGIN` y
-   `frame-ancestors 'self'`, porque el panel la muestra en un iframe propio). El
-   proxy no debe quitarlas ni reemplazarlas. Por `includeSubDomains`, el navegador
+   `frame-ancestors 'self'`, porque el panel la muestra en un iframe propio, y en los
+   formularios de captación `/f/…` y los widgets `/w/…`, que se embeben en la web de
+   cada negocio: sin `X-Frame-Options` y con `frame-ancestors *`). El proxy no debe
+   quitarlas ni reemplazarlas. Por `includeSubDomains`, el navegador
    exige HTTPS en **todo** subdominio de `DOMINIO` durante un año: si otro servicio
    usa uno (por ejemplo, el seguimiento de clics del proveedor de correo), debe tener
    HTTPS.

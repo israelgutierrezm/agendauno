@@ -49,6 +49,11 @@ calendario ya era así.
 
 ## Consecuencias
 
+- nginx deja embeber `/w/{negocio}/{widget}` en cualquier sitio (sin `X-Frame-Options`
+  y con `frame-ancestors *`), como los formularios `/f/…`. Al principio se quedó fuera
+  y en producción el widget salía bloqueado, tanto en la web del negocio como en la
+  vista previa del panel. El CI lo revisa con el contenedor de nginx.
+
 - Migración de negocio 000132 (`widgets`).
 - La página del negocio y el widget comparten la tarjeta de plan: un cambio se ve en los
   dos.

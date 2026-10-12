@@ -31,18 +31,22 @@ map $http_x_forwarded_proto $https_cliente {
 # sitio de un negocio (/estudio/{slug}/vista-previa), que el panel muestra en un iframe
 # del mismo origen (ADR 0114). Con $request_uri: tras try_files, $uri ya es /app.html.
 #
-# Los formularios de captación (/f/{negocio}/{formulario}, ADR 0117) se embeben en el
-# sitio propio del negocio, en cualquier dominio: ahí no va X-Frame-Options (vacío, nginx
-# no la manda) y frame-ancestors admite cualquier origen. Son páginas públicas sin
-# sesión: lo único que hacen es enviar el formulario.
+# Los formularios de captación (/f/{negocio}/{formulario}, ADR 0117) y los widgets
+# (/w/{negocio}/{widget}, ADR 0141) se embeben en el sitio propio del negocio, en
+# cualquier dominio: ahí no va X-Frame-Options (vacío, nginx no la manda) y
+# frame-ancestors admite cualquier origen. Son páginas públicas sin sesión: muestran lo
+# que ya es público y, a lo más, envían el formulario de captación. El widget además
+# solo se muestra en las webs que el negocio registró (lo revisa la página).
 map $request_uri $marco {
     ~^/estudio/[a-z0-9-]+/vista-previa/?(\?.*)?$ SAMEORIGIN;
     ~^/f/[a-z0-9-]+/[0-9a-z]+/?(\?.*)?$ "";
+    ~^/w/[a-z0-9-]+/[0-9a-z]+/?(\?.*)?$ "";
     default DENY;
 }
 map $request_uri $marco_csp {
     ~^/estudio/[a-z0-9-]+/vista-previa/?(\?.*)?$ "frame-ancestors 'self'";
     ~^/f/[a-z0-9-]+/[0-9a-z]+/?(\?.*)?$ "frame-ancestors *";
+    ~^/w/[a-z0-9-]+/[0-9a-z]+/?(\?.*)?$ "frame-ancestors *";
     default "frame-ancestors 'none'";
 }
 
