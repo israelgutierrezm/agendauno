@@ -178,7 +178,9 @@ onMounted(() => {
 
 <template>
   <!-- ===================== APP AUTENTICADA (panel con barra lateral) ===================== -->
-  <div v-if="enPanel" class="flex min-h-screen">
+  <!-- Un marco del color de la barra (con el menú lateral y el encabezado) y, dentro,
+       el contenido en una tarjeta redondeada. -->
+  <div v-if="enPanel" class="tu-marco flex min-h-screen">
     <!-- Velo del cajón (móvil) -->
     <div
       v-if="menuLateral"
@@ -197,14 +199,12 @@ onMounted(() => {
       :style="{
         background: 'var(--barra)',
         color: 'var(--barra-texto)',
-        borderRight: '1px solid var(--barra-borde)',
       }"
     >
       <!-- Marca -->
       <RouterLink
         :to="hogar"
-        class="flex items-center gap-3 h-16 px-4 shrink-0 border-b"
-        :style="{ borderColor: 'var(--barra-borde)' }"
+        class="flex items-center gap-3 h-16 px-4 shrink-0"
         @click="menuLateral = false"
       >
         <img
@@ -295,14 +295,10 @@ onMounted(() => {
 
     <!-- Columna principal -->
     <div class="flex-1 flex flex-col min-w-0">
-      <!-- Encabezado (claro, translúcido) -->
+      <!-- Encabezado: sobre el marco, con los colores de la barra -->
       <header
         v-show="!agendaAmpliada"
-        class="tu-sin-imprimir tu-barra-superior sticky top-0 z-30 h-16 flex items-center justify-between gap-3 px-4 sm:px-6 border-b backdrop-blur"
-        :style="{
-          background: 'color-mix(in srgb, var(--superficie) 85%, transparent)',
-          borderColor: 'var(--borde)',
-        }"
+        class="tu-sin-imprimir tu-barra-superior sticky top-0 z-30 h-16 flex items-center justify-between gap-3 px-4 sm:px-6"
       >
         <div class="flex flex-1 items-center gap-3 min-w-0">
           <button
@@ -438,7 +434,11 @@ onMounted(() => {
         </div>
       </header>
 
-      <main class="flex-1" :style="{ background: 'var(--fondo)' }">
+      <!-- El contenido: la tarjeta redondeada dentro del marco -->
+      <main
+        class="tu-tarjeta-panel flex-1"
+        :class="{ 'tu-tarjeta-ampliada': agendaAmpliada }"
+      >
         <!-- Las vistas del área (Agenda: Calendario, Recepción…), bajo la barra -->
         <PestanasArea v-show="!agendaAmpliada" class="tu-sin-imprimir" />
         <div
@@ -536,6 +536,71 @@ onMounted(() => {
 </template>
 
 <style>
+/* Marco del panel: el color de la barra de su tema envuelve todo (menú lateral y
+   encabezado) y el contenido va en una tarjeta redondeada. El menú lateral cambia de
+   ancho y la tarjeta se ajusta sola (flex). */
+.tu-marco {
+  /* Los colores de la página, guardados para lo que se abre desde el encabezado. */
+  --texto-pagina: var(--texto);
+  --texto-suave-pagina: var(--texto-suave);
+  --borde-pagina: var(--borde);
+  --superficie-pagina: var(--superficie);
+  --superficie-2-pagina: var(--superficie-2);
+  background: var(--barra);
+}
+.tu-marco .tu-barra-superior {
+  --texto: var(--barra-texto);
+  --texto-suave: color-mix(in srgb, var(--barra-texto) 80%, transparent);
+  --borde: var(--barra-borde);
+  --superficie: color-mix(in srgb, var(--barra-suave) 70%, transparent);
+  --superficie-2: var(--barra-suave);
+  --fondo: var(--barra-suave);
+  background: var(--barra);
+  color: var(--barra-texto);
+}
+/* Lo que se abre desde el encabezado vuelve a los colores de la página. */
+.tu-marco .tu-barra-superior .tu-perfil-menu {
+  --texto: var(--texto-pagina);
+  --texto-suave: var(--texto-suave-pagina);
+  --borde: var(--borde-pagina);
+  --superficie: var(--superficie-pagina);
+  --superficie-2: var(--superficie-2-pagina);
+  color: var(--texto);
+}
+.tu-tarjeta-panel {
+  min-width: 0;
+  margin: 0 0.5rem 0.5rem;
+  /* Con su borde y una sombra leve, también se distingue si la barra es clara. */
+  border: 1px solid var(--borde);
+  border-radius: 1.25rem;
+  background: var(--fondo);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
+  /* Recorta sus esquinas sin volverse contenedor de desplazamiento (lo pegajoso de
+     cada pantalla sigue pegado a la ventana). */
+  overflow: clip;
+}
+@media (min-width: 1024px) {
+  .tu-tarjeta-panel {
+    margin: 0 0.75rem 0.75rem 0.25rem;
+    border-radius: 1.5rem;
+  }
+}
+/* La agenda a pantalla completa: sin marco. */
+.tu-tarjeta-panel.tu-tarjeta-ampliada {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+@media print {
+  .tu-marco {
+    background: none;
+  }
+  .tu-tarjeta-panel {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+}
 .tu-lienzo.tu-lienzo-ampliado {
   padding-inline: 0;
 }
