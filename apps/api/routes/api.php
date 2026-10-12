@@ -24,6 +24,7 @@ use App\Modules\Tenancy\Http\Controllers\CaptacionPublicaController;
 use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
+use App\Modules\Tenancy\Http\Controllers\ComplementosNegocioController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CuotasTenantController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
@@ -549,6 +550,9 @@ Route::prefix('v1')->group(function (): void {
                 ->middleware(['puede:estudio.gestionar', 'throttle:whatsapp-panel-verificar'])->name('avisos-plataforma.cambio');
             // Transparencia del cobro: a quién se contó en el periodo (alumnos o profesionales).
             Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
+            // Complementos que se piden a la plataforma (p. ej. Familias; ADR 0140).
+            Route::get('/renta/complementos', [ComplementosNegocioController::class, 'index'])->middleware('puede:facturacion.ver')->name('renta.complementos');
+            Route::post('/renta/complementos/{modulo}/solicitud', [ComplementosNegocioController::class, 'solicitar'])->middleware(['puede:estudio.gestionar', 'throttle:login'])->name('renta.complementos.solicitar');
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente
             // + checkout; el webhook de la plataforma confirma). El dueño paga su suscripcion.
             Route::post('/renta/cargos/{cargo}/pagar', [PagoRentaController::class, 'pagar'])->middleware('puede:facturacion.ver')->name('renta.pagar');

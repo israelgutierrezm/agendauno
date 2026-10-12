@@ -347,6 +347,16 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Complementos que se piden (ADR 0140)
+
+- `GET /renta/complementos` (`facturacion.ver`): los módulos que se activan a pedido,
+  cada uno con `clave`, `nombre`, `descripcion`, `activo` y `solicitado_en`.
+- `POST /renta/complementos/{modulo}/solicitud` (`estudio.gestionar`): registra la
+  alerta `modulo_solicitado` para la plataforma.
+  - Ya activo: 422.
+  - Módulo que no existe: 404.
+- Se activa con `PUT /plataforma/estudios/{estudio}/modulos` (superadmin).
+
 ## Mostrador: extras, propina y cambio (ADR 0139)
 
 - Extras de un artículo:

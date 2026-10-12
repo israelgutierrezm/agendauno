@@ -4,6 +4,18 @@
  * facturar y lo que no incluye un nivel. Se montan bajo `suscripcion` en es-MX.
  */
 export default {
+  // Complementos que se piden a la plataforma (ADR 0140): p. ej. Familias.
+  complementos: {
+    titulo: "Complementos",
+    ayuda:
+      "Funciones que se activan a pedido para tu negocio. No aparecen en tu panel hasta que se activan.",
+    activo: "Activo",
+    solicitado: "Solicitado el {fecha}",
+    pedir: "Solicitarlo",
+    pedirOtraVez: "Volver a pedirlo",
+    pedido:
+      "Listo: le avisamos al equipo de AgendaUno para activar {nombre}. Te contactaremos.",
+  },
   niveles: {
     individual: "Individual",
     premium: "Premium",
