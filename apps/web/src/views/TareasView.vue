@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
 import BarraListado from "@/components/BarraListado.vue";
+import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -34,6 +35,7 @@ interface Tarea {
   vence_en: string | null;
   persona: string | null;
   responsable: string | null;
+  responsable_id?: string | null;
   automatica: boolean;
   completada_en: string | null;
   // Seguimiento (M09): a quién, por qué y con qué terminó.
@@ -86,13 +88,41 @@ const estadoFiltro = ref<"pendiente" | "completada">("pendiente");
 const cargandoTareas = ref(true);
 const accionando = ref(false);
 const mostrarNueva = ref(false);
-const nueva = ref({ titulo: "", detalle: "", vence_en: "" });
+// La tarea que se crea o se edita (`editando`): con su persona y a quién se asigna.
+const editando = ref<Tarea | null>(null);
+const FORMULARIO_VACIO = {
+  titulo: "",
+  detalle: "",
+  vence_en: "",
+  persona_id: "",
+  responsable_id: "",
+};
+const nueva = ref({ ...FORMULARIO_VACIO });
+const personaElegida = ref<{ id: string; nombre: string } | null>(null);
+// A quién se le puede asignar (solo quien ve las tareas del equipo).
+const puedeEquipo = computed(() => sesion.puede("tareas.equipo"));
+const responsables = ref<{ id: string; nombre: string }[]>([]);
+async function cargarResponsables(): Promise<void> {
+  if (!puedeEquipo.value || responsables.value.length > 0) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: { id: string; nombre: string }[] }>(
+      `${base.value}/tareas/responsables`,
+    );
+    responsables.value = data.data;
+  } catch {
+    // Sin la lista, la tarea queda para quien la crea.
+  }
+}
 
 // Búsqueda y filtros. El inicio abre los seguimientos ya filtrados
 // (`?tipo=seguimiento`; M08) y puede abrir un vencimiento (`?vencimiento=hoy`).
 const consulta = useRoute()?.query ?? {};
 const busqueda = ref("");
-const filtros = ref<Record<"tipo" | "vencimiento" | "mias", string>>({
+const filtros = ref<
+  Record<"tipo" | "vencimiento" | "mias" | "responsable", string>
+>({
   tipo:
     typeof consulta.tipo === "string" &&
     ["seguimiento", "automatica", "manual"].includes(consulta.tipo)
@@ -104,6 +134,7 @@ const filtros = ref<Record<"tipo" | "vencimiento" | "mias", string>>({
       ? consulta.vencimiento
       : "",
   mias: "",
+  responsable: "",
 });
 const desde = ref("");
 const hasta = ref("");
@@ -144,9 +175,26 @@ const definicionFiltros = computed(() => [
         },
       ]
     : []),
+  ...(alcance.value === "equipo" && responsables.value.length > 1
+    ? [
+        {
+          clave: "responsable",
+          etiqueta: t("operacion.bandeja.filtros.responsable"),
+          opciones: responsables.value.map((r) => ({
+            valor: r.id,
+            texto: r.nombre,
+          })),
+        },
+      ]
+    : []),
 ]);
 function cambiarFiltro(clave: string, valor: string): void {
-  if (clave === "tipo" || clave === "vencimiento" || clave === "mias") {
+  if (
+    clave === "tipo" ||
+    clave === "vencimiento" ||
+    clave === "mias" ||
+    clave === "responsable"
+  ) {
     filtros.value[clave] = valor;
     recargarDesdeElInicio();
   }
@@ -157,7 +205,7 @@ function elegirVencimiento(v: Vencimiento): void {
 }
 function limpiarFiltros(): void {
   busqueda.value = "";
-  filtros.value = { tipo: "", vencimiento: "", mias: "" };
+  filtros.value = { tipo: "", vencimiento: "", mias: "", responsable: "" };
   desde.value = "";
   hasta.value = "";
   recargarDesdeElInicio();
@@ -436,6 +484,9 @@ async function cargarTareas(): Promise<void> {
           ? { vencimiento: filtros.value.vencimiento }
           : {}),
         ...(filtros.value.mias !== "" ? { mias: 1 } : {}),
+        ...(filtros.value.responsable !== ""
+          ? { responsable: filtros.value.responsable }
+          : {}),
         ...(desde.value !== "" ? { desde: desde.value } : {}),
         ...(hasta.value !== "" ? { hasta: hasta.value } : {}),
       },
@@ -459,19 +510,62 @@ async function cargarTareas(): Promise<void> {
   }
 }
 
+function abrirNueva(): void {
+  editando.value = null;
+  nueva.value = { ...FORMULARIO_VACIO };
+  personaElegida.value = null;
+  mostrarNueva.value = true;
+  void cargarResponsables();
+}
+function abrirEdicion(tarea: Tarea): void {
+  editando.value = tarea;
+  nueva.value = {
+    titulo: tarea.titulo,
+    detalle: tarea.detalle ?? "",
+    // El campo de fecha va en el día del negocio.
+    vence_en: tarea.vence_en ? diaDelNegocio(new Date(tarea.vence_en)) : "",
+    persona_id: tarea.persona_id ?? "",
+    responsable_id: tarea.responsable_id ?? "",
+  };
+  personaElegida.value =
+    tarea.persona_id && tarea.persona
+      ? { id: tarea.persona_id, nombre: tarea.persona }
+      : null;
+  mostrarNueva.value = true;
+  void cargarResponsables();
+}
+function quitarPersona(): void {
+  nueva.value.persona_id = "";
+  personaElegida.value = null;
+}
+
 async function crearTarea(): Promise<void> {
   if (nueva.value.titulo.trim() === "") {
     return;
   }
   accionando.value = true;
   error.value = null;
+  const f = nueva.value;
+  const datos: Record<string, string | null> = {
+    titulo: f.titulo,
+    detalle: f.detalle !== "" ? f.detalle : null,
+    vence_en: f.vence_en !== "" ? f.vence_en : null,
+    persona_id: f.persona_id !== "" ? f.persona_id : null,
+  };
+  // A quién: solo si se puede asignar y (al editar) si cambió.
+  const original = editando.value?.responsable_id ?? "";
+  if (puedeEquipo.value && (!editando.value || f.responsable_id !== original)) {
+    datos.responsable_id = f.responsable_id !== "" ? f.responsable_id : null;
+  }
   try {
-    await api.post(`${base.value}/tareas`, {
-      titulo: nueva.value.titulo,
-      detalle: nueva.value.detalle !== "" ? nueva.value.detalle : null,
-      vence_en: nueva.value.vence_en !== "" ? nueva.value.vence_en : null,
-    });
-    nueva.value = { titulo: "", detalle: "", vence_en: "" };
+    if (editando.value) {
+      await api.put(`${base.value}/tareas/${editando.value.id}`, datos);
+    } else {
+      await api.post(`${base.value}/tareas`, datos);
+    }
+    toast.exito(t("operacion.bandeja.guardada"));
+    nueva.value = { ...FORMULARIO_VACIO };
+    editando.value = null;
     mostrarNueva.value = false;
     await cargarTareas();
   } catch (e) {
@@ -650,7 +744,11 @@ function cambiarTab(t: "pendientes" | "reglas"): void {
   }
 }
 
-onMounted(cargarTareas);
+onMounted(() => {
+  void cargarTareas();
+  // Para el filtro «Asignadas a» y para asignar.
+  void cargarResponsables();
+});
 </script>
 
 <template>
@@ -750,7 +848,7 @@ onMounted(cargarTareas);
         :nuevo-texto="$t('tareas.nueva')"
         @cambio-filtro="cambiarFiltro"
         @limpiar="limpiarFiltros"
-        @nuevo="mostrarNueva = true"
+        @nuevo="abrirNueva"
       >
         <template #acciones>
           <fieldset class="ta-rango">
@@ -787,10 +885,12 @@ onMounted(cargarTareas);
         </template>
       </BarraListado>
 
-      <!-- Nueva tarea (drawer lateral) -->
+      <!-- Nueva tarea o editar una (drawer lateral) -->
       <PanelLateral
         :abierto="mostrarNueva"
-        :titulo="$t('tareas.nueva')"
+        :titulo="
+          editando ? $t('operacion.bandeja.editarTarea') : $t('tareas.nueva')
+        "
         @cerrar="mostrarNueva = false"
       >
         <form class="grid gap-4" @submit.prevent="crearTarea">
@@ -821,6 +921,53 @@ onMounted(cargarTareas);
               type="date"
               class="tu-input"
             />
+          </div>
+          <div>
+            <label class="tu-label" for="t-persona">{{
+              $t("operacion.bandeja.persona")
+            }}</label>
+            <BuscarPersona
+              v-model="nueva.persona_id"
+              campo-id="t-persona"
+              :personas="personaElegida ? [personaElegida] : []"
+              :buscar-en="`${base}/miembros`"
+              @elegir="
+                personaElegida = { id: $event.id, nombre: $event.nombre }
+              "
+            />
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("operacion.bandeja.personaAyuda") }}
+              <button
+                v-if="nueva.persona_id !== ''"
+                type="button"
+                class="tu-enlace ml-1"
+                @click="quitarPersona"
+              >
+                {{ $t("operacion.bandeja.quitarPersona") }}
+              </button>
+            </p>
+          </div>
+          <div v-if="puedeEquipo && responsables.length > 0">
+            <label class="tu-label" for="t-responsable">{{
+              $t("operacion.bandeja.responsable")
+            }}</label>
+            <select
+              id="t-responsable"
+              v-model="nueva.responsable_id"
+              class="tu-input"
+              data-prueba="tarea-responsable"
+            >
+              <option value="">{{ $t("operacion.bandeja.paraMi") }}</option>
+              <option
+                v-for="r in responsables.filter(
+                  (x) => x.id !== sesion.usuario?.ulid,
+                )"
+                :key="r.id"
+                :value="r.id"
+              >
+                {{ r.nombre }}
+              </option>
+            </select>
           </div>
         </form>
 
@@ -1048,6 +1195,18 @@ onMounted(cargarTareas);
                   </div>
                 </div>
 
+                <button
+                  v-if="puedeGestionar && tarea.estado === 'pendiente'"
+                  class="tu-enlace shrink-0 text-sm"
+                  type="button"
+                  :aria-label="
+                    $t('operacion.bandeja.editarDe', { titulo: tarea.titulo })
+                  "
+                  data-prueba="editar-tarea"
+                  @click="abrirEdicion(tarea)"
+                >
+                  {{ $t("operacion.bandeja.editar") }}
+                </button>
                 <button
                   v-if="
                     puedeGestionar &&

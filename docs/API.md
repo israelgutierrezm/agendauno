@@ -323,6 +323,20 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
   - quien está acotado a sus sucursales ve sus entradas y las registradas sin sucursal;
   - `meta.conteos` cuenta lo encontrado por resultado, sin ese filtro.
 
+## Asignar y editar tareas
+
+- `POST /tareas` suma `persona_id` (ULID de una persona del negocio) y `responsable_id`
+  (ULID de alguien del equipo). Sin `responsable_id`, la tarea es de quien la crea.
+  Asignarla a otro pide `tareas.equipo` y que esa persona atienda tareas
+  (`tareas.gestionar`); si no, 422.
+- `PUT /tareas/{tarea}` (`tareas.gestionar`): edita una tarea pendiente (`titulo`,
+  `detalle`, `vence_en`, `persona_id`, `responsable_id`). Lo que no viene no cambia. Una
+  completada no se edita (422).
+- `GET /tareas/responsables` (`tareas.equipo`): quienes pueden recibir una tarea
+  (`id`, `nombre`).
+- `GET /tareas?responsable={ulid}` (con `tareas.equipo`): las de alguien del equipo.
+  Cada tarea suma `responsable_id`.
+
 ## Campañas controladas (B08)
 
 - Las difusiones traen `estado` (enviando, pausada, cancelada), `enviados`, `pendientes`
