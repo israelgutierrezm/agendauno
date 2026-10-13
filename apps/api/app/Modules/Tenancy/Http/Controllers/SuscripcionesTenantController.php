@@ -29,7 +29,7 @@ use Illuminate\Http\Request;
  */
 class SuscripcionesTenantController
 {
-    private const LIMITE = 200;
+    private const POR_PAGINA = 25;
 
     public function __construct(
         private readonly DomiciliacionesTenant $domiciliaciones,
@@ -38,15 +38,36 @@ class SuscripcionesTenantController
         private readonly FamiliasTenant $familias,
     ) {}
 
-    public function index(): JsonResponse
+    /**
+     * Las próximas renovaciones por páginas (antes, solo las primeras 200), de la más
+     * cercana; se buscan por la persona y se filtran por pago automático. El resumen
+     * (sin filtros) da los indicadores.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $acuerdos = AcuerdoTenant::query()
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'automatico' => ['nullable', 'in:si,no'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $base = AcuerdoTenant::query()
             ->whereNotNull('proxima_cobro_en')
-            ->where('estado', '!=', EstadoAcuerdo::Cancelado->value)
+            ->where('estado', '!=', EstadoAcuerdo::Cancelado->value);
+        $resumen = [
+            'total' => (clone $base)->count(),
+            'automaticos' => (clone $base)->whereHas('domiciliacion')->count(),
+        ];
+        $buscar = trim((string) ($filtros['q'] ?? ''));
+        $pagina = (clone $base)
+            ->when($buscar !== '', fn ($q) => $q->whereHas('persona', fn ($p) => $p->buscar($buscar)))
+            ->when(($filtros['automatico'] ?? null) === 'si', fn ($q) => $q->whereHas('domiciliacion'))
+            ->when(($filtros['automatico'] ?? null) === 'no', fn ($q) => $q->whereDoesntHave('domiciliacion'))
             ->with(['persona', 'producto', 'domiciliacion.persona'])
             ->orderBy('proxima_cobro_en')
-            ->limit(self::LIMITE)
-            ->get();
+            ->orderBy('id')
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+        $acuerdos = $pagina->getCollection();
         // Pagos automáticos que se quitaron y la pasarela aún no confirma (ADR 0134).
         $cancelando = DomiciliacionTenant::query()
             ->whereIn('acuerdo_id', $acuerdos->modelKeys())
@@ -80,6 +101,13 @@ class SuscripcionesTenantController
                     : null,
             ])->all(),
             'pago_automatico_disponible' => $this->domiciliaciones->proveedor() !== null,
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'resumen' => $resumen,
+            ],
         ]);
     }
 

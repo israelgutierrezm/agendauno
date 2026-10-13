@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\EstadoFactura;
@@ -31,22 +32,35 @@ class FacturasTenantController
 
     /**
      * Las facturas por páginas (antes, solo las últimas 100), de la más reciente a la
-     * más antigua; se buscan por receptor (nombre o RFC) o folio fiscal y por estado.
+     * más antigua; se buscan por receptor (nombre o RFC) o folio fiscal, por estado y
+     * por fechas (días del negocio). Con cuántas hay de cada estado para los filtros.
      */
     public function index(Request $request): JsonResponse
     {
         $filtros = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'estado' => ['nullable', Rule::enum(EstadoFactura::class)],
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+        if (isset($filtros['desde'], $filtros['hasta']) && $filtros['hasta'] < $filtros['desde']) {
+            throw ValidationException::withMessages(['hasta' => ['La fecha final no puede ser antes que la inicial.']]);
+        }
         $buscar = trim((string) ($filtros['q'] ?? ''));
-        $pagina = FacturaTenant::query()
+        $fechas = app(FechasNegocioTenant::class);
+        $consulta = FacturaTenant::query()
             ->when($buscar !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
                 ->where('receptor_nombre', 'like', "%{$buscar}%")
                 ->orWhere('receptor_rfc', 'like', '%'.mb_strtoupper($buscar).'%')
                 ->orWhere('uuid', 'like', "%{$buscar}%")))
+            ->when(isset($filtros['desde']), fn (Builder $q) => $q->where('created_at', '>=', $fechas->inicioDelDia((string) $filtros['desde'])))
+            ->when(isset($filtros['hasta']), fn (Builder $q) => $q->where('created_at', '<=', $fechas->finDelDia((string) $filtros['hasta'])));
+        // De cada estado, con la búsqueda y las fechas (para los filtros).
+        $conteos = (clone $consulta)->selectRaw('estado, COUNT(*) as total')->groupBy('estado')->pluck('total', 'estado')
+            ->map(static fn ($n): int => (int) $n)->all();
+        $pagina = $consulta
             ->when(($filtros['estado'] ?? null) !== null, fn (Builder $q) => $q->where('estado', $filtros['estado']))
             ->orderByDesc('id')
             ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
@@ -58,6 +72,10 @@ class FacturasTenantController
                 'page' => $pagina->currentPage(),
                 'per_page' => $pagina->perPage(),
                 'ultima_pagina' => $pagina->lastPage(),
+                'conteos' => [
+                    'timbrada' => $conteos[EstadoFactura::Timbrada->value] ?? 0,
+                    'error' => $conteos[EstadoFactura::Error->value] ?? 0,
+                ],
             ],
         ]);
     }

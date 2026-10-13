@@ -601,6 +601,7 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/renta/tarjeta', [TarjetaRentaController::class, 'quitar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.tarjeta.quitar');
             // Timbres para facturar a los clientes (ADR 0107): saldo y compra de paquetes.
             Route::get('/timbres', [TimbresTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('timbres.index');
+            Route::get('/timbres/movimientos', [TimbresTenantController::class, 'movimientos'])->middleware('puede:facturacion.ver')->name('timbres.movimientos');
             Route::post('/timbres/comprar', [TimbresTenantController::class, 'comprar'])->middleware('puede:facturacion.ver')->name('timbres.comprar');
             // Factura (CFDI) de la renta del SaaS: emite el CFDI de un cargo pagado y
             // entrega el PDF/XML (AgendaUno emisor, el estudio receptor).

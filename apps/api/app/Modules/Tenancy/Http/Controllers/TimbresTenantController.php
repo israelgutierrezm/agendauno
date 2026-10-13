@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Application\TimbresTenant;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\MovimientoTimbreTenant;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +46,40 @@ class TimbresTenantController
             'motivo' => $this->motivo($estudio),
             'movimientos' => $this->timbres->movimientos(),
         ]]);
+    }
+
+    /**
+     * Todos los movimientos de timbres por páginas (la pantalla solo trae los últimos
+     * 20), de los más recientes; se filtran por tipo (compra, consumo…).
+     */
+    public function movimientos(Request $request): JsonResponse
+    {
+        $filtros = $request->validate([
+            'tipo' => ['nullable', 'string', 'max:20'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $pagina = MovimientoTimbreTenant::query()
+            ->when(($filtros['tipo'] ?? '') !== '', fn ($q) => $q->where('tipo', $filtros['tipo']))
+            ->orderByDesc('id')
+            ->paginate((int) ($filtros['per_page'] ?? 20), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+
+        return response()->json([
+            'data' => $pagina->getCollection()->map(static fn (MovimientoTimbreTenant $m): array => [
+                'id' => (string) $m->ulid,
+                'tipo' => $m->tipo,
+                'cantidad' => $m->cantidad,
+                'saldo_despues' => $m->saldo_despues,
+                'detalle' => $m->detalle,
+                'fecha' => $m->created_at?->toIso8601String(),
+            ])->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
+        ]);
     }
 
     public function comprar(Request $request, ComprarTimbres $comprar): JsonResponse

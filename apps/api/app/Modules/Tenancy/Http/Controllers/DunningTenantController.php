@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Dunning tenant-local (R10): registrar fallos de cobro de membresías, regularizar
@@ -21,18 +22,38 @@ class DunningTenantController
     public function __construct(private readonly GestionarDunningTenant $dunning) {}
 
     /**
-     * Procesos de morosidad abiertos (en mora o suspendidos).
+     * Procesos de morosidad abiertos (en mora o suspendidos), por páginas; se buscan por
+     * la persona. El total sin filtros da el indicador.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $procesos = ProcesoDunningTenant::query()
-            ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'estado' => ['nullable', Rule::in([EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $base = ProcesoDunningTenant::query()
+            ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value]);
+        $total = (clone $base)->count();
+        $buscar = trim((string) ($filtros['q'] ?? ''));
+        $pagina = $base
+            ->when($buscar !== '', fn ($q) => $q->whereHas('acuerdo.persona', fn ($p) => $p->buscar($buscar)))
+            ->when(isset($filtros['estado']), fn ($q) => $q->where('estado', $filtros['estado']))
             ->with('acuerdo.persona')
             ->orderBy('gracia_hasta')
-            ->get();
+            ->orderBy('id')
+            ->paginate((int) ($filtros['per_page'] ?? 25), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
         return response()->json([
-            'data' => $procesos->map(fn (ProcesoDunningTenant $p): array => $this->presentar($p))->all(),
+            'data' => collect($pagina->items())->map(fn (ProcesoDunningTenant $p): array => $this->presentar($p))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'resumen' => ['total' => $total],
+            ],
         ]);
     }
 

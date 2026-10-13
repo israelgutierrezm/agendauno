@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useToastStore } from "@/stores/toast";
 
@@ -37,6 +38,40 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const paquete = ref<number | null>(null);
 const comprando = ref(false);
+// Los movimientos llegan con los últimos 20; los demás, por páginas.
+const paginaMovimientos = ref(1);
+const metaMovimientos = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
+async function cargarMovimientos(n: number): Promise<void> {
+  try {
+    const { data } = await api.get<{
+      data: Movimiento[];
+      meta: {
+        total: number;
+        page: number;
+        per_page: number;
+        ultima_pagina: number;
+      };
+    }>(`${props.base}/timbres/movimientos`, { params: { page: n } });
+    if (timbres.value) {
+      timbres.value.movimientos = data.data;
+    }
+    metaMovimientos.value = data.meta;
+    paginaMovimientos.value = n;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+// Al abrir la lista se sabe cuántas páginas hay.
+function alAbrirMovimientos(e: Event): void {
+  if ((e.target as HTMLDetailsElement).open && metaMovimientos.value === null) {
+    void cargarMovimientos(1);
+  }
+}
 
 function dinero(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
@@ -168,7 +203,11 @@ defineExpose({ cargar });
           }}
         </button>
       </div>
-      <details v-if="timbres.movimientos.length > 0" class="mt-4 text-sm">
+      <details
+        v-if="timbres.movimientos.length > 0"
+        class="mt-4 text-sm"
+        @toggle="alAbrirMovimientos"
+      >
         <summary class="tu-enlace cursor-pointer">
           {{ $t("suscripcion.timbres.movimientos") }}
         </summary>
@@ -189,6 +228,14 @@ defineExpose({ cargar });
             }}</span>
           </li>
         </ul>
+        <PaginacionListado
+          v-if="metaMovimientos && metaMovimientos.ultima_pagina > 1"
+          :page="metaMovimientos.page"
+          :ultima-pagina="metaMovimientos.ultima_pagina"
+          :total="metaMovimientos.total"
+          :per-page="metaMovimientos.per_page"
+          @ir="cargarMovimientos"
+        />
       </details>
     </template>
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
