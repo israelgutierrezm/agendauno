@@ -551,6 +551,9 @@ Route::prefix('v1')->group(function (): void {
             // Tareas de seguimiento (R16): bandeja de pendientes del staff (manuales o automaticas).
             Route::get('/tareas', [TareasTenantController::class, 'index'])->middleware('puede:tareas.ver')->name('tareas.index');
             Route::post('/tareas', [TareasTenantController::class, 'store'])->middleware('puede:tareas.gestionar')->name('tareas.store');
+            // A quién se le puede asignar una tarea (ruta literal antes de /tareas/{tarea}).
+            Route::get('/tareas/responsables', [TareasTenantController::class, 'responsables'])->middleware('puede:tareas.equipo')->name('tareas.responsables');
+            Route::put('/tareas/{tarea}', [TareasTenantController::class, 'update'])->middleware('puede:tareas.gestionar')->name('tareas.update');
             Route::post('/tareas/{tarea}/completar', [TareasTenantController::class, 'completar'])->middleware('puede:tareas.gestionar')->name('tareas.completar');
             Route::post('/tareas/{tarea}/reabrir', [TareasTenantController::class, 'reabrir'])->middleware('puede:tareas.gestionar')->name('tareas.reabrir');
             // Con qué terminó un seguimiento (M09).

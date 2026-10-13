@@ -624,7 +624,18 @@ export default {
       tipo: "Tipo",
       vencimiento: "Vencimiento",
       mias: "Solo las mías",
+      responsable: "Asignadas a",
     },
+    // Asignar, vincular a una persona y editar.
+    editarTarea: "Editar tarea",
+    editar: "Editar",
+    editarDe: "Editar «{titulo}»",
+    persona: "Persona (opcional)",
+    personaAyuda: "A quién llamar o escribirle por esta tarea.",
+    quitarPersona: "Quitar persona",
+    responsable: "Asignar a",
+    paraMi: "A mí",
+    guardada: "Tarea guardada",
     tipos: {
       seguimiento: "Seguimientos",
       automatica: "Automáticas",

@@ -27,6 +27,10 @@ use Illuminate\Validation\ValidationException;
  * Alcance: sin `tareas.equipo`, cada quien ve, completa y reabre solo SUS tareas
  * (de las que es responsable); las del equipo y las automáticas sin responsable
  * son de quien tiene ese permiso. Ocultarlas en la pantalla no bastaría.
+ *
+ * Asignar: quien tiene `tareas.equipo` asigna (y reasigna) una tarea a cualquiera del
+ * equipo que atienda tareas (`tareas.gestionar`); sin él, las tareas que crea son suyas.
+ * Una tarea puede ir con una persona del negocio (a quién llamar, a quién escribirle).
  */
 class TareasTenantController
 {
@@ -55,6 +59,8 @@ class TareasTenantController
             'desde' => ['nullable', 'date_format:Y-m-d'],
             'hasta' => ['nullable', 'date_format:Y-m-d'],
             'mias' => ['nullable', 'boolean'],
+            // Las de alguien del equipo (solo con `tareas.equipo`).
+            'responsable' => ['nullable', 'string', 'max:40'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
@@ -69,6 +75,9 @@ class TareasTenantController
         $suyas = $this->soloDe($request);
         if ($suyas === null && (bool) ($filtros['mias'] ?? false)) {
             $suyas = (int) $this->actor($request)?->getKey();
+        }
+        if ($suyas === null && ($filtros['responsable'] ?? '') !== '') {
+            $suyas = (int) (Usuario::query()->where('ulid', $filtros['responsable'])->value('id') ?? 0);
         }
         $deSuAlcance = fn (): Builder => TareaTenant::query()
             ->when($suyas !== null, fn (Builder $q) => $q->where('responsable_id', $suyas));
@@ -161,24 +170,110 @@ class TareasTenantController
         $validado = $request->validate([
             'titulo' => ['required', 'string', 'max:255'],
             'detalle' => ['nullable', 'string', 'max:2000'],
-            'persona_id' => ['nullable', 'string'],
+            'persona_id' => ['nullable', 'string', 'max:40'],
+            'responsable_id' => ['nullable', 'string', 'max:40'],
             'vence_en' => ['nullable', 'date'],
         ]);
-
-        $personaId = null;
-        if (! empty($validado['persona_id'])) {
-            $personaId = PersonaTenant::query()->where('ulid', $validado['persona_id'])->value('id');
-        }
 
         $tarea = $this->tareas->crear([
             'titulo' => $validado['titulo'],
             'detalle' => $validado['detalle'] ?? null,
-            'persona_id' => $personaId !== null ? (int) $personaId : null,
-            'responsable_id' => $this->actor($request)?->getKey(),
+            'persona_id' => $this->persona($validado['persona_id'] ?? null),
+            'responsable_id' => $this->responsable($request, $validado['responsable_id'] ?? null),
             'vence_en' => $this->vencimiento($validado['vence_en'] ?? null),
         ]);
 
         return response()->json(['data' => $this->presentar($tarea->load(['persona', 'responsable']))], 201);
+    }
+
+    /**
+     * Edita una tarea pendiente: título, detalle, vencimiento, persona y (con
+     * `tareas.equipo`) a quién se asigna. Lo que no viene no cambia.
+     */
+    public function update(Request $request): JsonResponse
+    {
+        $tarea = $this->resolver($request);
+        if ($tarea->estado !== EstadoTarea::Pendiente) {
+            throw ValidationException::withMessages(['titulo' => ['Solo se edita una tarea pendiente.']]);
+        }
+        $validado = $request->validate([
+            'titulo' => ['sometimes', 'required', 'string', 'max:255'],
+            'detalle' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'persona_id' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'responsable_id' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'vence_en' => ['sometimes', 'nullable', 'date'],
+        ]);
+
+        if (array_key_exists('titulo', $validado)) {
+            $tarea->titulo = (string) $validado['titulo'];
+        }
+        if (array_key_exists('detalle', $validado)) {
+            $tarea->detalle = $validado['detalle'];
+        }
+        if (array_key_exists('vence_en', $validado)) {
+            $tarea->vence_en = $this->vencimiento($validado['vence_en']);
+        }
+        if (array_key_exists('persona_id', $validado)) {
+            $tarea->persona_id = $this->persona($validado['persona_id']);
+        }
+        if (array_key_exists('responsable_id', $validado)) {
+            $tarea->responsable_id = $this->responsable($request, $validado['responsable_id']);
+        }
+        $tarea->save();
+
+        return response()->json(['data' => $this->presentar($tarea->fresh(['persona', 'responsable']) ?? $tarea)]);
+    }
+
+    /**
+     * Quienes pueden recibir una tarea: el equipo activo que atiende tareas.
+     */
+    public function responsables(): JsonResponse
+    {
+        $equipo = Usuario::query()
+            ->where('activo', true)
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Usuario $u): bool => $u->puede('tareas.gestionar'))
+            ->map(fn (Usuario $u): array => ['id' => (string) $u->ulid, 'nombre' => (string) $u->name])
+            ->values()
+            ->all();
+
+        return response()->json(['data' => $equipo]);
+    }
+
+    /** El id de la persona del negocio con ese ULID; 422 si no existe. */
+    private function persona(?string $ulid): ?int
+    {
+        if ($ulid === null || $ulid === '') {
+            return null;
+        }
+        $id = PersonaTenant::query()->where('ulid', $ulid)->value('id');
+        if ($id === null) {
+            throw ValidationException::withMessages(['persona_id' => ['La persona no existe.']]);
+        }
+
+        return (int) $id;
+    }
+
+    /**
+     * A quién se asigna: quien pide, si no dice otra cosa. A otra persona solo con
+     * `tareas.equipo`, y solo a quien atiende tareas.
+     */
+    private function responsable(Request $request, ?string $ulid): ?int
+    {
+        $actor = $this->actor($request);
+        if ($ulid === null || $ulid === '' || $ulid === $actor?->ulid) {
+            return $actor?->getKey() !== null ? (int) $actor->getKey() : null;
+        }
+        if ($this->soloDe($request) !== null) {
+            throw ValidationException::withMessages(['responsable_id' => ['Solo puedes crear tareas para ti.']]);
+        }
+        $usuario = Usuario::query()->where('ulid', $ulid)->where('activo', true)->first();
+        if (! $usuario instanceof Usuario || ! $usuario->puede('tareas.gestionar')) {
+            throw ValidationException::withMessages(['responsable_id' => ['Esa persona del equipo no atiende tareas.']]);
+        }
+
+        return (int) $usuario->getKey();
     }
 
     public function completar(Request $request): JsonResponse
@@ -297,6 +392,7 @@ class TareasTenantController
             'resultado' => $tarea->resultado?->value,
             'contactado_en' => $tarea->contactado_en?->toIso8601String(),
             'responsable' => $tarea->responsable?->name,
+            'responsable_id' => $tarea->responsable?->ulid,
             'automatica' => $tarea->regla_id !== null,
             'completada_en' => $tarea->completada_en?->toIso8601String(),
             'creado_en' => $tarea->created_at?->toIso8601String(),
