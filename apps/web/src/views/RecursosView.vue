@@ -7,6 +7,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -157,6 +158,24 @@ async function crear(): Promise<void> {
   }
 }
 
+// Activar o desactivar: el API no deja apagar el único espacio activo de un servicio.
+const cambiando = ref<string | null>(null);
+async function cambiarActivo(r: Recurso, activo: boolean): Promise<void> {
+  cambiando.value = r.id;
+  error.value = null;
+  try {
+    const { data } = await api.put<{ data: Recurso }>(
+      `${base.value}/recursos/${r.id}`,
+      { activo },
+    );
+    r.activo = data.data.activo;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cambiando.value = null;
+  }
+}
+
 async function eliminar(r: Recurso): Promise<void> {
   if (!(await confirmar(t("recursos.confirmarEliminar"), { peligro: true }))) {
     return;
@@ -234,6 +253,7 @@ onMounted(cargar);
                 </th>
                 <th class="hidden md:table-cell">{{ $t("recursos.tipo") }}</th>
                 <th>{{ $t("recursos.modo") }}</th>
+                <th>{{ $t("operacion.recursos.estado") }}</th>
                 <th>
                   <span class="sr-only">{{
                     $t("recursosVisual.acciones")
@@ -263,6 +283,30 @@ onMounted(cargar);
                       ? $t("recursosVisual.pool", { n: r.capacidad })
                       : $t("recursosVisual.unidad")
                   }}
+                </td>
+                <td>
+                  <InterruptorSiNo
+                    v-if="puedeGestionar"
+                    :model-value="r.activo"
+                    :etiqueta="
+                      r.activo
+                        ? $t('operacion.recursos.activo')
+                        : $t('operacion.recursos.inactivo')
+                    "
+                    :deshabilitado="cambiando === r.id"
+                    :prueba="`activo-${r.id}`"
+                    @update:model-value="cambiarActivo(r, $event)"
+                  />
+                  <span
+                    v-else
+                    class="tu-pastilla"
+                    :class="r.activo ? 'tu-tono-exito' : 'tu-tono-neutral'"
+                    >{{
+                      r.activo
+                        ? $t("operacion.recursos.activo")
+                        : $t("operacion.recursos.inactivo")
+                    }}</span
+                  >
                 </td>
                 <td class="text-right">
                   <button

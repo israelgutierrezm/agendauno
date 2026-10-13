@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
+use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ParametroNegocioTenant;
@@ -20,6 +21,7 @@ use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -214,6 +216,27 @@ class RegionNegocioTenant
         }
         $estudio->forceFill(['pais' => $codigo])->save();
         $this->auditoria->registrar($actor, 'negocio.pais', 'estudio', null, ['pais' => $antes], ['pais' => $codigo]);
+        if ($codigo !== 'MX') {
+            $this->apagarPlataformas($actor);
+        }
+    }
+
+    /**
+     * Wellhub y TotalPass solo operan en México: fuera de él se apagan (y dejan de
+     * publicar). Queda en la bitácora; las llaves se conservan por si vuelve.
+     */
+    private function apagarPlataformas(?Usuario $actor): void
+    {
+        if (! Schema::connection('tenant')->hasTable('integraciones')) {
+            return;
+        }
+        foreach (IntegracionTenant::query()->where('activa', true)->get() as $integracion) {
+            $antes = ['activa' => true, 'reservas_activas' => (bool) $integracion->reservas_activas];
+            $integracion->forceFill(['activa' => false, 'reservas_activas' => false])->save();
+            $this->auditoria->registrar($actor, 'integracion.actualizada', 'integracion', (string) $integracion->proveedor, $antes, [
+                'activa' => false, 'reservas_activas' => false, 'motivo' => 'El negocio ya no está en México.',
+            ]);
+        }
     }
 
     /**

@@ -739,6 +739,26 @@ export default {
   formularios: {
     dosOpciones: "Escribe al menos dos opciones, separadas por comas.",
   },
+  // Lugares apartados para un canal (Wellhub, TotalPass, ClassPass…).
+  cuposCanal: {
+    hastaQueEmpieza: "se apartan hasta que empieza",
+    ayudaLibera:
+      "Horas antes de la clase en que los que no se usaron vuelven a estar disponibles. Con 0 se apartan hasta que empieza.",
+    sinConectar:
+      "{plataforma} no está conectada: estos lugares solo los usa quien registre a sus visitantes en recepción con ese canal.",
+  },
+  // El sitio del negocio: un bloque con su formulario apagado no se muestra.
+  sitio: {
+    formularioApagado:
+      "Ese formulario está apagado o ya no existe: el bloque no se muestra en tu página. Elige otro o vuelve a encenderlo en Captación.",
+  },
+  // Espacios: se activan y desactivan.
+  recursos: {
+    activo: "Activo",
+    inactivo: "Inactivo",
+    estado: "Estado",
+    activar: "Activar «{nombre}»",
+  },
   // Productos del mostrador: categorías propias del negocio y foto de cada uno.
   productos: {
     categoria: "Categoría",

@@ -11,7 +11,7 @@ export default {
     bloqueado:
       "El país ya no se puede cambiar desde aquí porque define cómo se te cobra; escríbenos para cambiarlo.",
     fueraDeMexico:
-      "Fuera de México no hay facturación a tus clientes, y el cobro en línea solo funciona en pesos mexicanos: los cobros se registran en el negocio.",
+      "Fuera de México no hay facturación a tus clientes, y el cobro en línea solo funciona en pesos mexicanos: los cobros se registran en el negocio. Wellhub y TotalPass, que solo operan en México, se apagan.",
   },
   moneda: {
     titulo: "Moneda",

@@ -791,6 +791,7 @@ Route::prefix('v1')->group(function (): void {
             // agenda evita sobre-reservarlos (unidad = 1; pool = capacidad).
             Route::get('/recursos', [RecursosTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('recursos.index');
             Route::post('/recursos', [RecursosTenantController::class, 'crear'])->middleware(['puede:agenda.gestionar', 'plan:recursos'])->name('recursos.store');
+            Route::put('/recursos/{recurso}', [RecursosTenantController::class, 'actualizar'])->middleware('puede:agenda.gestionar')->name('recursos.update');
             Route::delete('/recursos/{recurso}', [RecursosTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('recursos.eliminar');
             Route::put('/sesiones/{sesion}/instructor', [AgendaTenantController::class, 'asignarInstructor'])->middleware('puede:agenda.gestionar')->name('sesiones.instructor');
 
