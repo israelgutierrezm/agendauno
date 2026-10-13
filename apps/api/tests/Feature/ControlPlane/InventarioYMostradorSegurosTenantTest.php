@@ -74,7 +74,7 @@ it('la respuesta de un movimiento solo trae las sedes de quien lo hace', functio
     asignarSucursal($e, usuarioIdPorEmail($e, 'recep@correo.mx'), $sedeA['sucursal']);
 
     $r = $this->postJson("/api/v1/app/{$e['slug']}/articulos/{$articulo}/movimientos", [
-        'sucursal_id' => $sedeA['sucursal'], 'tipo' => 'ajuste', 'cantidad' => -2,
+        'sucursal_id' => $sedeA['sucursal'], 'tipo' => 'ajuste', 'cantidad' => -2, 'motivo' => 'Conteo físico',
     ], conBearer($recep))->assertCreated();
 
     expect(collect($r->json('data.existencias'))->pluck('sucursal_id')->all())->toBe([$sedeA['sucursal']])
@@ -87,9 +87,9 @@ it('un ajuste no deja el stock en negativo', function (): void {
     $articulo = productoConStockSeguro($e, $sede['sucursal'], 5);
     $url = "/api/v1/app/{$e['slug']}/articulos/{$articulo}/movimientos";
 
-    $this->postJson($url, ['sucursal_id' => $sede['sucursal'], 'tipo' => 'ajuste', 'cantidad' => -6], conBearer($e['bearer']))
+    $this->postJson($url, ['sucursal_id' => $sede['sucursal'], 'tipo' => 'ajuste', 'cantidad' => -6, 'motivo' => 'Merma'], conBearer($e['bearer']))
         ->assertUnprocessable();
-    $this->postJson($url, ['sucursal_id' => $sede['sucursal'], 'tipo' => 'ajuste', 'cantidad' => -5], conBearer($e['bearer']))
+    $this->postJson($url, ['sucursal_id' => $sede['sucursal'], 'tipo' => 'ajuste', 'cantidad' => -5, 'motivo' => 'Merma'], conBearer($e['bearer']))
         ->assertCreated()->assertJsonPath('data.stock_total', 0);
 });
 

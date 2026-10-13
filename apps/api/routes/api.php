@@ -906,6 +906,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/articulos', [InventarioTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('articulos.index');
             Route::post('/articulos', [InventarioTenantController::class, 'store'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.store');
             Route::put('/articulos/{articulo}', [InventarioTenantController::class, 'actualizar'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.update');
+            Route::get('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimientos'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('articulos.movimientos.index');
             Route::post('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimiento'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.movimientos.store');
             Route::post('/articulos/{articulo}/foto', [InventarioTenantController::class, 'subirFoto'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.foto.store');
             Route::delete('/articulos/{articulo}/foto', [InventarioTenantController::class, 'eliminarFoto'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.foto.destroy');

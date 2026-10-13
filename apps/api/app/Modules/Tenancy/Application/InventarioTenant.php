@@ -46,6 +46,33 @@ class InventarioTenant
     }
 
     /**
+     * Stock de varios artículos por sucursal en una sola consulta (para un listado):
+     * mapa articulo_id => (sucursal_id => stock). Con `$sucursales`, solo esas.
+     *
+     * @param  list<int>  $articulos
+     * @param  list<int>|null  $sucursales
+     * @return array<int, array<int, int>>
+     */
+    public function stockPorArticulos(array $articulos, ?array $sucursales = null): array
+    {
+        if ($articulos === []) {
+            return [];
+        }
+        $mapa = [];
+        MovimientoInventarioTenant::query()
+            ->whereIn('articulo_id', $articulos)
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
+            ->groupBy('articulo_id', 'sucursal_id')
+            ->selectRaw('articulo_id, sucursal_id, sum(cantidad) as total')
+            ->get()
+            ->each(function (MovimientoInventarioTenant $fila) use (&$mapa): void {
+                $mapa[(int) $fila->articulo_id][(int) $fila->sucursal_id] = (int) $fila->getAttribute('total');
+            });
+
+        return $mapa;
+    }
+
+    /**
      * Una entrada o un ajuste a mano, sin dejar el stock en negativo. Bloquea el
      * artículo (como la venta del mostrador) durante la revisión del saldo y el
      * asiento: dos ajustes a la vez no se aprueban sobre el mismo saldo.
