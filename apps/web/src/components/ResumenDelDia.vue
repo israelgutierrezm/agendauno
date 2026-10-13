@@ -99,7 +99,8 @@ const error = ref<string | null>(null);
 const actualizadoEn = ref<Date | null>(null);
 const actualizando = ref(false);
 const busqueda = ref("");
-const filtro = ref<"todas" | "proximas" | "canceladas">("todas");
+// Al entrar se ve lo que falta del día; «Todas» sigue a un clic.
+const filtro = ref<"todas" | "proximas" | "canceladas">("proximas");
 const paginaAgenda = ref(1);
 const porPaginaAgenda = 6;
 const agendaVisible = computed(() => {
@@ -685,6 +686,32 @@ onMounted(() => {
             )
           "
         />
+        <EstadoVacio
+          v-else-if="
+            agendaVisible.length === 0 &&
+            filtro === 'proximas' &&
+            busqueda.trim() === ''
+          "
+          icono="agenda"
+          compacto
+          class="py-8"
+          data-prueba="nada-por-comenzar"
+          :titulo="
+            $t(
+              esCitas
+                ? 'operacion.hoy.citas.diaTerminado'
+                : 'operacion.hoy.diaTerminado',
+            )
+          "
+        >
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="filtro = 'todas'"
+          >
+            {{ $t("operacion.hoy.verTodas") }}
+          </button>
+        </EstadoVacio>
         <EstadoVacio
           v-else-if="agendaVisible.length === 0"
           icono="buscar"
