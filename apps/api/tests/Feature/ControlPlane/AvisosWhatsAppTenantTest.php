@@ -614,3 +614,19 @@ it('al dueño que contesta se le manda a su panel, y con BAJA deja de recibir lo
     expect(respuestasEnviadas()[1]['body'])->toStartWith('Listo. Ya no te enviaremos por WhatsApp los avisos de AgendaUno.')
         ->and($estudio->refresh()->contacto_whatsapp_aceptado_en)->toBeNull();
 });
+
+it('sin celular no se marca que el cliente pidió los avisos por WhatsApp', function (): void {
+    $m = negocioConAlumnas();
+    encenderWhatsApp();
+    avisoPorWhatsApp($m);
+    enNegocioWhatsApp($m, fn () => PersonaTenant::query()->where('ulid', $m['caro'])->update(['celular' => null]));
+
+    $this->putJson("/api/v1/app/{$m['slug']}/miembros/{$m['caro']}", ['acepta_whatsapp' => true], conBearer($m['bearer']))
+        ->assertOk()->assertJsonPath('data.acepta_whatsapp', false);
+    $this->getJson("/api/v1/app/{$m['slug']}/auditorias?accion=miembro.whatsapp_aceptado", conBearer($m['bearer']))
+        ->assertOk()->assertJsonCount(0, 'data');
+
+    // Con su celular en la misma edición, sí.
+    $this->putJson("/api/v1/app/{$m['slug']}/miembros/{$m['caro']}", ['celular' => '55 8765 4321', 'acepta_whatsapp' => true], conBearer($m['bearer']))
+        ->assertOk()->assertJsonPath('data.acepta_whatsapp', true);
+});
