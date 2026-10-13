@@ -6,12 +6,15 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\IntegracionSoloMexico;
+use App\Modules\Tenancy\Integraciones\ClienteTotalPass;
 use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Configuracion de integraciones de bienestar del estudio (Wellhub / TotalPass): el
@@ -19,12 +22,17 @@ use Illuminate\Http\Request;
  * solo se informa que llaves estan configuradas. Solo propietario, solo negocios de
  * clases (ADR 0104) y solo en México, donde operan. Encenderla, apagarla o cambiar
  * una llave queda en la bitácora con los NOMBRES de las llaves, nunca sus valores (M10).
+ *
+ * Check-in automático (ADR 0148): al conectarla se genera la dirección donde la
+ * plataforma avisa de cada check-in. En TotalPass se registra sola con su API (con la
+ * llave de la sede); en Wellhub se le da a Wellhub junto con la llave con que firma.
  */
 class IntegracionesTenantController
 {
     public function __construct(
         private readonly RegionNegocioTenant $region,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly ClienteTotalPass $totalpass,
     ) {}
 
     public function index(): JsonResponse
@@ -32,17 +40,10 @@ class IntegracionesTenantController
         $this->exigirMexico();
         $configs = IntegracionTenant::query()->get()->keyBy('proveedor');
 
-        $data = array_map(function (ProveedorPartner $proveedor) use ($configs): array {
-            $config = $configs->get($proveedor->value);
-
-            return [
-                'proveedor' => $proveedor->value,
-                'activa' => $config instanceof IntegracionTenant ? $config->activa : false,
-                // Las que pide el proveedor y las que ya se capturaron.
-                'llaves' => $proveedor->credenciales(),
-                'llaves_configuradas' => $config instanceof IntegracionTenant ? array_keys($config->llaves()) : [],
-            ];
-        }, ProveedorPartner::cases());
+        $data = array_map(fn (ProveedorPartner $proveedor): array => $this->presentar(
+            $proveedor,
+            $configs->get($proveedor->value),
+        ), ProveedorPartner::cases());
 
         return response()->json(['data' => $data]);
     }
@@ -79,6 +80,20 @@ class IntegracionesTenantController
             $config->credenciales = array_merge($actuales, $nuevas);
         }
 
+        // La dirección de sus avisos (check-in automático), una vez por integración.
+        if ((string) $config->token_webhook === '') {
+            $config->token_webhook = Str::random(40);
+        }
+        // TotalPass: con la llave de la sede, su aviso se registra solo (una vez, o de nuevo
+        // si cambió la llave).
+        if ($proveedor === ProveedorPartner::TotalPass && $config->activa
+            && ($config->llaves()['place_api_key'] ?? '') !== ''
+            && ($config->webhook_registrado_en === null || in_array('place_api_key', $cambiadas, true))) {
+            $config->webhook_registrado_en = $this->totalpass->registrarAviso(
+                $config->llaves()['place_api_key'],
+                $this->urlDeAvisos($proveedor, (string) $config->token_webhook),
+            ) ? now() : null;
+        }
         $config->save();
 
         if ($antes['activa'] !== $config->activa || $cambiadas !== []) {
@@ -93,12 +108,46 @@ class IntegracionesTenantController
             );
         }
 
-        return response()->json(['data' => [
+        return response()->json(['data' => $this->presentar($proveedor, $config)]);
+    }
+
+    /**
+     * La integración como la ve el negocio: sus llaves (solo los nombres) y su check-in
+     * automático: la dirección de avisos y si ya está listo.
+     *
+     * @return array<string, mixed>
+     */
+    private function presentar(ProveedorPartner $proveedor, ?IntegracionTenant $config): array
+    {
+        $llaves = $config instanceof IntegracionTenant ? $config->llaves() : [];
+        $token = $config instanceof IntegracionTenant ? (string) $config->token_webhook : '';
+
+        return [
             'proveedor' => $proveedor->value,
-            'activa' => $config->activa,
+            'activa' => $config instanceof IntegracionTenant ? $config->activa : false,
+            // Las que pide el proveedor y las que ya se capturaron.
             'llaves' => $proveedor->credenciales(),
-            'llaves_configuradas' => array_keys($config->llaves()),
-        ]]);
+            'llaves_configuradas' => array_keys($llaves),
+            'automatico' => [
+                'aviso_url' => $token !== '' ? $this->urlDeAvisos($proveedor, $token) : null,
+                'listo' => match ($proveedor) {
+                    // Wellhub firma con la llave que da (la del negocio o la de AgendaUno).
+                    ProveedorPartner::Wellhub => $token !== ''
+                        && (($llaves['webhook_secret'] ?? '') !== '' || (string) config('agendauno.integraciones.wellhub_webhook_secret') !== ''),
+                    ProveedorPartner::TotalPass => $config instanceof IntegracionTenant && $config->webhook_registrado_en !== null,
+                },
+                'registrado_en' => $config?->webhook_registrado_en?->toIso8601String(),
+            ],
+        ];
+    }
+
+    private function urlDeAvisos(ProveedorPartner $proveedor, string $token): string
+    {
+        return route('api.v1.webhooks.bienestar', [
+            'estudio' => (string) app(GestorDeConexionTenant::class)->actual()?->slug,
+            'proveedor' => $proveedor->value,
+            'token' => $token,
+        ]);
     }
 
     private function exigirMexico(): void

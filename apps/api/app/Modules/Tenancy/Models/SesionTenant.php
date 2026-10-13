@@ -122,6 +122,16 @@ class SesionTenant extends Model
     }
 
     /**
+     * Los lugares que ocupan quienes vienen por Wellhub o TotalPass (ADR 0148).
+     *
+     * @return HasMany<LugarPlataformaTenant, $this>
+     */
+    public function lugaresPlataforma(): HasMany
+    {
+        return $this->hasMany(LugarPlataformaTenant::class, 'sesion_id');
+    }
+
+    /**
      * @return HasMany<ReservaTenant, $this>
      */
     public function reservas(): HasMany

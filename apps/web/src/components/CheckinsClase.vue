@@ -17,6 +17,8 @@ export interface Checkin {
   id: string;
   proveedor: string;
   usuario: string | null;
+  // Si llegó sola por el aviso de la plataforma (ADR 0148) o la registró recepción.
+  origen?: "automatico" | "manual";
   estado: "validado" | "no_verificable" | "excepcion";
   motivo: string | null;
   registrado_en: string;
@@ -207,8 +209,16 @@ watch(
         data-prueba="checkin"
       >
         <div class="flex items-center justify-between gap-2">
-          <span class="truncate">
+          <span class="min-w-0 truncate">
             {{ c.usuario ?? $t(`integraciones.proveedores.${c.proveedor}`) }}
+            <span
+              v-if="c.origen === 'automatico'"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="checkin-automatico"
+            >
+              · {{ $t("operacion.plataformas.origen.automatico") }}</span
+            >
           </span>
           <span
             class="inline-flex items-center gap-1.5 shrink-0"

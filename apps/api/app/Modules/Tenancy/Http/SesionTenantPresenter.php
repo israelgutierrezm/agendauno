@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http;
 
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
+use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -33,7 +34,7 @@ class SesionTenantPresenter
      * Los conteos que usan `clase` y `ocupacion` (para `withCount` o `loadCount`): los de
      * la regla única de cupo.
      *
-     * @return array<string, Closure(Builder<ReservaTenant>): void>
+     * @return array<string, Closure(Builder<ReservaTenant>|Builder<LugarPlataformaTenant>): void>
      */
     public static function conteos(): array
     {
@@ -45,7 +46,9 @@ class SesionTenantPresenter
      */
     public static function contar(SesionTenant $sesion): SesionTenant
     {
-        if (! array_key_exists('ocupados', $sesion->getAttributes()) || ! array_key_exists('en_espera', $sesion->getAttributes())) {
+        $atributos = $sesion->getAttributes();
+        if (! array_key_exists('ocupados', $atributos) || ! array_key_exists('en_espera', $atributos)
+            || ! array_key_exists(CupoDeSesionTenant::ATRIBUTO_PLATAFORMA, $atributos)) {
             $sesion->loadCount(self::conteos());
         }
 
@@ -68,7 +71,8 @@ class SesionTenantPresenter
 
         self::contar($sesion);
         $capacidad = $sesion->capacidad !== null ? (int) $sesion->capacidad : null;
-        $ocupados = (int) $sesion->getAttribute('ocupados');
+        // Reservas y quienes vienen por Wellhub o TotalPass (ADR 0148).
+        $ocupados = CupoDeSesionTenant::ocupadosCargados($sesion);
         // Cómo se habilita la reserva: con plan o pagando la clase suelta.
         $dePago = $sesion->oferta?->politica_reserva === PoliticaReservaTenant::Pago;
 
@@ -98,7 +102,7 @@ class SesionTenantPresenter
 
         self::contar($sesion);
         $capacidad = (int) $sesion->capacidad;
-        $ocupados = (int) $sesion->getAttribute('ocupados');
+        $ocupados = CupoDeSesionTenant::ocupadosCargados($sesion);
 
         return [
             'ocupados' => $ocupados,

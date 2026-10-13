@@ -141,7 +141,9 @@ use App\Modules\Tenancy\Http\Controllers\TimbresTenantController;
 use App\Modules\Tenancy\Http\Controllers\TipoCambioPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\TiposDocumentoController;
 use App\Modules\Tenancy\Http\Controllers\UsuariosTenantController;
+use App\Modules\Tenancy\Http\Controllers\VisitantesPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
+use App\Modules\Tenancy\Http\Controllers\WebhookBienestarController;
 use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookTenantController;
@@ -172,6 +174,9 @@ Route::prefix('v1')->group(function (): void {
 
     // Webhook publico de la pasarela de la PLATAFORMA: confirma el cargo de renta del
     // SaaS (plataforma -> dueño) -> pagado. Sin sesion; idempotente.
+    // Avisos de Wellhub y TotalPass de cada negocio (check-in automático, ADR 0148).
+    Route::post('/webhooks/bienestar/{estudio}/{proveedor}/{token}', WebhookBienestarController::class)
+        ->middleware(['throttle:600,1,bienestar-webhook', 'estudio.resolver'])->name('api.v1.webhooks.bienestar');
     Route::post('/webhooks/plataforma/{proveedor}', WebhookPlataformaController::class)
         ->middleware('throttle:600,1,plataforma-webhook')->name('api.v1.webhooks.plataforma');
     // Estados de entrega de WhatsApp (Meta): verificación (GET) y avisos (POST), ADR 0074.
@@ -699,6 +704,11 @@ Route::prefix('v1')->group(function (): void {
             // Reporte de rentabilidad por clase (R30): ingreso vs costo de instructor por oferta.
             Route::get('/reportes/rentabilidad', ReporteRentabilidadTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.rentabilidad');
             // Agenda del equipo (ADR 0081): ocupación, asistencia, valor, pago y margen por profesional.
+            // Visitantes de Wellhub y TotalPass y sus visitas (ADR 0148): clientes de la
+            // plataforma, aparte de los alumnos.
+            Route::get('/reportes/plataformas', [VisitantesPlataformaTenantController::class, 'resumen'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('reportes.plataformas');
+            Route::get('/visitantes-plataforma', [VisitantesPlataformaTenantController::class, 'index'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.index');
+            Route::get('/visitantes-plataforma/{visitante}', [VisitantesPlataformaTenantController::class, 'show'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.show');
             Route::get('/reportes/equipo', ReporteEquipoTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.equipo');
             // Analitica de demanda (R31): mapa dia x hora + por actividad (ocupacion y espera).
             Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.demanda');

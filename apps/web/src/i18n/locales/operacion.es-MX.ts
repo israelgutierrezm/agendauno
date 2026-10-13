@@ -451,6 +451,82 @@ export default {
     },
   },
   // Seguimiento útil en Tareas (plan de mejoras M09).
+  // Wellhub y TotalPass (ADR 0148): sus visitantes en Reportes y el check-in automático.
+  plataformas: {
+    tab: "Plataformas",
+    titulo: "Wellhub y TotalPass",
+    subtitulo:
+      "Quién vino por cada plataforma y sus visitas. Son clientes de la plataforma, no de tu negocio: no aparecen en tu directorio hasta que los registres.",
+    periodo: "Periodo",
+    desde: "Desde",
+    hasta: "Hasta",
+    todas: "Todas",
+    proveedores: { wellhub: "Wellhub", totalpass: "TotalPass" },
+    indicadores: {
+      visitas: "Visitas",
+      visitantes: "Visitantes",
+      nuevos: "Nuevos en el periodo",
+      sinVerificar: "Sin verificar",
+      sinClase: "Sin clase asignada",
+      automaticas: "{n} automáticas",
+    },
+    porPlataforma: "Por plataforma",
+    porClase: "Clases con más visitas",
+    porDia: "Visitas por día",
+    visitasDe: "{n} visitas · {v} visitantes",
+    sinVisitas: "Sin visitas en el periodo.",
+    lista: {
+      titulo: "Visitantes",
+      buscar: "Buscar por nombre, correo, teléfono o ID…",
+      nombre: "Visitante",
+      plataforma: "Plataforma",
+      visitas: "Visitas",
+      ultima: "Última visita",
+      sinNombre: "Sin nombre",
+      esAlumno: "Ya es alumno",
+      vacio: "Aún no llega nadie por Wellhub o TotalPass.",
+      sinResultados: "Ningún visitante coincide con tu búsqueda.",
+      ver: "Ver visitas de {nombre}",
+    },
+    detalle: {
+      idPlataforma: "ID en {plataforma}",
+      correo: "Correo",
+      telefono: "Teléfono",
+      producto: "Plan",
+      primera: "Primera visita",
+      historial: "Visitas",
+      sinClase: "Sin clase asignada",
+      esAlumnoAyuda:
+        "Ya lo registraste como alumno con el mismo correo. Aquí siguen sus visitas por la plataforma.",
+    },
+    estados: {
+      validado: "Validada",
+      no_verificable: "Sin verificar",
+      excepcion: "Excepción",
+    },
+    origen: {
+      automatico: "Automática",
+      manual: "Registrada en recepción",
+    },
+    automatico: {
+      titulo: "Check-in automático",
+      listo: "Activo",
+      pendiente: "Por activar",
+      copiar: "Copiar dirección",
+      copiada: "Dirección copiada",
+      direccion: "Dirección de avisos",
+      sinDireccion:
+        "Guarda la integración para generar la dirección donde la plataforma avisa de cada check-in.",
+      wellhubListo:
+        "Cuando la persona hace check-in en la app de Wellhub, la visita se valida sola y queda en su clase.",
+      wellhubPendiente:
+        "Pide a Wellhub que mande sus avisos de check-in a esta dirección y captura la llave secreta con que los firma.",
+      totalpassListo:
+        "Registrado con TotalPass: cuando la persona hace check-in en su app, la visita se valida sola.",
+      totalpassPendiente:
+        "Captura la llave de API de tu sede (la generas en el portal de TotalPass, en Integraciones) y guarda: AgendaUno registra su aviso.",
+    },
+  },
   // La bandeja de tareas: por páginas, con búsqueda, filtros y grupos por vencimiento.
   bandeja: {
     tab: "Bandeja",

@@ -147,9 +147,14 @@ describe("pestañas del área", () => {
 
     // Recepción y Lugares disponibles: dos vistas.
     expect(w.find('[data-prueba="pestanas-area"]').exists()).toBe(true);
-    entrar(["facturacion.ver"]);
+    // Reportes en un negocio de citas: una sola vista (Plataformas es de clases).
+    entrar(["facturacion.ver"], "citas");
     const otra = await montar(PestanasArea, { name: "reportes" });
     expect(otra.w.find('[data-prueba="pestanas-area"]').exists()).toBe(false);
+    // En uno de clases suma Plataformas: Wellhub y TotalPass (ADR 0148).
+    entrar(["facturacion.ver"]);
+    const clases = await montar(PestanasArea, { name: "reportes" });
+    expect(clases.w.findAll('[data-prueba="pestanas-area"] a')).toHaveLength(2);
   });
 });
 

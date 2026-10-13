@@ -400,7 +400,7 @@ class AgendaTenantController
 
         // Solo las que de verdad tienen lugares libres (cupo - ocupados > 0).
         $oportunidades = $consulta->get()
-            ->filter(fn (SesionTenant $s): bool => (int) $s->capacidad - (int) $s->getAttribute('ocupados') > 0)
+            ->filter(fn (SesionTenant $s): bool => (int) $s->capacidad - CupoDeSesionTenant::ocupadosCargados($s) > 0)
             ->map(fn (SesionTenant $s): array => $this->presentarOportunidad($s))
             ->values()
             ->all();
@@ -495,7 +495,7 @@ class AgendaTenantController
             'ocupa_hasta' => $sesion->ocupa_hasta?->toIso8601String(),
             'zona_horaria' => $sesion->zona_horaria,
             'capacidad' => $sesion->capacidad,
-            'ocupados' => (int) ($sesion->getAttribute('ocupados') ?? 0),
+            'ocupados' => CupoDeSesionTenant::ocupadosCargados($sesion),
             'en_espera' => (int) ($sesion->getAttribute('en_espera') ?? 0),
             // A cuántos de los que ocupan lugar ya se les pasó lista.
             'marcadas' => (int) ($sesion->getAttribute('marcadas') ?? 0),
@@ -547,7 +547,7 @@ class AgendaTenantController
     private function presentarOportunidad(SesionTenant $sesion): array
     {
         $capacidad = (int) $sesion->capacidad;
-        $ocupados = (int) $sesion->getAttribute('ocupados');
+        $ocupados = CupoDeSesionTenant::ocupadosCargados($sesion);
         $enEspera = (int) $sesion->getAttribute('en_espera');
 
         return [

@@ -20,12 +20,12 @@ class IntegracionTenant extends Model
 
     protected $table = 'integraciones';
 
-    protected $fillable = ['proveedor', 'activa', 'credenciales'];
+    protected $fillable = ['proveedor', 'activa', 'credenciales', 'token_webhook', 'webhook_registrado_en'];
 
     /**
      * @var list<string>
      */
-    protected $hidden = ['credenciales'];
+    protected $hidden = ['credenciales', 'token_webhook'];
 
     /**
      * @var array<string, string>
@@ -33,6 +33,7 @@ class IntegracionTenant extends Model
     protected $casts = [
         'activa' => 'boolean',
         'credenciales' => 'encrypted:array',
+        'webhook_registrado_en' => 'datetime',
     ];
 
     /**

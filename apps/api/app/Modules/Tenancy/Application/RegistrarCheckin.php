@@ -27,6 +27,10 @@ use Illuminate\Database\UniqueConstraintViolationException;
  * aprobado, y la plataforma recibe una alerta). Reintentar con el mismo código en la
  * misma sesión retoma esa visita. Idempotente por `referencia_externa` dentro de la
  * sesión: la misma visita aprobada no se registra dos veces, ni en otra clase del día.
+ *
+ * Quien viene por la plataforma queda como su visitante (ADR 0148), nunca como persona
+ * del negocio, y su visita ocupa un lugar en la clase. Una visita que llegó sola sin
+ * clase (la persona hizo check-in en la app) se asigna a la clase donde se registra.
  */
 class RegistrarCheckin
 {
@@ -35,6 +39,8 @@ class RegistrarCheckin
         private readonly AlertasPlataforma $alertas,
         private readonly FechasNegocioTenant $fechas,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly VisitantesPlataformaTenant $visitantes,
+        private readonly LugaresPlataformaTenant $lugares,
     ) {}
 
     public function ejecutar(SesionTenant $sesion, string $proveedor, string $codigo, ?Usuario $actor = null): CheckinTenant
@@ -50,6 +56,11 @@ class RegistrarCheckin
         if (! $resultado->valido && $resultado->verificable) {
             throw new CheckinInvalido($resultado->motivo ?? 'Codigo de check-in no valido.');
         }
+        // Wellhub da el Wellhub ID de quien viene; con el token del día de TotalPass no se
+        // sabe quién es.
+        $visitante = $proveedor === ProveedorPartner::Wellhub->value && $resultado->usuario !== null
+            ? $this->visitantes->registrar($proveedor, $resultado->usuario, [], now())
+            : null;
 
         // La misma visita intentada antes en esta sesión (sin verificar o como excepción).
         $pendiente = CheckinTenant::query()
@@ -75,12 +86,16 @@ class RegistrarCheckin
                     'proveedor' => $proveedor,
                     'codigo_huella' => self::huella($proveedor, $codigo),
                     'nombre_usuario' => $resultado->usuario,
+                    'visitante_id' => $visitante?->getKey(),
+                    'origen' => CheckinTenant::ORIGEN_MANUAL,
                     'estado' => CheckinTenant::NO_VERIFICABLE,
                     'motivo' => $motivo,
                     'registrado_por_id' => $actor?->getKey(),
                     'registrado_en' => now(),
                 ]);
             }
+            // La persona está en la clase aunque la plataforma no respondiera.
+            $this->lugares->ocuparPorVisita($pendiente);
 
             throw new CheckinNoVerificable($motivo, (string) $pendiente->ulid);
         }
@@ -96,24 +111,31 @@ class RegistrarCheckin
                 'estado' => CheckinTenant::VALIDADO,
                 'referencia_externa' => $resultado->referencia,
                 'nombre_usuario' => $resultado->usuario ?? $pendiente->nombre_usuario,
+                'visitante_id' => $pendiente->visitante_id ?? $visitante?->getKey(),
                 'motivo' => null,
                 'intentos' => $pendiente->intentos + 1,
             ])->save();
+            $this->lugares->ocuparPorVisita($pendiente);
 
             return $pendiente;
         }
 
         try {
-            return CheckinTenant::query()->create([
+            $checkin = CheckinTenant::query()->create([
                 'sesion_id' => $sesion->getKey(),
                 'proveedor' => $proveedor,
                 'referencia_externa' => $resultado->referencia,
                 'codigo_huella' => self::huella($proveedor, $codigo),
                 'nombre_usuario' => $resultado->usuario,
+                'visitante_id' => $visitante?->getKey(),
+                'origen' => CheckinTenant::ORIGEN_MANUAL,
                 'estado' => CheckinTenant::VALIDADO,
                 'registrado_por_id' => $actor?->getKey(),
                 'registrado_en' => now(),
             ]);
+            $this->lugares->ocuparPorVisita($checkin);
+
+            return $checkin;
         } catch (UniqueConstraintViolationException) {
             // Dos validaciones del mismo código a la vez: la otra ya la guardó.
             return $this->mismaSesion(CheckinTenant::query()->where('referencia_externa', $resultado->referencia)->firstOrFail(), $sesion);
@@ -134,6 +156,14 @@ class RegistrarCheckin
     private function mismaSesion(CheckinTenant $previo, SesionTenant $sesion): CheckinTenant
     {
         if ((int) $previo->sesion_id === (int) $sesion->getKey()) {
+            return $previo;
+        }
+        // Llegó sola y sin clase (ADR 0148): es de la clase donde recepción la registra.
+        if ($previo->sesion_id === null) {
+            $previo->sesion_id = (int) $sesion->getKey();
+            $previo->save();
+            $this->lugares->ocuparPorVisita($previo);
+
             return $previo;
         }
 

@@ -340,7 +340,7 @@ class MiTenantController
                 'instructor_id' => $s->instructor?->ulid,
                 'zona_horaria' => $s->zona_horaria,
                 'capacidad' => $s->capacidad,
-                'ocupados' => (int) ($s->getAttribute('ocupados') ?? 0),
+                'ocupados' => CupoDeSesionTenant::ocupadosCargados($s),
                 'cobertura' => $this->coberturaDe($s, $cobertura),
                 // Contrato de la agenda (ADR 0104): aquí siempre son clases.
                 'tipo' => $s->tipo->value,

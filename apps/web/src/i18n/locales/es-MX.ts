@@ -3070,11 +3070,13 @@ export default {
       wellhub: {
         api_key: "Token de API de Wellhub",
         gym_id: "Gym ID",
+        webhook_secret: "Llave secreta de avisos (si Wellhub te dio una)",
       },
       totalpass: {
         api_key: "Llave de API de TotalPass",
         codigo_gimnasio: "Código de tu gimnasio",
         codigo_plan: "Código del plan (si tienes varios)",
+        place_api_key: "Llave de API de tu sede (check-in automático)",
       },
     },
     ayuda: {
@@ -3086,7 +3088,7 @@ export default {
     soloMexico: "Disponible para negocios en México.",
     // Lo que hace y lo que no (M10): validar la visita, no sincronizar todo.
     alcance:
-      "Lo que hace: valida el check-in de cada visita en la clase. No sincroniza reservas, membresías ni pagos con estas plataformas. Si la plataforma no responde, la visita queda «sin verificar»: se reintenta con el mismo código o quien tiene permiso la registra como excepción, con su motivo y quién la autorizó.",
+      "Lo que hace: valida el check-in de cada visita, sola cuando la plataforma avisa que la persona lo hizo en su app (check-in automático) o con el código que captura recepción, y la visita ocupa su lugar en la clase. Quien viene así es cliente de la plataforma: lo ves en Reportes → Plataformas, no en tu directorio. Aún no sincroniza reservas, membresías ni pagos. Si la plataforma no responde, la visita queda «sin verificar»: se reintenta o quien tiene permiso la registra como excepción, con su motivo y quién la autorizó.",
     proveedores: {
       wellhub: "Wellhub",
       totalpass: "TotalPass",

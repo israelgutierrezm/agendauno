@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -22,6 +23,9 @@ use Illuminate\Database\Eloquent\Builder;
  * - Ocupan lugar: confirmadas, ofrecidas (la oferta de la lista de espera aparta el lugar
  *   mientras decide) y pendientes de pago (lo retienen mientras se paga, hasta que el
  *   proceso de cada minuto las cancela).
+ * - También quienes vienen por Wellhub o TotalPass (ADR 0148): sus lugares de plataforma
+ *   reservados o con asistencia ocupan cupo sin ser reservas; cuentan en el canal de su
+ *   plataforma.
  * - Cada regla de capacidad por canal (R20) aparta sus cupos sin usar para su canal hasta
  *   `liberar_horas_antes` del inicio; para los demás canales esos lugares no están.
  * - Sin capacidad, la clase no tiene tope (`null`).
@@ -42,11 +46,15 @@ class CupoDeSesionTenant
     /** Atributo con que {@see cargar()} deja en cada sesión los lugares apartados para otros canales. */
     public const ATRIBUTO_APARTADOS = 'apartados_otros_canales';
 
+    /** Atributo de {@see conteos()} con los lugares que ocupan las plataformas (ADR 0148). */
+    public const ATRIBUTO_PLATAFORMA = 'ocupados_plataforma';
+
     /**
      * Los conteos de una lista de sesiones (para `withCount` o `loadCount`): cuántas
-     * reservas ocupan lugar y cuántas esperan.
+     * reservas ocupan lugar, cuántos lugares ocupan las plataformas y cuántas esperan.
+     * Lo ocupado en total lo da {@see ocupadosCargados()}.
      *
-     * @return array<string, Closure(Builder<ReservaTenant>): void>
+     * @return array<string, Closure(Builder<ReservaTenant>|Builder<LugarPlataformaTenant>): void>
      */
     public static function conteos(): array
     {
@@ -54,10 +62,39 @@ class CupoDeSesionTenant
             'reservas as ocupados' => static function (Builder $q): void {
                 $q->whereIn('estado', self::OCUPAN_LUGAR);
             },
+            'lugaresPlataforma as '.self::ATRIBUTO_PLATAFORMA => static function (Builder $q): void {
+                $q->whereIn('estado', LugarPlataformaTenant::OCUPAN_LUGAR);
+            },
             'reservas as en_espera' => static function (Builder $q): void {
                 $q->where('estado', EstadoReserva::EnEspera->value);
             },
         ];
+    }
+
+    /**
+     * Lugares ocupados de una sesión ya cargada con {@see conteos()}: reservas más
+     * plataformas. Lo que no venga cargado se consulta.
+     */
+    public static function ocupadosCargados(SesionTenant $sesion): int
+    {
+        $atributos = $sesion->getAttributes();
+        if (! array_key_exists('ocupados', $atributos)) {
+            return app(self::class)->ocupadas($sesion);
+        }
+        $plataforma = array_key_exists(self::ATRIBUTO_PLATAFORMA, $atributos)
+            ? (int) $atributos[self::ATRIBUTO_PLATAFORMA]
+            : self::ocupadosDePlataforma($sesion);
+
+        return (int) $atributos['ocupados'] + $plataforma;
+    }
+
+    /** Lugares que ocupan Wellhub y TotalPass en la sesión. */
+    public static function ocupadosDePlataforma(SesionTenant $sesion): int
+    {
+        return LugarPlataformaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->whereIn('estado', LugarPlataformaTenant::OCUPAN_LUGAR)
+            ->count();
     }
 
     /**
@@ -71,7 +108,7 @@ class CupoDeSesionTenant
             return null;
         }
         $atributos = $sesion->getAttributes();
-        $ocupados = array_key_exists('ocupados', $atributos) ? (int) $atributos['ocupados'] : $this->ocupadas($sesion);
+        $ocupados = self::ocupadosCargados($sesion);
         if (! array_key_exists(self::ATRIBUTO_APARTADOS, $atributos)) {
             $this->cargar([$sesion]);
         }
@@ -79,13 +116,13 @@ class CupoDeSesionTenant
         return max(0, (int) $sesion->capacidad - $ocupados - (int) $sesion->getAttribute(self::ATRIBUTO_APARTADOS));
     }
 
-    /** Reservas que ocupan un lugar en la sesión. */
+    /** Reservas y lugares de plataforma que ocupan un lugar en la sesión. */
     public function ocupadas(SesionTenant $sesion): int
     {
         return ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->whereIn('estado', self::OCUPAN_LUGAR)
-            ->count();
+            ->count() + self::ocupadosDePlataforma($sesion);
     }
 
     /**
@@ -138,15 +175,30 @@ class CupoDeSesionTenant
             return $resultado;
         }
 
-        // Lo que cada canal ya usó en cada sesión con reglas.
+        // Lo que cada canal ya usó en cada sesión con reglas: sus reservas y, en Wellhub y
+        // TotalPass, los lugares de su plataforma (ADR 0148).
         $conReglas = collect($porOferta)->only($reglas->keys()->all())->flatten(1);
-        $usados = ReservaTenant::query()
-            ->whereIn('sesion_id', $conReglas->map(fn (SesionTenant $s): int => (int) $s->getKey())->all())
+        $ids = $conReglas->map(fn (SesionTenant $s): int => (int) $s->getKey())->all();
+        $usados = [];
+        foreach (ReservaTenant::query()
+            ->whereIn('sesion_id', $ids)
             ->whereIn('estado', self::OCUPAN_LUGAR)
             ->selectRaw('sesion_id, canal, COUNT(*) as total')
             ->groupBy('sesion_id', 'canal')
-            ->get()
-            ->groupBy('sesion_id');
+            ->toBase()
+            ->get() as $fila) {
+            $canalDeFila = $fila->canal instanceof CanalReserva ? $fila->canal->value : (string) $fila->canal;
+            $usados[(int) $fila->sesion_id][$canalDeFila] = ($usados[(int) $fila->sesion_id][$canalDeFila] ?? 0) + (int) $fila->total;
+        }
+        foreach (LugarPlataformaTenant::query()
+            ->whereIn('sesion_id', $ids)
+            ->whereIn('estado', LugarPlataformaTenant::OCUPAN_LUGAR)
+            ->selectRaw('sesion_id, proveedor, COUNT(*) as total')
+            ->groupBy('sesion_id', 'proveedor')
+            ->toBase()
+            ->get() as $fila) {
+            $usados[(int) $fila->sesion_id][(string) $fila->proveedor] = ($usados[(int) $fila->sesion_id][(string) $fila->proveedor] ?? 0) + (int) $fila->total;
+        }
 
         $ahora = Carbon::now();
         foreach ($conReglas as $sesion) {
@@ -157,7 +209,7 @@ class CupoDeSesionTenant
                 if ($ahora->greaterThanOrEqualTo($sesion->inicia_en->copy()->subHours($regla->liberar_horas_antes))) {
                     continue;
                 }
-                $usadosDelCanal = (int) ($usados->get($sesion->getKey(), collect())->firstWhere('canal', $regla->canal->value)->total ?? 0);
+                $usadosDelCanal = $usados[(int) $sesion->getKey()][$regla->canal->value] ?? 0;
                 $apartados += max(0, $regla->cupos - $usadosDelCanal);
             }
             $resultado[(int) $sesion->getKey()] = $apartados;
