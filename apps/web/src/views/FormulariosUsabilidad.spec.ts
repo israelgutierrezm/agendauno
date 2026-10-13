@@ -7,17 +7,21 @@ import FormulariosView from "./FormulariosView.vue";
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
   puede: vi.fn(),
+  confirmar: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({
   api: mocks,
   mensajeDeError: () => "No se pudo crear",
 }));
+vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: mocks.puede }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.confirmar.mockResolvedValue(true);
   mocks.puede.mockReturnValue(true);
   mocks.get.mockResolvedValue({ data: { data: [] } });
 });
@@ -146,6 +150,7 @@ describe("alta de fichas sin estorbar al diseñador", () => {
         tipo: "texto",
         obligatorio: false,
         opciones: null,
+        orden: 1,
       },
     );
     expect(w.get('[role="dialog"]').text()).toContain("No se pudo crear");
@@ -190,5 +195,104 @@ describe("alta de fichas sin estorbar al diseñador", () => {
     const lectura = await montar();
     expect(lectura.find('[data-prueba="nueva-ficha"]').exists()).toBe(false);
     lectura.unmount();
+  });
+
+  it("edita, reordena y quita preguntas guardando la ficha completa", async () => {
+    const ficha = {
+      ...fichaSalud,
+      respuestas: 3,
+      version: 2,
+      campos: [
+        ...fichaSalud.campos,
+        {
+          id: "c2",
+          etiqueta: "Alergias",
+          tipo: "textarea",
+          obligatorio: false,
+          opciones: null,
+          orden: 1,
+        },
+      ],
+    };
+    mocks.get.mockResolvedValue({ data: { data: [ficha] } });
+    mocks.put.mockResolvedValue({ data: { data: ficha } });
+    const w = await montar();
+    await w
+      .get('button[aria-label="Gestionar ficha: Cuestionario de salud"]')
+      .trigger("click");
+    // Con respuestas, avisa que los cambios crean otra versión.
+    expect(w.get('[data-prueba="aviso-version"]').text()).toContain(
+      "versión 3",
+    );
+
+    await w.get('[data-prueba="bajar-c1"]').trigger("click");
+    await flushPromises();
+    expect(mocks.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/formularios/salud",
+      expect.objectContaining({
+        nombre: "Cuestionario de salud",
+        campos: [
+          expect.objectContaining({ id: "c2" }),
+          expect.objectContaining({ id: "c1" }),
+        ],
+      }),
+    );
+
+    await w.get('[data-prueba="editar-c2"]').trigger("click");
+    await w
+      .get('[role="dialog"] input[required]')
+      .setValue("Alergias o lesiones");
+    await w.get('[role="dialog"] select').setValue("texto");
+    expect(w.find('[data-prueba="cambia-tipo"]').exists()).toBe(true);
+    await w.get('[role="dialog"] form').trigger("submit");
+    await flushPromises();
+    expect(mocks.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/formularios/salud",
+      expect.objectContaining({
+        campos: [
+          expect.objectContaining({ id: "c1" }),
+          expect.objectContaining({
+            id: "c2",
+            etiqueta: "Alergias o lesiones",
+            tipo: "texto",
+          }),
+        ],
+      }),
+    );
+
+    await w.get('[data-prueba="quitar-c1"]').trigger("click");
+    await flushPromises();
+    expect(mocks.confirmar).toHaveBeenCalledWith(
+      expect.stringContaining("lo respondido se conserva"),
+      expect.anything(),
+    );
+    expect(mocks.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/formularios/salud",
+      expect.objectContaining({
+        campos: [expect.objectContaining({ id: "c2" })],
+      }),
+    );
+    w.unmount();
+  });
+
+  it("muestra la vista previa y archiva la ficha", async () => {
+    mocks.get.mockResolvedValue({ data: { data: [fichaSalud] } });
+    mocks.post.mockResolvedValue({ data: { data: {} } });
+    const w = await montar();
+    await w
+      .get('button[aria-label="Gestionar ficha: Cuestionario de salud"]')
+      .trigger("click");
+
+    await w.get('[data-prueba="vista-previa"]').trigger("click");
+    const previa = w.get('[data-prueba="lista-vista-previa"]');
+    expect(previa.text()).toContain("Contacto de emergencia");
+    expect(previa.get("input").attributes("disabled")).toBeDefined();
+
+    await w.get('[data-prueba="archivar-ficha"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/formularios/salud/archivar",
+    );
+    w.unmount();
   });
 });

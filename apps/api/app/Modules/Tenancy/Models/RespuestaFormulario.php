@@ -20,12 +20,12 @@ class RespuestaFormulario extends Model
 
     protected $table = 'respuestas_formulario';
 
-    protected $fillable = ['formulario_id', 'persona_id', 'valores'];
+    protected $fillable = ['formulario_id', 'persona_id', 'valores', 'version', 'campos'];
 
     /**
      * @var array<string, string>
      */
-    protected $casts = ['valores' => 'array'];
+    protected $casts = ['valores' => 'array', 'version' => 'integer', 'campos' => 'array'];
 
     /**
      * @return BelongsTo<PersonaTenant, $this>

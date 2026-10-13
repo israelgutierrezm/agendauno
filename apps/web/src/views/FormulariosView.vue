@@ -3,17 +3,21 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
  * Constructor de formularios dinámicos y sus respuestas. Se llenan desde el
- * expediente de cada persona; aquí se diseñan y se consultan todas juntas.
+ * expediente de cada persona; aquí se diseñan (nombre, preguntas, orden, vista
+ * previa, archivar) y se consultan todas juntas. Con respuestas, cambiar sus
+ * preguntas crea otra versión y cada respuesta se lee con las suyas (ADR 0150).
  */
 const { t } = useI18n();
 
@@ -32,6 +36,23 @@ interface Formulario {
   aplica_a: string;
   activo: boolean;
   campos: Campo[];
+  version?: number;
+  archivado?: boolean;
+  respuestas?: number;
+}
+// Una pregunta como se guardó en la respuesta (la de entonces).
+interface CampoRespondido {
+  id: string;
+  etiqueta: string;
+  tipo: string;
+  opciones: string[] | null;
+}
+interface CampoEditable {
+  id?: string;
+  etiqueta: string;
+  tipo: string;
+  obligatorio: boolean;
+  opciones: string[] | null;
 }
 type Valor = string | number | boolean | null;
 interface Respuesta {
@@ -42,6 +63,8 @@ interface Respuesta {
   usuario_id: string | null;
   respondido_en: string | null;
   valores: Record<string, Valor>;
+  version?: number;
+  campos?: CampoRespondido[] | null;
 }
 
 const sesion = useSesionTenantStore();
@@ -72,6 +95,9 @@ const nuevoCampo = ref({
 const agregandoCampo = ref(false);
 
 const respuestas = ref<Respuesta[]>([]);
+const versionActual = ref<number | null>(null);
+// Las fichas archivadas aparte (se restauran desde ahí).
+const verArchivadas = ref(false);
 // Por páginas (antes, solo las últimas 200) y buscando por la persona.
 const buscarRespuestas = ref("");
 const paginaRespuestas = ref(1);
@@ -102,7 +128,7 @@ function fecha(iso: string | null): string {
   }).format(new Date(iso));
 }
 
-function valor(c: Campo, v: Valor | undefined): string {
+function valor(c: Pick<Campo, "tipo">, v: Valor | undefined): string {
   if (v === undefined || v === null || v === "") {
     return t("expediente.sinValor");
   }
@@ -130,9 +156,12 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const f = await api.get<{ data: Formulario[] }>(
-      `${base.value}/formularios`,
-    );
+    const url = `${base.value}/formularios`;
+    const f = verArchivadas.value
+      ? await api.get<{ data: Formulario[] }>(url, {
+          params: { archivados: 1 },
+        })
+      : await api.get<{ data: Formulario[] }>(url);
     formularios.value = f.data.data;
     if (
       soloRespuestas.value &&
@@ -197,6 +226,28 @@ async function agregarCampo(): Promise<void> {
   try {
     const opciones =
       nuevoCampo.value.tipo === "seleccion" ? opcionesNuevas.value : null;
+    // Editar una pregunta guarda la ficha completa; una nueva se agrega al final.
+    if (editandoPregunta.value !== null) {
+      const id = editandoPregunta.value;
+      const ok = await guardarFicha(
+        actuales().map((c) =>
+          c.id === id
+            ? {
+                id,
+                etiqueta: nuevoCampo.value.etiqueta.trim(),
+                tipo: nuevoCampo.value.tipo,
+                obligatorio: nuevoCampo.value.obligatorio,
+                opciones,
+              }
+            : c,
+        ),
+      );
+      if (ok) {
+        editandoPregunta.value = null;
+        nuevaPregunta.value = false;
+      }
+      return;
+    }
     await api.post(
       `${base.value}/formularios/${seleccionado.value.id}/campos`,
       {
@@ -204,6 +255,7 @@ async function agregarCampo(): Promise<void> {
         tipo: nuevoCampo.value.tipo,
         obligatorio: nuevoCampo.value.obligatorio,
         opciones,
+        orden: seleccionado.value.campos.length,
       },
     );
     nuevoCampo.value = {
@@ -248,6 +300,9 @@ async function cargarRespuestas(): Promise<void> {
     });
     respuestas.value = data.data;
     metaRespuestas.value = data.meta ?? null;
+    versionActual.value =
+      (data.meta as { version_actual?: number } | undefined)?.version_actual ??
+      null;
   } catch (e) {
     error.value = mensajeDeError(e, t("formulariosRespuestas.cargarError"));
   } finally {
@@ -277,6 +332,172 @@ watch(soloRespuestas, (respuestas) => {
     : null;
   nuevaPregunta.value = false;
 });
+
+// ---- Edición de la ficha (ADR 0150) ----
+const guardandoFicha = ref(false);
+const editandoPregunta = ref<string | null>(null);
+const editandoDatos = ref(false);
+const datosFicha = ref({ nombre: "", descripcion: "", aplica_a: "miembro" });
+const vistaPrevia = ref(false);
+const conRespuestas = computed(() => (seleccionado.value?.respuestas ?? 0) > 0);
+function actuales(): CampoEditable[] {
+  return (seleccionado.value?.campos ?? []).map((c) => ({
+    id: c.id,
+    etiqueta: c.etiqueta,
+    tipo: c.tipo,
+    obligatorio: c.obligatorio,
+    opciones: c.opciones,
+  }));
+}
+/** Guarda la ficha completa (datos y preguntas en orden) y la actualiza aquí. */
+async function guardarFicha(
+  campos: CampoEditable[],
+  datos: Partial<Pick<Formulario, "nombre" | "descripcion" | "aplica_a">> = {},
+): Promise<boolean> {
+  const f = seleccionado.value;
+  if (f === null || guardandoFicha.value) {
+    return false;
+  }
+  guardandoFicha.value = true;
+  error.value = null;
+  try {
+    const { data } = await api.put<{ data: Formulario }>(
+      `${base.value}/formularios/${f.id}`,
+      {
+        nombre: datos.nombre ?? f.nombre,
+        descripcion:
+          datos.descripcion !== undefined ? datos.descripcion : f.descripcion,
+        aplica_a: datos.aplica_a ?? f.aplica_a,
+        campos: campos.map((c) => ({
+          id: c.id,
+          etiqueta: c.etiqueta,
+          tipo: c.tipo,
+          obligatorio: c.obligatorio,
+          opciones: c.tipo === "seleccion" ? c.opciones : null,
+        })),
+      },
+    );
+    const i = formularios.value.findIndex((x) => x.id === f.id);
+    if (i >= 0) {
+      formularios.value[i] = data.data;
+    }
+    return true;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+    return false;
+  } finally {
+    guardandoFicha.value = false;
+  }
+}
+function mover(i: number, delta: number): void {
+  const lista = actuales();
+  const j = i + delta;
+  if (j < 0 || j >= lista.length) {
+    return;
+  }
+  [lista[i], lista[j]] = [lista[j]!, lista[i]!];
+  void guardarFicha(lista);
+}
+async function quitarPregunta(c: Campo): Promise<void> {
+  const aviso = conRespuestas.value
+    ? t("operacion.fichas.quitarConRespuestas", { pregunta: c.etiqueta })
+    : t("operacion.fichas.quitarConfirmar", { pregunta: c.etiqueta });
+  if (!(await confirmar(aviso, { peligro: true }))) {
+    return;
+  }
+  void guardarFicha(actuales().filter((x) => x.id !== c.id));
+}
+function editarPregunta(c: Campo): void {
+  error.value = null;
+  editandoPregunta.value = c.id;
+  nuevoCampo.value = {
+    etiqueta: c.etiqueta,
+    tipo: c.tipo,
+    obligatorio: c.obligatorio,
+    opciones: (c.opciones ?? []).join(", "),
+  };
+  nuevaPregunta.value = true;
+}
+function nuevaPreguntaVacia(): void {
+  error.value = null;
+  editandoPregunta.value = null;
+  nuevoCampo.value = {
+    etiqueta: "",
+    tipo: "texto",
+    obligatorio: false,
+    opciones: "",
+  };
+  nuevaPregunta.value = true;
+}
+// Con respuestas, cambiar el tipo de una pregunta crea otra (la anterior se conserva).
+const cambiaTipo = computed(() => {
+  const c = seleccionado.value?.campos.find(
+    (x) => x.id === editandoPregunta.value,
+  );
+  return (
+    conRespuestas.value && c !== undefined && c.tipo !== nuevoCampo.value.tipo
+  );
+});
+function abrirDatos(): void {
+  const f = seleccionado.value;
+  if (f === null) {
+    return;
+  }
+  error.value = null;
+  datosFicha.value = {
+    nombre: f.nombre,
+    descripcion: f.descripcion ?? "",
+    aplica_a: f.aplica_a,
+  };
+  editandoDatos.value = true;
+}
+async function guardarDatos(): Promise<void> {
+  const ok = await guardarFicha(actuales(), {
+    nombre: datosFicha.value.nombre.trim(),
+    descripcion: datosFicha.value.descripcion.trim() || null,
+    aplica_a: datosFicha.value.aplica_a,
+  });
+  if (ok) {
+    editandoDatos.value = false;
+  }
+}
+// Archivar: deja de pedirse y sus respuestas se conservan; se restaura después.
+async function archivar(f: Formulario): Promise<void> {
+  if (
+    !(await confirmar(
+      t("operacion.fichas.archivarConfirmar", { nombre: f.nombre }),
+      { aceptar: t("operacion.fichas.archivar") },
+    ))
+  ) {
+    return;
+  }
+  try {
+    await api.post(`${base.value}/formularios/${f.id}/archivar`);
+    seleccionadoId.value = null;
+    await cargar();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+async function restaurar(f: Formulario): Promise<void> {
+  try {
+    await api.post(`${base.value}/formularios/${f.id}/restaurar`);
+    verArchivadas.value = false;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+watch(verArchivadas, () => {
+  seleccionadoId.value = null;
+  void cargar();
+});
+// Cada respuesta con las preguntas con que se contestó (las de antes de las
+// versiones, con las vigentes).
+function camposDe(r: Respuesta): CampoRespondido[] {
+  return r.campos && r.campos.length > 0
+    ? r.campos
+    : (seleccionado.value?.campos ?? []);
+}
 
 function gestionar(f: Formulario): void {
   seleccionadoId.value = f.id;
@@ -352,12 +573,28 @@ onMounted(cargar);
     >
       <!-- Lista + nuevo -->
       <div :class="soloRespuestas ? 'tu-card p-4 h-max' : ''">
+        <label
+          v-if="puedeGestionar && !soloRespuestas && !seleccionado"
+          class="mb-4 inline-flex items-center gap-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          <input
+            v-model="verArchivadas"
+            type="checkbox"
+            data-prueba="ver-archivadas"
+          />
+          {{ $t("operacion.fichas.verArchivadas") }}
+        </label>
         <EstadoVacio
           v-if="formularios.length === 0"
           class="py-6"
           icono="formularios"
           compacto
-          :titulo="$t('formularios.vacio')"
+          :titulo="
+            verArchivadas
+              ? $t('operacion.fichas.sinArchivadas')
+              : $t('formularios.vacio')
+          "
         />
         <ul v-else-if="soloRespuestas" class="space-y-1">
           <li v-for="f in formularios" :key="f.id">
@@ -406,11 +643,13 @@ onMounted(cargar);
                 class="tu-badge"
                 :class="f.activo ? 'tu-badge-exito' : ''"
                 >{{
-                  $t(
-                    f.activo
-                      ? "adminUsabilidad.fichas.activa"
-                      : "adminUsabilidad.fichas.inactiva",
-                  )
+                  f.archivado
+                    ? $t("operacion.fichas.archivada")
+                    : $t(
+                        f.activo
+                          ? "adminUsabilidad.fichas.activa"
+                          : "adminUsabilidad.fichas.inactiva",
+                      )
                 }}</span
               >
             </div>
@@ -419,6 +658,16 @@ onMounted(cargar);
               {{ cantidadCampos(f.campos.length) }}
             </p>
             <button
+              v-if="f.archivado"
+              type="button"
+              class="tu-btn tu-btn-contorno tu-tono-neutral self-start mt-auto"
+              :data-prueba="`restaurar-${f.id}`"
+              @click="restaurar(f)"
+            >
+              {{ $t("operacion.fichas.restaurar") }}
+            </button>
+            <button
+              v-else
               type="button"
               class="tu-btn tu-btn-fantasma self-start mt-auto"
               :aria-label="`${$t(puedeGestionar ? 'adminUsabilidad.fichas.gestionar' : 'adminUsabilidad.fichas.consultar')}: ${f.nombre}`"
@@ -547,29 +796,88 @@ onMounted(cargar);
               </p>
               <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
                 {{ $t(`formularios.${seleccionado.aplica_a}`) }} ·
-                {{ cantidadCampos(seleccionado.campos.length) }}
+                {{ cantidadCampos(seleccionado.campos.length)
+                }}<template v-if="conRespuestas">
+                  ·
+                  {{
+                    $t("operacion.fichas.versionRespuestas", {
+                      version: seleccionado.version ?? 1,
+                      n: seleccionado.respuestas ?? 0,
+                    })
+                  }}</template
+                >
               </p>
             </div>
-            <button
-              v-if="puedeGestionar"
-              class="tu-btn tu-btn-primario tu-btn-crear"
-              type="button"
-              @click="
-                error = null;
-                nuevaPregunta = true;
-              "
-            >
-              {{ $t("adminUsabilidad.fichas.nuevaPregunta") }}
-            </button>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="tu-btn tu-btn-contorno tu-tono-neutral"
+                data-prueba="vista-previa"
+                @click="vistaPrevia = true"
+              >
+                {{ $t("operacion.fichas.vistaPrevia") }}
+              </button>
+              <template v-if="puedeGestionar">
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-contorno tu-tono-neutral"
+                  data-prueba="editar-ficha"
+                  @click="abrirDatos"
+                >
+                  {{ $t("operacion.fichas.editarDatos") }}
+                </button>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-contorno tu-tono-neutral"
+                  data-prueba="archivar-ficha"
+                  @click="archivar(seleccionado)"
+                >
+                  {{ $t("operacion.fichas.archivar") }}
+                </button>
+                <button
+                  class="tu-btn tu-btn-primario tu-btn-crear"
+                  type="button"
+                  @click="nuevaPreguntaVacia"
+                >
+                  {{ $t("adminUsabilidad.fichas.nuevaPregunta") }}
+                </button>
+              </template>
+            </div>
           </div>
+          <AvisoTono
+            v-if="puedeGestionar && conRespuestas"
+            tono="info"
+            class="mt-4"
+            data-prueba="aviso-version"
+          >
+            {{
+              $t(
+                "operacion.fichas.avisoVersion",
+                {
+                  n: seleccionado.respuestas ?? 0,
+                  siguiente: (seleccionado.version ?? 1) + 1,
+                },
+                seleccionado.respuestas ?? 0,
+              )
+            }}
+          </AvisoTono>
+          <p
+            v-if="error && !nuevaPregunta && !editandoDatos"
+            role="alert"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--error)' }"
+          >
+            {{ error }}
+          </p>
           <ul
             v-if="seleccionado.campos.length > 0"
             class="mt-5 space-y-2 text-sm"
           >
             <li
-              v-for="c in seleccionado.campos"
+              v-for="(c, i) in seleccionado.campos"
               :key="c.id"
               class="ff-pregunta flex items-center gap-2 flex-wrap"
+              data-prueba="pregunta"
             >
               <span class="font-medium">{{ c.etiqueta }}</span>
               <span class="tu-badge">{{
@@ -578,6 +886,55 @@ onMounted(cargar);
               <span v-if="c.obligatorio" class="tu-badge tu-badge-aviso">{{
                 $t("formularios.campos.obligatorio")
               }}</span>
+              <span
+                v-if="puedeGestionar"
+                class="ml-auto flex items-center gap-1"
+              >
+                <button
+                  type="button"
+                  class="tu-icono-btn"
+                  :aria-label="
+                    $t('operacion.fichas.subir', { pregunta: c.etiqueta })
+                  "
+                  :disabled="i === 0 || guardandoFicha"
+                  :data-prueba="`subir-${c.id}`"
+                  @click="mover(i, -1)"
+                >
+                  <IconoNav nombre="arriba" :tam="14" />
+                </button>
+                <button
+                  type="button"
+                  class="tu-icono-btn"
+                  :aria-label="
+                    $t('operacion.fichas.bajar', { pregunta: c.etiqueta })
+                  "
+                  :disabled="
+                    i === seleccionado.campos.length - 1 || guardandoFicha
+                  "
+                  :data-prueba="`bajar-${c.id}`"
+                  @click="mover(i, 1)"
+                >
+                  <IconoNav nombre="abajo" :tam="14" />
+                </button>
+                <button
+                  type="button"
+                  class="tu-enlace text-sm ml-2"
+                  :data-prueba="`editar-${c.id}`"
+                  @click="editarPregunta(c)"
+                >
+                  {{ $t("operacion.fichas.editar") }}
+                </button>
+                <button
+                  type="button"
+                  class="tu-enlace text-sm ml-2"
+                  :style="{ color: 'var(--error)' }"
+                  :disabled="guardandoFicha"
+                  :data-prueba="`quitar-${c.id}`"
+                  @click="quitarPregunta(c)"
+                >
+                  {{ $t("operacion.fichas.quitar") }}
+                </button>
+              </span>
             </li>
           </ul>
           <p
@@ -591,14 +948,18 @@ onMounted(cargar);
           <ModalDialogo
             v-if="puedeGestionar"
             :abierto="nuevaPregunta"
-            :titulo="$t('adminUsabilidad.fichas.nuevaPregunta')"
+            :titulo="
+              editandoPregunta
+                ? $t('operacion.fichas.editarPregunta')
+                : $t('adminUsabilidad.fichas.nuevaPregunta')
+            "
             :descripcion="
               $t('adminUsabilidad.fichas.preguntaAyuda', {
                 nombre: seleccionado.nombre,
               })
             "
             icono="formularios"
-            :ocupado="agregandoCampo"
+            :ocupado="agregandoCampo || guardandoFicha"
             @cerrar="nuevaPregunta = false"
           >
             <form
@@ -673,6 +1034,13 @@ onMounted(cargar);
                 <input v-model="nuevoCampo.obligatorio" type="checkbox" />
                 {{ $t("formularios.campos.obligatorio") }}
               </label>
+              <p
+                v-if="cambiaTipo"
+                class="sm:col-span-2 tu-hint"
+                data-prueba="cambia-tipo"
+              >
+                {{ $t("operacion.fichas.cambiaTipo") }}
+              </p>
               <div class="sm:col-span-2 flex justify-end gap-2">
                 <button
                   type="button"
@@ -687,14 +1055,173 @@ onMounted(cargar);
                   type="submit"
                   :disabled="
                     agregandoCampo ||
+                    guardandoFicha ||
                     nuevoCampo.etiqueta.trim() === '' ||
                     faltanOpciones
                   "
                 >
-                  {{ $t("formularios.campos.agregar") }}
+                  {{
+                    editandoPregunta
+                      ? $t("comun.guardar")
+                      : $t("formularios.campos.agregar")
+                  }}
                 </button>
               </div>
             </form>
+          </ModalDialogo>
+
+          <!-- Nombre, descripción y a quién aplica -->
+          <ModalDialogo
+            v-if="puedeGestionar"
+            :abierto="editandoDatos"
+            :titulo="$t('operacion.fichas.editarDatos')"
+            icono="formularios"
+            tam="md"
+            :ocupado="guardandoFicha"
+            @cerrar="editandoDatos = false"
+          >
+            <form
+              id="ff-datos"
+              class="space-y-4"
+              @submit.prevent="guardarDatos"
+            >
+              <p
+                v-if="error"
+                role="alert"
+                class="text-sm"
+                :style="{ color: 'var(--error)' }"
+              >
+                {{ error }}
+              </p>
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("adminUsabilidad.fichas.nombre")
+                }}</span>
+                <input
+                  v-model="datosFicha.nombre"
+                  class="tu-input"
+                  required
+                  data-prueba="datos-nombre"
+                />
+              </label>
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("operacion.fichas.descripcion")
+                }}</span>
+                <textarea
+                  v-model="datosFicha.descripcion"
+                  class="tu-input"
+                  rows="2"
+                  maxlength="1000"
+                />
+              </label>
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("adminUsabilidad.fichas.destinatarios")
+                }}</span>
+                <select v-model="datosFicha.aplica_a" class="tu-input">
+                  <option value="miembro">
+                    {{ $t("formularios.miembro") }}
+                  </option>
+                  <option value="instructor">
+                    {{ $t("formularios.instructor") }}
+                  </option>
+                  <option value="todos">{{ $t("formularios.todos") }}</option>
+                </select>
+              </label>
+              <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma"
+                  :disabled="guardandoFicha"
+                  @click="editandoDatos = false"
+                >
+                  {{ $t("comun.cancelar") }}
+                </button>
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="submit"
+                  :disabled="guardandoFicha || datosFicha.nombre.trim() === ''"
+                >
+                  {{ $t("comun.guardar") }}
+                </button>
+              </div>
+            </form>
+          </ModalDialogo>
+
+          <!-- Vista previa: como la ve quien la llena -->
+          <ModalDialogo
+            :abierto="vistaPrevia"
+            :titulo="
+              $t('operacion.fichas.vistaPreviaDe', {
+                nombre: seleccionado.nombre,
+              })
+            "
+            icono="formularios"
+            tam="md"
+            @cerrar="vistaPrevia = false"
+          >
+            <p
+              v-if="seleccionado.descripcion"
+              class="text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ seleccionado.descripcion }}
+            </p>
+            <div class="mt-3 grid gap-3" data-prueba="lista-vista-previa">
+              <template v-for="c in seleccionado.campos" :key="c.id">
+                <label
+                  v-if="c.tipo === 'booleano'"
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <input type="checkbox" disabled />
+                  {{ c.etiqueta
+                  }}<span v-if="c.obligatorio" aria-hidden="true"> *</span>
+                </label>
+                <label v-else class="block">
+                  <span class="tu-label"
+                    >{{ c.etiqueta
+                    }}<span v-if="c.obligatorio" aria-hidden="true">
+                      *</span
+                    ></span
+                  >
+                  <textarea
+                    v-if="c.tipo === 'textarea'"
+                    class="tu-input"
+                    rows="2"
+                    disabled
+                  />
+                  <select
+                    v-else-if="c.tipo === 'seleccion'"
+                    class="tu-input"
+                    disabled
+                  >
+                    <option v-for="o in c.opciones ?? []" :key="o">
+                      {{ o }}
+                    </option>
+                  </select>
+                  <input
+                    v-else
+                    class="tu-input"
+                    :type="
+                      c.tipo === 'numero'
+                        ? 'number'
+                        : c.tipo === 'fecha'
+                          ? 'date'
+                          : 'text'
+                    "
+                    disabled
+                  />
+                </label>
+              </template>
+              <p
+                v-if="seleccionado.campos.length === 0"
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("formularios.campos.vacio") }}
+              </p>
+            </div>
           </ModalDialogo>
         </div>
 
@@ -759,7 +1286,18 @@ onMounted(cargar);
                         $t("formulariosRespuestas.respondio", {
                           fecha: fecha(r.respondido_en),
                         })
-                      }}</span
+                      }}<template
+                        v-if="
+                          r.version &&
+                          versionActual &&
+                          r.version < versionActual
+                        "
+                      >
+                        ·
+                        {{
+                          $t("operacion.fichas.conVersion", { n: r.version })
+                        }}</template
+                      ></span
                     >
                   </button>
                   <RouterLink
@@ -779,7 +1317,7 @@ onMounted(cargar);
                   }"
                 >
                   <div
-                    v-for="c in seleccionado.campos"
+                    v-for="c in camposDe(r)"
                     :key="c.id"
                     class="flex items-baseline justify-between gap-4 py-2"
                   >
