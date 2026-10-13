@@ -739,6 +739,31 @@ export default {
   formularios: {
     dosOpciones: "Escribe al menos dos opciones, separadas por comas.",
   },
+  // Productos del mostrador: categorías propias del negocio y foto de cada uno.
+  productos: {
+    categoria: "Categoría",
+    sinCategoria: "Sin categoría",
+    todas: "Todas",
+    categorias: "Categorías",
+    categoriasTitulo: "Categorías de productos",
+    categoriasAyuda:
+      "Agrupa tus productos para encontrarlos rápido en el mostrador.",
+    nueva: "Nueva categoría",
+    agregar: "Agregar",
+    guardar: "Guardar",
+    quitar: "Quitar",
+    vacio: "Aún no tienes categorías.",
+    cuantos: "Sin productos | 1 producto | {n} productos",
+    confirmarQuitar:
+      "¿Quitar la categoría «{nombre}»? Sus productos se quedan, sin categoría.",
+    quitada: "Categoría quitada.",
+    foto: "Foto",
+    fotoArrastra: "Arrastra la foto del producto aquí o",
+    fotoAyuda: "PNG, JPG o WebP de hasta 4 MB. Se ve en el mostrador.",
+    fotoQuitar: "Quitar foto",
+    fotoAlGuardar: "Se sube al guardar el producto.",
+    filtrar: "Filtrar por categoría",
+  },
   // Integrar a tu web: los widgets necesitan la página del negocio publicada.
   widgets: {
     paginaOculta: "Tu página está oculta",

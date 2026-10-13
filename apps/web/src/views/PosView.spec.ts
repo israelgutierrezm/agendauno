@@ -405,4 +405,52 @@ describe("ventas recientes del mostrador", () => {
     );
     expect(w.text()).not.toContain("$");
   });
+
+  it("filtra los productos por categoría; sin categorías no hay filtro", async () => {
+    const BEBIDA = {
+      ...ARTICULOS[0],
+      id: "b1",
+      nombre: "Agua",
+      categoria: { id: "c2", nombre: "Bebidas", orden: 2 },
+      foto_url: "https://cdn.test/agua.png",
+    };
+    const CERA = {
+      ...ARTICULOS[0],
+      id: "c1p",
+      nombre: "Cera",
+      categoria: { id: "c1", nombre: "Cuidado", orden: 1 },
+    };
+    respuestas([BEBIDA, CERA, ARTICULOS[0]]);
+    const w = montarConDialogo();
+    await flushPromises();
+
+    // En su orden, y «Sin categoría» al final por la pomada.
+    const botones = w.findAll('[data-prueba="categorias-mostrador"] button');
+    expect(botones.map((b) => b.text())).toEqual([
+      "Todas",
+      "Cuidado",
+      "Bebidas",
+      "Sin categoría",
+    ]);
+    expect(w.findAll('[data-prueba="producto"]')).toHaveLength(3);
+    // La foto en su cuadro.
+    expect(w.find('[data-prueba="producto"] img').attributes("src")).toBe(
+      "https://cdn.test/agua.png",
+    );
+
+    await w.get('[data-prueba="categoria-c2"]').trigger("click");
+    expect(w.findAll('[data-prueba="producto"]').map((p) => p.text())).toEqual([
+      expect.stringContaining("Agua"),
+    ]);
+    await w.get('[data-prueba="categoria--"]').trigger("click");
+    expect(w.get('[data-prueba="producto"]').text()).toContain("Pomada mate");
+
+    // Un negocio sin categorías no ve el filtro.
+    respuestas(ARTICULOS);
+    const otro = montarConDialogo();
+    await flushPromises();
+    expect(otro.find('[data-prueba="categorias-mostrador"]').exists()).toBe(
+      false,
+    );
+  });
 });

@@ -11,17 +11,24 @@ use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
+use App\Modules\Tenancy\Models\CategoriaArticuloTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\ExtraArticuloTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Inventario minorista del estudio, tenant-local (R21): catálogo de artículos y su stock
  * por sucursal (derivado del ledger), con entradas y ajustes. Cada existencia lleva su
  * estado (con stock, stock bajo, sin stock) según el umbral del negocio
  * (`inventario.stock_bajo`, ADR 0042). Opera SIEMPRE sobre la BD del estudio resuelto.
+ * Cada producto puede llevar una categoría del negocio y su foto (mostrador).
  */
 class InventarioTenantController
 {
@@ -33,7 +40,7 @@ class InventarioTenantController
 
     public function index(Request $request): JsonResponse
     {
-        $articulos = ArticuloTenant::query()->orderByDesc('id')->get();
+        $articulos = ArticuloTenant::query()->with('categoria')->orderByDesc('id')->get();
         $sucursales = $this->mapaSucursales();
         $permitidas = $this->permitidas($request);
 
@@ -59,6 +66,45 @@ class InventarioTenantController
         $this->guardarExtras($request, $articulo);
 
         return response()->json(['data' => $this->presentar($articulo->refresh(), $this->mapaSucursales(), $this->permitidas($request))]);
+    }
+
+    /** Su foto (PNG, JPG o WebP de hasta 4 MB): reemplaza la anterior. */
+    public function subirFoto(Request $request): JsonResponse
+    {
+        $articulo = $this->resolver($request);
+        $request->validate([
+            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ]);
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        $archivo = $request->file('foto');
+        abort_unless($archivo instanceof UploadedFile, 422);
+
+        $ruta = $archivo->storeAs(
+            'productos/'.$estudio->getKey(),
+            Str::lower(Str::random(40)).'.'.$archivo->extension(),
+            'public',
+        );
+        $this->borrarFoto($articulo);
+        $articulo->update(['foto_ruta' => (string) $ruta]);
+
+        return response()->json(['data' => $this->presentar($articulo->refresh(), $this->mapaSucursales(), $this->permitidas($request))]);
+    }
+
+    public function eliminarFoto(Request $request): JsonResponse
+    {
+        $articulo = $this->resolver($request);
+        $this->borrarFoto($articulo);
+        $articulo->update(['foto_ruta' => null]);
+
+        return response()->json(['data' => $this->presentar($articulo->refresh(), $this->mapaSucursales(), $this->permitidas($request))]);
+    }
+
+    private function borrarFoto(ArticuloTenant $articulo): void
+    {
+        if ($articulo->foto_ruta !== null && $articulo->foto_ruta !== '') {
+            Storage::disk('public')->delete($articulo->foto_ruta);
+        }
     }
 
     /**
@@ -183,15 +229,36 @@ class InventarioTenantController
             'precio_minor' => ['required', 'integer', 'min:0'],
             'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
             'activo' => ['boolean'],
+            // Su categoría (id público); null la quita.
+            'categoria_id' => ['sometimes', 'nullable', 'string', 'max:40'],
         ]);
 
-        return [
+        $datos = [
             'nombre' => $validado['nombre'],
             'sku' => $validado['sku'] ?? null,
             'precio_minor' => (int) $validado['precio_minor'],
             'moneda' => strtoupper($validado['moneda'] ?? app(ParametrosTenant::class)->moneda()),
             'activo' => (bool) ($validado['activo'] ?? true),
         ];
+        // La categoría solo se toca si viene (editar sin ella no la quita).
+        if ($request->has('categoria_id')) {
+            $datos['categoria_id'] = $this->categoriaId($validado['categoria_id'] ?? null);
+        }
+
+        return $datos;
+    }
+
+    private function categoriaId(?string $ulid): ?int
+    {
+        if ($ulid === null || $ulid === '') {
+            return null;
+        }
+        $categoria = CategoriaArticuloTenant::query()->where('ulid', $ulid)->first();
+        if (! $categoria instanceof CategoriaArticuloTenant) {
+            throw ValidationException::withMessages(['categoria_id' => ['Esa categoría no existe.']]);
+        }
+
+        return (int) $categoria->getKey();
     }
 
     /**
@@ -226,6 +293,13 @@ class InventarioTenantController
             'precio_minor' => $articulo->precio_minor,
             'moneda' => $articulo->moneda,
             'activo' => $articulo->activo,
+            // Su categoría (con su orden, para agrupar en el mostrador) y su foto.
+            'categoria' => $articulo->categoria instanceof CategoriaArticuloTenant ? [
+                'id' => $articulo->categoria->ulid,
+                'nombre' => $articulo->categoria->nombre,
+                'orden' => $articulo->categoria->orden,
+            ] : null,
+            'foto_url' => $articulo->fotoUrl(),
             // Lo que se le puede agregar (ADR 0139).
             'extras' => $articulo->extras()->where('activo', true)->get()->map(static fn (ExtraArticuloTenant $e): array => [
                 'id' => $e->ulid, 'nombre' => $e->nombre, 'precio_minor' => $e->precio_minor,

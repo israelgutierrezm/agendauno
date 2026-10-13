@@ -58,6 +58,9 @@ interface Articulo {
   stock_total: number;
   existencias: Existencia[];
   extras?: Extra[];
+  // Su categoría del negocio y su foto (para filtrar y reconocerlo al vender).
+  categoria?: { id: string; nombre: string; orden: number } | null;
+  foto_url?: string | null;
 }
 interface Sucursal {
   id: string;
@@ -135,11 +138,42 @@ function iniciales(nombre: string): string {
 
 // ---- Productos a la venta ----
 const busqueda = ref("");
+// Las categorías de los productos a la venta, en su orden; «sin categoría» (`-`) al
+// final si hay productos sin ella. Sin categorías, no hay filtro.
+const categoria = ref("");
+const categorias = computed(() => {
+  const vistas = new Map<
+    string,
+    { id: string; nombre: string; orden: number }
+  >();
+  let sinCategoria = false;
+  for (const a of articulos.value) {
+    if (!a.activo) {
+      continue;
+    }
+    if (a.categoria) {
+      vistas.set(a.categoria.id, a.categoria);
+    } else {
+      sinCategoria = true;
+    }
+  }
+  const lista = [...vistas.values()].sort(
+    (x, y) => x.orden - y.orden || x.nombre.localeCompare(y.nombre),
+  );
+  return lista.length > 0 && sinCategoria
+    ? [
+        ...lista,
+        { id: "-", nombre: t("operacion.productos.sinCategoria"), orden: 0 },
+      ]
+    : lista;
+});
 const vendibles = computed(() => {
   const q = busqueda.value.trim().toLowerCase();
   return articulos.value.filter(
     (a) =>
       a.activo &&
+      (categoria.value === "" ||
+        (a.categoria?.id ?? "-") === categoria.value) &&
       (q === "" ||
         a.nombre.toLowerCase().includes(q) ||
         (a.sku ?? "").toLowerCase().includes(q)),
@@ -457,6 +491,34 @@ onMounted(cargar);
               </label>
               <LeyendaSucursal v-else />
             </div>
+            <!-- Filtrar por categoría (solo si el negocio tiene categorías) -->
+            <div
+              v-if="categorias.length > 0"
+              class="mo-categorias"
+              role="group"
+              :aria-label="$t('operacion.productos.filtrar')"
+              data-prueba="categorias-mostrador"
+            >
+              <button
+                type="button"
+                class="mo-categoria"
+                :aria-pressed="categoria === ''"
+                @click="categoria = ''"
+              >
+                {{ $t("operacion.productos.todas") }}
+              </button>
+              <button
+                v-for="c in categorias"
+                :key="c.id"
+                type="button"
+                class="mo-categoria"
+                :aria-pressed="categoria === c.id"
+                :data-prueba="`categoria-${c.id}`"
+                @click="categoria = c.id"
+              >
+                {{ c.nombre }}
+              </button>
+            </div>
 
             <p
               v-if="vendibles.length === 0"
@@ -479,7 +541,13 @@ onMounted(cargar);
                 data-prueba="producto"
                 @click="agregar(a)"
               >
-                <span class="mo-tile" aria-hidden="true">{{
+                <img
+                  v-if="a.foto_url"
+                  :src="a.foto_url"
+                  alt=""
+                  class="mo-tile mo-foto"
+                />
+                <span v-else class="mo-tile" aria-hidden="true">{{
                   iniciales(a.nombre)
                 }}</span>
                 <span class="min-w-0 flex-1">
@@ -839,6 +907,42 @@ onMounted(cargar);
 }
 .mo-buscar > input {
   padding-left: 2.25rem;
+}
+.mo-categorias {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.75rem 1rem 0;
+  scrollbar-width: thin;
+}
+.mo-categoria {
+  flex-shrink: 0;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--texto-suave);
+  font-size: 0.82rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mo-categoria:hover {
+  color: var(--texto);
+  border-color: color-mix(in srgb, var(--primario) 35%, var(--borde));
+}
+.mo-categoria[aria-pressed="true"] {
+  border-color: var(--primario);
+  background: var(--primario-suave);
+  color: var(--primario-fuerte, var(--primario));
+}
+.mo-categoria:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: 2px;
+}
+.mo-foto {
+  width: 3rem;
+  height: 3rem;
+  object-fit: cover;
 }
 .mo-productos {
   display: grid;

@@ -257,6 +257,7 @@ function descargarPlantilla(): void {
         </div>
 
         <ZonaArchivo
+          fija
           class="mt-4"
           accept=".csv,text/csv"
           :boton="$t('importar.elegir')"

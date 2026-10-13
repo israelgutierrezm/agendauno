@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -11,7 +12,9 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -22,6 +25,8 @@ import { useToastStore } from "@/stores/toast";
  * y la tabla de productos con su estado (con stock, stock bajo, sin stock). Qué es
  * «stock bajo» lo decide el negocio (parámetro `inventario.stock_bajo`); el API lo
  * calcula. Con una sucursal elegida en la barra, todo se cuenta en esa sucursal.
+ * Cada producto puede llevar una categoría del negocio (para filtrar aquí y en el
+ * mostrador) y su foto.
  */
 type EstadoStock = "con_stock" | "bajo" | "sin_stock";
 interface Existencia {
@@ -46,6 +51,14 @@ interface Articulo {
   stock_total: number;
   estado_stock?: EstadoStock;
   existencias: Existencia[];
+  categoria?: { id: string; nombre: string; orden: number } | null;
+  foto_url?: string | null;
+}
+interface Categoria {
+  id: string;
+  nombre: string;
+  orden: number;
+  productos: number;
 }
 interface Sucursal {
   id: string;
@@ -59,6 +72,7 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("inventario.gestionar"));
 
 const articulos = ref<Articulo[]>([]);
+const categorias = ref<Categoria[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const stockBajo = ref(3);
 const cargando = ref(true);
@@ -73,13 +87,15 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [a, s] = await Promise.all([
+    const [a, s, c] = await Promise.all([
       api.get<{ data: Articulo[]; meta?: { stock_bajo?: number } }>(
         `${base.value}/articulos`,
       ),
       api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
+      api.get<{ data: Categoria[] }>(`${base.value}/categorias-articulo`),
     ]);
     articulos.value = a.data.data;
+    categorias.value = c.data.data;
     stockBajo.value = a.data.meta?.stock_bajo ?? stockBajo.value;
     sucursales.value = s.data.data;
   } catch (e) {
@@ -168,6 +184,8 @@ const indicadores = computed<Indicador[]>(() => {
 const busqueda = ref("");
 const filtroVenta = ref<"" | "activo" | "inactivo">("");
 const filtroStock = ref<"" | EstadoStock>("");
+// Una categoría, «sin categoría» (`-`) o todas ("").
+const filtroCategoria = ref("");
 const visibles = computed(() => {
   const q = busqueda.value.trim().toLowerCase();
   return articulos.value.filter(
@@ -177,31 +195,152 @@ const visibles = computed(() => {
         (a.sku ?? "").toLowerCase().includes(q)) &&
       (filtroVenta.value === "" ||
         (filtroVenta.value === "activo") === a.activo) &&
-      (filtroStock.value === "" || estadoDe(a) === filtroStock.value),
+      (filtroStock.value === "" || estadoDe(a) === filtroStock.value) &&
+      (filtroCategoria.value === "" ||
+        (a.categoria?.id ?? "-") === filtroCategoria.value),
   );
 });
 const hayFiltros = computed(
   () =>
     busqueda.value !== "" ||
     filtroVenta.value !== "" ||
-    filtroStock.value !== "",
+    filtroStock.value !== "" ||
+    filtroCategoria.value !== "",
 );
 function limpiar(): void {
   busqueda.value = "";
   filtroVenta.value = "";
   filtroStock.value = "";
+  filtroCategoria.value = "";
+}
+
+// ---- Categorías (un diálogo para crearlas, renombrarlas y quitarlas) ----
+const dialogoCategorias = ref(false);
+const nuevaCategoria = ref("");
+const nombres = ref<Record<string, string>>({});
+function abrirCategorias(): void {
+  nuevaCategoria.value = "";
+  nombres.value = Object.fromEntries(
+    categorias.value.map((c) => [c.id, c.nombre]),
+  );
+  dialogoCategorias.value = true;
+}
+async function recargarCategorias(): Promise<void> {
+  const { data } = await api.get<{ data: Categoria[] }>(
+    `${base.value}/categorias-articulo`,
+  );
+  categorias.value = data.data;
+  nombres.value = Object.fromEntries(data.data.map((c) => [c.id, c.nombre]));
+}
+async function agregarCategoria(): Promise<void> {
+  const nombre = nuevaCategoria.value.trim();
+  if (nombre === "" || guardando.value) {
+    return;
+  }
+  guardando.value = true;
+  error.value = null;
+  try {
+    await api.post(`${base.value}/categorias-articulo`, { nombre });
+    nuevaCategoria.value = "";
+    await recargarCategorias();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    guardando.value = false;
+  }
+}
+async function renombrarCategoria(c: Categoria): Promise<void> {
+  const nombre = (nombres.value[c.id] ?? "").trim();
+  if (nombre === "" || nombre === c.nombre || guardando.value) {
+    return;
+  }
+  guardando.value = true;
+  error.value = null;
+  try {
+    await api.put(`${base.value}/categorias-articulo/${c.id}`, { nombre });
+    await Promise.all([recargarCategorias(), cargar()]);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    guardando.value = false;
+  }
+}
+async function quitarCategoria(c: Categoria): Promise<void> {
+  if (
+    !(await confirmar(
+      t("operacion.productos.confirmarQuitar", { nombre: c.nombre }),
+      { aceptar: t("operacion.productos.quitar"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  guardando.value = true;
+  error.value = null;
+  try {
+    await api.delete(`${base.value}/categorias-articulo/${c.id}`);
+    if (filtroCategoria.value === c.id) {
+      filtroCategoria.value = "";
+    }
+    toast.exito(t("operacion.productos.quitada"));
+    await Promise.all([recargarCategorias(), cargar()]);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    guardando.value = false;
+  }
 }
 
 // ---- Alta y edición (un diálogo) ----
 const editando = ref<Articulo | null>(null);
 const dialogoProducto = ref(false);
-const form = ref({ nombre: "", sku: "", precio: "", activo: true });
+const form = ref({
+  nombre: "",
+  sku: "",
+  precio: "",
+  activo: true,
+  categoria: "",
+});
+// La foto de un producto nuevo: se elige aquí y se sube al crearlo.
+const fotoNueva = ref<File | null>(null);
+const vistaFotoNueva = ref<string | null>(null);
+function elegirFotoNueva(archivo: File): void {
+  if (vistaFotoNueva.value) {
+    URL.revokeObjectURL(vistaFotoNueva.value);
+  }
+  fotoNueva.value = archivo;
+  vistaFotoNueva.value = URL.createObjectURL(archivo);
+}
+function olvidarFotoNueva(): void {
+  if (vistaFotoNueva.value) {
+    URL.revokeObjectURL(vistaFotoNueva.value);
+  }
+  fotoNueva.value = null;
+  vistaFotoNueva.value = null;
+}
+// La foto del que se edita: se sube o se quita al momento.
+function fotoCambiada(url: string | null): void {
+  if (editando.value) {
+    editando.value.foto_url = url;
+    const a = articulos.value.find((x) => x.id === editando.value?.id);
+    if (a) {
+      a.foto_url = url;
+    }
+  }
+}
 // Extras del producto (ADR 0139): nombre y precio en pesos, como el producto.
 const extras = ref<{ id?: string; nombre: string; precio: string }[]>([]);
 function nuevoProducto(): void {
   editando.value = null;
-  form.value = { nombre: "", sku: "", precio: "", activo: true };
+  form.value = {
+    nombre: "",
+    sku: "",
+    precio: "",
+    activo: true,
+    // Con un filtro de categoría puesto, el nuevo nace en ella.
+    categoria: filtroCategoria.value !== "-" ? filtroCategoria.value : "",
+  };
   extras.value = [];
+  olvidarFotoNueva();
   dialogoProducto.value = true;
 }
 function editar(a: Articulo): void {
@@ -211,6 +350,7 @@ function editar(a: Articulo): void {
     sku: a.sku ?? "",
     precio: String(a.precio_minor / 100),
     activo: a.activo,
+    categoria: a.categoria?.id ?? "",
   };
   extras.value = (a.extras ?? []).map((e) => ({
     id: e.id,
@@ -238,6 +378,7 @@ async function guardarProducto(): Promise<void> {
     nombre: form.value.nombre.trim(),
     sku: form.value.sku.trim() !== "" ? form.value.sku.trim() : null,
     precio_minor: Math.round(Number(form.value.precio) * 100),
+    categoria_id: form.value.categoria !== "" ? form.value.categoria : null,
     extras: extras.value
       .filter((e) => e.nombre.trim() !== "")
       .map((e) => ({
@@ -255,7 +396,17 @@ async function guardarProducto(): Promise<void> {
       });
       toast.exito(t("inventarioExtra.guardado"));
     } else {
-      await api.post(`${base.value}/articulos`, datos);
+      const { data } = await api.post<{ data: Articulo }>(
+        `${base.value}/articulos`,
+        datos,
+      );
+      // Con su foto, si se eligió una.
+      if (fotoNueva.value) {
+        const cuerpo = new FormData();
+        cuerpo.append("foto", fotoNueva.value);
+        await api.post(`${base.value}/articulos/${data.data.id}/foto`, cuerpo);
+        olvidarFotoNueva();
+      }
       toast.exito(t("inventarioVisual.creado"));
     }
     dialogoProducto.value = false;
@@ -323,6 +474,15 @@ onMounted(cargar);
       :subtitulo="$t('inventarioVisual.subtitulo')"
     >
       <template #acciones>
+        <button
+          v-if="puedeGestionar"
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-neutral"
+          data-prueba="categorias"
+          @click="abrirCategorias"
+        >
+          {{ $t("operacion.productos.categorias") }}
+        </button>
         <button
           v-if="puedeGestionar"
           type="button"
@@ -398,6 +558,22 @@ onMounted(cargar);
                 </option>
               </select>
             </label>
+            <label v-if="categorias.length > 0" class="iv-filtro">
+              <span>{{ $t("operacion.productos.categoria") }}</span>
+              <select
+                v-model="filtroCategoria"
+                class="tu-input"
+                data-prueba="filtro-categoria"
+              >
+                <option value="">{{ $t("operacion.productos.todas") }}</option>
+                <option v-for="c in categorias" :key="c.id" :value="c.id">
+                  {{ c.nombre }}
+                </option>
+                <option value="-">
+                  {{ $t("operacion.productos.sinCategoria") }}
+                </option>
+              </select>
+            </label>
           </div>
 
           <div class="relative overflow-x-auto">
@@ -431,11 +607,24 @@ onMounted(cargar);
                 >
                   <td>
                     <div class="flex items-center gap-3">
-                      <span class="iv-tile" aria-hidden="true">{{
+                      <img
+                        v-if="a.foto_url"
+                        :src="a.foto_url"
+                        alt=""
+                        class="iv-tile iv-foto"
+                      />
+                      <span v-else class="iv-tile" aria-hidden="true">{{
                         iniciales(a.nombre)
                       }}</span>
                       <div class="min-w-0">
                         <p class="font-medium truncate">{{ a.nombre }}</p>
+                        <p
+                          v-if="a.categoria"
+                          class="iv-sub"
+                          data-prueba="categoria-producto"
+                        >
+                          {{ a.categoria.nombre }}
+                        </p>
                         <p v-if="!a.activo" class="iv-sub">
                           {{ $t("inventarioExtra.inactivo") }}
                         </p>
@@ -554,6 +743,67 @@ onMounted(cargar);
             />
           </div>
         </div>
+        <div v-if="categorias.length > 0">
+          <label class="tu-label" for="iv-categoria">{{
+            $t("operacion.productos.categoria")
+          }}</label>
+          <select
+            id="iv-categoria"
+            v-model="form.categoria"
+            class="tu-input"
+            data-prueba="categoria"
+          >
+            <option value="">
+              {{ $t("operacion.productos.sinCategoria") }}
+            </option>
+            <option v-for="c in categorias" :key="c.id" :value="c.id">
+              {{ c.nombre }}
+            </option>
+          </select>
+        </div>
+        <div data-prueba="foto-producto">
+          <p class="tu-label">{{ $t("operacion.productos.foto") }}</p>
+          <CargadorImagen
+            v-if="editando"
+            :url="editando.foto_url ?? null"
+            :ruta="`articulos/${editando.id}/foto`"
+            campo="foto"
+            clave="foto_url"
+            proporcion="1 / 1"
+            :arrastra="$t('operacion.productos.fotoArrastra')"
+            :ayuda="$t('operacion.productos.fotoAyuda')"
+            :quitar-texto="$t('operacion.productos.fotoQuitar')"
+            :puede-gestionar="puedeGestionar"
+            @update:url="fotoCambiada"
+          />
+          <template v-else>
+            <div v-if="vistaFotoNueva" class="iv-foto-nueva">
+              <img :src="vistaFotoNueva" alt="" />
+              <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
+                $t("operacion.productos.fotoAlGuardar")
+              }}</span>
+              <button
+                type="button"
+                class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+                @click="olvidarFotoNueva"
+              >
+                {{ $t("operacion.productos.fotoQuitar") }}
+              </button>
+            </div>
+            <ZonaArchivo
+              v-else
+              fija
+              compacta
+              icono="imagen"
+              accept="image/png,image/jpeg,image/webp"
+              :max-bytes="4 * 1024 * 1024"
+              :texto="$t('operacion.productos.fotoArrastra')"
+              :elige="$t('zonaArchivo.imagen.elige')"
+              :ayuda="$t('operacion.productos.fotoAyuda')"
+              @archivo="elegirFotoNueva"
+            />
+          </template>
+        </div>
         <fieldset class="grid gap-2" data-prueba="extras-producto">
           <legend class="tu-label">
             {{ $t("inventarioVisual.extras.titulo") }}
@@ -632,6 +882,77 @@ onMounted(cargar);
           {{ $t("pos.inventario.guardar") }}
         </button>
       </template>
+    </ModalDialogo>
+
+    <!-- Categorías de productos -->
+    <ModalDialogo
+      :abierto="dialogoCategorias"
+      :titulo="$t('operacion.productos.categoriasTitulo')"
+      icono="pos"
+      @cerrar="dialogoCategorias = false"
+    >
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("operacion.productos.categoriasAyuda") }}
+      </p>
+      <form
+        class="mt-4 flex gap-2"
+        data-prueba="nueva-categoria"
+        @submit.prevent="agregarCategoria"
+      >
+        <input
+          v-model="nuevaCategoria"
+          class="tu-input"
+          maxlength="60"
+          :placeholder="$t('operacion.productos.nueva')"
+          :aria-label="$t('operacion.productos.nueva')"
+        />
+        <button
+          type="submit"
+          class="tu-btn tu-btn-primario shrink-0"
+          :disabled="guardando || nuevaCategoria.trim() === ''"
+        >
+          {{ $t("operacion.productos.agregar") }}
+        </button>
+      </form>
+      <p
+        v-if="categorias.length === 0"
+        class="mt-4 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("operacion.productos.vacio") }}
+      </p>
+      <ul v-else class="mt-4 grid gap-2" data-prueba="lista-categorias">
+        <li v-for="c in categorias" :key="c.id" class="iv-categoria">
+          <input
+            v-model="nombres[c.id]"
+            class="tu-input"
+            maxlength="60"
+            :aria-label="$t('operacion.productos.categoria')"
+            @keydown.enter.prevent="renombrarCategoria(c)"
+          />
+          <span class="iv-sub whitespace-nowrap">{{
+            $t("operacion.productos.cuantos", c.productos)
+          }}</span>
+          <button
+            v-if="(nombres[c.id] ?? '').trim() !== c.nombre"
+            type="button"
+            class="tu-btn tu-btn-suave tu-tono-info tu-btn-chico"
+            :disabled="guardando || (nombres[c.id] ?? '').trim() === ''"
+            @click="renombrarCategoria(c)"
+          >
+            {{ $t("operacion.productos.guardar") }}
+          </button>
+          <button
+            type="button"
+            class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+            :disabled="guardando"
+            :data-prueba="`quitar-categoria-${c.id}`"
+            @click="quitarCategoria(c)"
+          >
+            {{ $t("operacion.productos.quitar") }}
+          </button>
+        </li>
+      </ul>
     </ModalDialogo>
 
     <!-- Entrada o ajuste de stock -->
@@ -795,5 +1116,26 @@ onMounted(cargar);
   border-top: 1px solid var(--borde);
   color: var(--texto-suave);
   font-size: 0.9rem;
+}
+.iv-foto {
+  object-fit: cover;
+}
+.iv-foto-nueva {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.iv-foto-nueva img {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 0.6rem;
+  object-fit: cover;
+}
+.iv-categoria {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.5rem;
 }
 </style>

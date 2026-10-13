@@ -343,6 +343,7 @@ async function descargar() {
         </AvisoTono>
         <ZonaArchivo
           id="archivo-clases"
+          fija
           class="mt-4"
           accept=".csv,text/csv"
           :boton="t('importarClases.elegir')"
