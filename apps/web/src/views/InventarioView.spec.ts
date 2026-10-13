@@ -10,11 +10,28 @@ import InventarioView from "./InventarioView.vue";
 | él y se registran entradas o ajustes en un diálogo.
 */
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  put: vi.fn(),
+  post: vi.fn(),
+  delete: vi.fn(),
+  categorias: [] as {
+    id: string;
+    nombre: string;
+    orden: number;
+    productos: number;
+  }[],
+}));
 vi.mock("@/lib/api", () => ({
-  api: { get: mocks.get, put: mocks.put, post: mocks.post },
+  api: {
+    get: mocks.get,
+    put: mocks.put,
+    post: mocks.post,
+    delete: mocks.delete,
+  },
   mensajeDeError: () => "Error",
 }));
+vi.mock("@/lib/confirmar", () => ({ confirmar: vi.fn(() => true) }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
 }));
@@ -42,20 +59,23 @@ const articulo = (
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.post.mockResolvedValue({ data: {} });
+  mocks.categorias = [];
+  mocks.post.mockResolvedValue({ data: { data: { id: "nuevo" } } });
   mocks.get.mockImplementation((url: string) =>
     Promise.resolve({
-      data: url.endsWith("/articulos")
-        ? {
-            data: [
-              articulo("a1", "Shampoo", 12, "con_stock"),
-              articulo("a2", "Aceite para barba", 2, "bajo"),
-              articulo("a3", "Peine", 0, "sin_stock"),
-              articulo("a4", "Cera vieja", 0, "sin_stock", false),
-            ],
-            meta: { stock_bajo: 3 },
-          }
-        : { data: [{ id: "s1", nombre: "Roma Norte" }] },
+      data: url.endsWith("/categorias-articulo")
+        ? { data: mocks.categorias }
+        : url.endsWith("/articulos")
+          ? {
+              data: [
+                articulo("a1", "Shampoo", 12, "con_stock"),
+                articulo("a2", "Aceite para barba", 2, "bajo"),
+                articulo("a3", "Peine", 0, "sin_stock"),
+                articulo("a4", "Cera vieja", 0, "sin_stock", false),
+              ],
+              meta: { stock_bajo: 3 },
+            }
+          : { data: [{ id: "s1", nombre: "Roma Norte" }] },
     }),
   );
 });
@@ -103,6 +123,7 @@ describe("inventario", () => {
       nombre: "Proteína preparada",
       sku: null,
       precio_minor: 6000,
+      categoria_id: null,
       extras: [{ id: undefined, nombre: "Fresas", precio_minor: 1500 }],
     });
   });
@@ -121,6 +142,109 @@ describe("inventario", () => {
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/articulos/a3/movimientos",
       { sucursal_id: "s1", tipo: "entrada", cantidad: 6 },
+    );
+  });
+
+  it("filtra por categoría y crea un producto en una, con su foto", async () => {
+    mocks.categorias = [
+      { id: "c1", nombre: "Cuidado", orden: 1, productos: 1 },
+    ];
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/categorias-articulo")
+          ? { data: mocks.categorias }
+          : url.endsWith("/articulos")
+            ? {
+                data: [
+                  {
+                    ...articulo("a1", "Shampoo", 12, "con_stock"),
+                    categoria: { id: "c1", nombre: "Cuidado", orden: 1 },
+                  },
+                  articulo("a3", "Peine", 0, "sin_stock"),
+                ],
+              }
+            : { data: [{ id: "s1", nombre: "Roma Norte" }] },
+      }),
+    );
+    const w = mount(InventarioView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    expect(w.get('[data-prueba="categoria-producto"]').text()).toBe("Cuidado");
+    await w.get('[data-prueba="filtro-categoria"]').setValue("c1");
+    expect(w.findAll('tr[data-prueba="producto"]')).toHaveLength(1);
+    await w.get('[data-prueba="filtro-categoria"]').setValue("-");
+    expect(w.get('tr[data-prueba="producto"]').text()).toContain("Peine");
+
+    // Con el filtro en una categoría, el nuevo nace en ella; la foto sube al crearlo.
+    await w.get('[data-prueba="filtro-categoria"]').setValue("c1");
+    await w.get('[data-prueba="nuevo-producto"]').trigger("click");
+    expect(
+      (w.get('[data-prueba="categoria"]').element as HTMLSelectElement).value,
+    ).toBe("c1");
+    await w.get("#iv-nombre").setValue("Acondicionador");
+    await w.get("#iv-precio").setValue("80");
+    const foto = new File(["x"], "foto.png", { type: "image/png" });
+    const entrada = w.get('[data-prueba="foto-producto"] input[type="file"]');
+    Object.defineProperty(entrada.element, "files", { value: [foto] });
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:foto");
+    globalThis.URL.revokeObjectURL = vi.fn();
+    await entrada.trigger("change");
+    await w.get("#iv-producto").trigger("submit");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/articulos",
+      expect.objectContaining({ nombre: "Acondicionador", categoria_id: "c1" }),
+    );
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/articulos/nuevo/foto",
+      expect.any(FormData),
+    );
+  });
+
+  it("administra las categorías: agrega, renombra y quita", async () => {
+    mocks.categorias = [
+      { id: "c1", nombre: "Cuidado", orden: 1, productos: 2 },
+    ];
+    mocks.put.mockResolvedValue({ data: {} });
+    mocks.delete.mockResolvedValue({});
+    const w = mount(InventarioView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    await w.get('[data-prueba="categorias"]').trigger("click");
+    expect(w.get('[data-prueba="lista-categorias"]').text()).toContain(
+      "2 productos",
+    );
+
+    await w.get('[data-prueba="nueva-categoria"] input').setValue("Bebidas");
+    await w.get('[data-prueba="nueva-categoria"]').trigger("submit");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/categorias-articulo",
+      { nombre: "Bebidas" },
+    );
+
+    await w
+      .get('[data-prueba="lista-categorias"] input')
+      .setValue("Cuidado personal");
+    await w
+      .findAll('[data-prueba="lista-categorias"] button')
+      .find((b) => b.text() === "Guardar")!
+      .trigger("click");
+    await flushPromises();
+    expect(mocks.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/categorias-articulo/c1",
+      { nombre: "Cuidado personal" },
+    );
+
+    await w.get('[data-prueba="quitar-categoria-c1"]').trigger("click");
+    await flushPromises();
+    expect(mocks.delete).toHaveBeenCalledWith(
+      "/api/v1/app/demo/categorias-articulo/c1",
     );
   });
 });

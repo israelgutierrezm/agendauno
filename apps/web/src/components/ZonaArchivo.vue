@@ -13,7 +13,8 @@ import { aceptaArchivo, useArrastreDeArchivos } from "@/lib/archivos";
  * soltarlo sin buscarla. Al soltar, el navegador no filtra por tipo: aquí se revisa
  * contra `accept` (y el peso con `maxBytes`) y lo que no se acepta se dice debajo;
  * el archivo válido se emite y quien la usa decide qué hacer. Con `cargado` muestra
- * el nombre del archivo elegido; `compacta` la pone en una fila (formularios).
+ * el nombre del archivo elegido; `compacta` la pone en una fila (formularios); `fija`
+ * la deja siempre a la vista, sin botón (importaciones: el archivo es lo principal).
  */
 const props = withDefaults(
   defineProps<{
@@ -33,6 +34,8 @@ const props = withDefaults(
     ocupadoTexto?: string;
     deshabilitado?: boolean;
     compacta?: boolean;
+    // Siempre a la vista para arrastrar el archivo (sin el botón que la despliega).
+    fija?: boolean;
     // Resaltada desde fuera (p. ej. arrastrando sobre la tarjeta que la contiene).
     resaltada?: boolean;
     icono?: "subir" | "imagen" | "archivo";
@@ -53,6 +56,7 @@ const props = withDefaults(
     ocupadoTexto: undefined,
     deshabilitado: false,
     compacta: false,
+    fija: false,
     resaltada: false,
     icono: "subir",
     id: undefined,
@@ -81,6 +85,7 @@ const arrastrando = computed(
 // página o sobre quien la contiene), si ya hay uno elegido o mientras sube.
 const visible = computed(
   () =>
+    props.fija ||
     abierta.value ||
     props.cargado !== null ||
     props.ocupado ||
@@ -211,7 +216,7 @@ function alSoltar(e: DragEvent): void {
       </div>
       <!-- Desplegada a pedido y sin archivo aún: se puede volver al botón. -->
       <button
-        v-if="abierta && cargado === null && !ocupado"
+        v-if="abierta && !fija && cargado === null && !ocupado"
         type="button"
         class="tu-zona-archivo-cancelar tu-enlace text-xs"
         data-prueba="plegar-zona"

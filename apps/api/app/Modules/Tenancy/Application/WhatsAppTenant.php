@@ -53,12 +53,12 @@ class WhatsAppTenant
     /**
      * Lo marca el equipo porque el cliente se lo pidió (p. ej. al agendar por
      * teléfono). Queda en la bitácora quién y cuándo. Aceptar solo si el negocio los
-     * usa; retirarlo, siempre.
+     * usa y la persona tiene celular (sin él no le llegaría nada); retirarlo, siempre.
      */
     public function registrarPorEquipo(PersonaTenant $persona, bool $acepta, ?Usuario $actor): void
     {
         $antes = $persona->whatsapp_aceptado_en !== null;
-        if ($acepta === $antes || ($acepta && ! $this->enUso())) {
+        if ($acepta === $antes || ($acepta && (! $this->enUso() || trim((string) $persona->celular) === ''))) {
             return;
         }
 

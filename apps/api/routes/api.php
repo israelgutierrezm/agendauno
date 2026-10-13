@@ -22,6 +22,7 @@ use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
 use App\Modules\Tenancy\Http\Controllers\CaptacionPublicaController;
 use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
+use App\Modules\Tenancy\Http\Controllers\CategoriasArticuloTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\ComplementosNegocioController;
@@ -902,6 +903,13 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/articulos', [InventarioTenantController::class, 'store'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.store');
             Route::put('/articulos/{articulo}', [InventarioTenantController::class, 'actualizar'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.update');
             Route::post('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimiento'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.movimientos.store');
+            Route::post('/articulos/{articulo}/foto', [InventarioTenantController::class, 'subirFoto'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.foto.store');
+            Route::delete('/articulos/{articulo}/foto', [InventarioTenantController::class, 'eliminarFoto'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.foto.destroy');
+            // Categorías de los productos del mostrador.
+            Route::get('/categorias-articulo', [CategoriasArticuloTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('categorias-articulo.index');
+            Route::post('/categorias-articulo', [CategoriasArticuloTenantController::class, 'store'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('categorias-articulo.store');
+            Route::put('/categorias-articulo/{categoria}', [CategoriasArticuloTenantController::class, 'update'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('categorias-articulo.update');
+            Route::delete('/categorias-articulo/{categoria}', [CategoriasArticuloTenantController::class, 'destroy'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('categorias-articulo.destroy');
             Route::get('/pos/ventas', [PuntoDeVentaTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('pos.ventas.index');
             Route::post('/pos/ventas', [PuntoDeVentaTenantController::class, 'vender'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.store');
             // A quién se le vende: una persona del negocio o público en general (ADR 0145).
