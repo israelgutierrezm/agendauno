@@ -27,11 +27,16 @@ class PuntoDeVentaTenant
     public function __construct(private readonly InventarioTenant $inventario) {}
 
     /**
-     * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras?: list<ExtraArticuloTenant>}>  $items
+     * Con `precio_minor` en un artículo (lo que mostró el mostrador por pieza, con sus
+     * extras), si el precio cambió con el carrito abierto no se cobra: se pide revisar
+     * el total. Un artículo que ya no está a la venta tampoco se vende. La clave del
+     * intento queda en la venta (única): un reintento devuelve la misma.
+     *
+     * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras?: list<ExtraArticuloTenant>, precio_minor?: int|null}>  $items
      */
-    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null): VentaPosTenant
+    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null): VentaPosTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor): VentaPosTenant {
+        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento): VentaPosTenant {
             $moneda = $items[0]['articulo']->moneda;
 
             // La propina va aparte de lo vendido: no es ingreso del negocio (ADR 0139).
@@ -43,13 +48,18 @@ class PuntoDeVentaTenant
                 'usuario_id' => $actor?->getKey(),
                 'propina_minor' => max(0, $propinaMinor),
                 'persona_id' => $comprador?->getKey(),
+                'clave_intento' => $claveIntento,
             ]);
 
             $total = 0;
-            foreach ($items as $item) {
+            foreach ($items as $n => $item) {
                 // Serializa ventas concurrentes del mismo articulo (no-sobreventa).
                 $articulo = ArticuloTenant::query()->whereKey($item['articulo']->getKey())->lockForUpdate()->firstOrFail();
                 $cantidad = max(1, $item['cantidad']);
+                // Se desactivó con el carrito abierto: ya no se vende.
+                if (! $articulo->activo) {
+                    throw ValidationException::withMessages(["items.{$n}.articulo_id" => ["«{$articulo->nombre}» ya no está a la venta: quítalo de la venta."]]);
+                }
 
                 $stock = $this->inventario->stock($articulo->getKey(), $sucursal->getKey());
                 if ($stock < $cantidad) {
@@ -61,6 +71,11 @@ class PuntoDeVentaTenant
                     'id' => $e->ulid, 'nombre' => $e->nombre, 'precio_minor' => $e->precio_minor,
                 ], $item['extras'] ?? []);
                 $extrasMinor = array_sum(array_column($extras, 'precio_minor'));
+                // Cambió su precio (o el de un extra) con el carrito abierto: se revisa.
+                $esperado = $item['precio_minor'] ?? null;
+                if ($esperado !== null && $esperado !== $articulo->precio_minor + $extrasMinor) {
+                    throw ValidationException::withMessages(["items.{$n}.precio_minor" => ["Cambió el precio de «{$articulo->nombre}»: revisa el total y vuelve a cobrar."]]);
+                }
                 $subtotal = ($articulo->precio_minor + $extrasMinor) * $cantidad;
                 $total += $subtotal;
 

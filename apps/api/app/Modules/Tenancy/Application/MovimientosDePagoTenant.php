@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\ConceptoDeCobro;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -426,9 +427,9 @@ class MovimientosDePagoTenant
         /** @var array<string, array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, propinas_minor: int, propinas_por_metodo: array<string, int>, por_metodo: array<string, int>, por_usuario: array<string, array{quien: string, cobrado_minor: int, devuelto_minor: int}>}> $por */
         $por = [];
         $vacio = static fn (string $moneda): array => ['moneda' => $moneda, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0, 'por_cobrar_minor' => 0, 'propinas_minor' => 0, 'propinas_por_metodo' => [], 'por_metodo' => [], 'por_usuario' => []];
-        $sumar = function (string $moneda, ?string $metodo, int $monto, string $quien) use (&$por, $vacio): void {
+        $sumar = function (string $moneda, ?string $metodo, int $monto, string $quien, ?string $proveedor = null) use (&$por, $vacio): void {
             $por[$moneda] ??= $vacio($moneda);
-            $etiqueta = MetodoPago::tryFrom((string) $metodo)?->etiqueta() ?? ucfirst($metodo !== null && $metodo !== '' ? $metodo : 'Otro');
+            $etiqueta = self::etiquetaMetodo($metodo, $proveedor);
             $por[$moneda]['por_metodo'][$etiqueta] = ($por[$moneda]['por_metodo'][$etiqueta] ?? 0) + $monto;
             $por[$moneda]['por_usuario'][$quien] ??= ['quien' => $quien, 'cobrado_minor' => 0, 'devuelto_minor' => 0];
             if ($monto >= 0) {
@@ -454,7 +455,7 @@ class MovimientosDePagoTenant
                 $quien = $f->registrado_por !== null
                     ? ($nombres[(int) $f->registrado_por]['nombre'] ?? 'Sistema')
                     : ((int) $f->automatico === 1 ? 'Pago automático' : 'En línea');
-                $sumar((string) $f->moneda, ($f->metodo ?? null) ?: ($f->proveedor ?? null), (int) $f->total, $quien);
+                $sumar((string) $f->moneda, ($f->metodo ?? null) ?: ($f->proveedor ?? null), (int) $f->total, $quien, $f->proveedor ?? null);
             }
         }
 
@@ -473,7 +474,7 @@ class MovimientosDePagoTenant
                 $quien = $f->actor_id !== null
                     ? ($nombres[(int) $f->actor_id]['nombre'] ?? 'Sistema')
                     : ((string) ($f->actor_nombre ?? '') !== '' ? (string) $f->actor_nombre : 'Sistema');
-                $sumar((string) $f->moneda, ($f->metodo ?? null) ?: ($f->proveedor ?? null), -((int) $f->total), $quien);
+                $sumar((string) $f->moneda, ($f->metodo ?? null) ?: ($f->proveedor ?? null), -((int) $f->total), $quien, $f->proveedor ?? null);
             }
         }
 
@@ -494,7 +495,7 @@ class MovimientosDePagoTenant
                 $propinas = (int) $f->propinas;
                 if ($propinas > 0) {
                     $moneda = (string) $f->moneda;
-                    $etiqueta = MetodoPago::tryFrom((string) $f->metodo_pago)?->etiqueta() ?? ucfirst((string) ($f->metodo_pago ?: 'Otro'));
+                    $etiqueta = self::etiquetaMetodo($f->metodo_pago ?? null, null);
                     $por[$moneda]['propinas_minor'] += $propinas;
                     $por[$moneda]['propinas_por_metodo'][$etiqueta] = ($por[$moneda]['propinas_por_metodo'][$etiqueta] ?? 0) + $propinas;
                 }
@@ -579,5 +580,20 @@ class MovimientosDePagoTenant
         }
 
         return ConceptoDeCobro::deLaSesion($orden) ?? ($orden?->renueva_acuerdo_id !== null ? 'Renovación' : 'Compra');
+    }
+
+    /**
+     * Cómo se llama una forma de pago en el corte. La tarjeta con la terminal del
+     * negocio (cobros en caja y mostrador) va aparte de la tarjeta en línea (por la
+     * pasarela): la primera se cuadra con el voucher de la terminal; la otra, no.
+     */
+    private static function etiquetaMetodo(?string $metodo, ?string $proveedor): string
+    {
+        $tipo = MetodoPago::tryFrom((string) $metodo);
+        if ($tipo === MetodoPago::Tarjeta) {
+            return in_array((string) $proveedor, ProveedorPasarela::enLinea(), true) ? 'Tarjeta en línea' : 'Tarjeta (terminal)';
+        }
+
+        return $tipo?->etiqueta() ?? ucfirst($metodo !== null && $metodo !== '' ? $metodo : 'Otro');
     }
 }

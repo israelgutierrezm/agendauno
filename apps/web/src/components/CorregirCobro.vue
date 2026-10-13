@@ -38,7 +38,7 @@ const props = withDefaults(
   {
     urlMetodo: undefined,
     urlAnular: undefined,
-    metodos: () => ["efectivo", "transferencia", "manual"],
+    metodos: () => ["efectivo", "tarjeta", "transferencia", "ventanilla"],
     permisoMetodo: "ordenes.gestionar",
     contexto: "cobro",
   },

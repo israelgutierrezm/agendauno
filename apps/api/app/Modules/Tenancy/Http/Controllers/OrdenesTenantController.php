@@ -33,7 +33,8 @@ class OrdenesTenantController
 {
     private const POR_PAGINA = 25;
 
-    private const METODOS = ['efectivo', 'transferencia', 'ventanilla', 'manual'];
+    // `tarjeta`: cobrada con la terminal del negocio (no por la pasarela en línea).
+    private const METODOS = ['efectivo', 'transferencia', 'tarjeta', 'ventanilla', 'manual'];
 
     public function __construct(
         private readonly OrdenesTenant $ordenes,

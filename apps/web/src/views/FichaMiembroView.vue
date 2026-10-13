@@ -1252,7 +1252,12 @@ const regreso = useRegreso({
                       >
                         {{ fecha(o.fecha)
                         }}<span v-if="o.metodo_pago">
-                          · {{ o.metodo_pago }}</span
+                          ·
+                          {{
+                            $te(`agendaVisual.cita.metodos.${o.metodo_pago}`)
+                              ? $t(`agendaVisual.cita.metodos.${o.metodo_pago}`)
+                              : o.metodo_pago
+                          }}</span
                         >
                       </p>
                     </div>

@@ -39,7 +39,7 @@ class VentaPosTenant extends Model
 
     protected $fillable = [
         'sucursal_id', 'total_minor', 'moneda', 'metodo_pago', 'usuario_id', 'anulada_en', 'anulada_por', 'motivo_anulacion',
-        'propina_minor', 'recibido_minor', 'persona_id', 'ticket_enviado_en',
+        'propina_minor', 'recibido_minor', 'persona_id', 'ticket_enviado_en', 'clave_intento',
     ];
 
     /**

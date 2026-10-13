@@ -1813,6 +1813,8 @@ export default {
     },
     metodos: {
       efectivo: "Efectivo",
+      // Con la terminal del negocio (no por la pasarela en línea).
+      tarjeta: "Tarjeta (terminal)",
       transferencia: "Transferencia",
       ventanilla: "Ventanilla",
     },
@@ -2182,8 +2184,7 @@ export default {
       guardar: "Guardar llave",
       guardando: "Guardando…",
       guardado: "Configuración guardada.",
-      ayuda:
-        "Se guarda cifrada y nunca se vuelve a mostrar.",
+      ayuda: "Se guarda cifrada y nunca se vuelve a mostrar.",
       // Quitarla detiene la facturación de todos: se confirma (ADR 0132).
       quitar: "Quitar llave",
       confirmarQuitar:
@@ -2765,6 +2766,7 @@ export default {
       vender: "Vender / cobrar",
       elegirProducto: "Elige un producto o membresía",
       efectivo: "Efectivo",
+      tarjeta: "Tarjeta (terminal)",
       transferencia: "Transferencia",
       cobrar: "Cobrar",
       cobrando: "Cobrando…",

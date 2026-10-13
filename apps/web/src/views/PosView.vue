@@ -16,7 +16,7 @@ import TarjetasIndicadores, {
 import VentasMostrador, {
   type ResumenVentas,
 } from "@/components/VentasMostrador.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoComprador } from "@/lib/mostrador";
@@ -336,6 +336,41 @@ function cambiarSucursal(): void {
   reiniciarCobro();
 }
 
+// La clave del intento de cobro: si la respuesta se pierde y se vuelve a cobrar, el
+// servidor devuelve la misma venta (no la registra dos veces). Se renueva al vender
+// o al vaciar el carrito.
+let claveIntento: string | null = null;
+function nuevaClave(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+watch(
+  () => carrito.value.length,
+  (n) => {
+    if (n === 0) {
+      claveIntento = null;
+    }
+  },
+);
+
+// Cambió un precio o se desactivó un producto con el carrito abierto: se refrescan
+// los productos y los precios del carrito, y se pide revisar el total.
+function refrescarCarrito(): void {
+  carrito.value = carrito.value
+    .map((l) => {
+      const a = articulos.value.find((x) => x.id === l.id);
+      if (!a || !a.activo) {
+        return null;
+      }
+      const extras = l.extras.map(
+        (e) => (a.extras ?? []).find((x) => x.id === e.id) ?? e,
+      );
+      return { ...l, precio: a.precio_minor, extras };
+    })
+    .filter((l): l is Linea => l !== null);
+}
+
 async function cobrar(): Promise<void> {
   if (carrito.value.length === 0 || sucursalSel.value === "") {
     return;
@@ -358,16 +393,20 @@ async function cobrar(): Promise<void> {
   }
   cobrando.value = true;
   error.value = null;
+  claveIntento ??= nuevaClave();
   try {
     const { data } = await api.post<{
       data: { cambio_minor: number | null; ticket_enviado_en?: string | null };
     }>(`${base.value}/pos/ventas`, {
+      clave_intento: claveIntento,
       sucursal_id: sucursalSel.value,
       metodo_pago: metodo.value,
       items: carrito.value.map((l) => ({
         articulo_id: l.id,
         cantidad: l.cantidad,
         extras: l.extras.map((e) => e.id),
+        // Lo que se mostró por pieza: si cambió, el servidor pide revisarlo.
+        precio_minor: precioLinea(l),
       })),
       propina_minor: propinaMinor.value,
       recibido_minor: recibidoMinor.value,
@@ -386,10 +425,24 @@ async function cobrar(): Promise<void> {
         : t("pos.vendido")) + ticket,
     );
     carrito.value = [];
+    claveIntento = null;
     reiniciarCobro();
     await Promise.all([cargar(), listaVentas.value?.cargar()]);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    const mensaje = mensajeDeError(e);
+    error.value = mensaje;
+    // Un precio que cambió o un producto que se desactivó: se trae lo vigente (y el
+    // aviso se conserva para que se revise el total).
+    const campos = camposConError(e);
+    if (
+      campos.some(
+        (c) => c.endsWith(".precio_minor") || c.endsWith(".articulo_id"),
+      )
+    ) {
+      await cargar();
+      refrescarCarrito();
+      error.value = mensaje;
+    }
   } finally {
     cobrando.value = false;
   }
