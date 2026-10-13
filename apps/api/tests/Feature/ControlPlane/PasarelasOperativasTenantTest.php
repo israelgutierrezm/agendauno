@@ -78,7 +78,7 @@ function ordenConStripeListo(array $e): string
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
 }
 
-it('Stripe, Mercado Pago y OpenPay se pueden activar, pero sin sus llaves no cobran', function (): void {
+it('Stripe, Mercado Pago y OpenPay están disponibles, pero sin sus llaves no se activan', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
 
     $pasarelas = collect($this->getJson("/api/v1/app/{$e['slug']}/pasarelas", conBearer($e['bearer']))->assertOk()->json('data'))
@@ -88,21 +88,26 @@ it('Stripe, Mercado Pago y OpenPay se pueden activar, pero sin sus llaves no cob
             ->and($pasarelas[$proveedor]['webhook_url'])->toEndWith("/webhooks/tenant/estudio-a/{$proveedor}");
     }
 
-    // Activas pero sin sus llaves: no están listas para cobrar.
+    // Sin sus llaves no se encienden (no estarían listas para cobrar).
     foreach (['openpay', 'mercadopago'] as $proveedor) {
         $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/{$proveedor}", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))
-            ->assertOk()->assertJsonPath('data.lista', false);
+            ->assertUnprocessable();
     }
     $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/openpay", [
         'activa' => true, 'modo' => 'test', 'credenciales' => ['merchant_id' => 'm123'],
+    ], conBearer($e['bearer']))->assertUnprocessable();
+    // Con algunas guardadas y apagada, sigue sin cobrar.
+    $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/openpay", [
+        'activa' => false, 'modo' => 'test', 'credenciales' => ['merchant_id' => 'm123'],
     ], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.lista', false);
 });
 
 it('Stripe sin llave secreta no cobra (antes simulaba un intento)', function (): void {
     Http::fake();
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    // No se activa sin ella, y sin pasarela activa no se intenta cobrar.
     $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/stripe", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.lista', false);
+        ->assertUnprocessable();
     $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
         'comprador_id' => crearMiembroTenant($e, 'Ana'), 'items' => [['producto_id' => crearPackTenant($e, 8000), 'cantidad' => 1]],
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
