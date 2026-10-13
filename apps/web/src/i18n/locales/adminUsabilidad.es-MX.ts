@@ -32,7 +32,6 @@ export default {
   registroManual: "Registro manual",
   prospectosAyuda:
     "Organiza contactos interesados, solicitudes y seguimientos para acompañarlos hasta su primera compra o reserva.",
-  clasesIncluidas: "{n} clases incluidas",
   configurarConexion: "Configurar conexión",
   credenciales: {
     secret_key: "Clave secreta",

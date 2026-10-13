@@ -500,4 +500,66 @@ describe("ventas recientes del mostrador", () => {
         .items[0]!.precio_minor,
     ).toBe(30000);
   });
+
+  it("cambiar de sucursal a media venta pide confirmación; si no, la venta sigue en su sede", async () => {
+    const enDos = {
+      ...ARTICULOS[0],
+      existencias: [
+        { sucursal_id: "s1", sucursal: "Roma Norte", stock: 2 },
+        { sucursal_id: "s2", sucursal: "Condesa", stock: 5 },
+      ],
+    };
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/pos/ventas")
+          ? { data: [], meta: { ...META, total: 0 } }
+          : {
+              data: url.endsWith("/sucursales")
+                ? [
+                    { id: "s1", nombre: "Roma Norte" },
+                    { id: "s2", nombre: "Condesa" },
+                  ]
+                : url.endsWith("/articulos")
+                  ? [enDos]
+                  : [],
+            },
+      }),
+    );
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    // La sede de la venta, a la vista aunque la barra diga «Todas».
+    expect(w.get('[data-prueba="sucursal-venta"]').text()).toContain(
+      "Roma Norte",
+    );
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await flushPromises();
+    expect(w.findAll('[data-prueba="linea-venta"]')).toHaveLength(1);
+
+    mocks.confirmar.mockResolvedValueOnce(false);
+    const select = w.get('[data-prueba="sucursal-pos"]');
+    await select.setValue("s2");
+    await flushPromises();
+    expect(mocks.confirmar).toHaveBeenCalledWith(
+      expect.stringContaining("Condesa"),
+      expect.objectContaining({ peligro: true }),
+    );
+    expect(w.findAll('[data-prueba="linea-venta"]')).toHaveLength(1);
+    expect((select.element as HTMLSelectElement).value).toBe("s1");
+
+    // Aceptando, cambia de sede y la venta empieza de nuevo.
+    await select.setValue("s2");
+    await flushPromises();
+    expect(w.findAll('[data-prueba="linea-venta"]')).toHaveLength(0);
+    expect(w.get('[data-prueba="sucursal-venta"]').text()).toContain("Condesa");
+  });
+
+  it("en el teléfono lo de hoy va en una línea y la barra lleva a la venta", async () => {
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    expect(w.get('[data-prueba="resumen-hoy"]').text()).toContain("3 ventas");
+    expect(w.find('[data-prueba="barra-cobro"]').exists()).toBe(false);
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await flushPromises();
+    expect(w.get('[data-prueba="barra-cobro"]').text()).toContain("280");
+  });
 });

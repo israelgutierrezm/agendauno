@@ -58,7 +58,8 @@ export default {
     llena: "Llena",
     enEspera: "{n} en espera",
     quedan: "Quedan {n}",
-    baja: "Baja",
+    // Pocos reservados (no «baja» de cancelación).
+    baja: "Ocupación baja",
     enCurso: "En curso",
     cancelada: "Cancelada",
   },

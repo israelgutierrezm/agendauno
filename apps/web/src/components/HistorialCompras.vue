@@ -64,6 +64,8 @@ function fecha(iso: string | null | undefined): string {
         day: "numeric",
         month: "short",
         year: "numeric",
+        // El día del negocio, no el del navegador.
+        timeZone: sesion.zonaHoraria || undefined,
       }).format(new Date(iso))
     : "";
 }
