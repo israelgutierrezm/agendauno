@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -42,20 +43,8 @@ class FichaMiembroTenantController
 
     public function __invoke(Request $request): JsonResponse
     {
-        // Su historial se consulta aunque esté dada de baja.
-        $persona = PersonaTenant::withTrashed()
-            ->with('sucursal')
-            ->where('ulid', (string) $request->route('persona'))
-            ->firstOrFail();
-
-        // Alcance por sucursal (R19): un acotado no abre la ficha de un alumno de otra sede.
+        $persona = $this->personaVisible($request);
         $actor = $request->attributes->get('usuario_tenant');
-        abort_unless(
-            ! $actor instanceof Usuario || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
-            403,
-        );
-        // Quien imparte solo abre a sus clientes (quienes reservaron sus sesiones).
-        abort_unless($this->alcance->puedeVer($persona, $actor instanceof Usuario ? $actor : null), 403);
 
         return response()->json(['data' => [
             'persona' => [
@@ -84,6 +73,92 @@ class FichaMiembroTenantController
             // Todo lo que debe (sin tope), para cobrarlo desde la ficha.
             'pendientes' => $this->veDinero($actor) ? $this->pendientes($persona) : null,
         ]]);
+    }
+
+    /**
+     * Todo su historial de reservas por páginas (la ficha trae las últimas 20), de la
+     * más reciente; se filtra por estado.
+     */
+    public function historialReservas(Request $request): JsonResponse
+    {
+        $persona = $this->personaVisible($request);
+        $filtros = $request->validate([
+            'estado' => ['nullable', 'string', 'max:30'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $pagina = ReservaTenant::query()
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->where('reservas.persona_id', $persona->getKey())
+            ->when(($filtros['estado'] ?? '') !== '', fn ($q) => $q->where('reservas.estado', $filtros['estado']))
+            ->orderByDesc('sesiones.inicia_en')
+            ->orderByDesc('reservas.id')
+            ->select('reservas.*')
+            ->with(['sesion.oferta', 'sesion.instructor', 'asistencia'])
+            ->paginate((int) ($filtros['per_page'] ?? 25), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+
+        return response()->json([
+            'data' => $pagina->getCollection()->map(fn (ReservaTenant $r): array => $this->presentarReserva($r))->all(),
+            'meta' => self::metaDe($pagina),
+        ]);
+    }
+
+    /**
+     * Todo su historial de compras por páginas (la ficha trae las últimas 20). Solo
+     * para quien puede ver órdenes.
+     */
+    public function historialOrdenes(Request $request): JsonResponse
+    {
+        $persona = $this->personaVisible($request);
+        abort_unless($this->veDinero($request->attributes->get('usuario_tenant')), 403);
+        $filtros = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $pagina = OrdenTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor'])
+            ->orderByDesc('id')
+            ->paginate((int) ($filtros['per_page'] ?? 25), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+
+        return response()->json([
+            'data' => $pagina->getCollection()->map(fn (OrdenTenant $o): array => $this->presentarOrden($o))->all(),
+            'meta' => self::metaDe($pagina),
+        ]);
+    }
+
+    /**
+     * La persona de la ruta, si quien consulta puede verla: un acotado solo a las de
+     * sus sedes (R19) y quien imparte solo a sus clientes. Aunque esté dada de baja.
+     */
+    private function personaVisible(Request $request): PersonaTenant
+    {
+        $persona = PersonaTenant::withTrashed()
+            ->with('sucursal')
+            ->where('ulid', (string) $request->route('persona'))
+            ->firstOrFail();
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless(
+            ! $actor instanceof Usuario || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
+            403,
+        );
+        abort_unless($this->alcance->puedeVer($persona, $actor instanceof Usuario ? $actor : null), 403);
+
+        return $persona;
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, *>  $pagina
+     * @return array{total: int, page: int, per_page: int, ultima_pagina: int}
+     */
+    private static function metaDe(LengthAwarePaginator $pagina): array
+    {
+        return [
+            'total' => $pagina->total(),
+            'page' => $pagina->currentPage(),
+            'per_page' => $pagina->perPage(),
+            'ultima_pagina' => $pagina->lastPage(),
+        ];
     }
 
     private function veDinero(mixed $actor): bool
@@ -146,7 +221,15 @@ class FichaMiembroTenantController
             ->limit(self::HISTORIAL)
             ->get();
 
-        return $reservas->map(fn (ReservaTenant $reserva): array => [
+        return $reservas->map(fn (ReservaTenant $reserva): array => $this->presentarReserva($reserva))->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarReserva(ReservaTenant $reserva): array
+    {
+        return [
             'id' => $reserva->ulid,
             'clase' => $reserva->sesion?->oferta?->nombre,
             // Clase o cita, y con quién: en citas, el servicio y el profesional habituales.
@@ -159,7 +242,7 @@ class FichaMiembroTenantController
             'retardo' => (bool) $reserva->asistencia?->retardo,
             // Quién canceló (cliente, negocio o sistema), si se canceló.
             'cancelada_por' => $reserva->cancelada_por,
-        ])->all();
+        ];
     }
 
     /**

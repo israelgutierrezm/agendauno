@@ -6,6 +6,7 @@ import { RouterLink, useRoute } from "vue-router";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -45,11 +46,32 @@ const estado = ref<"" | "por_vencer" | "vencida">(
     ? rutaActual.query.estado
     : "",
 );
-const visibles = computed(() =>
-  estado.value === ""
-    ? miembros.value
-    : miembros.value.filter((m) => m.estado === estado.value),
-);
+// El estado, la búsqueda y las páginas los resuelve el API (antes, todo en pantalla).
+const visibles = computed(() => miembros.value);
+const buscar = ref("");
+const pagina = ref(1);
+const meta = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
+function irPagina(n: number): void {
+  pagina.value = n;
+  void cargar();
+}
+let espera: ReturnType<typeof setTimeout> | undefined;
+watch(buscar, () => {
+  clearTimeout(espera);
+  espera = setTimeout(() => {
+    pagina.value = 1;
+    void cargar();
+  }, 300);
+});
+watch(estado, () => {
+  pagina.value = 1;
+  void cargar();
+});
 const cargando = ref(true);
 const error = ref<string | null>(null);
 // "No pudimos consultar" y "no hay pendientes" nunca deben verse igual.
@@ -96,12 +118,22 @@ async function cargar(): Promise<void> {
   errorCarga.value = false;
   try {
     const { data } = await api.get<{
-      data: { resumen: Resumen; miembros: Miembro[] };
+      data: {
+        resumen: Resumen;
+        miembros: Miembro[];
+        meta?: typeof meta.value;
+      };
     }>(`${base.value}/retencion/por-vencer`, {
-      params: { dias: dias.value },
+      params: {
+        dias: dias.value,
+        page: pagina.value,
+        ...(estado.value !== "" ? { estado: estado.value } : {}),
+        ...(buscar.value.trim() !== "" ? { q: buscar.value.trim() } : {}),
+      },
     });
     miembros.value = data.data.miembros;
     resumen.value = data.data.resumen;
+    meta.value = data.data.meta ?? null;
   } catch {
     errorCarga.value = true;
     miembros.value = [];
@@ -134,7 +166,10 @@ async function exportar(): Promise<void> {
   }
 }
 
-watch(dias, cargar);
+watch(dias, () => {
+  pagina.value = 1;
+  void cargar();
+});
 onMounted(cargar);
 </script>
 
@@ -196,10 +231,21 @@ onMounted(cargar);
           <option value="vencida">{{ $t("retencion.vencidas") }}</option>
         </select>
       </label>
+      <input
+        v-model="buscar"
+        type="search"
+        class="tu-input w-56"
+        :placeholder="$t('operacion.listadosTres.buscarPadron')"
+        :aria-label="$t('operacion.listadosTres.buscarPadron')"
+        data-prueba="buscar-retencion"
+      />
       <button
         class="tu-btn tu-btn-primario"
         type="button"
-        :disabled="exportando || miembros.length === 0"
+        :disabled="
+          exportando ||
+          (resumen?.por_vencer ?? 0) + (resumen?.vencidas ?? 0) === 0
+        "
         @click="exportar"
       >
         {{ exportando ? $t("retencion.exportando") : $t("retencion.exportar") }}
@@ -324,6 +370,14 @@ onMounted(cargar);
             </tr>
           </tbody>
         </table>
+        <PaginacionListado
+          v-if="meta && meta.ultima_pagina > 1"
+          :page="meta.page"
+          :ultima-pagina="meta.ultima_pagina"
+          :total="meta.total"
+          :per-page="meta.per_page"
+          @ir="irPagina"
+        />
       </div>
     </template>
   </section>

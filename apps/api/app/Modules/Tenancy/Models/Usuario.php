@@ -116,6 +116,32 @@ class Usuario extends Authenticatable
     }
 
     /**
+     * Solo clientes (su único rol es `miembro`): los que el negocio invitó a su portal.
+     *
+     * @param  Builder<Usuario>  $consulta
+     */
+    public function scopeSoloClientes(Builder $consulta): void
+    {
+        $consulta->where(fn (Builder $q) => $q
+            ->where(fn (Builder $sinLista) => $sinLista
+                ->where(fn (Builder $vacia) => $vacia->whereNull('roles')->orWhereJsonLength('roles', 0))
+                ->where('rol', 'miembro'))
+            ->orWhere(fn (Builder $soloMiembro) => $soloMiembro
+                ->whereJsonLength('roles', 1)
+                ->whereJsonContains('roles', 'miembro')));
+    }
+
+    /**
+     * El equipo: quien tiene algún rol que no es solo de cliente.
+     *
+     * @param  Builder<Usuario>  $consulta
+     */
+    public function scopeEquipo(Builder $consulta): void
+    {
+        $consulta->whereNot(fn (Builder $q) => $q->soloClientes());
+    }
+
+    /**
      * Roles vigentes del usuario. Usa `roles` (multi) y, si aún no está poblado,
      * cae al rol único `rol` (compatibilidad durante la transición).
      *

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -50,6 +51,34 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 // Lista del equipo o de los dados de baja.
 const verBajas = ref(false);
+// El equipo (acotado, completo y con filtros en pantalla) aparte de los clientes con
+// cuenta en su portal, que crecen con el negocio: por páginas y buscando en el API.
+const alcance = ref<"equipo" | "clientes">("equipo");
+const buscarClientes = ref("");
+const paginaClientes = ref(1);
+const metaUsuarios = ref<{
+  conteos?: { equipo: number; clientes: number };
+  total?: number;
+  page?: number;
+  per_page?: number;
+  ultima_pagina?: number;
+} | null>(null);
+function irPaginaClientes(n: number): void {
+  paginaClientes.value = n;
+  void cargar();
+}
+watch(alcance, () => {
+  paginaClientes.value = 1;
+  void cargar();
+});
+let esperaClientes: ReturnType<typeof setTimeout> | undefined;
+watch(buscarClientes, () => {
+  clearTimeout(esperaClientes);
+  esperaClientes = setTimeout(() => {
+    paginaClientes.value = 1;
+    void cargar();
+  }, 300);
+});
 
 // La asignación por sede solo aplica con varias sucursales (con una, es moot).
 const hayMultiSucursal = computed(() => sucursales.value.length > 1);
@@ -129,12 +158,25 @@ async function cargar(): Promise<void> {
           nombre: string | null;
           sistema: boolean;
         }[];
+        meta?: typeof metaUsuarios.value;
       }>(`${base.value}/usuarios`, {
-        params: { estado: verBajas.value ? "baja" : undefined },
+        params: {
+          estado: verBajas.value ? "baja" : undefined,
+          alcance: alcance.value,
+          ...(alcance.value === "clientes"
+            ? {
+                page: paginaClientes.value,
+                ...(buscarClientes.value.trim() !== ""
+                  ? { q: buscarClientes.value.trim() }
+                  : {}),
+              }
+            : {}),
+        },
       }),
       api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
     ]);
     usuarios.value = u.data.data;
+    metaUsuarios.value = u.data.meta ?? null;
     rolesDisponibles.value = u.data.roles;
     nombresPropios.value = Object.fromEntries(
       (u.data.roles_detalle ?? [])
@@ -360,10 +402,32 @@ onMounted(cargar);
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion
       :titulo="$t('usuarios.titulo')"
-      :total="usuarios.length"
+      :total="
+        metaUsuarios?.conteos
+          ? metaUsuarios.conteos.equipo + metaUsuarios.conteos.clientes
+          : usuarios.length
+      "
     />
 
-    <div class="mt-2 flex justify-end">
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
+      <div class="tu-segmentado" role="group" data-prueba="alcance-usuarios">
+        <button
+          v-for="a in ['equipo', 'clientes'] as const"
+          :key="a"
+          type="button"
+          :aria-pressed="alcance === a"
+          :data-prueba="`usuarios-${a}`"
+          @click="alcance = a"
+        >
+          {{ $t(`operacion.usuarios.${a}`) }}
+          <span
+            v-if="metaUsuarios?.conteos"
+            class="ml-1 tabular-nums"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ metaUsuarios.conteos[a] }}</span
+          >
+        </button>
+      </div>
       <button type="button" class="tu-enlace text-sm" @click="alternarBajas">
         {{ verBajas ? $t("bajas.verEquipo") : $t("bajas.verBajas") }}
       </button>
@@ -376,15 +440,30 @@ onMounted(cargar);
       {{ error }}
     </AvisoTono>
 
+    <input
+      v-if="alcance === 'clientes'"
+      v-model="buscarClientes"
+      type="search"
+      class="tu-input mt-4 max-w-sm"
+      :placeholder="$t('operacion.usuarios.buscarClientes')"
+      :aria-label="$t('operacion.usuarios.buscarClientes')"
+      data-prueba="buscar-clientes-usuarios"
+    />
     <TablaDatos
       v-if="!cargando && error === null"
       class="mt-6"
       :columnas="columnas"
       :filas="usuarios"
+      :buscar="alcance === 'equipo'"
       :buscar-en="['nombre', 'email']"
-      :filtros="filtrosDef"
+      :filtros="alcance === 'equipo' ? filtrosDef : undefined"
       :filtrar-fila="filtrarUsuario"
-      :vacio="$t('usuarios.vacio')"
+      :por-pagina="alcance === 'clientes' ? (metaUsuarios?.per_page ?? 25) : 10"
+      :vacio="
+        alcance === 'clientes' && buscarClientes.trim() !== ''
+          ? $t('operacion.listadosDos.sinResultados')
+          : $t('usuarios.vacio')
+      "
       clave-vista="usuarios"
     >
       <template #col-nombre="{ fila }">
@@ -475,6 +554,18 @@ onMounted(cargar);
         </div>
       </template>
     </TablaDatos>
+    <PaginacionListado
+      v-if="
+        alcance === 'clientes' &&
+        metaUsuarios?.ultima_pagina !== undefined &&
+        metaUsuarios.ultima_pagina > 1
+      "
+      :page="metaUsuarios.page ?? 1"
+      :ultima-pagina="metaUsuarios.ultima_pagina"
+      :total="metaUsuarios.total ?? 0"
+      :per-page="metaUsuarios.per_page ?? 25"
+      @ir="irPaginaClientes"
+    />
 
     <!-- Editar roles y sedes (drawer lateral) -->
     <PanelLateral

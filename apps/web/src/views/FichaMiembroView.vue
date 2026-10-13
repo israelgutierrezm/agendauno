@@ -13,6 +13,7 @@ import ExpedientePersona from "@/components/ExpedientePersona.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import RegistrarPagoOrden, {
   type CuotaPorCobrar,
@@ -368,6 +369,46 @@ async function reanudar(d: Derecho): Promise<void> {
 
 const resumen = ref<Resumen | null>(null);
 const ficha = ref<Ficha | null>(null);
+// La ficha trae las últimas 20 reservas y compras; «Ver todo» trae el resto por páginas.
+const HISTORIAL_FICHA = 20;
+interface MetaHistorial {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+}
+const todasReservas = ref<{ lista: Reserva[]; meta: MetaHistorial } | null>(
+  null,
+);
+const todasOrdenes = ref<{ lista: Orden[]; meta: MetaHistorial } | null>(null);
+const reservasVisibles = computed(
+  () => todasReservas.value?.lista ?? ficha.value?.reservas ?? [],
+);
+const ordenesVisibles = computed(
+  () => todasOrdenes.value?.lista ?? ficha.value?.ordenes ?? [],
+);
+async function verTodasReservas(page = 1): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: Reserva[]; meta: MetaHistorial }>(
+      `/api/v1/app/${sesion.slug}/miembros/${personaId.value}/historial/reservas`,
+      { params: { page } },
+    );
+    todasReservas.value = { lista: data.data, meta: data.meta };
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+async function verTodasOrdenes(page = 1): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: Orden[]; meta: MetaHistorial }>(
+      `/api/v1/app/${sesion.slug}/miembros/${personaId.value}/historial/ordenes`,
+      { params: { page } },
+    );
+    todasOrdenes.value = { lista: data.data, meta: data.meta };
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
 
 // Membresías y paquetes: lo vigente (no cancelado ni vencido) va primero con su
 // saldo; lo demás es historial y se abre aparte. El saldo no suma lo vencido.
@@ -1170,7 +1211,7 @@ const regreso = useRegreso({
                   }}
                 </h2>
                 <p
-                  v-if="ficha.reservas.length === 0"
+                  v-if="reservasVisibles.length === 0"
                   class="mt-2 text-sm"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
@@ -1178,7 +1219,7 @@ const regreso = useRegreso({
                 </p>
                 <ul v-else class="mt-1">
                   <li
-                    v-for="r in ficha.reservas"
+                    v-for="r in reservasVisibles"
                     :key="r.id"
                     class="fi-fila"
                     :style="{ borderColor: 'var(--borde)' }"
@@ -1217,6 +1258,26 @@ const regreso = useRegreso({
                     >
                   </li>
                 </ul>
+                <button
+                  v-if="
+                    todasReservas === null &&
+                    ficha.reservas.length >= HISTORIAL_FICHA
+                  "
+                  type="button"
+                  class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico mt-3"
+                  data-prueba="ver-todas-reservas"
+                  @click="verTodasReservas()"
+                >
+                  {{ $t("operacion.ficha.verTodo") }}
+                </button>
+                <PaginacionListado
+                  v-if="todasReservas && todasReservas.meta.ultima_pagina > 1"
+                  :page="todasReservas.meta.page"
+                  :ultima-pagina="todasReservas.meta.ultima_pagina"
+                  :total="todasReservas.meta.total"
+                  :per-page="todasReservas.meta.per_page"
+                  @ir="verTodasReservas"
+                />
               </section>
 
               <!-- Historial de compras (solo a quien puede ver órdenes) -->
@@ -1229,7 +1290,7 @@ const regreso = useRegreso({
                   {{ $t("ficha.ordenes.titulo") }}
                 </h2>
                 <p
-                  v-if="(ficha.ordenes ?? []).length === 0"
+                  v-if="ordenesVisibles.length === 0"
                   class="mt-2 text-sm"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
@@ -1237,7 +1298,7 @@ const regreso = useRegreso({
                 </p>
                 <ul v-else class="mt-1">
                   <li
-                    v-for="o in ficha.ordenes ?? []"
+                    v-for="o in ordenesVisibles"
                     :key="o.id"
                     class="fi-fila"
                     :style="{ borderColor: 'var(--borde)' }"
@@ -1277,6 +1338,26 @@ const regreso = useRegreso({
                     </div>
                   </li>
                 </ul>
+                <button
+                  v-if="
+                    todasOrdenes === null &&
+                    (ficha.ordenes ?? []).length >= HISTORIAL_FICHA
+                  "
+                  type="button"
+                  class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico mt-3"
+                  data-prueba="ver-todas-ordenes"
+                  @click="verTodasOrdenes()"
+                >
+                  {{ $t("operacion.ficha.verTodo") }}
+                </button>
+                <PaginacionListado
+                  v-if="todasOrdenes && todasOrdenes.meta.ultima_pagina > 1"
+                  :page="todasOrdenes.meta.page"
+                  :ultima-pagina="todasOrdenes.meta.ultima_pagina"
+                  :total="todasOrdenes.meta.total"
+                  :per-page="todasOrdenes.meta.per_page"
+                  @ir="verTodasOrdenes"
+                />
               </section>
 
               <!-- Compras en mostrador (ADR 0145) -->
