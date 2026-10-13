@@ -622,7 +622,16 @@ export default {
     hasta: "Hasta",
     asignada: "Asignada a {nombre}",
     marcarCompletada: "Marcar «{titulo}» como completada",
-    reabrirTarea: "Reabrir «{titulo}»",
+    reabrirTarea: "Regresar «{titulo}» a pendientes",
+    // Completar y regresar se confirman: un clic de más no cambia nada.
+    confirmarCompletar: "¿Marcar «{titulo}» como completada?",
+    completarAceptar: "Sí, completar",
+    completadaAviso: "Tarea completada",
+    confirmarReabrir: "¿Regresar «{titulo}» a pendientes?",
+    reabrirAceptar: "Sí, regresar",
+    reabiertaAviso: "La tarea volvió a pendientes",
+    completar: "Completar",
+    regresar: "Regresar a pendientes",
     cargando: "Cargando tareas…",
     todoAlDia: "Todo al día",
     sinPendientesTexto:
