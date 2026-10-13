@@ -98,6 +98,7 @@ class FrontDeskTenantController
     private function metricasSesion(SesionTenant $sesion, Collection $reservas): array
     {
         $porEstado = fn (EstadoReserva $estado): int => $reservas->where('estado', $estado)->count();
+        $plataforma = CupoDeSesionTenant::ocupadosDePlataforma($sesion);
         $asistencia = fn (EstadoAsistencia $estado): int => $reservas->filter(
             fn (ReservaTenant $r): bool => $r->asistencia?->estado === $estado,
         )->count();
@@ -118,8 +119,10 @@ class FrontDeskTenantController
             'pendientes_pago' => $porEstado(EstadoReserva::PendientePago),
             'ofrecidas' => $porEstado(EstadoReserva::Ofrecida),
             'en_espera' => $porEstado(EstadoReserva::EnEspera),
-            // Lugares tomados según la regla única de cupo (B02).
-            'ocupados' => $reservas->filter(fn (ReservaTenant $r): bool => in_array($r->estado->value, CupoDeSesionTenant::OCUPAN_LUGAR, true))->count(),
+            // Lugares tomados según la regla única de cupo (B02), con quienes vienen por
+            // Wellhub o TotalPass (ADR 0148).
+            'ocupados' => $reservas->filter(fn (ReservaTenant $r): bool => in_array($r->estado->value, CupoDeSesionTenant::OCUPAN_LUGAR, true))->count() + $plataforma,
+            'plataforma' => $plataforma,
             'presentes' => $asistencia(EstadoAsistencia::Presente),
             'ausentes' => $asistencia(EstadoAsistencia::Ausente),
         ];

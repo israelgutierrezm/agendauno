@@ -450,7 +450,18 @@ export const MENU_NEGOCIO: GrupoMenu[] = [
         clave: "reportes",
         etiqueta: "nav.reportes",
         icono: "reportes",
-        vistas: [v("reportes", "reportes", "nav.reportes")],
+        vistas: [
+          v("reportes", "reportes", "nav.reportes"),
+          // Visitantes de Wellhub y TotalPass (ADR 0148): solo negocios de clases.
+          v(
+            "plataformas",
+            "reportes-plataformas",
+            "operacion.plataformas.tab",
+            {
+              modalidad: "clases",
+            },
+          ),
+        ],
       },
     ],
   },

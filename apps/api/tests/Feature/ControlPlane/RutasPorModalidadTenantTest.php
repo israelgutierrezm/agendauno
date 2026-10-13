@@ -70,6 +70,10 @@ function rutasExclusivasPorModalidad(): array
         'sesiones.checkins.index' => 'clases',
         'integraciones.index' => 'clases',
         'integraciones.upsert' => 'clases',
+        // Visitantes de Wellhub y TotalPass (ADR 0148).
+        'reportes.plataformas' => 'clases',
+        'visitantes-plataforma.index' => 'clases',
+        'visitantes-plataforma.show' => 'clases',
         'miembros.padron' => 'clases',
         // Calendario público por fecha (M02, ADR 0118).
         'calendario' => 'clases',

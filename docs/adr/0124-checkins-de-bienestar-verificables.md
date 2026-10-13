@@ -70,6 +70,8 @@ del servidor.
   «Sin verificar» y puede reintentar, o alguien con permiso registra la excepción.
 - La web dice el alcance en Integraciones y en la clase: «valida el check-in, no
   sincroniza reservas, membresías ni pagos».
+- Ampliado por el ADR 0148: visitantes de la plataforma (no personas del negocio), su
+  lugar en la clase, check-in automático y su apartado en Reportes.
 - **Pendiente:** verificar con credenciales y entorno autorizados de cada proveedor. Las
   pruebas automáticas usan respuestas simuladas según su documentación pública. La
   comunicación comercial no debe prometer más que la validación de check-in.

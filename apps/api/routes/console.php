@@ -26,6 +26,10 @@ Schedule::command('agendauno:generar-ciclos')->hourlyAt(15)->withoutOverlapping(
 // Frecuente para baja latencia; withoutOverlapping evita relays solapados.
 Schedule::command('agendauno:despachar-outbox')->everyMinute()->withoutOverlapping();
 
+// Retoma los avisos de Wellhub y TotalPass pendientes de cada negocio: el check-in
+// automático que no se procesó al llegar o que se reintenta (ADR 0148).
+Schedule::command('agendauno:procesar-plataformas')->everyMinute()->withoutOverlapping();
+
 // Reintenta las entregas de webhook fallidas de cada estudio (R40).
 Schedule::command('agendauno:reintentar-webhooks')->everyFiveMinutes()->withoutOverlapping();
 

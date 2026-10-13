@@ -59,7 +59,8 @@ class ResolverEstudio
             || ! ($estudio->estado->operativo()
                 || ($estudio->suspendidoPorRenta() && self::abiertaSuspendido($request))
                 // El aviso de una pasarela llega aunque el negocio esté suspendido: el
-                // dinero ya se movió y hay que registrarlo.
+                // dinero ya se movió y hay que registrarlo. Igual la visita de alguien de
+                // Wellhub o TotalPass: ya está en la clase.
                 || ($estudio->estado === EstadoEstudio::Suspended && self::esAvisoDePago($request)))
             || ! self::enSuProducto($request, $estudio)
             || ! self::desdeSuApp($request, $estudio)
@@ -112,9 +113,13 @@ class ResolverEstudio
             || ($negocio === $estudio->slug && $estudio->producto() === ProductoComercial::AgendaUno);
     }
 
+    /**
+     * El aviso de una pasarela o de una plataforma de bienestar (Wellhub, TotalPass;
+     * ADR 0148): llega del proveedor, no de una app ni de un dominio de producto.
+     */
     private static function esAvisoDePago(Request $request): bool
     {
-        return $request->route()?->getName() === 'api.v1.webhooks.tenant';
+        return in_array($request->route()?->getName(), ['api.v1.webhooks.tenant', 'api.v1.webhooks.bienestar'], true);
     }
 
     private static function abiertaSuspendido(Request $request): bool

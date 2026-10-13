@@ -25,6 +25,12 @@ class CheckinTenant extends Model
 
     public const EXCEPCION = 'excepcion';
 
+    /** La registró recepción con el código de la persona. */
+    public const ORIGEN_MANUAL = 'manual';
+
+    /** Llegó sola: la plataforma avisó del check-in y se validó sin intervención (ADR 0148). */
+    public const ORIGEN_AUTOMATICO = 'automatico';
+
     protected $connection = 'tenant';
 
     protected $table = 'checkins';
@@ -33,6 +39,7 @@ class CheckinTenant extends Model
         'sesion_id', 'proveedor', 'referencia_externa', 'nombre_usuario', 'estado', 'registrado_en',
         'codigo_huella', 'motivo', 'intentos', 'registrado_por_id',
         'autorizado_por_id', 'autorizado_en', 'motivo_excepcion', 'evidencia',
+        'visitante_id', 'origen',
     ];
 
     /**
@@ -50,6 +57,14 @@ class CheckinTenant extends Model
     public function sesion(): BelongsTo
     {
         return $this->belongsTo(SesionTenant::class, 'sesion_id');
+    }
+
+    /**
+     * @return BelongsTo<VisitantePlataformaTenant, $this>
+     */
+    public function visitante(): BelongsTo
+    {
+        return $this->belongsTo(VisitantePlataformaTenant::class, 'visitante_id');
     }
 
     /**

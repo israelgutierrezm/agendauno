@@ -331,6 +331,34 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   los nombres de las llaves cambiadas, nunca sus valores. Alcance: validación de
   check-in; no sincroniza reservas, membresías ni pagos (ADR 0124).
 
+### Visitantes y check-in automático (ADR 0148)
+
+- Quien llega por Wellhub o TotalPass es visitante de la plataforma, no persona del
+  negocio. Su visita ocupa lugar en la clase: cuenta en `ocupados` y `libres` de la agenda
+  y en el uso del canal de su plataforma.
+- `GET /sesiones/{sesion}/checkins` suma `visitante_id` y `origen` (`manual` o
+  `automatico`).
+- `GET` y `PUT /integraciones/{proveedor}` suman `automatico`: `aviso_url` (la dirección
+  de avisos del negocio), `listo` y `registrado_en`. Las credenciales suman
+  `webhook_secret` (Wellhub) y `place_api_key` (TotalPass). Con `place_api_key`,
+  AgendaUno registra su aviso con TotalPass al guardar.
+- `POST /api/v1/webhooks/bienestar/{estudio}/{proveedor}/{token}` (público, para la
+  plataforma):
+  - 404 sin el token del negocio o con la integración apagada;
+  - Wellhub: 401 con una firma `X-Gympass-Signature` que no es la suya;
+  - 200 al recibir el aviso (se procesa aparte). Un aviso repetido no duplica la visita.
+- `GET /reportes/plataformas?desde&hasta[&proveedor]` (`facturacion.ver`, solo clases):
+  - `resumen`: `visitas`, `validadas`, `sin_verificar`, `excepciones`, `automaticas`,
+    `sin_clase`, `visitantes`, `nuevos`;
+  - `por_proveedor`, `por_dia` y `por_clase` (las 10 con más visitas).
+- `GET /visitantes-plataforma?q&proveedor&page` (`facturacion.ver`):
+  - campos: `id`, `proveedor`, `nombre`, `email`, `telefono`, `producto`, `id_externo`,
+    `visitas`, `primera_visita_en`, `ultima_visita_en` y `es_alumno` (el negocio ya
+    registró a alguien con ese correo);
+  - `meta` con la página.
+- `GET /visitantes-plataforma/{id}`: lo mismo y `historial` (fecha, clase, estado y
+  origen de sus visitas).
+
 ## Migración guiada (C07)
 
 - Las vistas previas e importaciones de `miembros` e `instructores` devuelven `estado` por

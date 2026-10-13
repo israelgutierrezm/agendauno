@@ -64,8 +64,8 @@ it('el propietario configura Wellhub con llaves cifradas que nunca se devuelven'
         ->assertOk()
         ->assertJsonPath('data.0.proveedor', 'wellhub')
         ->assertJsonPath('data.0.activa', false)
-        ->assertJsonPath('data.0.llaves', ['api_key', 'gym_id'])
-        ->assertJsonPath('data.1.llaves', ['api_key', 'codigo_gimnasio', 'codigo_plan']);
+        ->assertJsonPath('data.0.llaves', ['api_key', 'gym_id', 'webhook_secret'])
+        ->assertJsonPath('data.1.llaves', ['api_key', 'codigo_gimnasio', 'codigo_plan', 'place_api_key']);
 
     $r = test()->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub", [
         'activa' => true, 'credenciales' => ['api_key' => 'wh_secreto_estudio', 'gym_id' => '445566'],

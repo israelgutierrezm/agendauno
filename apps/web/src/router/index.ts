@@ -314,6 +314,13 @@ const router = createRouter({
       component: () => import("@/views/ReportesView.vue"),
       meta: { requiereSesion: true },
     },
+    // Visitantes de Wellhub y TotalPass (ADR 0148), aparte de los alumnos.
+    {
+      path: "/reportes/plataformas",
+      name: "reportes-plataformas",
+      component: () => import("@/views/ReportePlataformasView.vue"),
+      meta: { requiereSesion: true },
+    },
     {
       path: "/comunicaciones",
       name: "comunicaciones",

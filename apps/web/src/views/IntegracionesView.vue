@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AutomaticoBienestar from "@/components/AutomaticoBienestar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
@@ -23,6 +24,12 @@ interface Integracion {
   // Las credenciales que pide el proveedor y las que ya se capturaron.
   llaves: string[];
   llaves_configuradas: string[];
+  // Check-in automático (ADR 0148): dónde avisa la plataforma y si ya está activo.
+  automatico?: {
+    aviso_url: string | null;
+    listo: boolean;
+    registrado_en: string | null;
+  };
 }
 interface LlaveApi {
   id: string;
@@ -51,7 +58,7 @@ interface Entrega {
 type Pestana = "bienestar" | "llaves" | "webhooks" | "medicion";
 
 // Lo secreto se captura como contraseña; los códigos (Gym ID, gimnasio, plan), no.
-const SECRETAS = new Set(["api_key"]);
+const SECRETAS = new Set(["api_key", "webhook_secret", "place_api_key"]);
 
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
@@ -383,6 +390,10 @@ onMounted(cargar);
             />
           </div>
         </div>
+        <AutomaticoBienestar
+          :proveedor="i.proveedor"
+          :automatico="i.automatico"
+        />
 
         <button
           class="tu-btn tu-btn-primario mt-4 text-sm"

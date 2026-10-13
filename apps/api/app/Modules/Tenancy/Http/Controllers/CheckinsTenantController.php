@@ -54,7 +54,7 @@ class CheckinsTenantController
         abort_unless($this->acceso->puedeOperar($sesion, $this->usuario($request)), 403);
 
         $checkins = CheckinTenant::query()
-            ->with(['registradoPor', 'autorizadoPor'])
+            ->with(['registradoPor', 'autorizadoPor', 'visitante'])
             ->where('sesion_id', $sesion->getKey())
             ->orderByDesc('id')
             ->get();
@@ -120,7 +120,11 @@ class CheckinsTenantController
         return [
             'id' => $checkin->ulid,
             'proveedor' => $checkin->proveedor,
-            'usuario' => $checkin->nombre_usuario,
+            'usuario' => $checkin->visitante->nombre ?? $checkin->nombre_usuario,
+            // Quién es en la plataforma (ADR 0148): su visitante, no una persona del negocio.
+            'visitante_id' => $checkin->visitante?->ulid,
+            // Si llegó sola (la plataforma avisó del check-in) o la registró recepción.
+            'origen' => $checkin->origen,
             'estado' => $checkin->estado,
             // Por qué no se pudo verificar (solo si quedó sin verificar).
             'motivo' => $checkin->estado === CheckinTenant::NO_VERIFICABLE ? $checkin->motivo : null,
