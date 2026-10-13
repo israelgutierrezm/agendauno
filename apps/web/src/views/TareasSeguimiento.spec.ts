@@ -16,6 +16,9 @@ vi.mock("@/stores/sesionTenant", () => ({
 }));
 const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
 vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
+// Completar y regresar a pendientes se confirman.
+const confirmar = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
 
 const seguimiento = {
   id: "t1",
@@ -293,7 +296,7 @@ describe("la bandeja de tareas", () => {
     });
   });
 
-  it("marcar una tarea la completa; un seguimiento pide su resultado", async () => {
+  it("marcar una tarea la completa al confirmar; un seguimiento pide su resultado", async () => {
     const w = montar();
     api.get.mockResolvedValue(
       respuesta([tarea("a", "Revisar el tubo", null), seguimiento]),
@@ -303,14 +306,58 @@ describe("la bandeja de tareas", () => {
     await flushPromises();
 
     const marcas = w.findAll('[data-prueba="marcar-tarea"]');
+    expect(marcas[0]!.classes()).toContain("ta-check-completar");
+    // Si no confirma, no cambia nada.
+    confirmar.mockResolvedValueOnce(false);
     await marcas[0]!.trigger("click");
     await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
+
+    await marcas[0]!.trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenLastCalledWith(
+      "¿Marcar «Revisar el tubo» como completada?",
+      { aceptar: "Sí, completar" },
+    );
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/tareas/a/completar",
       {},
     );
+    expect(toast.exito).toHaveBeenCalledWith("Tarea completada");
 
+    // El seguimiento no pide confirmación: su panel de resultado ya lo es.
+    confirmar.mockClear();
     await marcas[1]!.trigger("click");
+    expect(confirmar).not.toHaveBeenCalled();
     expect(w.text()).toContain("Guardar resultado");
+  });
+
+  it("una completada se regresa a pendientes al confirmar", async () => {
+    const w = montar();
+    api.get.mockResolvedValue(
+      respuesta([
+        {
+          ...tarea("a", "Revisar el tubo", null),
+          estado: "completada",
+          completada_en: "2026-10-01T15:00:00+00:00",
+        },
+      ]),
+    );
+    await w.get('[data-prueba="ver-completadas"]').trigger("click");
+    await flushPromises();
+
+    const marca = w.get('[data-prueba="marcar-tarea"]');
+    expect(marca.classes()).toContain("ta-check-regresar");
+    expect(marca.attributes("title")).toBe("Regresar a pendientes");
+    await marca.trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenLastCalledWith(
+      "¿Regresar «Revisar el tubo» a pendientes?",
+      { aceptar: "Sí, regresar" },
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/tareas/a/reabrir",
+      {},
+    );
   });
 });

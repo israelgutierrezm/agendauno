@@ -292,14 +292,27 @@ const grupos = computed<{ clave: Grupo; tareas: Tarea[] }[]>(() => {
   }
   return lista;
 });
-function alMarcar(tarea: Tarea): void {
+// Completar y regresar a pendientes se confirman: un clic de más no cambia nada.
+async function alMarcar(tarea: Tarea): Promise<void> {
   if (tarea.estado !== "pendiente") {
-    void reabrir(tarea);
+    if (
+      await confirmar(
+        t("operacion.bandeja.confirmarReabrir", { titulo: tarea.titulo }),
+        { aceptar: t("operacion.bandeja.reabrirAceptar") },
+      )
+    ) {
+      await reabrir(tarea);
+    }
   } else if (tarea.motivo) {
-    // Un seguimiento se cierra con su resultado.
+    // Un seguimiento se cierra con su resultado (el panel ya es la confirmación).
     abrirResultado(tarea);
-  } else {
-    void completar(tarea);
+  } else if (
+    await confirmar(
+      t("operacion.bandeja.confirmarCompletar", { titulo: tarea.titulo }),
+      { aceptar: t("operacion.bandeja.completarAceptar") },
+    )
+  ) {
+    await completar(tarea);
   }
 }
 
@@ -468,11 +481,12 @@ async function crearTarea(): Promise<void> {
   }
 }
 
-async function completar(t: Tarea): Promise<void> {
+async function completar(tarea: Tarea): Promise<void> {
   accionando.value = true;
   error.value = null;
   try {
-    await api.post(`${base.value}/tareas/${t.id}/completar`, {});
+    await api.post(`${base.value}/tareas/${tarea.id}/completar`, {});
+    toast.exito(t("operacion.bandeja.completadaAviso"));
     await cargarTareas();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -481,11 +495,12 @@ async function completar(t: Tarea): Promise<void> {
   }
 }
 
-async function reabrir(t: Tarea): Promise<void> {
+async function reabrir(tarea: Tarea): Promise<void> {
   accionando.value = true;
   error.value = null;
   try {
-    await api.post(`${base.value}/tareas/${t.id}/reabrir`, {});
+    await api.post(`${base.value}/tareas/${tarea.id}/reabrir`, {});
+    toast.exito(t("operacion.bandeja.reabiertaAviso"));
     await cargarTareas();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -906,6 +921,11 @@ onMounted(cargarTareas);
                   v-if="puedeGestionar"
                   type="button"
                   class="ta-check"
+                  :class="
+                    tarea.estado === 'completada'
+                      ? 'ta-check-regresar'
+                      : 'ta-check-completar'
+                  "
                   :aria-label="
                     tarea.estado === 'completada'
                       ? $t('operacion.bandeja.reabrirTarea', {
@@ -917,16 +937,26 @@ onMounted(cargarTareas);
                   "
                   :title="
                     tarea.estado === 'completada'
-                      ? $t('tareas.reabrir')
-                      : $t('tareas.completar')
+                      ? $t('operacion.bandeja.regresar')
+                      : $t('operacion.bandeja.completar')
                   "
                   :disabled="accionando"
                   data-prueba="marcar-tarea"
                   @click="alMarcar(tarea)"
                 >
+                  <!-- En reposo, la hecha lleva su palomita; al pasar el cursor, el
+                       círculo dice qué hará: completar (verde) o regresar (ámbar). -->
                   <IconoNav
                     v-if="tarea.estado === 'completada'"
+                    class="ta-icono-reposo"
                     nombre="hecho"
+                    :tam="14"
+                  />
+                  <IconoNav
+                    class="ta-icono-accion"
+                    :nombre="
+                      tarea.estado === 'completada' ? 'deshacer' : 'hecho'
+                    "
                     :tam="14"
                   />
                 </button>
@@ -1446,13 +1476,40 @@ section + section .ta-grupo {
     border-color 0.15s,
     background-color 0.15s;
 }
-button.ta-check:hover:not(:disabled) {
-  border-color: var(--primario);
-  background: color-mix(in srgb, var(--primario) 12%, transparent);
+/* El ícono de la acción aparece al pasar el cursor (o con el foco del teclado). */
+.ta-icono-accion {
+  display: none;
+}
+button.ta-check:is(:hover, :focus-visible):not(:disabled) .ta-icono-accion {
+  display: block;
+}
+button.ta-check:is(:hover, :focus-visible):not(:disabled) .ta-icono-reposo {
+  display: none;
+}
+/* Completar: verde con palomita. */
+button.ta-check-completar:is(:hover, :focus-visible):not(:disabled) {
+  border-color: var(--exito);
+  background: var(--exito);
+  color: #fff;
 }
 .ta-hecha .ta-check {
   border-color: var(--exito);
   background: var(--exito);
+  color: #fff;
+}
+/* Regresar a pendientes: el color de alerta con la flecha de regresar. */
+button.ta-check-regresar:is(:hover, :focus-visible):not(:disabled) {
+  border-color: var(--aviso);
+  background: var(--aviso);
+  color: var(--fondo);
+}
+/* En pantallas táctiles no hay cursor: la palomita se insinúa siempre. */
+@media (hover: none) {
+  .ta-check-completar .ta-icono-accion {
+    display: block;
+    opacity: 0.35;
+    color: var(--texto-suave);
+  }
 }
 .ta-titulo {
   font-weight: 600;
