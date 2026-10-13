@@ -379,6 +379,8 @@ onMounted(cargar);
           v-model:desde="desdeEntradas"
           v-model:hasta="hastaEntradas"
           prueba="entradas"
+          atajos
+          :zona="sesion.zonaHoraria"
         />
         <button
           v-if="conFiltrosEntradas"

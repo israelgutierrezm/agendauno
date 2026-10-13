@@ -11,6 +11,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import RangoFechas from "@/components/RangoFechas.vue";
 import RegistrarPagoOrden, {
   type CuotaPorCobrar,
   type OrdenPorCobrar,
@@ -19,6 +20,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -486,6 +488,14 @@ async function reembolsar(): Promise<void> {
 // ---- Indicadores y filtros (patrón de los listados) ----
 const busqueda = ref("");
 const filtroEstado = ref<"" | "aprobado" | "otros">("");
+// Los filtros de los movimientos van en la dirección: un enlace o volver atrás los
+// conserva. Antes de vigilarlos, para no cargar dos veces.
+useFiltrosEnUrl({
+  q: busqueda,
+  estado: opcionEnUrl(filtroEstado, ["", "aprobado", "otros"] as const),
+  desde: fechaEnUrl(desdePagos),
+  hasta: fechaEnUrl(hastaPagos),
+});
 // La búsqueda espera a que se deje de escribir; el estado y las fechas recargan ya.
 let esperaBusqueda: ReturnType<typeof setTimeout> | undefined;
 watch(busqueda, () => {
@@ -509,6 +519,34 @@ const conFiltrosPagos = computed(
     desdePagos.value !== "" ||
     hastaPagos.value !== "",
 );
+// Lo encontrado, en CSV (con los mismos filtros).
+const descargandoPagos = ref(false);
+async function descargarPagos(): Promise<void> {
+  descargandoPagos.value = true;
+  const q = busqueda.value.trim();
+  try {
+    const { data } = await api.get<Blob>(`${base.value}/pagos`, {
+      params: {
+        formato: "csv",
+        ...(q !== "" ? { q } : {}),
+        ...(filtroEstado.value !== "" ? { estado: filtroEstado.value } : {}),
+        ...(desdePagos.value !== "" ? { desde: desdePagos.value } : {}),
+        ...(hastaPagos.value !== "" ? { hasta: hastaPagos.value } : {}),
+      },
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(data);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = "movimientos.csv";
+    enlace.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    descargandoPagos.value = false;
+  }
+}
 function limpiarFiltrosPagos(): void {
   busqueda.value = "";
   filtroEstado.value = "";
@@ -883,29 +921,15 @@ watch(vista, cargar, { immediate: true });
                 {{ $t(`cobranzaVisual.filtro.${f || "todos"}`) }}
               </button>
             </div>
-            <!-- Las fechas del cobro, en días del negocio -->
-            <fieldset class="cv-rango">
-              <legend class="sr-only">
-                {{ $t("cobranzaVisual.fechas") }}
-              </legend>
-              <input
-                v-model="desdePagos"
-                type="date"
-                class="tu-input"
-                :max="hastaPagos || undefined"
-                :aria-label="$t('cobranzaVisual.desde')"
-                data-prueba="pagos-desde"
-              />
-              <span aria-hidden="true">–</span>
-              <input
-                v-model="hastaPagos"
-                type="date"
-                class="tu-input"
-                :min="desdePagos || undefined"
-                :aria-label="$t('cobranzaVisual.hasta')"
-                data-prueba="pagos-hasta"
-              />
-            </fieldset>
+            <!-- Las fechas del cobro, en días del negocio, con atajos de periodo -->
+            <RangoFechas
+              v-model:desde="desdePagos"
+              v-model:hasta="hastaPagos"
+              :etiqueta="$t('cobranzaVisual.fechas')"
+              prueba="pagos"
+              atajos
+              :zona="sesion.zonaHoraria"
+            />
             <button
               v-if="conFiltrosPagos"
               type="button"
@@ -913,6 +937,20 @@ watch(vista, cargar, { immediate: true });
               @click="limpiarFiltrosPagos"
             >
               {{ $t("tabla.limpiar") }}
+            </button>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma ml-auto text-sm"
+              :disabled="descargandoPagos || pagos.length === 0"
+              data-prueba="descargar-pagos"
+              @click="descargarPagos"
+            >
+              <IconoNav nombre="descargar" :tam="16" />
+              {{
+                descargandoPagos
+                  ? $t("operacion.listados.descargando")
+                  : $t("operacion.listados.descargar")
+              }}
             </button>
           </div>
           <table class="tu-tabla">
@@ -1381,19 +1419,6 @@ watch(vista, cargar, { immediate: true });
 </template>
 
 <style scoped>
-.cv-rango {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--texto-suave);
-}
-.cv-rango .tu-input {
-  width: auto;
-  min-height: 2.5rem;
-  padding-block: 0.35rem;
-  font-size: 0.85rem;
-}
 .cb-seccion {
   display: flex;
   align-items: center;

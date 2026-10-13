@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn(),
   esCitas: false,
   ruta: { query: { vista: "movimientos" } as Record<string, string> },
+  replace: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, post: mocks.post, put: vi.fn(), delete: vi.fn() },
@@ -29,6 +30,7 @@ vi.mock("@/stores/sesionTenant", () => ({
 }));
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.ruta,
+  useRouter: () => ({ replace: mocks.replace }),
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
 }));
 
@@ -203,6 +205,69 @@ describe("cobros: movimientos", () => {
       params: { page: 1 },
     });
     vi.useRealTimers();
+  });
+
+  it("los filtros van en la dirección: se leen al abrir y cada cambio la actualiza", async () => {
+    mocks.ruta.query = {
+      vista: "movimientos",
+      q: "ana",
+      estado: "aprobado",
+      desde: "2026-10-01",
+      hasta: "no-es-fecha",
+    };
+    mocks.get.mockResolvedValue({
+      data: { data: [], meta: { ...resumen([]), total: 0 } },
+    });
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    // Lo que no es fecha se ignora.
+    expect(mocks.get).toHaveBeenCalledWith("/api/v1/app/demo/pagos", {
+      params: { page: 1, q: "ana", estado: "aprobado", desde: "2026-10-01" },
+    });
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Todos")!
+      .trigger("click");
+    await flushPromises();
+    // La vista se conserva y lo que no era fecha se quita.
+    expect(mocks.replace).toHaveBeenLastCalledWith({
+      query: { vista: "movimientos", q: "ana", desde: "2026-10-01" },
+    });
+  });
+
+  it("descarga en CSV lo encontrado con los mismos filtros", async () => {
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:x");
+    globalThis.URL.revokeObjectURL = vi.fn();
+    mocks.get.mockImplementation(
+      (url: string, config?: { params?: Record<string, unknown> }) =>
+        Promise.resolve({
+          data:
+            config?.params?.formato === "csv"
+              ? new Blob(["Fecha"])
+              : url.endsWith("/pagos")
+                ? {
+                    data: [pago("1", "Ana López", "aprobado")],
+                    meta: { ...resumen([]), total: 1 },
+                  }
+                : { data: [] },
+        }),
+    );
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    await w.get('[data-prueba="pagos-desde"]').setValue("2026-10-01");
+    await flushPromises();
+    await w.get('[data-prueba="descargar-pagos"]').trigger("click");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/pagos", {
+      params: { formato: "csv", desde: "2026-10-01" },
+      responseType: "blob",
+    });
   });
 });
 

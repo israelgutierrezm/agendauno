@@ -14,6 +14,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { whatsappDe } from "@/lib/captacion";
 import { confirmar } from "@/lib/confirmar";
+import { fechaEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -138,6 +139,35 @@ const filtros = ref<
 });
 const desde = ref("");
 const hasta = ref("");
+// La búsqueda y los filtros van en la dirección (un enlace o volver atrás los
+// conserva). Las pendientes son lo de siempre: no se escriben.
+useFiltrosEnUrl({
+  q: busqueda,
+  estado: computed({
+    get: () => (estadoFiltro.value === "completada" ? "completada" : ""),
+    set: (v: string) => {
+      estadoFiltro.value = v === "completada" ? "completada" : "pendiente";
+    },
+  }),
+  tipo: computed({
+    get: () => filtros.value.tipo,
+    set: (v: string) => {
+      if (["", "seguimiento", "automatica", "manual"].includes(v)) {
+        filtros.value.tipo = v;
+      }
+    },
+  }),
+  vencimiento: computed({
+    get: () => filtros.value.vencimiento,
+    set: (v: string) => {
+      if (v === "" || (VENCIMIENTOS as string[]).includes(v)) {
+        filtros.value.vencimiento = v;
+      }
+    },
+  }),
+  desde: fechaEnUrl(desde),
+  hasta: fechaEnUrl(hasta),
+});
 const hayFiltros = computed(
   () =>
     busqueda.value.trim() !== "" ||

@@ -1040,6 +1040,8 @@ onMounted(cargar);
           v-model:desde="desdeSalida"
           v-model:hasta="hastaSalida"
           prueba="salida"
+          atajos
+          :zona="sesion.zonaHoraria"
         />
         <button
           v-if="conFiltrosSalida"

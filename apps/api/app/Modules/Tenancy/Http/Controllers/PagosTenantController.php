@@ -13,11 +13,13 @@ use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Pagos capturados del estudio (data plane del tenant): base de la pantalla de
@@ -30,6 +32,15 @@ class PagosTenantController
 {
     private const POR_PAGINA = 25;
 
+    /** Cuántos movimientos baja a lo más un CSV. */
+    private const MAX_CSV = 5000;
+
+    private const ESTADOS_CSV = [
+        'aprobado' => 'Aprobado',
+        'parcialmente_reembolsado' => 'Devuelto en parte',
+        'reembolsado' => 'Devuelto',
+    ];
+
     public function __construct(
         private readonly ResolverAccesoTenant $acceso,
         private readonly FechasNegocioTenant $fechas,
@@ -40,8 +51,11 @@ class PagosTenantController
      * por persona y se acotan por estado (aprobados u otros) y por fechas (días del
      * negocio). `meta.resumen` cuenta y suma todo lo encontrado (no solo la página),
      * sin el filtro de estado: así los indicadores no cambian al elegirlo.
+     *
+     * Con `formato=csv` descarga lo encontrado con los mismos filtros (hasta 5,000), con
+     * las fechas en la zona del negocio.
      */
-    public function index(Request $request, AnularCobroTenant $anular, CorregirMetodoPagoTenant $corregir): JsonResponse
+    public function index(Request $request, AnularCobroTenant $anular, CorregirMetodoPagoTenant $corregir): JsonResponse|Response
     {
         $filtros = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -50,6 +64,7 @@ class PagosTenantController
             'hasta' => ['nullable', 'date_format:Y-m-d'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'formato' => ['nullable', Rule::in(['json', 'csv'])],
         ]);
         $desde = $filtros['desde'] ?? null;
         $hasta = $filtros['hasta'] ?? null;
@@ -75,6 +90,17 @@ class PagosTenantController
             ->when($hasta !== null, fn ($c) => $c->where('created_at', '<=', $this->fechas->finDelDia((string) $hasta)));
 
         $estado = $filtros['estado'] ?? null;
+        if (($filtros['formato'] ?? 'json') === 'csv') {
+            return $this->csv($encontrados()
+                ->when($estado === 'aprobado', fn ($c) => $c->where('estado', EstadoPago::Aprobado->value))
+                ->when($estado === 'otros', fn ($c) => $c->where('estado', '!=', EstadoPago::Aprobado->value))
+                ->with(['orden.persona', 'registradoPor'])
+                ->withSum(['reembolsos as reembolsado_minor' => fn ($c) => $c->where('estado', EstadoReembolso::Aprobado->value)], 'monto_minor')
+                ->orderByDesc('id')
+                ->limit(self::MAX_CSV)
+                ->get()
+                ->all());
+        }
         $pagina = $encontrados()
             ->when($estado === 'aprobado', fn ($c) => $c->where('estado', EstadoPago::Aprobado->value))
             ->when($estado === 'otros', fn ($c) => $c->where('estado', '!=', EstadoPago::Aprobado->value))
@@ -132,6 +158,46 @@ class PagosTenantController
                 ];
             })->all(),
         ]);
+    }
+
+    /**
+     * Los movimientos en CSV (Excel lo abre con acentos: lleva BOM). Los montos van en
+     * unidades con dos decimales y su moneda.
+     *
+     * @param  list<PagoTenant>  $pagos
+     */
+    private function csv(array $pagos): Response
+    {
+        $lineas = ['Fecha,Persona,Monto,Moneda,Devuelto,Estado,Forma de pago,Registró'];
+        foreach ($pagos as $pago) {
+            $lineas[] = implode(',', array_map(fn (string $v): string => self::escapar($v), [
+                $pago->created_at !== null ? CarbonImmutable::instance($pago->created_at)->setTimezone($this->fechas->zona())->format('Y-m-d H:i') : '',
+                (string) ($pago->orden?->persona?->nombreCompleto() ?? ''),
+                number_format($pago->monto_minor / 100, 2, '.', ''),
+                (string) $pago->moneda,
+                number_format(((int) ($pago->getAttribute('reembolsado_minor') ?? 0)) / 100, 2, '.', ''),
+                self::ESTADOS_CSV[$pago->estado->value] ?? $pago->estado->value,
+                (string) ($pago->proveedor === 'manual' ? ($pago->orden->metodo_pago ?? 'manual') : $pago->proveedor),
+                (string) ($pago->registradoPor->name ?? ''),
+            ]));
+        }
+
+        return response("\u{FEFF}".implode("\n", $lineas)."\n", 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="movimientos.csv"',
+        ]);
+    }
+
+    /** Un valor del CSV: entre comillas si hace falta y sin que se lea como fórmula. */
+    private static function escapar(string $valor): string
+    {
+        if ($valor !== '' && in_array($valor[0], ['=', '+', '-', '@'], true) && ! is_numeric($valor)) {
+            $valor = "'".$valor;
+        }
+
+        return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
+            ? '"'.str_replace('"', '""', $valor).'"'
+            : $valor;
     }
 
     /**
