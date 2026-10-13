@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
+import { confirmar } from "@/lib/confirmar";
 import FacturasView from "./FacturasView.vue";
 
 /*
@@ -84,6 +85,57 @@ describe("facturas: búsqueda, filtros y páginas", () => {
     expect(api.get).toHaveBeenLastCalledWith("/api/v1/app/demo/facturas", {
       params: { page: 1 },
     });
+    w.unmount();
+  });
+
+  it("el total del encabezado es el de todas las páginas", async () => {
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+    expect(w.get(".es-total").text()).toBe("45");
+    w.unmount();
+  });
+
+  it("el rechazo del proveedor se queda en el formulario aunque la lista se recargue", async () => {
+    vi.mocked(confirmar).mockResolvedValue(true);
+    api.post.mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 422,
+        data: {
+          data: {
+            estado: "error",
+            motivo_error: "RFC no registrado en el SAT",
+          },
+        },
+      },
+    });
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+
+    // Cada campo tiene su etiqueta visible.
+    expect(w.get('label[for="fa-rfc"]').text()).toContain("RFC");
+    expect(w.get("#fa-precio-0").attributes("min")).toBe("0.01");
+    await w.get("#fa-nombre").setValue("Ana López");
+    await w.get("#fa-rfc").setValue("LOAA800101AB1");
+    await w.get("#fa-cp").setValue("06700");
+    await w.get("#fa-desc-0").setValue("Clase de yoga");
+    await w.get("#fa-precio-0").setValue("100");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    // Se recargó la lista y el error sigue a la vista, junto al formulario.
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(w.get('[data-prueba="error-emision"]').text()).toBe(
+      "RFC no registrado en el SAT",
+    );
+    expect((w.get("#fa-nombre").element as HTMLInputElement).value).toBe(
+      "Ana López",
+    );
     w.unmount();
   });
 });

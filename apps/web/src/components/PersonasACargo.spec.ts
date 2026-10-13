@@ -118,6 +118,35 @@ describe("personas a cargo en la cuenta", () => {
     expect(w.find('[data-prueba="personas-a-cargo"]').exists()).toBe(false);
     useParticipantes().elegir(null);
   });
+
+  it("«Retirar» es una acción de peligro y no se repite mientras se procesa", async () => {
+    red.get.mockResolvedValue(respuesta("activa"));
+    await useParticipantes().cargar();
+    let terminar: (v: unknown) => void = () => undefined;
+    red.post.mockReturnValue(
+      new Promise((r) => {
+        terminar = r;
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    const boton = w.get('[data-prueba="retirar"]');
+    expect(boton.classes()).toContain("tu-tono-peligro");
+    await boton.trigger("click");
+    await flushPromises();
+    expect(red.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/mi/participantes/t-sofia/retirar",
+      {},
+    );
+    expect(
+      w.get('[data-prueba="retirar"]').attributes("disabled"),
+    ).toBeDefined();
+
+    terminar({ data: {} });
+    await flushPromises();
+    expect(red.post).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("al salir de la cuenta", () => {

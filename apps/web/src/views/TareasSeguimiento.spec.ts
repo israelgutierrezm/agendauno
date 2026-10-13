@@ -167,6 +167,28 @@ describe("seguimiento en tareas", () => {
     expect(toast.exito).toHaveBeenCalledWith("Resultado guardado");
   });
 
+  it("si el resultado no se guarda, el error se ve en su panel", async () => {
+    const w = montar();
+    await flushPromises();
+    api.post.mockRejectedValueOnce("La tarea ya no está pendiente.");
+
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Registrar resultado")!
+      .trigger("click");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Guardar resultado")!
+      .trigger("click");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-resultado"]').text()).toContain(
+      "La tarea ya no está pendiente.",
+    );
+    expect(w.text().split("La tarea ya no está pendiente.")).toHaveLength(2);
+    expect(w.find("#s-nota").exists()).toBe(true);
+  });
+
   it("filtra solo los seguimientos", async () => {
     const w = montar();
     await flushPromises();

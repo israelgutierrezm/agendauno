@@ -356,13 +356,16 @@ class CuentaRepository {
   }
 
   /// Guarda sus respuestas (reemplaza las anteriores). `valores`: por id de campo.
+  /// Va por `/mi`: la persona es la de la cuenta o, con `X-Participante`, la que
+  /// está a su cargo (el API ya no toma la persona del cuerpo). `personaId` queda
+  /// por compatibilidad con quien llama.
   Future<void> responderFormulario(
     String formularioId,
     String personaId,
     Map<String, Object> valores,
   ) => _dio.post<Map<String, dynamic>>(
-    '$_base/formularios/$formularioId/respuestas',
-    data: {'persona_id': personaId, 'valores': valores},
+    '$_base/mi/formularios/$formularioId/respuestas',
+    data: {'valores': valores},
   );
 
   /// Los documentos que pide el negocio y cómo va cada uno.

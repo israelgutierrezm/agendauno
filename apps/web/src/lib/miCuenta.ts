@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { camposDeMedicion } from "@/lib/etiquetas";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { participanteEnUso } from "@/lib/participanteEnUso";
 import type { FormularioPersona } from "@/lib/formularios";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -468,11 +469,21 @@ export function cuandoCorto(iso: string | null, zona: string | null): string {
   }).format(new Date(iso));
 }
 
-export function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+/** Un monto con los números del país del negocio («$ 25.000,00» en Colombia). */
+export function dinero(
+  minor: number,
+  moneda: string,
+  pais: string | null = paisDelNegocio(),
+): string {
+  return dineroDelPais(minor, moneda, pais);
+}
+function paisDelNegocio(): string | null {
+  try {
+    return useSesionTenantStore().pais ?? null;
+  } catch {
+    // Sin Pinia activa (fuera de la app): como en México.
+    return null;
+  }
 }
 
 /** Cómo se presenta la cobertura de una clase: su píldora y, si no entra, por qué. */

@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 const sesion = vi.hoisted(() => ({
   slug: "demo",
   suspendido: false,
+  puede: vi.fn(() => true),
   modalidad: "clases",
   esCitas: false,
   estudio: { facturacion_disponible: true } as {
@@ -90,6 +91,20 @@ async function montar(facturaRentaPosible: boolean) {
 beforeEach(() => {
   api.get.mockReset();
   sesion.estudio = { facturacion_disponible: true };
+  sesion.suspendido = false;
+  sesion.puede.mockReturnValue(true);
+});
+
+it("con el negocio suspendido, quien no ve la facturación ve un aviso neutro, sin deuda", async () => {
+  sesion.suspendido = true;
+  sesion.puede.mockReturnValue(false);
+  const w = await montar(true);
+
+  expect(w.find('[data-prueba="no-disponible"]').text()).toContain(
+    "no está disponible por ahora",
+  );
+  expect(w.find('[data-prueba="suspendido"]').exists()).toBe(false);
+  expect(api.get).not.toHaveBeenCalled();
 });
 
 describe("factura o recibo de la renta", () => {

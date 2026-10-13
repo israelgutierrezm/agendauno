@@ -59,6 +59,12 @@ const nuevo = ref<{ participante: string; parentesco: string }>({
   parentesco: "madre_padre",
 });
 const guardando = ref(false);
+// Lo que no se pudo vincular se ve en su panel (no en la ficha de atrás).
+const errorVincular = ref<string | null>(null);
+function abrirAgregar(): void {
+  errorVincular.value = null;
+  agregando.value = true;
+}
 // El vínculo cuya autorización se registra en el mostrador y quién la aceptó.
 const enMostrador = ref<{ vinculo: Vinculo; responsable: string } | null>(null);
 
@@ -96,6 +102,7 @@ function fecha(iso: string | null): string {
         day: "numeric",
         month: "short",
         year: "numeric",
+        timeZone: sesion.zonaHoraria || undefined,
       });
 }
 
@@ -104,7 +111,7 @@ async function vincular(): Promise<void> {
     return;
   }
   guardando.value = true;
-  error.value = null;
+  errorVincular.value = null;
   try {
     await api.post(`${base.value}/miembros/${props.personaId}/participantes`, {
       participante_id: nuevo.value.participante,
@@ -115,7 +122,7 @@ async function vincular(): Promise<void> {
     toast.exito(t("familias.ficha.vinculado"));
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorVincular.value = mensajeDeError(e);
   } finally {
     guardando.value = false;
   }
@@ -172,7 +179,8 @@ async function retirar(
         v-if="puedeGestionar && familia?.activo && familia.tiene_cuenta"
         type="button"
         class="tu-enlace text-sm"
-        @click="agregando = true"
+        data-prueba="agregar-familiar"
+        @click="abrirAgregar"
       >
         {{ $t("familias.ficha.agregar") }}
       </button>
@@ -286,9 +294,18 @@ async function retirar(
     <PanelLateral
       :abierto="agregando"
       :titulo="$t('familias.ficha.agregar')"
+      :ocupado="guardando"
       @cerrar="agregando = false"
     >
       <form class="grid gap-4" @submit.prevent="vincular">
+        <AvisoTono
+          v-if="errorVincular"
+          tono="peligro"
+          role="alert"
+          data-prueba="error-vincular"
+        >
+          {{ errorVincular }}
+        </AvisoTono>
         <div>
           <label class="tu-label" for="fam-participante">{{
             $t("familias.ficha.participante")
@@ -324,6 +341,7 @@ async function retirar(
           <button
             type="button"
             class="tu-btn tu-btn-fantasma"
+            :disabled="guardando"
             @click="agregando = false"
           >
             {{ $t("comun.cancelar") }}
@@ -345,6 +363,7 @@ async function retirar(
       :abierto="enMostrador !== null"
       :titulo="$t('familias.ficha.registrarMostrador')"
       tam="md"
+      :ocupado="guardando"
       @cerrar="enMostrador = null"
     >
       <div v-if="enMostrador && familia" class="grid gap-3 text-sm">
@@ -370,6 +389,7 @@ async function retirar(
           <button
             type="button"
             class="tu-btn tu-btn-fantasma"
+            :disabled="guardando"
             @click="enMostrador = null"
           >
             {{ $t("comun.cancelar") }}

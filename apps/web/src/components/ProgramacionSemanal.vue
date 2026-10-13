@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
-import { isoLocal } from "@/lib/misClases";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import {
   filtrarSeries,
   horaFin,
@@ -13,6 +13,7 @@ import {
   type SerieProgramada,
   sigueVigente,
 } from "@/lib/programacion";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
  * Las clases que se repiten, como una semana de lunes a domingo filtrable por
@@ -26,7 +27,9 @@ const props = defineProps<{
 const emit = defineEmits<{ dejar: [serie: SerieProgramada] }>();
 const { t } = useI18n();
 
-const hoy = isoLocal(new Date());
+// «Hoy» del negocio (su zona horaria), no del navegador de quien mira.
+const sesion = useSesionTenantStore();
+const hoy = hoyEnNegocio(sesion.zonaHoraria);
 const filtro = ref({ actividad: "", instructor: "", sucursal: "" });
 const detalle = ref<SerieProgramada | null>(null);
 

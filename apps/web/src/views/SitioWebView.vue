@@ -179,10 +179,12 @@ function detalleSeccion(s: SeccionSitio): string {
   }
   return tm(`sitioWeb.secciones.contenido.${s.tipo}`);
 }
+// En la zona horaria del negocio (ADR 0099), aunque quien mira esté en otra.
 function fecha(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(iso));
 }
 

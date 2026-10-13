@@ -11,6 +11,7 @@ import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 interface UsuarioRow {
   id: string;
@@ -254,6 +255,18 @@ async function asignarSede(): Promise<void> {
 }
 
 async function quitarSede(a: Asignacion): Promise<void> {
+  if (
+    guardandoSede.value ||
+    !(await confirmar(
+      t("usuarios.confirmarQuitarSede", {
+        nombre: editando.value?.nombre ?? "",
+        sucursal: a.sucursal ?? "",
+      }),
+      { peligro: true, aceptar: t("usuarios.sedeQuitar") },
+    ))
+  ) {
+    return;
+  }
   guardandoSede.value = true;
   errorEdicion.value = null;
   try {
@@ -320,16 +333,18 @@ async function guardar(): Promise<void> {
 
 const reenviandoId = ref<string | null>(null);
 const reenviadoId = ref<string | null>(null);
+// El error de una acción de la fila va en un aviso flotante: la tabla no se esconde
+// (eso es solo cuando no se pudo cargar).
+const toast = useToastStore();
 
 async function reenviar(u: UsuarioRow): Promise<void> {
   reenviandoId.value = u.id;
   reenviadoId.value = null;
-  error.value = null;
   try {
     await api.post(`${base.value}/usuarios/${u.id}/reenviar`);
     reenviadoId.value = u.id;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     reenviandoId.value = null;
   }
@@ -341,6 +356,7 @@ function detalleBaja(u: UsuarioRow): string {
   }
   const fecha = new Intl.DateTimeFormat("es-MX", {
     dateStyle: "medium",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(u.dado_de_baja_en));
   return u.dado_de_baja_por
     ? t("bajas.detallePor", { fecha, quien: u.dado_de_baja_por })
@@ -384,12 +400,11 @@ async function darDeBaja(): Promise<void> {
 const reactivandoId = ref<string | null>(null);
 async function reactivar(u: UsuarioRow): Promise<void> {
   reactivandoId.value = u.id;
-  error.value = null;
   try {
     await api.post(`${base.value}/usuarios/${u.id}/reactivar`, {});
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     reactivandoId.value = null;
   }
@@ -622,9 +637,9 @@ onMounted(cargar);
               <span class="tu-badge ml-2">{{ nombreRol(a.rol) }}</span>
             </span>
             <button
-              class="tu-enlace text-sm"
-              style="color: var(--error)"
+              class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
               type="button"
+              data-prueba="quitar-sede"
               :disabled="
                 guardandoSede ||
                 (editando !== null &&

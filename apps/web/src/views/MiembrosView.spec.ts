@@ -8,10 +8,12 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
   esCitas: false,
+  erroresPorCampo: vi.fn((): Record<string, string> => ({})),
 }));
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, post: mocks.post, put: vi.fn() },
   mensajeDeError: () => "Error",
+  erroresPorCampo: mocks.erroresPorCampo,
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
@@ -87,6 +89,7 @@ describe("directorio de clientes", () => {
     vi.clearAllMocks();
     localStorage.clear();
     mocks.esCitas = false;
+    mocks.erroresPorCampo.mockReturnValue({});
     miembro = miembroBase;
     mocks.post.mockResolvedValue({ data: {} });
     mocks.get.mockImplementation((url: string) =>
@@ -311,6 +314,42 @@ describe("directorio de clientes", () => {
       "/api/v1/app/estudio-a/miembros",
       expect.objectContaining({ nombre: "Lía", celular: "+54 1123456789" }),
     );
+  });
+  it("si el alta falla, el error se ve dentro del panel, junto al campo, y la lista sigue", async () => {
+    const w = montar();
+    await flushPromises();
+    w.getComponent({ name: "BarraListado" }).vm.$emit("nuevo");
+    await flushPromises();
+
+    mocks.post.mockRejectedValueOnce(new Error("422"));
+    mocks.erroresPorCampo.mockReturnValue({
+      email: "Ya hay alguien con ese correo.",
+    });
+    await w.get("#mn").setValue("Lía");
+    await w.get("#me").setValue("vale@correo.mx");
+    await w.get("#mn").element.form!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+
+    const panel = w.get("#mb-alta");
+    expect(panel.get('[data-prueba="error-alta"]').text()).toContain(
+      "Revisa los campos marcados.",
+    );
+    expect(panel.get('[data-prueba="error-email"]').text()).toBe(
+      "Ya hay alguien con ese correo.",
+    );
+    expect(w.get("#me").attributes("aria-invalid")).toBe("true");
+    // Lo escrito se queda y la lista de atrás no se esconde.
+    expect((w.get("#mn").element as HTMLInputElement).value).toBe("Lía");
+    expect(w.find('[data-prueba="tabla-miembros"]').exists()).toBe(true);
+  });
+  it("un error al invitar no esconde la lista", async () => {
+    const w = montar();
+    await flushPromises();
+    mocks.post.mockRejectedValueOnce(new Error("500"));
+    await w.get('[data-prueba="invitar-cuenta"]').trigger("click");
+    await flushPromises();
+
+    expect(w.find('[data-prueba="tabla-miembros"]').exists()).toBe(true);
   });
   it("un error de carga no se presenta como un directorio vacío", async () => {
     mocks.get.mockRejectedValue(new Error("red"));

@@ -117,6 +117,7 @@ function cantidadCampos(n: number): string {
   return t("adminUsabilidad.fichas.campos", { n }, n);
 }
 
+// En la zona horaria del negocio (ADR 0099), aunque quien mira esté en otra.
 function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
@@ -125,7 +126,17 @@ function fecha(iso: string | null): string {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(iso));
+}
+// Una fecha AAAA-MM-DD tal cual, sin que ninguna zona horaria la mueva de día.
+function fechaDia(dia: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${dia}T12:00:00Z`));
 }
 
 function valor(c: Pick<Campo, "tipo">, v: Valor | undefined): string {
@@ -136,7 +147,7 @@ function valor(c: Pick<Campo, "tipo">, v: Valor | undefined): string {
     return v === true ? t("expediente.si") : t("expediente.no");
   }
   if (c.tipo === "fecha" && typeof v === "string") {
-    return fecha(`${v}T12:00:00`);
+    return fechaDia(v);
   }
   return String(v);
 }

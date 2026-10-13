@@ -91,7 +91,13 @@ watch([estado, desde, hasta], () => {
   void cargar();
 });
 const cargando = ref(true);
+// Solo la primera carga oculta la página: al recargar (filtros, después de emitir)
+// el formulario sigue montado con lo que se escribió y con su error.
+const cargadoUnaVez = ref(false);
+// El de la lista (arriba) y el de la emisión (dentro del formulario), separados: recargar
+// la lista no borra el rechazo del proveedor.
 const error = ref<string | null>(null);
+const errorEmision = ref<string | null>(null);
 const mensaje = ref<string | null>(null);
 const emitiendo = ref(false);
 
@@ -146,6 +152,7 @@ async function cargar(): Promise<void> {
     });
     facturas.value = data.data;
     meta.value = data.meta ?? null;
+    cargadoUnaVez.value = true;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -173,7 +180,7 @@ async function emitir(): Promise<void> {
     return;
   }
   emitiendo.value = true;
-  error.value = null;
+  errorEmision.value = null;
   mensaje.value = null;
   try {
     await api.post(`${base.value}/facturas`, {
@@ -204,10 +211,11 @@ async function emitir(): Promise<void> {
       e.response?.status === 422 &&
       e.response.data?.data?.estado === "error"
     ) {
-      error.value = e.response.data.data.motivo_error ?? mensajeDeError(e);
+      errorEmision.value =
+        e.response.data.data.motivo_error ?? mensajeDeError(e);
       await cargar();
     } else {
-      error.value = mensajeDeError(e);
+      errorEmision.value = mensajeDeError(e);
     }
   } finally {
     emitiendo.value = false;
@@ -221,10 +229,33 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('facturas.titulo')"
-      :total="facturas.length"
+      :total="meta?.total ?? facturas.length"
     />
 
-    <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
+    <AvisoTono
+      v-if="error"
+      tono="peligro"
+      class="mt-4"
+      role="alert"
+      data-prueba="error-facturas"
+    >
+      {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          :disabled="cargando"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
+    <p
+      v-if="cargando && !cargadoUnaVez"
+      class="mt-8"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
       {{ $t("comun.cargando") }}
     </p>
 
@@ -369,43 +400,93 @@ onMounted(cargar);
               {{ $t("facturas.nueva.receptor") }}
             </h3>
             <div class="grid sm:grid-cols-2 gap-3">
-              <input
-                v-model="receptor.nombre"
-                class="tu-input"
-                :placeholder="$t('facturas.nueva.nombre')"
-                required
-              />
-              <input
-                v-model="receptor.rfc"
-                class="tu-input uppercase"
-                :placeholder="$t('facturas.nueva.rfc')"
-                required
-              />
-              <input
-                v-model="receptor.email"
-                class="tu-input"
-                type="email"
-                :placeholder="$t('facturas.nueva.email')"
-              />
-              <input
-                v-model="receptor.codigo_postal"
-                class="tu-input"
-                inputmode="numeric"
-                :placeholder="$t('facturas.nueva.codigoPostal')"
-                required
-              />
-              <input
-                v-model="usoCfdi"
-                class="tu-input uppercase"
-                :placeholder="$t('facturas.nueva.usoCfdi')"
-                required
-              />
-              <input
-                v-model="formaPago"
-                class="tu-input"
-                :placeholder="$t('facturas.nueva.formaPago')"
-                required
-              />
+              <div>
+                <label class="tu-label" for="fa-nombre"
+                  >{{ $t("facturas.nueva.nombre") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  id="fa-nombre"
+                  v-model="receptor.nombre"
+                  class="tu-input"
+                  maxlength="255"
+                  required
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="fa-rfc"
+                  >{{ $t("facturas.nueva.rfc") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  id="fa-rfc"
+                  v-model="receptor.rfc"
+                  class="tu-input uppercase"
+                  maxlength="13"
+                  required
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="fa-email">{{
+                  $t("facturas.nueva.email")
+                }}</label>
+                <input
+                  id="fa-email"
+                  v-model="receptor.email"
+                  class="tu-input"
+                  type="email"
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="fa-cp"
+                  >{{ $t("facturas.nueva.codigoPostal") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  id="fa-cp"
+                  v-model="receptor.codigo_postal"
+                  class="tu-input"
+                  inputmode="numeric"
+                  maxlength="5"
+                  required
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="fa-uso"
+                  >{{ $t("facturas.nueva.usoCfdi") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  id="fa-uso"
+                  v-model="usoCfdi"
+                  class="tu-input uppercase"
+                  maxlength="4"
+                  required
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="fa-forma"
+                  >{{ $t("facturas.nueva.formaPago") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  id="fa-forma"
+                  v-model="formaPago"
+                  class="tu-input"
+                  maxlength="2"
+                  required
+                />
+              </div>
             </div>
           </div>
 
@@ -416,37 +497,74 @@ onMounted(cargar);
             <div
               v-for="(c, i) in conceptos"
               :key="i"
-              class="grid sm:grid-cols-12 gap-2 items-start mb-2"
+              class="grid sm:grid-cols-12 gap-2 items-end mb-3"
+              data-prueba="concepto"
             >
-              <input
-                v-model="c.descripcion"
-                class="tu-input sm:col-span-5"
-                :placeholder="$t('facturas.nueva.descripcion')"
-                required
-              />
-              <input
-                v-model.number="c.cantidad"
-                class="tu-input sm:col-span-2"
-                type="number"
-                min="1"
-                :placeholder="$t('facturas.nueva.cantidad')"
-                required
-              />
-              <input
-                v-model="c.precio"
-                class="tu-input sm:col-span-2"
-                type="number"
-                min="0"
-                step="0.01"
-                :placeholder="$t('facturas.nueva.precio')"
-                required
-              />
-              <input
-                v-model="c.clave_prod_serv"
-                class="tu-input sm:col-span-2"
-                :placeholder="$t('facturas.nueva.claveProdServ')"
-                required
-              />
+              <div class="sm:col-span-5">
+                <label class="tu-label" :for="`fa-desc-${i}`"
+                  >{{ $t("facturas.nueva.descripcion") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  :id="`fa-desc-${i}`"
+                  v-model="c.descripcion"
+                  class="tu-input"
+                  maxlength="1000"
+                  required
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="tu-label" :for="`fa-cant-${i}`"
+                  >{{ $t("facturas.nueva.cantidad") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  :id="`fa-cant-${i}`"
+                  v-model.number="c.cantidad"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  required
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="tu-label" :for="`fa-precio-${i}`"
+                  >{{ $t("facturas.nueva.precio") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <!-- El API pide al menos 1 centavo. -->
+                <input
+                  :id="`fa-precio-${i}`"
+                  v-model="c.precio"
+                  class="tu-input"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="tu-label" :for="`fa-clave-${i}`"
+                  >{{ $t("facturas.nueva.claveProdServ") }}
+                  <span class="tu-obligatorio" aria-hidden="true"
+                    >*</span
+                  ></label
+                >
+                <input
+                  :id="`fa-clave-${i}`"
+                  v-model="c.clave_prod_serv"
+                  class="tu-input"
+                  maxlength="8"
+                  required
+                />
+              </div>
               <button
                 type="button"
                 class="tu-btn tu-btn-fantasma sm:col-span-1"
@@ -469,8 +587,13 @@ onMounted(cargar);
           <AvisoTono v-if="mensaje" tono="exito">
             {{ $t("facturas.nueva.timbrada") }}
           </AvisoTono>
-          <AvisoTono v-if="error" tono="peligro" role="alert">
-            {{ error }}
+          <AvisoTono
+            v-if="errorEmision"
+            tono="peligro"
+            role="alert"
+            data-prueba="error-emision"
+          >
+            {{ errorEmision }}
           </AvisoTono>
 
           <button

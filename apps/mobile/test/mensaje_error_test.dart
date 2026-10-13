@@ -71,11 +71,10 @@ void main() {
     );
   });
 
-  test('sin respuesta (sin red o tiempo agotado): que revise su conexión', () {
+  test('sin respuesta (sin red o sin conectar): que revise su conexión', () {
     for (final tipo in [
       DioExceptionType.connectionError,
       DioExceptionType.connectionTimeout,
-      DioExceptionType.receiveTimeout,
       DioExceptionType.unknown,
     ]) {
       expect(
@@ -84,6 +83,13 @@ void main() {
         reason: '$tipo',
       );
     }
+  });
+
+  test('se conectó pero la respuesta tardó: no es falta de internet', () {
+    expect(
+      mensajeDeError(_error(null, tipo: DioExceptionType.receiveTimeout)),
+      'El negocio tardó en responder. Vuelve a intentar en un momento.',
+    );
   });
 
   test('una función que el plan del negocio no incluye se dice para el '

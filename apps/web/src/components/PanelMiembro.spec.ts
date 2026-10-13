@@ -93,6 +93,16 @@ describe("resumen adaptado a citas o clases", () => {
     expect(w.get('[data-prueba="saldo-panel"]').text()).toContain("2");
   });
 
+  it("un saldo con fracción no se trunca (1.5 créditos, no 1)", async () => {
+    const datos = resumen(undefined);
+    datos.data.data.saldo_creditos = 1;
+    datos.data.data.saldo_unidades = 1500;
+    api.get.mockResolvedValue(datos);
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="saldo-panel"]').text()).toContain("1.5");
+  });
+
   it("en clases sigue mostrando el saldo aunque no haya un plan", async () => {
     api.get.mockResolvedValue(resumen(undefined));
     const w = montar();

@@ -255,6 +255,8 @@ export const reglasAgenda = {
   agregarDia: "Agregar día",
   sinCerrados: "No hay días cerrados próximos.",
   quitar: "Quitar",
+  confirmarQuitarDia:
+    "¿Quitar el cierre del {fecha}? Ese día vuelve a quedar abierto en la agenda.",
   series: "Clases que se repiten",
   seriesAyuda:
     "Al dejar de repetir una clase ya no se generan fechas nuevas; las que ya están en la agenda se conservan.",
@@ -835,6 +837,7 @@ export const plataformaAdmin = {
     ultimaSuspensionDetalle: "{fecha}, por {operador}",
     sinMotivo: "Sin motivo",
     guardado: "Cobro actualizado.",
+    cuotaRequerida: "Escribe la cuota fija (0 o más).",
     abrirPagina: "Ver su página",
     whatsappClientes: "WhatsApp con sus clientes",
     whatsappActivo: "Activo",
@@ -1320,6 +1323,8 @@ export const bloqueosAgenda = {
   bloquear: "Bloquear",
   bloquearIgual: "Bloquear de todos modos",
   quitar: "Quitar",
+  confirmarQuitar:
+    "¿Quitar el bloqueo «{motivo}» ({cuando})? Ese horario vuelve a quedar libre para agendar.",
   afectadas:
     "Ya hay {n} citas o clases en ese horario. No se cancelan: revísalas después de bloquear.",
   conReservas: "{n} con reserva",

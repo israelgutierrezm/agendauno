@@ -375,7 +375,15 @@ async function descargarRecibo(cargo: Cargo): Promise<void> {
 // Al volver de la página de pago de la renta: aviso y recarga tras la confirmación.
 const retornoPago = useRetornoPago();
 
+// La renta (y la deuda del negocio) solo la ve quien ve la facturación. Con el negocio
+// suspendido, el resto (alumnos, quien imparte, recepción) llega aquí y ve un aviso
+// neutro: el negocio no está disponible por ahora.
+const veRenta = computed(() => sesion.puede("facturacion.ver"));
+
 onMounted(() => {
+  if (!veRenta.value) {
+    return;
+  }
   void cargar();
   if (retornoPago.value === "exito") {
     toast.exito(t("pagoEnLinea.rentaExito"));
@@ -387,7 +395,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="tu-pagina">
+  <section v-if="!veRenta" class="tu-pagina" data-prueba="no-disponible">
+    <EstadoVacio
+      class="tu-card mt-6"
+      icono="renta"
+      :titulo="$t('renta.noDisponibleTitulo')"
+      :texto="$t('renta.noDisponibleAyuda')"
+    />
+  </section>
+  <section v-else class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('renta.titulo')" />
 
     <!-- Suspendido por renta vencida: qué pasa y cómo reactivarlo (ADR 0073). -->

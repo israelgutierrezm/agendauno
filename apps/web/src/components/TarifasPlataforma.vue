@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from "axios";
-import { onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -69,6 +69,8 @@ type Modalidad = (typeof MODALIDADES)[number];
 const vigentes = ref<Partial<Record<Modalidad, Tarifa | null>>>({});
 const borradores = ref<Partial<Record<Modalidad, Borrador>>>({});
 const publicando = ref<Modalidad | null>(null);
+// Tras intentar publicar con campos vacíos: se marcan y se explica dentro de su tarjeta.
+const incompleta = ref<Partial<Record<Modalidad, boolean>>>({});
 const cargando = ref(true);
 const errorCarga = ref<string | null>(null);
 
@@ -92,8 +94,40 @@ function cliente() {
 function decimal(minor: number): string {
   return String(minor / 100);
 }
-function aMinor(valor: string): number {
+function aMinor(valor: string | number): number {
   return Math.round(Number(valor) * 100);
+}
+// Un campo numérico vacío o que no es un número (antes se publicaba como 0).
+function vacio(valor: string | number | null | undefined): boolean {
+  const texto = String(valor ?? "").trim();
+  return texto === "" || !Number.isFinite(Number(texto)) || Number(texto) < 0;
+}
+function faltantes(m: Modalidad, b: Borrador): boolean {
+  const comunes = [
+    b.dias_prueba,
+    b.iva_porcentaje,
+    b.iva_porcentaje_extranjero,
+  ];
+  if (m === "clases") {
+    const ultimo = b.escalones.length - 1;
+    return (
+      comunes.some(vacio) ||
+      b.escalones.some(
+        (e, i) => vacio(e.precio) || (i < ultimo && vacio(e.hasta)),
+      )
+    );
+  }
+  return (
+    [...comunes, b.meses_anual, b.individual].some(vacio) ||
+    b.filas.some((f) => vacio(f.premium) || vacio(f.pro))
+  );
+}
+// Marca el campo vacío solo después de intentar publicar.
+function marcar(
+  m: Modalidad,
+  valor: string | number | null | undefined,
+): "true" | undefined {
+  return incompleta.value[m] === true && vacio(valor) ? "true" : undefined;
 }
 
 function borradorDe(tarifa: Tarifa | null): Borrador {
@@ -215,6 +249,16 @@ function cuerpoDe(m: Modalidad, b: Borrador): Record<string, unknown> {
 async function publicar(m: Modalidad): Promise<void> {
   const b = borradores.value[m];
   if (b === undefined) {
+    return;
+  }
+  incompleta.value[m] = faltantes(m, b);
+  if (incompleta.value[m]) {
+    await nextTick();
+    document
+      .querySelector<HTMLElement>(
+        `[data-prueba="tarifa-${m}"] [aria-invalid="true"]`,
+      )
+      ?.focus();
     return;
   }
   // Una versión publicada no se edita ni se borra: se confirma antes.
@@ -356,7 +400,9 @@ onMounted(reintentar);
                       class="tu-input"
                       type="number"
                       min="1"
+                      required
                       :aria-label="$t('cobro.tarifas.hasta')"
+                      :aria-invalid="marcar(m, e.hasta)"
                     />
                   </td>
                   <td class="pr-2">
@@ -366,7 +412,9 @@ onMounted(reintentar);
                       type="number"
                       min="0"
                       step="0.01"
+                      required
                       :aria-label="$t('cobro.tarifas.monto')"
+                      :aria-invalid="marcar(m, e.precio)"
                     />
                   </td>
                   <td class="text-right">
@@ -400,6 +448,8 @@ onMounted(reintentar);
                 type="number"
                 min="0"
                 step="0.01"
+                required
+                :aria-invalid="marcar(m, borradores[m]!.individual)"
               />
             </label>
             <table class="tu-tabla">
@@ -422,7 +472,9 @@ onMounted(reintentar);
                       type="number"
                       min="0"
                       step="0.01"
+                      required
                       :aria-label="`${$t('suscripcion.niveles.premium')} ${i + 2}`"
+                      :aria-invalid="marcar(m, f.premium)"
                     />
                   </td>
                   <td>
@@ -432,7 +484,9 @@ onMounted(reintentar);
                       type="number"
                       min="0"
                       step="0.01"
+                      required
                       :aria-label="`${$t('suscripcion.niveles.pro')} ${i + 2}`"
+                      :aria-invalid="marcar(m, f.pro)"
                     />
                   </td>
                 </tr>
@@ -497,6 +551,8 @@ onMounted(reintentar);
                 class="tu-input"
                 type="number"
                 min="0"
+                required
+                :aria-invalid="marcar(m, borradores[m]!.dias_prueba)"
               />
             </label>
             <label class="block">
@@ -506,6 +562,8 @@ onMounted(reintentar);
                 class="tu-input"
                 type="number"
                 min="0"
+                required
+                :aria-invalid="marcar(m, borradores[m]!.iva_porcentaje)"
               />
             </label>
             <label class="block">
@@ -517,6 +575,10 @@ onMounted(reintentar);
                 class="tu-input"
                 type="number"
                 min="0"
+                required
+                :aria-invalid="
+                  marcar(m, borradores[m]!.iva_porcentaje_extranjero)
+                "
               />
             </label>
             <label v-if="m === 'citas'" class="block">
@@ -529,9 +591,20 @@ onMounted(reintentar);
                 type="number"
                 min="1"
                 max="12"
+                required
+                :aria-invalid="marcar(m, borradores[m]!.meses_anual)"
               />
             </label>
           </div>
+
+          <AvisoTono
+            v-if="incompleta[m] && faltantes(m, borradores[m]!)"
+            tono="peligro"
+            role="alert"
+            :data-prueba="`tarifa-${m}-incompleta`"
+          >
+            {{ $t("cobro.tarifas.incompleta") }}
+          </AvisoTono>
 
           <button
             class="tu-btn tu-btn-primario w-full"

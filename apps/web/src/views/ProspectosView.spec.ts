@@ -229,6 +229,24 @@ describe("prospectos: responsable, contacto e historia", () => {
     );
   });
 
+  it("si la nota no se guarda, lo escrito se queda para reintentar", async () => {
+    const w = montar();
+    await abrirDetalle(w);
+    api.post.mockRejectedValueOnce("Sin conexión");
+
+    await w.get("#p-nota").setValue("Llamar el lunes");
+    await w.get("#p-nota").element.form!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+    expect(toast.error).toHaveBeenCalledWith("Sin conexión");
+    expect((w.get("#p-nota").element as HTMLTextAreaElement).value).toBe(
+      "Llamar el lunes",
+    );
+
+    await w.get("#p-nota").element.form!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+    expect((w.get("#p-nota").element as HTMLTextAreaElement).value).toBe("");
+  });
+
   it("escribirle por WhatsApp (botón verde) queda en su historia", async () => {
     const w = montar();
     await abrirDetalle(w);

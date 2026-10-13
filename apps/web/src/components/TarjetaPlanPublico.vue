@@ -2,6 +2,7 @@
 import { useI18n } from "vue-i18n";
 
 import { textoCobertura } from "@/lib/cobertura";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
 
 /**
@@ -33,12 +34,14 @@ const props = withDefaults(
   defineProps<{
     plan: PlanPublico;
     terminos?: TerminosNegocio | null;
+    // País del negocio (ISO 3166-1): los precios con sus números.
+    pais?: string | null;
     variasSedes?: boolean;
     // La etiqueta «Primera visita» arriba (si los planes no van agrupados).
     marcarPrimeraVez?: boolean;
     boton: string;
   }>(),
-  { terminos: null, variasSedes: false, marcarPrimeraVez: true },
+  { terminos: null, pais: null, variasSedes: false, marcarPrimeraVez: true },
 );
 const emit = defineEmits<{ elegir: [] }>();
 
@@ -59,10 +62,7 @@ function tn(
   return props.terminos ? adaptarTexto(texto, props.terminos) : texto;
 }
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, props.pais);
 }
 function fechaDia(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", {

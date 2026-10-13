@@ -18,6 +18,8 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     esCitas: true,
+    // Lejos de UTC: el día de cada reseña es el del negocio.
+    zonaHoraria: "Asia/Tokyo",
     terminologia: { miembro: "Cliente", instructor: "Profesional" },
     puede: () => true,
   }),
@@ -106,6 +108,8 @@ describe("reseñas", () => {
     expect(texto).toContain("50 %");
     // El mejor promedio primero en el lateral.
     expect(w.findAll(".rs-ranking > li")[0]!.text()).toContain("Toño");
+    // 18:00 UTC del 30 de septiembre ya es 1 de octubre en Tokio.
+    expect(texto).toContain("1 oct 2026");
   });
 
   it("filtra por calificación y por texto", async () => {

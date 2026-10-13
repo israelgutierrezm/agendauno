@@ -401,6 +401,7 @@ async function agendar(): Promise<void> {
           <span class="tu-label">{{
             $t("agendaVisual.nuevaCita.duracion")
           }}</span>
+          <!-- Con duración en el servicio, esa manda (el servidor la usa): solo se lee. -->
           <input
             v-model.number="form.duracion"
             class="tu-input"
@@ -408,7 +409,18 @@ async function agendar(): Promise<void> {
             min="5"
             step="5"
             required
+            :readonly="Boolean(oferta?.duracion_minutos)"
+            :aria-describedby="
+              oferta?.duracion_minutos ? 'nc-duracion-servicio' : undefined
+            "
+            data-prueba="duracion-cita"
           />
+          <span
+            v-if="oferta?.duracion_minutos"
+            id="nc-duracion-servicio"
+            class="tu-hint mt-1 block"
+            >{{ $t("agendaVisual.nuevaCita.duracionDelServicio") }}</span
+          >
         </label>
       </div>
 

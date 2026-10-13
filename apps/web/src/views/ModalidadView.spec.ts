@@ -537,11 +537,15 @@ describe("landing de una modalidad (/clases y /citas)", () => {
     },
   );
 
-  it("la pregunta de soporte da el correo de cada marca y el WhatsApp (C01)", () => {
+  it("la pregunta de soporte da el correo de cada marca y, sin WhatsApp configurado, no inventa uno (C01)", () => {
     const clases = montar("clases");
-    expect(
-      clases.get('#preguntas [data-pregunta="soporte"] p').text(),
-    ).toContain("soporte@agendauno.mx o por WhatsApp al 555555555");
+    const respuesta = clases
+      .get('#preguntas [data-pregunta="soporte"] p')
+      .text();
+    expect(respuesta).toContain(
+      "Escríbenos a soporte@agendauno.mx: te ayudamos",
+    );
+    expect(respuesta).not.toContain("WhatsApp");
     clases.unmount();
     const citas = montar("citas");
     expect(

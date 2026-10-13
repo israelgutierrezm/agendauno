@@ -10,7 +10,11 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    puede: () => true,
+    zonaHoraria: "America/Mexico_City",
+  }),
 }));
 const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
 vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
@@ -75,5 +79,59 @@ describe("una campaña en curso se controla (B08)", () => {
         .findAll("button")
         .some((b) => b.text() === "Reanudar"),
     ).toBe(true);
+  });
+
+  it("si el envío no pasa, el porqué se ve en la revisión y no se cierra mientras envía", async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/comunicaciones/segmentos")
+            ? [
+                {
+                  clave: "todos",
+                  etiqueta: "Todos",
+                  descripcion: "",
+                  total: 40,
+                },
+              ]
+            : url.endsWith("/comunicaciones/difusiones")
+              ? [difusion]
+              : [],
+        },
+      }),
+    );
+    let rechazar: (e: unknown) => void = () => undefined;
+    api.post.mockReturnValue(
+      new Promise((_, r) => {
+        rechazar = r;
+      }),
+    );
+    const w = mount(ComunicacionesView, {
+      global: {
+        plugins: [i18n],
+        stubs: { EncabezadoSeccion: true, PanelLateral: true, teleport: true },
+      },
+    });
+    await flushPromises();
+    // La fecha del historial, en la zona del negocio (12:00 UTC = 06:00 en CDMX).
+    expect(w.text()).toContain("06:00");
+
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("Todos"))!
+      .trigger("click");
+    await w.get("#com-asunto").setValue("Promo");
+    await w.get("#com-cuerpo").setValue("Hola {{persona_nombre}}");
+    await w.get('[data-prueba="revisar-difusion"]').trigger("click");
+    await w.get('[data-prueba="enviar-difusion"]').trigger("click");
+
+    // Enviando: el diálogo no se cierra.
+    expect(w.get('[role="dialog"]').attributes("aria-busy")).toBe("true");
+
+    rechazar("Ya mandaste esta misma difusión hace un momento.");
+    await flushPromises();
+    expect(w.get('[data-prueba="error-envio"]').text()).toBe(
+      "Ya mandaste esta misma difusión hace un momento.",
+    );
   });
 });

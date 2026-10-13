@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ListaFormularios from "@/components/ListaFormularios.vue";
 import MisDocumentos from "@/components/MisDocumentos.vue";
-import { useMiCuenta } from "@/lib/miCuenta";
+import { useMiCuenta, type Waiver } from "@/lib/miCuenta";
 
 /**
  * Expediente del portal: lo que el negocio le pide firmar, sus documentos y los
@@ -22,6 +22,17 @@ const variasSecciones = computed(
       ) >
     1,
 );
+
+// Si aceptar un documento falla, el porqué va junto a ese documento (no arriba, donde
+// el «Reintentar» solo recarga la página).
+const errorWaiver = ref<{ id: string; mensaje: string } | null>(null);
+async function aceptar(w: Waiver): Promise<void> {
+  errorWaiver.value = null;
+  if (!(await cuenta.aceptarWaiver(w))) {
+    errorWaiver.value = { id: w.id, mensaje: cuenta.error.value ?? "" };
+    cuenta.error.value = null;
+  }
+}
 
 onMounted(() => void cuenta.asegurar());
 </script>
@@ -109,10 +120,19 @@ onMounted(() => void cuenta.asegurar());
             <button
               class="tu-btn tu-btn-primario mt-2"
               :disabled="cuenta.accionando.value"
-              @click="cuenta.aceptarWaiver(w)"
+              @click="aceptar(w)"
             >
               {{ $t("miCuenta.aceptarWaiver") }}
             </button>
+            <AvisoTono
+              v-if="errorWaiver?.id === w.id"
+              tono="peligro"
+              class="mt-2"
+              role="alert"
+              data-prueba="error-waiver"
+            >
+              {{ errorWaiver.mensaje }}
+            </AvisoTono>
           </li>
         </ul>
       </div>
@@ -142,6 +162,7 @@ onMounted(() => void cuenta.asegurar());
           :formularios="cuenta.formularios.value"
           :persona-id="cuenta.personaId.value"
           :puede-responder="true"
+          en-cuenta
           @guardado="cuenta.cargarFormularios()"
         />
       </div>

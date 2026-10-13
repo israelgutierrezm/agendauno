@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import esMX from "@/i18n/locales/es-MX";
+import { confirmar } from "@/lib/confirmar";
 import operacion from "@/i18n/locales/operacion.es-MX";
 import RolesView from "./RolesView.vue";
 
@@ -87,6 +88,24 @@ describe("roles y permisos", () => {
     vi.clearAllMocks();
     api.get.mockResolvedValue({ data: respuesta });
     api.post.mockResolvedValue({ data: {} });
+  });
+
+  it("eliminar un rol propio se confirma como acción destructiva", async () => {
+    api.delete.mockResolvedValue({ data: {} });
+    const w = montar();
+    await flushPromises();
+
+    const boton = w.get('[data-prueba="eliminar-rol"]');
+    expect(boton.classes()).toEqual(
+      expect.arrayContaining(["tu-btn-contorno", "tu-tono-peligro"]),
+    );
+    await boton.trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ peligro: true }),
+    );
+    expect(api.delete).toHaveBeenCalledWith("/api/v1/app/demo/roles/01ROL");
   });
 
   it("separa los roles propios de los del sistema y solo deja cambiar los que caben en lo suyo", async () => {

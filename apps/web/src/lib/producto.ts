@@ -45,8 +45,9 @@ const DOMINIO_AGENDAUNO = (
 const DOMINIO_TURNOUNO = (
   env("VITE_DOMINIO_TURNOUNO") ?? "turnouno.mx"
 ).toLowerCase();
-// El WhatsApp de soporte es el mismo para las dos marcas; se cambia al compilar.
-const WHATSAPP_SOPORTE = env("VITE_SOPORTE_WHATSAPP") ?? "555555555";
+// El WhatsApp de soporte es el mismo para las dos marcas; se cambia al compilar. Sin
+// configurar queda vacío y no se ofrece (nada de un número de relleno).
+const WHATSAPP_SOPORTE = env("VITE_SOPORTE_WHATSAPP") ?? "";
 
 export const PRODUCTOS: Record<Producto, DatosProducto> = {
   agendauno: {

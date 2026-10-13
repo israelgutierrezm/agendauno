@@ -16,15 +16,19 @@ const props = defineProps<{
   abierto: boolean;
   titulo?: string;
   lateral?: boolean;
+  // Guardando: no se cierra (ni con Escape, el fondo o la X) hasta que termine, para
+  // que el resultado o el error se vean donde se hizo el cambio.
+  ocupado?: boolean;
 }>();
 const emit = defineEmits<{ cerrar: [] }>();
+function cerrar(): void {
+  if (!props.ocupado) {
+    emit("cerrar");
+  }
+}
 
 const panel = ref<HTMLElement | null>(null);
-const capa = useFocoPanel(
-  () => props.abierto,
-  panel,
-  () => emit("cerrar"),
-);
+const capa = useFocoPanel(() => props.abierto, panel, cerrar);
 </script>
 
 <template>
@@ -36,7 +40,7 @@ const capa = useFocoPanel(
         :style="{ zIndex: capa }"
         :class="lateral ? 'justify-end' : 'items-center justify-center p-4'"
       >
-        <div class="absolute inset-0 bg-black/50" @click="emit('cerrar')" />
+        <div class="absolute inset-0 bg-black/50" @click="cerrar" />
         <aside
           ref="panel"
           class="tu-drawer-panel relative flex w-full flex-col overflow-y-auto shadow-xl"
@@ -65,7 +69,8 @@ const capa = useFocoPanel(
               class="tu-icono-btn"
               type="button"
               :aria-label="$t('comun.cerrar')"
-              @click="emit('cerrar')"
+              :disabled="ocupado"
+              @click="cerrar"
             >
               <IconoNav nombre="cerrar" :tam="18" />
             </button>

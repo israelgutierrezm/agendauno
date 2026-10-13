@@ -404,9 +404,24 @@ async function recargarFicha(): Promise<void> {
   }
 }
 
+// La cuota fija en centavos; vacía o ilegible, null (antes se guardaba como $0).
+const errorCuota = ref(false);
+function leerCuota(valor: string | number): number | null {
+  const texto = String(valor).trim();
+  const n = Number(texto);
+  return texto !== "" && Number.isFinite(n) && n >= 0
+    ? Math.round(n * 100)
+    : null;
+}
 function guardarCobro(): void {
   const f = ficha.value;
   if (f === null) {
+    return;
+  }
+  const cuota = leerCuota(edit.value.cuota);
+  errorCuota.value = edit.value.modo_cobro === "fijo" && cuota === null;
+  if (errorCuota.value) {
+    document.querySelector<HTMLElement>("#cf")?.focus();
     return;
   }
   void accion(
@@ -415,7 +430,8 @@ function guardarCobro(): void {
         `/api/v1/plataforma/estudios/${f.slug}`,
         {
           modo_cobro: edit.value.modo_cobro,
-          cuota_fija_minor: Math.round(Number(edit.value.cuota) * 100),
+          // Sin cuota fija, la que ya tenía se conserva aunque el campo quedara vacío.
+          cuota_fija_minor: cuota ?? f.cuota_fija_minor,
           cuota_fija_moneda: edit.value.moneda,
           estado_facturacion: edit.value.estado_facturacion,
         },
@@ -2421,9 +2437,12 @@ function borrar(): void {
               </div>
               <template v-if="edit.modo_cobro === 'fijo'">
                 <div>
-                  <label class="tu-label" for="cf">{{
-                    $t("plataforma.estudios.cuotaFija")
-                  }}</label>
+                  <label class="tu-label" for="cf"
+                    >{{ $t("plataforma.estudios.cuotaFija") }}
+                    <span class="tu-obligatorio" aria-hidden="true"
+                      >*</span
+                    ></label
+                  >
                   <input
                     id="cf"
                     v-model="edit.cuota"
@@ -2431,7 +2450,17 @@ function borrar(): void {
                     min="0"
                     step="0.01"
                     class="tu-input"
+                    required
+                    :aria-invalid="errorCuota ? 'true' : undefined"
+                    :aria-describedby="errorCuota ? 'cf-error' : undefined"
+                    @input="errorCuota = false"
                   />
+                  <span
+                    v-if="errorCuota"
+                    id="cf-error"
+                    class="tu-error-campo"
+                    >{{ $t("plataformaAdmin.ficha.cuotaRequerida") }}</span
+                  >
                 </div>
                 <div>
                   <label class="tu-label" for="cfm">{{

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 
 import { useI18n } from "vue-i18n";
@@ -29,7 +29,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import SelectorColumnas from "@/components/SelectorColumnas.vue";
 import TarjetaMiembro from "@/components/TarjetaMiembro.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { useColumnasVisibles } from "@/lib/columnasListado";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import {
@@ -93,6 +93,7 @@ const puedeFamilias = computed(
     sesion.estudio?.modulos?.includes("familias") === true,
 );
 const familiasAbiertas = ref(false);
+const guardandoFamilias = ref(false);
 const puedeInvitar = computed(() => sesion.puede("usuarios.invitar"));
 
 const tipo = ref<"miembro" | "instructor">("miembro");
@@ -523,9 +524,10 @@ function editarDetalle(): void {
 }
 
 function fechaCorta(iso: string): string {
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeZone: sesion.zonaHoraria || undefined,
+  }).format(new Date(iso));
 }
 function detalleBaja(m: Miembro): string {
   if (!m.dado_de_baja_en) {
@@ -537,20 +539,27 @@ function detalleBaja(m: Miembro): string {
     : t("bajas.detalle", { fecha });
 }
 
-// Reactiva a alguien dado de baja (vuelve con su historial).
+// Reactiva a alguien dado de baja (vuelve con su historial). Devuelve el error, si
+// lo hubo: cada quien lo muestra donde se pidió (aviso o el diálogo del alta); el
+// error de una acción no esconde la lista (ese es solo el de cargarla).
 const reactivandoId = ref<string | null>(null);
-async function reactivar(id: string, nombre: string): Promise<void> {
+async function reactivar(id: string, nombre: string): Promise<string | null> {
   reactivandoId.value = id;
-  error.value = null;
   try {
     await api.post(`${base.value}/miembros/${id}/reactivar`, {});
     toast.exito(t("bajas.reactivado", { nombre }));
     await cargar();
+    return null;
   } catch (e) {
-    error.value = mensajeDeError(e);
-    toast.error(error.value);
+    return mensajeDeError(e);
   } finally {
     reactivandoId.value = null;
+  }
+}
+async function reactivarFila(m: Miembro): Promise<void> {
+  const fallo = await reactivar(m.id, nombreCompleto(m));
+  if (fallo !== null) {
+    toast.error(fallo);
   }
 }
 
@@ -559,7 +568,6 @@ async function invitar(m: Miembro): Promise<void> {
     return;
   }
   invitandoId.value = m.id;
-  error.value = null;
   try {
     await api.post(`${base.value}/usuarios/invitar`, {
       nombre: nombreCompleto(m),
@@ -568,7 +576,7 @@ async function invitar(m: Miembro): Promise<void> {
     });
     invitados.value = new Set(invitados.value).add(m.id);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     invitandoId.value = null;
   }
@@ -579,12 +587,11 @@ async function reenviarInvitacion(m: Miembro): Promise<void> {
     return;
   }
   invitandoId.value = m.id;
-  error.value = null;
   try {
     await api.post(`${base.value}/usuarios/${m.invitacion_pendiente}/reenviar`);
     toast.exito(t("operacion.clientes.reenviada", { email: m.email ?? "" }));
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     invitandoId.value = null;
   }
@@ -617,6 +624,20 @@ const coincidencia = ref<{
   nombre: string;
   mensaje: string;
 } | null>(null);
+// Lo que no se pudo guardar, dentro del panel del alta (no en la lista de atrás): el
+// error general arriba y cada error de campo junto a su campo, con el foco en el primero.
+const CAMPOS_ALTA = ["nombre", "primer_apellido", "email", "celular"];
+const errorAlta = ref<string | null>(null);
+const erroresAlta = ref<Record<string, string>>({});
+function errorDeAlta(campo: string): string | undefined {
+  return erroresAlta.value[campo];
+}
+async function enfocarPrimerErrorAlta(): Promise<void> {
+  await nextTick();
+  document
+    .querySelector<HTMLElement>('#mb-alta [aria-invalid="true"]')
+    ?.focus();
+}
 
 function abrirAlta(): void {
   form.value = {
@@ -632,7 +653,8 @@ function abrirAlta(): void {
     tipo: tipo.value,
   };
   mensaje.value = null;
-  error.value = null;
+  errorAlta.value = null;
+  erroresAlta.value = {};
   coincidencia.value = null;
   abiertoAlta.value = true;
 }
@@ -642,7 +664,8 @@ function cerrarAlta(): void {
 
 async function crear(liberarCelular = false): Promise<void> {
   guardando.value = true;
-  error.value = null;
+  errorAlta.value = null;
+  erroresAlta.value = {};
   mensaje.value = null;
   coincidencia.value = null;
   try {
@@ -696,8 +719,15 @@ async function crear(liberarCelular = false): Promise<void> {
       };
       return;
     }
-    error.value = mensajeDeError(e);
-    toast.error(error.value);
+    // Lo escrito se queda: solo se corrige lo marcado.
+    const campos = erroresPorCampo(e);
+    erroresAlta.value = campos;
+    const claves = Object.keys(campos);
+    errorAlta.value =
+      claves.length > 0 && claves.every((c) => CAMPOS_ALTA.includes(c))
+        ? t("comun.revisaCampos")
+        : mensajeDeError(e);
+    void enfocarPrimerErrorAlta();
   } finally {
     guardando.value = false;
   }
@@ -707,7 +737,15 @@ async function reactivarCoincidencia(): Promise<void> {
   if (coincidencia.value === null) {
     return;
   }
-  await reactivar(coincidencia.value.id, coincidencia.value.nombre);
+  errorAlta.value = null;
+  const fallo = await reactivar(
+    coincidencia.value.id,
+    coincidencia.value.nombre,
+  );
+  if (fallo !== null) {
+    errorAlta.value = fallo;
+    return;
+  }
   coincidencia.value = null;
   abiertoAlta.value = false;
 }
@@ -1279,7 +1317,7 @@ onMounted(() => {
                 class="mb-menu"
                 role="menuitem"
                 :disabled="reactivandoId === menuFila.m.id"
-                @click="accionFila((m) => reactivar(m.id, nombreCompleto(m)))"
+                @click="accionFila(reactivarFila)"
               >
                 {{ $t("bajas.reactivar") }}
               </button>
@@ -1336,22 +1374,75 @@ onMounted(() => {
     <PanelLateral
       :abierto="abiertoAlta"
       :titulo="$t('miembros.nuevoTitulo')"
+      :ocupado="guardando || reactivandoId !== null"
       @cerrar="cerrarAlta"
     >
-      <form class="space-y-4" @submit.prevent="crear()">
+      <form id="mb-alta" class="space-y-4" @submit.prevent="crear()">
+        <AvisoTono
+          v-if="errorAlta"
+          tono="peligro"
+          role="alert"
+          data-prueba="error-alta"
+        >
+          {{ errorAlta }}
+        </AvisoTono>
         <div>
-          <label class="tu-label" for="mn">{{ $t("miembros.nombre") }}</label>
-          <input id="mn" v-model="form.nombre" class="tu-input" required />
+          <label class="tu-label" for="mn"
+            >{{ $t("miembros.nombre")
+            }}<span class="tu-obligatorio" aria-hidden="true">*</span></label
+          >
+          <input
+            id="mn"
+            v-model="form.nombre"
+            class="tu-input"
+            required
+            :aria-invalid="errorDeAlta('nombre') ? 'true' : undefined"
+            :aria-describedby="errorDeAlta('nombre') ? 'mn-error' : undefined"
+          />
+          <span
+            v-if="errorDeAlta('nombre')"
+            id="mn-error"
+            class="tu-error-campo"
+            >{{ errorDeAlta("nombre") }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="mpa">{{
             $t("miembros.primerApellido")
           }}</label>
-          <input id="mpa" v-model="form.primer_apellido" class="tu-input" />
+          <input
+            id="mpa"
+            v-model="form.primer_apellido"
+            class="tu-input"
+            :aria-invalid="errorDeAlta('primer_apellido') ? 'true' : undefined"
+            :aria-describedby="
+              errorDeAlta('primer_apellido') ? 'mpa-error' : undefined
+            "
+          />
+          <span
+            v-if="errorDeAlta('primer_apellido')"
+            id="mpa-error"
+            class="tu-error-campo"
+            >{{ errorDeAlta("primer_apellido") }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="me">{{ $t("miembros.email") }}</label>
-          <input id="me" v-model="form.email" class="tu-input" type="email" />
+          <input
+            id="me"
+            v-model="form.email"
+            class="tu-input"
+            type="email"
+            :aria-invalid="errorDeAlta('email') ? 'true' : undefined"
+            :aria-describedby="errorDeAlta('email') ? 'me-error' : undefined"
+          />
+          <span
+            v-if="errorDeAlta('email')"
+            id="me-error"
+            class="tu-error-campo"
+            data-prueba="error-email"
+            >{{ errorDeAlta("email") }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="mc">{{ $t("miembros.celular") }}</label>
@@ -1361,7 +1452,15 @@ onMounted(() => {
             v-model="form.celular"
             maxlength="30"
             autocomplete="off"
+            :aria-invalid="errorDeAlta('celular') ? 'true' : undefined"
+            :aria-describedby="errorDeAlta('celular') ? 'mc-error' : undefined"
           />
+          <span
+            v-if="errorDeAlta('celular')"
+            id="mc-error"
+            class="tu-error-campo"
+            >{{ errorDeAlta("celular") }}</span
+          >
         </div>
         <CamposDatosPersonales
           id="ma"
@@ -1423,6 +1522,7 @@ onMounted(() => {
           <button
             class="tu-btn tu-btn-fantasma"
             type="button"
+            :disabled="guardando || reactivandoId !== null"
             @click="cerrarAlta"
           >
             {{ $t("comun.cerrar") }}
@@ -1468,10 +1568,12 @@ onMounted(() => {
       :abierto="familiasAbiertas"
       :titulo="$t('familias.config.titulo')"
       tam="md"
+      :ocupado="guardandoFamilias"
       @cerrar="familiasAbiertas = false"
     >
       <FamiliasNegocio
         v-if="familiasAbiertas"
+        @ocupado="guardandoFamilias = $event"
         @guardado="familiasAbiertas = false"
         @cerrar="familiasAbiertas = false"
       />

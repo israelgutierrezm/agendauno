@@ -115,6 +115,7 @@ function cambiarPorPagina(n: number): void {
   void cargar();
 }
 
+// En la zona horaria del negocio (ADR 0099), aunque quien mira esté en otra.
 function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
@@ -123,6 +124,7 @@ function fecha(iso: string | null): string {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(iso));
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
@@ -46,6 +47,16 @@ const error = ref<string | null>(null);
 const puedeImportar = computed(
   () => preview.value !== null && preview.value.resumen.validas > 0,
 );
+
+// Un 422 de la carga trae el análisis del archivo (`{data: resultado}`), no un mensaje:
+// las filas por corregir se ven en la lista.
+function rechazoConFilas(e: unknown): Resultado | null {
+  if (!axios.isAxiosError(e) || e.response?.status !== 422) {
+    return null;
+  }
+  const datos = (e.response.data as { data?: Resultado } | undefined)?.data;
+  return datos && Array.isArray(datos.filas) && datos.resumen ? datos : null;
+}
 
 function texto(v: unknown): string {
   return v === null || v === undefined || v === "" ? "—" : String(v);
@@ -119,7 +130,16 @@ async function importar(invitar: boolean): Promise<void> {
     archivo.value = null;
     nombreArchivo.value = "";
   } catch (e) {
-    error.value = mensajeDeError(e);
+    const rechazo = rechazoConFilas(e);
+    if (rechazo !== null) {
+      preview.value = rechazo;
+      error.value =
+        rechazo.resumen.total === 0
+          ? t("importar.sinFilas")
+          : t("importar.rechazado");
+    } else {
+      error.value = mensajeDeError(e);
+    }
   } finally {
     importando.value = false;
   }

@@ -41,6 +41,7 @@ export default {
     detalle: "Detalle",
     eliminar: "Eliminar",
     reintentar: "Reintentar",
+    revisaCampos: "Revisa los campos marcados.",
     // La petición no tuvo respuesta (sin red, servidor caído o tiempo agotado).
     sinRespuesta:
       "No hubo respuesta del servidor. Revisa tu conexión e inténtalo de nuevo.",
@@ -499,6 +500,9 @@ export default {
         soporte: {
           q: "¿Quién me ayuda si tengo dudas?",
           a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
+          // Sin WhatsApp de soporte configurado, solo el correo.
+          aSinWhatsapp:
+            "Nosotros. Escríbenos a {correo}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
         },
         pagos: {
           q: "¿Mis alumnos pueden pagar en línea?",
@@ -711,6 +715,9 @@ export default {
         soporte: {
           q: "¿Quién me ayuda si tengo dudas?",
           a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
+          // Sin WhatsApp de soporte configurado, solo el correo.
+          aSinWhatsapp:
+            "Nosotros. Escríbenos a {correo}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
         },
         // Sin nombrar la otra modalidad ni el otro producto: esta página habla solo de
         // citas (ADR 0104 y 0108, como en `landing.clases.faq.modalidad`).
@@ -1528,6 +1535,10 @@ export default {
       "Se cargarán {n} filas listas y quedarán {m} por corregir.",
     porCorregir:
       "Quedaron {n} filas por corregir: corrígelas en tu archivo y vuelve a subirlo; lo que ya se cargó no se repite.",
+    // El servidor volvió a revisar el archivo y no cargó nada (422 con su análisis).
+    rechazado:
+      "No se cargó nada: hay filas por corregir. Revísalas en la lista de abajo, corrige tu archivo y vuelve a subirlo.",
+    sinFilas: "El archivo no tiene filas para cargar.",
     colNombre: "Nombre",
     colCorreo: "Correo",
     colEstado: "Estado",
@@ -2060,6 +2071,8 @@ export default {
     sedeAsignar: "Asignar",
     sedeAsignando: "Asignando…",
     sedeQuitar: "Quitar",
+    confirmarQuitarSede:
+      "¿Quitar a {nombre} de {sucursal}? Deja de ver y atender lo de esa sucursal.",
   },
   datosFiscales: {
     titulo: "Datos fiscales",
@@ -2432,6 +2445,10 @@ export default {
   renta: {
     titulo: "Mi suscripción",
     suspendidoTitulo: "Tu negocio está suspendido por una renta sin pagar",
+    // Para quien no ve la facturación (alumnos, quien imparte, recepción).
+    noDisponibleTitulo: "Este negocio no está disponible por ahora",
+    noDisponibleAyuda:
+      "Por el momento no se puede agendar ni entrar. Cuando vuelva a estar activo podrás usarlo como siempre; tu información está a salvo.",
     suspendidoAyuda:
       "Mientras tanto nadie puede agendar ni entrar al panel. Paga la renta pendiente aquí abajo y se reactiva solo en unos minutos; tu información está a salvo.",
     historial: "Historial de cargos",

@@ -227,7 +227,7 @@ async function confirmarBaja(): Promise<void> {
       <button
         v-if="sim"
         type="button"
-        class="tu-btn tu-btn-primario"
+        class="tu-btn tu-btn-solido tu-tono-peligro"
         :disabled="enviando || motivoFalta"
         data-prueba="confirmar-baja"
         @click="confirmarBaja"
