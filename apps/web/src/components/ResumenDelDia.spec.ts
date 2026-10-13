@@ -67,6 +67,14 @@ function montar() {
   });
 }
 
+// El inicio abre en «Por comenzar»: lo que ya pasó o se canceló se ve en «Todas».
+async function verTodas(w: ReturnType<typeof montar>): Promise<void> {
+  await w
+    .findAll("button")
+    .find((b) => b.text() === "Todas")!
+    .trigger("click");
+}
+
 describe("el día de hoy en el Inicio", () => {
   it("pagina la agenda del inicio sin omitir sesiones y vuelve al inicio al buscar", async () => {
     api.get.mockImplementation(async (url: string) => ({
@@ -155,6 +163,7 @@ describe("el día de hoy en el Inicio", () => {
     });
     const w = montar();
     await flushPromises();
+    await verTodas(w);
     const texto = w.text();
 
     // La fecha local del día va a la API.
@@ -376,6 +385,7 @@ describe("el día de hoy en el Inicio", () => {
     });
     const w = montar();
     await flushPromises();
+    await verTodas(w);
     const texto = w.text();
 
     expect(texto).toContain("Quién viene después");
@@ -391,6 +401,62 @@ describe("el día de hoy en el Inicio", () => {
     expect(libres).toContain("Caro");
     expect(libres).toContain("6 espacios");
     expect(libres).toContain("desde las 13:30");
+  });
+  it("abre en «Por comenzar» sin quitar «Todas»; si ya no queda nada, ofrece verlas", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          agenda: {
+            totales: { sesiones: 3, esperados: 6, llegaron: 0, sin_marcar: 0 },
+            sesiones: [
+              sesion({ id: "uno", oferta: "Pole", momento: "proxima" }),
+              sesion({ id: "dos", oferta: "Exotic", momento: "termino" }),
+              sesion({ id: "tres", oferta: "Flex", momento: "en_curso" }),
+            ],
+          },
+          cobros: null,
+          renovaciones: null,
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    const activo = () =>
+      w
+        .findAll('[role="group"] button')
+        .filter((b) => b.attributes("aria-pressed") === "true")
+        .map((b) => b.text());
+    expect(activo()).toEqual(["Por comenzar"]);
+    expect(w.findAll(".hoy-sesion").map((e) => e.text())).toHaveLength(2);
+    expect(w.get(".hoy-agenda-lista").text()).not.toContain("Exotic");
+    await verTodas(w);
+    expect(activo()).toEqual(["Todas"]);
+    expect(w.findAll(".hoy-sesion")).toHaveLength(3);
+    w.unmount();
+
+    // Con el día terminado no dice «sin resultados»: ofrece ver todas.
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          agenda: {
+            totales: { sesiones: 1, esperados: 3, llegaron: 3, sin_marcar: 0 },
+            sesiones: [sesion({ oferta: "Exotic", momento: "termino" })],
+          },
+          cobros: null,
+          renovaciones: null,
+        },
+      },
+    });
+    const v = montar();
+    await flushPromises();
+    const vacio = v.get('[data-prueba="nada-por-comenzar"]');
+    expect(vacio.text()).toContain("No quedan clases por comenzar hoy");
+    expect(v.text()).not.toContain("No hay actividad que coincida");
+    await vacio.get("button").trigger("click");
+    expect(v.findAll(".hoy-sesion")).toHaveLength(1);
+    expect(v.get(".hoy-sesion").text()).toContain("Exotic");
   });
   it("busca por nombre sin acentos y filtra sin cambiar las cifras del día", async () => {
     api.get.mockResolvedValue({
@@ -417,6 +483,7 @@ describe("el día de hoy en el Inicio", () => {
     });
     const w = montar();
     await flushPromises();
+    await verTodas(w);
     await w.get('input[type="search"]').setValue("maria");
     expect(w.findAll(".hoy-sesion")).toHaveLength(1);
     expect(w.get(".hoy-sesion").text()).toContain("María");
@@ -453,6 +520,7 @@ describe("el día de hoy en el Inicio", () => {
     });
     const w = montar();
     await flushPromises();
+    await verTodas(w);
     expect(w.text()).toContain("No quedan clases por comenzar hoy");
     expect(w.text()).toContain("Revisa la asistencia");
     expect(
@@ -518,6 +586,7 @@ describe("el día de hoy en el Inicio", () => {
     );
     const w = montar();
     await flushPromises();
+    await verTodas(w);
 
     // Por atender (la que sigue) y sin registrar (la que ya pasó), por separado.
     expect(w.get('[data-prueba="indicador-porAtender"]').text()).toContain("1");
@@ -574,6 +643,7 @@ describe("el día de hoy en el Inicio", () => {
     );
     const w = montar();
     await flushPromises();
+    await verTodas(w);
 
     const marcar = JSON.parse(
       w.get('[data-prueba="marcar-pendiente"]').attributes("data-to")!,
@@ -588,6 +658,7 @@ describe("el día de hoy en el Inicio", () => {
     api.modalidad = "clases";
     const v = montar();
     await flushPromises();
+    await verTodas(v);
     expect(
       JSON.parse(
         v.get('[data-prueba="marcar-pendiente"]').attributes("data-to")!,

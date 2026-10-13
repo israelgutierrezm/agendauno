@@ -232,6 +232,7 @@ export default {
     },
     sinResultados: "No hay actividad que coincida con tu búsqueda.",
     limpiar: "Limpiar búsqueda y filtros",
+    verTodas: "Ver todas",
     abrirAgenda: "Abrir agenda",
     // Abre directo lo que sigue (la clase o la cita), con el término del negocio.
     verSesion: "Ver {sesion}",
