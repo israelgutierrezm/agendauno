@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FamiliasTenant;
 use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
@@ -155,9 +156,12 @@ class SuscripcionesTenantController
 
     private function acuerdo(Request $request): AcuerdoTenant
     {
-        return AcuerdoTenant::query()
+        $acuerdo = AcuerdoTenant::query()
             ->where('ulid', (string) $request->route('acuerdo'))
             ->with(['persona', 'producto'])
             ->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirAcuerdo($request, $acuerdo);
+
+        return $acuerdo;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
@@ -180,6 +181,7 @@ class OrdenesTenantController
     public function show(Request $request): JsonResponse
     {
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirOrden($request, $orden);
 
         return response()->json(['data' => $this->presentar($orden)]);
     }
@@ -187,6 +189,7 @@ class OrdenesTenantController
     public function cobrar(Request $request): JsonResponse
     {
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirOrden($request, $orden);
 
         $validado = $request->validate([
             'proveedor' => ['required', 'string'],
@@ -221,6 +224,7 @@ class OrdenesTenantController
     public function liquidar(Request $request): JsonResponse
     {
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirOrden($request, $orden);
 
         $validado = $request->validate([
             'metodo' => ['required', Rule::in(self::METODOS)],

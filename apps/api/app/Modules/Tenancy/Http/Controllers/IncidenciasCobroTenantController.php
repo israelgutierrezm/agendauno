@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\FulfillmentTenant;
 use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
@@ -56,6 +57,11 @@ class IncidenciasCobroTenantController
     public function resolver(Request $request, ReembolsarPagoTenant $reembolsos, IncidenciasCobroTenant $incidencias, RegistrarAuditoria $auditoria, FulfillmentTenant $fulfillment): JsonResponse
     {
         $incidencia = IncidenciaCobroTenant::query()->where('ulid', (string) $request->route('incidencia'))->firstOrFail();
+        // Un cobro de otra sede no se resuelve (ni se devuelve) desde aquí (R19).
+        $ordenIncidencia = $incidencia->orden_id !== null ? OrdenTenant::query()->find($incidencia->orden_id) : null;
+        if ($ordenIncidencia instanceof OrdenTenant) {
+            app(AlcancePersonaTenant::class)->exigirOrden($request, $ordenIncidencia);
+        }
         $validado = $request->validate([
             'resolucion' => ['required', 'string', 'max:500'],
             // En una devolución incierta: si la pasarela la hizo o no.

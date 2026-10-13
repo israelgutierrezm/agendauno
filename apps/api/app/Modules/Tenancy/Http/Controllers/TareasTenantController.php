@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\FamiliasTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
@@ -79,7 +80,8 @@ class TareasTenantController
         if ($suyas === null && ($filtros['responsable'] ?? '') !== '') {
             $suyas = (int) (Usuario::query()->where('ulid', $filtros['responsable'])->value('id') ?? 0);
         }
-        $deSuAlcance = fn (): Builder => TareaTenant::query()
+        // De sus sedes (R19): las que no cuelgan de nadie las ve todo el equipo.
+        $deSuAlcance = fn (): Builder => app(AlcancePersonaTenant::class)->acotada(TareaTenant::query(), $request, 'persona_id', true)
             ->when($suyas !== null, fn (Builder $q) => $q->where('responsable_id', $suyas));
 
         $q = trim((string) ($filtros['q'] ?? ''));

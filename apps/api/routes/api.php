@@ -377,7 +377,7 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/apariencia/fuente', [AparienciaTenantController::class, 'fuente'])->name('apariencia.fuente');
             // Mi perfil: cada quien ajusta su nombre, su foto y su contraseña.
             Route::put('/yo/perfil', [PerfilTenantController::class, 'actualizar'])->name('yo.perfil');
-            Route::put('/yo/contrasena', [PerfilTenantController::class, 'cambiarContrasena'])->name('yo.contrasena');
+            Route::put('/yo/contrasena', [PerfilTenantController::class, 'cambiarContrasena'])->middleware('throttle:confirmar-contrasena')->name('yo.contrasena');
             Route::post('/yo/correo', [PerfilTenantController::class, 'solicitarCambioCorreo'])->middleware('throttle:recuperacion')->name('yo.correo.store');
             Route::delete('/yo/correo', [PerfilTenantController::class, 'cancelarCambioCorreo'])->name('yo.correo.destroy');
             Route::post('/yo/foto', [PerfilTenantController::class, 'subirFoto'])->name('yo.foto.store');
@@ -575,11 +575,11 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/renta', [FacturacionController::class, 'renta'])->middleware('puede:facturacion.ver')->name('renta');
             // Avisos de AgendaUno al dueño: correo y WhatsApp, y verificar su número (ADR 0072).
             Route::get('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'mostrar'])->middleware('puede:facturacion.ver')->name('avisos-plataforma');
-            Route::put('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'guardar'])->middleware('puede:facturacion.ver')->name('avisos-plataforma.guardar');
+            Route::put('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'guardar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('avisos-plataforma.guardar');
             Route::post('/avisos-plataforma/whatsapp/codigo', [AvisosPlataformaTenantController::class, 'codigo'])
-                ->middleware(['puede:facturacion.ver', 'throttle:whatsapp-panel-codigo'])->name('avisos-plataforma.codigo');
+                ->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar', 'throttle:whatsapp-panel-codigo'])->name('avisos-plataforma.codigo');
             Route::post('/avisos-plataforma/whatsapp/verificar', [AvisosPlataformaTenantController::class, 'verificar'])
-                ->middleware(['puede:facturacion.ver', 'throttle:whatsapp-panel-verificar'])->name('avisos-plataforma.verificar');
+                ->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar', 'throttle:whatsapp-panel-verificar'])->name('avisos-plataforma.verificar');
             // Cambiar el WhatsApp del negocio: con código al número nuevo si hay WhatsApp con los dueños (ADR 0075).
             Route::post('/avisos-plataforma/whatsapp/cambio/codigo', [AvisosPlataformaTenantController::class, 'codigoCambio'])
                 ->middleware(['puede:estudio.gestionar', 'throttle:whatsapp-panel-codigo'])->name('avisos-plataforma.cambio.codigo');
@@ -602,10 +602,10 @@ Route::prefix('v1')->group(function (): void {
             // Timbres para facturar a los clientes (ADR 0107): saldo y compra de paquetes.
             Route::get('/timbres', [TimbresTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('timbres.index');
             Route::get('/timbres/movimientos', [TimbresTenantController::class, 'movimientos'])->middleware('puede:facturacion.ver')->name('timbres.movimientos');
-            Route::post('/timbres/comprar', [TimbresTenantController::class, 'comprar'])->middleware('puede:facturacion.ver')->name('timbres.comprar');
+            Route::post('/timbres/comprar', [TimbresTenantController::class, 'comprar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('timbres.comprar');
             // Factura (CFDI) de la renta del SaaS: emite el CFDI de un cargo pagado y
             // entrega el PDF/XML (AgendaUno emisor, el estudio receptor).
-            Route::post('/renta/cargos/{cargo}/factura', [FacturaRentaController::class, 'emitir'])->middleware('puede:facturacion.ver')->name('renta.factura');
+            Route::post('/renta/cargos/{cargo}/factura', [FacturaRentaController::class, 'emitir'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.factura');
             Route::get('/renta/facturas/{factura}/{formato}', [FacturaRentaController::class, 'descargar'])->middleware('puede:facturacion.ver')->name('renta.factura.descargar');
             // Recibo sin valor fiscal de un cargo pagado (quien no puede recibir la factura).
             Route::get('/renta/cargos/{cargo}/recibo', [FacturaRentaController::class, 'recibo'])->middleware('puede:facturacion.ver')->name('renta.recibo');

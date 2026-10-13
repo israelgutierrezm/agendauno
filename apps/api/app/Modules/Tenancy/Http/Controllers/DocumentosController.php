@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AccesoExpedienteTenant;
-use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\EstadoDocumento;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\Estudio;
@@ -51,8 +51,8 @@ class DocumentosController
             ->when(! $this->usuario($request)->puede('usuarios.gestionar'), function ($consulta): void {
                 $consulta->whereHas('persona', fn ($p) => $p->where('tipo', TipoPersonaTenant::Miembro->value));
             })
-            // Quien imparte: solo los de sus clientes.
-            ->whereHas('persona', fn ($p) => app(AlcanceClientesTenant::class)->acotar($p, $this->usuario($request)))
+            // De sus sedes (R19) y, si imparte, solo los de sus clientes.
+            ->tap(fn ($consulta) => app(AlcancePersonaTenant::class)->acotarPorPersona($consulta, $this->usuario($request)))
             ->orderByDesc('id')
             ->paginate((int) ($validado['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($validado['page'] ?? 1));
 

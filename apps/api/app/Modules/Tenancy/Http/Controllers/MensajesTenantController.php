@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
@@ -45,7 +46,8 @@ class MensajesTenantController
         }
 
         $q = trim((string) ($validado['q'] ?? ''));
-        $encontrados = fn (): Builder => MensajeTenant::query()
+        // De sus sedes (R19): los avisos al equipo (sin persona) los ve todo el equipo.
+        $encontrados = fn (): Builder => app(AlcancePersonaTenant::class)->acotada(MensajeTenant::query(), $request, 'persona_id', true)
             ->when(isset($validado['canal']), fn ($c) => $c->where('canal', $validado['canal']))
             ->when($q !== '', fn ($c) => $c->where(fn ($w) => $w
                 ->where('asunto', 'like', "%{$q}%")

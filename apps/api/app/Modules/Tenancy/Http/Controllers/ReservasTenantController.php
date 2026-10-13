@@ -45,6 +45,7 @@ class ReservasTenantController
     public function index(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesion($request, $sesion);
 
         // Un instructor solo ve el roster de SUS sesiones asignadas.
         $usuario = $request->attributes->get('usuario_tenant');
@@ -193,6 +194,7 @@ class ReservasTenantController
     public function reservar(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesion($request, $sesion);
 
         $validado = $request->validate([
             'persona_id' => ['required', 'string'],
@@ -226,6 +228,7 @@ class ReservasTenantController
     public function preview(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesion($request, $sesion);
 
         $validado = $request->validate([
             'persona_id' => ['required', 'string'],
@@ -255,6 +258,7 @@ class ReservasTenantController
     public function cancelar(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        $this->exigirSesion($request, $reserva->sesion);
         $usuario = $request->attributes->get('usuario_tenant');
 
         $this->reservas->cancelar($reserva, $this->quienCancela($request), $usuario instanceof Usuario ? $usuario : null);
@@ -281,8 +285,19 @@ class ReservasTenantController
     public function previsualizarCancelacion(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        $this->exigirSesion($request, $reserva->sesion);
 
         return response()->json(['data' => $this->reservas->efectoDeCancelar($reserva, $this->quienCancela($request))->toArray()]);
+    }
+
+    /**
+     * Quien imparte solo opera sus sesiones y el equipo acotado, las de sus sedes (R19):
+     * con el ULID de una reserva de otra sede no se cancela, mueve ni ve nada.
+     */
+    private function exigirSesion(Request $request, ?SesionTenant $sesion): void
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($sesion !== null && $this->acceso->puedeOperar($sesion, $usuario instanceof Usuario ? $usuario : null), 403);
     }
 
     private function quienCancela(Request $request): QuienCancela
@@ -297,6 +312,7 @@ class ReservasTenantController
     public function aceptar(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        $this->exigirSesion($request, $reserva->sesion);
 
         $this->reservas->aceptar($reserva);
 
@@ -310,6 +326,7 @@ class ReservasTenantController
     public function promover(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesion($request, $sesion);
 
         $ofrecidas = $this->reservas->promoverCupos($sesion);
 
@@ -322,6 +339,7 @@ class ReservasTenantController
     public function transferir(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        $this->exigirSesion($request, $reserva->sesion);
         $validado = $request->validate(['persona_id' => ['required', 'string']]);
         $destino = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
 

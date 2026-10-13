@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,7 +53,11 @@ class FacturasTenantController
         }
         $buscar = trim((string) ($filtros['q'] ?? ''));
         $fechas = app(FechasNegocioTenant::class);
+        // Alcance por sucursal (R19): las de las compras de sus sedes (una factura sin
+        // compra es del negocio y no es de ninguna sede).
+        $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
         $consulta = FacturaTenant::query()
+            ->when($sedes !== null, fn (Builder $q) => $q->whereIn('orden_id', OrdenTenant::query()->select('id')->whereIn('sucursal_id', $sedes)))
             ->when($buscar !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
                 ->where('receptor_nombre', 'like', "%{$buscar}%")
                 ->orWhere('receptor_rfc', 'like', '%'.mb_strtoupper($buscar).'%')
@@ -83,6 +90,10 @@ class FacturasTenantController
     public function show(Request $request): JsonResponse
     {
         $factura = FacturaTenant::query()->where('ulid', (string) $request->route('factura'))->firstOrFail();
+        $orden = $factura->orden_id !== null ? OrdenTenant::query()->find($factura->orden_id) : null;
+        $orden instanceof OrdenTenant
+            ? app(AlcancePersonaTenant::class)->exigirOrden($request, $orden)
+            : abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403);
 
         return response()->json(['data' => $this->presentar($factura)]);
     }

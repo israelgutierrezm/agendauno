@@ -37,6 +37,6 @@ return [
     'max_age' => 7200,
 
     // Required for Sanctum cookie-based SPA authentication.
-    'supports_credentials' => true,
+    'supports_credentials' => false,
 
 ];

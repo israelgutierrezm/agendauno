@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\CuotasTenant;
 use App\Modules\Tenancy\Application\ExentarCuotaTenant;
 use App\Modules\Tenancy\Models\ConfiguracionCuotasTenant;
@@ -60,6 +61,7 @@ class CuotasTenantController extends Controller
     public function dePersona(Request $request, CuotasTenant $cuotas): JsonResponse
     {
         $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
 
         return response()->json(['data' => [
             'inscripcion_minor' => $cuotas->debeInscripcion($persona) ? ConfiguracionCuotasTenant::actual()->inscripcion_minor : 0,
@@ -74,6 +76,7 @@ class CuotasTenantController extends Controller
     {
         $validado = $request->validate(['motivo' => ['required', 'string', 'max:300']]);
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirOrden($request, $orden);
         $linea = LineaOrdenTenant::query()
             ->where('orden_id', $orden->getKey())
             ->where('ulid', (string) $request->route('linea'))
