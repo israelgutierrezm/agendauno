@@ -323,6 +323,13 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
   - quien está acotado a sus sucursales ve sus entradas y las registradas sin sucursal;
   - `meta.conteos` cuenta lo encontrado por resultado, sin ese filtro.
 
+## Descargar los movimientos
+
+- `GET /pagos?formato=csv` descarga lo que encuentra la lista de Movimientos con los
+  mismos filtros (`q`, `estado`, `desde`, `hasta`), hasta 5,000, con las fechas en la zona
+  del negocio (`movimientos.csv`, con BOM). Columnas: Fecha, Persona, Monto, Moneda,
+  Devuelto, Estado, Forma de pago y Registró.
+
 ## Asignar y editar tareas
 
 - `POST /tareas` suma `persona_id` (ULID de una persona del negocio) y `responsable_id`

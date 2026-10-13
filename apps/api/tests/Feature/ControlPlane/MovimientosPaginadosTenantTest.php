@@ -60,3 +60,19 @@ it('pagina los movimientos, busca por persona, acota por fechas y resume todo lo
         ->assertUnprocessable()->assertJsonValidationErrors(['hasta'], 'meta.errors');
     $this->getJson("{$url}?estado=raro", conBearer($e['bearer']))->assertUnprocessable();
 });
+
+it('descarga en CSV lo que encuentra con los mismos filtros, en la hora del negocio', function (): void {
+    $e = estudioConSesion('estudio-mov', 'a@correo.mx');
+    cobroParaMovimientos($e, 'Ana');
+    cobroParaMovimientos($e, 'Bea');
+    $url = "/api/v1/app/{$e['slug']}/pagos";
+
+    $csv = $this->get("{$url}?formato=csv&q=bea", conBearer($e['bearer']))->assertOk();
+    expect($csv->headers->get('Content-Type'))->toContain('text/csv')
+        ->and($csv->headers->get('Content-Disposition'))->toContain('movimientos.csv');
+    $lineas = explode("\n", trim(ltrim((string) $csv->getContent(), "\u{FEFF}")));
+    expect($lineas)->toHaveCount(2)
+        ->and($lineas[0])->toBe('Fecha,Persona,Monto,Moneda,Devuelto,Estado,Forma de pago,Registró')
+        // El reloj de las pruebas: 1 de octubre de 2026, 06:00 en la Ciudad de México.
+        ->and($lineas[1])->toStartWith('2026-10-01 06:00,Bea,899.00,MXN,0.00,Aprobado,efectivo');
+});
