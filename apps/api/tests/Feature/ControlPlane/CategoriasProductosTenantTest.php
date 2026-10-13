@@ -22,6 +22,18 @@ afterEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
 });
 
+/**
+ * Un producto del mostrador para las pruebas de este archivo (su id público).
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function productoParaCategorias(array $e): string
+{
+    return (string) test()->postJson("/api/v1/app/{$e['slug']}/articulos", [
+        'nombre' => 'Agua 600ml', 'precio_minor' => 2500,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+}
+
 it('crea, ordena y renombra categorías, sin nombres repetidos', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $url = "/api/v1/app/{$e['slug']}/categorias-articulo";
@@ -74,7 +86,7 @@ it('un producto lleva su categoría; quitarla lo deja sin categoría', function 
 it('sube y quita la foto de un producto', function (): void {
     Storage::fake('public');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $agua = crearArticulo($e);
+    $agua = productoParaCategorias($e);
     $url = "/api/v1/app/{$e['slug']}/articulos/{$agua}/foto";
 
     $this->postJson($url, ['foto' => UploadedFile::fake()->create('nota.pdf', 10, 'application/pdf')], conBearer($e['bearer']))
@@ -96,7 +108,7 @@ it('sube y quita la foto de un producto', function (): void {
 
 it('solo quien gestiona el inventario administra categorías y fotos', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $agua = crearArticulo($e);
+    $agua = productoParaCategorias($e);
     $instructor = personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
 
     $this->postJson("/api/v1/app/{$e['slug']}/categorias-articulo", ['nombre' => 'Bebidas'], conBearer($instructor))->assertForbidden();
