@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\IntegracionSoloMexico;
+use App\Modules\Tenancy\Integraciones\ClienteTotalPassReservas;
 use App\Modules\Tenancy\Integraciones\ClienteWellhubReservas;
 use App\Modules\Tenancy\Integraciones\PublicadorPlataforma;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
@@ -32,7 +33,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Reservas desde la app de Wellhub o TotalPass (ADR 0149): qué clases publica el negocio,
- * con qué producto de la plataforma y de qué sucursal.
+ * con qué producto (Wellhub) o plan (TotalPass) y de qué sucursal.
  *
  * - `GET /integraciones/{proveedor}/reservas`: lo configurado, los productos de la
  *   plataforma (consultados en el momento), cómo va lo publicado y las reservas por venir.
@@ -49,6 +50,7 @@ class ReservasPlataformaTenantController
         private readonly PublicarEnPlataformasTenant $publicar,
         private readonly ParametrosTenant $parametros,
         private readonly ClienteWellhubReservas $wellhub,
+        private readonly ClienteTotalPassReservas $totalpass,
         private readonly GestorDeConexionTenant $gestor,
     ) {}
 
@@ -65,7 +67,7 @@ class ReservasPlataformaTenantController
         $proveedor = $this->proveedor($request);
         $publicador = $this->publicar->publicador($proveedor);
         $integracion = IntegracionTenant::query()->where('proveedor', $proveedor->value)->first();
-        if (! $publicador instanceof PublicadorPlataforma) {
+        if (! $publicador instanceof PublicadorPlataforma || ! $this->disponible($proveedor)) {
             throw ValidationException::withMessages(['activas' => 'Aún no se publican clases en '.$proveedor->nombre().'.']);
         }
         if (! $integracion instanceof IntegracionTenant || ! $integracion->activa) {
@@ -101,7 +103,7 @@ class ReservasPlataformaTenantController
             }
             $producto = trim((string) ($clase['producto'] ?? ''));
             if ($clase['publicada'] && $producto === '') {
-                throw ValidationException::withMessages(["clases.{$i}.producto" => 'Elige con qué producto de '.$proveedor->nombre().' se ofrece «'.$oferta->nombre.'».']);
+                throw ValidationException::withMessages(["clases.{$i}.producto" => 'Elige con qué '.$proveedor->producto().' de '.$proveedor->nombre().' se ofrece «'.$oferta->nombre.'».']);
             }
             $publicacion = $actuales->get($oferta->getKey());
             if (! $publicacion instanceof PublicacionPlataformaTenant && ! $clase['publicada']) {
@@ -205,7 +207,7 @@ class ReservasPlataformaTenantController
 
         return [
             'proveedor' => $proveedor->value,
-            'disponible' => $this->publicar->publicador($proveedor) instanceof PublicadorPlataforma,
+            'disponible' => $this->disponible($proveedor),
             'conectada' => $integracion instanceof IntegracionTenant && $integracion->activa,
             'activas' => $integracion instanceof IntegracionTenant && $integracion->reservas_activas,
             'sucursal_id' => $sucursales->firstWhere('id', $integracion?->sucursal_id)?->getAttribute('ulid'),
@@ -249,20 +251,30 @@ class ReservasPlataformaTenantController
     }
 
     /**
-     * Los productos de la plataforma con que se ofrece cada clase; null si no se pudieron
-     * consultar (sin llaves o sin respuesta).
+     * ¿Ya se publican clases en esa plataforma? TotalPass necesita además la llave de
+     * AgendaUno como integrador.
+     */
+    private function disponible(ProveedorPartner $proveedor): bool
+    {
+        return $this->publicar->publicador($proveedor) instanceof PublicadorPlataforma
+            && ($proveedor !== ProveedorPartner::TotalPass || $this->totalpass->disponible());
+    }
+
+    /**
+     * Los productos (Wellhub) o planes (TotalPass) con que se ofrece cada clase; null si
+     * no se pudieron consultar (sin llaves o sin respuesta).
      *
      * @return list<array{id: string, nombre: string, virtual: bool}>|null
      */
     private function productos(ProveedorPartner $proveedor, ?IntegracionTenant $integracion): ?array
     {
-        if (! $integracion instanceof IntegracionTenant || ! $integracion->activa) {
+        if (! $integracion instanceof IntegracionTenant || ! $integracion->activa || ! $this->disponible($proveedor)) {
             return null;
         }
 
         return match ($proveedor) {
             ProveedorPartner::Wellhub => $this->wellhub->productos($integracion->llaves()),
-            ProveedorPartner::TotalPass => null,
+            ProveedorPartner::TotalPass => $this->totalpass->planes($integracion->llaves()['place_api_key'] ?? ''),
         };
     }
 

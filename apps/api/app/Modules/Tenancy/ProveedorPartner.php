@@ -30,6 +30,15 @@ enum ProveedorPartner: string
         };
     }
 
+    /** Con qué se ofrece una clase en ella: el producto de Wellhub o el plan de TotalPass. */
+    public function producto(): string
+    {
+        return match ($this) {
+            self::Wellhub => 'producto',
+            self::TotalPass => 'plan',
+        };
+    }
+
     /**
      * Las credenciales que pide cada una (las da el proveedor al negocio): Wellhub,
      * su token de API, su Gym ID y, si Wellhub le dio una propia, la llave secreta con

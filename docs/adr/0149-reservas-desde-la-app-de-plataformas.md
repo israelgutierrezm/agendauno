@@ -1,4 +1,4 @@
-# ADR 0149 — Reservas desde la app de Wellhub (y después TotalPass)
+# ADR 0149 — Reservas desde la app de Wellhub y TotalPass
 
 Estado: Aceptado (2026-10-12). Amplía el ADR 0148.
 
@@ -18,8 +18,14 @@ sus clases en la plataforma. La Booking API de Wellhub funciona así:
 - su Integration Setup API registra por gimnasio la dirección de los avisos y la llave con
   que se firman.
 
-TotalPass tiene una Booking API parecida: ocurrencias con lugares, avisos de cada
-reserva y 5 minutos para confirmarla. Queda para el bloque siguiente, sobre la misma base.
+TotalPass tiene una Booking API parecida, con otra forma:
+
+- no hay clases aparte: cada ocurrencia (una fecha y una hora) lleva su plan y sus
+  lugares;
+- la fecha, la hora y el plan de una ocurrencia no se cambian en su lugar;
+- avisa de cada reserva con su evento y su «slot», sin firma;
+- con la confirmación encendida en la sede, cada reserva se confirma o se rechaza en 5
+  minutos.
 
 ## Decisión
 
@@ -94,6 +100,36 @@ reserva y 5 minutos para confirmarla. Queda para el bloque siguiente, sobre la m
   dirección de avisos del negocio (check-in y reservas).
 - La llave con que firma los avisos es la del negocio. Si no capturó una, se genera y se
   guarda cifrada, solo si Wellhub la aceptó.
+- Si cambian el token o el Gym ID de Wellhub, los avisos se vuelven a registrar al
+  guardar la publicación.
+
+**TotalPass.**
+
+- Con la llave de AgendaUno como integrador (`TOTALPASS_PARTNER_API_KEY`) y la de la sede
+  (`place_api_key`), su Booking API da una sesión de 24 horas. Sin la llave de
+  integrador, TotalPass no aparece para publicar.
+- Cada clase se publica con un plan de TotalPass (se consultan en el momento). Cada
+  sesión es una ocurrencia sin repetición:
+  - con la hora de la Ciudad de México (`es-MX`) en su formato («08:00 AM»);
+  - con la ventana para reservar y el plazo para cancelar del negocio;
+  - con el ULID de la sesión como referencia.
+- Sus lugares (`slots`) son los que TotalPass aún puede tomar más los que ya ocupan sus
+  visitantes: nunca menos de lo que ya reservaron.
+- `horarios_plataforma.fija` guarda la huella de la fecha, la hora y el plan. Si cambia,
+  la ocurrencia se retira y se publica de nuevo. El instructor, la duración y la ventana
+  se cambian en su lugar.
+- Al encender la publicación se registra la dirección de avisos de reserva de la sede
+  (`webhook/subscribe`) y se enciende la confirmación de cada reserva
+  (`hasSlotConfirmation`).
+- Sus avisos no van firmados. Antes de decidir, se comprueba con TotalPass que la reserva
+  existe y es de esa clase. La que no existe se descarta sin apartar nada.
+- La reserva se confirma o se rechaza con su motivo (`class_overbooked`,
+  `user_already_in_class`, `canceled_event`, `unavailable_spot`). Si la sede no pide
+  confirmar, la aceptada ya quedó y la rechazada se cancela.
+- Hay 5 minutos para contestar; después el lugar se libera.
+- La confirmación se hace con la dirección de TotalPass, nunca con la que trae el aviso.
+- Del usuario se guardan su código, nombre, correo y teléfono. No se guarda su documento
+  de identidad.
 
 **Reportes → Plataformas.**
 
@@ -108,10 +144,10 @@ reserva y 5 minutos para confirmarla. Queda para el bloque siguiente, sobre la m
   plataforma se rechaza con la clase bloqueada. No hay sobreventa.
 - Un negocio suspendido sigue publicando y recibiendo: sus clases siguen en pie.
 - **Pendiente:**
-  - TotalPass con su Booking API: ocurrencias, planes, aviso de reserva y confirmación en
-    5 minutos.
-  - Verificar con credenciales y ambiente de prueba de Wellhub. Las pruebas automáticas
-    usan respuestas simuladas según su documentación pública.
+  - Verificar con credenciales y ambiente de prueba de Wellhub y de TotalPass. Las
+    pruebas automáticas usan respuestas simuladas según su documentación pública.
+  - Confirmar con TotalPass el contenido completo de su aviso de reserva (publican un
+    ejemplo, no el esquema) y qué pasa con las reservas de una ocurrencia que se retira.
   - Confirmar con Wellhub que el token del negocio sirve para su Integration Setup API.
     Si no, la dirección y la llave se le dan a mano, como en el ADR 0148.
   - La conciliación con lo que paga cada plataforma.

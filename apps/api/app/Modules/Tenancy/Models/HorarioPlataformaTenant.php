@@ -13,7 +13,9 @@ use Illuminate\Support\Carbon;
  * Una sesión publicada en Wellhub (su «slot») o en TotalPass (su ocurrencia), con su id
  * allá y lo último que se le mandó (ADR 0149), tenant-local. La `firma` resume lo que
  * se publicó del horario (inicio, duración, instructor, sala, producto): si cambia, se
- * vuelve a mandar completo; si solo cambian los lugares, solo los lugares.
+ * vuelve a mandar completo; si solo cambian los lugares, solo los lugares. `fija` es la
+ * huella de lo que la plataforma no deja cambiar en su lugar (en TotalPass, la fecha, la
+ * hora y el plan): si cambia, se retira y se publica de nuevo.
  *
  * Estados: `publicado`, `retirado` (la sesión se canceló, salió de lo publicado o la
  * integración dejó de publicar) y `error` (la plataforma no lo aceptó; se reintenta).
@@ -24,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $id_externo
  * @property string|null $evento_externo
  * @property string|null $firma
+ * @property string|null $fija
  * @property int|null $capacidad_publicada
  * @property int|null $reservados_publicados
  * @property string $estado
@@ -45,7 +48,7 @@ class HorarioPlataformaTenant extends Model
     protected $table = 'horarios_plataforma';
 
     protected $fillable = [
-        'proveedor', 'sesion_id', 'publicacion_id', 'id_externo', 'evento_externo', 'firma',
+        'proveedor', 'sesion_id', 'publicacion_id', 'id_externo', 'evento_externo', 'firma', 'fija',
         'capacidad_publicada', 'reservados_publicados', 'estado', 'error', 'sincronizado_en',
     ];
 

@@ -7,8 +7,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Reservas desde la app de Wellhub (y después TotalPass) en Integraciones (ADR 0149): qué
- * clases se publican, con qué producto de la plataforma y de qué sucursal. Las reservas
+ * Reservas desde la app de Wellhub o TotalPass en Integraciones (ADR 0149): qué clases se
+ * publican, con qué producto (Wellhub) o plan (TotalPass) y de qué sucursal. Las reservas
  * que llegan ocupan lugar sin consumir créditos; se aceptan o rechazan solas.
  */
 interface ClasePublicable {
@@ -178,7 +178,7 @@ onMounted(cargar);
         class="text-sm"
         :style="{ color: 'var(--texto-suave)' }"
       >
-        {{ $t("operacion.plataformas.reservas.sinProductos", { plataforma }) }}
+        {{ $t(`operacion.plataformas.reservas.sinProductos.${proveedor}`) }}
       </p>
       <p
         v-if="config.clases.length === 0"
@@ -207,11 +207,15 @@ onMounted(cargar);
               v-model="edicion.clases[c.oferta_id].producto"
               class="tu-input text-sm"
               :aria-label="
-                $t('operacion.plataformas.reservas.producto', { plataforma })
+                $t(`operacion.plataformas.reservas.producto.${proveedor}`)
               "
             >
               <option value="" disabled>
-                {{ $t("operacion.plataformas.reservas.elegirProducto") }}
+                {{
+                  $t(
+                    `operacion.plataformas.reservas.elegirProducto.${proveedor}`,
+                  )
+                }}
               </option>
               <option v-for="p in productos" :key="p.id" :value="p.id">
                 {{ p.nombre }}
@@ -222,9 +226,11 @@ onMounted(cargar);
               v-model="edicion.clases[c.oferta_id].producto"
               class="tu-input text-sm"
               inputmode="numeric"
-              :placeholder="$t('operacion.plataformas.reservas.productoManual')"
+              :placeholder="
+                $t(`operacion.plataformas.reservas.productoManual.${proveedor}`)
+              "
               :aria-label="
-                $t('operacion.plataformas.reservas.producto', { plataforma })
+                $t(`operacion.plataformas.reservas.producto.${proveedor}`)
               "
             />
           </div>

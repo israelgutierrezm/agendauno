@@ -558,11 +558,25 @@ export default {
       elegirSucursal: "Elige la sucursal",
       clases: "Clases que se publican",
       sinClases: "Aún no tienes clases grupales para publicar.",
-      producto: "Producto de {plataforma}",
-      elegirProducto: "Elige el producto",
-      productoManual: "ID del producto",
-      sinProductos:
-        "No se pudieron consultar los productos de {plataforma}. Escribe el ID del producto que te dio tu contacto.",
+      // Con qué se ofrece cada clase: el producto de Wellhub o el plan de TotalPass.
+      producto: {
+        wellhub: "Producto de Wellhub",
+        totalpass: "Plan de TotalPass",
+      },
+      elegirProducto: {
+        wellhub: "Elige el producto",
+        totalpass: "Elige el plan",
+      },
+      productoManual: {
+        wellhub: "ID del producto",
+        totalpass: "ID del plan",
+      },
+      sinProductos: {
+        wellhub:
+          "No se pudieron consultar los productos de Wellhub. Escribe el ID del producto que te dio tu contacto.",
+        totalpass:
+          "No se pudieron consultar los planes de TotalPass. Escribe el ID del plan (está en el portal de TotalPass).",
+      },
       alcance:
         "Se publican {dias} días por adelantado; una clase sin cupo ofrece {lugares} lugares. Lo ajustas en Configuración → Parámetros.",
       publicados: "{n} horarios publicados",

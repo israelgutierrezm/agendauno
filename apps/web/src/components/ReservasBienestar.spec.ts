@@ -43,9 +43,9 @@ function configuracion(cambios: Record<string, unknown> = {}) {
   };
 }
 
-function montar() {
+function montar(proveedor = "wellhub") {
   return mount(ReservasBienestar, {
-    props: { proveedor: "wellhub" },
+    props: { proveedor },
     global: { plugins: [i18n] },
   });
 }
@@ -138,6 +138,40 @@ describe("reservas desde la app de la plataforma", () => {
       ).value,
     ).toBe("987");
     expect(w.text()).toContain("producto inválido");
+  });
+
+  it("en TotalPass cada clase va con su plan", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: configuracion({
+          activas: true,
+          productos: null,
+          clases: [
+            {
+              oferta_id: "of1",
+              nombre: "Pole Sport · Nivel 1",
+              publicada: true,
+              producto: null,
+              error: null,
+            },
+          ],
+        }),
+      },
+    });
+    const w = montar("totalpass");
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/fluo/integraciones/totalpass/reservas",
+    );
+    expect(w.text()).toContain(
+      "No se pudieron consultar los planes de TotalPass",
+    );
+    expect(
+      w
+        .get('[data-prueba="reservas-clase"] input.tu-input')
+        .attributes("placeholder"),
+    ).toBe("ID del plan");
   });
 
   it("no se muestra si la plataforma aún no publica clases", async () => {

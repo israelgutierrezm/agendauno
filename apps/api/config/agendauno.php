@@ -211,6 +211,8 @@ return [
         // y el mismo token que su Access Control API; sus avisos de reserva se registran
         // por gimnasio con su Integration Setup API.
         'wellhub_setup_url' => env('WELLHUB_SETUP_API_URL', 'https://api.partners-integrations.gympass.com'),
+        // La Booking API de TotalPass: misma llave de integrador y la de cada sede.
+        'totalpass_booking_url' => env('TOTALPASS_BOOKING_API_URL', 'https://booking-api.totalpass.com'),
     ],
 
     'operacion' => [

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Integraciones\ClienteTotalPassReservas;
 use App\Modules\Tenancy\Integraciones\ClienteWellhubReservas;
 use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
+use App\Modules\Tenancy\Integraciones\ResultadoPlataforma;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\HorarioPlataformaTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
@@ -18,15 +20,18 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Las reservas que llegan desde la app de Wellhub (ADR 0149). La persona sigue siendo
- * visitante de la plataforma y su reserva, un lugar de plataforma (`origen: reserva`):
- * ocupa cupo, no consume créditos ni derechos.
+ * Las reservas que llegan desde la app de Wellhub o TotalPass (ADR 0149). La persona
+ * sigue siendo visitante de la plataforma y su reserva, un lugar de plataforma
+ * (`origen: reserva`): ocupa cupo, no consume créditos ni derechos.
  *
  * - Solicitada: se decide con la clase bloqueada (invariante 8) y se le contesta a la
  *   plataforma: aceptada, o rechazada con su motivo (la clase ya no existe o se canceló,
  *   ya cerraron sus reservas, ya tiene lugar en esa clase o no hay lugar). Wellhub da 15
- *   minutos para contestar: si no se le pudo contestar a tiempo, la rechaza ella y el
- *   lugar se libera.
+ *   minutos para contestar y TotalPass 5: si no se le pudo contestar a tiempo, la
+ *   plataforma la rechaza y el lugar se libera.
+ * - TotalPass no firma sus avisos: antes de decidir se comprueba con TotalPass que la
+ *   reserva existe y es de esa clase. Si su sede no pide confirmar, la aceptada ya quedó
+ *   y la rechazada se cancela.
  * - Cancelada (a tiempo o tarde): el lugar se libera y queda cómo se canceló.
  * - Una reserva sin check-in queda «no asistió» al terminar la clase.
  *
@@ -36,6 +41,18 @@ class ReservasPlataformaTenant
 {
     /** Minutos que da Wellhub para contestar una reserva. */
     private const MINUTOS_WELLHUB = 15;
+
+    /** Minutos que da TotalPass para confirmar una reserva. */
+    private const MINUTOS_TOTALPASS = 5;
+
+    /** El motivo de TotalPass para cada rechazo. */
+    private const MOTIVOS_TOTALPASS = [
+        'CLASS_NOT_FOUND' => 'canceled_event',
+        'CLASS_HAS_BEEN_CANCELED' => 'canceled_event',
+        'CHECK_IN_AND_CANCELATION_WINDOWS_CLOSED' => 'unavailable_spot',
+        'USER_IS_ALREADY_BOOKED' => 'user_already_in_class',
+        'CLASS_IS_FULL' => 'class_overbooked',
+    ];
 
     /** Lo que se le dice a Wellhub en cada rechazo (su categoría está en `motivo`). */
     private const MOTIVOS = [
@@ -49,6 +66,7 @@ class ReservasPlataformaTenant
     public function __construct(
         private readonly RegistroDeIntegracionesTenant $registro,
         private readonly ClienteWellhubReservas $wellhub,
+        private readonly ClienteTotalPassReservas $totalpass,
         private readonly VisitantesPlataformaTenant $visitantes,
         private readonly CupoDeSesionTenant $cupo,
         private readonly ParametrosTenant $parametros,
@@ -64,8 +82,8 @@ class ReservasPlataformaTenant
     /** Procesa un aviso de reserva (lo llama la bandeja con la integración activa). */
     public function procesar(EventoPlataformaTenant $evento, ProveedorPartner $proveedor): void
     {
-        if ($proveedor !== ProveedorPartner::Wellhub) {
-            $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'Aún no se reciben reservas de '.$proveedor->nombre().'.');
+        if ($proveedor === ProveedorPartner::TotalPass) {
+            $this->totalPass($evento);
 
             return;
         }
@@ -119,6 +137,85 @@ class ReservasPlataformaTenant
         [$lugar, $motivo] = $this->decidir(ProveedorPartner::Wellhub, $publicado, $visitante, self::referencia(ProveedorPartner::Wellhub, $numero));
         $respuesta = $this->wellhub->responderReserva($credenciales, $numero, $motivo, $motivo !== null ? (self::MOTIVOS[$motivo] ?? null) : null);
 
+        $this->asentar($evento, ProveedorPartner::Wellhub, $lugar, $motivo, $respuesta, $solicitada->addMinutes(self::MINUTOS_WELLHUB));
+    }
+
+    /** Los avisos de reserva de TotalPass: se reconocen por el id de la reserva («slot»). */
+    private function totalPass(EventoPlataformaTenant $evento): void
+    {
+        $slot = (string) Arr::get($evento->payload, 'slot.id', '');
+
+        match ($evento->tipo) {
+            AvisosPlataformaTenant::RESERVA_SOLICITADA => $this->solicitudTotalPass($evento, $slot),
+            AvisosPlataformaTenant::RESERVA_CANCELADA => $this->cancelar($evento, ProveedorPartner::TotalPass, $slot, LugarPlataformaTenant::CANCELADO),
+            AvisosPlataformaTenant::RESERVA_CANCELADA_TARDE => $this->cancelar($evento, ProveedorPartner::TotalPass, $slot, LugarPlataformaTenant::CANCELADO_TARDE),
+            default => $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'Aviso de reserva desconocido.'),
+        };
+    }
+
+    private function solicitudTotalPass(EventoPlataformaTenant $evento, string $slot): void
+    {
+        $datos = $evento->payload;
+        $llave = $this->registro->credenciales(ProveedorPartner::TotalPass->value)['place_api_key'] ?? '';
+        $referencia = self::referencia(ProveedorPartner::TotalPass, $slot);
+        $limite = CarbonImmutable::instance($evento->recibido_en)->addMinutes(self::MINUTOS_TOTALPASS);
+        $claseDelAviso = (string) Arr::get($datos, 'event.id', '');
+
+        // Sus avisos no van firmados: la reserva tiene que existir en TotalPass y ser de
+        // esa clase (una vez decidida, su lugar ya lo dice).
+        if (! LugarPlataformaTenant::query()->where('referencia_externa', $referencia)->exists()) {
+            $reserva = $this->totalpass->reserva($llave, $slot);
+            if ($reserva === null) {
+                $this->asentar($evento, ProveedorPartner::TotalPass, null, null, ResultadoPlataforma::sinRespuesta('No se pudo comprobar la reserva con TotalPass.'), $limite);
+
+                return;
+            }
+            $claseDeTotalPass = $reserva === false ? '' : (string) (Arr::get($reserva, 'eventId') ?? Arr::get($reserva, 'event.id') ?? '');
+            if ($claseDeTotalPass === '' || $claseDeTotalPass !== $claseDelAviso) {
+                $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'TotalPass no tiene esa reserva en esa clase.');
+
+                return;
+            }
+        }
+
+        $publicado = HorarioPlataformaTenant::query()
+            ->where('proveedor', ProveedorPartner::TotalPass->value)
+            ->where('evento_externo', $claseDelAviso)
+            ->first();
+        $usuario = (array) Arr::get($datos, 'user', []);
+        $codigo = trim((string) ($usuario['code'] ?? ''));
+        // Su documento de identidad no se guarda: no hace falta para la clase.
+        $visitante = $codigo === '' ? null : $this->visitantes->registrar(ProveedorPartner::TotalPass->value, $codigo, [
+            'nombre' => $usuario['name'] ?? null,
+            'email' => $usuario['email'] ?? null,
+            'telefono' => $usuario['phone'] ?? null,
+            'producto' => Arr::get($datos, 'event.plan_code'),
+        ], null);
+
+        [$lugar, $motivo] = $this->decidir(ProveedorPartner::TotalPass, $publicado, $visitante, $referencia);
+        $respuesta = $this->totalpass->responderReserva($llave, $slot, $motivo !== null ? (self::MOTIVOS_TOTALPASS[$motivo] ?? 'denied_by_gym') : null);
+        if (! $respuesta->ok && ! $respuesta->reintentar) {
+            // Su sede no pide confirmar (o ya no se puede): la aceptada ya quedó y la
+            // rechazada se cancela.
+            $respuesta = $motivo === null ? ResultadoPlataforma::hecho() : $this->totalpass->cancelarReserva($llave, $slot);
+        }
+
+        $this->asentar($evento, ProveedorPartner::TotalPass, $lugar, $motivo, $respuesta, $limite);
+    }
+
+    /**
+     * Lo que contestó la plataforma: hecho (se cierra el aviso y se le mandan los lugares
+     * de la clase) o sin respuesta (se reintenta mientras la plataforma espere; después
+     * ella la rechaza y el lugar se libera).
+     */
+    private function asentar(
+        EventoPlataformaTenant $evento,
+        ProveedorPartner $proveedor,
+        ?LugarPlataformaTenant $lugar,
+        ?string $motivo,
+        ResultadoPlataforma $respuesta,
+        CarbonImmutable $limite,
+    ): void {
         if ($respuesta->ok) {
             $evento->terminar(EventoPlataformaTenant::PROCESADO, $motivo === null ? 'Reserva aceptada.' : 'Reserva rechazada: '.(self::MOTIVOS[$motivo] ?? $motivo));
             $this->alCambiar($lugar);
@@ -126,21 +223,19 @@ class ReservasPlataformaTenant
             return;
         }
 
-        // Sin respuesta: se reintenta mientras Wellhub espere.
         $evento->intentos++;
-        if ($respuesta->reintentar && $evento->intentos < AvisosPlataformaTenant::MAX_INTENTOS
-            && now()->lessThan($solicitada->addMinutes(self::MINUTOS_WELLHUB))) {
+        if ($respuesta->reintentar && $evento->intentos < AvisosPlataformaTenant::MAX_INTENTOS && now()->lessThan($limite)) {
             $evento->resultado = (string) $respuesta->error;
             $evento->save();
 
             return;
         }
-        // No se le pudo contestar: Wellhub la rechaza sola y el lugar se libera.
+        // No se le pudo contestar: la plataforma la rechaza sola y el lugar se libera.
         if ($lugar instanceof LugarPlataformaTenant && $lugar->estado === LugarPlataformaTenant::RESERVADO) {
             $lugar->fill(['estado' => LugarPlataformaTenant::RECHAZADO, 'motivo' => 'SIN_RESPUESTA'])->save();
             $this->alCambiar($lugar);
         }
-        $evento->terminar(EventoPlataformaTenant::FALLIDO, 'No se pudo contestar a Wellhub: '.$respuesta->error);
+        $evento->terminar(EventoPlataformaTenant::FALLIDO, 'No se pudo contestar a '.$proveedor->nombre().': '.$respuesta->error);
     }
 
     /**

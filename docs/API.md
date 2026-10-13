@@ -362,12 +362,13 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
 ### Reservas desde la app de la plataforma (ADR 0149)
 
 - `GET /integraciones/{proveedor}/reservas` (`integraciones.configurar`, solo clases):
-  - `disponible`: si ya se publican clases en esa plataforma (hoy, Wellhub);
+  - `disponible`: si se publican clases en esa plataforma (TotalPass, solo con la llave
+    de integrador de AgendaUno);
   - `conectada`, `activas`, `sucursal_id` y `sucursales`;
   - `dias_publicados` y `lugares_sin_tope` (parámetros del negocio);
   - `avisos`: `registrados`, `registrado_en` y `aviso_url`;
-  - `productos`: los de la plataforma (`id`, `nombre`, `virtual`), consultados en el
-    momento; `null` si no respondió;
+  - `productos`: los productos de Wellhub o los planes de TotalPass (`id`, `nombre`,
+    `virtual`), consultados en el momento; `null` si no respondió;
   - `clases`: las ofertas grupales con `oferta_id`, `nombre`, `publicada`, `producto` y
     `error` (lo que la plataforma no aceptó);
   - `horarios`: `publicados` y `con_error` de las sesiones por venir, `ultimo_error` y
@@ -386,6 +387,9 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   `booking-requested`, `booking-canceled`, `booking-late-canceled` y
   `checkin-booking-occurred`. La reserva se acepta o rechaza con la Booking API de
   Wellhub; un aviso repetido no vuelve a contestar.
+- `POST /api/v1/webhooks/bienestar/{estudio}/totalpass/{token}` recibe además los avisos
+  de reserva de TotalPass (`event`, `user`, `slot` con su `status`). Se comprueban con
+  TotalPass antes de decidir y se confirman o rechazan con su `confirmSlot`.
 - `GET /reportes/plataformas` suma `reservas` (`total`, `por_venir`, `asistieron`,
   `canceladas`, `canceladas_tarde`, `no_asistieron`, `rechazadas`, por la fecha de la
   clase) y `reservas` en cada `por_proveedor`.
