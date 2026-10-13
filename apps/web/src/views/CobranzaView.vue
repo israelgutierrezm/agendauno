@@ -140,6 +140,88 @@ const desdePagos = ref("");
 const hastaPagos = ref("");
 const suscripciones = ref<Suscripcion[]>([]);
 const pagoAutomaticoDisponible = ref(false);
+// Renovaciones y morosos por páginas (antes, las primeras 200 y todos), con búsqueda;
+// el resumen del API (sin filtros) da los indicadores.
+interface MetaLista {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  resumen?: { total: number; automaticos?: number };
+}
+const metaSuscripciones = ref<MetaLista | null>(null);
+const metaMorosos = ref<MetaLista | null>(null);
+const buscarRenovaciones = ref("");
+const filtroAutomatico = ref<"" | "si" | "no">("");
+const paginaRenovaciones = ref(1);
+const buscarMorosos = ref("");
+const paginaMorosos = ref(1);
+async function cargarSuscripciones(): Promise<void> {
+  const { data } = await api.get<{
+    data: Suscripcion[];
+    pago_automatico_disponible?: boolean;
+    meta?: MetaLista;
+  }>(`${base.value}/suscripciones`, {
+    params: {
+      page: paginaRenovaciones.value,
+      ...(buscarRenovaciones.value.trim() !== ""
+        ? { q: buscarRenovaciones.value.trim() }
+        : {}),
+      ...(filtroAutomatico.value !== ""
+        ? { automatico: filtroAutomatico.value }
+        : {}),
+    },
+  });
+  suscripciones.value = data.data;
+  metaSuscripciones.value = data.meta ?? null;
+  pagoAutomaticoDisponible.value = data.pago_automatico_disponible === true;
+}
+async function cargarMorosos(): Promise<void> {
+  const { data } = await api.get<{ data: Moroso[]; meta?: MetaLista }>(
+    `${base.value}/dunning`,
+    {
+      params: {
+        page: paginaMorosos.value,
+        ...(buscarMorosos.value.trim() !== ""
+          ? { q: buscarMorosos.value.trim() }
+          : {}),
+      },
+    },
+  );
+  morosos.value = data.data;
+  metaMorosos.value = data.meta ?? null;
+}
+async function recargarLista(cargarla: () => Promise<void>): Promise<void> {
+  try {
+    await cargarla();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+function irPaginaRenovaciones(n: number): void {
+  paginaRenovaciones.value = n;
+  void recargarLista(cargarSuscripciones);
+}
+function irPaginaMorosos(n: number): void {
+  paginaMorosos.value = n;
+  void recargarLista(cargarMorosos);
+}
+let esperaRenovaciones: ReturnType<typeof setTimeout> | undefined;
+watch([buscarRenovaciones, filtroAutomatico], () => {
+  clearTimeout(esperaRenovaciones);
+  esperaRenovaciones = setTimeout(() => {
+    paginaRenovaciones.value = 1;
+    void recargarLista(cargarSuscripciones);
+  }, 300);
+});
+let esperaMorosos: ReturnType<typeof setTimeout> | undefined;
+watch(buscarMorosos, () => {
+  clearTimeout(esperaMorosos);
+  esperaMorosos = setTimeout(() => {
+    paginaMorosos.value = 1;
+    void recargarLista(cargarMorosos);
+  }, 300);
+});
 const avisoRenovacion = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -217,24 +299,17 @@ async function cargar(): Promise<void> {
     if (vista.value === "movimientos") {
       await cargarPagos();
     } else {
-      const [pe, d, s] = await Promise.all([
+      const [pe] = await Promise.all([
         api.get<{ data: Pendiente[]; meta: MetaPendientes }>(
           `${base.value}/cobranza/pendientes`,
           { params: { page: paginaPendientes.value } },
         ),
-        api.get<{ data: Moroso[] }>(`${base.value}/dunning`),
-        api.get<{
-          data: Suscripcion[];
-          pago_automatico_disponible?: boolean;
-        }>(`${base.value}/suscripciones`),
+        cargarMorosos(),
+        cargarSuscripciones(),
       ]);
       pendientes.value = pe.data.data;
       metaPendientes.value = pe.data.meta;
       paginaPendientes.value = pe.data.meta.page;
-      morosos.value = d.data.data;
-      suscripciones.value = s.data.data;
-      pagoAutomaticoDisponible.value =
-        s.data.pago_automatico_disponible === true;
     }
     vistaCargada.value = vista.value;
   } catch (e) {
@@ -595,9 +670,13 @@ const indicadores = computed<Indicador[]>(() => {
     ];
   }
   if (vista.value === "por-cobrar") {
-    const automaticos = suscripciones.value.filter(
-      (x) => x.pago_automatico !== null,
-    ).length;
+    // Del resumen del negocio (sin búsqueda ni páginas).
+    const automaticos =
+      metaSuscripciones.value?.resumen?.automaticos ??
+      suscripciones.value.filter((x) => x.pago_automatico !== null).length;
+    const renovaciones =
+      metaSuscripciones.value?.resumen?.total ?? suscripciones.value.length;
+    const enMora = metaMorosos.value?.resumen?.total ?? morosos.value.length;
     const debe = metaPendientes.value;
     const lista: Indicador[] = [
       {
@@ -615,14 +694,14 @@ const indicadores = computed<Indicador[]>(() => {
       {
         clave: "mora",
         etiqueta: t("cobranzaVisual.kpi.enMora"),
-        valor: String(morosos.value.length),
+        valor: String(enMora),
         icono: "facturas",
-        aviso: morosos.value.length > 0,
+        aviso: enMora > 0,
       },
       {
         clave: "renovaciones",
         etiqueta: t("cobranzaVisual.kpi.renovaciones"),
-        valor: String(suscripciones.value.length),
+        valor: String(renovaciones),
         icono: "reloj",
       },
       {
@@ -630,12 +709,12 @@ const indicadores = computed<Indicador[]>(() => {
         etiqueta: t("cobranzaVisual.kpi.automatico"),
         valor: t("cobranzaVisual.deTotal", {
           n: automaticos,
-          total: suscripciones.value.length,
+          total: renovaciones,
         }),
         icono: "hecho",
       },
     ];
-    return sesion.esCitas && suscripciones.value.length === 0
+    return sesion.esCitas && renovaciones === 0
       ? lista.filter(
           (k) => k.clave !== "renovaciones" && k.clave !== "automatico",
         )
@@ -782,14 +861,29 @@ watch(vista, cargar, { immediate: true });
 
         <!-- Morosos (dunning) -->
         <h2
-          v-if="!sesion.esCitas || morosos.length > 0"
+          v-if="!sesion.esCitas || morosos.length > 0 || buscarMorosos !== ''"
           id="morosos"
           class="cb-seccion mt-8"
         >
           <IconoNav nombre="facturas" :tam="21" />{{ $t("cobranza.morosos") }}
         </h2>
+        <input
+          v-if="(metaMorosos?.resumen?.total ?? 0) > 10 || buscarMorosos !== ''"
+          v-model="buscarMorosos"
+          type="search"
+          class="tu-input mt-3 max-w-sm"
+          :placeholder="$t('operacion.listadosTres.buscarPersona')"
+          :aria-label="$t('operacion.listadosTres.buscarPersona')"
+          data-prueba="buscar-morosos"
+        />
         <EstadoVacio
-          v-if="morosos.length === 0 && !sesion.esCitas"
+          v-if="morosos.length === 0 && buscarMorosos !== ''"
+          class="tu-card mt-3"
+          icono="buscar"
+          :titulo="$t('operacion.listadosDos.sinResultados')"
+        />
+        <EstadoVacio
+          v-else-if="morosos.length === 0 && !sesion.esCitas"
           class="tu-card mt-3"
           icono="hecho"
           :titulo="$t('cobranza.sinMorosos')"
@@ -869,6 +963,14 @@ watch(vista, cargar, { immediate: true });
               </tr>
             </tbody>
           </table>
+          <PaginacionListado
+            v-if="metaMorosos && metaMorosos.ultima_pagina > 1"
+            :page="metaMorosos.page"
+            :ultima-pagina="metaMorosos.ultima_pagina"
+            :total="metaMorosos.total"
+            :per-page="metaMorosos.per_page"
+            @ir="irPaginaMorosos"
+          />
         </div>
       </template>
 
@@ -1150,12 +1252,43 @@ watch(vista, cargar, { immediate: true });
       <template
         v-if="
           vista === 'por-cobrar' &&
-          (!sesion.esCitas || suscripciones.length > 0)
+          (!sesion.esCitas || (metaSuscripciones?.resumen?.total ?? 0) > 0)
         "
       >
         <h2 class="mt-8 font-medium">
           {{ $t("cobranza.renovaciones") }}
         </h2>
+        <div
+          v-if="(metaSuscripciones?.resumen?.total ?? 0) > 0"
+          class="mt-3 flex flex-wrap items-center gap-2"
+          data-prueba="filtros-renovaciones"
+        >
+          <input
+            v-model="buscarRenovaciones"
+            type="search"
+            class="tu-input max-w-sm"
+            :placeholder="$t('operacion.listadosTres.buscarPersona')"
+            :aria-label="$t('operacion.listadosTres.buscarPersona')"
+            data-prueba="buscar-renovaciones"
+          />
+          <select
+            v-if="!sesion.esCitas"
+            v-model="filtroAutomatico"
+            class="tu-input max-w-[14rem]"
+            :aria-label="$t('operacion.listadosTres.pagoAutomatico')"
+            data-prueba="filtro-automatico"
+          >
+            <option value="">
+              {{ $t("operacion.listadosTres.automaticoTodos") }}
+            </option>
+            <option value="si">
+              {{ $t("operacion.listadosTres.automaticoSi") }}
+            </option>
+            <option value="no">
+              {{ $t("operacion.listadosTres.automaticoNo") }}
+            </option>
+          </select>
+        </div>
         <AvisoTono
           v-if="avisoRenovacion"
           tono="exito"
@@ -1168,7 +1301,11 @@ watch(vista, cargar, { immediate: true });
           v-if="suscripciones.length === 0"
           class="tu-card mt-3"
           icono="reloj"
-          :titulo="$t('cobranza.sinRenovaciones')"
+          :titulo="
+            buscarRenovaciones !== '' || filtroAutomatico !== ''
+              ? $t('operacion.listadosDos.sinResultados')
+              : $t('cobranza.sinRenovaciones')
+          "
         />
         <div v-else class="mt-3 tu-card overflow-x-auto">
           <table class="tu-tabla">
@@ -1301,6 +1438,14 @@ watch(vista, cargar, { immediate: true });
               </tr>
             </tbody>
           </table>
+          <PaginacionListado
+            v-if="metaSuscripciones && metaSuscripciones.ultima_pagina > 1"
+            :page="metaSuscripciones.page"
+            :ultima-pagina="metaSuscripciones.ultima_pagina"
+            :total="metaSuscripciones.total"
+            :per-page="metaSuscripciones.per_page"
+            @ir="irPaginaRenovaciones"
+          />
         </div>
       </template>
     </template>

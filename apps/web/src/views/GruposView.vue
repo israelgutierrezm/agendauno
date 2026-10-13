@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -7,6 +7,7 @@ import BuscarPersona from "@/components/BuscarPersona.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -40,6 +41,34 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
 
 const grupos = ref<Grupo[]>([]);
+// Búsqueda (por grupo o clase), estado y páginas de 20.
+const POR_PAGINA = 20;
+const buscar = ref("");
+const filtroEstado = ref<"activos" | "inactivos" | "">("activos");
+const pagina = ref(1);
+const visibles = computed(() => {
+  const q = buscar.value.trim().toLowerCase();
+  return grupos.value.filter(
+    (g) =>
+      (filtroEstado.value === "" ||
+        (filtroEstado.value === "activos") === g.activo) &&
+      (q === "" ||
+        g.nombre.toLowerCase().includes(q) ||
+        (g.oferta ?? "").toLowerCase().includes(q)),
+  );
+});
+const ultimaPagina = computed(() =>
+  Math.max(1, Math.ceil(visibles.value.length / POR_PAGINA)),
+);
+const enPagina = computed(() =>
+  visibles.value.slice(
+    (pagina.value - 1) * POR_PAGINA,
+    pagina.value * POR_PAGINA,
+  ),
+);
+watch([buscar, filtroEstado], () => {
+  pagina.value = 1;
+});
 const plantillas = ref<Plantilla[]>([]);
 
 const cargando = ref(true);
@@ -226,7 +255,39 @@ const indicadores = computed<Indicador[]>(() => {
         <div class="mt-5 grid gap-5 lg:grid-cols-5">
           <!-- Grupos -->
           <div class="tu-card overflow-x-auto lg:col-span-3">
-            <table class="tu-tabla">
+            <div class="flex flex-wrap items-center gap-2 p-3">
+              <input
+                v-model="buscar"
+                type="search"
+                class="tu-input max-w-xs"
+                :placeholder="$t('operacion.listadosTres.buscarGrupo')"
+                :aria-label="$t('operacion.listadosTres.buscarGrupo')"
+                data-prueba="buscar-grupos"
+              />
+              <div
+                class="tu-segmentado"
+                role="group"
+                data-prueba="estado-grupos"
+              >
+                <button
+                  v-for="e in ['activos', 'inactivos', ''] as const"
+                  :key="e"
+                  type="button"
+                  :aria-pressed="filtroEstado === e"
+                  @click="filtroEstado = e"
+                >
+                  {{ $t(`operacion.listadosTres.estadoGrupo.${e || "todos"}`) }}
+                </button>
+              </div>
+            </div>
+            <p
+              v-if="visibles.length === 0"
+              class="px-4 py-8 text-center text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("operacion.listadosDos.sinResultados") }}
+            </p>
+            <table v-else class="tu-tabla">
               <thead>
                 <tr>
                   <th>{{ $t("gruposVisual.col.grupo") }}</th>
@@ -238,7 +299,7 @@ const indicadores = computed<Indicador[]>(() => {
               </thead>
               <tbody>
                 <tr
-                  v-for="g in grupos"
+                  v-for="g in enPagina"
                   :key="g.id"
                   class="gr-fila"
                   :class="{ 'gr-elegida': seleccionado?.id === g.id }"
@@ -272,6 +333,14 @@ const indicadores = computed<Indicador[]>(() => {
                 </tr>
               </tbody>
             </table>
+            <PaginacionListado
+              v-if="ultimaPagina > 1"
+              :page="pagina"
+              :ultima-pagina="ultimaPagina"
+              :total="visibles.length"
+              :per-page="POR_PAGINA"
+              @ir="pagina = $event"
+            />
           </div>
 
           <!-- Grupo elegido: inscritos e inscribir -->

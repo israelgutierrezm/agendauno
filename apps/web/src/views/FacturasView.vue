@@ -8,9 +8,11 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import RangoFechas from "@/components/RangoFechas.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Factura {
@@ -39,15 +41,39 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeEmitir = computed(() => sesion.puede("ordenes.gestionar"));
 
 const facturas = ref<Factura[]>([]);
-// Por páginas (antes, solo las últimas 100) y con búsqueda en el API.
+// Por páginas (antes, solo las últimas 100), con búsqueda, estado y fechas en el API
+// (y en la dirección, para volver a ellos).
 const buscar = ref("");
+const estado = ref<"" | "timbrada" | "error">("");
+const desde = ref("");
+const hasta = ref("");
 const pagina = ref(1);
 const meta = ref<{
   total: number;
   page: number;
   per_page: number;
   ultima_pagina: number;
+  conteos?: { timbrada: number; error: number };
 } | null>(null);
+useFiltrosEnUrl({
+  q: buscar,
+  estado: opcionEnUrl(estado, ["", "timbrada", "error"] as const),
+  desde: fechaEnUrl(desde),
+  hasta: fechaEnUrl(hasta),
+});
+const conFiltros = computed(
+  () =>
+    buscar.value !== "" ||
+    estado.value !== "" ||
+    desde.value !== "" ||
+    hasta.value !== "",
+);
+function limpiarFiltros(): void {
+  buscar.value = "";
+  estado.value = "";
+  desde.value = "";
+  hasta.value = "";
+}
 function irPagina(n: number): void {
   pagina.value = n;
   void cargar();
@@ -59,6 +85,10 @@ watch(buscar, () => {
     pagina.value = 1;
     void cargar();
   }, 300);
+});
+watch([estado, desde, hasta], () => {
+  pagina.value = 1;
+  void cargar();
 });
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -109,6 +139,9 @@ async function cargar(): Promise<void> {
       params: {
         page: pagina.value,
         ...(buscar.value.trim() !== "" ? { q: buscar.value.trim() } : {}),
+        ...(estado.value !== "" ? { estado: estado.value } : {}),
+        ...(desde.value !== "" ? { desde: desde.value } : {}),
+        ...(hasta.value !== "" ? { hasta: hasta.value } : {}),
       },
     });
     facturas.value = data.data;
@@ -196,14 +229,61 @@ onMounted(cargar);
     </p>
 
     <template v-else>
-      <input
-        v-model="buscar"
-        type="search"
-        class="tu-input mt-6 max-w-sm"
-        :placeholder="$t('operacion.listadosDos.buscarFacturas')"
-        :aria-label="$t('operacion.listadosDos.buscarFacturas')"
-        data-prueba="buscar-facturas"
-      />
+      <div class="fa-filtros mt-6" data-prueba="filtros-facturas">
+        <input
+          v-model="buscar"
+          type="search"
+          class="tu-input fa-buscar"
+          :placeholder="$t('operacion.listadosDos.buscarFacturas')"
+          :aria-label="$t('operacion.listadosDos.buscarFacturas')"
+          data-prueba="buscar-facturas"
+        />
+        <div
+          class="tu-segmentado"
+          role="group"
+          :aria-label="$t('operacion.listadosDos.estadoFactura')"
+        >
+          <button
+            v-for="e in ['', 'timbrada', 'error'] as const"
+            :key="e"
+            type="button"
+            :aria-pressed="estado === e"
+            :data-prueba="`facturas-${e || 'todas'}`"
+            @click="estado = e"
+          >
+            {{
+              e === ""
+                ? $t("operacion.listadosDos.todas")
+                : e === "timbrada"
+                  ? $t("operacion.listadosDos.timbradas")
+                  : $t("operacion.listadosDos.conError")
+            }}
+            <span
+              v-if="e !== '' && meta?.conteos"
+              class="ml-1 tabular-nums"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ meta.conteos[e] }}</span
+            >
+          </button>
+        </div>
+        <RangoFechas
+          v-model:desde="desde"
+          v-model:hasta="hasta"
+          :etiqueta="$t('operacion.listadosDos.fechasFactura')"
+          prueba="facturas"
+          atajos
+          :zona="sesion.zonaHoraria"
+        />
+        <button
+          v-if="conFiltros"
+          type="button"
+          class="tu-enlace text-sm"
+          data-prueba="limpiar-facturas"
+          @click="limpiarFiltros"
+        >
+          {{ $t("operacion.listadosDos.limpiar") }}
+        </button>
+      </div>
       <TablaDatos
         class="mt-3"
         :columnas="columnas"
@@ -211,7 +291,7 @@ onMounted(cargar);
         :buscar="false"
         :por-pagina="meta?.per_page ?? 20"
         :vacio="
-          buscar.trim() !== ''
+          conFiltros
             ? $t('operacion.listadosDos.sinResultados')
             : $t('facturas.vacio')
         "
@@ -409,3 +489,16 @@ onMounted(cargar);
     </template>
   </section>
 </template>
+
+<style scoped>
+.fa-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+.fa-buscar {
+  flex: 1 1 16rem;
+  max-width: 24rem;
+}
+</style>

@@ -10,6 +10,7 @@ import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import ReservasBienestar from "@/components/ReservasBienestar.vue";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -244,6 +245,54 @@ const secretoWebhook = ref<string | null>(null);
 const modalWebhook = ref(false);
 const entregasDe = ref<string | null>(null);
 const entregas = ref<Entrega[]>([]);
+// Por páginas (antes, solo las últimas 100) y por estado, con sus cuentas.
+const estadoEntregas = ref<"" | "fallido" | "pendiente" | "entregado">("");
+const paginaEntregas = ref(1);
+const metaEntregas = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  conteos: { pendiente: number; entregado: number; fallido: number };
+} | null>(null);
+async function cargarEntregas(id: string): Promise<void> {
+  const { data } = await api.get<{
+    data: Entrega[];
+    meta?: typeof metaEntregas.value;
+  }>(`${base.value}/webhooks-salientes/${id}/entregas`, {
+    params: {
+      page: paginaEntregas.value,
+      ...(estadoEntregas.value !== "" ? { estado: estadoEntregas.value } : {}),
+    },
+  });
+  entregas.value = data.data;
+  metaEntregas.value = data.meta ?? null;
+}
+async function filtrarEntregas(
+  estado: "" | "fallido" | "pendiente" | "entregado",
+): Promise<void> {
+  if (entregasDe.value === null) {
+    return;
+  }
+  estadoEntregas.value = estado;
+  paginaEntregas.value = 1;
+  try {
+    await cargarEntregas(entregasDe.value);
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
+}
+async function irPaginaEntregas(n: number): Promise<void> {
+  if (entregasDe.value === null) {
+    return;
+  }
+  paginaEntregas.value = n;
+  try {
+    await cargarEntregas(entregasDe.value);
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
+}
 
 async function cargarWebhooks(): Promise<void> {
   const { data } = await api.get<{
@@ -300,10 +349,9 @@ async function verEntregas(w: Webhook): Promise<void> {
     return;
   }
   try {
-    const { data } = await api.get<{ data: Entrega[] }>(
-      `${base.value}/webhooks-salientes/${w.id}/entregas`,
-    );
-    entregas.value = data.data;
+    estadoEntregas.value = "";
+    paginaEntregas.value = 1;
+    await cargarEntregas(w.id);
     entregasDe.value = w.id;
   } catch (e) {
     toast.error(mensajeDeError(e));
@@ -750,6 +798,43 @@ onMounted(cargar);
                 background: 'var(--fondo)',
               }"
             >
+              <div
+                v-if="
+                  metaEntregas &&
+                  metaEntregas.conteos.pendiente +
+                    metaEntregas.conteos.entregado +
+                    metaEntregas.conteos.fallido >
+                    0
+                "
+                class="tu-segmentado my-2"
+                role="group"
+                data-prueba="estado-entregas"
+              >
+                <button
+                  v-for="e in [
+                    '',
+                    'fallido',
+                    'pendiente',
+                    'entregado',
+                  ] as const"
+                  :key="e"
+                  type="button"
+                  :aria-pressed="estadoEntregas === e"
+                  @click="filtrarEntregas(e)"
+                >
+                  {{
+                    e === ""
+                      ? $t("operacion.listadosDos.todas")
+                      : $t(`conexiones.webhook.estados.${e}`)
+                  }}
+                  <span
+                    v-if="e !== ''"
+                    class="ml-1 tabular-nums"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ metaEntregas.conteos[e] }}</span
+                  >
+                </button>
+              </div>
               <p
                 v-if="entregas.length === 0"
                 class="py-3"
@@ -792,6 +877,14 @@ onMounted(cargar);
                   >
                 </span>
               </div>
+              <PaginacionListado
+                v-if="metaEntregas && metaEntregas.ultima_pagina > 1"
+                :page="metaEntregas.page"
+                :ultima-pagina="metaEntregas.ultima_pagina"
+                :total="metaEntregas.total"
+                :per-page="metaEntregas.per_page"
+                @ir="irPaginaEntregas"
+              />
             </div>
           </li>
         </ul>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -12,6 +12,7 @@ import InteresadosPlataforma from "@/components/InteresadosPlataforma.vue";
 import ModalidadPlataforma from "@/components/ModalidadPlataforma.vue";
 import OperacionPlataforma from "@/components/OperacionPlataforma.vue";
 import PaisPlataforma from "@/components/PaisPlataforma.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
@@ -574,7 +575,29 @@ async function condonar(
 // ---- Cobros ----
 const cargos = ref<Cargo[]>([]);
 const resumen = ref<ResumenCobros | null>(null);
-const filtro = ref({ estado: "", periodo: "" });
+const filtro = ref({ estado: "", periodo: "", concepto: "" });
+// Por páginas (antes, solo los primeros 200) y buscando el negocio.
+const buscarCobros = ref("");
+const paginaCobros = ref(1);
+const metaCobros = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
+function irPaginaCobros(n: number): void {
+  paginaCobros.value = n;
+  void cargarCobros();
+}
+function filtrarCobros(): void {
+  paginaCobros.value = 1;
+  void cargarCobros();
+}
+let esperaCobros: ReturnType<typeof setTimeout> | undefined;
+watch(buscarCobros, () => {
+  clearTimeout(esperaCobros);
+  esperaCobros = setTimeout(filtrarCobros, 300);
+});
 const cargandoCobros = ref(false);
 const errorCobros = ref<string | null>(null);
 
@@ -585,6 +608,7 @@ async function cargarCobros(): Promise<void> {
     const { data } = await cliente.get<{
       data: Cargo[];
       resumen: ResumenCobros;
+      meta?: typeof metaCobros.value;
     }>("/api/v1/plataforma/cobros", {
       ...encabezados(),
       params: {
@@ -595,10 +619,14 @@ async function cargarCobros(): Promise<void> {
             : undefined,
         vencidos: filtro.value.estado === "vencidos" ? 1 : undefined,
         periodo: filtro.value.periodo || undefined,
+        concepto: filtro.value.concepto || undefined,
+        q: buscarCobros.value.trim() || undefined,
+        page: paginaCobros.value,
       },
     });
     cargos.value = data.data;
     resumen.value = data.resumen;
+    metaCobros.value = data.meta ?? null;
   } catch (err) {
     errorCobros.value = mensajeDeError(err);
   } finally {
@@ -1383,11 +1411,19 @@ function borrar(): void {
 
         <div class="mt-5 tu-card p-5">
           <div class="flex flex-wrap items-end gap-3">
+            <input
+              v-model="buscarCobros"
+              type="search"
+              class="tu-input w-64"
+              :placeholder="$t('operacion.listadosTres.buscarNegocio')"
+              :aria-label="$t('operacion.listadosTres.buscarNegocio')"
+              data-prueba="buscar-cobros"
+            />
             <select
               v-model="filtro.estado"
               class="tu-input max-w-[12rem]"
               :aria-label="$t('plataformaAdmin.cobros.colEstado')"
-              @change="cargarCobros"
+              @change="filtrarCobros"
             >
               <option value="">{{ $t("plataformaAdmin.cobros.todos") }}</option>
               <option
@@ -1401,12 +1437,30 @@ function borrar(): void {
                 {{ $t("plataformaAdmin.cobros.vencidos") }}
               </option>
             </select>
+            <select
+              v-model="filtro.concepto"
+              class="tu-input max-w-[12rem]"
+              :aria-label="$t('operacion.listadosTres.concepto')"
+              data-prueba="concepto-cobros"
+              @change="filtrarCobros"
+            >
+              <option value="">
+                {{ $t("operacion.listadosTres.todosConceptos") }}
+              </option>
+              <option
+                v-for="c in ['renta', 'plan', 'ajuste', 'timbres']"
+                :key="c"
+                :value="c"
+              >
+                {{ $t(`operacion.listadosTres.conceptos.${c}`) }}
+              </option>
+            </select>
             <input
               v-model="filtro.periodo"
               class="tu-input max-w-[12rem]"
               type="month"
               :aria-label="$t('plataformaAdmin.cobros.periodo')"
-              @change="cargarCobros"
+              @change="filtrarCobros"
             />
           </div>
           <div
@@ -1517,6 +1571,14 @@ function borrar(): void {
               </div>
             </li>
           </ul>
+          <PaginacionListado
+            v-if="metaCobros && metaCobros.ultima_pagina > 1"
+            :page="metaCobros.page"
+            :ultima-pagina="metaCobros.ultima_pagina"
+            :total="metaCobros.total"
+            :per-page="metaCobros.per_page"
+            @ir="irPaginaCobros"
+          />
         </div>
       </div>
 

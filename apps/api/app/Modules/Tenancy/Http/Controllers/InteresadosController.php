@@ -99,19 +99,27 @@ class InteresadosController
     }
 
     /**
-     * Para el superadmin: los interesados de un producto, los más recientes primero.
+     * Para el superadmin: los interesados de un producto, los más recientes primero, por
+     * páginas; se buscan por nombre, correo, negocio o ciudad.
      */
     public function index(Request $request): JsonResponse
     {
         $validado = $request->validate([
             'producto' => ['nullable', Rule::enum(ProductoComercial::class)],
+            'q' => ['nullable', 'string', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
+        $buscar = trim((string) ($validado['q'] ?? ''));
 
         $pagina = Interesado::query()
             ->when(isset($validado['producto']), fn ($q) => $q->where('producto', $validado['producto']))
+            ->when($buscar !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('nombre', 'like', "%{$buscar}%")
+                ->orWhere('correo', 'like', "%{$buscar}%")
+                ->orWhere('negocio', 'like', "%{$buscar}%")
+                ->orWhere('ciudad', 'like', "%{$buscar}%")))
             ->orderByDesc('updated_at')
-            ->paginate(50);
+            ->paginate(50, ['*'], 'page', (int) ($validado['page'] ?? 1));
 
         return response()->json([
             'data' => collect($pagina->items())->map(fn (Interesado $i): array => [

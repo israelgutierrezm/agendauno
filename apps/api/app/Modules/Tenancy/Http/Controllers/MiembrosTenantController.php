@@ -554,12 +554,12 @@ class MiembrosTenantController
     /**
      * Padrón facturable: alumnos activos, facturables y no archivados. La renta SaaS
      * cobra solo a quienes además tuvieron actividad en el mes ({@see MedirUsoSaas}).
-     * Con `?formato=csv` descarga el padrón para conciliar/aclarar.
+     * Con `?formato=csv` descarga el padrón completo para conciliar/aclarar; en pantalla
+     * va por páginas, buscando por nombre o correo y por sucursal.
      */
     public function padron(Request $request): Response
     {
-        /** @var Collection<int, PersonaTenant> $miembros */
-        $miembros = PersonaTenant::query()
+        $base = PersonaTenant::query()
             ->with('sucursal')
             ->where('tipo', TipoPersonaTenant::Miembro->value)
             ->where('activo', true)
@@ -567,11 +567,31 @@ class MiembrosTenantController
             ->where('archivado', false)
             ->orderBy('primer_apellido')
             ->orderBy('nombre')
-            ->get();
+            ->orderBy('id');
 
         if ((string) $request->query('formato') === 'csv') {
-            return $this->exportarCsv($miembros);
+            /** @var Collection<int, PersonaTenant> $todos */
+            $todos = $base->get();
+
+            return $this->exportarCsv($todos);
         }
+
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'sucursal_id' => ['nullable', 'string', 'max:40'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $totalPadron = (clone $base)->count();
+        $buscar = trim((string) ($filtros['q'] ?? ''));
+        $sucursal = ($filtros['sucursal_id'] ?? '') !== ''
+            ? SucursalTenant::query()->where('ulid', $filtros['sucursal_id'])->value('id')
+            : null;
+        $pagina = $base
+            ->when($buscar !== '', fn ($q) => $q->buscar($buscar))
+            ->when(($filtros['sucursal_id'] ?? '') !== '', fn ($q) => $q->where('sucursal_id', $sucursal ?? 0))
+            ->paginate((int) ($filtros['per_page'] ?? 50), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+        $miembros = $pagina->getCollection();
 
         return response()->json([
             'data' => $miembros->map(fn (PersonaTenant $persona): array => [
@@ -583,7 +603,12 @@ class MiembrosTenantController
                 'razon' => 'Alumno activo y facturable',
             ])->all(),
             'meta' => [
-                'total' => $miembros->count(),
+                // Los del padrón con la búsqueda; `total_padron`, todos.
+                'total' => $pagina->total(),
+                'total_padron' => $totalPadron,
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
                 'regla' => 'Alumnos activos, facturables y no archivados',
             ],
         ]);

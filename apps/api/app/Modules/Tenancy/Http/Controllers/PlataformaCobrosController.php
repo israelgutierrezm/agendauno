@@ -22,7 +22,7 @@ use Illuminate\Validation\ValidationException;
  */
 class PlataformaCobrosController
 {
-    private const LIMITE = 200;
+    private const POR_PAGINA = 50;
 
     public function __invoke(Request $request): JsonResponse
     {
@@ -31,7 +31,13 @@ class PlataformaCobrosController
             'periodo' => ['nullable', 'date_format:Y-m'],
             // Solo las rentas vencidas y sin pagar (para decidir si se suspende).
             'vencidos' => ['nullable', 'boolean'],
+            // El negocio (nombre o slug) y qué se cobra.
+            'q' => ['nullable', 'string', 'max:100'],
+            'concepto' => ['nullable', 'in:renta,plan,ajuste,timbres'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+        $buscar = trim((string) ($validado['q'] ?? ''));
         $hoy = Carbon::today();
 
         // Por moneda (ADR 0107: a México en pesos, al resto en dólares): no se suman
@@ -61,8 +67,15 @@ class PlataformaCobrosController
             'otras_monedas' => $otras,
         ];
 
-        $cargos = CargoRenta::query()
+        // Por páginas (antes, solo los primeros 200 y sin avisar).
+        $pagina = CargoRenta::query()
             ->with('estudio')
+            ->when($buscar !== '', fn ($q) => $q->whereHas('estudio', fn ($e) => $e
+                ->where('nombre', 'like', "%{$buscar}%")
+                ->orWhere('slug', 'like', "%{$buscar}%")))
+            ->when(isset($validado['concepto']), fn ($q) => $validado['concepto'] === 'renta'
+                ? $q->where(fn ($w) => $w->whereNull('concepto')->orWhere('concepto', 'renta'))
+                : $q->where('concepto', $validado['concepto']))
             ->when(isset($validado['estado']), fn ($q) => $q->where('estado', $validado['estado']))
             ->when(isset($validado['periodo']), fn ($q) => $q->where('periodo', $validado['periodo']))
             ->when($request->boolean('vencidos'), fn ($q) => $q
@@ -70,8 +83,8 @@ class PlataformaCobrosController
                 ->whereDate('vence_en', '<', $hoy))
             ->orderByDesc('periodo')
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
-            ->get();
+            ->paginate((int) ($validado['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($validado['page'] ?? 1));
+        $cargos = $pagina->getCollection();
 
         $facturas = FacturaPlataforma::query()
             ->whereIn('cargo_renta_id', $cargos->modelKeys())
@@ -102,6 +115,12 @@ class PlataformaCobrosController
                 // Solo un cargo pendiente se puede condonar.
                 'condonable' => $c->estado === EstadoCargoRenta::Pendiente,
             ])->values()->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
         ]);
     }
 

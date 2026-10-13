@@ -24,7 +24,7 @@ class WebhooksSalientesTenantController
 {
     public function __construct(private readonly ValidarDestinoWebhook $destinos) {}
 
-    private const LIMITE_ENTREGAS = 100;
+    private const POR_PAGINA_ENTREGAS = 20;
 
     public function index(): JsonResponse
     {
@@ -72,14 +72,39 @@ class WebhooksSalientesTenantController
         return response()->json(status: 204);
     }
 
+    /**
+     * Las entregas del webhook por páginas (antes, solo las últimas 100), de la más
+     * reciente; se filtran por estado, con cuántas hay de cada uno.
+     */
     public function entregas(Request $request): JsonResponse
     {
         $webhook = WebhookSalienteTenant::query()->where('ulid', (string) $request->route('webhook'))->firstOrFail();
+        $filtros = $request->validate([
+            'estado' => ['nullable', 'in:pendiente,entregado,fallido'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $conteos = $webhook->entregas()->selectRaw('estado, COUNT(*) as total')->groupBy('estado')->pluck('total', 'estado')
+            ->map(static fn ($n): int => (int) $n)->all();
 
-        $entregas = $webhook->entregas()->orderByDesc('id')->limit(self::LIMITE_ENTREGAS)->get();
+        $pagina = $webhook->entregas()
+            ->when(isset($filtros['estado']), fn ($q) => $q->where('estado', $filtros['estado']))
+            ->orderByDesc('id')
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA_ENTREGAS), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
         return response()->json([
-            'data' => $entregas->map(fn (EntregaWebhookTenant $e): array => [
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'conteos' => [
+                    'pendiente' => $conteos['pendiente'] ?? 0,
+                    'entregado' => $conteos['entregado'] ?? 0,
+                    'fallido' => $conteos['fallido'] ?? 0,
+                ],
+            ],
+            'data' => $pagina->getCollection()->map(fn (EntregaWebhookTenant $e): array => [
                 'id' => $e->ulid,
                 'evento_tipo' => $e->evento_tipo,
                 'evento_ulid' => $e->evento_ulid,

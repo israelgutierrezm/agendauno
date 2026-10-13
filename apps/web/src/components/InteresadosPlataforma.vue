@@ -4,6 +4,7 @@ import { onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { mensajeDeError } from "@/lib/api";
 import { PRODUCTOS, PRODUCTOS_LISTA, type Producto } from "@/lib/producto";
 
@@ -34,6 +35,15 @@ const cliente = axios.create({
 const producto = ref<Producto>("turnouno");
 const lista = ref<Interesado[]>([]);
 const total = ref(0);
+// Por páginas (antes solo se veían los primeros 50) y con búsqueda.
+const buscar = ref("");
+const pagina = ref(1);
+const meta = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
 const cargando = ref(false);
 const error = ref<string | null>(null);
 
@@ -43,13 +53,23 @@ async function cargar(): Promise<void> {
   try {
     const { data } = await cliente.get<{
       data: Interesado[];
-      meta: { total: number };
+      meta: {
+        total: number;
+        page: number;
+        per_page: number;
+        ultima_pagina: number;
+      };
     }>("/api/v1/plataforma/interesados", {
-      params: { producto: producto.value },
+      params: {
+        producto: producto.value,
+        page: pagina.value,
+        ...(buscar.value.trim() !== "" ? { q: buscar.value.trim() } : {}),
+      },
       headers: { Authorization: `Bearer ${props.token}` },
     });
     lista.value = data.data;
     total.value = data.meta.total;
+    meta.value = data.meta;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -63,7 +83,22 @@ function fecha(iso: string): string {
   );
 }
 
-watch(producto, () => void cargar());
+watch(producto, () => {
+  pagina.value = 1;
+  void cargar();
+});
+let espera: ReturnType<typeof setTimeout> | undefined;
+watch(buscar, () => {
+  clearTimeout(espera);
+  espera = setTimeout(() => {
+    pagina.value = 1;
+    void cargar();
+  }, 300);
+});
+function irPagina(n: number): void {
+  pagina.value = n;
+  void cargar();
+}
 onMounted(() => void cargar());
 </script>
 
@@ -84,14 +119,26 @@ onMounted(() => void cargar());
           {{ t("interesados.plataforma.ayuda") }}
         </p>
       </div>
-      <label class="block">
-        <span class="sr-only">{{ t("interesados.plataforma.producto") }}</span>
-        <select v-model="producto" class="tu-input">
-          <option v-for="p in PRODUCTOS_LISTA" :key="p" :value="p">
-            {{ PRODUCTOS[p].nombre }}
-          </option>
-        </select>
-      </label>
+      <div class="flex flex-wrap items-center gap-2">
+        <input
+          v-model="buscar"
+          type="search"
+          class="tu-input w-64"
+          :placeholder="t('operacion.listadosTres.buscarInteresados')"
+          :aria-label="t('operacion.listadosTres.buscarInteresados')"
+          data-prueba="buscar-interesados"
+        />
+        <label class="block">
+          <span class="sr-only">{{
+            t("interesados.plataforma.producto")
+          }}</span>
+          <select v-model="producto" class="tu-input">
+            <option v-for="p in PRODUCTOS_LISTA" :key="p" :value="p">
+              {{ PRODUCTOS[p].nombre }}
+            </option>
+          </select>
+        </label>
+      </div>
     </div>
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
@@ -118,7 +165,11 @@ onMounted(() => void cargar());
       class="mt-4 text-sm"
       :style="{ color: 'var(--texto-suave)' }"
     >
-      {{ t("interesados.plataforma.vacio") }}
+      {{
+        buscar.trim() !== ""
+          ? t("operacion.listadosDos.sinResultados")
+          : t("interesados.plataforma.vacio")
+      }}
     </p>
     <ul v-else class="mt-4 divide-y divide-[var(--borde)]">
       <li v-for="i in lista" :key="i.id" class="py-3 text-sm">
@@ -143,5 +194,13 @@ onMounted(() => void cargar());
         </p>
       </li>
     </ul>
+    <PaginacionListado
+      v-if="meta && meta.ultima_pagina > 1"
+      :page="meta.page"
+      :ultima-pagina="meta.ultima_pagina"
+      :total="meta.total"
+      :per-page="meta.per_page"
+      @ir="irPagina"
+    />
   </section>
 </template>
