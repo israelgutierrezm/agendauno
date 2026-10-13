@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\RespuestaFormulario;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\TipoCampo;
 use DateTimeImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -24,22 +25,31 @@ use Illuminate\Validation\ValidationException;
  */
 class RespuestasFormularioController
 {
-    private const LIMITE = 200;
+    private const POR_PAGINA = 25;
 
     /**
-     * Las respuestas de un formulario, con quién respondió y cuándo; el id de su
-     * usuario (instructores) sirve para abrir su expediente desde la lista.
+     * Las respuestas de un formulario por páginas (antes, solo las últimas 200), con
+     * quién respondió y cuándo; se buscan por la persona. El id de su usuario
+     * (instructores) sirve para abrir su expediente desde la lista.
      */
     public function index(Request $request): JsonResponse
     {
         $formulario = Formulario::query()->where('ulid', (string) $request->route('formulario'))->firstOrFail();
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $buscar = trim((string) ($filtros['q'] ?? ''));
 
-        $respuestas = RespuestaFormulario::query()
+        $pagina = RespuestaFormulario::query()
             ->with('persona')
             ->where('formulario_id', $formulario->id)
+            ->when($buscar !== '', fn (Builder $q) => $q->whereHas('persona', fn (Builder $p) => $p->buscar($buscar)))
             ->orderByDesc('updated_at')
-            ->limit(self::LIMITE)
-            ->get();
+            ->orderByDesc('id')
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+        $respuestas = collect($pagina->items());
 
         $usuarios = Usuario::query()
             ->whereIn('id', $respuestas->pluck('persona.usuario_id')->filter()->unique()->all())
@@ -57,6 +67,12 @@ class RespuestasFormularioController
                 'respondido_en' => $respuesta->updated_at?->toIso8601String(),
                 'valores' => $respuesta->valores,
             ])->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
         ]);
     }
 

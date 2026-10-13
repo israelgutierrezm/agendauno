@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\LibroPuntosTenant;
 use App\Modules\Tenancy\Application\PuntosTenant;
+use App\Modules\Tenancy\Lealtad\EstadoCanje;
 use App\Modules\Tenancy\Listeners\AcumularPuntos;
 use App\Modules\Tenancy\Models\CanjeLealtadTenant;
 use App\Modules\Tenancy\Models\MovimientoPuntosTenant;
@@ -13,6 +14,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProgramaLealtadTenant;
 use App\Modules\Tenancy\Models\RecompensaLealtadTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -118,11 +120,54 @@ class LealtadTenantController
         return response()->json(['data' => $this->presentarCanje($canje->loadMissing('persona'))], 201);
     }
 
-    public function canjes(): JsonResponse
+    /**
+     * Los canjes por páginas (antes, solo los últimos 100). `pendientes`: los que faltan
+     * por entregar, del más antiguo al más reciente (se atienden en orden); `historial`:
+     * entregados y cancelados, del más reciente. Sin vista, los pendientes primero.
+     */
+    public function canjes(Request $request): JsonResponse
     {
-        $canjes = CanjeLealtadTenant::query()->with('persona')->orderByDesc('id')->limit(100)->get();
+        $filtros = $request->validate([
+            'vista' => ['nullable', 'in:pendientes,historial'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $vista = $filtros['vista'] ?? null;
+        $buscar = trim((string) ($filtros['q'] ?? ''));
+        $pendiente = EstadoCanje::Pendiente->value;
+        $consulta = CanjeLealtadTenant::query()
+            ->with('persona')
+            ->when($buscar !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
+                ->whereHas('persona', fn (Builder $p) => $p->buscar($buscar))
+                ->orWhere('recompensa_nombre', 'like', "%{$buscar}%")));
+        $conteos = [
+            'pendientes' => (clone $consulta)->where('estado', $pendiente)->count(),
+            'historial' => (clone $consulta)->where('estado', '!=', $pendiente)->count(),
+        ];
+        match ($vista) {
+            'pendientes' => $consulta->where('estado', $pendiente)->orderBy('id'),
+            'historial' => $consulta->where('estado', '!=', $pendiente)->orderByDesc('id'),
+            default => $consulta->orderByRaw('case when estado = ? then 0 else 1 end', [$pendiente])->orderByDesc('id'),
+        };
+        $pagina = $consulta->paginate((int) ($filtros['per_page'] ?? 20), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
-        return response()->json(['data' => $canjes->map(fn (CanjeLealtadTenant $c): array => $this->presentarCanje($c))->all()]);
+        return response()->json([
+            'data' => collect($pagina->items())->map(fn (CanjeLealtadTenant $c): array => $this->presentarCanje($c))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'conteos' => $conteos,
+                // Para los indicadores, sin búsqueda: cuántos esperan y cuántos puntos
+                // se han entregado en total.
+                'resumen' => [
+                    'pendientes' => CanjeLealtadTenant::query()->where('estado', $pendiente)->count(),
+                    'puntos_entregados' => (int) CanjeLealtadTenant::query()->where('estado', EstadoCanje::Entregado->value)->sum('puntos'),
+                ],
+            ],
+        ]);
     }
 
     public function entregarCanje(Request $request): JsonResponse

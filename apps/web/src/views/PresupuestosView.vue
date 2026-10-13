@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -93,6 +94,18 @@ const puedeGestionar = computed(() => sesion.puede("presupuestos.gestionar"));
 const puedeCobrar = computed(() => sesion.puede("ordenes.gestionar"));
 
 const lista = ref<Resumen[]>([]);
+// Por páginas (antes, solo los últimos 300).
+const pagina = ref(1);
+const meta = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
+function irPagina(n: number): void {
+  pagina.value = n;
+  void cargar();
+}
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const filtro = ref<"todos" | Estado | "vencido">("todos");
@@ -140,12 +153,14 @@ async function cargar(): Promise<void> {
       `${base.value}/presupuestos`,
       {
         params: {
+          page: pagina.value,
           ...(filtro.value !== "todos" ? { estado: filtro.value } : {}),
           ...(buscar.value.trim() !== "" ? { q: buscar.value.trim() } : {}),
         },
       },
     );
     lista.value = data.data;
+    meta.value = (data as { meta?: typeof meta.value }).meta ?? null;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -173,10 +188,16 @@ async function cargarApoyos(): Promise<void> {
 }
 
 let espera: ReturnType<typeof setTimeout> | undefined;
-watch(filtro, () => void cargar());
+watch(filtro, () => {
+  pagina.value = 1;
+  void cargar();
+});
 watch(buscar, () => {
   clearTimeout(espera);
-  espera = setTimeout(() => void cargar(), 300);
+  espera = setTimeout(() => {
+    pagina.value = 1;
+    void cargar();
+  }, 300);
 });
 
 // ---- Editor ----
@@ -559,7 +580,7 @@ onMounted(() => {
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('presupuestos.titulo')"
-      :total="lista.length"
+      :total="meta?.total ?? lista.length"
     >
       <template v-if="puedeGestionar" #acciones>
         <button
@@ -665,6 +686,14 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
+      <PaginacionListado
+        v-if="meta && meta.ultima_pagina > 1"
+        :page="meta.page"
+        :ultima-pagina="meta.ultima_pagina"
+        :total="meta.total"
+        :per-page="meta.per_page"
+        @ir="irPagina"
+      />
     </div>
 
     <!-- Editor / detalle -->

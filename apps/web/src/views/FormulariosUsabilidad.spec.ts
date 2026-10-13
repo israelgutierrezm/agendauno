@@ -79,6 +79,7 @@ describe("alta de fichas sin estorbar al diseñador", () => {
     await flushPromises();
     expect(mocks.get).toHaveBeenCalledWith(
       "/api/v1/app/demo/formularios/otra/respuestas",
+      { params: { page: 1 } },
     );
     expect(
       w.findAll("button").some((b) => b.text() === "Agregar pregunta"),
