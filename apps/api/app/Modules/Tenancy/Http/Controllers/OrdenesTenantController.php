@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -13,11 +14,14 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Ordenes del estudio (data plane del tenant): crea ordenes pendientes con precio
@@ -27,7 +31,7 @@ use Illuminate\Validation\Rule;
  */
 class OrdenesTenantController
 {
-    private const LIMITE = 200;
+    private const POR_PAGINA = 25;
 
     private const METODOS = ['efectivo', 'transferencia', 'ventanilla', 'manual'];
 
@@ -36,20 +40,71 @@ class OrdenesTenantController
         private readonly CobrarOrdenTenant $cobrar,
         private readonly ResolverAccesoTenant $acceso,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly FechasNegocioTenant $fechas,
     ) {}
 
+    /**
+     * Las órdenes por páginas, de la más reciente a la más antigua: se buscan por el
+     * comprador y se acotan por estado y por las fechas en que se crearon (días del
+     * negocio). `meta.resumen` es lo de hoy en el negocio (ventas pagadas hoy, lo
+     * vendido hoy por moneda y lo que queda por cobrar), sin los filtros: no cambia al
+     * buscar.
+     */
     public function index(Request $request): JsonResponse
     {
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'estado' => ['nullable', Rule::enum(EstadoOrden::class)],
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        if (isset($filtros['desde'], $filtros['hasta']) && $filtros['hasta'] < $filtros['desde']) {
+            throw ValidationException::withMessages(['hasta' => ['La fecha final no puede ser antes que la inicial.']]);
+        }
+
         // Alcance por sucursal (R19): el staff acotado solo ve las órdenes de SUS sedes.
         $actor = $this->actor($request);
         $permitidas = $actor !== null ? $this->acceso->sucursalesPermitidas($actor) : null;
+        $deSusSedes = fn (): Builder => OrdenTenant::query()
+            ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas));
 
-        $ordenes = OrdenTenant::query()->with(['persona', 'lineas.producto', 'lineas.beneficiario'])
-            ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
-            ->orderByDesc('id')->limit(self::LIMITE)->get();
+        $q = trim((string) ($filtros['q'] ?? ''));
+        $pagina = $deSusSedes()
+            ->with(['persona', 'lineas.producto', 'lineas.beneficiario'])
+            ->when($q !== '', fn ($c) => $c->whereHas('persona', fn ($p) => $p->buscar($q)))
+            ->when(isset($filtros['estado']), fn ($c) => $c->where('estado', $filtros['estado']))
+            ->when(isset($filtros['desde']), fn ($c) => $c->where('created_at', '>=', $this->fechas->inicioDelDia((string) $filtros['desde'])))
+            ->when(isset($filtros['hasta']), fn ($c) => $c->where('created_at', '<=', $this->fechas->finDelDia((string) $filtros['hasta'])))
+            ->orderByDesc('id')
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+
+        $hoy = $this->fechas->hoy();
+        $pagadasHoy = fn (): Builder => $deSusSedes()
+            ->where('estado', EstadoOrden::Pagada->value)
+            ->whereBetween('pagada_en', [$this->fechas->inicioDelDia($hoy), $this->fechas->finDelDia($hoy)]);
 
         return response()->json([
-            'data' => $ordenes->map(fn (OrdenTenant $orden): array => $this->presentar($orden))->all(),
+            'data' => collect($pagina->items())->map(fn (OrdenTenant $orden): array => $this->presentar($orden))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'resumen' => [
+                    'ventas_hoy' => $pagadasHoy()->count(),
+                    'vendido_hoy' => $pagadasHoy()
+                        ->selectRaw('moneda, SUM(total_minor) as total_minor')
+                        ->groupBy('moneda')
+                        ->orderBy('moneda')
+                        ->toBase()
+                        ->get()
+                        ->map(fn (object $fila): array => ['moneda' => (string) $fila->moneda, 'total_minor' => (int) $fila->total_minor])
+                        ->all(),
+                    'por_cobrar' => $deSusSedes()->where('estado', EstadoOrden::Pendiente->value)->count(),
+                ],
+            ],
         ]);
     }
 

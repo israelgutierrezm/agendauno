@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -61,6 +64,7 @@ interface Mensaje {
   asunto: string;
   estado: "encolado" | "enviado" | "fallido" | "descartado";
   intentos: number;
+  creado_en?: string | null;
   enviado_en: string | null;
   // Lo que Meta avisa de un WhatsApp (ADR 0074).
   entregado_en?: string | null;
@@ -485,16 +489,98 @@ async function eliminarPlantilla(): Promise<void> {
   }
 }
 
-// ---- Bandeja de salida ----
+// ---- Bandeja de salida (por páginas: el API busca, filtra y cuenta) ----
+const ESTADOS_SALIDA = [
+  "encolado",
+  "enviado",
+  "fallido",
+  "descartado",
+] as const;
+interface MetaSalida {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  conteos: Record<string, number>;
+}
 const mensajes = ref<Mensaje[]>([]);
+const metaSalida = ref<MetaSalida | null>(null);
 const filtroEstado = ref("");
+const filtroCanal = ref("");
+const buscarSalida = ref("");
+const desdeSalida = ref("");
+const hastaSalida = ref("");
+const paginaSalida = ref(1);
+const cargandoSalida = ref(false);
 
+let peticionSalida = 0;
 async function cargarSalida(): Promise<void> {
-  const { data } = await api.get<{ data: Mensaje[] }>(
-    `${base.value}/mensajes`,
-    { params: filtroEstado.value !== "" ? { estado: filtroEstado.value } : {} },
-  );
-  mensajes.value = data.data;
+  const mia = ++peticionSalida;
+  cargandoSalida.value = true;
+  const q = buscarSalida.value.trim();
+  try {
+    const { data } = await api.get<{ data: Mensaje[]; meta?: MetaSalida }>(
+      `${base.value}/mensajes`,
+      {
+        params: {
+          page: paginaSalida.value,
+          ...(q !== "" ? { q } : {}),
+          ...(filtroEstado.value !== "" ? { estado: filtroEstado.value } : {}),
+          ...(filtroCanal.value !== "" ? { canal: filtroCanal.value } : {}),
+          ...(desdeSalida.value !== "" ? { desde: desdeSalida.value } : {}),
+          ...(hastaSalida.value !== "" ? { hasta: hastaSalida.value } : {}),
+        },
+      },
+    );
+    // Solo la última búsqueda: una anterior que llegue tarde no la pisa.
+    if (mia === peticionSalida) {
+      mensajes.value = data.data;
+      metaSalida.value = data.meta ?? null;
+    }
+  } finally {
+    if (mia === peticionSalida) {
+      cargandoSalida.value = false;
+    }
+  }
+}
+async function irPaginaSalida(n = 1): Promise<void> {
+  paginaSalida.value = n;
+  try {
+    await cargarSalida();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+// La búsqueda espera a que se deje de escribir; lo demás recarga ya.
+let esperaSalida: ReturnType<typeof setTimeout> | undefined;
+watch(buscarSalida, () => {
+  clearTimeout(esperaSalida);
+  esperaSalida = setTimeout(() => void irPaginaSalida(1), 300);
+});
+watch([filtroEstado, filtroCanal, desdeSalida, hastaSalida], () => {
+  if (
+    desdeSalida.value === "" ||
+    hastaSalida.value === "" ||
+    hastaSalida.value >= desdeSalida.value
+  ) {
+    void irPaginaSalida(1);
+  }
+});
+onBeforeUnmount(() => clearTimeout(esperaSalida));
+const conFiltrosSalida = computed(
+  () =>
+    buscarSalida.value.trim() !== "" ||
+    filtroEstado.value !== "" ||
+    filtroCanal.value !== "" ||
+    desdeSalida.value !== "" ||
+    hastaSalida.value !== "",
+);
+function limpiarFiltrosSalida(): void {
+  buscarSalida.value = "";
+  filtroEstado.value = "";
+  filtroCanal.value = "";
+  desdeSalida.value = "";
+  hastaSalida.value = "";
 }
 
 async function irPestana(p: Pestana): Promise<void> {
@@ -898,30 +984,92 @@ onMounted(cargar);
       </ul>
     </div>
 
-    <!-- Bandeja de salida -->
-    <div v-if="pestana === 'salida'" class="mt-5 tu-card p-5">
-      <select
-        v-model="filtroEstado"
-        class="tu-input max-w-[180px]"
-        @change="cargarSalida"
-      >
-        <option value="">{{ $t("comunicacionesAuto.todos") }}</option>
-        <option
-          v-for="e in ['encolado', 'enviado', 'fallido', 'descartado']"
-          :key="e"
-          :value="e"
+    <!-- Bandeja de salida: por páginas, con búsqueda, estado, canal y fechas -->
+    <div v-if="pestana === 'salida'" class="mt-5 tu-card overflow-hidden">
+      <div class="tu-filtros">
+        <label class="tu-buscar">
+          <IconoNav nombre="buscar" :tam="16" />
+          <input
+            v-model="buscarSalida"
+            type="search"
+            class="tu-input"
+            :placeholder="$t('operacion.salida.buscar')"
+            :aria-label="$t('operacion.salida.buscar')"
+            data-prueba="buscar-salida"
+          />
+        </label>
+        <div
+          class="tu-segmentado"
+          role="group"
+          :aria-label="$t('operacion.salida.estado')"
         >
-          {{ $t(`comunicacionesAuto.estados.${e}`) }}
-        </option>
-      </select>
+          <button
+            v-for="e in ['', ...ESTADOS_SALIDA]"
+            :key="e"
+            type="button"
+            :aria-pressed="filtroEstado === e"
+            :data-prueba="`salida-estado-${e || 'todos'}`"
+            @click="filtroEstado = e"
+          >
+            {{
+              e === ""
+                ? $t("operacion.salida.todos")
+                : $t("operacion.salida.conCuenta", {
+                    estado: $t(`comunicacionesAuto.estados.${e}`),
+                    n: metaSalida?.conteos[e] ?? 0,
+                  })
+            }}
+          </button>
+        </div>
+        <select
+          v-model="filtroCanal"
+          class="tu-input com-canal"
+          :aria-label="$t('operacion.salida.canal')"
+          data-prueba="salida-canal"
+        >
+          <option value="">{{ $t("operacion.salida.todosLosCanales") }}</option>
+          <option
+            v-for="c in ['email', 'whatsapp', 'push', 'interno']"
+            :key="c"
+            :value="c"
+          >
+            {{ canalTexto(c) }}
+          </option>
+        </select>
+        <RangoFechas
+          v-model:desde="desdeSalida"
+          v-model:hasta="hastaSalida"
+          prueba="salida"
+        />
+        <button
+          v-if="conFiltrosSalida"
+          type="button"
+          class="tu-enlace text-sm"
+          @click="limpiarFiltrosSalida"
+        >
+          {{ $t("operacion.listados.quitarFiltros") }}
+        </button>
+      </div>
       <p
         v-if="mensajes.length === 0"
-        class="mt-4 text-sm"
+        class="px-5 pb-5 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
+        :aria-busy="cargandoSalida"
       >
-        {{ $t("comunicacionesAuto.salidaVacia") }}
+        {{
+          cargandoSalida
+            ? $t("operacion.listados.cargando")
+            : conFiltrosSalida
+              ? $t("operacion.listados.sinResultados")
+              : $t("comunicacionesAuto.salidaVacia")
+        }}
       </p>
-      <ul v-else class="mt-2">
+      <ul
+        v-else
+        class="px-5"
+        :class="{ 'com-recargando': cargandoSalida }"
+        :aria-busy="cargandoSalida"
+      >
         <li v-for="m in mensajes" :key="m.id" class="com-fila text-sm">
           <div class="min-w-0">
             <p class="font-medium truncate">{{ m.asunto }}</p>
@@ -930,7 +1078,8 @@ onMounted(cargar);
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{ m.persona ?? m.destinatario ?? "—" }} ·
-              {{ canalTexto(m.canal) }} · {{ fecha(m.enviado_en) }}
+              {{ canalTexto(m.canal) }} ·
+              {{ fecha(m.enviado_en ?? m.creado_en ?? null) }}
             </p>
             <p
               v-if="m.estado === 'fallido' && m.ultimo_error"
@@ -952,6 +1101,14 @@ onMounted(cargar);
           >
         </li>
       </ul>
+      <PaginacionListado
+        v-if="metaSalida && metaSalida.ultima_pagina > 1"
+        :page="metaSalida.page"
+        :ultima-pagina="metaSalida.ultima_pagina"
+        :total="metaSalida.total"
+        :per-page="metaSalida.per_page"
+        @ir="irPaginaSalida"
+      />
     </div>
 
     <PanelLateral
@@ -1097,6 +1254,16 @@ onMounted(cargar);
 }
 .com-fila:first-child {
   border-top: 0;
+}
+.com-canal {
+  width: auto;
+  min-height: 2.5rem;
+  padding-block: 0.35rem;
+  font-size: 0.85rem;
+}
+.com-recargando {
+  opacity: 0.55;
+  transition: opacity 0.15s;
 }
 .com-fijo {
   padding: 0.75rem;

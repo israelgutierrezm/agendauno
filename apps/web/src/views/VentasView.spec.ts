@@ -229,4 +229,34 @@ describe("vender un plan", () => {
     expect(w.text().replace(/\s/g, " ")).toContain("0,00 €");
     expect(w.text()).not.toContain("$0.00");
   });
+
+  it("los indicadores son los de hoy en el negocio, del API, y solo pide las ventas recientes", async () => {
+    const base = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation((url: string, config?: unknown) =>
+      url.endsWith("/ordenes")
+        ? Promise.resolve({
+            data: {
+              data: [],
+              meta: {
+                total: 57,
+                resumen: {
+                  ventas_hoy: 3,
+                  vendido_hoy: [{ moneda: "MXN", total_minor: 450000 }],
+                  por_cobrar: 9,
+                },
+              },
+            },
+          })
+        : base(url, config),
+    );
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    expect(mocks.get).toHaveBeenCalledWith("/api/v1/app/demo/ordenes", {
+      params: { per_page: 20 },
+    });
+    const texto = w.text().replace(/\s/g, " ");
+    expect(texto).toContain("$4,500.00");
+    expect(texto).toContain("9");
+  });
 });

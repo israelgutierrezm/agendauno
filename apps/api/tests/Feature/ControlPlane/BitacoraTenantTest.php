@@ -75,6 +75,17 @@ it('configurar una pasarela queda en la bitácora sin las llaves', function (): 
         ->and($asiento->getContent())->not->toContain('sk_test_supersecreta');
 });
 
+it('conectar Wellhub o TotalPass queda descrito con el nombre de la plataforma', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub", [
+        'activa' => true, 'credenciales' => ['api_key' => 'wh_token', 'gym_id' => '445566'],
+    ], conBearer($e['bearer']))->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/auditorias?accion=integracion.actualizada", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.0.descripcion', 'Configuró la integración con Wellhub (activa)');
+});
+
 it('invitar a alguien al equipo queda registrado', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
 

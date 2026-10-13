@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\ProveedorPartner;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -139,8 +140,17 @@ class BitacoraTenant
             'bloqueo_agenda.creado' => 'Bloqueó la agenda'.(isset($despues['motivo']) ? ': '.$despues['motivo'] : ''),
             'estudio.modalidad' => 'La plataforma cambió el negocio a '.((string) ($despues['modalidad'] ?? '')).(isset($despues['perfil']) ? " (giro: {$despues['perfil']})" : ''),
             'pasarela.configurada' => 'Configuró la pasarela '.((string) ($despues['proveedor'] ?? '')).(isset($despues['activa']) ? ($despues['activa'] ? ' (activa)' : ' (inactiva)') : ''),
+            // Wellhub y TotalPass (ADR 0124, 0149): de la plataforma solo su nombre.
+            'integracion.actualizada' => 'Configuró la integración con '.self::plataforma($a).(isset($despues['activa']) ? ($despues['activa'] ? ' (activa)' : ' (inactiva)') : ''),
+            'integracion.reservas' => (($despues['activas'] ?? false) ? 'Publicó sus clases en ' : 'Dejó de publicar sus clases en ').self::plataforma($a),
             default => self::eliminacion($a->accion, $antes, $despues) ?? $a->accion,
         };
+    }
+
+    /** El nombre de la plataforma de bienestar de una integración. */
+    private static function plataforma(AuditoriaTenant $a): string
+    {
+        return ProveedorPartner::tryFrom((string) $a->entidad_id)?->nombre() ?? (string) $a->entidad_id;
     }
 
     /**
