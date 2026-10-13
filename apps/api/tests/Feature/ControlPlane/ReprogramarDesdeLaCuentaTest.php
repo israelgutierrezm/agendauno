@@ -139,3 +139,19 @@ it('un alumno cambia su clase a otra fecha de la misma clase que tenga lugar', f
     $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas/{$reserva}/reprogramar", ['sesion_id' => $miercoles], conBearer($bearer))
         ->assertOk()->assertJsonPath('data.ahora', '2030-01-09T14:00:00+00:00');
 });
+
+it('al cambiar su clase, el alumno no se adelanta a la apertura de reservas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Ana', 'email' => 'ana@correo.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $bearer = personalConSesion($e['slug'], $e['bearer'], 'ana@correo.mx', 'miembro');
+    $manana = crearSesionTenant($e, $sede, 5, '2030-01-02 08:00:00');
+    $lejana = crearSesionTenant($e, $sede, 5, '2030-01-20 08:00:00');
+    $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $manana], conBearer($bearer))->assertCreated()->json('data.id');
+
+    // Las reservas abren 7 días antes: la del 20 aún no se puede tomar, ni cambiándose a ella.
+    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['reservas.dias_apertura' => 7]], conBearer($e['bearer']))->assertOk();
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas/{$reserva}/reprogramar", ['sesion_id' => $lejana], conBearer($bearer))
+        ->assertStatus(422);
+});

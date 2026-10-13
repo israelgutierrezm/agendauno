@@ -43,7 +43,7 @@ class WebhookWhatsAppController
     public function recibir(Request $request): JsonResponse
     {
         $firma = $this->whatsapp->firmaValida($request->getContent(), $request->header('X-Hub-Signature-256'));
-        if ($firma === false || ($firma === null && app()->environment('production'))) {
+        if ($firma === false || ($firma === null && ! app()->environment(['local', 'testing']))) {
             abort(403, 'Firma inválida.');
         }
 

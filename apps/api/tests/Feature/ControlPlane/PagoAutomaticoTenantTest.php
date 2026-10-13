@@ -406,3 +406,34 @@ it('en un negocio de citas no hay pago automático: no se ofrece, no se activa a
     Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), '/payment_intents'));
     expect(enEstudioPago($m, fn () => DomiciliacionTenant::query()->where('estado', DomiciliacionTenant::ACTIVA)->count()))->toBe(0);
 });
+
+it('si Stripe cobró pero no respondió a tiempo, su aviso registra el pago y cumple la renovación', function (): void {
+    $m = alumnoConMembresia();
+    autorizarTarjeta($m);
+    $this->stripe->cargo = 'caido';
+    expect(renovarHoy($m))->toBe('fallido');
+    [$orden, $domiciliacion, $total] = enEstudioPago($m, fn (): array => [
+        (string) OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('ulid'),
+        (string) DomiciliacionTenant::query()->value('ulid'),
+        (int) OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('total_minor'),
+    ]);
+    $aviso = fn (int $monto) => $this->postJson("/api/v1/webhooks/tenant/{$m['slug']}/stripe", [
+        'type' => 'payment_intent.succeeded',
+        'data' => ['object' => [
+            'id' => 'pi_tardio', 'amount_received' => $monto, 'currency' => 'mxn',
+            'metadata' => ['orden' => $orden, 'domiciliacion' => $domiciliacion],
+        ]],
+    ])->assertOk();
+
+    // Con otro importe no se da por pagada.
+    $aviso($total + 100);
+    expect(enEstudioPago($m, fn () => OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value))->toBe('pendiente');
+
+    // El banco sí cobró: el aviso (aunque llegue dos veces) registra un solo pago.
+    $aviso($total);
+    $aviso($total);
+    expect(enEstudioPago($m, fn (): array => [
+        OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value,
+        PagoTenant::query()->where('referencia_externa', 'pi_tardio')->count(),
+    ]))->toBe(['pagada', 1]);
+});

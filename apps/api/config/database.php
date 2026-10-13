@@ -61,6 +61,9 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => env('DB_ENGINE', 'InnoDB'),
+            // La sesión de MySQL en UTC, como la aplicación: `CURRENT_TIMESTAMP` (useCurrent)
+            // no toma la hora del servidor.
+            'timezone' => env('DB_TIMEZONE', '+00:00'),
             // Cada lectura ve lo último confirmado: lo que se lee tras un candado ya
             // incluye lo que guardó la solicitud anterior (ADR 0052).
             'isolation_level' => env('DB_ISOLATION_LEVEL', 'READ COMMITTED'),
@@ -109,6 +112,8 @@ return [
             'prefix' => '',
             'foreign_key_constraints' => true,
             'engine' => 'InnoDB',
+            // MySQL en UTC, como la aplicación (SQLite lo ignora).
+            'timezone' => env('DB_TIMEZONE', '+00:00'),
             // MySQL: los candados de fila (sesión, profesional, paquete) solo
             // protegen si las lecturas de después ven lo recién confirmado; en
             // REPEATABLE READ ven la foto del inicio y se sobrevende (ADR 0052).

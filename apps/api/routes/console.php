@@ -131,6 +131,9 @@ Schedule::command('agendauno:respaldar-estudios')->dailyAt('09:15')->withoutOver
 // tarjeta), con los plazos de los parámetros de plataforma (ADR 0079). 03:40 de CDMX.
 Schedule::command('agendauno:limpiar-registros')->dailyAt('09:40')->withoutOverlapping();
 
+// Los trabajos fallidos (ya alertados al fallar) se guardan 30 días para revisarlos.
+Schedule::command('queue:prune-failed', ['--hours' => 720])->dailyAt('09:45')->withoutOverlapping();
+
 // Borra los negocios cuyo dueño nunca activó su cuenta tras los días del parámetro de
 // plataforma `registro.dias_sin_activar` (14 por omisión): su base, sus respaldos y su
 // registro. Nunca uno activado, con pagos o con más usuarios. 03:50 de CDMX.

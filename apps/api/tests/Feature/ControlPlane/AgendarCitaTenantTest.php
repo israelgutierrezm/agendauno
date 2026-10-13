@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\SesionTenant;
 use Illuminate\Support\Facades\File;
 
 /*
@@ -74,4 +77,24 @@ it('no permite dos citas del mismo proveedor a la misma hora', function (): void
     $this->postJson("/api/v1/app/{$e['slug']}/mi/citas", $carga(), conBearer($a['bearer']))->assertCreated();
     // Mismo proveedor, misma hora → el hueco ya no está disponible.
     $this->postJson("/api/v1/app/{$e['slug']}/mi/citas", $carga(), conBearer($b['bearer']))->assertStatus(422);
+});
+
+it('quien agenda desde su cuenta no decide cuánto dura la cita', function (): void {
+    ['e' => $e, 'sede' => $sede, 'coach' => $coach] = estudioDeCitas();
+    $a = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
+
+    // Pide 10 horas: el servicio no tiene duración, así que vale la del negocio.
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/citas", [
+        'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $coach,
+        'inicia_en_local' => '2026-10-05 10:00:00', 'duracion_minutos' => 600,
+    ], conBearer($a['bearer']))->assertCreated();
+
+    $minutos = app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn (): int => (int) SesionTenant::query()->latest('id')->firstOrFail()->inicia_en->diffInMinutes(SesionTenant::query()->latest('id')->firstOrFail()->termina_en),
+    );
+    expect($minutos)->toBe(app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn (): int => app(ParametrosTenant::class)->entero('citas.duracion_defecto'),
+    ));
 });

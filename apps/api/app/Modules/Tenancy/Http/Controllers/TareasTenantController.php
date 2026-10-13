@@ -80,8 +80,9 @@ class TareasTenantController
         if ($suyas === null && ($filtros['responsable'] ?? '') !== '') {
             $suyas = (int) (Usuario::query()->where('ulid', $filtros['responsable'])->value('id') ?? 0);
         }
-        // De sus sedes (R19): las que no cuelgan de nadie las ve todo el equipo.
-        $deSuAlcance = fn (): Builder => app(AlcancePersonaTenant::class)->acotada(TareaTenant::query(), $request, 'persona_id', true)
+        // De sus sedes (R19): las que no cuelgan de nadie las ve todo el equipo y las que
+        // le asignaron, quien las tiene.
+        $deSuAlcance = fn (): Builder => app(AlcancePersonaTenant::class)->acotadaSalvoLoSuyo(TareaTenant::query(), $request, 'responsable_id')
             ->when($suyas !== null, fn (Builder $q) => $q->where('responsable_id', $suyas));
 
         $q = trim((string) ($filtros['q'] ?? ''));

@@ -142,7 +142,7 @@ class RegistroEstudioController
                 // Los identificadores con que el servidor manda estas conversiones
                 // (ADR 0143): el píxel del navegador usa los mismos y Meta deduplica.
                 'medicion' => ['eventos' => ConversionesPlataforma::idsDelRegistro($estudio)],
-                'activacion' => app()->environment('production') ? null : [
+                'activacion' => ! app()->environment(['local', 'testing']) ? null : [
                     'email' => $estudio->contacto_email,
                     'token' => $token,
                 ],

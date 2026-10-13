@@ -43,6 +43,11 @@ class RegistrarEstudio
         'agendauno', 'turnouno', 'clases', 'citas', 'registro', 'entrar', 'negocios',
         // El superadmin vive en /plataforma (ADR 0126).
         'plataforma',
+        // Que nadie registre un subdominio que parezca de la plataforma (p. ej.
+        // pagos.agendauno.mx) para suplantarla.
+        'login', 'auth', 'cuenta', 'cuentas', 'pagos', 'pago', 'cobros', 'facturacion', 'billing',
+        'seguridad', 'support', 'help', 'webmail', 'smtp', 'ftp', 'vpn', 'sso', 'oauth', 'secure',
+        'accounts', 'account', 'checkout', 'stripe', 'superadmin', 'root', 'sistema', 'system',
     ];
 
     public static function reservado(string $slug): bool

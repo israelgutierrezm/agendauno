@@ -258,3 +258,24 @@ it('el módulo está apagado por omisión y solo el superadministrador lo encien
     $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/modulos", ['modulo' => 'familias', 'habilitado' => false], conBearer($e['bearer']))
         ->assertUnauthorized();
 });
+
+it('el responsable llena la ficha de datos de la persona a su cargo desde su cuenta', function (): void {
+    ['e' => $e, 'mama' => $mama, 'mamaId' => $mamaId] = familiaConResponsable();
+    $sofia = crearMiembroTenant($e, 'Sofía');
+    $vinculo = ponerACargo($e, $mamaId, $sofia);
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/participantes/{$vinculo}/autorizar", ['acepto' => true, 'version' => 1], conBearer($mama['bearer']))
+        ->assertOk();
+    $ficha = (string) $this->postJson("/api/v1/app/{$e['slug']}/formularios", ['nombre' => 'Ficha médica'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $campo = (string) $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$ficha}/campos", ['etiqueta' => 'Alergias', 'tipo' => 'texto'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/formularios/{$ficha}/respuestas", ['valores' => [$campo => 'Ninguna']], comoParticipante($mama['bearer'], $sofia))
+        ->assertCreated();
+
+    $deSofia = $this->getJson("/api/v1/app/{$e['slug']}/mi/formularios", comoParticipante($mama['bearer'], $sofia))->assertOk();
+    expect($deSofia->json('data.persona_id'))->toBe($sofia)
+        ->and($deSofia->json('data.formularios.0.campos.0.valor'))->toBe('Ninguna');
+    // La de la mamá sigue sin responder.
+    expect($this->getJson("/api/v1/app/{$e['slug']}/mi/formularios", conBearer($mama['bearer']))->json('data.formularios.0.campos.0.valor'))->toBeNull();
+});

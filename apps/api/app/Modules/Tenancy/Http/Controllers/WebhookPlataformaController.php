@@ -36,7 +36,7 @@ class WebhookPlataformaController
         // Otros proveedores aun no tienen verificacion de firma dedicada. En PRODUCCION
         // no se acepta una confirmacion sin firma (evita que quien adivine una referencia
         // dispare el pago). En dev/test se permite por referencia (simulacion/pruebas).
-        if (app()->environment('production')) {
+        if (! app()->environment(['local', 'testing'])) {
             abort(400, 'Webhook no verificado para este proveedor.');
         }
 
@@ -55,7 +55,7 @@ class WebhookPlataformaController
         if ($secret === '') {
             // Sin webhook_secret no se puede verificar la firma: en PRODUCCION se rechaza;
             // en dev/test se permite para pruebas/simulacion.
-            if (app()->environment('production')) {
+            if (! app()->environment(['local', 'testing'])) {
                 abort(400, 'Webhook sin secreto configurado.');
             }
         } elseif (! VerificarFirmaStripe::valida($request->getContent(), $request->header('Stripe-Signature'), $secret)) {

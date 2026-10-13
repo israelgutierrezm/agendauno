@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\VerificarRecaptcha;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Exceptions\ModalidadNoDisponible;
@@ -32,6 +33,7 @@ use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\CuentaRequerida;
+use App\Modules\Tenancy\Reservas\Exceptions\LimiteCitasPorPagar;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
@@ -116,7 +118,9 @@ class PublicoCitasController
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
         $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
-        [$duracion, $margenes] = $this->disponibilidad->duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
+        // Quien agenda desde la página no decide cuánto dura: la del servicio o, sin ella,
+        // la del negocio (`citas.duracion_defecto`).
+        [$duracion, $margenes] = $this->disponibilidad->duracionYMargenes($oferta, null);
         $paso = isset($validado['paso_minutos']) ? (int) $validado['paso_minutos'] : null;
 
         $slots = $instructor instanceof Usuario
@@ -185,7 +189,14 @@ class PublicoCitasController
             // De dónde llegó (ADR 0142): se guarda con su cita y su orden.
             ...Atribucion::reglas(),
             ...IdentificadoresNavegador::reglas(),
+            // Sin cuenta ni correo verificado: que no sea un bot llenando la agenda.
+            'recaptcha_token' => ['nullable', 'string', 'max:4000'],
         ]);
+        if (! app(VerificarRecaptcha::class)->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip())) {
+            throw ValidationException::withMessages([
+                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
+            ]);
+        }
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
         // Desde la página pública solo se agendan servicios que se pagan: uno que se toma
@@ -196,14 +207,21 @@ class PublicoCitasController
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = $this->profesionalElegido($validado);
         $persona = $this->personaGuest($validado);
-        if (($validado['acepta_whatsapp'] ?? false) && $this->whatsapp->enUso()) {
+        // Escribir un correo no prueba que sea suyo: el consentimiento de WhatsApp solo se
+        // registra para quien es nuevo; el de una ficha existente no lo cambia un anónimo.
+        if (($validado['acepta_whatsapp'] ?? false) && $persona->wasRecentlyCreated && $this->whatsapp->enUso()) {
             $this->whatsapp->aceptar($persona, true);
         }
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
-        $reserva = $instructor instanceof Usuario
-            ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
-            : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
+        try {
+            $reserva = $instructor instanceof Usuario
+                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0)
+                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0);
+        } catch (LimiteCitasPorPagar) {
+            // Sin decir a un anónimo si ese correo es de un cliente ni cuánto debe.
+            throw new LimiteCitasPorPagar('No se puede agendar con estos datos desde aquí. Entra a tu cuenta o comunícate con el negocio.');
+        }
         $this->anotar($reserva, $validado['nota'] ?? null, $validado['asiste'] ?? null);
         $reserva->load(['orden', 'sesion.instructor']);
         $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $persona, $validado['medicion'] ?? null, $request->ip(), $request->userAgent());

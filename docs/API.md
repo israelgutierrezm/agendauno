@@ -304,6 +304,24 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Revisión para producción (ADR 0151)
+
+- `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`
+  (conviene pedir un rango menor). Acepta `oferta_id` para ver solo una clase o servicio.
+- `POST /mi/formularios/{formulario}/respuestas` (`valores`): el cliente llena una ficha
+  de datos desde su cuenta, la suya o, con `X-Participante`, la de una persona a su cargo.
+  Responde igual que `POST /formularios/{formulario}/respuestas`.
+- `POST /mi/citas` y la cita pública ignoran `duracion_minutos`: vale la del servicio o
+  `citas.duracion_defecto`. La cita pública pide `recaptcha_token` cuando el captcha está
+  configurado.
+- Lo que cuelga de un cliente (expediente, documentos, reservas, créditos, membresías,
+  órdenes, cuotas, incidencias, facturas) responde 404 a quien está acotado a otras
+  sedes. Tareas, mensajes, reseñas y canjes se listan solo de sus sedes.
+- `POST /llaves-api` da 422 en `scopes` con un permiso que quien la crea no tiene y 403 a
+  quien está acotado a sus sedes.
+- `PUT /avisos-plataforma`, `POST /timbres/comprar` y la factura de la renta piden
+  `estudio.gestionar`.
+
 ## Listados por páginas: órdenes, mensajes y entradas
 
 Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `per_page`,

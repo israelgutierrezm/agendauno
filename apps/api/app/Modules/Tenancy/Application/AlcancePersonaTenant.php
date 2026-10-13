@@ -91,22 +91,60 @@ final class AlcancePersonaTenant
      */
     public function acotarPorPersona(Builder $consulta, ?Usuario $actor, string $columna = 'persona_id', bool $sinPersonaVisible = false): void
     {
-        if (! $actor instanceof Usuario) {
+        $personas = $this->personasVisibles($actor);
+        if ($personas === null) {
             return;
+        }
+        $sinPersonaVisible
+            ? $consulta->where(fn ($w) => $w->whereNull($columna)->orWhereIn($columna, $personas))
+            : $consulta->whereIn($columna, $personas);
+    }
+
+    /**
+     * Como {@see self::acotada()}, pero lo asignado a quien consulta (`$columnaResponsable`)
+     * lo ve siempre: una tarea que le dieron es suya aunque su cliente sea de otra sede.
+     *
+     * @template TConsulta of Builder<*>
+     *
+     * @param  TConsulta  $consulta
+     * @return TConsulta
+     */
+    public function acotadaSalvoLoSuyo(Builder $consulta, Request $request, string $columnaResponsable, string $columna = 'persona_id'): Builder
+    {
+        $actor = self::actor($request);
+        $personas = $this->personasVisibles($actor);
+        if ($actor instanceof Usuario && $personas !== null) {
+            $consulta->where(fn ($w) => $w
+                ->where($columnaResponsable, $actor->getKey())
+                ->orWhereNull($columna)
+                ->orWhereIn($columna, $personas));
+        }
+
+        return $consulta;
+    }
+
+    /**
+     * Subconsulta de los ids de las personas que ve el actor, o `null` si las ve todas.
+     *
+     * @return Builder<PersonaTenant>|null
+     */
+    private function personasVisibles(?Usuario $actor): ?Builder
+    {
+        if (! $actor instanceof Usuario) {
+            return null;
         }
         $sedes = $this->acceso->sucursalesPermitidas($actor);
         $acotaClientes = $this->clientes->esAcotado($actor);
         if ($sedes === null && ! $acotaClientes) {
-            return;
+            return null;
         }
         $personas = PersonaTenant::withTrashed()->select('id')
             ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes));
         if ($acotaClientes) {
             $this->clientes->acotar($personas, $actor);
         }
-        $sinPersonaVisible
-            ? $consulta->where(fn ($w) => $w->whereNull($columna)->orWhereIn($columna, $personas))
-            : $consulta->whereIn($columna, $personas);
+
+        return $personas;
     }
 
     /**

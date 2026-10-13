@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
+use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\MetodoPago;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -94,6 +96,42 @@ class ConfirmarPagoTenant
         if ($pago instanceof PagoTenant) {
             $this->aprobar($pago, $referencia);
         }
+    }
+
+    /**
+     * El aviso de un cargo automático (pago domiciliado): si su pago no quedó registrado
+     * porque la llamada a la pasarela no respondió (el intento se deshizo, pero el banco
+     * sí cobró), se registra con su orden: la misma domiciliación y el mismo importe y
+     * moneda que debe la compra. Si ya estaba pagada, queda como cobro doble por
+     * devolver. Idempotente: el segundo aviso encuentra el pago por su referencia.
+     */
+    public function porCargoDomiciliado(string $referencia, string $ordenUlid, string $domiciliacionUlid, int $montoMinor, string $moneda): void
+    {
+        if ($referencia === '') {
+            return;
+        }
+        if (PagoTenant::query()->where('referencia_externa', $referencia)->exists()) {
+            $this->porReferencia($referencia);
+
+            return;
+        }
+        $orden = $ordenUlid !== '' ? OrdenTenant::query()->where('ulid', $ordenUlid)->first() : null;
+        $domiciliacion = $domiciliacionUlid !== '' ? DomiciliacionTenant::query()->where('ulid', $domiciliacionUlid)->first() : null;
+        if (! $orden instanceof OrdenTenant || ! $domiciliacion instanceof DomiciliacionTenant
+            || (int) $orden->total_minor !== $montoMinor || strtoupper((string) $orden->moneda) !== strtoupper($moneda)) {
+            return;
+        }
+        $pago = PagoTenant::query()->create([
+            'orden_id' => $orden->getKey(),
+            'proveedor' => $domiciliacion->proveedor,
+            'metodo' => MetodoPago::Tarjeta->value,
+            'estado' => EstadoPago::Pendiente->value,
+            'monto_minor' => $montoMinor,
+            'moneda' => strtoupper($moneda),
+            'domiciliacion_id' => $domiciliacion->getKey(),
+            'referencia_externa' => $referencia,
+        ]);
+        $this->aprobar($pago, $referencia);
     }
 
     /**

@@ -93,15 +93,15 @@ it('productos y derechos son tenant-local: un estudio no ve los de otro', functi
     $this->getJson("/api/v1/app/{$b['slug']}/productos", conBearer($b['bearer']))->assertOk()->assertJsonCount(0, 'data');
 });
 
-it('un instructor ve derechos pero no vende ni mueve el ledger (RBAC tenant-local)', function (): void {
+it('un instructor ve derechos solo de sus clientes y no vende ni mueve el ledger (RBAC tenant-local)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $derecho = venderPackTenant($e, 8000);
     $persona = crearMiembroTenant($e, 'Beto');
     $producto = crearPackTenant($e, 8000);
     $coach = personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
 
-    // Ver derechos de una persona: permitido.
-    $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/derechos", conBearer($coach))->assertOk();
+    // Ver derechos: solo de sus clientes (quien reservó sus clases, ADR 0095); Beto no lo es.
+    $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/derechos", conBearer($coach))->assertForbidden();
 
     // Vender o mover el ledger: prohibido.
     $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [

@@ -417,6 +417,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
             Route::get('/mi/formularios', [MiTenantController::class, 'formularios'])->name('mi.formularios.index');
+            Route::post('/mi/formularios/{formulario}/respuestas', [MiTenantController::class, 'responderFormulario'])->name('mi.formularios.responder');
             // Notificaciones push: la app registra el teléfono al iniciar sesión y lo quita al salir.
             Route::post('/mi/dispositivos', [MiDispositivosTenantController::class, 'registrar'])->name('mi.dispositivos.store');
             Route::delete('/mi/dispositivos', [MiDispositivosTenantController::class, 'quitar'])->name('mi.dispositivos.destroy');
