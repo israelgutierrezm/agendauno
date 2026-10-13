@@ -116,6 +116,8 @@ interface RespuestaCheckout {
   };
 }
 
+// El error de autorizar con la tarjeta capturada va dentro de esa tarjeta.
+const errorTarjeta = ref<string | null>(null);
 async function irA(
   ruta: string,
   clave: string,
@@ -124,6 +126,10 @@ async function irA(
 ): Promise<void> {
   accionando.value = clave;
   error.value = null;
+  errorTarjeta.value = null;
+  // Con un token, la tarjeta se capturó aquí: su error se queda en su formulario.
+  const desdeTarjeta =
+    Object.keys(datos).length > 0 && capturando.value?.membresia === clave;
   try {
     const { data } = await api.post<RespuestaCheckout>(ruta, datos);
     const url = data.data.checkout?.url;
@@ -142,7 +148,11 @@ async function irA(
     capturando.value = null;
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    if (desdeTarjeta) {
+      errorTarjeta.value = mensajeDeError(e);
+    } else {
+      error.value = mensajeDeError(e);
+    }
   } finally {
     accionando.value = null;
   }
@@ -351,13 +361,18 @@ onMounted(async () => {
           <TarjetaOpenPay
             v-if="capturando?.membresia === m.id"
             :formulario="capturando.formulario"
+            :ocupado="accionando === m.id"
+            :error-servidor="errorTarjeta"
             @lista="
               (datos) =>
                 capturando?.precio
                   ? autorizarPrecio(m, datos)
                   : activar(m, datos)
             "
-            @cancelar="capturando = null"
+            @cancelar="
+              capturando = null;
+              errorTarjeta = null;
+            "
           />
         </div>
         <button

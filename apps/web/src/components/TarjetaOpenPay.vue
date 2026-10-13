@@ -13,7 +13,13 @@ import {
  * `name` ni se envían a AgendaUno: OpenPay.js los convierte en un token de un solo
  * uso y solo ese token (con la sesión del dispositivo) sale hacia el API.
  */
-const props = defineProps<{ formulario: FormularioOpenPay }>();
+const props = defineProps<{
+  formulario: FormularioOpenPay;
+  // El padre manda el token al API: hasta que responde, no se vuelve a autorizar.
+  ocupado?: boolean;
+  // Lo que respondió el API al autorizar (p. ej. la tarjeta rechazada), aquí mismo.
+  errorServidor?: string | null;
+}>();
 const emit = defineEmits<{
   lista: [datos: { token_id: string; device_session_id: string }];
   cancelar: [];
@@ -30,6 +36,9 @@ const procesando = ref(false);
 const error = ref<string | null>(null);
 
 async function enviar(): Promise<void> {
+  if (procesando.value || props.ocupado) {
+    return;
+  }
   procesando.value = true;
   error.value = null;
   try {
@@ -107,19 +116,25 @@ async function enviar(): Promise<void> {
     <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("pagoAutomatico.seguridadOpenPay") }}
     </p>
-    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
+    <AvisoTono
+      v-if="error || errorServidor"
+      tono="peligro"
+      role="alert"
+      data-prueba="error-tarjeta"
+      >{{ error ?? errorServidor }}</AvisoTono
+    >
     <div class="flex gap-2">
       <button
         type="submit"
         class="tu-btn tu-btn-primario"
-        :disabled="procesando"
+        :disabled="procesando || ocupado"
       >
         {{ $t("pagoAutomatico.autorizar") }}
       </button>
       <button
         type="button"
         class="tu-btn tu-btn-fantasma"
-        :disabled="procesando"
+        :disabled="procesando || ocupado"
         @click="emit('cancelar')"
       >
         {{ $t("comun.cancelar") }}

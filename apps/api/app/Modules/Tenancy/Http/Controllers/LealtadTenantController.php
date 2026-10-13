@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\LibroPuntosTenant;
 use App\Modules\Tenancy\Application\PuntosTenant;
 use App\Modules\Tenancy\Lealtad\EstadoCanje;
@@ -113,6 +114,7 @@ class LealtadTenantController
         ]);
 
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
         $recompensa = RecompensaLealtadTenant::query()->where('ulid', $validado['recompensa_id'])->where('activa', true)->firstOrFail();
 
         $canje = $this->puntos->canjear($persona->getKey(), $recompensa, $this->actor($request));
@@ -136,7 +138,7 @@ class LealtadTenantController
         $vista = $filtros['vista'] ?? null;
         $buscar = trim((string) ($filtros['q'] ?? ''));
         $pendiente = EstadoCanje::Pendiente->value;
-        $consulta = CanjeLealtadTenant::query()
+        $consulta = app(AlcancePersonaTenant::class)->acotada(CanjeLealtadTenant::query(), $request)
             ->with('persona')
             ->when($buscar !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
                 ->whereHas('persona', fn (Builder $p) => $p->buscar($buscar))
@@ -189,6 +191,7 @@ class LealtadTenantController
     public function puntosMiembro(Request $request): JsonResponse
     {
         $modelo = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $modelo);
 
         $movimientos = MovimientoPuntosTenant::query()
             ->where('persona_id', $modelo->getKey())
@@ -206,6 +209,7 @@ class LealtadTenantController
     public function ajustar(Request $request): JsonResponse
     {
         $modelo = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $modelo);
 
         $validado = $request->validate([
             'puntos' => ['required', 'integer', 'not_in:0', 'min:-1000000', 'max:1000000'],

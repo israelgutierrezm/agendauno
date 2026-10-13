@@ -84,6 +84,10 @@ describe("nómina", () => {
       "/api/v1/app/demo/nomina",
       expect.objectContaining({ params: expect.any(Object) }),
     );
+    // Solo pide al equipo, no todas las cuentas de clientes.
+    expect(mocks.get).toHaveBeenCalledWith("/api/v1/app/demo/usuarios", {
+      params: { alcance: "equipo" },
+    });
     const texto = w.get("table").text();
     expect(w.find("#es").exists()).toBe(false);
     expect(texto).toContain("Juan Pérez");

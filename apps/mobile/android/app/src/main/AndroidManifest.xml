@@ -1,10 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- La app habla con la API: el permiso se declara aquí, no solo vía Firebase. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Sin respaldo automático: la sesión vive en almacenamiento cifrado ligado al
+         teléfono y un respaldo restaurado en otro no se puede leer. -->
     <application
         android:label="${appNombre}"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

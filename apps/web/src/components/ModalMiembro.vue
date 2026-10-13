@@ -178,7 +178,7 @@ const conPlanes = computed(
     !sesion.esCitas ||
     Boolean(resumen.value?.membresia.plan) ||
     Boolean(resumen.value?.ilimitado) ||
-    (resumen.value?.saldo_creditos ?? 0) > 0,
+    (resumen.value?.saldo_unidades ?? 0) > 0,
 );
 const visitas = computed(() => plural(sesion.terminologia.sesion));
 const pestanas = computed<{ clave: Pestana; texto: string }[]>(() => [
@@ -242,10 +242,12 @@ const saldoTexto = computed(() => {
   if (r.ilimitado) {
     return t("detalleMiembro.saldo.ilimitado");
   }
+  // Con sus fracciones (1000 unidades = 1 crédito): 1.5 no se lee «1».
+  const n = (r.saldo_unidades ?? 0) / 1000;
   return t(
     "detalleMiembro.saldo.disponibles",
-    { n: r.saldo_creditos },
-    r.saldo_creditos === 0 ? 0 : r.saldo_creditos === 1 ? 1 : 2,
+    { n: n.toLocaleString("es-MX", { maximumFractionDigits: 3 }) },
+    n === 0 ? 0 : n === 1 ? 1 : 2,
   );
 });
 // «Ver en agenda» abre la agenda en el día de su próxima reserva.

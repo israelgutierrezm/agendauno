@@ -530,10 +530,11 @@ async function abrir(p: Prospecto): Promise<void> {
   }
 }
 
+// Devuelve si se aplicó: lo escrito (la nota, el motivo) solo se limpia si se guardó.
 async function aplicar(
   peticion: () => Promise<{ data: { data: Prospecto } }>,
   exito?: string,
-): Promise<void> {
+): Promise<boolean> {
   accionando.value = true;
   try {
     const { data } = await peticion();
@@ -542,17 +543,19 @@ async function aplicar(
       toast.exito(exito);
     }
     await cargar();
+    return true;
   } catch (e) {
     toast.error(mensajeDeError(e));
+    return false;
   } finally {
     accionando.value = false;
   }
 }
 
-function cambiarEstado(estado: EstadoProspecto): Promise<void> {
+function cambiarEstado(estado: EstadoProspecto): Promise<boolean> {
   const p = actual.value;
   if (!p) {
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
   return aplicar(() =>
     api.put(`${base.value}/prospectos/${p.id}/estado`, { estado }),
@@ -563,19 +566,21 @@ async function descartar(): Promise<void> {
   if (!p || descartando.motivo === "") {
     return;
   }
-  await aplicar(() =>
+  const listo = await aplicar(() =>
     api.put(`${base.value}/prospectos/${p.id}/estado`, {
       estado: "descartado",
       motivo_cierre: descartando.motivo,
       comentario: descartando.comentario || null,
     }),
   );
-  descartando.abierto = false;
+  if (listo) {
+    descartando.abierto = false;
+  }
 }
-function asignarA(id: string | null): Promise<void> {
+function asignarA(id: string | null): Promise<boolean> {
   const p = actual.value;
   if (!p) {
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
   eligiendo.value = false;
   buscarResponsable.value = "";
@@ -607,10 +612,10 @@ async function registrarContacto(
     // Sin registro: el contacto ya se abrió.
   }
 }
-function guardarSeguimiento(quitar = false): Promise<void> {
+function guardarSeguimiento(quitar = false): Promise<boolean> {
   const p = actual.value;
   if (!p) {
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
   return aplicar(() =>
     api.put(`${base.value}/prospectos/${p.id}/seguimiento`, {
@@ -626,10 +631,12 @@ async function anotar(): Promise<void> {
   if (!p || nota.value.trim() === "") {
     return;
   }
-  await aplicar(() =>
+  const listo = await aplicar(() =>
     api.post(`${base.value}/prospectos/${p.id}/notas`, { texto: nota.value }),
   );
-  nota.value = "";
+  if (listo) {
+    nota.value = "";
+  }
 }
 
 function abrirAcceso(): void {

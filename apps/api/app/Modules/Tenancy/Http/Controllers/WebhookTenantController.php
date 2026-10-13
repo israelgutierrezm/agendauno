@@ -52,7 +52,7 @@ class WebhookTenantController
         // tenant. En PRODUCCION no se acepta una confirmacion sin firma: evita que
         // quien conozca/adivine una `referencia_externa` dispare pago+fulfillment. En
         // dev/test se permite la confirmacion por referencia (simulacion/pruebas).
-        if (app()->environment('production')) {
+        if (! app()->environment(['local', 'testing'])) {
             abort(400, 'Webhook no verificado para este proveedor.');
         }
 
@@ -74,7 +74,7 @@ class WebhookTenantController
         $dataId = (string) $request->query('data_id', '');
 
         if ($secreto === '') {
-            if (app()->environment('production')) {
+            if (! app()->environment(['local', 'testing'])) {
                 abort(400, 'Webhook sin secreto configurado.');
             }
         } elseif (! VerificarFirmaMercadoPago::valida($dataId, $request->header('x-request-id'), $request->header('x-signature'), $secreto)) {
@@ -98,7 +98,7 @@ class WebhookTenantController
         $clave = $llaves['webhook_password'] ?? '';
 
         if ($usuario === '' || $clave === '') {
-            if (app()->environment('production')) {
+            if (! app()->environment(['local', 'testing'])) {
                 abort(400, 'Webhook sin usuario y contraseña configurados.');
             }
         } else {
@@ -139,7 +139,7 @@ class WebhookTenantController
         if ($secret === '') {
             // Sin webhook_secret no se puede verificar la firma: en PRODUCCION se
             // rechaza; en dev/test se permite para pruebas/simulacion.
-            if (app()->environment('production')) {
+            if (! app()->environment(['local', 'testing'])) {
                 abort(400, 'Webhook sin secreto configurado.');
             }
         } elseif (! VerificarFirmaStripe::valida($request->getContent(), $request->header('Stripe-Signature'), $secret)) {
@@ -157,7 +157,18 @@ class WebhookTenantController
         $sesionPagada = ($tipo === 'checkout.session.completed' && is_array($objeto) && ($objeto['payment_status'] ?? '') === 'paid')
             || $tipo === 'checkout.session.async_payment_succeeded';
 
-        if (($sesionPagada || $tipo === 'payment_intent.succeeded') && $referencia !== '') {
+        // Un cargo automático trae su orden y su domiciliación: si su pago no quedó
+        // registrado (la pasarela no respondió a tiempo), se registra con ellas.
+        $metadatos = is_array($objeto) && is_array($objeto['metadata'] ?? null) ? $objeto['metadata'] : [];
+        if ($tipo === 'payment_intent.succeeded' && $referencia !== '' && isset($metadatos['orden'], $metadatos['domiciliacion'])) {
+            $this->confirmar->porCargoDomiciliado(
+                $referencia,
+                (string) $metadatos['orden'],
+                (string) $metadatos['domiciliacion'],
+                (int) ($objeto['amount_received'] ?? $objeto['amount'] ?? 0),
+                (string) ($objeto['currency'] ?? ''),
+            );
+        } elseif (($sesionPagada || $tipo === 'payment_intent.succeeded') && $referencia !== '') {
             $this->confirmar->porReferencia($referencia);
         }
 

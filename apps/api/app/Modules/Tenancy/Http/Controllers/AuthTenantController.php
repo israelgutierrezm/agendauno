@@ -104,16 +104,25 @@ class AuthTenantController
         return response()->json(['data' => ['ok' => true]]);
     }
 
+    /** Un hash con el costo de los reales, para correos sin cuenta (se calcula una vez). */
+    private static function hashDeRelleno(): string
+    {
+        static $hash = null;
+
+        return $hash ??= Hash::make('relleno-sin-cuenta');
+    }
+
     public function store(LoginTenantRequest $request): JsonResponse
     {
         $estudio = $this->estudioDe($request);
 
         $usuario = Usuario::query()->where('email', (string) $request->validated('email'))->first();
 
-        if (! $usuario instanceof Usuario
-            || ! $usuario->activo
-            || $usuario->password === null
-            || ! Hash::check((string) $request->validated('password'), (string) $usuario->password)) {
+        // Se compara siempre contra un hash (el suyo o uno de relleno): el tiempo de la
+        // respuesta no dice si el correo tiene cuenta.
+        $hash = $usuario instanceof Usuario && $usuario->password !== null ? (string) $usuario->password : self::hashDeRelleno();
+        $coincide = Hash::check((string) $request->validated('password'), $hash);
+        if (! $usuario instanceof Usuario || ! $usuario->activo || $usuario->password === null || ! $coincide) {
             throw ValidationException::withMessages(['email' => [__('auth.failed')]]);
         }
 

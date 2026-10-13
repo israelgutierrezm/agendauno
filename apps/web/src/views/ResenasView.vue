@@ -66,12 +66,14 @@ const conteos = ref<Record<Filtro, number> | null>(null);
 const comentarios = ref<number | null>(null);
 let solicitud = 0;
 
+// En la zona horaria del negocio (ADR 0099), aunque quien mira esté en otra.
 function fecha(iso: string | null): string {
   return iso
     ? new Intl.DateTimeFormat("es-MX", {
         day: "numeric",
         month: "short",
         year: "numeric",
+        timeZone: sesion.zonaHoraria || undefined,
       }).format(new Date(iso))
     : "";
 }

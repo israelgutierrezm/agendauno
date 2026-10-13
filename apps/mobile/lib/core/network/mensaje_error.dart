@@ -41,6 +41,10 @@ String mensajeDeError(
     return 'Demasiados intentos. Espera un minuto y vuelve a intentar.';
   }
   if (respuesta == null) {
+    // Se conectó pero la respuesta tardó: no es falta de internet.
+    if (error.type == DioExceptionType.receiveTimeout) {
+      return 'El negocio tardó en responder. Vuelve a intentar en un momento.';
+    }
     return 'Sin conexión. Revisa tu internet y vuelve a intentar.';
   }
   if (cuerpo?['code'] == 'PLAN_FEATURE_NOT_INCLUDED') {

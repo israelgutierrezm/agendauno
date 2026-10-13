@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 
 /**
  * Bloqueos de agenda (fase 2, punto 2.2) de la persona, la sede o una sala de la sede
@@ -192,13 +194,31 @@ async function bloquear(): Promise<void> {
   }
 }
 
+// Quitarlo libera el horario: se confirma, y no se manda dos veces.
+const { t } = useI18n();
+const quitandoId = ref<string | null>(null);
 async function quitar(b: Bloqueo): Promise<void> {
+  if (
+    quitandoId.value !== null ||
+    !(await confirmar(
+      t("bloqueosAgenda.confirmarQuitar", {
+        motivo: b.motivo,
+        cuando: cuando(b),
+      }),
+      { peligro: true, aceptar: t("bloqueosAgenda.quitar") },
+    ))
+  ) {
+    return;
+  }
+  quitandoId.value = b.id;
   error.value = null;
   try {
     await api.delete(`${props.base}/bloqueos/${b.id}`);
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
+  } finally {
+    quitandoId.value = null;
   }
 }
 
@@ -241,6 +261,8 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
           v-if="puedeEliminar ?? puedeGestionar"
           type="button"
           class="tu-enlace text-xs shrink-0"
+          data-prueba="quitar-bloqueo"
+          :disabled="quitandoId !== null"
           @click="quitar(b)"
         >
           {{ $t("bloqueosAgenda.quitar") }}

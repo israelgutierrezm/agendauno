@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
@@ -158,9 +159,9 @@ class ResenasTenantController
         // Quien imparte (acotado) ve solo las reseñas de sus clases o citas.
         $actor = $request->attributes->get('usuario_tenant');
         $propias = $actor instanceof Usuario && app(AlcanceClientesTenant::class)->esAcotado($actor) ? (int) $actor->getKey() : null;
-        $consulta = ResenaTenant::query()->with(['oferta', 'instructor', 'persona'])->orderByDesc('id')
+        $consulta = app(AlcancePersonaTenant::class)->acotada(ResenaTenant::query(), $request)->with(['oferta', 'instructor', 'persona'])->orderByDesc('id')
             ->when($propias !== null, fn ($q) => $q->where('instructor_id', $propias));
-        $todas = ResenaTenant::query()->with('instructor')
+        $todas = app(AlcancePersonaTenant::class)->acotada(ResenaTenant::query(), $request)->with('instructor')
             ->when($propias !== null, fn ($q) => $q->where('instructor_id', $propias))
             ->get(['calificacion', 'instructor_id', 'oferta_id', 'comentario']);
         $nota = $filtros['calificacion'] ?? 'todas';

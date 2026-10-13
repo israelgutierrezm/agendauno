@@ -71,7 +71,10 @@ const pagando = ref<string | null>(null);
 const comprando = ref<string | null>(null);
 const voucher = ref<Voucher | null>(null);
 const mensaje = ref<string | null>(null);
-const error = ref<string | null>(null);
+// El error de pagar una orden o de comprar un plan va junto a ese botón (no arriba,
+// donde el «Reintentar» solo recarga la página).
+const errorPago = ref<{ id: string; mensaje: string } | null>(null);
+const errorCompra = ref<{ id: string; mensaje: string } | null>(null);
 const domiciliar = ref<Record<string, boolean>>({});
 // Por una persona a cargo, el pago automático va a la tarjeta del responsable (ADR 0129).
 const porPersonaACargo = participanteEnUso() !== null;
@@ -127,7 +130,7 @@ async function pagar(
   metodo: "tarjeta" | "oxxo" = "tarjeta",
 ): Promise<void> {
   pagando.value = ordenId;
-  error.value = null;
+  errorPago.value = null;
   mensaje.value = null;
   voucher.value = null;
   try {
@@ -148,7 +151,7 @@ async function pagar(
     }
     mensaje.value = "pago";
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorPago.value = { id: ordenId, mensaje: mensajeDeError(e) };
   } finally {
     pagando.value = null;
   }
@@ -163,8 +166,13 @@ async function comprar(id: string): Promise<void> {
   }
   comprando.value = id;
   mensaje.value = null;
+  errorCompra.value = null;
   if (await cuenta.comprar(p, !!p.condiciones)) {
     mensaje.value = "comprado";
+  } else {
+    // El de la compra, en su tarjeta; el aviso de arriba queda para lo que no cargó.
+    errorCompra.value = { id, mensaje: cuenta.error.value ?? "" };
+    cuenta.error.value = null;
   }
   comprando.value = null;
 }
@@ -233,14 +241,9 @@ onMounted(() => void cuenta.asegurar());
       >
     </nav>
 
-    <AvisoTono v-if="error || cuenta.error.value" tono="peligro" class="mt-3">
-      {{ error ?? cuenta.error.value }}
-      <button
-        v-if="cuenta.error.value"
-        type="button"
-        class="tu-enlace ml-2"
-        @click="cuenta.cargar(true)"
-      >
+    <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-3">
+      {{ cuenta.error.value }}
+      <button type="button" class="tu-enlace ml-2" @click="cuenta.cargar(true)">
         {{ $t("comun.reintentar") }}
       </button>
     </AvisoTono>
@@ -411,6 +414,15 @@ onMounted(() => void cuenta.asegurar());
                   }}
                 </label>
               </div>
+              <AvisoTono
+                v-if="errorPago?.id === o.id"
+                tono="peligro"
+                class="mt-2"
+                role="alert"
+                data-prueba="error-pago"
+              >
+                {{ errorPago.mensaje }}
+              </AvisoTono>
             </li>
           </ul>
           <p v-else class="mp-al-corriente">
@@ -545,6 +557,15 @@ onMounted(() => void cuenta.asegurar());
                   : $t("miCuenta.comprar.comprar")
               }}
             </button>
+            <AvisoTono
+              v-if="errorCompra?.id === p.id"
+              tono="peligro"
+              class="mt-2"
+              role="alert"
+              data-prueba="error-compra"
+            >
+              {{ errorCompra.mensaje }}
+            </AvisoTono>
           </li>
         </ul>
       </div>

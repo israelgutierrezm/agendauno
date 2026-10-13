@@ -11,6 +11,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { tokenRecaptcha } from "@/lib/recaptcha";
 import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import { camposDeMedicion, eventoComercio } from "@/lib/etiquetas";
 import { separarTelefono } from "@/lib/ladas";
@@ -878,6 +879,8 @@ async function agendar(): Promise<void> {
         ...(ofrecerWhatsApp.value && datos.value.whatsapp
           ? { acepta_whatsapp: true }
           : {}),
+        // Sin cuenta: que no sea un bot llenando la agenda (en desarrollo, sin llave, null).
+        recaptcha_token: await tokenRecaptcha("cita"),
         ...cita,
         // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
         ...(await camposDeMedicion(`negocio:${slug.value.toLowerCase()}`)),

@@ -43,6 +43,10 @@ describe("confirmar cancelación", () => {
     await flushPromises();
 
     expect(w.text()).toContain("Se devolverá 1 crédito.");
+    // Cancelar es destructivo: el botón que confirma va en rojo.
+    expect(boton(w, "Sí, cancelar")?.classes()).toEqual(
+      expect.arrayContaining(["tu-btn-solido", "tu-tono-peligro"]),
+    );
     await boton(w, "Sí, cancelar")?.trigger("click");
     expect(w.emitted("confirmar")).toEqual([[null]]);
   });

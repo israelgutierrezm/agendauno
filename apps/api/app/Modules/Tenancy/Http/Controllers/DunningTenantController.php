@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\GestionarDunningTenant;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
@@ -86,7 +87,10 @@ class DunningTenantController
 
     private function acuerdoDe(Request $request): AcuerdoTenant
     {
-        return AcuerdoTenant::query()->where('ulid', (string) $request->route('acuerdo'))->firstOrFail();
+        $acuerdo = AcuerdoTenant::query()->where('ulid', (string) $request->route('acuerdo'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirAcuerdo($request, $acuerdo);
+
+        return $acuerdo;
     }
 
     /**

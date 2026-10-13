@@ -79,6 +79,7 @@ export default {
     fecha: "Fecha",
     hora: "Hora",
     duracion: "Minutos",
+    duracionDelServicio: "La fija el servicio.",
     seCobraEnCaja: "Queda confirmada y se cobra en caja: {monto}.",
     consumeCredito: "Queda confirmada y usa un crédito de su membresía.",
     agendar: "Agendar cita",
@@ -152,4 +153,7 @@ export default {
   // Al generar una clase recurrente: las fechas que no se pudieron crear y por qué.
   serieOmitidas:
     "Se crearon {creadas} clases. No se generaron {n} fechas: {detalle}",
+  // El rango pedido trae más clases de las que el servidor manda de una vez.
+  truncado:
+    "Hay más clases de las que se pueden mostrar en este rango: elige una semana o filtra por sucursal o instructor.",
 };

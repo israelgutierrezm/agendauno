@@ -65,6 +65,9 @@ export default {
     guardar: "Guardar",
     guardado: "Presupuesto guardado.",
     soloLectura: "Este presupuesto ya se respondió: solo se consulta.",
+    montoIlegible: "No entendimos este monto. Escríbelo así: {ejemplo}.",
+    revisaMontos:
+      "Hay montos que no se pueden leer: corrígelos (están marcados) para guardar.",
   },
   acciones: {
     enviar: "Enviar por correo",
@@ -92,6 +95,8 @@ export default {
     desglosados: "Impuestos desglosados",
     desglosadosAyuda: "Subtotal más impuestos igual al total.",
     tasa: "Tasa de impuestos (%)",
+    tasaInvalida:
+      "Escribe un porcentaje de 0 a 100, con hasta dos decimales (p. ej. 16).",
     vigencia: "Vigencia por omisión (días)",
     notas: "Notas al pie por omisión",
     notasAyuda:

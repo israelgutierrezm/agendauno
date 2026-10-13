@@ -19,11 +19,13 @@ vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
 }));
+const permisos = vi.hoisted(() => ({ gestionar: true }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "barberia",
     pais: "MX",
-    puede: () => true,
+    moneda: "MXN",
+    puede: (p: string) => p !== "presupuestos.gestionar" || permisos.gestionar,
   }),
 }));
 vi.mock("@/stores/toast", () => ({
@@ -69,6 +71,7 @@ const aceptado = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  permisos.gestionar = true;
   api.get.mockImplementation((url: string) =>
     Promise.resolve({
       data: {
@@ -197,6 +200,90 @@ describe("presupuestos", () => {
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/barberia/presupuestos/p1/convertir",
       {},
+    );
+  });
+
+  it("un monto que no se puede leer se marca y no se guarda como 0", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="nuevo-presupuesto"]').trigger("click");
+    await w.get('input[type="checkbox"]').setValue(true);
+    await w.get('input[placeholder="Nombre"]').setValue("Diego");
+    // En México, «12,50» se presta a confusión.
+    await w.get('[data-prueba="precio-concepto"]').setValue("12,50");
+    expect(w.get('[data-prueba="monto-ilegible"]').text()).toContain(
+      "1,250.50",
+    );
+    expect(
+      w.get('[data-prueba="precio-concepto"]').attributes("aria-invalid"),
+    ).toBe("true");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(w.text()).toContain("Hay montos que no se pueden leer");
+  });
+
+  it("la tasa de impuestos se valida antes de guardarla", async () => {
+    api.put.mockResolvedValue({
+      data: {
+        data: {
+          impuestos: "desglosados",
+          tasa_impuesto_bp: 850,
+          vigencia_dias: 15,
+          notas: null,
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="ajustes-presupuestos"]').trigger("click");
+    await w.get("#pr-tasa").setValue("dieciséis");
+    await w.get("#form-ajustes-presupuestos").trigger("submit");
+    await flushPromises();
+    expect(api.put).not.toHaveBeenCalled();
+    expect(w.find('[data-prueba="tasa-invalida"]').exists()).toBe(true);
+
+    await w.get("#pr-tasa").setValue("8,5");
+    await w.get("#form-ajustes-presupuestos").trigger("submit");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/barberia/presupuestos/configuracion",
+      expect.objectContaining({ tasa_impuesto_bp: 850 }),
+    );
+  });
+
+  it("si el catálogo falla, los ajustes llegan igual; sin permiso de armar, no se pide", async () => {
+    api.get.mockImplementation((url: string) =>
+      url.endsWith("/catalogo")
+        ? Promise.reject(new Error("403"))
+        : Promise.resolve({
+            data: {
+              data: url.endsWith("/configuracion")
+                ? {
+                    impuestos: "desglosados",
+                    tasa_impuesto_bp: 800,
+                    vigencia_dias: 15,
+                    notas: null,
+                  }
+                : [],
+            },
+          }),
+    );
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="ajustes-presupuestos"]').trigger("click");
+    expect((w.get("#pr-tasa").element as HTMLInputElement).value).toBe("8");
+    w.unmount();
+
+    api.get.mockClear();
+    permisos.gestionar = false;
+    montar();
+    await flushPromises();
+    const urls = api.get.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.endsWith("/presupuestos/catalogo"))).toBe(false);
+    expect(urls.some((u) => u.endsWith("/presupuestos/configuracion"))).toBe(
+      true,
     );
   });
 });

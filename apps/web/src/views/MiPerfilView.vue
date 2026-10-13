@@ -14,7 +14,7 @@ import LogoCalendario from "@/components/LogoCalendario.vue";
 import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { APPS_CALENDARIO } from "@/lib/calendario";
 import {
   googleEnDominioRaiz,
@@ -233,8 +233,16 @@ async function guardarDatos(): Promise<void> {
 const editandoCorreo = ref(false);
 const correo = ref({ email: "", password: "" });
 const enviandoCorreo = ref(false);
+// Lo que el API rechazó de un campo (correo en uso, contraseña incorrecta…) va junto a
+// ese campo; lo demás, en un aviso.
+const erroresCorreo = ref<Record<string, string>>({});
+function abrirCorreo(abierto: boolean): void {
+  erroresCorreo.value = {};
+  editandoCorreo.value = abierto;
+}
 async function pedirCambioCorreo(): Promise<void> {
   enviandoCorreo.value = true;
+  erroresCorreo.value = {};
   try {
     const { data } = await api.post<Respuesta>(`${base.value}/yo/correo`, {
       email: correo.value.email.trim(),
@@ -247,7 +255,10 @@ async function pedirCambioCorreo(): Promise<void> {
     correo.value = { email: "", password: "" };
     editandoCorreo.value = false;
   } catch (err) {
-    toast.error(mensajeDeError(err, t("miPerfil.error")));
+    erroresCorreo.value = erroresPorCampo(err);
+    if (Object.keys(erroresCorreo.value).length === 0) {
+      toast.error(mensajeDeError(err, t("miPerfil.error")));
+    }
   } finally {
     enviandoCorreo.value = false;
   }
@@ -268,8 +279,16 @@ async function cancelarCambioCorreo(): Promise<void> {
 // ---- Contraseña ----
 const clave = ref({ actual: "", nueva: "", confirmacion: "" });
 const cambiandoClave = ref(false);
+const erroresClave = ref<Record<string, string>>({});
+// El botón espera a que coincidan: se dice por qué, no solo se deshabilita.
+const noCoinciden = computed(
+  () =>
+    clave.value.confirmacion !== "" &&
+    clave.value.nueva !== clave.value.confirmacion,
+);
 async function cambiarClave(): Promise<void> {
   cambiandoClave.value = true;
+  erroresClave.value = {};
   try {
     const { data } = await api.put<Respuesta>(`${base.value}/yo/contrasena`, {
       actual: clave.value.actual || null,
@@ -280,7 +299,10 @@ async function cambiarClave(): Promise<void> {
     clave.value = { actual: "", nueva: "", confirmacion: "" };
     toast.exito(t("miPerfil.cambiada"));
   } catch (err) {
-    toast.error(mensajeDeError(err, t("miPerfil.error")));
+    erroresClave.value = erroresPorCampo(err);
+    if (Object.keys(erroresClave.value).length === 0) {
+      toast.error(mensajeDeError(err, t("miPerfil.error")));
+    }
   } finally {
     cambiandoClave.value = false;
   }
@@ -624,7 +646,17 @@ const aparienciaAbierta = ref(false);
                   required
                   maxlength="255"
                   autocomplete="email"
+                  :aria-invalid="erroresCorreo.email ? 'true' : undefined"
+                  :aria-describedby="
+                    erroresCorreo.email ? 'mp-correo-error' : undefined
+                  "
                 />
+                <span
+                  v-if="erroresCorreo.email"
+                  id="mp-correo-error"
+                  class="tu-error-campo"
+                  >{{ erroresCorreo.email }}</span
+                >
               </div>
               <div v-if="usuario.tiene_contrasena !== false">
                 <label class="tu-label" for="mp-correo-clave">{{
@@ -636,6 +668,13 @@ const aparienciaAbierta = ref(false);
                   autocomplete="current-password"
                   required
                 />
+                <span
+                  v-if="erroresCorreo.password"
+                  class="tu-error-campo"
+                  role="alert"
+                  data-prueba="error-correo-clave"
+                  >{{ erroresCorreo.password }}</span
+                >
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
@@ -648,7 +687,7 @@ const aparienciaAbierta = ref(false);
                 <button
                   type="button"
                   class="tu-btn tu-btn-fantasma"
-                  @click="editandoCorreo = false"
+                  @click="abrirCorreo(false)"
                 >
                   {{ $t("miPerfil.cancelar") }}
                 </button>
@@ -658,7 +697,7 @@ const aparienciaAbierta = ref(false);
               v-else
               type="button"
               class="tu-btn tu-btn-fantasma text-sm"
-              @click="editandoCorreo = true"
+              @click="abrirCorreo(true)"
             >
               {{ $t("miPerfil.cambiarCorreo") }}
             </button>
@@ -682,6 +721,13 @@ const aparienciaAbierta = ref(false);
                 autocomplete="current-password"
                 required
               />
+              <span
+                v-if="erroresClave.actual"
+                class="tu-error-campo"
+                role="alert"
+                data-prueba="error-clave-actual"
+                >{{ erroresClave.actual }}</span
+              >
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
@@ -695,6 +741,13 @@ const aparienciaAbierta = ref(false);
                   :minlength="8"
                   required
                 />
+                <span
+                  v-if="erroresClave.password"
+                  class="tu-error-campo"
+                  role="alert"
+                  data-prueba="error-clave-nueva"
+                  >{{ erroresClave.password }}</span
+                >
               </div>
               <div>
                 <label class="tu-label" for="mp-conf">{{
@@ -707,6 +760,12 @@ const aparienciaAbierta = ref(false);
                   :minlength="8"
                   required
                 />
+                <span
+                  v-if="noCoinciden"
+                  class="tu-error-campo"
+                  data-prueba="no-coinciden"
+                  >{{ $t("validacion.contrasenasNoCoinciden") }}</span
+                >
               </div>
             </div>
             <div class="mp-pie-formulario">

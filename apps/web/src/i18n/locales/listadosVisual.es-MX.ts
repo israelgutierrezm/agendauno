@@ -42,6 +42,10 @@ export default {
       "Uno por línea: nombre, cuánto dura y su precio (o cuántos lugares tiene). Lo demás, al configurarlo.",
     quitar: "Quitar",
     otraFila: "Agregar otro",
+    faltaPrecio: "Escribe su precio (mayor a 0).",
+    cupoInvalido: "Escribe cuántos lugares tiene (un número entero, 1 o más).",
+    filasIncompletas:
+      "Completa o quita las filas marcadas: así como están no se pueden guardar.",
     deTotal: "{n} de {total}",
     kpi: {
       servicios: "Servicios",

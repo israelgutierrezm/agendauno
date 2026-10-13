@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -14,6 +14,7 @@ import {
   aMinor as leerMinor,
   aTexto as textoMinor,
   dinero,
+  ejemploPrecio,
 } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -129,7 +130,8 @@ const FILTROS = [
   "convertido",
 ] as const;
 
-function plata(minor: number, moneda = "MXN"): string {
+// Sin moneda, la del negocio (ADR 0099).
+function plata(minor: number, moneda: string = sesion.moneda): string {
   return dinero(minor, moneda, sesion.pais);
 }
 
@@ -169,21 +171,32 @@ async function cargar(): Promise<void> {
 }
 
 async function cargarApoyos(): Promise<void> {
-  try {
-    const [cat, cfg, suc] = await Promise.all([
-      api.get<{ data: Catalogo }>(`${base.value}/presupuestos/catalogo`),
-      api.get<{ data: Configuracion }>(
-        `${base.value}/presupuestos/configuracion`,
-      ),
-      sesion.puede("sucursales.ver")
-        ? api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`)
-        : Promise.resolve({ data: { data: [] as Sucursal[] } }),
-    ]);
-    catalogo.value = cat.data.data;
-    config.value = cfg.data.data;
-    sucursales.value = suc.data.data;
-  } catch {
-    // Sin catálogo se puede presupuestar con conceptos libres.
+  // Cada apoyo por su lado: si uno falla, los demás llegan igual. El catálogo solo lo
+  // pide quien puede armar presupuestos (el API lo exige); sin él se presupuesta con
+  // conceptos libres.
+  const [cat, cfg, suc] = await Promise.allSettled([
+    puedeGestionar.value
+      ? api.get<{ data: Catalogo }>(`${base.value}/presupuestos/catalogo`)
+      : Promise.resolve({
+          data: {
+            data: { servicios: [], productos: [], articulos: [] } as Catalogo,
+          },
+        }),
+    api.get<{ data: Configuracion }>(
+      `${base.value}/presupuestos/configuracion`,
+    ),
+    sesion.puede("sucursales.ver")
+      ? api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`)
+      : Promise.resolve({ data: { data: [] as Sucursal[] } }),
+  ]);
+  if (cat.status === "fulfilled") {
+    catalogo.value = cat.value.data.data;
+  }
+  if (cfg.status === "fulfilled") {
+    config.value = cfg.value.data.data;
+  }
+  if (suc.status === "fulfilled") {
+    sucursales.value = suc.value.data.data;
   }
 }
 
@@ -230,11 +243,34 @@ const soloLectura = computed(
     !puedeGestionar.value || (actual.value !== null && !actual.value.editable),
 );
 
-// Los montos como los escribe el país del negocio («1,250.50» en México).
+// Los montos como los escribe el país del negocio («1,250.50» en México). Lo que no
+// se puede leer sin adivinar se marca en su campo y no deja guardar (antes que
+// guardarlo como 0).
 function aMinor(texto: string): number {
   return texto.trim() === ""
     ? 0
     : Math.max(0, leerMinor(texto, sesion.pais) ?? 0);
+}
+function ilegible(texto: string): boolean {
+  return texto.trim() !== "" && leerMinor(texto, sesion.pais) === null;
+}
+const errorMonto = computed(() =>
+  t("presupuestos.editor.montoIlegible", {
+    ejemplo: ejemploPrecio(sesion.pais),
+  }),
+);
+const hayIlegibles = computed(
+  () =>
+    ilegible(borrador.value.descuento) ||
+    borrador.value.lineas.some(
+      (l) => ilegible(l.precio) || ilegible(l.descuento),
+    ),
+);
+async function enfocarInvalido(formulario: string): Promise<void> {
+  await nextTick();
+  document
+    .querySelector<HTMLElement>(`#${formulario} [aria-invalid="true"]`)
+    ?.focus();
 }
 function aTexto(minor: number): string {
   return minor > 0 ? textoMinor(minor, sesion.pais) : "";
@@ -314,7 +350,7 @@ const totales = computed(() => {
 });
 const tasaTexto = computed(() => `${totales.value.tasa / 100} %`);
 const moneda = computed(
-  () => actual.value?.moneda ?? lista.value[0]?.moneda ?? "MXN",
+  () => actual.value?.moneda ?? lista.value[0]?.moneda ?? sesion.moneda,
 );
 
 function abrirNuevo(): void {
@@ -399,6 +435,11 @@ function cuerpo(): Record<string, unknown> {
 }
 
 async function guardar(): Promise<void> {
+  if (hayIlegibles.value) {
+    errorEditor.value = t("presupuestos.editor.revisaMontos");
+    void enfocarInvalido("form-presupuesto");
+    return;
+  }
   guardando.value = true;
   errorEditor.value = null;
   try {
@@ -537,7 +578,19 @@ const ajustes = ref({
   vigencia: 15,
   notas: "",
 });
+// La tasa en porcentaje, de 0 a 100 con hasta dos decimales (el API la guarda en
+// puntos base); con punto o coma decimal.
+const tasaBp = computed<number | null>(() => {
+  const texto = ajustes.value.tasa.trim();
+  if (!/^\d{1,3}(?:[.,]\d{1,2})?$/.test(texto)) {
+    return null;
+  }
+  const bp = Math.round(Number(texto.replace(",", ".")) * 100);
+  return bp <= 10000 ? bp : null;
+});
+const errorTasa = ref(false);
 function abrirAjustes(): void {
+  errorTasa.value = false;
   ajustes.value = {
     impuestos: config.value.impuestos,
     tasa: String(config.value.tasa_impuesto_bp / 100),
@@ -547,15 +600,19 @@ function abrirAjustes(): void {
   ajustesAbiertos.value = true;
 }
 async function guardarAjustes(): Promise<void> {
+  const tasa = tasaBp.value;
+  errorTasa.value = tasa === null;
+  if (tasa === null) {
+    void enfocarInvalido("form-ajustes-presupuestos");
+    return;
+  }
   guardando.value = true;
   try {
     const { data } = await api.put<{ data: Configuracion }>(
       `${base.value}/presupuestos/configuracion`,
       {
         impuestos: ajustes.value.impuestos,
-        tasa_impuesto_bp: Math.round(
-          (Number.parseFloat(ajustes.value.tasa.replace(",", ".")) || 0) * 100,
-        ),
+        tasa_impuesto_bp: tasa,
         vigencia_dias: Number(ajustes.value.vigencia) || 15,
         notas: ajustes.value.notas.trim() || null,
       },
@@ -873,6 +930,8 @@ onMounted(() => {
                     v-model="l.precio"
                     class="tu-input mt-1"
                     inputmode="decimal"
+                    data-prueba="precio-concepto"
+                    :aria-invalid="ilegible(l.precio) ? 'true' : undefined"
                   />
                 </label>
                 <label class="text-xs">
@@ -881,9 +940,16 @@ onMounted(() => {
                     v-model="l.descuento"
                     class="tu-input mt-1"
                     inputmode="decimal"
+                    :aria-invalid="ilegible(l.descuento) ? 'true' : undefined"
                   />
                 </label>
               </div>
+              <span
+                v-if="ilegible(l.precio) || ilegible(l.descuento)"
+                class="tu-error-campo"
+                data-prueba="monto-ilegible"
+                >{{ errorMonto }}</span
+              >
               <div class="flex items-center justify-between text-sm">
                 <button
                   v-if="!soloLectura && borrador.lineas.length > 1"
@@ -929,7 +995,17 @@ onMounted(() => {
               v-model="borrador.descuento"
               class="tu-input sm:max-w-[12rem]"
               inputmode="decimal"
+              :aria-invalid="ilegible(borrador.descuento) ? 'true' : undefined"
+              :aria-describedby="
+                ilegible(borrador.descuento) ? 'pr-descuento-error' : undefined
+              "
             />
+            <span
+              v-if="ilegible(borrador.descuento)"
+              id="pr-descuento-error"
+              class="tu-error-campo"
+              >{{ errorMonto }}</span
+            >
           </div>
           <div>
             <label class="tu-label" for="pr-notas">{{
@@ -1135,7 +1211,17 @@ onMounted(() => {
               v-model="ajustes.tasa"
               class="tu-input"
               inputmode="decimal"
+              :aria-invalid="errorTasa ? 'true' : undefined"
+              :aria-describedby="errorTasa ? 'pr-tasa-error' : undefined"
+              @input="errorTasa = false"
             />
+            <span
+              v-if="errorTasa"
+              id="pr-tasa-error"
+              class="tu-error-campo"
+              data-prueba="tasa-invalida"
+              >{{ $t("presupuestos.config.tasaInvalida") }}</span
+            >
           </div>
           <div>
             <label class="tu-label" for="pr-vig">{{

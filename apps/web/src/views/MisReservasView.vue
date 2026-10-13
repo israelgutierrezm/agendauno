@@ -340,7 +340,15 @@ const enCalendario = computed<EventoPeriodo[]>(() =>
     })),
 );
 
+// El error de una acción es de la clase en que se hizo: al abrir o cerrar otra no se
+// arrastra (el de carga, sin datos aún, se queda con su «Reintentar»).
+function olvidarErrorDeAccion(): void {
+  if (cuenta.cargado.value) {
+    cuenta.error.value = null;
+  }
+}
 function abrir(e: Evento): void {
+  olvidarErrorDeAccion();
   abierto.value = e;
   accion.value = null;
   recienReservada.value = false;
@@ -352,6 +360,7 @@ function abrirPorId(id: string): void {
   }
 }
 function cerrar(): void {
+  olvidarErrorDeAccion();
   abierto.value = null;
   accion.value = null;
   recienReservada.value = false;

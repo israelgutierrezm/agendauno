@@ -150,6 +150,54 @@ describe("sedes: foto y enlace de Google Maps", () => {
     expect(w.text()).toContain(
       "Pega el enlace que da Google Maps al compartir la ubicación de la sede.",
     );
+    expect(w.get("#s-mapa").attributes("aria-invalid")).toBe("true");
+  });
+
+  it("el error al dar de alta (p. ej. el plan no incluye otra sede) se ve dentro del diálogo y el de cada campo junto a él", async () => {
+    api.post.mockRejectedValueOnce(
+      new Error("Tu plan no incluye más sucursales."),
+    );
+    const w = await montar();
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "sedes.agregar")!
+      .trigger("click");
+    await w.get("#s-nombre").setValue("Polanco");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "comun.guardar")!
+      .trigger("click");
+    await flushPromises();
+    const aviso = w.get('[data-prueba="error-sucursal"]');
+    expect(aviso.text()).toContain("Tu plan no incluye más sucursales.");
+    // Una sola vez: no se repite en la página de atrás.
+    expect(w.text().split("Tu plan no incluye más sucursales.")).toHaveLength(
+      2,
+    );
+    // Lo escrito se queda.
+    expect((w.get("#s-nombre").element as HTMLInputElement).value).toBe(
+      "Polanco",
+    );
+
+    api.post.mockRejectedValueOnce({
+      response: {
+        data: {
+          meta: { errors: { nombre: ["Ya hay una sede con ese nombre."] } },
+        },
+      },
+    });
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "comun.guardar")!
+      .trigger("click");
+    await flushPromises();
+    expect(w.get("#s-nombre-error").text()).toBe(
+      "Ya hay una sede con ese nombre.",
+    );
+    expect(w.get("#s-nombre").attributes("aria-invalid")).toBe("true");
+    expect(w.get('[data-prueba="error-sucursal"]').text()).toContain(
+      "comun.revisaCampos",
+    );
   });
 });
 

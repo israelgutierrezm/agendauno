@@ -14,8 +14,9 @@ import CuotasNegocio from "./CuotasNegocio.vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: String }));
+const sesion = vi.hoisted(() => ({ slug: "demo", moneda: "MXN", pais: "MX" }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", moneda: "MXN", pais: "MX" }),
+  useSesionTenantStore: () => sesion,
 }));
 
 function montar() {
@@ -35,6 +36,8 @@ function montar() {
 }
 
 beforeEach(() => {
+  sesion.moneda = "MXN";
+  sesion.pais = "MX";
   api.get.mockReset();
   api.put.mockReset();
   api.get.mockResolvedValue({
@@ -86,5 +89,35 @@ describe("cuotas del negocio", () => {
     expect(
       (w.get('button[type="submit"]').element as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+
+  it("con coma decimal, lo guardado se muestra como en el país y se vuelve a leer igual", async () => {
+    sesion.pais = "ES";
+    sesion.moneda = "EUR";
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          inscripcion_minor: 125050,
+          reingreso_meses: 6,
+          anualidad_minor: 0,
+          anualidad_modo: "aniversario",
+          anualidad_mes: null,
+          anualidad_dia: null,
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    expect((w.get("#cu-inscripcion").element as HTMLInputElement).value).toBe(
+      "1250,50",
+    );
+    expect(w.find('[role="alert"]').exists()).toBe(false);
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/cuotas",
+      expect.objectContaining({ inscripcion_minor: 125050 }),
+    );
   });
 });

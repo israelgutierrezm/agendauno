@@ -82,7 +82,7 @@ class WebhookBienestarController
     {
         $secreto = $config->llaves()['webhook_secret'] ?? (string) config('agendauno.integraciones.wellhub_webhook_secret');
         if ($secreto === '') {
-            abort_if(app()->environment('production'), 400, 'Aviso sin llave secreta configurada.');
+            abort_if(! app()->environment(['local', 'testing']), 400, 'Aviso sin llave secreta configurada.');
 
             return;
         }

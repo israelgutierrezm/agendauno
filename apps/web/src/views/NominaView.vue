@@ -216,7 +216,10 @@ async function cargarEquipo(): Promise<void> {
     const { data } = await api.get<{
       data: Persona[];
       roles_detalle?: { clave: string; nombre: string | null }[];
-    }>(`${base.value}/usuarios`);
+    }>(`${base.value}/usuarios`, {
+      // Solo el equipo: sin alcance llegarían también todas las cuentas de clientes.
+      params: { alcance: "equipo" },
+    });
     nombresRoles.value = Object.fromEntries(
       (data.roles_detalle ?? [])
         .filter((r) => r.nombre)

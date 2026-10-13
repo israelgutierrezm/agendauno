@@ -205,21 +205,28 @@ async function guardar(): Promise<void> {
   }
 }
 
+// El rol que se está eliminando: su botón no se vuelve a tocar mientras tanto.
+const eliminandoId = ref<string | null>(null);
 async function eliminar(rol: Rol): Promise<void> {
   if (
     rol.id === null ||
+    eliminandoId.value !== null ||
     !(await confirmar(
       t("operacion.rolesPropios.confirmarEliminar", { nombre: nombreDe(rol) }),
+      { peligro: true, aceptar: t("operacion.rolesPropios.eliminar") },
     ))
   ) {
     return;
   }
+  eliminandoId.value = rol.id;
   try {
     await api.delete(`${base.value}/roles/${rol.id}`);
     toast.exito(t("operacion.rolesPropios.eliminado"));
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e));
+  } finally {
+    eliminandoId.value = null;
   }
 }
 
@@ -298,7 +305,9 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-contorno tu-tono-peligro"
+                  :disabled="eliminandoId !== null"
+                  data-prueba="eliminar-rol"
                   @click="eliminar(rol)"
                 >
                   {{ $t("operacion.rolesPropios.eliminar") }}

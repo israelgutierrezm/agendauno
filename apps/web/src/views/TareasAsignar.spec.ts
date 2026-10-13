@@ -165,4 +165,35 @@ describe("asignar y editar tareas", () => {
       persona_id: "p1",
     });
   });
+
+  it("si no se puede guardar, el error se ve dentro del panel y lo escrito se queda", async () => {
+    const w = montar();
+    await flushPromises();
+    api.post.mockRejectedValueOnce("El título es muy largo.");
+
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("Nueva tarea"))!
+      .trigger("click");
+    await flushPromises();
+    const panel = w.get('[data-prueba="panel"]');
+    expect(panel.get("#t-titulo").attributes("maxlength")).toBe("255");
+    expect(panel.get("#t-detalle").attributes("maxlength")).toBe("2000");
+    await panel.get("#t-titulo").setValue("Llamar a Bea");
+    await panel
+      .findAll("button")
+      .find((b) => b.text() === "Guardar")!
+      .trigger("click");
+    await flushPromises();
+
+    const abierto = w.get('[data-prueba="panel"]');
+    expect(abierto.get('[data-prueba="error-tarea"]').text()).toContain(
+      "El título es muy largo.",
+    );
+    expect((abierto.get("#t-titulo").element as HTMLInputElement).value).toBe(
+      "Llamar a Bea",
+    );
+    // Solo en el panel: no se repite en la página de atrás.
+    expect(w.text().split("El título es muy largo.")).toHaveLength(2);
+  });
 });

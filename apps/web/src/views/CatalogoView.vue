@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -14,6 +14,7 @@ import TarjetasIndicadores, {
 import { api, mensajeDeError } from "@/lib/api";
 import {
   aMinor,
+  aTexto,
   dinero as dineroDelPais,
   ejemploPrecio,
   simboloMoneda,
@@ -142,6 +143,8 @@ const form = ref<{
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
+// Lo que no se pudo guardar, dentro de su diálogo (no en la página de atrás).
+const errorEdicion = ref<string | null>(null);
 // La foto se sube aparte, al momento.
 function fotoCambiada(o: Oferta, url: string | null): void {
   o.foto_url = url;
@@ -153,9 +156,18 @@ function dinero(minor: number | null): string {
 // Junto a los campos de precio: el símbolo de la moneda del negocio.
 const simbolo = computed(() => simboloMoneda(sesion.moneda, sesion.pais));
 
+// El precio se lee como en el país del negocio, igual que en el alta; lo que no se
+// puede leer sin adivinar se marca y no se guarda.
+const precioEdicion = computed(() => aMinor(form.value.precio, sesion.pais));
+const precioEdicionIlegible = computed(
+  () => form.value.precio.trim() !== "" && precioEdicion.value === null,
+);
 // Para el pago-al-agendar hace falta un precio mayor a 0.
 const precioInvalido = computed(
-  () => form.value.politica === "pago" && (Number(form.value.precio) || 0) <= 0,
+  () =>
+    !precioEdicionIlegible.value &&
+    form.value.politica === "pago" &&
+    (precioEdicion.value ?? 0) <= 0,
 );
 // El pago-al-agendar (cita) necesita duración para calcular los huecos.
 const duracionInvalida = computed(
@@ -163,7 +175,10 @@ const duracionInvalida = computed(
     form.value.politica === "pago" && (Number(form.value.duracion) || 0) <= 0,
 );
 const formInvalido = computed(
-  () => precioInvalido.value || duracionInvalida.value,
+  () =>
+    precioEdicionIlegible.value ||
+    precioInvalido.value ||
+    duracionInvalida.value,
 );
 
 async function cargar(): Promise<void> {
@@ -185,11 +200,14 @@ async function cargar(): Promise<void> {
 function configurar(o: Oferta): void {
   editandoId.value = o.id;
   guardadoId.value = null;
+  errorEdicion.value = null;
   form.value = {
     descripcion: o.descripcion ?? "",
     politica: o.politica_reserva,
     precio:
-      o.precio_clase_minor !== null ? String(o.precio_clase_minor / 100) : "",
+      o.precio_clase_minor !== null
+        ? aTexto(o.precio_clase_minor, sesion.pais)
+        : "",
     duracion: o.duracion_minutos !== null ? String(o.duracion_minutos) : "",
     lugares: String(o.lugares),
     preparacion: String(o.preparacion_min ?? 0),
@@ -305,6 +323,9 @@ interface FilaAlta {
 const filas = ref<FilaAlta[]>([]);
 const dandoAlta = ref(false);
 const dandoAltaGuardando = ref(false);
+const errorAlta = ref<string | null>(null);
+// Tras intentar guardar: se marcan las filas con nombre a las que les falta algo.
+const revisarAlta = ref(false);
 function agregarFila(): void {
   filas.value.push({
     nombre: "",
@@ -315,6 +336,8 @@ function agregarFila(): void {
 function abrirAlta(): void {
   filas.value = [];
   agregarFila();
+  errorAlta.value = null;
+  revisarAlta.value = false;
   dandoAlta.value = true;
 }
 // El precio se escribe como en el país del negocio («25.000» en Colombia, «12,50» en
@@ -325,16 +348,31 @@ const precioIlegible = (f: FilaAlta): boolean =>
 const errorPrecio = computed(() =>
   t("validacion.precioIlegible", { ejemplo: ejemploPrecio(sesion.pais) }),
 );
+const conNombre = (f: FilaAlta): boolean => f.nombre.trim() !== "";
+// Con citas, un precio mayor a 0; con clases, lugares enteros desde 1.
+const valorValido = (f: FilaAlta): boolean =>
+  esCitas.value
+    ? (precioDe(f) ?? 0) > 0
+    : /^\d+$/.test(String(f.valor).trim()) && Number(f.valor) > 0;
+// Una fila con nombre a la que le falta el precio (o los lugares) no se guarda
+// callada: se marca y no deja guardar hasta completarla o quitarla.
+const filaIncompleta = (f: FilaAlta): boolean =>
+  conNombre(f) && !valorValido(f) && !precioIlegible(f);
 const filasValidas = computed(() =>
-  filas.value.filter(
-    (f) =>
-      f.nombre.trim() !== "" &&
-      (esCitas.value ? (precioDe(f) ?? 0) > 0 : Number(f.valor) > 0),
-  ),
+  filas.value.filter((f) => conNombre(f) && valorValido(f)),
 );
 async function guardarAlta(): Promise<void> {
+  if (filas.value.some(filaIncompleta)) {
+    revisarAlta.value = true;
+    errorAlta.value = t("listadosVisual.catalogo.filasIncompletas");
+    await nextTick();
+    document
+      .querySelector<HTMLElement>('#ct-alta [aria-invalid="true"]')
+      ?.focus();
+    return;
+  }
   dandoAltaGuardando.value = true;
-  error.value = null;
+  errorAlta.value = null;
   try {
     await api.post(`${base.value}/ofertas/rapidas`, {
       items: filasValidas.value.map((f) =>
@@ -354,7 +392,7 @@ async function guardarAlta(): Promise<void> {
     dandoAlta.value = false;
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorAlta.value = mensajeDeError(e);
   } finally {
     dandoAltaGuardando.value = false;
   }
@@ -365,9 +403,9 @@ async function guardar(o: Oferta): Promise<void> {
     return;
   }
   guardando.value = true;
-  error.value = null;
+  errorEdicion.value = null;
   try {
-    const precioMinor = Math.round((Number(form.value.precio) || 0) * 100);
+    const precioMinor = precioEdicion.value ?? 0;
     const duracion = Number(form.value.duracion) || 0;
     await api.put(`${base.value}/ofertas/${o.id}`, {
       lugares: Number(form.value.lugares) || 0,
@@ -392,7 +430,7 @@ async function guardar(o: Oferta): Promise<void> {
     editandoId.value = null;
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorEdicion.value = mensajeDeError(e);
   } finally {
     guardando.value = false;
   }
@@ -570,8 +608,18 @@ onMounted(cargar);
       :abierto="editando !== null"
       :titulo="editando?.nombre ?? ''"
       icono="etiqueta"
+      :ocupado="guardando"
       @cerrar="cerrar"
     >
+      <AvisoTono
+        v-if="errorEdicion"
+        tono="peligro"
+        class="mb-4"
+        role="alert"
+        data-prueba="error-edicion"
+      >
+        {{ errorEdicion }}
+      </AvisoTono>
       <template v-for="o in editandoLista" :key="o.id">
         <div class="mb-4" data-prueba="foto-servicio">
           <span class="tu-label">{{ $t("perfilPublico.catalogo.foto") }}</span>
@@ -692,18 +740,31 @@ onMounted(cargar);
               <input
                 :id="`precio-${o.id}`"
                 v-model="form.precio"
-                type="number"
-                min="0"
-                step="1"
+                inputmode="decimal"
                 class="tu-input"
-                :style="precioInvalido ? { borderColor: 'var(--error)' } : {}"
+                data-prueba="precio-edicion"
+                :aria-invalid="
+                  precioEdicionIlegible || precioInvalido ? 'true' : undefined
+                "
+                :style="
+                  precioEdicionIlegible || precioInvalido
+                    ? { borderColor: 'var(--error)' }
+                    : {}
+                "
               />
               <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
                 sesion.moneda
               }}</span>
             </div>
             <span
-              v-if="precioInvalido"
+              v-if="precioEdicionIlegible"
+              class="tu-hint"
+              style="color: var(--error)"
+              data-prueba="precio-edicion-ilegible"
+              >{{ errorPrecio }}</span
+            >
+            <span
+              v-else-if="precioInvalido"
               class="tu-hint"
               style="color: var(--error)"
               >{{ $t("catalogo.precioReq") }}</span
@@ -864,12 +925,22 @@ onMounted(cargar);
           : $t('listadosVisual.catalogo.nuevaClase')
       "
       icono="etiqueta"
+      :ocupado="dandoAltaGuardando"
       @cerrar="dandoAlta = false"
     >
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("listadosVisual.catalogo.altaAyuda") }}
       </p>
-      <div class="ct-filas mt-4" data-prueba="filas-alta">
+      <AvisoTono
+        v-if="errorAlta"
+        tono="peligro"
+        class="mt-4"
+        role="alert"
+        data-prueba="error-alta"
+      >
+        {{ errorAlta }}
+      </AvisoTono>
+      <div id="ct-alta" class="ct-filas mt-4" data-prueba="filas-alta">
         <div class="ct-fila ct-fila-cabeza" aria-hidden="true">
           <span>{{ $t("listadosVisual.catalogo.nombre") }}</span>
           <span>{{ $t("listadosVisual.catalogo.duracion") }}</span>
@@ -910,8 +981,16 @@ onMounted(cargar);
               class="tu-input"
               inputmode="decimal"
               :aria-label="$t('listadosVisual.catalogo.precio')"
-              :aria-invalid="precioIlegible(f)"
-              :style="precioIlegible(f) ? { borderColor: 'var(--error)' } : {}"
+              :aria-invalid="
+                precioIlegible(f) || (revisarAlta && filaIncompleta(f))
+                  ? 'true'
+                  : undefined
+              "
+              :style="
+                precioIlegible(f) || (revisarAlta && filaIncompleta(f))
+                  ? { borderColor: 'var(--error)' }
+                  : {}
+              "
               data-prueba="precio-alta"
             />
           </div>
@@ -921,7 +1000,16 @@ onMounted(cargar);
             class="tu-input"
             type="number"
             min="1"
+            step="1"
             :aria-label="$t('listadosVisual.catalogo.cupo')"
+            :aria-invalid="
+              revisarAlta && filaIncompleta(f) ? 'true' : undefined
+            "
+            :style="
+              revisarAlta && filaIncompleta(f)
+                ? { borderColor: 'var(--error)' }
+                : {}
+            "
           />
           <button
             type="button"
@@ -939,6 +1027,18 @@ onMounted(cargar);
             data-prueba="precio-ilegible"
           >
             {{ errorPrecio }}
+          </p>
+          <p
+            v-else-if="revisarAlta && filaIncompleta(f)"
+            class="col-span-full text-xs"
+            style="color: var(--error)"
+            data-prueba="fila-incompleta"
+          >
+            {{
+              esCitas
+                ? $t("listadosVisual.catalogo.faltaPrecio")
+                : $t("listadosVisual.catalogo.cupoInvalido")
+            }}
           </p>
         </div>
       </div>
@@ -965,7 +1065,7 @@ onMounted(cargar);
           data-prueba="guardar-alta"
           :disabled="
             dandoAltaGuardando ||
-            filasValidas.length === 0 ||
+            !filas.some(conNombre) ||
             filas.some(precioIlegible)
           "
           @click="guardarAlta"

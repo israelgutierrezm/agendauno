@@ -20,7 +20,9 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-chown -R www-data:www-data storage bootstrap/cache
+# Solo lo que no es de www-data (lo nuevo o lo que creó root): recorrer y cambiar todo
+# en cada arranque alarga el despliegue cuando hay muchos archivos subidos.
+find storage bootstrap/cache ! -user www-data -exec chown www-data:www-data {} +
 # Carpeta de trabajo de los respaldos (volcados de las bases): de www-data y solo
 # suya. Si la creara primero un comando con `docker compose exec` (root), el
 # programador ya no podría escribir ahí y los respaldos nocturnos fallarían.

@@ -43,7 +43,12 @@ use Illuminate\Support\Facades\DB;
  */
 class AgendaTenantController
 {
-    private const LIMITE = 200;
+    /**
+     * Tope de sesiones por consulta (un mes de un negocio grande cabe de sobra). Si se
+     * alcanza, la respuesta lo dice (`meta.truncado`) para que la pantalla lo avise en
+     * vez de perder clases en silencio.
+     */
+    private const LIMITE = 1500;
 
     /**
      * Estados de reserva que ocupan un lugar en la sesión.
@@ -283,6 +288,11 @@ class AgendaTenantController
             $consulta->where('instructor_id', $instructor instanceof Usuario ? $instructor->getKey() : 0);
         }
 
+        // Solo las fechas de una clase (p. ej. a dónde mover una reserva).
+        if (is_string($request->query('oferta_id')) && $request->query('oferta_id') !== '') {
+            $consulta->where('oferta_id', (int) OfertaTenant::query()->where('ulid', $request->query('oferta_id'))->value('id'));
+        }
+
         // La ventana se ensancha 1 dia por lado: `desde`/`hasta` llegan como fechas
         // (dia local del estudio) pero `inicia_en` se guarda en UTC. Como el desfase
         // de zona es < 24h, este superconjunto garantiza incluir las clases del borde
@@ -295,7 +305,11 @@ class AgendaTenantController
             $consulta->where('inicia_en', '<', CarbonImmutable::parse((string) $request->query('hasta'))->addDays(2)->utc());
         }
 
-        $sesiones = $consulta->limit(self::LIMITE)->get();
+        $sesiones = $consulta->limit(self::LIMITE + 1)->get();
+        $truncado = $sesiones->count() > self::LIMITE;
+        if ($truncado) {
+            $sesiones = $sesiones->take(self::LIMITE)->values();
+        }
         // Lo que otros canales apartan, para todo el lote (los libres de la regla única).
         app(CupoDeSesionTenant::class)->cargar($sesiones);
         $titulares = $this->titularesDeCitas($sesiones);
@@ -304,6 +318,8 @@ class AgendaTenantController
 
         return response()->json([
             'data' => $sesiones->map(fn (SesionTenant $sesion): array => $this->presentar($sesion, $titulares, $verContacto))->all(),
+            // Hay más sesiones en el rango que el tope: se pide un rango menor o se filtra.
+            'meta' => ['truncado' => $truncado],
         ]);
     }
 

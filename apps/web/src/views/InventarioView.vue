@@ -268,8 +268,11 @@ function limpiar(): void {
 const dialogoCategorias = ref(false);
 const nuevaCategoria = ref("");
 const nombres = ref<Record<string, string>>({});
+// Lo que no se pudo (p. ej. un nombre repetido), dentro del diálogo y no atrás.
+const errorCategorias = ref<string | null>(null);
 function abrirCategorias(): void {
   nuevaCategoria.value = "";
+  errorCategorias.value = null;
   nombres.value = Object.fromEntries(
     categorias.value.map((c) => [c.id, c.nombre]),
   );
@@ -288,13 +291,13 @@ async function agregarCategoria(): Promise<void> {
     return;
   }
   guardando.value = true;
-  error.value = null;
+  errorCategorias.value = null;
   try {
     await api.post(`${base.value}/categorias-articulo`, { nombre });
     nuevaCategoria.value = "";
     await recargarCategorias();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCategorias.value = mensajeDeError(e);
   } finally {
     guardando.value = false;
   }
@@ -305,12 +308,12 @@ async function renombrarCategoria(c: Categoria): Promise<void> {
     return;
   }
   guardando.value = true;
-  error.value = null;
+  errorCategorias.value = null;
   try {
     await api.put(`${base.value}/categorias-articulo/${c.id}`, { nombre });
     await Promise.all([recargarCategorias(), cargar()]);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCategorias.value = mensajeDeError(e);
   } finally {
     guardando.value = false;
   }
@@ -325,7 +328,7 @@ async function quitarCategoria(c: Categoria): Promise<void> {
     return;
   }
   guardando.value = true;
-  error.value = null;
+  errorCategorias.value = null;
   try {
     await api.delete(`${base.value}/categorias-articulo/${c.id}`);
     if (filtroCategoria.value === c.id) {
@@ -334,7 +337,7 @@ async function quitarCategoria(c: Categoria): Promise<void> {
     toast.exito(t("operacion.productos.quitada"));
     await Promise.all([recargarCategorias(), cargar()]);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCategorias.value = mensajeDeError(e);
   } finally {
     guardando.value = false;
   }
@@ -1166,11 +1169,21 @@ onMounted(cargar);
       :abierto="dialogoCategorias"
       :titulo="$t('operacion.productos.categoriasTitulo')"
       icono="pos"
+      :ocupado="guardando"
       @cerrar="dialogoCategorias = false"
     >
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("operacion.productos.categoriasAyuda") }}
       </p>
+      <AvisoTono
+        v-if="errorCategorias"
+        tono="peligro"
+        class="mt-4"
+        role="alert"
+        data-prueba="error-categorias"
+      >
+        {{ errorCategorias }}
+      </AvisoTono>
       <form
         class="mt-4 flex gap-2"
         data-prueba="nueva-categoria"

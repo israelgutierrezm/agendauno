@@ -19,12 +19,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, post: mocks.post, put: vi.fn(), delete: vi.fn() },
   mensajeDeError: () => "Error",
+  erroresPorCampo: (e: unknown) =>
+    (e as { campos?: Record<string, string> })?.campos ?? {},
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     esCitas: mocks.esCitas,
     moneda: "MXN",
+    zonaHoraria: "America/Mexico_City",
     puede: () => true,
   }),
 }));
@@ -123,6 +126,34 @@ describe("cobros: movimientos", () => {
     await flushPromises();
     expect(w.text()).toContain("Ana");
     expect(mocks.post).not.toHaveBeenCalled();
+  });
+  it("el reembolso que no pasa se explica dentro del diálogo, junto a su campo", async () => {
+    mocks.post.mockRejectedValueOnce({
+      campos: { monto_minor: "El monto excede lo reembolsable." },
+    });
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+    // La hora del cobro, en la zona del negocio (18:00 UTC = 12:00 en CDMX).
+    expect(w.text()).toContain("12:00");
+
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Reembolsar")!
+      .trigger("click");
+    const dialogo = w.get('[role="dialog"]');
+    expect(dialogo.get("#rm").attributes("max")).toBe("100");
+    await dialogo.get("#rmt").setValue("Cobro doble");
+    await dialogo.get("#form-reembolso").trigger("submit");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    expect(w.get('[data-prueba="error-reembolso"]').text()).toBe(
+      "Revisa los campos marcados.",
+    );
+    expect(w.get("#rm").attributes("aria-invalid")).toBe("true");
+    expect(w.get("#rm-error").text()).toBe("El monto excede lo reembolsable.");
   });
   it("resume lo cobrado y pide al API por cliente, por estado y por fechas", async () => {
     vi.useFakeTimers();

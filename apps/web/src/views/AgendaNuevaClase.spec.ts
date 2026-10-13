@@ -25,10 +25,13 @@ vi.mock("@/stores/sesionTenant", () => ({
   }),
 }));
 
-function montar() {
+function montar(metaSesiones?: { truncado: boolean }) {
   api.get.mockImplementation((url: string) =>
     Promise.resolve({
       data: {
+        ...(url.endsWith("/sesiones") && metaSesiones
+          ? { meta: metaSesiones }
+          : {}),
         data: url.endsWith("/ofertas")
           ? [{ id: "o1", nombre: "Nivel 1", modalidad: "grupal" }]
           : url.endsWith("/sucursales")
@@ -96,6 +99,45 @@ function boton(w: ReturnType<typeof montar>, texto: string) {
 describe("nueva clase", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("si no se puede crear, el error se ve dentro del diálogo y no en la agenda", async () => {
+    const w = montar();
+    await abrirNueva(w);
+    expect(w.get("#ad").attributes()).toMatchObject({
+      required: "",
+      min: "1",
+      max: "1440",
+    });
+    api.post.mockImplementation((url: string) =>
+      url.endsWith("/verificar")
+        ? Promise.resolve({ data: { data: { conflictos: [] } } })
+        : Promise.reject("El instructor ya tiene otra clase a esa hora."),
+    );
+    await w.get("#ah").setValue("18:30");
+    await w.get("#form-nueva-clase").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-nueva-clase"]').text()).toContain(
+      "El instructor ya tiene otra clase a esa hora.",
+    );
+    expect(
+      w.text().split("El instructor ya tiene otra clase a esa hora."),
+    ).toHaveLength(2);
+    expect(w.find("#form-nueva-clase").exists()).toBe(true);
+  });
+
+  it("con más clases de las que caben en el rango, lo avisa arriba del calendario", async () => {
+    const completa = montar({ truncado: false });
+    await flushPromises();
+    expect(completa.find('[data-prueba="agenda-truncada"]').exists()).toBe(
+      false,
+    );
+    completa.unmount();
+
+    const w = montar({ truncado: true });
+    await flushPromises();
+    expect(w.find('[data-prueba="agenda-truncada"]').exists()).toBe(true);
   });
 
   it("una sola: fecha y hora por separado", async () => {

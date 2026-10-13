@@ -85,10 +85,6 @@ class RespuestasFormularioController
     public function store(Request $request): JsonResponse
     {
         $formulario = Formulario::query()->with('campos')->where('ulid', (string) $request->route('formulario'))->firstOrFail();
-        if ($formulario->archivado_en !== null) {
-            throw ValidationException::withMessages(['formulario' => ['Esta ficha de datos está archivada.']]);
-        }
-
         $persona = PersonaTenant::query()->where('ulid', (string) $request->input('persona_id'))->firstOrFail();
 
         // Se responde por alguien cuyo expediente se puede ver (o por uno mismo), y
@@ -99,18 +95,34 @@ class RespuestasFormularioController
                 && ($persona->usuario_id === $usuario->getKey() || AccesoExpedienteTenant::puedeVer($usuario, $persona)),
             403,
         );
+        /** @var array<string, mixed> $entrada */
+        $entrada = is_array($request->input('valores')) ? $request->input('valores') : [];
+        $respuesta = $this->responder($formulario, $persona, $entrada);
+
+        return response()->json(['data' => ['id' => $respuesta->ulid, 'valores' => $respuesta->valores]], 201);
+    }
+
+    /**
+     * Guarda la respuesta de una persona (una por persona y ficha): la ficha debe estar
+     * vigente y aplicarle, y los valores se validan contra sus preguntas. Quién puede
+     * responder por quién lo decide quien llama (el equipo o la cuenta de la persona).
+     *
+     * @param  array<string, mixed>  $entrada
+     */
+    public function responder(Formulario $formulario, PersonaTenant $persona, array $entrada): RespuestaFormulario
+    {
+        if ($formulario->archivado_en !== null) {
+            throw ValidationException::withMessages(['formulario' => ['Esta ficha de datos está archivada.']]);
+        }
         if (! in_array($formulario->aplica_a, [$persona->tipo->value, 'todos'], true)) {
             throw ValidationException::withMessages([
                 'persona_id' => ['Esta ficha de datos no aplica a esta persona.'],
             ]);
         }
-
-        /** @var array<string, mixed> $entrada */
-        $entrada = is_array($request->input('valores')) ? $request->input('valores') : [];
-
+        $formulario->loadMissing('campos');
         $valores = $this->validarYNormalizar($formulario->campos, $entrada);
 
-        $respuesta = RespuestaFormulario::query()->updateOrCreate(
+        return RespuestaFormulario::query()->updateOrCreate(
             ['formulario_id' => $formulario->id, 'persona_id' => $persona->id],
             [
                 'valores' => $valores,
@@ -119,8 +131,6 @@ class RespuestasFormularioController
                 'campos' => FichasDeDatosTenant::preguntasActuales($formulario),
             ],
         );
-
-        return response()->json(['data' => ['id' => $respuesta->ulid, 'valores' => $respuesta->valores]], 201);
     }
 
     /**

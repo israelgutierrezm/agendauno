@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\PromocionTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -41,6 +42,11 @@ class FulfillmentTenant
         }
 
         $orden->update(['estado' => EstadoOrden::Pagada->value, 'pagada_en' => now()]);
+        // El código de promoción se cuenta al pagarse (no al crear una orden que quizá
+        // nadie paga): así una compra abandonada no agota sus usos.
+        if ($orden->promocion_id !== null) {
+            PromocionTenant::query()->whereKey($orden->promocion_id)->increment('usos');
+        }
         $this->emitirPagada($orden);
 
         // Orden de RESERVA (pago-para-reservar, citas): confirma la reserva pendiente

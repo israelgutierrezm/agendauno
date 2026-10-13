@@ -77,10 +77,14 @@ const error = ref<string | null>(null);
 const nuevo = ref({ nombre: "", plantillaId: "" });
 const creando = ref(false);
 const abierto = ref(false);
+// Cada error donde se hizo la acción (una sola vez): crear, en su panel; inscribir,
+// junto al grupo elegido. El de la página es solo el de cargar.
+const errorCrear = ref<string | null>(null);
+const errorDetalle = ref<string | null>(null);
 
 function abrir(): void {
   nuevo.value = { nombre: "", plantillaId: "" };
-  error.value = null;
+  errorCrear.value = null;
   abierto.value = true;
 }
 function cerrar(): void {
@@ -124,7 +128,7 @@ async function cargar(): Promise<void> {
 
 async function crear(): Promise<void> {
   creando.value = true;
-  error.value = null;
+  errorCrear.value = null;
   try {
     await api.post(`${base.value}/grupos`, {
       nombre: nuevo.value.nombre,
@@ -133,7 +137,7 @@ async function crear(): Promise<void> {
     abierto.value = false;
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCrear.value = mensajeDeError(e);
   } finally {
     creando.value = false;
   }
@@ -144,13 +148,14 @@ async function seleccionar(g: Grupo): Promise<void> {
   inscripciones.value = [];
   miembroId.value = "";
   mensaje.value = null;
+  errorDetalle.value = null;
   try {
     const { data } = await api.get<{ data: Inscripcion[] }>(
       `${base.value}/grupos/${g.id}/inscripciones`,
     );
     inscripciones.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorDetalle.value = mensajeDeError(e);
   }
 }
 
@@ -169,21 +174,22 @@ async function inscribir(): Promise<void> {
   }
   inscribiendo.value = true;
   mensaje.value = null;
-  error.value = null;
+  errorDetalle.value = null;
   try {
     const { data } = await api.post<{ data: { reservadas: number } }>(
       `${base.value}/grupos/${seleccionado.value.id}/inscripciones`,
       { persona_id: miembroId.value },
     );
     const n = data.data.reservadas;
+    miembroId.value = "";
+    await seleccionar(seleccionado.value);
+    // Después de recargar el grupo (que limpia el aviso anterior).
     sinReservas.value = n === 0;
     mensaje.value =
       n === 0 ? t("cursos.sinReservadas") : t("cursos.reservadas", { n });
-    miembroId.value = "";
-    await seleccionar(seleccionado.value);
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorDetalle.value = mensajeDeError(e);
   } finally {
     inscribiendo.value = false;
   }
@@ -389,6 +395,15 @@ const indicadores = computed<Indicador[]>(() => {
                   }}
                 </button>
               </form>
+              <AvisoTono
+                v-if="errorDetalle"
+                tono="peligro"
+                class="mt-3"
+                role="alert"
+                data-prueba="error-inscribir"
+              >
+                {{ errorDetalle }}
+              </AvisoTono>
               <p
                 v-if="mensaje"
                 class="mt-2 text-sm"
@@ -423,11 +438,17 @@ const indicadores = computed<Indicador[]>(() => {
     <PanelLateral
       :abierto="abierto"
       :titulo="$t('cursos.nuevo')"
+      :ocupado="creando"
       @cerrar="cerrar"
     >
       <form class="space-y-4" @submit.prevent="crear">
-        <AvisoTono v-if="error" tono="peligro" role="alert">
-          {{ error }}
+        <AvisoTono
+          v-if="errorCrear"
+          tono="peligro"
+          role="alert"
+          data-prueba="error-crear-grupo"
+        >
+          {{ errorCrear }}
         </AvisoTono>
         <div>
           <label class="tu-label" for="gn">{{ $t("cursos.nombre") }}</label>
@@ -446,7 +467,12 @@ const indicadores = computed<Indicador[]>(() => {
 
       <template #pie>
         <div class="flex justify-end gap-2">
-          <button class="tu-btn tu-btn-fantasma" type="button" @click="cerrar">
+          <button
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            :disabled="creando"
+            @click="cerrar"
+          >
             {{ $t("comun.cancelar") }}
           </button>
           <button

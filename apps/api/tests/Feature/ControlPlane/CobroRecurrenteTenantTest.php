@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
@@ -172,4 +173,22 @@ it('el comando cobra-suscripciones se salta estudios sin pasarela en línea', fu
 
     // Sin pasarela en línea configurada: no cobra ni abre dunning.
     expect(enTenant($m, fn () => ProcesoDunningTenant::query()->count()))->toBe(0);
+});
+
+it('si cobrar una renovación truena (la pasarela no responde), las demás se cobran igual', function (): void {
+    $servicio = Mockery::mock(CobroRecurrenteTenant::class)->makePartial();
+    $servicio->shouldReceive('renovar')->twice()->andReturnUsing(function (AcuerdoTenant $acuerdo): string {
+        if ($acuerdo->ulid === 'falla') {
+            throw new RuntimeException('Stripe no respondió');
+        }
+
+        return 'cobrado';
+    });
+    $procesar = new ReflectionMethod(CobroRecurrenteTenant::class, 'procesar');
+    $acuerdos = new Collection([
+        (new AcuerdoTenant)->forceFill(['ulid' => 'falla']),
+        (new AcuerdoTenant)->forceFill(['ulid' => 'bien']),
+    ]);
+
+    expect($procesar->invoke($servicio, $acuerdos, 'stripe'))->toBe(['cobrados' => 1, 'pendientes' => 0, 'fallidos' => 1]);
 });

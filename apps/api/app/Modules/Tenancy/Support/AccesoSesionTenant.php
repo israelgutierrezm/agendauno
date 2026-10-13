@@ -31,7 +31,8 @@ class AccesoSesionTenant
         }
 
         if (! $this->esInstructorAcotado($usuario)) {
-            return true;
+            // El equipo acotado por sucursal (R19) solo opera las sesiones de sus sedes.
+            return $this->acceso->permiteSucursal($usuario, (int) $sesion->sucursal_id);
         }
 
         if ($sesion->instructor_id !== null && (int) $sesion->instructor_id === (int) $usuario->getKey()) {

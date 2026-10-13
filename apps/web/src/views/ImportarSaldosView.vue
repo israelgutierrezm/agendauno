@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
@@ -12,6 +13,7 @@ import ResumenImportacion, {
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -36,13 +38,8 @@ const sesion = useSesionTenantStore();
 const { t } = useI18n();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
-function hoyLocal(): string {
-  const d = new Date();
-  const dos = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
-}
-
-const corte = ref(hoyLocal());
+// El corte, por omisión «hoy» del negocio (no del navegador de quien carga).
+const corte = ref(hoyEnNegocio(sesion.zonaHoraria));
 const evidencia = ref("");
 const archivo = ref<File | null>(null);
 const nombreArchivo = ref("");
@@ -76,6 +73,16 @@ const puedeCargarListas = computed(
 watch(corte, () => {
   preview.value = null;
 });
+
+// Un 422 de la carga trae el análisis del archivo (`{data: resultado}`), no un mensaje:
+// las filas por corregir se ven en la lista.
+function rechazoConFilas(e: unknown): Resultado | null {
+  if (!axios.isAxiosError(e) || e.response?.status !== 422) {
+    return null;
+  }
+  const datos = (e.response.data as { data?: Resultado } | undefined)?.data;
+  return datos && Array.isArray(datos.filas) && datos.resumen ? datos : null;
+}
 
 function texto(v: unknown): string {
   return v === null || v === undefined || v === "" ? "—" : String(v);
@@ -151,7 +158,16 @@ async function cargar(parcial = false): Promise<void> {
     archivo.value = null;
     nombreArchivo.value = "";
   } catch (e) {
-    error.value = mensajeDeError(e);
+    const rechazo = rechazoConFilas(e);
+    if (rechazo !== null) {
+      preview.value = rechazo;
+      error.value =
+        rechazo.resumen.total === 0
+          ? t("importar.sinFilas")
+          : t("importar.rechazado");
+    } else {
+      error.value = mensajeDeError(e);
+    }
   } finally {
     importando.value = false;
   }

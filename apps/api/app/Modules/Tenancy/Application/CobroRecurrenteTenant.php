@@ -276,7 +276,14 @@ class CobroRecurrenteTenant
         $resumen = ['cobrados' => 0, 'pendientes' => 0, 'fallidos' => 0];
 
         foreach ($acuerdos as $acuerdo) {
-            $resultado = $this->renovar($acuerdo, $proveedor);
+            try {
+                $resultado = $this->renovar($acuerdo, $proveedor);
+            } catch (Throwable $e) {
+                // Uno que falla (la pasarela no respondió, un dato que rechaza) se reporta
+                // y se reintenta en la siguiente corrida; los demás se cobran igual.
+                ReporteDeErrores::reportarAtrapado($e);
+                $resultado = 'fallido';
+            }
             match ($resultado) {
                 'cobrado' => $resumen['cobrados']++,
                 'pendiente' => $resumen['pendientes']++,

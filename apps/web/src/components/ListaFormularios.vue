@@ -19,6 +19,9 @@ const props = defineProps<{
   formularios: FormularioPersona[];
   personaId: string;
   puedeResponder: boolean;
+  // En el portal: responde la cuenta por sí (o por la persona a su cargo, que viaja
+  // como `X-Participante`), en `/mi/…` y sin `persona_id`.
+  enCuenta?: boolean;
 }>();
 const emit = defineEmits<{ guardado: [] }>();
 
@@ -27,12 +30,23 @@ const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
+// Cuándo respondió, en la zona horaria del negocio (ADR 0099).
 function fecha(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(iso));
+}
+// Una fecha AAAA-MM-DD tal cual, sin que ninguna zona horaria la mueva de día.
+function fechaDia(dia: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${dia}T12:00:00Z`));
 }
 
 const abiertos = ref<Set<string>>(new Set());
@@ -54,7 +68,7 @@ function valor(c: CampoFormulario): string {
     return c.valor === true ? t("expediente.si") : t("expediente.no");
   }
   if (c.tipo === "fecha" && typeof c.valor === "string") {
-    return fecha(`${c.valor}T12:00:00`);
+    return fechaDia(c.valor);
   }
   return String(c.valor);
 }
@@ -94,10 +108,16 @@ async function guardar(f: FormularioPersona): Promise<void> {
         valores[c.id] = c.tipo === "numero" ? Number(v) : v;
       }
     }
-    await api.post(`${base.value}/formularios/${f.id}/respuestas`, {
-      persona_id: props.personaId,
-      valores,
-    });
+    if (props.enCuenta) {
+      await api.post(`${base.value}/mi/formularios/${f.id}/respuestas`, {
+        valores,
+      });
+    } else {
+      await api.post(`${base.value}/formularios/${f.id}/respuestas`, {
+        persona_id: props.personaId,
+        valores,
+      });
+    }
     toast.exito(t("expediente.formularioGuardado"));
     llenando.value = null;
     abiertos.value = new Set(abiertos.value).add(f.id);

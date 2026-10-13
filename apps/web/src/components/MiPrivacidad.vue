@@ -58,7 +58,9 @@ async function cargar(): Promise<void> {
 
 async function cambiar(
   cambio: { recibe_promociones: boolean } | { acepta_whatsapp: boolean },
+  evento: Event,
 ): Promise<void> {
+  const casilla = evento.target as HTMLInputElement;
   ocupado.value = true;
   try {
     const { data } = await api.put<{ data: Privacidad }>(
@@ -67,6 +69,12 @@ async function cambiar(
     );
     datos.value = data.data;
   } catch (e) {
+    // No se guardó: la casilla vuelve a lo que sigue guardado (si no, se vería
+    // cambiada sin estarlo).
+    casilla.checked =
+      "recibe_promociones" in cambio
+        ? datos.value?.recibe_promociones === true
+        : datos.value?.acepta_whatsapp === true;
     toast.error(mensajeDeError(e));
   } finally {
     ocupado.value = false;
@@ -177,9 +185,12 @@ onMounted(cargar);
           :checked="datos.recibe_promociones"
           :disabled="ocupado"
           @change="
-            cambiar({
-              recibe_promociones: ($event.target as HTMLInputElement).checked,
-            })
+            cambiar(
+              {
+                recibe_promociones: ($event.target as HTMLInputElement).checked,
+              },
+              $event,
+            )
           "
         />
       </label>
@@ -203,9 +214,10 @@ onMounted(cargar);
           :checked="datos.acepta_whatsapp"
           :disabled="ocupado"
           @change="
-            cambiar({
-              acepta_whatsapp: ($event.target as HTMLInputElement).checked,
-            })
+            cambiar(
+              { acepta_whatsapp: ($event.target as HTMLInputElement).checked },
+              $event,
+            )
           "
         />
       </label>
@@ -267,7 +279,7 @@ onMounted(cargar);
         </div>
         <button
           type="submit"
-          class="tu-btn tu-btn-primario text-sm"
+          class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
           :disabled="ocupado"
         >
           {{ $t("miPrivacidad.confirmarBaja") }}
@@ -278,6 +290,7 @@ onMounted(cargar);
     <ModalDialogo
       :abierto="confirmando !== null"
       :titulo="$t('miPrivacidad.confirmarTitulo')"
+      :ocupado="ocupado"
       @cerrar="cerrarConfirmacion"
     >
       <form
@@ -325,7 +338,12 @@ onMounted(cargar);
         <button
           type="submit"
           form="mp-confirmar"
-          class="tu-btn tu-btn-primario"
+          class="tu-btn"
+          :class="
+            confirmando === 'baja'
+              ? 'tu-btn-contorno tu-tono-peligro'
+              : 'tu-btn-primario'
+          "
           :disabled="ocupado || contrasena === ''"
         >
           {{

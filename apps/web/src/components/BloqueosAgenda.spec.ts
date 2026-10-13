@@ -14,8 +14,10 @@ vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
 }));
+const confirmar = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
 
-function montar() {
+function montar(extra: Record<string, unknown> = {}) {
   return mount(BloqueosAgenda, {
     props: {
       base: "/api/v1/app/a",
@@ -25,6 +27,7 @@ function montar() {
       sucursalNombre: "Roma",
       zona: "America/Mexico_City",
       puedeGestionar: true,
+      ...extra,
     },
     global: {
       plugins: [
@@ -106,6 +109,71 @@ describe("bloqueos de agenda", () => {
       "/api/v1/app/a/bloqueos",
       expect.objectContaining({ motivo: "Vacaciones" }),
     );
+  });
+});
+
+describe("quitar un bloqueo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            id: "b1",
+            ambito: "profesional",
+            instructor_id: "pro1",
+            sucursal_id: null,
+            recurso_id: null,
+            desde: "2099-01-07T15:00:00Z",
+            hasta: "2099-01-07T16:00:00Z",
+            todo_el_dia: false,
+            zona_horaria: "America/Mexico_City",
+            motivo: "Comida",
+            creado_por: null,
+          },
+        ],
+      },
+    });
+  });
+
+  it("pide confirmar (como acción destructiva) antes de quitarlo", async () => {
+    confirmar.mockResolvedValueOnce(false);
+    const w = montar({ puedeEliminar: true });
+    await flushPromises();
+
+    await w.get('[data-prueba="quitar-bloqueo"]').trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalledWith(
+      expect.stringContaining("Comida"),
+      expect.objectContaining({ peligro: true }),
+    );
+    expect(api.delete).not.toHaveBeenCalled();
+
+    api.delete.mockResolvedValue({});
+    await w.get('[data-prueba="quitar-bloqueo"]').trigger("click");
+    await flushPromises();
+    expect(api.delete).toHaveBeenCalledTimes(1);
+    expect(api.delete).toHaveBeenCalledWith("/api/v1/app/a/bloqueos/b1");
+  });
+
+  it("un doble clic no lo manda dos veces", async () => {
+    let soltar: () => void = () => undefined;
+    api.delete.mockReturnValue(
+      new Promise<void>((r) => {
+        soltar = r;
+      }),
+    );
+    const w = montar({ puedeEliminar: true });
+    await flushPromises();
+
+    const quitar = w.get('[data-prueba="quitar-bloqueo"]');
+    await quitar.trigger("click");
+    await flushPromises();
+    await quitar.trigger("click");
+    await flushPromises();
+    expect(api.delete).toHaveBeenCalledTimes(1);
+    soltar();
+    await flushPromises();
   });
 });
 

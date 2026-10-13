@@ -35,13 +35,18 @@ const rechazando = ref<string | null>(null);
 const respuesta = ref("");
 const ocupado = ref<string | null>(null);
 
+// Un instante, en la zona horaria del negocio (ADR 0099); una fecha AAAA-MM-DD, tal
+// cual (sin que la zona la mueva de día).
 function fecha(iso: string | null): string {
-  return iso
-    ? new Intl.DateTimeFormat("es-MX", {
-        day: "numeric",
-        month: "short",
-      }).format(new Date(iso.length === 10 ? `${iso}T12:00:00` : iso))
-    : "—";
+  if (!iso) {
+    return "—";
+  }
+  const soloDia = iso.length === 10;
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    timeZone: soloDia ? "UTC" : sesion.zonaHoraria || undefined,
+  }).format(new Date(soloDia ? `${iso}T12:00:00Z` : iso));
 }
 
 async function cargar(): Promise<void> {

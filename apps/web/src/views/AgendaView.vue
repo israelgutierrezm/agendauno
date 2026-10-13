@@ -178,6 +178,9 @@ const error = ref<string | null>(null);
 const errorReferencias = ref<string | null>(null);
 // Fechas de una clase recurrente que no se pudieron generar (y por qué).
 const avisoSerie = ref<string | null>(null);
+// El rango trae más clases de las que el servidor manda de una vez (`meta.truncado`):
+// lo que se ve (y las cifras) no está completo.
+const truncado = ref(false);
 
 // ---- Calendario (semana / dia / por profesional) ----
 // Citas: el día en columnas por profesional (o la semana). Clases: la semana con
@@ -683,7 +686,10 @@ async function cargarSesionesAhora(): Promise<void> {
       params.sucursal_id = sucursalFiltro.value;
     }
     const [{ data }, previas] = await Promise.all([
-      api.get<{ data: Sesion[] }>(`${base.value}/sesiones`, { params }),
+      api.get<{ data: Sesion[]; meta?: { truncado?: boolean } }>(
+        `${base.value}/sesiones`,
+        { params },
+      ),
       // Para la tendencia de los indicadores; si falla, solo no se muestra.
       vista.value === "mes"
         ? Promise.resolve(null)
@@ -694,6 +700,7 @@ async function cargarSesionesAhora(): Promise<void> {
             .catch(() => null),
     ]);
     sesiones.value = data.data;
+    truncado.value = data.meta?.truncado === true;
     sesionesPrevias.value = previas?.data.data ?? [];
     // La que se pidió al entrar, una sola vez.
     if (sesionPedida !== null) {
@@ -1548,6 +1555,12 @@ async function cancelarSesion(id: string): Promise<void> {
 }
 // ---- Nueva clase (modal) ----
 const mostrarNueva = ref(false);
+// Lo que no se pudo crear se ve en el diálogo (no en la agenda de atrás).
+const errorNueva = ref<string | null>(null);
+function abrirNuevaClase(): void {
+  errorNueva.value = null;
+  mostrarNueva.value = true;
+}
 // Tres formas de cargar: una sola clase; la misma hora en varios días; o cada día
 // con su propia hora (p. ej. Nivel 1 el lunes a las 18:00 y el sábado a las 10:00).
 type ModoCarga = "una" | "misma" | "porDia";
@@ -1594,6 +1607,11 @@ const horarioRepetido = computed(() => {
 const listoParaCrear = computed(() => {
   const f = form.value;
   if (f.ofertaId === "" || f.sucursalId === "" || f.fecha === "") {
+    return false;
+  }
+  // La duración, en minutos: de 1 a un día.
+  const duracion = Number(f.duracion);
+  if (!Number.isInteger(duracion) || duracion < 1 || duracion > 1440) {
     return false;
   }
   if (modo.value === "una") {
@@ -1725,7 +1743,7 @@ watch(modo, (m) => {
 
 async function crearSesion(): Promise<void> {
   creando.value = true;
-  error.value = null;
+  errorNueva.value = null;
   avisoSerie.value = null;
   try {
     if (esRecurrente.value) {
@@ -1755,7 +1773,7 @@ async function crearSesion(): Promise<void> {
     mostrarNueva.value = false;
     await cargarSesiones();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorNueva.value = mensajeDeError(e);
   } finally {
     creando.value = false;
   }
@@ -1871,7 +1889,7 @@ onMounted(async () => {
         <button
           v-else-if="!sesion.esCitas && puedeGestionar"
           class="tu-btn tu-btn-primario tu-btn-crear"
-          @click="mostrarNueva = true"
+          @click="abrirNuevaClase"
         >
           {{ $t("agenda.nuevaClase") }}
         </button>
@@ -1881,12 +1899,12 @@ onMounted(async () => {
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
-    <p v-if="errorReferencias" class="mt-4 text-sm" style="color: var(--error)">
+    </AvisoTono>
+    <AvisoTono v-if="errorReferencias" tono="peligro" class="mt-4" role="alert">
       {{ errorReferencias }}
-    </p>
+    </AvisoTono>
     <p
       v-if="avisoSerie"
       class="mt-4 text-sm"
@@ -2142,6 +2160,15 @@ onMounted(async () => {
       >
         {{ $t("comun.cargando") }}
       </p>
+      <AvisoTono
+        v-if="truncado && !cargandoSesiones"
+        tono="aviso"
+        class="mt-4"
+        role="status"
+        data-prueba="agenda-truncada"
+      >
+        {{ $t("agendaVisual.truncado") }}
+      </AvisoTono>
 
       <!-- ===== Vista MES: el mes en semanas; tocar un día lleva a ese día ===== -->
       <AgendaMes
@@ -2879,7 +2906,9 @@ onMounted(async () => {
                             >
                               {{ cambio.de }} → {{ cambio.a }}<br />
                               {{
-                                new Date(cambio.fecha).toLocaleString("es-MX")
+                                new Date(cambio.fecha).toLocaleString("es-MX", {
+                                  timeZone: sesion.zonaHoraria || undefined,
+                                })
                               }}
                               ·
                               {{ cambio.por ?? $t("agenda.roster.sistema") }}
@@ -3378,6 +3407,15 @@ onMounted(async () => {
         class="grid gap-4 sm:grid-cols-2"
         @submit.prevent="crearSesion"
       >
+        <AvisoTono
+          v-if="errorNueva"
+          tono="peligro"
+          role="alert"
+          class="sm:col-span-2"
+          data-prueba="error-nueva-clase"
+        >
+          {{ errorNueva }}
+        </AvisoTono>
         <!-- Cómo se carga: primero se elige, y según eso cambia el formulario. -->
         <div class="sm:col-span-2">
           <div class="tu-segmentado" role="group">
@@ -3478,7 +3516,10 @@ onMounted(async () => {
               v-model="form.duracion"
               class="tu-input"
               type="number"
+              required
               min="1"
+              max="1440"
+              step="1"
             />
           </div>
           <div>
@@ -3609,6 +3650,7 @@ onMounted(async () => {
         <button
           type="button"
           class="tu-btn tu-btn-fantasma"
+          :disabled="creando"
           @click="mostrarNueva = false"
         >
           {{ $t("comun.cancelar") }}

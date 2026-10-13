@@ -77,6 +77,8 @@ export default {
     extra: "Precio por persona adicional",
     publicar: "Publicar versión nueva",
     publicando: "Publicando…",
+    incompleta:
+      "Completa los campos marcados: un precio vacío no se publica como 0.",
     publicada: "Se publicó la versión {n}.",
     confirmarPublicar:
       "¿Publicar una versión nueva de la tarifa de {modalidad}? No se puede editar ni deshacer: los cobros siguientes y la landing usarán estos precios.",

@@ -92,7 +92,8 @@ onMounted(cargar);
       <button
         v-if="efecto?.cancelable"
         type="button"
-        class="tu-btn tu-btn-primario"
+        class="tu-btn tu-btn-solido tu-tono-peligro"
+        data-prueba="confirmar-cancelacion"
         :disabled="ocupado"
         @click="emit('confirmar', conQuien ? por : null)"
       >

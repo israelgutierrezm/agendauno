@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
@@ -137,6 +138,32 @@ function fotoCambiada(url: string | null): void {
   }
 }
 const errores = ref<Record<string, string>>({});
+// Lo que no se pudo guardar, dentro del diálogo (no en la página de atrás): p. ej. una
+// segunda sucursal sin el plan que la incluye. Cada error de campo, junto a su campo.
+const errorGuardar = ref<string | null>(null);
+const CAMPOS_FORM = new Set([
+  "nombre",
+  "region",
+  "zona_horaria",
+  "impuesto_tasa_bps",
+  "direccion",
+  "latitud",
+  "longitud",
+  "mapa_url",
+  "telefono",
+  "whatsapp",
+]);
+function campoEnFormulario(campo: string): boolean {
+  return (
+    CAMPOS_FORM.has(campo) ||
+    campo.startsWith("redes.") ||
+    /^horario\.\d+\.cierra$/.test(campo)
+  );
+}
+async function enfocarPrimerError(): Promise<void> {
+  await nextTick();
+  document.querySelector<HTMLElement>('#s-form [aria-invalid="true"]')?.focus();
+}
 // El error de un día abierto: la API numera solo los días que se envían.
 function errorDelDia(d: DiaHorario): string | undefined {
   const i = form.value.horario.filter((x) => x.abierto).indexOf(d);
@@ -181,6 +208,7 @@ function abrirNueva(): void {
   };
   fotoSede.value = null;
   errores.value = {};
+  errorGuardar.value = null;
   abierto.value = true;
 }
 
@@ -214,6 +242,7 @@ function abrirEdicion(s: Sucursal): void {
   };
   fotoSede.value = s.foto_url ?? null;
   errores.value = {};
+  errorGuardar.value = null;
   abierto.value = true;
 }
 
@@ -275,7 +304,7 @@ async function guardar(): Promise<void> {
     return;
   }
   guardando.value = true;
-  error.value = null;
+  errorGuardar.value = null;
   errores.value = {};
   try {
     const cuerpo = {
@@ -314,7 +343,12 @@ async function guardar(): Promise<void> {
     errores.value = Object.fromEntries(
       Object.entries(detalle ?? {}).map(([k, v]) => [k, v[0] ?? ""]),
     );
-    error.value = mensajeDeError(e);
+    const campos = Object.keys(errores.value);
+    errorGuardar.value =
+      campos.length > 0 && campos.every(campoEnFormulario)
+        ? t("comun.revisaCampos")
+        : mensajeDeError(e);
+    void enfocarPrimerError();
   } finally {
     guardando.value = false;
   }
@@ -346,9 +380,18 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
 
     <template v-if="!cargando">
       <BarraListado
@@ -456,7 +499,20 @@ onMounted(cargar);
       :ocupado="guardando"
       @cerrar="cerrar"
     >
-      <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="guardar">
+      <form
+        id="s-form"
+        class="grid gap-4 sm:grid-cols-2"
+        @submit.prevent="guardar"
+      >
+        <AvisoTono
+          v-if="errorGuardar"
+          tono="peligro"
+          role="alert"
+          class="sm:col-span-2"
+          data-prueba="error-sucursal"
+        >
+          {{ errorGuardar }}
+        </AvisoTono>
         <div v-if="esNueva && organizaciones.length > 1" class="sm:col-span-2">
           <label class="tu-label" for="s-org">{{
             $t("sedes.organizacion")
@@ -468,16 +524,26 @@ onMounted(cargar);
           </select>
         </div>
         <div>
-          <label class="tu-label" for="s-nombre">{{
-            $t("sedes.nombre")
-          }}</label>
+          <label class="tu-label" for="s-nombre"
+            >{{ $t("sedes.nombre")
+            }}<span class="tu-obligatorio" aria-hidden="true">*</span></label
+          >
           <input
             id="s-nombre"
             v-model="form.nombre"
             class="tu-input"
             required
+            maxlength="255"
             :placeholder="$t('sedes.nombrePh')"
+            :aria-invalid="errores.nombre ? 'true' : undefined"
+            :aria-describedby="errores.nombre ? 's-nombre-error' : undefined"
           />
+          <span
+            v-if="errores.nombre"
+            id="s-nombre-error"
+            class="tu-error-campo"
+            >{{ errores.nombre }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="s-region">{{
@@ -489,7 +555,15 @@ onMounted(cargar);
             class="tu-input"
             maxlength="255"
             :placeholder="$t('sedes.regionPh')"
+            :aria-invalid="errores.region ? 'true' : undefined"
+            :aria-describedby="errores.region ? 's-region-error' : undefined"
           />
+          <span
+            v-if="errores.region"
+            id="s-region-error"
+            class="tu-error-campo"
+            >{{ errores.region }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="s-zona">{{ $t("sedes.zona") }}</label>
@@ -497,7 +571,17 @@ onMounted(cargar);
             id="s-zona"
             v-model="form.zona_horaria"
             :opciones="zonas"
+            :aria-invalid="errores.zona_horaria ? 'true' : undefined"
+            :aria-describedby="
+              errores.zona_horaria ? 's-zona-error' : undefined
+            "
           />
+          <span
+            v-if="errores.zona_horaria"
+            id="s-zona-error"
+            class="tu-error-campo"
+            >{{ errores.zona_horaria }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="s-iva">{{ $t("sedes.ivaLabel") }}</label>
@@ -507,9 +591,19 @@ onMounted(cargar);
             type="number"
             min="0"
             max="100"
-            step="0.5"
+            step="0.01"
             class="tu-input"
+            :aria-invalid="errores.impuesto_tasa_bps ? 'true' : undefined"
+            :aria-describedby="
+              errores.impuesto_tasa_bps ? 's-iva-error' : undefined
+            "
           />
+          <span
+            v-if="errores.impuesto_tasa_bps"
+            id="s-iva-error"
+            class="tu-error-campo"
+            >{{ errores.impuesto_tasa_bps }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="s-ubicacion">{{
@@ -520,16 +614,23 @@ onMounted(cargar);
             v-model="form.ubicacion"
             class="tu-input"
             :placeholder="$t('operacion.sedes.ubicacionPh')"
+            :aria-invalid="
+              coordenadas === 'invalida' || errores.latitud || errores.longitud
+                ? 'true'
+                : undefined
+            "
           />
           <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("operacion.sedes.ubicacionAyuda") }}
           </p>
-          <p
-            v-if="coordenadas === 'invalida'"
-            class="mt-1 text-xs"
-            style="color: var(--error)"
-          >
+          <p v-if="coordenadas === 'invalida'" class="tu-error-campo">
             {{ $t("operacion.sedes.invalida") }}
+          </p>
+          <p
+            v-else-if="errores.latitud || errores.longitud"
+            class="tu-error-campo"
+          >
+            {{ errores.latitud || errores.longitud }}
           </p>
           <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
             <button
@@ -557,11 +658,7 @@ onMounted(cargar);
                 class="inline align-[-0.15em]"
             /></a>
           </div>
-          <p
-            v-if="errorUbicacion"
-            class="mt-1 text-xs"
-            style="color: var(--error)"
-          >
+          <p v-if="errorUbicacion" class="tu-error-campo">
             {{ errorUbicacion }}
           </p>
         </div>
@@ -611,7 +708,17 @@ onMounted(cargar);
               class="tu-input"
               maxlength="255"
               :placeholder="$t('perfilPublico.sucursal.direccionPh')"
+              :aria-invalid="errores.direccion ? 'true' : undefined"
+              :aria-describedby="
+                errores.direccion ? 's-direccion-error' : undefined
+              "
             />
+            <span
+              v-if="errores.direccion"
+              id="s-direccion-error"
+              class="tu-error-campo"
+              >{{ errores.direccion }}</span
+            >
           </div>
           <div>
             <label class="tu-label" for="s-mapa">{{
@@ -624,12 +731,9 @@ onMounted(cargar);
               inputmode="url"
               maxlength="500"
               placeholder="https://maps.app.goo.gl/…"
+              :aria-invalid="errores.mapa_url ? 'true' : undefined"
             />
-            <p
-              v-if="errores.mapa_url"
-              class="mt-1 text-xs"
-              style="color: var(--error)"
-            >
+            <p v-if="errores.mapa_url" class="tu-error-campo">
               {{ errores.mapa_url }}
             </p>
             <p
@@ -650,6 +754,7 @@ onMounted(cargar);
                 id="s-telefono"
                 v-model="form.telefono"
                 maxlength="24"
+                :aria-invalid="errores.telefono ? 'true' : undefined"
               />
             </div>
             <div>
@@ -660,13 +765,13 @@ onMounted(cargar);
                 id="s-whatsapp"
                 v-model="form.whatsapp"
                 maxlength="24"
+                :aria-invalid="errores.whatsapp ? 'true' : undefined"
               />
             </div>
           </div>
           <p
             v-if="errores.telefono || errores.whatsapp"
-            class="-mt-2 text-xs"
-            style="color: var(--error)"
+            class="tu-error-campo -mt-2"
           >
             {{ errores.telefono || errores.whatsapp }}
           </p>
@@ -690,12 +795,9 @@ onMounted(cargar);
                   v-model="form.redes[r]"
                   class="tu-input"
                   :placeholder="$t(`perfilPublico.redesPh.${r}`)"
+                  :aria-invalid="errores[`redes.${r}`] ? 'true' : undefined"
                 />
-                <span
-                  v-if="errores[`redes.${r}`]"
-                  class="text-xs"
-                  style="color: var(--error)"
-                >
+                <span v-if="errores[`redes.${r}`]" class="tu-error-campo">
                   {{ errores[`redes.${r}`] }}
                 </span>
               </label>
@@ -735,6 +837,7 @@ onMounted(cargar);
                     type="time"
                     class="tu-input w-auto"
                     :aria-label="$t('perfilPublico.sucursal.cierra')"
+                    :aria-invalid="errorDelDia(d) ? 'true' : undefined"
                   />
                   <span
                     v-if="errorDelDia(d)"

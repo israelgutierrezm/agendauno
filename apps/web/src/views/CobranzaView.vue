@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
@@ -20,7 +20,7 @@ import RegistrarPagoOrden, {
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { confirmar } from "@/lib/confirmar";
@@ -236,6 +236,10 @@ const rRevertir = ref(true);
 // Pago en línea cuyo dinero el negocio ya devolvió por fuera (no se pide a la pasarela).
 const rManual = ref(false);
 const rProcesando = ref(false);
+// Lo que no se pudo devolver, dentro del diálogo (no en la página de atrás): el error
+// general arriba y cada error de campo junto a su campo.
+const errorReembolso = ref<string | null>(null);
+const erroresReembolso = ref<Record<string, string>>({});
 const PASARELAS_EN_LINEA = ["stripe", "openpay", "mercadopago"];
 const avisoReembolso = ref<string | null>(null);
 const porConciliar = ref<InstanceType<typeof PorConciliar> | null>(null);
@@ -244,6 +248,7 @@ const porConciliar = ref<InstanceType<typeof PorConciliar> | null>(null);
 function dinero(minor: number, moneda?: string | null): string {
   return dineroDelPais(minor, moneda || sesion.moneda, sesion.pais);
 }
+// En la zona horaria del negocio (ADR 0099), aunque quien mira esté en otra.
 function fechaHora(iso: string | null): string {
   if (iso === null) {
     return "—";
@@ -251,15 +256,25 @@ function fechaHora(iso: string | null): string {
   return new Intl.DateTimeFormat("es-MX", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(iso));
 }
 function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
   }
-  // Fecha-solo (YYYY-MM-DD) en hora local para no restar un día; datetime tal cual.
-  const d = iso.includes("T") ? new Date(iso) : new Date(`${iso}T00:00:00`);
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(d);
+  // Fecha-solo (YYYY-MM-DD) tal cual (en UTC, para no restar un día); un instante,
+  // en la zona del negocio.
+  if (!iso.includes("T")) {
+    return new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "medium",
+      timeZone: "UTC",
+    }).format(new Date(`${iso}T00:00:00Z`));
+  }
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeZone: sesion.zonaHoraria || undefined,
+  }).format(new Date(iso));
 }
 
 /**
@@ -525,15 +540,18 @@ function abrirReembolso(p: Pago): void {
   rMotivo.value = "";
   rRevertir.value = true;
   rManual.value = false;
+  errorReembolso.value = null;
+  erroresReembolso.value = {};
 }
 
 async function reembolsar(): Promise<void> {
   const p = reembolsando.value;
-  if (p === null || rMotivo.value.trim() === "") {
+  if (p === null || rMotivo.value.trim() === "" || rProcesando.value) {
     return;
   }
   rProcesando.value = true;
-  error.value = null;
+  errorReembolso.value = null;
+  erroresReembolso.value = {};
   try {
     const { data } = await api.post<{ data: { estado: string } }>(
       `${base.value}/pagos/${p.id}/reembolsos`,
@@ -555,7 +573,15 @@ async function reembolsar(): Promise<void> {
     reembolsando.value = null;
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    erroresReembolso.value = erroresPorCampo(e);
+    errorReembolso.value =
+      Object.keys(erroresReembolso.value).length > 0
+        ? t("comun.revisaCampos")
+        : mensajeDeError(e);
+    await nextTick();
+    document
+      .querySelector<HTMLElement>('#form-reembolso [aria-invalid="true"]')
+      ?.focus();
   } finally {
     rProcesando.value = false;
   }
@@ -1454,6 +1480,7 @@ watch(vista, cargar, { immediate: true });
     <ModalDialogo
       :abierto="reembolsando !== null"
       :titulo="$t('cobranza.reembolso.titulo')"
+      :ocupado="rProcesando"
       @cerrar="reembolsando = null"
     >
       <template v-if="reembolsando">
@@ -1468,36 +1495,68 @@ watch(vista, cargar, { immediate: true });
             })
           }}
         </p>
+        <AvisoTono
+          v-if="errorReembolso"
+          tono="peligro"
+          class="mt-4"
+          role="alert"
+          data-prueba="error-reembolso"
+        >
+          {{ errorReembolso }}
+        </AvisoTono>
         <form
           id="form-reembolso"
           class="mt-4 grid gap-4 sm:grid-cols-2"
           @submit.prevent="reembolsar"
         >
           <div>
-            <label class="tu-label" for="rm">{{
-              $t("cobranza.reembolso.monto")
-            }}</label>
+            <label class="tu-label" for="rm"
+              >{{ $t("cobranza.reembolso.monto") }}
+              <span class="tu-obligatorio" aria-hidden="true">*</span></label
+            >
             <input
               id="rm"
               v-model="rMonto"
               class="tu-input"
               type="number"
-              min="0"
+              min="0.01"
+              :max="reembolsando.reembolsable_minor / 100"
               step="0.01"
               required
+              :aria-invalid="erroresReembolso.monto_minor ? 'true' : undefined"
+              :aria-describedby="
+                erroresReembolso.monto_minor ? 'rm-error' : undefined
+              "
             />
+            <span
+              v-if="erroresReembolso.monto_minor"
+              id="rm-error"
+              class="tu-error-campo"
+              >{{ erroresReembolso.monto_minor }}</span
+            >
           </div>
           <div>
-            <label class="tu-label" for="rmt">{{
-              $t("cobranza.reembolso.motivo")
-            }}</label>
+            <label class="tu-label" for="rmt"
+              >{{ $t("cobranza.reembolso.motivo") }}
+              <span class="tu-obligatorio" aria-hidden="true">*</span></label
+            >
             <input
               id="rmt"
               v-model="rMotivo"
               class="tu-input"
               required
               :placeholder="$t('cobranza.reembolso.motivoPh')"
+              :aria-invalid="erroresReembolso.motivo ? 'true' : undefined"
+              :aria-describedby="
+                erroresReembolso.motivo ? 'rmt-error' : undefined
+              "
             />
+            <span
+              v-if="erroresReembolso.motivo"
+              id="rmt-error"
+              class="tu-error-campo"
+              >{{ erroresReembolso.motivo }}</span
+            >
           </div>
           <label
             class="flex items-center justify-between gap-3 text-sm sm:col-span-2"
@@ -1532,6 +1591,7 @@ watch(vista, cargar, { immediate: true });
         <button
           type="button"
           class="tu-btn tu-btn-fantasma"
+          :disabled="rProcesando"
           @click="reembolsando = null"
         >
           {{ $t("comun.cancelar") }}
@@ -1540,6 +1600,7 @@ watch(vista, cargar, { immediate: true });
           class="tu-btn tu-btn-primario"
           type="submit"
           form="form-reembolso"
+          data-prueba="confirmar-reembolso"
           :disabled="rProcesando || rMotivo.trim() === ''"
         >
           {{

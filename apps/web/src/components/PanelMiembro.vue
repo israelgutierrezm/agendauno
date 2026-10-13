@@ -232,8 +232,11 @@ const mostrarSaldo = computed(
   () =>
     !sesionStore.esCitas ||
     Boolean(resumen.value?.ilimitado) ||
-    (resumen.value?.saldo_unidades ?? 0) > 0 ||
-    (resumen.value?.saldo_creditos ?? 0) > 0,
+    (resumen.value?.saldo_unidades ?? 0) > 0,
+);
+// El saldo con sus fracciones (1000 unidades = 1 crédito): 1.5 no se lee «1».
+const saldoCreditos = computed(
+  () => (resumen.value?.saldo_unidades ?? 0) / 1000,
 );
 
 // Ámbar para "por vencer"; rojo para el resto de alertas.
@@ -360,8 +363,12 @@ function cancelarVenta(): void {
                 ? $t("recepcion.miembro.ilimitado")
                 : $t(
                     "recepcion.miembro.creditos",
-                    { n: resumen.saldo_creditos },
-                    resumen.saldo_creditos === 1 ? 1 : 2,
+                    {
+                      n: saldoCreditos.toLocaleString("es-MX", {
+                        maximumFractionDigits: 3,
+                      }),
+                    },
+                    saldoCreditos === 1 ? 1 : 2,
                   )
             }}
           </dd>

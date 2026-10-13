@@ -268,4 +268,71 @@ describe("catálogo", () => {
     // Con citas, la duración se pide igual: la cita ocupa la agenda.
     expect(w.find('[id="duracion-o1"]').exists()).toBe(true);
   });
+
+  it("al configurar, el precio se lee como en el país y el error queda en el diálogo", async () => {
+    sesion.pais = "ES";
+    sesion.moneda = "EUR";
+    api.put.mockReset();
+    api.put.mockRejectedValueOnce("No se pudo guardar");
+    const w = await montar([oferta({ precio_clase_minor: 125050 })]);
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    const precio = w.get('[data-prueba="precio-edicion"]');
+    expect((precio.element as HTMLInputElement).value).toBe("1250,50");
+
+    // «12.50» en España no se puede leer sin adivinar: se marca y no se guarda.
+    await precio.setValue("12.50");
+    expect(w.find('[data-prueba="precio-edicion-ilegible"]').exists()).toBe(
+      true,
+    );
+    const guardar = () =>
+      w.findAll("button").find((b) => b.text() === "catalogo.guardar")!;
+    expect(guardar().attributes("disabled")).toBeDefined();
+
+    await precio.setValue("12,50");
+    await guardar().trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/a/ofertas/o1",
+      expect.objectContaining({ precio_clase_minor: 1250 }),
+    );
+    expect(w.get('[data-prueba="error-edicion"]').text()).toBe(
+      "No se pudo guardar",
+    );
+  });
+
+  it("una fila con nombre y sin precio se marca en lugar de perderse al guardar", async () => {
+    api.post.mockReset();
+    api.post.mockResolvedValue({ data: { data: [] } });
+    const w = await montar([oferta({})]);
+    await w.get('[data-prueba="nuevo-servicio"]').trigger("click");
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("otraFila"))!
+      .trigger("click");
+    const filas = w.findAll(
+      '[data-prueba="filas-alta"] .ct-fila:not(.ct-fila-cabeza)',
+    );
+    await filas[0]!.get("input").setValue("Corte");
+    await filas[0]!.get('[data-prueba="precio-alta"]').setValue("250");
+    await filas[1]!.get("input").setValue("Barba");
+
+    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(w.get('[data-prueba="error-alta"]').exists()).toBe(true);
+    expect(w.findAll('[data-prueba="fila-incompleta"]')).toHaveLength(1);
+    expect(
+      w.findAll('[data-prueba="precio-alta"]')[1]!.attributes("aria-invalid"),
+    ).toBe("true");
+
+    await w.findAll('[data-prueba="precio-alta"]')[1]!.setValue("150");
+    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
+      items: [
+        expect.objectContaining({ nombre: "Corte", precio_minor: 25000 }),
+        expect.objectContaining({ nombre: "Barba", precio_minor: 15000 }),
+      ],
+    });
+  });
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\ContextoMovimiento;
 use App\Modules\Tenancy\Application\CreditosTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
@@ -35,6 +36,7 @@ class CreditosTenantController
     public function consumir(Request $request): JsonResponse
     {
         $derecho = DerechoTenant::query()->where('ulid', (string) $request->route('derecho'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirDerecho($request, $derecho);
         $validado = $request->validate([
             'unidades' => ['required', 'integer', 'min:1'],
             'descripcion' => ['nullable', 'string', 'max:255'],
@@ -65,6 +67,7 @@ class CreditosTenantController
     public function movimientos(Request $request): JsonResponse
     {
         $derecho = DerechoTenant::query()->where('ulid', (string) $request->route('derecho'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirDerecho($request, $derecho);
 
         $movimientos = MovimientoCreditoTenant::query()
             ->where('derecho_id', $derecho->getKey())
@@ -82,6 +85,7 @@ class CreditosTenantController
     public function retener(Request $request): JsonResponse
     {
         $derecho = DerechoTenant::query()->where('ulid', (string) $request->route('derecho'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirDerecho($request, $derecho);
         $validado = $request->validate([
             'unidades' => ['required', 'integer', 'min:1'],
             'descripcion' => ['nullable', 'string', 'max:255'],
@@ -101,6 +105,7 @@ class CreditosTenantController
     public function confirmar(Request $request): JsonResponse
     {
         $retencion = RetencionCreditoTenant::query()->where('ulid', (string) $request->route('retencion'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirRetencion($request, $retencion);
         $this->creditos->confirmar($retencion, $this->contextoManual($request));
 
         return response()->json(['data' => $this->presentarRetencion($retencion->refresh())]);
@@ -109,6 +114,7 @@ class CreditosTenantController
     public function liberar(Request $request): JsonResponse
     {
         $retencion = RetencionCreditoTenant::query()->where('ulid', (string) $request->route('retencion'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirRetencion($request, $retencion);
         $this->creditos->liberar($retencion);
 
         return response()->json(['data' => $this->presentarRetencion($retencion->refresh())]);
@@ -117,6 +123,7 @@ class CreditosTenantController
     public function perder(Request $request): JsonResponse
     {
         $retencion = RetencionCreditoTenant::query()->where('ulid', (string) $request->route('retencion'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirRetencion($request, $retencion);
         $this->creditos->perder($retencion, $this->contextoManual($request));
 
         return response()->json(['data' => $this->presentarRetencion($retencion->refresh())]);

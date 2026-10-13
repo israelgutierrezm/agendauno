@@ -27,9 +27,10 @@ class GestionarPromocionesTenant
     }
 
     /**
-     * Aplica un código dentro de la transacción de la orden: bloquea la fila, revalida y
-     * consume un uso. Devuelve la promoción y el descuento (minor). Debe llamarse dentro
-     * de una transacción de la conexión `tenant`.
+     * Aplica un código dentro de la transacción de la orden: bloquea la fila y revalida.
+     * Devuelve la promoción y el descuento (minor). El uso se cuenta al pagarse la orden
+     * ({@see FulfillmentTenant::cumplir()}): una compra que nadie paga no agota el
+     * código. Debe llamarse dentro de una transacción de la conexión `tenant`.
      *
      * @return array{promocion: PromocionTenant, descuento: int}
      */
@@ -42,7 +43,6 @@ class GestionarPromocionesTenant
 
         $promocion = $this->validar($encontrada, $subtotal);
         $descuento = $promocion->descuentoPara($subtotal);
-        $promocion->marcarUso();
 
         return ['promocion' => $promocion, 'descuento' => $descuento];
     }

@@ -65,6 +65,9 @@ describe("dar de baja una membresía", () => {
     );
     expect(w.get('[data-prueba="baja-total"]').text()).toContain("$7,200.00");
 
+    expect(w.get('[data-prueba="confirmar-baja"]').classes()).toEqual(
+      expect.arrayContaining(["tu-btn-solido", "tu-tono-peligro"]),
+    );
     await w.get('[data-prueba="confirmar-baja"]').trigger("click");
     await flushPromises();
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/acuerdos/a1/baja", {

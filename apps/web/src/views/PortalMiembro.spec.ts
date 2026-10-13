@@ -6,7 +6,7 @@ import esMX from "@/i18n/locales/es-MX";
 import { miPerfil } from "@/i18n/locales/equipo.es-MX";
 import { miCuentaExtra, miReprogramar } from "@/i18n/locales/gestion.es-MX";
 import portal from "@/i18n/locales/portal.es-MX";
-import { reiniciarMiCuenta } from "@/lib/miCuenta";
+import { reiniciarMiCuenta, useMiCuenta } from "@/lib/miCuenta";
 import MiCuentaView from "./MiCuentaView.vue";
 import MisReservasView from "./MisReservasView.vue";
 import MisPagosView from "./MisPagosView.vue";
@@ -650,6 +650,22 @@ describe("portal del alumno", () => {
     );
   });
 
+  it("reservas: el error de una acción no se arrastra a la siguiente clase que abre", async () => {
+    const w = montar(MisReservasView);
+    await flushPromises();
+    // Quedó el error de algo que falló en otra clase.
+    useMiCuenta().error.value = "No quedan lugares.";
+    await flushPromises();
+
+    const flexi = w
+      .findAll('[data-prueba="clase-disponible"]')
+      .find((f) => f.text().includes("Flexibilidad"))!;
+    await flexi.get('[data-prueba="reservar-clase"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-prueba="error-panel"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("No quedan lugares.");
+  });
+
   it("reservas: en el calendario, la que está en espera no parece confirmada", async () => {
     api.get.mockImplementation((url: string) => {
       const ruta = url.replace("/api/v1/app/demo", "");
@@ -907,6 +923,41 @@ describe("portal del alumno", () => {
     w.unmount();
   });
 
+  it("si la compra falla, el porqué va en la tarjeta del plan y no ofrece «Reintentar»", async () => {
+    api.post.mockRejectedValue("Este plan ya no está a la venta.");
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/mi/productos")
+            ? [
+                {
+                  id: "p9",
+                  nombre: "Mensualidad",
+                  tipo: "membresia",
+                  precio_minor: 120000,
+                  moneda: "MXN",
+                  ilimitado: true,
+                  creditos_incluidos: null,
+                  disponible: true,
+                },
+              ]
+            : (datos[url.replace("/api/v1/app/demo", "")] ?? []),
+        },
+      }),
+    );
+    const w = montar(MisPagosView);
+    await flushPromises();
+    const tarjeta = w.get('[data-prueba="comprable"]');
+    await tarjeta.findAll("button").at(-1)!.trigger("click");
+    await flushPromises();
+
+    expect(
+      w.get('[data-prueba="comprable"] [data-prueba="error-compra"]').text(),
+    ).toBe("Este plan ya no está a la venta.");
+    expect(w.text()).not.toContain("Reintentar");
+    w.unmount();
+  });
+
   it("al volver de pagar, el siguiente paso es reservar con su plan", async () => {
     retorno.valor = "exito";
     const w = montar(MisPagosView);
@@ -942,6 +993,19 @@ describe("portal del alumno", () => {
     expect(w.get("#me-firmar").text()).toContain("…");
     expect(w.find('a[href="#me-documentos"]').exists()).toBe(true);
     expect(api.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("si aceptar un documento falla, el porqué va junto a ese documento", async () => {
+    api.post.mockRejectedValue("La versión del documento cambió.");
+    const w = montar(MiExpedienteView);
+    await flushPromises();
+    await w.get("#me-firmar button").trigger("click");
+    await flushPromises();
+    expect(w.get('#me-firmar [data-prueba="error-waiver"]').text()).toBe(
+      "La versión del documento cambió.",
+    );
+    expect(w.text()).not.toContain("Reintentar");
     w.unmount();
   });
 

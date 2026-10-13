@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
@@ -83,7 +83,7 @@ class WaiversTenantController
     {
         $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
         $actor = $request->attributes->get('usuario_tenant');
-        abort_unless(app(AlcanceClientesTenant::class)->puedeVer($persona, $actor instanceof Usuario ? $actor : null), 403);
+        abort_unless(app(AlcancePersonaTenant::class)->puedeVer($actor instanceof Usuario ? $actor : null, $persona), 403);
 
         return response()->json([
             'data' => $this->waivers->pendientesDe($persona)->map(fn (WaiverTenant $w): array => $this->presentar($w))->all(),

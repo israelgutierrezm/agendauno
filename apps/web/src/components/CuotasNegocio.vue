@@ -4,7 +4,12 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { aMinor, ejemploPrecio, simboloMoneda } from "@/lib/formato";
+import {
+  aMinor,
+  aTexto as textoDelPais,
+  ejemploPrecio,
+  simboloMoneda,
+} from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -39,8 +44,9 @@ const form = ref({
   dia: "1",
 });
 
+// Como se escribe en el país del negocio («12,50» en España), para que `aMinor` lo lea.
 function aTexto(minor: number): string {
-  return minor > 0 ? String(minor / 100) : "";
+  return minor > 0 ? textoDelPais(minor, sesion.pais) : "";
 }
 // Vacío = 0; lo que no se puede leer sin adivinar se marca y no se guarda.
 function monto(texto: string): number | null {

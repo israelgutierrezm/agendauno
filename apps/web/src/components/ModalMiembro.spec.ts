@@ -304,6 +304,36 @@ describe("detalle de un cliente en un modal", () => {
     ).not.toContain("Planes y créditos");
   });
 
+  it("en citas, con medio crédito y sin plan, muestra el saldo exacto y la pestaña de planes", async () => {
+    permisos.esCitas = true;
+    datosResumen = resumen({
+      saldo_creditos: 0,
+      saldo_unidades: 500,
+      membresia: {
+        estado: "sin_membresia",
+        valido_hasta: null,
+        pausada_hasta: null,
+        plan: null,
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="saldo"]').text()).toContain("0.5 disponibles");
+    expect(
+      w
+        .get('[data-prueba="pestanas-miembro"]')
+        .findAll("button")
+        .map((b) => b.text()),
+    ).toContain("Planes y créditos");
+  });
+
+  it("un saldo con fracción no se trunca (1.5, no 1)", async () => {
+    datosResumen = resumen({ saldo_creditos: 1, saldo_unidades: 1500 });
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="saldo"]').text()).toContain("1.5 disponibles");
+  });
+
   it("«Registrar entrada» solo en negocios que controlan la entrada (acceso libre)", async () => {
     permisos.lista.push("checkins.registrar");
     const estudio = montar();

@@ -440,8 +440,11 @@ async function copiarMensaje(tarea: Tarea): Promise<void> {
     toast.error(t("operacion.seguimiento.noSeCopio"));
   }
 }
+// Lo que no se pudo guardar se ve en su panel (no en la página de atrás).
+const errorResultado = ref<string | null>(null);
 function abrirResultado(tarea: Tarea): void {
   resultado.value = { valor: "contactado", nota: "" };
+  errorResultado.value = null;
   conResultado.value = tarea;
 }
 async function guardarResultado(): Promise<void> {
@@ -450,7 +453,7 @@ async function guardarResultado(): Promise<void> {
     return;
   }
   accionando.value = true;
-  error.value = null;
+  errorResultado.value = null;
   try {
     await api.post(`${base.value}/tareas/${tarea.id}/resultado`, {
       resultado: resultado.value.valor,
@@ -461,7 +464,7 @@ async function guardarResultado(): Promise<void> {
     toast.exito(t("operacion.seguimiento.registrado"));
     await cargarTareas();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorResultado.value = mensajeDeError(e);
   } finally {
     accionando.value = false;
   }
@@ -473,6 +476,7 @@ const eventos = ref<string[]>([]);
 const cargandoReglas = ref(false);
 const mostrarRegla = ref(false);
 const editandoId = ref<string | null>(null);
+const errorRegla = ref<string | null>(null);
 const regla = ref({
   nombre: "",
   evento: "reserva.creada",
@@ -541,10 +545,13 @@ async function cargarTareas(): Promise<void> {
   }
 }
 
+// El error al guardar la tarea, dentro de su panel.
+const errorTarea = ref<string | null>(null);
 function abrirNueva(): void {
   editando.value = null;
   nueva.value = { ...FORMULARIO_VACIO };
   personaElegida.value = null;
+  errorTarea.value = null;
   mostrarNueva.value = true;
   void cargarResponsables();
 }
@@ -562,6 +569,7 @@ function abrirEdicion(tarea: Tarea): void {
     tarea.persona_id && tarea.persona
       ? { id: tarea.persona_id, nombre: tarea.persona }
       : null;
+  errorTarea.value = null;
   mostrarNueva.value = true;
   void cargarResponsables();
 }
@@ -575,7 +583,7 @@ async function crearTarea(): Promise<void> {
     return;
   }
   accionando.value = true;
-  error.value = null;
+  errorTarea.value = null;
   const f = nueva.value;
   const datos: Record<string, string | null> = {
     titulo: f.titulo,
@@ -600,7 +608,7 @@ async function crearTarea(): Promise<void> {
     mostrarNueva.value = false;
     await cargarTareas();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorTarea.value = mensajeDeError(e);
   } finally {
     accionando.value = false;
   }
@@ -663,6 +671,7 @@ function nuevaRegla(): void {
     delay_minutos: 0,
     activa: true,
   };
+  errorRegla.value = null;
   mostrarRegla.value = true;
 }
 
@@ -679,6 +688,7 @@ function editarRegla(r: Regla): void {
     delay_minutos: r.delay_minutos,
     activa: r.activa,
   };
+  errorRegla.value = null;
   mostrarRegla.value = true;
 }
 
@@ -690,7 +700,7 @@ async function guardarRegla(): Promise<void> {
     return;
   }
   accionando.value = true;
-  error.value = null;
+  errorRegla.value = null;
   const condiciones: Record<string, string> = {};
   if (
     regla.value.condicionCampo.trim() !== "" &&
@@ -723,7 +733,7 @@ async function guardarRegla(): Promise<void> {
     mostrarRegla.value = false;
     await cargarReglas();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorRegla.value = mensajeDeError(e);
   } finally {
     accionando.value = false;
   }
@@ -922,25 +932,41 @@ onMounted(() => {
         :titulo="
           editando ? $t('operacion.bandeja.editarTarea') : $t('tareas.nueva')
         "
+        :ocupado="accionando"
         @cerrar="mostrarNueva = false"
       >
         <form class="grid gap-4" @submit.prevent="crearTarea">
+          <AvisoTono
+            v-if="errorTarea"
+            tono="peligro"
+            role="alert"
+            data-prueba="error-tarea"
+          >
+            {{ errorTarea }}
+          </AvisoTono>
           <div>
-            <label class="tu-label" for="t-titulo">{{
-              $t("tareas.campos.titulo")
-            }}</label>
+            <label class="tu-label" for="t-titulo"
+              >{{ $t("tareas.campos.titulo")
+              }}<span class="tu-obligatorio" aria-hidden="true">*</span></label
+            >
             <input
               id="t-titulo"
               v-model="nueva.titulo"
               class="tu-input"
               required
+              maxlength="255"
             />
           </div>
           <div>
             <label class="tu-label" for="t-detalle">{{
               $t("tareas.campos.detalle")
             }}</label>
-            <input id="t-detalle" v-model="nueva.detalle" class="tu-input" />
+            <input
+              id="t-detalle"
+              v-model="nueva.detalle"
+              class="tu-input"
+              maxlength="2000"
+            />
           </div>
           <div>
             <label class="tu-label" for="t-vence">{{
@@ -1007,6 +1033,7 @@ onMounted(() => {
             <button
               class="tu-btn tu-btn-fantasma"
               type="button"
+              :disabled="accionando"
               @click="mostrarNueva = false"
             >
               {{ $t("tareas.cancelar") }}
@@ -1270,6 +1297,7 @@ onMounted(() => {
       <PanelLateral
         :abierto="conResultado !== null"
         :titulo="$t('operacion.seguimiento.panelTitulo')"
+        :ocupado="accionando"
         @cerrar="conResultado = null"
       >
         <form
@@ -1277,6 +1305,14 @@ onMounted(() => {
           class="grid gap-4"
           @submit.prevent="guardarResultado"
         >
+          <AvisoTono
+            v-if="errorResultado"
+            tono="peligro"
+            role="alert"
+            data-prueba="error-resultado"
+          >
+            {{ errorResultado }}
+          </AvisoTono>
           <p class="text-sm font-medium">{{ conResultado.titulo }}</p>
           <fieldset class="grid gap-2">
             <legend class="tu-label">
@@ -1322,6 +1358,7 @@ onMounted(() => {
             <button
               class="tu-btn tu-btn-fantasma"
               type="button"
+              :disabled="accionando"
               @click="conResultado = null"
             >
               {{ $t("tareas.cancelar") }}
@@ -1362,18 +1399,29 @@ onMounted(() => {
             ? $t('tareas.reglas.editar')
             : $t('tareas.reglas.nueva')
         "
+        :ocupado="accionando"
         @cerrar="mostrarRegla = false"
       >
         <form class="grid gap-4" @submit.prevent="guardarRegla">
+          <AvisoTono
+            v-if="errorRegla"
+            tono="peligro"
+            role="alert"
+            data-prueba="error-regla"
+          >
+            {{ errorRegla }}
+          </AvisoTono>
           <div>
-            <label class="tu-label" for="r-nombre">{{
-              $t("tareas.reglas.nombre")
-            }}</label>
+            <label class="tu-label" for="r-nombre"
+              >{{ $t("tareas.reglas.nombre")
+              }}<span class="tu-obligatorio" aria-hidden="true">*</span></label
+            >
             <input
               id="r-nombre"
               v-model="regla.nombre"
               class="tu-input"
               required
+              maxlength="255"
             />
           </div>
           <div>
@@ -1411,14 +1459,16 @@ onMounted(() => {
             </div>
           </div>
           <div>
-            <label class="tu-label" for="r-titulo">{{
-              $t("tareas.reglas.tituloTarea")
-            }}</label>
+            <label class="tu-label" for="r-titulo"
+              >{{ $t("tareas.reglas.tituloTarea")
+              }}<span class="tu-obligatorio" aria-hidden="true">*</span></label
+            >
             <input
               id="r-titulo"
               v-model="regla.titulo_plantilla"
               class="tu-input"
               required
+              maxlength="255"
             />
             <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
               {{ ayudaPlantilla }}
@@ -1432,6 +1482,7 @@ onMounted(() => {
               id="r-detalle"
               v-model="regla.detalle_plantilla"
               class="tu-input"
+              maxlength="2000"
             />
           </div>
           <div>
@@ -1443,6 +1494,7 @@ onMounted(() => {
               v-model.number="regla.delay_minutos"
               type="number"
               min="0"
+              max="525600"
               class="tu-input"
             />
           </div>
@@ -1457,6 +1509,7 @@ onMounted(() => {
             <button
               class="tu-btn tu-btn-fantasma"
               type="button"
+              :disabled="accionando"
               @click="mostrarRegla = false"
             >
               {{ $t("tareas.cancelar") }}

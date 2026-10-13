@@ -268,6 +268,24 @@ describe("inventario", () => {
     );
   });
 
+  it("un nombre de categoría repetido se avisa dentro del diálogo", async () => {
+    mocks.post.mockRejectedValueOnce(new Error("422"));
+    const w = mount(InventarioView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    await w.get('[data-prueba="categorias"]').trigger("click");
+    await w.get('[data-prueba="nueva-categoria"] input').setValue("Cuidado");
+    await w.get('[data-prueba="nueva-categoria"]').trigger("submit");
+    await flushPromises();
+
+    const dialogo = w.get('[role="dialog"]');
+    expect(dialogo.get('[data-prueba="error-categorias"]').text()).toBe(
+      "Error",
+    );
+  });
+
   it("un ajuste pide el motivo y lo manda con su detalle", async () => {
     const w = mount(InventarioView, {
       global: { plugins: [i18n], stubs: { teleport: true } },

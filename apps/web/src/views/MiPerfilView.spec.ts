@@ -5,7 +5,7 @@ import { reactive } from "vue";
 
 import esMX from "@/i18n/locales/es-MX";
 import { miPerfil } from "@/i18n/locales/equipo.es-MX";
-import { miPrivacidad } from "@/i18n/locales/gestion.es-MX";
+import { miPrivacidad, validacion } from "@/i18n/locales/gestion.es-MX";
 import datosPersonales from "@/i18n/locales/datosPersonales.es-MX";
 import zonaArchivo from "@/i18n/locales/zonaArchivo.es-MX";
 import MiPerfilView from "./MiPerfilView.vue";
@@ -38,6 +38,8 @@ const api = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
+  erroresPorCampo: (e: unknown) =>
+    (e as { campos?: Record<string, string> })?.campos ?? {},
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
@@ -68,6 +70,7 @@ function montar() {
               miPrivacidad,
               zonaArchivo,
               datosPersonales,
+              validacion,
             },
           },
           missingWarn: false,
@@ -203,6 +206,31 @@ describe("perfil unificado", () => {
     await cancelar.trigger("click");
     expect(w.find("#mp-correo").exists()).toBe(false);
     expect(api.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("la contraseña: dice si no coinciden y el rechazo va junto a su campo", async () => {
+    api.put.mockRejectedValueOnce({
+      campos: { actual: "La contraseña actual no es correcta." },
+    });
+    const w = montar();
+    await w.get("#mp-actual").setValue("mala");
+    await w.get("#mp-nueva").setValue("nueva-segura");
+    await w.get("#mp-conf").setValue("otra-cosa");
+    expect(w.get('[data-prueba="no-coinciden"]').text()).toBe(
+      "Las contraseñas no coinciden.",
+    );
+
+    await w.get("#mp-conf").setValue("nueva-segura");
+    expect(w.find('[data-prueba="no-coinciden"]').exists()).toBe(false);
+    await w
+      .get("#mp-conf")
+      .element.closest("form")!
+      .dispatchEvent(new Event("submit"));
+    await flushPromises();
+    expect(w.get('[data-prueba="error-clave-actual"]').text()).toBe(
+      "La contraseña actual no es correcta.",
+    );
     w.unmount();
   });
 

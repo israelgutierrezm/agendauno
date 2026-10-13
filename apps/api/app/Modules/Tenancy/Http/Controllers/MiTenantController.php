@@ -43,6 +43,7 @@ use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\ConfiguracionCuotasTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\Formulario;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -106,7 +107,7 @@ class MiTenantController
 
     /**
      * Los formularios que le tocan al alumno, con lo que ya respondió. Los responde
-     * él mismo (POST /formularios/{formulario}/respuestas con su persona_id).
+     * él mismo (POST /mi/formularios/{formulario}/respuestas).
      */
     public function formularios(Request $request): JsonResponse
     {
@@ -117,6 +118,26 @@ class MiTenantController
             'persona_id' => $persona->ulid,
             'formularios' => $this->formularios->de($persona),
         ]]);
+    }
+
+    /**
+     * Llena una ficha desde su cuenta: la suya o, con `X-Participante`, la de una persona
+     * a su cargo (B05). La persona sale de la cuenta en uso, nunca del cuerpo.
+     */
+    public function responderFormulario(Request $request, RespuestasFormularioController $respuestas): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
+        $formulario = Formulario::query()
+            ->where('ulid', (string) $request->route('formulario'))
+            ->where('activo', true)
+            ->firstOrFail();
+
+        /** @var array<string, mixed> $entrada */
+        $entrada = is_array($request->input('valores')) ? $request->input('valores') : [];
+        $respuesta = $respuestas->responder($formulario, $persona, $entrada);
+
+        return response()->json(['data' => ['id' => $respuesta->ulid, 'valores' => $respuesta->valores]], 201);
     }
 
     /**
@@ -553,7 +574,9 @@ class MiTenantController
         $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
-        [$duracion, $margenes] = $disponibilidad->duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
+        // Quien agenda por su cuenta no decide cuánto dura: la del servicio o, sin ella, la
+        // del negocio (`citas.duracion_defecto`); no la que mande la pantalla.
+        [$duracion, $margenes] = $disponibilidad->duracionYMargenes($oferta, null);
 
         return response()->json(['data' => [
             'fecha' => $validado['fecha'],
@@ -595,8 +618,8 @@ class MiTenantController
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
         $reserva = $instructor instanceof Usuario
-            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
-            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
+            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0)
+            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0);
         $cambios = array_filter([
             'nota_cliente' => trim((string) ($validado['nota'] ?? '')),
             'asiste' => trim((string) ($validado['asiste'] ?? '')),

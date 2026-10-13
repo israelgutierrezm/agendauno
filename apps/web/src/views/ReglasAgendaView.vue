@@ -269,12 +269,26 @@ async function agregarDia(): Promise<void> {
   }
 }
 
+// Quitar un cierre vuelve a abrir ese día: se confirma, y no se manda dos veces.
+const quitandoDiaId = ref<string | null>(null);
 async function quitarDia(d: DiaCerrado): Promise<void> {
+  if (
+    quitandoDiaId.value !== null ||
+    !(await confirmar(
+      t("reglasAgenda.confirmarQuitarDia", { fecha: fecha(d.fecha) }),
+      { peligro: true, aceptar: t("reglasAgenda.quitar") },
+    ))
+  ) {
+    return;
+  }
+  quitandoDiaId.value = d.id;
   try {
     await api.delete(`${base.value}/excepciones-horario/${d.id}`);
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e));
+  } finally {
+    quitandoDiaId.value = null;
   }
 }
 
@@ -612,6 +626,8 @@ onMounted(cargar);
               type="button"
               class="tu-enlace shrink-0"
               style="color: var(--error)"
+              data-prueba="quitar-dia"
+              :disabled="quitandoDiaId !== null"
               @click="quitarDia(d)"
             >
               {{ $t("reglasAgenda.quitar") }}

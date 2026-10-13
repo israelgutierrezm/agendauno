@@ -16,6 +16,12 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/lib/retornoPago", () => ({ useRetornoPago: () => ref(null) }));
+vi.mock("@/lib/openpay", () => ({
+  tokenizarTarjeta: vi.fn(async () => ({
+    token_id: "tok_1",
+    device_session_id: "dev_1",
+  })),
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "estudio-a" }),
 }));
@@ -160,5 +166,52 @@ describe("pago automático del alumno", () => {
     const precio = w.get('[data-prueba="precio-nuevo"]');
     expect(precio.text()).toContain("$1,499.00");
     expect(precio.text()).toContain("$1,299.00");
+  });
+
+  it("autorizar con la tarjeta capturada espera al servidor y su rechazo queda en la tarjeta", async () => {
+    api.get.mockResolvedValue(respuesta(false));
+    let rechazar: (e: unknown) => void = () => undefined;
+    api.post
+      .mockResolvedValueOnce({
+        data: {
+          data: {
+            estado: "formulario",
+            formulario: {
+              proveedor: "openpay",
+              merchant_id: "m",
+              public_key: "k",
+              sandbox: true,
+            },
+          },
+        },
+      })
+      .mockReturnValueOnce(
+        new Promise((_, r) => {
+          rechazar = r;
+        }),
+      );
+    const vista = montar();
+    await flushPromises();
+    await vista.get("button.tu-btn-primario").trigger("click");
+    await flushPromises();
+
+    const autorizar = () =>
+      vista.findAll("button").find((b) => b.text() === "Autorizar tarjeta")!;
+    await vista.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/estudio-a/mi/pago-automatico/a1",
+      { token_id: "tok_1", device_session_id: "dev_1" },
+    );
+    // Mientras el servidor responde, no se puede volver a autorizar.
+    expect(autorizar().attributes("disabled")).toBeDefined();
+
+    rechazar("Tarjeta rechazada por el banco.");
+    await flushPromises();
+    expect(vista.get('[data-prueba="error-tarjeta"]').text()).toBe(
+      "Tarjeta rechazada por el banco.",
+    );
+    expect(autorizar().attributes("disabled")).toBeUndefined();
+    expect(vista.findAll('[role="alert"]')).toHaveLength(1);
   });
 });

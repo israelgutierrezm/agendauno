@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,7 @@ class ReprogramarTenantController
     public function reserva(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->with('sesion')->firstOrFail();
+        $this->exigirSesion($request, $reserva->sesion);
         $sesion = $reserva->sesion;
         abort_unless($sesion instanceof SesionTenant, 404);
         $actor = $this->actor($request);
@@ -58,6 +60,7 @@ class ReprogramarTenantController
                 'instructor_id.prohibited' => 'En una clase se elige otra fecha de la clase.',
             ]);
             $destino = SesionTenant::query()->where('ulid', (string) $validado['sesion_id'])->firstOrFail();
+            $this->exigirSesion($request, $destino);
             $movida = $this->reprogramar->moverAClase($reserva, $destino, $actor);
         }
 
@@ -81,6 +84,7 @@ class ReprogramarTenantController
     public function sesion(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesion($request, $sesion);
         $validado = $request->validate([
             'inicia_en_local' => ['required', 'date'],
             'instructor_id' => ['nullable', 'string'],
@@ -105,6 +109,12 @@ class ReprogramarTenantController
         }
 
         return (int) Usuario::query()->where('ulid', $ulid)->firstOrFail()->getKey();
+    }
+
+    /** Solo sesiones de sus sedes (R19) y, si imparte, las suyas. */
+    private function exigirSesion(Request $request, ?SesionTenant $sesion): void
+    {
+        abort_unless($sesion !== null && app(AccesoSesionTenant::class)->puedeOperar($sesion, $this->actor($request)), 403);
     }
 
     private function actor(Request $request): ?Usuario

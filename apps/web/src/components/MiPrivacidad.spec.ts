@@ -98,4 +98,18 @@ describe("avisos por WhatsApp en Mi privacidad", () => {
         .checked,
     ).toBe(true);
   });
+
+  it("si no se guarda, la casilla vuelve a como estaba", async () => {
+    api.get.mockResolvedValue(privacidad({ whatsapp_disponible: true }));
+    api.put.mockRejectedValue(new Error("red"));
+    const w = montar();
+    await flushPromises();
+
+    const casilla = w.get('[data-prueba="acepta-whatsapp"]');
+    await casilla.setValue(true);
+    await flushPromises();
+
+    expect(api.put).toHaveBeenCalled();
+    expect((casilla.element as HTMLInputElement).checked).toBe(false);
+  });
 });

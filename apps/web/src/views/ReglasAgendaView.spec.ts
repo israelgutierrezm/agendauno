@@ -19,6 +19,7 @@ const mocks = await vi.hoisted(async () => {
     delete: vi.fn(),
     ruta: reactive({ hash: "", query: {} as Record<string, string> }),
     sesion: { esCitas: false },
+    confirmar: vi.fn(async () => true),
   };
 });
 vi.mock("@/lib/api", () => ({
@@ -40,7 +41,7 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
-vi.mock("@/lib/confirmar", () => ({ confirmar: () => Promise.resolve(true) }));
+vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.ruta,
   onBeforeRouteLeave: vi.fn(),
@@ -132,6 +133,37 @@ describe("reglas de la agenda", () => {
     await nextTick();
     expect(activa(w)).toBe("Programación recurrente");
     expect(w.text()).not.toContain("Agregar día");
+  });
+
+  it("quitar un día de cierre se confirma antes de abrirlo de nuevo", async () => {
+    mocks.ruta.hash = "#cierres";
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/excepciones-horario")
+            ? [{ id: "d1", fecha: "2099-12-25", motivo: "Navidad" }]
+            : [],
+        },
+      }),
+    );
+    mocks.delete.mockResolvedValue({});
+    mocks.confirmar.mockResolvedValueOnce(false);
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="quitar-dia"]').trigger("click");
+    await flushPromises();
+    expect(mocks.confirmar).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ peligro: true }),
+    );
+    expect(mocks.delete).not.toHaveBeenCalled();
+
+    await w.get('[data-prueba="quitar-dia"]').trigger("click");
+    await flushPromises();
+    expect(mocks.delete).toHaveBeenCalledWith(
+      "/api/v1/app/demo/excepciones-horario/d1",
+    );
   });
 
   it("en citas no ofrece la programación recurrente ni la pide (ADR 0104)", async () => {

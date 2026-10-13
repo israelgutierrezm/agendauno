@@ -77,6 +77,55 @@ function montar() {
 beforeEach(() => vi.clearAllMocks());
 
 describe("la familia en la ficha", () => {
+  it("si no se puede vincular, el error se ve en el panel y no en la ficha", async () => {
+    api.get.mockResolvedValue({ data: { data: familia } });
+    api.post.mockRejectedValueOnce("Ya está a cargo de alguien más.");
+    const w = mount(FamiliaMiembro, {
+      props: { personaId: "p-mama", nombre: "Mamá" },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { ...esMX, familias } },
+          }),
+        ],
+        stubs: {
+          RouterLink: { props: ["to"], template: "<a><slot /></a>" },
+          BuscarPersona: {
+            props: ["modelValue"],
+            emits: ["update:modelValue"],
+            template:
+              '<button type="button" data-prueba="elegir" @click="$emit(\'update:modelValue\', \'p-ana\')" />',
+          },
+          PanelLateral: {
+            props: ["abierto", "titulo", "ocupado"],
+            template:
+              '<div v-if="abierto" data-prueba="panel" :data-ocupado="ocupado"><slot /><slot name="pie" /></div>',
+          },
+          ModalDialogo: true,
+        },
+      },
+    });
+    await flushPromises();
+    await w.get('[data-prueba="agregar-familiar"]').trigger("click");
+    const panel = w.get('[data-prueba="panel"]');
+    await panel.get('[data-prueba="elegir"]').trigger("click");
+    await panel
+      .findAll("button")
+      .find((b) => b.text() === "Poner a su cargo")!
+      .trigger("click");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-vincular"]').text()).toContain(
+      "Ya está a cargo de alguien más.",
+    );
+    expect(w.text().split("Ya está a cargo de alguien más.")).toHaveLength(2);
+    expect(w.find('[data-prueba="panel"]').exists()).toBe(true);
+  });
+
   it("dice a quién tiene a su cargo, su parentesco y el estado de la autorización", async () => {
     const w = montar();
     await flushPromises();

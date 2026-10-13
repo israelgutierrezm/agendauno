@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\FulfillmentTenant;
 use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
@@ -18,6 +19,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -56,6 +58,11 @@ class IncidenciasCobroTenantController
     public function resolver(Request $request, ReembolsarPagoTenant $reembolsos, IncidenciasCobroTenant $incidencias, RegistrarAuditoria $auditoria, FulfillmentTenant $fulfillment): JsonResponse
     {
         $incidencia = IncidenciaCobroTenant::query()->where('ulid', (string) $request->route('incidencia'))->firstOrFail();
+        // Un cobro de otra sede no se resuelve (ni se devuelve) desde aquí (R19).
+        $ordenIncidencia = $incidencia->orden_id !== null ? OrdenTenant::query()->find($incidencia->orden_id) : null;
+        if ($ordenIncidencia instanceof OrdenTenant) {
+            app(AlcancePersonaTenant::class)->exigirOrden($request, $ordenIncidencia);
+        }
         $validado = $request->validate([
             'resolucion' => ['required', 'string', 'max:500'],
             // En una devolución incierta: si la pasarela la hizo o no.
@@ -91,10 +98,20 @@ class IncidenciasCobroTenantController
             $reembolsos->ejecutar($pago, is_int($excedente) ? $excedente : null, 'Devolución: '.$validado['resolucion'], $actor, false, false, 'incidencia_'.$incidencia->ulid);
         }
         if (($validado['accion'] ?? null) === 'aplicar') {
-            $orden = self::aplicable($incidencia)
-                ?? throw ValidationException::withMessages(['accion' => ['Este cobro ya no tiene una renovación por pagar a la cual aplicarse.']]);
-            // «Dar por pagada»: el cobro paga la renovación aunque el importe sea otro.
-            $fulfillment->cumplir($orden);
+            // «Dar por pagada»: el cobro paga la renovación aunque el importe sea otro. Bajo
+            // bloqueo de la incidencia y de la orden: un doble clic (o un pago en el portal
+            // al mismo tiempo) no la cumple dos veces (dos periodos por uno).
+            DB::connection('tenant')->transaction(function () use ($incidencia, $fulfillment): void {
+                $bloqueada = IncidenciaCobroTenant::query()->whereKey($incidencia->getKey())->lockForUpdate()->firstOrFail();
+                $aplicable = self::aplicable($bloqueada);
+                $orden = $aplicable instanceof OrdenTenant
+                    ? OrdenTenant::query()->whereKey($aplicable->getKey())->lockForUpdate()->first()
+                    : null;
+                if (! $orden instanceof OrdenTenant || $orden->estado !== EstadoOrden::Pendiente) {
+                    throw ValidationException::withMessages(['accion' => ['Este cobro ya no tiene una renovación por pagar a la cual aplicarse.']]);
+                }
+                $fulfillment->cumplir($orden);
+            });
         }
 
         $incidencias->cerrar($incidencia->refresh(), (string) $validado['resolucion'], $actor);

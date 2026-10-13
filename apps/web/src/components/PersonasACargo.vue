@@ -54,8 +54,11 @@ async function autorizar(): Promise<void> {
   }
 }
 
+// A quién se le está retirando la autorización (no se pide dos veces).
+const retirando = ref<string | null>(null);
 async function retirar(p: Participante): Promise<void> {
   if (
+    retirando.value !== null ||
     !(await confirmar(
       t("familias.confirmarRetiro", { nombre: p.persona.nombre }),
       { peligro: true },
@@ -63,11 +66,14 @@ async function retirar(p: Participante): Promise<void> {
   ) {
     return;
   }
+  retirando.value = p.id;
   try {
     await participantes.retirar(p.id);
     toast.exito(t("familias.retirada", { nombre: p.persona.nombre }));
   } catch (e) {
     toast.error(mensajeDeError(e));
+  } finally {
+    retirando.value = null;
   }
 }
 </script>
@@ -122,8 +128,9 @@ async function retirar(p: Participante): Promise<void> {
             </button>
             <button
               type="button"
-              class="tu-enlace"
-              :style="{ color: 'var(--error)' }"
+              class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+              :disabled="retirando !== null"
+              data-prueba="retirar"
               @click="retirar(p)"
             >
               {{ $t("familias.retirar") }}
@@ -137,6 +144,7 @@ async function retirar(p: Participante): Promise<void> {
       :abierto="leyendo !== null"
       :titulo="$t('familias.tituloAutorizacion')"
       tam="md"
+      :ocupado="guardando"
       @cerrar="leyendo = null"
     >
       <div v-if="leyendo" class="grid gap-3 text-sm">
@@ -168,6 +176,7 @@ async function retirar(p: Participante): Promise<void> {
           <button
             type="button"
             class="tu-btn tu-btn-fantasma"
+            :disabled="guardando"
             @click="leyendo = null"
           >
             {{ $t("comun.cancelar") }}

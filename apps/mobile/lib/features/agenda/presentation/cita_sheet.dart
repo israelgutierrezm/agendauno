@@ -360,7 +360,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                           child: Text('Transferencia'),
                         ),
                         DropdownMenuItem(
-                          value: 'manual',
+                          value: 'tarjeta',
                           child: Text('Tarjeta (terminal)'),
                         ),
                       ],

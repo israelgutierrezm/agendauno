@@ -116,6 +116,8 @@ const difusiones = ref<Difusion[]>([]);
 const cargando = ref(true);
 const enviando = ref(false);
 const error = ref<string | null>(null);
+// Lo que impidió enviar (p. ej. una difusión repetida), dentro de la revisión.
+const errorEnvio = ref<string | null>(null);
 const exito = ref<number | null>(null);
 
 const form = ref({
@@ -132,6 +134,10 @@ const destinatarios = computed(() => segmentoSel.value?.total ?? 0);
 
 // Antes de un envío masivo: a cuántos, por qué canal y cómo se verá (revisión).
 const revisando = ref(false);
+function abrirRevision(): void {
+  errorEnvio.value = null;
+  revisando.value = true;
+}
 const EJEMPLO: Record<string, string> = {
   persona_nombre: "Ana López",
   persona_email: "ana@correo.mx",
@@ -190,11 +196,13 @@ function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
   }
+  // En la zona horaria del negocio (ADR 0099), aunque quien mira esté en otra.
   return new Intl.DateTimeFormat("es-MX", {
     day: "numeric",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(iso));
 }
 
@@ -223,7 +231,7 @@ async function enviar(): Promise<void> {
     return;
   }
   enviando.value = true;
-  error.value = null;
+  errorEnvio.value = null;
   exito.value = null;
   try {
     const { data } = await api.post<{ data: Difusion }>(
@@ -236,7 +244,7 @@ async function enviar(): Promise<void> {
     form.value.cuerpo = "";
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorEnvio.value = mensajeDeError(e);
   } finally {
     enviando.value = false;
   }
@@ -714,10 +722,11 @@ onMounted(cargar);
           </div>
         </div>
 
-        <label class="block mt-5 text-sm font-semibold">{{
+        <label class="block mt-5 text-sm font-semibold" for="com-asunto">{{
           $t("comunicaciones.asuntoLabel")
         }}</label>
         <input
+          id="com-asunto"
           v-model="form.asunto"
           type="text"
           maxlength="255"
@@ -725,10 +734,11 @@ onMounted(cargar);
           :placeholder="$t('comunicaciones.asuntoPh')"
         />
 
-        <label class="block mt-4 text-sm font-semibold">{{
+        <label class="block mt-4 text-sm font-semibold" for="com-cuerpo">{{
           $t("comunicaciones.cuerpoLabel")
         }}</label>
         <textarea
+          id="com-cuerpo"
           v-model="form.cuerpo"
           rows="4"
           maxlength="5000"
@@ -747,7 +757,8 @@ onMounted(cargar);
             class="tu-btn tu-btn-primario"
             type="button"
             :disabled="!puedeEnviar || enviando"
-            @click="revisando = true"
+            data-prueba="revisar-difusion"
+            @click="abrirRevision"
           >
             {{ $t("operacion.comunicacion.revisar") }}
           </button>
@@ -759,6 +770,7 @@ onMounted(cargar);
         :abierto="revisando"
         :titulo="$t('operacion.comunicacion.confirmarTitulo')"
         tam="md"
+        :ocupado="enviando"
         @cerrar="revisando = false"
       >
         <p class="font-medium">
@@ -793,10 +805,20 @@ onMounted(cargar);
         <AvisoTono v-if="destinatarios === 0" tono="aviso" class="mt-4">
           {{ $t("operacion.comunicacion.sinDestinatarios") }}
         </AvisoTono>
+        <AvisoTono
+          v-if="errorEnvio"
+          tono="peligro"
+          class="mt-4"
+          role="alert"
+          data-prueba="error-envio"
+        >
+          {{ errorEnvio }}
+        </AvisoTono>
         <div class="mt-6 flex justify-end gap-2">
           <button
             type="button"
             class="tu-btn tu-btn-fantasma"
+            :disabled="enviando"
             @click="revisando = false"
           >
             {{ $t("operacion.comunicacion.cancelar") }}
@@ -805,6 +827,7 @@ onMounted(cargar);
             type="button"
             class="tu-btn tu-btn-primario"
             :disabled="enviando || destinatarios === 0"
+            data-prueba="enviar-difusion"
             @click="enviar"
           >
             {{
@@ -1219,7 +1242,10 @@ onMounted(cargar);
       <template #pie>
         <div class="flex flex-wrap items-center justify-end gap-2">
           <button
-            v-if="puedeEliminar && plantillaDe(editor.clave, borrador.canal)"
+            v-if="
+              puedeEliminar &&
+              plantillaDe(editor.clave, borrador.canal, borrador.destinatario)
+            "
             type="button"
             class="tu-btn tu-btn-contorno tu-tono-peligro mr-auto"
             @click="eliminarPlantilla"

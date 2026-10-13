@@ -36,6 +36,14 @@ x-web-args: &web-args
   VITE_SOPORTE_WHATSAPP: ${VITE_SOPORTE_WHATSAPP:-}
   GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
 
+# Los logs de cada contenedor (stdout/stderr) rotan: sin esto el json-file de Docker
+# crece sin límite y llena el disco.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 x-api: &api
   build:
     context: ../..
@@ -56,6 +64,7 @@ x-api: &api
     redis:
       condition: service_healthy
   restart: unless-stopped
+  logging: *logging
 
 services:
   # La API (PHP-FPM). nginx le pasa /api y /up.
@@ -127,6 +136,7 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    logging: *logging
 
   # La landing de cada producto (ADR 0112): su portada, sus páginas por giro, su sitemap
   # y su robots, con HTML completo. Solo la alcanza `web` por la red interna; se publica
@@ -141,6 +151,7 @@ services:
         VITE_APP_VERSION: ${VERSION_LANDING_AGENDAUNO:-latest}
     image: agendauno-landing-agendauno:${VERSION_LANDING_AGENDAUNO:-latest}
     restart: unless-stopped
+    logging: *logging
 
   landing-turnouno:
     build:
@@ -152,6 +163,7 @@ services:
         VITE_APP_VERSION: ${VERSION_LANDING_TURNOUNO:-latest}
     image: agendauno-landing-turnouno:${VERSION_LANDING_TURNOUNO:-latest}
     restart: unless-stopped
+    logging: *logging
 
   redis:
     image: redis:7-alpine
@@ -164,6 +176,7 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+    logging: *logging
 
 volumes:
   # storage de Laravel: archivos de los negocios (documentos, fotos, logos),

@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
  * Mover a un alumno a otra fecha de la MISMA clase (fase 2, punto 2.1): conserva su
@@ -54,14 +56,24 @@ function cuando(s: SesionLibre): string {
   }).format(new Date(s.inicia_en));
 }
 
+const sesion = useSesionTenantStore();
+
 onMounted(async () => {
-  const hoy = new Date();
-  const hasta = new Date(hoy.getTime() + 30 * 86_400_000);
-  const iso = (d: Date): string => d.toISOString().slice(0, 10);
+  // Desde hoy en el negocio (no el día UTC: de noche ya sería mañana) y solo las
+  // fechas de esta clase, para que no se queden fuera por el tope de la agenda.
+  const zona = sesion.zonaHoraria || "America/Mexico_City";
+  const desde = hoyEnNegocio(zona);
+  const hasta = hoyEnNegocio(zona, new Date(Date.now() + 30 * 86_400_000));
   try {
     const { data } = await api.get<{ data: SesionLibre[] }>(
       `${props.base}/sesiones`,
-      { params: { desde: iso(hoy), hasta: iso(hasta) } },
+      {
+        params: {
+          desde,
+          hasta,
+          ...(props.ofertaId ? { oferta_id: props.ofertaId } : {}),
+        },
+      },
     );
     sesiones.value = data.data;
   } catch (e) {

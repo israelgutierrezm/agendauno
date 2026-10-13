@@ -194,19 +194,69 @@ class VolcadoBaseDatos
      */
     public function bajar(string $ruta, string $destino, bool $descomprimir = true): void
     {
-        $contenido = $this->disco()->get($ruta);
-        if (! is_string($contenido)) {
+        // Por flujo, sin cargarlo en memoria: el paquete de archivos de un negocio grande
+        // pasa de cientos de MB y el límite de memoria de PHP lo tumbaría.
+        $entrada = $this->disco()->readStream($ruta);
+        if (! is_resource($entrada)) {
             throw new RuntimeException('No se pudo leer el respaldo.');
         }
-        if ($this->disco()->exists($ruta.self::SUMA)) {
-            $esperada = trim((string) $this->disco()->get($ruta.self::SUMA));
-            if (! hash_equals($esperada, hash('sha256', $contenido))) {
-                throw new RuntimeException('El respaldo está dañado: su suma de verificación no coincide.');
+        $bajado = $descomprimir ? $destino.'.gz' : $destino;
+        $salida = fopen($bajado, 'wb');
+        if ($salida === false) {
+            fclose($entrada);
+            throw new RuntimeException('No se pudo guardar el respaldo.');
+        }
+        $copiado = stream_copy_to_stream($entrada, $salida);
+        fclose($entrada);
+        fclose($salida);
+
+        try {
+            if ($copiado === false) {
+                throw new RuntimeException('No se pudo leer el respaldo.');
+            }
+            if ($this->disco()->exists($ruta.self::SUMA)) {
+                $esperada = trim((string) $this->disco()->get($ruta.self::SUMA));
+                $real = hash_file('sha256', $bajado);
+                if ($real === false || ! hash_equals($esperada, $real)) {
+                    throw new RuntimeException('El respaldo está dañado: su suma de verificación no coincide.');
+                }
+            }
+            if ($descomprimir) {
+                $this->descomprimir($bajado, $destino);
+            }
+        } catch (RuntimeException $e) {
+            @unlink($destino);
+            throw $e;
+        } finally {
+            if ($descomprimir) {
+                @unlink($bajado);
             }
         }
-        $datos = $descomprimir ? gzdecode($contenido) : $contenido;
-        if ($datos === false || file_put_contents($destino, $datos) === false) {
+    }
+
+    /**
+     * Descomprime por bloques (gzip) de un archivo a otro.
+     */
+    private function descomprimir(string $origen, string $destino): void
+    {
+        $entrada = gzopen($origen, 'rb');
+        $salida = fopen($destino, 'wb');
+        if ($entrada === false || $salida === false) {
             throw new RuntimeException('El respaldo está dañado.');
+        }
+        try {
+            while (! gzeof($entrada)) {
+                $bloque = gzread($entrada, 1048576);
+                if ($bloque === false) {
+                    throw new RuntimeException('El respaldo está dañado.');
+                }
+                if (fwrite($salida, $bloque) === false) {
+                    throw new RuntimeException('No se pudo guardar el respaldo.');
+                }
+            }
+        } finally {
+            gzclose($entrada);
+            fclose($salida);
         }
     }
 

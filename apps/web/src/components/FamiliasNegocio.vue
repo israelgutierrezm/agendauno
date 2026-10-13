@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -18,7 +18,12 @@ interface ConfiguracionFamilias {
   texto_vigente: string;
 }
 
-const emit = defineEmits<{ guardado: []; cerrar: [] }>();
+const emit = defineEmits<{
+  guardado: [];
+  cerrar: [];
+  // Guardando: quien lo abre no deja cerrar su diálogo hasta que termine.
+  ocupado: [valor: boolean];
+}>();
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
@@ -26,12 +31,18 @@ const toast = useToastStore();
 const cargando = ref(true);
 const guardando = ref(false);
 const error = ref<string | null>(null);
+// Sin la configuración actual no se guarda: se mandaría «apagado» y sin texto propio.
+const cargaFallida = ref(false);
 const activo = ref(false);
 const texto = ref("");
 const version = ref(1);
 const textoBase = ref("");
+watch(guardando, (valor) => emit("ocupado", valor));
 
-onMounted(async () => {
+async function cargar(): Promise<void> {
+  cargando.value = true;
+  error.value = null;
+  cargaFallida.value = false;
   try {
     const { data } = await api.get<{ data: ConfiguracionFamilias }>(
       `/api/v1/app/${sesion.slug}/familias`,
@@ -43,12 +54,17 @@ onMounted(async () => {
       data.data.texto_autorizacion === null ? data.data.texto_vigente : "";
   } catch (e) {
     error.value = mensajeDeError(e);
+    cargaFallida.value = true;
   } finally {
     cargando.value = false;
   }
-});
+}
+onMounted(cargar);
 
 async function guardar(): Promise<void> {
+  if (cargaFallida.value) {
+    return;
+  }
   guardando.value = true;
   error.value = null;
   try {
@@ -74,7 +90,7 @@ async function guardar(): Promise<void> {
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <template v-else>
+    <template v-else-if="!cargaFallida">
       <label class="flex items-center gap-2 text-sm">
         <input v-model="activo" type="checkbox" />
         {{ $t("familias.config.activar") }}
@@ -99,11 +115,22 @@ async function guardar(): Promise<void> {
     </template>
     <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
+      <template v-if="cargaFallida" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          data-prueba="reintentar-familias"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <div class="flex justify-end gap-2">
       <button
         type="button"
         class="tu-btn tu-btn-fantasma"
+        :disabled="guardando"
         @click="emit('cerrar')"
       >
         {{ $t("comun.cancelar") }}
@@ -111,7 +138,8 @@ async function guardar(): Promise<void> {
       <button
         type="button"
         class="tu-btn tu-btn-primario"
-        :disabled="cargando || guardando"
+        :disabled="cargando || guardando || cargaFallida"
+        data-prueba="guardar-familias"
         @click="guardar"
       >
         {{ $t("familias.config.guardar") }}

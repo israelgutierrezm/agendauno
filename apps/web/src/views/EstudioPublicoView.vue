@@ -34,6 +34,7 @@ import { marcarPwa } from "@/lib/pwa";
 import { updateSeo } from "@/lib/seo";
 import { urlCanonicaEstudio } from "@/lib/tenant";
 import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import {
   avisarEditorSitio,
   claveSeccion,
@@ -502,11 +503,9 @@ const etiquetaProfesional = computed(
     "Profesional",
 );
 
+// Con los números del país del negocio («$ 25.000,00» en Colombia).
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, escaparate.value?.estudio.pais);
 }
 function fechaHora(iso: string | null, zona: string | null): string {
   if (iso === null) {
@@ -1626,6 +1625,7 @@ onBeforeUnmount(() => {
                       <TarjetaPlanPublico
                         :plan="p"
                         :terminos="terminosPagina"
+                        :pais="escaparate?.estudio.pais"
                         :varias-sedes="variasSedes"
                         :marcar-primera-vez="gruposPrecios.length === 1"
                         :boton="tn('escaparate.planes.loQuiero')"

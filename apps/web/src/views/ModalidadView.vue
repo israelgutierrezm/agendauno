@@ -157,17 +157,23 @@ const beneficiosPagina = computed(() =>
     texto: t(k(`pagina.beneficios.${clave}`)),
   })),
 );
-const preguntas = computed(() =>
-  contenido.value.preguntas.map((clave) => ({
+const preguntas = computed(() => {
+  const soporte = PRODUCTOS[productoDeModalidad(props.modo)].soporte;
+  return contenido.value.preguntas.map((clave) => ({
     clave,
     pregunta: t(k(`faq.${clave}.q`)),
-    // El canal de soporte de la marca (C01); a las demás respuestas no les afecta.
+    // El canal de soporte de la marca (C01); a las demás respuestas no les afecta. Sin
+    // WhatsApp configurado, la respuesta sin él (no un número de relleno).
     respuesta: t(
-      k(`faq.${clave}.a`),
-      PRODUCTOS[productoDeModalidad(props.modo)].soporte,
+      k(
+        clave === "soporte" && soporte.whatsapp === ""
+          ? `faq.${clave}.aSinWhatsapp`
+          : `faq.${clave}.a`,
+      ),
+      soporte,
     ),
-  })),
-);
+  }));
+});
 
 // La nota de México (`landing.soloMexico`) solo donde algo lleva el asterisco.
 const notas = computed(() => ({

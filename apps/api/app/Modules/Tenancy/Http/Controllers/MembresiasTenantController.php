@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
@@ -251,6 +252,7 @@ class MembresiasTenantController
         ]);
 
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
         $producto = ProductoTenant::query()->where('ulid', $validado['producto_id'])->firstOrFail();
         $this->modalidades->exigirQueSeVenda($producto);
 
@@ -284,6 +286,7 @@ class MembresiasTenantController
     {
         // Su historial se consulta aunque esté dada de baja.
         $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
 
         $derechos = DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
@@ -302,6 +305,7 @@ class MembresiasTenantController
     {
         // Su historial se consulta aunque esté dada de baja.
         $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
 
         return response()->json(['data' => $corte->dePersona($persona)]);
     }
@@ -309,6 +313,7 @@ class MembresiasTenantController
     public function topUp(Request $request): JsonResponse
     {
         $derecho = DerechoTenant::query()->where('ulid', (string) $request->route('derecho'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirDerecho($request, $derecho);
         $validado = $request->validate([
             'unidades' => ['required', 'integer', 'min:1'],
             'descripcion' => ['nullable', 'string', 'max:255'],
