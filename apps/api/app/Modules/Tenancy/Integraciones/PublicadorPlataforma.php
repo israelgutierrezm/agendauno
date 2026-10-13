@@ -50,6 +50,14 @@ interface PublicadorPlataforma
     public function horario(SesionTenant $sesion, PublicacionPlataformaTenant $publicacion): array;
 
     /**
+     * La huella de lo que la plataforma no deja cambiar en su lugar (si cambia, se retira
+     * y se publica de nuevo); null si todo se cambia en su lugar.
+     *
+     * @param  array<string, mixed>  $horario
+     */
+    public function firmaFija(array $horario): ?string;
+
+    /**
      * Los dos números de lugares que se le mandan, para saber si cambiaron.
      *
      * @return array{0: int, 1: int}

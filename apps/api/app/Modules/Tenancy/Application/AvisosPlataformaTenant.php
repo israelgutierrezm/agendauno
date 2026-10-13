@@ -20,7 +20,8 @@ use Throwable;
  * - `checkin`: la persona hizo check-in en la app ({@see CheckinsAutomaticosTenant}).
  * - `checkin_reserva`: hizo check-in a la clase que reservó (Wellhub).
  * - `reserva_solicitada`, `reserva_cancelada`, `reserva_cancelada_tarde`: sus reservas
- *   desde la app ({@see ReservasPlataformaTenant}).
+ *   desde la app ({@see ReservasPlataformaTenant}). TotalPass avisa de cada reserva con
+ *   su evento y su «slot»; el estado del slot dice si se reservó o se canceló.
  *
  * Un error inesperado se reintenta; después de varios intentos queda «fallido».
  */
@@ -171,13 +172,29 @@ class AvisosPlataformaTenant
     }
 
     /**
-     * El aviso de check-in de TotalPass: su clave es la huella del token de confirmación.
+     * Los avisos de TotalPass: el de una reserva trae su evento y su «slot» (se reconoce
+     * por el id del slot y lo que pasó, según su estado); el de check-in, por la huella
+     * de su token de confirmación.
      *
      * @param  array<string, mixed>  $datos
      * @return array{0: string, 1: string}|null
      */
     private static function totalPass(array $datos): ?array
     {
+        $slot = Arr::get($datos, 'slot');
+        if (is_array($slot) && is_array(Arr::get($datos, 'event'))) {
+            $numero = self::numeroDeReserva($slot['id'] ?? $slot['_id'] ?? null);
+            $estado = strtolower(is_string($slot['status'] ?? null) ? $slot['status'] : '');
+            $tipo = match (true) {
+                str_contains($estado, 'cancel') && str_contains($estado, 'late') => self::RESERVA_CANCELADA_TARDE,
+                str_contains($estado, 'cancel') => self::RESERVA_CANCELADA,
+                in_array($estado, ['active', 'reserved', 'confirmed', 'pending', 'booked'], true) => self::RESERVA_SOLICITADA,
+                default => null,
+            };
+
+            return $numero === null || $tipo === null ? null : [$tipo, 'reserva:'.$numero.':'.$tipo];
+        }
+
         $tipo = '';
         foreach (['event', 'event_type', 'type'] as $campo) {
             $valor = Arr::get($datos, $campo);

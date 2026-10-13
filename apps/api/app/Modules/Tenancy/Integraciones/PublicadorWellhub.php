@@ -150,6 +150,12 @@ class PublicadorWellhub implements PublicadorPlataforma
         ];
     }
 
+    /** En Wellhub todo el horario se cambia en su lugar. */
+    public function firmaFija(array $horario): ?string
+    {
+        return null;
+    }
+
     public function numeros(LugaresDeHorario $lugares): array
     {
         return [$lugares->total, max(0, $lugares->total - $lugares->libres)];

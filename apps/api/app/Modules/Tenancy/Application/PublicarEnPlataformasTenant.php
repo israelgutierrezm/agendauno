@@ -8,6 +8,7 @@ use App\Console\Commands\SincronizarPlataformas;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Integraciones\LugaresDeHorario;
 use App\Modules\Tenancy\Integraciones\PublicadorPlataforma;
+use App\Modules\Tenancy\Integraciones\PublicadorTotalPass;
 use App\Modules\Tenancy\Integraciones\PublicadorWellhub;
 use App\Modules\Tenancy\Integraciones\ResultadoPlataforma;
 use App\Modules\Tenancy\Models\HorarioPlataformaTenant;
@@ -51,6 +52,7 @@ class PublicarEnPlataformasTenant
         private readonly CupoDeSesionTenant $cupo,
         private readonly ParametrosTenant $parametros,
         private readonly PublicadorWellhub $wellhub,
+        private readonly PublicadorTotalPass $totalpass,
     ) {}
 
     /** Cómo se publica en cada plataforma; null si aún no se publica en ella. */
@@ -58,7 +60,7 @@ class PublicarEnPlataformasTenant
     {
         return match ($proveedor) {
             ProveedorPartner::Wellhub => $this->wellhub,
-            ProveedorPartner::TotalPass => null,
+            ProveedorPartner::TotalPass => $this->totalpass,
         };
     }
 
@@ -254,6 +256,7 @@ class PublicarEnPlataformasTenant
         $horario = $publicador->horario($sesion, $publicacion);
         $firma = hash('sha256', (string) json_encode([$publicacion->clase_externa, $horario]));
         $numeros = $publicador->numeros($lugares);
+        $fija = $publicador->firmaFija($horario);
         $publicado ??= new HorarioPlataformaTenant([
             'proveedor' => $publicador->proveedor()->value,
             'sesion_id' => $sesion->getKey(),
@@ -278,11 +281,14 @@ class PublicarEnPlataformasTenant
         }
 
         if ($resultado->ok) {
+            // Nuevo, o publicado de nuevo (TotalPass): con el id que dio la plataforma.
+            $otroId = $nuevo || $resultado->id !== null;
             $publicado->fill([
                 'publicacion_id' => $publicacion->getKey(),
-                'id_externo' => $nuevo ? $resultado->id : $publicado->id_externo,
-                'evento_externo' => $nuevo ? $resultado->evento : $publicado->evento_externo,
+                'id_externo' => $otroId ? $resultado->id : $publicado->id_externo,
+                'evento_externo' => $otroId ? $resultado->evento : $publicado->evento_externo,
                 'firma' => $firma,
+                'fija' => $fija,
                 'capacidad_publicada' => $numeros[0],
                 'reservados_publicados' => $numeros[1],
                 'estado' => HorarioPlataformaTenant::PUBLICADO,
