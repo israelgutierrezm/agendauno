@@ -211,6 +211,31 @@ export function camposConError(e: unknown): string[] {
 }
 
 /**
+ * Los errores de campo de un 422 (`meta.errors`), el primero de cada campo y en la
+ * terminología del negocio, para mostrarlos junto a su campo.
+ */
+export function erroresPorCampo(e: unknown): Record<string, string> {
+  if (!axios.isAxiosError(e)) {
+    return {};
+  }
+  const errores = (
+    e.response?.data as
+      { meta?: { errors?: Record<string, string[] | string> } } | undefined
+  )?.meta?.errors;
+  if (!errores) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(errores).map(([campo, mensajes]) => [
+      campo,
+      conTerminosActuales(
+        String(Array.isArray(mensajes) ? (mensajes[0] ?? "") : mensajes),
+      ),
+    ]),
+  );
+}
+
+/**
  * Extrae un mensaje legible del contrato de error de la API
  * `{code, message, meta:{errors}}`. Prefiere el primer error de campo (más
  * específico) cuando la respuesta es de validación; si no, usa `message`.

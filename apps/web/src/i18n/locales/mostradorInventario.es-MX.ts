@@ -126,6 +126,43 @@ export const inventarioVisual = {
     entrada: "Entrada",
     ajuste: "Ajuste",
   },
+  // Por qué se ajusta a mano: queda en el historial con quién lo hizo.
+  motivo: "Motivo del ajuste",
+  motivoElige: "Elige el motivo",
+  motivos: {
+    conteo: "Conteo físico",
+    merma: "Merma o daño",
+    caducidad: "Caducidad",
+    uso_interno: "Uso interno",
+    otro: "Otro",
+  },
+  detalle: "Detalle (opcional)",
+  detalleObligatorio: "¿Cuál es el motivo?",
+  detalleEjemplo: "p. ej. se rompieron 2 frascos",
+  nota: "Nota (opcional)",
+  notaEjemplo: "p. ej. proveedor o número de factura",
+  errores: {
+    revisa: "Revisa los campos marcados.",
+    fotoNoSubio:
+      "El producto se guardó, pero la foto no se subió ({error}). Inténtalo de nuevo desde aquí.",
+  },
+  historial: {
+    ver: "Historial",
+    titulo: "Historial de {producto}",
+    vacio: "Sin movimientos todavía.",
+    venta: "Venta en mostrador",
+    ventaAnulada: "Venta anulada (regresó al stock)",
+    tipos: {
+      entrada: "Entrada",
+      salida: "Salida",
+      ajuste: "Ajuste a mano",
+    },
+    filtros: {
+      entrada: "Entradas",
+      ajuste: "Ajustes",
+      salida: "Ventas",
+    },
+  },
   estado: {
     con_stock: "Con stock",
     bajo: "Stock bajo",

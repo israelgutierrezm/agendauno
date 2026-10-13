@@ -6,8 +6,10 @@ import InventarioView from "./InventarioView.vue";
 
 /*
 | Inventario con el patrón de los listados: el estado de cada producto (con stock,
-| stock bajo, sin stock) lo calcula el API con el umbral del negocio; se filtra por
-| él y se registran entradas o ajustes en un diálogo.
+| stock bajo, sin stock) lo calcula el API con el umbral del negocio; la búsqueda, los
+| filtros y las páginas van al servidor. Las entradas y los ajustes (con su motivo)
+| se registran en un diálogo, los errores se marcan dentro de él junto a su campo, y
+| cada producto tiene su historial.
 */
 
 const mocks = vi.hoisted(() => ({
@@ -30,10 +32,16 @@ vi.mock("@/lib/api", () => ({
     delete: mocks.delete,
   },
   mensajeDeError: () => "Error",
+  erroresPorCampo: (e: unknown) =>
+    (e as { campos?: Record<string, string> })?.campos ?? {},
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: vi.fn(() => true) }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    puede: () => true,
+    zonaHoraria: "America/Mexico_City",
+  }),
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
@@ -73,7 +81,15 @@ beforeEach(() => {
                 articulo("a3", "Peine", 0, "sin_stock"),
                 articulo("a4", "Cera vieja", 0, "sin_stock", false),
               ],
-              meta: { stock_bajo: 3 },
+              meta: {
+                stock_bajo: 3,
+                total: 4,
+                page: 1,
+                per_page: 25,
+                ultima_pagina: 1,
+                total_articulos: 4,
+                resumen: { productos: 3, con_stock: 1, bajo: 1, sin_stock: 1 },
+              },
             }
           : { data: [{ id: "s1", nombre: "Roma Norte" }] },
     }),
@@ -81,26 +97,29 @@ beforeEach(() => {
 });
 
 describe("inventario", () => {
-  it("cuenta el stock de lo que está a la venta y filtra por su estado", async () => {
+  it("los indicadores cuentan todo y la búsqueda y los filtros van al servidor", async () => {
     const w = mount(InventarioView, { global: { plugins: [i18n] } });
     await flushPromises();
 
-    const kpis = w.text();
-    expect(kpis).toContain("Productos a la venta");
-    expect(w.findAll('[data-prueba="producto"]')).toHaveLength(4);
+    expect(w.text()).toContain("Productos a la venta");
+    expect(w.get('[data-prueba="indicador-productos"]').text()).toContain("3");
+    expect(w.findAll('tr[data-prueba="producto"]')).toHaveLength(4);
     expect(
       w.findAll("[data-estado]").map((p) => p.attributes("data-estado")),
     ).toEqual(["con_stock", "bajo", "sin_stock", "sin_stock"]);
 
     await w.get('[data-prueba="filtro-stock"]').setValue("bajo");
-    const filas = w.findAll('[data-prueba="producto"]');
-    expect(filas).toHaveLength(1);
-    expect(filas[0]!.text()).toContain("Aceite para barba");
-    expect(filas[0]!.text()).toContain("Stock bajo");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/articulos", {
+      params: expect.objectContaining({ page: 1, stock: "bajo" }),
+    });
 
-    await w.get('[data-prueba="filtro-stock"]').setValue("");
     await w.get('[data-prueba="buscar"]').setValue("sku-a3");
-    expect(w.findAll('[data-prueba="producto"]')).toHaveLength(1);
+    await new Promise((r) => setTimeout(r, 350));
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/articulos", {
+      params: expect.objectContaining({ q: "sku-a3", stock: "bajo" }),
+    });
   });
 
   it("un producto nuevo se guarda con sus extras y su precio (ADR 0139)", async () => {
@@ -172,10 +191,11 @@ describe("inventario", () => {
     await flushPromises();
 
     expect(w.get('[data-prueba="categoria-producto"]').text()).toBe("Cuidado");
-    await w.get('[data-prueba="filtro-categoria"]').setValue("c1");
-    expect(w.findAll('tr[data-prueba="producto"]')).toHaveLength(1);
     await w.get('[data-prueba="filtro-categoria"]').setValue("-");
-    expect(w.get('tr[data-prueba="producto"]').text()).toContain("Peine");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/articulos", {
+      params: expect.objectContaining({ categoria: "-" }),
+    });
 
     // Con el filtro en una categoría, el nuevo nace en ella; la foto sube al crearlo.
     await w.get('[data-prueba="filtro-categoria"]').setValue("c1");
@@ -245,6 +265,122 @@ describe("inventario", () => {
     await flushPromises();
     expect(mocks.delete).toHaveBeenCalledWith(
       "/api/v1/app/demo/categorias-articulo/c1",
+    );
+  });
+
+  it("un ajuste pide el motivo y lo manda con su detalle", async () => {
+    const w = mount(InventarioView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    await w.findAll('[data-prueba="movimiento"]')[0]!.trigger("click");
+    await w.get('[data-prueba="tipo-ajuste"]').trigger("click");
+    await w.get('[data-prueba="cantidad"]').setValue("-2");
+    const guardar = w.get('[data-prueba="guardar-movimiento"]');
+    expect(guardar.attributes("disabled")).toBeDefined();
+
+    await w.get('[data-prueba="motivo"]').setValue("merma");
+    await w.get('[data-prueba="detalle"]').setValue("se rompieron 2");
+    expect(guardar.attributes("disabled")).toBeUndefined();
+    await w.get("#iv-movimiento").trigger("submit");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/articulos/a1/movimientos",
+      {
+        sucursal_id: "s1",
+        tipo: "ajuste",
+        cantidad: -2,
+        motivo: "Merma o daño: se rompieron 2",
+      },
+    );
+  });
+
+  it("los errores al guardar quedan en el diálogo, junto a su campo", async () => {
+    mocks.post.mockRejectedValueOnce({
+      campos: { nombre: "Escribe el nombre.", "extras.0.nombre": "Falta." },
+    });
+    const w = mount(InventarioView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    await w.get('[data-prueba="nuevo-producto"]').trigger("click");
+    await w.get("#iv-nombre").setValue("X");
+    await w.get("#iv-precio").setValue("10");
+    await w.get('[data-prueba="agregar-extra"]').trigger("click");
+    await w.get('[data-prueba="agregar-extra"]').trigger("click");
+    const nombres = w.findAll('[data-prueba="extras-producto"] input');
+    // El primer extra va sin nombre (no se manda); el error del enviado es el segundo.
+    await nombres[2]!.setValue("Fresas");
+    await w.get("#iv-producto").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-producto"]').text()).toContain(
+      "Revisa los campos",
+    );
+    expect(w.get("#iv-nombre").attributes("aria-invalid")).toBe("true");
+    expect(w.text()).toContain("Escribe el nombre.");
+    const extras = w.findAll('[data-prueba="extras-producto"] input');
+    expect(extras[2]!.attributes("aria-invalid")).toBe("true");
+    expect(extras[0]!.attributes("aria-invalid")).toBeUndefined();
+    // El diálogo sigue abierto.
+    expect(w.find("#iv-producto").exists()).toBe(true);
+  });
+
+  it("abre el historial de un producto con quién y por qué", async () => {
+    const base = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation((url: string, config?: unknown) =>
+      url.endsWith("/articulos/a1/movimientos")
+        ? Promise.resolve({
+            data: {
+              data: [
+                {
+                  id: "m2",
+                  tipo: "ajuste",
+                  cantidad: -2,
+                  motivo: "Merma o daño",
+                  sucursal: "Roma Norte",
+                  quien: "Ana",
+                  de_venta: false,
+                  creado_en: "2026-10-01T18:00:00Z",
+                },
+                {
+                  id: "m1",
+                  tipo: "salida",
+                  cantidad: -1,
+                  motivo: null,
+                  sucursal: "Roma Norte",
+                  quien: null,
+                  de_venta: true,
+                  creado_en: "2026-10-01T17:00:00Z",
+                },
+              ],
+              meta: { total: 2, page: 1, per_page: 20, ultima_pagina: 1 },
+            },
+          })
+        : base(url, config),
+    );
+    const w = mount(InventarioView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    await w.findAll('[data-prueba="historial"]')[0]!.trigger("click");
+    await flushPromises();
+    const filas = w.findAll('[data-prueba="movimiento-historial"]');
+    expect(filas).toHaveLength(2);
+    expect(filas[0]!.text()).toContain("Ajuste a mano");
+    expect(filas[0]!.text()).toContain("Merma o daño");
+    expect(filas[0]!.text()).toContain("Ana");
+    expect(filas[1]!.text()).toContain("Venta en mostrador");
+
+    await w.get('[data-prueba="historial-ajuste"]').trigger("click");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/articulos/a1/movimientos",
+      { params: { page: 1, tipo: "ajuste" } },
     );
   });
 });

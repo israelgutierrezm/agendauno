@@ -282,6 +282,13 @@
     color: var(--error);
     font-weight: 600;
   }
+  /* El error de un campo, debajo de él. */
+  .tu-error-campo {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--error);
+  }
 
   /* -------------------------------------------------------- interruptor */
   .tu-interruptor {
