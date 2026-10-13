@@ -191,6 +191,7 @@ const RUTAS: Record<string, string[]> = {
     "M8 11h6",
   ],
   buscar: ["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z", "M20 20l-3.6-3.6"],
+  editar: ["M16 3l5 5", "M3 21l5-1L21 7a2.1 2.1 0 0 0-3-3L5 17l-2 4z"],
   lista: [
     "M9 6h11",
     "M9 12h11",

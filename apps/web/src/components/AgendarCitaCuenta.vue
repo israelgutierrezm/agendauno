@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CalendarioDias from "@/components/CalendarioDias.vue";
 import ElegirProfesional from "@/components/ElegirProfesional.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
@@ -537,9 +538,9 @@ onMounted(async () => {
         </div>
       </div>
 
-      <p v-if="error" class="text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
       <label v-if="ofrecerWhatsApp" class="flex items-center gap-2 text-sm">
         <input
           v-model="aceptaWhatsApp"

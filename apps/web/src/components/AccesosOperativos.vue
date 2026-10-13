@@ -82,7 +82,7 @@ const accesos = computed(() =>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("accesos.subtitulo") }}
     </p>
-    <ul class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <ul class="mt-4 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
       <li v-for="item in accesos" :key="item.clave">
         <TarjetaOperacion
           :to="{ name: item.ruta }"

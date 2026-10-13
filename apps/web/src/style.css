@@ -142,6 +142,20 @@
   --enlace: #74d4df;
   --marketing-enfasis: #75b798;
 }
+/* Identidad comercial por producto: AgendaUno conserva el rosa; TurnoUno usa
+   el turquesa de «agenda» en sus acentos, fondos decorativos y acciones. El botón
+   lleva una variante más profunda del mismo tono para contrastar con texto blanco.
+   Solo marketing: no sobrescribe los colores propios de los negocios. */
+.tu-marketing[data-producto="turnouno"] {
+  --acento: #007e91;
+  --marketing-rosa: #1098ad;
+  --marketing-cta: #007e91;
+  --marketing-cta-hover: #006574;
+}
+.dark .tu-marketing[data-producto="turnouno"] {
+  --acento: #74d4df;
+  --marketing-rosa: #74d4df;
+}
 .tu-public-business .tu-btn,
 .tu-marketing .tu-btn {
   font-weight: 500;
@@ -156,9 +170,8 @@
   background: var(--marketing-cta);
   color: var(--marketing-cta-contraste);
 }
-/* Botón azul de las páginas comerciales (`--primario`, el de la marca): el del hero y
-   los de las tarjetas de precio. El rosa queda para «Probar gratis» del menú y los
-   cierres. En oscuro `--primario` es claro y lleva su texto (`--primario-contraste`). */
+/* Variante turquesa opcional; las acciones principales usan `--marketing-cta`
+   según la marca. En oscuro esta variante clara conserva su texto de contraste. */
 .tu-marketing .tu-btn-primario.tu-btn-azul {
   background: var(--primario);
   color: var(--primario-contraste);

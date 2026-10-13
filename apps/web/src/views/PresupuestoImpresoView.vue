@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -97,9 +98,9 @@ function imprimir(): void {
       </button>
     </div>
 
-    <p v-if="error" class="mt-6 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-6" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <article
       v-if="presupuesto"

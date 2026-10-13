@@ -158,20 +158,20 @@ export interface Tono {
 }
 
 /**
- * Paleta de servicios/clases. `tinta` es un tono medio (el de la demo de la
- * landing): va en el borde izquierdo del evento y, al 11 %, en su fondo; el texto
- * del evento usa el color normal. `fondo` es el pastel para el modo oscuro. El
- * color identifica el SERVICIO; el estado va aparte.
+ * Paleta pastel de servicios/clases: fondo claro y acento contenido. Las vistas
+ * mezclan el fondo con la superficie del tema (menos proporción en oscuro);
+ * el texto conserva el contraste del tema. El color identifica el SERVICIO;
+ * el estado va aparte y conserva sus colores semánticos.
  */
 export const PALETA_SERVICIO: readonly Tono[] = [
-  { fondo: "#DCE9FF", tinta: "#0070FF" },
-  { fondo: "#D6F2EA", tinta: "#12A68B" },
-  { fondo: "#EBE3FF", tinta: "#9673DE" },
-  { fondo: "#FCE0EB", tinta: "#D6457F" },
-  { fondo: "#FDE7D6", tinta: "#E07A2E" },
-  { fondo: "#DFF3FB", tinta: "#1C9BC7" },
-  { fondo: "#FFF1CC", tinta: "#C28A12" },
-  { fondo: "#E6F4D7", tinta: "#5E9B2A" },
+  { fondo: "#E7EFF9", tinta: "#6486B1" },
+  { fondo: "#E2F1EC", tinta: "#528C7D" },
+  { fondo: "#EFE8F7", tinta: "#9378B5" },
+  { fondo: "#F8E6EE", tinta: "#B57891" },
+  { fondo: "#F9ECDD", tinta: "#B78B62" },
+  { fondo: "#E2F1F5", tinta: "#5B92A3" },
+  { fondo: "#F7F0DB", tinta: "#A39152" },
+  { fondo: "#EAF1DF", tinta: "#839A62" },
 ];
 
 function hash(texto: string): number {

@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -158,7 +159,9 @@ async function retirar(p: Participante): Promise<void> {
           <input v-model="acepto" type="checkbox" class="mt-0.5" />
           <span>{{ $t("familias.acepto") }}</span>
         </label>
-        <p v-if="error" :style="{ color: 'var(--error)' }">{{ error }}</p>
+        <AvisoTono v-if="error" tono="peligro" role="alert">{{
+          error
+        }}</AvisoTono>
       </div>
       <template #pie>
         <div class="flex justify-end gap-2">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
@@ -116,7 +117,7 @@ async function mover(): Promise<void> {
         </option>
       </select>
     </div>
-    <p v-if="error" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
     <div class="flex flex-wrap gap-2">
       <button
         v-if="opciones.length > 0"

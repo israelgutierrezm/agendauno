@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { aMinor, ejemploPrecio, simboloMoneda } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -208,14 +209,14 @@ async function guardar(): Promise<void> {
       </p>
     </fieldset>
 
-    <p v-if="ilegible" class="text-sm" style="color: var(--error)" role="alert">
+    <AvisoTono v-if="ilegible" tono="peligro" role="alert">
       {{
         t("validacion.precioIlegible", { ejemplo: ejemploPrecio(sesion.pais) })
       }}
-    </p>
-    <p v-if="error" class="text-sm" style="color: var(--error)" role="alert">
+    </AvisoTono>
+    <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <div class="flex justify-end gap-2">
       <button
         type="button"

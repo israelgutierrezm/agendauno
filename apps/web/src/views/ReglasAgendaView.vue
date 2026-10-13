@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ParametrosNegocio from "@/components/ParametrosNegocio.vue";
 import ProgramacionSemanal from "@/components/ProgramacionSemanal.vue";
@@ -311,9 +312,9 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <template v-if="!cargando">
       <!-- Cancelaciones (Configuración › Agenda y reservas › Políticas) -->

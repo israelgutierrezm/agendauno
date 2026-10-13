@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CalificacionEstrellas from "@/components/CalificacionEstrellas.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -229,9 +230,9 @@ onMounted(cargar);
       </button>
     </div>
 
-    <p v-if="error" class="px-5 pb-5 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="px-5 pb-5" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando && items.length === 0"
       class="px-5 pb-5 text-sm"

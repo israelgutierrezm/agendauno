@@ -2,6 +2,7 @@
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -189,9 +190,9 @@ async function guardar(): Promise<void> {
         </label>
       </div>
 
-      <p v-if="error" class="text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
       <button
         class="tu-btn tu-btn-primario w-full"
         type="submit"
@@ -217,8 +218,7 @@ async function guardar(): Promise<void> {
         />
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma w-full"
-          style="color: var(--error)"
+          class="tu-btn tu-btn-contorno tu-tono-peligro w-full"
           :disabled="dandoDeBaja"
           @click="darDeBaja"
         >

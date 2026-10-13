@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -96,9 +97,9 @@ async function guardar(): Promise<void> {
         </p>
       </div>
     </template>
-    <p v-if="error" class="text-sm" :style="{ color: 'var(--error)' }">
+    <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <div class="flex justify-end gap-2">
       <button
         type="button"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -330,9 +331,9 @@ function cancelarVenta(): void {
       </p>
     </template>
 
-    <p v-if="error" class="mb-3 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mb-3" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
@@ -562,9 +563,9 @@ function cancelarVenta(): void {
             </button>
           </div>
         </div>
-        <p v-if="avisoVenta" class="mt-2 text-sm" style="color: var(--exito)">
+        <AvisoTono v-if="avisoVenta" tono="exito" class="mt-2">
           {{ avisoVenta }}
-        </p>
+        </AvisoTono>
       </div>
     </template>
   </MarcoDetalle>

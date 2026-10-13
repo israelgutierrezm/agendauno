@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { mensajeDeError } from "@/lib/api";
 import { useToastStore } from "@/stores/toast";
@@ -199,14 +200,9 @@ onMounted(() => void cargar());
       </select>
     </div>
 
-    <p
-      v-if="error"
-      class="mt-4 text-sm"
-      role="alert"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="!cargando && errores.length === 0"
       class="mt-5 text-sm"

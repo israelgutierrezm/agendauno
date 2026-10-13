@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import agendaVisual from "@/i18n/locales/agendaVisual.es-MX";
-import type { SesionAgenda } from "@/lib/agenda";
+import { PALETA_SERVICIO, type SesionAgenda } from "@/lib/agenda";
 import AgendaMes from "./AgendaMes.vue";
 
 function sesion(
@@ -46,6 +46,24 @@ function montar(sesiones: SesionAgenda[]) {
 }
 
 describe("agenda del mes", () => {
+  it("conserva el pastel de servicio y los acentos del tema para reservas propias", async () => {
+    const w = montar([sesion("a", "2026-10-05T14:00:00Z")]);
+    expect(w.get(".am-evento").attributes("style")).toContain(
+      `--pastel: ${PALETA_SERVICIO[0].fondo}`,
+    );
+    await w.setProps({ destacadas: new Set(["a"]) });
+    expect(w.get(".am-evento").attributes("style")).toContain(
+      "--pastel: var(--primario-suave)",
+    );
+    expect(w.get(".am-evento").attributes("style")).toContain(
+      "--tinta: var(--primario)",
+    );
+    await w.setProps({ destacadas: new Set<string>() });
+    expect(w.get(".am-evento").attributes("style")).toContain(
+      "--pastel: var(--superficie-2)",
+    );
+  });
+
   it("arma las semanas completas del mes, de lunes a domingo", () => {
     const w = montar([]);
     // Octubre de 2026 empieza en jueves y termina en sábado: 5 semanas.

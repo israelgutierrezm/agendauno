@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
@@ -121,7 +122,7 @@ onMounted(cargar);
     role="group"
     :aria-label="$t('miReprogramar.titulo')"
   >
-    <p v-if="error" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
     <template v-if="opciones">
       <p v-if="!opciones.puede" :style="{ color: 'var(--texto-suave)' }">
         {{ opciones.motivo }}

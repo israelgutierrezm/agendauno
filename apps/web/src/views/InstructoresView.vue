@@ -290,7 +290,12 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="plural(sesion.terminologia.instructor)"
-      :subtitulo="$t('equipoVisual.subtitulo')"
+      :subtitulo="
+        sesion.esCitas
+          ? $t('equipoVisual.subtitulo')
+          : $t('adminUsabilidad.equipoClases')
+      "
+      icono="instructores"
     >
       <template
         v-if="puedeInvitar || puedeEntrar('usuarios', sesion)"

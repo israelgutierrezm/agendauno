@@ -89,7 +89,7 @@ describe("legibilidad de la paleta comercial", () => {
       /\.tu-banda \.tu-titulo\s*\{\s*font-size: clamp\(1\.75rem,/,
     );
   });
-  it("el botón azul (hero y tarjetas de precio) usa los tokens de la marca con contraste AA", () => {
+  it("la variante azul opcional usa los tokens públicos con contraste AA", () => {
     // Fondo `--primario`, texto `--primario-contraste` (blanco en claro, oscuro en
     // oscuro) y el tono fuerte al pasar el cursor.
     expect(css).toMatch(
@@ -124,5 +124,32 @@ describe("legibilidad de la paleta comercial", () => {
     expect(
       contraste("#ffffff", claro["--marketing-operacion"]!),
     ).toBeGreaterThanOrEqual(4.5);
+  });
+  it("TurnoUno sustituye los acentos rosas por turquesa sin cambiar AgendaUno ni los estados", () => {
+    const selector = '.tu-marketing[data-producto="turnouno"]';
+    const turnoClaro = { ...claro, ...tokens(selector) };
+    const turnoOscuro = {
+      ...oscuro,
+      ...tokens(selector),
+      ...tokens(`.dark ${selector}`),
+    };
+    expect(claro["--marketing-cta"]).toBe("#c43b80");
+    expect(claro["--marketing-rosa"]).toBe("#e7549b");
+    expect(turnoClaro["--marketing-rosa"]).toBe("#1098ad");
+    expect(turnoClaro["--marketing-cta"]).toBe("#007e91");
+    expect(turnoOscuro["--marketing-rosa"]).toBe("#74d4df");
+    for (const paleta of [turnoClaro, turnoOscuro]) {
+      expect(paleta["--exito"]).toBe("#198754");
+      for (const fondo of ["--marketing-cta", "--marketing-cta-hover"]) {
+        expect(
+          contraste(paleta["--marketing-cta-contraste"]!, paleta[fondo]!),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const fondo of ["--fondo", "--superficie"]) {
+        expect(
+          contraste(paleta["--marketing-rosa"]!, paleta[fondo]!),
+        ).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 });

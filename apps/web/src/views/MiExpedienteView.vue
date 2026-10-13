@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ListaFormularios from "@/components/ListaFormularios.vue";
@@ -32,16 +33,12 @@ onMounted(() => void cuenta.asegurar());
       :subtitulo="$t('portal.expediente.descripcion')"
     />
 
-    <p
-      v-if="cuenta.error.value"
-      class="mt-3 text-sm"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-3">
       {{ cuenta.error.value }}
       <button type="button" class="tu-enlace ml-2" @click="cuenta.cargar(true)">
         {{ $t("comun.reintentar") }}
       </button>
-    </p>
+    </AvisoTono>
     <p
       v-if="cuenta.cargando.value"
       class="mt-6"

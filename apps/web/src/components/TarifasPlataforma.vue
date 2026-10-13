@@ -3,6 +3,7 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
@@ -612,14 +613,14 @@ onMounted(reintentar);
           {{ $t("suscripcion.plataforma.tipoCambio.guardar") }}
         </button>
       </div>
-      <p
+      <AvisoTono
         v-if="errorCambio"
         id="tipo-cambio-error"
-        class="text-sm"
-        style="color: var(--error)"
+        tono="peligro"
+        role="alert"
       >
         {{ errorCambio }}
-      </p>
+      </AvisoTono>
     </form>
   </div>
 </template>

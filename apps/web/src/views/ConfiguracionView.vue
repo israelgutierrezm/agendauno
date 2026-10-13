@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -15,6 +16,19 @@ import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
+const route = useRoute();
+const secciones: Record<string, string> = {
+  datos: "configNegocio.opciones.datos",
+  "pagina-publica": "configNegocio.opciones.pagina",
+  "tipo-negocio": "modalidadNegocio.giro.titulo",
+  terminologia: "configNegocio.opciones.terminologia",
+};
+const seccion = computed(() => {
+  const pedida = route.hash.slice(1);
+  return secciones[pedida] ? pedida : "";
+});
+const visible = (clave: string): boolean =>
+  !seccion.value || seccion.value === clave;
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -121,7 +135,10 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('configuracion.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t(secciones[seccion] ?? 'configuracion.titulo')"
+      icono="comercio"
+    />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -132,7 +149,11 @@ onMounted(cargar);
 
     <template v-if="!cargando">
       <!-- Logo del estudio (Configuración › Negocio › Datos e imagen) -->
-      <div id="datos" class="mt-6 tu-card p-6 scroll-mt-24">
+      <div
+        v-show="visible('datos')"
+        id="datos"
+        class="mt-6 tu-card p-6 scroll-mt-24"
+      >
         <h2 class="font-medium text-lg">
           {{ $t("configuracion.logoTitulo") }}
         </h2>
@@ -150,30 +171,40 @@ onMounted(cargar);
       </div>
 
       <!-- Portada, descripción y redes: la página pública y la de enlaces -->
-      <PerfilPublicoNegocio
+      <div
         v-if="puedeGestionar"
+        v-show="visible('pagina-publica')"
         id="pagina-publica"
         class="mt-6 scroll-mt-24"
-      />
+      >
+        <PerfilPublicoNegocio />
+      </div>
       <!-- Tipo de negocio: solo los de su modalidad (ADR 0104) -->
-      <GiroNegocio
+      <div
         v-if="puedeGestionar"
+        v-show="visible('tipo-negocio')"
         id="tipo-negocio"
         class="mt-6 scroll-mt-24"
-      />
+      >
+        <GiroNegocio />
+      </div>
       <!-- Cómo se llaman las cosas en el negocio (otro giro trae otros términos) -->
-      <TerminologiaNegocio
+      <div
         v-if="puedeGestionar"
+        v-show="visible('terminologia')"
         id="terminologia"
-        :key="sesion.estudio?.perfil"
         class="mt-6 scroll-mt-24"
-        :cargar="cargarTerminologia"
-        :guardar="guardarTerminologia"
-        @guardado="terminologiaGuardada"
-      />
+      >
+        <TerminologiaNegocio
+          :key="sesion.estudio?.perfil"
+          :cargar="cargarTerminologia"
+          :guardar="guardarTerminologia"
+          @guardado="terminologiaGuardada"
+        />
+      </div>
 
       <!-- Visibilidad en Explorar -->
-      <div class="mt-6 tu-card p-6">
+      <div v-show="visible('pagina-publica')" class="mt-6 tu-card p-6">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h2 class="font-medium text-lg">

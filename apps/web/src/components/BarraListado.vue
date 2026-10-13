@@ -62,6 +62,17 @@ const activos = computed(
 // qué la lista viene acotada).
 const abierto = ref(activos.value > 0);
 const filtrosId = useId();
+const aplicados = computed(() =>
+  props.filtros
+    .filter((f) => esActivo(f.clave))
+    .map((f) => ({
+      clave: f.clave,
+      texto:
+        f.tipo === "booleano"
+          ? f.etiqueta
+          : `${f.etiqueta}: ${f.opciones?.find((o) => String(o.valor) === props.valores[f.clave])?.texto ?? props.valores[f.clave]}`,
+    })),
+);
 
 function esActivo(clave: string): boolean {
   const v = props.valores[clave];
@@ -161,6 +172,24 @@ function esActivo(clave: string): boolean {
       </div>
     </div>
 
+    <!-- La selección sigue visible aunque se cierre el editor de filtros. -->
+    <div
+      v-if="aplicados.length"
+      class="bl-aplicados"
+      :aria-label="$t('adminUsabilidad.filtrosAplicados')"
+    >
+      <button
+        v-for="f in aplicados"
+        :key="f.clave"
+        type="button"
+        class="bl-filtro"
+        :aria-label="$t('adminUsabilidad.quitarFiltro', { nombre: f.texto })"
+        @click="emit('cambioFiltro', f.clave, '')"
+      >
+        {{ f.texto }} <IconoNav nombre="cerrar" :tam="12" />
+      </button>
+    </div>
+
     <!-- Fila 2: filtros colapsables. -->
     <div
       v-show="abierto && filtros.length"
@@ -228,3 +257,29 @@ function esActivo(clave: string): boolean {
     </div>
   </section>
 </template>
+
+<style scoped>
+.bl-aplicados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+.bl-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.5rem;
+  color: var(--texto);
+  background: var(--superficie-2);
+  font-size: 0.75rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.bl-filtro:hover {
+  border-color: var(--primario);
+}
+</style>

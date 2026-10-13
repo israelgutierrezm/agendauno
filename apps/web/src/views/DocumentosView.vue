@@ -254,10 +254,17 @@ function tipoVacio(): Omit<TipoDoc, "id"> {
 }
 const nuevoTipo = ref(tipoVacio());
 const creandoTipo = ref(false);
+const nuevoRequisito = ref(false);
 const editandoTipo = ref<string | null>(null);
 const tipoEditado = ref(tipoVacio());
 
 async function crearTipo(): Promise<void> {
+  if (
+    !puedeGestionar.value ||
+    creandoTipo.value ||
+    !nuevoTipo.value.nombre.trim()
+  )
+    return;
   creandoTipo.value = true;
   error.value = null;
   try {
@@ -268,6 +275,7 @@ async function crearTipo(): Promise<void> {
       aplica_a: nuevoTipo.value.aplica_a,
     });
     nuevoTipo.value = tipoVacio();
+    nuevoRequisito.value = false;
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -282,7 +290,11 @@ function editarTipo(tipo: TipoDoc): void {
 }
 
 async function guardarTipo(): Promise<void> {
-  if (editandoTipo.value === null) {
+  if (
+    editandoTipo.value === null ||
+    !puedeGestionar.value ||
+    accionando.value
+  ) {
     return;
   }
   accionando.value = true;
@@ -442,10 +454,7 @@ onMounted(cargar);
     </p>
 
     <!-- Documentos cargados -->
-    <div
-      v-if="!cargando && pestana === 'documentos'"
-      class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
-    >
+    <div v-if="!cargando && pestana === 'documentos'" class="mt-5 space-y-5">
       <div class="relative tu-card min-w-0 overflow-x-auto">
         <div class="tu-filtros">
           <h2 class="font-medium mr-auto">
@@ -623,7 +632,20 @@ onMounted(cargar);
       class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
     >
       <div class="tu-card p-5 min-w-0">
-        <h2 class="font-semibold">{{ $t("documentos.tipos.titulo") }}</h2>
+        <div class="flex flex-wrap justify-between items-center gap-3">
+          <h2 class="font-semibold">{{ $t("documentos.tipos.titulo") }}</h2>
+          <button
+            v-if="puedeGestionar"
+            type="button"
+            class="tu-btn tu-btn-primario tu-btn-crear"
+            @click="
+              error = null;
+              nuevoRequisito = true;
+            "
+          >
+            {{ $t("adminUsabilidad.documentos.nuevo") }}
+          </button>
+        </div>
         <EstadoVacio
           v-if="tipos.length === 0"
           class="mt-4 py-6"
@@ -633,65 +655,87 @@ onMounted(cargar);
         />
         <ul v-else class="mt-2">
           <li v-for="t2 in tipos" :key="t2.id" class="doc-fila text-sm">
-            <form
-              v-if="editandoTipo === t2.id"
-              class="w-full space-y-3 py-1"
-              @submit.prevent="guardarTipo"
+            <ModalDialogo
+              v-if="puedeGestionar && editandoTipo === t2.id"
+              :abierto="true"
+              :titulo="
+                $t('adminUsabilidad.documentos.editar', { nombre: t2.nombre })
+              "
+              :descripcion="$t('adminUsabilidad.documentos.ayuda')"
+              icono="documentos"
+              :ocupado="accionando"
+              @cerrar="editandoTipo = null"
             >
-              <input
-                v-model="tipoEditado.nombre"
-                class="tu-input"
-                :aria-label="$t('documentos.tipos.nombre')"
-                required
-              />
-              <input
-                v-model="tipoEditado.descripcion"
-                class="tu-input"
-                :placeholder="$t('documentos.tipos.descripcion')"
-              />
-              <div class="flex items-center gap-4 flex-wrap">
-                <select
-                  v-model="tipoEditado.aplica_a"
-                  class="tu-input max-w-[12rem]"
-                  :aria-label="$t('documentos.tipos.aplicaA')"
-                >
-                  <option value="miembro">
-                    {{ $t("documentos.tipos.miembro") }}
-                  </option>
-                  <option value="instructor">
-                    {{ $t("documentos.tipos.instructor") }}
-                  </option>
-                  <option value="todos">
-                    {{ $t("documentos.tipos.todos") }}
-                  </option>
-                </select>
-                <label class="flex items-center gap-1.5">
-                  <input v-model="tipoEditado.obligatorio" type="checkbox" />
-                  {{ $t("documentos.tipos.obligatorio") }}
-                </label>
-                <label class="flex items-center gap-1.5">
-                  <input v-model="tipoEditado.activo" type="checkbox" />
-                  {{ $t("documentosTabs.activo") }}
-                </label>
-              </div>
-              <div class="flex gap-2">
-                <button
-                  type="submit"
-                  class="tu-btn tu-btn-primario text-sm"
-                  :disabled="accionando"
-                >
-                  {{ $t("documentosTabs.guardar") }}
-                </button>
-                <button
-                  type="button"
-                  class="tu-btn tu-btn-fantasma text-sm"
-                  @click="editandoTipo = null"
-                >
-                  {{ $t("comun.cancelar") }}
-                </button>
-              </div>
-            </form>
-            <template v-else>
+              <form class="w-full space-y-3 py-1" @submit.prevent="guardarTipo">
+                <label class="block"
+                  ><span class="tu-label">{{
+                    $t("documentos.tipos.nombre")
+                  }}</span
+                  ><input
+                    v-model="tipoEditado.nombre"
+                    class="tu-input"
+                    :aria-label="$t('documentos.tipos.nombre')"
+                    required
+                /></label>
+                <label class="block"
+                  ><span class="tu-label">{{
+                    $t("documentos.tipos.descripcion")
+                  }}</span
+                  ><input
+                    v-model="tipoEditado.descripcion"
+                    class="tu-input"
+                    :placeholder="$t('documentos.tipos.descripcion')"
+                /></label>
+                <div class="flex items-center gap-4 flex-wrap">
+                  <label class="block w-full"
+                    ><span class="tu-label">{{
+                      $t("documentos.tipos.aplicaA")
+                    }}</span
+                    ><select
+                      v-model="tipoEditado.aplica_a"
+                      class="tu-input"
+                      :aria-label="$t('documentos.tipos.aplicaA')"
+                    >
+                      <option value="miembro">
+                        {{ $t("documentos.tipos.miembro") }}
+                      </option>
+                      <option value="instructor">
+                        {{ $t("documentos.tipos.instructor") }}
+                      </option>
+                      <option value="todos">
+                        {{ $t("documentos.tipos.todos") }}
+                      </option>
+                    </select></label
+                  >
+                  <label class="flex items-center gap-1.5">
+                    <input v-model="tipoEditado.obligatorio" type="checkbox" />
+                    {{ $t("documentos.tipos.obligatorio") }}
+                  </label>
+                  <label class="flex items-center gap-1.5">
+                    <input v-model="tipoEditado.activo" type="checkbox" />
+                    {{ $t("documentosTabs.activo") }}
+                  </label>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    type="submit"
+                    class="tu-btn tu-btn-primario text-sm"
+                    :disabled="accionando"
+                  >
+                    {{ $t("documentosTabs.guardar") }}
+                  </button>
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-fantasma text-sm"
+                    :disabled="accionando"
+                    @click="editandoTipo = null"
+                  >
+                    {{ $t("comun.cancelar") }}
+                  </button>
+                </div>
+              </form>
+            </ModalDialogo>
+            <div class="contents">
               <div class="min-w-0">
                 <p
                   class="font-medium truncate"
@@ -707,8 +751,16 @@ onMounted(cargar);
                   <span v-if="t2.obligatorio"
                     >· {{ $t("documentos.tipos.obligatorio") }}</span
                   >
-                  <span v-if="!t2.activo"
-                    >· {{ $t("documentosTabs.inactivo") }}</span
+                  <span
+                    class="tu-badge"
+                    :class="t2.activo ? 'tu-badge-exito' : ''"
+                    >{{
+                      $t(
+                        t2.activo
+                          ? "adminUsabilidad.estadoActivo"
+                          : "adminUsabilidad.estadoInactivo",
+                      )
+                    }}</span
                   >
                 </p>
               </div>
@@ -720,52 +772,85 @@ onMounted(cargar);
               >
                 {{ $t("documentosTabs.editar") }}
               </button>
-            </template>
+            </div>
           </li>
         </ul>
       </div>
 
-      <form
+      <ModalDialogo
         v-if="puedeGestionar"
-        class="tu-card p-5 h-max space-y-3"
-        @submit.prevent="crearTipo"
+        :abierto="nuevoRequisito"
+        :titulo="$t('adminUsabilidad.documentos.nuevo')"
+        :descripcion="$t('adminUsabilidad.documentos.ayuda')"
+        icono="documentos"
+        :ocupado="creandoTipo"
+        @cerrar="nuevoRequisito = false"
       >
-        <h2 class="font-semibold">{{ $t("documentos.tipos.nuevo") }}</h2>
-        <input
-          v-model="nuevoTipo.nombre"
-          class="tu-input"
-          :placeholder="$t('documentos.tipos.nombrePh')"
-          :aria-label="$t('documentos.tipos.nombre')"
-          required
-        />
-        <input
-          v-model="nuevoTipo.descripcion"
-          class="tu-input"
-          :placeholder="$t('documentos.tipos.descripcion')"
-        />
-        <select
-          v-model="nuevoTipo.aplica_a"
-          class="tu-input"
-          :aria-label="$t('documentos.tipos.aplicaA')"
+        <form
+          v-if="puedeGestionar"
+          class="space-y-4"
+          @submit.prevent="crearTipo"
         >
-          <option value="miembro">{{ $t("documentos.tipos.miembro") }}</option>
-          <option value="instructor">
-            {{ $t("documentos.tipos.instructor") }}
-          </option>
-          <option value="todos">{{ $t("documentos.tipos.todos") }}</option>
-        </select>
-        <label class="flex items-center gap-1.5 text-sm">
-          <input v-model="nuevoTipo.obligatorio" type="checkbox" />
-          {{ $t("documentos.tipos.obligatorio") }}
-        </label>
-        <button
-          class="tu-btn tu-btn-fantasma w-full"
-          type="submit"
-          :disabled="creandoTipo || nuevoTipo.nombre.trim() === ''"
-        >
-          {{ $t("documentos.tipos.crear") }}
-        </button>
-      </form>
+          <p v-if="error" role="alert" :style="{ color: 'var(--error)' }">
+            {{ error }}
+          </p>
+          <label class="block"
+            ><span class="tu-label">{{ $t("documentos.tipos.nombre") }}</span
+            ><input
+              v-model="nuevoTipo.nombre"
+              class="tu-input"
+              :placeholder="$t('documentos.tipos.nombrePh')"
+              :aria-label="$t('documentos.tipos.nombre')"
+              required
+          /></label>
+          <label class="block"
+            ><span class="tu-label">{{
+              $t("documentos.tipos.descripcion")
+            }}</span
+            ><input
+              v-model="nuevoTipo.descripcion"
+              class="tu-input"
+              :placeholder="$t('documentos.tipos.descripcion')"
+          /></label>
+          <label class="block"
+            ><span class="tu-label">{{ $t("documentos.tipos.aplicaA") }}</span
+            ><select
+              v-model="nuevoTipo.aplica_a"
+              class="tu-input"
+              :aria-label="$t('documentos.tipos.aplicaA')"
+            >
+              <option value="miembro">
+                {{ $t("documentos.tipos.miembro") }}
+              </option>
+              <option value="instructor">
+                {{ $t("documentos.tipos.instructor") }}
+              </option>
+              <option value="todos">{{ $t("documentos.tipos.todos") }}</option>
+            </select></label
+          >
+          <label class="flex items-center gap-1.5 text-sm">
+            <input v-model="nuevoTipo.obligatorio" type="checkbox" />
+            {{ $t("documentos.tipos.obligatorio") }}
+          </label>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              :disabled="creandoTipo"
+              @click="nuevoRequisito = false"
+            >
+              {{ $t("comun.cancelar") }}
+            </button>
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="creandoTipo || nuevoTipo.nombre.trim() === ''"
+            >
+              {{ $t("documentos.tipos.crear") }}
+            </button>
+          </div>
+        </form>
+      </ModalDialogo>
     </div>
 
     <!-- Aviso de privacidad para los clientes: lo pide la ley antes de sus datos -->

@@ -183,7 +183,12 @@ function elegirModo(valor: Modo) {
       </button>
     </div>
 
-    <div class="precios-intro" aria-live="polite" aria-atomic="true">
+    <div
+      v-if="!fijo || modo === 'citas'"
+      class="precios-intro"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <template v-if="modo === 'clases'">
         <h3>Tu comunidad crece. Tu plan la acompaña.</h3>
         <p>
@@ -196,8 +201,8 @@ function elegirModo(valor: Modo) {
         </p>
       </template>
       <template v-else>
-        <h3>Tu agenda, a solas o con todo tu equipo.</h3>
-        <p>
+        <h3 v-if="!fijo">Tu agenda, a solas o con todo tu equipo.</h3>
+        <p v-if="!fijo">
           Organiza servicios, disponibilidad y reservas desde
           <strong
             >{{ dolares(desde.individual) }} {{ monedaCitas }} al mes</strong
@@ -220,7 +225,11 @@ function elegirModo(valor: Modo) {
             >
           </button>
         </div>
-        <p class="precios-periodo-nota" data-prueba="anual-adelantado">
+        <p
+          v-if="anual"
+          class="precios-periodo-nota"
+          data-prueba="anual-adelantado"
+        >
           El plan anual se paga completo por adelantado: {{ mesesAnual }} meses
           por 12 de servicio.
         </p>
@@ -233,7 +242,7 @@ function elegirModo(valor: Modo) {
         :key="`${modo}-${tarjeta.clave}`"
         class="precio-tarjeta"
       >
-        <p class="precio-contexto">{{ NOMBRE_MODALIDAD[modo] }}</p>
+        <p v-if="!fijo" class="precio-contexto">{{ NOMBRE_MODALIDAD[modo] }}</p>
         <h4>{{ tarjeta.nombre }}</h4>
         <p v-if="tarjeta.capacidad" class="precio-capacidad">
           {{ tarjeta.capacidad }}
@@ -248,8 +257,11 @@ function elegirModo(valor: Modo) {
             · {{ tarjeta.nota }}</template
           >
         </p>
-        <ul>
-          <li v-for="beneficio in tarjeta.funciones" :key="beneficio">
+        <ul v-if="modo === 'citas'">
+          <li
+            v-for="beneficio in tarjeta.funciones.slice(0, 4)"
+            :key="beneficio"
+          >
             <svg
               class="precio-check"
               aria-hidden="true"
@@ -266,8 +278,36 @@ function elegirModo(valor: Modo) {
             >{{ beneficio }}
           </li>
         </ul>
+        <details
+          v-if="modo === 'citas' && tarjeta.funciones.length > 4"
+          class="precio-mas-funciones"
+        >
+          <summary>Ver todas las funciones de {{ tarjeta.nombre }}</summary>
+          <ul>
+            <li
+              v-for="beneficio in tarjeta.funciones.slice(4)"
+              :key="beneficio"
+            >
+              <svg
+                class="precio-check"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m5 12.5 4 4 10-10" />
+              </svg>
+              {{ beneficio }}
+            </li>
+          </ul>
+        </details>
         <RouterLink
-          class="tu-btn tu-btn-primario tu-btn-azul precio-cta"
+          class="tu-btn tu-btn-primario precio-cta"
           :to="registro"
           @click="medirTarjeta"
           >{{
@@ -283,6 +323,33 @@ function elegirModo(valor: Modo) {
         </p>
       </article>
     </div>
+
+    <section
+      v-if="modo === 'clases'"
+      class="precios-incluye"
+      aria-label="Herramientas incluidas en todos los rangos"
+    >
+      <h3>El tamaño de tu estudio cambia. Lo que incluye, no.</h3>
+      <ul>
+        <li v-for="beneficio in beneficiosClases" :key="beneficio">
+          <svg
+            class="precio-check"
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m5 12.5 4 4 10-10" />
+          </svg>
+          {{ beneficio }}
+        </li>
+      </ul>
+    </section>
 
     <p class="precios-aclaracion">
       Precios en {{ nombreMoneda }}, más impuestos.
@@ -407,9 +474,9 @@ function elegirModo(valor: Modo) {
           rel="noopener"
           >WhatsApp</a
         >
-        <!-- Azul, como las tarjetas: el rosa queda para el menú y el cierre. -->
+        <!-- Contacto es una acción secundaria frente a empezar la prueba. -->
         <a
-          class="tu-btn tu-btn-primario tu-btn-azul"
+          class="tu-btn tu-btn-fantasma"
           :href="`mailto:${ventasCorreo}?subject=${encodeURIComponent(`Cotización ${marca}`)}`"
           >Contáctanos</a
         >
@@ -483,6 +550,7 @@ function elegirModo(valor: Modo) {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.35rem 0.75rem;
+  margin-bottom: 1.25rem;
 }
 .precios-modelo strong {
   font-size: clamp(1.05rem, 2vw, 1.25rem);
@@ -552,7 +620,7 @@ summary:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
-/* Borde de arriba rosa y botón azul (`tu-btn-azul`): al revés que el hero. */
+/* El registro conserva el color principal de la marca que presenta la página. */
 .precio-tarjeta {
   display: flex;
   flex-direction: column;
@@ -571,6 +639,12 @@ summary:focus-visible {
   margin-top: 0.65rem;
   font-size: 1.15rem;
   font-weight: 500;
+}
+.precios-modelo + .precios-tarjetas .precio-tarjeta h4 {
+  margin-top: 0;
+}
+.precios-modelo + .precios-tarjetas .precio-cta {
+  margin-top: 1.5rem;
 }
 .precio-importe {
   margin-top: 1.5rem;
@@ -595,13 +669,14 @@ summary:focus-visible {
 }
 .precio-tarjeta ul {
   display: grid;
+  align-content: start;
   gap: 0.8rem;
   margin: 1.5rem 0 2rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--borde);
   font-size: 0.9rem;
   line-height: 1.6;
-  flex: 1;
+  flex: 0 0 auto;
 }
 .precio-tarjeta li {
   display: flex;
@@ -614,8 +689,61 @@ summary:focus-visible {
   margin-top: 0.25rem;
   color: var(--exito);
 }
+.precio-mas-funciones {
+  margin: -0.75rem 0 1.25rem;
+  font-size: 0.85rem;
+}
+.precio-mas-funciones summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--enlace);
+  cursor: pointer;
+  gap: 0.65rem;
+}
+.precio-mas-funciones summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.precio-mas-funciones[open] summary::after {
+  transform: translateY(2px) rotate(225deg);
+}
+.precio-mas-funciones ul {
+  margin: 0.5rem 0 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.precios-incluye {
+  margin-top: 1.25rem;
+  padding: 1.5rem;
+  border: 1px solid var(--borde);
+  border-radius: 18px;
+  background: var(--superficie);
+}
+.precios-incluye h3 {
+  font-weight: 500;
+  font-size: 1rem;
+}
+.precios-incluye ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+.precios-incluye li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
 .precio-cta {
   width: 100%;
+  margin-top: auto;
   padding: 0.8rem 1rem;
   text-align: center;
   justify-content: center;
@@ -698,7 +826,8 @@ td {
   }
 }
 @media (max-width: 540px) {
-  .precios-selector {
+  .precios-selector,
+  .precios-incluye ul {
     grid-template-columns: 1fr;
   }
 }

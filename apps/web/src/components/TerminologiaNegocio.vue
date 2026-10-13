@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import type {
@@ -140,8 +141,8 @@ onMounted(async () => {
         >
       </div>
     </form>
-    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
   </div>
 </template>

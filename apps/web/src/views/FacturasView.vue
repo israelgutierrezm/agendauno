@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoRegion from "@/components/AvisoRegion.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
@@ -335,12 +336,12 @@ onMounted(cargar);
             </button>
           </div>
 
-          <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
+          <AvisoTono v-if="mensaje" tono="exito">
             {{ $t("facturas.nueva.timbrada") }}
-          </p>
-          <p v-if="error" class="text-sm" style="color: var(--error)">
+          </AvisoTono>
+          <AvisoTono v-if="error" tono="peligro" role="alert">
             {{ error }}
-          </p>
+          </AvisoTono>
 
           <button
             class="tu-btn tu-btn-primario"

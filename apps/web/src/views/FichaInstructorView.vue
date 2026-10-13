@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -80,9 +81,9 @@ function fecha(iso: string | null): string {
       {{ regreso.etiqueta.value }}</RouterLink
     >
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-if="cargando"
       class="tu-card mt-4 p-6 text-sm"

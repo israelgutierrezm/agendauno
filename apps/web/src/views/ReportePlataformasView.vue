@@ -2,8 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -347,9 +349,9 @@ onMounted(() => {
       </div>
     </div>
 
-    <p v-if="error" class="mt-4 text-sm" :style="{ color: 'var(--error)' }">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <!-- Indicadores del periodo -->
     <div class="rp-indicadores mt-5" :aria-busy="cargando">
@@ -379,9 +381,10 @@ onMounted(() => {
             :key="p.proveedor"
             class="flex items-center justify-between gap-3 text-sm"
           >
-            <span class="font-medium">{{
-              $t(`operacion.plataformas.proveedores.${p.proveedor}`)
-            }}</span>
+            <span class="flex items-center gap-2.5 font-medium">
+              <LogoPlataforma :proveedor="p.proveedor" :tam="28" />
+              {{ $t(`operacion.plataformas.proveedores.${p.proveedor}`) }}
+            </span>
             <span :style="{ color: 'var(--texto-suave)' }"
               >{{
                 $t("operacion.plataformas.visitasDe", {

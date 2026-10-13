@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useToastStore } from "@/stores/toast";
 
@@ -113,13 +114,13 @@ defineExpose({ cargar });
         }}
       </p>
       <p class="mt-1 text-sm tm-suave">{{ $t("suscripcion.timbres.ayuda") }}</p>
-      <p
+      <AvisoTono
         v-if="timbres.posible && timbres.disponibles === 0"
-        class="mt-2 text-sm"
-        style="color: var(--aviso)"
+        tono="aviso"
+        class="mt-2"
       >
         {{ $t("suscripcion.timbres.agotados") }}
-      </p>
+      </AvisoTono>
       <p
         v-if="!timbres.posible && timbres.motivo"
         class="mt-2 text-sm tm-suave"
@@ -190,12 +191,18 @@ defineExpose({ cargar });
         </ul>
       </details>
     </template>
-    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ $t("comun.reintentar") }}
-      </button>
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
   </div>
 </template>
 

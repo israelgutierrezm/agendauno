@@ -130,6 +130,7 @@ function nombreMetodo(m: string | null | undefined): string {
   if (!m) {
     return "—";
   }
+  if (m === "manual") return t("adminUsabilidad.registroManual");
   return te(`ventas.metodos.${m}`) ? t(`ventas.metodos.${m}`) : m;
 }
 function cuando(iso: string | null | undefined): string {

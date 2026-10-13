@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -126,12 +127,18 @@ onMounted(cargar);
       {{ $t("region.subtitulo") }}
     </p>
 
-    <p v-if="error" class="mt-6 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-6" role="alert">
       {{ error }}
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ $t("comun.reintentar") }}
-      </button>
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p
       v-else-if="cargando"
       class="mt-6 text-sm"

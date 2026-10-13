@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -196,9 +197,9 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <template v-if="!cargando">
       <!-- Lista -->
@@ -291,14 +292,9 @@ onMounted(cargar);
       @cerrar="cerrar"
     >
       <form class="space-y-4" @submit.prevent="crear">
-        <p
-          v-if="error"
-          class="text-sm"
-          role="alert"
-          :style="{ color: 'var(--error)' }"
-        >
+        <AvisoTono v-if="error" tono="peligro" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
         <div>
           <label class="tu-label" for="rn">{{ $t("recursos.nombre") }}</label>
           <input id="rn" v-model="form.nombre" class="tu-input" required />

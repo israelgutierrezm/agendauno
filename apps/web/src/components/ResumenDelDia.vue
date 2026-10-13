@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 import ActualizadoHace from "@/components/ActualizadoHace.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
+import ProporcionCircular from "@/components/ProporcionCircular.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -98,6 +100,8 @@ const actualizadoEn = ref<Date | null>(null);
 const actualizando = ref(false);
 const busqueda = ref("");
 const filtro = ref<"todas" | "proximas" | "canceladas">("todas");
+const paginaAgenda = ref(1);
+const porPaginaAgenda = 6;
 const agendaVisible = computed(() => {
   const q = busqueda.value
     .trim()
@@ -124,6 +128,40 @@ function limpiar(): void {
   busqueda.value = "";
   filtro.value = "todas";
 }
+const paginasAgenda = computed(() =>
+  Math.max(1, Math.ceil(agendaVisible.value.length / porPaginaAgenda)),
+);
+const paginaSegura = computed(() =>
+  Math.min(paginaAgenda.value, paginasAgenda.value),
+);
+const agendaPaginada = computed(() =>
+  agendaVisible.value.slice(
+    (paginaSegura.value - 1) * porPaginaAgenda,
+    paginaSegura.value * porPaginaAgenda,
+  ),
+);
+watch([busqueda, filtro], () => {
+  paginaAgenda.value = 1;
+});
+const metricaDia = computed(() => {
+  const tot = hoy.value?.agenda?.totales;
+  if (!tot) return null;
+  if (esCitas.value)
+    return tot.sesiones > 0 && tot.por_atender !== undefined
+      ? {
+          valor: tot.por_atender,
+          total: tot.sesiones,
+          etiqueta: t("operacion.hoy.citas.kpi.porAtender"),
+        }
+      : null;
+  return (tot.capacidad ?? 0) > 0
+    ? {
+        valor: tot.esperados,
+        total: tot.capacidad!,
+        etiqueta: t("adminUsabilidad.panel.ocupacion"),
+      }
+    : null;
+});
 function ocupacion(s: SesionHoy): number {
   return s.capacidad && s.capacidad > 0
     ? Math.max(0, Math.min(100, (s.esperados / s.capacidad) * 100))
@@ -479,77 +517,107 @@ onMounted(() => {
       @actualizar="cargar(true)"
     />
     <!-- La tarjeta principal: lo que sigue hoy y los indicadores del día -->
-    <TarjetaPrincipal
-      v-if="hoy.agenda"
-      class="mt-2"
-      :etiqueta="etiquetaDia"
-      :etiqueta-viva="enCurso !== null"
-      :foto="foto"
-      :clima="clima"
-      :clima-lugar="climaLugar"
-      compacta
+    <div
+      class="hoy-destacado"
+      :class="{ 'hoy-con-metrica': metricaDia !== null }"
     >
-      <p class="mt-2 text-2xl font-semibold sm:text-3xl">{{ tituloDia }}</p>
-      <p v-if="siguiente" class="mt-2" data-prueba="detalle-siguiente">
-        {{ hora(siguiente) }}
-        <span v-if="detalleSiguiente" :style="{ color: 'var(--texto-suave)' }">
-          · {{ detalleSiguiente }}</span
-        >
-      </p>
-      <p
-        v-else-if="hoy.agenda && hoy.agenda.totales.sesiones > 0"
-        class="mt-2 text-sm"
-        style="color: var(--texto-suave)"
+      <TarjetaPrincipal
+        v-if="hoy.agenda"
+        class="min-w-0"
+        :etiqueta="etiquetaDia"
+        :etiqueta-viva="enCurso !== null"
+        :foto="foto"
+        :clima="clima"
+        :clima-lugar="climaLugar"
+        compacta
       >
-        {{
-          $t(
-            esCitas
-              ? "operacion.hoy.citas.revisarCierre"
-              : "operacion.hoy.clases.revisarCierre",
-          )
-        }}
-      </p>
-      <div class="mt-6 flex flex-wrap items-center gap-4">
-        <!-- Lo que sigue se abre directo; la agenda completa queda a un lado. -->
-        <RouterLink
-          v-if="siguiente && veAgenda"
-          :to="enAgenda(siguiente)"
-          class="tu-btn tu-btn-primario inline-flex"
-          data-prueba="abrir-siguiente"
+        <p class="mt-2 text-2xl font-semibold sm:text-3xl">{{ tituloDia }}</p>
+        <p v-if="siguiente" class="mt-2" data-prueba="detalle-siguiente">
+          {{ hora(siguiente) }}
+          <span
+            v-if="detalleSiguiente"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            · {{ detalleSiguiente }}</span
+          >
+        </p>
+        <p
+          v-else-if="hoy.agenda && hoy.agenda.totales.sesiones > 0"
+          class="mt-2 text-sm"
+          style="color: var(--texto-suave)"
         >
           {{
-            $t("operacion.hoy.verSesion", {
-              sesion: sesion.terminologia.sesion.toLowerCase(),
+            $t(
+              esCitas
+                ? "operacion.hoy.citas.revisarCierre"
+                : "operacion.hoy.clases.revisarCierre",
+            )
+          }}
+        </p>
+        <div class="mt-6 flex flex-wrap items-center gap-4">
+          <!-- Lo que sigue se abre directo; la agenda completa queda a un lado. -->
+          <RouterLink
+            v-if="siguiente && veAgenda"
+            :to="enAgenda(siguiente)"
+            class="tu-btn tu-btn-primario inline-flex"
+            data-prueba="abrir-siguiente"
+          >
+            {{
+              $t("operacion.hoy.verSesion", {
+                sesion: sesion.terminologia.sesion.toLowerCase(),
+              })
+            }}
+          </RouterLink>
+          <RouterLink
+            v-if="veAgenda"
+            :to="{ name: 'agenda' }"
+            :class="
+              siguiente
+                ? 'tu-enlace text-sm'
+                : 'tu-btn tu-btn-primario inline-flex'
+            "
+          >
+            {{ $t("operacion.hoy.abrirAgenda") }}
+          </RouterLink>
+          <RouterLink
+            v-if="puedeEntrar('recepcion', sesion)"
+            :to="{ name: 'recepcion' }"
+            class="tu-enlace text-sm"
+          >
+            {{ $t("operacion.hoy.irRecepcion") }}
+            <IconoNav
+              nombre="flecha"
+              :tam="14"
+              class="inline align-[-0.15em]"
+            />
+          </RouterLink>
+        </div>
+      </TarjetaPrincipal>
+      <aside v-if="metricaDia" class="hoy-metrica tu-card">
+        <p class="hoy-metrica-etiqueta">
+          {{ $t("adminUsabilidad.panel.resumen") }}
+        </p>
+        <h2 class="font-semibold">{{ metricaDia.etiqueta }}</h2>
+        <ProporcionCircular
+          :valor="metricaDia.valor"
+          :total="metricaDia.total"
+          :etiqueta="metricaDia.etiqueta"
+        />
+        <p class="hoy-metrica-dato">
+          {{
+            $t("adminUsabilidad.panel.proporcion", {
+              n: metricaDia.valor,
+              total: metricaDia.total,
             })
           }}
-        </RouterLink>
-        <RouterLink
-          v-if="veAgenda"
-          :to="{ name: 'agenda' }"
-          :class="
-            siguiente
-              ? 'tu-enlace text-sm'
-              : 'tu-btn tu-btn-primario inline-flex'
-          "
-        >
-          {{ $t("operacion.hoy.abrirAgenda") }}
-        </RouterLink>
-        <RouterLink
-          v-if="puedeEntrar('recepcion', sesion)"
-          :to="{ name: 'recepcion' }"
-          class="tu-enlace text-sm"
-        >
-          {{ $t("operacion.hoy.irRecepcion") }}
-          <IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]" />
-        </RouterLink>
-      </div>
-    </TarjetaPrincipal>
+        </p>
+      </aside>
+    </div>
 
     <TarjetasIndicadores
       v-if="indicadores.length > 0"
       class="mt-4"
       :tarjetas="indicadores"
-      compacta
     />
 
     <div class="mt-6 grid gap-6 lg:grid-cols-3">
@@ -630,7 +698,7 @@ onMounted(() => {
         </EstadoVacio>
         <ul v-else class="hoy-agenda-lista">
           <li
-            v-for="s in agendaVisible"
+            v-for="s in agendaPaginada"
             :key="s.id"
             class="hoy-sesion"
             :class="{
@@ -740,6 +808,15 @@ onMounted(() => {
             </span>
           </li>
         </ul>
+        <PaginacionListado
+          v-if="agendaVisible.length > 0"
+          class="mt-3"
+          :page="paginaSegura"
+          :ultima-pagina="paginasAgenda"
+          :total="agendaVisible.length"
+          :per-page="porPaginaAgenda"
+          @ir="paginaAgenda = $event"
+        />
       </section>
 
       <div
@@ -958,6 +1035,57 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.hoy-destacado {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+.hoy-metrica {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1.35rem;
+  text-align: center;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--primario) 9%, var(--superficie)),
+    var(--superficie)
+  );
+}
+.hoy-metrica-etiqueta {
+  color: var(--texto-suave);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.hoy-metrica-dato {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 1280px) {
+  .hoy-con-metrica {
+    grid-template-columns: minmax(0, 2.5fr) minmax(13rem, 1fr);
+  }
+}
+@media (max-width: 1279px) {
+  .hoy-metrica {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    text-align: left;
+    gap: 0.3rem 1rem;
+  }
+  .hoy-metrica :deep(.pc) {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    width: 5.5rem;
+  }
+  .hoy-metrica :deep(.pc span) {
+    font-size: 1.25rem;
+  }
+}
 .hoy-seccion {
   display: flex;
   align-items: center;

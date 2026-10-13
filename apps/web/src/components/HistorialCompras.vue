@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { cuandoCorto, dinero, type Orden } from "@/lib/miCuenta";
@@ -93,9 +94,9 @@ onMounted(() => void cargar());
 <template>
   <div class="tu-card overflow-hidden" data-prueba="historial-compras">
     <h2 class="px-5 pt-5 font-semibold">{{ $t("portal.pagos.historial") }}</h2>
-    <p v-if="error" class="px-5 py-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="px-5 py-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando && ordenes.length === 0"
       class="px-5 py-4 text-sm"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -546,9 +547,9 @@ const regreso = useRegreso({
       {{ regreso.etiqueta.value }}</RouterLink
     >
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-if="cargando"
       class="tu-card mt-4 p-6 text-sm"
@@ -665,14 +666,14 @@ const regreso = useRegreso({
               tipo-persona="miembro"
             />
             <template v-else>
-              <p
+              <AvisoTono
                 v-if="avisoCobro"
-                class="px-5 pt-5 text-sm"
+                tono="exito"
+                class="mx-5 mt-5"
                 role="status"
-                :style="{ color: 'var(--exito)' }"
               >
                 {{ avisoCobro }}
-              </p>
+              </AvisoTono>
               <!-- Lo que debe: primero, con «Registrar pago» -->
               <section
                 v-if="pendientes.length > 0"

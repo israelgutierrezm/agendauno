@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvisoTono from "@/components/AvisoTono.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
 import axios from "axios";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
@@ -692,14 +693,9 @@ onMounted(async () => {
               </RouterLink>
             </div>
 
-            <p
-              v-if="sesion.error"
-              class="text-sm"
-              role="alert"
-              style="color: var(--error)"
-            >
+            <AvisoTono v-if="sesion.error" tono="peligro" role="alert">
               {{ sesion.error }}
-            </p>
+            </AvisoTono>
 
             <button
               class="tu-btn tu-btn-primario w-full justify-center py-3"

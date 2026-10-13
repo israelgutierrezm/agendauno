@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
 import ActualizadoHace from "@/components/ActualizadoHace.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EscanerPase from "@/components/EscanerPase.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -593,9 +594,9 @@ onMounted(async () => {
       </p>
     </div>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <!-- Métricas del día -->
     <TarjetasIndicadores

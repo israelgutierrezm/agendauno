@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 
 /**
@@ -95,9 +96,9 @@ onBeforeUnmount(detener);
     @cerrar="emit('cerrar')"
   >
     <div class="p-5">
-      <p v-if="error" class="text-sm" role="alert" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ $t("paseEntrada.sinCamara") }}
-      </p>
+      </AvisoTono>
       <template v-else>
         <video
           ref="video"

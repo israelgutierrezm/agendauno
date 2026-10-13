@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -182,9 +183,9 @@ defineExpose({ cargar });
             maxlength="500"
             :placeholder="$t('porConciliar.notaEjemplo')"
           />
-          <p v-if="error" class="text-sm" style="color: var(--error)">
+          <AvisoTono v-if="error" tono="peligro" role="alert">
             {{ error }}
-          </p>
+          </AvisoTono>
           <div class="flex flex-wrap gap-2">
             <template
               v-if="

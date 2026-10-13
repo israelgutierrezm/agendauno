@@ -2,6 +2,7 @@
 import { ref, useId } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
@@ -66,14 +67,9 @@ async function agregar(): Promise<void> {
     <p v-if="llena" class="text-xs" :style="{ color: 'var(--aviso)' }">
       {{ t("paseLista.agregar.llena") }}
     </p>
-    <p
-      v-if="error"
-      class="text-sm"
-      role="alert"
-      :style="{ color: 'var(--error)' }"
-    >
+    <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <div class="flex flex-wrap gap-2">
       <button
         type="submit"

@@ -6,6 +6,7 @@ import { RouterLink, useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
@@ -812,12 +813,18 @@ onMounted(() => {
           </template>
         </BarraListado>
 
-        <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+        <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
           {{ error }}
-          <button type="button" class="tu-enlace ml-2" @click="cargar">
-            {{ $t("comun.reintentar") }}
-          </button>
-        </p>
+          <template #acciones>
+            <button
+              type="button"
+              class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+              @click="cargar"
+            >
+              {{ $t("comun.reintentar") }}
+            </button>
+          </template>
+        </AvisoTono>
         <p
           v-if="cargando"
           class="tu-card mt-4 p-6 text-sm"
@@ -1377,9 +1384,9 @@ onMounted(() => {
             >
           </span>
         </label>
-        <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
+        <AvisoTono v-if="mensaje" tono="exito">
           {{ $t("miembros.creado") }}
-        </p>
+        </AvisoTono>
         <div
           v-if="coincidencia"
           class="rounded-lg border p-3 text-sm"

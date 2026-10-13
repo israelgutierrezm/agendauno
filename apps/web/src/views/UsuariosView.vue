@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
@@ -371,9 +372,9 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <TablaDatos
       v-if="!cargando && error === null"
@@ -646,8 +647,7 @@ onMounted(cargar);
         />
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
-          style="color: var(--error)"
+          class="tu-btn tu-btn-contorno tu-tono-peligro"
           :disabled="dandoDeBaja"
           @click="darDeBaja"
         >
@@ -655,9 +655,9 @@ onMounted(cargar);
         </button>
       </div>
 
-      <p v-if="errorEdicion" class="mt-3 text-sm" style="color: var(--error)">
+      <AvisoTono v-if="errorEdicion" tono="peligro" class="mt-3" role="alert">
         {{ errorEdicion }}
-      </p>
+      </AvisoTono>
 
       <template #pie>
         <div class="flex justify-end gap-2">

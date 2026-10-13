@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BitacoraPlataforma from "@/components/BitacoraPlataforma.vue";
 import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
 import EquipoPlataforma from "@/components/EquipoPlataforma.vue";
@@ -1069,14 +1070,14 @@ function borrar(): void {
       <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("plataforma.codigoAyuda", { correo: correoDestino }) }}
       </p>
-      <p
+      <AvisoTono
         v-if="codigoDesarrollo"
-        class="mt-2 text-sm"
-        :style="{ color: 'var(--aviso)' }"
+        tono="aviso"
+        class="mt-2"
         data-prueba="codigo-desarrollo"
       >
         {{ $t("plataforma.codigoDesarrollo", { codigo: codigoDesarrollo }) }}
-      </p>
+      </AvisoTono>
       <form class="mt-4 space-y-3" @submit.prevent="verificar">
         <div>
           <label class="tu-label" for="pl-codigo">{{
@@ -1093,9 +1094,9 @@ function borrar(): void {
             required
           />
         </div>
-        <p v-if="error" class="text-sm" style="color: var(--error)">
+        <AvisoTono v-if="error" tono="peligro" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
         <button
           class="tu-btn tu-btn-primario w-full"
           type="submit"
@@ -1158,9 +1159,9 @@ function borrar(): void {
             required
           />
         </div>
-        <p v-if="error" class="text-sm" style="color: var(--error)">
+        <AvisoTono v-if="error" tono="peligro" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
         <button
           class="tu-btn tu-btn-primario w-full"
           type="submit"
@@ -1499,8 +1500,7 @@ function borrar(): void {
                   <button
                     v-else
                     type="button"
-                    class="tu-btn tu-btn-fantasma text-xs"
-                    style="color: var(--error)"
+                    class="tu-btn tu-btn-contorno tu-tono-peligro text-xs"
                     data-prueba="suspender-por-renta"
                     :disabled="suspendiendo === c.id"
                     @click="suspenderPorRenta(c)"
@@ -2388,8 +2388,7 @@ function borrar(): void {
                 />
               </div>
               <button
-                class="tu-btn tu-btn-fantasma text-sm"
-                style="color: var(--error)"
+                class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
                 type="button"
                 :disabled="accionando"
                 @click="suspender"

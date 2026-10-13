@@ -127,6 +127,10 @@ export function giroDeQuery(valor: unknown): string | null {
 export const PERFIL_DE_SOLUCION: Readonly<Record<string, string>> = {
   // «CrossFit y HYROX» junta dos giros: no lleva ninguno.
   nutriologos: "salud",
+  psicologos: "salud",
+  dentistas: "salud",
+  yoga: "yoga",
+  natacion: "natacion",
   pilates: "pilates",
   "pole-dance": "pole",
   academias: "academia",
@@ -325,9 +329,9 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     nombreRuta: NOMBRE_RUTA_MODALIDAD.clases,
     nombre: NOMBRE_MODALIDAD.clases,
     seo: {
-      title: "Software de clases para estudios y gimnasios | AgendaUno",
+      title: "Software de reservas para estudios y gimnasios | AgendaUno",
       description:
-        "Organiza clases con cupo, lista de espera, membresías y créditos, y pasa lista con retardos.",
+        "Gestiona reservas de clases, cupos, membresías y cobros para tu estudio o academia.",
       imagen: "/assets/landing/disciplinas/pilates-v1.jpg",
       imagenAlt: "Alumna practicando Pilates Reformer en un estudio moderno",
       miga: ETIQUETA_MENU.clases,
@@ -387,7 +391,7 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     seo: {
       title: "Agenda de citas: barberías, spas y consultorios | AgendaUno",
       description:
-        "Agenda por profesional, servicios con su duración y precio, paquetes y recordatorios por correo.",
+        "Agenda de citas para barberías, estéticas y consultorios: profesionales, reservas y cobros.",
       imagen: "/assets/landing/disciplinas/barberia-v1.jpg",
       imagenAlt: "Barbero atendiendo a un cliente en una barbería moderna",
       miga: ETIQUETA_MENU.citas,

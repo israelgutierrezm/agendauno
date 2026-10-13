@@ -106,7 +106,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       es.landing[modo].hero.enfasis,
     );
     expect(vista.get(".tu-modalidad-nombre").text()).toBe(
-      MODALIDADES[modo].nombre,
+      es.landing[modo].hero.etiqueta,
     );
     // Ninguna clave de i18n sin texto.
     expect(vista.text()).not.toMatch(/landing\.|escaparate\./);
@@ -508,18 +508,21 @@ describe("landing de una modalidad (/clases y /citas)", () => {
   );
 
   it.each(MODOS_PRUEBA)(
-    "%s: el botón del hero va en azul y el cierre se queda rosa",
+    "%s: los botones principales mantienen el mismo color de marca",
     (modo) => {
       const vista = montar(modo);
       expect(vista.get('[data-cta="hero"]').classes()).toEqual(
-        expect.arrayContaining(["tu-btn", "tu-btn-primario", "tu-btn-azul"]),
+        expect.arrayContaining(["tu-btn", "tu-btn-primario"]),
+      );
+      expect(vista.get('[data-cta="hero"]').classes()).not.toContain(
+        "tu-btn-azul",
       );
       expect(vista.get('[data-cta="final"]').classes()).not.toContain(
         "tu-btn-azul",
       );
-      // A media página también azul: el rosa es solo del menú y el cierre.
+      // La misma acción mantiene el mismo estilo también a media página.
       for (const cta of ["product_demo", "public_page"]) {
-        expect(vista.get(`[data-cta="${cta}"]`).classes()).toContain(
+        expect(vista.get(`[data-cta="${cta}"]`).classes()).not.toContain(
           "tu-btn-azul",
         );
       }

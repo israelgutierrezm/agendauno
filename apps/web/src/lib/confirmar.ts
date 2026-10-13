@@ -11,6 +11,11 @@ export interface OpcionesConfirmar {
   aceptar?: string;
   /** Acción destructiva: el botón va en rojo. */
   peligro?: boolean;
+  /**
+   * El tono del botón que confirma (paleta del sistema): `exito` para completar o
+   * aprobar, `aviso` para regresar o deshacer. `peligro` equivale a `peligro: true`.
+   */
+  tono?: "exito" | "aviso" | "info" | "peligro";
 }
 
 export const estadoConfirmar = reactive({
@@ -19,6 +24,7 @@ export const estadoConfirmar = reactive({
   mensaje: "",
   aceptar: null as string | null,
   peligro: false,
+  tono: null as OpcionesConfirmar["tono"] | null,
   resolver: null as ((si: boolean) => void) | null,
 });
 
@@ -37,6 +43,7 @@ export function confirmar(
       mensaje,
       aceptar: opciones.aceptar ?? null,
       peligro: opciones.peligro ?? false,
+      tono: opciones.tono ?? (opciones.peligro ? "peligro" : null),
       resolver,
     });
   });

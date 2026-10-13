@@ -249,107 +249,141 @@ onMounted(cargar);
           {{ $t("pasarelasEstado.enPrueba") }}
         </p>
 
-        <div class="mt-3 grid sm:grid-cols-2 gap-3">
-          <div>
-            <label class="tu-label" :for="`modo-${p.proveedor}`">{{
-              $t("pasarelas.modo")
-            }}</label>
-            <select
-              :id="`modo-${p.proveedor}`"
-              v-model="edicion[p.proveedor].modo"
-              class="tu-input"
-            >
-              <option value="test">{{ $t("pasarelas.test") }}</option>
-              <option value="live">{{ $t("pasarelas.live") }}</option>
-            </select>
+        <details class="pg-configurar" :open="p.activa">
+          <summary>{{ $t("adminUsabilidad.configurarConexion") }}</summary>
+          <div class="mt-3 grid sm:grid-cols-2 gap-3">
+            <div>
+              <label class="tu-label" :for="`modo-${p.proveedor}`">{{
+                $t("pasarelas.modo")
+              }}</label>
+              <select
+                :id="`modo-${p.proveedor}`"
+                v-model="edicion[p.proveedor].modo"
+                class="tu-input"
+              >
+                <option value="test">{{ $t("pasarelas.test") }}</option>
+                <option value="live">{{ $t("pasarelas.live") }}</option>
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div v-if="p.webhook_url" class="mt-3 text-sm">
-          <p class="tu-label">{{ $t("pasarelasEstado.webhook") }}</p>
-          <div class="flex flex-wrap items-center gap-2">
-            <code
-              class="rounded px-2 py-1 text-xs break-all"
-              :style="{ background: 'var(--superficie-2)' }"
-              >{{ p.webhook_url }}</code
+          <div v-if="p.webhook_url" class="mt-3 text-sm">
+            <p class="tu-label">{{ $t("pasarelasEstado.webhook") }}</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <code
+                class="rounded px-2 py-1 text-xs break-all"
+                :style="{ background: 'var(--superficie-2)' }"
+                >{{ p.webhook_url }}</code
+              >
+              <button
+                type="button"
+                class="tu-enlace text-xs"
+                @click="copiar(p)"
+              >
+                {{
+                  copiada === p.proveedor
+                    ? $t("pasarelasEstado.copiada")
+                    : $t("pasarelasEstado.copiar")
+                }}
+              </button>
+            </div>
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t(`pasarelasEstado.ayudaWebhook.${p.proveedor}`) }}
+            </p>
+            <p
+              v-if="p.codigo_verificacion"
+              class="mt-1 text-xs"
+              role="status"
+              style="color: var(--aviso)"
             >
-            <button type="button" class="tu-enlace text-xs" @click="copiar(p)">
               {{
-                copiada === p.proveedor
-                  ? $t("pasarelasEstado.copiada")
-                  : $t("pasarelasEstado.copiar")
+                $t("pasarelasEstado.codigoVerificacion", {
+                  codigo: p.codigo_verificacion,
+                })
+              }}
+            </p>
+          </div>
+
+          <div
+            v-if="LLAVES[p.proveedor].length > 0"
+            class="mt-3 grid sm:grid-cols-2 gap-3"
+          >
+            <div v-for="llave in LLAVES[p.proveedor]" :key="llave">
+              <label class="tu-label" :for="`${p.proveedor}-${llave}`">
+                {{ $t(`adminUsabilidad.credenciales.${llave}`) }}
+                <code
+                  class="block text-xs font-normal"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ llave }}</code
+                >
+                <span
+                  v-if="estaConfigurada(p.proveedor, llave)"
+                  class="tu-badge tu-badge-exito ml-1"
+                  >{{ $t("pasarelas.configurada") }}</span
+                >
+              </label>
+              <input
+                :id="`${p.proveedor}-${llave}`"
+                v-model="edicion[p.proveedor].llaves[llave]"
+                class="tu-input"
+                type="password"
+                autocomplete="off"
+                :placeholder="
+                  estaConfigurada(p.proveedor, llave)
+                    ? '••••••'
+                    : $t('pasarelas.nuevaLlave')
+                "
+              />
+            </div>
+          </div>
+          <p
+            v-else
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("pasarelas.sinLlaves") }}
+          </p>
+
+          <div class="mt-4 flex items-center gap-3">
+            <button
+              class="tu-btn tu-btn-primario"
+              :disabled="guardando === p.proveedor"
+              @click="guardar(p.proveedor)"
+            >
+              {{
+                guardando === p.proveedor
+                  ? $t("pasarelas.guardando")
+                  : $t("pasarelas.guardar")
               }}
             </button>
+            <span
+              v-if="guardado === p.proveedor"
+              class="text-sm"
+              :style="{ color: 'var(--exito)' }"
+            >
+              {{ $t("pasarelas.guardado") }}
+            </span>
           </div>
-          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t(`pasarelasEstado.ayudaWebhook.${p.proveedor}`) }}
-          </p>
-          <p
-            v-if="p.codigo_verificacion"
-            class="mt-1 text-xs"
-            role="status"
-            style="color: var(--aviso)"
-          >
-            {{
-              $t("pasarelasEstado.codigoVerificacion", {
-                codigo: p.codigo_verificacion,
-              })
-            }}
-          </p>
-        </div>
-
-        <div
-          v-if="LLAVES[p.proveedor].length > 0"
-          class="mt-3 grid sm:grid-cols-2 gap-3"
-        >
-          <div v-for="llave in LLAVES[p.proveedor]" :key="llave">
-            <label class="tu-label" :for="`${p.proveedor}-${llave}`">
-              {{ llave }}
-              <span
-                v-if="estaConfigurada(p.proveedor, llave)"
-                class="tu-badge tu-badge-exito ml-1"
-                >{{ $t("pasarelas.configurada") }}</span
-              >
-            </label>
-            <input
-              :id="`${p.proveedor}-${llave}`"
-              v-model="edicion[p.proveedor].llaves[llave]"
-              class="tu-input"
-              type="password"
-              autocomplete="off"
-              :placeholder="
-                estaConfigurada(p.proveedor, llave)
-                  ? '••••••'
-                  : $t('pasarelas.nuevaLlave')
-              "
-            />
-          </div>
-        </div>
-        <p v-else class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("pasarelas.sinLlaves") }}
-        </p>
-
-        <div class="mt-4 flex items-center gap-3">
-          <button
-            class="tu-btn tu-btn-primario"
-            :disabled="guardando === p.proveedor"
-            @click="guardar(p.proveedor)"
-          >
-            {{
-              guardando === p.proveedor
-                ? $t("pasarelas.guardando")
-                : $t("pasarelas.guardar")
-            }}
-          </button>
-          <span
-            v-if="guardado === p.proveedor"
-            class="text-sm"
-            :style="{ color: 'var(--exito)' }"
-          >
-            {{ $t("pasarelas.guardado") }}
-          </span>
-        </div>
+        </details>
       </div>
     </div>
   </section>
 </template>
+
+<style scoped>
+.pg-configurar {
+  margin-top: 1rem;
+  border-top: 1px solid var(--borde);
+  padding-top: 0.75rem;
+}
+.pg-configurar summary {
+  cursor: pointer;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.6rem;
+  background: var(--superficie-2);
+  color: var(--primario-fuerte);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+</style>

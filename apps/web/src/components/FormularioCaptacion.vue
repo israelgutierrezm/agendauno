@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { trackEvent } from "@/lib/analytics";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { leerAtribucion, type Ambito } from "@/lib/atribucion";
@@ -335,9 +336,9 @@ onMounted(cargar);
         </span>
       </label>
 
-      <p v-if="error" class="text-sm" style="color: var(--error)" role="alert">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
       <button
         class="tu-btn tu-btn-primario w-full sm:w-auto"
         type="submit"

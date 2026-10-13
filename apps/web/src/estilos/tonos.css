@@ -1,0 +1,324 @@
+/*
+| Tonos del sistema: avisos (alertas) y botones con una paleta suave, la misma en todos
+| los temas. El tema decide el color principal (`tu-btn-primario`); estos tonos son
+| para lo que comunica algo por sí mismo: confirmar, advertir, informar, eliminar.
+|
+| Cada tono (`tu-tono-exito`, `-peligro`, `-aviso`, `-info`, `-neutral`) define su fondo,
+| su borde, su texto y su color sólido; los avisos y los botones los usan.
+*/
+
+@layer components {
+  /* Sin tono explícito, neutral (sin especificidad: cualquier `tu-tono-*` gana). */
+  :where(
+    .tu-alerta,
+    .tu-pastilla,
+    .tu-btn-solido,
+    .tu-btn-contorno,
+    .tu-btn-suave
+  ) {
+    --tono-fondo: #f8fafc;
+    --tono-borde: #e2e8f0;
+    --tono-texto: #475569;
+    --tono-suave: #eef2f6;
+    --tono-solido: #334155;
+    --tono-solido-fuerte: #1e293b;
+  }
+  .tu-tono-exito {
+    --tono-fondo: #f1faf5;
+    --tono-borde: #d7e9dd;
+    --tono-texto: #246953;
+    --tono-suave: #e3f2e9;
+    --tono-solido: #246953;
+    --tono-solido-fuerte: #1c5543;
+  }
+  .tu-tono-peligro {
+    --tono-fondo: #fdf4f3;
+    --tono-borde: #f2dbd8;
+    --tono-texto: #a24747;
+    --tono-suave: #f9e5e3;
+    --tono-solido: #a24747;
+    --tono-solido-fuerte: #883a3a;
+  }
+  .tu-tono-aviso {
+    --tono-fondo: #fdf9ed;
+    --tono-borde: #eee4c7;
+    /* Un poco más oscuro que la referencia (#886a30): así llega a AA en lo suave. */
+    --tono-texto: #806328;
+    --tono-suave: #f7eed5;
+    --tono-solido: #886a30;
+    --tono-solido-fuerte: #6f5625;
+  }
+  .tu-tono-info {
+    --tono-fondo: #f2f7fb;
+    --tono-borde: #d9e7f0;
+    --tono-texto: #386c90;
+    --tono-suave: #e4eef6;
+    --tono-solido: #3d6a8f;
+    --tono-solido-fuerte: #315776;
+  }
+  .tu-tono-neutral {
+    --tono-fondo: #f8fafc;
+    --tono-borde: #e2e8f0;
+    --tono-texto: #475569;
+    --tono-suave: #eef2f6;
+    --tono-solido: #334155;
+    --tono-solido-fuerte: #1e293b;
+  }
+
+  /* En oscuro: el tono sobre la superficie del tema, con su texto aclarado. */
+  .dark .tu-tono-exito {
+    --tono-texto: #8fd4b5;
+    --tono-solido: #2f8a6b;
+    --tono-solido-fuerte: #36a07d;
+  }
+  .dark .tu-tono-peligro {
+    --tono-texto: #f0aaaa;
+    --tono-solido: #b55454;
+    --tono-solido-fuerte: #c66565;
+  }
+  .dark .tu-tono-aviso {
+    --tono-texto: #e6c787;
+    --tono-solido: #9a7a37;
+    --tono-solido-fuerte: #ad8b42;
+  }
+  .dark .tu-tono-info {
+    --tono-texto: #9cc4e2;
+    --tono-solido: #46779e;
+    --tono-solido-fuerte: #5288b3;
+  }
+  .dark .tu-tono-neutral {
+    --tono-texto: #cbd5e1;
+    --tono-solido: #475569;
+    --tono-solido-fuerte: #56657a;
+  }
+  .dark
+    :is(
+      .tu-tono-exito,
+      .tu-tono-peligro,
+      .tu-tono-aviso,
+      .tu-tono-info,
+      .tu-tono-neutral
+    ) {
+    --tono-fondo: color-mix(in srgb, var(--tono-texto) 10%, var(--superficie));
+    --tono-borde: color-mix(in srgb, var(--tono-texto) 28%, var(--superficie));
+    --tono-suave: color-mix(in srgb, var(--tono-texto) 16%, var(--superficie));
+  }
+  :where(.dark)
+    :where(
+      .tu-alerta,
+      .tu-pastilla,
+      .tu-btn-solido,
+      .tu-btn-contorno,
+      .tu-btn-suave
+    ) {
+    --tono-texto: #cbd5e1;
+    --tono-solido: #475569;
+    --tono-solido-fuerte: #56657a;
+    --tono-fondo: color-mix(in srgb, #cbd5e1 10%, var(--superficie));
+    --tono-borde: color-mix(in srgb, #cbd5e1 28%, var(--superficie));
+    --tono-suave: color-mix(in srgb, #cbd5e1 16%, var(--superficie));
+  }
+
+  /* ---------------------------------------------------------------- avisos */
+  .tu-alerta {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.95rem 1rem;
+    border: 1px solid var(--tono-borde);
+    border-radius: 0.6rem;
+    background: var(--tono-fondo);
+    color: var(--tono-texto);
+  }
+  .tu-alerta-icono {
+    flex-shrink: 0;
+    width: 1.2rem;
+    height: 1.2rem;
+    margin-top: 0.05rem;
+  }
+  .tu-alerta-contenido {
+    flex: 1;
+    min-width: 0;
+  }
+  .tu-alerta-titulo {
+    margin: 0 0 0.2rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  /* Sin transparencia: con ella el texto chico baja de AA en ámbar, rojo y azul. */
+  .tu-alerta-mensaje {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  .tu-alerta-mensaje strong {
+    font-weight: 600;
+  }
+  /* Sin título (un error, una confirmación breve): más compacto y a tamaño de texto. */
+  .tu-alerta-simple {
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.85rem;
+  }
+  .tu-alerta-simple .tu-alerta-icono {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-top: 0;
+  }
+  .tu-alerta-simple .tu-alerta-mensaje {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  /* Estado en una pastilla: punto y texto en el tono, sobre su fondo suave. */
+  .tu-pastilla {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--tono-suave);
+    color: var(--tono-texto);
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .tu-pastilla::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  /* Un apartado dentro de una tarjeta, con su icono en una placa a la izquierda. */
+  .tu-apartado {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.25rem 0.85rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-tarjeta);
+    background: color-mix(in srgb, var(--superficie-2) 60%, var(--superficie));
+  }
+  .tu-apartado-icono {
+    display: grid;
+    grid-row: span 2;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.6rem;
+    background: var(--primario-suave);
+    color: var(--primario);
+  }
+
+  /* --------------------------------------------------------------- botones */
+  /* Sólidos: confirmar (éxito), guardar (info), continuar (neutral), eliminar. */
+  .tu-btn-solido {
+    background: var(--tono-solido);
+    color: #ffffff;
+  }
+  .tu-btn-solido:hover:not(:disabled) {
+    background: var(--tono-solido-fuerte);
+  }
+  /* Con contorno: modales, formularios y acciones secundarias. */
+  .tu-btn-contorno {
+    background: var(--superficie);
+    color: var(--tono-texto);
+    border-color: var(--tono-borde);
+  }
+  .tu-btn-contorno:hover:not(:disabled) {
+    background: var(--tono-fondo);
+  }
+  /* Suaves (pastel): acciones dentro de tablas y módulos administrativos. */
+  .tu-btn-suave {
+    background: var(--tono-suave);
+    color: var(--tono-texto);
+  }
+  .tu-btn-suave:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--tono-texto) 16%, var(--tono-fondo));
+  }
+  /* Mínimos: pantallas con muchas acciones. */
+  .tu-btn-minimo {
+    background: transparent;
+    color: var(--texto-suave);
+    padding-inline: 0.5rem;
+  }
+  .tu-btn-minimo:hover:not(:disabled) {
+    background: var(--superficie-2);
+    color: var(--texto);
+  }
+  /* Compactos para filas de tablas, y solo con icono. */
+  .tu-btn-chico {
+    gap: 0.3rem;
+    padding: 0.32rem 0.65rem;
+    font-size: 0.8rem;
+    border-radius: 0.45rem;
+  }
+  .tu-btn-icono {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-radius: 0.45rem;
+  }
+  /* Deshabilitados: se ven claramente apagados, sin perder su tono. */
+  .tu-btn-solido:disabled,
+  .tu-btn-contorno:disabled,
+  .tu-btn-suave:disabled {
+    opacity: 0.55;
+  }
+
+  /* -------------------------------------------------------- interruptor */
+  .tu-interruptor {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--texto);
+  }
+  .tu-interruptor-riel {
+    position: relative;
+    flex-shrink: 0;
+    width: 2.6rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--texto-suave) 35%, var(--superficie-2));
+    transition: background-color 0.15s ease;
+  }
+  .tu-interruptor-riel::after {
+    content: "";
+    position: absolute;
+    top: 0.2rem;
+    left: 0.2rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgb(16 24 40 / 25%);
+    transition: transform 0.15s ease;
+  }
+  .tu-interruptor[aria-checked="true"] .tu-interruptor-riel {
+    background: var(--primario);
+  }
+  .tu-interruptor[aria-checked="true"] .tu-interruptor-riel::after {
+    transform: translateX(1.1rem);
+  }
+  .tu-interruptor:focus-visible {
+    outline: none;
+  }
+  .tu-interruptor:focus-visible .tu-interruptor-riel {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primario) 35%, transparent);
+  }
+  .tu-interruptor:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tu-interruptor-riel,
+    .tu-interruptor-riel::after {
+      transition: none;
+    }
+  }
+}

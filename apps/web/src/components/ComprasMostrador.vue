@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
@@ -114,9 +115,9 @@ onMounted(() => void cargar());
     <h2 class="px-5 pt-5 font-semibold">
       {{ $t("portal.comprasMostrador.titulo") }}
     </h2>
-    <p v-if="error" class="px-5 py-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="px-5 py-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando && tickets.length === 0"
       class="px-5 py-4 text-sm"

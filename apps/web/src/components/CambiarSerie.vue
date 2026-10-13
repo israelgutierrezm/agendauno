@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
@@ -208,7 +209,7 @@ async function enviar(previsualizar: boolean): Promise<void> {
         </ul>
       </template>
     </div>
-    <p v-if="error" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
 
     <div class="flex flex-wrap gap-2">
       <button

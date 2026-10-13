@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
@@ -62,6 +63,7 @@ const TONO_TIPO: Record<TipoPago, string> = {
 };
 
 const equipo = ref<Persona[]>([]);
+const nombresRoles = ref<Record<string, string>>({});
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -72,7 +74,11 @@ const esquema = ref<{ usuarioId: string; tipo: TipoPago; monto: string }>({
 });
 const guardando = ref(false);
 const guardado = ref(false);
-const formulario = useTemplateRef<HTMLFormElement>("formulario");
+const editorEsquema = ref(false);
+const nombreEsquema = computed(
+  () =>
+    equipo.value.find((u) => u.id === esquema.value.usuarioId)?.nombre ?? "",
+);
 
 function iso(d: Date): string {
   const p = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
@@ -128,6 +134,7 @@ function rolDe(rol: string | null): string {
   if (rol === "instructor") {
     return sesion.terminologia.instructor;
   }
+  if (nombresRoles.value[rol]) return nombresRoles.value[rol];
   return nombreDeRol(rol, undefined, (llave) => {
     const texto = t(llave);
     return texto === llave ? null : texto;
@@ -206,8 +213,14 @@ const indicadores = computed<Indicador[]>(() => [
 
 async function cargarEquipo(): Promise<void> {
   try {
-    const { data } = await api.get<{ data: Persona[] }>(
-      `${base.value}/usuarios`,
+    const { data } = await api.get<{
+      data: Persona[];
+      roles_detalle?: { clave: string; nombre: string | null }[];
+    }>(`${base.value}/usuarios`);
+    nombresRoles.value = Object.fromEntries(
+      (data.roles_detalle ?? [])
+        .filter((r) => r.nombre)
+        .map((r) => [r.clave, r.nombre as string]),
     );
     // La nómina es del equipo: los clientes con cuenta no cobran.
     equipo.value = data.data.filter((u) => u.rol !== "miembro");
@@ -235,6 +248,8 @@ async function calcular(): Promise<void> {
 }
 
 async function guardarEsquema(): Promise<void> {
+  if (guardando.value || !esquema.value.usuarioId || esquema.value.monto === "")
+    return;
   guardando.value = true;
   guardado.value = false;
   error.value = null;
@@ -248,6 +263,7 @@ async function guardarEsquema(): Promise<void> {
       },
     );
     guardado.value = true;
+    editorEsquema.value = false;
     await calcular();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -268,7 +284,8 @@ function editar(x: FilaVista): void {
       x.fila?.monto_minor !== undefined ? String(x.fila.monto_minor / 100) : "",
   };
   guardado.value = false;
-  formulario.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  error.value = null;
+  editorEsquema.value = true;
 }
 
 // CSV del resumen (abre en Excel: BOM UTF-8 y separador coma).
@@ -311,7 +328,21 @@ onMounted(async () => {
     <EncabezadoSeccion
       :titulo="$t('nomina.titulo')"
       :subtitulo="$t('nominaVisual.subtitulo')"
-    />
+    >
+      <template #acciones
+        ><button
+          type="button"
+          class="tu-btn tu-btn-primario"
+          @click="
+            esquema = { usuarioId: '', tipo: 'por_clase', monto: '' };
+            error = null;
+            editorEsquema = true;
+          "
+        >
+          {{ $t("adminUsabilidad.nomina.definir") }}
+        </button></template
+      >
+    </EncabezadoSeccion>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -320,112 +351,138 @@ onMounted(async () => {
     <div class="nm-arriba mt-6">
       <div class="space-y-5 min-w-0">
         <!-- Esquema de pago -->
-        <form
-          ref="formulario"
-          class="tu-card p-5 scroll-mt-24"
-          @submit.prevent="guardarEsquema"
+        <ModalDialogo
+          :abierto="editorEsquema"
+          :titulo="
+            nombreEsquema
+              ? $t('adminUsabilidad.nomina.editar', { nombre: nombreEsquema })
+              : $t('adminUsabilidad.nomina.definir')
+          "
+          :descripcion="$t('adminUsabilidad.nomina.ayuda')"
+          icono="nomina"
+          :ocupado="guardando"
+          @cerrar="editorEsquema = false"
         >
-          <header class="nm-cabeza">
-            <span class="tu-icono-tono tu-tono-azul">
-              <IconoNav nombre="nomina" :tam="20" />
-            </span>
-            <span>
-              <h2 class="font-semibold">{{ $t("nomina.esquemas") }}</h2>
-              <p class="nm-sub">{{ $t("nominaVisual.esquemasAyuda") }}</p>
-            </span>
-          </header>
-
-          <div class="mt-5 grid gap-4 md:grid-cols-2">
-            <div>
-              <label class="tu-label" for="es">{{
-                $t("nominaVisual.quien")
-              }}</label>
-              <label class="tu-select-icono flex">
-                <IconoNav nombre="personas" :tam="16" />
-                <select
-                  id="es"
-                  v-model="esquema.usuarioId"
-                  class="tu-input"
-                  required
-                >
-                  <option value="" disabled>
-                    {{ $t("nominaVisual.elegir") }}
-                  </option>
-                  <option v-for="u in equipo" :key="u.id" :value="u.id">
-                    {{ u.nombre }}
-                  </option>
-                </select>
-              </label>
-            </div>
-            <div>
-              <label class="tu-label" for="em">{{ $t("nomina.monto") }}</label>
-              <div class="nm-monto">
-                <span aria-hidden="true" data-prueba="simbolo-monto">{{
-                  simbolo
-                }}</span>
-                <input
-                  id="em"
-                  v-model="esquema.monto"
-                  class="tu-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputmode="decimal"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-              <p class="tu-hint">
-                {{
-                  $t(`nominaVisual.ayudaMonto.${esquema.tipo}`, {
-                    sesion: termino,
-                  })
-                }}
-              </p>
-            </div>
-          </div>
-
-          <fieldset class="mt-4">
-            <legend class="tu-label">{{ $t("nominaVisual.tipo") }}</legend>
-            <div class="nm-chips">
-              <label
-                v-for="x in TIPOS"
-                :key="x.valor"
-                class="nm-chip"
-                :class="{ 'nm-chip-activo': esquema.tipo === x.valor }"
-              >
-                <input
-                  v-model="esquema.tipo"
-                  type="radio"
-                  name="tipo-esquema"
-                  :value="x.valor"
-                  class="sr-only"
-                />
-                <IconoNav :nombre="x.icono" :tam="16" />
-                {{ etiquetaTipo(x.valor) }}
-              </label>
-            </div>
-          </fieldset>
-
-          <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
-            <p
-              v-if="guardado"
-              class="text-sm"
-              :style="{ color: 'var(--exito)' }"
-            >
-              {{ $t("nomina.guardado") }}
+          <form
+            data-prueba="editor-esquema"
+            class="space-y-4"
+            @submit.prevent="guardarEsquema"
+          >
+            <p v-if="error" role="alert" :style="{ color: 'var(--error)' }">
+              {{ error }}
             </p>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="
-                guardando || esquema.usuarioId === '' || esquema.monto === ''
-              "
-            >
-              {{ $t("nomina.guardarEsquema") }}
-            </button>
-          </div>
-        </form>
+            <header class="nm-cabeza">
+              <span class="tu-icono-tono tu-tono-azul">
+                <IconoNav nombre="nomina" :tam="20" />
+              </span>
+              <span>
+                <h2 class="font-semibold">{{ $t("nomina.esquemas") }}</h2>
+                <p class="nm-sub">{{ $t("nominaVisual.esquemasAyuda") }}</p>
+              </span>
+            </header>
+
+            <div class="mt-5 grid gap-4 md:grid-cols-2">
+              <div>
+                <label class="tu-label" for="es">{{
+                  $t("nominaVisual.quien")
+                }}</label>
+                <label class="tu-select-icono flex">
+                  <IconoNav nombre="personas" :tam="16" />
+                  <select
+                    id="es"
+                    v-model="esquema.usuarioId"
+                    class="tu-input"
+                    required
+                  >
+                    <option value="" disabled>
+                      {{ $t("nominaVisual.elegir") }}
+                    </option>
+                    <option v-for="u in equipo" :key="u.id" :value="u.id">
+                      {{ u.nombre }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <div>
+                <label class="tu-label" for="em">{{
+                  $t("nomina.monto")
+                }}</label>
+                <div class="nm-monto">
+                  <span aria-hidden="true" data-prueba="simbolo-monto">{{
+                    simbolo
+                  }}</span>
+                  <input
+                    id="em"
+                    v-model="esquema.monto"
+                    class="tu-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputmode="decimal"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <p class="tu-hint">
+                  {{
+                    $t(`nominaVisual.ayudaMonto.${esquema.tipo}`, {
+                      sesion: termino,
+                    })
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <fieldset class="mt-4">
+              <legend class="tu-label">{{ $t("nominaVisual.tipo") }}</legend>
+              <div class="nm-chips">
+                <label
+                  v-for="x in TIPOS"
+                  :key="x.valor"
+                  class="nm-chip"
+                  :class="{ 'nm-chip-activo': esquema.tipo === x.valor }"
+                >
+                  <input
+                    v-model="esquema.tipo"
+                    type="radio"
+                    name="tipo-esquema"
+                    :value="x.valor"
+                    class="sr-only"
+                  />
+                  <IconoNav :nombre="x.icono" :tam="16" />
+                  {{ etiquetaTipo(x.valor) }}
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
+              <p
+                v-if="guardado"
+                class="text-sm"
+                :style="{ color: 'var(--exito)' }"
+              >
+                {{ $t("nomina.guardado") }}
+              </p>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma"
+                :disabled="guardando"
+                @click="editorEsquema = false"
+              >
+                {{ $t("comun.cancelar") }}
+              </button>
+              <button
+                class="tu-btn tu-btn-primario"
+                type="submit"
+                :disabled="
+                  guardando || esquema.usuarioId === '' || esquema.monto === ''
+                "
+              >
+                {{ $t("nomina.guardarEsquema") }}
+              </button>
+            </div>
+          </form>
+        </ModalDialogo>
 
         <!-- Periodo -->
         <div class="tu-card p-5">

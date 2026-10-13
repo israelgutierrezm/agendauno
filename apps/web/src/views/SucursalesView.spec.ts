@@ -52,8 +52,8 @@ async function montar(sede: Record<string, unknown> = roma) {
         }),
       ],
       stubs: {
-        EncabezadoSeccion: true,
-        PanelLateral: { template: "<div><slot /><slot name='pie' /></div>" },
+        EncabezadoSeccion: { template: "<div><slot name='acciones' /></div>" },
+        ModalDialogo: { template: "<div><slot /><slot name='pie' /></div>" },
       },
     },
   });
@@ -64,6 +64,20 @@ async function montar(sede: Record<string, unknown> = roma) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("sedes: foto y enlace de Google Maps", () => {
+  it("muestra dirección e impuesto en tarjetas y busca sin exigir acentos", async () => {
+    const w = await montar();
+    expect(w.get('[data-prueba="sucursal"]').element.tagName).toBe("ARTICLE");
+    expect(w.get('[data-prueba="sucursal"]').text()).toContain(
+      "Av. Álvaro Obregón 120",
+    );
+    expect(w.get('[data-prueba="sucursal"]').text()).toContain("16%");
+    await w.get('input[type="search"]').setValue("alvaro");
+    expect(w.findAll('[data-prueba="sucursal"]')).toHaveLength(1);
+    await w.get('input[type="search"]').setValue("Polanco");
+    expect(w.findAll('[data-prueba="sucursal"]')).toHaveLength(0);
+    await w.get('input[type="search"]').setValue("");
+    expect(w.findAll('[data-prueba="sucursal"]')).toHaveLength(1);
+  });
   it("al editar muestra su foto para cambiarla y guarda el enlace de Maps", async () => {
     api.put.mockResolvedValue({ data: { data: roma } });
     const w = await montar();

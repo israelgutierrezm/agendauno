@@ -3,6 +3,7 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 import { PRODUCTOS, type Producto } from "@/lib/producto";
 
@@ -172,17 +173,18 @@ onMounted(() => {
       </button>
     </form>
 
-    <p
-      v-if="error"
-      class="mt-4 text-sm"
-      role="alert"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ t("plataformaAdmin.bitacora.reintentar") }}
-      </button>
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ t("plataformaAdmin.bitacora.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p v-else-if="cargando" class="mt-4 text-sm" role="status">
       {{ t("plataformaAdmin.bitacora.cargando") }}
     </p>

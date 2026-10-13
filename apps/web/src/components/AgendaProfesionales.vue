@@ -752,17 +752,16 @@ watch(() => props.fecha, enfocar);
   justify-content: center;
   pointer-events: none;
 }
-/* Como en la demo de la landing: tinte muy suave del servicio y su color en el
-   borde izquierdo; el texto en el color normal. */
+/* Superficie pastel del servicio; texto y selección derivados del tema activo. */
 .ag-tarjeta {
   position: absolute;
   z-index: 3;
   box-sizing: border-box;
   border: none;
-  border-left: 3px solid var(--tt);
+  border-left: 3px solid color-mix(in srgb, var(--tt) 70%, var(--superficie));
   border-radius: 0.55rem;
   padding: 0.4rem 0.55rem;
-  background: color-mix(in srgb, var(--tt) 11%, var(--superficie));
+  background: color-mix(in srgb, var(--tf) 75%, var(--superficie));
   color: var(--texto);
   text-align: left;
   display: flex;
@@ -841,7 +840,7 @@ watch(() => props.fecha, enfocar);
 }
 .dark .ag-tarjeta {
   background: color-mix(in srgb, var(--tf) 18%, var(--superficie));
-  border-left-color: var(--tf);
+  border-left-color: color-mix(in srgb, var(--tf) 65%, var(--superficie));
 }
 /* Preparación / limpieza del servicio: tramo tenue junto a la cita. */
 .ag-margen {

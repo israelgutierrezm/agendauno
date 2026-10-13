@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useId } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { aceptaArchivo, useArrastreDeArchivos } from "@/lib/archivos";
 
@@ -229,13 +230,8 @@ function alSoltar(e: DragEvent): void {
       :disabled="!habilitada"
       @change="alElegir"
     />
-    <p
-      v-if="error"
-      class="mt-1.5 text-sm"
-      role="alert"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="error" tono="peligro" class="mt-1.5" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
   </div>
 </template>

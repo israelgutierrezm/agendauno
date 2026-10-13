@@ -3,15 +3,17 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import CampoCelular from "@/components/CampoCelular.vue";
+import BarraListado from "@/components/BarraListado.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
-import PanelLateral from "@/components/PanelLateral.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { etiquetaZona, opcionesZona, ZONA_POR_OMISION } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { normalizar } from "@/lib/menu";
 
 interface Sucursal {
   id: string;
@@ -86,6 +88,22 @@ const error = ref<string | null>(null);
 const totalSucursales = computed(() =>
   organizaciones.value.reduce((n, o) => n + o.sucursales.length, 0),
 );
+const busqueda = ref("");
+const listado = computed(() => {
+  const q = normalizar(busqueda.value.trim());
+  return organizaciones.value
+    .map((org) => ({
+      ...org,
+      sucursales: org.sucursales.filter(
+        (s) =>
+          !q ||
+          normalizar(
+            [s.nombre, s.region, s.direccion].filter(Boolean).join(" "),
+          ).includes(q),
+      ),
+    }))
+    .filter((org) => !q || org.sucursales.length > 0);
+});
 
 // Drawer de alta/edición.
 const abierto = ref(false);
@@ -307,20 +325,23 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        :titulo="$t('sedes.titulo')"
-        :total="totalSucursales"
-      />
-      <button
-        v-if="puedeGestionar"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        type="button"
-        @click="abrirNueva"
-      >
-        {{ $t("sedes.agregar") }}
-      </button>
-    </div>
+    <EncabezadoSeccion
+      :titulo="$t('sedes.titulo')"
+      :total="totalSucursales"
+      icono="ubicacion"
+      :subtitulo="$t('adminUsabilidad.sucursales.ayuda')"
+    >
+      <template #acciones>
+        <button
+          v-if="puedeGestionar"
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          type="button"
+          @click="abrirNueva"
+        >
+          {{ $t("sedes.agregar") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -330,7 +351,19 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <div v-for="org in organizaciones" :key="org.id" class="mt-6">
+      <BarraListado
+        v-if="totalSucursales"
+        v-model:busqueda="busqueda"
+        class="mt-5"
+        :placeholder="$t('adminUsabilidad.sucursales.buscar')"
+      />
+      <EstadoVacio
+        v-if="totalSucursales && !listado.length"
+        class="mt-6"
+        icono="buscar"
+        :titulo="$t('adminUsabilidad.sucursales.sinResultados')"
+      />
+      <div v-for="org in listado" :key="org.id" class="mt-6">
         <h2
           v-if="organizaciones.length > 1"
           class="font-semibold text-sm mb-2"
@@ -347,81 +380,84 @@ onMounted(cargar);
           :titulo="$t('sedes.vacio')"
         />
 
-        <div v-else class="tu-card overflow-x-auto">
-          <table class="tu-tabla">
-            <thead>
-              <tr>
-                <th>{{ $t("sucursalesVisual.col.sucursal") }}</th>
-                <th class="hidden md:table-cell">
-                  {{ $t("sucursalesVisual.col.zona") }}
-                </th>
-                <th class="hidden sm:table-cell text-right">
-                  {{ $t("sucursalesVisual.col.iva") }}
-                </th>
-                <th>
-                  <span class="sr-only">{{
-                    $t("sucursalesVisual.col.acciones")
-                  }}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="s in org.sucursales"
-                :key="s.id"
-                data-prueba="sucursal"
+        <div v-else class="su-rejilla">
+          <article
+            v-for="s in org.sucursales"
+            :key="s.id"
+            class="tu-card su-tarjeta"
+            data-prueba="sucursal"
+          >
+            <div class="su-cabecera">
+              <img
+                v-if="s.foto_url"
+                :src="s.foto_url"
+                alt=""
+                class="su-foto"
+                loading="lazy"
+              />
+              <span v-else class="su-foto su-sin-foto" aria-hidden="true"
+                ><IconoNav nombre="ubicacion" :tam="27"
+              /></span>
+              <div class="min-w-0">
+                <h2 class="font-semibold break-words">{{ s.nombre }}</h2>
+                <p v-if="s.region" class="su-suave mt-1 text-sm">
+                  {{ s.region }}
+                </p>
+              </div>
+            </div>
+            <p class="su-direccion">
+              <IconoNav nombre="ubicacion" :tam="16" class="shrink-0" /><span>{{
+                s.direccion || $t("adminUsabilidad.sucursales.sinDireccion")
+              }}</span>
+            </p>
+            <dl class="su-datos">
+              <div>
+                <dt>{{ $t("adminUsabilidad.sucursales.zona") }}</dt>
+                <dd>{{ etiquetaZona(s.zona_horaria ?? zonaNegocio) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t("adminUsabilidad.sucursales.impuesto") }}</dt>
+                <dd>{{ s.impuesto_tasa_bps / 100 }}%</dd>
+              </div>
+              <div v-if="s.telefono">
+                <dt>{{ $t("perfilPublico.sucursal.telefono") }}</dt>
+                <dd>{{ s.telefono }}</dd>
+              </div>
+            </dl>
+            <div class="su-acciones">
+              <a
+                v-if="s.mapa_url"
+                :href="s.mapa_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="tu-btn tu-btn-fantasma text-sm"
+                >{{ $t("operacion.sedes.verMapa") }}</a
               >
-                <td>
-                  <div class="flex items-center gap-3">
-                    <img
-                      v-if="s.foto_url"
-                      :src="s.foto_url"
-                      alt=""
-                      class="su-foto"
-                    />
-                    <span v-else class="su-foto su-sin-foto" aria-hidden="true">
-                      <IconoNav nombre="ubicacion" :tam="16" />
-                    </span>
-                    <div class="min-w-0">
-                      <span class="font-medium">{{ s.nombre }}</span>
-                      <span v-if="s.region" class="tu-sub">{{ s.region }}</span>
-                    </div>
-                  </div>
-                </td>
-                <td
-                  class="hidden md:table-cell"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ s.zona_horaria ? etiquetaZona(s.zona_horaria) : "—" }}
-                </td>
-                <td class="hidden sm:table-cell text-right tabular-nums">
-                  {{ s.impuesto_tasa_bps / 100 }}%
-                </td>
-                <td class="text-right">
-                  <button
-                    v-if="puedeGestionar"
-                    class="tu-enlace text-sm"
-                    type="button"
-                    @click="abrirEdicion(s)"
-                  >
-                    {{ $t("sedes.editar") }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+              <button
+                v-if="puedeGestionar"
+                class="tu-btn tu-btn-fantasma text-sm"
+                type="button"
+                @click="abrirEdicion(s)"
+              >
+                <IconoNav nombre="editar" :tam="16" />{{ $t("sedes.editar") }}
+              </button>
+            </div>
+          </article>
         </div>
       </div>
     </template>
 
-    <!-- Alta / edición en drawer lateral -->
-    <PanelLateral
+    <!-- Formulario amplio: identidad y ubicación primero; perfil y horarios debajo. -->
+    <ModalDialogo
       :abierto="abierto"
       :titulo="esNueva ? $t('sedes.nueva') : $t('sedes.editarTitulo')"
+      icono="ubicacion"
+      :descripcion="$t('adminUsabilidad.sucursales.formulario')"
+      :ocupado="guardando"
       @cerrar="cerrar"
     >
-      <form class="space-y-4" @submit.prevent="guardar">
-        <div v-if="esNueva && organizaciones.length > 1">
+      <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="guardar">
+        <div v-if="esNueva && organizaciones.length > 1" class="sm:col-span-2">
           <label class="tu-label" for="s-org">{{
             $t("sedes.organizacion")
           }}</label>
@@ -532,7 +568,7 @@ onMounted(cargar);
 
         <!-- Perfil público de la sede -->
         <div
-          class="border-t pt-4 space-y-4"
+          class="border-t pt-4 space-y-4 sm:col-span-2"
           :style="{ borderColor: 'var(--borde)' }"
           data-prueba="perfil-sede"
         >
@@ -719,7 +755,12 @@ onMounted(cargar);
 
       <template #pie>
         <div class="flex justify-end gap-2">
-          <button class="tu-btn tu-btn-fantasma" type="button" @click="cerrar">
+          <button
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            :disabled="guardando"
+            @click="cerrar"
+          >
             {{ $t("comun.cancelar") }}
           </button>
           <button
@@ -736,16 +777,16 @@ onMounted(cargar);
           </button>
         </div>
       </template>
-    </PanelLateral>
+    </ModalDialogo>
   </section>
 </template>
 
 <style scoped>
 .su-foto {
-  width: 2.75rem;
-  height: 2.25rem;
+  width: 4.5rem;
+  height: 4.5rem;
   flex-shrink: 0;
-  border-radius: 0.4rem;
+  border-radius: 0.8rem;
   object-fit: cover;
 }
 .su-sin-foto {
@@ -753,5 +794,59 @@ onMounted(cargar);
   place-items: center;
   border: 1px solid var(--borde);
   color: var(--texto-suave);
+  background: var(--primario-suave);
+}
+.su-rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
+}
+.su-tarjeta {
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+}
+.su-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.su-direccion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--texto-suave);
+  overflow-wrap: anywhere;
+}
+.su-datos {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1.25rem;
+  font-size: 0.875rem;
+}
+.su-datos > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.su-datos dt,
+.su-suave {
+  color: var(--texto-suave);
+}
+.su-datos dd {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.su-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: auto;
+  border-top: 1px solid var(--borde);
+  padding-top: 1rem;
 }
 </style>

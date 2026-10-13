@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
@@ -386,9 +387,9 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
           </li>
         </ul>
       </div>
-      <p v-if="error" class="text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
       <button
         type="submit"
         class="tu-btn tu-btn-primario"

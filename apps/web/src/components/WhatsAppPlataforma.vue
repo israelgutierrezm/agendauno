@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { useToastStore } from "@/stores/toast";
@@ -165,14 +166,9 @@ onMounted(cargar);
       </span>
     </div>
 
-    <p
-      v-if="error"
-      class="mt-3 text-sm"
-      role="alert"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <form v-if="config" class="mt-4 space-y-4" @submit.prevent="guardar">
       <div class="grid gap-3 sm:grid-cols-2">

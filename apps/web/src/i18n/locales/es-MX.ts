@@ -365,10 +365,11 @@ export default {
       // pagina, preguntas). Sin autorregistro de alumnos ni pago por cuenta propia
       // desde la página (ADR 0093); el QR es pase de entrada.
       hero: {
+        etiqueta: "Software para estudios, academias y gimnasios",
         titulo: "Tus clases, llenas y en orden.",
         enfasis: "llenas",
         subtitulo:
-          "Cupos, lista de espera, membresías y créditos, y pase de lista con retardos: todo tu estudio en un solo lugar.",
+          "Gestiona reservas, clases, membresías y cobros desde una sola agenda. Tu equipo tiene el control; tus alumnos eligen su próxima clase.",
         avisoTitulo: "Lugar reservado",
         avisoDetalle: "Pole dance · Hoy 18:00 · 2 lugares libres",
       },
@@ -448,9 +449,9 @@ export default {
         },
       },
       precio: {
-        titulo: "Pagas según tus alumnos activos.",
+        titulo: "Un plan que crece con tu estudio.",
         subtitulo:
-          "Un solo precio al mes según cuántos alumnos activos tuvo tu estudio, con todas las herramientas desde el primer plan. Precios en dólares; en México se cobran en pesos.",
+          "Todas las herramientas desde el primer plan. Tu tarifa mensual se adapta a los alumnos activos de tu estudio.",
       },
       giros: {
         etiqueta: "Para quién es",
@@ -568,10 +569,11 @@ export default {
       // 0093), «Cualquier profesional» (ADR 0062), cobro al agendar* (ADR 0065) y
       // recordatorios solo por correo. Nada de cupos, lista de espera ni clases.
       hero: {
+        etiqueta: "Software de citas para profesionales y equipos",
         titulo: "Tus clientes agendan solos. Tú atiendes.",
         enfasis: "agendan solos",
         subtitulo:
-          "Servicios con su duración y precio, la agenda de cada profesional y una página para agendar a cualquier hora. Los recordatorios llegan por correo.",
+          "Organiza servicios, horarios y cobros en una sola agenda. Comparte tu enlace para que tus clientes elijan servicio, profesional y hora, sin crear una cuenta.",
         avisoTitulo: "Cita confirmada",
         avisoDetalle: "Corte y peinado · Hoy 17:30 · con Ana",
       },
@@ -656,9 +658,9 @@ export default {
         },
       },
       precio: {
-        titulo: "Elige tu plan por los profesionales que contratas.",
+        titulo: "Tu agenda, a solas o con todo tu equipo.",
         subtitulo:
-          "Individual para un profesional; Premium o Pro para tu equipo. Mensual o anual, con 2 meses de cortesía.",
+          "Individual si atiendes por tu cuenta. Premium o Pro cuando trabajas con un equipo. Elige el plan y los profesionales que necesitas.",
       },
       giros: {
         etiqueta: "Para quién es",
@@ -2254,7 +2256,7 @@ export default {
     campos: {
       titulo: "Título",
       detalle: "Detalle",
-      vence: "Vence",
+      vence: "Fecha límite",
     },
     reglas: {
       subtitulo:

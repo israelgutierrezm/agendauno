@@ -9,6 +9,7 @@ import {
 } from "@/lib/terminologia";
 
 import agendaVisual from "./locales/agendaVisual.es-MX";
+import adminUsabilidad from "./locales/adminUsabilidad.es-MX";
 import importarClases from "./locales/importarClases.es-MX";
 import apariencia from "./locales/apariencia.es-MX";
 import cobro from "./locales/cobro.es-MX";
@@ -117,6 +118,7 @@ import recepcionVisual from "./locales/recepcionVisual.es-MX";
 // Textos base (sin adaptar a ningún negocio).
 const mensajesBase = {
   ...esMX,
+  adminUsabilidad,
   presupuestos,
   importarClases,
   agendaVisual,

@@ -748,7 +748,7 @@ async function crear(): Promise<void> {
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('captacion.prospectos.titulo')"
-      :subtitulo="$t('captacion.prospectos.descripcion')"
+      :subtitulo="$t('adminUsabilidad.prospectosAyuda')"
     />
 
     <div class="mt-5 flex flex-wrap items-center justify-between gap-3">

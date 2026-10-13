@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 
 import AvisoRegion from "@/components/AvisoRegion.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -191,12 +192,12 @@ onMounted(cargar);
             </p>
           </div>
 
-          <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
+          <AvisoTono v-if="mensaje" tono="exito">
             {{ $t("datosFiscales.guardado") }}
-          </p>
-          <p v-if="error" class="text-sm" style="color: var(--error)">
+          </AvisoTono>
+          <AvisoTono v-if="error" tono="peligro" role="alert">
             {{ error }}
-          </p>
+          </AvisoTono>
 
           <button
             class="tu-btn tu-btn-primario"
@@ -287,16 +288,12 @@ onMounted(cargar);
             />
           </div>
 
-          <p
-            v-if="mensajeSello"
-            class="text-sm"
-            :style="{ color: 'var(--exito)' }"
-          >
+          <AvisoTono v-if="mensajeSello" tono="exito">
             {{ $t("datosFiscales.sellos.cargado") }}
-          </p>
-          <p v-if="errorSello" class="text-sm" style="color: var(--error)">
+          </AvisoTono>
+          <AvisoTono v-if="errorSello" tono="peligro" role="alert">
             {{ errorSello }}
-          </p>
+          </AvisoTono>
 
           <button
             class="tu-btn tu-btn-primario"

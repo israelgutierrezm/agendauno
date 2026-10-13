@@ -1147,8 +1147,7 @@ onBeforeUnmount(() => {
                   </p>
                   <button
                     type="button"
-                    class="tu-btn tu-btn-fantasma text-sm"
-                    style="color: var(--error)"
+                    class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
                     :data-prueba="`quitar-pagina-${p.slug}`"
                     @click="quitarPagina(n)"
                   >
@@ -1348,8 +1347,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-fantasma text-sm"
-                      style="color: var(--error)"
+                      class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
                       :data-prueba="`quitar-${claveSeccion(s)}`"
                       @click="quitarBloque(i)"
                     >
@@ -1454,8 +1452,7 @@ onBeforeUnmount(() => {
                   <button
                     v-if="paginaEditada"
                     type="button"
-                    class="tu-btn tu-btn-fantasma text-sm"
-                    style="color: var(--error)"
+                    class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
                     :data-prueba="`quitar-${claveSeccion(s)}`"
                     @click="quitarSeccion(i)"
                   >

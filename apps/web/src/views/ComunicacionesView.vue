@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -636,9 +637,9 @@ onMounted(cargar);
       </button>
     </div>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <template v-if="pestana === 'difusion'">
       <div
         v-if="exito !== null"
@@ -789,13 +790,9 @@ onMounted(cargar);
             {{ conEjemplo(form.cuerpo) }}
           </p>
         </div>
-        <p
-          v-if="destinatarios === 0"
-          class="mt-4 text-sm"
-          :style="{ color: 'var(--aviso)' }"
-        >
+        <AvisoTono v-if="destinatarios === 0" tono="aviso" class="mt-4">
           {{ $t("operacion.comunicacion.sinDestinatarios") }}
-        </p>
+        </AvisoTono>
         <div class="mt-6 flex justify-end gap-2">
           <button
             type="button"
@@ -1224,8 +1221,7 @@ onMounted(cargar);
           <button
             v-if="puedeEliminar && plantillaDe(editor.clave, borrador.canal)"
             type="button"
-            class="tu-btn tu-btn-fantasma mr-auto"
-            style="color: var(--error)"
+            class="tu-btn tu-btn-contorno tu-tono-peligro mr-auto"
             @click="eliminarPlantilla"
           >
             {{ $t("comunicacionesAuto.eliminar") }}

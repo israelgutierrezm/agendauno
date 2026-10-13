@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 
 /**
@@ -172,9 +173,9 @@ onMounted(cargar);
       </button>
     </div>
 
-    <p v-if="error" class="text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando && datos === null"
       class="text-sm"

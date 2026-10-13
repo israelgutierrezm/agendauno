@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -414,16 +415,12 @@ onMounted(() => {
       :negocio="sesion.estudio.nombre"
     />
 
-    <p
-      v-if="cuenta.error.value"
-      class="mt-4 text-sm"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-4">
       {{ cuenta.error.value }}
       <button type="button" class="tu-enlace ml-2" @click="cuenta.cargar(true)">
         {{ $t("comun.reintentar") }}
       </button>
-    </p>
+    </AvisoTono>
     <p
       v-if="retornoPago"
       class="mt-4 text-sm"

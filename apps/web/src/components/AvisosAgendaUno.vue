@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { separarTelefono } from "@/lib/ladas";
@@ -338,14 +339,9 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
           </template>
         </p>
       </div>
-      <p
-        v-if="error"
-        class="mt-2 text-xs"
-        role="alert"
-        style="color: var(--error)"
-      >
+      <AvisoTono v-if="error" tono="peligro" class="mt-2" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
     </template>
   </div>
 </template>

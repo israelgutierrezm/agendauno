@@ -39,13 +39,79 @@ async function ayuda(moneda: string, pais: string): Promise<string> {
   sesion.moneda = moneda;
   sesion.pais = pais;
   const w = mount(LealtadView, {
-    global: { plugins: [i18n], stubs: { BuscarPersona: true } },
+    global: { plugins: [i18n], stubs: { BuscarPersona: true, Teleport: true } },
   });
   await flushPromises();
-  return w.get('[data-prueba="ayuda-por-moneda"]').text().replace(/\s/g, " ");
+  await w
+    .findAll("button")
+    .find((b) => b.text() === "Configurar programa")!
+    .trigger("click");
+  const texto = w
+    .get('[data-prueba="ayuda-por-moneda"]')
+    .text()
+    .replace(/\s/g, " ");
+  w.unmount();
+  return texto;
 }
 
 describe("puntos por unidad de moneda", () => {
+  it("separa consulta de configuración y cancelar no cambia el programa", async () => {
+    const w = mount(LealtadView, {
+      global: {
+        plugins: [i18n],
+        stubs: { BuscarPersona: true, Teleport: true },
+      },
+    });
+    await flushPromises();
+    expect(w.find("#ppa").exists()).toBe(false);
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Configurar programa")!
+      .trigger("click");
+    await w.get("#ppa").setValue(99);
+    await w
+      .get('[role="dialog"]')
+      .findAll("button")
+      .find((b) => b.text() === "Cancelar")!
+      .trigger("click");
+    expect(api.put).not.toHaveBeenCalled();
+    expect(w.text()).toContain("Puntos por asistir a una clase: 10");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Configurar programa")!
+      .trigger("click");
+    expect((w.get("#ppa").element as HTMLInputElement).value).toBe("10");
+    w.unmount();
+  });
+  it("el alta de recompensa se abre a demanda y conserva la petición existente", async () => {
+    api.post.mockResolvedValue({ data: {} });
+    const w = mount(LealtadView, {
+      global: {
+        plugins: [i18n],
+        stubs: { BuscarPersona: true, Teleport: true },
+      },
+    });
+    await flushPromises();
+    expect(w.find('[role="dialog"]').exists()).toBe(false);
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Nueva recompensa")!
+      .trigger("click");
+    await w.get('[role="dialog"] input[required]').setValue("Clase de regalo");
+    await w.get('[role="dialog"] input[type="number"]').setValue(200);
+    await w.get('[role="dialog"] form').trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/lealtad/recompensas",
+      {
+        nombre: "Clase de regalo",
+        descripcion: null,
+        costo_puntos: 200,
+      },
+    );
+    expect(w.find('[role="dialog"]').exists()).toBe(false);
+    w.unmount();
+  });
   it("en pesos mexicanos, como siempre", async () => {
     expect(await ayuda("MXN", "MX")).toBe(
       "Ej. 1 = un punto por cada $1 pagado.",
