@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import type { SeoSitio } from "@/lib/sitioWeb";
 
@@ -101,9 +102,9 @@ const error = computed(
           {{ seo.descripcion ?? t("sitioWeb.seo.sinDescripcion") }}
         </p>
       </div>
-      <p v-if="error" class="text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
     </div>
   </fieldset>
 </template>

@@ -917,8 +917,7 @@ watch(
         <button
           v-if="sePuedeMover"
           type="button"
-          class="tu-btn tu-btn-fantasma"
-          style="color: var(--error)"
+          class="tu-btn tu-btn-contorno tu-tono-peligro"
           :disabled="accionando"
           :aria-expanded="cancelando"
           @click="abrirCancelacion"

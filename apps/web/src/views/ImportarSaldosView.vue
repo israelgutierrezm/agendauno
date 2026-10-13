@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoFilaImportacion from "@/components/EstadoFilaImportacion.vue";
 import ResumenImportacion, {
@@ -285,28 +286,28 @@ function descargarPlantilla(): void {
             {{ $t("importarSaldos.revisar") }}
           </button>
         </div>
-        <p
+        <AvisoTono
           v-if="archivo !== null && !listoParaRevisar"
-          class="mt-2 text-sm"
-          :style="{ color: 'var(--aviso)' }"
+          tono="aviso"
+          class="mt-2"
         >
           {{ $t("importarSaldos.faltan") }}
-        </p>
+        </AvisoTono>
       </div>
 
-      <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
 
       <template v-if="preview">
         <ResumenImportacion class="mt-6" :resumen="preview.resumen" />
-        <p
+        <AvisoTono
           v-if="preview.resumen.invalidas > 0"
-          class="mt-4 text-sm"
-          :style="{ color: 'var(--aviso)' }"
+          tono="aviso"
+          class="mt-4"
         >
           {{ $t("importar.corrige") }}
-        </p>
+        </AvisoTono>
 
         <div class="mt-4 tu-card overflow-x-auto relative">
           <table class="tu-tabla">

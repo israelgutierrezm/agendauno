@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import ComplementosNegocio from "@/components/ComplementosNegocio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -400,12 +401,18 @@ onMounted(() => {
       <p class="mt-1 text-sm">{{ $t("renta.suspendidoAyuda") }}</p>
     </div>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ $t("comun.reintentar") }}
-      </button>
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p
       v-if="cargando && !renta"
       class="tu-card mt-6 p-6 text-sm"

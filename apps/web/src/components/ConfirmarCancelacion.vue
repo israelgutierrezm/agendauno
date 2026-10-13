@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
@@ -85,7 +86,7 @@ onMounted(cargar);
     <p v-else-if="!error" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("cancelacion.calculando") }}
     </p>
-    <p v-if="error" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
 
     <div class="flex flex-wrap gap-2">
       <button

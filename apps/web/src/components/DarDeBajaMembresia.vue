@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -221,7 +222,7 @@ async function confirmarBaja(): Promise<void> {
         }}
       </p>
     </template>
-    <p v-if="error" role="alert" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
     <div class="flex flex-wrap gap-2">
       <button
         v-if="sim"

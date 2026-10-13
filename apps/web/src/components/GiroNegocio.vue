@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { girosDe } from "@/lib/modalidad";
@@ -91,14 +92,14 @@ async function enviar(): Promise<void> {
         >{{ $t("modalidadNegocio.giro.guardado") }}</span
       >
     </form>
-    <p
+    <AvisoTono
       v-if="error"
-      class="mt-3 text-sm"
+      tono="peligro"
+      class="mt-3"
       role="alert"
-      style="color: var(--error)"
       data-prueba="giro-error"
     >
       {{ error }}
-    </p>
+    </AvisoTono>
   </div>
 </template>

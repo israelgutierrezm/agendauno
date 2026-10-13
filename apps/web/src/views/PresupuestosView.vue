@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -601,9 +602,9 @@ onMounted(() => {
       />
     </div>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando"
       class="mt-6 text-sm"
@@ -949,9 +950,9 @@ onMounted(() => {
           </p>
         </dl>
 
-        <p v-if="errorEditor" class="text-sm" style="color: var(--error)">
+        <AvisoTono v-if="errorEditor" tono="peligro" role="alert">
           {{ errorEditor }}
-        </p>
+        </AvisoTono>
 
         <!-- Rechazo con motivo -->
         <div v-if="rechazando" class="space-y-2">

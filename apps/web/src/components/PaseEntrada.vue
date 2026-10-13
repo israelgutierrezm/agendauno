@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { computed, onBeforeUnmount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -78,14 +79,9 @@ onBeforeUnmount(() => clearInterval(temporizador));
           {{ $t("comun.cargando") }}
         </p>
       </div>
-      <p
-        v-if="error"
-        class="mt-3 text-sm"
-        role="alert"
-        style="color: var(--error)"
-      >
+      <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
       <button
         type="button"
         class="tu-btn tu-btn-fantasma mt-4 w-full"

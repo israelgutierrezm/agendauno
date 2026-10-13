@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import IconoNav from "@/components/IconoNav.vue";
+import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -121,35 +123,38 @@ onMounted(cargar);
     class="rb mt-4"
     data-prueba="reservas-plataforma"
   >
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-sm font-medium">
-        {{ $t("operacion.plataformas.reservas.titulo") }}
-      </p>
-      <span
-        class="tu-estado text-sm"
-        :style="{
-          '--tono': config.activas ? 'var(--exito)' : 'var(--texto-suave)',
-        }"
-        data-prueba="reservas-plataforma-estado"
-        >{{
-          config.activas
-            ? $t("operacion.plataformas.reservas.publicando")
-            : $t("operacion.plataformas.reservas.sinPublicar")
-        }}</span
-      >
+    <div class="rb-cabeza">
+      <span class="tu-apartado-icono" aria-hidden="true">
+        <IconoNav nombre="agenda" :tam="18" />
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="text-sm font-semibold">
+            {{ $t("operacion.plataformas.reservas.titulo") }}
+          </p>
+          <span
+            class="tu-pastilla"
+            :class="config.activas ? 'tu-tono-exito' : 'tu-tono-neutral'"
+            data-prueba="reservas-plataforma-estado"
+            >{{
+              config.activas
+                ? $t("operacion.plataformas.reservas.publicando")
+                : $t("operacion.plataformas.reservas.sinPublicar")
+            }}</span
+          >
+        </div>
+        <p class="mt-0.5 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("operacion.plataformas.reservas.ayuda", { plataforma }) }}
+        </p>
+      </div>
     </div>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("operacion.plataformas.reservas.ayuda", { plataforma }) }}
-    </p>
 
-    <label class="mt-3 flex items-center gap-2 text-sm cursor-pointer">
-      <input
-        v-model="edicion.activas"
-        type="checkbox"
-        data-prueba="reservas-activas"
-      />
-      {{ $t("operacion.plataformas.reservas.publicar", { plataforma }) }}
-    </label>
+    <InterruptorSiNo
+      v-model="edicion.activas"
+      class="mt-4"
+      :etiqueta="$t('operacion.plataformas.reservas.publicar', { plataforma })"
+      prueba="reservas-activas"
+    />
 
     <template v-if="edicion.activas">
       <div class="mt-3 max-w-sm">
@@ -300,7 +305,7 @@ onMounted(cargar);
 
     <button
       type="button"
-      class="tu-btn tu-btn-fantasma mt-4 text-sm"
+      class="tu-btn tu-btn-solido tu-tono-info mt-4 text-sm"
       :disabled="guardando"
       data-prueba="reservas-guardar"
       @click="guardar"
@@ -316,10 +321,15 @@ onMounted(cargar);
 
 <style scoped>
 .rb {
-  padding: 0.85rem 1rem;
+  padding: 0.9rem 1rem;
   border: 1px solid var(--borde);
   border-radius: var(--radio-tarjeta);
-  background: var(--superficie-2);
+  background: color-mix(in srgb, var(--superficie-2) 60%, var(--superficie));
+}
+.rb-cabeza {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
 }
 .rb-clases {
   display: grid;

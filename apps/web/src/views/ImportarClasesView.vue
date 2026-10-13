@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -195,9 +196,9 @@ async function descargar() {
         t("importarClases.volver")
       }}</RouterLink>
     </div>
-    <p v-if="error" role="alert" class="mt-4" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" role="alert" class="mt-4">
       {{ error }}
-    </p>
+    </AvisoTono>
     <div v-if="exito" class="tu-card mt-6 p-8 text-center" role="status">
       <h2 class="text-2xl font-semibold" style="color: var(--exito)">
         {{ t("importarClases.creada", { n: exito.creados }) }}
@@ -330,16 +331,16 @@ async function descargar() {
         >
           {{ t("importarClases.limite", { n: catalogos.max_sesiones }) }}
         </p>
-        <p
+        <AvisoTono
           v-if="
             catalogos &&
             (!catalogos.clases.length || !catalogos.sucursales.length)
           "
+          tono="aviso"
           class="mt-3"
-          style="color: var(--aviso)"
         >
           {{ t("importarClases.sinCatalogo") }}
-        </p>
+        </AvisoTono>
         <ZonaArchivo
           id="archivo-clases"
           class="mt-4"
@@ -401,14 +402,14 @@ async function descargar() {
             </p>
           </div>
         </div>
-        <p
+        <AvisoTono
           v-if="preview.resumen.invalidas"
+          tono="peligro"
           class="mt-4"
           role="alert"
-          style="color: var(--error)"
         >
           {{ t("importarClases.corrige") }}
-        </p>
+        </AvisoTono>
         <p v-else-if="!preview.resumen.sesiones" class="mt-4" role="status">
           {{ t("importarClases.sinNuevas") }}
         </p>

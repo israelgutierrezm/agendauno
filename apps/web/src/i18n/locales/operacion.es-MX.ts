@@ -622,7 +622,7 @@ export default {
     buscar: "Buscar por tarea, detalle o persona…",
     filtros: {
       tipo: "Tipo",
-      vencimiento: "Vencimiento",
+      vencimiento: "Fecha límite",
       mias: "Solo las mías",
       responsable: "Asignadas a",
     },
@@ -641,7 +641,7 @@ export default {
       automatica: "Automáticas",
       manual: "Manuales",
     },
-    rangoVence: "Vencen",
+    rangoVence: "Fecha límite",
     rangoCompletada: "Completadas",
     desde: "Desde",
     hasta: "Hasta",
@@ -723,6 +723,11 @@ export default {
     enviar: "Enviar ahora",
     cancelar: "Cancelar",
     sinDestinatarios: "Nadie cumple con este segmento: no hay a quién enviar.",
+  },
+  // Integraciones con Wellhub y TotalPass.
+  integraciones: {
+    reemplazar: "Escribe para reemplazar",
+    capturar: "Pega aquí la llave",
   },
   // Lo común de los listados por páginas: fechas y filtros.
   listados: {

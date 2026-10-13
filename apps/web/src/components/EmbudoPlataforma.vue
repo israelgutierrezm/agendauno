@@ -2,6 +2,7 @@
 import axios from "axios";
 import { onMounted, ref, watch } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 import { textoCampana } from "@/lib/captacion";
 import { PRODUCTOS, esProducto } from "@/lib/producto";
@@ -102,9 +103,9 @@ function dias(d: number | null): string {
         <input v-model="hasta" type="date" class="tu-input w-auto" />
       </label>
     </div>
-    <p v-if="error" class="mt-3 text-sm" :style="{ color: 'var(--error)' }">
+    <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando"
       class="mt-3 text-sm"

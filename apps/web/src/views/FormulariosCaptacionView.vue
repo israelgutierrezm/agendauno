@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -262,14 +263,9 @@ function descargarQr(): void {
       </button>
     </div>
 
-    <p
-      v-if="error"
-      class="mt-4 text-sm"
-      style="color: var(--error)"
-      role="alert"
-    >
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando"
       class="mt-4 text-sm"
@@ -531,9 +527,9 @@ function descargarQr(): void {
         class="grid gap-5 text-sm"
         data-prueba="compartir-formulario"
       >
-        <p v-if="!activa" role="status" style="color: var(--aviso)">
+        <AvisoTono v-if="!activa" tono="aviso" role="status">
           {{ $t("captacion.formularios.compartirPanel.captacionApagada") }}
-        </p>
+        </AvisoTono>
         <p
           v-else-if="!compartiendo.activo"
           role="status"

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import TarjetaOpenPay from "@/components/TarjetaOpenPay.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -236,9 +237,9 @@ onMounted(async () => {
           : $t("pagoAutomatico.tarjetaCancelado")
       }}
     </p>
-    <p v-if="error" class="mt-2 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-2" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <div
       v-if="tarjeta"

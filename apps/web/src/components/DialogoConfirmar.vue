@@ -6,7 +6,9 @@ import { estadoConfirmar, responderConfirmar } from "@/lib/confirmar";
 
 /**
  * El diálogo de `confirmar()` (ver lib/confirmar.ts): una pregunta, "Cancelar" y el
- * botón que confirma (en rojo si la acción es destructiva). Se monta una sola vez.
+ * botón que confirma: con el color principal del tema o, si la acción lo pide, con su
+ * tono (verde para completar, ámbar para regresar, rojo si es destructiva). Se monta
+ * una sola vez.
  */
 onMounted(() => (estadoConfirmar.montado = true));
 onUnmounted(() => {
@@ -33,12 +35,13 @@ onUnmounted(() => {
       </button>
       <button
         type="button"
-        class="tu-btn tu-btn-primario"
-        :style="
-          estadoConfirmar.peligro
-            ? { background: 'var(--error)', borderColor: 'var(--error)' }
-            : undefined
+        class="tu-btn"
+        :class="
+          estadoConfirmar.tono
+            ? ['tu-btn-solido', `tu-tono-${estadoConfirmar.tono}`]
+            : 'tu-btn-primario'
         "
+        data-prueba="confirmar-aceptar"
         @click="responderConfirmar(true)"
       >
         {{ estadoConfirmar.aceptar ?? $t("operacion.confirmar.aceptar") }}

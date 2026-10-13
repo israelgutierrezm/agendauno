@@ -8,6 +8,7 @@ import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import AntesDeReservar, {
   type AccionAntes,
 } from "@/components/AntesDeReservar.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import CambiarMiLugar from "@/components/CambiarMiLugar.vue";
 import CalendarioVistas, {
   type EventoPeriodo,
@@ -614,21 +615,12 @@ onMounted(() => void cuenta.asegurar());
       </button>
     </div>
 
-    <p
-      v-if="cuenta.error.value"
-      class="mt-3 text-sm"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-3">
       {{ cuenta.error.value }}
-    </p>
-    <p
-      v-if="aviso"
-      class="mt-3 text-sm"
-      role="status"
-      :style="{ color: 'var(--exito)' }"
-    >
+    </AvisoTono>
+    <AvisoTono v-if="aviso" tono="exito" class="mt-3" role="status">
       {{ aviso }}
-    </p>
+    </AvisoTono>
 
     <!-- RESERVAR: citas -->
     <p
@@ -670,13 +662,9 @@ onMounted(() => void cuenta.asegurar());
 
     <!-- RESERVAR: clases -->
     <template v-else-if="pestana === 'reservar'">
-      <p
-        v-if="truncado && !errorClases"
-        class="mt-3 text-sm"
-        :style="{ color: 'var(--aviso)' }"
-      >
+      <AvisoTono v-if="truncado && !errorClases" tono="aviso" class="mt-3">
         {{ $t("portal.reservas.demasiadas") }}
-      </p>
+      </AvisoTono>
 
       <CalendarioVistas
         class="mt-4"
@@ -990,15 +978,15 @@ onMounted(() => void cuenta.asegurar());
       <template v-if="abierto">
         <!-- Lo que falló al reservar, aceptar o cancelar: aquí, a la vista (el aviso
              de la página queda detrás del panel). -->
-        <p
+        <AvisoTono
           v-if="cuenta.error.value"
-          class="mb-3 text-sm"
+          tono="peligro"
+          class="mb-3"
           role="alert"
-          style="color: var(--error)"
           data-prueba="error-panel"
         >
           {{ cuenta.error.value }}
-        </p>
+        </AvisoTono>
         <p class="first-letter:uppercase">
           {{ cuandoCorto(abierto.inicia, abierto.zona) }}
         </p>
@@ -1124,8 +1112,7 @@ onMounted(() => void cuenta.asegurar());
               {{ $t("miReprogramar.boton") }}
             </button>
             <button
-              class="tu-btn tu-btn-fantasma"
-              style="color: var(--error)"
+              class="tu-btn tu-btn-contorno tu-tono-peligro"
               :aria-expanded="accion === 'cancelar'"
               @click="accion = accion === 'cancelar' ? null : 'cancelar'"
             >

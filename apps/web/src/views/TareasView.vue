@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvisoTono from "@/components/AvisoTono.vue";
 import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -376,7 +377,7 @@ async function alMarcar(tarea: Tarea): Promise<void> {
     if (
       await confirmar(
         t("operacion.bandeja.confirmarReabrir", { titulo: tarea.titulo }),
-        { aceptar: t("operacion.bandeja.reabrirAceptar") },
+        { aceptar: t("operacion.bandeja.reabrirAceptar"), tono: "aviso" },
       )
     ) {
       await reabrir(tarea);
@@ -387,7 +388,7 @@ async function alMarcar(tarea: Tarea): Promise<void> {
   } else if (
     await confirmar(
       t("operacion.bandeja.confirmarCompletar", { titulo: tarea.titulo }),
-      { aceptar: t("operacion.bandeja.completarAceptar") },
+      { aceptar: t("operacion.bandeja.completarAceptar"), tono: "exito" },
     )
   ) {
     await completar(tarea);
@@ -815,9 +816,9 @@ onMounted(() => {
       </button>
     </div>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <!-- ===== Pestaña: Pendientes ===== -->
     <div v-if="tab === 'pendientes'" class="mt-6 space-y-4">
@@ -1100,8 +1101,8 @@ onMounted(() => {
                   class="ta-check"
                   :class="
                     tarea.estado === 'completada'
-                      ? 'ta-check-regresar'
-                      : 'ta-check-completar'
+                      ? 'ta-check-regresar tu-tono-aviso'
+                      : 'ta-check-completar tu-tono-exito'
                   "
                   :aria-label="
                     tarea.estado === 'completada'
@@ -1665,6 +1666,10 @@ section + section .ta-grupo {
     border-color 0.15s,
     background-color 0.15s;
 }
+/* El ícono, con trazo grueso: a 14 px el fino se pierde sobre el verde. */
+.ta-check svg {
+  stroke-width: 2.8;
+}
 /* El ícono de la acción aparece al pasar el cursor (o con el foco del teclado). */
 .ta-icono-accion {
   display: none;
@@ -1675,10 +1680,10 @@ button.ta-check:is(:hover, :focus-visible):not(:disabled) .ta-icono-accion {
 button.ta-check:is(:hover, :focus-visible):not(:disabled) .ta-icono-reposo {
   display: none;
 }
-/* Completar: verde con palomita. */
+/* Completar: el verde de la paleta con la palomita en blanco. */
 button.ta-check-completar:is(:hover, :focus-visible):not(:disabled) {
-  border-color: var(--exito);
-  background: var(--exito);
+  border-color: var(--tono-solido);
+  background: var(--tono-solido);
   color: #fff;
 }
 .ta-hecha .ta-check {
@@ -1686,11 +1691,11 @@ button.ta-check-completar:is(:hover, :focus-visible):not(:disabled) {
   background: var(--exito);
   color: #fff;
 }
-/* Regresar a pendientes: el color de alerta con la flecha de regresar. */
+/* Regresar a pendientes: el ámbar de la paleta con la flecha de regresar. */
 button.ta-check-regresar:is(:hover, :focus-visible):not(:disabled) {
-  border-color: var(--aviso);
-  background: var(--aviso);
-  color: var(--fondo);
+  border-color: var(--tono-solido);
+  background: var(--tono-solido);
+  color: #fff;
 }
 /* En pantallas táctiles no hay cursor: la palomita se insinúa siempre. */
 @media (hover: none) {

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
+import IconoNav from "@/components/IconoNav.vue";
 import { useToastStore } from "@/stores/toast";
 
 /**
@@ -47,14 +48,17 @@ async function copiar(): Promise<void> {
 </script>
 
 <template>
-  <div class="ab mt-4" data-prueba="checkin-automatico">
+  <div class="tu-apartado mt-4" data-prueba="checkin-automatico">
+    <span class="tu-apartado-icono" aria-hidden="true">
+      <IconoNav nombre="ajustes" :tam="18" />
+    </span>
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-sm font-medium">
+      <p class="text-sm font-semibold">
         {{ $t("operacion.plataformas.automatico.titulo") }}
       </p>
       <span
-        class="tu-estado text-sm"
-        :style="{ '--tono': listo ? 'var(--exito)' : 'var(--aviso)' }"
+        class="tu-pastilla"
+        :class="listo ? 'tu-tono-exito' : 'tu-tono-aviso'"
         data-prueba="checkin-automatico-estado"
         >{{
           listo
@@ -63,36 +67,32 @@ async function copiar(): Promise<void> {
         }}</span
       >
     </div>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ ayuda }}
-    </p>
-    <div
-      v-if="automatico?.aviso_url && (!listo || proveedor === 'wellhub')"
-      class="mt-2 flex items-center gap-2"
-    >
-      <code
-        class="ab-url"
-        :title="$t('operacion.plataformas.automatico.direccion')"
-        >{{ automatico.aviso_url }}</code
+    <div class="min-w-0">
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ ayuda }}
+      </p>
+      <div
+        v-if="automatico?.aviso_url && (!listo || proveedor === 'wellhub')"
+        class="mt-2 flex items-center gap-2"
       >
-      <button
-        type="button"
-        class="tu-btn tu-btn-fantasma shrink-0 text-sm"
-        @click="copiar"
-      >
-        {{ $t("operacion.plataformas.automatico.copiar") }}
-      </button>
+        <code
+          class="ab-url"
+          :title="$t('operacion.plataformas.automatico.direccion')"
+          >{{ automatico.aviso_url }}</code
+        >
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico shrink-0"
+          @click="copiar"
+        >
+          {{ $t("operacion.plataformas.automatico.copiar") }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.ab {
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-tarjeta);
-  background: var(--superficie-2);
-}
 .ab-url {
   min-width: 0;
   flex: 1;

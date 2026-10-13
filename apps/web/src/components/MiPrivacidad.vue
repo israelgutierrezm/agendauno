@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -221,22 +222,21 @@ onMounted(cargar);
         <button
           v-if="!datos.baja || datos.baja.estado === 'rechazada'"
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
-          style="color: var(--error)"
+          class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
           @click="pidiendoBaja = !pidiendoBaja"
         >
           {{ $t("miPrivacidad.baja") }}
         </button>
       </div>
 
-      <p
+      <AvisoTono
         v-if="datos.baja?.estado === 'pendiente'"
-        class="mt-3 text-sm"
+        tono="aviso"
+        class="mt-3"
         role="status"
-        style="color: var(--aviso)"
       >
         {{ $t("miPrivacidad.bajaPendiente") }}
-      </p>
+      </AvisoTono>
       <p
         v-else-if="datos.baja?.estado === 'rechazada'"
         class="mt-3 text-sm"
@@ -302,14 +302,15 @@ onMounted(cargar);
             v-model="contrasena"
             autocomplete="current-password"
           />
-          <p
+          <AvisoTono
             v-if="errorContrasena"
-            class="mt-1 text-sm"
+            tono="peligro"
+            class="mt-1"
             data-prueba="error-contrasena"
-            style="color: var(--error)"
+            role="alert"
           >
             {{ errorContrasena }}
-          </p>
+          </AvisoTono>
         </div>
       </form>
       <template #pie>

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -394,9 +395,9 @@ const enlaceWhatsApp = computed(() =>
         </article>
       </div>
 
-      <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
       <p class="mt-3 text-xs pc-suave">
         {{
           plan.moneda_cobro === "MXN" && plan.tipo_cambio

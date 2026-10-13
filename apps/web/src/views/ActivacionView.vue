@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import { trackEvent } from "@/lib/analytics";
 import { facetaActiva } from "@/lib/roles";
@@ -135,14 +136,9 @@ async function enviar(): Promise<void> {
         />
       </div>
 
-      <p
-        v-if="errorLocal ?? sesion.error"
-        role="alert"
-        class="text-sm"
-        style="color: var(--error)"
-      >
+      <AvisoTono v-if="errorLocal ?? sesion.error" tono="peligro" role="alert">
         {{ errorLocal ?? sesion.error }}
-      </p>
+      </AvisoTono>
 
       <button
         class="tu-btn tu-btn-primario w-full"

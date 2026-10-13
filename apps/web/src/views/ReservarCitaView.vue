@@ -23,6 +23,7 @@ import { urlCanonicaEstudio } from "@/lib/tenant";
 import { puedeEntrar } from "@/lib/acceso";
 import { esMiembro, nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import AvisoTono from "@/components/AvisoTono.vue";
 import CalendarioDias from "@/components/CalendarioDias.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import ElegirProfesional from "@/components/ElegirProfesional.vue";
@@ -1198,9 +1199,9 @@ onMounted(cargar);
             {{ textoPago("deNuevo") }}
           </button>
         </template>
-        <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+        <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
       </div>
 
       <!-- Negocio de clases de vuelta de la pasarela: el aviso va arriba; a su página -->
@@ -1338,9 +1339,9 @@ onMounted(cargar);
         <button class="tu-enlace mt-4 text-sm" type="button" @click="otra">
           {{ $t("reservar.otra") }}
         </button>
-        <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+        <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
       </div>
 
       <!-- ===== Asistente por pasos ===== -->
@@ -1722,14 +1723,14 @@ onMounted(cargar);
                 :zona="zona"
               />
 
-              <p
+              <AvisoTono
                 v-if="error && !slotSel"
-                class="mt-3 text-sm"
+                tono="peligro"
+                class="mt-3"
                 role="alert"
-                style="color: var(--error)"
               >
                 {{ error }}
-              </p>
+              </AvisoTono>
 
               <p
                 v-if="fecha !== '' && buscandoSlots"
@@ -2341,13 +2342,14 @@ onMounted(cargar);
                     >{{ $t("reservar.verAviso") }}</RouterLink
                   >
                 </p>
-                <p
+                <AvisoTono
                   v-if="error"
-                  class="mt-3 text-sm"
-                  style="color: var(--error)"
+                  tono="peligro"
+                  class="mt-3"
+                  role="alert"
                 >
                   {{ error }}
-                </p>
+                </AvisoTono>
               </div>
             </div>
 

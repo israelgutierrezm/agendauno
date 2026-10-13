@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 
 import "./style.css";
+import "./estilos/tonos.css";
 import "./marketing/public-ui.css";
 import App from "./App.vue";
 import { aplicarMarca, i18n } from "./i18n";

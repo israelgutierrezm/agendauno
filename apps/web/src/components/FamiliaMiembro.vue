@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -183,9 +184,9 @@ async function retirar(
     >
       {{ $t("familias.ficha.sinCuenta") }}
     </p>
-    <p v-if="error" class="mt-2 text-sm" :style="{ color: 'var(--error)' }">
+    <AvisoTono v-if="error" tono="peligro" class="mt-2" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <template
       v-for="grupo in [

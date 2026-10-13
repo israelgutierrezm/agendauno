@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import MenuFlotante from "@/components/MenuFlotante.vue";
@@ -529,12 +530,18 @@ function colorAlerta(codigo: string): string {
         </button>
       </div>
 
-      <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
         {{ error }}
-        <button type="button" class="tu-enlace ml-2" @click="cargarResumen">
-          {{ $t("comun.reintentar") }}
-        </button>
-      </p>
+        <template #acciones>
+          <button
+            type="button"
+            class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+            @click="cargarResumen"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </template>
+      </AvisoTono>
       <p
         v-else-if="cargando && !resumen"
         class="mt-4 text-sm"
@@ -1078,8 +1085,7 @@ function colorAlerta(codigo: string): string {
         <button
           v-if="puedeDarDeBaja"
           type="button"
-          class="tu-btn tu-btn-fantasma hidden text-sm sm:inline-flex"
-          style="color: var(--error)"
+          class="tu-btn tu-btn-contorno tu-tono-peligro hidden text-sm sm:inline-flex"
           @click="emit('baja')"
         >
           {{ $t("detalleMiembro.acciones.baja") }}

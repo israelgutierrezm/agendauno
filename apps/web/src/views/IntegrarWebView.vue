@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -234,7 +235,9 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
       </button>
     </div>
 
-    <p v-if="error" class="mt-4" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">{{
+      error
+    }}</AvisoTono>
     <EstadoVacio
       v-else-if="!cargando && widgets.length === 0 && !abierto"
       class="mt-4"

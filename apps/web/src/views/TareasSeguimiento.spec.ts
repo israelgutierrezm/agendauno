@@ -317,7 +317,7 @@ describe("la bandeja de tareas", () => {
     await flushPromises();
     expect(confirmar).toHaveBeenLastCalledWith(
       "¿Marcar «Revisar el tubo» como completada?",
-      { aceptar: "Sí, completar" },
+      { aceptar: "Sí, completar", tono: "exito" },
     );
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/tareas/a/completar",
@@ -353,7 +353,7 @@ describe("la bandeja de tareas", () => {
     await flushPromises();
     expect(confirmar).toHaveBeenLastCalledWith(
       "¿Regresar «Revisar el tubo» a pendientes?",
-      { aceptar: "Sí, regresar" },
+      { aceptar: "Sí, regresar", tono: "aviso" },
     );
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/tareas/a/reabrir",

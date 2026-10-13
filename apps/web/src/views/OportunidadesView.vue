@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import TarjetasIndicadores, {
@@ -197,12 +198,12 @@ onMounted(cargar);
       :subtitulo="$t('oportunidadesVisual.subtitulo')"
     />
 
-    <p v-if="aviso" class="mt-4 text-sm" style="color: var(--exito)">
+    <AvisoTono v-if="aviso" tono="exito" class="mt-4">
       {{ aviso }}
-    </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    </AvisoTono>
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-if="cargando"
       class="mt-6 text-sm"

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { textoCobertura } from "@/lib/cobertura";
 import { fechaCorta } from "@/lib/planes";
@@ -209,9 +210,9 @@ defineExpose({ cargar });
     <h2 class="font-semibold">
       {{ equipo ? $t("planes.corte.tituloEquipo") : $t("planes.corte.titulo") }}
     </h2>
-    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando"
       class="mt-3 text-sm"

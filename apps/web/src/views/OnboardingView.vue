@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -912,9 +913,9 @@ onMounted(cargar);
           </div>
         </header>
 
-        <p v-if="error" class="mt-5 text-sm" style="color: var(--error)">
+        <AvisoTono v-if="error" tono="peligro" class="mt-5" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
 
         <div class="mt-6 space-y-5">
           <!-- Tu negocio -->

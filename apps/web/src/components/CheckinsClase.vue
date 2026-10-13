@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import axios from "axios";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -181,9 +182,9 @@ watch(
         }}
       </button>
     </form>
-    <p v-if="ok" class="mt-2 text-sm" :style="{ color: 'var(--exito)' }">
+    <AvisoTono v-if="ok" tono="exito" class="mt-2">
       {{ $t("checkins.ok") }}
-    </p>
+    </AvisoTono>
     <p
       v-if="aviso"
       class="mt-2 text-sm"
@@ -197,9 +198,9 @@ watch(
           : $t("checkins.sinVerificarSinPermiso")
       }}
     </p>
-    <p v-if="error" class="mt-2 text-sm" :style="{ color: 'var(--error)' }">
+    <AvisoTono v-if="error" tono="peligro" class="mt-2" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <ul v-if="checkins.length > 0" class="mt-3 space-y-3">
       <li

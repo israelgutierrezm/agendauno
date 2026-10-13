@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -253,14 +254,9 @@ onMounted(cargar);
       @cerrar="mostrarForm = false"
     >
       <form class="grid gap-4" @submit.prevent="guardar">
-        <p
-          v-if="error"
-          class="text-sm"
-          role="alert"
-          :style="{ color: 'var(--error)' }"
-        >
+        <AvisoTono v-if="error" tono="peligro" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
         <div>
           <label class="tu-label" for="p-codigo">{{
             $t("promociones.campos.codigo")
@@ -372,9 +368,9 @@ onMounted(cargar);
       </template>
     </PanelLateral>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-if="cargando"
       class="mt-6 text-sm"

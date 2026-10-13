@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -121,12 +122,7 @@ async function guardar(): Promise<void> {
             :minlength="8"
           />
         </div>
-        <p
-          v-if="error"
-          class="text-sm"
-          role="alert"
-          style="color: var(--error)"
-        >
+        <AvisoTono v-if="error" tono="peligro" role="alert">
           {{ error }}
           <RouterLink
             class="tu-enlace ml-1"
@@ -138,7 +134,7 @@ async function guardar(): Promise<void> {
           >
             {{ $t("recuperarContrasena.pedirOtro") }}
           </RouterLink>
-        </p>
+        </AvisoTono>
         <button
           class="tu-btn tu-btn-primario w-full"
           type="submit"
@@ -202,14 +198,9 @@ async function guardar(): Promise<void> {
             required
           />
         </div>
-        <p
-          v-if="error"
-          class="text-sm"
-          role="alert"
-          style="color: var(--error)"
-        >
+        <AvisoTono v-if="error" tono="peligro" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
         <button
           class="tu-btn tu-btn-primario w-full"
           type="submit"

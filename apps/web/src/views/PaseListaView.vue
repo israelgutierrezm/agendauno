@@ -5,6 +5,7 @@ import { RouterLink, useRouter } from "vue-router";
 
 import AgregarAClase from "@/components/AgregarAClase.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { asistenciaAbierta } from "@/lib/agenda";
 import { useRecargarAlVolver } from "@/lib/alVolver";
@@ -552,14 +553,9 @@ watch(
         @cerrar="agregando = false"
       />
 
-      <p
-        v-if="errorAccion"
-        class="mt-3 text-sm"
-        role="alert"
-        :style="{ color: 'var(--error)' }"
-      >
+      <AvisoTono v-if="errorAccion" tono="peligro" class="mt-3" role="alert">
         {{ errorAccion }}
-      </p>
+      </AvisoTono>
 
       <!-- La lista: en orden alfabético; marcar a alguien no lo mueve de lugar -->
       <ul

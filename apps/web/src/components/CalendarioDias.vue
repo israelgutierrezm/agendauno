@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
@@ -262,14 +263,9 @@ onBeforeUnmount(() => {
         </svg>
       </button>
     </div>
-    <p
-      v-if="error"
-      class="mt-2 text-sm"
-      role="alert"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="error" tono="peligro" class="mt-2" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <p
       v-else-if="cargando || modelValue === ''"
       class="mt-2 text-sm"

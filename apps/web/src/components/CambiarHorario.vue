@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
@@ -111,7 +112,7 @@ async function guardar(): Promise<void> {
     <p :style="{ color: 'var(--texto-suave)' }">
       {{ $t("reprogramar.ayuda") }}
     </p>
-    <p v-if="error" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
     <div class="flex flex-wrap gap-2">
       <button
         type="submit"

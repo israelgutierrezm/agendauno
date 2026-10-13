@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import ComprasMostrador from "@/components/ComprasMostrador.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -232,11 +233,7 @@ onMounted(() => void cuenta.asegurar());
       >
     </nav>
 
-    <p
-      v-if="error || cuenta.error.value"
-      class="mt-3 text-sm"
-      style="color: var(--error)"
-    >
+    <AvisoTono v-if="error || cuenta.error.value" tono="peligro" class="mt-3">
       {{ error ?? cuenta.error.value }}
       <button
         v-if="cuenta.error.value"
@@ -246,7 +243,7 @@ onMounted(() => void cuenta.asegurar());
       >
         {{ $t("comun.reintentar") }}
       </button>
-    </p>
+    </AvisoTono>
     <p
       v-if="retornoPago"
       class="mt-3 text-sm"
@@ -268,14 +265,14 @@ onMounted(() => void cuenta.asegurar());
         >{{ $t("portal.miReserva.reservarConPlan") }}</RouterLink
       >
     </p>
-    <p
+    <AvisoTono
       v-if="mensaje === 'pago'"
-      class="mt-3 text-sm"
+      tono="exito"
+      class="mt-3"
       role="status"
-      :style="{ color: 'var(--exito)' }"
     >
       {{ $t("miCuentaExtra.pagoEnProceso") }}
-    </p>
+    </AvisoTono>
 
     <!-- Referencia para pagar en tienda -->
     <div v-if="voucher" class="mt-4 tu-card p-5 text-sm" role="status">
@@ -334,15 +331,15 @@ onMounted(() => void cuenta.asegurar());
             }}</span>
           </h2>
           <!-- La pasarela del negocio está en pruebas (M07). -->
-          <p
+          <AvisoTono
             v-if="cuenta.pagoEnLinea.value && cuenta.pagoEnLineaPrueba.value"
-            class="mt-2 text-sm"
+            tono="aviso"
+            class="mt-2"
             role="status"
-            :style="{ color: 'var(--aviso)' }"
             data-prueba="modo-prueba"
           >
             {{ $t("miCuentaExtra.modoPrueba") }}
-          </p>
+          </AvisoTono>
           <ul
             v-if="cuenta.porPagar.value.length > 0"
             class="mt-3 divide-y divide-[var(--borde)] text-sm"
@@ -437,13 +434,9 @@ onMounted(() => void cuenta.asegurar());
             $t("miCuenta.comprar.titulo")
           }}
         </h2>
-        <p
-          v-if="mensaje === 'comprado'"
-          class="mt-2 text-sm"
-          :style="{ color: 'var(--exito)' }"
-        >
+        <AvisoTono v-if="mensaje === 'comprado'" tono="exito" class="mt-2">
           {{ $t("miCuenta.comprar.creada") }}
-        </p>
+        </AvisoTono>
         <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <li
             v-for="p in comprables"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import ElegirLugar from "@/components/ElegirLugar.vue";
 import { api, mensajeDeError } from "@/lib/api";
 
@@ -75,7 +76,7 @@ onMounted(cargar);
       :ocupados="lugares.ocupados"
       :mio="lugares.mio"
     />
-    <p v-if="error" role="alert" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
     <div class="flex flex-wrap gap-2">
       <button
         type="button"

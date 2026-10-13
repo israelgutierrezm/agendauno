@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -112,8 +113,7 @@ async function quitar(): Promise<void> {
       <button
         v-if="logoUrl && !abierta"
         type="button"
-        class="tu-btn tu-btn-fantasma text-sm"
-        style="color: var(--error)"
+        class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
         :disabled="subiendo"
         @click="quitar"
       >
@@ -121,9 +121,9 @@ async function quitar(): Promise<void> {
       </button>
     </div>
 
-    <p v-if="error" class="mt-2 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-2" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
   </div>
 </template>
 

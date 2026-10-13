@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
@@ -226,13 +227,12 @@ onMounted(cargar);
         </div>
       </fieldset>
 
-      <p
+      <AvisoTono
         v-if="error && Object.keys(errores).length === 0"
-        class="text-sm"
-        style="color: var(--error)"
+        tono="peligro"
       >
         {{ error }}
-      </p>
+      </AvisoTono>
       <div class="flex flex-wrap items-center gap-3">
         <button
           v-if="puedeGestionar"

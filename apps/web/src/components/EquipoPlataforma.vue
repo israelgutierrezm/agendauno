@@ -3,6 +3,7 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useToastStore } from "@/stores/toast";
@@ -180,12 +181,18 @@ onMounted(() => void cargar());
 
 <template>
   <div class="space-y-5" data-prueba="equipo-plataforma">
-    <p v-if="error" class="text-sm" role="alert" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ t("plataformaAdmin.equipo.reintentar") }}
-      </button>
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ t("plataformaAdmin.equipo.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
 
     <section class="tu-card p-5">
       <h2 class="font-medium text-lg">

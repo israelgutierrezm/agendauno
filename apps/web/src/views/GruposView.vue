@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -208,9 +209,9 @@ const indicadores = computed<Indicador[]>(() => {
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <template v-if="!cargando">
       <EstadoVacio
@@ -356,14 +357,9 @@ const indicadores = computed<Indicador[]>(() => {
       @cerrar="cerrar"
     >
       <form class="space-y-4" @submit.prevent="crear">
-        <p
-          v-if="error"
-          class="text-sm"
-          role="alert"
-          :style="{ color: 'var(--error)' }"
-        >
+        <AvisoTono v-if="error" tono="peligro" role="alert">
           {{ error }}
-        </p>
+        </AvisoTono>
         <div>
           <label class="tu-label" for="gn">{{ $t("cursos.nombre") }}</label>
           <input id="gn" v-model="nuevo.nombre" class="tu-input" required />

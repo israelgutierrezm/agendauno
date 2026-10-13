@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import AgregarAClase from "@/components/AgregarAClase.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -322,12 +323,12 @@ watch(() => props.sesion.id, cargar, { immediate: true });
       <div v-if="$slots.acciones" class="mt-3"><slot name="acciones" /></div>
     </template>
 
-    <p v-if="aviso" class="mb-3 text-sm" style="color: var(--exito)">
+    <AvisoTono v-if="aviso" tono="exito" class="mb-3">
       {{ aviso }}
-    </p>
-    <p v-if="error" class="mb-3 text-sm" style="color: var(--error)">
+    </AvisoTono>
+    <AvisoTono v-if="error" tono="peligro" class="mb-3" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <!-- Walk-in: agregar alumno en el momento (a la clase o a la lista de espera) -->
     <div v-if="puedeGestionar" class="mb-4">

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona, {
   type PersonaBuscable,
 } from "@/components/BuscarPersona.vue";
@@ -432,9 +433,9 @@ async function agendar(): Promise<void> {
       >
         {{ aviso }}
       </p>
-      <p v-if="error" class="text-sm" style="color: var(--error)">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
-      </p>
+      </AvisoTono>
     </form>
 
     <template #pie>

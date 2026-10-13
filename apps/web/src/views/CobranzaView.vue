@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CorregirCobro from "@/components/CorregirCobro.vue";
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -659,20 +660,21 @@ watch(vista, cargar, { immediate: true });
       :subtitulo="$t(`operacion.admin.cobros.${vista}`)"
     />
 
-    <p
-      v-if="avisoReembolso"
-      class="mt-4 text-sm"
-      role="status"
-      style="color: var(--aviso)"
-    >
+    <AvisoTono v-if="avisoReembolso" tono="aviso" class="mt-4" role="status">
       {{ avisoReembolso }}
-    </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    </AvisoTono>
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ $t("comun.reintentar") }}
-      </button>
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p
       v-if="cargando"
       class="mt-6 text-sm"
@@ -688,14 +690,9 @@ watch(vista, cargar, { immediate: true });
         :tarjetas="indicadores"
       />
       <template v-if="vista === 'por-cobrar'">
-        <p
-          v-if="avisoCobro"
-          class="mt-4 text-sm"
-          role="status"
-          :style="{ color: 'var(--exito)' }"
-        >
+        <AvisoTono v-if="avisoCobro" tono="exito" class="mt-4" role="status">
           {{ avisoCobro }}
-        </p>
+        </AvisoTono>
         <!-- Lo que ya se debe: compras sin pagar y citas o clases ya pasadas -->
         <h2 id="pendientes" class="cb-seccion mt-6">
           <IconoNav nombre="dinero" :tam="21" />
@@ -1159,14 +1156,14 @@ watch(vista, cargar, { immediate: true });
         <h2 class="mt-8 font-medium">
           {{ $t("cobranza.renovaciones") }}
         </h2>
-        <p
+        <AvisoTono
           v-if="avisoRenovacion"
-          class="mt-2 text-sm"
+          tono="exito"
+          class="mt-2"
           role="status"
-          :style="{ color: 'var(--exito)' }"
         >
           {{ avisoRenovacion }}
-        </p>
+        </AvisoTono>
         <EstadoVacio
           v-if="suscripciones.length === 0"
           class="tu-card mt-3"

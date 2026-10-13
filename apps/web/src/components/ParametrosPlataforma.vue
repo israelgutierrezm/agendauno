@@ -3,6 +3,7 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import ParametrosEditor from "@/components/ParametrosEditor.vue";
 import { mensajeDeError } from "@/lib/api";
 import type { Parametro } from "@/lib/parametros";
@@ -70,9 +71,9 @@ onMounted(cargar);
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("parametrosConfig.ayudaPlataforma") }}
     </p>
-    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <ParametrosEditor
       v-if="parametros.length > 0"
       class="mt-4"

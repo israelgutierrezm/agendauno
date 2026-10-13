@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import {
   tokenizarTarjeta,
   type FormularioOpenPay,
@@ -106,7 +107,7 @@ async function enviar(): Promise<void> {
     <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("pagoAutomatico.seguridadOpenPay") }}
     </p>
-    <p v-if="error" class="text-xs" style="color: var(--error)">{{ error }}</p>
+    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
     <div class="flex gap-2">
       <button
         type="submit"

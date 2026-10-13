@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import { RouterLink } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   UNIDADES_POR_CLASE,
@@ -483,17 +484,17 @@ onMounted(async () => {
           {{ tx("algunas") }}
         </label>
       </div>
-      <p
+      <AvisoTono
         v-if="esCitas && ofertasElegibles.length === 0"
-        class="mt-2 text-sm"
-        :style="{ color: 'var(--aviso)' }"
+        tono="aviso"
+        class="mt-2"
         data-prueba="sin-servicios-con-bono"
       >
         {{ $t("planes.editorCitas.sinServiciosConBono") }}
         <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace">{{
           $t("planes.editorCitas.irCatalogo")
         }}</RouterLink>
-      </p>
+      </AvisoTono>
       <div v-if="!form.todas" class="mt-3 space-y-3">
         <p
           v-if="ofertasElegibles.length === 0 && !esCitas"
@@ -521,13 +522,12 @@ onMounted(async () => {
             </label>
           </div>
         </div>
-        <p
+        <AvisoTono
           v-if="ofertasElegibles.length > 0 && form.ofertas.size === 0"
-          class="text-sm"
-          :style="{ color: 'var(--aviso)' }"
+          tono="aviso"
         >
           {{ tx("eligeClases") }}
-        </p>
+        </AvisoTono>
       </div>
     </fieldset>
 
@@ -756,9 +756,9 @@ onMounted(async () => {
     <p v-if="plan" class="text-xs" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("planes.editor.soloFuturo") }}
     </p>
-    <p v-if="error" class="text-sm" style="color: var(--error)" role="alert">
+    <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
     <div class="flex justify-end gap-2">
       <button
         type="button"

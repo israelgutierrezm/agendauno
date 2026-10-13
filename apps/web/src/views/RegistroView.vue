@@ -20,6 +20,7 @@ import { opcionesPais, paisSugerido, zonaSugerida } from "@/lib/region";
 import { trackEvent, type AnalyticsProperties } from "@/lib/analytics";
 import { modoDePerfil, type Modo } from "@/marketing/modalidades";
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
+import AvisoTono from "@/components/AvisoTono.vue";
 import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -1054,14 +1055,14 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                         </button>
                       </p>
                     </template>
-                    <p
+                    <AvisoTono
                       v-if="errorWhatsApp"
-                      class="mt-1 text-xs"
+                      tono="peligro"
+                      class="mt-1"
                       role="alert"
-                      style="color: var(--error)"
                     >
                       {{ errorWhatsApp }}
-                    </p>
+                    </AvisoTono>
                   </div>
                 </div>
               </div>
@@ -1119,14 +1120,9 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
               </div>
             </template>
 
-            <p
-              v-if="error"
-              class="text-sm"
-              role="alert"
-              style="color: var(--error)"
-            >
+            <AvisoTono v-if="error" tono="peligro" role="alert">
               {{ error }}
-            </p>
+            </AvisoTono>
 
             <!-- Navegación -->
             <div class="flex gap-2 pt-1">
@@ -1185,13 +1181,9 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                 reenviando ? $t("registro.reenviando") : $t("registro.reenviar")
               }}
             </button>
-            <p
-              v-if="reenviado"
-              class="mt-2 text-sm"
-              :style="{ color: 'var(--exito)' }"
-            >
+            <AvisoTono v-if="reenviado" tono="exito" class="mt-2">
               {{ $t("registro.reenviado", { email: correo }) }}
-            </p>
+            </AvisoTono>
           </div>
 
           <div

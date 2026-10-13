@@ -2254,7 +2254,7 @@ export default {
     campos: {
       titulo: "Título",
       detalle: "Detalle",
-      vence: "Vence",
+      vence: "Fecha límite",
     },
     reglas: {
       subtitulo:

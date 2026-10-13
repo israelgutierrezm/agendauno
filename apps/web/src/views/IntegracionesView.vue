@@ -3,8 +3,11 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AutomaticoBienestar from "@/components/AutomaticoBienestar.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
+import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import ReservasBienestar from "@/components/ReservasBienestar.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -18,6 +21,15 @@ import { useToastStore } from "@/stores/toast";
  * Los secretos se muestran una sola vez, al crearlos.
  */
 const { t } = useI18n();
+
+// Lo que hace la integración: «Lo que hace:» resaltado y el resto como mensaje.
+const alcance = computed(() => {
+  const texto = t("integraciones.alcance");
+  const corte = texto.indexOf(":");
+  return corte > 0 && corte < 30
+    ? { cabeza: texto.slice(0, corte + 1), resto: texto.slice(corte + 1) }
+    : { cabeza: "", resto: texto };
+});
 
 interface Integracion {
   proveedor: string;
@@ -334,40 +346,48 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <!-- Plataformas de bienestar -->
     <div
       v-if="!cargando && conBienestar && pestana === 'bienestar'"
       class="mt-5 space-y-4"
     >
-      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("integraciones.soloMexico") }}
-      </p>
-      <p
-        class="text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
+      <AvisoTono
+        tono="info"
+        :titulo="$t('integraciones.soloMexico')"
         data-prueba="alcance-bienestar"
       >
-        {{ $t("integraciones.alcance") }}
-      </p>
-      <div v-for="i in integraciones" :key="i.proveedor" class="tu-card p-5">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="font-medium">
-            {{ $t(`integraciones.proveedores.${i.proveedor}`) }}
-          </h2>
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input v-model="edicion[i.proveedor].activa" type="checkbox" />
-            {{ $t("integraciones.activa") }}
-          </label>
+        <strong v-if="alcance.cabeza">{{ alcance.cabeza }}</strong
+        >{{ alcance.resto }}
+      </AvisoTono>
+      <div
+        v-for="i in integraciones"
+        :key="i.proveedor"
+        class="tu-card p-5"
+        :data-prueba="`integracion-${i.proveedor}`"
+      >
+        <!-- Su distintivo, su nombre, qué valida y si está activa -->
+        <div class="flex items-start gap-3">
+          <LogoPlataforma :proveedor="i.proveedor" />
+          <div class="min-w-0 flex-1">
+            <h2 class="text-base font-semibold">
+              {{ $t(`integraciones.proveedores.${i.proveedor}`) }}
+            </h2>
+            <p class="mt-0.5 text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t(`integraciones.ayuda.${i.proveedor}`) }}
+            </p>
+          </div>
+          <InterruptorSiNo
+            v-model="edicion[i.proveedor].activa"
+            class="shrink-0"
+            :etiqueta="$t('integraciones.activa')"
+            :prueba="`activa-${i.proveedor}`"
+          />
         </div>
-
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t(`integraciones.ayuda.${i.proveedor}`) }}
-        </p>
-        <div class="mt-3 grid sm:grid-cols-2 gap-3">
+        <div class="mt-4 grid sm:grid-cols-2 gap-3">
           <div v-for="llave in i.llaves" :key="llave">
             <label class="tu-label" :for="`${i.proveedor}-${llave}`">
               {{ $t(`integraciones.llaves.${i.proveedor}.${llave}`) }}
@@ -385,8 +405,8 @@ onMounted(cargar);
               autocomplete="off"
               :placeholder="
                 configurada(i.proveedor, llave)
-                  ? '••••••'
-                  : $t('integraciones.nuevaLlave')
+                  ? $t('operacion.integraciones.reemplazar')
+                  : $t('operacion.integraciones.capturar')
               "
             />
           </div>

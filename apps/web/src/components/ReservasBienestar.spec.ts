@@ -87,7 +87,8 @@ describe("reservas desde la app de la plataforma", () => {
       "Sin publicar",
     );
 
-    await w.get('[data-prueba="reservas-activas"]').setValue(true);
+    // Se enciende con su interruptor.
+    await w.get('[data-prueba="reservas-activas"]').trigger("click");
     await w.get('[data-prueba="reservas-clase"] input').setValue(true);
     await w.get('[data-prueba="reservas-clase"] select').setValue("987");
     await w.get('[data-prueba="reservas-guardar"]').trigger("click");

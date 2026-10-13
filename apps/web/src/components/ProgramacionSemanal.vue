@@ -287,8 +287,7 @@ function dejar(s: SerieProgramada): void {
       <template v-if="puedeEliminar && detalle" #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
-          style="color: var(--error)"
+          class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
           @click="dejar(detalle)"
         >
           {{ $t("reglasAgenda.dejarDeRepetir") }}
