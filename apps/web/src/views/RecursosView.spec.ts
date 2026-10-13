@@ -11,11 +11,12 @@ import RecursosView from "./RecursosView.vue";
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
+  put: vi.fn(),
   sucursal: { value: null as { id: string; nombre: string } | null },
 }));
 vi.mock("@/lib/api", () => ({
-  api: { get: mocks.get, post: vi.fn(), delete: vi.fn() },
-  mensajeDeError: () => "Error",
+  api: { get: mocks.get, put: mocks.put, post: vi.fn(), delete: vi.fn() },
+  mensajeDeError: (e: unknown) => (e instanceof Error ? e.message : "Error"),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
@@ -80,5 +81,36 @@ describe("salas y equipos", () => {
     const filas = fija.findAll('[data-prueba="recurso"]');
     expect(filas).toHaveLength(1);
     expect(filas[0]!.text()).toContain("Cabina 1");
+  });
+
+  it("activa y desactiva un espacio; si es el único de un servicio, lo dice", async () => {
+    mocks.put.mockResolvedValueOnce({
+      data: {
+        data: { ...recurso("1", "Cabina 1", "Roma Norte"), activo: false },
+      },
+    });
+    const w = mount(RecursosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    const interruptor = w.get('[data-prueba="activo-1"]');
+    expect(interruptor.attributes("aria-checked")).toBe("true");
+    await interruptor.trigger("click");
+    await flushPromises();
+    expect(mocks.put).toHaveBeenCalledWith("/api/v1/app/demo/recursos/1", {
+      activo: false,
+    });
+    expect(w.get('[data-prueba="activo-1"]').attributes("aria-checked")).toBe(
+      "false",
+    );
+
+    mocks.put.mockRejectedValueOnce(
+      new Error("Es el único espacio activo de «Masaje» en esta sede."),
+    );
+    await w.get('[data-prueba="activo-2"]').trigger("click");
+    await flushPromises();
+    expect(w.get('[role="alert"]').text()).toContain("único espacio activo");
+    expect(w.get('[data-prueba="activo-2"]').attributes("aria-checked")).toBe(
+      "true",
+    );
   });
 });

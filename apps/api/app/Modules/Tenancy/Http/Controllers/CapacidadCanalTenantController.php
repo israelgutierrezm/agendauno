@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EliminacionesTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Reservas\CanalReserva;
@@ -19,6 +21,8 @@ use Illuminate\Validation\Rule;
  */
 class CapacidadCanalTenantController
 {
+    public function __construct(private readonly ParametrosTenant $parametros) {}
+
     public function index(Request $request): JsonResponse
     {
         $oferta = $this->resolverOferta($request);
@@ -31,6 +35,13 @@ class CapacidadCanalTenantController
         return response()->json([
             'data' => $reglas->map(fn (ReglaCapacidadCanalTenant $r): array => $this->presentar($r))->all(),
             'canales' => array_map(fn (CanalReserva $c): string => $c->value, CanalReserva::cases()),
+            'meta' => [
+                // Lo que se propone al apartar lugares (lo decide el negocio).
+                'liberar_horas_antes' => $this->parametros->entero('canales.liberar_horas_antes'),
+                // Las plataformas conectadas: sin conexión, sus lugares solo los usa quien
+                // registra a sus visitantes en recepción.
+                'conectadas' => IntegracionTenant::query()->where('activa', true)->pluck('proveedor')->values()->all(),
+            ],
         ]);
     }
 
@@ -49,7 +60,9 @@ class CapacidadCanalTenantController
             ['oferta_id' => $oferta->getKey(), 'canal' => $validado['canal']],
             [
                 'cupos' => (int) $validado['cupos'],
-                'liberar_horas_antes' => (int) ($validado['liberar_horas_antes'] ?? 0),
+                // Sin decirlo, se liberan cuando el negocio lo tiene por omisión (no al
+                // empezar la clase: los directos la verían llena hasta entonces).
+                'liberar_horas_antes' => (int) ($validado['liberar_horas_antes'] ?? $this->parametros->entero('canales.liberar_horas_antes')),
                 'activa' => (bool) ($validado['activa'] ?? true),
             ],
         );

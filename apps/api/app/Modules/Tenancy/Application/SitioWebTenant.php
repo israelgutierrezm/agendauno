@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\BorradorSitioWebTenant;
+use App\Modules\Tenancy\Models\FormularioCaptacionTenant;
 use App\Modules\Tenancy\Models\PublicacionSitioWebTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\SitioWeb\CatalogoSitioWeb;
@@ -288,16 +289,20 @@ class SitioWebTenant
             static fn (array $b): bool => ($b['desde'] === null || $b['desde'] <= $hoy) && ($b['hasta'] === null || $b['hasta'] >= $hoy),
         ));
 
+        // Un bloque de formulario solo sale si su formulario sigue encendido (si no, en
+        // la página habría un formulario que no recibe nada).
+        $formularios = FormularioCaptacionTenant::query()->where('activo', true)->pluck('ulid')->all();
+
         return [
             'plantilla' => $contenido['plantilla'],
-            'secciones' => self::seccionesPublicas((array) $contenido['secciones']),
+            'secciones' => self::seccionesPublicas((array) $contenido['secciones'], $formularios),
             'seo' => $contenido['seo'] ?? self::seo([]),
             'pie' => $contenido['pie'] ?? ['texto' => null],
             'estilo' => $contenido['estilo'] ?? self::estilo([]),
             'encabezado' => $contenido['encabezado'] ?? self::encabezado([]),
             'paginas' => array_values(array_map(static fn (array $p): array => [
                 ...$p,
-                'secciones' => self::seccionesPublicas((array) $p['secciones']),
+                'secciones' => self::seccionesPublicas((array) $p['secciones'], $formularios),
             ], (array) ($contenido['paginas'] ?? []))),
             'banners' => array_map(static function (array $b): array {
                 unset($b['desde'], $b['hasta']);
@@ -309,17 +314,20 @@ class SitioWebTenant
 
     /**
      * Solo las visibles (la portada y el contacto siempre) que tienen algo que mostrar,
-     * sin la marca de visible. Del video, solo con qué se arma el reproductor.
+     * sin la marca de visible. Del video, solo con qué se arma el reproductor; de un
+     * formulario, solo si sigue encendido.
      *
      * @param  array<int, array<string, mixed>>  $secciones
+     * @param  list<string>  $formulariosActivos
      * @return list<array<string, mixed>>
      */
-    private static function seccionesPublicas(array $secciones): array
+    private static function seccionesPublicas(array $secciones, array $formulariosActivos): array
     {
         $visibles = array_filter(
             $secciones,
             static fn (array $s): bool => ($s['visible'] || in_array($s['tipo'], [CatalogoSitioWeb::INICIO, CatalogoSitioWeb::CONTACTO], true))
-                && self::tieneContenido($s),
+                && self::tieneContenido($s)
+                && ($s['tipo'] !== 'formulario' || in_array((string) ($s['datos']['formulario_id'] ?? ''), $formulariosActivos, true)),
         );
 
         return array_values(array_map(static function (array $s): array {

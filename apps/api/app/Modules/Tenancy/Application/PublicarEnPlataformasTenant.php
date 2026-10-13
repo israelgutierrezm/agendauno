@@ -53,6 +53,7 @@ class PublicarEnPlataformasTenant
         private readonly ParametrosTenant $parametros,
         private readonly PublicadorWellhub $wellhub,
         private readonly PublicadorTotalPass $totalpass,
+        private readonly RegionNegocioTenant $region,
     ) {}
 
     /** Cómo se publica en cada plataforma; null si aún no se publica en ella. */
@@ -203,7 +204,9 @@ class PublicarEnPlataformasTenant
     /** ¿La integración publica sus clases? */
     public function publica(IntegracionTenant $integracion): bool
     {
-        return $integracion->activa && $integracion->reservas_activas && $integracion->sucursal_id !== null;
+        // Wellhub y TotalPass solo operan en México: fuera, lo publicado se retira.
+        return $integracion->activa && $integracion->reservas_activas && $integracion->sucursal_id !== null
+            && $this->region->enMexico();
     }
 
     /**

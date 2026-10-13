@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import { esEnlaceDeVideo, type SeccionSitio } from "@/lib/sitioWeb";
 
@@ -388,6 +389,18 @@ const id = computed(() => bloque.value.id ?? bloque.value.tipo);
           {{ f.nombre }}
         </option>
       </select>
+      <!-- Su formulario se apagó o se borró: el bloque no sale en la página. -->
+      <AvisoTono
+        v-if="
+          datos.formulario_id &&
+          !catalogo.formularios.some((f) => f.id === datos.formulario_id)
+        "
+        tono="aviso"
+        class="mt-2"
+        data-prueba="formulario-apagado"
+      >
+        {{ t("operacion.sitio.formularioApagado") }}
+      </AvisoTono>
     </div>
 
     <!-- Estilo -->

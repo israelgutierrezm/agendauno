@@ -174,14 +174,14 @@ onMounted(cargar);
           {{ region.motivo_pais ?? $t("region.pais.bloqueado") }}
         </p>
         <p v-else class="tu-hint mt-1">{{ $t("region.pais.ayuda") }}</p>
-        <p
+        <AvisoTono
           v-if="pais !== 'MX'"
-          class="tu-hint mt-2"
-          :style="{ color: 'var(--aviso)' }"
+          tono="aviso"
+          class="mt-2"
           data-prueba="fuera-de-mexico"
         >
           {{ $t("region.pais.fueraDeMexico") }}
-        </p>
+        </AvisoTono>
       </section>
 
       <!-- Moneda -->

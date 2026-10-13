@@ -221,9 +221,14 @@ class CatalogoTenantController
             }
         }
         if (array_key_exists('recursos', $validado)) {
-            $ids = RecursoTenant::query()->whereIn('ulid', $validado['recursos'])->pluck('id')->all();
+            $elegidos = RecursoTenant::query()->whereIn('ulid', $validado['recursos'])->get(['id', 'activo']);
+            $ids = $elegidos->pluck('id')->all();
             if (count($ids) !== count(array_unique($validado['recursos']))) {
                 throw ValidationException::withMessages(['recursos' => ['Algún espacio no existe.']]);
+            }
+            // Solo con espacios inactivos el servicio no se podría agendar.
+            if ($elegidos->isNotEmpty() && ! $elegidos->contains('activo', true)) {
+                throw ValidationException::withMessages(['recursos' => ['Elige al menos un espacio activo.']]);
             }
             $oferta->recursos()->sync($ids);
         }

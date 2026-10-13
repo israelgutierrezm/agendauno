@@ -20,6 +20,7 @@ import CheckinsClase from "@/components/CheckinsClase.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -1054,11 +1055,20 @@ const guardandoLugares = ref(false);
 const transferirModel = ref({ reservaId: "", personaId: "" });
 // Cupos por canal / marketplace (R20): reglas de la oferta de la sesion abierta.
 const reglasCanal = ref<ReglaCanal[]>([]);
+// Cuándo se liberan por omisión (lo decide el negocio) y qué plataformas están
+// conectadas (sin conexión, sus lugares solo los usa recepción).
+const liberarPorOmision = ref(2);
+const canalesConectados = ref<string[]>([]);
 const reglaCanalModel = ref({
   canal: "wellhub",
   cupos: 0,
-  liberar_horas_antes: 0,
+  liberar_horas_antes: 2,
 });
+const canalSinConectar = computed(
+  () =>
+    ["wellhub", "totalpass"].includes(reglaCanalModel.value.canal) &&
+    !canalesConectados.value.includes(reglaCanalModel.value.canal),
+);
 const guardandoCanal = ref(false);
 const accionando = ref(false);
 
@@ -1148,7 +1158,7 @@ async function abrirDetalle(s: Sesion): Promise<void> {
   reglaCanalModel.value = {
     canal: "wellhub",
     cupos: 0,
-    liberar_horas_antes: 0,
+    liberar_horas_antes: liberarPorOmision.value,
   };
   staffModel.value = { usuarioId: "", rol: "instructor", sustituyeA: "" };
   await cargarRoster(s.id);
@@ -1162,10 +1172,23 @@ async function abrirDetalle(s: Sesion): Promise<void> {
 
 async function cargarReglasCanal(ofertaId: string): Promise<void> {
   try {
-    const { data } = await api.get<{ data: ReglaCanal[] }>(
-      `${base.value}/ofertas/${ofertaId}/capacidad-canal`,
-    );
+    const { data } = await api.get<{
+      data: ReglaCanal[];
+      meta?: { liberar_horas_antes?: number; conectadas?: string[] };
+    }>(`${base.value}/ofertas/${ofertaId}/capacidad-canal`);
     reglasCanal.value = data.data;
+    if (data.meta?.liberar_horas_antes !== undefined) {
+      // Si aún no se tocó, propone lo que el negocio tiene por omisión.
+      if (
+        reglaCanalModel.value.cupos === 0 &&
+        reglaCanalModel.value.liberar_horas_antes === liberarPorOmision.value
+      ) {
+        reglaCanalModel.value.liberar_horas_antes =
+          data.meta.liberar_horas_antes;
+      }
+      liberarPorOmision.value = data.meta.liberar_horas_antes;
+    }
+    canalesConectados.value = data.meta?.conectadas ?? [];
   } catch (e) {
     error.value = mensajeDeError(e);
   }
@@ -1190,7 +1213,7 @@ async function guardarReglaCanal(): Promise<void> {
     reglaCanalModel.value = {
       canal: "wellhub",
       cupos: 0,
-      liberar_horas_antes: 0,
+      liberar_horas_antes: liberarPorOmision.value,
     };
     await cargarReglasCanal(detalle.value.oferta_id);
   } catch (e) {
@@ -3006,14 +3029,14 @@ onMounted(async () => {
                       $t(`agenda.canales.${rc.canal}`)
                     }}</span>
                     {{ $t("agenda.cuposCanal.cupos", { n: rc.cupos }) }}
-                    <span
-                      v-if="rc.liberar_horas_antes > 0"
-                      :style="{ color: 'var(--texto-suave)' }"
+                    <span :style="{ color: 'var(--texto-suave)' }"
                       >·
                       {{
-                        $t("agenda.cuposCanal.libera", {
-                          h: rc.liberar_horas_antes,
-                        })
+                        rc.liberar_horas_antes > 0
+                          ? $t("agenda.cuposCanal.libera", {
+                              h: rc.liberar_horas_antes,
+                            })
+                          : $t("operacion.cuposCanal.hastaQueEmpieza")
                       }}</span
                     >
                   </span>
@@ -3074,8 +3097,21 @@ onMounted(async () => {
                     type="number"
                     min="0"
                     class="tu-input"
+                    :title="$t('operacion.cuposCanal.ayudaLibera')"
                   />
                 </div>
+                <AvisoTono
+                  v-if="canalSinConectar"
+                  tono="aviso"
+                  class="w-full"
+                  data-prueba="canal-sin-conectar"
+                >
+                  {{
+                    $t("operacion.cuposCanal.sinConectar", {
+                      plataforma: $t(`agenda.canales.${reglaCanalModel.canal}`),
+                    })
+                  }}
+                </AvisoTono>
                 <button
                   class="tu-btn tu-btn-fantasma"
                   type="submit"

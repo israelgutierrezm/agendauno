@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Recursos\ModoRecurso;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -41,6 +42,16 @@ class RecursoTenant extends Model
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(SucursalTenant::class, 'sucursal_id');
+    }
+
+    /**
+     * Los servicios que lo pueden usar (2.4).
+     *
+     * @return BelongsToMany<OfertaTenant, $this>
+     */
+    public function ofertas(): BelongsToMany
+    {
+        return $this->belongsToMany(OfertaTenant::class, 'oferta_recursos', 'recurso_id', 'oferta_id')->withTimestamps();
     }
 
     /**

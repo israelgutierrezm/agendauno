@@ -65,6 +65,11 @@ final class CatalogoParametros
             new DefinicionParametro('agenda.dias_a_generar', 'Clases recurrentes', 'Fechas creadas por adelantado',
                 'Días hacia adelante con fechas de las clases recurrentes listas para reservar.', $e, 30, 7, 365, 'días', modalidad: 'clases'),
 
+            // Lugares apartados para un canal (Wellhub, TotalPass, ClassPass…): sin
+            // devolverlos antes de la clase, los clientes directos la verían llena.
+            new DefinicionParametro('canales.liberar_horas_antes', 'Lugares por canal', 'Los lugares apartados se liberan',
+                'Horas antes de la clase en que los lugares apartados para un canal que no se usaron vuelven a estar disponibles para todos. Es el valor que se propone al apartar lugares.', $e, 2, 0, 168, 'h', modalidad: 'clases'),
+
             // Wellhub y TotalPass: reservas desde su app (ADR 0149).
             new DefinicionParametro('plataformas.dias_publicados', 'Wellhub y TotalPass', 'Clases publicadas por adelantado',
                 'Días hacia adelante con las clases que se pueden reservar desde la app de Wellhub o TotalPass.', $e, 14, 1, 60, 'días', modalidad: 'clases'),
