@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Models\AsistenciaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -18,7 +19,8 @@ use Carbon\CarbonImmutable;
 */
 
 /**
- * Sesión sin guardar (tipo, estado y horario), con sus conteos ya puestos.
+ * Sesión sin guardar (tipo, estado y horario), con sus conteos ya puestos (también el de
+ * los lugares de Wellhub y TotalPass, ADR 0148).
  */
 function sesionContratoUnit(string $tipo = 'cita', string $estado = 'programada', ?int $capacidad = 1, int $ocupados = 0): SesionTenant
 {
@@ -29,6 +31,7 @@ function sesionContratoUnit(string $tipo = 'cita', string $estado = 'programada'
         'inicia_en' => CarbonImmutable::parse('2026-10-03 10:00:00', 'UTC'),
         'termina_en' => CarbonImmutable::parse('2026-10-03 11:00:00', 'UTC'),
         'ocupados' => $ocupados,
+        CupoDeSesionTenant::ATRIBUTO_PLATAFORMA => 0,
         'en_espera' => 0,
     ]);
 }
