@@ -29,9 +29,18 @@ const resumen = {
     visitantes: 7,
     nuevos: 3,
   },
+  reservas: {
+    total: 6,
+    por_venir: 2,
+    asistieron: 2,
+    canceladas: 1,
+    canceladas_tarde: 1,
+    no_asistieron: 0,
+    rechazadas: 0,
+  },
   por_proveedor: [
-    { proveedor: "wellhub", visitas: 8, visitantes: 5 },
-    { proveedor: "totalpass", visitas: 4, visitantes: 2 },
+    { proveedor: "wellhub", visitas: 8, visitantes: 5, reservas: 6 },
+    { proveedor: "totalpass", visitas: 4, visitantes: 2, reservas: 0 },
   ],
   por_dia: [
     { fecha: "2026-10-01", visitas: 5 },
@@ -89,6 +98,14 @@ beforeEach(() => {
                 origen: "automatico",
               },
             ],
+            reservas: [
+              {
+                id: "l1",
+                clase: "Pole Sport",
+                sesion_inicia_en: "2026-10-02T14:00:00Z",
+                estado: "reservado",
+              },
+            ],
           },
         },
       });
@@ -124,6 +141,12 @@ describe("reportes: plataformas", () => {
     expect(fila.text()).toContain("Ana Pérez");
     expect(fila.text()).toContain("Wellhub");
     expect(w.get('[data-prueba="es-alumno"]').text()).toBe("Ya es alumno");
+
+    // Las reservas desde la app (ADR 0149): canceladas suma las tardías.
+    const reservas = w.get('[data-prueba="reservas-app"]').text();
+    expect(reservas).toContain("2 por venir");
+    expect(reservas).toContain("1 tarde");
+    expect(w.text()).toContain("6 reservas");
   });
 
   it("filtra por plataforma el resumen y la lista", async () => {
@@ -153,6 +176,9 @@ describe("reportes: plataformas", () => {
     expect(panel.text()).toContain("Plan Gold");
     expect(w.get('[data-prueba="historial-visitante"]').text()).toContain(
       "Automática",
+    );
+    expect(w.get('[data-prueba="reservas-visitante"]').text()).toContain(
+      "Reservada",
     );
   });
 });

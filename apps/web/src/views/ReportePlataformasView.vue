@@ -27,10 +27,21 @@ interface Resumen {
     visitantes: number;
     nuevos: number;
   };
+  // Reservas desde la app de la plataforma, por la fecha de su clase (ADR 0149).
+  reservas?: {
+    total: number;
+    por_venir: number;
+    asistieron: number;
+    canceladas: number;
+    canceladas_tarde: number;
+    no_asistieron: number;
+    rechazadas: number;
+  };
   por_proveedor: {
     proveedor: Proveedor;
     visitas: number;
     visitantes: number;
+    reservas?: number;
   }[];
   por_dia: { fecha: string; visitas: number }[];
   por_clase: { clase: string; visitas: number }[];
@@ -56,6 +67,12 @@ interface Detalle extends Visitante {
     sesion_inicia_en: string | null;
     estado: string;
     origen: string;
+  }[];
+  reservas?: {
+    id: string;
+    clase: string | null;
+    sesion_inicia_en: string | null;
+    estado: string;
   }[];
 }
 interface Meta {
@@ -208,6 +225,42 @@ function diaCorto(dia: string): string {
 const maxDia = computed(() =>
   Math.max(1, ...(resumen.value?.por_dia.map((d) => d.visitas) ?? [1])),
 );
+// Cómo quedaron las reservas desde la app, sin mostrar lo que está en cero.
+const reservasApp = computed(() => {
+  const r = resumen.value?.reservas;
+  if (!r || r.total === 0) {
+    return [];
+  }
+  return [
+    {
+      clave: "total",
+      valor: r.total,
+      detalle:
+        r.por_venir > 0
+          ? t("operacion.plataformas.reservasApp.porVenir", { n: r.por_venir })
+          : "",
+    },
+    { clave: "asistieron", valor: r.asistieron, detalle: "" },
+    {
+      clave: "canceladas",
+      valor: r.canceladas + r.canceladas_tarde,
+      detalle:
+        r.canceladas_tarde > 0
+          ? t("operacion.plataformas.reservasApp.tarde", {
+              n: r.canceladas_tarde,
+            })
+          : "",
+    },
+    { clave: "noAsistieron", valor: r.no_asistieron, detalle: "" },
+    { clave: "rechazadas", valor: r.rechazadas, detalle: "" },
+  ];
+});
+const tonoReserva: Record<string, string> = {
+  asistio: "var(--exito)",
+  reservado: "var(--primario)",
+  no_asistio: "var(--aviso)",
+};
+
 const indicadores = computed(() => {
   const r = resumen.value?.resumen;
   if (!r) {
@@ -329,12 +382,19 @@ onMounted(() => {
             <span class="font-medium">{{
               $t(`operacion.plataformas.proveedores.${p.proveedor}`)
             }}</span>
-            <span :style="{ color: 'var(--texto-suave)' }">{{
-              $t("operacion.plataformas.visitasDe", {
-                n: p.visitas,
-                v: p.visitantes,
-              })
-            }}</span>
+            <span :style="{ color: 'var(--texto-suave)' }"
+              >{{
+                $t("operacion.plataformas.visitasDe", {
+                  n: p.visitas,
+                  v: p.visitantes,
+                })
+              }}<template v-if="p.reservas">
+                ·
+                {{
+                  $t("operacion.plataformas.reservasDe", { n: p.reservas })
+                }}</template
+              ></span
+            >
           </li>
         </ul>
       </div>
@@ -354,6 +414,25 @@ onMounted(() => {
           {{ $t("operacion.plataformas.sinVisitas") }}
         </p>
       </div>
+      <div
+        v-if="reservasApp.length > 0"
+        class="tu-card p-4 sm:p-5 rp-ancha"
+        data-prueba="reservas-app"
+      >
+        <h2 class="rp-titulo">
+          {{ $t("operacion.plataformas.reservasApp.titulo") }}
+        </h2>
+        <dl class="rp-reservas mt-3">
+          <div v-for="r in reservasApp" :key="r.clave" class="rp-reserva">
+            <dt class="rp-etiqueta">
+              {{ $t(`operacion.plataformas.reservasApp.${r.clave}`) }}
+            </dt>
+            <dd class="rp-valor">{{ r.valor }}</dd>
+            <dd v-if="r.detalle" class="rp-detalle">{{ r.detalle }}</dd>
+          </div>
+        </dl>
+      </div>
+
       <div class="tu-card p-4 sm:p-5 rp-ancha">
         <h2 class="rp-titulo">{{ $t("operacion.plataformas.porDia") }}</h2>
         <ul v-if="resumen.por_dia.length > 0" class="mt-3 space-y-1.5">
@@ -526,6 +605,35 @@ onMounted(() => {
             </li>
           </ul>
         </div>
+        <div v-if="detalle.reservas && detalle.reservas.length > 0">
+          <h3 class="rp-titulo">
+            {{ $t("operacion.plataformas.detalle.reservas") }}
+          </h3>
+          <ul class="mt-2 space-y-2" data-prueba="reservas-visitante">
+            <li v-for="r in detalle.reservas" :key="r.id" class="rp-visita">
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium">{{
+                  r.clase ?? $t("operacion.plataformas.detalle.sinClase")
+                }}</span>
+                <span
+                  v-if="r.sesion_inicia_en"
+                  class="block text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ fecha(r.sesion_inicia_en, true) }}</span
+                >
+              </span>
+              <span
+                class="tu-estado shrink-0 text-xs"
+                :style="{
+                  '--tono': tonoReserva[r.estado] ?? 'var(--texto-suave)',
+                }"
+                >{{
+                  $t(`operacion.plataformas.estadosReserva.${r.estado}`)
+                }}</span
+              >
+            </li>
+          </ul>
+        </div>
       </div>
     </PanelLateral>
   </section>
@@ -598,6 +706,28 @@ onMounted(() => {
   .rp-ancha {
     grid-column: 1 / -1;
   }
+}
+.rp-reservas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+@media (min-width: 640px) {
+  .rp-reservas {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.rp-reserva {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+/* El número arriba, como en los indicadores (en el HTML va primero la etiqueta). */
+.rp-reserva .rp-etiqueta {
+  order: 1;
+}
+.rp-reserva .rp-detalle {
+  order: 2;
 }
 .rp-titulo {
   font-size: 0.95rem;

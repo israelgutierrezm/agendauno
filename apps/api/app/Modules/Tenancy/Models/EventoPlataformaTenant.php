@@ -7,10 +7,11 @@ namespace App\Modules\Tenancy\Models;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
- * Un aviso de Wellhub o TotalPass (ADR 0148), tenant-local: la bandeja de entrada de
- * las plataformas. Se guarda al recibirlo (Wellhub espera respuesta en un segundo) y se
+ * Un aviso de Wellhub o TotalPass (ADR 0148 y 0149), tenant-local: la bandeja de entrada
+ * de las plataformas (check-ins y reservas). Se guarda al recibirlo (Wellhub espera respuesta en un segundo) y se
  * procesa aparte; el mismo aviso (`proveedor` + `clave`) no se guarda dos veces.
  *
  * Estados: `pendiente` (por procesar o por reintentar), `procesado`, `descartado` (no
@@ -55,4 +56,10 @@ class EventoPlataformaTenant extends Model
         'recibido_en' => 'datetime',
         'procesado_en' => 'datetime',
     ];
+
+    /** Lo deja terminado (procesado, descartado o fallido) con lo que pasó. */
+    public function terminar(string $estado, string $resultado): void
+    {
+        $this->fill(['estado' => $estado, 'resultado' => Str::limit($resultado, 290), 'procesado_en' => now()])->save();
+    }
 }

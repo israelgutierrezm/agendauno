@@ -12,6 +12,8 @@ use App\Modules\Tenancy\Integraciones\ResultadoCheckin;
 use App\Modules\Tenancy\Integraciones\ValidadorWellhub;
 use App\Modules\Tenancy\Models\CheckinTenant;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
+use App\Modules\Tenancy\Models\LugarPlataformaTenant;
+use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
 use Carbon\CarbonImmutable;
@@ -19,7 +21,6 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Throwable;
 
 /**
  * El check-in automático de Wellhub y TotalPass (ADR 0148): la persona hace check-in en
@@ -31,10 +32,11 @@ use Throwable;
  *   referencia: una visita por día).
  * - TotalPass manda el aviso de check-in con un token; confirmarlo lo valida.
  *
- * El aviso se guarda al llegar ({@see recibir()}) y se procesa aparte
- * ({@see procesar()}): Wellhub espera respuesta en un segundo. La persona queda como
- * visitante de la plataforma (nunca como persona del negocio) y la visita, en la clase
- * de ese momento si se sabe cuál; si no, sin clase hasta que recepción la asigne.
+ * El aviso se guarda al llegar y se procesa aparte ({@see AvisosPlataformaTenant}):
+ * Wellhub espera respuesta en un segundo. La persona queda como visitante de la
+ * plataforma (nunca como persona del negocio) y la visita, en la clase de ese momento si
+ * se sabe cuál; si no, sin clase hasta que recepción la asigne. Si hizo check-in a la
+ * clase que reservó desde la app de Wellhub (ADR 0149), la visita va a esa clase.
  *
  * Si la plataforma no responde, se reintenta mientras el check-in siga vigente; después
  * la visita queda «sin verificar» (nunca aprobada) y la plataforma recibe una alerta.
@@ -43,7 +45,7 @@ use Throwable;
 class CheckinsAutomaticosTenant
 {
     /** Intentos de validar un aviso antes de darlo por no verificable. */
-    private const MAX_INTENTOS = 5;
+    private const MAX_INTENTOS = AvisosPlataformaTenant::MAX_INTENTOS;
 
     /** Cuánto dura el check-in en la app de Wellhub. */
     private const MINUTOS_WELLHUB = 20;
@@ -61,86 +63,13 @@ class CheckinsAutomaticosTenant
         private readonly GestorDeConexionTenant $gestor,
     ) {}
 
-    /**
-     * Guarda el aviso de check-in una sola vez. Null si no es un aviso de check-in (se
-     * contesta que llegó, sin guardar nada).
-     *
-     * @param  array<string, mixed>  $datos
-     */
-    public function recibir(ProveedorPartner $proveedor, array $datos): ?EventoPlataformaTenant
+    /** Procesa un aviso de check-in (lo llama la bandeja con la integración activa). */
+    public function procesar(EventoPlataformaTenant $evento, ProveedorPartner $proveedor): void
     {
-        $clave = match ($proveedor) {
-            ProveedorPartner::Wellhub => self::claveWellhub($datos),
-            ProveedorPartner::TotalPass => self::claveTotalPass($datos),
+        match ($proveedor) {
+            ProveedorPartner::Wellhub => $this->wellhub($evento),
+            ProveedorPartner::TotalPass => $this->totalPass($evento),
         };
-        if ($clave === null) {
-            return null;
-        }
-
-        $existente = EventoPlataformaTenant::query()->where('proveedor', $proveedor->value)->where('clave', $clave)->first();
-        if ($existente instanceof EventoPlataformaTenant) {
-            return $existente;
-        }
-        try {
-            return EventoPlataformaTenant::query()->create([
-                'proveedor' => $proveedor->value,
-                'tipo' => 'checkin',
-                'clave' => $clave,
-                'payload' => $datos,
-                'estado' => EventoPlataformaTenant::PENDIENTE,
-                'recibido_en' => now(),
-            ]);
-        } catch (UniqueConstraintViolationException) {
-            // La plataforma reintentó mientras se guardaba el primero.
-            return EventoPlataformaTenant::query()->where('proveedor', $proveedor->value)->where('clave', $clave)->firstOrFail();
-        }
-    }
-
-    /** Procesa los avisos pendientes del negocio conectado; cuántos terminó. */
-    public function procesarPendientes(): int
-    {
-        $terminados = 0;
-        EventoPlataformaTenant::query()
-            ->where('estado', EventoPlataformaTenant::PENDIENTE)
-            ->orderBy('id')
-            ->limit(200)
-            ->get()
-            ->each(function (EventoPlataformaTenant $evento) use (&$terminados): void {
-                $this->procesar($evento);
-                if ($evento->estado !== EventoPlataformaTenant::PENDIENTE) {
-                    $terminados++;
-                }
-            });
-
-        return $terminados;
-    }
-
-    public function procesar(EventoPlataformaTenant $evento): void
-    {
-        if ($evento->estado !== EventoPlataformaTenant::PENDIENTE) {
-            return;
-        }
-        $proveedor = ProveedorPartner::tryFrom($evento->proveedor);
-        if ($proveedor === null || ! $this->registro->activa($proveedor->value)) {
-            $this->terminar($evento, EventoPlataformaTenant::DESCARTADO, 'La integración no está activa.');
-
-            return;
-        }
-
-        try {
-            match ($proveedor) {
-                ProveedorPartner::Wellhub => $this->wellhub($evento),
-                ProveedorPartner::TotalPass => $this->totalPass($evento),
-            };
-        } catch (Throwable $e) {
-            $evento->intentos++;
-            $evento->resultado = Str::limit($e->getMessage(), 290);
-            if ($evento->intentos >= self::MAX_INTENTOS) {
-                $evento->estado = EventoPlataformaTenant::FALLIDO;
-                $evento->procesado_en = now();
-            }
-            $evento->save();
-        }
     }
 
     private function wellhub(EventoPlataformaTenant $evento): void
@@ -149,7 +78,7 @@ class CheckinsAutomaticosTenant
         $credenciales = $this->registro->credenciales(ProveedorPartner::Wellhub->value);
         $gimnasio = (string) Arr::get($datos, 'event_data.gym.id', '');
         if ($gimnasio !== '' && ($credenciales['gym_id'] ?? '') !== '' && $gimnasio !== (string) $credenciales['gym_id']) {
-            $this->terminar($evento, EventoPlataformaTenant::DESCARTADO, 'El aviso es de otro gimnasio de Wellhub.');
+            $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'El aviso es de otro gimnasio de Wellhub.');
 
             return;
         }
@@ -162,8 +91,21 @@ class CheckinsAutomaticosTenant
             'producto' => Arr::get($datos, 'event_data.gym.product.description') ?? Arr::get($datos, 'event_data.product.description'),
         ], $cuando);
 
+        // Check-in a la clase que reservó desde la app (ADR 0149): va a esa clase.
+        $sesion = null;
+        $limite = $cuando->addMinutes(self::MINUTOS_WELLHUB);
+        if ($evento->tipo === AvisosPlataformaTenant::CHECKIN_RESERVA) {
+            $sesion = LugarPlataformaTenant::query()
+                ->where('referencia_externa', ReservasPlataformaTenant::referencia(ProveedorPartner::Wellhub, (string) Arr::get($datos, 'event_data.booking.booking_number')))
+                ->first()?->sesion;
+            $vence = Arr::get($datos, 'event_data.expires_at');
+            if (is_numeric($vence)) {
+                $limite = self::momento($vence, $evento);
+            }
+        }
+
         $resultado = $this->wellhub->validar($wellhubId, $credenciales);
-        $this->asentar($evento, ProveedorPartner::Wellhub, $resultado, $visitante, $cuando, $cuando->addMinutes(self::MINUTOS_WELLHUB));
+        $this->asentar($evento, ProveedorPartner::Wellhub, $resultado, $visitante, $cuando, $limite, $sesion);
     }
 
     private function totalPass(EventoPlataformaTenant $evento): void
@@ -202,6 +144,7 @@ class CheckinsAutomaticosTenant
         ?VisitantePlataformaTenant $visitante,
         CarbonImmutable $cuando,
         CarbonInterface $limite,
+        ?SesionTenant $sesion = null,
     ): void {
         if ($resultado->valido) {
             $previo = CheckinTenant::query()->where('referencia_externa', $resultado->referencia)->first();
@@ -212,15 +155,15 @@ class CheckinsAutomaticosTenant
                     $previo->save();
                 }
             } else {
-                $this->registrarVisita($proveedor, CheckinTenant::VALIDADO, $resultado->referencia, $visitante, $cuando, null);
+                $this->registrarVisita($proveedor, CheckinTenant::VALIDADO, $resultado->referencia, $visitante, $cuando, null, $sesion);
             }
-            $this->terminar($evento, EventoPlataformaTenant::PROCESADO, 'Visita validada.');
+            $evento->terminar(EventoPlataformaTenant::PROCESADO, 'Visita validada.');
 
             return;
         }
 
         if ($resultado->verificable) {
-            $this->terminar($evento, EventoPlataformaTenant::DESCARTADO, $resultado->motivo ?? 'La plataforma no validó la visita.');
+            $evento->terminar(EventoPlataformaTenant::DESCARTADO, $resultado->motivo ?? 'La plataforma no validó la visita.');
 
             return;
         }
@@ -232,13 +175,13 @@ class CheckinsAutomaticosTenant
 
             return;
         }
-        $this->registrarVisita($proveedor, CheckinTenant::NO_VERIFICABLE, null, $visitante, $cuando, $resultado->motivo);
+        $this->registrarVisita($proveedor, CheckinTenant::NO_VERIFICABLE, null, $visitante, $cuando, $resultado->motivo, $sesion);
         $this->alertas->registrar(
             'bienestar_no_verificable',
             ($this->gestor->actual()->slug ?? '').':'.$proveedor->value,
             $proveedor->nombre().' no pudo verificar una visita automática: '.$resultado->motivo,
         );
-        $this->terminar($evento, EventoPlataformaTenant::PROCESADO, 'Sin verificar: '.$resultado->motivo);
+        $evento->terminar(EventoPlataformaTenant::PROCESADO, 'Sin verificar: '.$resultado->motivo);
     }
 
     private function registrarVisita(
@@ -248,8 +191,9 @@ class CheckinsAutomaticosTenant
         ?VisitantePlataformaTenant $visitante,
         CarbonImmutable $cuando,
         ?string $motivo,
+        ?SesionTenant $sesion,
     ): void {
-        $sesion = $this->visitantes->sesionDeVisita($visitante, $cuando);
+        $sesion ??= $this->visitantes->sesionDeVisita($visitante, $cuando);
         try {
             $checkin = CheckinTenant::query()->create([
                 'sesion_id' => $sesion?->getKey(),
@@ -269,49 +213,13 @@ class CheckinsAutomaticosTenant
         $this->lugares->ocuparPorVisita($checkin);
     }
 
-    private function terminar(EventoPlataformaTenant $evento, string $estado, string $resultado): void
-    {
-        $evento->fill(['estado' => $estado, 'resultado' => Str::limit($resultado, 290), 'procesado_en' => now()])->save();
-    }
-
-    /**
-     * El aviso `checkin` de Wellhub: su clave es el Wellhub ID con el momento del aviso.
-     *
-     * @param  array<string, mixed>  $datos
-     */
-    private static function claveWellhub(array $datos): ?string
-    {
-        $wellhubId = (string) preg_replace('/\D/', '', (string) Arr::get($datos, 'event_data.user.unique_token', ''));
-        if (Arr::get($datos, 'event_type') !== 'checkin' || $wellhubId === '') {
-            return null;
-        }
-
-        return 'checkin:'.$wellhubId.':'.(string) Arr::get($datos, 'event_data.timestamp', '');
-    }
-
-    /**
-     * El aviso de check-in de TotalPass: su clave es la huella del token de confirmación.
-     *
-     * @param  array<string, mixed>  $datos
-     */
-    private static function claveTotalPass(array $datos): ?string
-    {
-        $tipo = strtoupper((string) (Arr::get($datos, 'event') ?? Arr::get($datos, 'event_type') ?? Arr::get($datos, 'type') ?? ''));
-        $token = self::tokenTotalPass($datos);
-        if (! str_contains($tipo, 'CHECK') || $token === null) {
-            return null;
-        }
-
-        return 'checkin:'.hash('sha256', $token);
-    }
-
     /**
      * El token de confirmación del aviso de TotalPass: viene al final de la dirección de
      * confirmación (`…/webhook_confirmations/{TOKEN}`) o suelto.
      *
      * @param  array<string, mixed>  $datos
      */
-    private static function tokenTotalPass(array $datos): ?string
+    public static function tokenTotalPass(array $datos): ?string
     {
         foreach (['endpoint', 'confirmation_url', 'check_in.endpoint', 'check_in.confirmation_url'] as $campo) {
             $url = Arr::get($datos, $campo);

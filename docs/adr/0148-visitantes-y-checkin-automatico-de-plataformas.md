@@ -1,6 +1,7 @@
 # ADR 0148 — Wellhub y TotalPass: visitantes de la plataforma y check-in automático
 
-Estado: Aceptado (2026-10-12). Amplía el ADR 0124.
+Estado: Aceptado (2026-10-12). Amplía el ADR 0124. Ampliado por el ADR 0149 (reservas
+desde la app de la plataforma).
 
 Pedido: revisar contra la competencia cómo se usan Wellhub y TotalPass y cubrir lo que
 falta: «debe existir un apartado para reportes en donde se vea la información del
@@ -121,7 +122,8 @@ este ADR.
   - Confirmar con TotalPass el host de confirmación de producción (documentan el de
     pruebas) y el contenido de su aviso de check-in, que no publican completo.
   - El aviso de Wellhub de cuando un negocio elige a AgendaUno como su sistema
-    (Integration Setup API).
-  - Las reservas desde la app de cada plataforma (Booking API), que usarán
-    `lugares_plataforma` con origen `reserva`.
+    (Integration Setup API). Ya se usa para registrar la dirección de avisos al publicar
+    las clases (ADR 0149).
+  - Las reservas desde la app de cada plataforma (Booking API): Wellhub, en el ADR 0149;
+    TotalPass, pendiente.
   - La conciliación con lo que paga cada plataforma.

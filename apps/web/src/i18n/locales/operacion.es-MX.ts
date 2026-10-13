@@ -471,6 +471,17 @@ export default {
       automaticas: "{n} automáticas",
     },
     porPlataforma: "Por plataforma",
+    reservasDe: "{n} reservas",
+    reservasApp: {
+      titulo: "Reservas desde la app",
+      total: "Reservas",
+      asistieron: "Asistieron",
+      canceladas: "Canceladas",
+      noAsistieron: "No asistieron",
+      rechazadas: "Rechazadas por cupo o reglas",
+      tarde: "{n} tarde",
+      porVenir: "{n} por venir",
+    },
     porClase: "Clases con más visitas",
     porDia: "Visitas por día",
     visitasDe: "{n} visitas · {v} visitantes",
@@ -495,6 +506,7 @@ export default {
       producto: "Plan",
       primera: "Primera visita",
       historial: "Visitas",
+      reservas: "Reservas desde la app",
       sinClase: "Sin clase asignada",
       esAlumnoAyuda:
         "Ya lo registraste como alumno con el mismo correo. Aquí siguen sus visitas por la plataforma.",
@@ -507,6 +519,14 @@ export default {
     origen: {
       automatico: "Automática",
       manual: "Registrada en recepción",
+    },
+    estadosReserva: {
+      reservado: "Reservada",
+      asistio: "Asistió",
+      cancelado: "Cancelada",
+      cancelado_tarde: "Cancelada tarde",
+      no_asistio: "No asistió",
+      rechazado: "Rechazada",
     },
     automatico: {
       titulo: "Check-in automático",
@@ -525,6 +545,36 @@ export default {
         "Registrado con TotalPass: cuando la persona hace check-in en su app, la visita se valida sola.",
       totalpassPendiente:
         "Captura la llave de API de tu sede (la generas en el portal de TotalPass, en Integraciones) y guarda: AgendaUno registra su aviso.",
+    },
+    // Reservas desde la app de la plataforma (ADR 0149).
+    reservas: {
+      titulo: "Reservas desde la app",
+      ayuda:
+        "Publica tus clases en la app de {plataforma} para que sus usuarios las reserven. Cada reserva ocupa un lugar sin consumir créditos y se acepta o se rechaza sola según el cupo.",
+      publicando: "Publicando",
+      sinPublicar: "Sin publicar",
+      publicar: "Publicar mis clases en {plataforma}",
+      sucursal: "Sucursal",
+      elegirSucursal: "Elige la sucursal",
+      clases: "Clases que se publican",
+      sinClases: "Aún no tienes clases grupales para publicar.",
+      producto: "Producto de {plataforma}",
+      elegirProducto: "Elige el producto",
+      productoManual: "ID del producto",
+      sinProductos:
+        "No se pudieron consultar los productos de {plataforma}. Escribe el ID del producto que te dio tu contacto.",
+      alcance:
+        "Se publican {dias} días por adelantado; una clase sin cupo ofrece {lugares} lugares. Lo ajustas en Configuración → Parámetros.",
+      publicados: "{n} horarios publicados",
+      porVenir: "{n} reservas por venir",
+      conError: "{n} con error",
+      avisosRegistrados: "Avisos de reserva registrados con {plataforma}",
+      avisosPendientes:
+        "Falta registrar con {plataforma} la dirección de avisos de reserva. Se intenta al guardar.",
+      guardar: "Guardar publicación",
+      guardando: "Guardando…",
+      guardado:
+        "Publicación guardada. Tus clases se publican en unos momentos.",
     },
   },
   // La bandeja de tareas: por páginas, con búsqueda, filtros y grupos por vencimiento.

@@ -17,7 +17,8 @@ use Illuminate\Support\Carbon;
  * Quienes llegan por Wellhub o TotalPass (ADR 0148): se registran como visitantes de la
  * plataforma, nunca como personas del negocio. Se reconocen por el id que da la
  * plataforma; cada visita actualiza lo que ella mande (nombre, correo, teléfono,
- * producto) y cuándo vino.
+ * producto) y cuándo vino. Quien solo reservó desde la app (ADR 0149) es visitante sin
+ * visitas todavía.
  */
 class VisitantesPlataformaTenant
 {
@@ -26,11 +27,12 @@ class VisitantesPlataformaTenant
 
     /**
      * El visitante con ese id en la plataforma, nuevo o el de siempre, con lo que ella
-     * mandó ahora (lo que no manda se conserva).
+     * mandó ahora (lo que no manda se conserva) y, si vino, cuándo (`$visita`; null si
+     * solo reservó).
      *
      * @param  array{nombre?: string|null, email?: string|null, telefono?: string|null, producto?: string|null}  $datos
      */
-    public function registrar(string $proveedor, string $idExterno, array $datos, CarbonInterface $cuando): VisitantePlataformaTenant
+    public function registrar(string $proveedor, string $idExterno, array $datos, ?CarbonInterface $visita): VisitantePlataformaTenant
     {
         $limpios = array_filter([
             'nombre' => self::texto($datos['nombre'] ?? null, 160),
@@ -49,8 +51,8 @@ class VisitantesPlataformaTenant
                     'proveedor' => $proveedor,
                     'id_externo' => $idExterno,
                     ...$limpios,
-                    'primera_visita_en' => $cuando,
-                    'ultima_visita_en' => $cuando,
+                    'primera_visita_en' => $visita,
+                    'ultima_visita_en' => $visita,
                 ]);
 
                 return $visitante;
@@ -64,11 +66,11 @@ class VisitantesPlataformaTenant
         }
 
         $visitante->fill($limpios);
-        if ($visitante->ultima_visita_en === null || $cuando->greaterThan($visitante->ultima_visita_en)) {
-            $visitante->ultima_visita_en = Carbon::instance($cuando);
+        if ($visita !== null && ($visitante->ultima_visita_en === null || $visita->greaterThan($visitante->ultima_visita_en))) {
+            $visitante->ultima_visita_en = Carbon::instance($visita);
         }
-        if ($visitante->primera_visita_en === null || $cuando->lessThan($visitante->primera_visita_en)) {
-            $visitante->primera_visita_en = Carbon::instance($cuando);
+        if ($visita !== null && ($visitante->primera_visita_en === null || $visita->lessThan($visitante->primera_visita_en))) {
+            $visitante->primera_visita_en = Carbon::instance($visita);
         }
         $visitante->save();
 

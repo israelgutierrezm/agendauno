@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\Application\CheckinsAutomaticosTenant;
+use App\Modules\Tenancy\Application\AvisosPlataformaTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -17,8 +17,8 @@ use Illuminate\Http\Request;
 use function Illuminate\Support\defer;
 
 /**
- * Los avisos de Wellhub y TotalPass de un negocio (ADR 0148):
- * `POST /webhooks/bienestar/{estudio}/{proveedor}/{token}`.
+ * Los avisos de Wellhub y TotalPass de un negocio (ADR 0148), de check-in y de las
+ * reservas desde su app (ADR 0149): `POST /webhooks/bienestar/{estudio}/{proveedor}/{token}`.
  *
  * - El token de la dirección es el del negocio con esa plataforma (se genera al
  *   conectarla): sin él, el aviso no se acepta.
@@ -34,7 +34,7 @@ class WebhookBienestarController
 {
     public function __construct(
         private readonly RegistroDeIntegracionesTenant $registro,
-        private readonly CheckinsAutomaticosTenant $checkins,
+        private readonly AvisosPlataformaTenant $avisos,
         private readonly GestorDeConexionTenant $gestor,
     ) {}
 
@@ -61,7 +61,7 @@ class WebhookBienestarController
         $datos = json_decode($cuerpo, true);
         abort_unless(is_array($datos), 400, 'El aviso no es JSON.');
 
-        $evento = $this->checkins->recibir($proveedor, $datos);
+        $evento = $this->avisos->recibir($proveedor, $datos);
         $estudio = $this->gestor->actual();
         if ($evento instanceof EventoPlataformaTenant && $estudio instanceof Estudio) {
             $id = (int) $evento->getKey();
@@ -69,7 +69,7 @@ class WebhookBienestarController
                 $this->gestor->ejecutarAislado($estudio, function () use ($id): void {
                     $evento = EventoPlataformaTenant::query()->find($id);
                     if ($evento instanceof EventoPlataformaTenant) {
-                        $this->checkins->procesar($evento);
+                        $this->avisos->procesar($evento);
                     }
                 }, null);
             });
