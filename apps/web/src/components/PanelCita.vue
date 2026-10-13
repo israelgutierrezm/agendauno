@@ -53,7 +53,8 @@ const { t, te } = useI18n();
 const toast = useToastStore();
 const sesionTenant = useSesionTenantStore();
 
-const METODOS = ["efectivo", "transferencia", "manual"] as const;
+// «tarjeta»: con la terminal del negocio (antes se mandaba como «manual»).
+const METODOS = ["efectivo", "tarjeta", "transferencia"] as const;
 const metodo = ref<(typeof METODOS)[number]>("efectivo");
 const accionando = ref(false);
 

@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\DB;
 class CorregirMetodoPagoTenant
 {
     /** Formas de pago de caja (las que registra `liquidar`) y cómo se guardan. */
-    public const METODOS = ['efectivo', 'transferencia', 'ventanilla', 'manual'];
+    public const METODOS = ['efectivo', 'transferencia', 'tarjeta', 'ventanilla', 'manual'];
 
     public function __construct(
         private readonly ParametrosTenant $parametros,
@@ -103,6 +103,9 @@ class CorregirMetodoPagoTenant
             'efectivo' => MetodoPago::Efectivo,
             'transferencia' => MetodoPago::Spei,
             'ventanilla' => MetodoPago::Ventanilla,
+            // Con la terminal del negocio (no por la pasarela). «manual» es como lo
+            // mandaban las citas y la app para la terminal: cuenta igual.
+            'tarjeta', 'manual' => MetodoPago::Tarjeta,
             default => null,
         };
     }

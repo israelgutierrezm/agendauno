@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
+use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\MovimientoInventarioTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Inventario tenant-local (R21): stock por (artículo, sucursal) DERIVADO del ledger
@@ -40,6 +43,31 @@ class InventarioTenant
             ->pluck('total', 'sucursal_id')
             ->map(fn ($v): int => (int) $v)
             ->all();
+    }
+
+    /**
+     * Una entrada o un ajuste a mano, sin dejar el stock en negativo. Bloquea el
+     * artículo (como la venta del mostrador) durante la revisión del saldo y el
+     * asiento: dos ajustes a la vez no se aprueban sobre el mismo saldo.
+     *
+     * @throws StockInsuficiente si dejaría el stock en negativo
+     */
+    public function ajustar(
+        int $articuloId,
+        int $sucursalId,
+        int $delta,
+        TipoMovimientoInventario $tipo,
+        ?string $motivo = null,
+        ?Usuario $actor = null,
+    ): MovimientoInventarioTenant {
+        return DB::connection('tenant')->transaction(function () use ($articuloId, $sucursalId, $delta, $tipo, $motivo, $actor): MovimientoInventarioTenant {
+            ArticuloTenant::query()->whereKey($articuloId)->lockForUpdate()->firstOrFail();
+            if ($delta < 0 && $this->stock($articuloId, $sucursalId) + $delta < 0) {
+                throw new StockInsuficiente('El ajuste dejaría el stock en negativo.');
+            }
+
+            return $this->registrar($articuloId, $sucursalId, $delta, $tipo, $motivo, $actor);
+        });
     }
 
     /**

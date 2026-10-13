@@ -6,16 +6,21 @@ namespace App\Modules\Platform\Operacion;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
+use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
+use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Inventario\Exceptions\InventarioException;
+use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
@@ -61,6 +66,8 @@ class EscenariosConcurrencia
         private readonly AgendarCitaTenant $agendar,
         private readonly ReprogramarTenant $reprogramar,
         private readonly LibroMayorTenant $libro,
+        private readonly InventarioTenant $inventario,
+        private readonly PuntoDeVentaTenant $mostrador,
     ) {}
 
     /**
@@ -107,6 +114,25 @@ class EscenariosConcurrencia
             'servicio' => (int) $servicio->getKey(),
             'profesionales' => $profesionales,
         ];
+    }
+
+    /**
+     * Un producto del mostrador con `$stock` piezas en la sede.
+     */
+    public function articulo(int $sucursalId, int $stock): ArticuloTenant
+    {
+        $articulo = ArticuloTenant::query()->create([
+            'nombre' => 'Agua '.Str::lower(Str::random(6)), 'precio_minor' => 2500, 'moneda' => 'MXN', 'activo' => true,
+        ]);
+        $this->inventario->registrar((int) $articulo->getKey(), $sucursalId, $stock, TipoMovimientoInventario::Entrada);
+
+        return $articulo;
+    }
+
+    /** Las piezas de un producto en la sede (suma del ledger). */
+    public function stock(int $articuloId, int $sucursalId): int
+    {
+        return $this->inventario->stock($articuloId, $sucursalId);
     }
 
     /**
@@ -262,7 +288,7 @@ class EscenariosConcurrencia
 
         try {
             return ['hecho' => true, 'esperado' => true, 'detalle' => $accion()];
-        } catch (ReservaException|SaldoInsuficiente|ValidationException $e) {
+        } catch (ReservaException|SaldoInsuficiente|InventarioException|ValidationException $e) {
             return ['hecho' => false, 'esperado' => true, 'detalle' => class_basename($e).': '.$e->getMessage()];
         } catch (Throwable $e) {
             return ['hecho' => false, 'esperado' => false, 'detalle' => class_basename($e).': '.Str::limit($e->getMessage(), 300)];
@@ -285,10 +311,27 @@ class EscenariosConcurrencia
             'cancelar' => $this->prepararCancelar((int) $paso['reserva']),
             'mover-clase' => $this->prepararMoverClase((int) $paso['reserva'], (int) $paso['sesion']),
             'mover-cita' => $this->prepararMoverCita((int) $paso['reserva'], (string) $paso['inicia']),
+            'ajustar-inventario' => $this->prepararAjustarInventario((int) $paso['articulo'], (int) $paso['sucursal'], (int) $paso['delta']),
+            'vender-mostrador' => $this->prepararVenderMostrador((int) $paso['articulo'], (int) $paso['sucursal'], (int) $paso['cantidad']),
             'aprovisionar' => $this->prepararAprovisionar((int) $paso['estudio']),
             'migrar' => $this->prepararMigrar((int) $paso['estudio']),
             default => throw new InvalidArgumentException("Paso desconocido: {$paso['accion']}"),
         };
+    }
+
+    /** Un ajuste a mano del inventario (con el artículo bloqueado, como en el panel). */
+    private function prepararAjustarInventario(int $articuloId, int $sucursalId, int $delta): callable
+    {
+        return fn (): string => (string) $this->inventario->ajustar($articuloId, $sucursalId, $delta, TipoMovimientoInventario::Ajuste)->cantidad;
+    }
+
+    /** Una venta del mostrador. */
+    private function prepararVenderMostrador(int $articuloId, int $sucursalId, int $cantidad): callable
+    {
+        $articulo = ArticuloTenant::query()->findOrFail($articuloId);
+        $sucursal = SucursalTenant::query()->findOrFail($sucursalId);
+
+        return fn (): string => (string) $this->mostrador->vender($sucursal, [['articulo' => $articulo, 'cantidad' => $cantidad]], 'efectivo')->total_minor;
     }
 
     private function prepararReservar(int $sesionId, int $personaId): callable

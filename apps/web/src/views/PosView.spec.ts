@@ -21,7 +21,9 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, put: mocks.put, post: mocks.post },
-  mensajeDeError: () => "Error",
+  mensajeDeError: (e: unknown) =>
+    (e as { mensaje?: string })?.mensaje ?? "Error",
+  camposConError: (e: unknown) => (e as { campos?: string[] })?.campos ?? [],
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 const sesion = vi.hoisted(() => ({
@@ -198,9 +200,14 @@ describe("extras, propina y cambio (ADR 0139)", () => {
     await w.get('[data-prueba="cobrar"]').trigger("click");
     await flushPromises();
     expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/pos/ventas", {
+      // La clave del intento: un reintento devuelve la misma venta.
+      clave_intento: expect.any(String),
       sucursal_id: "s1",
       metodo_pago: "efectivo",
-      items: [{ articulo_id: "a2", cantidad: 1, extras: [] }],
+      // Con el precio que se mostró (si cambió, el servidor pide revisarlo).
+      items: [
+        { articulo_id: "a2", cantidad: 1, extras: [], precio_minor: 6000 },
+      ],
       propina_minor: 600,
       recibido_minor: 10000,
       comprador_id: null,
@@ -376,9 +383,12 @@ describe("ventas recientes del mostrador", () => {
     await flushPromises();
 
     expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/pos/ventas", {
+      clave_intento: expect.any(String),
       sucursal_id: "s1",
       metodo_pago: "tarjeta",
-      items: [{ articulo_id: "a1", cantidad: 2, extras: [] }],
+      items: [
+        { articulo_id: "a1", cantidad: 2, extras: [], precio_minor: 28000 },
+      ],
       propina_minor: 0,
       recibido_minor: null,
       comprador_id: null,
@@ -452,5 +462,42 @@ describe("ventas recientes del mostrador", () => {
     expect(otro.find('[data-prueba="categorias-mostrador"]').exists()).toBe(
       false,
     );
+  });
+
+  it("si cambió un precio con el carrito abierto, lo trae y pide revisar; el reintento usa la misma clave", async () => {
+    respuestas(ARTICULOS);
+    mocks.confirmar.mockResolvedValue(true);
+    mocks.post.mockRejectedValueOnce({
+      mensaje:
+        "Cambió el precio de «Pomada mate»: revisa el total y vuelve a cobrar.",
+      campos: ["items.0.precio_minor"],
+    });
+    const w = montarConDialogo();
+    await flushPromises();
+    await w.get('[data-prueba="producto"]').trigger("click");
+
+    // Mientras, subió a $300.
+    respuestas([{ ...ARTICULOS[0], precio_minor: 30000 }]);
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+
+    expect(w.text()).toContain("Cambió el precio de «Pomada mate»");
+    // El carrito ya trae el precio nuevo para revisarlo.
+    expect(w.get('[data-prueba="venta-actual"]').text()).toContain("300.00");
+
+    mocks.post.mockResolvedValueOnce({
+      data: { data: { cambio_minor: null } },
+    });
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+    const [primera, segunda] = mocks.post.mock.calls.map(
+      (c) => (c[1] as { clave_intento: string }).clave_intento,
+    );
+    // Nada se registró con el primer intento: puede usar la misma clave.
+    expect(segunda).toBe(primera);
+    expect(
+      (mocks.post.mock.calls[1]![1] as { items: { precio_minor: number }[] })
+        .items[0]!.precio_minor,
+    ).toBe(30000);
   });
 });

@@ -536,6 +536,9 @@ function cancelarVenta(): void {
             <option value="efectivo">
               {{ $t("recepcion.miembro.efectivo") }}
             </option>
+            <option value="tarjeta">
+              {{ $t("recepcion.miembro.tarjeta") }}
+            </option>
             <option value="transferencia">
               {{ $t("recepcion.miembro.transferencia") }}
             </option>

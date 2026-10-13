@@ -8,7 +8,6 @@ use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
-use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\CategoriaArticuloTenant;
@@ -19,6 +18,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -51,10 +51,20 @@ class InventarioTenantController
         ]);
     }
 
+    /**
+     * Crea el producto con sus extras: todo se valida antes y se guarda junto (si algo
+     * no es válido, no queda nada a medias que se duplique al volver a guardar).
+     */
     public function store(Request $request): JsonResponse
     {
-        $articulo = ArticuloTenant::query()->create($this->validar($request));
-        $this->guardarExtras($request, $articulo);
+        $datos = $this->validar($request);
+        $extras = $this->validarExtras($request);
+        $articulo = DB::connection('tenant')->transaction(function () use ($datos, $extras): ArticuloTenant {
+            $articulo = ArticuloTenant::query()->create($datos);
+            $this->guardarExtras($articulo, $extras);
+
+            return $articulo;
+        });
 
         return response()->json(['data' => $this->presentar($articulo, $this->mapaSucursales(), $this->permitidas($request))], 201);
     }
@@ -62,8 +72,12 @@ class InventarioTenantController
     public function actualizar(Request $request): JsonResponse
     {
         $articulo = $this->resolver($request);
-        $articulo->update($this->validar($request));
-        $this->guardarExtras($request, $articulo);
+        $datos = $this->validar($request);
+        $extras = $this->validarExtras($request);
+        DB::connection('tenant')->transaction(function () use ($articulo, $datos, $extras): void {
+            $articulo->update($datos);
+            $this->guardarExtras($articulo, $extras);
+        });
 
         return response()->json(['data' => $this->presentar($articulo->refresh(), $this->mapaSucursales(), $this->permitidas($request))]);
     }
@@ -137,12 +151,8 @@ class InventarioTenantController
         // Entrada siempre suma; ajuste usa el signo tal cual.
         $delta = $tipo === TipoMovimientoInventario::Entrada ? abs($cantidad) : $cantidad;
 
-        if ($this->inventario->stock($articulo->getKey(), $sucursalId) + $delta < 0) {
-            throw new StockInsuficiente('El ajuste dejaría el stock en negativo.');
-        }
-
-        $this->inventario->registrar(
-            $articulo->getKey(),
+        $this->inventario->ajustar(
+            (int) $articulo->getKey(),
             $sucursalId,
             $delta,
             $tipo,
@@ -150,7 +160,8 @@ class InventarioTenantController
             $this->actor($request),
         );
 
-        return response()->json(['data' => $this->presentar($articulo, $this->mapaSucursales())], 201);
+        // Con el mismo alcance que el listado: un acotado no ve el stock de otras sedes.
+        return response()->json(['data' => $this->presentar($articulo, $this->mapaSucursales(), $this->permitidas($request))], 201);
     }
 
     /**
@@ -192,13 +203,14 @@ class InventarioTenantController
     }
 
     /**
-     * Los extras del artículo, si vienen (ADR 0139): los que traen `id` se actualizan,
-     * los nuevos se crean y los que ya no vienen se apagan (las ventas guardan los suyos).
+     * Los extras que vienen, ya validados (null si no vienen: no se tocan).
+     *
+     * @return list<array{id?: string|null, nombre: string, precio_minor: int}>|null
      */
-    private function guardarExtras(Request $request, ArticuloTenant $articulo): void
+    private function validarExtras(Request $request): ?array
     {
         if (! $request->has('extras')) {
-            return;
+            return null;
         }
         $validado = $request->validate([
             'extras' => ['present', 'array', 'max:30'],
@@ -206,8 +218,24 @@ class InventarioTenantController
             'extras.*.nombre' => ['required', 'string', 'max:80'],
             'extras.*.precio_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
         ]);
+
+        /** @var list<array{id?: string|null, nombre: string, precio_minor: int}> */
+        return array_values($validado['extras']);
+    }
+
+    /**
+     * Guarda los extras ya validados (ADR 0139): los que traen `id` se actualizan, los
+     * nuevos se crean y los que ya no vienen se apagan (las ventas guardan los suyos).
+     *
+     * @param  list<array{id?: string|null, nombre: string, precio_minor: int}>|null  $extras
+     */
+    private function guardarExtras(ArticuloTenant $articulo, ?array $extras): void
+    {
+        if ($extras === null) {
+            return;
+        }
         $vigentes = [];
-        foreach (array_values($validado['extras']) as $orden => $dato) {
+        foreach ($extras as $orden => $dato) {
             $extra = isset($dato['id']) && $dato['id'] !== ''
                 ? ExtraArticuloTenant::query()->where('articulo_id', $articulo->getKey())->where('ulid', $dato['id'])->first()
                 : null;

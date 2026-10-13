@@ -127,6 +127,7 @@ class VerificarConcurrencia extends Command
             $this->caso('Cancelar y reprogramar la misma reserva a la vez', fn () => $this->cancelarYReprogramar($escenarios, $rondas));
             $this->caso('Reprogramaciones y reservas por el último lugar', fn () => $this->reprogramarAlUltimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Una cancelación libera lugar mientras otros lo piden', fn () => $this->cancelacionLiberaLugar($escenarios, $rondas));
+            $this->caso('Ajustes de inventario y una venta a la vez con poco stock', fn () => $this->inventarioSinNegativos($escenarios, $rondas));
             $this->caso('Respaldo y restauración de un negocio', fn () => $this->respaldoYRestauracion($gestor));
             $this->caso('Migraciones de varios negocios', fn () => $this->migraciones($gestor, is_string($base)));
         } catch (Throwable $e) {
@@ -401,6 +402,34 @@ class VerificarConcurrencia extends Command
             }
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).": cancelación + 4 por el lugar → {$ocupadas} de 2", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Tres ajustes a mano de −4 y una venta de 2 sobre 5 piezas, a la vez: comparten el
+     * bloqueo del artículo, así que solo uno pasa y el stock nunca queda en negativo.
+     *
+     * @return list<string>
+     */
+    private function inventarioSinNegativos(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $articulo = (int) $e->articulo($this->base['sucursal'], 5)->getKey();
+            $ajuste = ['accion' => 'ajustar-inventario', 'articulo' => $articulo, 'sucursal' => $this->base['sucursal'], 'delta' => -4];
+            $res = $this->competir([
+                $ajuste, $ajuste, $ajuste,
+                ['accion' => 'vender-mostrador', 'articulo' => $articulo, 'sucursal' => $this->base['sucursal'], 'cantidad' => 2],
+            ]);
+
+            $stock = $e->stock($articulo, $this->base['sucursal']);
+            $hechos = $this->hechos($res);
+            $this->comprobar($fallas, $stock >= 0, "stock en negativo ({$stock})");
+            $this->comprobar($fallas, $hechos === 1, "{$hechos} movimientos pasaron con 5 piezas");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).": 3 ajustes de −4 y una venta de 2 con 5 piezas → quedan {$stock}", $res);
         }
 
         return $fallas;

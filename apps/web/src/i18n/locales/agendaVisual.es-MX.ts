@@ -104,11 +104,12 @@ export default {
     metodo: "Método de pago",
     metodos: {
       efectivo: "Efectivo",
+      // Con la terminal del negocio; «manual» es como se guardaba antes.
+      tarjeta: "Tarjeta (terminal)",
       transferencia: "Transferencia",
       manual: "Tarjeta (terminal)",
-      // Solo para mostrar con qué se pagó.
       ventanilla: "Ventanilla",
-      tarjeta: "Tarjeta",
+      // Solo para mostrar con qué se pagó.
       spei: "Transferencia",
       oxxo: "OXXO",
     },

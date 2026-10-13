@@ -234,11 +234,7 @@ class OrdenesTenant
 
     private static function metodoDeCaja(string $metodo): ?MetodoPago
     {
-        return match ($metodo) {
-            'efectivo' => MetodoPago::Efectivo,
-            'transferencia' => MetodoPago::Spei,
-            'ventanilla' => MetodoPago::Ventanilla,
-            default => null,
-        };
+        // La misma de la corrección del cobro: no se separan nunca.
+        return CorregirMetodoPagoTenant::metodoDeCaja($metodo);
     }
 }

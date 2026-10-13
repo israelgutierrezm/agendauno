@@ -51,7 +51,8 @@ interface ResumenOrdenes {
   por_cobrar: number;
 }
 
-const METODOS = ["efectivo", "transferencia", "ventanilla"] as const;
+// «tarjeta»: con la terminal del negocio (no por la pasarela en línea).
+const METODOS = ["efectivo", "tarjeta", "transferencia", "ventanilla"] as const;
 
 const { t, te } = useI18n();
 const sesion = useSesionTenantStore();

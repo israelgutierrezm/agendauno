@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -153,7 +154,18 @@ class PuntoDeVentaTenantController
             // persona se le puede mandar su ticket por correo (ADR 0145).
             'comprador_id' => ['nullable', 'string', 'max:80'],
             'enviar_ticket' => ['nullable', 'boolean'],
+            // Lo que mostró el mostrador por pieza (con extras): si cambió, se revisa.
+            'items.*.precio_minor' => ['nullable', 'integer', 'min:0'],
+            // La clave del intento de cobro: un reintento devuelve la misma venta.
+            'clave_intento' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
+
+        // Ya se registró con esta clave (la respuesta se perdió): la misma venta.
+        $clave = $validado['clave_intento'] ?? null;
+        $previa = $clave !== null ? VentaPosTenant::query()->where('clave_intento', $clave)->first() : null;
+        if ($previa instanceof VentaPosTenant) {
+            return response()->json(['data' => $this->presentar($previa->load(['sucursal', 'lineas.articulo', 'persona']))]);
+        }
 
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
@@ -174,7 +186,10 @@ class PuntoDeVentaTenantController
             if (count($extras) !== count($pedidos)) {
                 throw ValidationException::withMessages(["items.{$n}.extras" => ['Uno de los extras ya no está disponible para este producto.']]);
             }
-            $items[] = ['articulo' => $articulo, 'cantidad' => (int) $item['cantidad'], 'extras' => $extras];
+            $items[] = [
+                'articulo' => $articulo, 'cantidad' => (int) $item['cantidad'], 'extras' => $extras,
+                'precio_minor' => isset($item['precio_minor']) ? (int) $item['precio_minor'] : null,
+            ];
         }
 
         // A público en general no se le manda ticket; a una persona, solo si tiene correo.
@@ -186,11 +201,22 @@ class PuntoDeVentaTenantController
             throw ValidationException::withMessages(['enviar_ticket' => ['No tiene correo: no se le puede mandar el ticket.']]);
         }
 
-        $venta = $this->pos->vender(
-            $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $actor,
-            (int) ($validado['propina_minor'] ?? 0), $comprador,
-            isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
-        );
+        try {
+            $venta = $this->pos->vender(
+                $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $actor,
+                (int) ($validado['propina_minor'] ?? 0), $comprador,
+                isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
+                $clave,
+            );
+        } catch (UniqueConstraintViolationException $e) {
+            // Dos intentos con la misma clave a la vez: el otro ya la registró.
+            $previa = $clave !== null ? VentaPosTenant::query()->where('clave_intento', $clave)->first() : null;
+            if (! $previa instanceof VentaPosTenant) {
+                throw $e;
+            }
+
+            return response()->json(['data' => $this->presentar($previa->load(['sucursal', 'lineas.articulo', 'persona']))]);
+        }
         if ($enviarTicket) {
             $this->tickets->enviar($venta->load('persona'));
         }

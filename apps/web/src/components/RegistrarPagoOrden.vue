@@ -39,7 +39,8 @@ const total = ref(0);
 const cuotas = ref<CuotaPorCobrar[]>([]);
 const exentando = ref<string | null>(null);
 const motivo = ref("");
-const METODOS = ["efectivo", "transferencia", "ventanilla"] as const;
+// «tarjeta»: con la terminal del negocio (no por la pasarela en línea).
+const METODOS = ["efectivo", "tarjeta", "transferencia", "ventanilla"] as const;
 const metodo = ref<(typeof METODOS)[number]>("efectivo");
 const referencia = ref("");
 const procesando = ref(false);
