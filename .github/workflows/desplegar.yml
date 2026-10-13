@@ -38,6 +38,8 @@ on:
 
 permissions:
   contents: read
+  # Para revisar que el commit a publicar tenga su CI en verde.
+  checks: read
 
 concurrency:
   group: desplegar-${{ inputs.entorno }}
@@ -83,6 +85,31 @@ jobs:
             echo "::error::RUTA_PLATAFORMA inválida."
             exit 1
           fi
+
+      # Solo se publica un commit con su CI completo y en verde: imagenes.yml publica la
+      # imagen de cada push a main sin esperar al CI, y aquí se frena la que no pasó.
+      - uses: actions/checkout@v5
+        if: inputs.accion == 'actualizar'
+        with:
+          fetch-depth: 0
+
+      - name: CI en verde
+        if: inputs.accion == 'actualizar'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse "${REF}^{commit}")
+          estado=$(gh api "repos/${{ github.repository }}/commits/$sha/check-runs?per_page=100" --jq '
+            [.check_runs[] | select(.name | test("^(Cambios|API|Web|Mobile|Docker)"))]
+            | if length == 0 then "sin CI"
+              elif all(.status == "completed" and (.conclusion == "success" or .conclusion == "skipped")) then "verde"
+              else "pendiente o en rojo" end')
+          if [ "$estado" != "verde" ]; then
+            echo "::error::El commit $sha no tiene el CI en verde ($estado)."
+            exit 1
+          fi
+          echo "CI en verde: $sha"
 
       - name: Llave SSH
         run: |

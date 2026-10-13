@@ -835,7 +835,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/miembros/{persona}/derechos', [MembresiasTenantController::class, 'derechos'])->middleware('puede:derechos.ver')->name('miembros.derechos.index');
             Route::get('/miembros/{persona}/planes', [MembresiasTenantController::class, 'planes'])->middleware('puede:derechos.ver')->name('miembros.planes');
             // Resumen operativo del miembro para Recepcion (P0): membresia, saldo, adeudo, alertas.
-            Route::get('/miembros/{persona}/resumen', ResumenMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
+            Route::get('/miembros/{persona}/resumen', ResumenMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.ficha-resumen');
             // Ficha 360° del alumno (P0 Etapa 1): derechos, historial de reservas y de compras.
             Route::get('/miembros/{persona}/ficha', FichaMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.ficha');
             Route::get('/miembros/{persona}/historial/reservas', [FichaMiembroTenantController::class, 'historialReservas'])->middleware('puede:miembros.ver')->name('miembros.historial.reservas');
