@@ -125,6 +125,7 @@ export default {
     configuracion: "Configuración",
     sedes: "Sucursales",
     contraer: "Contraer",
+    expandir: "Expandir",
     grupos: {
       operacion: "Operación",
       suscripcion: "Mi suscripción",
