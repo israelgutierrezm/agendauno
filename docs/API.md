@@ -304,6 +304,25 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Listados por páginas: órdenes, mensajes y entradas
+
+Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `per_page`,
+`ultima_pagina`). Las fechas son días del negocio; con `hasta` antes que `desde`, 422.
+
+- `GET /ordenes?q&estado&desde&hasta&page&per_page` (25 por omisión, hasta 100):
+  - `q` busca al comprador; `estado` es `pendiente`, `pagada` o `cancelada`; las fechas,
+    de creación;
+  - `meta.resumen` es lo de hoy, sin los filtros: `ventas_hoy`, `vendido_hoy` (por
+    moneda) y `por_cobrar`.
+- `GET /mensajes?q&estado&canal&desde&hasta&page&per_page` (25 por omisión):
+  - `q` busca en el asunto, el destinatario o la persona;
+  - `meta.conteos` cuenta lo encontrado por estado, sin el filtro de estado;
+  - cada mensaje suma `creado_en`.
+- `GET /accesos?q&resultado&desde&hasta&page&per_page` (50 por omisión):
+  - `q` busca a la persona; `resultado` es `permitido` o `denegado`;
+  - quien está acotado a sus sucursales ve sus entradas y las registradas sin sucursal;
+  - `meta.conteos` cuenta lo encontrado por resultado, sin ese filtro.
+
 ## Campañas controladas (B08)
 
 - Las difusiones traen `estado` (enviando, pausada, cancelada), `enviados`, `pendientes`

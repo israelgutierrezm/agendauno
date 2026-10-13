@@ -713,4 +713,30 @@ export default {
     cancelar: "Cancelar",
     sinDestinatarios: "Nadie cumple con este segmento: no hay a quién enviar.",
   },
+  // Lo común de los listados por páginas: fechas y filtros.
+  listados: {
+    fechas: "Fechas",
+    desde: "Desde",
+    hasta: "Hasta",
+    quitarFiltros: "Quitar filtros",
+    cargando: "Cargando…",
+    sinResultados: "Nada coincide con tu búsqueda o filtros.",
+  },
+  // La bandeja de salida de Comunicaciones, por páginas.
+  salida: {
+    buscar: "Buscar por asunto, destinatario o persona…",
+    estado: "Qué mensajes ver",
+    todos: "Todos",
+    canal: "Canal",
+    todosLosCanales: "Todos los canales",
+    conCuenta: "{estado} ({n})",
+  },
+  // La bitácora de entradas, por páginas.
+  entradas: {
+    buscar: "Buscar por persona…",
+    resultado: "Qué entradas ver",
+    todas: "Todas",
+    permitido: "Permitidas",
+    denegado: "Denegadas",
+  },
 };

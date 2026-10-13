@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
+import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -36,6 +38,14 @@ interface Acceso {
   registrado_en: string;
 }
 type Pestana = "cambios" | "accesos";
+// Las entradas van por páginas: el API busca, filtra y cuenta por resultado.
+interface MetaEntradas {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  conteos: Record<string, number>;
+}
 
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
@@ -63,6 +73,27 @@ const ultimaPagina = ref(1);
 const actores = ref<{ id: string; nombre: string }[]>([]);
 const categorias = ref<string[]>([]);
 const descargando = ref(false);
+
+// Filtros y página de las entradas.
+const buscarEntradas = ref("");
+const resultadoEntradas = ref<"" | "permitido" | "denegado">("");
+const desdeEntradas = ref("");
+const hastaEntradas = ref("");
+const paginaEntradas = ref(1);
+const metaEntradas = ref<MetaEntradas | null>(null);
+const conFiltrosEntradas = computed(
+  () =>
+    buscarEntradas.value.trim() !== "" ||
+    resultadoEntradas.value !== "" ||
+    desdeEntradas.value !== "" ||
+    hastaEntradas.value !== "",
+);
+function limpiarFiltrosEntradas(): void {
+  buscarEntradas.value = "";
+  resultadoEntradas.value = "";
+  desdeEntradas.value = "";
+  hastaEntradas.value = "";
+}
 
 function filtros(): Record<string, string | number | undefined> {
   return {
@@ -133,10 +164,27 @@ async function cargar(): Promise<void> {
       actores.value = data.meta?.actores ?? [];
       categorias.value = data.meta?.categorias ?? [];
     } else {
-      const { data } = await api.get<{ data: Acceso[] }>(
+      const q = buscarEntradas.value.trim();
+      const { data } = await api.get<{ data: Acceso[]; meta?: MetaEntradas }>(
         `${base.value}/accesos`,
+        {
+          params: {
+            page: paginaEntradas.value,
+            ...(q !== "" ? { q } : {}),
+            ...(resultadoEntradas.value !== ""
+              ? { resultado: resultadoEntradas.value }
+              : {}),
+            ...(desdeEntradas.value !== ""
+              ? { desde: desdeEntradas.value }
+              : {}),
+            ...(hastaEntradas.value !== ""
+              ? { hasta: hastaEntradas.value }
+              : {}),
+          },
+        },
       );
       accesos.value = data.data;
+      metaEntradas.value = data.meta ?? null;
     }
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -165,6 +213,30 @@ watch([desde, hasta, usuario, categoria, texto], () => {
     pagina.value = 1;
     void cargar();
   }, 300);
+});
+
+function irPaginaEntradas(n: number): void {
+  paginaEntradas.value = n;
+  void cargar();
+}
+// La búsqueda espera a que se deje de escribir; el resultado y las fechas recargan ya.
+let esperaEntradas: ReturnType<typeof setTimeout> | undefined;
+watch(buscarEntradas, () => {
+  clearTimeout(esperaEntradas);
+  esperaEntradas = setTimeout(() => irPaginaEntradas(1), 300);
+});
+watch([resultadoEntradas, desdeEntradas, hastaEntradas], () => {
+  if (
+    desdeEntradas.value === "" ||
+    hastaEntradas.value === "" ||
+    hastaEntradas.value >= desdeEntradas.value
+  ) {
+    irPaginaEntradas(1);
+  }
+});
+onBeforeUnmount(() => {
+  clearTimeout(espera);
+  clearTimeout(esperaEntradas);
 });
 
 async function descargar(): Promise<void> {
@@ -265,6 +337,56 @@ onMounted(cargar);
           @click="descargar"
         >
           {{ $t("bitacora.descargar") }}
+        </button>
+      </div>
+      <!-- Filtros de las entradas -->
+      <div v-else class="tu-filtros">
+        <label class="tu-buscar">
+          <IconoNav nombre="buscar" :tam="16" />
+          <input
+            v-model="buscarEntradas"
+            type="search"
+            class="tu-input"
+            :placeholder="$t('operacion.entradas.buscar')"
+            :aria-label="$t('operacion.entradas.buscar')"
+            data-prueba="buscar-entradas"
+          />
+        </label>
+        <div
+          class="tu-segmentado"
+          role="group"
+          :aria-label="$t('operacion.entradas.resultado')"
+        >
+          <button
+            v-for="r in ['', 'permitido', 'denegado'] as const"
+            :key="r"
+            type="button"
+            :aria-pressed="resultadoEntradas === r"
+            :data-prueba="`entradas-${r || 'todas'}`"
+            @click="resultadoEntradas = r"
+          >
+            {{
+              r === ""
+                ? $t("operacion.entradas.todas")
+                : $t("operacion.salida.conCuenta", {
+                    estado: $t(`operacion.entradas.${r}`),
+                    n: metaEntradas?.conteos[r] ?? 0,
+                  })
+            }}
+          </button>
+        </div>
+        <RangoFechas
+          v-model:desde="desdeEntradas"
+          v-model:hasta="hastaEntradas"
+          prueba="entradas"
+        />
+        <button
+          v-if="conFiltrosEntradas"
+          type="button"
+          class="tu-enlace text-sm"
+          @click="limpiarFiltrosEntradas"
+        >
+          {{ $t("operacion.listados.quitarFiltros") }}
         </button>
       </div>
 
@@ -373,9 +495,13 @@ onMounted(cargar);
           <EstadoVacio
             v-if="accesos.length === 0"
             class="py-6"
-            icono="lista"
+            :icono="conFiltrosEntradas ? 'buscar' : 'lista'"
             compacto
-            :titulo="$t('bitacora.sinAccesos')"
+            :titulo="
+              conFiltrosEntradas
+                ? $t('operacion.listados.sinResultados')
+                : $t('bitacora.sinAccesos')
+            "
           />
           <ul v-else>
             <li v-for="a in accesos" :key="a.id" class="bi-fila text-sm">
@@ -405,6 +531,19 @@ onMounted(cargar);
           </ul>
         </template>
       </div>
+      <PaginacionListado
+        v-if="
+          pestana === 'accesos' &&
+          !cargando &&
+          metaEntradas &&
+          metaEntradas.ultima_pagina > 1
+        "
+        :page="metaEntradas.page"
+        :ultima-pagina="metaEntradas.ultima_pagina"
+        :total="metaEntradas.total"
+        :per-page="metaEntradas.per_page"
+        @ir="irPaginaEntradas"
+      />
     </div>
   </section>
 </template>

@@ -44,6 +44,12 @@ interface Orden {
   pagada_en?: string | null;
   lineas?: { producto: string | null; cantidad: number }[];
 }
+// Lo de hoy en el negocio, calculado en el API sobre todas las órdenes.
+interface ResumenOrdenes {
+  ventas_hoy: number;
+  vendido_hoy: { moneda: string; total_minor: number }[];
+  por_cobrar: number;
+}
 
 const METODOS = ["efectivo", "transferencia", "ventanilla"] as const;
 
@@ -58,6 +64,10 @@ const puedePromos = computed(() => sesion.puede("ordenes.gestionar"));
 const comprador = ref<PersonaBuscable | null>(null);
 const productos = ref<Producto[]>([]);
 const ordenes = ref<Orden[]>([]);
+// Cuántas ventas recientes se muestran (el resto, en Cobros → Movimientos).
+const RECIENTES = 20;
+const totalOrdenes = ref(0);
+const resumen = ref<ResumenOrdenes | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -144,10 +154,16 @@ async function cargar(): Promise<void> {
       api.get<{ data: Producto[] }>(`${base.value}/productos`, {
         params: { incluir: "todos" },
       }),
-      api.get<{ data: Orden[] }>(`${base.value}/ordenes`),
+      // Las ventas recientes (una página) y el resumen de hoy.
+      api.get<{
+        data: Orden[];
+        meta?: { total: number; resumen: ResumenOrdenes };
+      }>(`${base.value}/ordenes`, { params: { per_page: RECIENTES } }),
     ]);
     productos.value = p.data.data;
     ordenes.value = o.data.data;
+    totalOrdenes.value = o.data.meta?.total ?? o.data.data.length;
+    resumen.value = o.data.meta?.resumen ?? null;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -304,38 +320,32 @@ async function vender(): Promise<void> {
   }
 }
 
-// ---- Indicadores ----
-const pagadasHoy = computed(() => {
-  const hoy = new Date().toDateString();
-  return ordenes.value.filter(
-    (o) =>
-      o.estado === "pagada" &&
-      o.pagada_en &&
-      new Date(o.pagada_en).toDateString() === hoy,
-  );
+// ---- Indicadores (los de hoy en el negocio, de todas las órdenes) ----
+const vendidoHoy = computed(() => {
+  const montos = resumen.value?.vendido_hoy ?? [];
+  return montos.length === 0
+    ? dinero(0)
+    : montos.map((m) => dinero(m.total_minor, m.moneda)).join(" · ");
 });
-const pendientes = computed(() =>
-  ordenes.value.filter((o) => o.estado === "pendiente"),
-);
 const indicadores = computed<Indicador[]>(() => [
   {
     clave: "ventas",
     etiqueta: t("ventasVisual.kpi.ventasHoy"),
-    valor: String(pagadasHoy.value.length),
+    valor: String(resumen.value?.ventas_hoy ?? 0),
     icono: "ventas",
   },
   {
     clave: "vendido",
     etiqueta: t("ventasVisual.kpi.vendidoHoy"),
-    valor: dinero(pagadasHoy.value.reduce((s, o) => s + o.total_minor, 0)),
+    valor: vendidoHoy.value,
     icono: "dinero",
   },
   {
     clave: "pendientes",
     etiqueta: t("ventasVisual.kpi.porCobrar"),
-    valor: String(pendientes.value.length),
+    valor: String(resumen.value?.por_cobrar ?? 0),
     icono: "reloj",
-    aviso: pendientes.value.length > 0,
+    aviso: (resumen.value?.por_cobrar ?? 0) > 0,
   },
   {
     clave: "planes",
@@ -613,7 +623,7 @@ onMounted(cargar);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="o in ordenes.slice(0, 20)" :key="o.id">
+            <tr v-for="o in ordenes" :key="o.id">
               <td class="whitespace-nowrap vv-suave">
                 {{ cuando(o.pagada_en) }}
               </td>
@@ -650,7 +660,7 @@ onMounted(cargar);
           </tbody>
         </table>
         <RouterLink
-          v-if="ordenes.length > 20 && puedeEntrar('cobranza', sesion)"
+          v-if="totalOrdenes > RECIENTES && puedeEntrar('cobranza', sesion)"
           :to="{ name: 'cobranza' }"
           class="vv-mas tu-enlace text-sm"
         >
