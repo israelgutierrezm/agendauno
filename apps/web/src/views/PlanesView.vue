@@ -103,6 +103,45 @@ function vigencia(p: Plan): string {
       return t("planes.resumen.sinVencimiento");
   }
 }
+// Cómo se renueva, aparte de cuánto dura: la membresía cada mes (y si acumula lo no
+// usado); lo demás no se renueva solo.
+function renovacion(p: Plan): string {
+  if (p.tipo === "add_on") {
+    return "";
+  }
+  if (p.tipo !== "membresia") {
+    return t("planesVisual.renovacion.no");
+  }
+  const cada = t("planesVisual.renovacion.cadaMes");
+  if (p.ilimitado) {
+    return cada;
+  }
+  if (p.politica_rollover === "completo") {
+    return `${cada} · ${t("planesVisual.renovacion.acumula")}`;
+  }
+  if (p.politica_rollover === "limitado" && p.rollover_max) {
+    const n = clasesDe(p.rollover_max);
+    return `${cada} · ${t("planesVisual.renovacion.acumulaHasta", { n }, n)}`;
+  }
+  return `${cada} · ${t("planesVisual.renovacion.noAcumula")}`;
+}
+// Restricciones de compra, cada una por separado (no mezcladas con lo que incluye).
+function restricciones(p: Plan): string[] {
+  const lista: string[] = [];
+  if (p.primera_vez) {
+    lista.push(t("planesVisual.restricciones.primeraVez"));
+  }
+  if (p.permanencia_meses) {
+    lista.push(
+      t(
+        "planesVisual.restricciones.permanencia",
+        { n: p.permanencia_meses },
+        p.permanencia_meses,
+      ),
+    );
+  }
+  return lista;
+}
 function aplicaA(p: Plan): string {
   if (p.tipo === "add_on") {
     return "—";
@@ -304,9 +343,24 @@ onMounted(cargar);
                     }}
                   </p>
                   <p class="pv-sub">{{ nombreSeccion(seccionDe(p.tipo)) }}</p>
+                  <p
+                    v-if="restricciones(p).length > 0"
+                    class="pv-sub"
+                    data-prueba="restricciones-plan"
+                  >
+                    {{ restricciones(p).join(" · ") }}
+                  </p>
                 </td>
                 <td class="hidden sm:table-cell">{{ clases(p) }}</td>
-                <td class="hidden md:table-cell pv-suave">{{ vigencia(p) }}</td>
+                <td class="hidden md:table-cell pv-suave">
+                  {{ vigencia(p) }}
+                  <span
+                    v-if="renovacion(p)"
+                    class="pv-sub block"
+                    data-prueba="renovacion-plan"
+                    >{{ renovacion(p) }}</span
+                  >
+                </td>
                 <td class="hidden lg:table-cell pv-suave pv-corta">
                   <details
                     v-if="p.tipo !== 'add_on' && p.ofertas.length > 2"
@@ -314,9 +368,11 @@ onMounted(cargar);
                   >
                     <summary>
                       {{
-                        $t("adminUsabilidad.clasesIncluidas", {
-                          n: p.ofertas.length,
-                        })
+                        $t(
+                          "planesVisual.validoPara",
+                          { n: p.ofertas.length },
+                          p.ofertas.length,
+                        )
                       }}
                     </summary>
                     <ul>

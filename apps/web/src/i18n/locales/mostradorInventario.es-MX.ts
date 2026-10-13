@@ -7,6 +7,18 @@ export const mostradorVisual = {
   enExistencia: "{n} en existencia",
   ventaActual: "Venta actual",
   vacia: "Toca un producto para agregarlo.",
+  // Lo de hoy en una línea (teléfono) y la barra que lleva a la venta.
+  hoyResumen:
+    "Hoy: sin ventas | Hoy: 1 venta · {total} | Hoy: {n} ventas · {total}",
+  verVenta: "Ver venta y cobrar",
+  // La sede en que se vende; cambiarla a media venta la descarta.
+  sucursal: {
+    etiqueta: "Sucursal de la venta",
+    ventaEn: "Venta en {sucursal}",
+    cambiar: "Cambiar de sucursal",
+    confirmarCambio:
+      "Cambiar a {sucursal} vacía la venta actual (1 pieza): cada sucursal tiene su propio stock. | Cambiar a {sucursal} vacía la venta actual ({n} piezas): cada sucursal tiene su propio stock.",
+  },
   piezas: "1 pieza | {n} piezas",
   menos: "Quitar uno",
   mas: "Agregar uno",
@@ -157,6 +169,19 @@ export const planesVisual = {
   todos: "Todos",
   aLaVenta: "A la venta",
   mientrasPague: "Mientras se pague",
+  // Con muchas clases compatibles: cuántos tipos de clase acepta (no «incluidas»).
+  validoPara: "Válido para 1 tipo de clase | Válido para {n} tipos de clase",
+  renovacion: {
+    no: "Sin renovación automática",
+    cadaMes: "Se renueva cada mes",
+    acumula: "acumula lo no usado",
+    acumulaHasta: "acumula hasta 1 clase | acumula hasta {n} clases",
+    noAcumula: "lo no usado no se acumula",
+  },
+  restricciones: {
+    primeraVez: "Solo para la primera visita",
+    permanencia: "Permanencia de 1 mes | Permanencia de {n} meses",
+  },
   sinResultados: "Ningún plan coincide con la búsqueda.",
   kpi: {
     aLaVenta: "Planes a la venta",
@@ -165,8 +190,8 @@ export const planesVisual = {
   col: {
     plan: "Plan",
     incluye: "Incluye",
-    dura: "Cuánto dura",
-    sirve: "Para qué sirve",
+    dura: "Vigencia y renovación",
+    sirve: "Válido para",
     precio: "Precio",
     estado: "Estado",
     acciones: "Acciones",

@@ -139,12 +139,22 @@ function cuando(iso: string | null | undefined): string {
     return "—";
   }
   const d = new Date(iso);
-  const hoy = new Date().toDateString() === d.toDateString();
+  // En la zona del negocio (la de los filtros por día), no en la del navegador.
+  const zona = sesion.zonaHoraria || undefined;
+  const dia = (x: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: zona }).format(x);
+  const hoy = dia(new Date()) === dia(d);
   return new Intl.DateTimeFormat(
     "es-MX",
     hoy
-      ? { hour: "numeric", minute: "2-digit" }
-      : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" },
+      ? { hour: "numeric", minute: "2-digit", timeZone: zona }
+      : {
+          day: "numeric",
+          month: "short",
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: zona,
+        },
   ).format(d);
 }
 

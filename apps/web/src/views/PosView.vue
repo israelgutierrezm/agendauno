@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -20,7 +20,7 @@ import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoComprador } from "@/lib/mostrador";
-import { useSucursalOperativa } from "@/lib/sucursalOperativa";
+import { useSucursalOperativa, useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -82,12 +82,14 @@ const error = ref<string | null>(null);
 const cobrando = ref(false);
 
 const sucursalSel = ref("");
-// Con una sucursal fija (la de la barra o la única), se vende ahí sin preguntar.
+// Con una sucursal fija (la de la barra o la única), se vende ahí sin preguntar. La
+// sede de la venta la sigue más abajo, confirmando si hay productos en la venta.
 const {
   mostrarSelect: elegirSucursal,
   actual: sucursalActual,
   fija: sucursalFija,
-} = useSucursalOperativa({ campo: sucursalSel });
+} = useSucursalOperativa();
+const barraSucursal = useSucursales();
 
 // Las ventas recientes (con su paginación y fechas) y lo vendido hoy.
 const listaVentas = ref<InstanceType<typeof VentasMostrador> | null>(null);
@@ -330,10 +332,82 @@ function reiniciarCobro(): void {
   recibido.value = "";
   comprador.value = "";
 }
-// Al cambiar de sucursal, la venta empieza de nuevo (otro stock).
-function cambiarSucursal(): void {
+// La sede de la venta, siempre a la vista: con «Todas» en la barra se vende en la
+// elegida aquí (la primera al entrar), no en todas.
+const sucursalVenta = computed(
+  () => sucursales.value.find((s) => s.id === sucursalSel.value)?.nombre ?? "",
+);
+// Cambiar de sede descarta la venta (otro stock): si ya hay productos, se pregunta.
+async function puedeCambiarSucursal(destino: string): Promise<boolean> {
+  if (carrito.value.length === 0) {
+    return true;
+  }
+  return confirmar(
+    t(
+      "mostradorVisual.sucursal.confirmarCambio",
+      {
+        sucursal:
+          sucursales.value.find((s) => s.id === destino)?.nombre ?? destino,
+        n: piezas.value,
+      },
+      piezas.value,
+    ),
+    { aceptar: t("mostradorVisual.sucursal.cambiar"), peligro: true },
+  );
+}
+function vaciarVenta(): void {
   carrito.value = [];
   reiniciarCobro();
+}
+async function alElegirSucursal(evento: Event): Promise<void> {
+  const select = evento.target as HTMLSelectElement;
+  const destino = select.value;
+  if (destino === sucursalSel.value) {
+    return;
+  }
+  if (!(await puedeCambiarSucursal(destino))) {
+    select.value = sucursalSel.value;
+    return;
+  }
+  sucursalSel.value = destino;
+  vaciarVenta();
+}
+// Si cambia la sucursal de la barra a media venta: se confirma, y si no, la barra
+// vuelve a como estaba (la venta sigue en su sede).
+watch(
+  sucursalFija,
+  async (fija, antes) => {
+    if (fija === null || fija === sucursalSel.value) {
+      return;
+    }
+    if (await puedeCambiarSucursal(fija)) {
+      sucursalSel.value = fija;
+      vaciarVenta();
+    } else {
+      barraSucursal.elegir(antes ?? null);
+    }
+  },
+  { immediate: true },
+);
+
+// En el teléfono la venta queda debajo de los productos: una barra fija con las
+// piezas y el total lleva a ella (se oculta cuando la venta ya está a la vista).
+const ventaRef = ref<HTMLElement | null>(null);
+const ventaVisible = ref(false);
+let observador: IntersectionObserver | null = null;
+watch(ventaRef, (el) => {
+  observador?.disconnect();
+  observador = null;
+  if (el !== null && typeof IntersectionObserver !== "undefined") {
+    observador = new IntersectionObserver((entradas) => {
+      ventaVisible.value = entradas[0]?.isIntersecting ?? false;
+    });
+    observador.observe(el);
+  }
+});
+onBeforeUnmount(() => observador?.disconnect());
+function irAVenta(): void {
+  ventaRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 // La clave del intento de cobro: si la respuesta se pierde y se vuelve a cobrar, el
@@ -512,9 +586,31 @@ onMounted(cargar);
       </p>
 
       <template v-else>
-        <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
+        <!-- Lo de hoy, compacto: en el teléfono una línea, para que los productos
+             queden arriba. -->
+        <TarjetasIndicadores
+          class="mt-6 hidden sm:block"
+          compacta
+          :tarjetas="indicadores"
+        />
+        <p
+          class="mo-hoy sm:hidden"
+          data-prueba="resumen-hoy"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{
+            $t(
+              "mostradorVisual.hoyResumen",
+              { n: hoy.ventas, total: dinero(hoy.vendido_minor) },
+              hoy.ventas,
+            )
+          }}
+        </p>
 
-        <div class="mt-5 grid gap-5 lg:grid-cols-3">
+        <div
+          class="mt-5 grid gap-5 lg:grid-cols-3"
+          :class="{ 'mo-con-barra': carrito.length > 0 }"
+        >
           <!-- Productos -->
           <div class="tu-card lg:col-span-2">
             <div class="mo-barra">
@@ -532,10 +628,11 @@ onMounted(cargar);
                 <IconoNav nombre="ubicacion" :tam="16" />
                 <select
                   id="pos-suc"
-                  v-model="sucursalSel"
+                  :value="sucursalSel"
                   class="tu-input"
-                  :aria-label="$t('pos.sucursal')"
-                  @change="cambiarSucursal"
+                  :aria-label="$t('mostradorVisual.sucursal.etiqueta')"
+                  data-prueba="sucursal-pos"
+                  @change="alElegirSucursal"
                 >
                   <option v-for="s in sucursales" :key="s.id" :value="s.id">
                     {{ s.nombre }}
@@ -631,7 +728,11 @@ onMounted(cargar);
           </div>
 
           <!-- Venta actual -->
-          <aside class="tu-card mo-venta h-fit" data-prueba="venta-actual">
+          <aside
+            ref="ventaRef"
+            class="tu-card mo-venta h-fit"
+            data-prueba="venta-actual"
+          >
             <header class="flex items-center justify-between gap-2">
               <h2 class="font-medium">
                 {{ $t("mostradorVisual.ventaActual") }}
@@ -643,6 +744,18 @@ onMounted(cargar);
                 >{{ $t("mostradorVisual.piezas", { n: piezas }) }}</span
               >
             </header>
+            <p
+              v-if="sucursalVenta"
+              class="mo-sede"
+              data-prueba="sucursal-venta"
+            >
+              <IconoNav nombre="ubicacion" :tam="14" />
+              {{
+                $t("mostradorVisual.sucursal.ventaEn", {
+                  sucursal: sucursalVenta,
+                })
+              }}
+            </p>
             <p
               v-if="carrito.length === 0"
               class="mt-3 text-sm"
@@ -885,6 +998,32 @@ onMounted(cargar);
           </aside>
         </div>
 
+        <!-- En el teléfono: piezas y total siempre a mano, hasta la venta. -->
+        <div
+          v-if="carrito.length > 0 && !ventaVisible"
+          class="mo-barra-cobro lg:hidden"
+          data-prueba="barra-cobro"
+        >
+          <span class="min-w-0">
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t("mostradorVisual.piezas", { n: piezas }) }}</span
+            >
+            <span class="block font-semibold tabular-nums">{{
+              dinero(totalCobrar)
+            }}</span>
+          </span>
+          <button
+            type="button"
+            class="tu-btn tu-btn-primario"
+            data-prueba="ir-a-venta"
+            @click="irAVenta"
+          >
+            {{ $t("mostradorVisual.verVenta") }}
+          </button>
+        </div>
+
         <!-- Ventas recientes: a quién, por páginas y con fechas (ADR 0145). -->
         <VentasMostrador
           ref="listaVentas"
@@ -1066,6 +1205,39 @@ onMounted(cargar);
 }
 .mo-venta {
   padding: 1rem 1.1rem 1.1rem;
+  scroll-margin-top: 1rem;
+}
+.mo-hoy {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+.mo-sede {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+}
+.mo-barra-cobro {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem calc(0.7rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--borde);
+  background: var(--superficie);
+  box-shadow: 0 -6px 18px rgb(0 0 0 / 0.08);
+}
+/* Que la barra fija no tape lo último de la venta en el teléfono. */
+@media (max-width: 1023.98px) {
+  .mo-con-barra {
+    padding-bottom: 4.5rem;
+  }
 }
 .mo-lineas {
   display: grid;
