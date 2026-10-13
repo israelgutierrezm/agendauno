@@ -14,7 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * negocio, no consume créditos ni derechos y la plataforma paga la visita.
  *
  * Origen: `visita` (llegó e hizo check-in) o `reserva` (reservó desde la app de la
- * plataforma). Ocupan lugar mientras están `reservado` o `asistio`.
+ * plataforma, ADR 0149). Ocupan lugar mientras están `reservado` o `asistio`. Una
+ * reserva rechazada guarda el `motivo` que se le contestó a la plataforma.
  *
  * @property int $sesion_id
  * @property string $proveedor
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $estado
  * @property string|null $referencia_externa
  * @property int|null $checkin_id
+ * @property string|null $motivo
  */
 class LugarPlataformaTenant extends Model
 {
@@ -56,7 +58,7 @@ class LugarPlataformaTenant extends Model
     protected $table = 'lugares_plataforma';
 
     protected $fillable = [
-        'sesion_id', 'proveedor', 'visitante_id', 'origen', 'estado', 'referencia_externa', 'checkin_id',
+        'sesion_id', 'proveedor', 'visitante_id', 'origen', 'estado', 'referencia_externa', 'checkin_id', 'motivo',
     ];
 
     /**

@@ -359,6 +359,38 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
 - `GET /visitantes-plataforma/{id}`: lo mismo y `historial` (fecha, clase, estado y
   origen de sus visitas).
 
+### Reservas desde la app de la plataforma (ADR 0149)
+
+- `GET /integraciones/{proveedor}/reservas` (`integraciones.configurar`, solo clases):
+  - `disponible`: si ya se publican clases en esa plataforma (hoy, Wellhub);
+  - `conectada`, `activas`, `sucursal_id` y `sucursales`;
+  - `dias_publicados` y `lugares_sin_tope` (parámetros del negocio);
+  - `avisos`: `registrados`, `registrado_en` y `aviso_url`;
+  - `productos`: los de la plataforma (`id`, `nombre`, `virtual`), consultados en el
+    momento; `null` si no respondió;
+  - `clases`: las ofertas grupales con `oferta_id`, `nombre`, `publicada`, `producto` y
+    `error` (lo que la plataforma no aceptó);
+  - `horarios`: `publicados` y `con_error` de las sesiones por venir, `ultimo_error` y
+    `sincronizado_en`;
+  - `reservas_por_venir`.
+- `PUT /integraciones/{proveedor}/reservas`:
+  - cuerpo: `activas`, `sucursal_id` (obligatoria al encender) y
+    `clases: [{oferta_id, publicada, producto}]`;
+  - 422 sin la integración conectada y activa, si una clase publicada no trae producto o
+    si la plataforma aún no publica clases;
+  - responde lo mismo con `productos: null` y `error_avisos` (si no se pudo registrar la
+    dirección de avisos con la plataforma);
+  - publica después de responder; `agendauno:sincronizar-plataformas` sigue cada 5
+    minutos.
+- El mismo `POST /api/v1/webhooks/bienestar/{estudio}/wellhub/{token}` recibe
+  `booking-requested`, `booking-canceled`, `booking-late-canceled` y
+  `checkin-booking-occurred`. La reserva se acepta o rechaza con la Booking API de
+  Wellhub; un aviso repetido no vuelve a contestar.
+- `GET /reportes/plataformas` suma `reservas` (`total`, `por_venir`, `asistieron`,
+  `canceladas`, `canceladas_tarde`, `no_asistieron`, `rechazadas`, por la fecha de la
+  clase) y `reservas` en cada `por_proveedor`.
+- `GET /visitantes-plataforma/{id}` suma `reservas` (clase, inicio y estado).
+
 ## Migración guiada (C07)
 
 - Las vistas previas e importaciones de `miembros` e `instructores` devuelven `estado` por

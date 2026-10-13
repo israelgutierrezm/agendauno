@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Modules\Tenancy\Application\CheckinsAutomaticosTenant;
+use App\Modules\Tenancy\Application\AvisosPlataformaTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
@@ -15,8 +15,9 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Retoma los avisos de Wellhub y TotalPass que quedaron pendientes en cada negocio
- * (ADR 0148): los que no se procesaron al llegar o los que la plataforma no pudo
- * verificar y se reintentan mientras el check-in siga vigente.
+ * (ADR 0148 y 0149): los que no se procesaron al llegar, los check-ins que la plataforma
+ * no pudo verificar y las reservas que no se le pudieron contestar, que se reintentan
+ * mientras sigan vigentes.
  */
 class ProcesarPlataformas extends Command
 {
@@ -24,25 +25,25 @@ class ProcesarPlataformas extends Command
 
     protected $description = 'Procesa los avisos pendientes de Wellhub y TotalPass de cada negocio';
 
-    public function handle(CheckinsAutomaticosTenant $checkins, GestorDeConexionTenant $gestor): int
+    public function handle(AvisosPlataformaTenant $avisos, GestorDeConexionTenant $gestor): int
     {
         $terminados = 0;
         Estudio::query()
             ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
-            ->chunkById(100, function (Collection $estudios) use (&$terminados, $checkins, $gestor): void {
+            ->chunkById(100, function (Collection $estudios) use (&$terminados, $avisos, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
                     if (! $gestor->baseDeDatosExiste($estudio)) {
                         continue;
                     }
-                    $terminados += $gestor->ejecutarAislado($estudio, function () use ($checkins): int {
+                    $terminados += $gestor->ejecutarAislado($estudio, function () use ($avisos): int {
                         // Un negocio sin avisos (o sin la migración aún) no hace nada.
                         if (! Schema::connection('tenant')->hasTable('eventos_plataforma')
                             || ! EventoPlataformaTenant::query()->where('estado', EventoPlataformaTenant::PENDIENTE)->exists()) {
                             return 0;
                         }
 
-                        return $checkins->procesarPendientes();
+                        return $avisos->procesarPendientes();
                     }, 0);
                 }
             });

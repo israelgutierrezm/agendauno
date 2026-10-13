@@ -80,6 +80,11 @@ class IntegracionesTenantController
             $config->credenciales = array_merge($actuales, $nuevas);
         }
 
+        // Otro gimnasio u otro token de Wellhub: sus avisos de reserva se vuelven a
+        // registrar al guardar la publicación (ADR 0149).
+        if ($proveedor === ProveedorPartner::Wellhub && array_intersect($cambiadas, ['api_key', 'gym_id']) !== []) {
+            $config->reservas_registradas_en = null;
+        }
         // La dirección de sus avisos (check-in automático), una vez por integración.
         if ((string) $config->token_webhook === '') {
             $config->token_webhook = Str::random(40);
@@ -91,7 +96,7 @@ class IntegracionesTenantController
             && ($config->webhook_registrado_en === null || in_array('place_api_key', $cambiadas, true))) {
             $config->webhook_registrado_en = $this->totalpass->registrarAviso(
                 $config->llaves()['place_api_key'],
-                $this->urlDeAvisos($proveedor, (string) $config->token_webhook),
+                self::urlDeAvisos($proveedor, (string) $config->token_webhook),
             ) ? now() : null;
         }
         $config->save();
@@ -129,9 +134,10 @@ class IntegracionesTenantController
             'llaves' => $proveedor->credenciales(),
             'llaves_configuradas' => array_keys($llaves),
             'automatico' => [
-                'aviso_url' => $token !== '' ? $this->urlDeAvisos($proveedor, $token) : null,
+                'aviso_url' => $token !== '' ? self::urlDeAvisos($proveedor, $token) : null,
                 'listo' => match ($proveedor) {
-                    // Wellhub firma con la llave que da (la del negocio o la de AgendaUno).
+                    // Wellhub firma con la llave que da (la del negocio o la de AgendaUno), o
+                    // con la que se le registró al publicar las clases (ADR 0149).
                     ProveedorPartner::Wellhub => $token !== ''
                         && (($llaves['webhook_secret'] ?? '') !== '' || (string) config('agendauno.integraciones.wellhub_webhook_secret') !== ''),
                     ProveedorPartner::TotalPass => $config instanceof IntegracionTenant && $config->webhook_registrado_en !== null,
@@ -141,7 +147,8 @@ class IntegracionesTenantController
         ];
     }
 
-    private function urlDeAvisos(ProveedorPartner $proveedor, string $token): string
+    /** La dirección donde la plataforma avisa al negocio (check-in y reservas). */
+    public static function urlDeAvisos(ProveedorPartner $proveedor, string $token): string
     {
         return route('api.v1.webhooks.bienestar', [
             'estudio' => (string) app(GestorDeConexionTenant::class)->actual()?->slug,

@@ -123,6 +123,7 @@ use App\Modules\Tenancy\Http\Controllers\ReporteSucursalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteTendenciasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResenasTenantController;
+use App\Modules\Tenancy\Http\Controllers\ReservasPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
 use App\Modules\Tenancy\Http\Controllers\ResumenClientesTenantController;
@@ -962,6 +963,9 @@ Route::prefix('v1')->group(function (): void {
             // Son de clases (ADR 0104).
             Route::get('/integraciones', [IntegracionesTenantController::class, 'index'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.index');
             Route::put('/integraciones/{proveedor}', [IntegracionesTenantController::class, 'upsert'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.upsert');
+            // Reservas desde la app de Wellhub y TotalPass (ADR 0149).
+            Route::get('/integraciones/{proveedor}/reservas', [ReservasPlataformaTenantController::class, 'show'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.reservas.show');
+            Route::put('/integraciones/{proveedor}/reservas', [ReservasPlataformaTenantController::class, 'guardar'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.reservas.guardar');
 
             // Webhooks salientes (R40): endpoints firmados que consumen el outbox. El
             // secreto se devuelve solo al crear. Configuracion solo del propietario.

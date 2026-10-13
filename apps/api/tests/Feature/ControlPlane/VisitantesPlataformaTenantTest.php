@@ -237,7 +237,7 @@ it('los visitantes se ven en Reportes, aparte de los alumnos; si el negocio lo r
     $resumen = $this->getJson("/api/v1/app/{$e['slug']}/reportes/plataformas?desde=2026-10-01&hasta=2026-10-01", conBearer($e['bearer']))
         ->assertOk()->json('data');
     expect($resumen['resumen'])->toMatchArray(['visitas' => 1, 'validadas' => 1, 'automaticas' => 1, 'visitantes' => 1, 'nuevos' => 1])
-        ->and($resumen['por_proveedor'][0])->toBe(['proveedor' => 'wellhub', 'visitas' => 1, 'visitantes' => 1])
+        ->and($resumen['por_proveedor'][0])->toBe(['proveedor' => 'wellhub', 'visitas' => 1, 'visitantes' => 1, 'reservas' => 0])
         ->and($resumen['por_clase'][0]['visitas'])->toBe(1);
 
     $lista = $this->getJson("/api/v1/app/{$e['slug']}/visitantes-plataforma", conBearer($e['bearer']))->assertOk();

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Models\CheckinTenant;
+use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
@@ -22,7 +23,8 @@ use Illuminate\Validation\ValidationException;
  * El apartado de Reportes de Wellhub y TotalPass (ADR 0148): quiénes vinieron por cada
  * plataforma y sus visitas. Son clientes de la plataforma, no del negocio: aquí se ven
  * con lo que la plataforma manda, sin mezclarse con los alumnos. Si el negocio ya
- * registró a alguien con el mismo correo, se dice que ya es alumno.
+ * registró a alguien con el mismo correo, se dice que ya es alumno. Las reservas desde la
+ * app de la plataforma (ADR 0149) se cuentan por la fecha de su clase.
  *
  * - `GET /reportes/plataformas`: el resumen de un periodo (días del negocio).
  * - `GET /visitantes-plataforma`: los visitantes, por página, con búsqueda.
@@ -67,6 +69,19 @@ class VisitantesPlataformaTenantController
             ->when($proveedor !== null, fn (Builder $q) => $q->where('proveedor', $proveedor))
             ->count();
 
+        // Reservas desde la app de la plataforma de las clases del periodo, por cómo quedaron.
+        $reservas = LugarPlataformaTenant::query()
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->whereHas('sesion', fn (Builder $q) => $q->whereBetween('inicia_en', [$inicio, $fin]))
+            ->when($proveedor !== null, fn (Builder $q) => $q->where('proveedor', $proveedor))
+            ->selectRaw('proveedor, estado, COUNT(*) as total')
+            ->groupBy('proveedor', 'estado')
+            ->toBase()
+            ->get();
+        $deReservas = fn (?string $estado = null, ?string $de = null): int => (int) $reservas
+            ->filter(fn (object $f): bool => ($estado === null || $f->estado === $estado) && ($de === null || $f->proveedor === $de))
+            ->sum('total');
+
         $porDia = $visitas
             ->groupBy(fn (CheckinTenant $c): string => $this->fechas->fecha($c->registrado_en))
             ->map(fn (Collection $dia, string $fecha): array => ['fecha' => $fecha, 'visitas' => $dia->count()])
@@ -94,10 +109,20 @@ class VisitantesPlataformaTenantController
                 'visitantes' => $visitas->pluck('visitante_id')->filter()->unique()->count(),
                 'nuevos' => $nuevos,
             ],
+            'reservas' => [
+                'total' => $deReservas(),
+                'por_venir' => $deReservas(LugarPlataformaTenant::RESERVADO),
+                'asistieron' => $deReservas(LugarPlataformaTenant::ASISTIO),
+                'canceladas' => $deReservas(LugarPlataformaTenant::CANCELADO),
+                'canceladas_tarde' => $deReservas(LugarPlataformaTenant::CANCELADO_TARDE),
+                'no_asistieron' => $deReservas(LugarPlataformaTenant::NO_ASISTIO),
+                'rechazadas' => $deReservas(LugarPlataformaTenant::RECHAZADO),
+            ],
             'por_proveedor' => array_map(fn (ProveedorPartner $p): array => [
                 'proveedor' => $p->value,
                 'visitas' => $visitas->where('proveedor', $p->value)->count(),
                 'visitantes' => $visitas->where('proveedor', $p->value)->pluck('visitante_id')->filter()->unique()->count(),
+                'reservas' => $deReservas(null, $p->value),
             ], ProveedorPartner::cases()),
             'por_dia' => $porDia,
             'por_clase' => $porClase,
@@ -152,6 +177,13 @@ class VisitantesPlataformaTenantController
             ->orderByDesc('registrado_en')
             ->limit(100)
             ->get();
+        $reservas = LugarPlataformaTenant::query()
+            ->with('sesion.oferta')
+            ->where('visitante_id', $visitante->getKey())
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get();
 
         return response()->json(['data' => [
             ...$this->presentar($visitante, $this->correosDeAlumnos(collect([$visitante]))),
@@ -162,6 +194,13 @@ class VisitantesPlataformaTenantController
                 'sesion_inicia_en' => $c->sesion?->inicia_en->toIso8601String(),
                 'estado' => $c->estado,
                 'origen' => $c->origen,
+            ])->all(),
+            // Sus reservas desde la app de la plataforma (ADR 0149).
+            'reservas' => $reservas->map(fn (LugarPlataformaTenant $l): array => [
+                'id' => (string) $l->getAttribute('ulid'),
+                'clase' => $l->sesion?->oferta?->nombre,
+                'sesion_inicia_en' => $l->sesion?->inicia_en->toIso8601String(),
+                'estado' => $l->estado,
             ])->all(),
         ]]);
     }

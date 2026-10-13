@@ -6,6 +6,7 @@ import AutomaticoBienestar from "@/components/AutomaticoBienestar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
+import ReservasBienestar from "@/components/ReservasBienestar.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -406,6 +407,8 @@ onMounted(cargar);
               : $t("integraciones.guardar")
           }}
         </button>
+        <!-- Reservas desde la app de la plataforma (ADR 0149). -->
+        <ReservasBienestar v-if="i.activa" :proveedor="i.proveedor" />
       </div>
     </div>
 

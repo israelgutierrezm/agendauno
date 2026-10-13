@@ -207,6 +207,10 @@ return [
         'totalpass_partner_api_key' => env('TOTALPASS_PARTNER_API_KEY'),
         'totalpass_gym_url' => env('TOTALPASS_GYM_API_URL', 'https://gym-service-api.totalpass.com'),
         'totalpass_admin_url' => env('TOTALPASS_ADMIN_URL', 'https://admin.totalpass.com'),
+        // Reservas desde la app (ADR 0149). La Booking API de Wellhub usa la misma dirección
+        // y el mismo token que su Access Control API; sus avisos de reserva se registran
+        // por gimnasio con su Integration Setup API.
+        'wellhub_setup_url' => env('WELLHUB_SETUP_API_URL', 'https://api.partners-integrations.gympass.com'),
     ],
 
     'operacion' => [
