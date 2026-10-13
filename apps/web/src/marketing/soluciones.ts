@@ -376,6 +376,182 @@ export const soluciones: readonly Solucion[] = [
       },
     ],
   },
+  {
+    slug: "yoga",
+    nombre: "Yoga",
+    nombreEnFrase: "estudios de yoga",
+    titulo: "Software de reservas para estudios de yoga | AgendaUno",
+    descripcion:
+      "Organiza clases de yoga, reservas, cupos, profesores y paquetes en tu estudio.",
+    encabezado: "Más presencia en tus clases. Menos tiempo en mensajes.",
+    resumen:
+      "Vinyasa, hatha o una práctica para principiantes: organiza los horarios de tu estudio de yoga y el cupo de cada grupo. Tu equipo consulta las reservas y tus alumnos eligen su siguiente práctica con la cuenta que les das.",
+    imagen: "yoga-v2.webp",
+    alt: "Práctica de yoga en un estudio con luz natural",
+    modo: "clases",
+    ejemplo: "Yoga Vinyasa",
+    beneficios: [
+      {
+        titulo: "Una práctica, un horario claro",
+        texto:
+          "Nombra tus clases por estilo o nivel, asigna al profesor y programa los horarios de la semana. Cada sesión aparece con su cupo y sus reservas.",
+      },
+      {
+        titulo: "Un lugar para cada alumno",
+        texto:
+          "Define cuántas personas caben en tu salón. Cuando una clase se llena, la lista de espera ayuda a gestionar los siguientes lugares.",
+      },
+      {
+        titulo: "Paquetes que acompañan la práctica",
+        texto:
+          "Ofrece paquetes de clases o membresías con sus vigencias. Consulta créditos y asistencia sin reconstruir el historial entre hojas y conversaciones.",
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Puedo ofrecer varios estilos de yoga?",
+        respuesta:
+          "Sí. Crea actividades con los nombres que usa tu estudio y asigna profesor, horario y cupo a cada sesión. Puedes programar horarios recurrentes para tu oferta semanal.",
+      },
+      {
+        pregunta: "¿Cómo reservan mis alumnos?",
+        respuesta:
+          "Das de alta a tus alumnos y los invitas a activar su cuenta. Con tu enlace consultan las clases disponibles y reservan según el paquete o la membresía que tienen.",
+      },
+    ],
+  },
+  {
+    slug: "natacion",
+    nombre: "Natación",
+    nombreEnFrase: "escuelas de natación",
+    titulo: "Software para escuelas de natación | AgendaUno",
+    descripcion:
+      "Gestiona grupos de natación, horarios, instructores, cupos, paquetes y asistencia.",
+    encabezado: "Tus grupos en orden, dentro y fuera del agua.",
+    resumen:
+      "Organiza la operación de tu escuela de natación desde una agenda de clases. Identifica tus grupos por nombre, nivel o edad, programa a tus instructores y consulta quién tiene lugar en cada horario.",
+    imagen: "natacion-v1.jpg",
+    alt: "Clase de natación en una alberca",
+    modo: "clases",
+    ejemplo: "Natación principiantes",
+    beneficios: [
+      {
+        titulo: "Grupos fáciles de identificar",
+        texto:
+          "Usa los nombres de las actividades para distinguir tus grupos y niveles. Define el horario, instructor y capacidad de cada sesión según tu operación.",
+      },
+      {
+        titulo: "Reservas y asistencia visibles",
+        texto:
+          "Consulta la lista de quienes vienen a cada clase y registra su asistencia. Mantén el control de lugares disponibles y de la lista de espera.",
+      },
+      {
+        titulo: "Planes y vigencias a la mano",
+        texto:
+          "Ofrece paquetes o membresías, consulta las clases disponibles de cada alumno y organiza tus horarios por sucursal cuando tienes más de una sede.",
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Puedo distinguir grupos infantiles y de adultos?",
+        respuesta:
+          "Sí. Puedes crear actividades y nombrar tus grupos por nivel o edad. Estos nombres ayudan a organizar la oferta; no realizan por sí mismos una evaluación técnica del alumno.",
+      },
+      {
+        pregunta: "¿Puedo manejar varias sedes?",
+        respuesta:
+          "Sí. Organiza los horarios y sesiones por sucursal y configura en qué sedes puede utilizarse cada paquete o membresía. Los alumnos reservan con la cuenta que les das.",
+      },
+    ],
+  },
+  {
+    slug: "psicologos",
+    nombre: "Psicólogos",
+    nombreEnFrase: "psicólogos",
+    titulo: "Agenda de citas para psicólogos | AgendaUno",
+    descripcion:
+      "Organiza citas de psicología, disponibilidad, servicios y cobros por profesional.",
+    encabezado: "Más atención a tus pacientes. Menos mensajes para coordinar.",
+    resumen:
+      "Si atiendes por tu cuenta o compartes un consultorio con otros psicólogos, reúne tus horarios, servicios y citas en una sola agenda. Comparte tu enlace para que cada paciente elija un espacio disponible sin crear una cuenta.",
+    imagen: "psicologia-v1.webp",
+    alt: "Profesional de psicología conversando durante una consulta",
+    modo: "citas",
+    ejemplo: "Sesión de psicología",
+    beneficios: [
+      {
+        titulo: "Cada sesión con su tiempo",
+        texto:
+          "Configura servicios con su duración y precio. La disponibilidad ayuda a ofrecer horarios sin superponer las citas de un mismo profesional.",
+      },
+      {
+        titulo: "Un enlace para coordinar la siguiente cita",
+        texto:
+          "El paciente consulta los servicios y horarios disponibles, elige al profesional y agenda. Las confirmaciones y recordatorios llegan por correo.",
+      },
+      {
+        titulo: "De tu práctica a un equipo",
+        texto:
+          "Empieza con un profesional en Individual o elige Premium o Pro para varios profesionales. Consulta tus citas y registra los cobros desde el mismo lugar.",
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Sirve para una práctica independiente?",
+        respuesta:
+          "Sí. Configura tus servicios y horarios para un profesional. Si después incorporas un equipo, puedes elegir Premium o Pro según los profesionales que contrates.",
+      },
+      {
+        pregunta: "¿Incluye expediente clínico o sesiones por videollamada?",
+        respuesta:
+          "No. El producto organiza citas y operación; no sustituye un expediente clínico, una plataforma de videollamadas ni herramientas especializadas de atención psicológica.",
+      },
+    ],
+  },
+  {
+    slug: "dentistas",
+    nombre: "Dentistas",
+    nombreEnFrase: "dentistas y consultorios dentales",
+    titulo: "Agenda de citas para dentistas | AgendaUno",
+    descripcion:
+      "Gestiona citas de tu consultorio dental, servicios, disponibilidad y cobros.",
+    encabezado: "Tu consultorio organizado, antes de la siguiente cita.",
+    resumen:
+      "Organiza consultas, limpiezas y otros servicios con su duración y precio. Cada dentista tiene su disponibilidad y tus pacientes pueden solicitar una cita desde el enlace de tu consultorio, sin crear una cuenta.",
+    imagen: "consultorios-v1.webp",
+    alt: "Profesional de odontología atendiendo en un consultorio dental",
+    modo: "citas",
+    ejemplo: "Consulta dental",
+    beneficios: [
+      {
+        titulo: "El tiempo que necesita cada servicio",
+        texto:
+          "Configura la duración de las consultas y servicios que ofreces. La agenda muestra las citas de cada profesional para coordinar el día de atención.",
+      },
+      {
+        titulo: "Una reserva más fácil para el paciente",
+        texto:
+          "Comparte una página con tus servicios, precios, profesionales y sucursales. El paciente elige un horario disponible y recibe la confirmación por correo.",
+      },
+      {
+        titulo: "Recepción y cobros en la misma operación",
+        texto:
+          "Registra la llegada del paciente y el cobro del servicio. Consulta la agenda desde el celular, la tableta o la computadora, según los permisos de tu equipo.",
+      },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Puedo trabajar con varios dentistas?",
+        respuesta:
+          "Sí. Premium y Pro permiten contratar varios profesionales y organizar sus servicios y disponibilidad. Individual es para un profesional; consulta las tarifas vigentes en precios.",
+      },
+      {
+        pregunta: "¿Incluye odontograma o expediente clínico dental?",
+        respuesta:
+          "No. Se enfoca en citas, disponibilidad y gestión operativa. No sustituye un odontograma, un expediente clínico ni un sistema especializado de tratamientos dentales.",
+      },
+    ],
+  },
 ];
 
 export function rutaSolucion(slug: string): string {

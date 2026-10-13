@@ -22,6 +22,8 @@ const props = defineProps<{
   excluir?: string;
   modo?: Modo;
   dosColumnas?: boolean;
+  /** Tarjetas con fotografía para descubrir el producto por tipo de negocio. */
+  visual?: boolean;
 }>();
 const id = useId();
 
@@ -71,6 +73,7 @@ const columnas = computed(() =>
   <nav
     v-else
     class="soluciones-enlaces"
+    :class="{ 'soluciones-enlaces--visual': visual }"
     :data-modo="modo"
     aria-label="Soluciones por tipo de negocio"
   >
@@ -79,7 +82,18 @@ const columnas = computed(() =>
       :key="solucion.slug"
       :to="rutaSolucion(solucion.slug)"
     >
-      <span>{{ solucion.nombre }}</span
+      <img
+        v-if="visual"
+        :src="`/assets/landing/disciplinas/${solucion.imagen}`"
+        alt=""
+        width="480"
+        height="320"
+        loading="lazy"
+        decoding="async"
+      />
+      <span class="solucion-enlace-copy">
+        <span>{{ solucion.nombre }}</span>
+        <small v-if="visual">{{ solucion.ejemplo }}</small> </span
       ><span aria-hidden="true"
         ><IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
       /></span>
@@ -116,6 +130,41 @@ const columnas = computed(() =>
   outline: 2px solid var(--enlace);
   outline-offset: 3px;
 }
+.soluciones-enlaces--visual a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0 0 1.1rem;
+  gap: 0.9rem 0.5rem;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.soluciones-enlaces--visual a:hover {
+  transform: translateY(-3px);
+}
+.soluciones-enlaces--visual img {
+  grid-column: 1 / -1;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+.solucion-enlace-copy {
+  min-width: 0;
+}
+.soluciones-enlaces--visual .solucion-enlace-copy {
+  padding-left: 1.1rem;
+}
+.soluciones-enlaces--visual a > span:last-child {
+  padding-right: 1.1rem;
+}
+.solucion-enlace-copy small {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
 /* Portada: dos columnas, una por modalidad, con su lista de giros. */
 .soluciones-columnas {
   display: grid;
@@ -140,6 +189,27 @@ const columnas = computed(() =>
   .soluciones-enlaces,
   .soluciones-columnas {
     grid-template-columns: 1fr;
+  }
+  .soluciones-enlaces--visual {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .soluciones-enlaces--visual a {
+    font-size: 0.85rem;
+  }
+  .soluciones-enlaces--visual .solucion-enlace-copy {
+    padding-left: 0.8rem;
+  }
+  .soluciones-enlaces--visual a > span:last-child {
+    padding-right: 0.8rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .soluciones-enlaces--visual a {
+    transition: none;
+  }
+  .soluciones-enlaces--visual a:hover {
+    transform: none;
   }
 }
 </style>

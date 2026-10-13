@@ -60,6 +60,14 @@ defineProps<{
   display: grid;
   overflow: hidden;
   padding: 0;
+  background:
+    radial-gradient(
+      ellipse at 0% 0%,
+      color-mix(in srgb, var(--primario) 12%, transparent),
+      transparent 68%
+    ),
+    var(--superficie);
+  border-radius: 1.5rem;
 }
 .tp-texto {
   order: 1;
@@ -70,6 +78,9 @@ defineProps<{
   order: 2;
   min-height: 7rem;
   background: var(--superficie-2);
+  margin: 0.65rem;
+  border-radius: 1.15rem;
+  overflow: hidden;
 }
 .tp-foto img {
   position: absolute;
@@ -96,7 +107,12 @@ defineProps<{
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--primario);
+  color: var(--primario-fuerte);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  background: var(--primario-suave);
 }
 .tp-viva::before {
   content: "";

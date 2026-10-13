@@ -27,16 +27,24 @@ describe("Tarjetas de indicadores", () => {
     expect(compacta.get("dl").attributes("style")).toContain("--ti-n: 3");
   });
 
-  it("cada indicador con su etiqueta, un ícono neutro y el valor (sin color de adorno)", () => {
+  it("cada tarjeta conserva la etiqueta y la cifra con su acento visual", () => {
     const w = mount(TarjetasIndicadores, {
       props: { tarjetas: indicadores(2) },
     });
 
     const tarjeta = w.get('[data-prueba="indicador-k1"]');
-    expect(tarjeta.classes()).not.toContain("tu-tono-verde");
+    expect(tarjeta.classes()).toContain("tu-tono-verde");
     expect(tarjeta.find("dt svg").exists()).toBe(true);
     expect(tarjeta.text()).toContain("Indicador 1");
     expect(tarjeta.get("dd").text()).toBe("1");
+  });
+  it("la variante compacta conserva una franja neutra para la agenda", () => {
+    const w = mount(TarjetasIndicadores, {
+      props: { tarjetas: indicadores(2), compacta: true },
+    });
+    expect(w.get('[data-prueba="indicador-k1"]').classes()).not.toContain(
+      "tu-tono-verde",
+    );
   });
 
   it("en una fila hasta 5; con 6, dos filas de 3 para que no quede uno solo", () => {

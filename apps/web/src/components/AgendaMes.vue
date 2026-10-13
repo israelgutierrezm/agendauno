@@ -160,6 +160,11 @@ const limite = computed(() => props.porDia ?? 3);
                 'am-destacada': destacadas?.has(x.id),
               }"
               :style="{
+                '--pastel': destacadas
+                  ? destacadas.has(x.id)
+                    ? 'var(--primario-suave)'
+                    : 'var(--superficie-2)'
+                  : tonoServicio(x.oferta_id, catalogo, x.oferta).fondo,
                 '--tinta': destacadas
                   ? destacadas.has(x.id)
                     ? 'var(--primario)'
@@ -234,19 +239,32 @@ const limite = computed(() => props.porDia ?? 3);
   min-width: 0;
   padding: 0.1rem 0.3rem;
   border-radius: 0.3rem;
-  border-left: 3px solid var(--tinta);
-  background: color-mix(in srgb, var(--tinta) 11%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--tinta) 70%, var(--superficie));
+  background: color-mix(in srgb, var(--pastel) 75%, var(--superficie));
+  color: var(--texto);
   font-size: 0.72rem;
   line-height: 1.3;
   text-align: left;
 }
 .am-evento:hover,
 .am-activo {
-  background: color-mix(in srgb, var(--tinta) 20%, transparent);
+  background: color-mix(in srgb, var(--pastel) 90%, var(--superficie));
+}
+.am-evento:focus-visible,
+.am-activo {
+  outline: 2px solid var(--primario);
+  outline-offset: 1px;
 }
 .am-destacada {
   font-weight: 600;
-  background: color-mix(in srgb, var(--tinta) 24%, transparent);
+  border-left-color: var(--primario);
+}
+.dark .am-evento {
+  background: color-mix(in srgb, var(--pastel) 18%, var(--superficie));
+}
+.dark .am-evento:hover,
+.dark .am-activo {
+  background: color-mix(in srgb, var(--pastel) 25%, var(--superficie));
 }
 .am-hora {
   flex-shrink: 0;

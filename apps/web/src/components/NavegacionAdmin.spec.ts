@@ -75,6 +75,35 @@ beforeEach(() => {
 });
 
 describe("barra lateral", () => {
+  it("busca dentro de las opciones permitidas y respeta el rol activo", async () => {
+    entrar(["*"]);
+    const { w } = await montar(NavLateral, { name: "panel" });
+    await w.get('input[type="search"]').setValue("stripe");
+    expect(w.findAll(".nl-resultado").map((r) => r.attributes("href"))).toEqual(
+      ["/pasarelas"],
+    );
+    expect(w.findAll(".nl-grupo")).toHaveLength(0);
+    entrar(["agenda.ver"]);
+    await flushPromises();
+    expect(w.findAll(".nl-resultado")).toHaveLength(0);
+    await w.get('input[type="search"]').setValue("");
+    expect(w.find('[data-prueba="area-agenda"]').exists()).toBe(true);
+    expect(w.find('[data-prueba="area-configuracion"]').exists()).toBe(false);
+  });
+
+  it("buscar respuestas conserva la pestaña correcta del formulario", async () => {
+    entrar(["*"]);
+    const { w, router } = await montar(NavLateral, { name: "panel" });
+    await w.get('input[type="search"]').setValue("Respuestas");
+    expect(w.find(".nl-resultado").attributes("href")).toBe(
+      "/formularios?vista=respuestas",
+    );
+    await router.push({ name: "formularios", query: { vista: "respuestas" } });
+    await flushPromises();
+    expect(
+      (w.get('input[type="search"]').element as HTMLInputElement).value,
+    ).toBe("");
+  });
   it("grupos con títulos y un enlace por área; solo uno activo", async () => {
     entrar(["*"]);
     const { w } = await montar(NavLateral, { name: "ficha-miembro" });
@@ -132,9 +161,7 @@ describe("pestañas del área", () => {
       "/ventas",
       "/presupuestos",
     ]);
-    expect(citas.w.findAll(".pa-pestanas a").at(2)!.text()).toBe(
-      "Bonos",
-    );
+    expect(citas.w.findAll(".pa-pestanas a").at(2)!.text()).toBe("Bonos");
     const lateral = await montar(NavLateral, { name: "pos" });
     expect(
       lateral.w.find('[data-prueba="area-ventas"]').attributes("href"),

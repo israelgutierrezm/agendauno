@@ -82,6 +82,7 @@ defineEmits<{ alternarTema: [] }>();
 <template>
   <div
     class="tu-public-shell min-h-screen flex flex-col"
+    :data-producto="producto"
     :class="{
       'tu-marketing': !esRutaPublicaDeNegocio,
       'tu-public-business': esRutaPublicaDeNegocio,

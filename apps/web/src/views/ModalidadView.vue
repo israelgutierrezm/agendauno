@@ -216,7 +216,7 @@ function medirOtra(): void {
       <div class="tu-hero-layout mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="tu-hero-copy reveal">
           <p class="tu-seccion-etiqueta tu-modalidad-nombre">
-            {{ contenido.nombre }}
+            {{ t(k("hero.etiqueta")) }}
           </p>
           <NegociosAnimados
             :negocios="negociosAnimados"
@@ -236,10 +236,10 @@ function medirOtra(): void {
           >
             {{ t(k("hero.subtitulo")) }}
           </p>
-          <!-- El botón del hero va en azul; el rosa queda para el menú y el cierre. -->
+          <!-- Una misma acción principal y un mismo color en toda la landing. -->
           <div class="tu-hero-actions mt-7 flex flex-wrap items-center gap-3">
             <RouterLink
-              class="tu-btn tu-btn-primario tu-btn-azul text-base px-7 py-3"
+              class="tu-btn tu-btn-primario text-base px-7 py-3"
               :to="registro"
               data-cta="hero"
               @click="medirRegistro('hero')"
@@ -304,7 +304,7 @@ function medirOtra(): void {
         <ProductoDemo :modo="modo" />
         <div class="mt-8 text-center">
           <RouterLink
-            class="tu-btn tu-btn-primario tu-btn-azul px-7 py-3"
+            class="tu-btn tu-btn-primario px-7 py-3"
             :to="registro"
             data-cta="product_demo"
             @click="medirRegistro('product_demo')"
@@ -408,7 +408,7 @@ function medirOtra(): void {
           :negocios="negocios"
         >
           <RouterLink
-            class="tu-btn tu-btn-primario tu-btn-azul px-7 py-3"
+            class="tu-btn tu-btn-primario px-7 py-3"
             :to="registroCon(elegido ? perfilDeNegocio(activo?.clave) : null)"
             data-cta="business_carousel"
             @click="
@@ -430,7 +430,7 @@ function medirOtra(): void {
           <h3 class="text-lg font-medium text-center">
             {{ t(k("giros.soluciones")) }}
           </h3>
-          <SolucionesEnlaces :modo="modo" />
+          <SolucionesEnlaces :modo="modo" visual />
         </div>
         <p
           v-if="contenido.notaSalud"
@@ -566,7 +566,7 @@ function medirOtra(): void {
             </p>
             <div class="mt-8">
               <RouterLink
-                class="tu-btn tu-btn-primario tu-btn-azul px-6 py-3"
+                class="tu-btn tu-btn-primario px-6 py-3"
                 :to="registro"
                 data-cta="public_page"
                 @click="medirRegistro('public_page')"

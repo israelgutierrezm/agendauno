@@ -52,13 +52,18 @@ withDefaults(
   justify-content: center;
   width: 4.25rem;
   height: 4.25rem;
-  border-radius: 999px;
+  border-radius: 1.3rem;
+  border: 1px solid color-mix(in srgb, var(--primario) 15%, var(--borde));
+  transform: rotate(-5deg);
   background: color-mix(in srgb, var(--primario) 9%, var(--superficie));
   color: color-mix(in srgb, var(--primario) 75%, var(--texto-suave));
 }
 .ev-compacto .ev-circulo {
   width: 3.6rem;
   height: 3.6rem;
+}
+.ev-circulo > svg {
+  transform: rotate(5deg);
 }
 .ev-mas {
   position: absolute;

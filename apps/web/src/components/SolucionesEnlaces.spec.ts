@@ -10,7 +10,12 @@ import SolucionesEnlaces from "./SolucionesEnlaces.vue";
 const Vacia = { render: () => null };
 
 async function montar(
-  props: { excluir?: string; modo?: Modo; dosColumnas?: boolean } = {},
+  props: {
+    excluir?: string;
+    modo?: Modo;
+    dosColumnas?: boolean;
+    visual?: boolean;
+  } = {},
   slots: Record<string, string> = {},
 ) {
   // Router real con las rutas comerciales: los href son los de producción.
@@ -34,6 +39,24 @@ const hrefs = (vista: Awaited<ReturnType<typeof montar>>, selector = "a") =>
   vista.findAll(selector).map((n) => n.attributes("href"));
 
 describe("enlaces a las páginas por giro", () => {
+  it.each(["clases", "citas"] as const)(
+    "%s: las tarjetas visuales enlazan a su página y cargan las fotos bajo demanda",
+    async (modo) => {
+      const vista = await montar({ modo, visual: true });
+      const lista = solucionesDe(modo);
+      expect(hrefs(vista)).toEqual(lista.map((s) => rutaSolucion(s.slug)));
+      expect(vista.findAll("img")).toHaveLength(lista.length);
+      for (const [i, imagen] of vista.findAll("img").entries()) {
+        expect(imagen.attributes("src")).toBe(
+          `/assets/landing/disciplinas/${lista[i]!.imagen}`,
+        );
+        expect(imagen.attributes("loading")).toBe("lazy");
+        expect(imagen.attributes("width")).toBe("480");
+        expect(imagen.attributes("height")).toBe("320");
+      }
+      vista.unmount();
+    },
+  );
   it("sin props enlaza todas las páginas por giro, como siempre", async () => {
     const vista = await montar();
     expect(hrefs(vista)).toEqual(soluciones.map((s) => rutaSolucion(s.slug)));

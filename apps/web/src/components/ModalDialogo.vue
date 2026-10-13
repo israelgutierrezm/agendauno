@@ -18,17 +18,18 @@ const props = withDefaults(
     tam?: "md" | "lg" | "xl";
     // Ícono junto al título (p. ej. `agenda` en el detalle de una cita).
     icono?: string;
+    descripcion?: string;
+    ocupado?: boolean;
   }>(),
-  { tam: "lg", icono: undefined },
+  { tam: "lg", icono: undefined, descripcion: undefined, ocupado: false },
 );
 const emit = defineEmits<{ cerrar: [] }>();
+function cerrar(): void {
+  if (!props.ocupado) emit("cerrar");
+}
 
 const panel = ref<HTMLElement | null>(null);
-const capa = useFocoPanel(
-  () => props.abierto,
-  panel,
-  () => emit("cerrar"),
-);
+const capa = useFocoPanel(() => props.abierto, panel, cerrar);
 
 const ancho = computed(
   () => ({ md: "max-w-lg", lg: "max-w-3xl", xl: "max-w-5xl" })[props.tam],
@@ -43,7 +44,7 @@ const ancho = computed(
         class="fixed inset-0 flex items-center justify-center p-4"
         :style="{ zIndex: capa }"
       >
-        <div class="absolute inset-0 bg-black/50" @click="emit('cerrar')" />
+        <div class="absolute inset-0 bg-black/50" @click="cerrar" />
         <section
           ref="panel"
           class="tu-modal-panel relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-xl shadow-xl"
@@ -51,6 +52,7 @@ const ancho = computed(
           :style="{ background: 'var(--superficie)' }"
           role="dialog"
           aria-modal="true"
+          :aria-busy="ocupado || undefined"
           :aria-label="titulo"
           tabindex="-1"
         >
@@ -58,20 +60,30 @@ const ancho = computed(
             class="flex items-center justify-between gap-3 border-b px-6 py-4"
             :style="{ borderColor: 'var(--borde)' }"
           >
-            <h2 class="flex items-center gap-2.5 text-lg font-semibold">
-              <IconoNav
-                v-if="icono"
-                :nombre="icono"
-                :tam="22"
+            <div class="min-w-0">
+              <h2 class="flex items-center gap-2.5 text-lg font-semibold">
+                <IconoNav
+                  v-if="icono"
+                  :nombre="icono"
+                  :tam="22"
+                  :style="{ color: 'var(--texto-suave)' }"
+                />
+                {{ titulo }}
+              </h2>
+              <p
+                v-if="descripcion"
+                class="mt-1 text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
-              />
-              {{ titulo }}
-            </h2>
+              >
+                {{ descripcion }}
+              </p>
+            </div>
             <button
               class="tu-icono-btn"
               type="button"
               :aria-label="$t('comun.cerrar')"
-              @click="emit('cerrar')"
+              :disabled="ocupado"
+              @click="cerrar"
             >
               <IconoNav nombre="cerrar" :tam="18" />
             </button>

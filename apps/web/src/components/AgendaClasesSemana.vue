@@ -53,8 +53,8 @@ interface Tarjeta {
   detalle: string;
   cupo: string;
   pct: number;
-  // Aviso en texto; `urgente` (en curso / cancelada) va en rojo, el resto en la
-  // tinta de la tarjeta.
+  // Aviso en texto; `urgente` (en curso / cancelada) va en rojo, el resto usa el
+  // texto secundario del tema para conservar contraste sobre el pastel.
   aviso: { texto: string; urgente: boolean } | null;
   pasada: boolean;
   enCurso: boolean;
@@ -393,7 +393,7 @@ const horaAhora = computed(() => {
 }
 .cs-dia-num-hoy {
   background: var(--acento);
-  color: #fff;
+  color: var(--primario-contraste);
 }
 .cs-hoy {
   background: color-mix(in srgb, var(--acento) 4%, var(--superficie));
@@ -418,7 +418,7 @@ const horaAhora = computed(() => {
   padding: 0.05rem 0.4rem;
   border-radius: 0.35rem;
   background: var(--acento);
-  color: #fff;
+  color: var(--primario-contraste);
   font-size: 0.7rem;
   font-weight: 600;
 }
@@ -453,17 +453,17 @@ const horaAhora = computed(() => {
   border-radius: 999px;
   background: var(--acento);
 }
-/* Tinte suave del servicio y su color en el borde izquierdo. */
+/* Misma superficie pastel que las citas; sin imponer fondos claros en oscuro. */
 .cs-tarjeta {
   position: absolute;
   z-index: 1;
   box-sizing: border-box;
   overflow: hidden;
   border: none;
-  border-left: 3px solid var(--tt);
+  border-left: 3px solid color-mix(in srgb, var(--tt) 70%, var(--superficie));
   border-radius: 0.5rem;
   padding: 0.35rem 0.5rem;
-  background: color-mix(in srgb, var(--tt) 13%, var(--superficie));
+  background: color-mix(in srgb, var(--tf) 75%, var(--superficie));
   color: var(--texto);
   text-align: left;
   display: flex;
@@ -486,7 +486,7 @@ const horaAhora = computed(() => {
   box-shadow: 0 0 0 2px var(--acento);
 }
 .cs-en-curso {
-  box-shadow: 0 0 0 2px #d92d20;
+  box-shadow: 0 0 0 2px var(--error);
 }
 .cs-pasada {
   opacity: 0.55;
@@ -511,7 +511,7 @@ const horaAhora = computed(() => {
 .cs-horario {
   font-size: 0.68rem;
   font-weight: 600;
-  color: color-mix(in srgb, var(--tt) 75%, var(--texto));
+  color: var(--texto);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -543,7 +543,7 @@ const horaAhora = computed(() => {
 .cs-aviso {
   font-size: 0.62rem;
   font-weight: 700;
-  color: var(--tt);
+  color: var(--texto-suave);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -553,6 +553,6 @@ const horaAhora = computed(() => {
 }
 .dark .cs-tarjeta {
   background: color-mix(in srgb, var(--tf) 18%, var(--superficie));
-  border-left-color: var(--tf);
+  border-left-color: color-mix(in srgb, var(--tf) 65%, var(--superficie));
 }
 </style>

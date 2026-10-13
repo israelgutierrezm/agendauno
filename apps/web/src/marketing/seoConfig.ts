@@ -181,6 +181,14 @@ function seoDeModalidad(modo: Modo, registroAbierto: boolean): SeoOptions {
       "@graph": [
         ...organizacionYSoftware(registroAbierto),
         {
+          "@type": "WebSite",
+          "@id": `${SITE_URL}/#website`,
+          name: MARCA.nombre,
+          url,
+          inLanguage: "es-MX",
+          publisher: { "@id": `${SITE_URL}/#organization` },
+        },
+        {
           "@type": "WebPage",
           "@id": `${url}#webpage`,
           url,
@@ -189,6 +197,7 @@ function seoDeModalidad(modo: Modo, registroAbierto: boolean): SeoOptions {
           inLanguage: "es-MX",
           primaryImageOfPage: image,
           about: { "@id": `${SITE_URL}/#software` },
+          isPartOf: { "@id": `${SITE_URL}/#website` },
         },
       ],
     },
@@ -272,6 +281,7 @@ function seoBase(path: string, registroAbierto: boolean): SeoOptions {
             inLanguage: "es-MX",
             primaryImageOfPage: image,
             about: { "@id": `${SITE_URL}/#software` },
+            isPartOf: { "@id": `${SITE_URL}/#website` },
             breadcrumb: { "@id": `${url}#breadcrumb` },
           },
           miga,

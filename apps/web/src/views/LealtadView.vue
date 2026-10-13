@@ -8,6 +8,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero } from "@/lib/formato";
@@ -64,6 +65,11 @@ const recompensas = ref<Recompensa[]>([]);
 const canjes = ref<Canje[]>([]);
 
 const nueva = ref({ nombre: "", descripcion: "", costo_puntos: 100 });
+const nuevaRecompensa = ref(false);
+const creandoRecompensa = ref(false);
+const editorPrograma = ref(false);
+const guardandoPrograma = ref(false);
+const borradorPrograma = ref<Programa>({ ...programa.value });
 
 const miembroSel = ref("");
 const saldo = ref<number | null>(null);
@@ -91,21 +97,28 @@ async function cargar(): Promise<void> {
 }
 
 async function guardarPrograma(): Promise<void> {
+  if (!puedeGestionar.value || guardandoPrograma.value) return;
+  guardandoPrograma.value = true;
   aviso.value = null;
   error.value = null;
   try {
     const { data } = await api.put<{ data: Programa }>(
       `${base.value}/lealtad/programa`,
-      programa.value,
+      borradorPrograma.value,
     );
     programa.value = data.data;
     aviso.value = t("lealtad.guardado");
+    editorPrograma.value = false;
   } catch (e) {
     error.value = mensajeDeError(e);
+  } finally {
+    guardandoPrograma.value = false;
   }
 }
 
 async function crearRecompensa(): Promise<void> {
+  if (!puedeGestionar.value || creandoRecompensa.value) return;
+  creandoRecompensa.value = true;
   aviso.value = null;
   error.value = null;
   try {
@@ -115,9 +128,12 @@ async function crearRecompensa(): Promise<void> {
       costo_puntos: Number(nueva.value.costo_puntos) || 1,
     });
     nueva.value = { nombre: "", descripcion: "", costo_puntos: 100 };
+    nuevaRecompensa.value = false;
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
+  } finally {
+    creandoRecompensa.value = false;
   }
 }
 
@@ -303,60 +319,126 @@ const indicadores = computed<Indicador[]>(() => {
       <div class="mt-5 tu-card p-5">
         <div class="flex items-center justify-between gap-3">
           <h2 class="font-medium">{{ $t("lealtad.programa.titulo") }}</h2>
+          <span
+            class="tu-badge"
+            :class="programa.activa ? 'tu-badge-exito' : ''"
+            >{{
+              $t(
+                programa.activa
+                  ? "adminUsabilidad.estadoActivo"
+                  : "adminUsabilidad.estadoInactivo",
+              )
+            }}</span
+          >
+        </div>
+        <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("lealtad.programa.porAsistencia") }}:
+          {{ programa.puntos_por_asistencia }} ·
+          {{ $t("lealtad.programa.porMoneda") }}:
+          {{ programa.puntos_por_moneda }}
+        </p>
+        <button
+          v-if="puedeGestionar"
+          type="button"
+          class="tu-btn tu-btn-fantasma mt-4"
+          @click="
+            borradorPrograma = { ...programa };
+            error = null;
+            editorPrograma = true;
+          "
+        >
+          {{ $t("adminUsabilidad.configurarPrograma") }}
+        </button>
+      </div>
+      <ModalDialogo
+        v-if="puedeGestionar"
+        :abierto="editorPrograma"
+        :titulo="$t('adminUsabilidad.configurarPrograma')"
+        icono="lealtad"
+        :ocupado="guardandoPrograma"
+        @cerrar="editorPrograma = false"
+      >
+        <form @submit.prevent="guardarPrograma">
+          <p v-if="error" role="alert" :style="{ color: 'var(--error)' }">
+            {{ error }}
+          </p>
           <label class="flex items-center gap-2 text-sm font-medium">
             <input
-              v-model="programa.activa"
+              v-model="borradorPrograma.activa"
               type="checkbox"
               :disabled="!puedeGestionar"
             />
             {{ $t("lealtad.programa.activa") }}
           </label>
-        </div>
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label class="tu-label" for="ppa">{{
-              $t("lealtad.programa.porAsistencia")
-            }}</label>
-            <input
-              id="ppa"
-              v-model.number="programa.puntos_por_asistencia"
-              type="number"
-              min="0"
-              class="tu-input"
-              :disabled="!puedeGestionar"
-            />
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="tu-label" for="ppa">{{
+                $t("lealtad.programa.porAsistencia")
+              }}</label>
+              <input
+                id="ppa"
+                v-model.number="borradorPrograma.puntos_por_asistencia"
+                type="number"
+                min="0"
+                class="tu-input"
+                :disabled="!puedeGestionar"
+              />
+            </div>
+            <div>
+              <label class="tu-label" for="ppm">{{
+                $t("lealtad.programa.porMoneda")
+              }}</label>
+              <input
+                id="ppm"
+                v-model.number="borradorPrograma.puntos_por_moneda"
+                type="number"
+                min="0"
+                class="tu-input"
+                :disabled="!puedeGestionar"
+              />
+              <span class="tu-hint" data-prueba="ayuda-por-moneda">{{
+                $t("lealtad.programa.porMonedaAyuda", { monto: unaUnidad })
+              }}</span>
+            </div>
           </div>
-          <div>
-            <label class="tu-label" for="ppm">{{
-              $t("lealtad.programa.porMoneda")
-            }}</label>
-            <input
-              id="ppm"
-              v-model.number="programa.puntos_por_moneda"
-              type="number"
-              min="0"
-              class="tu-input"
-              :disabled="!puedeGestionar"
-            />
-            <span class="tu-hint" data-prueba="ayuda-por-moneda">{{
-              $t("lealtad.programa.porMonedaAyuda", { monto: unaUnidad })
-            }}</span>
+          <div class="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              :disabled="guardandoPrograma"
+              @click="editorPrograma = false"
+            >
+              {{ $t("comun.cancelar") }}
+            </button>
+            <button
+              v-if="puedeGestionar"
+              type="submit"
+              class="tu-btn tu-btn-primario"
+              :disabled="guardandoPrograma"
+            >
+              {{ $t("comun.guardar") }}
+            </button>
           </div>
-        </div>
-        <button
-          v-if="puedeGestionar"
-          type="button"
-          class="tu-btn tu-btn-primario mt-4"
-          @click="guardarPrograma"
-        >
-          {{ $t("comun.guardar") }}
-        </button>
-      </div>
+        </form>
+      </ModalDialogo>
 
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
         <!-- Recompensas -->
         <div class="tu-card p-5">
-          <h2 class="font-medium">{{ $t("lealtad.recompensas.titulo") }}</h2>
+          <div class="flex flex-wrap justify-between gap-3 items-center">
+            <h2 class="font-medium">{{ $t("lealtad.recompensas.titulo") }}</h2>
+            <button
+              v-if="puedeGestionar"
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              @click="
+                error = null;
+                nuevaRecompensa = true;
+              "
+            >
+              {{ $t("adminUsabilidad.recompensas.nueva") }}
+            </button>
+          </div>
           <EstadoVacio
             v-if="recompensas.length === 0"
             class="mt-3 py-6"
@@ -403,33 +485,64 @@ const indicadores = computed<Indicador[]>(() => {
             </li>
           </ul>
 
-          <form
+          <ModalDialogo
             v-if="puedeGestionar"
-            class="mt-4 space-y-2"
-            @submit.prevent="crearRecompensa"
+            :abierto="nuevaRecompensa"
+            :titulo="$t('adminUsabilidad.recompensas.nueva')"
+            tam="md"
+            icono="lealtad"
+            :ocupado="creandoRecompensa"
+            @cerrar="nuevaRecompensa = false"
           >
-            <input
-              v-model="nueva.nombre"
-              class="tu-input"
-              :placeholder="$t('lealtad.recompensas.nombrePh')"
-              required
-            />
-            <div class="flex gap-2">
-              <input
-                v-model.number="nueva.costo_puntos"
-                type="number"
-                min="1"
-                class="tu-input w-32"
-                :placeholder="$t('lealtad.puntos')"
-              />
-              <button
-                type="submit"
-                class="tu-btn tu-btn-fantasma whitespace-nowrap"
-              >
-                {{ $t("lealtad.recompensas.crear") }}
-              </button>
-            </div>
-          </form>
+            <form
+              v-if="puedeGestionar"
+              class="space-y-4"
+              @submit.prevent="crearRecompensa"
+            >
+              <p v-if="error" role="alert" :style="{ color: 'var(--error)' }">
+                {{ error }}
+              </p>
+              <label class="block"
+                ><span class="tu-label">{{
+                  $t("adminUsabilidad.recompensas.nombre")
+                }}</span
+                ><input
+                  v-model="nueva.nombre"
+                  class="tu-input"
+                  :placeholder="$t('adminUsabilidad.recompensas.ejemplo')"
+                  required
+              /></label>
+              <label class="block"
+                ><span class="tu-label">{{
+                  $t("adminUsabilidad.recompensas.costo")
+                }}</span
+                ><input
+                  v-model.number="nueva.costo_puntos"
+                  type="number"
+                  min="1"
+                  class="tu-input"
+                  :placeholder="$t('lealtad.puntos')"
+                  required
+              /></label>
+              <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma"
+                  :disabled="creandoRecompensa"
+                  @click="nuevaRecompensa = false"
+                >
+                  {{ $t("comun.cancelar") }}
+                </button>
+                <button
+                  type="submit"
+                  class="tu-btn tu-btn-primario whitespace-nowrap"
+                  :disabled="creandoRecompensa || !nueva.nombre.trim()"
+                >
+                  {{ $t("lealtad.recompensas.crear") }}
+                </button>
+              </div>
+            </form>
+          </ModalDialogo>
         </div>
 
         <!-- Consulta por miembro -->

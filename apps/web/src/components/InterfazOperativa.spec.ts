@@ -13,6 +13,52 @@ afterEach(() => {
 });
 
 describe("listados operativos", () => {
+  it("etiqueta los campos de las fichas móviles y permite conservar tablas comparativas", async () => {
+    const vista = mount(TablaDatos, {
+      global,
+      props: {
+        columnas: [
+          { clave: "nombre", etiqueta: "Nombre" },
+          { clave: "estado", etiqueta: "Estado" },
+        ],
+        filas: [{ nombre: "Andrea", estado: "Activa" }],
+      },
+    });
+    expect(vista.classes()).toContain("td-adaptable");
+    expect(
+      vista.findAll("tbody td").map((c) => c.attributes("data-etiqueta")),
+    ).toEqual(["Nombre", "Estado"]);
+    await vista.setProps({ adaptarMovil: false });
+    expect(vista.classes()).not.toContain("td-adaptable");
+    vista.unmount();
+  });
+  it("mantiene visibles los filtros aplicados y permite quitar uno sin borrar los demás", async () => {
+    const vista = mount(BarraListado, {
+      global,
+      props: {
+        filtros: [
+          {
+            clave: "estado",
+            etiqueta: "Estado",
+            opciones: [{ valor: "vigente", texto: "Vigente" }],
+          },
+          { clave: "solo", etiqueta: "Solo pendientes", tipo: "booleano" },
+        ],
+        valores: { estado: "vigente", solo: "1" },
+      },
+    });
+    await vista.get("button[aria-controls]").trigger("click");
+    expect(vista.get("button[aria-controls]").attributes("aria-expanded")).toBe(
+      "false",
+    );
+    expect(vista.findAll(".bl-filtro").map((b) => b.text())).toEqual([
+      "Estado: Vigente",
+      "Solo pendientes",
+    ]);
+    await vista.findAll(".bl-filtro")[0].trigger("click");
+    expect(vista.emitted("cambioFiltro")?.[0]).toEqual(["estado", ""]);
+    vista.unmount();
+  });
   it("busca nombres sin exigir acentos y permite recuperar el listado", async () => {
     const vista = mount(TablaDatos, {
       global,

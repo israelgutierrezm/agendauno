@@ -33,6 +33,26 @@ const montarFijo = (modo: Modo) =>
   });
 
 describe("precios públicos (ADR 0107)", () => {
+  it("en la landing de clases muestra el precio antes de repetir beneficios", () => {
+    const vista = montarFijo("clases");
+    expect(vista.find(".precios-intro").exists()).toBe(false);
+    expect(vista.findAll(".precio-contexto")).toHaveLength(0);
+    expect(vista.findAll(".precios-incluye")).toHaveLength(1);
+    expect(vista.findAll(".precios-incluye li")).toHaveLength(4);
+    expect(vista.findAll("article ul")).toHaveLength(0);
+    vista.unmount();
+  });
+  it("en citas ofrece las funciones adicionales sin alargar todas las tarjetas", () => {
+    const vista = montarFijo("citas");
+    expect(vista.find(".precios-intro h3").exists()).toBe(false);
+    for (const tarjeta of vista.findAll("article")) {
+      expect(tarjeta.findAll(":scope > ul > li").length).toBeLessThanOrEqual(4);
+    }
+    expect(vista.findAll(".precio-mas-funciones").length).toBeGreaterThan(0);
+    expect(vista.findAll(".precio-mas-funciones[open]")).toHaveLength(0);
+    expect(vista.find('[data-prueba="anual-adelantado"]').exists()).toBe(false);
+    vista.unmount();
+  });
   // Cada prueba empieza con el respaldo (lo publicado al escribir precios.ts).
   afterEach(() => aplicarPreciosPublicos(PRECIOS_POR_OMISION));
 
@@ -112,10 +132,8 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.text()).not.toMatch(/\bapp\b|dirección propia/i);
     expect(tarjetas[2]!.text()).toContain("Mensajes masivos por correo");
     expect(vista.text()).not.toMatch(/WhatsApp/);
-    // El anual se paga por adelantado (junto al selector y en la aclaración).
-    expect(vista.get('[data-prueba="anual-adelantado"]').text()).toBe(
-      "El plan anual se paga completo por adelantado: 10 meses por 12 de servicio.",
-    );
+    // La nota del pago completo aparece al elegir el periodo anual.
+    expect(vista.find('[data-prueba="anual-adelantado"]').exists()).toBe(false);
     expect(vista.get(".precios-aclaracion").text()).toContain(
       "el anual cuesta 10 meses y se paga por adelantado",
     );
@@ -128,6 +146,9 @@ describe("precios públicos (ADR 0107)", () => {
       .findAll(".precios-periodo button")
       .find((b) => b.text().startsWith("Anual"))!;
     await anual.trigger("click");
+    expect(vista.get('[data-prueba="anual-adelantado"]').text()).toBe(
+      "El plan anual se paga completo por adelantado: 10 meses por 12 de servicio.",
+    );
     expect(
       vista.findAll(".precio-importe strong").map((n) => n.text()),
     ).toEqual(["$90", "$240", "$330"]);
@@ -266,10 +287,10 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.get(".precio-cta").text()).toContain("Probar 21 días gratis");
     vista.unmount();
   });
-  it("el botón de cotizar va en azul, como las tarjetas (el rosa es del menú y el cierre)", () => {
+  it("cotizar es una acción secundaria frente a probar gratis", () => {
     const vista = montar();
     expect(vista.get(".precios-contacto a[href^='mailto:']").classes()).toEqual(
-      expect.arrayContaining(["tu-btn-primario", "tu-btn-azul"]),
+      expect.arrayContaining(["tu-btn-fantasma"]),
     );
     vista.unmount();
   });
@@ -316,11 +337,7 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.get(".precios-modelo").text()).toBe(
       "Citas 1 a 1 · Por plan y profesionales",
     );
-    expect(vista.findAll(".precio-contexto").map((n) => n.text())).toEqual([
-      "Citas 1 a 1",
-      "Citas 1 a 1",
-      "Citas 1 a 1",
-    ]);
+    expect(vista.findAll(".precio-contexto")).toHaveLength(0);
     // Individual + de 2 a 20 profesionales.
     expect(vista.findAll("tbody tr")).toHaveLength(20);
     expect(vista.text()).not.toMatch(
@@ -339,14 +356,15 @@ describe("precios públicos (ADR 0107)", () => {
     }
     vista.unmount();
   });
-  it("cada tarjeta lleva el borde de arriba rosa y su botón en azul", () => {
+  it("cada tarjeta mantiene el mismo CTA rosa que la portada", () => {
     for (const vista of [montar(), montarFijo("clases"), montarFijo("citas")]) {
       const botones = vista.findAll(".precio-tarjeta .precio-cta");
       expect(botones).toHaveLength(3);
       for (const boton of botones) {
         expect(boton.classes()).toEqual(
-          expect.arrayContaining(["tu-btn-primario", "tu-btn-azul"]),
+          expect.arrayContaining(["tu-btn-primario"]),
         );
+        expect(boton.classes()).not.toContain("tu-btn-azul");
       }
       vista.unmount();
     }

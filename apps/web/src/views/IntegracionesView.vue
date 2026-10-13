@@ -9,6 +9,7 @@ import EstadoVacio from "@/components/EstadoVacio.vue";
 import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import ReservasBienestar from "@/components/ReservasBienestar.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -160,6 +161,7 @@ const nuevaLlave = ref<{ nombre: string; scopes: string[] }>({
 });
 const creandoLlave = ref(false);
 const secretoLlave = ref<string | null>(null);
+const modalLlave = ref(false);
 
 async function crearLlave(): Promise<void> {
   creandoLlave.value = true;
@@ -169,6 +171,7 @@ async function crearLlave(): Promise<void> {
       nuevaLlave.value,
     );
     secretoLlave.value = data.data.secreto;
+    modalLlave.value = false;
     nuevaLlave.value = { nombre: "", scopes: [] };
     await cargarLlaves();
   } catch (e) {
@@ -211,6 +214,7 @@ const nuevoWebhook = ref<{ url: string; eventos: string[] }>({
 });
 const creandoWebhook = ref(false);
 const secretoWebhook = ref<string | null>(null);
+const modalWebhook = ref(false);
 const entregasDe = ref<string | null>(null);
 const entregas = ref<Entrega[]>([]);
 
@@ -237,6 +241,7 @@ async function crearWebhook(): Promise<void> {
       },
     );
     secretoWebhook.value = data.data.secreto;
+    modalWebhook.value = false;
     nuevoWebhook.value = { url: "", eventos: [] };
     await cargarWebhooks();
   } catch (e) {
@@ -308,7 +313,35 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-5xl px-4 py-10">
-    <EncabezadoSeccion :titulo="$t('conexiones.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t('conexiones.titulo')"
+      icono="integraciones"
+      :subtitulo="$t('adminUsabilidad.integraciones.ayuda')"
+    >
+      <template
+        v-if="!cargando && (pestana === 'llaves' || pestana === 'webhooks')"
+        #acciones
+      >
+        <button
+          v-if="pestana === 'llaves'"
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          type="button"
+          data-prueba="nueva-llave"
+          @click="modalLlave = true"
+        >
+          {{ $t("conexiones.llave.nueva") }}
+        </button>
+        <button
+          v-else
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          type="button"
+          data-prueba="nuevo-webhook"
+          @click="modalWebhook = true"
+        >
+          {{ $t("conexiones.webhook.nuevo") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <div class="tu-pestanas mt-6" role="group">
       <button
@@ -433,10 +466,7 @@ onMounted(cargar);
     </div>
 
     <!-- Llaves de API -->
-    <div
-      v-if="!cargando && pestana === 'llaves'"
-      class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
-    >
+    <div v-if="!cargando && pestana === 'llaves'" class="mt-5 space-y-5">
       <div class="tu-card p-5 min-w-0">
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("conexiones.llave.ayuda") }}
@@ -519,52 +549,69 @@ onMounted(cargar);
         </ul>
       </div>
 
-      <form class="tu-card p-5 h-max space-y-3" @submit.prevent="crearLlave">
-        <h2 class="font-semibold">{{ $t("conexiones.llave.nueva") }}</h2>
-        <div>
-          <label class="tu-label" for="ll-nombre">{{
-            $t("conexiones.llave.nombre")
-          }}</label>
-          <input
-            id="ll-nombre"
-            v-model="nuevaLlave.nombre"
-            class="tu-input"
-            :placeholder="$t('conexiones.llave.nombrePh')"
-            required
-          />
-        </div>
-        <fieldset>
-          <legend class="tu-label">
-            {{ $t("conexiones.llave.permisos") }}
-          </legend>
-          <label
-            v-for="s in scopesDisponibles"
-            :key="s"
-            class="flex items-center gap-2 py-0.5 text-sm"
-          >
-            <input v-model="nuevaLlave.scopes" type="checkbox" :value="s" />
-            {{ $t(`conexiones.llave.scopes.${s}`) }}
-          </label>
-        </fieldset>
-        <button
-          type="submit"
-          class="tu-btn tu-btn-primario w-full text-sm"
-          :disabled="
-            creandoLlave ||
-            nuevaLlave.nombre.trim() === '' ||
-            nuevaLlave.scopes.length === 0
-          "
+      <ModalDialogo
+        :abierto="modalLlave"
+        :titulo="$t('conexiones.llave.nueva')"
+        icono="integraciones"
+        tam="md"
+        :descripcion="$t('adminUsabilidad.integraciones.llave')"
+        :ocupado="creandoLlave"
+        @cerrar="modalLlave = false"
+      >
+        <form
+          id="integracion-llave"
+          class="space-y-4"
+          @submit.prevent="crearLlave"
         >
-          {{ $t("conexiones.llave.crear") }}
-        </button>
-      </form>
+          <div>
+            <label class="tu-label" for="ll-nombre">{{
+              $t("conexiones.llave.nombre")
+            }}</label>
+            <input
+              id="ll-nombre"
+              v-model="nuevaLlave.nombre"
+              class="tu-input"
+              :placeholder="$t('conexiones.llave.nombrePh')"
+              required
+            />
+          </div>
+          <fieldset>
+            <legend class="tu-label">
+              {{ $t("conexiones.llave.permisos") }}
+            </legend>
+            <label v-for="s in scopesDisponibles" :key="s" class="int-opcion">
+              <input v-model="nuevaLlave.scopes" type="checkbox" :value="s" />
+              {{ $t(`conexiones.llave.scopes.${s}`) }}
+            </label>
+          </fieldset>
+        </form>
+        <template #pie>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="creandoLlave"
+            @click="modalLlave = false"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            type="submit"
+            form="integracion-llave"
+            class="tu-btn tu-btn-primario text-sm"
+            :disabled="
+              creandoLlave ||
+              nuevaLlave.nombre.trim() === '' ||
+              nuevaLlave.scopes.length === 0
+            "
+          >
+            {{ $t("conexiones.llave.crear") }}
+          </button>
+        </template>
+      </ModalDialogo>
     </div>
 
     <!-- Webhooks -->
-    <div
-      v-if="!cargando && pestana === 'webhooks'"
-      class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
-    >
+    <div v-if="!cargando && pestana === 'webhooks'" class="mt-5 space-y-5">
       <div class="tu-card p-5 min-w-0">
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("conexiones.webhook.ayuda") }}
@@ -699,45 +746,72 @@ onMounted(cargar);
         </ul>
       </div>
 
-      <form class="tu-card p-5 h-max space-y-3" @submit.prevent="crearWebhook">
-        <h2 class="font-semibold">{{ $t("conexiones.webhook.nuevo") }}</h2>
-        <div>
-          <label class="tu-label" for="wh-url">{{
-            $t("conexiones.webhook.url")
-          }}</label>
-          <input
-            id="wh-url"
-            v-model="nuevoWebhook.url"
-            class="tu-input"
-            type="url"
-            :placeholder="$t('conexiones.webhook.urlPh')"
-            required
-          />
-        </div>
-        <fieldset>
-          <legend class="tu-label">
-            {{ $t("conexiones.webhook.eventos") }}
-          </legend>
-          <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("conexiones.webhook.todosAyuda") }}
-          </p>
-          <label
-            v-for="ev in eventosDisponibles"
-            :key="ev"
-            class="flex items-center gap-2 py-0.5 text-sm"
-          >
-            <input v-model="nuevoWebhook.eventos" type="checkbox" :value="ev" />
-            {{ $t(`conexiones.webhook.tipos.${ev}`) }}
-          </label>
-        </fieldset>
-        <button
-          type="submit"
-          class="tu-btn tu-btn-primario w-full text-sm"
-          :disabled="creandoWebhook || nuevoWebhook.url.trim() === ''"
+      <ModalDialogo
+        :abierto="modalWebhook"
+        :titulo="$t('conexiones.webhook.nuevo')"
+        icono="integraciones"
+        :descripcion="$t('adminUsabilidad.integraciones.webhook')"
+        :ocupado="creandoWebhook"
+        @cerrar="modalWebhook = false"
+      >
+        <form
+          id="integracion-webhook"
+          class="space-y-4"
+          @submit.prevent="crearWebhook"
         >
-          {{ $t("conexiones.webhook.crear") }}
-        </button>
-      </form>
+          <div>
+            <label class="tu-label" for="wh-url">{{
+              $t("conexiones.webhook.url")
+            }}</label>
+            <input
+              id="wh-url"
+              v-model="nuevoWebhook.url"
+              class="tu-input"
+              type="url"
+              :placeholder="$t('conexiones.webhook.urlPh')"
+              required
+            />
+          </div>
+          <fieldset>
+            <legend class="tu-label">
+              {{ $t("conexiones.webhook.eventos") }}
+            </legend>
+            <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("conexiones.webhook.todosAyuda") }}
+            </p>
+            <label
+              v-for="ev in eventosDisponibles"
+              :key="ev"
+              class="int-opcion"
+            >
+              <input
+                v-model="nuevoWebhook.eventos"
+                type="checkbox"
+                :value="ev"
+              />
+              {{ $t(`conexiones.webhook.tipos.${ev}`) }}
+            </label>
+          </fieldset>
+        </form>
+        <template #pie>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="creandoWebhook"
+            @click="modalWebhook = false"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            type="submit"
+            form="integracion-webhook"
+            class="tu-btn tu-btn-primario text-sm"
+            :disabled="creandoWebhook || nuevoWebhook.url.trim() === ''"
+          >
+            {{ $t("conexiones.webhook.crear") }}
+          </button>
+        </template>
+      </ModalDialogo>
     </div>
 
     <!-- GA4 y Meta del negocio (ADR 0143) -->
@@ -746,6 +820,23 @@ onMounted(cargar);
 </template>
 
 <style scoped>
+.int-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.8rem;
+  margin-top: 0.45rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.6rem;
+  background: var(--superficie-2);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.int-opcion:has(input:checked) {
+  border-color: var(--primario);
+  background: var(--primario-suave);
+}
 .int-fila {
   display: flex;
   flex-wrap: wrap;

@@ -5,6 +5,7 @@ import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
 import {
   FRASES_SOLO_CON_REGISTRO,
   FRASES_SOLO_EN_PRELANZAMIENTO,
+  PRODUCTO_COMERCIAL,
   frasesEncontradas,
   render,
   rutasMarketing,
@@ -33,6 +34,10 @@ describe("prerender de marketing", () => {
     expect(rutasMarketing.length).toBeGreaterThan(1);
     for (const path of rutasMarketing) {
       const pagina = documento((await render(path)).html);
+      expect(
+        pagina.querySelector(".tu-marketing")?.getAttribute("data-producto"),
+        path,
+      ).toBe(PRODUCTO_COMERCIAL);
       expect(pagina.querySelectorAll("h1"), path).toHaveLength(1);
       // Comercial por su ruta (meta.marketing): menú y «Probar gratis», sin «Inicio».
       expect(pagina.querySelector(".tu-public-register"), path).not.toBeNull();

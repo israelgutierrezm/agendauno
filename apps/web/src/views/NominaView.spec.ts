@@ -39,7 +39,7 @@ function montar() {
   return mount(NominaView, {
     global: {
       plugins: [i18n],
-      stubs: { TarjetasIndicadores: true, EstadoVacio: true },
+      stubs: { TarjetasIndicadores: true, EstadoVacio: true, Teleport: true },
     },
   });
 }
@@ -59,6 +59,23 @@ beforeEach(() => {
 });
 
 describe("nómina", () => {
+  it("muestra el nombre del rol personalizado y no su clave técnica", async () => {
+    mocks.get.mockImplementation(async (url: string) =>
+      url.endsWith("/usuarios")
+        ? {
+            data: {
+              data: [{ id: "c1", nombre: "Daniel", rol: "rol_caja" }],
+              roles_detalle: [{ clave: "rol_caja", nombre: "Caja" }],
+            },
+          }
+        : { data: { data: [] } },
+    );
+    const w = montar();
+    await flushPromises();
+    expect(w.get("table").text()).toContain("Caja");
+    expect(w.get("table").text()).not.toContain("rol_caja");
+    w.unmount();
+  });
   it("al abrir calcula el mes y lista al equipo, sin clientes", async () => {
     const w = montar();
     await flushPromises();
@@ -68,6 +85,7 @@ describe("nómina", () => {
       expect.objectContaining({ params: expect.any(Object) }),
     );
     const texto = w.get("table").text();
+    expect(w.find("#es").exists()).toBe(false);
     expect(texto).toContain("Juan Pérez");
     expect(texto).toContain("28 horas");
     expect(texto).toContain("$700.00");
@@ -83,6 +101,9 @@ describe("nómina", () => {
       .findAll("button")
       .find((b) => b.text() === "Editar esquema");
     await editar!.trigger("click");
+    expect(w.get('[role="dialog"]').attributes("aria-label")).toBe(
+      "Esquema de pago de Juan Pérez",
+    );
 
     expect((w.get("#es").element as HTMLSelectElement).value).toBe("u1");
     expect((w.get("#em").element as HTMLInputElement).value).toBe("25");
@@ -91,7 +112,7 @@ describe("nómina", () => {
     ).toBe(true);
 
     await w.get("#em").setValue("30");
-    await w.get("form").trigger("submit");
+    await w.get('[data-prueba="editor-esquema"]').trigger("submit");
     await flushPromises();
     expect(mocks.put).toHaveBeenCalledWith(
       "/api/v1/app/demo/staff/u1/esquema-pago",

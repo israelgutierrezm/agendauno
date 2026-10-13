@@ -322,7 +322,7 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
 ];
 
 /** Menú del panel del negocio: tres grupos y sus áreas. */
-export const MENU_NEGOCIO: GrupoMenu[] = [
+const MENU_NEGOCIO_BASE: GrupoMenu[] = [
   {
     clave: "operacion",
     etiqueta: "nav.grupos.operacionDiaria",
@@ -491,6 +491,30 @@ export const MENU_NEGOCIO: GrupoMenu[] = [
     ],
   },
 ];
+
+// El trabajo inmediato queda primero. Captación y Equipo son gestión del negocio,
+// no pasos obligatorios para recibir, reservar o cobrar. Conservamos áreas, rutas
+// y pestañas: cambiar el grupo no cambia permisos ni destinos guardados.
+export const MENU_NEGOCIO: GrupoMenu[] = MENU_NEGOCIO_BASE.map((grupo) => {
+  if (grupo.clave === "operacion") {
+    return {
+      ...grupo,
+      areas: grupo.areas.filter(
+        (area) => !["captacion", "equipo"].includes(area.clave),
+      ),
+    };
+  }
+  if (grupo.clave === "gestion") {
+    const movidas = MENU_NEGOCIO_BASE.find(
+      (g) => g.clave === "operacion",
+    )!.areas.filter((area) => ["captacion", "equipo"].includes(area.clave));
+    return {
+      ...grupo,
+      areas: [...grupo.areas.slice(0, 1), ...movidas, ...grupo.areas.slice(1)],
+    };
+  }
+  return grupo;
+});
 
 /** Portal del alumno o cliente y de quien imparte: su propio contexto. */
 export const MENU_PORTALES: GrupoMenu[] = [

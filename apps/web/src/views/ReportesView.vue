@@ -14,6 +14,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio, inicioDeMesEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { plural } from "@/lib/terminologia";
 
 const { t } = useI18n();
 
@@ -362,7 +363,15 @@ const tarjetas = computed<Indicador[]>(() => {
   ];
   return lista.map((k) => ({
     ...k,
-    etiqueta: t(`reportes.metricas.${k.clave}`),
+    etiqueta:
+      k.clave === "arpu"
+        ? t("adminUsabilidad.ingresoPromedio", {
+            persona: (
+              sesion.terminologia?.miembro ??
+              (sesion.esCitas ? "Cliente" : "Alumno")
+            ).toLowerCase(),
+          })
+        : t(`reportes.metricas.${k.clave}`),
   }));
 });
 
@@ -607,7 +616,7 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('reportes.titulo')" />
+    <EncabezadoSeccion :titulo="$t('reportes.titulo')" icono="reportes" />
 
     <div class="tu-pestanas mt-6" role="group">
       <button
@@ -617,7 +626,14 @@ onMounted(cargar);
         :aria-pressed="pestana === p"
         @click="pestana = p"
       >
-        {{ $t(`operacion.reportes.pestanas.${p}`) }}
+        {{
+          p === "clientes"
+            ? plural(
+                sesion.terminologia?.miembro ??
+                  (sesion.esCitas ? "Cliente" : "Alumno"),
+              )
+            : $t(`operacion.reportes.pestanas.${p}`)
+        }}
       </button>
     </div>
 

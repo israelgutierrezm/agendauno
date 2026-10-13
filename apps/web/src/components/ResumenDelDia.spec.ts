@@ -68,6 +68,46 @@ function montar() {
 }
 
 describe("el día de hoy en el Inicio", () => {
+  it("pagina la agenda del inicio sin omitir sesiones y vuelve al inicio al buscar", async () => {
+    api.get.mockImplementation(async (url: string) => ({
+      data: {
+        data: url.endsWith("/clima")
+          ? null
+          : {
+              fecha: "2026-10-01",
+              agenda: {
+                totales: {
+                  sesiones: 8,
+                  esperados: 16,
+                  llegaron: 0,
+                  sin_marcar: 0,
+                  capacidad: 80,
+                },
+                sesiones: Array.from({ length: 8 }, (_, i) =>
+                  sesion({ id: `s${i}`, oferta: `Clase ${i + 1}` }),
+                ),
+              },
+              cobros: null,
+              renovaciones: null,
+            },
+      },
+    }));
+    const w = montar();
+    await flushPromises();
+    expect(w.findAll(".hoy-agenda-lista>li")).toHaveLength(6);
+    expect(w.get('[role="img"]').attributes("aria-label")).toBe(
+      "Ocupación de tus clases: 20%",
+    );
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "2")!
+      .trigger("click");
+    expect(w.findAll(".hoy-agenda-lista>li")).toHaveLength(2);
+    expect(w.get(".hoy-agenda-lista").text()).toContain("Clase 8");
+    await w.get('input[type="search"]').setValue("Clase 1");
+    expect(w.findAll(".hoy-agenda-lista>li")).toHaveLength(1);
+    expect(w.get(".hoy-agenda-lista").text()).toContain("Clase 1");
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     api.permisos = null;

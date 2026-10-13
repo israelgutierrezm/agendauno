@@ -1,0 +1,43 @@
+/* Acabado del lienzo privado. No altera el marco ni el tema elegido por el usuario. */
+.tu-marco .tu-tarjeta-panel {
+  --radio-tarjeta: 1.05rem;
+  --sombra-tarjeta: 0 3px 14px color-mix(in srgb, var(--texto) 4%, transparent);
+}
+.tu-tarjeta-panel .tu-card {
+  border-color: color-mix(in srgb, var(--borde) 78%, var(--superficie));
+  box-shadow: var(--sombra-tarjeta);
+}
+/* Los acentos generales siguen el tema elegido; éxito y atención siguen siendo
+   semánticos. Los demás tonos identifican categorías, no reemplazan el tema. */
+.tu-tarjeta-panel :is(.ti-celda, .to-tarjeta).tu-tono-azul {
+  --tono: var(--primario);
+}
+.tu-tarjeta-panel :is(.ti-celda, .to-tarjeta).tu-tono-verde {
+  --tono: var(--exito);
+}
+.tu-tarjeta-panel :is(.ti-celda, .to-tarjeta).tu-tono-naranja {
+  --tono: var(--aviso);
+}
+.tu-tarjeta-panel .tu-input:focus-visible {
+  outline-offset: 2px;
+}
+.tu-tarjeta-panel .tu-tabla thead th {
+  background: color-mix(in srgb, var(--primario) 3%, var(--superficie));
+  padding-block: 0.85rem;
+}
+.tu-tarjeta-panel .tu-tabla tbody td {
+  padding-block: 0.9rem;
+}
+.tu-tarjeta-panel .tu-tabla tbody tr:focus-within {
+  background: color-mix(in srgb, var(--primario) 5%, var(--superficie));
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-tarjeta-panel .tu-card {
+    transition: none;
+  }
+}
+@media print {
+  .tu-marco .tu-tarjeta-panel {
+    --sombra-tarjeta: none;
+  }
+}

@@ -77,7 +77,7 @@ const foto = computed(() => imagenAcceso(props.imagen));
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 15rem;
+  min-height: 13.5rem;
   overflow: hidden;
   padding: 1.35rem;
   color: inherit;
@@ -86,8 +86,8 @@ const foto = computed(() => imagenAcceso(props.imagen));
   cursor: pointer;
   background: linear-gradient(
     120deg,
-    var(--superficie) 40%,
-    color-mix(in srgb, var(--tono) 14%, var(--superficie)) 100%
+    color-mix(in srgb, var(--tono) 9%, var(--superficie)) 0%,
+    color-mix(in srgb, var(--tono) 18%, var(--superficie)) 100%
   );
   transition:
     border-color 0.15s ease,
@@ -113,11 +113,12 @@ const foto = computed(() => imagenAcceso(props.imagen));
 }
 .to-dibujo {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 58%;
-  max-width: 15rem;
-  height: 92%;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  width: 36%;
+  max-width: 13rem;
+  height: 76%;
+  pointer-events: none;
 }
 .to-foto {
   object-fit: contain;
@@ -129,8 +130,8 @@ const foto = computed(() => imagenAcceso(props.imagen));
   flex-direction: column;
   align-items: flex-start;
   height: 100%;
-  min-height: 12.3rem;
-  max-width: 58%;
+  min-height: 11rem;
+  max-width: 62%;
 }
 .to-icono {
   width: 3.1rem;
@@ -140,7 +141,7 @@ const foto = computed(() => imagenAcceso(props.imagen));
 .to-titulo {
   margin-top: 1rem;
   font-size: 1.2rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 .to-texto {
@@ -156,9 +157,18 @@ const foto = computed(() => imagenAcceso(props.imagen));
   justify-content: center;
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: 999px;
-  background: var(--tono);
-  color: #fff;
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--tono) 35%, transparent);
+  border-radius: 0.8rem;
+  background: var(--superficie);
+  color: var(--texto);
+  border: 1px solid color-mix(in srgb, var(--tono) 15%, var(--borde));
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--texto) 6%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .to-tarjeta {
+    transition: none;
+  }
+  .to-tarjeta:hover {
+    transform: none;
+  }
 }
 </style>

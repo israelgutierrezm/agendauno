@@ -6,9 +6,9 @@ import IconoNav from "@/components/IconoNav.vue";
 
 /**
  * Indicadores (Agenda, Recepción, listados): una franja con la etiqueta, un ícono
- * pequeño y neutro, y el valor. Sin color de adorno: solo lo que pide atención
- * (`aviso`) va en el color de aviso y la tendencia, en verde o rojo. `tono` y
- * `decoracion` se conservan por compatibilidad, pero ya no pintan nada.
+ * pequeño y el valor. Las tarjetas amplias usan un acento suave; la variante
+ * compacta conserva su franja para no restar espacio a la agenda.
+ * El aviso y la tendencia mantienen sus colores semánticos.
  */
 export type Tono = "azul" | "verde" | "naranja" | "morado" | "rosa" | "cielo";
 
@@ -75,6 +75,11 @@ const columnasMedio = computed(() =>
         v-for="k in tarjetas"
         :key="k.clave"
         class="ti-celda"
+        :class="
+          !compacta
+            ? `tu-tono-${k.aviso ? 'naranja' : (k.tono ?? 'azul')}`
+            : undefined
+        "
         :data-prueba="`indicador-${k.clave}`"
       >
         <dt class="ti-etiqueta">
@@ -266,5 +271,50 @@ const columnasMedio = computed(() =>
 .ti-celda:has(.ti-enlace:focus-visible) {
   outline: 2px solid var(--primario);
   outline-offset: -2px;
+}
+</style>
+
+<style scoped>
+.ti:not(.ti-compacta) {
+  gap: 0.85rem;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+.ti:not(.ti-compacta) .ti-celda {
+  padding: 1.15rem;
+  border: 1px solid
+    color-mix(in srgb, var(--tono, var(--primario)) 16%, var(--borde));
+  border-radius: var(--radio-tarjeta, 1rem);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tono, var(--primario)) 7%, var(--superficie)),
+    var(--superficie) 85%
+  );
+  box-shadow: var(--sombra-tarjeta);
+}
+.ti:not(.ti-compacta) .ti-icono {
+  box-sizing: content-box;
+  padding: 0.45rem;
+  border-radius: 0.65rem;
+  background: color-mix(
+    in srgb,
+    var(--tono, var(--primario)) 12%,
+    var(--superficie)
+  );
+  color: var(--texto);
+  opacity: 1;
+}
+.ti:not(.ti-compacta) .ti-valor {
+  margin-top: 0.8rem;
+  font-size: clamp(1.45rem, 2.3vw, 2rem);
+  font-weight: 500;
+}
+.ti:not(.ti-compacta) .ti-celda:has(.ti-enlace):hover {
+  border-color: var(--primario);
+}
+.ti-celda:has(.ti-enlace:focus-visible) {
+  outline-offset: 2px;
 }
 </style>

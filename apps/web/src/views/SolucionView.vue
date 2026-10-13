@@ -75,9 +75,9 @@ function medir(placement: string): void {
         </p>
         <h1>{{ solucion.encabezado }}</h1>
         <p class="solucion-resumen">{{ solucion.resumen }}</p>
-        <!-- El botón del hero va en azul; el rosa queda para el menú y el cierre. -->
+        <!-- El registro conserva la misma acción principal que la portada. -->
         <RouterLink
-          class="tu-btn tu-btn-primario tu-btn-azul px-7 py-3"
+          class="tu-btn tu-btn-primario px-7 py-3"
           :to="registro"
           data-cta="hero"
           @click="medir('solution_hero')"

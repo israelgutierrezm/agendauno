@@ -308,7 +308,24 @@ onMounted(cargar);
                 <td class="hidden sm:table-cell">{{ clases(p) }}</td>
                 <td class="hidden md:table-cell pv-suave">{{ vigencia(p) }}</td>
                 <td class="hidden lg:table-cell pv-suave pv-corta">
-                  {{ aplicaA(p) }}
+                  <details
+                    v-if="p.tipo !== 'add_on' && p.ofertas.length > 2"
+                    class="pv-incluidas"
+                  >
+                    <summary>
+                      {{
+                        $t("adminUsabilidad.clasesIncluidas", {
+                          n: p.ofertas.length,
+                        })
+                      }}
+                    </summary>
+                    <ul>
+                      <li v-for="oferta in p.ofertas" :key="oferta.id">
+                        {{ oferta.nombre }}
+                      </li>
+                    </ul>
+                  </details>
+                  <template v-else>{{ aplicaA(p) }}</template>
                 </td>
                 <td class="text-right font-medium tabular-nums">
                   {{ dinero(p.precio_minor, p.moneda) }}
@@ -384,6 +401,21 @@ onMounted(cargar);
 </template>
 
 <style scoped>
+.pv-incluidas summary {
+  cursor: pointer;
+  color: var(--primario-fuerte);
+  padding-block: 0.6rem;
+}
+.pv-incluidas ul {
+  margin-top: 0.25rem;
+  padding-left: 1rem;
+  list-style: disc;
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .pv-filtros {
   display: flex;
   flex-wrap: wrap;

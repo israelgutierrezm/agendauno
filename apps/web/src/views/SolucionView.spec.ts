@@ -274,10 +274,13 @@ describe("páginas por giro", () => {
     crossfit.unmount();
   });
 
-  it("el botón del hero va en azul y el del cierre se queda rosa", async () => {
+  it("el botón del hero y el del cierre mantienen el mismo color de marca", async () => {
     const vista = await montar("pilates");
     expect(vista.get('[data-cta="hero"]').classes()).toEqual(
-      expect.arrayContaining(["tu-btn-primario", "tu-btn-azul"]),
+      expect.arrayContaining(["tu-btn-primario"]),
+    );
+    expect(vista.get('[data-cta="hero"]').classes()).not.toContain(
+      "tu-btn-azul",
     );
     const cierre = vista.get(".solucion-cierre .tu-btn-primario");
     expect(cierre.classes()).not.toContain("tu-btn-azul");

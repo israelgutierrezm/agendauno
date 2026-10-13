@@ -5,6 +5,7 @@ import { createI18n } from "vue-i18n";
 import { createMemoryHistory, createRouter } from "vue-router";
 import es from "@/i18n/locales/es-MX";
 import { trackEvent } from "@/lib/analytics";
+import { fijarProductoDeSesion } from "@/lib/producto";
 import { PRECIOS_POR_OMISION } from "@/marketing/precios";
 import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
 import { rutasComerciales } from "@/router/comerciales";
@@ -15,6 +16,10 @@ import LogoAgendaUno from "./LogoAgendaUno.vue";
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 beforeEach(() => {
   setActivePinia(createPinia());
+  fijarProductoDeSesion(null);
+  // El watcher inicial de la sesión resuelve la marca. Prepararlo antes de
+  // simular el producto evita que borre la marca entre montajes de la prueba.
+  useSesionTenantStore();
   vi.mocked(trackEvent).mockClear();
 });
 
@@ -36,6 +41,7 @@ function routerPublico() {
         "recuperar-contrasena",
         "confirmar-correo",
         "aviso-privacidad",
+        "terminos",
         "panel",
       ].map((name) => ({
         path: name === "aviso-privacidad" ? "/aviso-de-privacidad" : `/${name}`,
@@ -66,6 +72,22 @@ function enlaces(vista: Awaited<ReturnType<typeof montar>>, selector: string) {
 }
 
 describe("encabezado público", () => {
+  it.each(["agendauno", "turnouno"] as const)(
+    "%s: identifica la marca para aplicar su paleta en landing y acceso",
+    async (producto) => {
+      fijarProductoDeSesion(producto);
+      try {
+        for (const ruta of ["/", "/registro", "/entrar"]) {
+          const vista = await montar({}, ruta);
+          expect(vista.attributes("data-producto")).toBe(producto);
+          expect(vista.classes()).toContain("tu-marketing");
+          vista.unmount();
+        }
+      } finally {
+        fijarProductoDeSesion(null);
+      }
+    },
+  );
   it("con sesión ofrece volver a su panel, no iniciar sesión", async () => {
     const sesion = useSesionTenantStore();
     sesion.$patch({

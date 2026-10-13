@@ -30,6 +30,38 @@ const deClases = soluciones.filter((s) => s.modo === "clases");
 const deCitas = soluciones.filter((s) => s.modo === "citas");
 
 describe("SEO comercial de AgendaUno", () => {
+  it.each(["agendauno", "turnouno"] as const)(
+    "%s: declara su propio sitio en la portada y conecta las páginas por giro",
+    async (producto) => {
+      vi.stubEnv("VITE_PRODUCTO", producto);
+      vi.resetModules();
+      const seo = await import("./seoConfig");
+      const marca = producto === "agendauno" ? "AgendaUno" : "TurnoUno";
+      const grafo = seo.seoParaRuta("/").jsonLd?.["@graph"] as Record<
+        string,
+        unknown
+      >[];
+      expect(grafo.filter((n) => n["@type"] === "WebSite")).toEqual([
+        {
+          "@type": "WebSite",
+          "@id": `${seo.SITE_URL}/#website`,
+          name: marca,
+          url: `${seo.SITE_URL}/`,
+          inLanguage: "es-MX",
+          publisher: { "@id": `${seo.SITE_URL}/#organization` },
+        },
+      ]);
+      for (const path of seo.rutasMarketing) {
+        const nodos = seo.seoParaRuta(path).jsonLd?.["@graph"] as Record<
+          string,
+          unknown
+        >[];
+        expect(nodos.find((n) => n["@type"] === "WebPage")?.isPartOf).toEqual({
+          "@id": `${seo.SITE_URL}/#website`,
+        });
+      }
+    },
+  );
   it("anuncia la prueba de 30 días sin conservar la oferta anterior", () => {
     expect(seoParaRuta("/").description).toContain("30 días");
     for (const path of rutasMarketing) {

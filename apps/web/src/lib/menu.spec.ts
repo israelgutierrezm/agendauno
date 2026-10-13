@@ -146,8 +146,8 @@ describe("menú del negocio", () => {
       "configuracion",
     ]);
     expect(MENU_NEGOCIO.map((g) => g.areas.map((a) => a.clave))).toEqual([
-      ["inicio", "agenda", "clientes", "captacion", "cobros", "equipo"],
-      ["ventas", "marketing", "reportes"],
+      ["inicio", "agenda", "clientes", "cobros"],
+      ["ventas", "captacion", "equipo", "marketing", "reportes"],
       ["configuracion", "suscripcion"],
     ]);
   });
@@ -164,10 +164,10 @@ describe("menú del negocio", () => {
       "inicio",
       "agenda",
       "clientes",
-      "captacion",
       "cobros",
-      "equipo",
       "ventas",
+      "captacion",
+      "equipo",
       "marketing",
       "reportes",
       "configuracion",

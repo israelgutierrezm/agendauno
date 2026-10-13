@@ -537,6 +537,9 @@ function bloquesDe(iso: string): Bloque[] {
 function colorTipo(s: Sesion): string {
   return tonoServicio(s.oferta_id, catalogo.value, s.oferta).tinta;
 }
+function pastelTipo(s: Sesion): string {
+  return tonoServicio(s.oferta_id, catalogo.value, s.oferta).fondo;
+}
 function pctOcupacion(s: Sesion): number | null {
   // Una cita no tiene cupo que llenar (su «1/1» no dice nada).
   if (s.tipo === "cita") {
@@ -2272,10 +2275,7 @@ onMounted(async () => {
                   height: b.alto + 'px',
                   left: `calc(${b.izq}% + 2px)`,
                   width: `calc(${b.ancho}% - 4px)`,
-                  background:
-                    estadoAgenda(b.sesion) === 'cancelada'
-                      ? 'var(--superficie-2)'
-                      : `color-mix(in srgb, ${colorTipo(b.sesion)} 11%, var(--superficie))`,
+                  '--pastel-evento': pastelTipo(b.sesion),
                   borderLeft: `3px solid ${estadoAgenda(b.sesion) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(b.sesion)}`,
                 }"
                 @click="abrirDesdeAgenda(b.sesion)"
@@ -2372,7 +2372,7 @@ onMounted(async () => {
               diaSel === d.iso
                 ? {
                     background: 'var(--primario)',
-                    color: '#fff',
+                    color: 'var(--primario-contraste)',
                     borderColor: 'var(--primario)',
                   }
                 : {
@@ -2390,9 +2390,13 @@ onMounted(async () => {
         <ul class="mt-3 space-y-2">
           <li v-for="s in sesionesDe(diaSelInfo.iso)" :key="s.id">
             <button
-              class="tu-card w-full text-left p-3"
-              :class="{ 'opacity-60': s.estado !== 'programada' }"
+              class="tu-card tu-evento-lista w-full text-left p-3"
+              :class="{
+                'opacity-60': s.estado !== 'programada',
+                'tu-bloque--cancelada': estadoAgenda(s) === 'cancelada',
+              }"
               :style="{
+                '--pastel-evento': pastelTipo(s),
                 borderLeft: `4px solid ${estadoAgenda(s) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(s)}`,
               }"
               @click="abrirDesdeAgenda(s)"
@@ -2754,7 +2758,7 @@ onMounted(async () => {
                         reservarModel.lugar === n
                           ? {
                               background: 'var(--primario)',
-                              color: '#fff',
+                              color: 'var(--primario-contraste)',
                               borderColor: 'var(--primario)',
                             }
                           : { borderColor: 'var(--borde)' }
@@ -3313,6 +3317,9 @@ onMounted(async () => {
     <ModalDialogo
       :abierto="mostrarNueva"
       :titulo="$t('agenda.nueva.titulo')"
+      icono="agenda"
+      :descripcion="$t('adminUsabilidad.agenda.ayuda')"
+      :ocupado="creando"
       @cerrar="mostrarNueva = false"
     >
       <p
@@ -3355,7 +3362,7 @@ onMounted(async () => {
 
         <div>
           <label class="tu-label" for="ao">{{
-            $t("agenda.nueva.oferta")
+            $t("adminUsabilidad.agenda.clase")
           }}</label>
           <select id="ao" v-model="form.ofertaId" class="tu-input" required>
             <option value="" disabled>
@@ -3731,7 +3738,7 @@ onMounted(async () => {
   cursor: pointer;
   text-align: left;
   border-left: 3px solid var(--primario);
-  background: var(--primario-suave);
+  background: color-mix(in srgb, var(--pastel-evento) 75%, var(--superficie));
   color: var(--texto);
   transition:
     filter 0.1s ease,
@@ -3743,11 +3750,21 @@ onMounted(async () => {
 .tu-bloque:active {
   transform: scale(0.99);
 }
+.tu-evento-lista {
+  background: color-mix(in srgb, var(--pastel-evento) 75%, var(--superficie));
+}
+.dark .tu-bloque,
+.dark .tu-evento-lista {
+  background: color-mix(in srgb, var(--pastel-evento) 18%, var(--superficie));
+}
 .tu-bloque--cancelada {
   background: var(--superficie-2);
   border-color: var(--texto-suave);
   color: var(--texto-suave);
   text-decoration: line-through;
+}
+.dark .tu-bloque--cancelada {
+  background: var(--superficie-2);
 }
 .tu-ocupa {
   height: 5px;

@@ -92,6 +92,20 @@ describe("agenda / estado de la cita", () => {
 });
 
 describe("agenda / colores y cupo", () => {
+  it("usa fondos pastel distintos sin depender del estado de la cita", () => {
+    expect(new Set(PALETA_SERVICIO.map((t) => t.fondo)).size).toBe(8);
+    for (const tono of PALETA_SERVICIO) {
+      expect(tono.fondo).toMatch(/^#[0-9A-F]{6}$/);
+      expect(tono.tinta).toMatch(/^#[0-9A-F]{6}$/);
+      // Fondos claros para mezclarse con la superficie; no son colores de texto.
+      const canales = [1, 3, 5].map((i) =>
+        parseInt(tono.fondo.slice(i, i + 2), 16),
+      );
+      expect(Math.min(...canales)).toBeGreaterThanOrEqual(210);
+      expect(tono.fondo).not.toBe(tono.tinta);
+    }
+  });
+
   it("el tono del servicio es estable por su lugar en el catálogo", () => {
     const catalogo = ["a", "b", "c"];
     expect(tonoServicio("b", catalogo)).toEqual(PALETA_SERVICIO[1]);
