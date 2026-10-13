@@ -835,6 +835,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/miembros/{persona}/resumen', ResumenMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
             // Ficha 360° del alumno (P0 Etapa 1): derechos, historial de reservas y de compras.
             Route::get('/miembros/{persona}/ficha', FichaMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.ficha');
+            Route::get('/miembros/{persona}/historial/reservas', [FichaMiembroTenantController::class, 'historialReservas'])->middleware('puede:miembros.ver')->name('miembros.historial.reservas');
+            Route::get('/miembros/{persona}/historial/ordenes', [FichaMiembroTenantController::class, 'historialOrdenes'])->middleware('puede:miembros.ver')->name('miembros.historial.ordenes');
             // Expediente de una persona (miembro o instructor): documentos, consentimientos
             // y formularios. El de personal exige además usuarios.gestionar (en el controlador).
             Route::get('/personas/{persona}/expediente', [ExpedienteTenantController::class, 'show'])->middleware('puede:miembros.ver')->name('personas.expediente');

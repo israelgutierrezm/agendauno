@@ -214,19 +214,56 @@ class UsuariosTenantController
     }
 
     /**
-     * Todos los usuarios del estudio con sus roles, para el apartado Usuarios.
+     * Los usuarios del estudio con sus roles, para el apartado Usuarios. Con
+     * `alcance=equipo`, solo el equipo (acotado: completo); con `alcance=clientes`, los
+     * clientes con cuenta en su portal, que crecen con el negocio: por páginas y
+     * buscando por nombre o correo. Sin alcance, todos (compatibilidad).
      */
     public function index(Request $request): JsonResponse
     {
+        $filtros = $request->validate([
+            'alcance' => ['nullable', 'in:equipo,clientes'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
         // `?estado=baja`: los dados de baja, con cuándo y quién.
         $deBaja = (string) $request->query('estado', '') === 'baja';
-        $usuarios = ($deBaja ? Usuario::onlyTrashed() : Usuario::query())->orderBy('name')->get();
+        $base = fn () => $deBaja ? Usuario::onlyTrashed() : Usuario::query();
+        $alcance = $filtros['alcance'] ?? null;
+        $meta = [
+            'conteos' => [
+                'equipo' => $base()->equipo()->count(),
+                'clientes' => $base()->soloClientes()->count(),
+            ],
+        ];
+
+        if ($alcance === 'clientes') {
+            $buscar = trim((string) ($filtros['q'] ?? ''));
+            $pagina = $base()->soloClientes()
+                ->when($buscar !== '', fn ($q) => $q->where(fn ($w) => $w
+                    ->where('name', 'like', "%{$buscar}%")
+                    ->orWhere('email', 'like', "%{$buscar}%")))
+                ->orderBy('name')
+                ->orderBy('id')
+                ->paginate((int) ($filtros['per_page'] ?? 25), ['*'], 'page', (int) ($filtros['page'] ?? 1));
+            $usuarios = $pagina->getCollection();
+            $meta += [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ];
+        } else {
+            $usuarios = ($alcance === 'equipo' ? $base()->equipo() : $base())->orderBy('name')->get();
+        }
         $quienes = $this->nombresDe($usuarios->pluck('eliminado_por')->filter()->all());
 
         $roles = $this->roles->todos();
 
         return response()->json([
             'data' => $usuarios->map(fn (Usuario $u): array => $this->presentar($u, $quienes))->all(),
+            'meta' => $meta,
             'roles' => array_keys($roles),
             // Los propios traen su nombre; los de sistema se nombran en la app.
             'roles_detalle' => array_values(array_map(

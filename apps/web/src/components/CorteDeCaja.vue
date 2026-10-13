@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
@@ -72,12 +73,44 @@ const error = ref<string | null>(null);
 function dinero(minor: number, moneda = sesion.moneda): string {
   return dineroDelPais(minor, moneda, sesion.pais);
 }
+// En la hora del negocio (la misma de los filtros), no la del navegador: así un
+// cobro de las 23:30 no aparece con la fecha de otro día al conciliar.
 function fechaHora(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", {
     dateStyle: "short",
     timeStyle: "short",
+    ...(sesion.zonaHoraria ? { timeZone: sesion.zonaHoraria } : {}),
   }).format(new Date(iso));
 }
+
+// Un rango puede traer miles de movimientos: se buscan por persona, concepto o
+// referencia y se muestran por páginas (los totales y el CSV siguen siendo de todo).
+const POR_PAGINA = 50;
+const buscar = ref("");
+const pagina = ref(1);
+const encontrados = computed(() => {
+  const q = buscar.value.trim().toLowerCase();
+  return q === ""
+    ? movimientos.value
+    : movimientos.value.filter((m) =>
+        [m.persona ?? "", m.concepto ?? "", m.referencia ?? "", m.quien ?? ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      );
+});
+const ultimaPagina = computed(() =>
+  Math.max(1, Math.ceil(encontrados.value.length / POR_PAGINA)),
+);
+const enPagina = computed(() =>
+  encontrados.value.slice(
+    (pagina.value - 1) * POR_PAGINA,
+    pagina.value * POR_PAGINA,
+  ),
+);
+watch([buscar, movimientos], () => {
+  pagina.value = 1;
+});
 
 function parametros(): Record<string, string | undefined> {
   return {
@@ -192,6 +225,16 @@ onMounted(cargar);
             {{ $t("corteCaja.tipos.cancelacion") }}
           </option>
         </select>
+      </label>
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("operacion.listadosTres.buscar") }}</span>
+        <input
+          v-model="buscar"
+          type="search"
+          class="tu-input"
+          :placeholder="$t('operacion.listadosTres.buscarMovimiento')"
+          data-prueba="buscar-corte"
+        />
       </label>
     </div>
 
@@ -339,7 +382,7 @@ onMounted(cargar);
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in movimientos" :key="`${m.tipo}-${m.referencia}`">
+          <tr v-for="m in enPagina" :key="`${m.tipo}-${m.referencia}`">
             <td
               class="whitespace-nowrap"
               :style="{ color: 'var(--texto-suave)' }"
@@ -384,6 +427,14 @@ onMounted(cargar);
           </tr>
         </tbody>
       </table>
+      <PaginacionListado
+        v-if="ultimaPagina > 1"
+        :page="pagina"
+        :ultima-pagina="ultimaPagina"
+        :total="encontrados.length"
+        :per-page="POR_PAGINA"
+        @ir="pagina = $event"
+      />
     </div>
   </div>
 </template>

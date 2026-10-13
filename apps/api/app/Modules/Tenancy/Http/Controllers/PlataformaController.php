@@ -8,6 +8,7 @@ use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
+use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Exceptions\CambioDeModoSinConfirmar;
 use App\Modules\Tenancy\Models\CargoRenta;
@@ -34,9 +35,39 @@ use Illuminate\Validation\ValidationException;
  */
 class PlataformaController
 {
-    public function estudios(): JsonResponse
+    public function estudios(Request $request): JsonResponse
     {
-        $estudios = Estudio::query()->orderBy('slug')->get();
+        // Búsqueda y filtros en el servidor; por páginas solo si se pide una (`page`):
+        // sin ella llega la lista completa, como antes.
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'estado' => ['nullable', Rule::enum(EstadoEstudio::class)],
+            'producto' => ['nullable', Rule::enum(ProductoComercial::class)],
+            'adeudo' => ['nullable', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $buscar = trim((string) ($filtros['q'] ?? ''));
+        $consulta = Estudio::query()
+            ->when($buscar !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('slug', 'like', '%'.$buscar.'%')
+                ->orWhere('nombre', 'like', '%'.$buscar.'%')
+                ->orWhere('ciudad', 'like', '%'.$buscar.'%')))
+            ->when(isset($filtros['estado']), fn ($q) => $q->where('estado', $filtros['estado']))
+            ->when(isset($filtros['producto']), fn ($q) => $q->where(
+                'modalidad',
+                ProductoComercial::from((string) $filtros['producto'])->modalidad()->value,
+            ))
+            ->when((bool) ($filtros['adeudo'] ?? false), fn ($q) => $q->whereIn('id', CargoRenta::query()
+                ->where('estado', EstadoCargoRenta::Pendiente->value)
+                ->where('monto_minor', '>', 0)
+                ->select('estudio_id')))
+            ->orderBy('slug');
+        $pagina = isset($filtros['page'])
+            ? $consulta->paginate((int) ($filtros['per_page'] ?? 50), ['*'], 'page', (int) $filtros['page'])
+            : null;
+        $estudios = $pagina !== null ? $pagina->getCollection() : $consulta->get();
+        $ids = $estudios->modelKeys();
 
         // Uso del último periodo medido y adeudo (cargos pendientes) por estudio,
         // en dos consultas agregadas (sin una por fila).
@@ -46,12 +77,14 @@ class PlataformaController
         $uso = MedicionUso::query()
             ->joinSub($ultimos, 'u', fn ($j) => $j->on('mediciones_uso.estudio_id', '=', 'u.estudio_id')
                 ->on('mediciones_uso.periodo', '=', 'u.periodo'))
+            ->whereIn('mediciones_uso.estudio_id', $ids)
             ->get(['mediciones_uso.estudio_id', 'mediciones_uso.cantidad', 'mediciones_uso.metrica'])
             ->keyBy('estudio_id');
         // Por moneda: un negocio en México debe pesos y uno de fuera, dólares; no se
         // suman entre sí (ADR 0132).
         $adeudos = CargoRenta::query()
             ->where('estado', EstadoCargoRenta::Pendiente->value)
+            ->whereIn('estudio_id', $ids)
             ->selectRaw('estudio_id, moneda, sum(monto_minor) as total')
             ->groupBy('estudio_id', 'moneda')
             ->get()
@@ -67,7 +100,15 @@ class PlataformaController
                     ->map(static fn (CargoRenta $c): array => ['moneda' => (string) $c->moneda, 'minor' => (int) $c->getAttribute('total')])
                     ->values()->all(),
             ])->all(),
-            'total' => $estudios->count(),
+            'total' => $pagina !== null ? $pagina->total() : $estudios->count(),
+            'meta' => [
+                'total' => $pagina !== null ? $pagina->total() : $estudios->count(),
+                'page' => $pagina !== null ? $pagina->currentPage() : 1,
+                'per_page' => $pagina !== null ? $pagina->perPage() : max(1, $estudios->count()),
+                'ultima_pagina' => $pagina !== null ? $pagina->lastPage() : 1,
+                // Todos los negocios de la plataforma, para la pestaña (sin filtros).
+                'total_negocios' => Estudio::query()->count(),
+            ],
         ]);
     }
 

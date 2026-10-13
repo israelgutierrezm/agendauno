@@ -49,9 +49,24 @@ class RetencionTenantController
         $porVencer = count(array_filter($miembros, static fn (array $m): bool => $m['estado'] === 'por_vencer'));
         $vencidas = count($miembros) - $porVencer;
 
+        // En pantalla, por páginas y con búsqueda (el resumen y el CSV, de todos).
+        $filtros = $request->validate([
+            'estado' => ['nullable', 'in:por_vencer,vencida'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $buscar = mb_strtolower(trim((string) ($filtros['q'] ?? '')));
+        $lista = array_values(array_filter($miembros, static fn (array $m): bool => (($filtros['estado'] ?? null) === null || $m['estado'] === $filtros['estado'])
+            && ($buscar === '' || str_contains(mb_strtolower((string) $m['nombre_completo']), $buscar) || str_contains(mb_strtolower((string) ($m['email'] ?? '')), $buscar))));
+        $porPagina = (int) ($filtros['per_page'] ?? 25);
+        $ultima = max(1, (int) ceil(count($lista) / $porPagina));
+        $pagina = min(max(1, (int) ($filtros['page'] ?? 1)), $ultima);
+
         return response()->json(['data' => [
             'resumen' => ['por_vencer' => $porVencer, 'vencidas' => $vencidas, 'dias' => $dias],
-            'miembros' => $miembros,
+            'miembros' => array_slice($lista, ($pagina - 1) * $porPagina, $porPagina),
+            'meta' => ['total' => count($lista), 'page' => $pagina, 'per_page' => $porPagina, 'ultima_pagina' => $ultima],
         ]]);
     }
 

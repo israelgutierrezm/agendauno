@@ -283,48 +283,50 @@ const columnas = computed(() => [
   { clave: "adeudo", etiqueta: t("plataformaAdmin.estudios.colAdeudo") },
   { clave: "acciones", etiqueta: "" },
 ]);
-// Por producto, estado y adeudo (ADR 0132): la plataforma tiene dos productos.
-const filtrosEstudios = computed(() => [
-  {
-    clave: "producto",
-    etiqueta: t("plataformaAdmin.estudios.filtroProducto"),
-    opciones: PRODUCTOS_LISTA.map((p) => ({
-      valor: p,
-      texto: PRODUCTOS[p].nombre,
-    })),
-  },
-  {
-    clave: "estado",
-    etiqueta: t("plataformaAdmin.estudios.filtroEstado"),
-    opciones: ["trialing", "active", "suspended", "cancelled"].map((e) => ({
-      valor: e,
-      texto: t(`plataformaAdmin.estados.${e}`),
-    })),
-  },
-  {
-    clave: "adeudo",
-    etiqueta: t("plataformaAdmin.estudios.filtroAdeudo"),
-    tipo: "booleano" as const,
-  },
-]);
-function filtrarEstudio(
-  fila: Estudio,
-  valores: Record<string, string>,
-): boolean {
-  return (
-    (!valores.producto ||
-      productoDeModalidad(fila.modalidad) === valores.producto) &&
-    (!valores.estado || fila.estado === valores.estado) &&
-    (!valores.adeudo || (fila.adeudos ?? []).some((a) => a.minor > 0))
+// Por producto, estado y adeudo (ADR 0132), buscando y por páginas en el servidor:
+// la plataforma puede tener miles de negocios.
+const ESTADOS_ESTUDIO = ["trialing", "active", "suspended", "cancelled"];
+const filtroEstudios = ref({ producto: "", estado: "", adeudo: false });
+const buscarEstudios = ref("");
+const paginaEstudios = ref(1);
+const metaEstudios = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  total_negocios?: number;
+} | null>(null);
+function irPaginaEstudios(n: number): void {
+  paginaEstudios.value = n;
+  void cargarEstudios().catch((err: unknown) =>
+    toast.error(mensajeDeError(err)),
   );
 }
+function filtrarEstudios(): void {
+  irPaginaEstudios(1);
+}
+let esperaEstudios: ReturnType<typeof setTimeout> | undefined;
+watch(buscarEstudios, () => {
+  clearTimeout(esperaEstudios);
+  esperaEstudios = setTimeout(filtrarEstudios, 300);
+});
 
 async function cargarEstudios(): Promise<void> {
-  const { data } = await cliente.get<{ data: Estudio[] }>(
-    "/api/v1/plataforma/estudios",
-    encabezados(),
-  );
+  const { data } = await cliente.get<{
+    data: Estudio[];
+    meta?: typeof metaEstudios.value;
+  }>("/api/v1/plataforma/estudios", {
+    ...encabezados(),
+    params: {
+      q: buscarEstudios.value.trim() || undefined,
+      producto: filtroEstudios.value.producto || undefined,
+      estado: filtroEstudios.value.estado || undefined,
+      adeudo: filtroEstudios.value.adeudo ? 1 : undefined,
+      page: paginaEstudios.value,
+    },
+  });
   estudios.value = data.data;
+  metaEstudios.value = data.meta ?? null;
 }
 
 // Ficha de un estudio (panel lateral).
@@ -341,7 +343,7 @@ const diasPrueba = ref(15);
 // Por qué se suspende (opcional): se escribe en la ficha, junto a las acciones.
 const motivoSuspension = ref("");
 
-async function abrirFicha(e: Estudio): Promise<void> {
+async function abrirFicha(e: Pick<Estudio, "slug">): Promise<void> {
   fichaAbierta.value = true;
   if (ficha.value?.slug !== e.slug) {
     motivoSuspension.value = "";
@@ -378,10 +380,8 @@ async function accion(
     await hacer();
     toast.exito(exito);
     await cargarEstudios();
-    const actual = estudios.value.find((e) => e.slug === slug);
-    if (actual !== undefined) {
-      await abrirFicha(actual);
-    }
+    // Aunque ya no esté en la página o los filtros actuales, su ficha sigue abierta.
+    await abrirFicha({ slug });
     return true;
   } catch (err) {
     toast.error(mensajeDeError(err));
@@ -399,9 +399,8 @@ async function recargarFicha(): Promise<void> {
   } catch (err) {
     toast.error(mensajeDeError(err));
   }
-  const actual = estudios.value.find((e) => e.slug === slug);
-  if (actual !== undefined) {
-    await abrirFicha(actual);
+  if (slug !== undefined) {
+    await abrirFicha({ slug });
   }
 }
 
@@ -1008,6 +1007,7 @@ async function salir(): Promise<void> {
   operador.value = null;
   autenticado.value = false;
   estudios.value = [];
+  metaEstudios.value = null;
   borrar();
 }
 
@@ -1258,20 +1258,69 @@ function borrar(): void {
             v-if="p === 'estudios'"
             class="ml-1 tabular-nums"
             :style="{ color: 'var(--texto-suave)' }"
-            >{{ estudios.length }}</span
+            >{{ metaEstudios?.total_negocios ?? estudios.length }}</span
           >
         </button>
       </div>
 
       <!-- Estudios -->
+      <div
+        v-if="pestana === 'estudios'"
+        class="mt-5 flex flex-wrap items-end gap-3"
+      >
+        <input
+          v-model="buscarEstudios"
+          type="search"
+          class="tu-input w-64"
+          :placeholder="$t('operacion.listadosTres.buscarNegocio')"
+          :aria-label="$t('operacion.listadosTres.buscarNegocio')"
+          data-prueba="buscar-estudios"
+        />
+        <select
+          v-model="filtroEstudios.producto"
+          class="tu-input max-w-[12rem]"
+          :aria-label="$t('plataformaAdmin.estudios.filtroProducto')"
+          data-prueba="producto-estudios"
+          @change="filtrarEstudios"
+        >
+          <option value="">
+            {{ $t("plataformaAdmin.estudios.filtroProducto") }}
+          </option>
+          <option v-for="p in PRODUCTOS_LISTA" :key="p" :value="p">
+            {{ PRODUCTOS[p].nombre }}
+          </option>
+        </select>
+        <select
+          v-model="filtroEstudios.estado"
+          class="tu-input max-w-[12rem]"
+          :aria-label="$t('plataformaAdmin.estudios.filtroEstado')"
+          data-prueba="estado-estudios"
+          @change="filtrarEstudios"
+        >
+          <option value="">
+            {{ $t("plataformaAdmin.estudios.filtroEstado") }}
+          </option>
+          <option v-for="e in ESTADOS_ESTUDIO" :key="e" :value="e">
+            {{ $t(`plataformaAdmin.estados.${e}`) }}
+          </option>
+        </select>
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            v-model="filtroEstudios.adeudo"
+            type="checkbox"
+            data-prueba="adeudo-estudios"
+            @change="filtrarEstudios"
+          />
+          {{ $t("plataformaAdmin.estudios.filtroAdeudo") }}
+        </label>
+      </div>
       <TablaDatos
         v-if="pestana === 'estudios'"
-        class="mt-5"
+        class="mt-3"
         :columnas="columnas"
         :filas="estudios"
-        :buscar-en="['slug', 'nombre', 'ciudad']"
-        :filtros="filtrosEstudios"
-        :filtrar-fila="(f, v) => filtrarEstudio(f as Estudio, v)"
+        :buscar="false"
+        :por-pagina="metaEstudios?.per_page ?? 50"
         :vacio="$t('plataforma.estudios.vacio')"
         clave-vista="plataforma-estudios"
       >
@@ -1348,6 +1397,18 @@ function borrar(): void {
           </button>
         </template>
       </TablaDatos>
+      <PaginacionListado
+        v-if="
+          pestana === 'estudios' &&
+          metaEstudios &&
+          metaEstudios.ultima_pagina > 1
+        "
+        :page="metaEstudios.page"
+        :ultima-pagina="metaEstudios.ultima_pagina"
+        :total="metaEstudios.total"
+        :per-page="metaEstudios.per_page"
+        @ir="irPaginaEstudios"
+      />
 
       <!-- Cobros -->
       <div v-if="pestana === 'cobros'" class="mt-5">

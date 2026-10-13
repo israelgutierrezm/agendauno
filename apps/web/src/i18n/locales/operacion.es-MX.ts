@@ -747,6 +747,16 @@ export default {
     sinPendientes: "No hay canjes por entregar.",
     sinHistorial: "Aún no hay canjes entregados ni cancelados.",
   },
+  // Ficha del miembro: todo su historial, por páginas.
+  ficha: {
+    verTodo: "Ver todo el historial",
+  },
+  // Usuarios: el equipo aparte de los clientes con cuenta.
+  usuarios: {
+    equipo: "Equipo",
+    clientes: "Clientes con cuenta",
+    buscarClientes: "Buscar cliente por nombre o correo",
+  },
   // Más listados por páginas (barrido de listados sin límite).
   listadosTres: {
     buscarInteresados: "Buscar por nombre, correo, negocio o ciudad",
@@ -754,6 +764,8 @@ export default {
     buscarPersona: "Buscar por persona",
     buscarPadron: "Buscar por nombre o correo",
     buscarGrupo: "Buscar grupo o clase",
+    buscar: "Buscar",
+    buscarMovimiento: "Persona, concepto o referencia",
     estadoGrupo: { activos: "Activos", inactivos: "Inactivos", todos: "Todos" },
     pagoAutomatico: "Pago automático",
     automaticoTodos: "Con y sin pago automático",
