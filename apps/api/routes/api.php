@@ -669,6 +669,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/formularios', [FormulariosController::class, 'index'])->middleware('puede:formularios.responder')->name('formularios.index');
             Route::post('/formularios', [FormulariosController::class, 'store'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.store');
             Route::post('/formularios/{formulario}/campos', [FormulariosController::class, 'agregarCampo'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.campos');
+            Route::put('/formularios/{formulario}', [FormulariosController::class, 'update'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.update');
+            Route::post('/formularios/{formulario}/archivar', [FormulariosController::class, 'archivar'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.archivar');
+            Route::post('/formularios/{formulario}/restaurar', [FormulariosController::class, 'restaurar'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.restaurar');
             Route::get('/formularios/{formulario}/respuestas', [RespuestasFormularioController::class, 'index'])->middleware('puede:formularios.gestionar')->name('formularios.respuestas.index');
             Route::post('/formularios/{formulario}/respuestas', [RespuestasFormularioController::class, 'store'])->middleware('puede:formularios.responder')->name('formularios.respuestas.store');
 

@@ -20,18 +20,29 @@ class Formulario extends Model
 
     protected $table = 'formularios';
 
-    protected $fillable = ['nombre', 'descripcion', 'aplica_a', 'activo'];
+    protected $fillable = ['nombre', 'descripcion', 'aplica_a', 'activo', 'version', 'archivado_en'];
 
     /**
      * @var array<string, string>
      */
-    protected $casts = ['activo' => 'boolean'];
+    protected $casts = ['activo' => 'boolean', 'version' => 'integer', 'archivado_en' => 'datetime'];
 
     /**
+     * Sus preguntas vigentes, en orden (las archivadas solo se leen en las respuestas
+     * que las contestaron, ADR 0150).
+     *
      * @return HasMany<CampoFormulario, $this>
      */
     public function campos(): HasMany
     {
-        return $this->hasMany(CampoFormulario::class, 'formulario_id')->orderBy('orden')->orderBy('id');
+        return $this->hasMany(CampoFormulario::class, 'formulario_id')->whereNull('archivado_en')->orderBy('orden')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<RespuestaFormulario, $this>
+     */
+    public function respuestas(): HasMany
+    {
+        return $this->hasMany(RespuestaFormulario::class, 'formulario_id');
     }
 }

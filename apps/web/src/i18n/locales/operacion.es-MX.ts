@@ -747,6 +747,34 @@ export default {
     sinPendientes: "No hay canjes por entregar.",
     sinHistorial: "Aún no hay canjes entregados ni cancelados.",
   },
+  // Fichas de datos: ciclo de edición completo y versiones (ADR 0150).
+  fichas: {
+    editarDatos: "Editar datos",
+    descripcion: "Descripción (opcional)",
+    vistaPrevia: "Vista previa",
+    vistaPreviaDe: "Así se ve: {nombre}",
+    archivar: "Archivar",
+    archivada: "Archivada",
+    restaurar: "Restaurar",
+    verArchivadas: "Ver archivadas",
+    sinArchivadas: "No hay fichas archivadas.",
+    archivarConfirmar:
+      "¿Archivar «{nombre}»? Deja de pedirse y nadie la podrá llenar; sus respuestas se conservan y puedes restaurarla.",
+    editar: "Editar",
+    quitar: "Quitar",
+    editarPregunta: "Editar pregunta",
+    subir: "Subir «{pregunta}»",
+    bajar: "Bajar «{pregunta}»",
+    quitarConfirmar: "¿Quitar la pregunta «{pregunta}»?",
+    quitarConRespuestas:
+      "¿Quitar «{pregunta}»? Ya tiene respuestas: deja de preguntarse, pero lo respondido se conserva.",
+    cambiaTipo:
+      "Cambiar el tipo crea una pregunta nueva; lo ya respondido se conserva con la anterior.",
+    versionRespuestas: "versión {version} · {n} respuestas",
+    avisoVersion:
+      "Ya tiene 1 respuesta: al cambiar sus preguntas se crea la versión {siguiente} y lo respondido se conserva con sus preguntas originales. | Ya tiene {n} respuestas: al cambiar sus preguntas se crea la versión {siguiente} y lo respondido se conserva con sus preguntas originales.",
+    conVersion: "con la versión {n}",
+  },
   // Ficha del miembro: todo su historial, por páginas.
   ficha: {
     verTodo: "Ver todo el historial",

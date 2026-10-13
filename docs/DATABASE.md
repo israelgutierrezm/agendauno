@@ -55,7 +55,10 @@ el esquema.
   cómo conoció al negocio (ADR 0067) y cuándo aceptó los avisos por WhatsApp
   (`whatsapp_aceptado_en`, ADR 0069).
 - `tipos_documento`, `documentos` — expediente del alumno.
-- `formularios`, `campos_formulario`, `respuestas_formulario` — formularios dinámicos.
+- `formularios`, `campos_formulario`, `respuestas_formulario` — formularios dinámicos
+  (fichas de datos). La ficha lleva `version` y `archivado_en`; una pregunta quitada de
+  una ficha con respuestas se archiva (`archivado_en`); cada respuesta guarda su
+  `version` y las preguntas con que se contestó (`campos`, ADR 0150).
 - `waivers`, `aceptaciones_waiver` — responsivas.
 - `solicitudes_privacidad` — derechos ARCO.
 

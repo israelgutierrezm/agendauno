@@ -29,6 +29,7 @@ class CampoFormulario extends Model
         'tipo' => TipoCampo::class,
         'obligatorio' => 'boolean',
         'opciones' => 'array',
+        'archivado_en' => 'datetime',
         'orden' => 'integer',
     ];
 }

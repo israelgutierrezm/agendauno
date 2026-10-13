@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AccesoExpedienteTenant;
+use App\Modules\Tenancy\Application\FichasDeDatosTenant;
 use App\Modules\Tenancy\Models\CampoFormulario;
 use App\Modules\Tenancy\Models\Formulario;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -66,8 +67,13 @@ class RespuestasFormularioController
                     : null,
                 'respondido_en' => $respuesta->updated_at?->toIso8601String(),
                 'valores' => $respuesta->valores,
+                // Con qué versión y qué preguntas se contestó (ADR 0150); las de antes
+                // de las versiones no las traen (se leen con las vigentes).
+                'version' => $respuesta->version,
+                'campos' => $respuesta->campos,
             ])->all(),
             'meta' => [
+                'version_actual' => $formulario->version,
                 'total' => $pagina->total(),
                 'page' => $pagina->currentPage(),
                 'per_page' => $pagina->perPage(),
@@ -79,6 +85,9 @@ class RespuestasFormularioController
     public function store(Request $request): JsonResponse
     {
         $formulario = Formulario::query()->with('campos')->where('ulid', (string) $request->route('formulario'))->firstOrFail();
+        if ($formulario->archivado_en !== null) {
+            throw ValidationException::withMessages(['formulario' => ['Esta ficha de datos está archivada.']]);
+        }
 
         $persona = PersonaTenant::query()->where('ulid', (string) $request->input('persona_id'))->firstOrFail();
 
@@ -103,7 +112,12 @@ class RespuestasFormularioController
 
         $respuesta = RespuestaFormulario::query()->updateOrCreate(
             ['formulario_id' => $formulario->id, 'persona_id' => $persona->id],
-            ['valores' => $valores],
+            [
+                'valores' => $valores,
+                // La versión y las preguntas de ahora: se lee igual aunque la ficha cambie.
+                'version' => $formulario->version,
+                'campos' => FichasDeDatosTenant::preguntasActuales($formulario),
+            ],
         );
 
         return response()->json(['data' => ['id' => $respuesta->ulid, 'valores' => $respuesta->valores]], 201);
