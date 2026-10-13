@@ -43,20 +43,20 @@ final class CatalogoTemas
                 'borde' => '#E6E9F0', 'texto' => '#1E2A3B', 'texto_suave' => '#6B7385',
             ],
         ],
-        // Institucional, con los tres colores del logo: la barra en su turquesa
-        // (#0096BE) profundo, el menú en su azul claro (#6EBEFA) y lo activo en su rosa
-        // (#DC5A96, con letra oscura: la blanca no se lee). Botones y enlaces en el
-        // turquesa un poco más profundo; el resto blanco sobre un azul muy claro.
+        // Marino y aguamarina: la barra en azul marino con el menú en un gris azulado
+        // claro, lo activo en un aguamarina pastel con letra marina, y botones y enlaces
+        // en verde azulado. La página en un gris niebla y las letras en el mismo marino.
+        // Todo con contraste AA (lo más justo, 4.8:1 de lo suave sobre lo gris).
         'agendauno_alternativo' => [
             'nombre' => 'Agenda Uno Alternativo',
             'oscuro' => false,
             'tokens' => [
-                'barra' => '#00485C', 'barra_suave' => '#003C4D', 'barra_texto' => '#6EBEFA',
-                'barra_activo' => '#DC5A96', 'barra_activo_texto' => '#071A22',
+                'barra' => '#16324F', 'barra_suave' => '#21456B', 'barra_texto' => '#D3E2F0',
+                'barra_activo' => '#A6E3D7', 'barra_activo_texto' => '#0E2A40',
                 'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#007594', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#F3F8FC', 'superficie' => '#FFFFFF', 'superficie_2' => '#E9F2F8',
-                'borde' => '#D5E3EC', 'texto' => '#0B2733', 'texto_suave' => '#4E6672',
+                'acento' => '#0F7B76', 'acento_texto' => '#FFFFFF',
+                'fondo' => '#F2F6F8', 'superficie' => '#FFFFFF', 'superficie_2' => '#E5EFF1',
+                'borde' => '#D3E0E6', 'texto' => '#16324F', 'texto_suave' => '#4F6A80',
             ],
         ],
         // Océano: un azul vivo (#0A6EBD) es el protagonista. Va en la barra, que en el

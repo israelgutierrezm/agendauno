@@ -270,16 +270,21 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Contraer (solo escritorio) -->
+      <!-- Contraer o expandir (solo escritorio). Contraída, el botón es un círculo. -->
       <div
         class="hidden lg:block p-3 border-t"
         :style="{ borderColor: 'var(--barra-borde)' }"
       >
         <button
           type="button"
-          class="tu-side-link w-full"
-          :class="{ 'lg:justify-center': compactoEfectivo }"
-          :title="$t('nav.contraer')"
+          class="tu-side-link"
+          :class="compactoEfectivo ? 'tu-expandir' : 'w-full'"
+          :title="compactoEfectivo ? $t('nav.expandir') : $t('nav.contraer')"
+          :aria-label="
+            compactoEfectivo ? $t('nav.expandir') : $t('nav.contraer')
+          "
+          :aria-expanded="!compactoEfectivo"
+          data-prueba="alternar-barra"
           @click="alternarCompacto"
         >
           <IconoNav
@@ -773,6 +778,15 @@ a.tu-miga:hover {
   background: var(--barra-activo);
   color: var(--barra-activo-texto, #ffffff);
   font-weight: 600;
+}
+/* Expandir la barra contraída: un círculo (también su efecto al pasar el cursor). */
+.tu-side-link.tu-expandir {
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-inline: auto;
+  padding: 0;
+  border-radius: 999px;
 }
 
 /* Botón de icono del encabezado. */

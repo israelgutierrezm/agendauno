@@ -39,16 +39,17 @@ it('un usuario nuevo ve el tema predeterminado y el catálogo de temas', functio
         ->not->toContain('agendauno_marino', 'agendauno_noche', 'indigo', 'alto_contraste');
     // El oscuro va al final.
     expect(end($claves))->toBe('medianoche');
-    // Institucional, con los colores del logo: turquesa, azul claro y rosa.
+    // Marino y aguamarina: barra marina, lo activo en aguamarina pastel y botones en
+    // verde azulado.
     expect(collect($data['disponibles'])->firstWhere('clave', 'agendauno_alternativo'))->toMatchArray([
         'nombre' => 'Agenda Uno Alternativo',
         'oscuro' => false,
-        'muestra' => ['barra' => '#00485C', 'acento' => '#007594', 'fondo' => '#F3F8FC', 'superficie' => '#FFFFFF'],
+        'muestra' => ['barra' => '#16324F', 'acento' => '#0F7B76', 'fondo' => '#F2F6F8', 'superficie' => '#FFFFFF'],
     ]);
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia", ['tema' => 'agendauno_alternativo'], conBearer($e['bearer']))
         ->assertOk()
-        ->assertJsonPath('data.tokens.barra_texto', '#6EBEFA')
-        ->assertJsonPath('data.tokens.barra_activo', '#DC5A96');
+        ->assertJsonPath('data.tokens.barra_texto', '#D3E2F0')
+        ->assertJsonPath('data.tokens.barra_activo', '#A6E3D7');
     // Océano: el azul vivo en la barra y en los botones; lo activo, en blanco.
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia", ['tema' => 'oceano'], conBearer($e['bearer']))
         ->assertOk()
