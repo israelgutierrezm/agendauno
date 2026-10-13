@@ -726,8 +726,46 @@ export default {
   },
   // Integraciones con Wellhub y TotalPass.
   integraciones: {
+    // Lo que falta para poder encenderla (sin ellas no valida ningún check-in).
+    faltanLlaves: "Para activarla captura: {llaves}.",
+    obligatoria: "Obligatoria para activarla",
     reemplazar: "Escribe para reemplazar",
     capturar: "Pega aquí la llave",
+  },
+  lealtad: {
+    sinPuntos:
+      "Para activarlo define cuántos puntos se ganan por asistir o por comprar.",
+  },
+  formularios: {
+    dosOpciones: "Escribe al menos dos opciones, separadas por comas.",
+  },
+  // Integrar a tu web: los widgets necesitan la página del negocio publicada.
+  widgets: {
+    paginaOculta: "Tu página está oculta",
+    paginaOcultaAyuda:
+      "Mientras esté oculta, tus widgets no se muestran en ninguna web. Publícala en Configuración.",
+    irConfiguracion: "Ir a Configuración",
+  },
+  // Pasarelas de pago del negocio: con su propia cuenta.
+  pasarelas: {
+    alcanceTitulo: "Cobra en línea con tu propia cuenta",
+    alcance:
+      "Los pagos llegan directo a tu cuenta de la pasarela. Tus llaves se guardan cifradas y nunca se vuelven a mostrar; activa la que uses cuando tenga sus llaves.",
+    descripcion: {
+      stripe:
+        "Tarjeta de crédito o débito y OXXO, en la página de pago de Stripe.",
+      mercadopago: "Tarjeta, OXXO y más, en la página de pago de Mercado Pago.",
+      openpay: "Tarjeta y pago en tienda con referencia.",
+      ventanilla:
+        "Depósito o transferencia: el cliente sube su comprobante y tú lo validas.",
+    },
+    estado: {
+      cobrando: "Cobrando",
+      enPrueba: "En pruebas",
+      faltan: "Faltan llaves",
+      apagada: "Apagada",
+    },
+    faltanLlaves: "Para activarla captura: {llaves}.",
   },
   // Lo común de los listados por páginas: fechas y filtros.
   listados: {

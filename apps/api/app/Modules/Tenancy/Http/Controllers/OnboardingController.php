@@ -138,9 +138,10 @@ class OnboardingController
             'privado' => ['nullable', 'boolean'],
         ]);
 
+        // «Solo con enlace» se toca solo si viene: mostrar u ocultar la página no lo cambia.
         $estudio->update([
             'publicado' => (bool) $validado['publicado'],
-            'privado' => (bool) ($validado['privado'] ?? false),
+            ...($request->has('privado') ? ['privado' => (bool) ($validado['privado'] ?? false)] : []),
         ]);
         // La primera vez que publica: un hito de su puesta en marcha (C02).
         if ($estudio->publicado && $estudio->publicado_en === null) {

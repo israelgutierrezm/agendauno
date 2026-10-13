@@ -209,7 +209,8 @@ class ReservasPlataformaTenantController
             'proveedor' => $proveedor->value,
             'disponible' => $this->disponible($proveedor),
             'conectada' => $integracion instanceof IntegracionTenant && $integracion->activa,
-            'activas' => $integracion instanceof IntegracionTenant && $integracion->reservas_activas,
+            // Con la integración apagada no se publica nada, aunque siga encendido.
+            'activas' => $integracion instanceof IntegracionTenant && $integracion->activa && $integracion->reservas_activas,
             'sucursal_id' => $sucursales->firstWhere('id', $integracion?->sucursal_id)?->getAttribute('ulid'),
             'sucursales' => $sucursales->map(fn (SucursalTenant $s): array => [
                 'id' => (string) $s->getAttribute('ulid'),

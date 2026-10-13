@@ -294,6 +294,7 @@ onMounted(cargar);
             v-model.number="form.valor"
             type="number"
             min="1"
+            :max="form.tipo === 'porcentaje' ? 100 : undefined"
             step="0.01"
             class="tu-input"
             required

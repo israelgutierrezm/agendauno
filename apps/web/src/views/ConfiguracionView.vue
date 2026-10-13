@@ -84,7 +84,7 @@ async function alternar(): Promise<void> {
   try {
     const { data } = await api.put<{
       data: { publicado: boolean; en_directorio: boolean };
-    }>(`${base.value}/publicacion`, { publicado: nuevo, privado: false });
+    }>(`${base.value}/publicacion`, { publicado: nuevo });
     aparece.value = data.data.publicado;
     if (sesion.estudio) {
       sesion.estudio.publicado = data.data.publicado;

@@ -22,6 +22,7 @@ const sesion = vi.hoisted(() => ({
   slug: "demo",
   esCitas: false,
   puede: () => true,
+  estudio: { publicado: true } as { publicado: boolean },
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
@@ -43,13 +44,17 @@ const GUARDADO = {
 
 function montar() {
   return mount(IntegrarWebView, {
-    global: { plugins: [i18n], stubs: { EncabezadoSeccion: true } },
+    global: {
+      plugins: [i18n],
+      stubs: { EncabezadoSeccion: true, RouterLink: true },
+    },
   });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   sesion.esCitas = false;
+  sesion.estudio = { publicado: true };
   api.get.mockImplementation((url: string) =>
     Promise.resolve({
       data: {
@@ -117,5 +122,28 @@ describe("integrar en mi web", () => {
       .find((b) => b.text() === "Calendario de clases")!;
     expect(calendario.attributes("disabled")).toBeDefined();
     expect(w.text()).toContain("El calendario es para negocios de clases.");
+  });
+
+  it("con la página del negocio oculta avisa que los widgets no se muestran", async () => {
+    sesion.estudio = { publicado: false };
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: { data: url.endsWith("/captacion/widgets") ? [GUARDADO] : [] },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="widgets-pagina-oculta"]').text()).toContain(
+      "Tu página está oculta",
+    );
+
+    // Publicada, no hay aviso.
+    sesion.estudio = { publicado: true };
+    const otra = montar();
+    await flushPromises();
+    expect(otra.find('[data-prueba="widgets-pagina-oculta"]').exists()).toBe(
+      false,
+    );
   });
 });

@@ -10,6 +10,7 @@ use App\Modules\Tenancy\TipoCampo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Formularios dinámicos definidos por el administrador (tenant-local). El admin
@@ -53,15 +54,24 @@ class FormulariosController
             'tipo' => ['required', Rule::enum(TipoCampo::class)],
             'obligatorio' => ['nullable', 'boolean'],
             'opciones' => ['nullable', 'array'],
-            'opciones.*' => ['string', 'max:255'],
+            // Las vacías se descartan.
+            'opciones.*' => ['nullable', 'string', 'max:255'],
             'orden' => ['nullable', 'integer', 'min:0'],
         ]);
+        // Con una sola opción (o ninguna) no habría qué elegir y nadie podría enviarlo.
+        $opciones = array_values(array_filter(
+            array_map(static fn (?string $opcion): string => trim((string) $opcion), $validado['opciones'] ?? []),
+            static fn (string $opcion): bool => $opcion !== '',
+        ));
+        if ($validado['tipo'] === TipoCampo::Seleccion->value && count($opciones) < 2) {
+            throw ValidationException::withMessages(['opciones' => ['Una pregunta de opción necesita al menos dos opciones.']]);
+        }
 
         $campo = $formulario->campos()->create([
             'etiqueta' => $validado['etiqueta'],
             'tipo' => $validado['tipo'],
             'obligatorio' => (bool) ($validado['obligatorio'] ?? false),
-            'opciones' => $validado['opciones'] ?? null,
+            'opciones' => $validado['tipo'] === TipoCampo::Seleccion->value ? $opciones : ($validado['opciones'] ?? null),
             'orden' => (int) ($validado['orden'] ?? 0),
         ]);
 

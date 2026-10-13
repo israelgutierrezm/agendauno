@@ -50,7 +50,7 @@ describe("pasarelas fuera de pesos mexicanos", () => {
       "solo funciona en pesos mexicanos",
     );
     // Stripe sin formulario (solo el aviso); la ventanilla, con el suyo.
-    expect(w.findAll('input[type="checkbox"]')).toHaveLength(1);
+    expect(w.findAll('[role="switch"]')).toHaveLength(1);
     expect(w.text()).toContain("Solo con pesos mexicanos (MXN)");
   });
 });

@@ -269,6 +269,20 @@
     opacity: 0.55;
   }
 
+  /* ------------------------------------------------------------ campos */
+  /* Lo que la API rechazó, en rojo; lo obligatorio, con su asterisco. */
+  .tu-input[aria-invalid="true"] {
+    border-color: var(--error);
+  }
+  .tu-input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 22%, transparent);
+  }
+  .tu-obligatorio {
+    margin-left: 0.15rem;
+    color: var(--error);
+    font-weight: 600;
+  }
+
   /* -------------------------------------------------------- interruptor */
   .tu-interruptor {
     display: inline-flex;

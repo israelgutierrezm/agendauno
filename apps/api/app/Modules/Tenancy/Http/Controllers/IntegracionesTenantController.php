@@ -15,6 +15,7 @@ use App\Modules\Tenancy\ProveedorPartner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Configuracion de integraciones de bienestar del estudio (Wellhub / TotalPass): el
@@ -26,6 +27,9 @@ use Illuminate\Support\Str;
  * Check-in automático (ADR 0148): al conectarla se genera la dirección donde la
  * plataforma avisa de cada check-in. En TotalPass se registra sola con su API (con la
  * llave de la sede); en Wellhub se le da a Wellhub junto con la llave con que firma.
+ *
+ * No se activa sin las llaves con que valida un check-in (las ya guardadas cuentan):
+ * encendida sin ellas, la plataforma rechazaría a cada visitante.
  */
 class IntegracionesTenantController
 {
@@ -78,6 +82,9 @@ class IntegracionesTenantController
             $actuales = $config->llaves();
             $cambiadas = array_keys(array_filter($nuevas, static fn (string $valor, string $nombre): bool => ($actuales[$nombre] ?? null) !== $valor, ARRAY_FILTER_USE_BOTH));
             $config->credenciales = array_merge($actuales, $nuevas);
+        }
+        if ($config->activa) {
+            $this->exigirLlaves($proveedor, $config);
         }
 
         // Otro gimnasio u otro token de Wellhub: sus avisos de reserva se vuelven a
@@ -133,6 +140,8 @@ class IntegracionesTenantController
             // Las que pide el proveedor y las que ya se capturaron.
             'llaves' => $proveedor->credenciales(),
             'llaves_configuradas' => array_keys($llaves),
+            // Sin estas no se puede activar.
+            'llaves_obligatorias' => $proveedor->credencialesObligatorias(),
             'automatico' => [
                 'aviso_url' => $token !== '' ? self::urlDeAvisos($proveedor, $token) : null,
                 'listo' => match ($proveedor) {
@@ -155,6 +164,26 @@ class IntegracionesTenantController
             'proveedor' => $proveedor->value,
             'token' => $token,
         ]);
+    }
+
+    /** Para activarla, las llaves sin las que no valida ningún check-in. */
+    private function exigirLlaves(ProveedorPartner $proveedor, IntegracionTenant $config): void
+    {
+        $llaves = $config->llaves();
+        $faltan = array_values(array_filter(
+            $proveedor->credencialesObligatorias(),
+            static fn (string $nombre): bool => trim($llaves[$nombre] ?? '') === '',
+        ));
+        if ($faltan === []) {
+            return;
+        }
+
+        $errores = ['activa' => ["Para activar {$proveedor->nombre()} captura sus llaves."]];
+        foreach ($faltan as $nombre) {
+            $errores["credenciales.{$nombre}"] = ['Captúrala para activar la integración.'];
+        }
+
+        throw ValidationException::withMessages($errores);
     }
 
     private function exigirMexico(): void

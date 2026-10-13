@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 
+import { useI18n } from "vue-i18n";
+
 import AvisoRegion from "@/components/AvisoRegion.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
+import LogoPlataforma from "@/components/LogoPlataforma.vue";
+import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -15,6 +20,8 @@ interface Pasarela {
   confirma_pagos?: boolean | null;
   en_prueba?: boolean | null;
   llaves_configuradas: string[];
+  // Sin estas no se puede activar.
+  llaves_requeridas?: string[];
   // ¿Existe de verdad? y ¿ya cobra?
   disponible?: boolean;
   lista?: boolean;
@@ -38,6 +45,7 @@ const LLAVES: Record<string, string[]> = {
   ventanilla: [],
 };
 
+const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -81,6 +89,41 @@ useCambiosPendientes(() =>
   }),
 );
 
+// Las llaves que la API rechazó, por pasarela.
+const llavesConError = reactive<Record<string, string[]>>({});
+
+/**
+ * Las llaves sin las que no cobra y que no están ni guardadas ni escritas: mientras
+ * falte alguna, el interruptor no se enciende.
+ */
+function faltanLlaves(p: Pasarela): string[] {
+  const escritas = edicion[p.proveedor]?.llaves ?? {};
+  return (p.llaves_requeridas ?? []).filter(
+    (llave) =>
+      !p.llaves_configuradas.includes(llave) &&
+      (escritas[llave] ?? "").trim() === "",
+  );
+}
+
+function nombresDeLlaves(llaves: string[]): string {
+  return llaves
+    .map((llave) => t(`adminUsabilidad.credenciales.${llave}`))
+    .join(", ");
+}
+
+/** Su estado en una pastilla: cobrando, en pruebas, sin llaves o apagada. */
+function estado(p: Pasarela): { tono: string; texto: string } {
+  if (!p.activa) {
+    return { tono: "neutral", texto: t("operacion.pasarelas.estado.apagada") };
+  }
+  if (p.lista === false) {
+    return { tono: "aviso", texto: t("operacion.pasarelas.estado.faltan") };
+  }
+  return p.en_prueba
+    ? { tono: "info", texto: t("operacion.pasarelas.estado.enPrueba") }
+    : { tono: "exito", texto: t("operacion.pasarelas.estado.cobrando") };
+}
+
 // Con otra moneda que no sea el peso mexicano, las de cobro en línea no aplican; la
 // ventanilla (depósito con comprobante) sí.
 const enLineaDisponible = ref(true);
@@ -118,6 +161,7 @@ async function guardar(proveedor: string): Promise<void> {
   guardando.value = proveedor;
   guardado.value = null;
   error.value = null;
+  llavesConError[proveedor] = [];
   try {
     const ed = edicion[proveedor];
     // Solo envia llaves con valor (merge en el backend).
@@ -145,6 +189,9 @@ async function guardar(proveedor: string): Promise<void> {
     }
     guardado.value = proveedor;
   } catch (e) {
+    llavesConError[proveedor] = camposConError(e)
+      .filter((campo) => campo.startsWith("credenciales."))
+      .map((campo) => campo.slice("credenciales.".length));
     error.value = mensajeDeError(e);
   } finally {
     guardando.value = null;
@@ -172,13 +219,21 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
-    </p>
+    </AvisoTono>
 
     <div v-if="!cargando" class="mt-6 space-y-4">
       <!-- Fuera de pesos mexicanos no se cobra en línea (ADR 0099). -->
       <AvisoRegion v-if="!enLineaDisponible" tipo="pasarelas" />
+      <AvisoTono
+        v-else
+        tono="info"
+        :titulo="$t('operacion.pasarelas.alcanceTitulo')"
+        data-prueba="alcance-pasarelas"
+      >
+        {{ $t("operacion.pasarelas.alcance") }}
+      </AvisoTono>
       <div
         v-for="p in pasarelas.filter(
           (x) => x.disponible === false || !configurable(x),
@@ -186,13 +241,16 @@ onMounted(cargar);
         :key="p.proveedor"
         class="tu-card p-6"
       >
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="font-medium text-lg">
+        <div class="flex items-center gap-3">
+          <LogoPlataforma :proveedor="p.proveedor" />
+          <h2 class="min-w-0 flex-1 text-base font-semibold">
             {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
           </h2>
-          <span v-if="p.disponible === false" class="tu-badge">{{
-            $t("pasarelasEstado.proximamente")
-          }}</span>
+          <span
+            v-if="p.disponible === false"
+            class="tu-pastilla tu-tono-neutral"
+            >{{ $t("pasarelasEstado.proximamente") }}</span
+          >
         </div>
         <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{
@@ -209,45 +267,73 @@ onMounted(cargar);
         :key="p.proveedor"
         class="tu-card p-6"
       >
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="font-medium text-lg">
-            {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
-          </h2>
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input v-model="edicion[p.proveedor].activa" type="checkbox" />
-            {{ $t("pasarelas.activa") }}
-          </label>
+        <div class="flex flex-wrap items-start gap-3">
+          <LogoPlataforma :proveedor="p.proveedor" />
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-base font-semibold">
+                {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
+              </h2>
+              <span
+                class="tu-pastilla"
+                :class="`tu-tono-${estado(p).tono}`"
+                :data-prueba="`estado-${p.proveedor}`"
+                >{{ estado(p).texto }}</span
+              >
+            </div>
+            <p class="mt-0.5 text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t(`operacion.pasarelas.descripcion.${p.proveedor}`) }}
+            </p>
+          </div>
+          <InterruptorSiNo
+            v-model="edicion[p.proveedor].activa"
+            class="shrink-0"
+            :etiqueta="$t('pasarelas.activa')"
+            :deshabilitado="
+              !edicion[p.proveedor].activa && faltanLlaves(p).length > 0
+            "
+            :prueba="`activa-${p.proveedor}`"
+          />
         </div>
+        <!-- Qué falta para poder activarla -->
         <p
+          v-if="!edicion[p.proveedor].activa && faltanLlaves(p).length > 0"
+          class="tu-hint mt-3"
+          :data-prueba="`faltan-llaves-${p.proveedor}`"
+        >
+          {{
+            $t("operacion.pasarelas.faltanLlaves", {
+              llaves: nombresDeLlaves(faltanLlaves(p)),
+            })
+          }}
+        </p>
+        <AvisoTono
           v-if="p.activa && p.lista === false"
-          class="mt-2 text-sm"
+          tono="aviso"
+          class="mt-3"
           role="status"
-          style="color: var(--aviso)"
         >
           {{ $t("pasarelasEstado.faltaLlave") }}
-        </p>
-        <p v-else-if="p.lista" class="mt-2 text-sm" style="color: var(--exito)">
-          {{ $t("pasarelasEstado.lista") }}
-        </p>
+        </AvisoTono>
         <!-- M07: sin confirmación de pagos (secreto del webhook) y modo de prueba. -->
-        <p
+        <AvisoTono
           v-if="p.activa && p.confirma_pagos === false"
-          class="mt-1 text-sm"
+          tono="aviso"
+          class="mt-3"
           role="status"
-          style="color: var(--aviso)"
           data-prueba="sin-confirmacion"
         >
           {{ $t("pasarelasEstado.sinConfirmacion") }}
-        </p>
-        <p
+        </AvisoTono>
+        <AvisoTono
           v-if="p.activa && p.en_prueba"
-          class="mt-1 text-sm"
+          tono="info"
+          class="mt-3"
           role="status"
-          :style="{ color: 'var(--texto-suave)' }"
           data-prueba="en-prueba"
         >
           {{ $t("pasarelasEstado.enPrueba") }}
-        </p>
+        </AvisoTono>
 
         <details class="pg-configurar" :open="p.activa">
           <summary>{{ $t("adminUsabilidad.configurarConexion") }}</summary>
@@ -277,7 +363,7 @@ onMounted(cargar);
               >
               <button
                 type="button"
-                class="tu-enlace text-xs"
+                class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico"
                 @click="copiar(p)"
               >
                 {{
@@ -290,18 +376,18 @@ onMounted(cargar);
             <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
               {{ $t(`pasarelasEstado.ayudaWebhook.${p.proveedor}`) }}
             </p>
-            <p
+            <AvisoTono
               v-if="p.codigo_verificacion"
-              class="mt-1 text-xs"
+              tono="aviso"
+              class="mt-2"
               role="status"
-              style="color: var(--aviso)"
             >
               {{
                 $t("pasarelasEstado.codigoVerificacion", {
                   codigo: p.codigo_verificacion,
                 })
               }}
-            </p>
+            </AvisoTono>
           </div>
 
           <div
@@ -310,7 +396,13 @@ onMounted(cargar);
           >
             <div v-for="llave in LLAVES[p.proveedor]" :key="llave">
               <label class="tu-label" :for="`${p.proveedor}-${llave}`">
-                {{ $t(`adminUsabilidad.credenciales.${llave}`) }}
+                {{ $t(`adminUsabilidad.credenciales.${llave}`)
+                }}<span
+                  v-if="(p.llaves_requeridas ?? []).includes(llave)"
+                  class="tu-obligatorio"
+                  :title="$t('operacion.integraciones.obligatoria')"
+                  >*</span
+                >
                 <code
                   class="block text-xs font-normal"
                   :style="{ color: 'var(--texto-suave)' }"
@@ -328,6 +420,10 @@ onMounted(cargar);
                 class="tu-input"
                 type="password"
                 autocomplete="off"
+                :aria-invalid="
+                  (llavesConError[p.proveedor] ?? []).includes(llave) ||
+                  undefined
+                "
                 :placeholder="
                   estaConfigurada(p.proveedor, llave)
                     ? '••••••'

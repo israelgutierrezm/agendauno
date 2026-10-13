@@ -11,7 +11,7 @@ import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import ReservasBienestar from "@/components/ReservasBienestar.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -38,6 +38,8 @@ interface Integracion {
   // Las credenciales que pide el proveedor y las que ya se capturaron.
   llaves: string[];
   llaves_configuradas: string[];
+  // Sin estas no se puede activar.
+  llaves_obligatorias?: string[];
   // Check-in automático (ADR 0148): dónde avisa la plataforma y si ya está activo.
   automatico?: {
     aviso_url: string | null;
@@ -114,9 +116,31 @@ const guardando = ref<string | null>(null);
 const edicion = reactive<
   Record<string, { activa: boolean; llaves: Record<string, string> }>
 >({});
+// Las llaves que la API rechazó, por plataforma.
+const llavesConError = reactive<Record<string, string[]>>({});
+
+/**
+ * Las llaves sin las que no se puede activar y que no están ni guardadas ni escritas:
+ * mientras falte alguna, el interruptor no se enciende.
+ */
+function faltanLlaves(i: Integracion): string[] {
+  const escritas = edicion[i.proveedor]?.llaves ?? {};
+  return (i.llaves_obligatorias ?? []).filter(
+    (llave) =>
+      !i.llaves_configuradas.includes(llave) &&
+      (escritas[llave] ?? "").trim() === "",
+  );
+}
+
+function nombresDeLlaves(proveedor: string, llaves: string[]): string {
+  return llaves
+    .map((llave) => t(`integraciones.llaves.${proveedor}.${llave}`))
+    .join(", ");
+}
 
 async function guardar(proveedor: string): Promise<void> {
   guardando.value = proveedor;
+  llavesConError[proveedor] = [];
   try {
     const ed = edicion[proveedor];
     const credenciales: Record<string, string> = {};
@@ -138,6 +162,9 @@ async function guardar(proveedor: string): Promise<void> {
     }
     toast.exito(t("integraciones.guardado"));
   } catch (e) {
+    llavesConError[proveedor] = camposConError(e)
+      .filter((campo) => campo.startsWith("credenciales."))
+      .map((campo) => campo.slice("credenciales.".length));
     toast.error(mensajeDeError(e));
   } finally {
     guardando.value = null;
@@ -417,13 +444,34 @@ onMounted(cargar);
             v-model="edicion[i.proveedor].activa"
             class="shrink-0"
             :etiqueta="$t('integraciones.activa')"
+            :deshabilitado="
+              !edicion[i.proveedor].activa && faltanLlaves(i).length > 0
+            "
             :prueba="`activa-${i.proveedor}`"
           />
         </div>
+        <!-- Qué falta para poder activarla -->
+        <p
+          v-if="!edicion[i.proveedor].activa && faltanLlaves(i).length > 0"
+          class="tu-hint mt-3"
+          :data-prueba="`faltan-llaves-${i.proveedor}`"
+        >
+          {{
+            $t("operacion.integraciones.faltanLlaves", {
+              llaves: nombresDeLlaves(i.proveedor, faltanLlaves(i)),
+            })
+          }}
+        </p>
         <div class="mt-4 grid sm:grid-cols-2 gap-3">
           <div v-for="llave in i.llaves" :key="llave">
             <label class="tu-label" :for="`${i.proveedor}-${llave}`">
-              {{ $t(`integraciones.llaves.${i.proveedor}.${llave}`) }}
+              {{ $t(`integraciones.llaves.${i.proveedor}.${llave}`)
+              }}<span
+                v-if="(i.llaves_obligatorias ?? []).includes(llave)"
+                class="tu-obligatorio"
+                :title="$t('operacion.integraciones.obligatoria')"
+                >*</span
+              >
               <span
                 v-if="configurada(i.proveedor, llave)"
                 class="tu-badge tu-badge-exito ml-1"
@@ -436,6 +484,9 @@ onMounted(cargar);
               class="tu-input"
               :type="SECRETAS.has(llave) ? 'password' : 'text'"
               autocomplete="off"
+              :aria-invalid="
+                (llavesConError[i.proveedor] ?? []).includes(llave) || undefined
+              "
               :placeholder="
                 configurada(i.proveedor, llave)
                   ? $t('operacion.integraciones.reemplazar')
