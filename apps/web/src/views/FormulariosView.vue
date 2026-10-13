@@ -162,6 +162,18 @@ async function crearFormulario(): Promise<void> {
   }
 }
 
+// Una pregunta de opción necesita al menos dos opciones (si no, nadie podría enviarla).
+const opcionesNuevas = computed(() =>
+  nuevoCampo.value.opciones
+    .split(",")
+    .map((o) => o.trim())
+    .filter((o) => o !== ""),
+);
+const faltanOpciones = computed(
+  () =>
+    nuevoCampo.value.tipo === "seleccion" && opcionesNuevas.value.length < 2,
+);
+
 async function agregarCampo(): Promise<void> {
   if (
     seleccionado.value === null ||
@@ -174,12 +186,7 @@ async function agregarCampo(): Promise<void> {
   error.value = null;
   try {
     const opciones =
-      nuevoCampo.value.tipo === "seleccion"
-        ? nuevoCampo.value.opciones
-            .split(",")
-            .map((o) => o.trim())
-            .filter((o) => o !== "")
-        : null;
+      nuevoCampo.value.tipo === "seleccion" ? opcionesNuevas.value : null;
     await api.post(
       `${base.value}/formularios/${seleccionado.value.id}/campos`,
       {
@@ -614,7 +621,17 @@ onMounted(cargar);
                   v-model="nuevoCampo.opciones"
                   class="tu-input"
                   :placeholder="$t('formularios.campos.opciones')"
+                  :aria-describedby="
+                    faltanOpciones ? 'opciones-minimas' : undefined
+                  "
                 />
+                <span
+                  v-if="faltanOpciones"
+                  id="opciones-minimas"
+                  class="tu-hint mt-1 block"
+                  data-prueba="opciones-minimas"
+                  >{{ $t("operacion.formularios.dosOpciones") }}</span
+                >
               </label>
               <label class="flex items-center gap-1.5 text-sm">
                 <input v-model="nuevoCampo.obligatorio" type="checkbox" />
@@ -633,7 +650,9 @@ onMounted(cargar);
                   class="tu-btn tu-btn-primario"
                   type="submit"
                   :disabled="
-                    agregandoCampo || nuevoCampo.etiqueta.trim() === ''
+                    agregandoCampo ||
+                    nuevoCampo.etiqueta.trim() === '' ||
+                    faltanOpciones
                   "
                 >
                   {{ $t("formularios.campos.agregar") }}

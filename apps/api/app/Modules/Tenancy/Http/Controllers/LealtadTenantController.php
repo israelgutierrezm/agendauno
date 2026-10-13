@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Models\RecompensaLealtadTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Lealtad (R24): programa de puntos del estudio. Configura las reglas de acumulación y
@@ -41,6 +42,10 @@ class LealtadTenantController
             'puntos_por_asistencia' => ['required', 'integer', 'min:0', 'max:100000'],
             'puntos_por_moneda' => ['required', 'integer', 'min:0', 'max:100000'],
         ]);
+        // Activo sin puntos por asistir ni por comprar, nadie juntaría nada.
+        if ((bool) $validado['activa'] && (int) $validado['puntos_por_asistencia'] === 0 && (int) $validado['puntos_por_moneda'] === 0) {
+            throw ValidationException::withMessages(['activa' => ['Para activarlo define cuántos puntos se ganan por asistir o por comprar.']]);
+        }
 
         $programa = $this->programaActual();
         $programa->update([

@@ -11,6 +11,8 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Disponibilidad para citas (F-08): configura el horario de atención de un proveedor y
@@ -63,23 +65,32 @@ class DisponibilidadTenantController
             'horarios.*.hora_fin' => ['required', 'date_format:H:i'],
         ]);
 
+        foreach ($validado['horarios'] as $i => $h) {
+            if ($h['hora_fin'] <= $h['hora_inicio']) {
+                throw ValidationException::withMessages(["horarios.{$i}.hora_fin" => ['La hora de fin debe ser después de la de inicio.']]);
+            }
+        }
+
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
-        HorarioAtencionTenant::query()
-            ->where('instructor_id', $instructor->getKey())
-            ->where('sucursal_id', $sucursal->getKey())
-            ->delete();
+        // Se reemplazan todas o ninguna: un error a la mitad no deja el horario vacío.
+        DB::connection('tenant')->transaction(function () use ($instructor, $sucursal, $validado): void {
+            HorarioAtencionTenant::query()
+                ->where('instructor_id', $instructor->getKey())
+                ->where('sucursal_id', $sucursal->getKey())
+                ->delete();
 
-        foreach ($validado['horarios'] as $h) {
-            HorarioAtencionTenant::query()->create([
-                'instructor_id' => $instructor->getKey(),
-                'sucursal_id' => $sucursal->getKey(),
-                'dia_semana' => (int) $h['dia_semana'],
-                'hora_inicio' => $h['hora_inicio'],
-                'hora_fin' => $h['hora_fin'],
-            ]);
-        }
+            foreach ($validado['horarios'] as $h) {
+                HorarioAtencionTenant::query()->create([
+                    'instructor_id' => $instructor->getKey(),
+                    'sucursal_id' => $sucursal->getKey(),
+                    'dia_semana' => (int) $h['dia_semana'],
+                    'hora_inicio' => $h['hora_inicio'],
+                    'hora_fin' => $h['hora_fin'],
+                ]);
+            }
+        });
 
         return response()->json(['data' => ['total' => count($validado['horarios'])]], 201);
     }

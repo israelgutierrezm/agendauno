@@ -75,6 +75,8 @@ class PasarelasTenantController
             'llaves_configuradas' => $config instanceof ConfiguracionPasarelaTenant
                 ? array_keys($config->llaves())
                 : [],
+            // Sin estas no se puede activar.
+            'llaves_requeridas' => RegistroDePasarelasTenant::llavesRequeridas($proveedor),
             'disponible' => ProveedorPasarela::disponible($proveedor),
             // ¿Ya cobra? (activa y con sus llaves)
             'lista' => $this->registro->activa($proveedor),
@@ -135,6 +137,17 @@ class PasarelasTenantController
                 }
             }
             $config->credenciales = array_merge($config->llaves(), $nuevas);
+        }
+
+        // Encendida sin las llaves con que cobra, el cliente vería «pagar en línea» y
+        // fallaría: no se activa sin ellas (las ya guardadas cuentan).
+        $faltan = $config->activa ? RegistroDePasarelasTenant::llavesFaltantes($proveedor, $config->llaves()) : [];
+        if ($faltan !== []) {
+            $errores = ['activa' => ['Para activarla captura sus llaves.']];
+            foreach ($faltan as $llave) {
+                $errores["credenciales.{$llave}"] = ['Captúrala para activar la pasarela.'];
+            }
+            throw ValidationException::withMessages($errores);
         }
 
         // Llaves de prueba con modo real (o al revés): se dice antes de guardar (M07).

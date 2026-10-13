@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { codigoEmbebido } from "@/lib/captacion";
 import { confirmar } from "@/lib/confirmar";
@@ -235,6 +237,25 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
       </button>
     </div>
 
+    <!-- Con la página del negocio oculta, ningún widget se muestra en otra web. -->
+    <AvisoTono
+      v-if="
+        sesion.estudio?.publicado === false && widgets.some((w) => w.activo)
+      "
+      tono="aviso"
+      class="mt-4"
+      :titulo="$t('operacion.widgets.paginaOculta')"
+      data-prueba="widgets-pagina-oculta"
+    >
+      {{ $t("operacion.widgets.paginaOcultaAyuda") }}
+      <template #acciones>
+        <RouterLink
+          class="tu-btn tu-btn-contorno tu-tono-aviso tu-btn-chico"
+          :to="{ name: 'configuracion' }"
+          >{{ $t("operacion.widgets.irConfiguracion") }}</RouterLink
+        >
+      </template>
+    </AvisoTono>
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">{{
       error
     }}</AvisoTono>
@@ -254,10 +275,8 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="font-medium">{{ w.nombre }}</h2>
           <span
-            class="tu-estado text-sm"
-            :style="{
-              '--tono': w.activo ? 'var(--exito)' : 'var(--texto-suave)',
-            }"
+            class="tu-pastilla"
+            :class="w.activo ? 'tu-tono-exito' : 'tu-tono-neutral'"
             >{{
               w.activo
                 ? $t("captacion.widgets.activo")
@@ -425,10 +444,12 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
             {{ $t("captacion.widgets.agregarDominio") }}
           </button>
         </fieldset>
-        <label class="flex items-center gap-2 text-sm">
-          <input v-model="form.activo" type="checkbox" />
-          {{ $t("captacion.widgets.activo") }}
-        </label>
+        <InterruptorSiNo
+          v-model="form.activo"
+          class="justify-self-start"
+          :etiqueta="$t('captacion.widgets.activo')"
+          prueba="widget-activo"
+        />
         <button
           type="submit"
           class="tu-btn tu-btn-primario justify-self-start"

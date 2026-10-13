@@ -65,6 +65,31 @@ class RegistroDePasarelasTenant
      * ¿El proveedor puede cobrar? Integradas siempre; el resto solo si existe de
      * verdad, está activo y tiene sus llaves.
      */
+    /**
+     * Las llaves sin las que la pasarela no cobra (vacío si no pide ninguna).
+     *
+     * @return list<string>
+     */
+    public static function llavesRequeridas(string $proveedor): array
+    {
+        return self::LLAVES_REQUERIDAS[$proveedor] ?? [];
+    }
+
+    /**
+     * Las llaves sin las que la pasarela no cobra y que aún no tiene (vacío si no pide
+     * ninguna, como la ventanilla).
+     *
+     * @param  array<string, string>  $llaves
+     * @return list<string>
+     */
+    public static function llavesFaltantes(string $proveedor, array $llaves): array
+    {
+        return array_values(array_filter(
+            self::llavesRequeridas($proveedor),
+            static fn (string $llave): bool => trim($llaves[$llave] ?? '') === '',
+        ));
+    }
+
     public function activa(string $proveedor): bool
     {
         if (in_array($proveedor, self::INTEGRADAS, true)) {
@@ -87,10 +112,8 @@ class RegistroDePasarelasTenant
         }
 
         $llaves = $config->llaves();
-        foreach (self::LLAVES_REQUERIDAS[$proveedor] ?? [] as $llave) {
-            if (($llaves[$llave] ?? '') === '') {
-                return false;
-            }
+        if (self::llavesFaltantes($proveedor, $llaves) !== []) {
+            return false;
         }
 
         // En producción, sin cómo confirmar los pagos no se promete cobrar en línea:

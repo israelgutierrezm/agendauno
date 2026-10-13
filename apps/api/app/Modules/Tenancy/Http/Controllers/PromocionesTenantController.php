@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\PromocionTenant;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -150,6 +151,13 @@ class PromocionesTenantController
     private function normalizarDatos(Request $request): array
     {
         $v = $request->validate($this->reglas());
+        // El porcentaje va en centésimas (1000 = 10 %): más de 100 % no existe.
+        if ($v['tipo'] === TipoPromocion::Porcentaje->value && (int) $v['valor'] > 10000) {
+            throw ValidationException::withMessages(['valor' => ['Un descuento no puede ser mayor a 100 %.']]);
+        }
+        if ((bool) ($v['activa'] ?? true) && isset($v['vence_en']) && Carbon::parse((string) $v['vence_en'])->endOfDay()->isPast()) {
+            throw ValidationException::withMessages(['vence_en' => ['Esa fecha ya pasó: elige una futura o deja la promoción apagada.']]);
+        }
 
         return [
             'codigo' => $v['codigo'],

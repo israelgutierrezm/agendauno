@@ -161,6 +161,10 @@ class CatalogoTenantController
 
         // Defaults por modalidad: en un negocio de citas el servicio se agenda y se paga
         // (pago-para-reservar, 30 min); en uno de clases se reserva con la membresía.
+        // Quien elige «se paga al reservar» le pone su precio.
+        if (($validado['politica_reserva'] ?? null) === PoliticaReservaTenant::Pago->value) {
+            self::exigirPrecioParaPagar($validado['precio_clase_minor'] ?? null);
+        }
 
         $oferta = $actividad->ofertas()->create([
             'nombre' => $validado['nombre'],
@@ -246,6 +250,13 @@ class CatalogoTenantController
         // La duración de la cita solo se toca si viene (null la limpia).
         if ($request->has('duracion_minutos')) {
             $cambios['duracion_minutos'] = $validado['duracion_minutos'] !== null ? (int) $validado['duracion_minutos'] : null;
+        }
+        // Se paga al reservar: con precio (si se toca la política o el precio).
+        $politica = $cambios['politica_reserva'] ?? $oferta->politica_reserva;
+        $politica = $politica instanceof PoliticaReservaTenant ? $politica->value : (string) $politica;
+        if ((isset($validado['politica_reserva']) || $request->has('precio_clase_minor'))
+            && $politica === PoliticaReservaTenant::Pago->value) {
+            self::exigirPrecioParaPagar(array_key_exists('precio_clase_minor', $cambios) ? $cambios['precio_clase_minor'] : $oferta->precio_clase_minor);
         }
         $oferta->update($cambios);
 
@@ -377,5 +388,13 @@ class CatalogoTenantController
             'incluye' => $oferta->incluidas->pluck('ulid')->values()->all(),
             'foto_url' => $oferta->fotoUrl(),
         ];
+    }
+
+    /** Pagar al reservar sin precio dejaría una cuenta en cero: se pide el precio. */
+    private static function exigirPrecioParaPagar(mixed $precioMinor): void
+    {
+        if ((int) ($precioMinor ?? 0) <= 0) {
+            throw ValidationException::withMessages(['precio_clase_minor' => ['Un servicio que se paga al reservar necesita un precio mayor a 0.']]);
+        }
     }
 }

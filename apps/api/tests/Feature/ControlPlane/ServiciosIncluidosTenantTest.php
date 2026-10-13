@@ -37,7 +37,8 @@ function consultorioConPaquete(?int $precioDiagnostico = 15000): array
 
     $crear = static fn (string $nombre, ?int $precio): string => (string) test()->postJson("/api/v1/app/{$e['slug']}/actividades/{$actividad}/ofertas", [
         'nombre' => $nombre, 'modalidad' => 'individual', 'capacidad' => 1,
-        'politica_reserva' => 'pago', 'precio_clase_minor' => $precio, 'duracion_minutos' => 30,
+        // Sin precio no se puede pagar al reservar: ese se reserva con su bono.
+        'politica_reserva' => $precio !== null ? 'pago' : 'entitlement', 'precio_clase_minor' => $precio, 'duracion_minutos' => 30,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
     pasarNegocioACitas($e);
 

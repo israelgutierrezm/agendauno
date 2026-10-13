@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Membresias\TipoVigencia;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\ActividadTenant;
+use App\Modules\Tenancy\Models\ConfiguracionCuotasTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -99,6 +100,7 @@ class MembresiasTenantController
         ]);
         // Un negocio de citas vende bonos de sesiones, no membresías (ADR 0130).
         $this->modalidades->exigirAtributos($validado);
+        self::exigirCuotasConMonto($validado);
 
         $producto = $this->membresias->crearProducto(
             $validado['nombre'],
@@ -168,6 +170,8 @@ class MembresiasTenantController
             'cobra_anualidad' => ['sometimes', 'boolean'],
             ...self::reglasPermanencia(),
         ]);
+
+        self::exigirCuotasConMonto($validado);
 
         $actor = $request->attributes->get('usuario_tenant');
         $archiva = (bool) ($validado['archivado'] ?? false) && ! $producto->archivado;
@@ -485,5 +489,26 @@ class MembresiasTenantController
     private static function texto(mixed $valor): ?string
     {
         return is_string($valor) && trim($valor) !== '' ? trim($valor) : null;
+    }
+
+    /**
+     * Cobrar una inscripción o una anualidad que valen 0 no cobraría nada (y el plan
+     * pasaría por membresía): primero se define su monto en las cuotas del negocio.
+     *
+     * @param  array<string, mixed>  $validado
+     */
+    private static function exigirCuotasConMonto(array $validado): void
+    {
+        $cuotas = ConfiguracionCuotasTenant::actual();
+        $errores = [];
+        if ((bool) ($validado['cobra_inscripcion'] ?? false) && $cuotas->inscripcion_minor <= 0) {
+            $errores['cobra_inscripcion'] = ['Primero define el monto de la inscripción en las cuotas del negocio.'];
+        }
+        if ((bool) ($validado['cobra_anualidad'] ?? false) && $cuotas->anualidad_minor <= 0) {
+            $errores['cobra_anualidad'] = ['Primero define el monto de la anualidad en las cuotas del negocio.'];
+        }
+        if ($errores !== []) {
+            throw ValidationException::withMessages($errores);
+        }
     }
 }

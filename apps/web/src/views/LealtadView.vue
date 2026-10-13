@@ -7,7 +7,9 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -95,6 +97,14 @@ async function cargar(): Promise<void> {
     cargando.value = false;
   }
 }
+
+// Activo sin puntos por asistir ni por comprar, nadie juntaría nada.
+const programaSinPuntos = computed(
+  () =>
+    borradorPrograma.value.activa &&
+    Number(borradorPrograma.value.puntos_por_asistencia || 0) === 0 &&
+    Number(borradorPrograma.value.puntos_por_moneda || 0) === 0,
+);
 
 async function guardarPrograma(): Promise<void> {
   if (!puedeGestionar.value || guardandoPrograma.value) return;
@@ -359,17 +369,15 @@ const indicadores = computed<Indicador[]>(() => {
         @cerrar="editorPrograma = false"
       >
         <form @submit.prevent="guardarPrograma">
-          <p v-if="error" role="alert" :style="{ color: 'var(--error)' }">
+          <AvisoTono v-if="error" tono="peligro" class="mb-4" role="alert">
             {{ error }}
-          </p>
-          <label class="flex items-center gap-2 text-sm font-medium">
-            <input
-              v-model="borradorPrograma.activa"
-              type="checkbox"
-              :disabled="!puedeGestionar"
-            />
-            {{ $t("lealtad.programa.activa") }}
-          </label>
+          </AvisoTono>
+          <InterruptorSiNo
+            v-model="borradorPrograma.activa"
+            :etiqueta="$t('lealtad.programa.activa')"
+            :deshabilitado="!puedeGestionar"
+            prueba="lealtad-activa"
+          />
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <label class="tu-label" for="ppa">{{
@@ -401,6 +409,14 @@ const indicadores = computed<Indicador[]>(() => {
               }}</span>
             </div>
           </div>
+          <AvisoTono
+            v-if="programaSinPuntos"
+            tono="aviso"
+            class="mt-4"
+            data-prueba="lealtad-sin-puntos"
+          >
+            {{ $t("operacion.lealtad.sinPuntos") }}
+          </AvisoTono>
           <div class="mt-4 flex justify-end gap-2">
             <button
               type="button"
@@ -414,7 +430,7 @@ const indicadores = computed<Indicador[]>(() => {
               v-if="puedeGestionar"
               type="submit"
               class="tu-btn tu-btn-primario"
-              :disabled="guardandoPrograma"
+              :disabled="guardandoPrograma || programaSinPuntos"
             >
               {{ $t("comun.guardar") }}
             </button>
