@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoRegion from "@/components/AvisoRegion.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -38,6 +39,27 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeEmitir = computed(() => sesion.puede("ordenes.gestionar"));
 
 const facturas = ref<Factura[]>([]);
+// Por páginas (antes, solo las últimas 100) y con búsqueda en el API.
+const buscar = ref("");
+const pagina = ref(1);
+const meta = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
+function irPagina(n: number): void {
+  pagina.value = n;
+  void cargar();
+}
+let espera: ReturnType<typeof setTimeout> | undefined;
+watch(buscar, () => {
+  clearTimeout(espera);
+  espera = setTimeout(() => {
+    pagina.value = 1;
+    void cargar();
+  }, 300);
+});
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const mensaje = ref<string | null>(null);
@@ -80,10 +102,17 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Factura[] }>(
-      `${base.value}/facturas`,
-    );
+    const { data } = await api.get<{
+      data: Factura[];
+      meta?: typeof meta.value;
+    }>(`${base.value}/facturas`, {
+      params: {
+        page: pagina.value,
+        ...(buscar.value.trim() !== "" ? { q: buscar.value.trim() } : {}),
+      },
+    });
     facturas.value = data.data;
+    meta.value = data.meta ?? null;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -167,12 +196,25 @@ onMounted(cargar);
     </p>
 
     <template v-else>
+      <input
+        v-model="buscar"
+        type="search"
+        class="tu-input mt-6 max-w-sm"
+        :placeholder="$t('operacion.listadosDos.buscarFacturas')"
+        :aria-label="$t('operacion.listadosDos.buscarFacturas')"
+        data-prueba="buscar-facturas"
+      />
       <TablaDatos
-        class="mt-6"
+        class="mt-3"
         :columnas="columnas"
         :filas="facturas"
         :buscar="false"
-        :vacio="$t('facturas.vacio')"
+        :por-pagina="meta?.per_page ?? 20"
+        :vacio="
+          buscar.trim() !== ''
+            ? $t('operacion.listadosDos.sinResultados')
+            : $t('facturas.vacio')
+        "
         clave-vista="facturas"
       >
         <template #col-receptor="{ fila }">
@@ -217,6 +259,14 @@ onMounted(cargar);
           }}</span>
         </template>
       </TablaDatos>
+      <PaginacionListado
+        v-if="meta && meta.ultima_pagina > 1"
+        :page="meta.page"
+        :ultima-pagina="meta.ultima_pagina"
+        :total="meta.total"
+        :per-page="meta.per_page"
+        @ir="irPagina"
+      />
 
       <!-- La plataforma aún no factura (sin proveedor en producción). -->
       <AvisoRegion

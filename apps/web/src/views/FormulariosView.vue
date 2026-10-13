@@ -7,6 +7,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -71,6 +72,15 @@ const nuevoCampo = ref({
 const agregandoCampo = ref(false);
 
 const respuestas = ref<Respuesta[]>([]);
+// Por páginas (antes, solo las últimas 200) y buscando por la persona.
+const buscarRespuestas = ref("");
+const paginaRespuestas = ref(1);
+const metaRespuestas = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
 const cargandoRespuestas = ref(false);
 const abierta = ref<string | null>(null);
 
@@ -213,6 +223,7 @@ async function agregarCampo(): Promise<void> {
 
 async function cargarRespuestas(): Promise<void> {
   respuestas.value = [];
+  metaRespuestas.value = null;
   abierta.value = null;
   // Solo en la vista de respuestas: el diseño no las consulta.
   if (
@@ -224,17 +235,42 @@ async function cargarRespuestas(): Promise<void> {
   }
   cargandoRespuestas.value = true;
   try {
-    const { data } = await api.get<{ data: Respuesta[] }>(
-      `${base.value}/formularios/${seleccionadoId.value}/respuestas`,
-    );
+    const { data } = await api.get<{
+      data: Respuesta[];
+      meta?: typeof metaRespuestas.value;
+    }>(`${base.value}/formularios/${seleccionadoId.value}/respuestas`, {
+      params: {
+        page: paginaRespuestas.value,
+        ...(buscarRespuestas.value.trim() !== ""
+          ? { q: buscarRespuestas.value.trim() }
+          : {}),
+      },
+    });
     respuestas.value = data.data;
+    metaRespuestas.value = data.meta ?? null;
   } catch (e) {
     error.value = mensajeDeError(e, t("formulariosRespuestas.cargarError"));
   } finally {
     cargandoRespuestas.value = false;
   }
 }
-watch([seleccionadoId, soloRespuestas], cargarRespuestas);
+watch([seleccionadoId, soloRespuestas], () => {
+  paginaRespuestas.value = 1;
+  buscarRespuestas.value = "";
+  void cargarRespuestas();
+});
+function irPaginaRespuestas(n: number): void {
+  paginaRespuestas.value = n;
+  void cargarRespuestas();
+}
+let esperaRespuestas: ReturnType<typeof setTimeout> | undefined;
+function alBuscarRespuestas(): void {
+  clearTimeout(esperaRespuestas);
+  esperaRespuestas = setTimeout(() => {
+    paginaRespuestas.value = 1;
+    void cargarRespuestas();
+  }, 300);
+}
 watch(soloRespuestas, (respuestas) => {
   seleccionadoId.value = respuestas
     ? (seleccionadoId.value ?? formularios.value[0]?.id ?? null)
@@ -670,13 +706,22 @@ onMounted(cargar);
               v-if="puedeGestionar && respuestas.length > 0"
               class="ml-1 font-normal tabular-nums"
               :style="{ color: 'var(--texto-suave)' }"
-              >{{ respuestas.length }}</span
+              >{{ metaRespuestas?.total ?? respuestas.length }}</span
             >
           </h2>
           <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("formulariosRespuestas.comoLlenar") }}
           </p>
           <template v-if="puedeGestionar">
+            <input
+              v-model="buscarRespuestas"
+              type="search"
+              class="tu-input mt-4 max-w-sm"
+              :placeholder="$t('operacion.listadosDos.buscarRespuestas')"
+              :aria-label="$t('operacion.listadosDos.buscarRespuestas')"
+              data-prueba="buscar-respuestas"
+              @input="alBuscarRespuestas"
+            />
             <p
               v-if="cargandoRespuestas"
               class="mt-4 text-sm"
@@ -689,7 +734,11 @@ onMounted(cargar);
               class="mt-4 text-sm"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ $t("formulariosRespuestas.vacio") }}
+              {{
+                buscarRespuestas.trim() !== ""
+                  ? $t("operacion.listadosDos.sinResultados")
+                  : $t("formulariosRespuestas.vacio")
+              }}
             </p>
             <ul v-else class="mt-3">
               <li v-for="r in respuestas" :key="r.id" class="form-fila">
@@ -744,6 +793,14 @@ onMounted(cargar);
                 </dl>
               </li>
             </ul>
+            <PaginacionListado
+              v-if="metaRespuestas && metaRespuestas.ultima_pagina > 1"
+              :page="metaRespuestas.page"
+              :ultima-pagina="metaRespuestas.ultima_pagina"
+              :total="metaRespuestas.total"
+              :per-page="metaRespuestas.per_page"
+              @ir="irPaginaRespuestas"
+            />
           </template>
         </div>
       </div>

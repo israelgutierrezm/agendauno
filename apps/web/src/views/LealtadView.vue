@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import BuscarPersona from "@/components/BuscarPersona.vue";
@@ -11,6 +11,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero } from "@/lib/formato";
@@ -65,6 +66,59 @@ const programa = ref<Programa>({
 });
 const recompensas = ref<Recompensa[]>([]);
 const canjes = ref<Canje[]>([]);
+// Canjes por páginas: los que faltan por entregar (en orden de llegada) aparte del
+// historial; el resumen (sin búsqueda) alimenta los indicadores.
+interface MetaCanjes {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  conteos?: { pendientes: number; historial: number };
+  resumen?: { pendientes: number; puntos_entregados: number };
+}
+const vistaCanjes = ref<"pendientes" | "historial">("pendientes");
+const buscarCanjes = ref("");
+const paginaCanjes = ref(1);
+const metaCanjes = ref<MetaCanjes | null>(null);
+async function cargarCanjes(): Promise<void> {
+  const { data } = await api.get<{ data: Canje[]; meta?: MetaCanjes }>(
+    `${base.value}/lealtad/canjes`,
+    {
+      params: {
+        vista: vistaCanjes.value,
+        page: paginaCanjes.value,
+        ...(buscarCanjes.value.trim() !== ""
+          ? { q: buscarCanjes.value.trim() }
+          : {}),
+      },
+    },
+  );
+  canjes.value = data.data;
+  metaCanjes.value = data.meta ?? null;
+}
+async function recargarCanjes(): Promise<void> {
+  try {
+    await cargarCanjes();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+function irPaginaCanjes(n: number): void {
+  paginaCanjes.value = n;
+  void recargarCanjes();
+}
+watch(vistaCanjes, () => {
+  paginaCanjes.value = 1;
+  void recargarCanjes();
+});
+let esperaBusqueda: ReturnType<typeof setTimeout> | undefined;
+watch(buscarCanjes, () => {
+  clearTimeout(esperaBusqueda);
+  esperaBusqueda = setTimeout(() => {
+    paginaCanjes.value = 1;
+    void recargarCanjes();
+  }, 300);
+});
 
 const nueva = ref({ nombre: "", descripcion: "", costo_puntos: 100 });
 const nuevaRecompensa = ref(false);
@@ -83,14 +137,13 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [prog, recs, canj] = await Promise.all([
+    const [prog, recs] = await Promise.all([
       api.get<{ data: Programa }>(`${base.value}/lealtad/programa`),
       api.get<{ data: Recompensa[] }>(`${base.value}/lealtad/recompensas`),
-      api.get<{ data: Canje[] }>(`${base.value}/lealtad/canjes`),
+      cargarCanjes(),
     ]);
     programa.value = prog.data.data;
     recompensas.value = recs.data.data;
-    canjes.value = canj.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -263,9 +316,9 @@ onMounted(cargar);
 
 // Indicadores del programa (patrón de los listados).
 const indicadores = computed<Indicador[]>(() => {
-  const pendientes = canjes.value.filter(
-    (c) => c.estado === "pendiente",
-  ).length;
+  const pendientes =
+    metaCanjes.value?.resumen?.pendientes ??
+    canjes.value.filter((c) => c.estado === "pendiente").length;
   return [
     {
       clave: "programa",
@@ -292,9 +345,10 @@ const indicadores = computed<Indicador[]>(() => {
       clave: "canjeados",
       etiqueta: t("lealtadVisual.kpi.canjeados"),
       valor: String(
-        canjes.value
-          .filter((c) => c.estado === "entregado")
-          .reduce((suma, c) => suma + c.puntos, 0),
+        metaCanjes.value?.resumen?.puntos_entregados ??
+          canjes.value
+            .filter((c) => c.estado === "entregado")
+            .reduce((suma, c) => suma + c.puntos, 0),
       ),
       icono: "hecho",
     },
@@ -653,15 +707,53 @@ const indicadores = computed<Indicador[]>(() => {
       </div>
 
       <!-- Canjes recientes -->
-      <h2 class="mt-8 font-medium">
-        {{ $t("lealtad.canjes.titulo") }}
-      </h2>
+      <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-medium">
+          {{ $t("lealtad.canjes.titulo") }}
+        </h2>
+        <div class="tu-segmentado" role="group" data-prueba="vista-canjes">
+          <button
+            v-for="v in ['pendientes', 'historial'] as const"
+            :key="v"
+            type="button"
+            :aria-pressed="vistaCanjes === v"
+            :data-prueba="`canjes-${v}`"
+            @click="vistaCanjes = v"
+          >
+            {{
+              v === "pendientes"
+                ? $t("operacion.canjes.porEntregar")
+                : $t("operacion.canjes.historial")
+            }}
+            <span
+              v-if="metaCanjes?.conteos"
+              class="ml-1 tabular-nums"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ metaCanjes.conteos[v] }}</span
+            >
+          </button>
+        </div>
+      </div>
+      <input
+        v-model="buscarCanjes"
+        type="search"
+        class="tu-input mt-3 max-w-sm"
+        :placeholder="$t('operacion.canjes.buscar')"
+        :aria-label="$t('operacion.canjes.buscar')"
+        data-prueba="buscar-canjes"
+      />
       <EstadoVacio
         v-if="canjes.length === 0"
         class="mt-3 py-6"
         icono="lealtad"
         compacto
-        :titulo="$t('lealtad.canjes.vacio')"
+        :titulo="
+          buscarCanjes.trim() !== ''
+            ? $t('operacion.listadosDos.sinResultados')
+            : vistaCanjes === 'pendientes'
+              ? $t('operacion.canjes.sinPendientes')
+              : $t('operacion.canjes.sinHistorial')
+        "
       />
       <div v-else class="mt-3 tu-card overflow-x-auto">
         <table class="tu-tabla">
@@ -710,14 +802,14 @@ const indicadores = computed<Indicador[]>(() => {
                 >
                   <button
                     type="button"
-                    class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                    class="tu-btn tu-btn-suave tu-tono-exito tu-btn-chico whitespace-nowrap"
                     @click="accionCanje(c, 'entregar')"
                   >
                     {{ $t("lealtad.canjes.entregar") }}
                   </button>
                   <button
                     type="button"
-                    class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                    class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico whitespace-nowrap"
                     @click="accionCanje(c, 'cancelar')"
                   >
                     {{ $t("lealtad.canjes.cancelar") }}
@@ -728,6 +820,14 @@ const indicadores = computed<Indicador[]>(() => {
             </tr>
           </tbody>
         </table>
+        <PaginacionListado
+          v-if="metaCanjes && metaCanjes.ultima_pagina > 1"
+          :page="metaCanjes.page"
+          :ultima-pagina="metaCanjes.ultima_pagina"
+          :total="metaCanjes.total"
+          :per-page="metaCanjes.per_page"
+          @ir="irPaginaCanjes"
+        />
       </div>
     </template>
   </section>

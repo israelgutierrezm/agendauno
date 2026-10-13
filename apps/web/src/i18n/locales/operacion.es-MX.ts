@@ -739,6 +739,20 @@ export default {
   formularios: {
     dosOpciones: "Escribe al menos dos opciones, separadas por comas.",
   },
+  // Canjes de lealtad: los que faltan por entregar, aparte del historial.
+  canjes: {
+    porEntregar: "Por entregar",
+    historial: "Historial",
+    buscar: "Buscar por persona o recompensa",
+    sinPendientes: "No hay canjes por entregar.",
+    sinHistorial: "Aún no hay canjes entregados ni cancelados.",
+  },
+  // Listados por páginas con búsqueda.
+  listadosDos: {
+    buscarFacturas: "Buscar por receptor, RFC o folio fiscal",
+    buscarRespuestas: "Buscar por persona",
+    sinResultados: "Nada coincide con la búsqueda.",
+  },
   // Lugares apartados para un canal (Wellhub, TotalPass, ClassPass…).
   cuposCanal: {
     hastaQueEmpieza: "se apartan hasta que empieza",

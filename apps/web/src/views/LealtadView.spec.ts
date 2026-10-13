@@ -124,3 +124,74 @@ describe("puntos por unidad de moneda", () => {
     );
   });
 });
+
+describe("canjes por entregar y su historial", () => {
+  it("separa los pendientes del historial, con sus cuentas y por páginas", async () => {
+    api.get.mockImplementation(
+      (url: string, opciones?: { params?: { vista?: string } }) =>
+        Promise.resolve({
+          data: url.endsWith("/programa")
+            ? {
+                data: {
+                  activa: true,
+                  puntos_por_asistencia: 10,
+                  puntos_por_moneda: 1,
+                },
+              }
+            : url.endsWith("/canjes")
+              ? {
+                  data: [
+                    {
+                      id: "c1",
+                      persona: "Ana",
+                      recompensa: "Botella",
+                      puntos: 100,
+                      estado:
+                        opciones?.params?.vista === "historial"
+                          ? "entregado"
+                          : "pendiente",
+                      entregado_en: null,
+                      creado_en: "2026-10-01T10:00:00Z",
+                    },
+                  ],
+                  meta: {
+                    total: 41,
+                    page: 1,
+                    per_page: 20,
+                    ultima_pagina: 3,
+                    conteos: { pendientes: 41, historial: 7 },
+                    resumen: { pendientes: 41, puntos_entregados: 700 },
+                  },
+                }
+              : { data: [] },
+        }),
+    );
+    const w = mount(LealtadView, {
+      global: {
+        plugins: [i18n],
+        stubs: { BuscarPersona: true, Teleport: true },
+      },
+    });
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/lealtad/canjes", {
+      params: { vista: "pendientes", page: 1 },
+    });
+    expect(w.get('[data-prueba="canjes-pendientes"]').text()).toContain("41");
+    expect(w.get('[data-prueba="canjes-historial"]').text()).toContain("7");
+    // Los indicadores usan el resumen del negocio, no solo la página.
+    expect(w.text()).toContain("700");
+    expect(w.text()).toContain("Entregar");
+
+    await w.get('[data-prueba="canjes-historial"]').trigger("click");
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/lealtad/canjes",
+      {
+        params: { vista: "historial", page: 1 },
+      },
+    );
+    expect(w.text()).not.toContain("Entregar");
+    w.unmount();
+  });
+});

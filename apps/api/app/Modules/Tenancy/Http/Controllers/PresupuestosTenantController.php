@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
 use App\Modules\Tenancy\Application\PresupuestosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -42,15 +43,26 @@ class PresupuestosTenantController
         private readonly ResolverAccesoTenant $acceso,
     ) {}
 
+    /**
+     * Los presupuestos por páginas (antes, solo los últimos 300), por folio. «Vencido»
+     * es uno sin responder cuya vigencia ya pasó en el negocio.
+     */
     public function index(Request $request): JsonResponse
     {
+        $filtros = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
         $estado = (string) $request->query('estado', '');
         $buscar = trim((string) $request->query('q', ''));
         $consulta = PresupuestoTenant::query()
             ->with(['persona', 'sucursal'])
             ->tap(fn (Builder $q) => $this->acotar($q, $request))
             ->orderByDesc('folio');
-        if ($estado !== '' && $estado !== 'vencido') {
+        if ($estado === 'vencido') {
+            $consulta->whereIn('estado', [EstadoPresupuesto::Borrador->value, EstadoPresupuesto::Enviado->value])
+                ->whereDate('valido_hasta', '<', app(FechasNegocioTenant::class)->hoy());
+        } elseif ($estado !== '') {
             $consulta->where('estado', $estado);
         }
         if ($buscar !== '') {
@@ -59,12 +71,17 @@ class PresupuestosTenantController
                 ->orWhereHas('persona', fn (Builder $p) => $p->buscar($buscar))
                 ->orWhere('folio', (int) ltrim(preg_replace('/\D/', '', $buscar) ?? '', '0')));
         }
-        $lista = $consulta->limit(300)->get();
-        if ($estado === 'vencido') {
-            $lista = $lista->filter(fn (PresupuestoTenant $p): bool => $this->presupuestos->vencido($p))->values();
-        }
+        $pagina = $consulta->paginate((int) ($filtros['per_page'] ?? 25), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
-        return response()->json(['data' => $lista->map(fn (PresupuestoTenant $p): array => $this->resumen($p))->all()]);
+        return response()->json([
+            'data' => collect($pagina->items())->map(fn (PresupuestoTenant $p): array => $this->resumen($p))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
+        ]);
     }
 
     public function show(Request $request): JsonResponse

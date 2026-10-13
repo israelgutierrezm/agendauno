@@ -12,8 +12,10 @@ use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -23,14 +25,40 @@ use Illuminate\Validation\ValidationException;
  */
 class FacturasTenantController
 {
+    private const POR_PAGINA = 20;
+
     public function __construct(private readonly EmitirFacturaTenant $emisor) {}
 
-    public function index(): JsonResponse
+    /**
+     * Las facturas por páginas (antes, solo las últimas 100), de la más reciente a la
+     * más antigua; se buscan por receptor (nombre o RFC) o folio fiscal y por estado.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $facturas = FacturaTenant::query()->orderByDesc('id')->limit(100)->get();
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'estado' => ['nullable', Rule::enum(EstadoFactura::class)],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $buscar = trim((string) ($filtros['q'] ?? ''));
+        $pagina = FacturaTenant::query()
+            ->when($buscar !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
+                ->where('receptor_nombre', 'like', "%{$buscar}%")
+                ->orWhere('receptor_rfc', 'like', '%'.mb_strtoupper($buscar).'%')
+                ->orWhere('uuid', 'like', "%{$buscar}%")))
+            ->when(($filtros['estado'] ?? null) !== null, fn (Builder $q) => $q->where('estado', $filtros['estado']))
+            ->orderByDesc('id')
+            ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
         return response()->json([
-            'data' => $facturas->map(fn (FacturaTenant $f): array => $this->presentar($f))->all(),
+            'data' => collect($pagina->items())->map(fn (FacturaTenant $f): array => $this->presentar($f))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
         ]);
     }
 
@@ -111,6 +139,7 @@ class FacturasTenantController
             'xml_url' => $factura->xml_url,
             'motivo_error' => $factura->motivo_error,
             'timbrada_en' => $factura->timbrada_en?->toIso8601String(),
+            'creado_en' => $factura->created_at?->toIso8601String(),
         ];
     }
 }
