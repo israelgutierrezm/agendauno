@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Exceptions\TimbresAgotados;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\MovimientoTimbreTenant;
 use App\Modules\Tenancy\Models\SaldoTimbresTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -98,6 +99,55 @@ class TimbresTenant
                 'detalle' => $m->detalle,
                 'fecha' => $m->created_at?->toIso8601String(),
             ])->all();
+    }
+
+    /**
+     * Cómo se usan los timbres, por mes del negocio (en su zona horaria): lo gastado y
+     * lo comprado en los últimos `$meses` meses (el actual incluido), el promedio de
+     * los tres meses completos anteriores y para cuántos meses alcanza el saldo a ese
+     * ritmo (`null` si aún no hay uso con qué estimarlo).
+     *
+     * @return array{usados_mes: int, usados_mes_anterior: int, promedio_mensual: int, alcanza_meses: int|null, por_mes: list<array{mes: string, usados: int, comprados: int}>}
+     */
+    public function resumen(string $zona, int $meses = 12): array
+    {
+        $inicio = CarbonImmutable::now($zona)->startOfMonth()->subMonths($meses - 1);
+        /** @var array<string, array{mes: string, usados: int, comprados: int}> $porMes */
+        $porMes = [];
+        for ($i = 0; $i < $meses; $i++) {
+            $mes = $inicio->addMonths($i)->format('Y-m');
+            $porMes[$mes] = ['mes' => $mes, 'usados' => 0, 'comprados' => 0];
+        }
+        $movimientos = MovimientoTimbreTenant::query()
+            ->whereIn('tipo', ['consumo', 'compra'])
+            ->where('created_at', '>=', $inicio->utc())
+            ->select(['id', 'tipo', 'cantidad', 'created_at'])
+            ->cursor();
+        foreach ($movimientos as $m) {
+            $mes = $m->created_at?->setTimezone($zona)->format('Y-m');
+            if ($mes === null || ! isset($porMes[$mes])) {
+                continue;
+            }
+            if ($m->tipo === 'consumo') {
+                $porMes[$mes]['usados'] += abs($m->cantidad);
+            } else {
+                $porMes[$mes]['comprados'] += $m->cantidad;
+            }
+        }
+        $lista = array_values($porMes);
+        $usadosMes = $lista[$meses - 1]['usados'];
+        $completos = array_slice($lista, max(0, $meses - 4), 3);
+        $promedio = (int) round(array_sum(array_column($completos, 'usados')) / max(1, count($completos)));
+        // Sin historia, el ritmo del mes en curso es la mejor estimación.
+        $ritmo = $promedio > 0 ? $promedio : $usadosMes;
+
+        return [
+            'usados_mes' => $usadosMes,
+            'usados_mes_anterior' => $meses > 1 ? $lista[$meses - 2]['usados'] : 0,
+            'promedio_mensual' => $promedio,
+            'alcanza_meses' => $ritmo > 0 ? intdiv($this->disponibles(), $ritmo) : null,
+            'por_mes' => $lista,
+        ];
     }
 
     private function bloquear(): SaldoTimbresTenant

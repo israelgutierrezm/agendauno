@@ -685,6 +685,7 @@ const AREA_DE_AUXILIAR: Record<string, { area: string; vista: string }> = {
   "importar-clases": { area: "agenda", vista: "calendario" },
   "pase-lista": { area: "agenda", vista: "recepcion" },
   onboarding: { area: "inicio", vista: "resumen" },
+  timbres: { area: "suscripcion", vista: "pagos" },
 };
 
 interface RutaActual {
