@@ -1623,10 +1623,26 @@ onMounted(() => {
   text-align: left;
   transition:
     border-color 0.15s,
-    background-color 0.15s;
+    background-color 0.15s,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .ta-conteo:hover {
-  border-color: var(--tono);
+  transform: translateY(-2px);
+  box-shadow:
+    var(--sombra-elevada),
+    0 12px 24px -14px color-mix(in srgb, var(--tono) 45%, transparent);
+}
+.ta-conteo:active {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ta-conteo {
+    transition: box-shadow 0.2s ease;
+  }
+  .ta-conteo:hover {
+    transform: none;
+  }
 }
 .ta-conteo[aria-pressed="true"] {
   border-color: var(--tono);

@@ -563,12 +563,20 @@ const esTurnoUno = productoActual() === "turnouno";
   overflow: hidden;
   border-radius: 1.5rem;
   transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .tu-estudio-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 1.4rem 3.5rem rgb(37 49 64 / 13%);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-elevada);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-estudio-card {
+    transition: box-shadow 0.2s ease;
+  }
+  .tu-estudio-card:hover {
+    transform: none;
+  }
 }
 .tu-estudio-accion {
   display: flex;

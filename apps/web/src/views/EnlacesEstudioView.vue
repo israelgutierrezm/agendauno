@@ -324,9 +324,24 @@ onMounted(cargar);
   color: var(--texto);
   font-weight: 600;
   box-shadow: var(--sombra-tarjeta);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .ee-boton:hover {
-  border-color: var(--primario);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-elevada);
+}
+.ee-boton:active {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ee-boton {
+    transition: box-shadow 0.2s ease;
+  }
+  .ee-boton:hover {
+    transform: none;
+  }
 }
 .ee-red {
   display: inline-flex;

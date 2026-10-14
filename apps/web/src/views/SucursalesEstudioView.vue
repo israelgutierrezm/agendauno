@@ -185,15 +185,10 @@ onMounted(cargar);
       </p>
 
       <ul class="mt-4 space-y-3">
-        <li
-          v-for="s in opciones.sucursales"
-          :key="s.id"
-          class="tu-card overflow-hidden"
-          data-prueba="sucursal"
-        >
+        <li v-for="s in opciones.sucursales" :key="s.id" data-prueba="sucursal">
           <RouterLink
             :to="destinoSucursal(s)"
-            class="p-5 flex items-center justify-between gap-3 transition hover:-translate-y-0.5"
+            class="tu-card tu-card-enlace p-5 flex items-center justify-between gap-3"
           >
             <span class="flex items-center gap-3 min-w-0">
               <img

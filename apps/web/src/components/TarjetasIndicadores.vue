@@ -311,8 +311,29 @@ const columnasMedio = computed(() =>
   font-size: clamp(1.45rem, 2.3vw, 2rem);
   font-weight: 500;
 }
+/* Con destino: se eleva con una sombra del tono de la tarjeta (el borde no cambia). */
+.ti:not(.ti-compacta) .ti-celda:has(.ti-enlace) {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
 .ti:not(.ti-compacta) .ti-celda:has(.ti-enlace):hover {
-  border-color: var(--primario);
+  transform: translateY(-2px);
+  box-shadow:
+    var(--sombra-elevada),
+    0 12px 24px -14px
+      color-mix(in srgb, var(--tono, var(--primario)) 45%, transparent);
+}
+.ti:not(.ti-compacta) .ti-celda:has(.ti-enlace):active {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ti:not(.ti-compacta) .ti-celda:has(.ti-enlace) {
+    transition: box-shadow 0.2s ease;
+  }
+  .ti:not(.ti-compacta) .ti-celda:has(.ti-enlace):hover {
+    transform: none;
+  }
 }
 .ti-celda:has(.ti-enlace:focus-visible) {
   outline-offset: 2px;

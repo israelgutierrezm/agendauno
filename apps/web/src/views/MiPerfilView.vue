@@ -1072,8 +1072,8 @@ const aparienciaAbierta = ref(false);
   font-weight: 500;
   text-decoration: none;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .mp-atajo > svg {
   color: var(--primario-fuerte);
@@ -1083,8 +1083,19 @@ const aparienciaAbierta = ref(false);
   margin-left: auto;
 }
 .mp-atajo:hover {
-  border-color: var(--acento);
-  background: var(--primario-suave);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-elevada);
+}
+.mp-atajo:active {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-atajo {
+    transition: box-shadow 0.2s ease;
+  }
+  .mp-atajo:hover {
+    transform: none;
+  }
 }
 .mp-atajo:focus-visible {
   outline: 2px solid var(--acento);

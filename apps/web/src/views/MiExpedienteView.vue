@@ -67,7 +67,7 @@ onMounted(() => void cuenta.asegurar());
         <a
           v-if="cuenta.waivers.value.length"
           href="#me-firmar"
-          class="me-acceso tu-card"
+          class="me-acceso tu-card tu-card-enlace"
           ><IconoNav nombre="expediente" :tam="26" /><span
             ><strong>{{ $t("portal.expediente.firmar") }}</strong
             ><small class="me-estado">{{
@@ -78,7 +78,7 @@ onMounted(() => void cuenta.asegurar());
         <a
           v-if="cuenta.personaId.value !== null"
           href="#me-documentos"
-          class="me-acceso tu-card"
+          class="me-acceso tu-card tu-card-enlace"
           ><IconoNav nombre="expediente" :tam="26" /><span
             ><strong>{{ $t("portal.expediente.documentos") }}</strong
             ><small>{{ $t("portal.expediente.documentosAyuda") }}</small></span
@@ -89,7 +89,7 @@ onMounted(() => void cuenta.asegurar());
             cuenta.formularios.value.length && cuenta.personaId.value !== null
           "
           href="#me-fichas"
-          class="me-acceso tu-card"
+          class="me-acceso tu-card tu-card-enlace"
           ><IconoNav nombre="lista" :tam="26" /><span
             ><strong>{{ $t("portal.expediente.formularios") }}</strong
             ><small>{{ $t("portal.expediente.fichasAyuda") }}</small></span
@@ -204,9 +204,6 @@ onMounted(() => void cuenta.asegurar());
   margin-top: 0.2rem;
   color: var(--texto-suave);
   font-size: 0.8rem;
-}
-.me-acceso:hover {
-  border-color: var(--primario);
 }
 .me-seccion {
   display: flex;
