@@ -202,7 +202,7 @@ onMounted(() => void cuenta.asegurar());
     >
       <a
         href="#mp-pendientes"
-        class="tu-card mp-acceso"
+        class="tu-card tu-card-enlace mp-acceso"
         :class="{ 'mp-atencion': cuenta.porPagar.value.length > 0 }"
       >
         <span class="mp-icono"><IconoNav nombre="ventas" :tam="26" /></span>
@@ -218,21 +218,27 @@ onMounted(() => void cuenta.asegurar());
           }}</strong></span
         >
       </a>
-      <a v-if="mostrarPlanes" href="#mp-planes" class="tu-card mp-acceso"
+      <a
+        v-if="mostrarPlanes"
+        href="#mp-planes"
+        class="tu-card tu-card-enlace mp-acceso"
         ><span class="mp-icono"><IconoNav nombre="etiqueta" :tam="26" /></span
         ><span
           ><strong>{{ $t("portal.pagos.planes") }}</strong
           ><small>{{ $t("portal.pagos.saldoVigencia") }}</small></span
         ></a
       >
-      <a href="#mp-historial" class="tu-card mp-acceso"
+      <a href="#mp-historial" class="tu-card tu-card-enlace mp-acceso"
         ><span class="mp-icono"><IconoNav nombre="lista" :tam="26" /></span
         ><span
           ><strong>{{ $t("portal.pagos.historial") }}</strong
           ><small>{{ $t("portal.pagos.verMovimientos") }}</small></span
         ></a
       >
-      <a v-if="comprables.length" href="#mp-comprar" class="tu-card mp-acceso"
+      <a
+        v-if="comprables.length"
+        href="#mp-comprar"
+        class="tu-card tu-card-enlace mp-acceso"
         ><span class="mp-icono"><IconoNav nombre="dinero" :tam="26" /></span
         ><span
           ><strong>{{ $t("portal.pagos.renovar") }}</strong
@@ -604,9 +610,6 @@ onMounted(() => void cuenta.asegurar());
   gap: 0.8rem;
   padding: 1rem;
   text-decoration: none;
-}
-.mp-acceso:hover {
-  border-color: var(--primario);
 }
 .mp-acceso strong {
   display: block;

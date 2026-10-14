@@ -57,6 +57,9 @@
   --radio-tarjeta: 0.65rem; /* ~10px */
   --radio-boton: 0.5rem; /* ~8px */
   --sombra-tarjeta: 0 1px 2px rgb(16 24 40 / 5%);
+  /* Una tarjeta que lleva a otro lado se eleva al pasar el cursor. */
+  --sombra-elevada:
+    0 2px 4px rgb(16 24 40 / 5%), 0 14px 28px -12px rgb(16 24 40 / 22%);
   color-scheme: light;
 }
 
@@ -87,6 +90,8 @@
   --aviso-suave: #2a1e0a;
   --sombra: none;
   --sombra-tarjeta: none;
+  --sombra-elevada:
+    0 2px 4px rgb(0 0 0 / 30%), 0 16px 32px -12px rgb(0 0 0 / 65%);
   color-scheme: dark;
 }
 
@@ -851,6 +856,30 @@
     .tu-zona-archivo {
       transition: none;
     }
+  }
+}
+
+/* Tarjetas que llevan a otro lado (accesos, métricas): al pasar el cursor se elevan
+   con una sombra, sin pintar el borde. Fuera de las capas para ganarle a la sombra
+   fija de las tarjetas del panel (`ui/superficies.css`). */
+.tu-card.tu-card-enlace {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.tu-card.tu-card-enlace:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-elevada);
+}
+.tu-card.tu-card-enlace:active {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-card.tu-card-enlace {
+    transition: box-shadow 0.2s ease;
+  }
+  .tu-card.tu-card-enlace:hover {
+    transform: none;
   }
 }
 

@@ -328,7 +328,7 @@ onUnmounted(() => clearInterval(reloj));
           v-for="a in accesos.slice(0, 3)"
           :key="a.clave"
           :to="a.to"
-          class="pi-metrica tu-card"
+          class="pi-metrica tu-card tu-card-enlace"
         >
           <span class="pi-metrica-icono"
             ><IconoNav :nombre="a.icono" :tam="22"
@@ -340,7 +340,7 @@ onUnmounted(() => clearInterval(reloj));
         </RouterLink>
         <a
           href="#mi-dia"
-          class="pi-metrica tu-card"
+          class="pi-metrica tu-card tu-card-enlace"
           :class="{ 'pi-metrica-pendiente': pendientesHoy > 0 }"
           :title="$t('portal.instructor.inicio.pendientesAyuda')"
         >
@@ -596,9 +596,6 @@ onUnmounted(() => clearInterval(reloj));
   padding: 1rem;
   min-width: 0;
   text-decoration: none;
-}
-.pi-metrica:hover {
-  border-color: var(--primario);
 }
 .pi-metrica-icono {
   display: grid;
