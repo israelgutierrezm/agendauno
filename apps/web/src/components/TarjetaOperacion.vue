@@ -90,13 +90,18 @@ const foto = computed(() => imagenAcceso(props.imagen));
     color-mix(in srgb, var(--tono) 18%, var(--superficie)) 100%
   );
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
+/* Se eleva con una sombra del tono de la tarjeta; el borde no cambia. */
 .to-tarjeta:hover {
-  border-color: color-mix(in srgb, var(--tono) 45%, var(--borde));
   transform: translateY(-2px);
+  box-shadow:
+    var(--sombra-elevada),
+    0 12px 24px -14px color-mix(in srgb, var(--tono) 45%, transparent);
+}
+.to-tarjeta:active {
+  transform: translateY(0);
 }
 .to-tarjeta:focus-visible {
   outline: 2px solid var(--tono);
@@ -165,7 +170,7 @@ const foto = computed(() => imagenAcceso(props.imagen));
 }
 @media (prefers-reduced-motion: reduce) {
   .to-tarjeta {
-    transition: none;
+    transition: box-shadow 0.2s ease;
   }
   .to-tarjeta:hover {
     transform: none;

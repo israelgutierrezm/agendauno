@@ -318,14 +318,14 @@ const columnasMedio = computed(() =>
     box-shadow 0.2s ease;
 }
 .ti:not(.ti-compacta) .ti-celda:has(.ti-enlace):hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   box-shadow:
     var(--sombra-elevada),
     0 12px 24px -14px
       color-mix(in srgb, var(--tono, var(--primario)) 45%, transparent);
 }
 .ti:not(.ti-compacta) .ti-celda:has(.ti-enlace):active {
-  transform: translateY(-1px);
+  transform: translateY(0);
 }
 @media (prefers-reduced-motion: reduce) {
   .ti:not(.ti-compacta) .ti-celda:has(.ti-enlace) {

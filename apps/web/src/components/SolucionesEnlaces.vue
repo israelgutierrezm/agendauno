@@ -121,10 +121,24 @@ const columnas = computed(() =>
   font-weight: 600;
   color: var(--texto);
   text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .soluciones-enlaces a:hover {
-  border-color: var(--acento);
-  color: var(--enlace);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-elevada);
+}
+.soluciones-enlaces a:active {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .soluciones-enlaces a {
+    transition: box-shadow 0.2s ease;
+  }
+  .soluciones-enlaces a:hover {
+    transform: none;
+  }
 }
 .soluciones-enlaces a:focus-visible {
   outline: 2px solid var(--enlace);
@@ -136,12 +150,6 @@ const columnas = computed(() =>
   padding: 0 0 1.1rem;
   gap: 0.9rem 0.5rem;
   overflow: hidden;
-  transition:
-    border-color 0.2s ease,
-    transform 0.2s ease;
-}
-.soluciones-enlaces--visual a:hover {
-  transform: translateY(-3px);
 }
 .soluciones-enlaces--visual img {
   grid-column: 1 / -1;

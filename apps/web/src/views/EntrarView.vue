@@ -1034,14 +1034,20 @@ onMounted(async () => {
   border-radius: 1rem;
   background: var(--superficie);
   transition:
-    border-color 0.2s ease,
     transform 0.2s ease,
     box-shadow 0.2s ease;
 }
 .tu-negocios-recientes > li:hover {
-  border-color: color-mix(in srgb, var(--primario) 48%, var(--borde));
-  box-shadow: var(--sombra);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-elevada);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-negocios-recientes > li {
+    transition: box-shadow 0.2s ease;
+  }
+  .tu-negocios-recientes > li:hover {
+    transform: none;
+  }
 }
 .tu-negocio-principal,
 .tu-resultados-negocio button {
