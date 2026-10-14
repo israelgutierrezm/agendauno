@@ -36,6 +36,16 @@
         "Set-Location apps/web; $env:VITE_API_URL='http://localhost:8001'; npx vite --host 127.0.0.1 --port 5176 --strictPort"
       ],
       "port": 5176
+    },
+    {
+      "name": "web-turnouno",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location apps/web; npx vite --host 127.0.0.1 --port 5177 --strictPort"
+      ],
+      "port": 5177
     }
   ]
 }
