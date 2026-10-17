@@ -25,6 +25,7 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: {} }),
   useRouter: () => ({ push: vi.fn() }),
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 const documento = (n: number) => ({

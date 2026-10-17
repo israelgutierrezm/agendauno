@@ -30,6 +30,7 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: { vista: "consentimientos" } }),
   useRouter: () => ({ push: vi.fn() }),
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 function montar(waivers: unknown[]) {
@@ -69,9 +70,10 @@ describe("aviso de privacidad del negocio", () => {
       .dispatchEvent(new Event("submit"));
     await flushPromises();
     expect(api.post).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("campos entre corchetes"),
-    );
+    // El aviso queda dentro del panel, junto a lo que se está editando.
+    expect(
+      document.querySelector("#form-consentimiento [role=alert]")?.textContent,
+    ).toContain("campos entre corchetes");
   });
 
   it("ya publicado, no vuelve a ofrecer la plantilla", async () => {

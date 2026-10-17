@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -14,6 +15,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { conMarca, productoDeModalidad } from "@/lib/producto";
 import plantillaAvisoNegocio from "@/marketing/legales/aviso-negocio.txt?raw";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -259,6 +261,36 @@ const creandoTipo = ref(false);
 const nuevoRequisito = ref(false);
 const editandoTipo = ref<string | null>(null);
 const tipoEditado = ref(tipoVacio());
+// Con cambios sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartarNuevo = useDescartarCambios({
+  abierto: nuevoRequisito,
+  valor: () => nuevoTipo.value,
+  guardando: creandoTipo,
+});
+function abrirNuevoRequisito(): void {
+  error.value = null;
+  descartarNuevo.fijar();
+  nuevoRequisito.value = true;
+}
+function cerrarNuevoRequisito(): void {
+  void descartarNuevo.cerrar();
+}
+const editandoTipoAbierto = computed({
+  get: () => editandoTipo.value !== null,
+  set: (v: boolean) => {
+    if (!v) editandoTipo.value = null;
+  },
+});
+const descartarTipo = useDescartarCambios({
+  abierto: editandoTipoAbierto,
+  valor: () => tipoEditado.value,
+  guardando: accionando,
+});
+// Lo que no se pudo guardar se ve en su diálogo (no en un aviso flotante).
+const errorTipo = ref<string | null>(null);
+function cerrarTipo(): void {
+  void descartarTipo.cerrar();
+}
 
 async function crearTipo(): Promise<void> {
   if (
@@ -276,7 +308,11 @@ async function crearTipo(): Promise<void> {
       obligatorio: nuevoTipo.value.obligatorio,
       aplica_a: nuevoTipo.value.aplica_a,
     });
+    toast.exito(
+      t("documentosTabs.requisitoCreado", { nombre: nuevoTipo.value.nombre }),
+    );
     nuevoTipo.value = tipoVacio();
+    descartarNuevo.fijar();
     nuevoRequisito.value = false;
     await cargar();
   } catch (e) {
@@ -289,6 +325,8 @@ async function crearTipo(): Promise<void> {
 function editarTipo(tipo: TipoDoc): void {
   editandoTipo.value = tipo.id;
   tipoEditado.value = { ...tipo, descripcion: tipo.descripcion ?? "" };
+  errorTipo.value = null;
+  descartarTipo.fijar();
 }
 
 async function guardarTipo(): Promise<void> {
@@ -300,6 +338,7 @@ async function guardarTipo(): Promise<void> {
     return;
   }
   accionando.value = true;
+  errorTipo.value = null;
   try {
     await api.put(`${base.value}/tipos-documento/${editandoTipo.value}`, {
       nombre: tipoEditado.value.nombre,
@@ -308,11 +347,12 @@ async function guardarTipo(): Promise<void> {
       aplica_a: tipoEditado.value.aplica_a,
       activo: tipoEditado.value.activo,
     });
+    descartarTipo.fijar();
     editandoTipo.value = null;
     toast.exito(t("documentosTabs.guardado"));
     await cargar();
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    errorTipo.value = mensajeDeError(e);
   } finally {
     accionando.value = false;
   }
@@ -325,11 +365,32 @@ const editor = ref<{ abierto: boolean; clave: string | null }>({
 });
 const borrador = ref({ titulo: "", contenido: "" });
 const publicando = ref(false);
+const editorAbierto = computed({
+  get: () => editor.value.abierto,
+  set: (v: boolean) => {
+    editor.value.abierto = v;
+  },
+});
+const descartarConsentimiento = useDescartarCambios({
+  abierto: editorAbierto,
+  valor: () => borrador.value,
+  guardando: publicando,
+});
+// Lo que no se pudo publicar se ve en su panel (no en un aviso flotante).
+const errorConsentimiento = ref<string | null>(null);
+function abrirEditor(clave: string | null): void {
+  errorConsentimiento.value = null;
+  descartarConsentimiento.fijar();
+  editor.value = { abierto: true, clave };
+}
+function cerrarConsentimiento(): void {
+  void descartarConsentimiento.cerrar();
+}
 const textoAbierto = ref<string | null>(null);
 
 function nuevoConsentimiento(): void {
   borrador.value = { titulo: "", contenido: "" };
-  editor.value = { abierto: true, clave: null };
+  abrirEditor(null);
 }
 
 // El aviso de privacidad del negocio para sus clientes (clave reservada): se firma
@@ -353,12 +414,12 @@ function usarPlantillaAviso(): void {
       productoDeModalidad(sesion.esCitas ? "citas" : "clases"),
     ),
   };
-  editor.value = { abierto: true, clave: CLAVE_AVISO };
+  abrirEditor(CLAVE_AVISO);
 }
 
 function nuevaVersion(c: Consentimiento): void {
   borrador.value = { titulo: c.titulo, contenido: c.contenido };
-  editor.value = { abierto: true, clave: c.clave };
+  abrirEditor(c.clave);
 }
 
 /** Clave estable a partir del título, sin chocar con una vigente. */
@@ -381,8 +442,9 @@ function claveNueva(titulo: string): string {
 
 async function publicar(): Promise<void> {
   // Una plantilla con campos por llenar ([DOMICILIO DEL NEGOCIO]…) no se publica.
+  errorConsentimiento.value = null;
   if (/\[[^\]\n]{4,}\]/.test(borrador.value.contenido)) {
-    toast.error(t("consentimientos.faltanCampos"));
+    errorConsentimiento.value = t("consentimientos.faltanCampos");
     return;
   }
   if (
@@ -400,11 +462,12 @@ async function publicar(): Promise<void> {
       titulo: borrador.value.titulo,
       contenido: borrador.value.contenido,
     });
+    descartarConsentimiento.fijar();
     editor.value.abierto = false;
     toast.exito(t("consentimientos.publicadoOk"));
     await cargar();
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    errorConsentimiento.value = mensajeDeError(e);
   } finally {
     publicando.value = false;
   }
@@ -640,10 +703,7 @@ onMounted(cargar);
             v-if="puedeGestionar"
             type="button"
             class="tu-btn tu-btn-primario tu-btn-crear"
-            @click="
-              error = null;
-              nuevoRequisito = true;
-            "
+            @click="abrirNuevoRequisito"
           >
             {{ $t("adminUsabilidad.documentos.nuevo") }}
           </button>
@@ -666,9 +726,12 @@ onMounted(cargar);
               :descripcion="$t('adminUsabilidad.documentos.ayuda')"
               icono="documentos"
               :ocupado="accionando"
-              @cerrar="editandoTipo = null"
+              @cerrar="cerrarTipo"
             >
               <form class="w-full space-y-3 py-1" @submit.prevent="guardarTipo">
+                <AvisoTono v-if="errorTipo" tono="peligro" role="alert">
+                  {{ errorTipo }}
+                </AvisoTono>
                 <label class="block"
                   ><span class="tu-label">{{
                     $t("documentos.tipos.nombre")
@@ -730,7 +793,7 @@ onMounted(cargar);
                     type="button"
                     class="tu-btn tu-btn-fantasma text-sm"
                     :disabled="accionando"
-                    @click="editandoTipo = null"
+                    @click="cerrarTipo"
                   >
                     {{ $t("comun.cancelar") }}
                   </button>
@@ -786,7 +849,7 @@ onMounted(cargar);
         :descripcion="$t('adminUsabilidad.documentos.ayuda')"
         icono="documentos"
         :ocupado="creandoTipo"
-        @cerrar="nuevoRequisito = false"
+        @cerrar="cerrarNuevoRequisito"
       >
         <form
           v-if="puedeGestionar"
@@ -839,7 +902,7 @@ onMounted(cargar);
               type="button"
               class="tu-btn tu-btn-fantasma"
               :disabled="creandoTipo"
-              @click="nuevoRequisito = false"
+              @click="cerrarNuevoRequisito"
             >
               {{ $t("comun.cancelar") }}
             </button>
@@ -953,13 +1016,17 @@ onMounted(cargar);
           ? $t('consentimientos.nuevo')
           : $t('consentimientos.nuevaVersion')
       "
-      @cerrar="editor.abierto = false"
+      :ocupado="publicando"
+      @cerrar="cerrarConsentimiento"
     >
       <form
         id="form-consentimiento"
         class="space-y-4 p-5"
         @submit.prevent="publicar"
       >
+        <AvisoTono v-if="errorConsentimiento" tono="peligro" role="alert">
+          {{ errorConsentimiento }}
+        </AvisoTono>
         <div>
           <label class="tu-label" for="c-titulo">{{
             $t("consentimientos.titulo")
@@ -995,7 +1062,15 @@ onMounted(cargar);
         </p>
       </form>
       <template #pie>
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="publicando"
+            @click="cerrarConsentimiento"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
           <button
             type="submit"
             form="form-consentimiento"
@@ -1013,6 +1088,7 @@ onMounted(cargar);
       :abierto="rechazando !== null"
       :titulo="$t('documentos.docs.rechazarTitulo')"
       tam="md"
+      :ocupado="accionando"
       @cerrar="rechazando = null"
     >
       <form

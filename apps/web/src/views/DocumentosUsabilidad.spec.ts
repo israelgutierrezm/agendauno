@@ -20,6 +20,7 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: { vista: "requisitos" } }),
   useRouter: () => ({ push: vi.fn() }),
+  onBeforeRouteLeave: vi.fn(),
 }));
 const requisito = {
   id: "t1",

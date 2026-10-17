@@ -4,6 +4,7 @@
  */
 
 export const documentosTabs = {
+  requisitoCreado: "Requisito «{nombre}» creado.",
   documentos: "Documentos",
   requisitos: "Requisitos",
   consentimientos: "Consentimientos",
