@@ -4,7 +4,9 @@ import { computed, onMounted, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AyudaParaEmpezar from "@/components/AyudaParaEmpezar.vue";
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
+import CasosPiloto from "@/components/CasosPiloto.vue";
 import FondoHero from "@/components/FondoHero.vue";
 import DemoPaginaPublicaCitas from "@/components/DemoPaginaPublicaCitas.vue";
 import DemoPaginaPublicaClases from "@/components/DemoPaginaPublicaClases.vue";
@@ -15,10 +17,12 @@ import NegociosAnimados from "@/components/NegociosAnimados.vue";
 import PreciosLanding from "@/components/PreciosLanding.vue";
 import PreguntasFrecuentes from "@/components/PreguntasFrecuentes.vue";
 import ProductoDemo from "@/components/ProductoDemo.vue";
+import RecorridoDemo from "@/components/RecorridoDemo.vue";
 import SellosConfianza from "@/components/SellosConfianza.vue";
 import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
 import TextoDestacado from "@/components/TextoDestacado.vue";
 import { trackEvent } from "@/lib/analytics";
+import { CASOS } from "@/marketing/casos";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { contarVisitaLanding } from "@/lib/visitaLanding";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
@@ -145,6 +149,7 @@ const pasos = computed(() =>
     estado: t(k(`pasos.${paso}.estado`)),
   })),
 );
+// Lo demás de recepción, en una línea bajo el recorrido.
 const beneficiosOperacion = computed(() =>
   contenido.value.operacion.map((clave) => ({
     clave,
@@ -175,6 +180,9 @@ const preguntas = computed(() => {
     ),
   }));
 });
+
+// Casos reales de los pilotos (autorizados); sin ellos, la sección no aparece.
+const casos = computed(() => CASOS[props.modo]);
 
 // La nota de México (`landing.soloMexico`) solo donde algo lleva el asterisco.
 const notas = computed(() => ({
@@ -389,6 +397,7 @@ function medirOtra(): void {
         <p v-if="notas.pasos" class="tu-nota-mexico">
           {{ t("landing.soloMexico") }}
         </p>
+        <AyudaParaEmpezar :modo="modo" class="reveal" />
       </div>
     </section>
 
@@ -446,69 +455,73 @@ function medirOtra(): void {
           <strong>{{ t("landing.paraQuien.saludTitulo") }}</strong>
           {{ t("landing.paraQuien.saludAlcance") }}
         </p>
+        <!-- Casos reales de los pilotos (autorizados); sin ellos no aparece. -->
+        <div v-if="casos.length > 0" id="casos" class="mt-16">
+          <h3 class="tu-titulo text-2xl reveal">
+            {{ t("landing.modalidad.casosTitulo") }}
+          </h3>
+          <p class="mt-3 text-lg max-w-2xl reveal" :style="SUAVE">
+            {{ t("landing.modalidad.casosSubtitulo") }}
+          </p>
+          <CasosPiloto :modo="modo" />
+        </div>
       </div>
     </section>
 
-    <!-- ===================== RECEPCIÓN Y VENTAS ===================== -->
-    <section id="operacion" class="tu-banda tu-ancla" :style="BANDA_SUPERFICIE">
+    <!-- ===================== RECORRIDO ===================== -->
+    <section id="recorrido" class="tu-banda tu-ancla" :style="BANDA_SUPERFICIE">
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
-        <div
-          class="tu-operacion grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16"
-        >
-          <div class="reveal">
-            <p class="tu-seccion-etiqueta">
-              {{ t("landing.modalidad.operacionEtiqueta") }}
-            </p>
-            <h2 class="tu-titulo mt-3">{{ t(k("operacion.titulo")) }}</h2>
-            <p class="mt-5 text-lg max-w-xl" :style="SUAVE">
-              {{ t(k("operacion.subtitulo")) }}
-            </p>
-            <ul class="mt-8 space-y-4" role="list">
-              <li
-                v-for="b in beneficiosOperacion"
-                :key="b.clave"
-                class="tu-check-item"
-              >
-                <span class="tu-check" aria-hidden="true">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="m5 12.5 4 4 10-10" />
-                  </svg>
-                </span>
-                <span>{{ b.texto }}</span>
-              </li>
-            </ul>
-            <p v-if="notas.operacion" class="tu-nota-mexico">
-              {{ t("landing.soloMexico") }}
-            </p>
-            <RouterLink
-              class="tu-link-flecha mt-8"
-              :to="registro"
-              @click="medirRegistro('operations')"
-            >
-              {{ alRegistro("operacion.enlace") }}
-              <IconoNav nombre="chevron" :tam="16" />
-            </RouterLink>
-          </div>
-          <figure class="tu-imagen-marco tu-modalidad-recepcion reveal">
-            <img
-              :src="contenido.fotos.recepcion.src"
-              :alt="contenido.fotos.recepcion.alt"
-              width="1536"
-              height="1024"
-              loading="lazy"
-              decoding="async"
-            />
-          </figure>
+        <p class="tu-seccion-etiqueta reveal">
+          {{ t("landing.modalidad.recorridoEtiqueta") }}
+        </p>
+        <h2 class="tu-titulo mt-3 max-w-3xl reveal">
+          {{ t(k("recorrido.titulo")) }}
+        </h2>
+        <p class="mt-4 text-lg max-w-2xl reveal" :style="SUAVE">
+          {{ t(k("recorrido.subtitulo")) }}
+        </p>
+        <div class="mt-10 reveal">
+          <RecorridoDemo :modo="modo" />
         </div>
+        <div class="tu-recorrido-ademas reveal">
+          <p class="font-medium">
+            {{ t("landing.modalidad.recorridoAdemas") }}
+          </p>
+          <ul class="mt-3 grid gap-3 sm:grid-cols-3" role="list">
+            <li
+              v-for="b in beneficiosOperacion"
+              :key="b.clave"
+              class="tu-check-item"
+            >
+              <span class="tu-check" aria-hidden="true">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="m5 12.5 4 4 10-10" />
+                </svg>
+              </span>
+              <span>{{ b.texto }}</span>
+            </li>
+          </ul>
+          <p v-if="notas.operacion" class="tu-nota-mexico">
+            {{ t("landing.soloMexico") }}
+          </p>
+        </div>
+        <RouterLink
+          class="tu-link-flecha mt-8"
+          :to="registro"
+          @click="medirRegistro('journey')"
+        >
+          {{ alRegistro("operacion.enlace") }}
+          <IconoNav nombre="chevron" :tam="16" />
+        </RouterLink>
       </div>
     </section>
 
@@ -661,11 +674,9 @@ function medirOtra(): void {
 .tu-modalidad-giros {
   overflow: hidden;
 }
-/* La foto de recepción, la misma proporción en las dos modalidades. */
-.tu-modalidad-recepcion img {
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
-  object-position: 50% 30%;
+/* Lo demás de recepción, bajo el recorrido. */
+.tu-recorrido-ademas {
+  margin-top: 2rem;
 }
 .tu-modalidad-demo {
   min-width: 0;

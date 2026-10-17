@@ -72,16 +72,9 @@ describe("modalidades comerciales", () => {
 
   it("usa imágenes que ya existen en public/", () => {
     for (const modo of MODOS) {
-      const { seo, fotos } = MODALIDADES[modo];
-      for (const src of [seo.imagen, fotos.recepcion.src]) {
-        expect(existsSync(publico(src)), src).toBe(true);
-      }
-      expect(fotos.recepcion.alt.length).toBeGreaterThan(10);
+      const { seo } = MODALIDADES[modo];
+      expect(existsSync(publico(seo.imagen)), seo.imagen).toBe(true);
     }
-    // La recepción de citas no reutiliza la foto con objetos de yoga.
-    expect(MODALIDADES.citas.fotos.recepcion.src).not.toBe(
-      MODALIDADES.clases.fotos.recepcion.src,
-    );
   });
 
   it("los giros del registro son los del servidor y lib/modalidad los reutiliza", () => {

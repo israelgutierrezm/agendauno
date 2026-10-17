@@ -125,7 +125,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
         "soluciones",
         "como-funciona",
         "para-quien",
-        "operacion",
+        "recorrido",
         "precios",
         "pagina-publica",
         "preguntas",
@@ -362,7 +362,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
 
   it("pone la nota de México donde se menciona el cobro en línea", () => {
     const citas = montar("citas");
-    for (const seccion of ["#como-funciona", "#operacion", "#pagina-publica"]) {
+    for (const seccion of ["#como-funciona", "#recorrido", "#pagina-publica"]) {
       expect(citas.find(`${seccion} .tu-nota-mexico`).exists(), seccion).toBe(
         true,
       );
@@ -397,7 +397,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
           .findAll("#como-funciona [data-paso]")
           .map((p) => p.attributes("data-paso")),
       ).toEqual([...MODALIDADES[modo].pasos]);
-      expect(vista.findAll("#operacion .tu-check-item")).toHaveLength(
+      expect(vista.findAll("#recorrido .tu-check-item")).toHaveLength(
         MODALIDADES[modo].operacion.length,
       );
       vista.unmount();
@@ -435,7 +435,8 @@ describe("landing de una modalidad (/clases y /citas)", () => {
     (modo) => {
       const vista = montar(modo);
       const imagenes = vista.findAll("img");
-      expect(imagenes.length).toBeGreaterThanOrEqual(4);
+      // Las tres del collage (el recorrido no usa fotos: muestra pantallas de ejemplo).
+      expect(imagenes.length).toBeGreaterThanOrEqual(3);
       for (const img of imagenes) {
         expect(
           img.attributes("alt")?.length,
@@ -446,10 +447,6 @@ describe("landing de una modalidad (/clases y /citas)", () => {
           img.attributes("src"),
         ).toBe(true);
       }
-      // La foto de recepción es la de su modalidad (citas no usa la de yoga).
-      expect(vista.get("#operacion img").attributes("src")).toBe(
-        MODALIDADES[modo].fotos.recepcion.src,
-      );
       // El collage: la foto del centro se pide primero.
       expect(
         vista.findAll(".tu-hero-foto img")[1]!.attributes("fetchpriority"),
@@ -478,13 +475,6 @@ describe("landing de una modalidad (/clases y /citas)", () => {
         expect(escritura[clave], clave).toBeDefined();
       }
       expect(contenido.otra).not.toBe(modo);
-      // La foto de recepción no repite el hero ni la que abre el carrusel, que va
-      // justo antes de su banda.
-      const repetidas = [
-        ...contenido.hero.collage,
-        NEGOCIOS_POR_MODO[modo][0]!,
-      ].map(imagenNegocio);
-      expect(repetidas).not.toContain(contenido.fotos.recepcion.src);
     },
   );
 

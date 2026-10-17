@@ -260,8 +260,12 @@ export default {
       heroNota: "Imágenes y avisos de ejemplo.",
       demoPie: "{dias} días para probarlo. Sin tarjeta.",
       pasosTitulo: "Empieza en solo tres pasos",
+      recorridoEtiqueta: "De principio a fin",
+      recorridoAdemas: "Y en recepción, también:",
+      casosTitulo: "Negocios que ya trabajan así",
+      casosSubtitulo:
+        "Lo que tenían, lo que resolvieron y lo que cambió, contado por ellos.",
       ejemplo: "Ejemplo",
-      operacionEtiqueta: "Recepción y ventas",
       precioEtiqueta: "Tu suscripción a AgendaUno",
       faqTitulo: "Preguntas frecuentes",
     },
@@ -401,6 +405,11 @@ export default {
         subtitulo:
           "Tú armas tu semana. Tus alumnos reservan su lugar. Tú pasas lista.",
       },
+      recorrido: {
+        titulo: "De la reserva al corte del día, en un solo lugar.",
+        subtitulo:
+          "Sigue una misma clase: tu alumna reserva, tu estudio la recibe, se registra el pago y ves el resultado.",
+      },
       pasos: {
         preparar: {
           titulo: "Arma tu semana",
@@ -428,9 +437,6 @@ export default {
         },
       },
       operacion: {
-        titulo: "Recibe a tus alumnos desde cualquier pantalla.",
-        subtitulo:
-          "Pasa lista, consulta membresías y vende paquetes o productos desde el celular, la tableta o la computadora.",
         beneficios: {
           lista: "Pase de lista: llegó, retardo o no vino",
           paseQr: "Pase QR de entrada en gimnasios y boxes",
@@ -608,6 +614,11 @@ export default {
         subtitulo:
           "Tú defines servicios y horarios. Tus clientes agendan. Tu equipo atiende.",
       },
+      recorrido: {
+        titulo: "De la cita al corte del día, en un solo lugar.",
+        subtitulo:
+          "Sigue una misma cita: tu cliente agenda, llega a la agenda de tu profesional, se registra el pago y ves el resultado.",
+      },
       pasos: {
         preparar: {
           titulo: "Configura servicios y horarios",
@@ -635,9 +646,6 @@ export default {
         },
       },
       operacion: {
-        titulo: "De la llegada al cobro, sin vueltas.",
-        subtitulo:
-          "Registra la llegada de tus clientes, cobra el servicio y vende productos desde el celular, la tableta o la computadora.",
         beneficios: {
           llegada: "Llegada de cada cita: llegó, llegó tarde o no vino",
           cobro: "Cobro en recepción o en línea al agendar*",

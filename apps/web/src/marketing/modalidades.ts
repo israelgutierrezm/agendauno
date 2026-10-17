@@ -264,12 +264,6 @@ export function imagenNegocio(clave: string): string {
   return `/assets/landing/disciplinas/${IMAGEN_NEGOCIO[clave] ?? IMAGEN_NEGOCIO.pilates}`;
 }
 
-export interface FotoMarketing {
-  /** Ruta pública de una imagen que ya existe en `public/`. */
-  src: string;
-  alt: string;
-}
-
 export interface ContenidoModalidad {
   modo: Modo;
   ruta: `/${Modo}`;
@@ -299,10 +293,6 @@ export interface ContenidoModalidad {
   funciones: readonly string[];
   /** Preguntas frecuentes propias: claves de `landing.{modo}.faq.{clave}`. */
   preguntas: readonly string[];
-  fotos: {
-    /** Banda de recepción y ventas. */
-    recepcion: FotoMarketing;
-  };
   /** Hero de la página: el texto animado y las tres fotos del collage. */
   hero: {
     /** Claves de `landing.heroEscritura.negocios.*`, en orden. */
@@ -312,7 +302,7 @@ export interface ContenidoModalidad {
   };
   /** «Cómo funciona», en orden: `landing.{modo}.pasos.{clave}`. */
   pasos: readonly string[];
-  /** Recepción y ventas: `landing.{modo}.operacion.beneficios.{clave}`. */
+  /** Lo demás de recepción, bajo el recorrido: `landing.{modo}.operacion.beneficios.{clave}`. */
   operacion: readonly string[];
   /** Página pública: `landing.{modo}.pagina.beneficios.{clave}`. */
   pagina: readonly string[];
@@ -376,12 +366,6 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     pagina: ["compartir", "lugares", "directorio"],
     notaSalud: false,
     otra: "citas",
-    fotos: {
-      recepcion: {
-        src: "/assets/landing/agendauno-checkin-pos.webp",
-        alt: "Teléfono con la lista de asistencia y tableta con productos del mostrador",
-      },
-    },
   },
   citas: {
     modo: "citas",
@@ -445,12 +429,5 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     pagina: ["compartir", "cualquiera", "cobro"],
     notaSalud: true,
     otra: "clases",
-    fotos: {
-      recepcion: {
-        // No la de estética: abre el carrusel, justo antes de esta banda.
-        src: "/assets/landing/disciplinas/barberia-v1.jpg",
-        alt: "Barbero atendiendo a un cliente en una barbería moderna",
-      },
-    },
   },
 };
