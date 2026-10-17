@@ -1694,6 +1694,15 @@ export default {
       renovaciones: "Por vencer y vencidas",
       recuperar: "Para recuperar",
     },
+    // Dar seguimiento desde la tabla (deja registro en Tareas).
+    // Se usa con llave dinámica (`retencion.seguimiento.${estado}`).
+    seguimiento: {
+      dar: "Dar seguimiento",
+      creado: "Seguimiento creado · Ver",
+      abierta: "Ya tiene seguimiento · Ver",
+      no_promociones: "No desea promociones",
+      reciente: "Se le contactó hace poco · Ver",
+    },
     // Retención por segmentos (ADR 0159, components/SegmentosRetencion.vue).
     segmentos: {
       ayuda:
@@ -1775,12 +1784,15 @@ export default {
       regularizado: "Regularizado",
       pausado: "En pausa",
     },
+    // Un solo vocabulario en Cobros (J): pendiente, confirmado, devolución e
+    // incidencia. Se usa con llave dinámica (`cobranza.pagoEstados.${estado}`).
     pagoEstados: {
-      aprobado: "Aprobado",
-      parcialmente_reembolsado: "Reembolso parcial",
-      reembolsado: "Reembolsado",
       pendiente: "Pendiente",
-      rechazado: "Rechazado",
+      aprobado: "Confirmado",
+      parcialmente_reembolsado: "Devuelto en parte",
+      reembolsado: "Devuelto",
+      rechazado: "Incidencia: rechazado",
+      anulado: "Anulado (se registró por error)",
     },
     reembolso: {
       titulo: "Reembolsar pago",

@@ -160,6 +160,33 @@ async function cargar(): Promise<void> {
   }
 }
 
+// Dar seguimiento: crea su tarea (o dice por qué no) y deja el enlace a Tareas.
+const puedeSeguir =
+  sesion.puede?.("tareas.gestionar") === true &&
+  sesion.puede?.("miembros.gestionar") === true;
+const seguimientos = ref<Record<string, string>>({});
+const dandoSeguimiento = ref<string | null>(null);
+async function darSeguimiento(m: Miembro): Promise<void> {
+  dandoSeguimiento.value = m.id;
+  error.value = null;
+  try {
+    const { data } = await api.post<{
+      data: { creada: boolean; omitida: string | null };
+    }>(`${base.value}/retencion/seguimiento/${m.id}`, {
+      estado: m.estado,
+      vence: m.vence,
+    });
+    seguimientos.value = {
+      ...seguimientos.value,
+      [m.id]: data.data.creada ? "creado" : (data.data.omitida ?? "abierta"),
+    };
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    dandoSeguimiento.value = null;
+  }
+}
+
 async function exportar(): Promise<void> {
   exportando.value = true;
   error.value = null;
@@ -419,12 +446,31 @@ onMounted(cargar);
                   {{ asistTexto(m) }}
                 </td>
                 <td class="text-right whitespace-nowrap">
-                  <a
-                    v-if="m.email"
-                    :href="`mailto:${m.email}`"
+                  <!-- Contactar deja registro: su seguimiento (una tarea donde se
+                       anota con qué terminó), no solo un enlace de correo. -->
+                  <template v-if="seguimientos[m.id]">
+                    <RouterLink
+                      :to="{
+                        name: 'tareas',
+                        query: { tipo: 'seguimiento', q: m.nombre_completo },
+                      }"
+                      class="tu-enlace text-sm mr-3"
+                      :data-prueba="`seguimiento-de-${m.id}`"
+                      >{{
+                        $t(`retencion.seguimiento.${seguimientos[m.id]}`)
+                      }}</RouterLink
+                    >
+                  </template>
+                  <button
+                    v-else-if="puedeSeguir"
+                    type="button"
                     class="tu-enlace text-sm mr-3"
-                    >{{ $t("retencion.contactar") }}</a
+                    :disabled="dandoSeguimiento === m.id"
+                    :data-prueba="`dar-seguimiento-${m.id}`"
+                    @click="darSeguimiento(m)"
                   >
+                    {{ $t("retencion.seguimiento.dar") }}
+                  </button>
                   <RouterLink
                     :to="{ name: 'ficha-miembro', params: { id: m.id } }"
                     class="tu-enlace text-sm"

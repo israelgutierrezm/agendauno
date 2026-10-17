@@ -758,6 +758,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/retencion/segmentos', [RetencionTenantController::class, 'segmentos'])->middleware('puede:miembros.ver')->name('retencion.segmentos');
             Route::get('/retencion/segmentos/{segmento}', [RetencionTenantController::class, 'segmento'])->middleware('puede:miembros.ver')->name('retencion.segmento');
             Route::post('/retencion/segmentos/{segmento}/seguimientos', [RetencionTenantController::class, 'seguimientos'])->middleware(['puede:miembros.gestionar', 'puede:tareas.gestionar'])->name('retencion.seguimientos');
+            Route::post('/retencion/seguimiento/{persona}', [RetencionTenantController::class, 'seguimientoDe'])->middleware(['puede:miembros.gestionar', 'puede:tareas.gestionar'])->name('retencion.seguimiento');
 
             // Agenda (data plane del tenant): materializa una Oferta en una Sucursal
             // a una hora concreta. La hora local (zona de la sucursal) se guarda en UTC

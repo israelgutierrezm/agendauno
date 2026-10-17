@@ -9,14 +9,18 @@ import RetencionView from "./RetencionView.vue";
 | los días y bajaba un conjunto distinto del que se veía.
 */
 
-const api = vi.hoisted(() => ({ get: vi.fn() }));
+const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("vue-router", () => ({
   RouterLink: { template: "<a><slot /></a>" },
   useRoute: () => ({ query: {} }),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", esCitas: false }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    esCitas: false,
+    puede: () => true,
+  }),
 }));
 
 const miembro = {
@@ -127,6 +131,35 @@ describe("retención", () => {
       (w.get('[data-prueba="filtro-estado"]').element as HTMLSelectElement)
         .value,
     ).toBe("");
+    vi.useRealTimers();
+  });
+
+  it("dar seguimiento deja registro en Tareas y lo dice en la fila", async () => {
+    api.post.mockResolvedValue({
+      data: { data: { creada: true, omitida: null } },
+    });
+    const w = mount(RetencionView, {
+      global: {
+        plugins: [i18n],
+        stubs: {
+          EncabezadoSeccion: true,
+          RouterLink: {
+            props: ["to"],
+            template: "<a :data-to='JSON.stringify(to)'><slot /></a>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+    await w.get('[data-prueba="dar-seguimiento-m1"]').trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/retencion/seguimiento/m1",
+      { estado: "por_vencer", vence: "2026-10-05" },
+    );
+    const enlace = w.get('[data-prueba="seguimiento-de-m1"]');
+    expect(enlace.text()).toContain("Seguimiento creado");
     vi.useRealTimers();
   });
 });

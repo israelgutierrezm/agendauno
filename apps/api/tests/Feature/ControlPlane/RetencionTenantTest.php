@@ -134,3 +134,18 @@ it('"por vencer" y "vencida" se miden igual en el radar y en la ficha, con los d
     expect($radar())->toBe(['Vencio' => 'vencida'])
         ->and($ficha())->toBe('vigente');
 });
+
+it('contactar desde Renovaciones deja registro: crea su seguimiento una vez y dice por qué no otra', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $vp = venderPackAMiembroTenant($e, 8000, 'Renovar');
+    fijarVigencia($e, $vp['derecho'], CarbonImmutable::now()->addDays(3)->toDateString());
+    $url = "/api/v1/app/{$e['slug']}/retencion/seguimiento/{$vp['persona']}";
+
+    $this->postJson($url, ['estado' => 'por_vencer', 'vence' => CarbonImmutable::now()->addDays(3)->toDateString()], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.creada', true);
+    $this->postJson($url, ['estado' => 'por_vencer'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.creada', false)->assertJsonPath('data.omitida', 'abierta');
+
+    $tareas = $this->getJson("/api/v1/app/{$e['slug']}/tareas?tipo=seguimiento", conBearer($e['bearer']))->assertOk()->json('data');
+    expect(collect($tareas)->pluck('motivo')->all())->toBe(['plan_por_vencer']);
+});

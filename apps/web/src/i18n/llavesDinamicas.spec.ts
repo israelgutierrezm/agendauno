@@ -71,4 +71,20 @@ describe("llaves de texto armadas en el momento", () => {
     expect(i18n.global.t("retencion.estados.por_vencer")).toBe("Por vencer");
     expect(i18n.global.t("retencion.estados.vencida")).toBe("Vencida");
   });
+
+  it("cada estado de pago del API tiene su nombre (ninguno se ve como clave)", () => {
+    // Los de EstadoPago (apps/api/app/Modules/Tenancy/Pagos/EstadoPago.php).
+    for (const estado of [
+      "pendiente",
+      "aprobado",
+      "rechazado",
+      "reembolsado",
+      "parcialmente_reembolsado",
+      "anulado",
+    ]) {
+      expect(i18n.global.te(`cobranza.pagoEstados.${estado}`), estado).toBe(
+        true,
+      );
+    }
+  });
 });

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\SegmentosRetencionTenant;
 use App\Modules\Tenancy\Application\SeguimientoTenant;
 use App\Modules\Tenancy\Automatizacion\EstadoTarea;
+use App\Modules\Tenancy\Automatizacion\MotivoSeguimiento;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -110,6 +111,35 @@ class RetencionTenantController
         }
 
         return response()->json(['data' => ['creadas' => $creadas, 'omitidas' => count($filas) - $creadas]], 201);
+    }
+
+    /**
+     * El seguimiento de una persona de Renovaciones (por vencer o vencida): contactarla
+     * deja registro (una tarea con su mensaje sugerido, donde se anota con qué terminó),
+     * no solo un enlace de correo. Sin repetir el que ya tiene abierto o reciente.
+     */
+    public function seguimientoDe(Request $request, SeguimientoTenant $seguimiento): JsonResponse
+    {
+        $this->exigirNegocioCompleto($request);
+        $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        $validado = $request->validate([
+            'estado' => ['required', 'in:por_vencer,vencida'],
+            'vence' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $motivo = $validado['estado'] === 'por_vencer' ? MotivoSeguimiento::PlanPorVencer : MotivoSeguimiento::PlanVencido;
+        $creada = $seguimiento->crearPorSegmento((int) $persona->getKey(), $motivo, $validado['vence'] ?? null);
+        $abierta = TareaTenant::query()->where('persona_id', $persona->getKey())->where('motivo', $motivo->value)
+            ->where('estado', EstadoTarea::Pendiente->value)->exists();
+
+        // Por qué no se creó: ya tiene uno abierto, no desea promociones o se le contactó hace poco.
+        $omitida = match (true) {
+            $creada => null,
+            $abierta => 'abierta',
+            ! $persona->recibe_promociones => 'no_promociones',
+            default => 'reciente',
+        };
+
+        return response()->json(['data' => ['creada' => $creada, 'omitida' => $omitida]], $creada ? 201 : 200);
     }
 
     private function clave(Request $request): string

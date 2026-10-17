@@ -748,10 +748,15 @@ const indicadores = computed<Indicador[]>(() => {
   }
   return [];
 });
+// Pendiente en ámbar, confirmado en verde, devoluciones en gris e incidencias en
+// rojo: un rechazo no se ve como un pendiente más.
 const TONO_PAGO: Record<string, string> = {
+  pendiente: "var(--aviso)",
   aprobado: "var(--exito)",
+  parcialmente_reembolsado: "var(--texto-suave)",
   reembolsado: "var(--texto-suave)",
   anulado: "var(--texto-suave)",
+  rechazado: "var(--error)",
   fallido: "var(--error)",
 };
 
