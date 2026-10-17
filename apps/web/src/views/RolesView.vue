@@ -247,19 +247,20 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion :titulo="$t('operacion.rolesPropios.titulo')" />
-      <button
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        type="button"
-        @click="abrirNuevo"
-      >
-        {{ $t("operacion.rolesPropios.nuevo") }}
-      </button>
-    </div>
-    <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("operacion.rolesPropios.ayuda") }}
-    </p>
+    <EncabezadoSeccion
+      :titulo="$t('operacion.rolesPropios.titulo')"
+      :subtitulo="$t('operacion.rolesPropios.ayuda')"
+    >
+      <template #acciones>
+        <button
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          type="button"
+          @click="abrirNuevo"
+        >
+          {{ $t("operacion.rolesPropios.nuevo") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

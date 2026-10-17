@@ -24,7 +24,9 @@ function montar() {
       ],
       stubs: {
         RouterLink: { template: "<a><slot /></a>" },
-        EncabezadoSeccion: true,
+        EncabezadoSeccion: {
+          template: "<div><slot name='acciones' /></div>",
+        },
       },
     },
   });

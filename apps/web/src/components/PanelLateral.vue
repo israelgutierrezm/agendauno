@@ -10,12 +10,15 @@ import { useFocoPanel } from "@/lib/focoPanel";
  * (`lateral`), para ver el cambio de tema sobre la pantalla. Se cierra con Escape o
  * tocando el fondo, atrapa el foco y bloquea el scroll de atrás. El contenido va en
  * el slot por defecto, las acciones en el slot `pie` y, si hace falta, un encabezado
- * propio en `cabecera` (en lugar del título).
+ * propio en `cabecera` (en lugar del título). Para un proceso largo con tablas (p. ej.
+ * los conceptos de un presupuesto), `amplio` (~1024 px): los campos no se estiran,
+ * pero las tablas caben.
  */
 const props = defineProps<{
   abierto: boolean;
   titulo?: string;
   lateral?: boolean;
+  amplio?: boolean;
   // Guardando: no se cierra (ni con Escape, el fondo o la X) hasta que termine, para
   // que el resultado o el error se vean donde se hizo el cambio.
   ocupado?: boolean;
@@ -45,7 +48,11 @@ const capa = useFocoPanel(() => props.abierto, panel, cerrar);
           ref="panel"
           class="tu-drawer-panel relative flex w-full flex-col overflow-y-auto shadow-xl"
           :class="
-            lateral ? 'h-full max-w-md' : 'max-h-[92vh] max-w-3xl rounded-xl'
+            lateral
+              ? 'h-full max-w-md'
+              : amplio
+                ? 'max-h-[92vh] max-w-5xl rounded-xl'
+                : 'max-h-[92vh] max-w-3xl rounded-xl'
           "
           :style="{ background: 'var(--superficie)' }"
           role="dialog"

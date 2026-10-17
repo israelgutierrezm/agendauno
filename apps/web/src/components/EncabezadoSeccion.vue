@@ -14,7 +14,9 @@ defineProps<{
 
 <template>
   <div class="tu-encabezado flex items-center justify-between gap-4 flex-wrap">
-    <div class="flex min-w-0 items-center gap-3">
+    <!-- El título cede espacio (su texto baja de renglón) para que las acciones se
+         queden a la derecha; con poco ancho, las acciones pasan abajo. -->
+    <div class="flex min-w-0 flex-1 basis-64 items-center gap-3">
       <span v-if="icono" class="es-icono" aria-hidden="true"
         ><IconoNav :nombre="icono" :tam="23"
       /></span>

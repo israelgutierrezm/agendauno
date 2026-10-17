@@ -472,12 +472,13 @@ onMounted(async () => {
 
 <template>
   <section class="tu-pagina">
-    <div class="flex items-center justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion :titulo="$t('recepcion.titulo')" />
-      <RouterLink class="tu-btn tu-btn-fantasma" :to="{ name: 'agenda' }">{{
-        $t("recepcion.abrirAgenda")
-      }}</RouterLink>
-    </div>
+    <EncabezadoSeccion :titulo="$t('recepcion.titulo')">
+      <template #acciones>
+        <RouterLink class="tu-btn tu-btn-fantasma" :to="{ name: 'agenda' }">{{
+          $t("recepcion.abrirAgenda")
+        }}</RouterLink>
+      </template>
+    </EncabezadoSeccion>
     <!-- Clases: cuándo se trajo lo que se ve (en citas lo dice su propia lista). -->
     <ActualizadoHace
       v-if="!sesion.esCitas && actualizadoEn"

@@ -1876,50 +1876,51 @@ onMounted(async () => {
 
 <template>
   <section class="tu-pagina">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        :titulo="$t('agenda.titulo')"
-        :subtitulo="$t('agenda.subtitulo')"
-      />
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- En el teléfono, solo la acción principal: lo demás está en el menú. -->
-        <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
-        <RouterLink
-          v-if="puedeEntrar('horarios', sesion)"
-          :to="{ name: 'horarios' }"
-          class="tu-btn tu-btn-fantasma max-sm:hidden"
-          >{{ $t("agenda.disponibilidadEquipo") }}</RouterLink
-        >
-        <RouterLink
-          v-if="puedeEntrar('reglas-agenda', sesion)"
-          :to="{ name: 'reglas-agenda', hash: '#politicas' }"
-          class="tu-btn tu-btn-fantasma max-sm:hidden"
-          >{{ $t("agenda.reglasReserva") }}</RouterLink
-        >
-        <!-- Importar es secundaria: la principal es crear (al final). -->
-        <BotonImportar
-          v-if="puedeEntrar('importar-clases', sesion)"
-          class="max-sm:hidden"
-          ruta="importar-clases"
-          :texto="$t('importarClases.titulo')"
-        />
-        <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
-        <button
-          v-if="sesion.esCitas && puedeReservar"
-          class="tu-btn tu-btn-primario tu-btn-crear"
-          @click="abrirNuevaCita()"
-        >
-          {{ $t("agendaVisual.nuevaCita.boton") }}
-        </button>
-        <button
-          v-else-if="!sesion.esCitas && puedeGestionar"
-          class="tu-btn tu-btn-primario tu-btn-crear"
-          @click="abrirNuevaClase"
-        >
-          {{ $t("agenda.nuevaClase") }}
-        </button>
-      </div>
-    </div>
+    <EncabezadoSeccion
+      :titulo="$t('agenda.titulo')"
+      :subtitulo="$t('agenda.subtitulo')"
+    >
+      <template #acciones>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- En el teléfono, solo la acción principal: lo demás está en el menú. -->
+          <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
+          <RouterLink
+            v-if="puedeEntrar('horarios', sesion)"
+            :to="{ name: 'horarios' }"
+            class="tu-btn tu-btn-fantasma max-sm:hidden"
+            >{{ $t("agenda.disponibilidadEquipo") }}</RouterLink
+          >
+          <RouterLink
+            v-if="puedeEntrar('reglas-agenda', sesion)"
+            :to="{ name: 'reglas-agenda', hash: '#politicas' }"
+            class="tu-btn tu-btn-fantasma max-sm:hidden"
+            >{{ $t("agenda.reglasReserva") }}</RouterLink
+          >
+          <!-- Importar es secundaria: la principal es crear (al final). -->
+          <BotonImportar
+            v-if="puedeEntrar('importar-clases', sesion)"
+            class="max-sm:hidden"
+            ruta="importar-clases"
+            :texto="$t('importarClases.titulo')"
+          />
+          <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
+          <button
+            v-if="sesion.esCitas && puedeReservar"
+            class="tu-btn tu-btn-primario tu-btn-crear"
+            @click="abrirNuevaCita()"
+          >
+            {{ $t("agendaVisual.nuevaCita.boton") }}
+          </button>
+          <button
+            v-else-if="!sesion.esCitas && puedeGestionar"
+            class="tu-btn tu-btn-primario tu-btn-crear"
+            @click="abrirNuevaClase"
+          >
+            {{ $t("agenda.nuevaClase") }}
+          </button>
+        </div>
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

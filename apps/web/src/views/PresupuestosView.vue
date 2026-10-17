@@ -814,6 +814,7 @@ onMounted(() => {
           ? $t('presupuestos.editor.titulo', { folio: actual.folio })
           : $t('presupuestos.editor.tituloNuevo')
       "
+      amplio
       :ocupado="guardando"
       @cerrar="cerrarEditor"
     >

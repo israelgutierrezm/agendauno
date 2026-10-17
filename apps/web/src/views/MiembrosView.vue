@@ -779,35 +779,36 @@ onMounted(() => {
 
 <template>
   <section class="tu-pagina">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        :titulo="plural(sesion.terminologia.miembro)"
-        :total="meta?.total ?? 0"
-        :subtitulo="
-          $t(
-            sesion.esCitas
-              ? 'operacion.admin.clientesCitas'
-              : 'operacion.admin.clientesClases',
-          )
-        "
-      />
-      <div class="flex flex-wrap items-center gap-2">
-        <button
-          v-if="puedeFamilias && tipo === 'miembro'"
-          type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
-          data-prueba="abrir-familias"
-          @click="familiasAbiertas = true"
-        >
-          {{ $t("familias.config.titulo") }}
-        </button>
-        <BotonImportar
-          v-if="puedeGestionar"
-          ruta="importar"
-          :texto="$t('nav.importar')"
-        />
-      </div>
-    </div>
+    <EncabezadoSeccion
+      :titulo="plural(sesion.terminologia.miembro)"
+      :total="meta?.total ?? 0"
+      :subtitulo="
+        $t(
+          sesion.esCitas
+            ? 'operacion.admin.clientesCitas'
+            : 'operacion.admin.clientesClases',
+        )
+      "
+    >
+      <template #acciones>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-if="puedeFamilias && tipo === 'miembro'"
+            type="button"
+            class="tu-btn tu-btn-fantasma text-sm"
+            data-prueba="abrir-familias"
+            @click="familiasAbiertas = true"
+          >
+            {{ $t("familias.config.titulo") }}
+          </button>
+          <BotonImportar
+            v-if="puedeGestionar"
+            ruta="importar"
+            :texto="$t('nav.importar')"
+          />
+        </div>
+      </template>
+    </EncabezadoSeccion>
 
     <!-- Cuántos hay y qué pide atención -->
     <TarjetasIndicadores

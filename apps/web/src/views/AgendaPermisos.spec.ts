@@ -59,7 +59,9 @@ function montar() {
       ],
       stubs: {
         teleport: true,
-        EncabezadoSeccion: true,
+        EncabezadoSeccion: {
+          template: "<div><slot name='acciones' /></div>",
+        },
         AgendaProfesionales: true,
         AgendaClasesSemana: true,
         AgendaKpis: true,

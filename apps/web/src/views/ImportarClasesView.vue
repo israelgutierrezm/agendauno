@@ -201,15 +201,16 @@ async function descargar() {
 
 <template>
   <section class="tu-pagina" :aria-busy="ocupado">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <EncabezadoSeccion
-        :titulo="t('importarClases.titulo')"
-        :subtitulo="t('importarClases.subtitulo')"
-      />
-      <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-fantasma">{{
-        t("importarClases.volver")
-      }}</RouterLink>
-    </div>
+    <EncabezadoSeccion
+      :titulo="t('importarClases.titulo')"
+      :subtitulo="t('importarClases.subtitulo')"
+    >
+      <template #acciones>
+        <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-fantasma">{{
+          t("importarClases.volver")
+        }}</RouterLink>
+      </template>
+    </EncabezadoSeccion>
     <AvisoTono v-if="error" tono="peligro" role="alert" class="mt-4">
       {{ error }}
     </AvisoTono>

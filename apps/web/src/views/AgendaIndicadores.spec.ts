@@ -81,7 +81,9 @@ describe("indicadores de la agenda", () => {
         ],
         stubs: {
           teleport: true,
-          EncabezadoSeccion: true,
+          EncabezadoSeccion: {
+            template: "<div><slot name='acciones' /></div>",
+          },
           AgendaProfesionales: true,
           PanelCita: true,
           PanelNuevaCita: true,
@@ -137,7 +139,9 @@ describe("indicadores de la agenda", () => {
         ],
         stubs: {
           teleport: true,
-          EncabezadoSeccion: true,
+          EncabezadoSeccion: {
+            template: "<div><slot name='acciones' /></div>",
+          },
           AgendaProfesionales: true,
           PanelCita: true,
           PanelNuevaCita: true,

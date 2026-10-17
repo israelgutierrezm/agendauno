@@ -73,7 +73,9 @@ function montar(metaSesiones?: { truncado: boolean }) {
       ],
       stubs: {
         teleport: true,
-        EncabezadoSeccion: true,
+        EncabezadoSeccion: {
+          template: "<div><slot name='acciones' /></div>",
+        },
         AgendaClasesSemana: true,
         AgendaProfesionales: true,
         AgendaKpis: true,
