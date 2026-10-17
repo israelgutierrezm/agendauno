@@ -144,6 +144,13 @@ const cargando = ref(false);
 const error = ref<string | null>(null);
 const dias = ref(30);
 const notas = ref<Nota[]>([]);
+// Por páginas: quien anota en cada visita junta cientos de notas por cliente.
+const metaNotas = ref<{
+  page: number;
+  ultima_pagina: number;
+  total: number;
+} | null>(null);
+const cargandoMasNotas = ref(false);
 const ficha = ref<Ficha | null>(null);
 const cargandoFicha = ref(false);
 
@@ -281,12 +288,43 @@ async function cargarNotas(): Promise<void> {
     return;
   }
   try {
-    const { data } = await api.get<{ data: Nota[] }>(
-      `${base.value}/miembros/${props.persona.id}/notas`,
-    );
+    const { data } = await api.get<{
+      data: Nota[];
+      meta?: { page: number; ultima_pagina: number; total: number };
+    }>(`${base.value}/miembros/${props.persona.id}/notas`, {
+      params: { page: 1 },
+    });
     notas.value = data.data;
+    metaNotas.value = data.meta ?? null;
   } catch {
     notas.value = [];
+    metaNotas.value = null;
+  }
+}
+async function masNotas(): Promise<void> {
+  const meta = metaNotas.value;
+  if (!props.persona || !meta || meta.page >= meta.ultima_pagina) {
+    return;
+  }
+  cargandoMasNotas.value = true;
+  try {
+    const { data } = await api.get<{
+      data: Nota[];
+      meta?: { page: number; ultima_pagina: number; total: number };
+    }>(`${base.value}/miembros/${props.persona.id}/notas`, {
+      params: { page: meta.page + 1 },
+    });
+    // Sin repetir la que se acabe de agregar (se recorre una al crear).
+    const vistas = new Set(notas.value.map((n) => n.id));
+    notas.value = [
+      ...notas.value,
+      ...data.data.filter((n) => !vistas.has(n.id)),
+    ];
+    metaNotas.value = data.meta ?? null;
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    cargandoMasNotas.value = false;
   }
 }
 async function cargarFicha(): Promise<void> {
@@ -344,6 +382,12 @@ async function guardarNota(): Promise<void> {
       { texto: textoNota.value.trim() },
     );
     notas.value = [data.data, ...notas.value];
+    if (metaNotas.value) {
+      metaNotas.value = {
+        ...metaNotas.value,
+        total: metaNotas.value.total + 1,
+      };
+    }
     textoNota.value = "";
     escribiendo.value = false;
     toast.exito(t("detalleMiembro.notas.guardada"));
@@ -367,6 +411,12 @@ async function eliminarNota(n: Nota): Promise<void> {
       `${base.value}/miembros/${props.persona.id}/notas/${n.id}`,
     );
     notas.value = notas.value.filter((x) => x.id !== n.id);
+    if (metaNotas.value) {
+      metaNotas.value = {
+        ...metaNotas.value,
+        total: Math.max(0, metaNotas.value.total - 1),
+      };
+    }
   } catch (e) {
     toast.error(mensajeDeError(e));
   }
@@ -967,6 +1017,13 @@ function colorAlerta(codigo: string): string {
             >
           </li>
         </ul>
+        <RouterLink
+          v-if="persona && ficha && ficha.reservas.length >= 20"
+          :to="{ name: 'ficha-miembro', params: { id: persona.id } }"
+          class="tu-enlace mt-3 inline-block text-sm"
+          data-prueba="historial-en-ficha"
+          >{{ $t("detalleMiembro.verTodoEnFicha") }} →</RouterLink
+        >
       </div>
 
       <!-- PAGOS -->
@@ -1025,6 +1082,13 @@ function colorAlerta(codigo: string): string {
               }}</span>
             </li>
           </ul>
+          <RouterLink
+            v-if="persona && (ficha.ordenes ?? []).length >= 20"
+            :to="{ name: 'ficha-miembro', params: { id: persona.id } }"
+            class="tu-enlace mt-3 inline-block text-sm"
+            data-prueba="compras-en-ficha"
+            >{{ $t("detalleMiembro.verTodoEnFicha") }} →</RouterLink
+          >
         </section>
       </div>
 
@@ -1079,6 +1143,22 @@ function colorAlerta(codigo: string): string {
             </p>
           </li>
         </ul>
+        <button
+          v-if="metaNotas && notas.length < metaNotas.total"
+          type="button"
+          class="tu-enlace mt-3 text-sm"
+          :disabled="cargandoMasNotas"
+          data-prueba="ver-mas-notas"
+          @click="masNotas"
+        >
+          {{
+            cargandoMasNotas
+              ? $t("comun.cargando")
+              : $t("detalleMiembro.notas.verMas", {
+                  n: metaNotas.total - notas.length,
+                })
+          }}
+        </button>
       </div>
     </template>
 

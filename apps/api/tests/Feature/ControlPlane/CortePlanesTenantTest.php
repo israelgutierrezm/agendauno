@@ -69,8 +69,10 @@ it('el corte muestra lo incluido, las extras y cada clase en que se usó', funct
         ->and($plan['unidades']['extras'])->toBe(1000)
         ->and($plan['unidades']['disponibles'])->toBe(0)
         ->and($plan['extras'])->toBe([['producto' => 'Clase extra', 'comprado' => '2026-10-20', 'unidades' => 1000, 'usadas' => 0]]);
-    expect(array_column($plan['usos'], 'estado'))->toBe(['asistio', 'no_asistio', 'proxima', 'proxima'])
-        ->and(array_column($plan['usos'], 'extra'))->toBe([false, false, false, true])
+    // Del más reciente al más antiguo (los demás, por páginas).
+    expect(array_column($plan['usos'], 'estado'))->toBe(['proxima', 'proxima', 'no_asistio', 'asistio'])
+        ->and(array_column($plan['usos'], 'extra'))->toBe([true, false, false, false])
+        ->and($plan['usos_total'])->toBe(4)
         ->and($plan['usos'][0]['clase'])->toBe('Nivel 1');
 
     // …y el equipo, igual.

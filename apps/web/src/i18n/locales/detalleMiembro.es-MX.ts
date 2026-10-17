@@ -61,6 +61,8 @@ export default {
     canceladas: "Cancelaciones",
     noAsistio: "No asistió",
   },
+  // Historial y compras del modal traen los 20 más recientes; la ficha, todo.
+  verTodoEnFicha: "Ver todo en la ficha completa",
   notas: {
     titulo: "Notas",
     ayuda: "Solo las ve el equipo.",
@@ -73,6 +75,7 @@ export default {
     confirmarEliminar: "¿Eliminar esta nota?",
     guardada: "Nota guardada.",
     todas: "Ver todas las notas",
+    verMas: "Ver más ({n})",
   },
   historial: {
     vacio: "Aún no tiene reservas.",

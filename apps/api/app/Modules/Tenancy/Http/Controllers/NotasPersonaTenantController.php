@@ -27,11 +27,29 @@ class NotasPersonaTenantController
     public function index(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
-        $notas = NotaPersonaTenant::query()
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $consulta = NotaPersonaTenant::query()
             ->where('persona_id', $persona->getKey())
             ->with('autor')
-            ->orderByDesc('id')
-            ->get();
+            ->orderByDesc('id');
+        // Con `page`, por páginas: quien anota en cada visita junta cientos.
+        if (isset($validado['page'])) {
+            $pagina = $consulta->paginate((int) ($validado['per_page'] ?? 20), ['*'], 'page', (int) $validado['page']);
+
+            return response()->json([
+                'data' => collect($pagina->items())->map(fn (NotaPersonaTenant $n): array => $this->presentar($n))->values()->all(),
+                'meta' => [
+                    'total' => $pagina->total(),
+                    'page' => $pagina->currentPage(),
+                    'per_page' => $pagina->perPage(),
+                    'ultima_pagina' => $pagina->lastPage(),
+                ],
+            ]);
+        }
+        $notas = $consulta->get();
 
         return response()->json([
             'data' => $notas->map(fn (NotaPersonaTenant $n): array => $this->presentar($n))->all(),

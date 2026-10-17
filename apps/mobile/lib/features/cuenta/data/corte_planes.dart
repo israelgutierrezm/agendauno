@@ -72,6 +72,7 @@ class PlanCorte {
     this.aplicaA = const [],
     this.extras = const [],
     this.usos = const [],
+    this.usosTotal = 0,
     this.cobertura = const CoberturaSucursales(),
   });
 
@@ -96,6 +97,10 @@ class PlanCorte {
   final Map<String, int> unidades;
   final List<ExtraPlan> extras;
   final List<UsoPlan> usos;
+
+  /// Cuántos usos tiene en total: el corte trae los más recientes y los demás se
+  /// piden por páginas.
+  final int usosTotal;
 
   /// Vigente, por empezar o en pausa: los que siguen en juego.
   bool get actual => const [
@@ -162,5 +167,8 @@ class PlanCorte {
         .whereType<Map<String, dynamic>>()
         .map(UsoPlan.desdeJson)
         .toList(),
+    usosTotal:
+        (j['usos_total'] as num?)?.toInt() ??
+        ((j['usos'] ?? []) as List).length,
   );
 }

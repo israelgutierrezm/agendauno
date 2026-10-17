@@ -211,8 +211,7 @@ export default {
       "¿Tienes un bono? Entra a tu cuenta para usarlo: ahí aparecen los servicios que incluye.",
     entrarBono: "Entrar a mi cuenta",
     conTuBono: "Con tu bono",
-    pagoConBono:
-      "Se descuenta una sesión de tu bono; no pagas al agendar.",
+    pagoConBono: "Se descuenta una sesión de tu bono; no pagas al agendar.",
     horaSucursal: "Horario local de la sucursal",
     pagoPrevio:
       "Para confirmar tu cita, completa el pago en el siguiente paso.",

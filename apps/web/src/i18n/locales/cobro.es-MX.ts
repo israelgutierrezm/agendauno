@@ -39,13 +39,21 @@ export default {
   },
   quien: {
     ver: "Ver quién cuenta",
-    ocultar: "Ocultar",
-    titulo: "Quién cuenta este mes",
+    tituloMes: "Quién cuenta en {mes}",
     nadie: "Nadie cuenta todavía este mes.",
-    sesiones: "{n} citas o clases",
-    // Cada negocio cuenta lo suyo (ADR 0131).
-    sesionesCitas: "1 cita | {n} citas",
-    sesionesClases: "1 clase | {n} clases",
+    sinResultados: "Nadie con ese nombre cuenta este mes.",
+    buscar: "Buscar por nombre",
+    reglaAlumnos:
+      "Cuenta cada alumno con al menos una reserva confirmada en una clase no cancelada o una compra pagada en el mes. Estar registrado no basta.",
+    reglaProfesionales:
+      "Cuenta cada profesional que atendió al menos una cita no cancelada en el mes, completo sin importar sus horas.",
+    cuentanAlumnos: "Cuenta 1 alumno | Cuentan {n} alumnos",
+    cuentanProfesionales: "Cuenta 1 profesional | Cuentan {n} profesionales",
+    colAlumno: "Alumno",
+    colProfesional: "Profesional",
+    colReservas: "Clases reservadas",
+    colCompras: "Compras pagadas",
+    colCitas: "Citas atendidas",
   },
   historial: {
     uso: "Uso",

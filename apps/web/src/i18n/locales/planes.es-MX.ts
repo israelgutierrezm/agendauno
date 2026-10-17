@@ -246,6 +246,7 @@ export default {
     usos: "Cómo lo usaste",
     usosEquipo: "Cómo lo usó",
     sinUsos: "Aún no se ha usado.",
+    verMasUsos: "Ver 1 más | Ver {n} más",
     usoEstados: {
       asistio: "Asistió",
       no_asistio: "No asistió",

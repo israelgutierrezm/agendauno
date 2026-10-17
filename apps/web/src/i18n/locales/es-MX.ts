@@ -2419,6 +2419,7 @@ export default {
       ajustar: "Ajustar",
       ajustePh: "± puntos",
       motivo: "Motivo (opcional)",
+      verMas: "Ver más ({n})",
     },
     canjes: {
       titulo: "Canjes recientes",

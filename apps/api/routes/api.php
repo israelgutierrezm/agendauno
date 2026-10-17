@@ -411,6 +411,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/interes', MiInteresTenantController::class)->name('mi.interes');
             Route::get('/mi/derechos/{derecho}/movimientos', [MiTenantController::class, 'movimientosDerecho'])->name('mi.derechos.movimientos');
             Route::get('/mi/planes', [MiTenantController::class, 'planes'])->name('mi.planes');
+            Route::get('/mi/planes/{derecho}/usos', [MiTenantController::class, 'usosPlan'])->name('mi.planes.usos');
             Route::get('/mi/clima', [MiTenantController::class, 'clima'])->middleware('throttle:clima')->name('mi.clima');
             // El lugar que le ofreció la lista de espera (solo en clases).
             Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->middleware('modalidad:clases')->name('mi.reservas.aceptar');
@@ -587,6 +588,7 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/avisos-plataforma/whatsapp', [AvisosPlataformaTenantController::class, 'cambiar'])
                 ->middleware(['puede:estudio.gestionar', 'throttle:whatsapp-panel-verificar'])->name('avisos-plataforma.cambio');
             // Transparencia del cobro: a quién se contó en el periodo (alumnos o profesionales).
+            Route::get('/renta/cargos', [FacturacionController::class, 'cargos'])->middleware('puede:facturacion.ver')->name('renta.cargos');
             Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
             // Complementos que se piden a la plataforma (p. ej. Familias; ADR 0140).
             Route::get('/renta/complementos', [ComplementosNegocioController::class, 'index'])->middleware('puede:facturacion.ver')->name('renta.complementos');
@@ -835,6 +837,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/acuerdos/{acuerdo}/baja', [BajasMembresiaTenantController::class, 'dar'])->middleware('puede:membresias.gestionar')->name('acuerdos.baja');
             Route::get('/miembros/{persona}/derechos', [MembresiasTenantController::class, 'derechos'])->middleware('puede:derechos.ver')->name('miembros.derechos.index');
             Route::get('/miembros/{persona}/planes', [MembresiasTenantController::class, 'planes'])->middleware('puede:derechos.ver')->name('miembros.planes');
+            Route::get('/miembros/{persona}/planes/{derecho}/usos', [MembresiasTenantController::class, 'usosPlan'])->middleware('puede:derechos.ver')->name('miembros.planes.usos');
             // Resumen operativo del miembro para Recepcion (P0): membresia, saldo, adeudo, alertas.
             Route::get('/miembros/{persona}/resumen', ResumenMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.ficha-resumen');
             // Ficha 360° del alumno (P0 Etapa 1): derechos, historial de reservas y de compras.

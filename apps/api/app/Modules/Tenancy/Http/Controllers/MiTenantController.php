@@ -83,6 +83,9 @@ use Illuminate\Validation\ValidationException;
 class MiTenantController
 {
     // Movimientos de créditos que ve el alumno (los más recientes).
+    /** Planes vencidos que acompañan a los vigentes en el perfil (el resto, en «Mis planes»). */
+    private const VENCIDOS_EN_PERFIL = 3;
+
     private const LIMITE_MOVIMIENTOS = 200;
 
     /** Días que abarca como máximo un periodo de la agenda del alumno (un mes y algo). */
@@ -190,10 +193,19 @@ class MiTenantController
         }
 
         $hoy = $corte->hoy();
-        $derechos = DerechoTenant::query()
+        // Lo que sirve hoy (vigentes, en pausa, por empezar) y los últimos vencidos: su
+        // historial completo está en «Mis planes». Una persona con años de paquetes no
+        // carga (ni calcula el saldo de) todos.
+        $deLaPersona = fn () => DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
-            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta'])
+            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta']);
+        $derechos = $deLaPersona()
+            ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhere('valido_hasta', '>=', $hoy))
             ->get()
+            ->concat($deLaPersona()
+                ->whereNotNull('valido_hasta')->where('valido_hasta', '<', $hoy)
+                ->orderByDesc('valido_hasta')->orderByDesc('id')
+                ->limit(self::VENCIDOS_EN_PERFIL)->get())
             ->map(function (DerechoTenant $d) use ($corte, $hoy): array {
                 $saldo = $d->ilimitado ? null : $this->libro->saldo($d);
                 $disponible = $d->ilimitado ? null : $this->libro->disponible($d);
@@ -222,6 +234,9 @@ class MiTenantController
             ])
             // Con los conteos de su sesión, su asistencia y su orden: el contrato de la
             // agenda (`clase`, `cita`, `ocupacion`) sin una consulta por reserva.
+            // Solo las que aún no empiezan: las pasadas siguen «confirmadas» al asistir y
+            // con los años serían cientos.
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
             ->with([
                 'sesion' => fn ($q) => $q->withCount(SesionTenantPresenter::conteos()),
                 'sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'orden', 'asistencia',
@@ -689,6 +704,27 @@ class MiTenantController
     }
 
     /**
+     * En qué clases usó uno de sus planes, por páginas. Un plan de otra persona no
+     * existe para él (404).
+     */
+    public function usosPlan(Request $request, CorteDePlanesTenant $corte): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 404);
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $plan = DerechoTenant::query()
+            ->where('ulid', (string) $request->route('derecho'))
+            ->whereNull('extra_de_id')
+            ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
+            ->firstOrFail();
+
+        return response()->json($corte->usosDe($plan, (int) ($validado['page'] ?? 1), (int) ($validado['per_page'] ?? 20)));
+    }
+
+    /**
      * Movimientos de créditos de un plan propio: por qué cambió su saldo (1.4). Un plan
      * de otra persona no existe para él (404).
      */
@@ -702,16 +738,28 @@ class MiTenantController
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
             ->firstOrFail();
 
-        $lista = MovimientoCreditoTenant::query()
-            ->where('derecho_id', $derecho->getKey())
-            ->orderByDesc('id')
-            ->limit(self::LIMITE_MOVIMIENTOS)
-            ->get();
+        // Con `page`, por páginas y con su total; sin ella, los últimos 200 (versiones
+        // anteriores de la app).
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $consulta = MovimientoCreditoTenant::query()->where('derecho_id', $derecho->getKey())->orderByDesc('id');
+        $pagina = isset($validado['page'])
+            ? $consulta->paginate((int) ($validado['per_page'] ?? 30), ['*'], 'page', (int) $validado['page'])
+            : null;
+        $lista = $pagina !== null ? collect($pagina->items()) : $consulta->limit(self::LIMITE_MOVIMIENTOS)->get();
 
         return response()->json([
             'data' => $movimientos->presentar($lista),
             'saldo' => $derecho->ilimitado ? null : $this->libro->saldo($derecho),
             'disponible' => $derecho->ilimitado ? null : $this->libro->disponible($derecho),
+            ...($pagina !== null ? ['meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ]] : []),
         ]);
     }
 

@@ -8,56 +8,107 @@ import '../data/cuenta_repository.dart';
 
 /// Movimientos de créditos de un plan: por qué cambió su saldo ("Asistencia",
 /// "Cancelación tardía", "Créditos vencidos"…), de qué clase y con qué saldo quedó.
-class MovimientosSheet extends ConsumerWidget {
+/// Por páginas: una membresía de años junta cientos.
+class MovimientosSheet extends ConsumerStatefulWidget {
   const MovimientosSheet({required this.derechoId, super.key});
 
   final String derechoId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.watch(cuentaRepositoryProvider);
+  ConsumerState<MovimientosSheet> createState() => _MovimientosSheetState();
+}
+
+class _MovimientosSheetState extends ConsumerState<MovimientosSheet> {
+  final List<MovimientoCredito> _lista = [];
+  int _pagina = 0;
+  int _ultima = 1;
+  int _total = 0;
+  bool _cargando = true;
+  bool _error = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    if (repo == null) {
+      return;
+    }
+    setState(() {
+      _cargando = true;
+      _error = false;
+    });
+    try {
+      final r = await repo.movimientos(widget.derechoId, pagina: _pagina + 1);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lista.addAll(r.lista);
+        _pagina = r.pagina;
+        _ultima = r.ultimaPagina;
+        _total = r.total;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _cargando = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hayMas = _pagina < _ultima;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: FutureBuilder<List<MovimientoCredito>>(
-          future: repo?.movimientos(derechoId),
-          builder: (context, snap) {
-            if (snap.hasError) {
-              return const Text('No se pudieron cargar los movimientos.');
-            }
-            if (!snap.hasData) {
-              return const Padding(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Movimientos',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            if (_error && _lista.isEmpty)
+              const Text('No se pudieron cargar los movimientos.')
+            else if (_cargando && _lista.isEmpty)
+              const Padding(
                 padding: EdgeInsets.all(24),
                 child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            final lista = snap.data!;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Movimientos',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              )
+            else if (_lista.isEmpty)
+              Text(
+                'Aún no hay movimientos.',
+                style: TextStyle(color: context.colores.textoSuave),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _lista.length + (hayMas ? 1 : 0),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, i) => i < _lista.length
+                      ? _Movimiento(_lista[i])
+                      : TextButton(
+                          onPressed: _cargando ? null : _cargar,
+                          child: Text(
+                            _cargando
+                                ? 'Cargando…'
+                                : 'Ver más (${_total - _lista.length})',
+                          ),
+                        ),
                 ),
-                const SizedBox(height: 8),
-                if (lista.isEmpty)
-                  Text(
-                    'Aún no hay movimientos.',
-                    style: TextStyle(color: context.colores.textoSuave),
-                  )
-                else
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: lista.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (_, i) => _Movimiento(lista[i]),
-                    ),
-                  ),
-              ],
-            );
-          },
+              ),
+          ],
         ),
       ),
     );

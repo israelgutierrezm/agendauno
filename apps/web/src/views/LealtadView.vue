@@ -130,6 +130,13 @@ const borradorPrograma = ref<Programa>({ ...programa.value });
 const miembroSel = ref("");
 const saldo = ref<number | null>(null);
 const movimientos = ref<Movimiento[]>([]);
+// Por páginas: un cliente frecuente junta decenas de movimientos al mes.
+const metaMovimientos = ref<{
+  page: number;
+  ultima_pagina: number;
+  total: number;
+} | null>(null);
+const cargandoMasMovimientos = ref(false);
 const recompensaSel = ref("");
 const ajuste = ref({ puntos: 0, descripcion: "" });
 
@@ -224,11 +231,36 @@ async function verMiembro(): Promise<void> {
   try {
     const { data } = await api.get<{
       data: { saldo: number; movimientos: Movimiento[] };
-    }>(`${base.value}/miembros/${miembroSel.value}/puntos`);
+      meta?: { page: number; ultima_pagina: number; total: number };
+    }>(`${base.value}/miembros/${miembroSel.value}/puntos`, {
+      params: { page: 1 },
+    });
     saldo.value = data.data.saldo;
     movimientos.value = data.data.movimientos;
+    metaMovimientos.value = data.meta ?? null;
   } catch (e) {
     error.value = mensajeDeError(e);
+  }
+}
+async function masMovimientos(): Promise<void> {
+  const meta = metaMovimientos.value;
+  if (miembroSel.value === "" || !meta || meta.page >= meta.ultima_pagina) {
+    return;
+  }
+  cargandoMasMovimientos.value = true;
+  try {
+    const { data } = await api.get<{
+      data: { movimientos: Movimiento[] };
+      meta?: { page: number; ultima_pagina: number; total: number };
+    }>(`${base.value}/miembros/${miembroSel.value}/puntos`, {
+      params: { page: meta.page + 1 },
+    });
+    movimientos.value = [...movimientos.value, ...data.data.movimientos];
+    metaMovimientos.value = data.meta ?? null;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cargandoMasMovimientos.value = false;
   }
 }
 
@@ -702,6 +734,24 @@ const indicadores = computed<Indicador[]>(() => {
                 </span>
               </li>
             </ul>
+            <button
+              v-if="
+                metaMovimientos && movimientos.length < metaMovimientos.total
+              "
+              type="button"
+              class="tu-enlace mt-2 text-sm"
+              :disabled="cargandoMasMovimientos"
+              data-prueba="ver-mas-puntos"
+              @click="masMovimientos"
+            >
+              {{
+                cargandoMasMovimientos
+                  ? $t("comun.cargando")
+                  : $t("lealtad.miembro.verMas", {
+                      n: metaMovimientos.total - movimientos.length,
+                    })
+              }}
+            </button>
           </template>
         </div>
       </div>

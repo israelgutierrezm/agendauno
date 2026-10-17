@@ -76,6 +76,38 @@ it('clases: cobra la banda de alumnos activos del mes con IVA', function (): voi
         ->and($cargo['estado'])->toBe('pendiente');
 });
 
+it('clases: quién cuenta va por páginas, se busca por nombre y dice por qué cuenta cada quien', function (): void {
+    $e = estudioConSesion('pilates-a', 'dueno@pilates.mx');
+    terminarPrueba($e);
+    $semilla = agendaSemilla($e);
+    $ana = crearMiembroTenant($e, 'Ana');
+    compraPagadaTenant($e, $ana);
+    foreach (['2026-10-05 19:00:00', '2026-10-06 19:00:00'] as $cuando) {
+        $sesion = crearSesionTenant($e, $semilla, 10, $cuando);
+        $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $ana], conBearer($e['bearer']))
+            ->assertCreated();
+    }
+    foreach (['Beto', 'Caro'] as $nombre) {
+        compraPagadaTenant($e, crearMiembroTenant($e, $nombre));
+    }
+    crearMiembroTenant($e, 'Sin actividad');
+    $url = "/api/v1/app/{$e['slug']}/renta/quien-cuenta";
+
+    $primera = $this->getJson("{$url}?page=1&per_page=2", conBearer($e['bearer']))->assertOk();
+    expect($primera->json('data.cantidad'))->toBe(3)
+        ->and($primera->json('meta.total'))->toBe(3)
+        ->and($primera->json('meta.ultima_pagina'))->toBe(2)
+        ->and($primera->json('data.quienes.0'))->toMatchArray(['id' => $ana, 'nombre' => 'Ana', 'reservas' => 2, 'compras' => 1])
+        ->and($primera->json('data.quienes.1'))->toMatchArray(['nombre' => 'Beto', 'reservas' => 0, 'compras' => 1]);
+    $this->getJson("{$url}?page=2&per_page=2", conBearer($e['bearer']))->assertOk()
+        ->assertJsonCount(1, 'data.quienes')->assertJsonPath('data.quienes.0.nombre', 'Caro');
+    // Buscar acota la lista, no lo que se cobra.
+    $this->getJson("{$url}?page=1&q=car", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('meta.total', 1)->assertJsonPath('data.cantidad', 3)->assertJsonPath('data.quienes.0.nombre', 'Caro');
+    // Sin `page`, la lista completa como antes.
+    expect($this->getJson($url, conBearer($e['bearer']))->assertOk()->json())->not->toHaveKey('meta');
+});
+
 it('citas: cuenta como referencia a cada profesional que atendió, completo sin importar sus horas', function (): void {
     $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     terminarPrueba($e);
@@ -106,6 +138,11 @@ it('citas: cuenta como referencia a cada profesional que atendió, completo sin 
         ->and($quien['quienes'])->toHaveCount(2)
         ->and($quien['quienes'][0])->not->toHaveKey('medio_tiempo')
         ->and($quien['detalle'])->not->toHaveKey('fte_milesimas');
+    // Por páginas, cada profesional con las sesiones que atendió.
+    $pagina = $this->getJson("/api/v1/app/{$e['slug']}/renta/quien-cuenta?periodo={$periodo}&page=1&per_page=1", conBearer($e['bearer']))->assertOk();
+    expect($pagina->json('meta.total'))->toBe(2)
+        ->and($pagina->json('data.quienes'))->toHaveCount(1)
+        ->and($pagina->json('data.quienes.0.sesiones'))->toBe(1);
 });
 
 it('citas: un taller nuevo nace como cita y no suma personas atendidas fuera de cita', function (): void {

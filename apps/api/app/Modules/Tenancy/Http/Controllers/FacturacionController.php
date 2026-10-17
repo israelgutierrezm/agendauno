@@ -98,48 +98,85 @@ class FacturacionController
             // ¿Puede recibir la factura (CFDI) de la renta? Si no, se ofrece el recibo sin valor fiscal.
             'factura_renta_posible' => $this->facturaRentaPosible(),
             'actual' => $this->estimacion($estudio),
-            'cargos' => $cargos->map(function (CargoRenta $c) use ($facturas): array {
-                $factura = $facturas->get($c->getKey());
-
-                return [
-                    'id' => $c->ulid,
-                    'periodo' => $c->periodo,
-                    // `renta` (mes vencido), `plan` (por adelantado), `ajuste` (cambio de plan) o `timbres`.
-                    'concepto' => $c->concepto ?? 'renta',
-                    'cubre_desde' => $c->cubre_desde?->toDateString(),
-                    'cubre_hasta' => $c->cubre_hasta?->toDateString(),
-                    'monto_tarifa_minor' => $c->monto_tarifa_minor,
-                    'moneda_tarifa' => $c->moneda_tarifa,
-                    'tipo_cambio' => $c->tipo_cambio_diezmilesimas !== null ? [
-                        'valor' => TiposDeCambio::formatear($c->tipo_cambio_diezmilesimas),
-                        'fecha' => $c->tipo_cambio_fecha?->toDateString(),
-                        'fuente' => $c->tipo_cambio_fuente,
-                    ] : null,
-                    'modo_cobro' => $c->modo_cobro->value,
-                    'metrica' => $c->metrica ?? 'alumnos_activos',
-                    'cantidad' => $c->alumnos_activos,
-                    'alumnos_activos' => $c->alumnos_activos,
-                    'tarifa_version' => $c->tarifa_version,
-                    // Con qué se calculó y cuándo se emitió (no cambia después).
-                    'regla' => $c->regla_version,
-                    'emitido_en' => $c->emitido_en?->toIso8601String(),
-                    'desglose' => $c->desglose,
-                    'monto_minor' => $c->monto_minor,
-                    'moneda' => $c->moneda,
-                    'estado' => $c->estado->value,
-                    'vence_en' => $c->vence_en?->toDateString(),
-                    'pagado_en' => $c->pagado_en?->toIso8601String(),
-                    // Cobro a la tarjeta domiciliada: el último rechazo y el siguiente intento.
-                    'error_cobro' => $c->error_cobro,
-                    'proximo_intento_en' => $c->proximo_intento_en?->toIso8601String(),
-                    'factura' => $factura instanceof FacturaPlataforma ? [
-                        'id' => $factura->ulid,
-                        'estado' => $factura->estado->value,
-                        'uuid' => $factura->uuid,
-                    ] : null,
-                ];
-            })->all(),
+            'cargos' => $cargos->map(fn (CargoRenta $c): array => $this->presentarCargo($c, $facturas->get($c->getKey())))->all(),
         ]]);
+    }
+
+    /**
+     * El historial de cargos de la renta por páginas, del más reciente: renta, planes,
+     * ajustes y compras de timbres (con los años son decenas).
+     */
+    public function cargos(Request $request): JsonResponse
+    {
+        $estudio = $this->estudio($request);
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $pagina = CargoRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->orderByDesc('periodo')
+            ->orderByDesc('id')
+            ->paginate((int) ($validado['per_page'] ?? 12), ['*'], 'page', (int) ($validado['page'] ?? 1));
+        $cargos = collect($pagina->items());
+        $facturas = FacturaPlataforma::query()
+            ->whereIn('cargo_renta_id', $cargos->map(fn (CargoRenta $c): int => (int) $c->getKey())->all())
+            ->get()
+            ->keyBy('cargo_renta_id');
+
+        return response()->json([
+            'data' => $cargos->map(fn (CargoRenta $c): array => $this->presentarCargo($c, $facturas->get($c->getKey())))->values()->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarCargo(CargoRenta $c, ?FacturaPlataforma $factura): array
+    {
+        return [
+            'id' => $c->ulid,
+            'periodo' => $c->periodo,
+            // `renta` (mes vencido), `plan` (por adelantado), `ajuste` (cambio de plan) o `timbres`.
+            'concepto' => $c->concepto ?? 'renta',
+            'cubre_desde' => $c->cubre_desde?->toDateString(),
+            'cubre_hasta' => $c->cubre_hasta?->toDateString(),
+            'monto_tarifa_minor' => $c->monto_tarifa_minor,
+            'moneda_tarifa' => $c->moneda_tarifa,
+            'tipo_cambio' => $c->tipo_cambio_diezmilesimas !== null ? [
+                'valor' => TiposDeCambio::formatear($c->tipo_cambio_diezmilesimas),
+                'fecha' => $c->tipo_cambio_fecha?->toDateString(),
+                'fuente' => $c->tipo_cambio_fuente,
+            ] : null,
+            'modo_cobro' => $c->modo_cobro->value,
+            'metrica' => $c->metrica ?? 'alumnos_activos',
+            'cantidad' => $c->alumnos_activos,
+            'alumnos_activos' => $c->alumnos_activos,
+            'tarifa_version' => $c->tarifa_version,
+            // Con qué se calculó y cuándo se emitió (no cambia después).
+            'regla' => $c->regla_version,
+            'emitido_en' => $c->emitido_en?->toIso8601String(),
+            'desglose' => $c->desglose,
+            'monto_minor' => $c->monto_minor,
+            'moneda' => $c->moneda,
+            'estado' => $c->estado->value,
+            'vence_en' => $c->vence_en?->toDateString(),
+            'pagado_en' => $c->pagado_en?->toIso8601String(),
+            // Cobro a la tarjeta domiciliada: el último rechazo y el siguiente intento.
+            'error_cobro' => $c->error_cobro,
+            'proximo_intento_en' => $c->proximo_intento_en?->toIso8601String(),
+            'factura' => $factura instanceof FacturaPlataforma ? [
+                'id' => $factura->ulid,
+                'estado' => $factura->estado->value,
+                'uuid' => $factura->uuid,
+            ] : null,
+        ];
     }
 
     /**
@@ -156,24 +193,55 @@ class FacturacionController
     /**
      * Quién cuenta en el cobro del periodo (transparencia): los alumnos con actividad o
      * los profesionales que atendieron, con la regla aplicada. Solo para el dueño.
+     *
+     * Con `page`, la lista va por páginas (un estudio grande junta cientos de alumnos),
+     * se puede buscar por nombre (`q`) y cada quien trae por qué cuenta: cuántas veces
+     * reservó y cuántas compras pagó, o cuántas sesiones atendió. Sin ella, la lista
+     * completa como antes.
      */
     public function quienCuenta(Request $request): JsonResponse
     {
         $estudio = $this->estudio($request);
-        $validado = $request->validate(['periodo' => ['nullable', 'date_format:Y-m']]);
+        $validado = $request->validate([
+            'periodo' => ['nullable', 'date_format:Y-m'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
         $periodo = (string) ($validado['periodo'] ?? $this->periodoActual($estudio));
+        $porPaginas = isset($validado['page']);
 
-        $uso = $this->medir->calcular($estudio, $periodo, quienes: true);
-
-        return response()->json(['data' => [
+        $uso = $this->medir->calcular($estudio, $periodo, quienes: ! $porPaginas);
+        $datos = [
             'periodo' => $periodo,
             'metrica' => $uso['metrica'],
             'regla' => $uso['regla_version'],
             'descripcion' => $uso['evidencia']['regla'] ?? null,
             'cantidad' => $uso['cantidad'],
             'detalle' => $uso['detalle'],
-            'quienes' => $uso['quienes'] ?? [],
-        ]]);
+        ];
+
+        if (! $porPaginas) {
+            return response()->json(['data' => $datos + ['quienes' => $uso['quienes'] ?? []]]);
+        }
+
+        $pagina = $this->medir->quienesPorPagina(
+            $estudio,
+            $periodo,
+            $validado['q'] ?? null,
+            (int) $validado['page'],
+            (int) ($validado['per_page'] ?? 25),
+        );
+
+        return response()->json([
+            'data' => $datos + ['quienes' => array_values($pagina->items())],
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
+        ]);
     }
 
     /**

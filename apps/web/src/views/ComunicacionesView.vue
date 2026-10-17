@@ -113,6 +113,30 @@ const pestana = ref<Pestana>("difusion");
 
 const segmentos = ref<Segmento[]>([]);
 const difusiones = ref<Difusion[]>([]);
+// Por páginas: un negocio que difunde varias veces por semana junta cientos.
+const metaDifusiones = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
+const paginaDifusiones = ref(1);
+async function cargarDifusiones(n = paginaDifusiones.value): Promise<void> {
+  const { data } = await api.get<{
+    data: Difusion[];
+    meta?: typeof metaDifusiones.value;
+  }>(`${base.value}/comunicaciones/difusiones`, { params: { page: n } });
+  difusiones.value = data.data;
+  metaDifusiones.value = data.meta ?? null;
+  paginaDifusiones.value = n;
+}
+async function irPaginaDifusiones(n: number): Promise<void> {
+  try {
+    await cargarDifusiones(n);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
 const cargando = ref(true);
 const enviando = ref(false);
 const error = ref<string | null>(null);
@@ -210,15 +234,14 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [seg, dif] = await Promise.all([
+    const [seg] = await Promise.all([
       api.get<{ data: Segmento[]; canales?: Canal[] }>(
         `${base.value}/comunicaciones/segmentos`,
       ),
-      api.get<{ data: Difusion[] }>(`${base.value}/comunicaciones/difusiones`),
+      cargarDifusiones(1),
     ]);
     segmentos.value = seg.data.data;
     canalesDifusion.value = seg.data.canales ?? ["interno", "email"];
-    difusiones.value = dif.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -958,6 +981,14 @@ onMounted(cargar);
           </tbody>
         </table>
       </div>
+      <PaginacionListado
+        v-if="metaDifusiones && metaDifusiones.ultima_pagina > 1"
+        :page="metaDifusiones.page"
+        :ultima-pagina="metaDifusiones.ultima_pagina"
+        :total="metaDifusiones.total"
+        :per-page="metaDifusiones.per_page"
+        @ir="irPaginaDifusiones"
+      />
     </template>
 
     <!-- Mensajes automáticos -->

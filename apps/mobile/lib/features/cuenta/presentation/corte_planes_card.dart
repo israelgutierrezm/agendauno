@@ -7,6 +7,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../application/cuenta_controller.dart';
 import '../data/corte_planes.dart';
+import '../data/cuenta_repository.dart';
 import 'cuenta_widgets.dart';
 import 'movimientos_sheet.dart';
 
@@ -58,18 +59,48 @@ class CortePlanesSeccion extends ConsumerWidget {
   }
 }
 
-class _PlanCard extends StatefulWidget {
+class _PlanCard extends ConsumerStatefulWidget {
   const _PlanCard(this.p, this.terminologia);
 
   final PlanCorte p;
   final Terminologia terminologia;
 
   @override
-  State<_PlanCard> createState() => _PlanCardState();
+  ConsumerState<_PlanCard> createState() => _PlanCardState();
 }
 
-class _PlanCardState extends State<_PlanCard> {
+class _PlanCardState extends ConsumerState<_PlanCard> {
   bool _verUsos = false;
+
+  /// Los usos ya cargados: llegan los más recientes y los demás, por páginas.
+  late final List<UsoPlan> _usos = [...widget.p.usos];
+  bool _cargandoUsos = false;
+  static const _porPagina = 10;
+
+  Future<void> _masUsos() async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    if (repo == null || _cargandoUsos) {
+      return;
+    }
+    setState(() => _cargandoUsos = true);
+    try {
+      final pagina = _usos.length ~/ _porPagina + 1;
+      final mas = await repo.usosPlan(
+        widget.p.derechoId,
+        pagina: pagina,
+        porPagina: _porPagina,
+      );
+      if (mounted) {
+        setState(() => _usos.addAll(mas));
+      }
+    } catch (_) {
+      // Se puede volver a intentar con el mismo botón.
+    } finally {
+      if (mounted) {
+        setState(() => _cargandoUsos = false);
+      }
+    }
+  }
 
   static String _fecha(String? iso) =>
       iso == null ? '—' : Formato.dia(DateTime.parse(iso));
@@ -153,11 +184,11 @@ class _PlanCardState extends State<_PlanCard> {
             Wrap(
               spacing: 8,
               children: [
-                if (p.usos.isNotEmpty)
+                if (_usos.isNotEmpty)
                   TextButton(
                     style: TextButton.styleFrom(padding: EdgeInsets.zero),
                     onPressed: () => setState(() => _verUsos = !_verUsos),
-                    child: Text('Cómo lo usaste (${p.usos.length})'),
+                    child: Text('Cómo lo usaste (${p.usosTotal})'),
                   )
                 else
                   Padding(
@@ -181,7 +212,7 @@ class _PlanCardState extends State<_PlanCard> {
               ],
             ),
             if (_verUsos)
-              for (final u in p.usos)
+              for (final u in _usos)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
@@ -218,6 +249,16 @@ class _PlanCardState extends State<_PlanCard> {
                     ],
                   ),
                 ),
+            if (_verUsos && _usos.length < p.usosTotal)
+              TextButton(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                onPressed: _cargandoUsos ? null : _masUsos,
+                child: Text(
+                  _cargandoUsos
+                      ? 'Cargando…'
+                      : 'Ver más (${p.usosTotal - _usos.length})',
+                ),
+              ),
           ],
         ),
       ),

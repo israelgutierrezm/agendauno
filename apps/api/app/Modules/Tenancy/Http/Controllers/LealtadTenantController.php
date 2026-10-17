@@ -193,17 +193,30 @@ class LealtadTenantController
         $modelo = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
         app(AlcancePersonaTenant::class)->exigirPersona($request, $modelo);
 
-        $movimientos = MovimientoPuntosTenant::query()
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $consulta = MovimientoPuntosTenant::query()
             ->where('persona_id', $modelo->getKey())
-            ->orderByDesc('id')
-            ->limit(50)
-            ->get();
+            ->orderByDesc('id');
+        // Con `page`, por páginas (un cliente frecuente suma decenas al mes); sin ella,
+        // los últimos 50.
+        $pagina = isset($validado['page'])
+            ? $consulta->paginate((int) ($validado['per_page'] ?? 20), ['*'], 'page', (int) $validado['page'])
+            : null;
+        $movimientos = $pagina !== null ? collect($pagina->items()) : $consulta->limit(50)->get();
 
         return response()->json(['data' => [
             'persona' => $modelo->nombreCompleto(),
             'saldo' => $this->libro->saldo($modelo->getKey()),
-            'movimientos' => $movimientos->map(fn (MovimientoPuntosTenant $m): array => $this->presentarMovimiento($m))->all(),
-        ]]);
+            'movimientos' => $movimientos->map(fn (MovimientoPuntosTenant $m): array => $this->presentarMovimiento($m))->values()->all(),
+        ], ...($pagina !== null ? ['meta' => [
+            'total' => $pagina->total(),
+            'page' => $pagina->currentPage(),
+            'per_page' => $pagina->perPage(),
+            'ultima_pagina' => $pagina->lastPage(),
+        ]] : [])]);
     }
 
     public function ajustar(Request $request): JsonResponse

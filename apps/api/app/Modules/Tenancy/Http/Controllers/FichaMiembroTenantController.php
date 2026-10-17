@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
@@ -34,6 +35,9 @@ class FichaMiembroTenantController
 {
     // Cuántos registros recientes de historial mostrar (reservas y órdenes).
     private const HISTORIAL = 20;
+
+    /** Planes vencidos que acompañan a los vigentes en la ficha. */
+    private const HISTORIAL_PLANES = 12;
 
     public function __construct(
         private readonly LibroMayorTenant $libro,
@@ -174,11 +178,21 @@ class FichaMiembroTenantController
      */
     private function derechos(PersonaTenant $persona): array
     {
-        $derechos = DerechoTenant::query()
+        // Los que siguen vigentes, todos; del historial (vencidos), los más recientes:
+        // con paquetes, un cliente suma una docena al año y cada uno calcula su saldo.
+        // El corte de «Planes» de la ficha muestra el detalle.
+        $hoy = app(FechasNegocioTenant::class)->hoy();
+        $deLaPersona = fn () => DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
-            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta'])
+            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta']);
+        $derechos = $deLaPersona()
+            ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhere('valido_hasta', '>=', $hoy))
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->concat($deLaPersona()
+                ->whereNotNull('valido_hasta')->where('valido_hasta', '<', $hoy)
+                ->orderByDesc('valido_hasta')->orderByDesc('id')
+                ->limit(self::HISTORIAL_PLANES)->get());
 
         return $derechos->map(function (DerechoTenant $derecho): array {
             $saldo = $derecho->ilimitado ? null : $this->libro->saldo($derecho);

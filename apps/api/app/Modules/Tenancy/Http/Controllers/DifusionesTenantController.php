@@ -43,9 +43,28 @@ class DifusionesTenantController
         ]);
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $difusiones = DifusionTenant::query()->orderByDesc('id')->limit(self::LIMITE)->get();
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $consulta = DifusionTenant::query()->orderByDesc('id');
+        // Con `page`, por páginas y con su total; sin ella, las últimas 100.
+        if (isset($validado['page'])) {
+            $pagina = $consulta->paginate((int) ($validado['per_page'] ?? 20), ['*'], 'page', (int) $validado['page']);
+
+            return response()->json([
+                'data' => collect($pagina->items())->map(fn (DifusionTenant $d): array => $this->presentar($d))->values()->all(),
+                'meta' => [
+                    'total' => $pagina->total(),
+                    'page' => $pagina->currentPage(),
+                    'per_page' => $pagina->perPage(),
+                    'ultima_pagina' => $pagina->lastPage(),
+                ],
+            ]);
+        }
+        $difusiones = $consulta->limit(self::LIMITE)->get();
 
         return response()->json([
             'data' => $difusiones->map(fn (DifusionTenant $d): array => $this->presentar($d))->all(),

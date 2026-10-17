@@ -62,23 +62,34 @@ class CreditosTenantController
     /**
      * Historial auditable del ledger de un derecho: cada asiento con su origen, saldo
      * resultante, referencia (reserva/acuerdo), actor y datos extra. Más reciente
-     * primero. Fuente de verdad del saldo: sigue siendo la suma de `unidades`.
+     * primero. Fuente de verdad del saldo: sigue siendo la suma de `unidades`. Con
+     * `page`, por páginas y con su total (una membresía de años suma cientos); sin
+     * ella, los últimos 200 (clientes anteriores).
      */
     public function movimientos(Request $request): JsonResponse
     {
         $derecho = DerechoTenant::query()->where('ulid', (string) $request->route('derecho'))->firstOrFail();
         app(AlcancePersonaTenant::class)->exigirDerecho($request, $derecho);
-
-        $movimientos = MovimientoCreditoTenant::query()
-            ->where('derecho_id', $derecho->getKey())
-            ->orderByDesc('id')
-            ->limit(self::LIMITE)
-            ->get();
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $consulta = MovimientoCreditoTenant::query()->where('derecho_id', $derecho->getKey())->orderByDesc('id');
+        $pagina = isset($validado['page'])
+            ? $consulta->paginate((int) ($validado['per_page'] ?? 30), ['*'], 'page', (int) $validado['page'])
+            : null;
+        $movimientos = $pagina !== null ? collect($pagina->items()) : $consulta->limit(self::LIMITE)->get();
 
         return response()->json([
-            'data' => $movimientos->map(fn (MovimientoCreditoTenant $m): array => $this->presentarMovimiento($m))->all(),
+            'data' => $movimientos->map(fn (MovimientoCreditoTenant $m): array => $this->presentarMovimiento($m))->values()->all(),
             'saldo' => $this->libro->saldo($derecho),
             'disponible' => $derecho->ilimitado ? null : $this->libro->disponible($derecho),
+            ...($pagina !== null ? ['meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ]] : []),
         ]);
     }
 

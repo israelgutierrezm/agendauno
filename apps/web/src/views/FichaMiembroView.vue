@@ -242,6 +242,13 @@ const toast = useToastStore();
 // Movimientos del ledger de un derecho (1000 unidades = 1 crédito) y recarga manual.
 const movimientosDe = ref<string | null>(null);
 const movimientos = ref<Movimiento[]>([]);
+// Por páginas: una membresía de años junta cientos de movimientos.
+const metaMovimientos = ref<{
+  page: number;
+  ultima_pagina: number;
+  total: number;
+} | null>(null);
+const cargandoMasMovimientos = ref(false);
 const recargando = ref<string | null>(null);
 const recarga = ref({ creditos: 1, motivo: "" });
 const guardandoRecarga = ref(false);
@@ -258,13 +265,38 @@ async function verMovimientos(d: Derecho): Promise<void> {
     return;
   }
   try {
-    const { data } = await api.get<{ data: Movimiento[] }>(
-      `${base.value}/derechos/${d.id}/movimientos`,
-    );
+    const { data } = await api.get<{
+      data: Movimiento[];
+      meta?: { page: number; ultima_pagina: number; total: number };
+    }>(`${base.value}/derechos/${d.id}/movimientos`, {
+      params: { page: 1 },
+    });
     movimientos.value = data.data;
+    metaMovimientos.value = data.meta ?? null;
     movimientosDe.value = d.id;
   } catch (e) {
     toast.error(mensajeDeError(e));
+  }
+}
+async function masMovimientos(d: Derecho): Promise<void> {
+  const meta = metaMovimientos.value;
+  if (!meta || meta.page >= meta.ultima_pagina) {
+    return;
+  }
+  cargandoMasMovimientos.value = true;
+  try {
+    const { data } = await api.get<{
+      data: Movimiento[];
+      meta?: { page: number; ultima_pagina: number; total: number };
+    }>(`${base.value}/derechos/${d.id}/movimientos`, {
+      params: { page: meta.page + 1 },
+    });
+    movimientos.value = [...movimientos.value, ...data.data];
+    metaMovimientos.value = data.meta ?? null;
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    cargandoMasMovimientos.value = false;
   }
 }
 
@@ -1175,6 +1207,29 @@ const regreso = useRegreso({
                               }}</span>
                             </span>
                           </div>
+                          <button
+                            v-if="
+                              metaMovimientos &&
+                              metaMovimientos.page <
+                                metaMovimientos.ultima_pagina
+                            "
+                            type="button"
+                            class="tu-enlace border-t py-2 w-full text-left"
+                            :style="{ borderColor: 'var(--borde)' }"
+                            :disabled="cargandoMasMovimientos"
+                            data-prueba="ver-mas-movimientos"
+                            @click="masMovimientos(d)"
+                          >
+                            {{
+                              cargandoMasMovimientos
+                                ? $t("comun.cargando")
+                                : $t("creditosFicha.verMas", {
+                                    n:
+                                      metaMovimientos.total -
+                                      movimientos.length,
+                                  })
+                            }}
+                          </button>
                         </div>
                       </li>
                     </template>

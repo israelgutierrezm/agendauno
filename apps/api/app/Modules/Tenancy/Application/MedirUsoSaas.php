@@ -19,6 +19,7 @@ use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as Consulta;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -57,6 +58,54 @@ class MedirUsoSaas
         return $this->gestor->ejecutarEn($estudio, fn (): array => $modalidad === ModalidadServicio::Citas
             ? $this->profesionales($periodo, $inicio, $fin, $quienes)
             : $this->alumnos($periodo, $inicio, $fin, $quienes));
+    }
+
+    /**
+     * Quién cuenta en el periodo, por páginas y con por qué cuenta cada quien (para la
+     * transparencia del dueño): de cada alumno, cuántas veces reservó y cuántas compras
+     * pagó en el mes; de cada profesional, cuántas sesiones atendió. `$buscar` filtra
+     * por nombre; el total de la medición no cambia.
+     *
+     * @return LengthAwarePaginator<int, array{id: string, nombre: string, reservas: int, compras: int}>|LengthAwarePaginator<int, array{id: string, nombre: string, sesiones: int}>
+     */
+    public function quienesPorPagina(Estudio $estudio, string $periodo, ?string $buscar, int $pagina, int $porPagina): LengthAwarePaginator
+    {
+        [$inicio, $fin] = $this->limites($estudio, $periodo);
+        $modalidad = $estudio->modalidad();
+        $buscar = trim((string) $buscar);
+
+        return $this->gestor->ejecutarEn($estudio, function () use ($modalidad, $inicio, $fin, $buscar, $pagina, $porPagina): LengthAwarePaginator {
+            if ($modalidad === ModalidadServicio::Citas) {
+                // Pocos por negocio (su equipo): se filtran y se paginan en memoria.
+                $todos = collect($this->profesionalesConSesiones($inicio, $fin))
+                    ->when($buscar !== '', fn ($c) => $c->filter(
+                        static fn (array $p): bool => mb_stripos((string) $p['nombre'], $buscar) !== false,
+                    ))
+                    ->values();
+
+                return new LengthAwarePaginator($todos->forPage($pagina, $porPagina)->values()->all(), $todos->count(), $porPagina, $pagina);
+            }
+
+            $paginado = $this->consultaAlumnos($inicio, $fin)
+                ->select('personas.*')
+                ->selectSub(function (Consulta $s) use ($inicio, $fin): void {
+                    $this->reservasDelMes($s->selectRaw('count(*)'), $inicio, $fin);
+                }, 'reservas_mes')
+                ->selectSub(function (Consulta $s) use ($inicio, $fin): void {
+                    $this->comprasDelMes($s->selectRaw('count(*)'), $inicio, $fin);
+                }, 'compras_mes')
+                ->when($buscar !== '', fn (Builder $q) => $q->buscar($buscar))
+                ->orderBy('nombre')
+                ->orderBy('id')
+                ->paginate($porPagina, ['*'], 'page', $pagina);
+
+            return $paginado->through(static fn (PersonaTenant $p): array => [
+                'id' => $p->ulid,
+                'nombre' => $p->nombreCompleto(),
+                'reservas' => (int) $p->getAttribute('reservas_mes'),
+                'compras' => (int) $p->getAttribute('compras_mes'),
+            ]);
+        });
     }
 
     /**
@@ -120,16 +169,7 @@ class MedirUsoSaas
      */
     private function alumnos(string $periodo, CarbonImmutable $inicio, CarbonImmutable $fin, bool $quienes): array
     {
-        // Incluye a quien se dio de baja durante o después del mes: sí usó el servicio.
-        $consulta = PersonaTenant::withTrashed()
-            ->where(fn (Builder $q) => $q->whereNull('deleted_at')->orWhere('deleted_at', '>=', $inicio))
-            ->where('tipo', TipoPersonaTenant::Miembro->value)
-            ->where('es_facturable', true)
-            ->where('archivado', false)
-            ->where(function (Builder $q) use ($inicio, $fin): void {
-                $q->whereExists($this->reservoEnElMes($inicio, $fin))
-                    ->orWhereExists($this->comproEnElMes($inicio, $fin));
-            });
+        $consulta = $this->consultaAlumnos($inicio, $fin);
 
         $resultado = [
             'metrica' => ModalidadServicio::Clases->metrica(),
@@ -153,9 +193,31 @@ class MedirUsoSaas
     }
 
     /**
-     * @return array{metrica: string, regla_version: string, cantidad: int, detalle: array<string, mixed>, evidencia: array<string, mixed>, quienes?: list<array<string, mixed>>}
+     * Los alumnos que cuentan en el mes. Incluye a quien se dio de baja durante o después
+     * del mes: sí usó el servicio.
+     *
+     * @return Builder<PersonaTenant>
      */
-    private function profesionales(string $periodo, CarbonImmutable $inicio, CarbonImmutable $fin, bool $quienes): array
+    private function consultaAlumnos(CarbonImmutable $inicio, CarbonImmutable $fin): Builder
+    {
+        return PersonaTenant::withTrashed()
+            ->where(fn (Builder $q) => $q->whereNull('deleted_at')->orWhere('deleted_at', '>=', $inicio))
+            ->where('tipo', TipoPersonaTenant::Miembro->value)
+            ->where('es_facturable', true)
+            ->where('archivado', false)
+            ->where(function (Builder $q) use ($inicio, $fin): void {
+                $q->whereExists($this->reservoEnElMes($inicio, $fin))
+                    ->orWhereExists($this->comproEnElMes($inicio, $fin));
+            });
+    }
+
+    /**
+     * Los profesionales que atendieron al menos una sesión no cancelada en el mes, con
+     * cuántas.
+     *
+     * @return list<array{id: string, nombre: string, sesiones: int}>
+     */
+    private function profesionalesConSesiones(CarbonImmutable $inicio, CarbonImmutable $fin): array
     {
         $sesionesPorProfesional = SesionTenant::query()
             ->where('estado', EstadoSesionTenant::Programada->value)
@@ -174,6 +236,16 @@ class MedirUsoSaas
                 'sesiones' => (int) $sesionesPorProfesional[$u->getKey()],
             ];
         }
+
+        return $profesionales;
+    }
+
+    /**
+     * @return array{metrica: string, regla_version: string, cantidad: int, detalle: array<string, mixed>, evidencia: array<string, mixed>, quienes?: list<array<string, mixed>>}
+     */
+    private function profesionales(string $periodo, CarbonImmutable $inicio, CarbonImmutable $fin, bool $quienes): array
+    {
+        $profesionales = $this->profesionalesConSesiones($inicio, $fin);
 
         // Regla híbrida: personas atendidas fuera de cita (clases/talleres grupales).
         $personasFueraDeCita = DB::connection('tenant')->table('reservas')
@@ -214,16 +286,23 @@ class MedirUsoSaas
      */
     private function reservoEnElMes(CarbonImmutable $inicio, CarbonImmutable $fin): \Closure
     {
-        return static function (Consulta $s) use ($inicio, $fin): void {
-            $s->select(DB::raw(1))
-                ->from('reservas')
-                ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
-                ->whereColumn('reservas.persona_id', 'personas.id')
-                ->where('reservas.estado', EstadoReserva::Confirmada->value)
-                ->where('sesiones.estado', EstadoSesionTenant::Programada->value)
-                ->where('sesiones.inicia_en', '>=', $inicio)
-                ->where('sesiones.inicia_en', '<', $fin);
+        return function (Consulta $s) use ($inicio, $fin): void {
+            $this->reservasDelMes($s->select(DB::raw(1)), $inicio, $fin);
         };
+    }
+
+    /**
+     * Las reservas confirmadas de la persona en sesiones no canceladas del mes.
+     */
+    private function reservasDelMes(Consulta $s, CarbonImmutable $inicio, CarbonImmutable $fin): void
+    {
+        $s->from('reservas')
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->whereColumn('reservas.persona_id', 'personas.id')
+            ->where('reservas.estado', EstadoReserva::Confirmada->value)
+            ->where('sesiones.estado', EstadoSesionTenant::Programada->value)
+            ->where('sesiones.inicia_en', '>=', $inicio)
+            ->where('sesiones.inicia_en', '<', $fin);
     }
 
     /**
@@ -233,13 +312,20 @@ class MedirUsoSaas
      */
     private function comproEnElMes(CarbonImmutable $inicio, CarbonImmutable $fin): \Closure
     {
-        return static function (Consulta $s) use ($inicio, $fin): void {
-            $s->select(DB::raw(1))
-                ->from('ordenes')
-                ->whereColumn('ordenes.persona_id', 'personas.id')
-                ->where('ordenes.estado', EstadoOrden::Pagada->value)
-                ->where('ordenes.pagada_en', '>=', $inicio)
-                ->where('ordenes.pagada_en', '<', $fin);
+        return function (Consulta $s) use ($inicio, $fin): void {
+            $this->comprasDelMes($s->select(DB::raw(1)), $inicio, $fin);
         };
+    }
+
+    /**
+     * Las compras pagadas de la persona en el mes.
+     */
+    private function comprasDelMes(Consulta $s, CarbonImmutable $inicio, CarbonImmutable $fin): void
+    {
+        $s->from('ordenes')
+            ->whereColumn('ordenes.persona_id', 'personas.id')
+            ->where('ordenes.estado', EstadoOrden::Pagada->value)
+            ->where('ordenes.pagada_en', '>=', $inicio)
+            ->where('ordenes.pagada_en', '<', $fin);
     }
 }

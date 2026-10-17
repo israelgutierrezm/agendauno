@@ -158,3 +158,36 @@ describe("factura o recibo de la renta", () => {
     expect(w.find('[data-prueba="recibo"]').exists()).toBe(true);
   });
 });
+
+describe("historial de cargos", () => {
+  it("se pide por páginas al servidor", async () => {
+    const cargo = renta(true).cargos[0];
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/renta/cargos")
+          ? {
+              data: [cargo],
+              meta: { total: 30, page: 1, per_page: 12, ultima_pagina: 3 },
+            }
+          : { data: renta(true) },
+      }),
+    );
+    const w = mount(RentaView, {
+      global: {
+        plugins: [i18n, createPinia()],
+        stubs: { AvisosAgendaUno: true },
+      },
+    });
+    await flushPromises();
+    expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/renta/cargos", {
+      params: { page: 1 },
+    });
+
+    const pagina2 = w.findAll("button").find((b) => b.text() === "2");
+    await pagina2!.trigger("click");
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith("/api/v1/app/demo/renta/cargos", {
+      params: { page: 2 },
+    });
+  });
+});

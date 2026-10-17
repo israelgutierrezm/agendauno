@@ -8,7 +8,9 @@ import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import ComplementosNegocio from "@/components/ComplementosNegocio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PlanCitasRenta from "@/components/PlanCitasRenta.vue";
+import QuienCuentaRenta from "@/components/QuienCuentaRenta.vue";
 import TarjetaRenta from "@/components/TarjetaRenta.vue";
 import TimbresRenta from "@/components/TimbresRenta.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -101,16 +103,6 @@ interface Renta {
   actual: Uso;
   cargos: Cargo[];
 }
-interface QuienCuenta {
-  metrica: string;
-  descripcion: string | null;
-  cantidad: number;
-  quienes: {
-    id: string;
-    nombre: string;
-    sesiones?: number;
-  }[];
-}
 interface RespuestaPago {
   estado: string;
   checkout?: { tipo?: string; url?: string };
@@ -128,8 +120,8 @@ const error = ref<string | null>(null);
 const pagando = ref<string | null>(null);
 const facturando = ref<string | null>(null);
 
-const quien = ref<QuienCuenta | null>(null);
-const cargandoQuien = ref(false);
+// Quién cuenta en el cobro del mes: en un diálogo con tabla (cientos de alumnos).
+const verQuien = ref(false);
 const expandido = ref<string | null>(null);
 
 function dinero(minor: number, moneda: string): string {
@@ -232,34 +224,40 @@ function notaCobro(c: Cargo): string | null {
     : t("suscripcion.cobro.rechazoFinal");
 }
 
+// El historial de cargos, por páginas: renta, planes, ajustes y compras de timbres
+// suman decenas con los años (antes se cortaba en 36 sin decirlo).
+const metaCargos = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+} | null>(null);
+async function cargarCargos(n: number): Promise<void> {
+  try {
+    const { data } = await api.get<{
+      data: Cargo[];
+      meta?: typeof metaCargos.value;
+    }>(`${base.value}/renta/cargos`, { params: { page: n } });
+    if (renta.value && Array.isArray(data.data)) {
+      renta.value.cargos = data.data;
+      metaCargos.value = data.meta ?? null;
+    }
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
     const { data } = await api.get<{ data: Renta }>(`${base.value}/renta`);
     renta.value = data.data;
+    await cargarCargos(metaCargos.value?.page ?? 1);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
-  }
-}
-
-async function alternarQuien(): Promise<void> {
-  if (quien.value !== null) {
-    quien.value = null;
-    return;
-  }
-  cargandoQuien.value = true;
-  try {
-    const { data } = await api.get<{ data: QuienCuenta }>(
-      `${base.value}/renta/quien-cuenta`,
-    );
-    quien.value = data.data;
-  } catch (e) {
-    toast.error(mensajeDeError(e));
-  } finally {
-    cargandoQuien.value = false;
   }
 }
 
@@ -629,59 +627,26 @@ onMounted(() => {
             }}
           </p>
 
-          <!-- Transparencia: a quién se contó -->
+          <!-- Transparencia: a quién se contó, en un diálogo con tabla. -->
           <button
             v-if="renta.modo_cobro !== 'fijo' && !porPlan"
             type="button"
             class="tu-enlace text-sm mt-4"
-            :disabled="cargandoQuien"
-            :aria-expanded="quien !== null"
-            @click="alternarQuien"
+            aria-haspopup="dialog"
+            data-prueba="ver-quien"
+            @click="verQuien = true"
           >
-            {{ quien ? $t("cobro.quien.ocultar") : $t("cobro.quien.ver") }}
+            {{ $t("cobro.quien.ver") }}
           </button>
-          <div v-if="quien" class="mt-3">
-            <p class="text-sm font-medium">{{ $t("cobro.quien.titulo") }}</p>
-            <p
-              v-if="quien.descripcion"
-              class="text-xs mt-1"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ quien.descripcion }}
-            </p>
-            <p
-              v-if="quien.quienes.length === 0"
-              class="text-sm mt-2"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t("cobro.quien.nadie") }}
-            </p>
-            <ul v-else class="mt-2 flex flex-wrap gap-2">
-              <li
-                v-for="p in quien.quienes"
-                :key="p.id"
-                class="tu-badge"
-                :style="{
-                  background: 'var(--superficie-2)',
-                  color: 'var(--texto)',
-                }"
-              >
-                {{ p.nombre }}
-                <span v-if="p.sesiones !== undefined" class="rt-suave">
-                  ·
-                  {{
-                    $t(
-                      sesion.esCitas
-                        ? "cobro.quien.sesionesCitas"
-                        : "cobro.quien.sesionesClases",
-                      { n: p.sesiones },
-                      p.sesiones,
-                    )
-                  }}</span
-                >
-              </li>
-            </ul>
-          </div>
+          <QuienCuentaRenta
+            v-if="renta.modo_cobro !== 'fijo' && !porPlan"
+            :abierto="verQuien"
+            :base="base"
+            :titulo="
+              $t('cobro.quien.tituloMes', { mes: mes(renta.actual.periodo) })
+            "
+            @cerrar="verQuien = false"
+          />
         </div>
       </div>
 
@@ -943,6 +908,14 @@ onMounted(() => {
           </tbody>
         </table>
       </div>
+      <PaginacionListado
+        v-if="metaCargos && metaCargos.ultima_pagina > 1"
+        :page="metaCargos.page"
+        :ultima-pagina="metaCargos.ultima_pagina"
+        :total="metaCargos.total"
+        :per-page="metaCargos.per_page"
+        @ir="cargarCargos"
+      />
       <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ facturaPosible ? $t("renta.pagoNota") : $t("renta.recibo.nota") }}
       </p>

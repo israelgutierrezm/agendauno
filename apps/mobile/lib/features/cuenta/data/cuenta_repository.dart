@@ -464,14 +464,41 @@ class CuentaRepository {
         .toList();
   }
 
-  /// Movimientos de créditos de uno de sus planes (los más recientes primero).
-  Future<List<MovimientoCredito>> movimientos(String derechoId) async {
+  /// En qué clases usó uno de sus planes, por páginas (del más reciente).
+  Future<List<UsoPlan>> usosPlan(
+    String derechoId, {
+    required int pagina,
+    int porPagina = 10,
+  }) async {
     final res = await _dio.get<Map<String, dynamic>>(
-      '$_base/mi/derechos/$derechoId/movimientos',
+      '$_base/mi/planes/$derechoId/usos',
+      queryParameters: {'page': pagina, 'per_page': porPagina},
     );
     return ((res.data?['data'] ?? []) as List)
+        .map((e) => UsoPlan.desdeJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Movimientos de créditos de uno de sus planes por páginas (los más recientes
+  /// primero): una membresía de años junta cientos.
+  Future<
+    ({List<MovimientoCredito> lista, int pagina, int ultimaPagina, int total})
+  >
+  movimientos(String derechoId, {int pagina = 1}) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/derechos/$derechoId/movimientos',
+      queryParameters: {'page': pagina},
+    );
+    final lista = ((res.data?['data'] ?? []) as List)
         .map((e) => MovimientoCredito.desdeJson(e as Map<String, dynamic>))
         .toList();
+    final meta = (res.data?['meta'] ?? const <String, dynamic>{}) as Map;
+    return (
+      lista: lista,
+      pagina: (meta['page'] as num?)?.toInt() ?? pagina,
+      ultimaPagina: (meta['ultima_pagina'] as num?)?.toInt() ?? pagina,
+      total: (meta['total'] as num?)?.toInt() ?? lista.length,
+    );
   }
 
   /// Acepta el lugar que le ofreció la lista de espera.

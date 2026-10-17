@@ -59,7 +59,9 @@ interface PlanCorte {
     unidades: number;
     usadas: number;
   }[];
+  // Los más recientes; `usos_total` cuenta todos (el resto, por páginas).
   usos: Uso[];
+  usos_total?: number;
 }
 
 const props = defineProps<{ url: string; equipo?: boolean }>();
@@ -186,6 +188,29 @@ function alternar(id: string): void {
     s.add(id);
   }
   abiertos.value = s;
+}
+
+// Una membresía de años junta cientos de clases: de cada plan llegan las más
+// recientes y las demás se piden por páginas, del mismo tamaño que las primeras.
+const USOS_POR_PAGINA = 10;
+const cargandoUsos = ref<string | null>(null);
+function totalUsos(p: PlanCorte): number {
+  return p.usos_total ?? p.usos.length;
+}
+async function verMasUsos(p: PlanCorte): Promise<void> {
+  cargandoUsos.value = p.id;
+  try {
+    const pagina = Math.floor(p.usos.length / USOS_POR_PAGINA) + 1;
+    const { data } = await api.get<{ data: Uso[] }>(
+      `${props.url}/${p.derecho_id}/usos`,
+      { params: { page: pagina, per_page: USOS_POR_PAGINA } },
+    );
+    p.usos = [...p.usos, ...data.data];
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cargandoUsos.value = null;
+  }
 }
 
 async function cargar(): Promise<void> {
@@ -395,7 +420,7 @@ defineExpose({ cargar });
             {{
               equipo ? $t("planes.corte.usosEquipo") : $t("planes.corte.usos")
             }}
-            ({{ p.usos.length }})
+            ({{ totalUsos(p) }})
           </button>
           <p
             v-else
@@ -438,6 +463,24 @@ defineExpose({ cargar });
               >
             </li>
           </ul>
+          <button
+            v-if="abiertos.has(p.id) && p.usos.length < totalUsos(p)"
+            type="button"
+            class="tu-enlace mt-2 text-sm"
+            :disabled="cargandoUsos === p.id"
+            data-prueba="ver-mas-usos"
+            @click="verMasUsos(p)"
+          >
+            {{
+              cargandoUsos === p.id
+                ? $t("comun.cargando")
+                : $t(
+                    "planes.corte.verMasUsos",
+                    { n: totalUsos(p) - p.usos.length },
+                    totalUsos(p) - p.usos.length,
+                  )
+            }}
+          </button>
         </article>
       </template>
       <button

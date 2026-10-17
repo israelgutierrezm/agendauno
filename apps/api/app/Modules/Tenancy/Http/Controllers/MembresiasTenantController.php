@@ -310,6 +310,26 @@ class MembresiasTenantController
         return response()->json(['data' => $corte->dePersona($persona)]);
     }
 
+    /**
+     * En qué clases se usó un plan, por páginas (el corte solo trae los más recientes).
+     */
+    public function usosPlan(Request $request, CorteDePlanesTenant $corte): JsonResponse
+    {
+        $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $plan = DerechoTenant::query()
+            ->where('ulid', (string) $request->route('derecho'))
+            ->whereNull('extra_de_id')
+            ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
+            ->firstOrFail();
+
+        return response()->json($corte->usosDe($plan, (int) ($validado['page'] ?? 1), (int) ($validado['per_page'] ?? 20)));
+    }
+
     public function topUp(Request $request): JsonResponse
     {
         $derecho = DerechoTenant::query()->where('ulid', (string) $request->route('derecho'))->firstOrFail();

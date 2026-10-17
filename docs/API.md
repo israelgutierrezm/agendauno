@@ -322,6 +322,33 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
 - `POST /timbres/comprar` acepta `retorno` (`/renta` o `/renta/timbres`): a dónde
   vuelve tras pagar.
 
+## Listados que crecen con el uso (por páginas)
+
+Lo que crece con cada visita de un cliente o con la operación se pide por páginas (`page`,
+`per_page`) y responde `meta` (`total`, `page`, `per_page`, `ultima_pagina`). Sin `page`,
+estos endpoints responden como antes (para versiones anteriores de la app):
+
+- `GET /mi/planes` y `GET /miembros/{persona}/planes`: cada plan trae sus 10 usos más
+  recientes (del más reciente al más antiguo) y `usos_total`. Los demás:
+  `GET /mi/planes/{derecho}/usos` y `GET /miembros/{persona}/planes/{derecho}/usos`
+  (hasta 50 por página). Las sumas del corte salen agrupadas del libro.
+- `GET /derechos/{derecho}/movimientos` y `GET /mi/derechos/{derecho}/movimientos`: con
+  `page`, por páginas (30 por omisión); sin ella, los últimos 200.
+- `GET /miembros/{persona}/notas`: con `page`, 20 por página.
+- `GET /miembros/{persona}/puntos`: con `page`, 20 por página (y `meta` junto a `data`);
+  sin ella, los últimos 50.
+- `GET /comunicaciones/difusiones`: con `page`, 20 por página; sin ella, las últimas 100.
+- `GET /renta/quien-cuenta`: con `page`, quién cuenta en el cobro del mes por páginas
+  (25 por omisión, hasta 100), con búsqueda por nombre (`q`, no cambia `cantidad`) y por
+  qué cuenta cada quien: `reservas` y `compras` del mes de cada alumno, o `sesiones` de
+  cada profesional. Sin ella, la lista completa como antes.
+- `GET /renta/cargos`: el historial de cargos de la renta (renta, planes, ajustes y compras
+  de timbres) por páginas, 12 por omisión. `GET /renta` sigue trayendo los últimos 36.
+- `GET /mi/perfil` trae las reservas que aún no empiezan y, de sus planes, los que siguen
+  en juego más los 3 vencidos más recientes.
+- `GET /miembros/{persona}/ficha` trae los planes que siguen en juego y los 12 vencidos más
+  recientes.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`

@@ -302,6 +302,7 @@ export const creditosFicha = {
   confirmar: "Agregar",
   agregados: "Créditos agregados.",
   sinMovimientos: "Sin movimientos.",
+  verMas: "Ver más ({n})",
   saldo: "Saldo {n}",
   por: "por {actor}",
   tipos: {
