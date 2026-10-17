@@ -440,3 +440,15 @@ describe("catálogo", () => {
     confirmar.mockRestore();
   });
 });
+
+describe("catálogo según la modalidad", () => {
+  it("en clases no ofrece armar paquetes (una clase no incluye otras)", async () => {
+    sesion.esCitas = false;
+    const w = await montar([
+      oferta({ id: "o1", nombre: "Pilates", incluye: [] }),
+      oferta({ id: "o2", nombre: "Yoga", incluye: [] }),
+    ]);
+    await w.findAll('[data-prueba="configurar"]')[0]!.trigger("click");
+    expect(w.find('[data-prueba="incluye"]').exists()).toBe(false);
+  });
+});

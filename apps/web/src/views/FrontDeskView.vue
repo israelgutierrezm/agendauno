@@ -296,6 +296,7 @@ function claseInicial(): SesionDia | null {
 
 // Cuándo se trajo lo que se ve, y si se está volviendo a pedir sin quitarlo.
 const actualizadoEn = ref<Date | null>(null);
+const falloActualizar = ref(false);
 const actualizando = ref(false);
 
 /**
@@ -341,10 +342,13 @@ async function cargar(enSegundoPlano = false): Promise<void> {
       sesionActiva.value = misma ?? claseInicial();
     }
     actualizadoEn.value = new Date();
+    falloActualizar.value = false;
   } catch (e) {
-    // En segundo plano, un fallo no borra lo que ya se ve.
+    // En segundo plano, un fallo no borra lo que ya se ve: avisa que es de antes.
     if (!enSegundoPlano || metricas.value === null) {
       error.value = mensajeDeError(e);
+    } else {
+      falloActualizar.value = true;
     }
   } finally {
     cargando.value = false;
@@ -488,6 +492,7 @@ onMounted(async () => {
       class="mt-2"
       :en="actualizadoEn"
       :actualizando="actualizando"
+      :fallo="falloActualizar"
       @actualizar="cargar(true)"
     />
 

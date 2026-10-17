@@ -304,6 +304,15 @@ describe("el día de hoy en el Inicio", () => {
     await flushPromises();
     vi.useRealTimers();
     expect(pedidosDelDia()).toBe(3);
+
+    // Si una actualización falla, lo que se ve sigue y se avisa que es de antes.
+    api.get.mockRejectedValueOnce(new Error("red"));
+    await w.get('[data-prueba="actualizar"]').trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("Pole Nivel 1");
+    expect(w.get('[data-prueba="desactualizado"]').text()).toContain(
+      "No se pudo actualizar",
+    );
   });
 
   it("sin permisos de cobro ni agenda no muestra esos bloques; el error no es un día vacío", async () => {

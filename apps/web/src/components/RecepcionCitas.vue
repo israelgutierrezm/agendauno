@@ -106,8 +106,10 @@ function limpiar(): void {
   filtro.value = "todas";
 }
 
-// Cuándo se trajo lo que se ve.
+// Cuándo se trajo lo que se ve y si la última actualización falló (lo que se ve
+// sigue, con el aviso de que puede no estar al día).
 const actualizadoEn = ref<Date | null>(null);
+const falloActualizar = ref(false);
 let pedido = 0;
 async function cargar(): Promise<void> {
   const mio = ++pedido;
@@ -140,8 +142,16 @@ async function cargar(): Promise<void> {
         citas.value.find((s) => s.id === abierta.value?.id) ?? null;
     }
     actualizadoEn.value = new Date();
+    falloActualizar.value = false;
   } catch (e) {
-    if (mio === pedido) {
+    if (
+      mio === pedido &&
+      citas.value.length > 0 &&
+      actualizadoEn.value !== null
+    ) {
+      // Ya hay una jornada a la vista: no se borra, se avisa que es de antes.
+      falloActualizar.value = true;
+    } else if (mio === pedido) {
       error.value = mensajeDeError(e);
     }
   } finally {
@@ -259,6 +269,7 @@ defineExpose({ cargar });
       class="mb-2"
       :en="actualizadoEn"
       :actualizando="cargando && citas.length > 0"
+      :fallo="falloActualizar"
       @actualizar="cargar()"
     />
     <div v-if="!error && citas.length > 0" class="rc-filtros">

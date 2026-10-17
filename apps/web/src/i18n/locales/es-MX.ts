@@ -28,6 +28,8 @@ export default {
     horas: "Actualizado hace {n} h",
     boton: "Actualizar",
     actualizando: "Actualizando…",
+    // Falló la actualización en segundo plano: lo que se ve puede no estar al día.
+    fallo: "No se pudo actualizar: lo que ves es de antes ({hace})",
   },
   comun: {
     // Elegir varias de una lista que crece (SelectorOpciones).

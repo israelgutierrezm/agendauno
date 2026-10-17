@@ -131,6 +131,22 @@ describe("recepción en un negocio de citas", () => {
     expect(w.find('[aria-pressed="true"]').text()).toBe("Por cobrar");
   });
 
+  it("si falla una actualización, la jornada sigue a la vista y avisa que es de antes", async () => {
+    const w = mount(RecepcionCitas, {
+      props: { fecha: "2030-01-07", sucursalId: "" },
+      global: { plugins: [i18n], stubs: { PanelCita: true } },
+    });
+    await flushPromises();
+    api.get.mockRejectedValueOnce(new Error("red"));
+    await w.get('[data-prueba="actualizar"]').trigger("click");
+    await flushPromises();
+
+    expect(w.findAll(".rc-fila")).toHaveLength(3);
+    expect(w.get('[data-prueba="desactualizado"]').text()).toContain(
+      "No se pudo actualizar",
+    );
+  });
+
   it("distingue una búsqueda sin coincidencias de una jornada vacía", async () => {
     const w = mount(RecepcionCitas, {
       props: { fecha: "2030-01-07", sucursalId: "" },

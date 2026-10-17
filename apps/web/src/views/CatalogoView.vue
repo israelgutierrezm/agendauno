@@ -1174,9 +1174,10 @@ onMounted(cargar);
             </div>
             <span class="tu-hint">{{ $t("recursosServicio.ayuda") }}</span>
           </fieldset>
-          <!-- Paquete (ADR 0063): servicios que incluye, sin anidar. -->
+          <!-- Paquete (ADR 0063): servicios que incluye, sin anidar. Solo citas:
+               una clase no «incluye» otras clases. -->
           <fieldset
-            v-if="paquetesCon(o) || incluibles(o).length > 0"
+            v-if="esCitas && (paquetesCon(o) || incluibles(o).length > 0)"
             class="sm:col-span-2"
             data-prueba="incluye"
           >

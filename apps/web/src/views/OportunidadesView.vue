@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -43,7 +44,8 @@ const promoviendo = ref<string | null>(null);
 const busqueda = ref("");
 const sucursal = ref("");
 const instructor = ref("");
-const soloEspera = ref(false);
+// Desde el Inicio, «en espera» abre solo las clases con gente esperando (`?espera=1`).
+const soloEspera = ref(useRoute()?.query.espera === "1");
 const pagina = ref(1);
 const porPagina = 20;
 const sucursales = computed(() =>

@@ -97,6 +97,8 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 // Cuándo se trajo lo que se ve, y si se está volviendo a pedir sin quitarlo.
 const actualizadoEn = ref<Date | null>(null);
+// Falló la última actualización en segundo plano: lo que se ve es de antes.
+const falloActualizar = ref(false);
 const actualizando = ref(false);
 const busqueda = ref("");
 // Al entrar se ve lo que falta del día; «Todas» sigue a un clic.
@@ -249,10 +251,13 @@ async function cargar(enSegundoPlano = false): Promise<void> {
     );
     hoy.value = data.data;
     actualizadoEn.value = new Date();
+    falloActualizar.value = false;
   } catch (e) {
-    // En segundo plano, un fallo no borra lo que ya se ve.
+    // En segundo plano, un fallo no borra lo que ya se ve: avisa que es de antes.
     if (!enSegundoPlano || hoy.value === null) {
       error.value = mensajeDeError(e);
+    } else {
+      falloActualizar.value = true;
     }
   } finally {
     cargando.value = false;
@@ -459,10 +464,14 @@ const indicadores = computed<Indicador[]>(() => {
       to: destino("recepcion", { name: "recepcion" }),
     },
     {
+      // Abre las clases con gente en espera (Lugares libres), no la agenda entera.
       clave: "enEspera",
       valor: String(tot.en_espera ?? 0),
       icono: "reloj",
-      to: destino("agenda", { name: "agenda" }),
+      to: destino("oportunidades", {
+        name: "oportunidades",
+        query: { espera: "1" },
+      }),
     },
   ];
   const r = hoy.value?.renovaciones;
@@ -522,6 +531,7 @@ onMounted(() => {
       class="mt-4"
       :en="actualizadoEn"
       :actualizando="actualizando"
+      :fallo="falloActualizar"
       @actualizar="cargar(true)"
     />
     <!-- La tarjeta principal: lo que sigue hoy y los indicadores del día -->
