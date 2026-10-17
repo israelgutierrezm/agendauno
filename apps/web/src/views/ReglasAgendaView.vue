@@ -310,7 +310,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+  <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('reglasAgenda.titulo')" />
 
     <div class="tu-pestanas mt-6" role="group" data-prueba="pestanas">
