@@ -335,4 +335,21 @@ describe("catálogo", () => {
       ],
     });
   });
+
+  it("un catálogo grande se busca y se ve por páginas", async () => {
+    const w = await montar([
+      ...Array.from({ length: 24 }, (_, i) =>
+        oferta({ id: `o${i}`, nombre: `Servicio ${i}`, incluye: [] }),
+      ),
+      oferta({ id: "lim", nombre: "Limpieza dental", incluye: [] }),
+    ]);
+    expect(w.findAll('[data-prueba="servicio"]')).toHaveLength(20);
+    // La paginación (aquí los textos van como claves).
+    expect(w.text()).toContain("tabla.mostrando");
+
+    await w.get('[data-prueba="buscar-servicio"]').setValue("limpieza");
+    const filas = w.findAll('[data-prueba="servicio"]');
+    expect(filas).toHaveLength(1);
+    expect(filas[0]!.text()).toContain("Limpieza dental");
+  });
 });

@@ -6,14 +6,17 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CambiarSerieTenant;
 use App\Modules\Tenancy\Application\EliminacionesTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -23,14 +26,64 @@ use Illuminate\Validation\ValidationException;
  */
 class PlantillasHorarioTenantController
 {
+    /** El filtro de las series sin instructor (como en la web). */
+    private const SIN_INSTRUCTOR = 'sin-asignar';
+
     public function __construct(private readonly GenerarAgendaTenant $generar) {}
 
-    public function index(): JsonResponse
+    /**
+     * Las series de la agenda. Con `estado=vigentes`, solo las que siguen generando
+     * fechas (la semana tipo, elegir una para un grupo); con `estado=terminadas`, las
+     * que ya no se repiten, de la que terminó más reciente a la más vieja: se juntan
+     * con cada cambio de horario, así que con `page` van por páginas (10 por omisión),
+     * con los filtros de la semana (`actividad_id`, `instructor_id` o `sin-asignar`,
+     * `sucursal`). Sin `estado`, todas como antes.
+     */
+    public function index(Request $request, FechasNegocioTenant $fechas): JsonResponse
     {
-        $plantillas = PlantillaHorarioTenant::query()->with(['oferta.actividad', 'sucursal', 'instructor'])->orderByDesc('id')->get();
+        $validado = $request->validate([
+            'estado' => ['nullable', Rule::in(['vigentes', 'terminadas'])],
+            'actividad_id' => ['nullable', 'string', 'max:40'],
+            'instructor_id' => ['nullable', 'string', 'max:40'],
+            'sucursal' => ['nullable', 'string', 'max:150'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $hoy = $fechas->hoy();
+        $estado = $validado['estado'] ?? null;
+
+        $consulta = PlantillaHorarioTenant::query()
+            ->with(['oferta.actividad', 'sucursal', 'instructor'])
+            ->when($estado === 'vigentes', fn (Builder $q) => $q->where('activo', true)
+                ->where(fn (Builder $v) => $v->whereNull('vigente_hasta')->orWhereDate('vigente_hasta', '>=', $hoy)))
+            ->when($estado === 'terminadas', fn (Builder $q) => $q
+                ->where(fn (Builder $t) => $t->where('activo', false)->orWhereDate('vigente_hasta', '<', $hoy)))
+            ->when($validado['actividad_id'] ?? null, fn (Builder $q, string $actividad) => $q
+                ->whereHas('oferta.actividad', fn (Builder $a) => $a->where('ulid', $actividad)))
+            ->when($validado['instructor_id'] ?? null, fn (Builder $q, string $instructor) => $instructor === self::SIN_INSTRUCTOR
+                ? $q->whereNull('instructor_id')
+                : $q->whereHas('instructor', fn (Builder $i) => $i->where('ulid', $instructor)))
+            ->when($validado['sucursal'] ?? null, fn (Builder $q, string $sucursal) => $q
+                ->whereHas('sucursal', fn (Builder $c) => $c->where('nombre', $sucursal)))
+            ->when($estado === 'terminadas', fn (Builder $q) => $q->orderByDesc('vigente_hasta'))
+            ->orderByDesc('id');
+
+        if ($estado === 'terminadas' && isset($validado['page'])) {
+            $pagina = $consulta->paginate((int) ($validado['per_page'] ?? 10), ['*'], 'page', (int) $validado['page']);
+
+            return response()->json([
+                'data' => $pagina->getCollection()->map(fn (PlantillaHorarioTenant $p): array => $this->presentar($p))->values()->all(),
+                'meta' => [
+                    'total' => $pagina->total(),
+                    'page' => $pagina->currentPage(),
+                    'per_page' => $pagina->perPage(),
+                    'ultima_pagina' => $pagina->lastPage(),
+                ],
+            ]);
+        }
 
         return response()->json([
-            'data' => $plantillas->map(fn (PlantillaHorarioTenant $p): array => $this->presentar($p))->all(),
+            'data' => $consulta->get()->map(fn (PlantillaHorarioTenant $p): array => $this->presentar($p))->all(),
         ]);
     }
 

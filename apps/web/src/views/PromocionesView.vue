@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -166,13 +167,33 @@ const busqueda = ref("");
 const filtro = ref<"" | "vigentes" | "no_vigentes">("");
 const visibles = computed(() => {
   const q = busqueda.value.trim().toLowerCase();
-  return promos.value.filter(
-    (p) =>
-      (q === "" ||
-        p.codigo.toLowerCase().includes(q) ||
-        (p.descripcion ?? "").toLowerCase().includes(q)) &&
-      (filtro.value === "" || (filtro.value === "vigentes") === p.vigente),
+  return (
+    promos.value
+      .filter(
+        (p) =>
+          (q === "" ||
+            p.codigo.toLowerCase().includes(q) ||
+            (p.descripcion ?? "").toLowerCase().includes(q)) &&
+          (filtro.value === "" || (filtro.value === "vigentes") === p.vigente),
+      )
+      // Las vigentes primero: las vencidas se juntan con el tiempo.
+      .sort((a, b) => Number(b.vigente) - Number(a.vigente))
   );
+});
+// Por páginas: las promociones de años se juntan.
+const POR_PAGINA = 20;
+const pagina = ref(1);
+const ultimaPagina = computed(() =>
+  Math.max(1, Math.ceil(visibles.value.length / POR_PAGINA)),
+);
+const enPagina = computed(() =>
+  visibles.value.slice(
+    (pagina.value - 1) * POR_PAGINA,
+    pagina.value * POR_PAGINA,
+  ),
+);
+watch([busqueda, filtro], () => {
+  pagina.value = 1;
 });
 const indicadores = computed<Indicador[]>(() => {
   const vigentes = promos.value.filter((p) => p.vigente);
@@ -434,7 +455,7 @@ onMounted(cargar);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="p in visibles" :key="p.id" data-prueba="promo">
+            <tr v-for="p in enPagina" :key="p.id" data-prueba="promo">
               <td>
                 <span class="font-semibold tracking-wide">{{ p.codigo }}</span>
                 <span v-if="p.descripcion" class="tu-sub">{{
@@ -495,6 +516,14 @@ onMounted(cargar);
         <p v-if="visibles.length === 0" class="tu-sin-resultados">
           {{ $t("promocionesVisual.sinResultados") }}
         </p>
+        <PaginacionListado
+          v-if="ultimaPagina > 1"
+          :page="pagina"
+          :ultima-pagina="ultimaPagina"
+          :total="visibles.length"
+          :per-page="POR_PAGINA"
+          @ir="pagina = $event"
+        />
       </div>
     </template>
   </section>

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import SelectorOpciones from "@/components/SelectorOpciones.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   UNIDADES_POR_CLASE,
@@ -153,23 +154,14 @@ const ofertasElegibles = computed(() =>
     : ofertas.value,
 );
 // Clases agrupadas por actividad para elegir a cuáles aplica.
-const ofertasPorActividad = computed(() => {
-  const grupos = new Map<string, Opcion[]>();
-  for (const o of ofertasElegibles.value) {
-    const clave = o.actividad ?? "";
-    grupos.set(clave, [...(grupos.get(clave) ?? []), o]);
-  }
-  return [...grupos.entries()];
-});
-function alternar(id: string): void {
-  const s = new Set(form.ofertas);
-  if (s.has(id)) {
-    s.delete(id);
-  } else {
-    s.add(id);
-  }
-  form.ofertas = s;
-}
+// Los servicios elegibles, agrupados por actividad en el selector.
+const opcionesOfertas = computed(() =>
+  ofertasElegibles.value.map((o) => ({
+    id: o.id,
+    nombre: o.nombre,
+    grupo: o.actividad ?? null,
+  })),
+);
 
 const valido = computed(
   () =>
@@ -503,25 +495,13 @@ onMounted(async () => {
         >
           {{ tx("sinClases") }}
         </p>
-        <div v-for="[actividad, lista] in ofertasPorActividad" :key="actividad">
-          <p
-            v-if="actividad"
-            class="text-xs font-medium"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ actividad }}
-          </p>
-          <div class="mt-1 flex flex-wrap gap-2">
-            <label v-for="o in lista" :key="o.id" class="ep-opcion">
-              <input
-                type="checkbox"
-                :checked="form.ofertas.has(o.id)"
-                @change="alternar(o.id)"
-              />
-              {{ o.nombre }}
-            </label>
-          </div>
-        </div>
+        <!-- En filas por actividad, con búsqueda: el catálogo crece. -->
+        <SelectorOpciones
+          v-if="ofertasElegibles.length > 0"
+          :opciones="opcionesOfertas"
+          :model-value="[...form.ofertas]"
+          @update:model-value="form.ofertas = new Set($event)"
+        />
         <AvisoTono
           v-if="ofertasElegibles.length > 0 && form.ofertas.size === 0"
           tono="aviso"

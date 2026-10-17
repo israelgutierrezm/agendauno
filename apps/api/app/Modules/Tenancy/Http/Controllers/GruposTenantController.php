@@ -69,18 +69,46 @@ class GruposTenantController
         ]], 201);
     }
 
+    /**
+     * Quién está inscrito en el grupo: las activas primero, en el orden en que se
+     * inscribieron. Un grupo no tiene tope de lugares, así que con `page` va por páginas
+     * (20 por omisión) y se busca por nombre, correo o celular (`q`). Sin `page`, todas
+     * como antes.
+     */
     public function inscripciones(Request $request): JsonResponse
     {
         $grupo = GrupoTenant::query()->where('ulid', (string) $request->route('grupo'))->firstOrFail();
+        $validado = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
-        $inscripciones = $grupo->inscripciones()->with('persona')->get();
+        $consulta = $grupo->inscripciones()->with('persona')
+            ->when($validado['q'] ?? null, fn ($q, string $texto) => $q->whereHas('persona', fn ($p) => $p->buscar($texto)))
+            ->orderByDesc('activo')
+            ->orderBy('id');
+        $presentar = static fn (InscripcionGrupoTenant $i): array => [
+            'id' => $i->ulid,
+            'persona' => $i->persona?->nombreCompleto(),
+            'persona_id' => $i->persona?->ulid,
+            'activo' => $i->activo,
+        ];
+
+        if (! isset($validado['page'])) {
+            return response()->json(['data' => $consulta->get()->map($presentar)->all()]);
+        }
+
+        $pagina = $consulta->paginate((int) ($validado['per_page'] ?? 20), ['*'], 'page', (int) $validado['page']);
 
         return response()->json([
-            'data' => $inscripciones->map(fn (InscripcionGrupoTenant $i): array => [
-                'id' => $i->ulid,
-                'persona' => $i->persona?->nombre,
-                'activo' => $i->activo,
-            ])->all(),
+            'data' => $pagina->getCollection()->map($presentar)->values()->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
         ]);
     }
 }

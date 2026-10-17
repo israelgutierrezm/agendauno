@@ -30,6 +30,15 @@ export default {
     actualizando: "Actualizando…",
   },
   comun: {
+    // Elegir varias de una lista que crece (SelectorOpciones).
+    selector: {
+      buscar: "Buscar",
+      elegidas: "{n} de {total} elegidas",
+      elegirTodas: "Elegir todas",
+      quitarTodas: "Quitar todas",
+      sinGrupo: "Otras",
+      sinCoincidencias: "Nada coincide con la búsqueda.",
+    },
     cambiosSinGuardar:
       "Tienes cambios sin guardar. Si sales ahora, se pierden.",
     salirSinGuardar: "Salir sin guardar",
@@ -2709,8 +2718,12 @@ export default {
     inscribir: "Inscribir",
     inscribiendo: "Inscribiendo…",
     elegirMiembro: "Elige un alumno",
-    inscritosTitulo: "Inscritos",
+    inscritosTotal: "Sin inscritos | 1 inscrito | {n} inscritos",
+    buscarInscrito: "Buscar inscrito",
+    inscritoBaja: "Baja",
     sinInscritos: "Aún no hay inscritos.",
+    sinInscritosBusqueda: "Nadie inscrito con ese nombre.",
+    verMasInscritos: "Ver 1 más | Ver {n} más",
     reservadas: "Inscrito. Se reservaron {n} clases próximas.",
     sinReservadas:
       "Quedó inscrito, pero no se reservó ninguna clase: no hay clases próximas o su plan no le alcanza.",

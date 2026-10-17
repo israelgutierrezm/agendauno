@@ -348,6 +348,12 @@ estos endpoints responden como antes (para versiones anteriores de la app):
   en juego más los 3 vencidos más recientes.
 - `GET /miembros/{persona}/ficha` trae los planes que siguen en juego y los 12 vencidos más
   recientes.
+- `GET /plantillas-horario`: con `estado=vigentes`, solo las series que siguen generando
+  fechas; con `estado=terminadas`, las que ya no se repiten (de la que terminó más
+  reciente a la más vieja), por páginas con `page` (10 por omisión) y con los filtros de
+  la semana (`actividad_id`, `instructor_id` o `sin-asignar`, `sucursal`).
+- `GET /grupos/{grupo}/inscripciones`: con `page`, 20 por página, las activas primero,
+  con búsqueda (`q`); cada inscripción trae el nombre completo y `persona_id`.
 
 ## Aviso de la renta en el panel (ADR 0152)
 

@@ -58,7 +58,29 @@ it('inscribir en un grupo auto-reserva las ocurrencias futuras', function (): vo
     $inscritos = $this->getJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones", conBearer($e['bearer']))
         ->assertOk()->json('data');
     expect($inscritos)->toHaveCount(1);
-    expect($inscritos[0]['persona'])->toBe('Ana');
+    expect($inscritos[0]['persona'])->toStartWith('Ana');
+});
+
+it('los inscritos de un grupo van por páginas, con su nombre completo y se buscan', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $grupo = grupoConSesiones($e, $semilla);
+    $url = "/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones";
+    foreach (['Ana', 'Beto', 'Caro'] as $nombre) {
+        $persona = crearMiembroTenant($e, $nombre);
+        $this->putJson("/api/v1/app/{$e['slug']}/miembros/{$persona}", ['primer_apellido' => 'Ruiz'], conBearer($e['bearer']));
+        $this->postJson($url, ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
+    }
+
+    $primera = $this->getJson("{$url}?page=1&per_page=2", conBearer($e['bearer']))->assertOk();
+    expect($primera->json('data'))->toHaveCount(2)
+        ->and($primera->json('meta.total'))->toBe(3)
+        ->and($primera->json('data.0.persona'))->toBe('Ana Ruiz')
+        ->and($primera->json('data.0.persona_id'))->toBeString();
+    $this->getJson("{$url}?page=1&q=caro", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.persona', 'Caro Ruiz');
+    // Sin `page`, todas como antes.
+    $this->getJson($url, conBearer($e['bearer']))->assertOk()->assertJsonCount(3, 'data');
 });
 
 it('reinscribir es idempotente (no duplica la inscripcion)', function (): void {

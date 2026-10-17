@@ -177,6 +177,8 @@ async function cargar(): Promise<void> {
       conProgramacion.value
         ? api.get<{ data: SerieProgramada[] }>(
             `${base.value}/plantillas-horario`,
+            // Las que ya no se repiten las pide la semana, por páginas.
+            { params: { estado: "vigentes" } },
           )
         : Promise.resolve({ data: { data: [] as SerieProgramada[] } }),
       api.get<{ data: Oferta[] }>(`${base.value}/ofertas`),
@@ -641,6 +643,7 @@ onMounted(cargar);
         v-if="pestana === 'programacion'"
         :series="series"
         :puede-eliminar="puedeEliminar"
+        :base="base"
         @dejar="dejarDeRepetir"
       />
 

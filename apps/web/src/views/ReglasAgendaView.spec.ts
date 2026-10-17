@@ -1,5 +1,5 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import { i18n } from "@/i18n";
@@ -88,14 +88,27 @@ const SERIES = [
   }),
 ];
 
+// Cada prueba desmonta su pantalla: una montada de antes no reacciona a la siguiente.
+enableAutoUnmount(afterEach);
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.ruta.hash = "";
   mocks.sesion.esCitas = false;
-  mocks.get.mockImplementation((url: string) =>
-    Promise.resolve({
-      data: { data: url.endsWith("/plantillas-horario") ? SERIES : [] },
-    }),
+  // Las vigentes, para la semana; las que ya no se repiten, por páginas.
+  mocks.get.mockImplementation(
+    (url: string, opciones?: { params?: { estado?: string } }) => {
+      if (!url.endsWith("/plantillas-horario")) {
+        return Promise.resolve({ data: { data: [] } });
+      }
+      const terminadas = SERIES.filter((s) => s.vigente_hasta !== null);
+      return Promise.resolve({
+        data:
+          opciones?.params?.estado === "terminadas"
+            ? { data: terminadas, meta: { total: terminadas.length } }
+            : { data: SERIES.filter((s) => s.vigente_hasta === null) },
+      });
+    },
   );
 });
 
@@ -177,9 +190,11 @@ describe("reglas de la agenda", () => {
       "Programación recurrente",
     );
     expect(activa(w)).toBe("Políticas");
-    expect(mocks.get).not.toHaveBeenCalledWith(
-      "/api/v1/app/demo/plantillas-horario",
-    );
+    expect(
+      mocks.get.mock.calls.some((c) =>
+        String(c[0]).endsWith("/plantillas-horario"),
+      ),
+    ).toBe(false);
   });
 
   it("muestra la semana de lunes a domingo y la filtra por actividad e instructor", async () => {
@@ -205,7 +220,25 @@ describe("reglas de la agenda", () => {
       "6 clases a la semana",
     );
 
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/plantillas-horario",
+      { params: { estado: "vigentes" } },
+    );
+
     await w.get('[data-prueba="filtro-actividad"]').setValue("a1");
+    await flushPromises();
+    // Las que ya no se repiten se piden con el mismo filtro.
+    expect(mocks.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/plantillas-horario",
+      {
+        params: {
+          estado: "terminadas",
+          page: 1,
+          per_page: 10,
+          actividad_id: "a1",
+        },
+      },
+    );
     expect(dia(1)).toHaveLength(2);
     expect(w.get('[data-dia="2"]').findAll(".ps-clase")).toHaveLength(0);
 

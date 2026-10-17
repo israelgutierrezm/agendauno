@@ -178,7 +178,7 @@ describe("planes de un negocio de citas", () => {
       .find((r) => (r.element as HTMLInputElement).value === "false")!;
     await algunas.setValue(true);
     const servicios = w
-      .findAll(".ep-opcion")
+      .findAll(".so-opcion")
       .map((o) => o.text())
       .filter((t) => t === "Corte" || t === "Masaje");
     expect(servicios).toEqual(["Masaje"]);

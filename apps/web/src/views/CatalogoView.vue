@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -8,6 +8,8 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
+import SelectorOpciones from "@/components/SelectorOpciones.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
@@ -83,6 +85,33 @@ function efectoPolitica(o: Oferta): string {
 }
 
 const ofertas = ref<Oferta[]>([]);
+// El catálogo de una clínica o un salón junta decenas de servicios: se busca por nombre
+// o actividad y se ve por páginas.
+const buscarServicio = ref("");
+const paginaServicios = ref(1);
+const SERVICIOS_POR_PAGINA = 20;
+const serviciosVisibles = computed(() => {
+  const q = buscarServicio.value.trim().toLowerCase();
+  return q === ""
+    ? ofertas.value
+    : ofertas.value.filter(
+        (o) =>
+          o.nombre.toLowerCase().includes(q) ||
+          (o.actividad ?? "").toLowerCase().includes(q),
+      );
+});
+const ultimaPaginaServicios = computed(() =>
+  Math.max(1, Math.ceil(serviciosVisibles.value.length / SERVICIOS_POR_PAGINA)),
+);
+const serviciosEnPagina = computed(() =>
+  serviciosVisibles.value.slice(
+    (paginaServicios.value - 1) * SERVICIOS_POR_PAGINA,
+    paginaServicios.value * SERVICIOS_POR_PAGINA,
+  ),
+);
+watch(buscarServicio, () => {
+  paginaServicios.value = 1;
+});
 const recursos = ref<Recurso[]>([]);
 function nombresDe(ids: string[] | undefined): string {
   return (ids ?? [])
@@ -486,6 +515,22 @@ onMounted(cargar);
         <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
         <div class="tu-card mt-5 overflow-x-auto">
+          <div
+            v-if="ofertas.length > SERVICIOS_POR_PAGINA / 2"
+            class="tu-filtros"
+          >
+            <label class="tu-buscar">
+              <IconoNav nombre="buscar" :tam="16" />
+              <input
+                v-model="buscarServicio"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('listadosVisual.catalogo.buscar')"
+                :aria-label="$t('listadosVisual.catalogo.buscar')"
+                data-prueba="buscar-servicio"
+              />
+            </label>
+          </div>
           <table class="ct-tabla">
             <thead>
               <tr>
@@ -507,7 +552,11 @@ onMounted(cargar);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="o in ofertas" :key="o.id" data-prueba="servicio">
+              <tr
+                v-for="o in serviciosEnPagina"
+                :key="o.id"
+                data-prueba="servicio"
+              >
                 <td>
                   <div class="flex items-center gap-3">
                     <img
@@ -599,6 +648,17 @@ onMounted(cargar);
               </tr>
             </tbody>
           </table>
+          <p v-if="serviciosVisibles.length === 0" class="tu-sin-resultados">
+            {{ $t("listadosVisual.catalogo.sinResultados") }}
+          </p>
+          <PaginacionListado
+            v-if="ultimaPaginaServicios > 1"
+            :page="paginaServicios"
+            :ultima-pagina="ultimaPaginaServicios"
+            :total="serviciosVisibles.length"
+            :per-page="SERVICIOS_POR_PAGINA"
+            @ir="paginaServicios = $event"
+          />
         </div>
       </template>
     </template>
@@ -879,16 +939,11 @@ onMounted(cargar);
               }}
             </p>
             <template v-else>
-              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                <label
-                  v-for="x in incluibles(o)"
-                  :key="x.id"
-                  class="flex items-center gap-2"
-                >
-                  <input v-model="form.incluye" type="checkbox" :value="x.id" />
-                  {{ x.nombre }}
-                </label>
-              </div>
+              <SelectorOpciones
+                v-model="form.incluye"
+                :opciones="incluibles(o)"
+                class="mt-1"
+              />
               <span class="tu-hint">{{
                 $t("perfilPublico.catalogo.incluyeAyuda")
               }}</span>

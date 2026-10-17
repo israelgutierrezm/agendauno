@@ -32,6 +32,7 @@ interface Plantilla {
 interface Inscripcion {
   id: string;
   persona: string | null;
+  persona_id?: string | null;
   activo: boolean;
 }
 
@@ -92,7 +93,12 @@ function cerrar(): void {
 }
 
 const seleccionado = ref<Grupo | null>(null);
+// Un grupo no tiene tope de lugares: sus inscritos se piden por páginas y se buscan.
 const inscripciones = ref<Inscripcion[]>([]);
+const totalInscritos = ref(0);
+const buscarInscrito = ref("");
+const cargandoInscritos = ref(false);
+const INSCRITOS_POR_PAGINA = 20;
 const miembroId = ref("");
 const inscribiendo = ref(false);
 const mensaje = ref<string | null>(null);
@@ -115,7 +121,10 @@ async function cargar(): Promise<void> {
   try {
     const [g, p] = await Promise.all([
       api.get<{ data: Grupo[] }>(`${base.value}/grupos`),
-      api.get<{ data: Plantilla[] }>(`${base.value}/plantillas-horario`),
+      // Un grupo nuevo sale de una serie que sigue vigente.
+      api.get<{ data: Plantilla[] }>(`${base.value}/plantillas-horario`, {
+        params: { estado: "vigentes" },
+      }),
     ]);
     grupos.value = g.data.data;
     plantillas.value = p.data.data;
@@ -146,18 +155,56 @@ async function crear(): Promise<void> {
 async function seleccionar(g: Grupo): Promise<void> {
   seleccionado.value = g;
   inscripciones.value = [];
+  totalInscritos.value = 0;
   miembroId.value = "";
   mensaje.value = null;
   errorDetalle.value = null;
+  if (buscarInscrito.value !== "") {
+    // Al limpiar la búsqueda se vuelven a pedir (ver el watch).
+    buscarInscrito.value = "";
+    return;
+  }
+  await cargarInscritos(1);
+}
+
+let turnoInscritos = 0;
+async function cargarInscritos(pagina: number): Promise<void> {
+  const g = seleccionado.value;
+  if (g === null) return;
+  const mio = ++turnoInscritos;
+  cargandoInscritos.value = true;
+  const q = buscarInscrito.value.trim();
   try {
-    const { data } = await api.get<{ data: Inscripcion[] }>(
-      `${base.value}/grupos/${g.id}/inscripciones`,
-    );
-    inscripciones.value = data.data;
+    const { data } = await api.get<{
+      data: Inscripcion[];
+      meta: { total: number };
+    }>(`${base.value}/grupos/${g.id}/inscripciones`, {
+      params: {
+        page: pagina,
+        per_page: INSCRITOS_POR_PAGINA,
+        ...(q ? { q } : {}),
+      },
+    });
+    if (mio !== turnoInscritos) return;
+    inscripciones.value =
+      pagina === 1 ? data.data : [...inscripciones.value, ...data.data];
+    totalInscritos.value = data.meta.total;
   } catch (e) {
-    errorDetalle.value = mensajeDeError(e);
+    if (mio === turnoInscritos) errorDetalle.value = mensajeDeError(e);
+  } finally {
+    if (mio === turnoInscritos) cargandoInscritos.value = false;
   }
 }
+function masInscritos(): void {
+  void cargarInscritos(
+    Math.floor(inscripciones.value.length / INSCRITOS_POR_PAGINA) + 1,
+  );
+}
+let esperaInscrito: ReturnType<typeof setTimeout> | undefined;
+watch(buscarInscrito, () => {
+  clearTimeout(esperaInscrito);
+  esperaInscrito = setTimeout(() => void cargarInscritos(1), 300);
+});
 
 async function inscribir(): Promise<void> {
   if (seleccionado.value === null || miembroId.value === "") {
@@ -363,8 +410,18 @@ const indicadores = computed<Indicador[]>(() => {
             </p>
             <template v-else>
               <h2 class="font-medium">{{ seleccionado.nombre }}</h2>
-              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                {{ $t("cursos.inscritosTitulo") }}
+              <p
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+                data-prueba="total-inscritos"
+              >
+                {{
+                  $t(
+                    "cursos.inscritosTotal",
+                    { n: totalInscritos },
+                    totalInscritos,
+                  )
+                }}
               </p>
 
               <form
@@ -415,19 +472,61 @@ const indicadores = computed<Indicador[]>(() => {
                 {{ mensaje }}
               </p>
 
-              <ul v-if="inscripciones.length > 0" class="gr-inscritos mt-4">
+              <!-- Con muchos inscritos, se busca en vez de recorrer la lista. -->
+              <input
+                v-if="totalInscritos > INSCRITOS_POR_PAGINA || buscarInscrito"
+                v-model="buscarInscrito"
+                type="search"
+                class="tu-input mt-4"
+                :placeholder="$t('cursos.buscarInscrito')"
+                :aria-label="$t('cursos.buscarInscrito')"
+                data-prueba="buscar-inscrito"
+              />
+              <ul
+                v-if="inscripciones.length > 0"
+                class="gr-inscritos mt-4"
+                :class="{ 'opacity-60': cargandoInscritos }"
+              >
                 <li v-for="i in inscripciones" :key="i.id">
                   <AvatarIniciales :nombre="i.persona" tam="sm" />
-                  <span>{{ i.persona ?? "—" }}</span>
+                  <span class="min-w-0 flex-1 truncate">{{
+                    i.persona ?? "—"
+                  }}</span>
+                  <span
+                    v-if="!i.activo"
+                    class="text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ $t("cursos.inscritoBaja") }}</span
+                  >
                 </li>
               </ul>
               <p
-                v-else
+                v-else-if="!cargandoInscritos"
                 class="mt-4 text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("cursos.sinInscritos") }}
+                {{
+                  buscarInscrito.trim()
+                    ? $t("cursos.sinInscritosBusqueda")
+                    : $t("cursos.sinInscritos")
+                }}
               </p>
+              <button
+                v-if="inscripciones.length < totalInscritos"
+                type="button"
+                class="tu-enlace mt-3 text-sm"
+                :disabled="cargandoInscritos"
+                data-prueba="mas-inscritos"
+                @click="masInscritos"
+              >
+                {{
+                  $t(
+                    "cursos.verMasInscritos",
+                    { n: totalInscritos - inscripciones.length },
+                    totalInscritos - inscripciones.length,
+                  )
+                }}
+              </button>
             </template>
           </aside>
         </div>

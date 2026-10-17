@@ -30,6 +30,8 @@ export default {
     nuevoServicio: "Nuevo servicio",
     nuevaClase: "Nueva clase",
     servicio: "Servicio",
+    buscar: "Buscar servicio o actividad",
+    sinResultados: "Ningún servicio coincide con la búsqueda.",
     duracion: "Duración",
     precio: "Precio",
     cupo: "Lugares",

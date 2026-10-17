@@ -204,3 +204,36 @@ it('cuántos días adelante se generan lo decide el negocio, también al cambiar
     // Los martes, hasta donde ya estaba generada (el 21).
     expect(array_keys(horarioDeEnero($e)))->toBe(['2030-01-08', '2030-01-15']);
 });
+
+it('las series que ya no se repiten van aparte, de la más reciente a la más vieja y por páginas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $url = "/api/v1/app/{$e['slug']}/plantillas-horario";
+    $serie = fn (string $desde, ?string $hasta): string => (string) $this->postJson($url, [
+        'oferta_id' => $semilla['oferta'], 'sucursal_id' => $semilla['sucursal'],
+        'dias_semana' => [1], 'hora_local' => '18:00', 'duracion_minutos' => 60,
+        'vigente_desde' => $desde, 'vigente_hasta' => $hasta,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+
+    // Hoy es el 1 de octubre de 2026: una sigue y doce terminaron (una por mes de 2025).
+    $vigente = $serie('2026-09-01', null);
+    foreach (range(1, 12) as $mes) {
+        $serie('2025-01-01', sprintf('2025-%02d-28', $mes));
+    }
+
+    $this->getJson("{$url}?estado=vigentes", conBearer($e['bearer']))->assertOk()
+        ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $vigente);
+    $primera = $this->getJson("{$url}?estado=terminadas&page=1", conBearer($e['bearer']))->assertOk();
+    expect($primera->json('data'))->toHaveCount(10)
+        ->and($primera->json('meta.total'))->toBe(12)
+        ->and($primera->json('data.0.vigente_hasta'))->toBe('2025-12-28');
+    $this->getJson("{$url}?estado=terminadas&page=2", conBearer($e['bearer']))->assertOk()
+        ->assertJsonCount(2, 'data')->assertJsonPath('data.1.vigente_hasta', '2025-01-28');
+    // Con los filtros de la semana.
+    $this->getJson("{$url}?estado=terminadas&page=1&instructor_id=sin-asignar", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('meta.total', 12);
+    $this->getJson("{$url}?estado=terminadas&page=1&actividad_id=otra", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('meta.total', 0);
+    // Sin `estado`, todas como antes.
+    $this->getJson($url, conBearer($e['bearer']))->assertOk()->assertJsonCount(13, 'data');
+});

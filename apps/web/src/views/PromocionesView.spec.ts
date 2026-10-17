@@ -64,4 +64,27 @@ describe("promociones", () => {
     expect(filas).toHaveLength(1);
     expect(filas[0]!.text()).toContain("BUENFIN");
   });
+
+  it("van por páginas, con las vigentes primero", async () => {
+    // 25 vencidas de otros años y una vigente creada al final.
+    mocks.get.mockResolvedValue({
+      data: {
+        data: [
+          ...Array.from({ length: 25 }, (_, i) =>
+            promo(`v${i}`, `VIEJA${i}`, false, 1),
+          ),
+          promo("n", "OTONO", true, 0),
+        ],
+      },
+    });
+    const w = mount(PromocionesView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    const filas = w.findAll('[data-prueba="promo"]');
+    expect(filas).toHaveLength(20);
+    expect(filas[0]!.text()).toContain("OTONO");
+    expect(w.text()).toContain("1–20 de 26");
+  });
 });

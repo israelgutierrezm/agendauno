@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
+import { api } from "@/lib/api";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import {
   filtrarSeries,
@@ -18,11 +19,15 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Las clases que se repiten, como una semana de lunes a domingo filtrable por
  * actividad, instructor y sede. Tocar una abre su detalle (y dejar de repetirla).
- * Las que ya no generan fechas quedan aparte, plegadas.
+ * Las que ya no generan fechas quedan aparte, plegadas y por páginas: se juntan con
+ * cada cambio de horario, así que se piden de 10 en 10 al API (`estado=terminadas`)
+ * con los mismos filtros.
  */
 const props = defineProps<{
+  // Las que siguen vigentes (la semana tipo).
   series: SerieProgramada[];
   puedeEliminar: boolean;
+  base: string;
 }>();
 const emit = defineEmits<{ dejar: [serie: SerieProgramada] }>();
 const { t } = useI18n();
@@ -71,9 +76,49 @@ const filtradas = computed(() => filtrarSeries(props.series, filtro.value));
 const vigentes = computed(() =>
   filtradas.value.filter((s) => sigueVigente(s, hoy)),
 );
-const terminadas = computed(() =>
-  filtradas.value.filter((s) => !sigueVigente(s, hoy)),
-);
+
+// Las que ya no se repiten: por páginas, de la que terminó más reciente a la más vieja.
+const POR_PAGINA = 10;
+const terminadas = ref<SerieProgramada[]>([]);
+const totalTerminadas = ref(0);
+const cargandoTerminadas = ref(false);
+let turno = 0;
+async function cargarTerminadas(pagina = 1): Promise<void> {
+  const mio = ++turno;
+  cargandoTerminadas.value = true;
+  const f = filtro.value;
+  try {
+    const { data } = await api.get<{
+      data: SerieProgramada[];
+      meta: { total: number };
+    }>(`${props.base}/plantillas-horario`, {
+      params: {
+        estado: "terminadas",
+        page: pagina,
+        per_page: POR_PAGINA,
+        ...(f.actividad ? { actividad_id: f.actividad } : {}),
+        ...(f.instructor ? { instructor_id: f.instructor } : {}),
+        ...(f.sucursal ? { sucursal: f.sucursal } : {}),
+      },
+    });
+    if (mio !== turno) return;
+    terminadas.value =
+      pagina === 1 ? data.data : [...terminadas.value, ...data.data];
+    totalTerminadas.value = data.meta.total;
+  } catch {
+    // Sin las viejas, la semana sigue a la vista; se reintenta al cambiar algo.
+  } finally {
+    if (mio === turno) cargandoTerminadas.value = false;
+  }
+}
+function masTerminadas(): void {
+  void cargarTerminadas(Math.floor(terminadas.value.length / POR_PAGINA) + 1);
+}
+// Al entrar, al filtrar y cuando cambian las vigentes (p. ej. dejó de repetir una).
+watch([filtro, () => props.series], () => void cargarTerminadas(1), {
+  deep: true,
+  immediate: true,
+});
 const semana = computed(() => semanaDe(vigentes.value));
 const clasesPorSemana = computed(() =>
   vigentes.value.reduce((n, s) => n + s.dias_semana.length, 0),
@@ -226,12 +271,12 @@ function dejar(s: SerieProgramada): void {
         </section>
       </div>
 
-      <details v-if="terminadas.length > 0" class="mt-5">
+      <details v-if="totalTerminadas > 0" class="mt-5" data-prueba="terminadas">
         <summary
           class="cursor-pointer text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
-          {{ $t("reglasAgenda.yaNoSeRepiten", { n: terminadas.length }) }}
+          {{ $t("reglasAgenda.yaNoSeRepiten", { n: totalTerminadas }) }}
         </summary>
         <ul class="mt-2">
           <li v-for="s in terminadas" :key="s.id" class="ps-fila text-sm">
@@ -250,6 +295,22 @@ function dejar(s: SerieProgramada): void {
             </button>
           </li>
         </ul>
+        <button
+          v-if="terminadas.length < totalTerminadas"
+          type="button"
+          class="tu-enlace mt-2 text-sm"
+          :disabled="cargandoTerminadas"
+          data-prueba="mas-terminadas"
+          @click="masTerminadas"
+        >
+          {{
+            $t(
+              "reglasAgenda.verMasTerminadas",
+              { n: totalTerminadas - terminadas.length },
+              totalTerminadas - terminadas.length,
+            )
+          }}
+        </button>
       </details>
     </template>
 

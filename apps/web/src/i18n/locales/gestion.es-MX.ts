@@ -278,6 +278,7 @@ export const reglasAgenda = {
     "Sin clases a la semana | 1 clase a la semana | {n} clases a la semana",
   sinSeriesFiltro: "Ninguna clase que se repite coincide con los filtros.",
   yaNoSeRepiten: "Ya no se repiten ({n})",
+  verMasTerminadas: "Ver 1 más | Ver {n} más",
   detalle: {
     actividad: "Actividad",
     dias: "Días",
