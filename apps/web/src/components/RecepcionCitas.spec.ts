@@ -114,6 +114,23 @@ describe("recepción en un negocio de citas", () => {
     expect(w.getComponent({ name: "PanelCita" }).props("sesion").id).toBe("c3");
     expect(api.get).toHaveBeenCalledTimes(1);
   });
+  it("desde una tarjeta del Inicio abre ya filtrada (p. ej. lo que falta cobrar)", async () => {
+    const w = mount(RecepcionCitas, {
+      props: {
+        fecha: "2030-01-07",
+        sucursalId: "",
+        filtroInicial: "porCobrar",
+      },
+      global: { plugins: [i18n], stubs: { PanelCita: true } },
+    });
+    await flushPromises();
+
+    const filas = w.findAll(".rc-fila").map((f) => f.text());
+    expect(filas).toHaveLength(1);
+    expect(filas[0]).toContain("Ana");
+    expect(w.find('[aria-pressed="true"]').text()).toBe("Por cobrar");
+  });
+
   it("distingue una búsqueda sin coincidencias de una jornada vacía", async () => {
     const w = mount(RecepcionCitas, {
       props: { fecha: "2030-01-07", sucursalId: "" },

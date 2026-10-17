@@ -33,7 +33,12 @@ export interface ResumenCitas {
   porCobrar: number;
 }
 
-const props = defineProps<{ fecha: string; sucursalId: string }>();
+const props = defineProps<{
+  fecha: string;
+  sucursalId: string;
+  // Desde el Inicio: «3 por cobrar» abre esas 3 (`?filtro=`).
+  filtroInicial?: string;
+}>();
 const emit = defineEmits<{ resumen: [r: ResumenCitas]; cambio: [] }>();
 
 const { t } = useI18n();
@@ -48,9 +53,28 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const abierta = ref<SesionAgenda | null>(null);
 const busqueda = ref("");
-const filtro = ref<
-  "todas" | "pendientes" | "sinRegistrar" | "llegaron" | "canceladas"
->("todas");
+const FILTROS = [
+  "todas",
+  "pendientes",
+  "sinRegistrar",
+  "llegaron",
+  "porCobrar",
+  "canceladas",
+] as const;
+type Filtro = (typeof FILTROS)[number];
+const filtro = ref<Filtro>(
+  (FILTROS as readonly string[]).includes(props.filtroInicial ?? "")
+    ? (props.filtroInicial as Filtro)
+    : "todas",
+);
+// Igual que la Agenda: quien no asistió no cuenta como por cobrar.
+function porCobrar(s: SesionAgenda, ahora: Date): boolean {
+  const p = pagoCita(s);
+  return (
+    estadoCita(s, ahora) !== "no_asistio" &&
+    (p === "por_cobrar" || p === "por_pagar")
+  );
+}
 const visibles = computed(() => {
   const q = normalizar(busqueda.value.trim());
   return citas.value.filter((s) => {
@@ -62,6 +86,9 @@ const visibles = computed(() => {
       (filtro.value === "llegaron" &&
         s.estado === "programada" &&
         s.cita?.asistencia === "presente") ||
+      (filtro.value === "porCobrar" &&
+        s.estado === "programada" &&
+        porCobrar(s, new Date())) ||
       (filtro.value === "canceladas" && estado === "cancelada");
     return (
       coincide &&
@@ -161,14 +188,7 @@ const resumen = computed<ResumenCitas>(() => {
     sinRegistrar: activas.value.filter(
       (s) => estadoCita(s, ahora) === "sin_registrar",
     ).length,
-    // Igual que la Agenda: quien no asistió no cuenta como por cobrar.
-    porCobrar: activas.value.filter((s) => {
-      const p = pagoCita(s);
-      return (
-        estadoCita(s, ahora) !== "no_asistio" &&
-        (p === "por_cobrar" || p === "por_pagar")
-      );
-    }).length,
+    porCobrar: activas.value.filter((s) => porCobrar(s, ahora)).length,
   };
 });
 watch(resumen, (r) => emit("resumen", r), { immediate: true });
@@ -258,13 +278,7 @@ defineExpose({ cargar });
         :aria-label="$t('operacion.admin.filtrarAtencion')"
       >
         <button
-          v-for="op in [
-            'todas',
-            'pendientes',
-            'sinRegistrar',
-            'llegaron',
-            'canceladas',
-          ] as const"
+          v-for="op in FILTROS"
           :key="op"
           type="button"
           :aria-pressed="filtro === op"

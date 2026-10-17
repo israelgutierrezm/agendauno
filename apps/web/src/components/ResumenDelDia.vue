@@ -380,6 +380,13 @@ const aRenovaciones = (estado: "por_vencer" | "vencida") =>
     },
   });
 
+// La jornada de hoy en Recepción, ya filtrada: la tarjeta abre lo que cuenta.
+const aRecepcion = (filtro: string) =>
+  destino("recepcion", {
+    name: "recepcion",
+    query: { fecha: hoy.value?.fecha ?? "", filtro },
+  });
+
 // Los indicadores del día: cada tipo de negocio, sus preguntas (no el mismo
 // indicador con otro nombre).
 const indicadores = computed<Indicador[]>(() => {
@@ -400,7 +407,7 @@ const indicadores = computed<Indicador[]>(() => {
         clave: "llegaron",
         valor: String(tot.llegaron),
         icono: "hecho",
-        to: destino("recepcion", { name: "recepcion" }),
+        to: aRecepcion("llegaron"),
       },
       // Por atender: aún no terminan. Sin registrar: ya terminaron y nadie dijo si
       // vino (no se cuentan como pendientes de atención).
@@ -408,21 +415,21 @@ const indicadores = computed<Indicador[]>(() => {
         clave: "porAtender",
         valor: String(tot.por_atender ?? 0),
         icono: "reloj",
-        to: destino("recepcion", { name: "recepcion" }),
+        to: aRecepcion("pendientes"),
       },
       {
         clave: "sinRegistrar",
         valor: String(tot.pendientes_registrar ?? 0),
         icono: "lista",
         aviso: (tot.pendientes_registrar ?? 0) > 0,
-        to: destino("recepcion", { name: "recepcion" }),
+        to: aRecepcion("sinRegistrar"),
       },
       {
         clave: "porCobrar",
         valor: String(porCobrar),
         icono: "dinero",
         aviso: porCobrar > 0,
-        to: destino("cobranza", { name: "cobranza", hash: "#pendientes" }),
+        to: aRecepcion("porCobrar"),
       },
     ].map((i) => ({ ...i, etiqueta: t(`operacion.hoy.citas.kpi.${i.clave}`) }));
   }

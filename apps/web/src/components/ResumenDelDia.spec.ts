@@ -401,6 +401,23 @@ describe("el día de hoy en el Inicio", () => {
     expect(libres).toContain("Caro");
     expect(libres).toContain("6 espacios");
     expect(libres).toContain("desde las 13:30");
+    // Cada tarjeta abre la jornada de Recepción ya filtrada en lo que cuenta.
+    expect(
+      w.get('[data-prueba="indicador-porCobrar"] a').attributes("data-to"),
+    ).toBe(
+      JSON.stringify({
+        name: "recepcion",
+        query: { fecha: "2026-10-01", filtro: "porCobrar" },
+      }),
+    );
+    expect(
+      w.get('[data-prueba="indicador-llegaron"] a').attributes("data-to"),
+    ).toBe(
+      JSON.stringify({
+        name: "recepcion",
+        query: { fecha: "2026-10-01", filtro: "llegaron" },
+      }),
+    );
   });
   it("abre en «Por comenzar» sin quitar «Todas»; si ya no queda nada, ofrece verlas", async () => {
     api.get.mockResolvedValue({

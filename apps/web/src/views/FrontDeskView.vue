@@ -78,6 +78,9 @@ const fecha = ref(
     ? fechaPedida
     : isoHoy(),
 );
+// `?filtro=` (desde una tarjeta del Inicio): la jornada ya filtrada.
+const filtroPedido =
+  typeof ruta?.query.filtro === "string" ? ruta.query.filtro : undefined;
 let sesionPedida: string | null =
   typeof ruta?.query.sesion === "string" && ruta.query.sesion !== ""
     ? ruta.query.sesion
@@ -675,6 +678,7 @@ onMounted(async () => {
         v-if="sesion.esCitas"
         :fecha="fecha"
         :sucursal-id="sucursalFiltro"
+        :filtro-inicial="filtroPedido"
         @resumen="resumenCitas = $event"
       />
       <div

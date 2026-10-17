@@ -15,6 +15,7 @@ export default {
       pendientes: "Por atender",
       sinRegistrar: "Sin registrar",
       llegaron: "Llegaron",
+      porCobrar: "Por cobrar",
       canceladas: "Canceladas",
     },
     verDetalle: "Ver detalle",
