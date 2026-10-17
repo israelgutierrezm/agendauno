@@ -15,6 +15,9 @@ vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
 }));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",

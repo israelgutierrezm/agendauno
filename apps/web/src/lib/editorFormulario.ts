@@ -32,36 +32,22 @@ export function useEditorFormulario(opciones: {
 }) {
   const { t } = useI18n();
   const toast = useToastStore();
-  const foto = instantanea(opciones.valor);
   const guardando = ref(false);
   const errores = ref<Record<string, string>>({});
   const error = ref<string | null>(null);
-  const sucio = computed(() => opciones.abierto.value && foto.cambio());
-  useCambiosPendientes(() => sucio.value);
+  const descartar = useDescartarCambios({
+    abierto: opciones.abierto,
+    valor: opciones.valor,
+    guardando,
+  });
+  const { sucio, cerrar } = descartar;
+  const foto = { fijar: descartar.fijar };
 
   /** Tras llenar el formulario (nuevo o con lo guardado): sin errores y sin cambios. */
   function empezar(): void {
     errores.value = {};
     error.value = null;
     foto.fijar();
-  }
-
-  /** Cierra si no está guardando; con cambios sin guardar, pregunta antes. */
-  async function cerrar(): Promise<boolean> {
-    if (guardando.value) {
-      return false;
-    }
-    if (
-      sucio.value &&
-      !(await confirmar(t("comun.cambiosSinGuardar"), {
-        aceptar: t("comun.salirSinGuardar"),
-        peligro: true,
-      }))
-    ) {
-      return false;
-    }
-    opciones.abierto.value = false;
-    return true;
   }
 
   /** Atributos del campo marcado (para `v-bind`). */
@@ -167,4 +153,40 @@ export function useContenedorEditor(abierto: Ref<boolean>) {
   }
 
   return { ocupado, alEstado, cerrar, cerrado };
+}
+
+/**
+ * Solo el aviso antes de descartar cambios (para editores que ya marcan sus errores y
+ * no se cierran mientras guardan): con cambios sin guardar, cerrar o salir de la
+ * pantalla pregunta antes. `fijar()` tras llenar el formulario y tras guardar.
+ */
+export function useDescartarCambios(opciones: {
+  abierto: Ref<boolean>;
+  valor: () => unknown;
+  guardando?: Ref<boolean>;
+}) {
+  const { t } = useI18n();
+  const foto = instantanea(opciones.valor);
+  const sucio = computed(() => opciones.abierto.value && foto.cambio());
+  useCambiosPendientes(() => sucio.value);
+
+  /** Cierra si no está guardando; con cambios sin guardar, pregunta antes. */
+  async function cerrar(): Promise<boolean> {
+    if (opciones.guardando?.value) {
+      return false;
+    }
+    if (
+      sucio.value &&
+      !(await confirmar(t("comun.cambiosSinGuardar"), {
+        aceptar: t("comun.salirSinGuardar"),
+        peligro: true,
+      }))
+    ) {
+      return false;
+    }
+    opciones.abierto.value = false;
+    return true;
+  }
+
+  return { sucio, fijar: foto.fijar, cerrar };
 }

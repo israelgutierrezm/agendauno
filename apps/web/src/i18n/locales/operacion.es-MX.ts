@@ -375,6 +375,7 @@ export default {
     negocio: "Datos del negocio",
   },
   sedes: {
+    guardada: "Sucursal «{nombre}» guardada.",
     ubicacion: "Ubicación (para el clima de tus alumnos)",
     ubicacionPh: "19.4194, -99.1617",
     ubicacionAyuda:

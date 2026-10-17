@@ -13,7 +13,9 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { etiquetaZona, opcionesZona, ZONA_POR_OMISION } from "@/lib/region";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 import { normalizar } from "@/lib/menu";
 
 interface Sucursal {
@@ -73,6 +75,7 @@ interface Organizacion {
 }
 
 const { t } = useI18n();
+const toast = useToastStore();
 const sesion = useSesionTenantStore();
 // Sin zona propia, la del negocio (CDMX si no eligió otra). La moneda es la del
 // negocio: una sola para todas sus sucursales (ADR 0099).
@@ -123,6 +126,12 @@ const form = ref({
   whatsapp: "",
   redes: redesVacias(),
   horario: horarioVacio(),
+});
+// Con cambios sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartar = useDescartarCambios({
+  abierto,
+  valor: () => form.value,
+  guardando,
 });
 // Todas las zonas, con las del país del negocio primero (ADR 0103).
 const zonas = computed(() =>
@@ -209,6 +218,7 @@ function abrirNueva(): void {
   fotoSede.value = null;
   errores.value = {};
   errorGuardar.value = null;
+  descartar.fijar();
   abierto.value = true;
 }
 
@@ -243,6 +253,7 @@ function abrirEdicion(s: Sucursal): void {
   fotoSede.value = s.foto_url ?? null;
   errores.value = {};
   errorGuardar.value = null;
+  descartar.fijar();
   abierto.value = true;
 }
 
@@ -292,7 +303,7 @@ function usarMiUbicacion(): void {
 }
 
 function cerrar(): void {
-  abierto.value = false;
+  void descartar.cerrar();
 }
 
 async function guardar(): Promise<void> {
@@ -332,7 +343,9 @@ async function guardar(): Promise<void> {
     } else {
       await api.put(`${base.value}/sucursales/${editandoId.value}`, cuerpo);
     }
+    descartar.fijar();
     abierto.value = false;
+    toast.exito(t("operacion.sedes.guardada", { nombre: cuerpo.nombre }));
     await cargar();
   } catch (e) {
     const detalle = (
