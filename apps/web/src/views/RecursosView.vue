@@ -16,6 +16,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 interface Sucursal {
   id: string;
@@ -158,17 +159,26 @@ async function crear(): Promise<void> {
   }
 }
 
-// Activar o desactivar: el API no deja apagar el único espacio activo de un servicio.
+// Activar o desactivar, y eliminar, con las mismas reglas (el API): no deja sin espacio
+// a un servicio ni a una serie, y sus citas próximas pasan a otro espacio libre.
+const toast = useToastStore();
+function avisarMovidas(n: number, hecho: string): void {
+  toast.exito(n > 0 ? `${hecho} ${t("recursos.movidas", { n }, n)}` : hecho);
+}
 const cambiando = ref<string | null>(null);
 async function cambiarActivo(r: Recurso, activo: boolean): Promise<void> {
   cambiando.value = r.id;
   error.value = null;
   try {
-    const { data } = await api.put<{ data: Recurso }>(
-      `${base.value}/recursos/${r.id}`,
-      { activo },
-    );
+    const { data } = await api.put<{
+      data: Recurso;
+      meta?: { movidas: number };
+    }>(`${base.value}/recursos/${r.id}`, { activo });
     r.activo = data.data.activo;
+    avisarMovidas(
+      data.meta?.movidas ?? 0,
+      activo ? t("recursos.activado") : t("recursos.desactivado"),
+    );
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -181,7 +191,10 @@ async function eliminar(r: Recurso): Promise<void> {
     return;
   }
   try {
-    await api.delete(`${base.value}/recursos/${r.id}`);
+    const { data } = await api.delete<{ data?: { movidas: number } }>(
+      `${base.value}/recursos/${r.id}`,
+    );
+    avisarMovidas(data?.data?.movidas ?? 0, t("recursos.eliminado"));
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);

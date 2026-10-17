@@ -42,7 +42,8 @@ class ElegirRecursoTenant
     /**
      * Uno libre en ese horario, o null. Con `bloquear` toma el candado de cada
      * candidato antes de revisarlo (en orden de id): se usa al GUARDAR, dentro de la
-     * transacción, para que dos solicitudes no se queden con la misma cabina.
+     * transacción, para que dos solicitudes no se queden con la misma cabina. Con
+     * `sinRecursoId`, uno distinto de ese (al dejar de usarlo).
      */
     public function libre(
         OfertaTenant $oferta,
@@ -52,8 +53,12 @@ class ElegirRecursoTenant
         MargenesServicio $margenes,
         ?int $excluirSesionId = null,
         bool $bloquear = false,
+        ?int $sinRecursoId = null,
     ): ?RecursoTenant {
         foreach ($this->candidatos($oferta, $sucursalId) as $recurso) {
+            if ($sinRecursoId !== null && (int) $recurso->getKey() === $sinRecursoId) {
+                continue;
+            }
             if ($bloquear) {
                 $this->agenda->bloquear(null, $recurso);
             }

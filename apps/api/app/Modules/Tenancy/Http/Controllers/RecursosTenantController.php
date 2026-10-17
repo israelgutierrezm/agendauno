@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\BajaDeRecursoTenant;
 use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -11,7 +12,6 @@ use App\Modules\Tenancy\Recursos\ModoRecurso;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Recursos reservables del estudio (R3): salas/canchas/carriles/equipos por sucursal.
@@ -58,7 +58,7 @@ class RecursosTenantController
      * Cambia sus datos o lo activa y desactiva. No se desactiva el único espacio activo
      * de un servicio en su sede: el servicio ya no se podría agendar ahí.
      */
-    public function actualizar(Request $request): JsonResponse
+    public function actualizar(Request $request, BajaDeRecursoTenant $bajas): JsonResponse
     {
         $recurso = RecursoTenant::query()->with('sucursal')->where('ulid', (string) $request->route('recurso'))->firstOrFail();
         $validado = $request->validate([
@@ -68,54 +68,33 @@ class RecursosTenantController
             'activo' => ['sometimes', 'boolean'],
         ]);
 
-        if (array_key_exists('activo', $validado) && ! $validado['activo'] && $recurso->activo) {
-            $sinOtro = $this->serviciosQueSeQuedanSinEspacio($recurso);
-            if ($sinOtro !== []) {
-                throw ValidationException::withMessages(['activo' => [
-                    'Es el único espacio activo de '.implode(', ', array_map(static fn (string $n): string => "«{$n}»", $sinOtro))
-                    .' en esta sede: activa otro o quítaselo al servicio antes de desactivarlo.',
-                ]]);
-            }
-        }
-
-        $recurso->update(array_filter([
+        $cambios = array_filter([
             'nombre' => isset($validado['nombre']) ? trim((string) $validado['nombre']) : null,
             'capacidad' => isset($validado['capacidad']) && $recurso->modo === ModoRecurso::Pool ? (int) $validado['capacidad'] : null,
             'activo' => array_key_exists('activo', $validado) ? (bool) $validado['activo'] : null,
-        ], static fn (mixed $v): bool => $v !== null) + (array_key_exists('tipo', $validado) ? ['tipo' => $validado['tipo']] : []));
+        ], static fn (mixed $v): bool => $v !== null) + (array_key_exists('tipo', $validado) ? ['tipo' => $validado['tipo']] : []);
 
-        return response()->json(['data' => $this->presentar($recurso->refresh()->load('sucursal'))]);
-    }
-
-    /**
-     * Los servicios que lo usan y no tienen otro espacio activo en su sede.
-     *
-     * @return list<string>
-     */
-    private function serviciosQueSeQuedanSinEspacio(RecursoTenant $recurso): array
-    {
-        $nombres = [];
-        foreach ($recurso->ofertas()->get() as $oferta) {
-            $otro = $oferta->recursos()
-                ->where('recursos.sucursal_id', $recurso->sucursal_id)
-                ->where('recursos.activo', true)
-                ->whereKeyNot($recurso->getKey())
-                ->exists();
-            if (! $otro) {
-                $nombres[] = (string) $oferta->nombre;
-            }
+        // Desactivarlo sigue las mismas reglas que eliminarlo (BajaDeRecursoTenant).
+        $movidas = 0;
+        if (array_key_exists('activo', $validado) && ! $validado['activo'] && $recurso->activo) {
+            $movidas = $bajas->dejarDeUsar($recurso, 'activo', static fn (RecursoTenant $r) => $r->update($cambios));
+        } else {
+            $recurso->update($cambios);
         }
 
-        return $nombres;
+        return response()->json([
+            'data' => $this->presentar($recurso->refresh()->load('sucursal')),
+            'meta' => ['movidas' => $movidas],
+        ]);
     }
 
-    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones, BajaDeRecursoTenant $bajas): JsonResponse
     {
         $recurso = RecursoTenant::query()->where('ulid', (string) $request->route('recurso'))->firstOrFail();
         // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
-        $eliminaciones->eliminar($recurso, 'recurso', $recurso->only(['nombre', 'tipo', 'capacidad']));
+        $movidas = $bajas->dejarDeUsar($recurso, 'recurso', static fn (RecursoTenant $r) => $eliminaciones->eliminar($r, 'recurso', $r->only(['nombre', 'tipo', 'capacidad'])));
 
-        return response()->json(status: 204);
+        return response()->json(['data' => ['movidas' => $movidas]]);
     }
 
     /**

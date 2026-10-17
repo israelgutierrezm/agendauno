@@ -80,3 +80,24 @@ it('verificar reporta el conflicto de sala sin guardar', function (): void {
     expect($data['conflictos'])->toHaveCount(1);
     expect($data['conflictos'][0]['tipo'])->toBe('recurso');
 });
+
+it('una sala no se elimina mientras una serie vigente o una clase próxima sin otra sala la usen', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $sala = crearSala($e, $semilla);
+    $serie = (string) $this->postJson("/api/v1/app/{$e['slug']}/plantillas-horario", [
+        'oferta_id' => $semilla['oferta'], 'sucursal_id' => $semilla['sucursal'], 'recurso_id' => $sala,
+        'dias_semana' => [1], 'hora_local' => '19:00', 'duracion_minutos' => 60, 'vigente_desde' => '2026-10-01',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+
+    $this->deleteJson("/api/v1/app/{$e['slug']}/recursos/{$sala}", [], conBearer($e['bearer']))
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.recurso.0', fn (string $m): bool => str_starts_with($m, 'Lo usa la serie «'));
+
+    // Sin la serie, la clase próxima en esa sala (el servicio no tiene otra) lo impide.
+    $this->deleteJson("/api/v1/app/{$e['slug']}/plantillas-horario/{$serie}", [], conBearer($e['bearer']))->assertSuccessful();
+    crearSesionSala($e, $semilla, $sala, '2026-10-20 19:00:00')->assertCreated();
+    $this->deleteJson("/api/v1/app/{$e['slug']}/recursos/{$sala}", [], conBearer($e['bearer']))
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.recurso.0', fn (string $m): bool => str_contains($m, 'no tienen otro espacio libre'));
+});

@@ -18,6 +18,8 @@ vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, put: mocks.put, post: vi.fn(), delete: vi.fn() },
   mensajeDeError: (e: unknown) => (e instanceof Error ? e.message : "Error"),
 }));
+const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
+vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
 }));
@@ -102,6 +104,8 @@ describe("salas y equipos", () => {
     expect(w.get('[data-prueba="activo-1"]').attributes("aria-checked")).toBe(
       "false",
     );
+    // Confirma qué quedó guardado.
+    expect(toast.exito).toHaveBeenCalledWith("Espacio desactivado.");
 
     mocks.put.mockRejectedValueOnce(
       new Error("Es el único espacio activo de «Masaje» en esta sede."),

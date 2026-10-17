@@ -137,3 +137,39 @@ it('al reprogramar, si su cabina está ocupada a la nueva hora, toma otra libre'
         ->firstWhere('id', $cita['id']);
     expect($sesion['sala'])->toBe('Cabina 2');
 });
+
+it('eliminar un espacio sigue las reglas de desactivarlo y pasa sus citas a otro libre', function (): void {
+    $s = spaConCabinas(['Cabina 1', 'Cabina 2']);
+    [$uno, $dos] = $s['pros'];
+    [$cabina1, $cabina2] = $s['cabinas'];
+    $e = $s['e'];
+    $sesiones = fn (): array => collect($this->getJson("/api/v1/app/{$e['slug']}/sesiones?desde=2030-01-07&hasta=2030-01-07", conBearer($e['bearer']))->json('data'))
+        ->mapWithKeys(fn (array $x): array => [$x['id'] => $x['sala']])->all();
+    $diez = citaConCabina($s, $uno, '2030-01-07 10:00:00')->assertCreated()->assertJsonPath('data.sala', 'Cabina 1')->json('data.id');
+    $once = citaConCabina($s, $uno, '2030-01-07 11:00:00')->assertCreated()->assertJsonPath('data.sala', 'Cabina 1')->json('data.id');
+    // A las 10:00 la Cabina 2 también está ocupada: esa cita no tiene a dónde ir.
+    citaConCabina($s, $dos, '2030-01-07 10:00:00')->assertCreated()->assertJsonPath('data.sala', 'Cabina 2');
+
+    $this->deleteJson("/api/v1/app/{$e['slug']}/recursos/{$cabina1}", [], conBearer($e['bearer']))
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.recurso.0', fn (string $m): bool => str_contains($m, 'no tienen otro espacio libre') && str_contains($m, '7 ene. 10:00'));
+    // No cambió nada: ni la de las 11:00 se movió.
+    expect($sesiones()[$once])->toBe('Cabina 1');
+
+    // Cancelada la otra cita de las 10:00, se elimina y sus dos citas pasan a la Cabina 2.
+    $otra = collect($this->getJson("/api/v1/app/{$e['slug']}/sesiones?desde=2030-01-07&hasta=2030-01-07", conBearer($e['bearer']))->json('data'))
+        ->first(fn (array $x): bool => $x['sala'] === 'Cabina 2');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$otra['id']}/cancelar", ['motivo' => 'Prueba'], conBearer($e['bearer']))->assertSuccessful();
+    $this->deleteJson("/api/v1/app/{$e['slug']}/recursos/{$cabina1}", [], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.movidas', 2);
+    expect($sesiones()[$diez])->toBe('Cabina 2')
+        ->and($sesiones()[$once])->toBe('Cabina 2');
+
+    // Ahora la Cabina 2 es la única del masaje: ni eliminarla ni desactivarla.
+    $this->deleteJson("/api/v1/app/{$e['slug']}/recursos/{$cabina2}", [], conBearer($e['bearer']))
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.recurso.0', fn (string $m): bool => str_starts_with($m, 'Es el único espacio activo de «'));
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$cabina2}", ['activo' => false], conBearer($e['bearer']))
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.activo.0', fn (string $m): bool => str_starts_with($m, 'Es el único espacio activo de «'));
+});

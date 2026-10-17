@@ -2683,7 +2683,13 @@ export default {
     creando: "Creando…",
     vacio: "Aún no hay recursos.",
     eliminar: "Eliminar",
-    confirmarEliminar: "¿Eliminar este recurso?",
+    confirmarEliminar:
+      "¿Eliminar este espacio? Sus citas próximas pasan a otro espacio libre del servicio; si alguna no cabe, te diremos cuál reprogramar.",
+    activado: "Espacio activado.",
+    desactivado: "Espacio desactivado.",
+    eliminado: "Espacio eliminado.",
+    movidas:
+      "Su cita próxima pasó a otro espacio. | Sus {n} citas próximas pasaron a otros espacios.",
   },
   nomina: {
     titulo: "Nómina",
