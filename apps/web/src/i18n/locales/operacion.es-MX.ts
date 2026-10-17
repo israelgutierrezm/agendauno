@@ -80,6 +80,7 @@ export default {
       "Quien imparte necesita «Ver la agenda» para ver sus clases.",
     guardar: "Guardar rol",
     guardado: "Rol guardado.",
+    guardadoNombre: "Rol «{nombre}» guardado.",
     eliminado: "Rol eliminado.",
     vacio: "Aún no hay roles propios. Crea el primero con «Nuevo rol».",
     grupos: {

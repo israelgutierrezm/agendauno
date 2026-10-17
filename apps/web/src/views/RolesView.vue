@@ -8,6 +8,7 @@ import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -52,8 +53,26 @@ const editandoId = ref<string | null>(null);
 const nombre = ref("");
 const faceta = ref<FacetaPropia>("equipo");
 const seleccion = ref<Set<string>>(new Set());
-const guardando = ref(false);
-const errorEditor = ref<string | null>(null);
+// El patrón común de los formularios (errores junto al campo, no cerrar mientras
+// guarda, preguntar antes de descartar, confirmar lo guardado).
+const {
+  guardando,
+  errores,
+  error: errorEditor,
+  empezar,
+  cerrar: cerrarEditor,
+  marcar,
+  guardar: guardarEditor,
+} = useEditorFormulario({
+  abierto: editorAbierto,
+  valor: () => ({
+    nombre: nombre.value,
+    faceta: faceta.value,
+    permisos: [...seleccion.value].sort(),
+  }),
+  campos: ["nombre", "faceta", "permisos"],
+  formulario: "#form-rol",
+});
 
 function nombreDe(rol: Rol): string {
   if (rol.nombre !== null) {
@@ -127,7 +146,7 @@ function abrirNuevo(): void {
   nombre.value = "";
   faceta.value = "equipo";
   seleccion.value = new Set();
-  errorEditor.value = null;
+  empezar();
   editorAbierto.value = true;
 }
 
@@ -136,7 +155,7 @@ function abrirEdicion(rol: Rol): void {
   nombre.value = rol.nombre ?? "";
   faceta.value = rol.faceta === "instructor" ? "instructor" : "equipo";
   seleccion.value = new Set(rol.permisos);
-  errorEditor.value = null;
+  empezar();
   editorAbierto.value = true;
 }
 
@@ -183,25 +202,18 @@ function alternarPermiso(permiso: string): void {
 }
 
 async function guardar(): Promise<void> {
-  guardando.value = true;
-  errorEditor.value = null;
   const cuerpo = { nombre: nombre.value, permisos: [...seleccion.value] };
-  try {
-    if (editandoId.value === null) {
-      await api.post(`${base.value}/roles`, {
-        ...cuerpo,
-        faceta: faceta.value,
-      });
-    } else {
-      await api.put(`${base.value}/roles/${editandoId.value}`, cuerpo);
-    }
+  const id = editandoId.value;
+  const listo = await guardarEditor(
+    (): Promise<unknown> =>
+      id === null
+        ? api.post(`${base.value}/roles`, { ...cuerpo, faceta: faceta.value })
+        : api.put(`${base.value}/roles/${id}`, cuerpo),
+    t("operacion.rolesPropios.guardadoNombre", { nombre: nombre.value.trim() }),
+  );
+  if (listo !== undefined) {
     editorAbierto.value = false;
-    toast.exito(t("operacion.rolesPropios.guardado"));
     await cargar();
-  } catch (e) {
-    errorEditor.value = mensajeDeError(e);
-  } finally {
-    guardando.value = false;
   }
 }
 
@@ -380,21 +392,32 @@ onMounted(cargar);
           ? $t('operacion.rolesPropios.editorNuevo')
           : $t('operacion.rolesPropios.editorEditar')
       "
-      @cerrar="editorAbierto = false"
+      :ocupado="guardando"
+      @cerrar="cerrarEditor"
     >
-      <form class="space-y-5 p-5" @submit.prevent="guardar">
+      <form id="form-rol" class="space-y-5 p-5" @submit.prevent="guardar">
+        <AvisoTono v-if="errorEditor" tono="peligro" role="alert">
+          {{ errorEditor }}
+        </AvisoTono>
         <div>
           <label class="tu-label" for="rol-nombre">{{
             $t("operacion.rolesPropios.nombre")
           }}</label>
           <input
             id="rol-nombre"
+            v-bind="marcar('nombre', 'rol-nombre-error')"
             v-model="nombre"
             class="tu-input"
             maxlength="60"
             :placeholder="$t('operacion.rolesPropios.nombrePh')"
             required
           />
+          <span
+            v-if="errores.nombre"
+            id="rol-nombre-error"
+            class="tu-error-campo"
+            >{{ errores.nombre }}</span
+          >
         </div>
         <!-- Del equipo o de quien imparte (ADR 0078): se elige al crearlo. -->
         <fieldset v-if="editandoId === null" data-prueba="faceta">
@@ -479,12 +502,23 @@ onMounted(cargar);
         <AvisoTono v-if="incompleto" tono="aviso">
           {{ $t("operacion.rolesPropios.incompleto") }}
         </AvisoTono>
-        <AvisoTono v-if="errorEditor" tono="peligro" role="alert">
-          {{ errorEditor }}
-        </AvisoTono>
+        <span
+          v-if="errores.permisos"
+          id="rol-permisos-error"
+          class="tu-error-campo"
+          >{{ errores.permisos }}</span
+        >
       </form>
       <template #pie>
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+          <button
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            :disabled="guardando"
+            @click="cerrarEditor"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
           <button
             class="tu-btn tu-btn-primario"
             type="button"

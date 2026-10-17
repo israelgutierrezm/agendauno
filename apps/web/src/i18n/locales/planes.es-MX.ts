@@ -89,6 +89,7 @@ export default {
     soloAlgunas: "Solo: {clases}",
   },
   editor: {
+    guardadoNombre: "«{nombre}» quedó guardado.",
     tituloNuevo: "Nuevo plan",
     tituloEditar: "Editar plan",
     queEs: "¿Qué es?",
@@ -176,6 +177,7 @@ export default {
   },
   // Cuotas del negocio (B04): inscripción y anualidad, aparte de los planes.
   cuotas: {
+    guardadas: "Cuotas guardadas.",
     titulo: "Cuotas",
     ayuda:
       "Lo que se cobra aparte de los planes. No da clases. Un monto vacío o en 0 no se cobra.",

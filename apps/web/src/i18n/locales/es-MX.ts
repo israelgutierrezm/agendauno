@@ -2689,6 +2689,7 @@ export default {
     activado: "Espacio activado.",
     desactivado: "Espacio desactivado.",
     eliminado: "Espacio eliminado.",
+    creado: "Espacio «{nombre}» creado.",
     movidas:
       "Su cita próxima pasó a otro espacio. | Sus {n} citas próximas pasaron a otros espacios.",
   },

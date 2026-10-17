@@ -15,6 +15,7 @@ import TarjetasIndicadores, {
 import { api, mensajeDeError } from "@/lib/api";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -50,8 +51,22 @@ const form = ref({
   modo: "unidad",
   capacidad: "1",
 });
-const creando = ref(false);
 const abierto = ref(false);
+// El patrón común de los formularios.
+const {
+  guardando: creando,
+  errores,
+  error: errorAlta,
+  empezar,
+  cerrar,
+  marcar,
+  guardar: guardarAlta,
+} = useEditorFormulario({
+  abierto,
+  valor: () => form.value,
+  campos: ["nombre", "sucursal_id", "tipo", "modo", "capacidad"],
+  formulario: "#form-recurso",
+});
 // Con una sucursal fija (la de la barra o la única), la sala nueva es de esa.
 const {
   mostrarSelect: elegirSucursal,
@@ -115,11 +130,8 @@ function abrir(): void {
     modo: "unidad",
     capacidad: "1",
   };
-  error.value = null;
+  empezar();
   abierto.value = true;
-}
-function cerrar(): void {
-  abierto.value = false;
 }
 
 async function cargar(): Promise<void> {
@@ -140,22 +152,22 @@ async function cargar(): Promise<void> {
 }
 
 async function crear(): Promise<void> {
-  creando.value = true;
-  error.value = null;
-  try {
-    await api.post(`${base.value}/recursos`, {
-      sucursal_id: form.value.sucursalId,
-      nombre: form.value.nombre,
-      tipo: form.value.tipo || null,
-      modo: form.value.modo,
-      capacidad: form.value.modo === "pool" ? Number(form.value.capacidad) : 1,
-    });
+  const nombre = form.value.nombre.trim();
+  const listo = await guardarAlta(
+    () =>
+      api.post(`${base.value}/recursos`, {
+        sucursal_id: form.value.sucursalId,
+        nombre: form.value.nombre,
+        tipo: form.value.tipo || null,
+        modo: form.value.modo,
+        capacidad:
+          form.value.modo === "pool" ? Number(form.value.capacidad) : 1,
+      }),
+    t("recursos.creado", { nombre }),
+  );
+  if (listo !== undefined) {
     abierto.value = false;
     await cargar();
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    creando.value = false;
   }
 }
 
@@ -346,41 +358,75 @@ onMounted(cargar);
     <PanelLateral
       :abierto="abierto"
       :titulo="$t('recursos.nuevo')"
+      :ocupado="creando"
       @cerrar="cerrar"
     >
-      <form class="space-y-4" @submit.prevent="crear">
-        <AvisoTono v-if="error" tono="peligro" role="alert">
-          {{ error }}
+      <form id="form-recurso" class="space-y-4" @submit.prevent="crear">
+        <AvisoTono v-if="errorAlta" tono="peligro" role="alert">
+          {{ errorAlta }}
         </AvisoTono>
         <div>
           <label class="tu-label" for="rn">{{ $t("recursos.nombre") }}</label>
-          <input id="rn" v-model="form.nombre" class="tu-input" required />
+          <input
+            id="rn"
+            v-bind="marcar('nombre', 'rn-error')"
+            v-model="form.nombre"
+            class="tu-input"
+            required
+          />
+          <span v-if="errores.nombre" id="rn-error" class="tu-error-campo">{{
+            errores.nombre
+          }}</span>
         </div>
         <div v-if="elegirSucursal">
           <label class="tu-label" for="rs">{{ $t("recursos.sucursal") }}</label>
-          <select id="rs" v-model="form.sucursalId" class="tu-input" required>
+          <select
+            id="rs"
+            v-bind="marcar('sucursal_id', 'rs-error')"
+            v-model="form.sucursalId"
+            class="tu-input"
+            required
+          >
             <option value="" disabled>{{ $t("recursos.sucursal") }}</option>
             <option v-for="s in sucursales" :key="s.id" :value="s.id">
               {{ s.nombre }}
             </option>
           </select>
+          <span
+            v-if="errores.sucursal_id"
+            id="rs-error"
+            class="tu-error-campo"
+            >{{ errores.sucursal_id }}</span
+          >
         </div>
         <LeyendaSucursal v-else />
         <div>
           <label class="tu-label" for="rt">{{ $t("recursos.tipo") }}</label>
           <input
             id="rt"
+            v-bind="marcar('tipo', 'rt-error')"
             v-model="form.tipo"
             class="tu-input"
             :placeholder="$t('validacion.recursoTipoPh')"
           />
+          <span v-if="errores.tipo" id="rt-error" class="tu-error-campo">{{
+            errores.tipo
+          }}</span>
         </div>
         <div>
           <label class="tu-label" for="rm">{{ $t("recursos.modo") }}</label>
-          <select id="rm" v-model="form.modo" class="tu-input">
+          <select
+            id="rm"
+            v-bind="marcar('modo', 'rm-error')"
+            v-model="form.modo"
+            class="tu-input"
+          >
             <option value="unidad">{{ $t("recursos.modoUnidad") }}</option>
             <option value="pool">{{ $t("recursos.modoPool") }}</option>
           </select>
+          <span v-if="errores.modo" id="rm-error" class="tu-error-campo">{{
+            errores.modo
+          }}</span>
         </div>
         <div v-if="form.modo === 'pool'">
           <label class="tu-label" for="rc">{{
@@ -388,17 +434,26 @@ onMounted(cargar);
           }}</label>
           <input
             id="rc"
+            v-bind="marcar('capacidad', 'rc-error')"
             v-model="form.capacidad"
             class="tu-input"
             type="number"
             min="1"
           />
+          <span v-if="errores.capacidad" id="rc-error" class="tu-error-campo">{{
+            errores.capacidad
+          }}</span>
         </div>
       </form>
 
       <template #pie>
         <div class="flex justify-end gap-2">
-          <button class="tu-btn tu-btn-fantasma" type="button" @click="cerrar">
+          <button
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            :disabled="creando"
+            @click="cerrar"
+          >
             {{ $t("comun.cancelar") }}
           </button>
           <button

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { RouterLink } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import SelectorOpciones from "@/components/SelectorOpciones.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
+import { instantanea } from "@/lib/cambiosPendientes";
+import type { EstadoEditor } from "@/lib/editorFormulario";
 import {
   UNIDADES_POR_CLASE,
   fechaLarga,
@@ -28,7 +30,12 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * los que se pueden elegir aquí.
  */
 const props = defineProps<{ plan: Plan | null }>();
-const emit = defineEmits<{ guardado: []; cerrar: [] }>();
+const emit = defineEmits<{
+  guardado: [nombre: string];
+  cerrar: [];
+  // Para su contenedor: no cerrarse a medio guardar ni descartar sin preguntar.
+  estado: [e: EstadoEditor];
+}>();
 
 const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
@@ -92,6 +99,28 @@ const form = reactive({
 });
 const guardando = ref(false);
 const error = ref<string | null>(null);
+// El error de cada campo, junto a él (y el resumen arriba del botón).
+const errores = ref<Record<string, string>>({});
+const CAMPOS = ["nombre", "precio_minor", "descripcion"];
+function marcar(
+  campo: string,
+  idError: string,
+): Record<string, string | undefined> {
+  return errores.value[campo]
+    ? { "aria-invalid": "true", "aria-describedby": idError }
+    : {};
+}
+// Lo capturado contra lo que se abrió (los conjuntos, como listas ordenadas).
+const foto = instantanea(() => ({
+  ...form,
+  ofertas: [...form.ofertas].sort(),
+  sucursalIds: [...form.sucursalIds].sort(),
+}));
+watch(
+  () => ({ guardando: guardando.value, sucio: foto.cambio() }),
+  (e) => emit("estado", e),
+  { immediate: true },
+);
 
 const esCitas = computed(() => sesion.esCitas === true);
 const TIPOS_PRINCIPALES = computed<TipoPlan[]>(() =>
@@ -174,6 +203,7 @@ const valido = computed(
 async function guardar(): Promise<void> {
   guardando.value = true;
   error.value = null;
+  errores.value = {};
   const unidades = (v: string) =>
     Math.round((numero(v) ?? 0) * UNIDADES_POR_CLASE);
   const recurrente = esMembresia.value;
@@ -234,9 +264,20 @@ async function guardar(): Promise<void> {
     } else {
       await api.post(`${base.value}/productos`, carga);
     }
-    emit("guardado");
+    foto.fijar();
+    emit("guardado", form.nombre.trim());
   } catch (e) {
-    error.value = mensajeDeError(e);
+    // Lo capturado se queda: solo se corrige lo marcado.
+    errores.value = erroresPorCampo(e);
+    const claves = Object.keys(errores.value);
+    error.value =
+      claves.length > 0 && claves.every((c) => CAMPOS.includes(c))
+        ? t("comun.revisaCampos")
+        : mensajeDeError(e);
+    await nextTick();
+    document
+      .querySelector<HTMLElement>('#form-plan [aria-invalid="true"]')
+      ?.focus();
   } finally {
     guardando.value = false;
   }
@@ -257,7 +298,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <form class="space-y-5" @submit.prevent="guardar">
+  <form id="form-plan" class="space-y-5" @submit.prevent="guardar">
     <!-- ¿Qué es? -->
     <fieldset>
       <legend class="tu-label">{{ $t("planes.editor.queEs") }}</legend>
@@ -315,12 +356,19 @@ onMounted(async () => {
         }}</label>
         <input
           id="ep-nombre"
+          v-bind="marcar('nombre', 'ep-nombre-error')"
           v-model="form.nombre"
           class="tu-input"
           :placeholder="tx('nombrePh')"
           required
           maxlength="255"
         />
+        <span
+          v-if="errores.nombre"
+          id="ep-nombre-error"
+          class="tu-error-campo"
+          >{{ errores.nombre }}</span
+        >
       </div>
       <div>
         <label class="tu-label" for="ep-precio">{{
@@ -328,6 +376,7 @@ onMounted(async () => {
         }}</label>
         <input
           id="ep-precio"
+          v-bind="marcar('precio_minor', 'ep-precio-error')"
           v-model="form.precio"
           class="tu-input"
           type="number"
@@ -336,6 +385,12 @@ onMounted(async () => {
           inputmode="decimal"
           required
         />
+        <span
+          v-if="errores.precio_minor"
+          id="ep-precio-error"
+          class="tu-error-campo"
+          >{{ errores.precio_minor }}</span
+        >
       </div>
       <div class="sm:col-span-2">
         <label class="tu-label" for="ep-descripcion">{{
@@ -343,11 +398,18 @@ onMounted(async () => {
         }}</label>
         <input
           id="ep-descripcion"
+          v-bind="marcar('descripcion', 'ep-descripcion-error')"
           v-model="form.descripcion"
           class="tu-input"
           maxlength="300"
           :placeholder="tx('descripcionPh')"
         />
+        <span
+          v-if="errores.descripcion"
+          id="ep-descripcion-error"
+          class="tu-error-campo"
+          >{{ errores.descripcion }}</span
+        >
       </div>
     </div>
 

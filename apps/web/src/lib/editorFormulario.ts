@@ -123,3 +123,48 @@ export function useEditorFormulario(opciones: {
     guardar,
   };
 }
+
+/** Lo que un editor que vive en otro componente le dice a su contenedor. */
+export interface EstadoEditor {
+  guardando: boolean;
+  sucio: boolean;
+}
+
+/**
+ * Del lado del contenedor (el diálogo o panel que muestra un editor hecho componente,
+ * p. ej. EditorPlan): el editor emite `estado` y el contenedor no se cierra mientras
+ * guarda (`:ocupado="ocupado"`) ni descarta cambios sin preguntar (`@cerrar="cerrar"`).
+ * Tras guardar, `cerrado()` cierra sin preguntar.
+ */
+export function useContenedorEditor(abierto: Ref<boolean>) {
+  const { t } = useI18n();
+  const estado = ref<EstadoEditor>({ guardando: false, sucio: false });
+  useCambiosPendientes(() => abierto.value && estado.value.sucio);
+  const ocupado = computed(() => estado.value.guardando);
+
+  function alEstado(e: EstadoEditor): void {
+    estado.value = e;
+  }
+  function cerrado(): void {
+    abierto.value = false;
+    estado.value = { guardando: false, sucio: false };
+  }
+  async function cerrar(): Promise<void> {
+    if (estado.value.guardando) {
+      return;
+    }
+    if (
+      abierto.value &&
+      estado.value.sucio &&
+      !(await confirmar(t("comun.cambiosSinGuardar"), {
+        aceptar: t("comun.salirSinGuardar"),
+        peligro: true,
+      }))
+    ) {
+      return;
+    }
+    cerrado();
+  }
+
+  return { ocupado, alEstado, cerrar, cerrado };
+}

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
+import { instantanea } from "@/lib/cambiosPendientes";
+import type { EstadoEditor } from "@/lib/editorFormulario";
 import {
   aMinor,
   aTexto as textoDelPais,
@@ -26,7 +28,12 @@ interface Cuotas {
   anualidad_dia: number | null;
 }
 
-const emit = defineEmits<{ guardado: []; cerrar: [] }>();
+const emit = defineEmits<{
+  guardado: [];
+  cerrar: [];
+  // Para su contenedor: no cerrarse a medio guardar ni descartar sin preguntar.
+  estado: [e: EstadoEditor];
+}>();
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
@@ -35,6 +42,23 @@ const simbolo = computed(() => simboloMoneda(sesion.moneda, sesion.pais));
 const cargando = ref(true);
 const guardando = ref(false);
 const error = ref<string | null>(null);
+// El error de cada campo, junto a él (y el resumen arriba del botón).
+const errores = ref<Record<string, string>>({});
+const CAMPOS = [
+  "inscripcion_minor",
+  "reingreso_meses",
+  "anualidad_minor",
+  "anualidad_mes",
+  "anualidad_dia",
+];
+function marcar(
+  campo: string,
+  idError: string,
+): Record<string, string | undefined> {
+  return errores.value[campo]
+    ? { "aria-invalid": "true", "aria-describedby": idError }
+    : {};
+}
 const form = ref({
   inscripcion: "",
   reingreso: "6",
@@ -43,6 +67,13 @@ const form = ref({
   mes: "1",
   dia: "1",
 });
+// Lo capturado contra lo guardado (se fija al cargar y al guardar).
+const foto = instantanea(() => form.value);
+watch(
+  () => ({ guardando: guardando.value, sucio: foto.cambio() }),
+  (e) => emit("estado", e),
+  { immediate: true },
+);
 
 // Como se escribe en el país del negocio («12,50» en España), para que `aMinor` lo lea.
 function aTexto(minor: number): string {
@@ -77,6 +108,7 @@ onMounted(async () => {
       mes: String(c.anualidad_mes ?? 1),
       dia: String(c.anualidad_dia ?? 1),
     };
+    foto.fijar();
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -90,6 +122,7 @@ async function guardar(): Promise<void> {
   }
   guardando.value = true;
   error.value = null;
+  errores.value = {};
   const fija = form.value.modo === "fecha_fija";
   try {
     await api.put(`${base.value}/cuotas`, {
@@ -100,9 +133,16 @@ async function guardar(): Promise<void> {
       anualidad_mes: fija ? Number(form.value.mes) : null,
       anualidad_dia: fija ? Number(form.value.dia) : null,
     });
+    foto.fijar();
     emit("guardado");
   } catch (e) {
-    error.value = mensajeDeError(e);
+    // Lo capturado se queda: solo se corrige lo marcado.
+    errores.value = erroresPorCampo(e);
+    const claves = Object.keys(errores.value);
+    error.value =
+      claves.length > 0 && claves.every((c) => CAMPOS.includes(c))
+        ? t("comun.revisaCampos")
+        : mensajeDeError(e);
   } finally {
     guardando.value = false;
   }
@@ -132,11 +172,18 @@ async function guardar(): Promise<void> {
           }}</label>
           <input
             id="cu-inscripcion"
+            v-bind="marcar('inscripcion_minor', 'cu-inscripcion-error')"
             v-model="form.inscripcion"
             class="tu-input"
             inputmode="decimal"
             :placeholder="$t('planes.cuotas.sinCobro')"
           />
+          <span
+            v-if="errores.inscripcion_minor"
+            id="cu-inscripcion-error"
+            class="tu-error-campo"
+            >{{ errores.inscripcion_minor }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="cu-reingreso">{{
@@ -144,12 +191,19 @@ async function guardar(): Promise<void> {
           }}</label>
           <input
             id="cu-reingreso"
+            v-bind="marcar('reingreso_meses', 'cu-reingreso-error')"
             v-model="form.reingreso"
             class="tu-input"
             type="number"
             min="0"
             max="120"
           />
+          <span
+            v-if="errores.reingreso_meses"
+            id="cu-reingreso-error"
+            class="tu-error-campo"
+            >{{ errores.reingreso_meses }}</span
+          >
         </div>
       </div>
       <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -165,11 +219,18 @@ async function guardar(): Promise<void> {
         }}</label>
         <input
           id="cu-anualidad"
+          v-bind="marcar('anualidad_minor', 'cu-anualidad-error')"
           v-model="form.anualidad"
           class="tu-input"
           inputmode="decimal"
           :placeholder="$t('planes.cuotas.sinCobro')"
         />
+        <span
+          v-if="errores.anualidad_minor"
+          id="cu-anualidad-error"
+          class="tu-error-campo"
+          >{{ errores.anualidad_minor }}</span
+        >
       </div>
       <div class="flex flex-wrap gap-2" role="radiogroup">
         <label
@@ -186,11 +247,22 @@ async function guardar(): Promise<void> {
           <label class="tu-label" for="cu-mes">{{
             $t("planes.cuotas.mes")
           }}</label>
-          <select id="cu-mes" v-model="form.mes" class="tu-input">
+          <select
+            id="cu-mes"
+            v-bind="marcar('anualidad_mes', 'cu-mes-error')"
+            v-model="form.mes"
+            class="tu-input"
+          >
             <option v-for="m in MESES" :key="m" :value="String(m)">
               {{ nombreMes(m) }}
             </option>
           </select>
+          <span
+            v-if="errores.anualidad_mes"
+            id="cu-mes-error"
+            class="tu-error-campo"
+            >{{ errores.anualidad_mes }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="cu-dia">{{
@@ -198,12 +270,19 @@ async function guardar(): Promise<void> {
           }}</label>
           <input
             id="cu-dia"
+            v-bind="marcar('anualidad_dia', 'cu-dia-error')"
             v-model="form.dia"
             class="tu-input"
             type="number"
             min="1"
             max="31"
           />
+          <span
+            v-if="errores.anualidad_dia"
+            id="cu-dia-error"
+            class="tu-error-campo"
+            >{{ errores.anualidad_dia }}</span
+          >
         </div>
       </div>
       <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">

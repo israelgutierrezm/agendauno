@@ -19,7 +19,9 @@ import {
   seccionDe,
   type Plan,
 } from "@/lib/planes";
+import { useContenedorEditor } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Planes y paquetes (ADR 0050) con el patrón de los listados: indicadores, búsqueda
@@ -206,9 +208,19 @@ function abrir(p: Plan | null): void {
   editando.value = p;
   abierto.value = true;
 }
-async function guardado(): Promise<void> {
-  abierto.value = false;
+// Los editores avisan si guardan o tienen cambios: el diálogo no se cierra a medio
+// guardar ni descarta sin preguntar.
+const editorPlan = useContenedorEditor(abierto);
+const editorCuotas = useContenedorEditor(cuotasAbiertas);
+const toast = useToastStore();
+async function guardado(nombre: string): Promise<void> {
+  editorPlan.cerrado();
+  toast.exito(t("planes.editor.guardadoNombre", { nombre }));
   await cargar();
+}
+function cuotasGuardadas(): void {
+  editorCuotas.cerrado();
+  toast.exito(t("planes.cuotas.guardadas"));
 }
 
 onMounted(cargar);
@@ -430,14 +442,16 @@ onMounted(cargar);
           : $t('planes.editor.tituloNuevo')
       "
       icono="etiqueta"
-      @cerrar="abierto = false"
+      :ocupado="editorPlan.ocupado.value"
+      @cerrar="editorPlan.cerrar"
     >
       <EditorPlan
         v-if="abierto"
         :key="editando?.id ?? 'nuevo'"
         :plan="editando"
         @guardado="guardado"
-        @cerrar="abierto = false"
+        @cerrar="editorPlan.cerrar"
+        @estado="editorPlan.alEstado"
       />
     </ModalDialogo>
 
@@ -445,12 +459,14 @@ onMounted(cargar);
       :abierto="cuotasAbiertas"
       :titulo="$t('planes.cuotas.titulo')"
       icono="dinero"
-      @cerrar="cuotasAbiertas = false"
+      :ocupado="editorCuotas.ocupado.value"
+      @cerrar="editorCuotas.cerrar"
     >
       <CuotasNegocio
         v-if="cuotasAbiertas"
-        @guardado="cuotasAbiertas = false"
-        @cerrar="cuotasAbiertas = false"
+        @guardado="cuotasGuardadas"
+        @cerrar="editorCuotas.cerrar"
+        @estado="editorCuotas.alEstado"
       />
     </ModalDialogo>
   </section>
