@@ -14,7 +14,9 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 interface Grupo {
   id: string;
@@ -37,6 +39,7 @@ interface Inscripcion {
 }
 
 const { t } = useI18n();
+const toast = useToastStore();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
@@ -83,13 +86,20 @@ const abierto = ref(false);
 const errorCrear = ref<string | null>(null);
 const errorDetalle = ref<string | null>(null);
 
+// Con lo capturado sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartar = useDescartarCambios({
+  abierto,
+  valor: () => nuevo.value,
+  guardando: creando,
+});
 function abrir(): void {
   nuevo.value = { nombre: "", plantillaId: "" };
   errorCrear.value = null;
+  descartar.fijar();
   abierto.value = true;
 }
 function cerrar(): void {
-  abierto.value = false;
+  void descartar.cerrar();
 }
 
 const seleccionado = ref<Grupo | null>(null);
@@ -143,7 +153,9 @@ async function crear(): Promise<void> {
       nombre: nuevo.value.nombre,
       plantilla_id: nuevo.value.plantillaId,
     });
+    descartar.fijar();
     abierto.value = false;
+    toast.exito(t("cursos.creado", { nombre: nuevo.value.nombre.trim() }));
     await cargar();
   } catch (e) {
     errorCrear.value = mensajeDeError(e);

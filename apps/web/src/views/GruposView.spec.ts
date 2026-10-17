@@ -12,6 +12,9 @@ import GruposView from "./GruposView.vue";
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: () => Promise.resolve(true) }));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
 }));

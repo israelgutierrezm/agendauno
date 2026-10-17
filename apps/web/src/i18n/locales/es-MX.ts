@@ -2733,6 +2733,7 @@ export default {
     buscarInscrito: "Buscar inscrito",
     inscritoBaja: "Baja",
     sinInscritos: "Aún no hay inscritos.",
+    creado: "Grupo «{nombre}» creado.",
     sinInscritosBusqueda: "Nadie inscrito con ese nombre.",
     verMasInscritos: "Ver 1 más | Ver {n} más",
     reservadas: "Inscrito. Se reservaron {n} clases próximas.",

@@ -24,6 +24,7 @@ export default {
   colTotal: "Devengado",
   colPorVenir: "Por venir",
   tarifaDesde: "Tarifa nueva desde el {fecha}",
+  esquemaGuardado: "Esquema de pago de {nombre} guardado.",
   cambioDesdeHoy:
     "Un cambio vale desde hoy: lo ya trabajado se sigue pagando con la tarifa de entonces.",
   colEstado: "Estado",

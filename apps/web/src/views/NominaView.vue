@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -15,6 +16,7 @@ import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { nombreDeRol } from "@/lib/roles";
 import { plural } from "@/lib/terminologia";
 import { hoyComoFecha } from "@/lib/hoyNegocio";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -85,9 +87,28 @@ const esquema = ref<{ usuarioId: string; tipo: TipoPago; monto: string }>({
   tipo: "por_clase",
   monto: "",
 });
-const guardando = ref(false);
-const guardado = ref(false);
 const editorEsquema = ref(false);
+// El patrón común de los formularios: errores junto al campo, no se cierra mientras
+// guarda, pregunta antes de descartar y confirma lo guardado.
+const {
+  guardando,
+  errores,
+  error: errorEsquema,
+  empezar,
+  cerrar: cerrarEsquema,
+  marcar,
+  guardar: guardarConEditor,
+} = useEditorFormulario({
+  abierto: editorEsquema,
+  valor: () => esquema.value,
+  campos: ["tipo", "monto_minor"],
+  formulario: '[data-prueba="editor-esquema"]',
+});
+function abrirEsquema(): void {
+  esquema.value = { usuarioId: "", tipo: "por_clase", monto: "" };
+  empezar();
+  editorEsquema.value = true;
+}
 const nombreEsquema = computed(
   () =>
     equipo.value.find((u) => u.id === esquema.value.usuarioId)?.nombre ?? "",
@@ -319,25 +340,18 @@ async function calcular(): Promise<void> {
 async function guardarEsquema(): Promise<void> {
   if (guardando.value || !esquema.value.usuarioId || esquema.value.monto === "")
     return;
-  guardando.value = true;
-  guardado.value = false;
-  error.value = null;
-  try {
-    await api.put(
-      `${base.value}/staff/${esquema.value.usuarioId}/esquema-pago`,
-      {
+  const listo = await guardarConEditor(
+    () =>
+      api.put(`${base.value}/staff/${esquema.value.usuarioId}/esquema-pago`, {
         tipo: esquema.value.tipo,
         monto_minor: Math.round(Number(esquema.value.monto) * 100),
         moneda: sesion.moneda,
-      },
-    );
-    guardado.value = true;
+      }),
+    t("nominaVisual.esquemaGuardado", { nombre: nombreEsquema.value }),
+  );
+  if (listo !== undefined) {
     editorEsquema.value = false;
     await calcular();
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    guardando.value = false;
   }
 }
 
@@ -352,8 +366,7 @@ function editar(x: FilaVista): void {
     monto:
       x.fila?.monto_minor !== undefined ? String(x.fila.monto_minor / 100) : "",
   };
-  guardado.value = false;
-  error.value = null;
+  empezar();
   editorEsquema.value = true;
 }
 
@@ -404,11 +417,7 @@ onMounted(async () => {
         ><button
           type="button"
           class="tu-btn tu-btn-primario"
-          @click="
-            esquema = { usuarioId: '', tipo: 'por_clase', monto: '' };
-            error = null;
-            editorEsquema = true;
-          "
+          @click="abrirEsquema"
         >
           {{ $t("adminUsabilidad.nomina.definir") }}
         </button></template
@@ -432,16 +441,16 @@ onMounted(async () => {
           :descripcion="$t('adminUsabilidad.nomina.ayuda')"
           icono="nomina"
           :ocupado="guardando"
-          @cerrar="editorEsquema = false"
+          @cerrar="cerrarEsquema"
         >
           <form
             data-prueba="editor-esquema"
             class="space-y-4"
             @submit.prevent="guardarEsquema"
           >
-            <p v-if="error" role="alert" :style="{ color: 'var(--error)' }">
-              {{ error }}
-            </p>
+            <AvisoTono v-if="errorEsquema" tono="peligro" role="alert">
+              {{ errorEsquema }}
+            </AvisoTono>
             <header class="nm-cabeza">
               <span class="tu-icono-tono tu-tono-azul">
                 <IconoNav nombre="nomina" :tam="20" />
@@ -461,6 +470,7 @@ onMounted(async () => {
                   <IconoNav nombre="personas" :tam="16" />
                   <select
                     id="es"
+                    v-bind="marcar('usuario_id', 'es-error')"
                     v-model="esquema.usuarioId"
                     class="tu-input"
                     required
@@ -472,6 +482,12 @@ onMounted(async () => {
                       {{ u.nombre }}
                     </option>
                   </select>
+                  <span
+                    v-if="errores.usuario_id"
+                    id="es-error"
+                    class="tu-error-campo"
+                    >{{ errores.usuario_id }}</span
+                  >
                 </label>
               </div>
               <div>
@@ -484,6 +500,7 @@ onMounted(async () => {
                   }}</span>
                   <input
                     id="em"
+                    v-bind="marcar('monto_minor', 'em-error')"
                     v-model="esquema.monto"
                     class="tu-input"
                     type="number"
@@ -493,6 +510,12 @@ onMounted(async () => {
                     placeholder="0.00"
                     required
                   />
+                  <span
+                    v-if="errores.monto_minor"
+                    id="em-error"
+                    class="tu-error-campo"
+                    >{{ errores.monto_minor }}</span
+                  >
                 </div>
                 <p class="tu-hint">
                   {{
@@ -529,18 +552,11 @@ onMounted(async () => {
             <p class="tu-hint mt-3">{{ $t("nominaVisual.cambioDesdeHoy") }}</p>
 
             <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
-              <p
-                v-if="guardado"
-                class="text-sm"
-                :style="{ color: 'var(--exito)' }"
-              >
-                {{ $t("nomina.guardado") }}
-              </p>
               <button
                 type="button"
                 class="tu-btn tu-btn-fantasma"
                 :disabled="guardando"
-                @click="editorEsquema = false"
+                @click="cerrarEsquema"
               >
                 {{ $t("comun.cancelar") }}
               </button>
