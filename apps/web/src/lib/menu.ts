@@ -30,6 +30,8 @@ export interface Vista {
   modalidad?: ModalidadServicio;
   // Permisos que pide esta vista además de los de su ruta (todos).
   permiso?: string | string[];
+  // Solo con equipo (más de una persona): quien trabaja solo no la necesita.
+  equipo?: true;
 }
 
 export interface Area {
@@ -404,7 +406,7 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
             termino: "instructor",
           }),
           v("disponibilidad", "horarios", "nav.vistas.disponibilidad"),
-          v("nomina", "nomina", "nav.nomina"),
+          v("nomina", "nomina", "nav.nomina", { equipo: true }),
         ],
       },
     ],
@@ -573,6 +575,7 @@ export function vistasVisibles(area: Area, sesion: Sesion): Vista[] {
   return area.vistas.filter(
     (x) =>
       (x.modalidad === undefined || x.modalidad === sesion.modalidad) &&
+      (x.equipo === undefined || sesion.conEquipo !== false) &&
       (x.permiso === undefined ||
         (Array.isArray(x.permiso) ? x.permiso : [x.permiso]).every((p) =>
           sesion.puede(p),

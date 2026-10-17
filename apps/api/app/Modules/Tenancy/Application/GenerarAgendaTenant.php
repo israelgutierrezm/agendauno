@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Listeners\ReservarInscritosEnFechasNuevas;
 use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
+use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -27,12 +29,15 @@ use Illuminate\Support\Facades\DB;
  * - Lo que no se puede generar se omite y se REPORTA (fecha y motivo).
  * - Una serie es de clases: en un negocio de citas no genera nada (ADR 0104) y el
  *   tipo de cada sesión es el de la modalidad del negocio.
+ * - Si un grupo abierto sigue la serie, las fechas nuevas salen en el outbox
+ *   (`agenda.sesiones_generadas`) para reservar a sus inscritos fuera de aquí.
  */
 class GenerarAgendaTenant
 {
     public function __construct(
         private readonly VerificarAgendaTenant $agenda,
         private readonly ModalidadNegocioTenant $modalidad,
+        private readonly RegistrarEventoTenant $eventos,
     ) {}
 
     public function ejecutar(PlantillaHorarioTenant $plantilla, string $desde, string $hasta): GeneracionDeAgenda
@@ -73,6 +78,7 @@ class GenerarAgendaTenant
             $this->agenda->bloquear($plantilla->instructor_id !== null ? (int) $plantilla->instructor_id : null, $recurso);
 
             $creadas = 0;
+            $nuevas = [];
             $omitidas = [];
 
             for ($dia = $inicio; $dia->lte($fin); $dia = $dia->addDay()) {
@@ -126,7 +132,17 @@ class GenerarAgendaTenant
 
                 if ($sesion->wasRecentlyCreated) {
                     $creadas++;
+                    $nuevas[] = (string) $sesion->ulid;
                 }
+            }
+
+            // Con un grupo abierto, sus inscritos también van en las fechas nuevas.
+            $conGrupo = $nuevas !== [] && GrupoTenant::query()
+                ->where('plantilla_id', $plantilla->getKey())
+                ->where('activo', true)
+                ->exists();
+            if ($conGrupo) {
+                $this->eventos->registrar(ReservarInscritosEnFechasNuevas::TIPO, 'plantilla_horario', (string) $plantilla->ulid, ['sesiones' => $nuevas]);
             }
 
             return new GeneracionDeAgenda($creadas, $omitidas);

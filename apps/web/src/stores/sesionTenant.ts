@@ -109,6 +109,8 @@ export interface EstudioSesion {
   // el negocio ofrece. La web no la deduce.
   modalidad?: ModalidadServicio;
   capacidades?: Capacidades;
+  // Más de una persona en el equipo: sin él, el menú no ofrece lo de un equipo.
+  con_equipo?: boolean;
   // El negocio manda avisos por WhatsApp a sus clientes (ADR 0069).
   whatsapp_clientes?: boolean;
   // Los módulos que el superadmin encendió en el negocio (ADR 0123): solo estos se
@@ -255,6 +257,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     modalidadDe(estudio.value),
   );
   const esCitas = computed(() => modalidad.value === "citas");
+  // Sin el dato (una sesión anterior), como si tuviera equipo: no se esconde nada.
+  const conEquipo = computed(() => estudio.value?.con_equipo !== false);
   /** Lo que ofrece el negocio: lo nuevo pregunta aquí, no por `esCitas`. */
   const capacidades = computed<Capacidades>(() =>
     capacidadesDeNegocio(estudio.value),
@@ -587,6 +591,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     confirmarRolInicial,
     modalidad,
     esCitas,
+    conEquipo,
     capacidades,
     moneda,
     pais,

@@ -44,5 +44,4 @@ problema de la tarifa actual.
 
 - Consultar un mes pasado da lo mismo aunque después cambien las tarifas.
 - Lo que se paga sale de lo devengado; la proyección es solo informativa.
-- Pendiente, si se necesita: cerrar cortes. Un corte cerrado congelaría un periodo ya
-  pagado aunque después se corrija la asistencia.
+- Cerrar cortes ya se hace: ver el ADR 0157 (cerrado, pagado y ajustes aparte).

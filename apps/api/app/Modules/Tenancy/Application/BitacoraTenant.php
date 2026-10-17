@@ -25,7 +25,7 @@ class BitacoraTenant
      * @var array<string, list<string>>
      */
     public const CATEGORIAS = [
-        'equipo' => ['usuario.'],
+        'equipo' => ['usuario.', 'nomina.'],
         'alumnos' => ['miembro.', 'grupo.'],
         'pagos' => ['pago.', 'orden.'],
         'membresias' => ['membresia.', 'credito.', 'pago_automatico.'],
@@ -136,6 +136,12 @@ class BitacoraTenant
             'grupo.cambio' => 'Cambió'.$de.' del grupo '.((string) ($antes['grupo'] ?? '')).' a '.((string) ($despues['grupo'] ?? '')).' desde el '.((string) ($despues['desde'] ?? '')),
             'grupo.cerrado' => 'Cerró el grupo '.((string) ($despues['grupo'] ?? '')).((int) ($despues['bajas'] ?? 0) > 0 ? ' y dio de baja a sus '.((int) $despues['bajas']).' inscritos desde el '.((string) ($despues['desde'] ?? '')) : ''),
             'grupo.reabierto' => 'Reabrió el grupo '.((string) ($despues['grupo'] ?? '')),
+            'grupo.fechas_nuevas' => self::fechasNuevasDeGrupo($despues),
+            // Cortes de nómina: cerrar, pagar, reabrir y ajustar un periodo.
+            'nomina.corte_cerrado' => 'Cerró la nómina'.self::periodoNomina($despues),
+            'nomina.corte_pagado' => 'Registró el pago de la nómina'.self::periodoNomina($despues).(isset($despues['referencia']) ? ' (referencia '.((string) $despues['referencia']).')' : ''),
+            'nomina.corte_reabierto' => 'Reabrió la nómina'.self::periodoNomina($antes),
+            'nomina.ajuste' => 'Ajustó la nómina'.self::periodoNomina($despues).' de '.((string) ($despues['persona'] ?? '')).': '.((string) ($despues['motivo'] ?? '')),
             // Servicios y clases (ADR 0154): retirados y vueltos a ofrecer, con su historial.
             'oferta.archivada' => 'Archivó'.($nombre !== '' ? " {$nombre}" : ' un servicio'),
             'oferta.restaurada' => 'Volvió a ofrecer'.($nombre !== '' ? " {$nombre}" : ' un servicio'),
@@ -155,6 +161,38 @@ class BitacoraTenant
             'integracion.reservas' => (($despues['activas'] ?? false) ? 'Publicó sus clases en ' : 'Dejó de publicar sus clases en ').self::plataforma($a),
             default => self::eliminacion($a->accion, $antes, $despues) ?? $a->accion,
         };
+    }
+
+    /**
+     * « del 2026-09-01 al 2026-09-15».
+     *
+     * @param  array<string, mixed>  $datos
+     */
+    private static function periodoNomina(array $datos): string
+    {
+        return isset($datos['desde'], $datos['hasta'])
+            ? ' del '.((string) $datos['desde']).' al '.((string) $datos['hasta'])
+            : '';
+    }
+
+    /**
+     * «Reservó a los inscritos del grupo X en 3 fechas nuevas: 5 reservadas, 1 sin
+     * reservar».
+     *
+     * @param  array<string, mixed>  $despues
+     */
+    private static function fechasNuevasDeGrupo(array $despues): string
+    {
+        $fechas = (int) ($despues['fechas'] ?? 0);
+        $partes = array_filter([
+            (int) ($despues['reservadas'] ?? 0) > 0 ? ((int) $despues['reservadas']).' reservadas' : null,
+            (int) ($despues['en_espera'] ?? 0) > 0 ? ((int) $despues['en_espera']).' en espera' : null,
+            (int) ($despues['no_reservadas'] ?? 0) > 0 ? ((int) $despues['no_reservadas']).' sin reservar' : null,
+        ]);
+
+        return 'Reservó a los inscritos del grupo '.((string) ($despues['grupo'] ?? ''))
+            .' en '.$fechas.($fechas === 1 ? ' fecha nueva' : ' fechas nuevas')
+            .($partes !== [] ? ': '.implode(', ', $partes) : '');
     }
 
     /**

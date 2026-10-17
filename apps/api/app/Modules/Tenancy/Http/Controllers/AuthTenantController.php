@@ -296,6 +296,9 @@ class AuthTenantController
             // Con qué marca se presenta (ADR 0108): AgendaUno o TurnoUno.
             'producto' => $estudio->producto()->value,
             'capacidades' => $estudio->modalidad()->capacidades(),
+            // ¿Trabaja con equipo (más de una persona que no es solo cliente)? Quien
+            // trabaja solo no ve lo de un equipo, como la nómina; aparece al invitar.
+            'con_equipo' => Usuario::query()->equipo()->count() > 1,
             // Los módulos que el superadministrador encendió (ADR 0123): la web y la app
             // solo muestran estos; el servidor niega los demás.
             'modulos' => $estudio->modulosHabilitados(),

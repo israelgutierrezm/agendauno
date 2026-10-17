@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Listeners\ReservarInscritosEnFechasNuevas;
 use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\InscripcionGrupoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -18,7 +19,8 @@ use Throwable;
 
 /**
  * Inscribe a una persona en un grupo/curso (R25) y le AUTO-RESERVA las ocurrencias
- * futuras de la serie del grupo (reusa el motor de reserva: derecho, hold, capacidad;
+ * futuras de la serie del grupo (y las que se generen después, al publicarse
+ * `agenda.sesiones_generadas`) (reusa el motor de reserva: derecho, hold, capacidad;
  * si una sesion esta llena va a lista de espera).
  *
  * Cada fecha dice cómo quedó: reservada, en espera o sin reservar con su motivo (sin
@@ -72,7 +74,7 @@ class InscribirEnGrupoTenant
             ->where('inicia_en', '>=', $inicio)
             ->orderBy('inicia_en')
             ->get()
-            ->map(fn (SesionTenant $sesion): array => $this->reservar($sesion, $persona))
+            ->map(fn (SesionTenant $sesion): array => $this->reservarFecha($sesion, $persona))
             ->values()
             ->all();
         $cuantas = static fn (string $estado): int => count(array_filter($sesiones, static fn (array $s): bool => $s['estado'] === $estado));
@@ -88,11 +90,12 @@ class InscribirEnGrupoTenant
 
     /**
      * Una fecha: cómo quedó y por qué. Cada reserva es su propia transacción, así que
-     * un error en una no deshace las demás.
+     * un error en una no deshace las demás. También la usan las fechas que la agenda
+     * genera después de inscribir ({@see ReservarInscritosEnFechasNuevas}).
      *
      * @return array{sesion_id: string, inicia_en: string, estado: string, motivo: string|null}
      */
-    private function reservar(SesionTenant $sesion, PersonaTenant $persona): array
+    public function reservarFecha(SesionTenant $sesion, PersonaTenant $persona): array
     {
         $fila = ['sesion_id' => (string) $sesion->ulid, 'inicia_en' => $sesion->inicia_en->toIso8601String()];
         try {

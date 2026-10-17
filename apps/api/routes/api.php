@@ -26,6 +26,7 @@ use App\Modules\Tenancy\Http\Controllers\CategoriasArticuloTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\ComplementosNegocioController;
+use App\Modules\Tenancy\Http\Controllers\CortesNominaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CuotasTenantController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
@@ -797,6 +798,13 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/sesiones/{sesion}/staff', [StaffTenantController::class, 'asignar'])->middleware('puede:agenda.gestionar')->name('sesiones.staff.store');
             Route::put('/staff/{usuario}/esquema-pago', [StaffTenantController::class, 'esquemaPago'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('staff.esquema-pago');
             Route::get('/nomina', [StaffTenantController::class, 'nomina'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina');
+            // Cortes de nómina: cerrar un periodo, registrar su pago y los ajustes posteriores.
+            Route::get('/nomina/cortes', [CortesNominaTenantController::class, 'index'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.index');
+            Route::post('/nomina/cortes', [CortesNominaTenantController::class, 'cerrar'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.cerrar');
+            Route::get('/nomina/cortes/{corte}', [CortesNominaTenantController::class, 'mostrar'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.mostrar');
+            Route::post('/nomina/cortes/{corte}/pagar', [CortesNominaTenantController::class, 'pagar'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.pagar');
+            Route::delete('/nomina/cortes/{corte}', [CortesNominaTenantController::class, 'reabrir'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.reabrir');
+            Route::post('/nomina/cortes/{corte}/ajustes', [CortesNominaTenantController::class, 'ajustar'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.ajustes');
 
             // Grupos / cursos con inscripcion (R25): un grupo sigue una serie; inscribir
             // auto-reserva las ocurrencias futuras.

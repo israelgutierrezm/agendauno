@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
+import CortesNomina from "@/components/CortesNomina.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -129,6 +130,8 @@ const periodoCalculado = ref({ ...periodo.value });
 const filas = ref<FilaNomina[]>([]);
 const calculando = ref(false);
 const calculado = ref(false);
+// Si el cálculo falla, se dice ahí mismo (no «calcula el periodo»).
+const errorCalculo = ref(false);
 
 const termino = computed(() => sesion.terminologia.sesion.toLowerCase());
 
@@ -322,6 +325,7 @@ async function cargarEquipo(): Promise<void> {
 async function calcular(): Promise<void> {
   calculando.value = true;
   error.value = null;
+  errorCalculo.value = false;
   try {
     const { data } = await api.get<{ data: FilaNomina[] }>(
       `${base.value}/nomina`,
@@ -330,8 +334,8 @@ async function calcular(): Promise<void> {
     filas.value = data.data;
     periodoCalculado.value = { ...periodo.value };
     calculado.value = true;
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCalculo.value = true;
   } finally {
     calculando.value = false;
   }
@@ -653,7 +657,27 @@ onMounted(async () => {
         </span>
       </header>
 
-      <p v-if="cargando" class="mt-4 nm-sub">{{ $t("comun.cargando") }}</p>
+      <p v-if="cargando || calculando" class="mt-4 nm-sub">
+        {{ $t("comun.cargando") }}
+      </p>
+      <AvisoTono
+        v-else-if="errorCalculo"
+        tono="peligro"
+        class="mt-4"
+        role="alert"
+        data-prueba="error-calculo"
+      >
+        <span class="flex flex-wrap items-center justify-between gap-3">
+          {{ $t("nominaVisual.errorCalculo") }}
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="calcular"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </span>
+      </AvisoTono>
       <EstadoVacio
         v-else-if="filasVista.length === 0"
         class="py-6"
@@ -768,6 +792,13 @@ onMounted(async () => {
         </table>
       </div>
     </div>
+
+    <!-- Cortes: cerrar el periodo calculado, su pago y los ajustes. -->
+    <CortesNomina
+      :periodo="calculado && !errorCalculo ? periodoCalculado : null"
+      :devengado="total"
+      :equipo="equipo"
+    />
   </section>
 </template>
 

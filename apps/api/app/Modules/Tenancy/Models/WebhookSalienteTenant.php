@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,10 +36,15 @@ class WebhookSalienteTenant extends Model
     ];
 
     /**
-     * ¿Este endpoint está suscrito al tipo de evento dado? (NULL = todos.)
+     * ¿Este endpoint está suscrito al tipo de evento dado? NULL = todos los del
+     * catálogo público ({@see EventoDeDominioTenant::TIPOS}); los internos, como
+     * `agenda.sesiones_generadas`, nunca salen.
      */
     public function suscritoA(string $tipo): bool
     {
+        if (! in_array($tipo, EventoDeDominioTenant::TIPOS, true)) {
+            return false;
+        }
         $eventos = $this->eventos;
 
         return $eventos === null || $eventos === [] || in_array($tipo, $eventos, true);

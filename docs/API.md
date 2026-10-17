@@ -377,6 +377,27 @@ estos endpoints responden como antes (para versiones anteriores de la app):
 - `PUT /staff/{usuario}/esquema-pago` acepta `vigente_desde` (AAAA-MM-DD; por omisión,
   hoy) y responde desde cuándo vale; la primera tarifa de cada quien vale desde siempre.
 
+## Nómina: cortes cerrados, pagados y ajustes (ADR 0157)
+
+Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equipo).
+
+- `POST /nomina/cortes` (`desde`, `hasta`: AAAA-MM-DD) cierra el periodo con lo
+  devengado por persona. 422 en `hasta` si no ha terminado (hasta ayer o antes) y en
+  `desde` si se encima con otro corte.
+- `GET /nomina/cortes` (`page`, 10 por página, lo más reciente primero): `estado`
+  (`cerrado` | `pagado`), `total_minor`, `ajustes_minor`, `total_con_ajustes_minor`,
+  quién lo cerró y el pago (`pagado_por`, `pagado_en`, `referencia_pago`).
+- `GET /nomina/cortes/{corte}` además trae `lineas` (lo que quedó por persona y
+  tarifa), `ajustes` y `diferencias`: por persona, lo del corte contra lo que da hoy el
+  cálculo del mismo periodo.
+- `POST /nomina/cortes/{corte}/pagar` (`referencia`) lo marca pagado (una vez: 422 si
+  ya lo estaba).
+- `DELETE /nomina/cortes/{corte}` lo reabre (vuelve a calcularse al vuelo). 422 en
+  `corte` si ya está pagado.
+- `POST /nomina/cortes/{corte}/ajustes` (`usuario_id`, `monto_minor` con signo: + a su
+  favor, − en su contra; `motivo`). Solo para un corte pagado (antes, se reabre). No
+  cambia el corte.
+
 ## Servicios y clases: corregir y archivar (ADR 0154)
 
 - `PUT /ofertas/{oferta}` acepta `nombre` y, solo en clases (grupales), `capacidad`
@@ -410,6 +431,10 @@ estos endpoints responden como antes (para versiones anteriores de la app):
   lo vuelve a abrir (las bajas siguen).
 - `GET /grupos` cuenta en `inscritos` solo a quienes siguen y trae `cerrado_en`; las
   inscripciones traen `baja_desde`. Todo queda en la bitácora (categoría alumnos).
+- Las fechas que la agenda genera después (la ventana de cada noche, días nuevos de la
+  serie) también reservan a los inscritos vigentes de los grupos abiertos, en el
+  siguiente minuto, por el outbox (`agenda.sesiones_generadas`, interno: no sale por
+  webhooks). El resumen queda en la bitácora (`grupo.fechas_nuevas`, ADR 0156).
 
 ## Espacios: corregir sin dejar fechas de más
 

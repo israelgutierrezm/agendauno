@@ -23,10 +23,12 @@ function sesion(
     modalidad?: "clases" | "citas";
     suspendido?: boolean;
     grupos?: boolean;
+    conEquipo?: boolean;
   } = {},
 ): Sesion {
   return {
     suspendido: extra.suspendido ?? false,
+    conEquipo: extra.conEquipo ?? true,
     puede: (p: string) => permisos.includes("*") || permisos.includes(p),
     usuario: { rol: extra.rol ?? "admin" },
     modalidad: extra.modalidad ?? "clases",
@@ -336,5 +338,16 @@ describe("ubicación de la pantalla actual", () => {
     expect(u("configuracion")?.vista.clave).toBe("datos");
     expect(u("reglas-agenda", {}, "#cierres")?.categoria?.clave).toBe("agenda");
     expect(u("ajustes")?.vista.clave).toBe("portada");
+  });
+
+  it("quien trabaja solo no ve la nómina; aparece en cuanto tiene equipo", () => {
+    const equipo = MENU_NEGOCIO.flatMap((g) => g.areas).find(
+      (a) => a.clave === "equipo",
+    );
+    expect(equipo).toBeDefined();
+    const rutas = (s: Sesion) => vistasVisibles(equipo!, s).map((x) => x.ruta);
+
+    expect(rutas(sesion(["*"], { conEquipo: false }))).not.toContain("nomina");
+    expect(rutas(sesion(["*"], { conEquipo: true }))).toContain("nomina");
   });
 });

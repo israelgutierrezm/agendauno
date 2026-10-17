@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Listeners\ReservarInscritosEnFechasNuevas;
+use App\Modules\Tenancy\Models\WebhookSalienteTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
 
@@ -253,4 +255,62 @@ it('cerrar un grupo da de baja a sus inscritos, ya no inscribe y se puede reabri
     $descripciones = collect($this->getJson("/api/v1/app/{$e['slug']}/auditorias?categoria=alumnos", conBearer($e['bearer']))->json('data'))->pluck('descripcion');
     expect($descripciones)->toContain('Cerró el grupo Curso Natación y dio de baja a sus 2 inscritos desde el 2026-10-01')
         ->toContain('Reabrió el grupo Curso Natación');
+});
+
+it('las fechas que la agenda genera después también reservan a los inscritos vigentes', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $grupo = grupoConSesiones($e, $semilla);
+    $ana = venderPackAMiembroTenant($e, 9000, 'Ana');
+    $beto = venderPackAMiembroTenant($e, 20000, 'Beto');
+    $carla = venderPackAMiembroTenant($e, 20000, 'Carla');
+    foreach ([$ana, $beto, $carla] as $vp) {
+        $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated();
+    }
+    $inscripcionCarla = collect($this->getJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones", conBearer($e['bearer']))->json('data'))
+        ->first(fn (array $i): bool => str_starts_with((string) $i['persona'], 'Carla'));
+    $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones/{$inscripcionCarla['id']}/baja", ['desde' => Carbon::now()->toDateString()], conBearer($e['bearer']))->assertOk();
+
+    // La serie se extiende tres días más (la ventana que avanza cada noche).
+    $plantilla = (string) $this->getJson("/api/v1/app/{$e['slug']}/plantillas-horario", conBearer($e['bearer']))->json('data.0.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/plantillas-horario/{$plantilla}/generar", [
+        'desde' => Carbon::now()->addDays(8)->toDateString(), 'hasta' => Carbon::now()->addDays(10)->toDateString(),
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.creadas', 3);
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    // Otra vuelta del relay no duplica nada.
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    // Beto (20 créditos) va en las 10 fechas; Ana (9) en 9, y la décima dice por qué.
+    expect(disponibleDeAlumnaEnGrupo($e, $beto['persona']))->toBe(10000);
+    expect(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(0);
+    // Carla se dio de baja: sus créditos siguen completos.
+    expect(disponibleDeAlumnaEnGrupo($e, $carla['persona']))->toBe(20000);
+
+    $registro = collect($this->getJson("/api/v1/app/{$e['slug']}/auditorias?categoria=alumnos", conBearer($e['bearer']))->json('data'))
+        ->firstWhere('accion', 'grupo.fechas_nuevas');
+    expect($registro['descripcion'])->toBe('Reservó a los inscritos del grupo Curso Natación en 3 fechas nuevas: 5 reservadas, 1 sin reservar');
+});
+
+it('un grupo cerrado no reserva en las fechas nuevas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $grupo = grupoConSesiones($e, $semilla);
+    $ana = venderPackAMiembroTenant($e, 20000, 'Ana');
+    $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones", ['persona_id' => $ana['persona']], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/cerrar", [], conBearer($e['bearer']))->assertOk();
+
+    $plantilla = (string) $this->getJson("/api/v1/app/{$e['slug']}/plantillas-horario", conBearer($e['bearer']))->json('data.0.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/plantillas-horario/{$plantilla}/generar", [
+        'desde' => Carbon::now()->addDays(8)->toDateString(), 'hasta' => Carbon::now()->addDays(10)->toDateString(),
+    ], conBearer($e['bearer']))->assertCreated();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    expect(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(20000);
+});
+
+it('el aviso interno de fechas nuevas nunca sale por un webhook suscrito a todo', function (): void {
+    $webhook = (new WebhookSalienteTenant)->forceFill(['eventos' => null]);
+
+    expect($webhook->suscritoA('reserva.creada'))->toBeTrue()
+        ->and($webhook->suscritoA(ReservarInscritosEnFechasNuevas::TIPO))->toBeFalse();
 });

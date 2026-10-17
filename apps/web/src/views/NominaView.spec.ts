@@ -39,7 +39,12 @@ function montar() {
   return mount(NominaView, {
     global: {
       plugins: [i18n],
-      stubs: { TarjetasIndicadores: true, EstadoVacio: true, Teleport: true },
+      stubs: {
+        TarjetasIndicadores: true,
+        EstadoVacio: true,
+        Teleport: true,
+        CortesNomina: true,
+      },
     },
   });
 }
