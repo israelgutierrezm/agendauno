@@ -31,8 +31,14 @@ const props = withDefaults(
       etiqueta?: string | null;
     } | null;
     compacto?: boolean;
+    /**
+     * Por dónde llega la solicitud: la página del negocio y su widget pasan por una
+     * visita medida; un enlace o QR y un formulario incrustado en otro sitio, no. El
+     * embudo solo compara con las visitas lo que llega por la página o el widget.
+     */
+    canal?: "pagina" | "widget" | "enlace" | "embebido";
   }>(),
-  { formulario: null, interes: null, compacto: false },
+  { formulario: null, interes: null, compacto: false, canal: "pagina" },
 );
 const emit = defineEmits<{ enviado: []; cargado: [FormularioPublico] }>();
 
@@ -131,6 +137,7 @@ async function enviar(): Promise<void> {
             }
           : null,
         fuente: fuente(),
+        canal: props.canal,
         ...(await camposDeMedicion(ambito.value)),
         acepta_aviso: datos.acepta,
         aviso_version: definicion.value.aviso?.version ?? null,

@@ -219,6 +219,7 @@ onBeforeUnmount(() => observador?.disconnect());
           :slug="slug"
           :formulario="formulario"
           :interes="pidiendo"
+          canal="widget"
           compacto
         />
       </section>

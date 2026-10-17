@@ -116,13 +116,22 @@ it('el embudo del negocio cuenta visitas, solicitudes, compras, asistencias y re
     app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-a')->firstOrFail(), function () use ($ana): void {
         $persona = PersonaTenant::query()->where('ulid', $ana)->firstOrFail();
         $atendida = ProspectoTenant::query()->create(['nombre' => 'Ana', 'origen' => OrigenProspecto::Formulario->value, 'estado' => 'convertido',
-            'persona_id' => $persona->getKey(), 'primer_contacto_en' => now()->addHours(2)]);
+            'persona_id' => $persona->getKey(), 'primer_contacto_en' => now()->addHours(2), 'canal' => 'pagina']);
         $atendida->forceFill(['created_at' => now()->subMinute()])->save();
-        ProspectoTenant::query()->create(['nombre' => 'Sin atender', 'origen' => OrigenProspecto::Formulario->value, 'estado' => 'nuevo']);
+        ProspectoTenant::query()->create(['nombre' => 'Sin atender', 'origen' => OrigenProspecto::Formulario->value, 'estado' => 'nuevo', 'canal' => 'widget']);
+        // Las que no pasan por una visita medida van aparte, no en la conversión.
+        ProspectoTenant::query()->create(['nombre' => 'Por QR', 'origen' => OrigenProspecto::Formulario->value, 'estado' => 'nuevo', 'canal' => 'enlace']);
+        ProspectoTenant::query()->create(['nombre' => 'Anterior', 'origen' => OrigenProspecto::Formulario->value, 'estado' => 'nuevo']);
+        ProspectoTenant::query()->create(['nombre' => 'Por teléfono', 'origen' => OrigenProspecto::Manual->value, 'estado' => 'nuevo']);
     });
 
     $embudo = $this->getJson("/api/v1/app/{$e['slug']}/reportes/embudo", conBearer($e['bearer']))->assertOk()->json('data');
-    expect($embudo['sitio_a_solicitud'])->toBe(['visitas' => 2, 'solicitudes' => 2])
+    expect($embudo['sitio_a_solicitud'])->toBe([
+        'visitas' => 2,
+        'solicitudes' => 2,
+        'otras' => ['enlace' => 1, 'embebido' => 0, 'sin_canal' => 1, 'equipo' => 1],
+    ])
+        ->and($embudo['solicitud_a_compra'])->toBe(['solicitudes' => 4, 'compraron' => 1])
         ->and($embudo['compra_a_asistencia'])->toBe(['compradores_nuevos' => 1, 'asistieron' => 0])
-        ->and($embudo['tiempo_respuesta'])->toMatchArray(['solicitudes' => 2, 'atendidas' => 1]);
+        ->and($embudo['tiempo_respuesta'])->toMatchArray(['solicitudes' => 4, 'atendidas' => 1]);
 });

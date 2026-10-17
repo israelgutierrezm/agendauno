@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FormularioCaptacionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -50,6 +51,8 @@ class CaptacionPublicaController
             'interes.sesion' => ['nullable', 'string', 'max:40'],
             'interes.producto' => ['nullable', 'string', 'max:40'],
             'fuente' => ['nullable', 'string', 'max:120'],
+            // Por dónde llegó: solo la página y el widget pasan por una visita medida.
+            'canal' => ['nullable', Rule::in(CaptacionTenant::CANALES)],
             'acepta_aviso' => ['accepted'],
             'aviso_version' => ['nullable', 'integer', 'min:1'],
             'recaptcha_token' => ['nullable', 'string', 'max:4000'],
@@ -70,6 +73,7 @@ class CaptacionPublicaController
             'respuestas' => $validado['respuestas'] ?? null,
             'interes' => $validado['interes'] ?? null,
             'fuente' => $validado['fuente'] ?? null,
+            'canal' => $validado['canal'] ?? null,
             'aviso_version' => isset($validado['aviso_version']) ? (int) $validado['aviso_version'] : null,
             'atribucion' => $validado['atribucion'] ?? null,
             // Sus preferencias de medición y lo que permitió de su navegador (ADR 0143).

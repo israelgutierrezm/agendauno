@@ -105,3 +105,11 @@ it('sin permiso no se ve la bitácora', function (): void {
 
     $this->getJson("/api/v1/app/{$e['slug']}/auditorias", conBearer($instructor))->assertForbidden();
 });
+
+it('las fechas de la bitácora son días del negocio y el final no va antes del inicio', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/auditorias?desde=2026-10-05&hasta=2026-10-01", conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['hasta'], 'meta.errors');
+    $this->getJson("/api/v1/app/{$e['slug']}/auditorias?desde=2026-10-01&hasta=2026-10-01", conBearer($e['bearer']))->assertOk();
+});

@@ -66,6 +66,7 @@ onBeforeUnmount(() => observador?.disconnect());
       <FormularioCaptacion
         :slug="props.slug"
         :formulario="props.formulario"
+        :canal="embebido ? 'embebido' : 'enlace'"
         @cargado="alCargar"
         @enviado="avisarAltura"
       />

@@ -42,6 +42,15 @@ class CaptacionTenant
     /** Largo máximo de cada respuesta libre. */
     private const MAX_RESPUESTA = 1000;
 
+    /**
+     * Por dónde llega una solicitud. La página y el widget pasan por una visita medida;
+     * un enlace o QR y un formulario incrustado en otro sitio, no.
+     */
+    public const CANALES = ['pagina', 'widget', 'enlace', 'embebido'];
+
+    /** Los canales que se comparan con las visitas medidas. */
+    public const CANALES_CON_VISITA = ['pagina', 'widget'];
+
     public function __construct(
         private readonly ParametrosTenant $parametros,
         private readonly WaiversTenant $waivers,
@@ -78,7 +87,7 @@ class CaptacionTenant
     /**
      * Recibe un envío del formulario.
      *
-     * @param  array{nombre: string, email: string, telefono?: string|null, respuestas?: array<string, mixed>|null, interes?: array<string, string|null>|null, fuente?: string|null, aviso_version?: int|null, atribucion?: mixed, medicion?: mixed, ip?: string|null, agente?: string|null}  $datos
+     * @param  array{nombre: string, email: string, telefono?: string|null, respuestas?: array<string, mixed>|null, interes?: array<string, string|null>|null, fuente?: string|null, canal?: string|null, aviso_version?: int|null, atribucion?: mixed, medicion?: mixed, ip?: string|null, agente?: string|null}  $datos
      */
     public function recibir(FormularioCaptacionTenant $formulario, array $datos): ProspectoTenant
     {
@@ -147,6 +156,8 @@ class CaptacionTenant
                 ...$interes,
                 'formulario_id' => $formulario->getKey(),
                 'origen' => OrigenProspecto::Formulario->value,
+                // El de su primera solicitud (un reenvío no lo cambia).
+                'canal' => in_array($datos['canal'] ?? null, self::CANALES, true) ? $datos['canal'] : null,
                 'fuente' => self::texto($datos['fuente'] ?? null, 120)
                     ?? self::texto(implode(' / ', array_filter([$contexto?->fuente, $contexto?->campana])) ?: $contexto?->referente, 120),
                 'contexto_medicion_id' => $contexto?->getKey(),

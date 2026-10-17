@@ -57,6 +57,8 @@ class ProspectoTenant extends Model
         'formulario_id', 'origen', 'fuente', 'estado', 'motivo_cierre', 'comentario_cierre',
         'responsable_id', 'proximo_seguimiento_en', 'primer_contacto_en', 'persona_id', 'convertido_en',
         'respuestas', 'aviso_version', 'acepto_aviso_en', 'sin_atender_desde', 'contexto_medicion_id',
+        // Por dónde llegó su solicitud (página, widget, enlace o QR, incrustado).
+        'canal',
     ];
 
     /**

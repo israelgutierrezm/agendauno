@@ -12,7 +12,18 @@ import CampanasNegocio from "@/components/CampanasNegocio.vue";
 export interface Embudo {
   desde: string;
   hasta: string;
-  sitio_a_solicitud: { visitas: number; solicitudes: number };
+  sitio_a_solicitud: {
+    visitas: number;
+    // Solo las que llegaron por la página o el widget (pasan por una visita medida).
+    solicitudes: number;
+    // Las demás, sin comparar con las visitas.
+    otras?: {
+      enlace: number;
+      embebido: number;
+      sin_canal: number;
+      equipo: number;
+    };
+  };
   solicitud_a_compra: { solicitudes: number; compraron: number };
   compra_a_asistencia: { compradores_nuevos: number; asistieron: number };
   renovacion: { por_renovar: number; renovadas: number };
@@ -58,15 +69,41 @@ const pasos = computed<Paso[]>(() => {
   ];
 });
 
-// Sin denominador no hay porcentaje: «—», nunca un 0 % engañoso.
+// Sin denominador no hay porcentaje: «—», nunca un 0 % engañoso. Más de lo que
+// cabe en la base (p. ej. más solicitudes que visitas medidas) tampoco es una
+// conversión: las poblaciones no se comparan.
+function comparable(p: Paso): boolean {
+  return p.base > 0 && p.cantidad <= p.base;
+}
 function pct(p: Paso): string {
-  return p.base > 0 ? `${Math.round((p.cantidad / p.base) * 100)} %` : "—";
+  return comparable(p) ? `${Math.round((p.cantidad / p.base) * 100)} %` : "—";
 }
 function ancho(p: Paso): string {
-  return p.base > 0
-    ? `${Math.min(100, Math.round((p.cantidad / p.base) * 100))}%`
-    : "0";
+  return comparable(p) ? `${Math.round((p.cantidad / p.base) * 100)}%` : "0";
 }
+
+// Las solicitudes que no pasan por una visita medida: aparte, solo la cantidad.
+const otrasSolicitudes = computed(() => {
+  const o = props.embudo.sitio_a_solicitud.otras;
+  if (!o) return "";
+  const partes = (
+    [
+      ["enlace", o.enlace],
+      ["embebido", o.embebido],
+      ["equipo", o.equipo],
+      ["sinCanal", o.sin_canal],
+    ] as const
+  )
+    .filter(([, n]) => n > 0)
+    .map(([clave, n]) =>
+      t(`operacion.reportes.embudo.otras.${clave}`, { n }, n),
+    );
+  return partes.length > 0
+    ? t("operacion.reportes.embudo.otras.titulo", {
+        lista: partes.join(" · "),
+      })
+    : "";
+});
 
 const sinAtender = computed(
   () =>
@@ -139,6 +176,22 @@ const mediana = computed(() => {
               `operacion.reportes.embudo.pasos.${p.clave}.${citas ? "ayudaCitas" : "ayuda"}`,
             )
           }}
+        </p>
+        <p
+          v-if="p.base > 0 && p.cantidad > p.base"
+          class="mt-1 text-xs"
+          :style="{ color: 'var(--aviso)' }"
+          data-prueba="no-comparable"
+        >
+          {{ $t("operacion.reportes.embudo.noComparable") }}
+        </p>
+        <p
+          v-if="p.clave === 'sitio' && otrasSolicitudes"
+          class="mt-1 text-xs"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="otras-solicitudes"
+        >
+          {{ otrasSolicitudes }}
         </p>
       </li>
     </ol>

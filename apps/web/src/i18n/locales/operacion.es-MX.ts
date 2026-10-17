@@ -420,9 +420,9 @@ export default {
           titulo: "Visitas → solicitudes",
           cifra: "{n} de {de}",
           ayuda:
-            "Quienes llenaron un formulario de interés del total de visitas a tu página.",
+            "Solicitudes que llegaron por tu página o tu widget, del total de visitas medidas a tu página.",
           ayudaCitas:
-            "Quienes llenaron un formulario de interés del total de visitas a tu página.",
+            "Solicitudes que llegaron por tu página o tu widget, del total de visitas medidas a tu página.",
         },
         compra: {
           titulo: "Solicitud → primera compra",
@@ -444,6 +444,18 @@ export default {
           ayudaCitas: "Renovaciones que tocaron en el periodo y se pagaron.",
         },
       },
+      // Lo que no pasa por una visita medida: aparte, sin porcentaje.
+      otras: {
+        titulo: "Aparte, sin compararse con las visitas: {lista}.",
+        enlace: "1 por enlace o QR | {n} por enlace o QR",
+        embebido:
+          "1 desde un formulario en otro sitio | {n} desde formularios en otros sitios",
+        equipo: "1 registrada por tu equipo | {n} registradas por tu equipo",
+        sinCanal:
+          "1 de antes de medir el canal | {n} de antes de medir el canal",
+      },
+      noComparable:
+        "Hay más que la base medida: no se muestra como conversión porque no son comparables.",
       respuesta: {
         titulo: "Tiempo de respuesta",
         mediana: "Mediana de la solicitud al primer contacto",

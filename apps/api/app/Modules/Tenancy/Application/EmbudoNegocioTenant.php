@@ -19,7 +19,9 @@ use Illuminate\Database\Eloquent\Builder;
  * cliente renueva, con la cantidad y su denominador (nunca un porcentaje sin contexto).
  * Todo sale de los registros del servidor; nada de datos personales.
  *
- * - **Sitio → solicitud:** solicitudes por formulario / visitas a la página.
+ * - **Sitio → solicitud:** solicitudes llegadas por la página o el widget / visitas
+ *   medidas. Solo eso es comparable: las de un enlace o QR, un formulario incrustado o
+ *   las que registra el equipo no pasan por una visita medida y van aparte (`otras`).
  * - **Solicitud → primera compra:** de esas solicitudes, cuántas se volvieron clientes con
  *   un pago confirmado.
  * - **Compra → primera asistencia:** de quienes compraron por primera vez en el periodo,
@@ -49,7 +51,9 @@ class EmbudoNegocioTenant
         $solicitudes = ProspectoTenant::query()
             ->where('origen', OrigenProspecto::Formulario->value)
             ->whereBetween('created_at', [$inicio, $fin])
-            ->get(['id', 'persona_id', 'convertido_en', 'created_at', 'primer_contacto_en']);
+            ->get(['id', 'persona_id', 'convertido_en', 'created_at', 'primer_contacto_en', 'canal']);
+        $porCanal = $solicitudes->countBy(static fn (ProspectoTenant $p): string => (string) ($p->canal ?? ''));
+        $conVisita = array_sum(array_map(static fn (string $c): int => (int) $porCanal->get($c, 0), CaptacionTenant::CANALES_CON_VISITA));
 
         // De las solicitudes, quienes ya son clientes con un pago confirmado después.
         $compraron = $solicitudes->filter(fn (ProspectoTenant $p): bool => $p->persona_id !== null
@@ -71,7 +75,17 @@ class EmbudoNegocioTenant
             'hasta' => $hasta,
             'sitio_a_solicitud' => [
                 'visitas' => $this->visitas->entre($desde, $hasta),
-                'solicitudes' => $solicitudes->count(),
+                'solicitudes' => $conVisita,
+                // Sin comparar con las visitas: no pasan por una visita medida.
+                'otras' => [
+                    'enlace' => (int) $porCanal->get('enlace', 0),
+                    'embebido' => (int) $porCanal->get('embebido', 0),
+                    'sin_canal' => (int) $porCanal->get('', 0),
+                    'equipo' => ProspectoTenant::query()
+                        ->where('origen', OrigenProspecto::Manual->value)
+                        ->whereBetween('created_at', [$inicio, $fin])
+                        ->count(),
+                ],
             ],
             'solicitud_a_compra' => [
                 'solicitudes' => $solicitudes->count(),

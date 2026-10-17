@@ -100,15 +100,20 @@ it('un envío repetido actualiza el mismo prospecto en lugar de abrir otro', fun
     $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
     $formulario = formularioPredeterminadoCaptacion($e);
 
-    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertCreated();
+    // Llegó por un enlace o QR; un canal desconocido no se acepta.
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['canal' => 'cartel']))
+        ->assertUnprocessable()->assertJsonValidationErrors('canal', 'meta.errors');
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['canal' => 'enlace']))->assertCreated();
     // Mismo teléfono con otro correo, y mismo correo en mayúsculas: el mismo prospecto.
-    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['email' => 'otro@correo.mx', 'telefono' => '5512345678']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['email' => 'otro@correo.mx', 'telefono' => '5512345678', 'canal' => 'pagina']))->assertCreated();
     $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['email' => 'LUCIA@correo.mx', 'telefono' => null]))->assertCreated();
 
     $lista = prospectosDelNegocioCaptacion($e);
     expect($lista['data'])->toHaveCount(1);
     $detalle = $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$lista['data'][0]['id']}", conBearer($e['bearer']))->assertOk()->json('data');
     expect(collect($detalle['eventos'])->pluck('tipo')->all())->toBe(['reenvio', 'reenvio', 'creado']);
+    // Su canal es el de la primera solicitud.
+    expect(enNegocioCaptacionInteres(fn () => ProspectoTenant::query()->value('canal')))->toBe('enlace');
 });
 
 it('el negocio arma sus formularios con preguntas propias y los apaga', function (): void {

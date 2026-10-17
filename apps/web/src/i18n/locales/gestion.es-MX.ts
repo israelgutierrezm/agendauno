@@ -352,6 +352,8 @@ export const bitacora = {
   detalle: "Detalle",
   desde: "Desde",
   hasta: "Hasta",
+  // Las fechas y horas, y sus filtros, son del negocio (no del navegador).
+  zona: "Fechas y horas en la zona del negocio: {zona}.",
   quien: "Quién",
   categoria: "Tipo",
   buscar: "Buscar",

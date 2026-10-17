@@ -34,7 +34,8 @@ class AuditoriaController
     {
         $filtros = $request->validate([
             'desde' => ['nullable', 'date_format:Y-m-d'],
-            'hasta' => ['nullable', 'date_format:Y-m-d'],
+            // Días del negocio; el final no puede quedar antes que el inicio.
+            'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
             'usuario' => ['nullable', 'string', 'max:40'],
             'categoria' => ['nullable', Rule::in(array_keys(BitacoraTenant::CATEGORIAS))],
             'accion' => ['nullable', 'string', 'max:100'],

@@ -9,6 +9,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { desfaseZona, etiquetaZona } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -106,6 +107,8 @@ function filtros(): Record<string, string | number | undefined> {
   };
 }
 
+// En la zona horaria del negocio (ADR 0099), la misma de los filtros y del CSV: no
+// la del navegador de quien mira.
 function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
@@ -115,8 +118,16 @@ function fecha(iso: string | null): string {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: sesion.zonaHoraria || undefined,
   }).format(new Date(iso));
 }
+// Se dice cuál es, para que nadie lea las horas como si fueran las suyas.
+const zonaNegocio = computed(() => {
+  const zona = sesion.zonaHoraria;
+  if (!zona) return "";
+  const desfase = desfaseZona(zona);
+  return desfase ? `${etiquetaZona(zona)} · ${desfase}` : etiquetaZona(zona);
+});
 
 function accion(c: Cambio): string {
   if (c.descripcion && c.descripcion !== c.accion) {
@@ -292,17 +303,25 @@ onMounted(cargar);
       {{ error }}
     </AvisoTono>
 
-    <div class="mt-5 tu-card">
+    <p
+      v-if="zonaNegocio"
+      class="mt-4 text-xs"
+      :style="{ color: 'var(--texto-suave)' }"
+      data-prueba="zona-bitacora"
+    >
+      {{ $t("bitacora.zona", { zona: zonaNegocio }) }}
+    </p>
+    <div class="mt-3 tu-card">
       <!-- Filtros de los cambios -->
       <div v-if="pestana === 'cambios'" class="tu-filtros bi-filtros text-sm">
-        <label class="grid gap-1">
-          <span class="tu-label">{{ $t("bitacora.desde") }}</span>
-          <input v-model="desde" type="date" class="tu-input" />
-        </label>
-        <label class="grid gap-1">
-          <span class="tu-label">{{ $t("bitacora.hasta") }}</span>
-          <input v-model="hasta" type="date" class="tu-input" />
-        </label>
+        <!-- Días del negocio, como las entradas: el final no queda antes del inicio. -->
+        <RangoFechas
+          v-model:desde="desde"
+          v-model:hasta="hasta"
+          prueba="cambios"
+          atajos
+          :zona="sesion.zonaHoraria"
+        />
         <label class="grid gap-1">
           <span class="tu-label">{{ $t("bitacora.quien") }}</span>
           <select v-model="usuario" class="tu-input">

@@ -89,6 +89,8 @@ describe("FormularioCaptacion", () => {
         interes: expect.objectContaining({ sesion: "01sesion" }),
         acepta_aviso: true,
         aviso_version: 2,
+        // En la página del negocio, por omisión.
+        canal: "pagina",
       }),
     );
     expect(w.text()).toContain("Te contactamos pronto.");

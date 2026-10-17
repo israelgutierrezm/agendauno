@@ -70,4 +70,24 @@ describe("el embudo del negocio", () => {
     expect(w.get('[data-paso="asistencia"]').text()).toContain("su cita");
     expect(w.get('[data-prueba="embudo-mediana"]').text()).toBe("30 min");
   });
+
+  it("solo compara con las visitas lo comparable; lo demás va aparte y sin porcentaje", () => {
+    const w = montar({
+      ...base,
+      sitio_a_solicitud: {
+        visitas: 4,
+        solicitudes: 10,
+        otras: { enlace: 6, embebido: 0, sin_canal: 1, equipo: 2 },
+      },
+    });
+
+    const sitio = w.get('[data-paso="sitio"]');
+    // Más solicitudes que visitas medidas no es un 250 %.
+    expect(sitio.text()).not.toContain("250 %");
+    expect(sitio.text()).toContain("—");
+    expect(sitio.find('[data-prueba="no-comparable"]').exists()).toBe(true);
+    expect(sitio.get('[data-prueba="otras-solicitudes"]').text()).toBe(
+      "Aparte, sin compararse con las visitas: 6 por enlace o QR · 2 registradas por tu equipo · 1 de antes de medir el canal.",
+    );
+  });
 });

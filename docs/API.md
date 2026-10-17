@@ -426,6 +426,22 @@ estos endpoints responden como antes (para versiones anteriores de la app):
   días hábiles o menos). `meta` suma `vencidas` y `por_vencer`. `vence_en` (20 días
   hábiles) se cuenta desde el día del negocio en que se pidió.
 
+## Embudo: solo lo comparable con las visitas
+
+- `POST /captacion/formularios/{formulario}/envios` acepta `canal` (`pagina`, `widget`,
+  `enlace` o `embebido`); el prospecto guarda el de su primera solicitud.
+- `GET /reportes/embudo`: `sitio_a_solicitud.solicitudes` cuenta solo las que llegaron
+  por la página o el widget (pasan por una visita medida). Las demás van en
+  `sitio_a_solicitud.otras` (`enlace`, `embebido`, `sin_canal`, `equipo`), sin
+  compararse con las visitas. La web no muestra porcentaje si la cantidad pasa a la
+  base.
+
+## Bitácora en la zona del negocio
+
+- `GET /auditorias` rechaza (422 en `hasta`) un rango con el final antes del inicio; las
+  fechas son días del negocio. La web muestra las horas en la zona del negocio y dice
+  cuál es.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`
