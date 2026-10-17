@@ -16,6 +16,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { whatsappDe } from "@/lib/captacion";
 import { confirmar } from "@/lib/confirmar";
 import { fechaEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -442,9 +443,24 @@ async function copiarMensaje(tarea: Tarea): Promise<void> {
 }
 // Lo que no se pudo guardar se ve en su panel (no en la página de atrás).
 const errorResultado = ref<string | null>(null);
+const resultadoAbierto = computed({
+  get: () => conResultado.value !== null,
+  set: (v: boolean) => {
+    if (!v) conResultado.value = null;
+  },
+});
+const descartarResultado = useDescartarCambios({
+  abierto: resultadoAbierto,
+  valor: () => resultado.value,
+  guardando: accionando,
+});
+function cerrarResultado(): void {
+  void descartarResultado.cerrar();
+}
 function abrirResultado(tarea: Tarea): void {
   resultado.value = { valor: "contactado", nota: "" };
   errorResultado.value = null;
+  descartarResultado.fijar();
   conResultado.value = tarea;
 }
 async function guardarResultado(): Promise<void> {
@@ -460,6 +476,7 @@ async function guardarResultado(): Promise<void> {
       nota:
         resultado.value.nota.trim() !== "" ? resultado.value.nota.trim() : null,
     });
+    descartarResultado.fijar();
     conResultado.value = null;
     toast.exito(t("operacion.seguimiento.registrado"));
     await cargarTareas();
@@ -487,6 +504,14 @@ const regla = ref({
   delay_minutos: 0,
   activa: true,
 });
+const descartarRegla = useDescartarCambios({
+  abierto: mostrarRegla,
+  valor: () => regla.value,
+  guardando: accionando,
+});
+function cerrarRegla(): void {
+  void descartarRegla.cerrar();
+}
 
 function etiquetaEvento(ev: string): string {
   return t(`tareas.eventos.${ev.replace(/\./g, "_")}`);
@@ -547,11 +572,21 @@ async function cargarTareas(): Promise<void> {
 
 // El error al guardar la tarea, dentro de su panel.
 const errorTarea = ref<string | null>(null);
+// Con lo capturado sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartarTarea = useDescartarCambios({
+  abierto: mostrarNueva,
+  valor: () => nueva.value,
+  guardando: accionando,
+});
+function cerrarTarea(): void {
+  void descartarTarea.cerrar();
+}
 function abrirNueva(): void {
   editando.value = null;
   nueva.value = { ...FORMULARIO_VACIO };
   personaElegida.value = null;
   errorTarea.value = null;
+  descartarTarea.fijar();
   mostrarNueva.value = true;
   void cargarResponsables();
 }
@@ -570,6 +605,7 @@ function abrirEdicion(tarea: Tarea): void {
       ? { id: tarea.persona_id, nombre: tarea.persona }
       : null;
   errorTarea.value = null;
+  descartarTarea.fijar();
   mostrarNueva.value = true;
   void cargarResponsables();
 }
@@ -604,6 +640,7 @@ async function crearTarea(): Promise<void> {
     }
     toast.exito(t("operacion.bandeja.guardada"));
     nueva.value = { ...FORMULARIO_VACIO };
+    descartarTarea.fijar();
     editando.value = null;
     mostrarNueva.value = false;
     await cargarTareas();
@@ -672,6 +709,7 @@ function nuevaRegla(): void {
     activa: true,
   };
   errorRegla.value = null;
+  descartarRegla.fijar();
   mostrarRegla.value = true;
 }
 
@@ -689,6 +727,7 @@ function editarRegla(r: Regla): void {
     activa: r.activa,
   };
   errorRegla.value = null;
+  descartarRegla.fijar();
   mostrarRegla.value = true;
 }
 
@@ -730,7 +769,9 @@ async function guardarRegla(): Promise<void> {
     } else {
       await api.post(`${base.value}/automatizaciones`, carga);
     }
+    descartarRegla.fijar();
     mostrarRegla.value = false;
+    toast.exito(t("operacion.bandeja.reglaGuardada", { nombre: carga.nombre }));
     await cargarReglas();
   } catch (e) {
     errorRegla.value = mensajeDeError(e);
@@ -933,7 +974,7 @@ onMounted(() => {
           editando ? $t('operacion.bandeja.editarTarea') : $t('tareas.nueva')
         "
         :ocupado="accionando"
-        @cerrar="mostrarNueva = false"
+        @cerrar="cerrarTarea"
       >
         <form class="grid gap-4" @submit.prevent="crearTarea">
           <AvisoTono
@@ -1034,7 +1075,7 @@ onMounted(() => {
               class="tu-btn tu-btn-fantasma"
               type="button"
               :disabled="accionando"
-              @click="mostrarNueva = false"
+              @click="cerrarTarea"
             >
               {{ $t("tareas.cancelar") }}
             </button>
@@ -1298,7 +1339,7 @@ onMounted(() => {
         :abierto="conResultado !== null"
         :titulo="$t('operacion.seguimiento.panelTitulo')"
         :ocupado="accionando"
-        @cerrar="conResultado = null"
+        @cerrar="cerrarResultado"
       >
         <form
           v-if="conResultado"
@@ -1359,7 +1400,7 @@ onMounted(() => {
               class="tu-btn tu-btn-fantasma"
               type="button"
               :disabled="accionando"
-              @click="conResultado = null"
+              @click="cerrarResultado"
             >
               {{ $t("tareas.cancelar") }}
             </button>
@@ -1400,7 +1441,7 @@ onMounted(() => {
             : $t('tareas.reglas.nueva')
         "
         :ocupado="accionando"
-        @cerrar="mostrarRegla = false"
+        @cerrar="cerrarRegla"
       >
         <form class="grid gap-4" @submit.prevent="guardarRegla">
           <AvisoTono
@@ -1510,7 +1551,7 @@ onMounted(() => {
               class="tu-btn tu-btn-fantasma"
               type="button"
               :disabled="accionando"
-              @click="mostrarRegla = false"
+              @click="cerrarRegla"
             >
               {{ $t("tareas.cancelar") }}
             </button>

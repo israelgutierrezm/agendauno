@@ -596,6 +596,7 @@ export default {
   },
   // La bandeja de tareas: por páginas, con búsqueda, filtros y grupos por vencimiento.
   bandeja: {
+    reglaGuardada: "Regla «{nombre}» guardada.",
     tab: "Bandeja",
     estado: "Qué tareas ver",
     pendientes: "Pendientes",
