@@ -83,6 +83,28 @@ it('el radar exporta a CSV', function (): void {
     expect($res->getContent())->toContain('Renovar');
 });
 
+it('el CSV lleva los mismos filtros que la tabla (estado y búsqueda), de todas las páginas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $ana = venderPackAMiembroTenant($e, 8000, 'Ana Ruiz');
+    $beto = venderPackAMiembroTenant($e, 8000, 'Beto Ruiz');
+    $carla = venderPackAMiembroTenant($e, 8000, 'Carla Soto');
+    fijarVigencia($e, $ana['derecho'], CarbonImmutable::now()->addDays(3)->toDateString());
+    fijarVigencia($e, $beto['derecho'], CarbonImmutable::now()->subDays(2)->toDateString());
+    fijarVigencia($e, $carla['derecho'], CarbonImmutable::now()->addDays(4)->toDateString());
+
+    $csv = $this->get("/api/v1/app/{$e['slug']}/retencion/por-vencer?formato=csv&estado=por_vencer&q=ruiz", conBearer($e['bearer']))
+        ->assertOk()->getContent();
+    expect($csv)->toContain('Ana Ruiz')->not->toContain('Beto Ruiz')->not->toContain('Carla Soto');
+
+    // La página no recorta la descarga.
+    $todos = $this->get("/api/v1/app/{$e['slug']}/retencion/por-vencer?formato=csv&per_page=1&page=2", conBearer($e['bearer']))
+        ->assertOk()->getContent();
+    expect($todos)->toContain('Ana Ruiz')->toContain('Beto Ruiz')->toContain('Carla Soto');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/retencion/por-vencer?formato=csv&estado=otro", conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['estado'], 'meta.errors');
+});
+
 it('el radar exige el permiso miembros.ver (el alumno no entra)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $a = alumnoConSesion($e);

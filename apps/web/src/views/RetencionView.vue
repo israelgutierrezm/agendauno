@@ -49,6 +49,14 @@ const estado = ref<"" | "por_vencer" | "vencida">(
 // El estado, la búsqueda y las páginas los resuelve el API (antes, todo en pantalla).
 const visibles = computed(() => miembros.value);
 const buscar = ref("");
+// «Nadie coincide» no es lo mismo que «no hay nadie por renovar».
+const filtrado = computed(
+  () => estado.value !== "" || buscar.value.trim() !== "",
+);
+function quitarFiltros(): void {
+  estado.value = "";
+  buscar.value = "";
+}
 const pagina = ref(1);
 const meta = ref<{
   total: number;
@@ -112,6 +120,15 @@ function asistTexto(m: Miembro): string {
     : t("retencion.haceDias", { n: m.dias_sin_asistir });
 }
 
+// Los mismos filtros para la tabla y la descarga: se exporta lo que se ve.
+function filtros(): Record<string, string | number> {
+  return {
+    dias: dias.value,
+    ...(estado.value !== "" ? { estado: estado.value } : {}),
+    ...(buscar.value.trim() !== "" ? { q: buscar.value.trim() } : {}),
+  };
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
@@ -124,12 +141,7 @@ async function cargar(): Promise<void> {
         meta?: typeof meta.value;
       };
     }>(`${base.value}/retencion/por-vencer`, {
-      params: {
-        dias: dias.value,
-        page: pagina.value,
-        ...(estado.value !== "" ? { estado: estado.value } : {}),
-        ...(buscar.value.trim() !== "" ? { q: buscar.value.trim() } : {}),
-      },
+      params: { ...filtros(), page: pagina.value },
     });
     miembros.value = data.data.miembros;
     resumen.value = data.data.resumen;
@@ -148,7 +160,7 @@ async function exportar(): Promise<void> {
   error.value = null;
   try {
     const { data } = await api.get<Blob>(`${base.value}/retencion/por-vencer`, {
-      params: { dias: dias.value, formato: "csv" },
+      params: { ...filtros(), formato: "csv" },
       responseType: "blob",
     });
     const url = URL.createObjectURL(data);
@@ -242,10 +254,8 @@ onMounted(cargar);
       <button
         class="tu-btn tu-btn-primario"
         type="button"
-        :disabled="
-          exportando ||
-          (resumen?.por_vencer ?? 0) + (resumen?.vencidas ?? 0) === 0
-        "
+        :disabled="exportando || cargando || (meta?.total ?? 0) === 0"
+        data-prueba="exportar-retencion"
         @click="exportar"
       >
         {{ exportando ? $t("retencion.exportando") : $t("retencion.exportar") }}
@@ -278,7 +288,23 @@ onMounted(cargar);
 
     <template v-else>
       <EstadoVacio
-        v-if="visibles.length === 0"
+        v-if="visibles.length === 0 && filtrado"
+        class="tu-card mt-6"
+        icono="buscar"
+        :titulo="$t('tabla.sinCoincidencias')"
+        :texto="$t('tabla.ajustarBusqueda')"
+        data-prueba="sin-coincidencias-retencion"
+      >
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          @click="quitarFiltros"
+        >
+          {{ $t("tabla.restablecer") }}
+        </button>
+      </EstadoVacio>
+      <EstadoVacio
+        v-else-if="visibles.length === 0"
         class="tu-card mt-6"
         icono="pulso"
         :titulo="

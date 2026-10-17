@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * Radar de retención (Etapa 2): alumnos con membresía POR VENCER (próximos días) o
  * VENCIDA hace poco (recuperable), con señales de churn (última asistencia) para que
  * el estudio actúe antes de perderlos (la regla vive en RadarRenovacionesTenant).
- * `?formato=csv` exporta la lista para campañas de renovación.
+ * `?formato=csv` exporta la lista para campañas de renovación, con los mismos
+ * filtros de estado y búsqueda que la tabla.
  */
 class RetencionTenantController
 {
@@ -42,14 +43,8 @@ class RetencionTenantController
      */
     private function responder(array $miembros, int $dias, Request $request): Response
     {
-        if ((string) $request->query('formato') === 'csv') {
-            return $this->exportarCsv($miembros);
-        }
-
-        $porVencer = count(array_filter($miembros, static fn (array $m): bool => $m['estado'] === 'por_vencer'));
-        $vencidas = count($miembros) - $porVencer;
-
-        // En pantalla, por páginas y con búsqueda (el resumen y el CSV, de todos).
+        // El estado y la búsqueda valen igual en pantalla y en el CSV: se descarga lo
+        // que se está viendo (todas las páginas). El resumen cuenta a todos.
         $filtros = $request->validate([
             'estado' => ['nullable', 'in:por_vencer,vencida'],
             'q' => ['nullable', 'string', 'max:100'],
@@ -59,6 +54,14 @@ class RetencionTenantController
         $buscar = mb_strtolower(trim((string) ($filtros['q'] ?? '')));
         $lista = array_values(array_filter($miembros, static fn (array $m): bool => (($filtros['estado'] ?? null) === null || $m['estado'] === $filtros['estado'])
             && ($buscar === '' || str_contains(mb_strtolower((string) $m['nombre_completo']), $buscar) || str_contains(mb_strtolower((string) ($m['email'] ?? '')), $buscar))));
+
+        if ((string) $request->query('formato') === 'csv') {
+            return $this->exportarCsv($lista);
+        }
+
+        $porVencer = count(array_filter($miembros, static fn (array $m): bool => $m['estado'] === 'por_vencer'));
+        $vencidas = count($miembros) - $porVencer;
+
         $porPagina = (int) ($filtros['per_page'] ?? 25);
         $ultima = max(1, (int) ceil(count($lista) / $porPagina));
         $pagina = min(max(1, (int) ($filtros['page'] ?? 1)), $ultima);
