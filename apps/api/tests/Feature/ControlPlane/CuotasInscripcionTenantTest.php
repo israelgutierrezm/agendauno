@@ -97,6 +97,26 @@ it('la primera alta paga inscripción, que no da clases; quien ya tiene plan no 
     expect(ventaConCuotas($e, crearMiembroTenant($e, 'Bea'), planConInscripcion($e, false, 'Suelta'))['total_minor'])->toBe(100000);
 });
 
+it('el reporte de ingresos desglosa planes y cuotas vendidos juntos', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    inscripcionDe500($e);
+    $plan = planConInscripcion($e);
+    // Dos altas: cada venta lleva el plan y la inscripción (una cuota, sin producto).
+    foreach (['Ana', 'Beto'] as $nombre) {
+        $orden = ventaConCuotas($e, crearMiembroTenant($e, $nombre), $plan);
+        $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden['id']}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    }
+
+    $hoy = now()->toDateString();
+    $porProducto = $this->getJson("/api/v1/app/{$e['slug']}/reportes/tendencias?desde={$hoy}&hasta={$hoy}&agrupacion=dia", conBearer($e['bearer']))
+        ->assertOk()->json('data.por_producto');
+
+    expect($porProducto)->toBe([
+        ['producto' => 'Mensual 8', 'ventas_minor' => 200000, 'unidades' => 2],
+        ['producto' => 'Inscripción', 'ventas_minor' => 100000, 'unidades' => 2],
+    ]);
+});
+
 it('al regresar tras X meses sin plan se cobra otra vez; antes, no', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     inscripcionDe500($e, 6);

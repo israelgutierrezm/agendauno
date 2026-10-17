@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EmbudoNegocio, { type Embudo } from "@/components/EmbudoNegocio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -224,7 +225,9 @@ function pctConv(n: number): string {
   return base > 0 ? `${Math.round((n / base) * 100)}%` : "—";
 }
 const cargando = ref(true);
-const error = ref<string | null>(null);
+// Un error por pestaña: el de Ingresos no se queda en Resumen, y cada una se reintenta.
+const errores = ref<Partial<Record<Pestana, string>>>({});
+const error = computed(() => errores.value[pestana.value] ?? null);
 
 // Qué muestra la gráfica: el dinero que entró menos devoluciones, o lo vendido.
 const metrica = ref<"neto" | "ventas">("neto");
@@ -376,87 +379,61 @@ const tarjetas = computed<Indicador[]>(() => {
 });
 
 async function cargarNegocio(): Promise<void> {
-  error.value = null;
-  try {
-    const { data } = await api.get<{ data: Negocio }>(
-      `${base.value}/reportes/negocio`,
-      {
-        params: { desde: desde.value, hasta: hasta.value },
-      },
-    );
-    negocio.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
+  const { data } = await api.get<{ data: Negocio }>(
+    `${base.value}/reportes/negocio`,
+    {
+      params: { desde: desde.value, hasta: hasta.value },
+    },
+  );
+  negocio.value = data.data;
 }
 
 async function cargarRentabilidad(): Promise<void> {
-  error.value = null;
-  try {
-    const { data } = await api.get<{ data: Rentabilidad }>(
-      `${base.value}/reportes/rentabilidad`,
-      {
-        params: { desde: desde.value, hasta: hasta.value },
-      },
-    );
-    rentabilidad.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
+  const { data } = await api.get<{ data: Rentabilidad }>(
+    `${base.value}/reportes/rentabilidad`,
+    {
+      params: { desde: desde.value, hasta: hasta.value },
+    },
+  );
+  rentabilidad.value = data.data;
 }
 
 async function cargarDemanda(): Promise<void> {
-  error.value = null;
-  try {
-    const { data } = await api.get<{ data: Demanda }>(
-      `${base.value}/reportes/demanda`,
-      {
-        params: { desde: desde.value, hasta: hasta.value },
-      },
-    );
-    demanda.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
+  const { data } = await api.get<{ data: Demanda }>(
+    `${base.value}/reportes/demanda`,
+    {
+      params: { desde: desde.value, hasta: hasta.value },
+    },
+  );
+  demanda.value = data.data;
 }
 
 async function cargarEquipo(): Promise<void> {
-  error.value = null;
-  try {
-    const { data } = await api.get<{ data: Equipo }>(
-      `${base.value}/reportes/equipo`,
-      {
-        params: { desde: desde.value, hasta: hasta.value },
-      },
-    );
-    equipo.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
+  const { data } = await api.get<{ data: Equipo }>(
+    `${base.value}/reportes/equipo`,
+    {
+      params: { desde: desde.value, hasta: hasta.value },
+    },
+  );
+  equipo.value = data.data;
 }
 
 async function cargarTendencias(): Promise<void> {
-  error.value = null;
-  try {
-    const { data } = await api.get<{ data: Tendencias }>(
-      `${base.value}/reportes/tendencias`,
-      {
-        params: {
-          desde: desde.value,
-          hasta: hasta.value,
-          agrupacion: agrupacion.value,
-        },
+  const { data } = await api.get<{ data: Tendencias }>(
+    `${base.value}/reportes/tendencias`,
+    {
+      params: {
+        desde: desde.value,
+        hasta: hasta.value,
+        agrupacion: agrupacion.value,
       },
-    );
-    tendencias.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
+    },
+  );
+  tendencias.value = data.data;
 }
 
 async function exportarTendencias(): Promise<void> {
   exportando.value = true;
-  error.value = null;
   try {
     const { data } = await api.get<Blob>(`${base.value}/reportes/tendencias`, {
       params: {
@@ -476,36 +453,26 @@ async function exportarTendencias(): Promise<void> {
     document.body.removeChild(enlace);
     URL.revokeObjectURL(url);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errores.value = { ...errores.value, ingresos: mensajeDeError(e) };
   } finally {
     exportando.value = false;
   }
 }
 
 async function cargarCohortes(): Promise<void> {
-  error.value = null;
-  try {
-    const { data } = await api.get<{ data: Cohortes }>(
-      `${base.value}/reportes/cohortes`,
-      { params: { meses: 6 } },
-    );
-    cohortes.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
+  const { data } = await api.get<{ data: Cohortes }>(
+    `${base.value}/reportes/cohortes`,
+    { params: { meses: 6 } },
+  );
+  cohortes.value = data.data;
 }
 
 async function cargarEmbudo(): Promise<void> {
-  error.value = null;
-  try {
-    const { data } = await api.get<{ data: Embudo }>(
-      `${base.value}/reportes/embudo`,
-      { params: { desde: desde.value, hasta: hasta.value } },
-    );
-    embudo.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
+  const { data } = await api.get<{ data: Embudo }>(
+    `${base.value}/reportes/embudo`,
+    { params: { desde: desde.value, hasta: hasta.value } },
+  );
+  embudo.value = data.data;
 }
 
 async function cargarSucursales(): Promise<void> {
@@ -535,14 +502,26 @@ async function cargar(): Promise<void> {
   }
   cargadas.add(actual);
   cargando.value = true;
-  try {
-    await Promise.all(CARGAS[actual]());
-  } catch (e) {
+  const sinError = { ...errores.value };
+  delete sinError[actual];
+  errores.value = sinError;
+  // Lo que sí llegó se muestra; si algo falló, la pestaña dice qué y se reintenta.
+  const resultados = await Promise.allSettled(CARGAS[actual]());
+  const fallo = resultados.find(
+    (r): r is PromiseRejectedResult => r.status === "rejected",
+  );
+  if (fallo !== undefined) {
     cargadas.delete(actual);
-    error.value = mensajeDeError(e);
-  } finally {
-    cargando.value = false;
+    errores.value = {
+      ...errores.value,
+      [actual]: mensajeDeError(fallo.reason),
+    };
   }
+  cargando.value = false;
+}
+function reintentar(): void {
+  cargadas.delete(pestana.value);
+  void cargar();
 }
 
 /**
@@ -608,7 +587,13 @@ watch([desde, hasta], () => {
   }
   void cargar();
 });
-watch(agrupacion, () => void cargarTendencias());
+watch(agrupacion, async () => {
+  try {
+    await cargarTendencias();
+  } catch (e) {
+    errores.value = { ...errores.value, ingresos: mensajeDeError(e) };
+  }
+});
 watch(pestana, () => void cargar());
 
 onMounted(cargar);
@@ -659,9 +644,25 @@ onMounted(cargar);
       </button>
     </div>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
-      {{ error }}
-    </p>
+    <AvisoTono
+      v-if="error && !cargando"
+      tono="peligro"
+      class="mt-4"
+      role="alert"
+      data-prueba="error-reporte"
+    >
+      {{ $t("reportes.noSeConsulto", { error }) }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno text-sm"
+          data-prueba="reintentar-reporte"
+          @click="reintentar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p
       v-if="cargando"
       class="mt-6 text-sm"

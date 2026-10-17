@@ -175,20 +175,23 @@ class ReporteTendenciasTenantController
             ->whereBetween('ordenes.created_at', [$inicio, $fin])
             ->groupBy('lineas_orden.producto_comercial_id', 'lineas_orden.concepto')
             ->selectRaw('lineas_orden.producto_comercial_id as pid, lineas_orden.concepto as concepto, SUM(lineas_orden.subtotal_minor) as vendido, SUM(lineas_orden.cantidad) as unidades')
+            // En crudo: el modelo convierte `concepto` en ConceptoCuota y aquí se agrupa
+            // por su valor (una cuota de inscripción o anualidad no tiene producto).
+            ->toBase()
             ->get();
 
         $nombres = ProductoTenant::query()
-            ->whereIn('id', $filas->pluck('pid')->all())
+            ->whereIn('id', $filas->pluck('pid')->filter()->all())
             ->pluck('nombre', 'id');
 
         return $filas
-            ->map(static fn ($f): array => [
+            ->map(static fn (object $f): array => [
                 // Las cuotas (B04) se nombran por su concepto.
-                'producto' => (string) ($nombres->get((int) $f->getAttribute('pid'))
-                    ?? ConceptoCuota::tryFrom((string) $f->getAttribute('concepto'))?->etiqueta()
+                'producto' => (string) ($nombres->get((int) ($f->pid ?? 0))
+                    ?? ConceptoCuota::tryFrom((string) ($f->concepto ?? ''))?->etiqueta()
                     ?? '—'),
-                'ventas_minor' => (int) $f->getAttribute('vendido'),
-                'unidades' => (int) $f->getAttribute('unidades'),
+                'ventas_minor' => (int) $f->vendido,
+                'unidades' => (int) $f->unidades,
             ])
             ->sortByDesc('ventas_minor')
             ->values()

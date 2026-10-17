@@ -201,4 +201,56 @@ describe("tendencias del dinero", () => {
     await flushPromises();
     expect(pedidos()).toEqual(["negocio", "tendencias", "rentabilidad"]);
   });
+
+  it("si un reporte falla, lo dice solo en su pestaña y se puede reintentar", async () => {
+    let falla = true;
+    api.get.mockImplementation((url: string) =>
+      url.endsWith("/reportes/tendencias") && falla
+        ? Promise.reject(new Error("could not be converted to string"))
+        : Promise.resolve({
+            data: {
+              data: url.endsWith("/reportes/tendencias") ? tendencias : null,
+            },
+          }),
+    );
+    const w = mount(ReportesView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { ...esMX, operacion } },
+          }),
+        ],
+        stubs: { EncabezadoSeccion: true },
+      },
+    });
+    const ir = async (nombre: string) => {
+      await w
+        .findAll(".tu-pestanas button")
+        .find((b) => b.text() === nombre)!
+        .trigger("click");
+      await flushPromises();
+    };
+    await flushPromises();
+
+    await ir("Ingresos");
+    expect(w.get('[data-prueba="error-reporte"]').text()).toContain(
+      "No se pudo consultar este reporte",
+    );
+    // El error es de Ingresos: en Resumen no se queda.
+    await ir("Resumen");
+    expect(w.find('[data-prueba="error-reporte"]').exists()).toBe(false);
+
+    await ir("Ingresos");
+    falla = false;
+    await w.get('[data-prueba="reintentar-reporte"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-prueba="error-reporte"]').exists()).toBe(false);
+    expect(w.get('[data-prueba="tendencias-totales"]').text()).toContain(
+      "$75.00",
+    );
+  });
 });

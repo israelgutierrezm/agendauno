@@ -2492,6 +2492,7 @@ export default {
       "El pago se procesa de forma segura con la pasarela de AgendaUno. Tu factura (CFDI) se emite con tus datos fiscales.",
   },
   reportes: {
+    noSeConsulto: "No se pudo consultar este reporte. {error}",
     titulo: "Reportes",
     desde: "Desde",
     hasta: "Hasta",
