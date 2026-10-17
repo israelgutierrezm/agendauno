@@ -140,4 +140,3 @@ it('la nómina separa lo devengado de lo proyectado y paga cada clase con la tar
         ->assertOk()->json('data.profesionales'))->keyBy('id');
     expect($equipo[$coach]['costo_minor'])->toBe(20000);
 });
-
