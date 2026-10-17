@@ -2046,6 +2046,7 @@ export default {
     iva: "{n}% IVA",
   },
   usuarios: {
+    rolesGuardados: "Roles de {nombre} guardados.",
     titulo: "Usuarios",
     vacio: "Aún no hay usuarios.",
     colUsuario: "Usuario",

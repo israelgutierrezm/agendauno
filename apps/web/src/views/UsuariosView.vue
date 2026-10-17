@@ -10,6 +10,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -89,8 +90,28 @@ const soyDueno = computed(() => sesion.usuario?.rol === "propietario");
 
 const editando = ref<UsuarioRow | null>(null);
 const seleccion = ref<Set<string>>(new Set());
-const guardando = ref(false);
 const errorEdicion = ref<string | null>(null);
+// El patrón común de los formularios para sus roles: no se cierra mientras guarda,
+// pregunta antes de descartar cambios y confirma lo guardado.
+const edicionAbierta = computed({
+  get: () => editando.value !== null,
+  set: (v: boolean) => {
+    if (!v) {
+      editando.value = null;
+      errorEdicion.value = null;
+    }
+  },
+});
+const {
+  guardando,
+  error: errorRoles,
+  empezar,
+  cerrar: cerrarEditor,
+  guardar: guardarRoles,
+} = useEditorFormulario({
+  abierto: edicionAbierta,
+  valor: () => [...seleccion.value].sort(),
+});
 
 const columnas = computed(() => [
   { clave: "nombre", etiqueta: t("usuarios.colUsuario") },
@@ -284,6 +305,7 @@ function abrirEdicion(u: UsuarioRow): void {
   seleccion.value = new Set(u.roles);
   nuevaSede.value = { sucursalId: "", rol: "recepcionista" };
   errorEdicion.value = null;
+  empezar();
 }
 
 function cerrarEdicion(): void {
@@ -311,23 +333,23 @@ async function guardar(): Promise<void> {
     errorEdicion.value = t("usuarios.minimoUnRol");
     return;
   }
-  guardando.value = true;
   errorEdicion.value = null;
-  try {
-    const objetivo = editando.value;
-    await api.put(`${base.value}/usuarios/${objetivo.id}/roles`, {
-      roles: [...seleccion.value],
-    });
-    cerrarEdicion();
-    await cargar();
-    // Si me edité a mí mismo, refresco la sesión para actualizar permisos y menú.
-    if (objetivo.id === sesion.usuario?.ulid) {
-      await sesion.cargarYo();
-    }
-  } catch (e) {
-    errorEdicion.value = mensajeDeError(e);
-  } finally {
-    guardando.value = false;
+  const objetivo = editando.value;
+  const listo = await guardarRoles(
+    () =>
+      api.put(`${base.value}/usuarios/${objetivo.id}/roles`, {
+        roles: [...seleccion.value],
+      }),
+    t("usuarios.rolesGuardados", { nombre: objetivo.nombre }),
+  );
+  if (listo === undefined) {
+    return;
+  }
+  cerrarEdicion();
+  await cargar();
+  // Si me edité a mí mismo, refresco la sesión para actualizar permisos y menú.
+  if (objetivo.id === sesion.usuario?.ulid) {
+    await sesion.cargarYo();
   }
 }
 
@@ -586,7 +608,8 @@ onMounted(cargar);
     <PanelLateral
       :abierto="editando !== null"
       :titulo="$t('usuarios.editarRoles')"
-      @cerrar="cerrarEdicion"
+      :ocupado="guardando || guardandoSede || dandoDeBaja"
+      @cerrar="cerrarEditor"
     >
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ editando?.nombre }} ·
@@ -761,8 +784,13 @@ onMounted(cargar);
         </button>
       </div>
 
-      <AvisoTono v-if="errorEdicion" tono="peligro" class="mt-3" role="alert">
-        {{ errorEdicion }}
+      <AvisoTono
+        v-if="errorRoles || errorEdicion"
+        tono="peligro"
+        class="mt-3"
+        role="alert"
+      >
+        {{ errorRoles ?? errorEdicion }}
       </AvisoTono>
 
       <template #pie>
@@ -770,7 +798,8 @@ onMounted(cargar);
           <button
             class="tu-btn tu-btn-fantasma"
             type="button"
-            @click="cerrarEdicion"
+            :disabled="guardando"
+            @click="cerrarEditor"
           >
             {{ $t("usuarios.cancelar") }}
           </button>
