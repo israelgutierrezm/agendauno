@@ -163,7 +163,8 @@ await writeFile(
 );
 await writeFile(
   resolve(root, salida, "robots.txt"),
-  `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`,
+  // El de la landing y el índice de los negocios de la marca (ADR 0155).
+  `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\nSitemap: ${SITE_URL}/sitemap-negocios.xml\n`,
 );
 console.log(
   `Landing de ${producto}: ${rutasMarketing.length} páginas con HTML completo en ${salida}.`,

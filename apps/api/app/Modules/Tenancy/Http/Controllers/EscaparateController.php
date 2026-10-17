@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EscaparateTenant;
+use App\Modules\Tenancy\Application\SeoPaginaNegocio;
 use App\Modules\Tenancy\Application\SitioWebTenant;
 use App\Modules\Tenancy\Application\VisitasPaginaTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -18,7 +19,7 @@ use Illuminate\Http\Request;
  */
 class EscaparateController
 {
-    public function __invoke(Request $request, EscaparateTenant $escaparate, SitioWebTenant $sitio, VisitasPaginaTenant $visitas): JsonResponse
+    public function __invoke(Request $request, EscaparateTenant $escaparate, SitioWebTenant $sitio, VisitasPaginaTenant $visitas, SeoPaginaNegocio $seo): JsonResponse
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
@@ -32,9 +33,12 @@ class EscaparateController
             report($e);
         }
 
-        return response()->json(['data' => $escaparate->datos(
-            $estudio,
-            $sitio->paraPublico($sitio->publicado($estudio->modalidad())),
-        )]);
+        $datos = $escaparate->datos($estudio, $sitio->paraPublico($sitio->publicado($estudio->modalidad())));
+
+        return response()->json(['data' => [
+            ...$datos,
+            // Sus datos estructurados, los mismos que da la cabecera del servidor (ADR 0155).
+            'json_ld' => $seo->datosEstructurados($estudio, $datos),
+        ]]);
     }
 }

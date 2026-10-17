@@ -320,8 +320,15 @@ jobs:
           if grep -q -e '<!--#' -e 'an error occurred' /tmp/cuerpo; then exit 1; fi
           test "$(pedir fluo.turnouno.test /robots.txt)" = 200 && grep -q '^Allow: /$' /tmp/cuerpo
           test "$(pedir agendauno.test /entrar)" = 200 && grep -q '<!--# include virtual="/_cabeza-negocio"' /tmp/cuerpo
+          # Sin API, el contenido para buscadores tampoco deja rastro del SSI (ADR 0155); en el
+          # dominio principal no hay SSI y el bloque queda como comentario.
+          test "$(pedir fluo.agendauno.test /)" = 200 && grep -q '<div id="app"></div>' /tmp/cuerpo
+          if grep -q -e '<!--#' -e 'an error occurred' /tmp/cuerpo; then exit 1; fi
+          test "$(pedir agendauno.test /entrar)" = 200 && grep -q '<!--# include virtual="/_cuerpo-negocio"' /tmp/cuerpo
           # La subpetición es solo interna.
           test "$(pedir fluo.agendauno.test /_cabeza-negocio)" != 200
+          test "$(pedir fluo.agendauno.test /_cuerpo-negocio)" != 200
+          test "$(pedir fluo.agendauno.test /_existe-pagina)" != 200
           # Nadie enmarca la plataforma, salvo la vista previa del sitio en su panel (ADR 0114).
           cabeceras() { curl -sS -D - -o /dev/null -H "Host: $1" "http://127.0.0.1:8080$2" | tr -d '\r'; }
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /entrar)"

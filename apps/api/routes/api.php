@@ -214,7 +214,11 @@ Route::prefix('v1')->group(function (): void {
     // (ADR 0128): nginx pide su cabecera HTML (SSI) al servir la aplicación, y su
     // sitemap y su robots. El negocio sale del host; no abre su base de datos.
     Route::get('/pagina-negocio/cabeza', [PaginaNegocioSeoController::class, 'cabeza'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.cabeza');
+    // Su contenido para buscadores (SSI dentro de #app) y si existe la dirección (404 de verdad; ADR 0155).
+    Route::get('/pagina-negocio/cuerpo', [PaginaNegocioSeoController::class, 'cuerpo'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.cuerpo');
+    Route::get('/pagina-negocio/existe', [PaginaNegocioSeoController::class, 'existe'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.existe');
     Route::get('/pagina-negocio/sitemap.xml', [PaginaNegocioSeoController::class, 'sitemap'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.sitemap');
+    Route::get('/pagina-negocio/negocios.xml', [PaginaNegocioSeoController::class, 'negocios'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.negocios');
     Route::get('/pagina-negocio/robots.txt', [PaginaNegocioSeoController::class, 'robots'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.robots');
 
     // Entrar al superadmin (ADR 0126): correo, contraseña y token; luego el código por correo.

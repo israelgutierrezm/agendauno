@@ -98,6 +98,11 @@ server {
     location = /robots.txt {
         include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
+    # Los sitemaps de los negocios de la marca (ADR 0155): los da la API.
+    location = /sitemap-negocios.xml {
+        set $api_ruta /api/v1/pagina-negocio/negocios.xml;
+        include /etc/nginx/snippets/agendauno-api-interna.conf;
+    }
     location ^~ /assets-agendauno/ {
         include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
@@ -141,6 +146,10 @@ server {
     location = /robots.txt {
         include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
+    location = /sitemap-negocios.xml {
+        set $api_ruta /api/v1/pagina-negocio/negocios.xml;
+        include /etc/nginx/snippets/agendauno-api-interna.conf;
+    }
     location ^~ /assets-turnouno/ {
         include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
@@ -170,12 +179,37 @@ server {
     # SU cabecera (título, descripción, imagen para compartir, canonical; ADR 0128):
     # app.html la pide con SSI a /_cabeza-negocio. Si no es una página pública o la API
     # no responde, queda la genérica sin indexar que trae app.html.
+    #
+    # Lo que no existe responde 404 de verdad, con la misma aplicación (ADR 0155): la
+    # API dice si la dirección es de un negocio y de una página que existe (un
+    # subdominio sin negocio, la página de uno sin publicar o una página propia que no
+    # existe, no). Si la API no responde, se sirve como siempre.
     location / {
+        auth_request /_existe-pagina;
+        error_page 403 =404 @no_existe;
         ssi on;
         ssi_silent_errors on;
         add_header Cache-Control "no-cache" always;
         include /etc/nginx/snippets/agendauno-cabeceras.conf;
         try_files /app.html =404;
+    }
+    location @no_existe {
+        ssi on;
+        ssi_silent_errors on;
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/snippets/agendauno-cabeceras.conf;
+        try_files /app.html =404;
+    }
+    location = /_existe-pagina {
+        internal;
+        set $api_ruta /api/v1/pagina-negocio/existe;
+        include /etc/nginx/snippets/agendauno-api-interna.conf;
+        fastcgi_param HTTP_X_PAGINA $request_uri;
+        fastcgi_intercept_errors on;
+        error_page 400 404 405 429 500 502 503 504 = @existe_sin_api;
+    }
+    location @existe_sin_api {
+        return 204;
     }
     # Solo la subpetición SSI: la API recibe en X-Pagina la dirección que pidió el
     # navegador. Un error (404, 429, 5xx, API caída) es una respuesta vacía, nunca un
@@ -190,6 +224,15 @@ server {
     }
     location @sin_cabeza {
         return 204;
+    }
+    # Igual para el contenido de la página dentro de #app (ADR 0155).
+    location = /_cuerpo-negocio {
+        internal;
+        set $api_ruta /api/v1/pagina-negocio/cuerpo;
+        include /etc/nginx/snippets/agendauno-api-interna.conf;
+        fastcgi_param HTTP_X_PAGINA $request_uri;
+        fastcgi_intercept_errors on;
+        error_page 400 403 404 405 429 500 502 503 504 = @sin_cabeza;
     }
 
     # Su sitemap y su robots (los de la landing son los del dominio principal). Sin la

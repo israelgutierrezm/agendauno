@@ -138,3 +138,124 @@ it('su sitemap y su robots, en su subdominio', function (): void {
     expect($this->get('http://barberia-norte.turnouno.mx/api/v1/pagina-negocio/robots.txt')->assertOk()->getContent())
         ->toBe("User-agent: *\nAllow: /\n\nSitemap: https://barberia-norte.turnouno.mx/sitemap.xml\n");
 });
+
+/**
+ * Una barbería publicada con un servicio, su sede con dirección, teléfono y horario, y
+ * un barbero.
+ *
+ * @return array{e: array{slug: string, bearer: string}, sede: array{oferta: string, sucursal: string}}
+ */
+function barberiaConDatosPublicos(): array
+{
+    $e = estudioConSesion('barberia-norte', 'b@correo.mx', 'barberia');
+    $sede = agendaSemilla($e);
+    test()->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
+        'lugares' => 0, 'nombre' => 'Corte <clásico>', 'politica_reserva' => 'pago', 'precio_clase_minor' => 35000, 'duracion_minutos' => 45,
+        'descripcion' => 'Con navaja y toalla caliente',
+    ], conBearer($e['bearer']))->assertOk();
+    test()->putJson("/api/v1/app/{$e['slug']}/sucursales/{$sede['sucursal']}", [
+        'direccion' => 'Av. Juárez 123, Centro', 'region' => 'Jalisco', 'telefono' => '33 1234 5678',
+        'horario' => [['dia' => 1, 'abre' => '10:00', 'cierra' => '20:00'], ['dia' => 6, 'abre' => '09:00', 'cierra' => '14:00']],
+    ], conBearer($e['bearer']))->assertOk();
+    personalConSesion($e['slug'], $e['bearer'], 'marco@correo.mx', 'instructor');
+    publicarNegocioParaSeo('barberia-norte');
+
+    return ['e' => $e, 'sede' => $sede];
+}
+
+it('sin JavaScript, su página trae su contenido: servicios con precio, equipo y sucursal con horario', function (): void {
+    barberiaConDatosPublicos();
+
+    $html = $this->get('http://barberia-norte.turnouno.mx/api/v1/pagina-negocio/cuerpo', ['X-Pagina' => '/'])
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/html; charset=UTF-8')
+        ->getContent();
+
+    expect($html)
+        ->toStartWith('<main class="pagina-publica-texto"><h1>Estudio barberia-norte</h1>')
+        ->toContain('<h2>Servicios</h2>')
+        // Lo que escribe el negocio, escapado.
+        ->toContain('<strong>Corte &lt;clásico&gt;</strong> · Pole Sport · 45 min · $350.00 MXN. Con navaja y toalla caliente')
+        ->toContain('<h2>Equipo</h2>')
+        ->toContain('<h2>Dónde estamos</h2>')
+        ->toContain('Av. Juárez 123, Centro · Jalisco · 33 1234 5678 · Horario: Lun 10:00–20:00, Sáb 09:00–14:00')
+        ->not->toContain('<clásico>');
+
+    // Agendar: solo los servicios. Lo que no es página pública, nada.
+    expect($this->get('http://barberia-norte.turnouno.mx/api/v1/pagina-negocio/cuerpo', ['X-Pagina' => '/agendar/barberia-norte'])->assertOk()->getContent())
+        ->toContain('<h2>Servicios</h2>')->not->toContain('<h2>Equipo</h2>');
+    $this->get('http://barberia-norte.turnouno.mx/api/v1/pagina-negocio/cuerpo', ['X-Pagina' => '/panel'])->assertNoContent();
+    $this->get('http://otro.turnouno.mx/api/v1/pagina-negocio/cuerpo', ['X-Pagina' => '/'])->assertNoContent();
+});
+
+it('sus datos estructurados dicen su giro, su dirección, su teléfono y su horario; la web recibe los mismos', function (): void {
+    barberiaConDatosPublicos();
+
+    $html = $this->get('http://barberia-norte.turnouno.mx/api/v1/pagina-negocio/cabeza', ['X-Pagina' => '/'])->assertOk()->getContent();
+    preg_match('#<script id="agendauno-route-jsonld" type="application/ld\+json">(.*?)</script>#s', $html, $m);
+    $jsonLd = json_decode($m[1] ?? 'null', true);
+
+    expect($jsonLd)->toMatchArray([
+        '@type' => 'HairSalon',
+        'name' => 'Estudio barberia-norte',
+        'telephone' => '33 1234 5678',
+    ])
+        ->and($jsonLd['address'])->toBe([
+            '@type' => 'PostalAddress',
+            'streetAddress' => 'Av. Juárez 123, Centro',
+            'addressLocality' => 'Guadalajara',
+            'addressRegion' => 'Jalisco',
+            'addressCountry' => 'MX',
+        ])
+        ->and($jsonLd['openingHoursSpecification'][0])->toBe([
+            '@type' => 'OpeningHoursSpecification',
+            'dayOfWeek' => 'https://schema.org/Monday',
+            'opens' => '10:00',
+            'closes' => '20:00',
+        ]);
+
+    // La web los pone tal cual al mostrar la página (no se contradicen).
+    $this->getJson('/api/v1/app/barberia-norte/escaparate')->assertOk()->assertJsonPath('data.json_ld', $jsonLd);
+});
+
+it('404 de verdad: un subdominio sin negocio, la página de uno sin publicar o una página propia que no existe', function (): void {
+    estudioConSesion('fluo', 'f@correo.mx');
+    $existe = fn (string $host, string $pagina): int => $this->get("http://{$host}/api/v1/pagina-negocio/existe", ['X-Pagina' => $pagina])->status();
+
+    // Sin publicar: su página no existe, su panel y entrar sí.
+    Estudio::query()->where('slug', 'fluo')->update(['publicado' => false]);
+    expect($existe('fluo.agendauno.mx', '/'))->toBe(403)
+        ->and($existe('fluo.agendauno.mx', '/entrar'))->toBe(204)
+        ->and($existe('fluo.agendauno.mx', '/panel'))->toBe(204);
+
+    publicarNegocioParaSeo('fluo');
+    expect($existe('fluo.agendauno.mx', '/'))->toBe(204)
+        ->and($existe('fluo.agendauno.mx', '/enlaces?utm=ig'))->toBe(204)
+        ->and($existe('fluo.agendauno.mx', '/estudio/fluo/p/no-existe'))->toBe(403)
+        // Un negocio que no existe, o en el dominio del otro producto.
+        ->and($existe('no-existe.agendauno.mx', '/'))->toBe(403)
+        ->and($existe('fluo.turnouno.mx', '/'))->toBe(403)
+        // Otro host no es asunto de esta página.
+        ->and($existe('localhost', '/lo-que-sea'))->toBe(204);
+});
+
+it('el dominio de la marca lista los sitemaps de sus negocios del directorio', function (): void {
+    estudioConSesion('fluo', 'f@correo.mx');
+    publicarNegocioParaSeo('fluo');
+    estudioConSesion('privado', 'p@correo.mx');
+    publicarNegocioParaSeo('privado', privado: true);
+    estudioConSesion('barberia-norte', 'b@correo.mx', 'barberia');
+    publicarNegocioParaSeo('barberia-norte');
+
+    $xml = $this->get('http://agendauno.mx/api/v1/pagina-negocio/negocios.xml')
+        ->assertOk()->assertHeader('Content-Type', 'application/xml; charset=UTF-8')->getContent();
+    expect($xml)
+        ->toContain('<loc>https://fluo.agendauno.mx/sitemap.xml</loc>')
+        // Ni el «solo con enlace» ni el de la otra marca.
+        ->not->toContain('privado.agendauno.mx')
+        ->not->toContain('barberia-norte');
+    expect($this->get('http://turnouno.mx/api/v1/pagina-negocio/negocios.xml')->assertOk()->getContent())
+        ->toContain('<loc>https://barberia-norte.turnouno.mx/sitemap.xml</loc>');
+    // Desde un subdominio u otro host, no.
+    $this->get('http://fluo.agendauno.mx/api/v1/pagina-negocio/negocios.xml')->assertNotFound();
+});

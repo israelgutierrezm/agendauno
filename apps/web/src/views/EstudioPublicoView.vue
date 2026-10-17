@@ -154,6 +154,8 @@ interface Resena {
   fecha: string | null;
 }
 interface Escaparate {
+  // Sus datos estructurados, los mismos que da la cabecera del servidor (ADR 0155).
+  json_ld?: Record<string, unknown>;
   estudio: {
     slug: string;
     nombre: string;
@@ -680,7 +682,9 @@ function aplicarSeo(): void {
     imageAlt: estudio.nombre,
     type: "profile",
     index: estudio.en_directorio !== false,
-    jsonLd: {
+    // Los del servidor (giro, dirección, teléfono y horario por sucursal): así la
+    // página y su cabecera no se contradicen. Sin ellos, los básicos de siempre.
+    jsonLd: escaparate.value?.json_ld ?? {
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
       name: estudio.nombre,

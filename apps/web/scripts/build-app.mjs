@@ -27,7 +27,18 @@ const app = index.replace(
 if (app === index) {
   throw new Error("index.html no trae la cabecera marcada (marketing:head).");
 }
-await writeFile(resolve(root, "dist/app/app.html"), app);
+// Y el contenido de su página para quien no ejecuta JavaScript (ADR 0155): dentro de
+// #app, que la web reemplaza al cargar. Sin página pública o sin SSI, nada.
+const conCuerpo = app.replace(
+  '<div id="app"></div>',
+  () =>
+    '<div id="app"><!--# block name="sin_cuerpo" --><!--# endblock -->' +
+    '<!--# include virtual="/_cuerpo-negocio" stub="sin_cuerpo" --></div>',
+);
+if (conCuerpo === app) {
+  throw new Error('index.html no trae <div id="app"></div>.');
+}
+await writeFile(resolve(root, "dist/app/app.html"), conCuerpo);
 // El de la vista previa local. En producción, el subdominio de cada negocio tiene el
 // suyo, con su sitemap, que da la API (ADR 0128); el dominio principal, el de su landing.
 await writeFile(

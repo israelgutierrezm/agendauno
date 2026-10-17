@@ -58,7 +58,7 @@ en desarrollo, de `?producto=turnouno`.
   la asistencia se pasa en lista, con retardos); en clases no hay
   autorregistro de alumnos (la página pública termina en «Pedir acceso / Ya soy
   alumno», ADR 0093); los spas sí manejan cabinas y equipos como recursos. Donde se
-  mencionan cobros en línea o facturación va «*» y la nota «* Solo para negocios en
+  mencionan cobros en línea o facturación va «_» y la nota «_ Solo para negocios en
   México (cobros en pesos)» (`.tu-nota-mexico`, ADR 0099). Los planes de citas solo
   listan lo que existe: recordatorios por correo, la página en
   `tunegocio.{dominio del producto}` y mensajes masivos por correo (la app aún no está
@@ -74,11 +74,16 @@ en desarrollo, de `?producto=turnouno`.
   la pone `seoConfig` según el registro del producto, «Prueba {marca} gratis durante
   {días} días, sin tarjeta.» o, en prelanzamiento, «{marca} abre pronto: déjanos tus
   datos y te avisamos.» (también en el JSON-LD).
-- JSON-LD: `Organization`, `SoftwareApplication` y `WebPage` en las 11. `BreadcrumbList`
-  en `/clases` y `/citas` (Inicio → Clases|Citas) y en cada página por giro
-  (Inicio → Clases|Citas → giro). Sin `Offer`, `FAQPage` ni `hreflang`.
-- El sitemap lista las 11. Registro, acceso, activación, directorio, aviso de
-  privacidad y la aplicación quedan con `noindex,follow`, sin canonical ni JSON-LD.
+- Cada marca tiene su portada (`/`) y sus páginas por giro (`/software-para-*`):
+  `paginasMarketing` en `seoConfig.ts` es la lista única (router, pre-generado, sitemap
+  y comprobaciones).
+- JSON-LD: `Organization`, `SoftwareApplication`, `WebSite` y `WebPage` en la portada;
+  en cada página por giro, además `BreadcrumbList` (Inicio → giro). Sin `Offer`,
+  `FAQPage` ni `hreflang`.
+- El sitemap lista las páginas de la marca; su robots anuncia también
+  `/sitemap-negocios.xml` (los negocios de la marca, ADR 0155). Registro, acceso,
+  activación, directorio, aviso de privacidad y la aplicación quedan con
+  `noindex,follow`, sin canonical ni JSON-LD.
 
 ## Menú comercial
 
@@ -101,11 +106,11 @@ Los negocios viven solo en `{slug}.agendauno.mx`; el dominio principal no tiene 
 con el slug de un negocio (`urlEnSubdominioDelNegocio` en `src/lib/tenant.ts`, guarda
 del router):
 
-| En `agendauno.mx` o `www.agendauno.mx` (producción) | Va a                                       |
-| ---------------------------------------------------- | ------------------------------------------ |
-| `/{slug}` (enlace corto)                             | `https://{slug}.agendauno.mx/`             |
-| `/estudio/{slug}` (página del negocio)               | `https://{slug}.agendauno.mx/estudio/{slug}` |
-| `/{slug}/enlaces` (enlaces para Instagram)           | `https://{slug}.agendauno.mx/enlaces`      |
+| En `agendauno.mx` o `www.agendauno.mx` (producción) | Va a                                         |
+| --------------------------------------------------- | -------------------------------------------- |
+| `/{slug}` (enlace corto)                            | `https://{slug}.agendauno.mx/`               |
+| `/estudio/{slug}` (página del negocio)              | `https://{slug}.agendauno.mx/estudio/{slug}` |
+| `/{slug}/enlaces` (enlaces para Instagram)          | `https://{slug}.agendauno.mx/enlaces`        |
 
 - Se conservan la query y el ancla (`/estudio/foo?x=1#precios` →
   `https://foo.agendauno.mx/estudio/foo?x=1#precios`). La página del negocio conserva
@@ -120,6 +125,31 @@ del router):
 - **Antes de publicar**: `/clases` y `/citas` tapan el enlace corto de un negocio con
   ese slug en el dominio principal (los slugs no se reservan; en su subdominio sigue
   funcionando). Revisar `SELECT slug FROM estudios WHERE slug IN ('clases','citas');`.
+
+## La página de cada negocio para buscadores (ADR 0128, 0155)
+
+En su subdominio, la página pública de un negocio llega completa para quien no ejecuta
+JavaScript:
+
+- **Cabecera** (SSI `/_cabeza-negocio`): título, descripción, robots, Open Graph,
+  canonical y datos estructurados. El tipo depende del giro: `ExerciseGym`,
+  `SportsActivityLocation`, `HairSalon`, `BeautySalon`, `DaySpa`, `MedicalBusiness` o
+  `LocalBusiness`. Llevan dirección postal, teléfono y horario de cada sucursal (con
+  varias, como `department`). La web pone los mismos (`json_ld` del escaparate).
+- **Contenido** (SSI `/_cuerpo-negocio`, dentro de `#app`): lo que escribió en su sitio,
+  sus servicios o clases con precio, las próximas clases, su equipo y sus sucursales.
+  Es texto escapado y la web lo reemplaza al cargar. Los datos salen de
+  `DatosPublicosNegocio`, guardados 10 minutos por negocio.
+- **404 de verdad** (`auth_request /_existe-pagina`): responden 404 un subdominio sin
+  negocio, la página pública de uno sin publicar y una página propia que no existe. Se
+  sirve la misma aplicación, que muestra «no disponible». Si la API no responde, se
+  sirve como siempre.
+- **Sitemaps**: cada subdominio tiene el suyo, anunciado en su robots. El dominio de la
+  marca lista los de sus negocios del directorio en `/sitemap-negocios.xml`. Que un
+  buscador los acepte desde ahí pide verificar el dominio completo (propiedad de
+  dominio) en su consola.
+- **Pendiente: dominio propio** (`docs/MULTIPRODUCTO.md`). Hace falta verificar el
+  dominio, emitir sus certificados y que la API resuelva el negocio por ese host.
 
 ## Registro con modalidad
 
@@ -172,13 +202,13 @@ llamados finales siguen en rosa.
 
 Publicar `dist`, nunca `dist-ssr`. El servidor debe distinguir dominio comercial y subdominios de negocios:
 
-1. En `agendauno.mx` y `www.agendauno.mx`, servir `/` desde `dist/index.html` y cada página comercial (`/clases`, `/citas`, `/software-para-*`) desde su propio `index.html` (`try_files $uri/index.html $uri /app.html` en `infra/produccion/nginx.conf.template`).
+1. En el dominio de cada marca, `/`, `/software-para-*`, `/sitemap.xml`, `/robots.txt` y `/assets-{marca}/` van al contenedor de su landing (`nginx.conf.template`, ADR 0112); `/sitemap-negocios.xml`, a la API; lo demás es `app.html`.
 2. Servir archivos reales, CSS, JS, imágenes, robots y sitemap normalmente. Un asset inexistente debe responder 404, no HTML.
 3. Acceso, registro, activación, pantallas privadas y rutas dinámicas usan `dist/app.html` como fallback. **No usar el HTML de la landing como fallback universal.** Las rutas estáticas de registro/acceso también tienen HTML propio sin indexación. El enlace corto y la página de un negocio en el dominio principal cargan `app.html`, que los manda a su subdominio.
 4. En `{negocio}.agendauno.mx` y hosts de aplicación, servir `app.html` para rutas de aplicación, incluida `/`; nunca la landing comercial. Mantener la resolución de tenant existente.
 5. Redirigir HTTP a HTTPS y www al dominio canónico en producción. Comprobar códigos HTTP y encabezados antes de enviar el sitemap. El `noindex` no sustituye autenticación.
 
-El directorio queda como herramienta de acceso, fuera del sitemap comercial. Los escaparates dinámicos conservan sus metadatos al cargar, pero no se prerenderizan con datos de negocios; si se quiere posicionar cada negocio, requiere un trabajo separado de renderizado y respuestas HTTP 404 reales. El catch-all histórico de Vue también debe revisarse antes de una estrategia SEO de escaparates.
+El directorio queda como herramienta de acceso, fuera del sitemap comercial. La página de cada negocio llega con su cabecera, su contenido y 404 reales desde su subdominio (ver «La página de cada negocio para buscadores»).
 
 ## Search Console
 
@@ -197,17 +227,17 @@ La integración interna emite eventos al evento local `agendauno:analytics` y, s
 
 La modalidad viaja siempre como `mode`, con solo dos valores: `clases` o `citas` (nunca `modo`).
 
-| Etapa             | Evento                                  | Propiedades                                                                                                  |
-| ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Visita comercial  | `page_view`                             | Navegación completada a una página comercial o al registro                                                   |
-| Elección          | `marketing_business_mode_selected`      | `mode`, `placement`: `hero`, `business_modes`, `business_types` (portada) o `mode_page_footer` (la otra modalidad) |
-| Interés           | `marketing_cta_clicked`                 | `placement`, `destination` (`register`, `waitlist` si el producto aún no recibe registros, `pricing`, `product`), `mode` cuando la página tiene modalidad, `solution` en las páginas por giro y `business_profile` (la clave del giro) cuando el enlace lleva `?giro=` |
-| Inicio            | `studio_registration_started`           | `mode_intent` si llegó con `?modo=` o `?giro=` (la modalidad del giro manda) y `business_profile_intent` si llegó con `?giro=` |
-| Avance            | `studio_registration_step_completed`    | `step`, `mode_intent`, `business_profile_intent`                                                             |
-| Error             | `studio_registration_failed`            | `step`, `mode_intent`, `business_profile_intent`                                                             |
-| Registro          | `tenant_created`                        | `business_profile`, `mode` (la modalidad del giro elegido), `mode_intent`, `business_profile_intent`         |
-| Activación        | `tenant_activated`                      | API confirma activación                                                                                      |
-| Pago              | `purchase` / `Purchase` desde el servidor (ADR 0143) | Primer cargo de la suscripción realmente pagado, no clic ni retorno del navegador                     |
+| Etapa            | Evento                                               | Propiedades                                                                                                                                                                                                                                                            |
+| ---------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Visita comercial | `page_view`                                          | Navegación completada a una página comercial o al registro                                                                                                                                                                                                             |
+| Elección         | `marketing_business_mode_selected`                   | `mode`, `placement`: `hero`, `business_modes`, `business_types` (portada) o `mode_page_footer` (la otra modalidad)                                                                                                                                                     |
+| Interés          | `marketing_cta_clicked`                              | `placement`, `destination` (`register`, `waitlist` si el producto aún no recibe registros, `pricing`, `product`), `mode` cuando la página tiene modalidad, `solution` en las páginas por giro y `business_profile` (la clave del giro) cuando el enlace lleva `?giro=` |
+| Inicio           | `studio_registration_started`                        | `mode_intent` si llegó con `?modo=` o `?giro=` (la modalidad del giro manda) y `business_profile_intent` si llegó con `?giro=`                                                                                                                                         |
+| Avance           | `studio_registration_step_completed`                 | `step`, `mode_intent`, `business_profile_intent`                                                                                                                                                                                                                       |
+| Error            | `studio_registration_failed`                         | `step`, `mode_intent`, `business_profile_intent`                                                                                                                                                                                                                       |
+| Registro         | `tenant_created`                                     | `business_profile`, `mode` (la modalidad del giro elegido), `mode_intent`, `business_profile_intent`                                                                                                                                                                   |
+| Activación       | `tenant_activated`                                   | API confirma activación                                                                                                                                                                                                                                                |
+| Pago             | `purchase` / `Purchase` desde el servidor (ADR 0143) | Primer cargo de la suscripción realmente pagado, no clic ni retorno del navegador                                                                                                                                                                                      |
 
 Los `placement` de `marketing_cta_clicked`: `navigation` («Probar gratis» del menú), `hero`, `product_demo`, `features` («Probar en mi negocio»), `business_carousel`, `operations`, `pricing`, `pricing_card`, `public_page`, `final`, `solution_hero` y `solution_final`. Comparar `mode_intent` con `mode` de `tenant_created` muestra quién llegó por una modalidad y registró otra.
 

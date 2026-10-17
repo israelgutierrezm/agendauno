@@ -28,6 +28,29 @@ use App\Modules\Tenancy\Support\RedesSociales;
 final class SeoPaginaNegocio
 {
     /**
+     * El tipo de schema.org de cada giro (lo más preciso que existe); los demás,
+     * LocalBusiness.
+     */
+    private const TIPO_POR_GIRO = [
+        'gimnasio' => 'ExerciseGym',
+        'crossfit' => 'ExerciseGym',
+        'hyrox' => 'ExerciseGym',
+        'pilates' => 'SportsActivityLocation',
+        'pole' => 'SportsActivityLocation',
+        'yoga' => 'SportsActivityLocation',
+        'danza' => 'SportsActivityLocation',
+        'natacion' => 'SportsActivityLocation',
+        'barberia' => 'HairSalon',
+        'salon' => 'BeautySalon',
+        'estetica' => 'BeautySalon',
+        'spa' => 'DaySpa',
+        'salud' => 'MedicalBusiness',
+    ];
+
+    /** Los días del horario (1 = lunes) como los nombra schema.org. */
+    private const DIAS = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
+
+    /**
      * Imagen para compartir cuando el negocio no tiene portada ni logo: la de la marca
      * (la misma que `DEFAULT_IMAGE` de la web), con su texto alternativo.
      */
@@ -42,6 +65,18 @@ final class SeoPaginaNegocio
      */
     public function negocioDelHost(string $host): ?Estudio
     {
+        $estudio = $this->delSubdominio($host);
+
+        return $estudio !== false && $estudio !== null && $estudio->paginaPublica() ? $estudio : null;
+    }
+
+    /**
+     * El negocio de un subdominio de un producto, abierto o no. False si el host no es
+     * un subdominio de ningún producto (otro host: no es asunto de esta página); null si
+     * lo es, pero de ningún negocio de ese producto.
+     */
+    private function delSubdominio(string $host): Estudio|false|null
+    {
         $host = strtolower(trim($host, '.'));
         foreach (ProductoComercial::cases() as $producto) {
             $dominio = $producto->dominio();
@@ -50,21 +85,46 @@ final class SeoPaginaNegocio
             }
             $estudio = Estudio::query()->where('slug', $partes[1])->first();
 
-            return $estudio instanceof Estudio && $estudio->producto() === $producto && $estudio->paginaPublica()
-                ? $estudio
-                : null;
+            return $estudio instanceof Estudio && $estudio->producto() === $producto ? $estudio : null;
         }
 
-        return null;
+        return false;
     }
 
     /**
-     * Lo que va en la cabecera de una dirección del subdominio (con o sin query). Null si
-     * no es una página pública del negocio: su panel, entrar, una vista previa…
-     *
-     * @return array{titulo: string, descripcion: string, ruta: string, imagen: string|null, tipo: string, indexar: bool, json_ld: array<string, mixed>|null}|null
+     * ¿Existe esa dirección? Para que nginx responda 404 de verdad (con la misma
+     * aplicación) en lugar de 200 a todo: un subdominio sin negocio; la página pública
+     * de un negocio que no la tiene abierta; una página propia de su sitio que no
+     * existe. Lo demás (entrar, su panel, otro host) sí existe: lo resuelve la web.
      */
-    public function paraRuta(Estudio $estudio, string $direccion): ?array
+    public function existe(string $host, string $direccion): bool
+    {
+        $estudio = $this->delSubdominio($host);
+        if ($estudio === false) {
+            return true;
+        }
+        if ($estudio === null) {
+            return false;
+        }
+        $pagina = $this->cualPagina($estudio, $direccion);
+        if ($pagina === null) {
+            return true;
+        }
+        if (! $estudio->paginaPublica()) {
+            return false;
+        }
+
+        return $pagina['pagina'] !== 'propia'
+            || $this->paginaPropia($estudio, is_array($estudio->seo_sitio) ? $estudio->seo_sitio : [], (string) $pagina['propia']) !== null;
+    }
+
+    /**
+     * Qué página pública es una dirección del subdominio (con o sin query), o null si
+     * no es una: su panel, entrar, una vista previa…
+     *
+     * @return array{pagina: string, propia: string|null}|null
+     */
+    public function cualPagina(Estudio $estudio, string $direccion): ?array
     {
         $camino = '/'.trim(strtolower(rawurldecode((string) preg_replace('/[?#].*$/s', '', $direccion))), '/');
         $slug = $estudio->slug;
@@ -77,12 +137,35 @@ final class SeoPaginaNegocio
             str_starts_with($camino, "/estudio/{$slug}/p/") => 'propia',
             default => null,
         };
-        if ($pagina === null) {
+
+        return $pagina === null ? null : [
+            'pagina' => $pagina,
+            'propia' => $pagina === 'propia' ? substr($camino, strlen("/estudio/{$slug}/p/")) : null,
+        ];
+    }
+
+    /**
+     * Lo que va en la cabecera de una dirección del subdominio (con o sin query). Null si
+     * no es una página pública del negocio: su panel, entrar, una vista previa…
+     *
+     * Con los datos públicos del negocio (`DatosPublicosNegocio`), los datos estructurados
+     * de Inicio van completos: su tipo, dirección, teléfono y horario por sucursal.
+     *
+     * @param  array<string, mixed>|null  $datos
+     * @return array{titulo: string, descripcion: string, ruta: string, imagen: string|null, tipo: string, indexar: bool, json_ld: array<string, mixed>|null}|null
+     */
+    public function paraRuta(Estudio $estudio, string $direccion, ?array $datos = null): ?array
+    {
+        $cual = $this->cualPagina($estudio, $direccion);
+        if ($cual === null) {
             return null;
         }
+        $pagina = $cual['pagina'];
+        $slug = $estudio->slug;
+        $citas = $estudio->modalidad() === ModalidadServicio::Citas;
         $seo = is_array($estudio->seo_sitio) ? $estudio->seo_sitio : [];
         if ($pagina === 'propia') {
-            return $this->paginaPropia($estudio, $seo, substr($camino, strlen("/estudio/{$slug}/p/")));
+            return $this->paginaPropia($estudio, $seo, (string) $cual['propia']);
         }
 
         $nombre = (string) $estudio->nombre;
@@ -107,16 +190,7 @@ final class SeoPaginaNegocio
                     ?? $this->absoluta($estudio, $estudio->portada_url) ?? $logo,
                 'tipo' => 'profile',
                 'indexar' => $estudio->enDirectorio(),
-                'json_ld' => array_filter([
-                    '@context' => 'https://schema.org',
-                    '@type' => 'LocalBusiness',
-                    'name' => $nombre,
-                    'url' => $this->urlBase($estudio).'/',
-                    'image' => $logo,
-                    'address' => $lugar !== '' ? $lugar : null,
-                    'description' => $descripcionPropia !== '' ? $descripcionPropia : null,
-                    'sameAs' => array_column(RedesSociales::publicas($estudio->redes), 'url'),
-                ], fn (mixed $valor): bool => $valor !== null),
+                'json_ld' => $this->datosEstructurados($estudio, $datos),
             ],
             'enlaces' => [
                 'titulo' => "{$nombre} | Enlaces",
@@ -178,6 +252,74 @@ final class SeoPaginaNegocio
         }
 
         return null;
+    }
+
+    /**
+     * Los datos estructurados de su página (schema.org): el tipo de su giro, y con sus
+     * datos públicos, la dirección, el teléfono y el horario de cada sucursal (con una,
+     * en el negocio; con varias, cada una como `department`). Los mismos que pone la
+     * web (el escaparate se los da), para que no se contradigan.
+     *
+     * @param  array<string, mixed>|null  $datos  los de `DatosPublicosNegocio` (o null)
+     * @return array<string, mixed>
+     */
+    public function datosEstructurados(Estudio $estudio, ?array $datos = null): array
+    {
+        $tipo = self::TIPO_POR_GIRO[$estudio->perfil_negocio->value] ?? 'LocalBusiness';
+        $ciudad = trim((string) $estudio->ciudad);
+        $pais = CatalogoPaises::codigo($estudio->pais);
+        $lugar = implode(', ', array_filter([$ciudad, $pais]));
+        $descripcion = trim((string) $estudio->descripcion);
+        $sucursales = array_values(array_filter((array) ($datos['sucursales'] ?? []), 'is_array'));
+
+        $base = array_filter([
+            '@context' => 'https://schema.org',
+            '@type' => $tipo,
+            'name' => (string) $estudio->nombre,
+            'url' => $this->urlBase($estudio).'/',
+            'image' => $this->absoluta($estudio, $estudio->logo_url),
+            'description' => $descripcion !== '' ? $descripcion : null,
+            'sameAs' => array_column(RedesSociales::publicas($estudio->redes), 'url'),
+        ], fn (mixed $valor): bool => $valor !== null);
+
+        $deSucursal = function (array $s) use ($ciudad, $pais): array {
+            $direccion = array_filter([
+                '@type' => 'PostalAddress',
+                'streetAddress' => self::propio($s['direccion'] ?? null),
+                'addressLocality' => $ciudad !== '' ? $ciudad : null,
+                'addressRegion' => self::propio($s['region'] ?? null),
+                'addressCountry' => $pais,
+            ], fn (mixed $valor): bool => $valor !== null);
+            $horario = array_map(static fn (array $d): array => [
+                '@type' => 'OpeningHoursSpecification',
+                'dayOfWeek' => 'https://schema.org/'.self::DIAS[(int) $d['dia']],
+                'opens' => (string) $d['abre'],
+                'closes' => (string) $d['cierra'],
+            ], array_values(array_filter((array) ($s['horario'] ?? []), static fn (mixed $d): bool => is_array($d) && isset(self::DIAS[(int) ($d['dia'] ?? 0)]))));
+
+            return array_filter([
+                'address' => count($direccion) > 2 ? $direccion : null,
+                'telephone' => self::propio($s['telefono'] ?? null),
+                'openingHoursSpecification' => $horario !== [] ? $horario : null,
+            ], fn (mixed $valor): bool => $valor !== null);
+        };
+
+        if (count($sucursales) === 1) {
+            return [...$base, ...($deSucursal($sucursales[0]) ?: ($lugar !== '' ? ['address' => $lugar] : []))];
+        }
+        if (count($sucursales) > 1) {
+            return [
+                ...$base,
+                ...($lugar !== '' ? ['address' => $lugar] : []),
+                'department' => array_map(fn (array $s): array => [
+                    '@type' => $tipo,
+                    'name' => trim((string) $estudio->nombre.' · '.(string) ($s['nombre'] ?? '')),
+                    ...$deSucursal($s),
+                ], $sucursales),
+            ];
+        }
+
+        return [...$base, ...($lugar !== '' ? ['address' => $lugar] : [])];
     }
 
     /** Un texto propio con algo escrito, o null. */
@@ -258,6 +400,37 @@ final class SeoPaginaNegocio
     }
 
     /**
+     * El índice de los sitemaps de los negocios de una marca, en su dominio principal
+     * (`agendauno.mx/sitemap-negocios.xml`; ADR 0155): uno por negocio que aparece en el
+     * directorio, en su subdominio. Null si el host no es el dominio de una marca. (Que
+     * un buscador lea sitemaps de otros subdominios desde aquí pide verificar el
+     * dominio completo en su consola; cada subdominio igual anuncia el suyo en su robots.)
+     */
+    public function indiceDeNegocios(string $host): ?string
+    {
+        $host = strtolower(trim($host, '.'));
+        $producto = null;
+        foreach (ProductoComercial::cases() as $p) {
+            if ($p->dominio() !== '' && $p->dominio() === $host) {
+                $producto = $p;
+            }
+        }
+        if ($producto === null) {
+            return null;
+        }
+        $sitemaps = Estudio::query()->where('publicado', true)->where('privado', false)->orderBy('slug')->get()
+            ->filter(static fn (Estudio $e): bool => $e->enDirectorio() && $e->producto() === $producto)
+            ->map(fn (Estudio $e): string => '  <sitemap><loc>'.htmlspecialchars($this->urlBase($e).'/sitemap.xml', ENT_XML1, 'UTF-8').'</loc>'
+                .($e->updated_at !== null ? '<lastmod>'.$e->updated_at->toDateString().'</lastmod>' : '').'</sitemap>')
+            ->all();
+
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            ."<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+            .implode("\n", $sitemaps).($sitemaps !== [] ? "\n" : '')
+            ."</sitemapindex>\n";
+    }
+
+    /**
      * Su robots: todo se puede rastrear (lo que no es página pública ya dice `noindex`);
      * con su sitemap si se indexa.
      */
@@ -271,7 +444,7 @@ final class SeoPaginaNegocio
     }
 
     /** `https://{slug}.{dominio de su producto}`, sin diagonal final. */
-    private function urlBase(Estudio $estudio): string
+    public function urlBase(Estudio $estudio): string
     {
         return "https://{$estudio->slug}.{$estudio->producto()->dominio()}";
     }

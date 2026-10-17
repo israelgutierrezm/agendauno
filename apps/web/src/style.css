@@ -901,3 +901,25 @@
     background: #fff !important;
   }
 }
+
+/* El contenido de la página de un negocio que nginx pone para buscadores (ADR 0155):
+   se ve un instante, hasta que carga la aplicación y lo reemplaza. */
+.pagina-publica-texto {
+  max-width: 46rem;
+  margin: 2.5rem auto;
+  padding: 0 1rem;
+  line-height: 1.6;
+}
+.pagina-publica-texto h1 {
+  font-size: 1.75rem;
+  font-weight: 650;
+}
+.pagina-publica-texto h2 {
+  margin-top: 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.pagina-publica-texto ul {
+  padding-left: 1.2rem;
+  list-style: disc;
+}
