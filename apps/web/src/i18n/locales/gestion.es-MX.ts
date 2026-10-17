@@ -452,6 +452,11 @@ export const reembolsosPago = {
 // Cobranza: lo del dinero que alguien debe revisar (devoluciones sin confirmar…).
 export const porConciliar = {
   titulo: "Por conciliar",
+  revisando: "Revisando si hay algo por conciliar…",
+  nada: "Nada por conciliar: la pasarela confirmó todos los movimientos.",
+  noSeConsulto:
+    "No se pudo consultar si hay algo por conciliar; esto no quiere decir que no haya nada. {error}",
+  sinPermiso: "Tu rol no puede ver lo que hay por conciliar.",
   ayuda:
     "Movimientos que la pasarela no confirmó. Revisa en su panel qué pasó y márcalo aquí.",
   devolucion: "Devolución de {monto}",

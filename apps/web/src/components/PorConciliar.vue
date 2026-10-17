@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isAxiosError } from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -10,8 +11,11 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Por conciliar: lo del dinero que necesita que alguien lo revise (p. ej. una
  * devolución que la pasarela no confirmó). Una devolución sin confirmar se resuelve
- * diciendo si la pasarela la hizo o no (se ve en su panel), con una nota. Solo se
- * muestra si hay algo pendiente.
+ * diciendo si la pasarela la hizo o no (se ve en su panel), con una nota.
+ *
+ * Cada estado se distingue: revisando, nada por conciliar, no se pudo consultar (con
+ * «Reintentar»: un fallo no se confunde con «no hay nada») y sin permiso. A quien no
+ * ve la facturación no se le muestra la sección.
  *
  * Del pago automático (ADR 0134): una cancelación que la pasarela no confirma (se
  * cancela en su panel; se cierra sola al confirmarse), un cobro que llegó tras
@@ -52,6 +56,9 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeResolver = computed(() => sesion.puede("pagos.reembolsar"));
 
 const incidencias = ref<Incidencia[]>([]);
+const puedeVer = computed(() => sesion.puede("facturacion.ver"));
+const estado = ref<"cargando" | "listo" | "error" | "sin_permiso">("cargando");
+const errorCarga = ref<string | null>(null);
 const abierta = ref<string | null>(null);
 const nota = ref("");
 const guardando = ref(false);
@@ -63,14 +70,27 @@ function dinero(minor: number, moneda: string | null): string {
 }
 
 async function cargar(): Promise<void> {
+  if (!puedeVer.value) {
+    return;
+  }
+  // Al recargar tras resolver, la lista se queda mientras llega la nueva.
+  if (estado.value !== "listo") {
+    estado.value = "cargando";
+  }
   try {
     const { data } = await api.get<{ data: Incidencia[] }>(
       `${base.value}/incidencias-cobro`,
     );
     incidencias.value = data.data;
-  } catch {
-    // Sin permiso o sin red: la sección simplemente no aparece.
-    incidencias.value = [];
+    estado.value = "listo";
+  } catch (e) {
+    if (isAxiosError(e) && e.response?.status === 403) {
+      estado.value = "sin_permiso";
+      return;
+    }
+    // Lo que ya se veía se conserva; el aviso dice que no está al día.
+    errorCarga.value = mensajeDeError(e);
+    estado.value = "error";
   }
 }
 
@@ -144,12 +164,62 @@ defineExpose({ cargar });
 </script>
 
 <template>
-  <section v-if="incidencias.length > 0" class="mt-8">
+  <section v-if="puedeVer" class="mt-8" data-prueba="por-conciliar">
     <h2 class="font-medium text-lg">{{ $t("porConciliar.titulo") }}</h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <p
+      v-if="estado === 'cargando'"
+      class="mt-1 text-sm"
+      role="status"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("porConciliar.revisando") }}
+    </p>
+    <p
+      v-else-if="estado === 'sin_permiso'"
+      class="mt-1 text-sm"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("porConciliar.sinPermiso") }}
+    </p>
+    <AvisoTono
+      v-else-if="estado === 'error'"
+      tono="peligro"
+      class="mt-3"
+      role="alert"
+      data-prueba="error-conciliar"
+    >
+      {{ $t("porConciliar.noSeConsulto", { error: errorCarga ?? "" }) }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno text-sm"
+          data-prueba="reintentar-conciliar"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
+    <p
+      v-else-if="incidencias.length === 0"
+      class="mt-1 text-sm"
+      :style="{ color: 'var(--texto-suave)' }"
+      data-prueba="nada-por-conciliar"
+    >
+      {{ $t("porConciliar.nada") }}
+    </p>
+    <p
+      v-if="incidencias.length > 0"
+      class="mt-1 text-sm"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
       {{ $t("porConciliar.ayuda") }}
     </p>
-    <ul class="mt-3 tu-card divide-y" :style="{ borderColor: 'var(--borde)' }">
+    <ul
+      v-if="incidencias.length > 0"
+      class="mt-3 tu-card divide-y"
+      :style="{ borderColor: 'var(--borde)' }"
+    >
       <li v-for="i in incidencias" :key="i.id" class="px-4 py-3 text-sm">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">

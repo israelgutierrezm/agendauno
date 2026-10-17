@@ -43,7 +43,9 @@ function montar() {
         createI18n({
           legacy: false,
           locale: "es",
-          messages: { es: { porConciliar } },
+          messages: {
+            es: { porConciliar, comun: { reintentar: "Reintentar" } },
+          },
         }),
       ],
     },
@@ -55,12 +57,44 @@ describe("por conciliar", () => {
     vi.clearAllMocks();
   });
 
-  it("no se muestra si no hay nada pendiente", async () => {
+  it("sin nada pendiente lo dice, en vez de esconderse", async () => {
     api.get.mockResolvedValue({ data: { data: [] } });
+    const w = montar();
+    expect(w.text()).toContain("Revisando");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="nada-por-conciliar"]').text()).toContain(
+      "Nada por conciliar",
+    );
+  });
+
+  it("si no se pudo consultar, lo dice (no es «nada») y se reintenta", async () => {
+    api.get.mockRejectedValueOnce(new Error("Sin red"));
     const w = montar();
     await flushPromises();
 
-    expect(w.text()).toBe("");
+    expect(w.get('[data-prueba="error-conciliar"]').text()).toContain(
+      "esto no quiere decir que no haya nada",
+    );
+    expect(w.find('[data-prueba="nada-por-conciliar"]').exists()).toBe(false);
+
+    api.get.mockResolvedValueOnce({ data: { data: [devolucionSinConfirmar] } });
+    await w.get('[data-prueba="reintentar-conciliar"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-prueba="error-conciliar"]').exists()).toBe(false);
+    expect(w.text()).toContain("Ana López");
+  });
+
+  it("sin permiso lo dice, y no se confunde con un fallo", async () => {
+    api.get.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 403 },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.text()).toContain("Tu rol no puede ver");
+    expect(w.find('[data-prueba="error-conciliar"]').exists()).toBe(false);
   });
 
   it("una devolución sin confirmar se resuelve diciendo si se hizo, con una nota", async () => {
