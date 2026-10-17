@@ -18,6 +18,9 @@ const sesion = vi.hoisted(() => ({
   moneda: "MXN",
   pais: "MX",
 }));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));

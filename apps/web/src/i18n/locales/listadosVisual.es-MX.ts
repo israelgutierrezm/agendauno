@@ -31,6 +31,8 @@ export default {
     nuevaClase: "Nueva clase",
     servicio: "Servicio",
     buscar: "Buscar servicio o actividad",
+    servicioGuardado: "«{nombre}» quedó guardado.",
+    altaGuardada: "Se agregó 1 al catálogo. | Se agregaron {n} al catálogo.",
     sinResultados: "Ningún servicio coincide con la búsqueda.",
     duracion: "Duración",
     precio: "Precio",

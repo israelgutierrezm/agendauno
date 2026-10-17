@@ -21,7 +21,9 @@ import {
   ejemploPrecio,
   simboloMoneda,
 } from "@/lib/formato";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 type Politica = "entitlement" | "pago";
 
@@ -64,6 +66,7 @@ interface Recurso {
  * (nombre, duración y precio o lugares; ADR 0088).
  */
 const { t } = useI18n();
+const toast = useToastStore();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("catalogo.gestionar"));
@@ -174,6 +177,18 @@ const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
 // Lo que no se pudo guardar, dentro de su diálogo (no en la página de atrás).
 const errorEdicion = ref<string | null>(null);
+// Con cambios sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const configurando = computed({
+  get: () => editandoId.value !== null,
+  set: (v: boolean) => {
+    if (!v) editandoId.value = null;
+  },
+});
+const descartarEdicion = useDescartarCambios({
+  abierto: configurando,
+  valor: () => form.value,
+  guardando,
+});
 // La foto se sube aparte, al momento.
 function fotoCambiada(o: Oferta, url: string | null): void {
   o.foto_url = url;
@@ -247,9 +262,10 @@ function configurar(o: Oferta): void {
     requisitos: o.requisitos ?? "",
     queLlevar: o.que_llevar ?? "",
   };
+  descartarEdicion.fijar();
 }
 function cerrar(): void {
-  editandoId.value = null;
+  void descartarEdicion.cerrar();
 }
 // El que se configura (en un diálogo); como lista, para usar el mismo editor.
 const editando = computed(
@@ -355,6 +371,11 @@ const dandoAltaGuardando = ref(false);
 const errorAlta = ref<string | null>(null);
 // Tras intentar guardar: se marcan las filas con nombre a las que les falta algo.
 const revisarAlta = ref(false);
+const descartarAlta = useDescartarCambios({
+  abierto: dandoAlta,
+  valor: () => filas.value,
+  guardando: dandoAltaGuardando,
+});
 function agregarFila(): void {
   filas.value.push({
     nombre: "",
@@ -367,7 +388,11 @@ function abrirAlta(): void {
   agregarFila();
   errorAlta.value = null;
   revisarAlta.value = false;
+  descartarAlta.fijar();
   dandoAlta.value = true;
+}
+function cerrarAlta(): void {
+  void descartarAlta.cerrar();
 }
 // El precio se escribe como en el país del negocio («25.000» en Colombia, «12,50» en
 // España); lo que no se puede leer sin adivinar se marca en su campo y no se guarda.
@@ -402,6 +427,7 @@ async function guardarAlta(): Promise<void> {
   }
   dandoAltaGuardando.value = true;
   errorAlta.value = null;
+  const items = filasValidas.value.length;
   try {
     await api.post(`${base.value}/ofertas/rapidas`, {
       items: filasValidas.value.map((f) =>
@@ -418,7 +444,9 @@ async function guardarAlta(): Promise<void> {
             },
       ),
     });
+    descartarAlta.fijar();
     dandoAlta.value = false;
+    toast.exito(t("listadosVisual.catalogo.altaGuardada", { n: items }, items));
     await cargar();
   } catch (e) {
     errorAlta.value = mensajeDeError(e);
@@ -456,7 +484,11 @@ async function guardar(o: Oferta): Promise<void> {
       que_llevar: form.value.queLlevar.trim() || null,
     });
     guardadoId.value = o.id;
+    descartarEdicion.fijar();
     editandoId.value = null;
+    toast.exito(
+      t("listadosVisual.catalogo.servicioGuardado", { nombre: o.nombre }),
+    );
     await cargar();
   } catch (e) {
     errorEdicion.value = mensajeDeError(e);
@@ -981,7 +1013,7 @@ onMounted(cargar);
       "
       icono="etiqueta"
       :ocupado="dandoAltaGuardando"
-      @cerrar="dandoAlta = false"
+      @cerrar="cerrarAlta"
     >
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("listadosVisual.catalogo.altaAyuda") }}
@@ -1110,7 +1142,7 @@ onMounted(cargar);
           class="tu-btn tu-btn-fantasma"
           type="button"
           :disabled="dandoAltaGuardando"
-          @click="dandoAlta = false"
+          @click="cerrarAlta"
         >
           {{ $t("catalogo.cerrar") }}
         </button>
