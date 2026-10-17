@@ -521,6 +521,7 @@ onMounted(cargar);
     <PanelLateral
       :abierto="abierto"
       :titulo="$t('instructores.invitar.titulo')"
+      :ocupado="invitando"
       @cerrar="cerrar"
     >
       <form class="space-y-4" @submit.prevent="invitar">

@@ -338,6 +338,7 @@ function descargarQr(): void {
           ? $t('captacion.formularios.editor.tituloEditar')
           : $t('captacion.formularios.editor.tituloNuevo')
       "
+      :ocupado="guardando"
       @cerrar="editor = null"
     >
       <form v-if="editor" class="grid gap-4 text-sm" @submit.prevent="guardar">

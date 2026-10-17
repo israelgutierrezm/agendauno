@@ -903,6 +903,7 @@ async function crear(): Promise<void> {
     <PanelLateral
       :abierto="actual !== null"
       :titulo="actual?.nombre ?? ''"
+      :ocupado="accionando"
       @cerrar="actual = null"
     >
       <div
@@ -1382,6 +1383,7 @@ async function crear(): Promise<void> {
     <PanelLateral
       :abierto="alta.abierto"
       :titulo="$t('captacion.prospectos.alta.titulo')"
+      :ocupado="accionando"
       @cerrar="alta.abierto = false"
     >
       <form class="grid gap-4" @submit.prevent="crear">

@@ -963,6 +963,7 @@ onMounted(cargarReferencias);
             })
           : ''
       "
+      :ocupado="guardando"
       @cerrar="cerrarDia"
     >
       <div v-if="diaEditando !== null" class="space-y-3">
@@ -1046,6 +1047,7 @@ onMounted(cargarReferencias);
     <ModalDialogo
       :abierto="copiando"
       :titulo="$t('horariosVisual.copiarTitulo')"
+      :ocupado="copiandoCarga"
       @cerrar="copiando = false"
     >
       <form class="space-y-3" @submit.prevent="copiarHorario">
