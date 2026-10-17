@@ -27,6 +27,7 @@ vi.mock("@/stores/toast", () => ({
 }));
 vi.mock("vue-router", () => ({
   RouterLink: { template: "<a><slot /></a>" },
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 const ORDEN = [

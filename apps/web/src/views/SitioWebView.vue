@@ -43,6 +43,7 @@ import {
   type TipografiaSitio,
   type TipoSeccion,
 } from "@/lib/sitioWeb";
+import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -152,6 +153,8 @@ const sinGuardar = computed(
 const hayCambios = computed(
   () => sinGuardar.value || (datos.value?.cambios_sin_publicar ?? false),
 );
+// Con cambios sin guardar, salir de la pantalla (o cerrar la pestaña) pregunta antes.
+useCambiosPendientes(() => sinGuardar.value);
 // Qué pasa con el sitio: sin guardar, sin publicar, publicado o la página de siempre.
 const etiquetaEstado = computed(() =>
   sinGuardar.value
