@@ -151,6 +151,8 @@ export default {
   leyendaVerServicios: "Colores de los servicios ({n})",
   quitarFiltros: "Quitar filtros",
   // Al generar una clase recurrente: las fechas que no se pudieron crear y por qué.
+  claseAgendada: "Clase agendada el {fecha} a las {hora}.",
+  serieAgendada: "Se agendó 1 clase. | Se agendaron {n} clases.",
   serieOmitidas:
     "Se crearon {creadas} clases. No se generaron {n} fechas: {detalle}",
   // El rango pedido trae más clases de las que el servidor manda de una vez.

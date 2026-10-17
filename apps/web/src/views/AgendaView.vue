@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { esInstructor } from "@/lib/roles";
-import { computed, onMounted, ref, toRef, watch } from "vue";
+import { computed, nextTick, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
@@ -52,7 +52,9 @@ import { colorEstado, estadoEnLista } from "@/lib/paseLista";
 import { confirmar } from "@/lib/confirmar";
 import { trackEvent } from "@/lib/analytics";
 import { plural } from "@/lib/terminologia";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 interface Oferta {
   id: string;
@@ -136,6 +138,7 @@ interface ReglaCanal {
 
 const sesion = useSesionTenantStore();
 const { t } = useI18n();
+const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
 // Borrar va aparte de gestionar (ADR 0077).
@@ -1560,6 +1563,11 @@ const errorNueva = ref<string | null>(null);
 function abrirNuevaClase(): void {
   errorNueva.value = null;
   mostrarNueva.value = true;
+  // Tras lo que el formulario completa solo al abrirse: desde ahí cuentan los cambios.
+  void nextTick(() => descartarNueva.fijar());
+}
+function cerrarNuevaClase(): void {
+  void descartarNueva.cerrar();
 }
 // Tres formas de cargar: una sola clase; la misma hora en varios días; o cada día
 // con su propia hora (p. ej. Nivel 1 el lunes a las 18:00 y el sábado a las 10:00).
@@ -1649,6 +1657,12 @@ const recursosDeSucursal = computed(() =>
       ),
 );
 const creando = ref(false);
+// Con lo capturado sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartarNueva = useDescartarCambios({
+  abierto: mostrarNueva,
+  valor: () => ({ form: form.value, modo: modo.value }),
+  guardando: creando,
+});
 
 // Conflictos (instructor/sala/recurso) verificados ANTES de guardar (rework Agenda).
 interface Conflicto {
@@ -1762,6 +1776,14 @@ async function crearSesion(): Promise<void> {
       });
     }
     trackEvent("class_schedule_created", { recurring: esRecurrente.value });
+    if (!esRecurrente.value) {
+      toast.exito(
+        t("agendaVisual.claseAgendada", {
+          fecha: form.value.fecha,
+          hora: form.value.hora,
+        }),
+      );
+    }
     form.value.fecha = "";
     form.value.hora = "";
     form.value.capacidad = "";
@@ -1770,6 +1792,7 @@ async function crearSesion(): Promise<void> {
     form.value.dias = [];
     form.value.horarios = [];
     form.value.repetirHasta = "";
+    descartarNueva.fijar();
     mostrarNueva.value = false;
     await cargarSesiones();
   } catch (e) {
@@ -1828,7 +1851,9 @@ async function crearRecurrente(): Promise<void> {
     creadas += generacion.data.data.creadas;
     omitidas.push(...(generacion.data.data.omitidas ?? []));
   }
-  if (omitidas.length > 0) {
+  if (omitidas.length === 0) {
+    toast.exito(t("agendaVisual.serieAgendada", { n: creadas }, creadas));
+  } else {
     avisoSerie.value = t("agendaVisual.serieOmitidas", {
       creadas,
       n: omitidas.length,
@@ -3385,7 +3410,7 @@ onMounted(async () => {
       icono="agenda"
       :descripcion="$t('adminUsabilidad.agenda.ayuda')"
       :ocupado="creando"
-      @cerrar="mostrarNueva = false"
+      @cerrar="cerrarNuevaClase"
     >
       <p
         v-if="ofertas.length === 0"
@@ -3651,7 +3676,7 @@ onMounted(async () => {
           type="button"
           class="tu-btn tu-btn-fantasma"
           :disabled="creando"
-          @click="mostrarNueva = false"
+          @click="cerrarNuevaClase"
         >
           {{ $t("comun.cancelar") }}
         </button>
