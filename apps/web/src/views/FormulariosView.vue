@@ -11,7 +11,9 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Constructor de formularios dinámicos y sus respuestas. Se llenan desde el
@@ -20,6 +22,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * preguntas crea otra versión y cada respuesta se lee con las suyas (ADR 0150).
  */
 const { t } = useI18n();
+const toast = useToastStore();
 
 interface Campo {
   id: string;
@@ -93,6 +96,20 @@ const nuevoCampo = ref({
   opciones: "",
 });
 const agregandoCampo = ref(false);
+// Con cambios sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartarFicha = useDescartarCambios({
+  abierto: nuevaFicha,
+  valor: () => nuevo.value,
+  guardando: creando,
+});
+function abrirNuevaFicha(): void {
+  error.value = null;
+  descartarFicha.fijar();
+  nuevaFicha.value = true;
+}
+function cerrarNuevaFicha(): void {
+  void descartarFicha.cerrar();
+}
 
 const respuestas = ref<Respuesta[]>([]);
 const versionActual = ref<number | null>(null);
@@ -201,7 +218,9 @@ async function crearFormulario(): Promise<void> {
         aplica_a: nuevo.value.aplica_a,
       },
     );
+    toast.exito(t("operacion.fichas.creada", { nombre: nuevo.value.nombre }));
     nuevo.value = { nombre: "", aplica_a: "miembro" };
+    descartarFicha.fijar();
     nuevaFicha.value = false;
     await cargar();
     seleccionadoId.value = data.data.id;
@@ -254,6 +273,7 @@ async function agregarCampo(): Promise<void> {
         ),
       );
       if (ok) {
+        descartarPregunta.fijar();
         editandoPregunta.value = null;
         nuevaPregunta.value = false;
       }
@@ -269,12 +289,18 @@ async function agregarCampo(): Promise<void> {
         orden: seleccionado.value.campos.length,
       },
     );
+    toast.exito(
+      t("operacion.fichas.preguntaAgregada", {
+        etiqueta: nuevoCampo.value.etiqueta.trim(),
+      }),
+    );
     nuevoCampo.value = {
       etiqueta: "",
       tipo: "texto",
       obligatorio: false,
       opciones: "",
     };
+    descartarPregunta.fijar();
     nuevaPregunta.value = false;
     await cargar();
   } catch (e) {
@@ -348,7 +374,20 @@ watch(soloRespuestas, (respuestas) => {
 const guardandoFicha = ref(false);
 const editandoPregunta = ref<string | null>(null);
 const editandoDatos = ref(false);
+const descartarPregunta = useDescartarCambios({
+  abierto: nuevaPregunta,
+  valor: () => nuevoCampo.value,
+  guardando: computed(() => agregandoCampo.value || guardandoFicha.value),
+});
+function cerrarPregunta(): void {
+  void descartarPregunta.cerrar();
+}
 const datosFicha = ref({ nombre: "", descripcion: "", aplica_a: "miembro" });
+const descartarDatos = useDescartarCambios({
+  abierto: editandoDatos,
+  valor: () => datosFicha.value,
+  guardando: guardandoFicha,
+});
 const vistaPrevia = ref(false);
 const conRespuestas = computed(() => (seleccionado.value?.respuestas ?? 0) > 0);
 function actuales(): CampoEditable[] {
@@ -427,6 +466,7 @@ function editarPregunta(c: Campo): void {
     obligatorio: c.obligatorio,
     opciones: (c.opciones ?? []).join(", "),
   };
+  descartarPregunta.fijar();
   nuevaPregunta.value = true;
 }
 function nuevaPreguntaVacia(): void {
@@ -438,6 +478,7 @@ function nuevaPreguntaVacia(): void {
     obligatorio: false,
     opciones: "",
   };
+  descartarPregunta.fijar();
   nuevaPregunta.value = true;
 }
 // Con respuestas, cambiar el tipo de una pregunta crea otra (la anterior se conserva).
@@ -460,7 +501,11 @@ function abrirDatos(): void {
     descripcion: f.descripcion ?? "",
     aplica_a: f.aplica_a,
   };
+  descartarDatos.fijar();
   editandoDatos.value = true;
+}
+function cerrarDatos(): void {
+  void descartarDatos.cerrar();
 }
 async function guardarDatos(): Promise<void> {
   const ok = await guardarFicha(actuales(), {
@@ -469,6 +514,7 @@ async function guardarDatos(): Promise<void> {
     aplica_a: datosFicha.value.aplica_a,
   });
   if (ok) {
+    descartarDatos.fijar();
     editandoDatos.value = false;
   }
 }
@@ -545,10 +591,7 @@ onMounted(cargar);
           class="tu-btn tu-btn-primario tu-btn-crear"
           type="button"
           data-prueba="nueva-ficha"
-          @click="
-            error = null;
-            nuevaFicha = true;
-          "
+          @click="abrirNuevaFicha"
         >
           {{ $t("formularios.nuevo") }}
         </button>
@@ -707,7 +750,7 @@ onMounted(cargar);
           icono="formularios"
           tam="md"
           :ocupado="creando"
-          @cerrar="nuevaFicha = false"
+          @cerrar="cerrarNuevaFicha"
         >
           <form
             v-if="puedeGestionar && !soloRespuestas"
@@ -751,7 +794,7 @@ onMounted(cargar);
                 type="button"
                 class="tu-btn tu-btn-fantasma"
                 :disabled="creando"
-                @click="nuevaFicha = false"
+                @click="cerrarNuevaFicha"
               >
                 {{ $t("comun.cancelar") }}
               </button>
@@ -971,7 +1014,7 @@ onMounted(cargar);
             "
             icono="formularios"
             :ocupado="agregandoCampo || guardandoFicha"
-            @cerrar="nuevaPregunta = false"
+            @cerrar="cerrarPregunta"
           >
             <form
               v-if="puedeGestionar"
@@ -1057,7 +1100,7 @@ onMounted(cargar);
                   type="button"
                   class="tu-btn tu-btn-fantasma"
                   :disabled="agregandoCampo"
-                  @click="nuevaPregunta = false"
+                  @click="cerrarPregunta"
                 >
                   {{ $t("comun.cancelar") }}
                 </button>
@@ -1089,7 +1132,7 @@ onMounted(cargar);
             icono="formularios"
             tam="md"
             :ocupado="guardandoFicha"
-            @cerrar="editandoDatos = false"
+            @cerrar="cerrarDatos"
           >
             <form
               id="ff-datos"
@@ -1145,7 +1188,7 @@ onMounted(cargar);
                   type="button"
                   class="tu-btn tu-btn-fantasma"
                   :disabled="guardandoFicha"
-                  @click="editandoDatos = false"
+                  @click="cerrarDatos"
                 >
                   {{ $t("comun.cancelar") }}
                 </button>

@@ -16,6 +16,9 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: () => "No se pudo crear",
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: mocks.puede }),
 }));

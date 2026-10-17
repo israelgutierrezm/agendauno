@@ -753,6 +753,8 @@ export default {
   },
   // Fichas de datos: ciclo de edición completo y versiones (ADR 0150).
   fichas: {
+    creada: "Ficha «{nombre}» creada.",
+    preguntaAgregada: "Pregunta «{etiqueta}» agregada.",
     editarDatos: "Editar datos",
     descripcion: "Descripción (opcional)",
     vistaPrevia: "Vista previa",
