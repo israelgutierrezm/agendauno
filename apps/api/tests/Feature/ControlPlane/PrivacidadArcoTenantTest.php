@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -141,4 +142,30 @@ it('confirmar con la contraseña tiene pocos intentos por minuto', function (): 
         $this->postJson($url, ['password' => 'adivinando'], conBearer($vale['bearer']))->assertUnprocessable();
     }
     $this->postJson($url, ['password' => 'secreto123'], conBearer($vale['bearer']))->assertStatus(429);
+});
+
+it('las solicitudes se buscan y se filtran por estado y por vencimiento (días del negocio)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $vale = alumnaConDatos($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['password' => 'secreto123'], conBearer($vale['bearer']))->assertCreated();
+    $url = "/api/v1/app/{$e['slug']}/solicitudes-privacidad?page=1";
+
+    // Pedida el jueves 1 de octubre: 20 días hábiles después es el 29.
+    $this->getJson($url, conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.0.vence_en', '2026-10-29')
+        ->assertJsonPath('meta.vencidas', 0)
+        ->assertJsonPath('meta.por_vencer', 0);
+    $this->getJson("{$url}&q=vale", conBearer($e['bearer']))->assertJsonPath('meta.total', 1);
+    $this->getJson("{$url}&q=otra", conBearer($e['bearer']))->assertJsonPath('meta.total', 0);
+    $this->getJson("{$url}&estado=atendida", conBearer($e['bearer']))->assertJsonPath('meta.total', 0);
+    $this->getJson("{$url}&estado=pendiente", conBearer($e['bearer']))->assertJsonPath('meta.total', 1);
+
+    // A una semana hábil del plazo, por vencer; pasado el plazo, vencida.
+    $this->travelTo(CarbonImmutable::parse('2026-10-23 12:00', 'America/Mexico_City'));
+    $this->getJson("{$url}&vencimiento=por_vencer", conBearer($e['bearer']))
+        ->assertJsonPath('meta.total', 1)->assertJsonPath('meta.por_vencer', 1);
+    $this->travelTo(CarbonImmutable::parse('2026-10-30 12:00', 'America/Mexico_City'));
+    $this->getJson("{$url}&vencimiento=vencidas", conBearer($e['bearer']))
+        ->assertJsonPath('meta.total', 1)->assertJsonPath('meta.vencidas', 1);
+    $this->getJson("{$url}&vencimiento=por_vencer", conBearer($e['bearer']))->assertJsonPath('meta.total', 0);
 });

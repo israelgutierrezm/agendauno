@@ -52,6 +52,8 @@ const form = ref({
   capacidad: "1",
 });
 const abierto = ref(false);
+// El que se corrige (null = alta de uno nuevo).
+const editando = ref<Recurso | null>(null);
 // El patrón común de los formularios.
 const {
   guardando: creando,
@@ -123,12 +125,26 @@ const indicadores = computed<Indicador[]>(() => {
 });
 
 function abrir(): void {
+  editando.value = null;
   form.value = {
     sucursalId: sucursalFija.value ?? "",
     nombre: "",
     tipo: "",
     modo: "unidad",
     capacidad: "1",
+  };
+  empezar();
+  abierto.value = true;
+}
+// Corregir nombre, tipo, modo y capacidad (su sede no cambia).
+function editar(r: Recurso): void {
+  editando.value = r;
+  form.value = {
+    sucursalId: "",
+    nombre: r.nombre,
+    tipo: r.tipo ?? "",
+    modo: r.modo,
+    capacidad: String(r.capacidad),
   };
   empezar();
   abierto.value = true;
@@ -152,6 +168,10 @@ async function cargar(): Promise<void> {
 }
 
 async function crear(): Promise<void> {
+  if (editando.value !== null) {
+    await guardarCambios(editando.value);
+    return;
+  }
   const nombre = form.value.nombre.trim();
   const listo = await guardarAlta(
     () =>
@@ -164,6 +184,28 @@ async function crear(): Promise<void> {
           form.value.modo === "pool" ? Number(form.value.capacidad) : 1,
       }),
     t("recursos.creado", { nombre }),
+  );
+  if (listo !== undefined) {
+    abierto.value = false;
+    await cargar();
+  }
+}
+
+// Al corregir, el API no deja bajar la capacidad (ni volverlo exclusivo) por debajo
+// de las sesiones próximas que ya lo usan a la vez: el error queda en su campo.
+async function guardarCambios(r: Recurso): Promise<void> {
+  const nombre = form.value.nombre.trim();
+  const listo = await guardarAlta(
+    () =>
+      api.put(`${base.value}/recursos/${r.id}`, {
+        nombre,
+        tipo: form.value.tipo.trim() || null,
+        modo: form.value.modo,
+        ...(form.value.modo === "pool"
+          ? { capacidad: Number(form.value.capacidad) }
+          : {}),
+      }),
+    t("recursos.guardado", { nombre }),
   );
   if (listo !== undefined) {
     abierto.value = false;
@@ -333,10 +375,19 @@ onMounted(cargar);
                     }}</span
                   >
                 </td>
-                <td class="text-right">
+                <td class="text-right whitespace-nowrap">
+                  <button
+                    v-if="puedeGestionar"
+                    class="tu-enlace text-sm"
+                    type="button"
+                    data-prueba="editar-recurso"
+                    @click="editar(r)"
+                  >
+                    {{ $t("recursos.editar") }}
+                  </button>
                   <button
                     v-if="puedeEliminar"
-                    class="tu-enlace text-sm"
+                    class="tu-enlace ml-3 text-sm"
                     style="color: var(--error)"
                     type="button"
                     @click="eliminar(r)"
@@ -357,7 +408,7 @@ onMounted(cargar);
     <!-- Nuevo recurso (drawer lateral) -->
     <PanelLateral
       :abierto="abierto"
-      :titulo="$t('recursos.nuevo')"
+      :titulo="editando ? $t('recursos.editarTitulo') : $t('recursos.nuevo')"
       :ocupado="creando"
       @cerrar="cerrar"
     >
@@ -378,7 +429,14 @@ onMounted(cargar);
             errores.nombre
           }}</span>
         </div>
-        <div v-if="elegirSucursal">
+        <p
+          v-if="editando"
+          class="text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("recursos.sucursal") }}: {{ editando.sucursal ?? "—" }}
+        </p>
+        <div v-else-if="elegirSucursal">
           <label class="tu-label" for="rs">{{ $t("recursos.sucursal") }}</label>
           <select
             id="rs"
@@ -439,7 +497,11 @@ onMounted(cargar);
             class="tu-input"
             type="number"
             min="1"
+            max="1000"
           />
+          <span v-if="editando && !errores.capacidad" class="tu-hint">{{
+            $t("recursos.capacidadAyuda")
+          }}</span>
           <span v-if="errores.capacidad" id="rc-error" class="tu-error-campo">{{
             errores.capacidad
           }}</span>
@@ -459,10 +521,22 @@ onMounted(cargar);
           <button
             class="tu-btn tu-btn-primario"
             type="button"
-            :disabled="creando || form.nombre === '' || form.sucursalId === ''"
+            :disabled="
+              creando ||
+              form.nombre.trim() === '' ||
+              (!editando && form.sucursalId === '')
+            "
             @click="crear"
           >
-            {{ creando ? $t("recursos.creando") : $t("recursos.crear") }}
+            {{
+              creando
+                ? editando
+                  ? $t("recursos.guardando")
+                  : $t("recursos.creando")
+                : editando
+                  ? $t("recursos.guardar")
+                  : $t("recursos.crear")
+            }}
           </button>
         </div>
       </template>

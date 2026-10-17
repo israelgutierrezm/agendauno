@@ -7,6 +7,7 @@ import BuscarPersona from "@/components/BuscarPersona.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TarjetasIndicadores, {
@@ -15,6 +16,7 @@ import TarjetasIndicadores, {
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useDescartarCambios } from "@/lib/editorFormulario";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -24,6 +26,8 @@ interface Grupo {
   oferta: string | null;
   inscritos: number;
   activo: boolean;
+  // Cerrado: ya no inscribe a nadie; su historial se conserva.
+  cerrado_en?: string | null;
 }
 interface Plantilla {
   id: string;
@@ -36,6 +40,25 @@ interface Inscripcion {
   persona: string | null;
   persona_id?: string | null;
   activo: boolean;
+  // Día del negocio desde el que ya no viene.
+  baja_desde?: string | null;
+}
+// Cómo quedó cada fecha al inscribir: reservada, en espera o sin reservar y por qué.
+interface FechaInscripcion {
+  sesion_id: string;
+  inicia_en: string;
+  estado: "reservada" | "en_espera" | "no_reservada";
+  motivo: string | null;
+}
+interface ResultadoInscripcion {
+  reservadas: number;
+  en_espera: number;
+  no_reservadas: number;
+  sesiones: FechaInscripcion[];
+}
+interface ResultadoBaja {
+  canceladas: number;
+  no_canceladas: { inicia_en: string; motivo: string }[];
 }
 
 const { t } = useI18n();
@@ -43,6 +66,26 @@ const toast = useToastStore();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
+// Fechas en la zona del negocio (ADR 0099).
+const hoy = computed(() => hoyEnNegocio(sesion.zonaHoraria));
+function fechaHora(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: sesion.zonaHoraria || undefined,
+  }).format(new Date(iso));
+}
+// Un día del negocio (AAAA-MM-DD), tal cual, sin moverlo de zona.
+function dia(fecha: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(new Date(`${fecha.slice(0, 10)}T12:00:00Z`));
+}
 
 const grupos = ref<Grupo[]>([]);
 // Búsqueda (por grupo o clase), estado y páginas de 20.
@@ -111,9 +154,36 @@ const cargandoInscritos = ref(false);
 const INSCRITOS_POR_PAGINA = 20;
 const miembroId = ref("");
 const inscribiendo = ref(false);
-const mensaje = ref<string | null>(null);
-// Quedó inscrito sin ninguna clase reservada: se avisa (no es un éxito completo).
-const sinReservas = ref(false);
+// Lo que pasó con cada fecha al inscribir (resumen y, aparte, fecha por fecha).
+const resultado = ref<ResultadoInscripcion | null>(null);
+const viendoFechas = ref(false);
+const resumenResultado = computed(() => {
+  const r = resultado.value;
+  if (r === null) return "";
+  if (r.sesiones.length === 0) return t("cursos.sinFechas");
+  const partes = [
+    r.reservadas > 0
+      ? t("cursos.resumen.reservadas", { n: r.reservadas }, r.reservadas)
+      : null,
+    r.en_espera > 0
+      ? t("cursos.resumen.enEspera", { n: r.en_espera }, r.en_espera)
+      : null,
+    r.no_reservadas > 0
+      ? t(
+          "cursos.resumen.noReservadas",
+          { n: r.no_reservadas },
+          r.no_reservadas,
+        )
+      : null,
+  ].filter((x): x is string => x !== null);
+  return t("cursos.resumenInscripcion", { detalle: partes.join(" · ") });
+});
+// Sin ninguna fecha reservada ni en espera, es un aviso (no un éxito completo).
+const resultadoIncompleto = computed(
+  () =>
+    resultado.value !== null &&
+    resultado.value.reservadas + resultado.value.en_espera === 0,
+);
 
 // Abreviaturas que no se confunden (martes y miércoles empiezan igual).
 const LETRAS = ["", "Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
@@ -169,7 +239,7 @@ async function seleccionar(g: Grupo): Promise<void> {
   inscripciones.value = [];
   totalInscritos.value = 0;
   miembroId.value = "";
-  mensaje.value = null;
+  resultado.value = null;
   errorDetalle.value = null;
   if (buscarInscrito.value !== "") {
     // Al limpiar la búsqueda se vuelven a pedir (ver el watch).
@@ -232,25 +302,135 @@ async function inscribir(): Promise<void> {
     return;
   }
   inscribiendo.value = true;
-  mensaje.value = null;
+  resultado.value = null;
   errorDetalle.value = null;
   try {
-    const { data } = await api.post<{ data: { reservadas: number } }>(
+    const { data } = await api.post<{ data: ResultadoInscripcion }>(
       `${base.value}/grupos/${seleccionado.value.id}/inscripciones`,
       { persona_id: miembroId.value },
     );
-    const n = data.data.reservadas;
     miembroId.value = "";
     await seleccionar(seleccionado.value);
-    // Después de recargar el grupo (que limpia el aviso anterior).
-    sinReservas.value = n === 0;
-    mensaje.value =
-      n === 0 ? t("cursos.sinReservadas") : t("cursos.reservadas", { n });
+    // Después de recargar el grupo (que limpia el resultado anterior).
+    resultado.value = data.data;
     await cargar();
   } catch (e) {
     errorDetalle.value = mensajeDeError(e);
   } finally {
     inscribiendo.value = false;
+  }
+}
+
+// Volver a pedir los grupos y el elegido (su estado pudo cambiar).
+async function recargarElegido(): Promise<void> {
+  const id = seleccionado.value?.id;
+  await cargar();
+  const g = grupos.value.find((x) => x.id === id);
+  if (g) await seleccionar(g);
+}
+
+// Salida de alguien: baja desde una fecha o cambio a otro grupo desde esa fecha.
+const salida = ref<{
+  inscripcion: Inscripcion;
+  desde: string;
+  destino: string;
+} | null>(null);
+const saliendo = ref(false);
+const errorSalida = ref<string | null>(null);
+const destinos = computed(() =>
+  grupos.value.filter((g) => g.activo && g.id !== seleccionado.value?.id),
+);
+const nombreDestino = computed(
+  () => grupos.value.find((g) => g.id === salida.value?.destino)?.nombre ?? "",
+);
+function abrirSalida(i: Inscripcion): void {
+  salida.value = { inscripcion: i, desde: hoy.value, destino: "" };
+  errorSalida.value = null;
+}
+function avisarNoCanceladas(b: ResultadoBaja): void {
+  const n = b.no_canceladas.length;
+  if (n > 0) toast.error(t("cursos.noCanceladas", { n }, n));
+}
+async function confirmarSalida(): Promise<void> {
+  const s = salida.value;
+  const g = seleccionado.value;
+  if (s === null || g === null || s.desde === "") return;
+  saliendo.value = true;
+  errorSalida.value = null;
+  const persona = s.inscripcion.persona ?? "";
+  try {
+    if (s.destino !== "") {
+      const destino = nombreDestino.value;
+      const { data } = await api.post<{ meta: { baja: ResultadoBaja } }>(
+        `${base.value}/grupos/${g.id}/inscripciones/${s.inscripcion.id}/cambiar`,
+        { grupo_id: s.destino, desde: s.desde },
+      );
+      toast.exito(t("cursos.cambiado", { persona, grupo: destino }));
+      avisarNoCanceladas(data.meta.baja);
+    } else {
+      const { data } = await api.post<{ meta: ResultadoBaja }>(
+        `${base.value}/grupos/${g.id}/inscripciones/${s.inscripcion.id}/baja`,
+        { desde: s.desde },
+      );
+      const n = data.meta.canceladas;
+      toast.exito(
+        t("cursos.dadoDeBaja", { persona, fecha: dia(s.desde), n }, n),
+      );
+      avisarNoCanceladas(data.meta);
+    }
+    salida.value = null;
+    await recargarElegido();
+  } catch (e) {
+    errorSalida.value = mensajeDeError(e);
+  } finally {
+    saliendo.value = false;
+  }
+}
+
+// Cerrar el grupo: ya no inscribe y da de baja a quienes siguen desde una fecha.
+const cierre = ref<{ desde: string } | null>(null);
+const cerrando = ref(false);
+const errorCierre = ref<string | null>(null);
+function abrirCierre(): void {
+  cierre.value = { desde: hoy.value };
+  errorCierre.value = null;
+}
+async function confirmarCierre(): Promise<void> {
+  const g = seleccionado.value;
+  if (cierre.value === null || g === null || cierre.value.desde === "") return;
+  cerrando.value = true;
+  errorCierre.value = null;
+  try {
+    const { data } = await api.post<{
+      meta: ResultadoBaja & { bajas: number };
+    }>(`${base.value}/grupos/${g.id}/cerrar`, { desde: cierre.value.desde });
+    const n = data.meta.bajas;
+    toast.exito(t("cursos.cerrado", { grupo: g.nombre, n }, n));
+    avisarNoCanceladas(data.meta);
+    cierre.value = null;
+    await recargarElegido();
+  } catch (e) {
+    errorCierre.value = mensajeDeError(e);
+  } finally {
+    cerrando.value = false;
+  }
+}
+async function reabrir(): Promise<void> {
+  const g = seleccionado.value;
+  if (
+    g === null ||
+    !(await confirmar(t("cursos.confirmarReabrir", { grupo: g.nombre }), {
+      aceptar: t("cursos.reabrir"),
+    }))
+  ) {
+    return;
+  }
+  try {
+    await api.post(`${base.value}/grupos/${g.id}/reabrir`);
+    toast.exito(t("cursos.reabierto", { grupo: g.nombre }));
+    await recargarElegido();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
   }
 }
 
@@ -391,7 +571,7 @@ const indicadores = computed<Indicador[]>(() => {
                       >{{
                         g.activo
                           ? $t("gruposVisual.activo")
-                          : $t("gruposVisual.inactivo")
+                          : $t("gruposVisual.cerrado")
                       }}</span
                     >
                   </td>
@@ -421,7 +601,29 @@ const indicadores = computed<Indicador[]>(() => {
               {{ $t("gruposVisual.elige") }}
             </p>
             <template v-else>
-              <h2 class="font-medium">{{ seleccionado.nombre }}</h2>
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <h2 class="font-medium">{{ seleccionado.nombre }}</h2>
+                <template v-if="puedeGestionar">
+                  <button
+                    v-if="seleccionado.activo"
+                    type="button"
+                    class="tu-enlace text-sm"
+                    data-prueba="cerrar-grupo"
+                    @click="abrirCierre"
+                  >
+                    {{ $t("cursos.cerrarGrupo") }}
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="tu-enlace text-sm"
+                    data-prueba="reabrir-grupo"
+                    @click="reabrir"
+                  >
+                    {{ $t("cursos.reabrir") }}
+                  </button>
+                </template>
+              </div>
               <p
                 class="text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
@@ -436,8 +638,22 @@ const indicadores = computed<Indicador[]>(() => {
                 }}
               </p>
 
+              <p
+                v-if="!seleccionado.activo"
+                class="mt-3 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+                data-prueba="grupo-cerrado"
+              >
+                {{
+                  seleccionado.cerrado_en
+                    ? $t("cursos.cerradoEl", {
+                        fecha: dia(seleccionado.cerrado_en),
+                      })
+                    : $t("cursos.cerradoSinFecha")
+                }}
+              </p>
               <form
-                v-if="puedeGestionar"
+                v-if="puedeGestionar && seleccionado.activo"
                 class="mt-4 flex flex-wrap items-end gap-2"
                 @submit.prevent="inscribir"
               >
@@ -473,16 +689,31 @@ const indicadores = computed<Indicador[]>(() => {
               >
                 {{ errorDetalle }}
               </AvisoTono>
-              <p
-                v-if="mensaje"
+              <div
+                v-if="resultado"
                 class="mt-2 text-sm"
                 role="status"
-                :style="{
-                  color: sinReservas ? 'var(--aviso)' : 'var(--exito)',
-                }"
+                data-prueba="resultado-inscripcion"
               >
-                {{ mensaje }}
-              </p>
+                <p
+                  :style="{
+                    color: resultadoIncompleto
+                      ? 'var(--aviso)'
+                      : 'var(--exito)',
+                  }"
+                >
+                  {{ resumenResultado }}
+                </p>
+                <button
+                  v-if="resultado.sesiones.length > 0"
+                  type="button"
+                  class="tu-enlace"
+                  data-prueba="ver-fechas"
+                  @click="viendoFechas = true"
+                >
+                  {{ $t("cursos.verFechas") }}
+                </button>
+              </div>
 
               <!-- Con muchos inscritos, se busca en vez de recorrer la lista. -->
               <input
@@ -508,8 +739,21 @@ const indicadores = computed<Indicador[]>(() => {
                     v-if="!i.activo"
                     class="text-xs"
                     :style="{ color: 'var(--texto-suave)' }"
-                    >{{ $t("cursos.inscritoBaja") }}</span
+                    >{{
+                      i.baja_desde
+                        ? $t("cursos.bajaDesde", { fecha: dia(i.baja_desde) })
+                        : $t("cursos.inscritoBaja")
+                    }}</span
                   >
+                  <button
+                    v-else-if="puedeGestionar && seleccionado.activo"
+                    type="button"
+                    class="tu-enlace text-xs"
+                    data-prueba="dar-de-baja"
+                    @click="abrirSalida(i)"
+                  >
+                    {{ $t("cursos.darDeBaja") }}
+                  </button>
                 </li>
               </ul>
               <p
@@ -544,6 +788,182 @@ const indicadores = computed<Indicador[]>(() => {
         </div>
       </template>
     </template>
+
+    <!-- Cómo quedó cada fecha al inscribir -->
+    <ModalDialogo
+      :abierto="viendoFechas && resultado !== null"
+      :titulo="$t('cursos.fechasTitulo')"
+      icono="agenda"
+      @cerrar="viendoFechas = false"
+    >
+      <div class="overflow-x-auto">
+        <table class="tu-tabla" data-prueba="fechas-inscripcion">
+          <thead>
+            <tr>
+              <th>{{ $t("cursos.col.fecha") }}</th>
+              <th>{{ $t("cursos.col.estado") }}</th>
+              <th>{{ $t("cursos.col.motivo") }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="f in resultado?.sesiones ?? []" :key="f.sesion_id">
+              <td class="whitespace-nowrap">{{ fechaHora(f.inicia_en) }}</td>
+              <td class="whitespace-nowrap">
+                <span
+                  class="tu-badge"
+                  :class="{
+                    'tu-badge-exito': f.estado === 'reservada',
+                    'tu-badge-aviso': f.estado !== 'reservada',
+                  }"
+                  >{{ $t(`cursos.estadoFecha.${f.estado}`) }}</span
+                >
+              </td>
+              <td>{{ f.motivo ?? "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </ModalDialogo>
+
+    <!-- Salida de alguien: baja desde una fecha o cambio de grupo -->
+    <ModalDialogo
+      :abierto="salida !== null"
+      :titulo="
+        $t('cursos.salidaTitulo', {
+          persona: salida?.inscripcion.persona ?? '',
+        })
+      "
+      tam="md"
+      :ocupado="saliendo"
+      @cerrar="salida = null"
+    >
+      <template v-if="salida">
+        <AvisoTono
+          v-if="errorSalida"
+          tono="peligro"
+          class="mb-4"
+          role="alert"
+          data-prueba="error-salida"
+        >
+          {{ errorSalida }}
+        </AvisoTono>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="tu-label" for="salida-desde">{{
+              $t("cursos.desde")
+            }}</label>
+            <input
+              id="salida-desde"
+              v-model="salida.desde"
+              type="date"
+              class="tu-input"
+              :min="hoy"
+              required
+              data-prueba="salida-desde"
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="salida-destino">{{
+              $t("cursos.pasarA")
+            }}</label>
+            <select
+              id="salida-destino"
+              v-model="salida.destino"
+              class="tu-input"
+              data-prueba="salida-destino"
+            >
+              <option value="">{{ $t("cursos.soloBaja") }}</option>
+              <option v-for="d in destinos" :key="d.id" :value="d.id">
+                {{ d.nombre }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <p class="tu-hint mt-3">
+          {{
+            salida.destino
+              ? $t("cursos.salidaAyudaCambio", { grupo: nombreDestino })
+              : $t("cursos.salidaAyuda")
+          }}
+        </p>
+      </template>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          :disabled="saliendo"
+          @click="salida = null"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="button"
+          class="tu-btn tu-btn-primario"
+          :disabled="saliendo || !salida?.desde"
+          data-prueba="confirmar-salida"
+          @click="confirmarSalida"
+        >
+          {{
+            salida?.destino
+              ? $t("cursos.cambiarDeGrupo")
+              : $t("cursos.darDeBaja")
+          }}
+        </button>
+      </template>
+    </ModalDialogo>
+
+    <!-- Cerrar el grupo -->
+    <ModalDialogo
+      :abierto="cierre !== null"
+      :titulo="$t('cursos.cerrarTitulo', { grupo: seleccionado?.nombre ?? '' })"
+      tam="md"
+      :ocupado="cerrando"
+      @cerrar="cierre = null"
+    >
+      <template v-if="cierre">
+        <AvisoTono
+          v-if="errorCierre"
+          tono="peligro"
+          class="mb-4"
+          role="alert"
+          data-prueba="error-cierre"
+        >
+          {{ errorCierre }}
+        </AvisoTono>
+        <label class="tu-label" for="cierre-desde">{{
+          $t("cursos.desde")
+        }}</label>
+        <input
+          id="cierre-desde"
+          v-model="cierre.desde"
+          type="date"
+          class="tu-input max-w-xs"
+          :min="hoy"
+          required
+          data-prueba="cierre-desde"
+        />
+        <p class="tu-hint mt-3">{{ $t("cursos.cerrarAyuda") }}</p>
+      </template>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          :disabled="cerrando"
+          @click="cierre = null"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro"
+          :disabled="cerrando || !cierre?.desde"
+          data-prueba="confirmar-cierre"
+          @click="confirmarCierre"
+        >
+          {{ $t("cursos.cerrarGrupo") }}
+        </button>
+      </template>
+    </ModalDialogo>
 
     <!-- Nuevo grupo (drawer lateral) -->
     <PanelLateral

@@ -13,7 +13,8 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { useSucursalOperativa } from "@/lib/sucursalOperativa";
+import { useCambiosPendientes } from "@/lib/cambiosPendientes";
+import { useSucursalOperativa, useSucursales } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -56,6 +57,10 @@ const sucursalId = ref("");
 const { mostrarSelect: elegirSucursal } = useSucursalOperativa({
   campo: sucursalId,
 });
+// La de la barra: si se cambia ahí con cambios sin guardar y no se descartan, la
+// barra también regresa (no queda en una sucursal mientras se edita otra).
+const barra = useSucursales();
+let barraVigente = barra.fija.value;
 const proveedorId = ref("");
 
 // semana[dia] = franjas de atención de ese día.
@@ -69,6 +74,8 @@ const original = ref(JSON.stringify(semanaVacia()));
 const sinGuardar = computed(
   () => JSON.stringify(semana.value) !== original.value,
 );
+// Salir de la pantalla o cerrar la pestaña con cambios sin guardar pregunta antes.
+useCambiosPendientes(() => puedeGestionar.value && sinGuardar.value);
 // Cada carga lleva su número: una respuesta vieja (de una selección anterior que
 // tardó más) no pisa a la actual.
 let pedido = 0;
@@ -313,8 +320,12 @@ watch([sucursalId, proveedorId], async (_nuevo, [sucAntes, provAntes]) => {
     revirtiendo = true;
     sucursalId.value = sucAntes;
     proveedorId.value = provAntes;
+    if (barra.fija.value !== barraVigente) {
+      barra.elegir(barraVigente);
+    }
     return;
   }
+  barraVigente = barra.fija.value;
   slots.value = [];
   previewHecho.value = false;
   if (listo.value) {

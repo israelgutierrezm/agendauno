@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
@@ -19,6 +19,9 @@ vi.mock("@/stores/sesionTenant", () => ({
     terminologia: { sesion: "Cita", miembro: "Cliente", instructor: "Barbero" },
   }),
 }));
+
+// Cada prueba desmonta lo suyo: un formulario con cambios no se queda registrado.
+enableAutoUnmount(afterEach);
 
 // Respuestas del horario que el test resuelve cuando quiere (para desordenarlas).
 const pendientes = new Map<string, (dato: unknown) => void>();
@@ -184,5 +187,26 @@ describe("horarios de atención", () => {
     expect((w.find("#d1-i0-ini").element as HTMLInputElement).value).toBe(
       "08:00",
     );
+  });
+
+  it("con cambios sin guardar, cerrar la pestaña pide confirmar", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.find("#h-prov").setValue("ana");
+    await flushPromises();
+    pendientes.get("ana")!(horario("09:00:00"));
+    await flushPromises();
+    await aLista(w);
+
+    const cerrar = () => {
+      const evento = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(evento);
+      return evento.defaultPrevented;
+    };
+    expect(cerrar()).toBe(false);
+    await w.find("#d1-i0-ini").setValue("08:00");
+    expect(cerrar()).toBe(true);
+    w.unmount();
+    expect(cerrar()).toBe(false);
   });
 });

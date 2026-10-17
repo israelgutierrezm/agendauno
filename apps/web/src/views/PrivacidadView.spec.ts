@@ -75,4 +75,45 @@ describe("solicitudes de privacidad", () => {
     );
     expect(w.text()).toContain("Persona 24");
   });
+
+  it("se buscan, se filtran por vencimiento y las vencidas se distinguen", async () => {
+    vi.useFakeTimers();
+    api.get.mockResolvedValue({
+      data: {
+        data: [{ ...solicitud(1), vence_en: "2026-09-01" }, solicitud(2)],
+        meta: {
+          total: 2,
+          page: 1,
+          per_page: 20,
+          ultima_pagina: 1,
+          pendientes: 2,
+          vencidas: 1,
+          por_vencer: 0,
+        },
+      },
+    });
+    const w = mount(PrivacidadView, {
+      global: { plugins: [i18n], stubs: { EncabezadoSeccion: true } },
+    });
+    await flushPromises();
+    // La que pasó su plazo lo dice; la otra, hasta cuándo responder.
+    expect(w.findAll('[data-prueba="vencida"]')).toHaveLength(1);
+    expect(w.get('[data-prueba="ver-vencidas"]').text()).toBe("Vencidas (1)");
+
+    await w.get('[data-prueba="buscar-solicitud"]').setValue("vale");
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/solicitudes-privacidad",
+      { params: { page: 1, per_page: 20, q: "vale" } },
+    );
+
+    await w.get('[data-prueba="ver-vencidas"]').trigger("click");
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/solicitudes-privacidad",
+      { params: { page: 1, per_page: 20, q: "vale", vencimiento: "vencidas" } },
+    );
+    vi.useRealTimers();
+  });
 });

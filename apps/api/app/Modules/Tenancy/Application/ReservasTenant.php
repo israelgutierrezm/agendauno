@@ -465,14 +465,16 @@ class ReservasTenant
      * registrado quién, con qué usuario y cuándo.
      *
      * Idempotente: cancelar dos veces no hace nada la segunda (ni devuelve dos
-     * créditos). Una reserva con asistencia registrada no se cancela.
+     * créditos). Una reserva con asistencia registrada no se cancela. Sin `$avisar`,
+     * no se le avisa al alumno por esta reserva (p. ej. una baja de grupo que cancela
+     * varias fechas a la vez).
      */
-    public function cancelar(ReservaTenant $reserva, QuienCancela $quien = QuienCancela::Cliente, ?Usuario $actor = null, ?int $horasLimite = null): ReservaTenant
+    public function cancelar(ReservaTenant $reserva, QuienCancela $quien = QuienCancela::Cliente, ?Usuario $actor = null, ?int $horasLimite = null, bool $avisar = true): ReservaTenant
     {
         // Respaldo para reservas anteriores a que se congelara su política (R8).
         $horasLimite ??= $this->parametros->entero('cancelacion.horas_limite');
 
-        return DB::connection('tenant')->transaction(function () use ($reserva, $quien, $actor, $horasLimite): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($reserva, $quien, $actor, $horasLimite, $avisar): ReservaTenant {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
 
             if (in_array($bloqueada->estado, [EstadoReserva::Cancelada, EstadoReserva::Expirada], true)) {
@@ -546,7 +548,7 @@ class ReservasTenant
                 'motivo_cancelacion' => $efecto->credito === EfectoCancelacion::COBRA ? 'tardia' : null,
             ]);
             // Aviso al alumno (no al salir de la lista de espera ni de una reserva ya vencida).
-            if (in_array($estadoAnterior, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
+            if ($avisar && in_array($estadoAnterior, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
                 $this->cancelada->reservaCancelada($bloqueada, $credito);
             }
             // Si su orden (cita de pago) seguía sin cobrar, ya no se entregará: se cancela.

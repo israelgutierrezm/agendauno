@@ -117,4 +117,30 @@ describe("salas y equipos", () => {
       "true",
     );
   });
+
+  it("corrige el nombre y el tipo de un espacio (su sede no cambia)", async () => {
+    mocks.put.mockResolvedValueOnce({ data: { data: {} } });
+    const w = mount(RecursosView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+    await w.findAll('[data-prueba="editar-recurso"]')[0]!.trigger("click");
+    expect(w.text()).toContain("Editar espacio");
+    expect(w.text()).toContain("Sucursal: Roma Norte");
+    await w.get("#rn").setValue("Cabina principal");
+    await w.get("#rt").setValue("Masaje");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Guardar cambios")!
+      .trigger("click");
+    await flushPromises();
+    expect(mocks.put).toHaveBeenCalledWith("/api/v1/app/demo/recursos/1", {
+      nombre: "Cabina principal",
+      tipo: "Masaje",
+      modo: "unidad",
+    });
+    expect(toast.exito).toHaveBeenCalledWith(
+      "«Cabina principal» quedó guardado.",
+    );
+  });
 });

@@ -109,3 +109,47 @@ it('gestionar recursos exige agenda.gestionar', function (): void {
         'sucursal_id' => $semilla['sucursal'], 'nombre' => 'Sala', 'modo' => 'unidad',
     ], conBearer($recep))->assertStatus(403);
 });
+
+it('se corrige el nombre, el tipo y la capacidad de un espacio, y queda en la bitácora', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $recurso = crearRecurso($e, $semilla, 'pool', 3);
+
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$recurso}", ['nombre' => ' Alberca ', 'tipo' => 'carril', 'capacidad' => 5], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.nombre', 'Alberca')
+        ->assertJsonPath('data.tipo', 'carril')
+        ->assertJsonPath('data.capacidad', 5);
+    $this->getJson("/api/v1/app/{$e['slug']}/auditorias?accion=recurso.actualizado", conBearer($e['bearer']))
+        ->assertJsonPath('data.0.descripcion', 'Editó el espacio Alberca');
+
+    // Sin nombre, no; un exclusivo no lleva capacidad.
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$recurso}", ['nombre' => ''], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['nombre'], 'meta.errors');
+    $sala = crearRecurso($e, $semilla);
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$sala}", ['capacidad' => 4], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonPath('meta.errors.capacidad.0', 'Un espacio exclusivo se usa una vez a la vez: no lleva capacidad.');
+    // Volverlo compartido sí, con su capacidad.
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$sala}", ['modo' => 'pool', 'capacidad' => 2], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.modo', 'pool')->assertJsonPath('data.capacidad', 2);
+});
+
+it('no se le baja la capacidad por debajo de las sesiones que ya lo usan a la vez', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $recurso = crearRecurso($e, $semilla, 'pool', 3);
+    // Dos a la vez el 5 de octubre a las 10:00 y una sola el 6.
+    postSesionConRecurso($e, $semilla, $recurso, '2026-10-05 10:00:00')->assertCreated();
+    postSesionConRecurso($e, $semilla, $recurso, '2026-10-05 10:30:00')->assertCreated();
+    postSesionConRecurso($e, $semilla, $recurso, '2026-10-06 10:00:00')->assertCreated();
+
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$recurso}", ['capacidad' => 1], conBearer($e['bearer']))
+        ->assertStatus(422)
+        ->assertJsonPath('meta.errors.capacidad.0', 'El 5 oct. 10:30 ya lo usan 2 sesiones a la vez. Deja una capacidad de 2 o más, o mueve esas sesiones primero.');
+    // Exclusivo tampoco (sería una a la vez).
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$recurso}", ['modo' => 'unidad'], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['modo'], 'meta.errors');
+    // Hasta 2, sí: nada queda de más.
+    $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$recurso}", ['capacidad' => 2], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.capacidad', 2);
+});

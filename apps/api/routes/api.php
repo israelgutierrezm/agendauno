@@ -800,6 +800,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/grupos', [GruposTenantController::class, 'crear'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.store');
             Route::get('/grupos/{grupo}/inscripciones', [GruposTenantController::class, 'inscripciones'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('grupos.inscripciones.index');
             Route::post('/grupos/{grupo}/inscripciones', [GruposTenantController::class, 'inscribir'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.inscripciones.store');
+            // Salidas con fecha: baja, cambio de grupo y cierre (cancelan sus reservas del grupo desde ahí).
+            Route::post('/grupos/{grupo}/inscripciones/{inscripcion}/baja', [GruposTenantController::class, 'baja'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.inscripciones.baja');
+            Route::post('/grupos/{grupo}/inscripciones/{inscripcion}/cambiar', [GruposTenantController::class, 'cambiar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.inscripciones.cambiar');
+            Route::post('/grupos/{grupo}/cerrar', [GruposTenantController::class, 'cerrar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.cerrar');
+            Route::post('/grupos/{grupo}/reabrir', [GruposTenantController::class, 'reabrir'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.reabrir');
 
             // Recursos reservables (R3): salas/canchas/carriles/equipos. El motor de
             // agenda evita sobre-reservarlos (unidad = 1; pool = capacidad).

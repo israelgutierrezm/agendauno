@@ -804,7 +804,7 @@ export default {
     buscarGrupo: "Buscar grupo o clase",
     buscar: "Buscar",
     buscarMovimiento: "Persona, concepto o referencia",
-    estadoGrupo: { activos: "Activos", inactivos: "Inactivos", todos: "Todos" },
+    estadoGrupo: { activos: "Activos", inactivos: "Cerrados", todos: "Todos" },
     pagoAutomatico: "Pago automático",
     automaticoTodos: "Con y sin pago automático",
     automaticoSi: "Con pago automático",

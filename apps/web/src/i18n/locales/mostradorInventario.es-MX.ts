@@ -367,7 +367,7 @@ export const gruposVisual = {
   subtitulo: "Grupos fijos de una clase y quiénes están inscritos.",
   elige: "Elige un grupo para ver e inscribir a sus integrantes.",
   activo: "Activo",
-  inactivo: "Inactivo",
+  cerrado: "Cerrado",
   kpi: {
     grupos: "Grupos activos",
     inscritos: "Inscritos",

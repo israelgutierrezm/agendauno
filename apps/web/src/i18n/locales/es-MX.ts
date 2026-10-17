@@ -2697,6 +2697,14 @@ export default {
     desactivado: "Espacio desactivado.",
     eliminado: "Espacio eliminado.",
     creado: "Espacio «{nombre}» creado.",
+    // Corregir un espacio (su sede no cambia).
+    editar: "Editar",
+    editarTitulo: "Editar espacio",
+    guardar: "Guardar cambios",
+    guardando: "Guardando…",
+    guardado: "«{nombre}» quedó guardado.",
+    capacidadAyuda:
+      "No puede quedar por debajo de las sesiones próximas que ya lo usan a la vez.",
     movidas:
       "Su cita próxima pasó a otro espacio. | Sus {n} citas próximas pasaron a otros espacios.",
   },
@@ -2741,9 +2749,53 @@ export default {
     creado: "Grupo «{nombre}» creado.",
     sinInscritosBusqueda: "Nadie inscrito con ese nombre.",
     verMasInscritos: "Ver 1 más | Ver {n} más",
-    reservadas: "Inscrito. Se reservaron {n} clases próximas.",
-    sinReservadas:
-      "Quedó inscrito, pero no se reservó ninguna clase: no hay clases próximas o su plan no le alcanza.",
+    // Cómo quedó cada fecha al inscribir.
+    resumenInscripcion: "Inscrito: {detalle}.",
+    resumen: {
+      reservadas:
+        "ninguna reservada | 1 clase reservada | {n} clases reservadas",
+      enEspera:
+        "nadie en espera | 1 en lista de espera | {n} en lista de espera",
+      noReservadas: "todas reservadas | 1 sin reservar | {n} sin reservar",
+    },
+    sinFechas: "Quedó inscrito. El grupo aún no tiene clases próximas.",
+    verFechas: "Ver fecha por fecha",
+    fechasTitulo: "Cómo quedó cada fecha",
+    col: { fecha: "Fecha", estado: "Cómo quedó", motivo: "Motivo" },
+    estadoFecha: {
+      reservada: "Reservada",
+      en_espera: "En espera",
+      no_reservada: "Sin reservar",
+    },
+    // Salidas con fecha: baja, cambio de grupo y cierre.
+    darDeBaja: "Dar de baja",
+    salidaTitulo: "Salida de {persona}",
+    desde: "Desde",
+    pasarA: "Pasar a otro grupo",
+    soloBaja: "No, solo darle de baja",
+    salidaAyuda:
+      "Desde esa fecha se cancelan sus reservas de este grupo y se le devuelven sus créditos. Lo anterior queda en su historial.",
+    salidaAyudaCambio:
+      "Desde esa fecha se cancelan sus reservas de este grupo, se le devuelven sus créditos y se reservan sus clases en «{grupo}».",
+    cambiarDeGrupo: "Cambiar de grupo",
+    dadoDeBaja:
+      "{persona} dejó el grupo desde el {fecha}. | {persona} dejó el grupo desde el {fecha}; se canceló 1 reserva. | {persona} dejó el grupo desde el {fecha}; se cancelaron {n} reservas.",
+    cambiado: "{persona} pasó a «{grupo}».",
+    noCanceladas:
+      "1 reserva no se pudo cancelar (ya empezó o tiene asistencia). | {n} reservas no se pudieron cancelar (ya empezaron o tienen asistencia).",
+    bajaDesde: "Baja desde el {fecha}",
+    cerrarGrupo: "Cerrar grupo",
+    cerrarTitulo: "Cerrar «{grupo}»",
+    cerrarAyuda:
+      "Ya no se inscribe a nadie. Quienes siguen inscritos se dan de baja desde esa fecha: se cancelan sus reservas del grupo y se les devuelven sus créditos. Su historial se conserva.",
+    cerrado:
+      "Se cerró «{grupo}». | Se cerró «{grupo}» y se dio de baja a 1 inscrito. | Se cerró «{grupo}» y se dio de baja a {n} inscritos.",
+    cerradoEl: "Cerrado el {fecha}. Reábrelo para inscribir de nuevo.",
+    cerradoSinFecha: "Grupo cerrado. Reábrelo para inscribir de nuevo.",
+    reabrir: "Reabrir",
+    confirmarReabrir:
+      "¿Reabrir «{grupo}» para inscribir? Quienes se dieron de baja siguen así.",
+    reabierto: "«{grupo}» está abierto de nuevo.",
     confirmarInscribir:
       "Al inscribirlo en «{grupo}» se reservan, con su plan, todas las clases próximas del grupo.",
   },

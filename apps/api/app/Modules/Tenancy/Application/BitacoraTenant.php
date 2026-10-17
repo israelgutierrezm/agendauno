@@ -26,7 +26,7 @@ class BitacoraTenant
      */
     public const CATEGORIAS = [
         'equipo' => ['usuario.'],
-        'alumnos' => ['miembro.'],
+        'alumnos' => ['miembro.', 'grupo.'],
         'pagos' => ['pago.', 'orden.'],
         'membresias' => ['membresia.', 'credito.', 'pago_automatico.'],
         'catalogo' => ['oferta.', 'producto.', 'promocion.', 'plantilla', 'recurso.', 'automatizacion.', 'capacidad.', 'excepcion_horario.', 'webhook.', 'asignacion.'],
@@ -130,6 +130,12 @@ class BitacoraTenant
             'pago.reembolso' => 'Devolvió '.self::dinero($despues),
             'credito.top_up' => 'Agregó créditos'.(isset($despues['unidades']) ? ' ('.((int) $despues['unidades'] / 1000).')' : ''),
             'producto.actualizado' => 'Editó el producto'.($nombre !== '' ? " {$nombre}" : ''),
+            'recurso.actualizado' => 'Editó el espacio'.($nombre !== '' ? " {$nombre}" : ''),
+            // Grupos y cursos: salidas con fecha y cierre.
+            'grupo.baja' => 'Dio de baja'.$de.' del grupo '.((string) ($despues['grupo'] ?? '')).' desde el '.((string) ($despues['desde'] ?? '')),
+            'grupo.cambio' => 'Cambió'.$de.' del grupo '.((string) ($antes['grupo'] ?? '')).' a '.((string) ($despues['grupo'] ?? '')).' desde el '.((string) ($despues['desde'] ?? '')),
+            'grupo.cerrado' => 'Cerró el grupo '.((string) ($despues['grupo'] ?? '')).((int) ($despues['bajas'] ?? 0) > 0 ? ' y dio de baja a sus '.((int) $despues['bajas']).' inscritos desde el '.((string) ($despues['desde'] ?? '')) : ''),
+            'grupo.reabierto' => 'Reabrió el grupo '.((string) ($despues['grupo'] ?? '')),
             // Servicios y clases (ADR 0154): retirados y vueltos a ofrecer, con su historial.
             'oferta.archivada' => 'Archivó'.($nombre !== '' ? " {$nombre}" : ' un servicio'),
             'oferta.restaurada' => 'Volvió a ofrecer'.($nombre !== '' ? " {$nombre}" : ' un servicio'),

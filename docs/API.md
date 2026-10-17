@@ -392,6 +392,40 @@ estos endpoints responden como antes (para versiones anteriores de la app):
   (`archivado: true`). Agendar, ver huecos o crear una serie con uno archivado da 422
   en `oferta_id`.
 
+## Grupos: inscripción fecha por fecha, bajas, cambios y cierre
+
+- `POST /grupos/{grupo}/inscripciones` responde `reservadas`, `en_espera`,
+  `no_reservadas` y `sesiones` (cada fecha con `estado`: `reservada`, `en_espera` o
+  `no_reservada`, y su `motivo`). Lo inesperado se registra en el log del negocio y
+  no rompe la inscripción. Volver a inscribir a quien se dio de baja la reactiva. Un
+  grupo cerrado responde 422 en `grupo`.
+- `POST /grupos/{grupo}/inscripciones/{inscripcion}/baja` (`desde`: AAAA-MM-DD, hoy
+  por omisión, no antes): cancela sus reservas del grupo desde ese día del negocio como
+  cancelación del negocio (el crédito regresa, sin un aviso por fecha). `meta`:
+  `canceladas` y `no_canceladas` (fecha y motivo). Ya dada de baja: 409.
+- `POST /grupos/{grupo}/inscripciones/{inscripcion}/cambiar` (`grupo_id`, `desde`):
+  baja en este y reservas en el otro desde la misma fecha; `meta.baja` y `meta.alta`.
+- `POST /grupos/{grupo}/cerrar` (`desde`): ya no inscribe y da de baja a quienes
+  seguían; `meta.bajas`, `canceladas`, `no_canceladas`. `POST /grupos/{grupo}/reabrir`
+  lo vuelve a abrir (las bajas siguen).
+- `GET /grupos` cuenta en `inscritos` solo a quienes siguen y trae `cerrado_en`; las
+  inscripciones traen `baja_desde`. Todo queda en la bitácora (categoría alumnos).
+
+## Espacios: corregir sin dejar fechas de más
+
+- `PUT /recursos/{recurso}` acepta `nombre` (obligatorio si viene), `tipo`, `modo`
+  (`unidad` o `pool`) y `capacidad` (solo en `pool`, 1 a 1000; en `unidad`, 422). Bajar
+  la capacidad o volverlo exclusivo por debajo de las sesiones próximas que ya lo usan
+  a la vez da 422 en `capacidad` (o `modo`) con la fecha y cuántas son. La corrección
+  queda en la bitácora (`recurso.actualizado`).
+
+## Privacidad: búsqueda, estado y vencimiento
+
+- `GET /solicitudes-privacidad?page=…` acepta `q` (nombre), `estado` (`pendiente`,
+  `atendida`, `rechazada`) y `vencimiento` (`vencidas` o `por_vencer`: pendientes con 5
+  días hábiles o menos). `meta` suma `vencidas` y `por_vencer`. `vence_en` (20 días
+  hábiles) se cuenta desde el día del negocio en que se pidió.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`
