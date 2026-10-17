@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -8,6 +8,7 @@ import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 export interface MiembroEditable {
@@ -49,8 +50,34 @@ const form = reactive({
   es_facturable: props.miembro.es_facturable,
   archivado: props.miembro.archivado,
 });
-const guardando = ref(false);
-const error = ref<string | null>(null);
+// El patrón común de los formularios: errores junto al campo, no se cierra mientras
+// guarda, pregunta antes de descartar cambios y confirma lo guardado.
+const abierto = ref(true);
+watch(abierto, (v) => {
+  if (!v) emit("cerrar");
+});
+const {
+  guardando,
+  errores,
+  error,
+  empezar,
+  cerrar,
+  marcar,
+  guardar: guardarForm,
+} = useEditorFormulario({
+  abierto,
+  valor: () => ({ ...form }),
+  campos: [
+    "nombre",
+    "primer_apellido",
+    "email",
+    "celular",
+    "fecha_nacimiento",
+    "genero",
+  ],
+  formulario: "#form-editar-miembro",
+});
+empezar();
 
 // Baja lógica: cierra lo vigente y conserva su historial (se puede reactivar).
 const motivoBaja = ref("");
@@ -78,35 +105,35 @@ async function darDeBaja(): Promise<void> {
 }
 
 async function guardar(): Promise<void> {
-  guardando.value = true;
-  error.value = null;
-  try {
-    const { data } = await api.put<{ data: MiembroEditable }>(
-      `${base}/miembros/${props.miembro.id}`,
-      {
-        nombre: form.nombre,
-        segundo_nombre: form.segundo_nombre || null,
-        primer_apellido: form.primer_apellido || null,
-        segundo_apellido: form.segundo_apellido || null,
-        email: form.email || null,
-        // Solo si lo cambió: uno guardado sin lada se queda como está (ADR 0103).
-        ...(props.miembro.celular !== undefined &&
-        form.celular !== (props.miembro.celular ?? "")
-          ? { celular: form.celular || null }
-          : {}),
-        fecha_nacimiento: form.fecha_nacimiento || null,
-        genero: form.genero || null,
-        activo: form.activo,
-        es_facturable: form.es_facturable,
-        archivado: form.archivado,
-      },
-    );
-    emit("guardado", data.data);
-    emit("cerrar");
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    guardando.value = false;
+  const nombre = [form.nombre, form.primer_apellido].filter(Boolean).join(" ");
+  const respuesta = await guardarForm(
+    () =>
+      api.put<{ data: MiembroEditable }>(
+        `${base}/miembros/${props.miembro.id}`,
+        {
+          nombre: form.nombre,
+          segundo_nombre: form.segundo_nombre || null,
+          primer_apellido: form.primer_apellido || null,
+          segundo_apellido: form.segundo_apellido || null,
+          email: form.email || null,
+          // Solo si lo cambió: uno guardado sin lada se queda como está (ADR 0103).
+          ...(props.miembro.celular !== undefined &&
+          form.celular !== (props.miembro.celular ?? "")
+            ? { celular: form.celular || null }
+            : {}),
+          fecha_nacimiento: form.fecha_nacimiento || null,
+          genero: form.genero || null,
+          activo: form.activo,
+          es_facturable: form.es_facturable,
+          archivado: form.archivado,
+        },
+      ),
+    t("miembros.editar.guardado", { nombre }),
+  );
+  if (respuesta !== undefined) {
+    emit("guardado", respuesta.data.data);
+    // Ya guardado: se cierra sin preguntar.
+    abierto.value = false;
   }
 }
 </script>
@@ -115,22 +142,55 @@ async function guardar(): Promise<void> {
   <PanelLateral
     :abierto="true"
     :titulo="$t('miembros.editar.titulo')"
-    @cerrar="emit('cerrar')"
+    :ocupado="guardando || dandoDeBaja"
+    @cerrar="cerrar"
   >
-    <form class="space-y-4" @submit.prevent="guardar">
+    <form id="form-editar-miembro" class="space-y-4" @submit.prevent="guardar">
+      <AvisoTono v-if="error" tono="peligro" role="alert">
+        {{ error }}
+      </AvisoTono>
       <div>
         <label class="tu-label" for="en">{{ $t("miembros.nombre") }}</label>
-        <input id="en" v-model="form.nombre" class="tu-input" required />
+        <input
+          id="en"
+          v-bind="marcar('nombre', 'en-error')"
+          v-model="form.nombre"
+          class="tu-input"
+          required
+        />
+        <span v-if="errores.nombre" id="en-error" class="tu-error-campo">{{
+          errores.nombre
+        }}</span>
       </div>
       <div>
         <label class="tu-label" for="ep">{{
           $t("miembros.primerApellido")
         }}</label>
-        <input id="ep" v-model="form.primer_apellido" class="tu-input" />
+        <input
+          id="ep"
+          v-bind="marcar('primer_apellido', 'ep-error')"
+          v-model="form.primer_apellido"
+          class="tu-input"
+        />
+        <span
+          v-if="errores.primer_apellido"
+          id="ep-error"
+          class="tu-error-campo"
+          >{{ errores.primer_apellido }}</span
+        >
       </div>
       <div>
         <label class="tu-label" for="ee">{{ $t("miembros.email") }}</label>
-        <input id="ee" v-model="form.email" class="tu-input" type="email" />
+        <input
+          id="ee"
+          v-bind="marcar('email', 'ee-error')"
+          v-model="form.email"
+          class="tu-input"
+          type="email"
+        />
+        <span v-if="errores.email" id="ee-error" class="tu-error-campo">{{
+          errores.email
+        }}</span>
       </div>
       <div v-if="miembro.celular !== undefined">
         <label class="tu-label" for="ec">{{ $t("miembros.celular") }}</label>
@@ -140,7 +200,11 @@ async function guardar(): Promise<void> {
           maxlength="30"
           autocomplete="off"
           data-prueba="celular-miembro"
+          v-bind="marcar('celular', 'ec-error')"
         />
+        <span v-if="errores.celular" id="ec-error" class="tu-error-campo">{{
+          errores.celular
+        }}</span>
       </div>
       <CamposDatosPersonales
         id="em"
@@ -190,9 +254,6 @@ async function guardar(): Promise<void> {
         </label>
       </div>
 
-      <AvisoTono v-if="error" tono="peligro" role="alert">
-        {{ error }}
-      </AvisoTono>
       <button
         class="tu-btn tu-btn-primario w-full"
         type="submit"

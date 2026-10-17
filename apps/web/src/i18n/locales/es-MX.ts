@@ -1496,6 +1496,7 @@ export default {
       sede: "Sede",
     },
     editar: {
+      guardado: "Datos de {nombre} guardados.",
       abrir: "Editar",
       titulo: "Editar alumno",
       estado: "Estado",

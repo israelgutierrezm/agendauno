@@ -12,6 +12,9 @@ import PanelEditarMiembro, {
 */
 
 const api = vi.hoisted(() => ({ put: vi.fn(), delete: vi.fn() }));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: () => Promise.resolve(true) }));
 vi.mock("@/stores/sesionTenant", () => ({
