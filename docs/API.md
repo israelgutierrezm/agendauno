@@ -349,6 +349,18 @@ estos endpoints responden como antes (para versiones anteriores de la app):
 - `GET /miembros/{persona}/ficha` trae los planes que siguen en juego y los 12 vencidos más
   recientes.
 
+## Aviso de la renta en el panel (ADR 0152)
+
+- `GET /renta/aviso` (con `facturacion.ver`): el pago de la suscripción por atender, o
+  `null`. Trae `nivel` (`por_vencer`, `rechazado`, `vencido` o `por_suspender`),
+  `cargo_id`, `periodo`, `concepto`, `monto_minor`, `moneda`, `vence_en`,
+  `suspende_en` (`null` sin suspensión automática), `dias_para_suspension`,
+  `rechazado`, `proximo_intento_en` y `con_tarjeta`.
+- `por_vencer` sale a partir de `renta.dias_recordatorio_pago` días antes de vencer
+  (parámetro de plataforma, 3 por omisión; 0 = solo ya vencido) y solo sin tarjeta
+  domiciliada; `por_suspender`, dentro de `renta.dias_aviso_suspension` días antes de
+  la suspensión.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`

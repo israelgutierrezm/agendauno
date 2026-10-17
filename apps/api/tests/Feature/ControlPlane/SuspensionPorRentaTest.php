@@ -170,3 +170,45 @@ it('el superadmin condona una renta pendiente: queda cancelada y el negocio susp
     $this->artisan('agendauno:suspender-por-renta')->assertSuccessful();
     expect(estadoDelNegocio())->toBe('active');
 });
+
+it('el panel avisa a quien ve la facturación del pago por vencer, vencido y por suspender', function (): void {
+    $n = negocioConRentaPorPagar();
+    $vence = $n['cargo']->vence_en->copy();
+    $aviso = fn (): mixed => $this->getJson('/api/v1/app/estudio-a/renta/aviso', conBearer($n['bearer']))->assertOk()->json('data');
+
+    // Recién emitida, aún lejos de vencer: nada que avisar.
+    expect($aviso())->toBeNull();
+
+    // A unos días de vencer, sin tarjeta que la pague sola.
+    $this->travelTo($vence->copy()->subDays(2)->setTime(18, 0));
+    expect($aviso())->toMatchArray([
+        'nivel' => 'por_vencer', 'cargo_id' => $n['cargo']->ulid, 'monto_minor' => $n['cargo']->monto_minor,
+        'vence_en' => $vence->toDateString(), 'suspende_en' => $vence->copy()->addDays(15)->toDateString(),
+    ]);
+    // Sin días de recordatorio (parámetro de la plataforma), solo se avisa ya vencido.
+    $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['renta.dias_recordatorio_pago' => 0]], conPlataforma())->assertOk();
+    expect($aviso())->toBeNull();
+
+    // Con tarjeta se cobra sola: no hace falta recordarlo… salvo que el banco la rechace.
+    $estudio = Estudio::query()->where('slug', 'estudio-a')->firstOrFail();
+    $estudio->forceFill(['domiciliacion_metodo' => 'pm_prueba', 'tarjeta_marca' => 'visa', 'tarjeta_ultimos4' => '4242'])->save();
+    expect($aviso())->toBeNull();
+    $n['cargo']->forceFill(['error_cobro' => 'card_declined'])->save();
+    expect($aviso())->toMatchArray(['nivel' => 'rechazado', 'rechazado' => true, 'con_tarjeta' => true]);
+
+    // Vencida: cuántos días quedan antes de la suspensión.
+    $this->travelTo($vence->copy()->addDay()->setTime(18, 0));
+    expect($aviso())->toMatchArray(['nivel' => 'vencido', 'dias_para_suspension' => 14]);
+
+    // Dentro de los días de aviso (3), ya es urgente.
+    $this->travelTo($vence->copy()->addDays(13)->setTime(18, 0));
+    expect($aviso())->toMatchArray(['nivel' => 'por_suspender', 'dias_para_suspension' => 2]);
+
+    // A quien no ve la facturación no se le muestra la deuda.
+    $this->getJson('/api/v1/app/estudio-a/renta/aviso', conBearer($n['alumna']))->assertForbidden();
+
+    // Pagada, el aviso se va.
+    $n['cargo']->forceFill(['referencia_pago' => 'pi_prueba'])->save();
+    app(ConfirmarCargoRenta::class)->porReferencia('pi_prueba', 'stripe');
+    expect($aviso())->toBeNull();
+});

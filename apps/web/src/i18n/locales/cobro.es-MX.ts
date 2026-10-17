@@ -58,6 +58,25 @@ export default {
   historial: {
     uso: "Uso",
   },
+  // El pago pendiente arriba del panel, para quien ve la facturación (ADR 0152).
+  aviso: {
+    porVencer: "Tu pago de {monto} vence el {vence}",
+    porVencerTexto: "Págalo a tiempo para seguir sin interrupciones.",
+    rechazado: "No pudimos cobrar {monto} a tu tarjeta",
+    rechazadoTexto:
+      "El banco rechazó el cobro. Págalo con otra tarjeta o cámbiala en Mi suscripción.",
+    rechazadoTextoReintento:
+      "El banco rechazó el cobro. Lo intentaremos de nuevo el {reintento}, o págalo ahora con otra tarjeta.",
+    vencido: "Tu pago de {monto} venció el {vence}",
+    vencidoTexto:
+      "Si no se paga, tu negocio se suspenderá el {suspende} (mañana) y nadie podrá agendar ni entrar al panel. | Si no se paga, tu negocio se suspenderá el {suspende} (en {dias} días) y nadie podrá agendar ni entrar al panel.",
+    vencidoSinSuspension: "Págalo para mantener tu suscripción al corriente.",
+    porSuspender: "Tu negocio se suspenderá el {suspende}",
+    porSuspenderHoy: "Tu negocio se suspenderá hoy",
+    porSuspenderTexto:
+      "Tu pago de {monto} está pendiente desde el {vence}. Suspendido, nadie podrá agendar ni entrar al panel hasta que se pague; tu información queda a salvo.",
+    pagar: "Pagar ahora",
+  },
   estados: {
     pendiente: "Por pagar",
     pagado: "Pagado",

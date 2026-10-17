@@ -14,6 +14,7 @@ import NavLateral from "@/components/NavLateral.vue";
 import PestanasArea from "@/components/PestanasArea.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import AvisoMedicion from "@/components/AvisoMedicion.vue";
+import AvisoRenta from "@/components/AvisoRenta.vue";
 import AvisoSinSucursal from "@/components/AvisoSinSucursal.vue";
 import BarraParticipante from "@/components/BarraParticipante.vue";
 import CuentaLateral from "@/components/CuentaLateral.vue";
@@ -466,6 +467,8 @@ onMounted(() => {
         >
           <!-- Personal sin sucursal (con varias en el negocio): no ve nada aún. -->
           <AvisoSinSucursal v-if="sesion.usuario?.sin_sucursal" />
+          <!-- El pago de la suscripción por atender (ADR 0152), a quien la paga. -->
+          <AvisoRenta class="tu-sin-imprimir" />
           <!-- Clientes con personas a su cargo: de quién es la cuenta (ADR 0123). -->
           <BarraParticipante
             v-if="

@@ -589,6 +589,7 @@ Route::prefix('v1')->group(function (): void {
                 ->middleware(['puede:estudio.gestionar', 'throttle:whatsapp-panel-verificar'])->name('avisos-plataforma.cambio');
             // Transparencia del cobro: a quién se contó en el periodo (alumnos o profesionales).
             Route::get('/renta/cargos', [FacturacionController::class, 'cargos'])->middleware('puede:facturacion.ver')->name('renta.cargos');
+            Route::get('/renta/aviso', [FacturacionController::class, 'aviso'])->middleware('puede:facturacion.ver')->name('renta.aviso');
             Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
             // Complementos que se piden a la plataforma (p. ej. Familias; ADR 0140).
             Route::get('/renta/complementos', [ComplementosNegocioController::class, 'index'])->middleware('puede:facturacion.ver')->name('renta.complementos');

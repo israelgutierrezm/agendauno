@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AvisoRentaTenant;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
@@ -188,6 +189,16 @@ class FacturacionController
         $rfc = DatosFiscalesTenant::query()->value('rfc');
 
         return (is_string($rfc) && $rfc !== '') || app(RegionNegocioTenant::class)->factura();
+    }
+
+    /**
+     * El aviso de la renta para el panel (ADR 0152): el pago pendiente que ya venció,
+     * está por vencer o se rechazó, y cuándo se suspendería el negocio; `null` si no
+     * hay nada que avisar.
+     */
+    public function aviso(Request $request, AvisoRentaTenant $avisos): JsonResponse
+    {
+        return response()->json(['data' => $avisos->de($this->estudio($request))]);
     }
 
     /**

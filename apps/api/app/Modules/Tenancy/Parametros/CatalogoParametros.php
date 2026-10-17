@@ -215,6 +215,9 @@ final class CatalogoParametros
                 'Pasados estos días desde el vencimiento, el negocio se suspende solo hasta que la pague. 0 = nunca.', $e, 15, 0, 90, 'días', porNegocio: false),
             new DefinicionParametro('renta.dias_aviso_suspension', 'Renta', 'Días antes de la suspensión para avisar al dueño',
                 'Por correo y, si lo aceptó, por WhatsApp.', $e, 3, 1, 14, 'días', porNegocio: false),
+            // El aviso del pago en el panel (ADR 0152).
+            new DefinicionParametro('renta.dias_recordatorio_pago', 'Renta', 'Días antes del vencimiento para recordar el pago en el panel',
+                'Solo si no hay tarjeta que lo pague sola. 0 = solo se avisa ya vencido.', $e, 3, 0, 14, 'días', porNegocio: false),
             // Renta en dólares cobrada en pesos (ADR 0107, solo la plataforma).
             new DefinicionParametro('renta.dias_para_pagar', 'Renta', 'Días para pagar cada cargo de la suscripción',
                 'Desde que se emite cada cargo (lo que se cobra mes vencido, nunca antes del fin del mes) hasta que vence.', $e, 10, 1, 60, 'días', porNegocio: false),
