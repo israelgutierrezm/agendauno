@@ -9,6 +9,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
 import {
   aMinor as leerMinor,
@@ -243,6 +244,26 @@ const soloLectura = computed(
     !puedeGestionar.value || (actual.value !== null && !actual.value.editable),
 );
 
+// Lo capturado contra lo guardado: enviar, aceptar e imprimir usan lo guardado, así
+// que con cambios pendientes primero se guarda (y no se cierra sin preguntar).
+const foto = instantanea(() => cuerpo());
+const hayCambios = computed(
+  () => abierto.value && !soloLectura.value && foto.cambio(),
+);
+useCambiosPendientes(() => hayCambios.value);
+async function cerrarEditor(): Promise<void> {
+  if (
+    hayCambios.value &&
+    !(await confirmar(t("comun.cambiosSinGuardar"), {
+      aceptar: t("comun.salirSinGuardar"),
+      peligro: true,
+    }))
+  ) {
+    return;
+  }
+  abierto.value = false;
+}
+
 // Los montos como los escribe el país del negocio («1,250.50» en México). Lo que no
 // se puede leer sin adivinar se marca en su campo y no deja guardar (antes que
 // guardarlo como 0).
@@ -369,6 +390,7 @@ function abrirNuevo(): void {
     lineas: [],
   };
   nuevaLinea();
+  foto.fijar();
   abierto.value = true;
 }
 
@@ -406,6 +428,7 @@ function cargarEnEditor(p: Presupuesto): void {
       descuento: aTexto(l.descuento_minor),
     })),
   };
+  foto.fijar();
 }
 
 function cuerpo(): Record<string, unknown> {
@@ -434,11 +457,12 @@ function cuerpo(): Record<string, unknown> {
   };
 }
 
-async function guardar(): Promise<void> {
+// true si quedó guardado; si falla, lo capturado se queda y el error se ve en el editor.
+async function guardar(avisar = true): Promise<boolean> {
   if (hayIlegibles.value) {
     errorEditor.value = t("presupuestos.editor.revisaMontos");
     void enfocarInvalido("form-presupuesto");
-    return;
+    return false;
   }
   guardando.value = true;
   errorEditor.value = null;
@@ -453,13 +477,26 @@ async function guardar(): Promise<void> {
           cuerpo(),
         );
     cargarEnEditor(data.data);
-    toast.exito(t("presupuestos.editor.guardado"));
+    if (avisar) {
+      toast.exito(t("presupuestos.editor.guardado"));
+    }
     await cargar();
+    return true;
   } catch (e) {
     errorEditor.value = mensajeDeError(e);
+    return false;
   } finally {
     guardando.value = false;
   }
+}
+
+// Con cambios pendientes, primero se guardan; después se confirma con lo que quedó
+// guardado (folio, total y a quién), que es lo que se envía o se acepta.
+async function guardarAntes(): Promise<Presupuesto | null> {
+  if (hayCambios.value && !(await guardar(false))) {
+    return null;
+  }
+  return actual.value;
 }
 
 async function accion(
@@ -486,6 +523,20 @@ async function accion(
 }
 
 async function enviar(): Promise<void> {
+  const guardado = await guardarAntes();
+  if (
+    guardado === null ||
+    !(await confirmar(
+      t("presupuestos.acciones.confirmarEnviar", {
+        folio: guardado.folio,
+        total: plata(guardado.total_minor, guardado.moneda),
+        correo: guardado.contacto.email ?? "",
+      }),
+      { aceptar: t("presupuestos.acciones.enviar") },
+    ))
+  ) {
+    return;
+  }
   const p = await accion("enviar");
   if (p) {
     cargarEnEditor(p);
@@ -496,11 +547,13 @@ async function enviar(): Promise<void> {
   }
 }
 async function aceptar(): Promise<void> {
+  const guardado = await guardarAntes();
   if (
-    actual.value === null ||
+    guardado === null ||
     !(await confirmar(
       t("presupuestos.acciones.confirmarAceptar", {
-        folio: actual.value.folio,
+        folio: guardado.folio,
+        total: plata(guardado.total_minor, guardado.moneda),
       }),
     ))
   ) {
@@ -761,12 +814,13 @@ onMounted(() => {
           ? $t('presupuestos.editor.titulo', { folio: actual.folio })
           : $t('presupuestos.editor.tituloNuevo')
       "
-      @cerrar="abierto = false"
+      :ocupado="guardando"
+      @cerrar="cerrarEditor"
     >
       <form
         id="form-presupuesto"
         class="space-y-4 p-5"
-        @submit.prevent="guardar"
+        @submit.prevent="guardar()"
       >
         <p
           v-if="actual && !actual.editable"
@@ -1087,8 +1141,9 @@ onMounted(() => {
           >
             {{ $t("presupuestos.acciones.eliminar") }}
           </button>
+          <!-- Imprime lo guardado: con cambios pendientes, primero se guarda. -->
           <RouterLink
-            v-if="actual"
+            v-if="actual && !hayCambios"
             :to="{ name: 'presupuesto-impreso', params: { id: actual.id } }"
             class="tu-btn tu-btn-fantasma"
             target="_blank"
@@ -1100,14 +1155,19 @@ onMounted(() => {
               type="button"
               class="tu-btn tu-btn-fantasma"
               :disabled="guardando"
+              data-prueba="enviar-presupuesto"
               @click="enviar"
             >
-              {{ $t("presupuestos.acciones.enviar") }}
+              {{
+                hayCambios
+                  ? $t("presupuestos.acciones.guardarYEnviar")
+                  : $t("presupuestos.acciones.enviar")
+              }}
             </button>
             <button
               type="button"
               class="tu-btn tu-btn-fantasma"
-              :disabled="guardando"
+              :disabled="guardando || hayCambios"
               @click="rechazando = !rechazando"
             >
               {{ $t("presupuestos.acciones.rechazar") }}
@@ -1119,7 +1179,11 @@ onMounted(() => {
               data-prueba="aceptar-presupuesto"
               @click="aceptar"
             >
-              {{ $t("presupuestos.acciones.aceptar") }}
+              {{
+                hayCambios
+                  ? $t("presupuestos.acciones.guardarYAceptar")
+                  : $t("presupuestos.acciones.aceptar")
+              }}
             </button>
           </template>
           <button

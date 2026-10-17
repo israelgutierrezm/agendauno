@@ -71,6 +71,10 @@ export default {
   },
   acciones: {
     enviar: "Enviar por correo",
+    guardarYEnviar: "Guardar y enviar",
+    guardarYAceptar: "Guardar y marcar aceptado",
+    confirmarEnviar:
+      "Se enviará el presupuesto {folio} por {total} a {correo}. ¿Enviarlo?",
     enviado: "Se envió a {correo}.",
     imprimir: "Imprimir o PDF",
     aceptar: "Marcar aceptado",
@@ -81,7 +85,7 @@ export default {
     verCobro: "Ver en Por cobrar",
     eliminar: "Eliminar borrador",
     confirmarAceptar:
-      "¿Marcar el presupuesto {folio} como aceptado por el cliente?",
+      "¿Marcar el presupuesto {folio} por {total} como aceptado por el cliente?",
     confirmarConvertir:
       "Se creará un cobro de {total} para {cliente} con los conceptos del presupuesto. ¿Continuar?",
     confirmarEliminar: "¿Eliminar el borrador {folio}? No se puede deshacer.",

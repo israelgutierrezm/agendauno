@@ -203,6 +203,84 @@ describe("presupuestos", () => {
     );
   });
 
+  it("con cambios sin guardar, Enviar primero guarda y confirma lo que se va a enviar", async () => {
+    const borrador = {
+      ...aceptado,
+      estado: "borrador",
+      editable: true,
+      puede_convertir: false,
+      contacto: { nombre: "Diego", email: "diego@correo.mx", celular: null },
+    };
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/presupuestos")
+            ? [borrador]
+            : url.endsWith("/p1")
+              ? borrador
+              : url.endsWith("/catalogo")
+                ? { servicios: [], productos: [], articulos: [] }
+                : url.endsWith("/configuracion")
+                  ? {
+                      impuestos: "desglosados",
+                      tasa_impuesto_bp: 1600,
+                      vigencia_dias: 15,
+                      notas: null,
+                    }
+                  : [],
+        },
+      }),
+    );
+    // Si guardar falla, no se envía nada y lo capturado se queda.
+    api.put.mockRejectedValueOnce(new Error("El servidor no respondió"));
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="fila-presupuesto"]').trigger("click");
+    await flushPromises();
+
+    const enviar = () => w.get('[data-prueba="enviar-presupuesto"]');
+    expect(enviar().text()).toBe("Enviar por correo");
+    await w.get('[data-prueba="precio-concepto"]').setValue("1,500.00");
+    expect(enviar().text()).toBe("Guardar y enviar");
+
+    await enviar().trigger("click");
+    await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(w.text()).toContain("El servidor no respondió");
+    expect(
+      (w.get('[data-prueba="precio-concepto"]').element as HTMLInputElement)
+        .value,
+    ).toBe("1,500.00");
+
+    // Ahora sí guarda: se envía lo guardado, con su total en la confirmación.
+    api.put.mockResolvedValueOnce({
+      data: {
+        data: {
+          ...borrador,
+          total_minor: 174000,
+          lineas: [{ ...borrador.lineas[0]!, precio_unitario_minor: 150000 }],
+        },
+      },
+    });
+    api.post.mockResolvedValue({ data: { data: borrador } });
+    await enviar().trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/barberia/presupuestos/p1",
+      expect.objectContaining({
+        lineas: [expect.objectContaining({ precio_unitario_minor: 150000 })],
+      }),
+    );
+    expect(confirmar).toHaveBeenLastCalledWith(
+      expect.stringContaining("$1,740.00 a diego@correo.mx"),
+      expect.anything(),
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/barberia/presupuestos/p1/enviar",
+      {},
+    );
+  });
+
   it("un monto que no se puede leer se marca y no se guarda como 0", async () => {
     const w = montar();
     await flushPromises();
