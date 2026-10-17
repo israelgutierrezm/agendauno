@@ -119,3 +119,29 @@ it('no se incluye a sí mismo, ni servicios que no existen, ni un paquete dentro
     incluirEn($ctx, $ctx['paquete'], [])->assertOk()->assertJsonPath('data.incluye', []);
     incluirEn($ctx, $ctx['limpieza'], [$ctx['diagnostico']])->assertOk();
 });
+
+it('al guardar un servicio se guarda todo o no cambia nada', function (): void {
+    $ctx = consultorioConPaquete();
+    $e = $ctx['e'];
+    $url = "/api/v1/app/{$e['slug']}/ofertas/{$ctx['limpieza']}";
+    $sede = agendaSemilla($e);
+    $cabina = (string) $this->postJson("/api/v1/app/{$e['slug']}/recursos", [
+        'sucursal_id' => $sede['sucursal'], 'nombre' => 'Cabina 1', 'modo' => 'unidad',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+
+    // Espacios e incluidos válidos, pero se paga al reservar sin precio: nada se guarda.
+    $this->putJson($url, [
+        'lugares' => 0, 'recursos' => [$cabina], 'incluye' => [$ctx['fluor']],
+        'politica_reserva' => 'pago', 'precio_clase_minor' => 0, 'descripcion' => 'Nueva',
+    ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonStructure(['meta' => ['errors' => ['precio_clase_minor']]]);
+    // Un incluido que no se puede (un paquete dentro de otro) tampoco deja nada a medias.
+    incluirEn($ctx, $ctx['paquete'], [$ctx['diagnostico']])->assertOk();
+    $this->putJson($url, [
+        'lugares' => 0, 'recursos' => [$cabina], 'incluye' => [$ctx['paquete']], 'descripcion' => 'Nueva',
+    ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonStructure(['meta' => ['errors' => ['incluye']]]);
+
+    $servicio = collect($this->getJson("/api/v1/app/{$e['slug']}/ofertas", conBearer($e['bearer']))->json('data'))->firstWhere('id', $ctx['limpieza']);
+    expect($servicio['recursos'])->toBe([])
+        ->and($servicio['incluye'])->toBe([])
+        ->and($servicio['descripcion'])->toBeNull();
+});

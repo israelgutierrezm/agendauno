@@ -211,6 +211,7 @@ class CatalogoTenantController
             'que_llevar' => ['sometimes', 'nullable', 'string', 'max:300'],
         ]);
 
+        // Primero se valida todo; después se guarda todo junto (ver abajo).
         $cambios = ['lugares' => (int) $validado['lugares']];
         if ($request->has('para_principiantes')) {
             $cambios['para_principiantes'] = (bool) $validado['para_principiantes'];
@@ -220,20 +221,17 @@ class CatalogoTenantController
                 $cambios[$campo] = $this->descripcion($validado[$campo] ?? null);
             }
         }
+        $recursos = null;
         if (array_key_exists('recursos', $validado)) {
             $elegidos = RecursoTenant::query()->whereIn('ulid', $validado['recursos'])->get(['id', 'activo']);
-            $ids = $elegidos->pluck('id')->all();
-            if (count($ids) !== count(array_unique($validado['recursos']))) {
+            $recursos = $elegidos->pluck('id')->all();
+            if (count($recursos) !== count(array_unique($validado['recursos']))) {
                 throw ValidationException::withMessages(['recursos' => ['Algún espacio no existe.']]);
             }
             // Solo con espacios inactivos el servicio no se podría agendar.
             if ($elegidos->isNotEmpty() && ! $elegidos->contains('activo', true)) {
                 throw ValidationException::withMessages(['recursos' => ['Elige al menos un espacio activo.']]);
             }
-            $oferta->recursos()->sync($ids);
-        }
-        if (array_key_exists('incluye', $validado)) {
-            $this->incluir($oferta, array_values($validado['incluye']));
         }
         // Los márgenes solo se tocan si vienen; aplican a lo que se agende desde ahora.
         foreach (['preparacion_min', 'limpieza_min'] as $campo) {
@@ -263,7 +261,18 @@ class CatalogoTenantController
             && $politica === PoliticaReservaTenant::Pago->value) {
             self::exigirPrecioParaPagar(array_key_exists('precio_clase_minor', $cambios) ? $cambios['precio_clase_minor'] : $oferta->precio_clase_minor);
         }
-        $oferta->update($cambios);
+
+        // Se guarda todo o no cambia nada: espacios, servicios incluidos (que validan
+        // bajo candado lo que no se puede saber antes) y los datos del servicio.
+        DB::connection('tenant')->transaction(function () use ($oferta, $validado, $recursos, $cambios): void {
+            if ($recursos !== null) {
+                $oferta->recursos()->sync($recursos);
+            }
+            if (array_key_exists('incluye', $validado)) {
+                $this->incluir($oferta, array_values($validado['incluye']));
+            }
+            $oferta->update($cambios);
+        });
 
         return response()->json(['data' => $this->presentarOferta($oferta->refresh())]);
     }
