@@ -108,6 +108,7 @@ function rutasExclusivasPorModalidad(): array
         'citas.dias' => 'citas',
         'citas.agendar' => 'citas',
         'reservas.historial' => 'citas',
+        'reservas.cobro' => 'citas',
         'presupuestos.index' => 'citas',
         'presupuestos.catalogo' => 'citas',
         'presupuestos.configuracion' => 'citas',

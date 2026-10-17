@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CambiarHorario from "@/components/CambiarHorario.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
+import CobroCita from "@/components/CobroCita.vue";
 import CorregirCobro from "@/components/CorregirCobro.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -53,10 +54,9 @@ const { t, te } = useI18n();
 const toast = useToastStore();
 const sesionTenant = useSesionTenantStore();
 
-// «tarjeta»: con la terminal del negocio (antes se mandaba como «manual»).
-const METODOS = ["efectivo", "tarjeta", "transferencia"] as const;
-const metodo = ref<(typeof METODOS)[number]>("efectivo");
 const accionando = ref(false);
+// Cobrar al terminar: servicio, productos y propina en un solo cobro (CobroCita).
+const cobrando = ref(false);
 
 type Pestana = "asistencia" | "cobro" | "historial";
 const pestana = ref<Pestana>("asistencia");
@@ -271,35 +271,6 @@ async function marcar(asistencia: Asistencia, retardo = false): Promise<void> {
   );
 }
 
-// ---- Cobro en caja ----
-async function cobrar(): Promise<void> {
-  const c = cita.value;
-  if (c === null || c.orden_id == null) {
-    return;
-  }
-  // Un cobro en caja no se deshace: se confirma monto, forma y a quién.
-  if (
-    !(await confirmar(
-      t("agendaVisual.cita.confirmarCobro", {
-        monto: precio.value ?? "",
-        metodo: nombreMetodo(metodo.value),
-        cliente: cliente.value,
-      }),
-      { aceptar: t("agendaVisual.cita.cobrar", { monto: precio.value ?? "" }) },
-    ))
-  ) {
-    return;
-  }
-  const orden = c.orden_id;
-  void accion(
-    () =>
-      api.post(`${props.base}/ordenes/${orden}/liquidar`, {
-        metodo: metodo.value,
-      }),
-    t("agendaVisual.cita.okCobrada"),
-  );
-}
-
 // ---- Historial (y los movimientos del pago) ----
 interface Hecho {
   tipo: string;
@@ -460,7 +431,7 @@ function abrirReprogramar(): void {
 watch(
   () => props.abierto,
   () => {
-    metodo.value = "efectivo";
+    cobrando.value = false;
     pestana.value = "asistencia";
     historial.value = null;
     reprogramando.value = false;
@@ -770,23 +741,7 @@ watch(
               <span class="pc-etiqueta">{{
                 $t("detalleCita.cobro.metodo")
               }}</span>
-              <div
-                v-if="sePuedeCobrar"
-                class="tu-segmentado flex-wrap"
-                role="group"
-                :aria-label="$t('detalleCita.cobro.elige')"
-              >
-                <button
-                  v-for="m in METODOS"
-                  :key="m"
-                  type="button"
-                  :aria-pressed="metodo === m"
-                  @click="metodo = m"
-                >
-                  {{ $t(`agendaVisual.cita.metodos.${m}`) }}
-                </button>
-              </div>
-              <template v-else-if="cita?.pago">
+              <template v-if="cita?.pago">
                 <span class="font-medium">{{
                   nombreMetodo(cita.pago.metodo)
                 }}</span>
@@ -819,7 +774,8 @@ watch(
                 type="button"
                 class="tu-btn tu-btn-primario w-full"
                 :disabled="accionando"
-                @click="cobrar"
+                data-prueba="abrir-cobro-cita"
+                @click="cobrando = true"
               >
                 <IconoNav nombre="dinero" :tam="18" />
                 {{ $t("detalleCita.cobro.registrar") }}
@@ -936,6 +892,13 @@ watch(
       </button>
     </template>
   </ModalDialogo>
+  <CobroCita
+    :abierto="cobrando"
+    :base="base"
+    :sesion="sesion"
+    @cerrar="cobrando = false"
+    @cobrada="emit('cambiada')"
+  />
 </template>
 
 <style scoped>

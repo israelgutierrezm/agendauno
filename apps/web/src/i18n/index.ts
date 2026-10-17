@@ -83,6 +83,7 @@ import sitioWeb from "./locales/sitioWeb.es-MX";
 import captacion from "./locales/captacion.es-MX";
 import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
+import cobroCita from "./locales/cobroCita.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
 import horariosVisual from "./locales/horariosVisual.es-MX";
 import detalleCita from "./locales/detalleCita.es-MX";
@@ -192,6 +193,7 @@ const mensajesBase = {
   sitioWeb,
   confirmaciones,
   corregirCobro,
+  cobroCita,
   nominaVisual,
   horariosVisual,
   detalleCita,

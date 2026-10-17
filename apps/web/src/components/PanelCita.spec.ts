@@ -103,30 +103,34 @@ beforeEach(() => {
 });
 
 describe("cobrar en caja", () => {
-  it("pregunta antes de cobrar y no cobra si se cancela", async () => {
-    mocks.confirmar.mockResolvedValue(false);
-    const w = montar(cita());
+  it("«Registrar pago» abre el cobro completo y cobra con la forma elegida", async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        data: {
+          servicio_minor: 15000,
+          productos_minor: 0,
+          propina_minor: 0,
+          total_minor: 15000,
+          recibido_minor: null,
+          cambio_minor: null,
+          ticket: null,
+        },
+      },
+    });
+    const w = montar(cita({ total_minor: 15000 }));
     await boton(w, "Registrar pago").trigger("click");
     await flushPromises();
 
-    expect(mocks.confirmar).toHaveBeenCalledWith(
-      expect.stringContaining("Israel Gutierrez"),
-      expect.anything(),
-    );
-    expect(mocks.post).not.toHaveBeenCalled();
-  });
-
-  it("al confirmar, registra el cobro con la forma elegida", async () => {
-    mocks.confirmar.mockResolvedValue(true);
-    const w = montar(cita());
     await boton(w, "Transferencia").trigger("click");
-    await boton(w, "Registrar pago").trigger("click");
+    await w.get("#form-cobro-cita").trigger("submit");
     await flushPromises();
 
     expect(mocks.post).toHaveBeenCalledWith(
-      "/api/v1/app/demo/ordenes/ord1/liquidar",
-      { metodo: "transferencia" },
+      "/api/v1/app/demo/reservas/r1/cobro",
+      expect.objectContaining({ metodo: "transferencia", items: [] }),
     );
+    expect(w.find('[data-prueba="comprobante-cita"]').exists()).toBe(true);
+    expect(w.emitted("cambiada")).toBeTruthy();
   });
 });
 

@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\ExtraArticuloTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -24,7 +25,37 @@ use Illuminate\Validation\ValidationException;
  */
 class PuntoDeVentaTenant
 {
-    public function __construct(private readonly InventarioTenant $inventario) {}
+    public function __construct(
+        private readonly InventarioTenant $inventario,
+        private readonly RegionNegocioTenant $region,
+    ) {}
+
+    /**
+     * Lo pedido (`articulo_id`, `cantidad`, `extras`, `precio_minor`) con sus artículos y
+     * extras resueltos. Un extra que ya no es de ese artículo o está apagado: 422.
+     *
+     * @param  array<int, array<string, mixed>>  $pedidos
+     * @return list<array{articulo: ArticuloTenant, cantidad: int, extras: list<ExtraArticuloTenant>, precio_minor: int|null}>
+     */
+    public function lineasPedidas(array $pedidos, string $campo = 'items'): array
+    {
+        $items = [];
+        foreach (array_values($pedidos) as $n => $item) {
+            $articulo = ArticuloTenant::query()->where('ulid', (string) $item['articulo_id'])->firstOrFail();
+            $extrasPedidos = array_values(array_unique(array_map('strval', (array) ($item['extras'] ?? []))));
+            $extras = $extrasPedidos === [] ? [] : ExtraArticuloTenant::query()
+                ->where('articulo_id', $articulo->getKey())->where('activo', true)->whereIn('ulid', $extrasPedidos)->get()->all();
+            if (count($extras) !== count($extrasPedidos)) {
+                throw ValidationException::withMessages(["{$campo}.{$n}.extras" => ['Uno de los extras ya no está disponible para este producto.']]);
+            }
+            $items[] = [
+                'articulo' => $articulo, 'cantidad' => (int) $item['cantidad'], 'extras' => array_values($extras),
+                'precio_minor' => isset($item['precio_minor']) ? (int) $item['precio_minor'] : null,
+            ];
+        }
+
+        return $items;
+    }
 
     /**
      * Con `precio_minor` en un artículo (lo que mostró el mostrador por pieza, con sus
@@ -32,12 +63,16 @@ class PuntoDeVentaTenant
      * el total. Un artículo que ya no está a la venta tampoco se vende. La clave del
      * intento queda en la venta (única): un reintento devuelve la misma.
      *
+     * Al terminar una cita ({@see CobroDeCitaTenant}) la venta va ligada a su orden y
+     * guarda cuánto fue del servicio (`$servicioMinor`): lo recibido alcanza para todo y
+     * el ticket es de todo. Ahí puede no llevar productos (solo la propina).
+     *
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras?: list<ExtraArticuloTenant>, precio_minor?: int|null}>  $items
      */
-    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null): VentaPosTenant
+    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0): VentaPosTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento): VentaPosTenant {
-            $moneda = $items[0]['articulo']->moneda;
+        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor): VentaPosTenant {
+            $moneda = $items !== [] ? $items[0]['articulo']->moneda : ($orden->moneda ?? $this->region->moneda());
 
             // La propina va aparte de lo vendido: no es ingreso del negocio (ADR 0139).
             $venta = VentaPosTenant::query()->create([
@@ -49,6 +84,8 @@ class PuntoDeVentaTenant
                 'propina_minor' => max(0, $propinaMinor),
                 'persona_id' => $comprador?->getKey(),
                 'clave_intento' => $claveIntento,
+                'orden_id' => $orden?->getKey(),
+                'servicio_minor' => max(0, $servicioMinor),
             ]);
 
             $total = 0;
@@ -100,7 +137,7 @@ class PuntoDeVentaTenant
             }
 
             // En efectivo: lo que entregó alcanza para lo vendido y la propina (el cambio).
-            if ($recibidoMinor !== null && $recibidoMinor < $total + $venta->propina_minor) {
+            if ($recibidoMinor !== null && $recibidoMinor < $total + $venta->propina_minor + $venta->servicio_minor) {
                 throw ValidationException::withMessages(['recibido_minor' => ['Lo que recibiste no alcanza para cobrar la venta.']]);
             }
             $venta->update(['total_minor' => $total, 'recibido_minor' => $metodo === 'efectivo' ? $recibidoMinor : null]);

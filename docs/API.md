@@ -398,6 +398,23 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
   favor, − en su contra; `motivo`). Solo para un corte pagado (antes, se reabre). No
   cambia el corte.
 
+## Citas: cobrar al terminar (ADR 0158)
+
+- `POST /reservas/{reserva}/cobro` (solo citas, `ordenes.gestionar`): `metodo`
+  (`efectivo`, `tarjeta`, `transferencia`, `ventanilla`, `manual`), `items` (como en
+  `POST /pos/ventas`; pide además `pos.vender` y la función `inventario`),
+  `propina_minor`, `recibido_minor` (efectivo), `referencia`, `enviar_ticket` y
+  `clave_intento`.
+- Cobra el servicio si su orden sigue pendiente, más los productos y la propina, todo o
+  nada. Responde `servicio_minor`, `productos_minor`, `propina_minor`, `total_minor`,
+  `recibido_minor`, `cambio_minor`, `orden_id` y `ticket` (si hubo productos o
+  propina; el servicio va primero).
+- 422:
+  - en `recibido_minor` si no alcanza;
+  - en `reserva` si no hay nada que cobrar o la orden se canceló;
+  - en `items.N.*` si un producto o extra ya no está a la venta.
+- La misma clave devuelve el mismo cobro.
+
 ## Servicios y clases: corregir y archivar (ADR 0154)
 
 - `PUT /ofertas/{oferta}` acepta `nombre` y, solo en clases (grupales), `capacidad`

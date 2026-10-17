@@ -25,6 +25,7 @@ use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CategoriasArticuloTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
+use App\Modules\Tenancy\Http\Controllers\CobroDeCitaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ComplementosNegocioController;
 use App\Modules\Tenancy\Http\Controllers\CortesNominaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
@@ -922,6 +923,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/ordenes', [OrdenesTenantController::class, 'crear'])->middleware('puede:ordenes.gestionar')->name('ordenes.store');
             Route::get('/ordenes/{orden}', [OrdenesTenantController::class, 'show'])->middleware('puede:ordenes.ver')->name('ordenes.show');
             Route::post('/ordenes/{orden}/liquidar', [OrdenesTenantController::class, 'liquidar'])->middleware('puede:ordenes.gestionar')->name('ordenes.liquidar');
+            // Al terminar una cita: servicio, productos y propina en un solo cobro.
+            Route::post('/reservas/{reserva}/cobro', [CobroDeCitaTenantController::class, 'cobrar'])->middleware(['puede:ordenes.gestionar', 'modalidad:citas'])->name('reservas.cobro');
             // Cobro en linea con la pasarela del estudio (asincrono -> pendiente +
             // checkout; el webhook confirma). Listo para activarse al cargar llaves.
             Route::post('/ordenes/{orden}/cobrar', [OrdenesTenantController::class, 'cobrar'])->middleware('puede:ordenes.gestionar')->name('ordenes.cobrar');

@@ -261,3 +261,95 @@ it('el calendario ofrece desde hoy los días en que alguien atiende, sin los cer
     $this->getJson('/api/v1/app/'.$e['slug'].'/mi/citas/dias?'.http_build_query(['sucursal_id' => $sede['sucursal'], 'desde' => '2030-01-06']), conBearer($e['bearer']))
         ->assertForbidden();
 });
+
+/**
+ * Un producto a la venta con existencias en la sede de la cita.
+ *
+ * @param  array{e: array{slug: string, bearer: string}, sede: array{oferta: string, sucursal: string}, pro: string}  $ctx
+ */
+function productoParaCobrarCita(array $ctx, int $precio, int $stock): string
+{
+    $e = $ctx['e'];
+    $articulo = (string) test()->postJson("/api/v1/app/{$e['slug']}/articulos", ['nombre' => 'Cera', 'precio_minor' => $precio, 'moneda' => 'MXN'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    test()->postJson("/api/v1/app/{$e['slug']}/articulos/{$articulo}/movimientos", ['sucursal_id' => $ctx['sede']['sucursal'], 'tipo' => 'entrada', 'cantidad' => $stock], conBearer($e['bearer']))
+        ->assertCreated();
+
+    return $articulo;
+}
+
+/** @param  array{slug: string, bearer: string}  $e */
+function existenciasDe(array $e, string $articulo): int
+{
+    return (int) collect(test()->getJson("/api/v1/app/{$e['slug']}/articulos", conBearer($e['bearer']))->json('data'))
+        ->firstWhere('id', $articulo)['stock_total'];
+}
+
+it('al terminar la cita cobra servicio, productos y propina en un solo cobro, con su ticket y el cambio', function (): void {
+    $ctx = barberiaParaCobrar();
+    $e = $ctx['e'];
+    $cita = agendarEnLinea($ctx)->assertCreated()->json('data');
+    $cera = productoParaCobrarCita($ctx, 5000, 5);
+    $cobro = [
+        'metodo' => 'efectivo', 'items' => [['articulo_id' => $cera, 'cantidad' => 2]],
+        'propina_minor' => 3000, 'recibido_minor' => 50000, 'clave_intento' => 'cita-1',
+    ];
+
+    $datos = $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro", $cobro, conBearer($e['bearer']))
+        ->assertCreated()->json('data');
+    expect($datos)->toMatchArray([
+        'servicio_minor' => 25000, 'productos_minor' => 10000, 'propina_minor' => 3000,
+        'total_minor' => 38000, 'recibido_minor' => 50000, 'cambio_minor' => 12000, 'metodo' => 'efectivo',
+    ])
+        ->and($datos['ticket']['servicio']['monto_minor'])->toBe(25000)
+        ->and($datos['ticket']['cobrado_minor'])->toBe(38000)
+        ->and($datos['ticket']['cambio_minor'])->toBe(12000);
+    $this->getJson("/api/v1/app/{$e['slug']}/ordenes/{$cita['orden_id']}", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estado', 'pagada');
+    expect(existenciasDe($e, $cera))->toBe(3);
+
+    // Un reintento con la misma clave devuelve el mismo cobro: no cobra ni descuenta otra vez.
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro", $cobro, conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.total_minor', 38000);
+    expect(existenciasDe($e, $cera))->toBe(3);
+});
+
+it('si lo recibido no alcanza o falta stock no se cobra nada: ni el servicio ni los productos', function (): void {
+    $ctx = barberiaParaCobrar();
+    $e = $ctx['e'];
+    $cita = agendarEnLinea($ctx)->assertCreated()->json('data');
+    $cera = productoParaCobrarCita($ctx, 5000, 1);
+    $url = "/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro";
+
+    $this->postJson($url, ['metodo' => 'efectivo', 'items' => [['articulo_id' => $cera, 'cantidad' => 1]], 'recibido_minor' => 26000], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['recibido_minor'], 'meta.errors');
+    $this->postJson($url, ['metodo' => 'tarjeta', 'items' => [['articulo_id' => $cera, 'cantidad' => 2]]], conBearer($e['bearer']))
+        ->assertStatus(422);
+
+    $this->getJson("/api/v1/app/{$e['slug']}/ordenes/{$cita['orden_id']}", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estado', 'pendiente');
+    expect(existenciasDe($e, $cera))->toBe(1);
+});
+
+it('una cita ya cobrada solo admite agregar algo más (productos o propina)', function (): void {
+    $ctx = barberiaParaCobrar();
+    $e = $ctx['e'];
+    $cita = agendarEnLinea($ctx)->assertCreated()->json('data');
+    $url = "/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro";
+    $this->postJson($url, ['metodo' => 'tarjeta'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.servicio_minor', 25000)->assertJsonPath('data.ticket', null);
+
+    $this->postJson($url, ['metodo' => 'tarjeta'], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['reserva'], 'meta.errors');
+    $this->postJson($url, ['metodo' => 'tarjeta', 'propina_minor' => 4000], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.servicio_minor', 0)->assertJsonPath('data.propina_minor', 4000)->assertJsonPath('data.total_minor', 4000);
+});
+
+it('vender productos al cobrar la cita pide el permiso del mostrador', function (): void {
+    $ctx = barberiaParaCobrar();
+    $e = $ctx['e'];
+    $cita = agendarEnLinea($ctx)->assertCreated()->json('data');
+    $cera = productoParaCobrarCita($ctx, 5000, 3);
+    $instructor = personalConSesion($e['slug'], $e['bearer'], 'otro@barberia.mx', 'instructor');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro", ['metodo' => 'tarjeta', 'items' => [['articulo_id' => $cera, 'cantidad' => 1]]], conBearer($instructor))
+        ->assertForbidden();
+});

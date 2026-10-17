@@ -26,6 +26,8 @@ use Illuminate\Support\Carbon;
  * @property int $propina_minor aparte de lo vendido: no es ingreso del negocio (ADR 0139)
  * @property int|null $persona_id a quién se le vendió; null = público en general
  * @property int|null $recibido_minor lo que entregó en efectivo (para el cambio)
+ * @property int|null $orden_id la cita cobrada junto con esta venta (al terminarla)
+ * @property int $servicio_minor lo que se cobró de esa cita en el mismo cobro
  * @property Carbon|null $anulada_en
  * @property Carbon|null $ticket_enviado_en
  */
@@ -40,6 +42,7 @@ class VentaPosTenant extends Model
     protected $fillable = [
         'sucursal_id', 'total_minor', 'moneda', 'metodo_pago', 'usuario_id', 'anulada_en', 'anulada_por', 'motivo_anulacion',
         'propina_minor', 'recibido_minor', 'persona_id', 'ticket_enviado_en', 'clave_intento',
+        'orden_id', 'servicio_minor',
     ];
 
     /**
@@ -49,6 +52,7 @@ class VentaPosTenant extends Model
         'total_minor' => 'integer',
         'propina_minor' => 'integer',
         'recibido_minor' => 'integer',
+        'servicio_minor' => 'integer',
         'anulada_en' => 'datetime',
         'ticket_enviado_en' => 'datetime',
     ];
@@ -80,9 +84,22 @@ class VentaPosTenant extends Model
         return $this->belongsTo(PersonaTenant::class, 'persona_id')->withTrashed();
     }
 
-    /** Lo que se cobró en total: lo vendido más la propina. */
+    /**
+     * La cita que se cobró junto con esta venta (al terminarla), si fue así.
+     *
+     * @return BelongsTo<OrdenTenant, $this>
+     */
+    public function orden(): BelongsTo
+    {
+        return $this->belongsTo(OrdenTenant::class, 'orden_id');
+    }
+
+    /**
+     * Lo que se cobró en total: lo vendido, la propina y, si se cobró junto, el
+     * servicio de la cita (cuyo pago es de su orden: los reportes no lo suman aquí).
+     */
     public function cobradoMinor(): int
     {
-        return $this->total_minor + $this->propina_minor;
+        return $this->total_minor + $this->propina_minor + $this->servicio_minor;
     }
 }

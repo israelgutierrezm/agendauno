@@ -54,6 +54,11 @@ class CorreoTicketVenta extends Mailable implements ShouldQueue
         $dinero = fn (int $minor): string => '$'.number_format($minor / 100, 2).' '.e((string) $t['moneda']);
 
         $filas = '';
+        // Cobrado al terminar una cita: el servicio primero.
+        if (is_array($t['servicio'] ?? null)) {
+            $filas .= '<tr><td style="padding:6px 0">'.e((string) ($t['servicio']['nombre'] ?? 'Servicio'))
+                .'</td><td style="padding:6px 0;text-align:right">'.$dinero((int) $t['servicio']['monto_minor']).'</td></tr>';
+        }
         foreach ($t['lineas'] as $l) {
             $extras = $l['extras'] !== [] ? '<br><small>Con '.e(implode(', ', $l['extras'])).'</small>' : '';
             $filas .= '<tr><td style="padding:6px 0">'.e((string) $l['articulo'])

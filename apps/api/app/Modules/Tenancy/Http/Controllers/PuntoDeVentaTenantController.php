@@ -10,8 +10,6 @@ use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\TicketVentaPosTenant;
-use App\Modules\Tenancy\Models\ArticuloTenant;
-use App\Modules\Tenancy\Models\ExtraArticuloTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -177,20 +175,7 @@ class PuntoDeVentaTenantController
             'No puedes vender en una sucursal que no te corresponde.',
         );
 
-        $items = [];
-        foreach ($validado['items'] as $n => $item) {
-            $articulo = ArticuloTenant::query()->where('ulid', $item['articulo_id'])->firstOrFail();
-            $pedidos = array_values(array_unique(array_map('strval', $item['extras'] ?? [])));
-            $extras = $pedidos === [] ? [] : ExtraArticuloTenant::query()
-                ->where('articulo_id', $articulo->getKey())->where('activo', true)->whereIn('ulid', $pedidos)->get()->all();
-            if (count($extras) !== count($pedidos)) {
-                throw ValidationException::withMessages(["items.{$n}.extras" => ['Uno de los extras ya no está disponible para este producto.']]);
-            }
-            $items[] = [
-                'articulo' => $articulo, 'cantidad' => (int) $item['cantidad'], 'extras' => $extras,
-                'precio_minor' => isset($item['precio_minor']) ? (int) $item['precio_minor'] : null,
-            ];
-        }
+        $items = $this->pos->lineasPedidas($validado['items']);
 
         // A público en general no se le manda ticket; a una persona, solo si tiene correo.
         $comprador = ($validado['comprador_id'] ?? '') !== ''

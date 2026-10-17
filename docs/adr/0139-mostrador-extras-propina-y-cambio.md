@@ -45,7 +45,6 @@ Estado: Aceptado (2026-10-12). Pedido del dueño sobre el punto de venta:
 ## Consecuencias
 
 - Migración de negocio 000131. Las ventas anteriores quedan sin propina ni extras.
-- Las propinas solo se registran en el Mostrador. Las de un servicio cobrado en caja
-  (una cita) quedan para después si se piden.
+- La propina de una cita se cobra con su servicio al terminarla (ADR 0158).
 - La propina no se reparte ni se paga sola: el corte dice cuánto hay y, si se eligió,
   de quién es.

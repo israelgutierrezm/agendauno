@@ -33,17 +33,22 @@ class TicketVentaPosTenant
     }
 
     /**
-     * @return array{id: string, folio: string, creado_en: string|null, sucursal: string|null, lineas: list<array{articulo: string|null, cantidad: int, extras: list<string>, subtotal_minor: int}>, total_minor: int, propina_minor: int, cobrado_minor: int, recibido_minor: int|null, cambio_minor: int|null, moneda: string, metodo_pago: string, anulada: bool}
+     * Si se cobró al terminar una cita, el servicio va primero (`servicio`).
+     *
+     * @return array{id: string, folio: string, creado_en: string|null, sucursal: string|null, servicio: array{nombre: string|null, monto_minor: int}|null, lineas: list<array{articulo: string|null, cantidad: int, extras: list<string>, subtotal_minor: int}>, total_minor: int, propina_minor: int, cobrado_minor: int, recibido_minor: int|null, cambio_minor: int|null, moneda: string, metodo_pago: string, anulada: bool}
      */
     public function datos(VentaPosTenant $venta): array
     {
-        $venta->loadMissing(['sucursal', 'lineas.articulo']);
+        $venta->loadMissing(['sucursal', 'lineas.articulo', 'orden.sesion.oferta']);
 
         return [
             'id' => (string) $venta->ulid,
             'folio' => self::folio($venta),
             'creado_en' => $venta->created_at?->toIso8601String(),
             'sucursal' => $venta->sucursal?->nombre,
+            'servicio' => $venta->orden_id !== null && $venta->servicio_minor > 0
+                ? ['nombre' => $venta->orden?->sesion?->oferta?->nombre, 'monto_minor' => $venta->servicio_minor]
+                : null,
             'lineas' => array_values($venta->lineas->map(static fn (LineaVentaPosTenant $l): array => [
                 'articulo' => $l->articulo?->nombre,
                 'cantidad' => (int) $l->cantidad,
