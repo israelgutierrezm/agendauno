@@ -130,3 +130,29 @@ it('el quickstart exige permiso de gestión del estudio', function (): void {
 
     $this->getJson("/api/v1/app/{$e['slug']}/onboarding/quickstart", conBearer($coach))->assertStatus(403);
 });
+
+it('la lista para empezar se comprueba con los datos y en orden; activar una pasarela no comprueba el cobro', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $url = "/api/v1/app/{$e['slug']}/onboarding/quickstart";
+    $comprobado = fn (): array => collect($this->getJson($url, conBearer($e['bearer']))->assertOk()->json('data.comprobaciones'))
+        ->mapWithKeys(fn (array $c): array => [$c['clave'] => $c['hecho']])->all();
+
+    expect(array_keys($comprobado()))->toBe(['servicios', 'disponibilidad', 'precios', 'cobro', 'prueba', 'publicar'])
+        // Un negocio nace con su página publicada; lo demás falta.
+        ->and(array_keys(array_filter($comprobado())))->toBe(['publicar']);
+
+    // Con una clase con lugar y un plan: servicios, disponibilidad y precios.
+    $semilla = agendaSemilla($e);
+    crearSesionTenant($e, $semilla, 8);
+    $vp = venderPackAMiembroTenant($e, 8000);
+    expect($comprobado())->toMatchArray(['servicios' => true, 'disponibilidad' => true, 'precios' => true, 'cobro' => false, 'prueba' => false]);
+
+    // Activar una pasarela no basta para el cobro.
+    $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/ventanilla", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))->assertOk();
+    expect($comprobado()['cobro'])->toBeFalse();
+
+    // Una reserva hecha comprueba la prueba de reserva.
+    $sesion = crearSesionTenant($e, $semilla, 8, '2026-10-02 08:00:00');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated();
+    expect($comprobado()['prueba'])->toBeTrue();
+});

@@ -77,3 +77,23 @@ los negocios publicados que no son privados.
 - Calcular «recibe reservas» cuesta unas consultas más en el Inicio del dueño. La
   búsqueda está acotada a 14 días y se detiene en la primera fecha encontrada.
 - Las demos ya traen las reglas revisadas y la publicación hecha.
+
+## Adenda (2026-10-17): lo comprobado, en orden
+
+`GET /onboarding/quickstart` trae además `comprobaciones`: la lista para empezar en el
+orden en que conviene hacerla, cada una comprobada con los datos. A diferencia de los
+pasos del asistente, que se marcan al guardarlos, estas solo cuentan si de verdad
+pasó:
+
+1. Servicios: hay alguno que se ofrece.
+2. Disponibilidad: hay horarios y una fecha que un cliente puede reservar en los
+   próximos 14 días.
+3. Precios: algún servicio tiene precio o hay un plan para entrar.
+4. Cobro: ya se registró un pago, en caja o aprobado en línea. Activar una pasarela no
+   basta; ver el estado de conexión de cada una en Pasarelas.
+5. Prueba de reserva: ya existe una reserva, de prueba o real.
+6. Publicar: la página está publicada.
+
+El Inicio la muestra en «Pon tu negocio en marcha» («Comprobado»). Cada pendiente
+lleva a donde se resuelve.
+

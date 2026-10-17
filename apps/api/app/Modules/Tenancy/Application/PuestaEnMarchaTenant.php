@@ -8,9 +8,11 @@ use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -103,6 +105,31 @@ class PuestaEnMarchaTenant
             'listo' => $configurado && $reservable && $this->hecho($estudio, 'publicacion'),
             'primera_fecha' => $primera,
             'motivo' => $primera === null ? $motivo : ($publicado ? null : 'sin_publicar'),
+        ];
+    }
+
+    /**
+     * La lista para empezar, en orden y con lo que de verdad pasó (H): servicios →
+     * disponibilidad → precios → cobro → una reserva → publicar. A diferencia de los
+     * pasos del asistente, cada una se comprueba con los datos: la disponibilidad, con
+     * una fecha que se pueda reservar; el cobro, con un pago que de verdad se registró
+     * o aprobó el proveedor (activar una pasarela no basta).
+     *
+     * @return list<array{clave: string, hecho: bool, ruta: string}>
+     */
+    public function comprobaciones(Estudio $estudio): array
+    {
+        $citas = $this->modalidad->esCitas();
+        [$primera] = $citas ? $this->primeraCita() : $this->primeraClase();
+        $conPrecio = OfertaTenant::query()->vigentes()->where('precio_clase_minor', '>', 0)->exists();
+
+        return [
+            ['clave' => 'servicios', 'hecho' => OfertaTenant::query()->vigentes()->exists(), 'ruta' => 'catalogo'],
+            ['clave' => 'disponibilidad', 'hecho' => $this->horariosListos($estudio) && $primera !== null, 'ruta' => $citas ? 'horarios' : 'agenda'],
+            ['clave' => 'precios', 'hecho' => $conPrecio || ProductoTenant::query()->exists(), 'ruta' => $citas ? 'catalogo' : 'ventas'],
+            ['clave' => 'cobro', 'hecho' => PagoTenant::query()->whereNotNull('aprobado_en')->exists(), 'ruta' => 'pasarelas'],
+            ['clave' => 'prueba', 'hecho' => ReservaTenant::query()->exists(), 'ruta' => 'agenda'],
+            ['clave' => 'publicar', 'hecho' => $estudio->paginaPublica(), 'ruta' => 'sitio-web'],
         ];
     }
 

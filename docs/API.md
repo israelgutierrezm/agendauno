@@ -398,6 +398,17 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
   favor, − en su contra; `motivo`). Solo para un corte pagado (antes, se reabre). No
   cambia el corte.
 
+## Pon tu negocio en marcha: lo comprobado (adenda del ADR 0090)
+
+- `GET /onboarding/quickstart` trae `comprobaciones`: `servicios`, `disponibilidad`,
+  `precios`, `cobro`, `prueba` y `publicar`, en ese orden. Cada una lleva `hecho`
+  (comprobado con los datos) y `ruta`, la pantalla donde se resuelve.
+- `GET /pasarelas` trae `estado_conexion` en las de cobro en línea:
+  - `sin_configurar`;
+  - `credenciales`;
+  - `activa_sin_comprobar`;
+  - `comprobada`: hay un pago que aprobó ese proveedor, con `comprobada_en`.
+
 ## Importar citas futuras (ADR 0160)
 
 Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.

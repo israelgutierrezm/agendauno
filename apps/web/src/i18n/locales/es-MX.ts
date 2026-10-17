@@ -2458,6 +2458,17 @@ export default {
       cobro: "Cobrar en línea",
       miembros: "Registra a tu primer cliente",
     },
+    // La lista para empezar, comprobada con los datos (H).
+    // Se usa con llave dinámica (`quickstart.comprobaciones.${clave}`).
+    comprobaciones: {
+      titulo: "Comprobado",
+      servicios: "Tienes servicios a la venta",
+      disponibilidad: "Hay una fecha que se puede reservar",
+      precios: "Tienen precio (o hay un plan para entrar)",
+      cobro: "Ya se registró un cobro (en caja o aprobado en línea)",
+      prueba: "Ya se hizo una reserva (de prueba o real)",
+      publicar: "Tu página está publicada",
+    },
   },
   lealtad: {
     recompensaCreada: "Recompensa «{nombre}» creada.",

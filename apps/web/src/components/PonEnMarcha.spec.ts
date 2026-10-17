@@ -112,3 +112,33 @@ describe("Pon tu negocio en marcha", () => {
     );
   });
 });
+
+describe("comprobado con los datos (H)", () => {
+  it("lista lo comprobado en orden y lleva a resolver lo que falta", () => {
+    const w = montar({
+      ...quickstart,
+      comprobaciones: [
+        { clave: "servicios", hecho: true, ruta: "catalogo" },
+        { clave: "disponibilidad", hecho: true, ruta: "horarios" },
+        { clave: "precios", hecho: true, ruta: "catalogo" },
+        { clave: "cobro", hecho: false, ruta: "pasarelas" },
+        { clave: "prueba", hecho: false, ruta: "agenda" },
+        { clave: "publicar", hecho: true, ruta: "sitio-web" },
+      ],
+    });
+    const lista = w.get('[data-prueba="comprobaciones"]');
+    expect(lista.text()).toContain("Comprobado");
+    expect(
+      w.get('[data-prueba="comprobacion-cobro"]').attributes("data-si"),
+    ).toBe("false");
+    expect(
+      w
+        .get('[data-prueba="comprobacion-cobro"]')
+        .findComponent(RouterLinkStub)
+        .props("to"),
+    ).toEqual({ name: "pasarelas" });
+    expect(w.get('[data-prueba="comprobacion-servicios"]').text()).toContain(
+      "Tienes servicios a la venta",
+    );
+  });
+});

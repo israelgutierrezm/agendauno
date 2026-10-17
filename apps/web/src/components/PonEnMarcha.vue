@@ -18,6 +18,8 @@ export interface Quickstart {
   }>;
   progreso: { hechas: number; total: number };
   listo: boolean;
+  // La lista para empezar, comprobada con los datos y en orden (H).
+  comprobaciones?: Array<{ clave: string; hecho: boolean; ruta: string }>;
   estado?: {
     configurado: boolean;
     publicado: boolean;
@@ -187,6 +189,40 @@ const avance = computed(() =>
         >
       </li>
     </ol>
+
+    <!-- Lo que de verdad pasó: de los servicios a publicar (H). -->
+    <div
+      v-if="quickstart.comprobaciones?.length"
+      class="pm-opcionales"
+      data-prueba="comprobaciones"
+    >
+      <span class="pm-etiqueta">{{
+        $t("quickstart.comprobaciones.titulo")
+      }}</span>
+      <ul class="pm-lista-opcional">
+        <li
+          v-for="c in quickstart.comprobaciones"
+          :key="c.clave"
+          class="pm-opcional tu-estado"
+          :style="{ '--tono': c.hecho ? 'var(--exito)' : 'var(--texto-suave)' }"
+          :data-prueba="`comprobacion-${c.clave}`"
+          :data-si="c.hecho"
+        >
+          <span v-if="c.hecho">{{
+            $t(`quickstart.comprobaciones.${c.clave}`)
+          }}</span>
+          <RouterLink
+            v-else
+            :to="{ name: c.ruta }"
+            class="pm-opcional-enlace"
+            >{{ $t(`quickstart.comprobaciones.${c.clave}`) }}</RouterLink
+          >
+          <span class="sr-only">{{
+            c.hecho ? $t("quickstart.hecho") : $t("quickstart.pendiente")
+          }}</span>
+        </li>
+      </ul>
+    </div>
 
     <div v-if="opcionales.length > 0" class="pm-opcionales">
       <span class="pm-etiqueta">{{ $t("quickstart.opcionales") }}</span>

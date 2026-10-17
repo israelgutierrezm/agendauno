@@ -80,6 +80,8 @@ class OnboardingController
             'progreso' => ['hechas' => count($hechasReq), 'total' => count($requeridas)],
             'listo' => $estado['listo'],
             'estado' => $estado,
+            // Comprobado con los datos, en orden (H): de los servicios a publicar.
+            'comprobaciones' => $this->marcha->comprobaciones($estudio),
         ]]);
     }
 
