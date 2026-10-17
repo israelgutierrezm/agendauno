@@ -98,6 +98,8 @@ const sucursales = ref<Sucursal[]>([]);
 const stockBajo = ref(3);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Que no se pudo consultar no debe verse como «aún no hay artículos».
+const errorCarga = ref(false);
 const guardando = ref(false);
 
 // Con una sucursal fija (la de la barra o la única), el stock es el de ahí.
@@ -129,6 +131,7 @@ async function cargarArticulos(): Promise<void> {
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const [, s, c] = await Promise.all([
       cargarArticulos(),
@@ -137,8 +140,8 @@ async function cargar(): Promise<void> {
     ]);
     categorias.value = c.data.data;
     sucursales.value = s.data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCarga.value = true;
   } finally {
     cargando.value = false;
   }
@@ -733,6 +736,20 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+
+    <div
+      v-else-if="errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-inventario"
+    >
+      <span style="color: var(--error)">{{
+        $t("inventarioVisual.errorCarga")
+      }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
 
     <template v-else>
       <EstadoVacio
@@ -1440,7 +1457,32 @@ onMounted(cargar);
         {{ errorHistorial }}
       </AvisoTono>
       <p
-        v-else-if="!cargandoHistorial && historial.length === 0"
+        v-else-if="cargandoHistorial && historial.length === 0"
+        class="mt-4 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
+      <!-- Con un tipo elegido, «ninguno de ese tipo» no es «sin movimientos». -->
+      <EstadoVacio
+        v-else-if="historial.length === 0 && tipoHistorial !== ''"
+        class="mt-3"
+        icono="buscar"
+        compacto
+        :titulo="$t('tabla.sinCoincidencias')"
+        :texto="$t('tabla.ajustarBusqueda')"
+        data-prueba="historial-sin-coincidencias"
+      >
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          @click="tipoHistorial = ''"
+        >
+          {{ $t("tabla.restablecer") }}
+        </button>
+      </EstadoVacio>
+      <p
+        v-else-if="historial.length === 0"
         class="mt-4 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
       >

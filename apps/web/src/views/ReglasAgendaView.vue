@@ -333,9 +333,21 @@ onMounted(cargar);
     </p>
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          data-prueba="reintentar-reglas"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
 
-    <template v-if="!cargando">
+    <!-- Sin las reglas guardadas no se muestran formularios con valores por omisión
+         (guardarlos pisaría las reales) ni «no hay días cerrados». -->
+    <template v-if="!cargando && !error">
       <!-- Cancelaciones (Configuración › Agenda y reservas › Políticas) -->
       <div v-if="pestana === 'politicas'" class="mt-5 tu-card p-5">
         <h2 class="font-medium">{{ $t("reglasAgenda.cancelaciones") }}</h2>

@@ -71,6 +71,8 @@ const totalOrdenes = ref(0);
 const resumen = ref<ResumenOrdenes | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Que no se pudo consultar no debe verse como «aún no hay planes ni ventas».
+const errorCarga = ref(false);
 
 const venta = ref<{
   compradorId: string;
@@ -161,6 +163,7 @@ function cuando(iso: string | null | undefined): string {
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const [p, o] = await Promise.all([
       api.get<{ data: Producto[] }>(`${base.value}/productos`, {
@@ -176,8 +179,8 @@ async function cargar(): Promise<void> {
     ordenes.value = o.data.data;
     totalOrdenes.value = o.data.meta?.total ?? o.data.data.length;
     resumen.value = o.data.meta?.resumen ?? null;
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCarga.value = true;
   } finally {
     cargando.value = false;
   }
@@ -393,6 +396,18 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+
+    <div
+      v-else-if="errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-ventas"
+    >
+      <span style="color: var(--error)">{{ $t("ventas.errorCarga") }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
 
     <template v-else>
       <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />

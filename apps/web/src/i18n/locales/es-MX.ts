@@ -1198,6 +1198,7 @@ export default {
     sinClases: "Aún no hay clases publicadas.",
     precios: "Precios",
     sinPrecios: "Aún no hay precios publicados.",
+    errorPrecios: "No se pudieron cargar los precios.",
     instructores: "Instructores",
     profesionales: "Equipo profesional",
     profesionalesDesc:
@@ -1819,6 +1820,7 @@ export default {
   },
   ventas: {
     titulo: "Ventas",
+    errorCarga: "No se pudieron cargar los planes y las ventas.",
     vender: {
       titulo: "Vender",
       subtitulo: "Vende un plan o paquete a un alumno.",
@@ -1901,6 +1903,7 @@ export default {
       "Elige una sucursal y a la persona para configurar su horario de atención.",
     sinProveedores:
       "Aún no hay instructores. Invita al primero desde «Instructores» para poder darle horario.",
+    errorReferencias: "No se pudieron cargar las sucursales y el equipo.",
     dias: {
       "1": "Lunes",
       "2": "Martes",
@@ -2288,6 +2291,7 @@ export default {
     sinVencimiento: "Sin fecha",
     sinPendientes: "Sin tareas pendientes. ¡Todo al día!",
     sinCompletadas: "Aún no hay tareas completadas.",
+    errorCarga: "No se pudieron cargar las tareas.",
     guardar: "Guardar",
     cancelar: "Cancelar",
     campos: {
@@ -2296,6 +2300,7 @@ export default {
       vence: "Fecha límite",
     },
     reglas: {
+      errorCarga: "No se pudieron cargar las reglas.",
       subtitulo:
         "Cuando ocurre un evento y se cumple la condición, se crea una tarea.",
       nueva: "Nueva regla",
@@ -2756,6 +2761,7 @@ export default {
     sinInscritos: "Aún no hay inscritos.",
     creado: "Grupo «{nombre}» creado.",
     sinInscritosBusqueda: "Nadie inscrito con ese nombre.",
+    errorInscritos: "No se pudieron cargar los inscritos.",
     verMasInscritos: "Ver 1 más | Ver {n} más",
     // Cómo quedó cada fecha al inscribir.
     resumenInscripcion: "Inscrito: {detalle}.",
@@ -2894,6 +2900,7 @@ export default {
     todasSucursales: "Todas las sucursales",
     nuevaClase: "Nueva clase",
     sinClasesDia: "Sin clases este día.",
+    errorCarga: "No se pudo cargar la agenda.",
     completo: "Completo",
     estados: {
       programada: "Con lugar",
@@ -2922,6 +2929,7 @@ export default {
       conflictos: "Hay un conflicto de horario:",
       sinOfertas: "Primero crea una clase en el Catálogo.",
       sinSucursales: "Primero crea una sucursal.",
+      errorCarga: "No se pudieron cargar las clases y sucursales.",
       modoUna: "Una sola clase",
       modoVarias: "Varias que se repiten",
       primeraClase: "Primera clase (fecha y hora)",
@@ -2986,6 +2994,7 @@ export default {
     },
     roster: {
       vacio: "Sin reservas.",
+      errorCarga: "No se pudo cargar quién va.",
       sinPermiso:
         "Tu rol no incluye ver reservas: aquí no se muestra quién va.",
       confirmada: "Confirmada",
@@ -3081,6 +3090,7 @@ export default {
     },
   },
   formularios: {
+    errorCarga: "No se pudieron cargar las fichas de datos.",
     disenar: "Diseñar fichas de datos",
     verRespuestas: "Ver respuestas",
     titulo: "Ficha de datos",

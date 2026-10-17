@@ -79,6 +79,8 @@ const articulos = ref<Articulo[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Que no se pudo consultar no es «primero crea una sucursal».
+const errorCarga = ref(false);
 const cobrando = ref(false);
 
 const sucursalSel = ref("");
@@ -102,6 +104,7 @@ const hoy = ref<ResumenVentas>({
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const [a, s] = await Promise.all([
       api.get<{ data: Articulo[] }>(`${base.value}/articulos`),
@@ -112,8 +115,8 @@ async function cargar(): Promise<void> {
     if (sucursalSel.value === "" && sucursales.value.length > 0) {
       sucursalSel.value = sucursales.value[0]!.id;
     }
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCarga.value = true;
   } finally {
     cargando.value = false;
   }
@@ -575,6 +578,20 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+
+    <div
+      v-else-if="errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-mostrador"
+    >
+      <span style="color: var(--error)">{{
+        $t("mostradorVisual.errorCarga")
+      }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
 
     <template v-else>
       <p

@@ -499,7 +499,9 @@ onMounted(cargar);
       :vacio="
         alcance === 'clientes' && buscarClientes.trim() !== ''
           ? $t('operacion.listadosDos.sinResultados')
-          : $t('usuarios.vacio')
+          : verBajas
+            ? $t('bajas.sinBajas')
+            : $t('usuarios.vacio')
       "
       clave-vista="usuarios"
     >

@@ -140,6 +140,8 @@ const visibles = computed(() => {
 const sucursales = ref<Sucursal[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// El de la carga, aparte del de invitar: sin lista no es «aún no hay instructores».
+const errorCarga = ref<string | null>(null);
 
 // Con varias sedes, se puede acotar al instructor a una desde el alta (R19).
 const hayMultiSucursal = computed(() => sucursales.value.length > 1);
@@ -187,7 +189,7 @@ function carga(i: Instructor): string {
 
 async function cargar(): Promise<void> {
   cargando.value = true;
-  error.value = null;
+  errorCarga.value = null;
   try {
     const [i, s] = await Promise.all([
       api.get<{ data: Instructor[] }>(`${base.value}/instructores`, {
@@ -198,7 +200,7 @@ async function cargar(): Promise<void> {
     instructores.value = i.data.data;
     sucursales.value = s.data.data;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -331,7 +333,19 @@ onMounted(cargar);
       {{ error }}
     </p>
 
-    <template v-if="!cargando">
+    <div
+      v-if="!cargando && errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-instructores"
+    >
+      <span style="color: var(--error)">{{ errorCarga }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+
+    <template v-else-if="!cargando">
       <!-- Lista -->
       <EstadoVacio
         v-if="instructores.length === 0"

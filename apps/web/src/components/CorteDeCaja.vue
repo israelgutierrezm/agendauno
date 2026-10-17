@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
@@ -68,6 +69,8 @@ const personasEquipo = ref<{ id: string; nombre: string }[]>([]);
 const cargando = ref(false);
 const descargando = ref(false);
 const error = ref<string | null>(null);
+// El de la carga, aparte del de descargar: sin datos no es «no hay movimientos».
+const errorCarga = ref<string | null>(null);
 
 // En la moneda del negocio (ADR 0099) y con los números de su país.
 function dinero(minor: number, moneda = sesion.moneda): string {
@@ -111,6 +114,15 @@ const enPagina = computed(() =>
 watch([buscar, movimientos], () => {
   pagina.value = 1;
 });
+// «Nada coincide» (persona, tipo o búsqueda) no es «no hay movimientos en esas fechas».
+const filtrado = computed(
+  () => usuario.value !== "" || tipo.value !== "" || buscar.value.trim() !== "",
+);
+function quitarFiltros(): void {
+  usuario.value = "";
+  tipo.value = "";
+  buscar.value = "";
+}
 
 function parametros(): Record<string, string | undefined> {
   return {
@@ -127,6 +139,7 @@ async function cargar(): Promise<void> {
   }
   cargando.value = true;
   error.value = null;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{
       data: Movimiento[];
@@ -150,7 +163,11 @@ async function cargar(): Promise<void> {
       }));
     }
   } catch (e) {
-    error.value = mensajeDeError(e);
+    // Sin totales de otro rango a la vista.
+    movimientos.value = [];
+    totalesPorMoneda.value = [];
+    truncado.value = null;
+    errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -359,6 +376,33 @@ onMounted(cargar);
       >
         {{ $t("comun.cargando") }}
       </p>
+      <div
+        v-else-if="errorCarga"
+        class="flex flex-wrap items-center justify-between gap-3 p-5 text-sm"
+        role="alert"
+        data-prueba="error-carga-corte"
+      >
+        <span style="color: var(--error)">{{ errorCarga }}</span>
+        <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+          {{ $t("comun.reintentar") }}
+        </button>
+      </div>
+      <EstadoVacio
+        v-else-if="encontrados.length === 0 && filtrado"
+        icono="buscar"
+        compacto
+        :titulo="$t('tabla.sinCoincidencias')"
+        :texto="$t('tabla.ajustarBusqueda')"
+        data-prueba="corte-sin-coincidencias"
+      >
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          @click="quitarFiltros"
+        >
+          {{ $t("tabla.restablecer") }}
+        </button>
+      </EstadoVacio>
       <p
         v-else-if="movimientos.length === 0"
         class="p-5 text-sm"

@@ -141,6 +141,8 @@ async function irPaginaDifusiones(n: number): Promise<void> {
 const cargando = ref(true);
 const enviando = ref(false);
 const error = ref<string | null>(null);
+// Segmentos e historial no se pudieron consultar: no es «aún no hay».
+const errorCarga = ref(false);
 // Lo que impidió enviar (p. ej. una difusión repetida), dentro de la revisión.
 const errorEnvio = ref<string | null>(null);
 const exito = ref<number | null>(null);
@@ -234,6 +236,7 @@ function fecha(iso: string | null): string {
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const [seg] = await Promise.all([
       api.get<{ data: Segmento[]; canales?: Canal[] }>(
@@ -245,6 +248,7 @@ async function cargar(): Promise<void> {
     canalesDifusion.value = seg.data.canales ?? ["interno", "email"];
   } catch (e) {
     error.value = mensajeDeError(e);
+    errorCarga.value = true;
   } finally {
     cargando.value = false;
   }
@@ -580,11 +584,14 @@ const desdeSalida = ref("");
 const hastaSalida = ref("");
 const paginaSalida = ref(1);
 const cargandoSalida = ref(false);
+// No se pudo consultar: no es «aún no se envían mensajes».
+const errorSalida = ref(false);
 
 let peticionSalida = 0;
 async function cargarSalida(): Promise<void> {
   const mia = ++peticionSalida;
   cargandoSalida.value = true;
+  errorSalida.value = false;
   const q = buscarSalida.value.trim();
   try {
     const { data } = await api.get<{ data: Mensaje[]; meta?: MetaSalida }>(
@@ -604,6 +611,10 @@ async function cargarSalida(): Promise<void> {
     if (mia === peticionSalida) {
       mensajes.value = data.data;
       metaSalida.value = data.meta ?? null;
+    }
+  } catch {
+    if (mia === peticionSalida) {
+      errorSalida.value = true;
     }
   } finally {
     if (mia === peticionSalida) {
@@ -706,6 +717,16 @@ onMounted(cargar);
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
+      <template v-if="errorCarga" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          data-prueba="reintentar-comunicaciones"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <template v-if="pestana === 'difusion'">
       <div
@@ -722,7 +743,7 @@ onMounted(cargar);
           {{ $t("comunicaciones.segmentoLabel") }}
         </h3>
         <p
-          v-if="!cargando && segmentos.length === 0"
+          v-if="!cargando && !errorCarga && segmentos.length === 0"
           class="mt-2 text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
@@ -903,7 +924,7 @@ onMounted(cargar);
         {{ $t("comunicaciones.historial") }}
       </h3>
       <EstadoVacio
-        v-if="!cargando && difusiones.length === 0"
+        v-if="!cargando && !errorCarga && difusiones.length === 0"
         class="tu-card mt-3"
         icono="mensaje"
         :titulo="$t('comunicaciones.historialVacio')"
@@ -1140,7 +1161,24 @@ onMounted(cargar);
         </button>
       </div>
       <p
-        v-if="mensajes.length === 0"
+        v-if="errorSalida && !cargandoSalida"
+        class="px-5 pb-5 text-sm"
+        role="alert"
+        data-prueba="error-salida"
+      >
+        <span style="color: var(--error)">{{
+          $t("comunicacionesAuto.errorSalida")
+        }}</span>
+        <button
+          type="button"
+          class="tu-enlace ml-2"
+          @click="irPaginaSalida(paginaSalida)"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </p>
+      <p
+        v-else-if="mensajes.length === 0"
         class="px-5 pb-5 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
         :aria-busy="cargandoSalida"

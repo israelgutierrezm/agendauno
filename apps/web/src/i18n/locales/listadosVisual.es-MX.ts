@@ -20,7 +20,6 @@ export default {
     todosProfesionales: "Todos",
     buscar: "Buscar cliente o comentario",
     oculta: "Oculta del público",
-    sinCoincidencias: "Ninguna reseña coincide con los filtros.",
     sinProfesionales: "Aún no hay reseñas de un instructor.",
     deCinco: "{n} de 5",
   },

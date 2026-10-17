@@ -39,6 +39,8 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const promos = ref<Promo[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// El de la carga, aparte del de borrar: sin lista no es «aún no hay promociones».
+const errorCarga = ref<string | null>(null);
 const accionando = ref(false);
 
 const mostrarForm = ref(false);
@@ -89,14 +91,14 @@ function valorLegible(p: Promo): string {
 
 async function cargar(): Promise<void> {
   cargando.value = true;
-  error.value = null;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{ data: Promo[] }>(
       `${base.value}/promociones`,
     );
     promos.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -480,6 +482,17 @@ onMounted(cargar);
     >
       {{ $t("comun.cargando") }}
     </p>
+    <div
+      v-else-if="errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-promociones"
+    >
+      <span style="color: var(--error)">{{ errorCarga }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
     <EstadoVacio
       v-else-if="promos.length === 0"
       class="mt-10"

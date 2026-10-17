@@ -58,6 +58,8 @@ const puedeGestionar = computed(() => sesion.puede("lealtad.gestionar"));
 
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Programa, recompensas y canjes no se pudieron consultar: no es «aún no hay».
+const errorCarga = ref(false);
 const aviso = ref<string | null>(null);
 
 const programa = ref<Programa>({
@@ -172,6 +174,7 @@ const ajuste = ref({ puntos: 0, descripcion: "" });
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const [prog, recs] = await Promise.all([
       api.get<{ data: Programa }>(`${base.value}/lealtad/programa`),
@@ -180,8 +183,8 @@ async function cargar(): Promise<void> {
     ]);
     programa.value = prog.data.data;
     recompensas.value = recs.data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCarga.value = true;
   } finally {
     cargando.value = false;
   }
@@ -440,6 +443,20 @@ const indicadores = computed<Indicador[]>(() => {
     >
       {{ $t("comun.cargando") }}
     </p>
+
+    <div
+      v-else-if="errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-lealtad"
+    >
+      <span style="color: var(--error)">{{
+        $t("lealtadVisual.errorCarga")
+      }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
 
     <template v-else>
       <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />

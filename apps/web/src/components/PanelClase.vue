@@ -74,6 +74,8 @@ const roster = ref<Reserva[]>([]);
 const cargando = ref(true);
 const accionando = ref(false);
 const error = ref<string | null>(null);
+// El de la carga, aparte del de las acciones: sin lista no hay «sin reservas».
+const errorCarga = ref<string | null>(null);
 const aviso = ref<string | null>(null);
 
 // Confirmadas, ofrecidas y pendientes de pago (todas ocupan lugar); en espera aparte.
@@ -148,14 +150,14 @@ function hora(iso: string, zona: string): string {
 
 async function cargar(): Promise<void> {
   cargando.value = true;
-  error.value = null;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{ data: Reserva[] }>(
       `${base.value}/sesiones/${props.sesion.id}/reservas`,
     );
     roster.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -271,7 +273,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
   >
     <template #destacado>
       <span
-        v-if="!cargando && !error && libres !== null"
+        v-if="!cargando && !errorCarga && libres !== null"
         class="md-pastilla"
         :class="{ 'md-pastilla-aviso': libres === 0 }"
         >{{
@@ -280,7 +282,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             : $t("recepcionVisual.lugaresDisponibles", { n: libres }, libres)
         }}</span
       >
-      <div v-if="!cargando && !error" class="pc-lista-resumen">
+      <div v-if="!cargando && !errorCarga" class="pc-lista-resumen">
         <div>
           <IconoNav nombre="miembros" :tam="18" /><strong>{{
             enSala.length
@@ -302,7 +304,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
       </div>
       <!-- La asistencia se pasa en su propia pantalla -->
       <RouterLink
-        v-if="!cargando && !error && puedePasarLista && enSala.length > 0"
+        v-if="!cargando && !errorCarga && puedePasarLista && enSala.length > 0"
         :to="{ name: 'pase-lista', params: { id: sesion.id } }"
         class="tu-btn tu-btn-primario mt-3 inline-flex items-center gap-2"
         data-prueba="pasar-lista"
@@ -311,7 +313,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
         {{ $t("paseLista.pasarLista") }}
       </RouterLink>
       <p
-        v-if="!cargando && !error && enEspera.length > 0"
+        v-if="!cargando && !errorCarga && enEspera.length > 0"
         class="mt-3 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
       >
@@ -352,6 +354,17 @@ watch(() => props.sesion.id, cargar, { immediate: true });
 
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
+    </p>
+    <p
+      v-else-if="errorCarga"
+      class="text-sm"
+      role="alert"
+      data-prueba="error-carga-clase"
+    >
+      <span style="color: var(--error)">{{ errorCarga }}</span>
+      <button type="button" class="tu-enlace ml-2" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
 
     <template v-else>

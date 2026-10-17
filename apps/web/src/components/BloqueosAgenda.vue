@@ -57,6 +57,9 @@ const bloqueos = ref<Bloqueo[]>([]);
 // Salas (y cabinas o equipos) de la sede elegida.
 const salas = ref<Sala[]>([]);
 const error = ref<string | null>(null);
+// La lista: cargando, o no se pudo consultar (no es «sin bloqueos próximos»).
+const cargando = ref(true);
+const errorCarga = ref(false);
 const guardando = ref(false);
 // Lo ya agendado que caería en el bloqueo (null = aún no se revisa).
 const afectadas = ref<Afectada[] | null>(null);
@@ -123,6 +126,8 @@ function horaDe(a: Afectada): string {
 }
 
 async function cargar(): Promise<void> {
+  cargando.value = true;
+  errorCarga.value = false;
   try {
     const [b, r] = await Promise.all([
       api.get<{ data: Bloqueo[] }>(`${props.base}/bloqueos`, {
@@ -143,8 +148,10 @@ async function cargar(): Promise<void> {
         form.value.ambito = "profesional";
       }
     }
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCarga.value = true;
+  } finally {
+    cargando.value = false;
   }
 }
 
@@ -234,8 +241,28 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
       {{ $t("bloqueosAgenda.ayuda") }}
     </p>
 
+    <p
+      v-if="cargando && visibles.length === 0"
+      class="mt-4 text-sm"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("comun.cargando") }}
+    </p>
+    <p
+      v-else-if="errorCarga"
+      class="mt-4 text-sm"
+      role="alert"
+      data-prueba="error-carga-bloqueos"
+    >
+      <span style="color: var(--error)">{{
+        $t("bloqueosAgenda.errorCarga")
+      }}</span>
+      <button type="button" class="tu-enlace ml-2" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </p>
     <ul
-      v-if="visibles.length > 0"
+      v-else-if="visibles.length > 0"
       class="mt-4 divide-y divide-[var(--borde)] border-y text-sm"
       :style="{ borderColor: 'var(--borde)' }"
     >

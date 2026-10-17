@@ -71,6 +71,7 @@ export default {
     guardar: "Guardar nota",
     cancelar: "Cancelar",
     vacio: "Sin notas del equipo.",
+    errorCarga: "No se pudieron cargar las notas.",
     eliminar: "Eliminar",
     confirmarEliminar: "¿Eliminar esta nota?",
     guardada: "Nota guardada.",

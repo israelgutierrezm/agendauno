@@ -33,6 +33,8 @@ const config = ref<WidgetPublico | null>(null);
 const estado = ref<"cargando" | "listo" | "no_disponible">("cargando");
 const formulario = ref<string | null>(null);
 const planes = ref<PlanPublico[]>([]);
+// Los precios no se pudieron consultar: no es «aún no hay precios».
+const errorPlanes = ref(false);
 const terminos = ref<TerminosNegocio | null>(null);
 // Lo que eligió (una clase o un plan): deja sus datos para eso.
 const pidiendo = ref<{
@@ -102,32 +104,42 @@ async function cargar(): Promise<void> {
     formulario.value = null;
   }
   if (config.value.tipo === "planes") {
-    try {
-      const { data } = await api.get<{
-        data: {
-          productos: PlanPublico[];
-          estudio: {
-            perfil_config: { terminologia?: Partial<TerminosNegocio> };
-          };
-        };
-      }>(`${base}/escaparate`);
-      const sede = config.value.filtros.sucursal;
-      planes.value = data.data.productos.filter(
-        (p) =>
-          !sede ||
-          p.todas_sucursales !== false ||
-          (p.sucursales ?? []).some((s) => s.id === sede),
-      );
-      const tr = data.data.estudio.perfil_config.terminologia;
-      terminos.value =
-        tr?.sesion && tr.miembro && tr.instructor
-          ? (tr as TerminosNegocio)
-          : null;
-    } catch {
-      planes.value = [];
-    }
+    await cargarPlanes();
   }
   estado.value = "listo";
+}
+
+async function cargarPlanes(): Promise<void> {
+  if (config.value === null) {
+    return;
+  }
+  const base = `/api/v1/app/${encodeURIComponent(props.slug)}`;
+  errorPlanes.value = false;
+  try {
+    const { data } = await api.get<{
+      data: {
+        productos: PlanPublico[];
+        estudio: {
+          perfil_config: { terminologia?: Partial<TerminosNegocio> };
+        };
+      };
+    }>(`${base}/escaparate`);
+    const sede = config.value.filtros.sucursal;
+    planes.value = data.data.productos.filter(
+      (p) =>
+        !sede ||
+        p.todas_sucursales !== false ||
+        (p.sucursales ?? []).some((s) => s.id === sede),
+    );
+    const tr = data.data.estudio.perfil_config.terminologia;
+    terminos.value =
+      tr?.sesion && tr.miembro && tr.instructor
+        ? (tr as TerminosNegocio)
+        : null;
+  } catch {
+    planes.value = [];
+    errorPlanes.value = true;
+  }
 }
 
 function elegirPlan(p: PlanPublico): void {
@@ -236,7 +248,20 @@ onBeforeUnmount(() => observador?.disconnect());
         />
         <template v-else>
           <p
-            v-if="planes.length === 0"
+            v-if="errorPlanes"
+            class="py-8 text-center text-sm"
+            role="alert"
+            data-prueba="widget-error-planes"
+          >
+            <span style="color: var(--error)">{{
+              t("escaparate.errorPrecios")
+            }}</span>
+            <button type="button" class="tu-enlace ml-2" @click="cargarPlanes">
+              {{ t("comun.reintentar") }}
+            </button>
+          </p>
+          <p
+            v-else-if="planes.length === 0"
             class="py-8 text-center text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >

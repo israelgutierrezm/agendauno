@@ -89,6 +89,8 @@ const cargando = ref(true);
 const cargandoHorario = ref(false);
 const guardando = ref(false);
 const error = ref<string | null>(null);
+// Sucursales y equipo no se pudieron consultar: no es «aún no hay instructores».
+const errorReferencias = ref(false);
 const okGuardado = ref(false);
 
 const sucursalActual = computed(
@@ -126,6 +128,7 @@ const rangoInvalido = computed(() =>
 async function cargarReferencias(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorReferencias.value = false;
   try {
     const [s, p] = await Promise.all([
       api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
@@ -137,8 +140,8 @@ async function cargarReferencias(): Promise<void> {
     if (sucursales.value.length === 1) {
       sucursalId.value = sucursales.value[0].id;
     }
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorReferencias.value = true;
   } finally {
     cargando.value = false;
   }
@@ -515,7 +518,25 @@ onMounted(cargarReferencias);
       {{ error }}
     </AvisoTono>
 
-    <template v-if="!cargando">
+    <div
+      v-if="!cargando && errorReferencias"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-referencias-horarios"
+    >
+      <span style="color: var(--error)">{{
+        $t("horarios.errorReferencias")
+      }}</span>
+      <button
+        type="button"
+        class="tu-btn tu-btn-fantasma"
+        @click="cargarReferencias"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+
+    <template v-else-if="!cargando">
       <!-- Sucursal y persona, con las acciones del horario -->
       <div class="hv-filtros mt-6">
         <div v-if="elegirSucursal">

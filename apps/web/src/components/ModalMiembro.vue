@@ -151,6 +151,9 @@ const metaNotas = ref<{
   total: number;
 } | null>(null);
 const cargandoMasNotas = ref(false);
+// Que no carguen no es lo mismo que no haya notas.
+const cargandoNotas = ref(false);
+const errorNotas = ref(false);
 const ficha = ref<Ficha | null>(null);
 const cargandoFicha = ref(false);
 
@@ -287,6 +290,8 @@ async function cargarNotas(): Promise<void> {
   if (!props.persona) {
     return;
   }
+  cargandoNotas.value = true;
+  errorNotas.value = false;
   try {
     const { data } = await api.get<{
       data: Nota[];
@@ -299,6 +304,9 @@ async function cargarNotas(): Promise<void> {
   } catch {
     notas.value = [];
     metaNotas.value = null;
+    errorNotas.value = true;
+  } finally {
+    cargandoNotas.value = false;
   }
 }
 async function masNotas(): Promise<void> {
@@ -936,7 +944,27 @@ function colorAlerta(codigo: string): string {
             </div>
           </form>
           <p
-            v-if="notas.length === 0 && !escribiendo"
+            v-if="cargandoNotas && notas.length === 0 && !escribiendo"
+            class="mt-2 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("comun.cargando") }}
+          </p>
+          <p
+            v-else-if="errorNotas && !escribiendo"
+            class="mt-2 text-sm"
+            role="alert"
+            data-prueba="error-notas"
+          >
+            <span style="color: var(--error)">{{
+              $t("detalleMiembro.notas.errorCarga")
+            }}</span>
+            <button type="button" class="tu-enlace ml-2" @click="cargarNotas">
+              {{ $t("comun.reintentar") }}
+            </button>
+          </p>
+          <p
+            v-else-if="notas.length === 0 && !escribiendo"
             class="mt-2 text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >
@@ -1118,7 +1146,22 @@ function colorAlerta(codigo: string): string {
           </div>
         </form>
         <p
-          v-if="notas.length === 0"
+          v-if="cargandoNotas && notas.length === 0"
+          class="mt-4 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("comun.cargando") }}
+        </p>
+        <p v-else-if="errorNotas" class="mt-4 text-sm" role="alert">
+          <span style="color: var(--error)">{{
+            $t("detalleMiembro.notas.errorCarga")
+          }}</span>
+          <button type="button" class="tu-enlace ml-2" @click="cargarNotas">
+            {{ $t("comun.reintentar") }}
+          </button>
+        </p>
+        <p
+          v-else-if="notas.length === 0"
           class="mt-4 text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >

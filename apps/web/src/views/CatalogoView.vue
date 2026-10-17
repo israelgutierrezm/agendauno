@@ -157,6 +157,8 @@ function paquetesCon(o: Oferta): string {
 }
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Sin ofertas porque no se pudieron consultar no es «aún no hay servicios».
+const errorCarga = ref(false);
 
 // Oferta en edición (una a la vez) + su formulario.
 const editandoId = ref<string | null>(null);
@@ -258,12 +260,15 @@ const formInvalido = computed(
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = true;
   try {
     const { data } = await api.get<{ data: Oferta[] }>(
       `${base.value}/ofertas`,
       { params: { archivados: 1 } },
     );
     todas.value = data.data;
+    // Los espacios son secundarios: si fallan, el catálogo sí se muestra.
+    errorCarga.value = false;
     // Espacios del negocio (si no hay, la sección no aparece).
     const r = await api.get<{ data: Recurso[] }>(`${base.value}/recursos`);
     recursos.value = r.data.data.filter((x) => x.activo);
@@ -626,9 +631,18 @@ onMounted(cargar);
     </p>
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
+      <template v-if="errorCarga" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
 
-    <template v-if="!cargando">
+    <template v-if="!cargando && !errorCarga">
       <EstadoVacio
         v-if="todas.length === 0"
         class="mt-8"

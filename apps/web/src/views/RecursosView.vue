@@ -43,6 +43,8 @@ const recursos = ref<Recurso[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// El de la carga, aparte del de guardar: sin lista no es «aún no hay espacios».
+const errorCarga = ref<string | null>(null);
 
 const form = ref({
   sucursalId: "",
@@ -152,7 +154,7 @@ function editar(r: Recurso): void {
 
 async function cargar(): Promise<void> {
   cargando.value = true;
-  error.value = null;
+  errorCarga.value = null;
   try {
     const [r, s] = await Promise.all([
       api.get<{ data: Recurso[] }>(`${base.value}/recursos`),
@@ -161,7 +163,7 @@ async function cargar(): Promise<void> {
     recursos.value = r.data.data;
     sucursales.value = s.data.data;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -287,7 +289,19 @@ onMounted(cargar);
       {{ error }}
     </AvisoTono>
 
-    <template v-if="!cargando">
+    <div
+      v-if="!cargando && errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-recursos"
+    >
+      <span style="color: var(--error)">{{ errorCarga }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+
+    <template v-else-if="!cargando">
       <!-- Lista -->
       <EstadoVacio
         v-if="recursos.length === 0"

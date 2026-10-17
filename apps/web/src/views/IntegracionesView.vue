@@ -478,8 +478,21 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+    <!-- Lo que no se pudo consultar: aquí, con Reintentar; las listas no dicen
+         «aún no hay». -->
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          :disabled="cargando"
+          data-prueba="reintentar-integraciones"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
 
     <!-- Plataformas de bienestar -->
@@ -621,13 +634,13 @@ onMounted(cargar);
         </div>
 
         <EstadoVacio
-          v-if="llaves.length === 0"
+          v-if="llaves.length === 0 && !error"
           class="mt-4 py-6"
           icono="integraciones"
           compacto
           :titulo="$t('conexiones.llave.vacio')"
         />
-        <ul v-else class="mt-3">
+        <ul v-else-if="llaves.length > 0" class="mt-3">
           <li v-for="l in llaves" :key="l.id" class="int-fila text-sm">
             <div class="min-w-0">
               <p
@@ -782,13 +795,13 @@ onMounted(cargar);
         </div>
 
         <EstadoVacio
-          v-if="webhooks.length === 0"
+          v-if="webhooks.length === 0 && !error"
           class="mt-4 py-6"
           icono="integraciones"
           compacto
           :titulo="$t('conexiones.webhook.vacio')"
         />
-        <ul v-else class="mt-3">
+        <ul v-else-if="webhooks.length > 0" class="mt-3">
           <li v-for="w in webhooks" :key="w.id" class="int-fila text-sm">
             <div class="min-w-0">
               <p class="font-medium truncate">{{ w.url }}</p>
@@ -872,8 +885,25 @@ onMounted(cargar);
                   >
                 </button>
               </div>
+              <!-- Con un estado elegido, «ninguna así» no es «sin entregas». -->
+              <EstadoVacio
+                v-if="entregas.length === 0 && estadoEntregas !== ''"
+                icono="buscar"
+                compacto
+                :titulo="$t('tabla.sinCoincidencias')"
+                :texto="$t('tabla.ajustarBusqueda')"
+                data-prueba="entregas-sin-coincidencias"
+              >
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma"
+                  @click="filtrarEntregas('')"
+                >
+                  {{ $t("tabla.restablecer") }}
+                </button>
+              </EstadoVacio>
               <p
-                v-if="entregas.length === 0"
+                v-else-if="entregas.length === 0"
                 class="py-3"
                 :style="{ color: 'var(--texto-suave)' }"
               >

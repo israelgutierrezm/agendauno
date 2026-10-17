@@ -1007,7 +1007,7 @@ onMounted(cargar);
       </template>
 
       <p
-        v-if="pestana === 'clientes' && !cohortes"
+        v-if="pestana === 'clientes' && !cohortes && !error"
         class="mt-6 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
       >
@@ -1151,13 +1151,16 @@ onMounted(cargar);
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reportes.equipo.subtitulo") }}
         </p>
-        <p
-          v-if="!equipo || equipo.profesionales.length === 0"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("reportes.equipo.vacio") }}
-        </p>
+        <!-- Si la pestaña falló, el aviso de arriba lo dice: no es «sin datos». -->
+        <template v-if="!equipo || equipo.profesionales.length === 0">
+          <p
+            v-if="!error"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("reportes.equipo.vacio") }}
+          </p>
+        </template>
         <template v-else>
           <div class="mt-3 tu-card overflow-x-auto">
             <table class="tu-tabla" data-prueba="equipo">
@@ -1303,13 +1306,15 @@ onMounted(cargar);
         <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("operacion.reportes.estadoActual") }}
         </p>
-        <p
-          v-if="sucursales.length === 0"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("reportes.sinSucursales") }}
-        </p>
+        <template v-if="sucursales.length === 0">
+          <p
+            v-if="!error"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("reportes.sinSucursales") }}
+          </p>
+        </template>
         <div v-else class="mt-3 tu-card overflow-x-auto">
           <table class="tu-tabla">
             <thead>
@@ -1384,19 +1389,21 @@ onMounted(cargar);
             )
           }}
         </h2>
-        <p
-          v-if="!rentabilidad || rentabilidad.ofertas.length === 0"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{
-            $t(
-              sesion.esCitas
-                ? "reportes.rentabilidad.vacioCitas"
-                : "reportes.rentabilidad.vacio",
-            )
-          }}
-        </p>
+        <template v-if="!rentabilidad || rentabilidad.ofertas.length === 0">
+          <p
+            v-if="!error"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              $t(
+                sesion.esCitas
+                  ? "reportes.rentabilidad.vacioCitas"
+                  : "reportes.rentabilidad.vacio",
+              )
+            }}
+          </p>
+        </template>
         <template v-else>
           <div class="mt-3 tu-card overflow-x-auto">
             <table class="tu-tabla">
@@ -1525,6 +1532,7 @@ onMounted(cargar);
               {{ $t("reportes.demanda.titulo") }}
             </h2>
             <EstadoVacio
+              v-if="!error"
               icono="reportes"
               :titulo="$t('reportes.demanda.vacio')"
             />

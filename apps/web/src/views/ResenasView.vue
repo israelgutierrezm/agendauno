@@ -204,6 +204,19 @@ const indicadores = computed<Indicador[]>(() => {
   ];
 });
 
+// «Ninguna coincide» no es «aún no hay reseñas» (el API ya filtra por páginas).
+const filtrado = computed(
+  () =>
+    filtro.value !== "todas" ||
+    profesional.value !== "" ||
+    busqueda.value.trim() !== "",
+);
+function quitarFiltros(): void {
+  filtro.value = "todas";
+  profesional.value = "";
+  busqueda.value = "";
+}
+
 watch([filtro, profesional, busqueda], () => {
   if (!meta.value) return;
   pagina.value = 1;
@@ -232,6 +245,17 @@ onMounted(cargar);
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          :disabled="cargando"
+          data-prueba="reintentar-resenas"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
 
     <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
@@ -289,18 +313,36 @@ onMounted(cargar);
         >
           {{ $t("comun.cargando") }}
         </p>
+        <!-- Si no se pudo consultar, el aviso de arriba lo dice (y se reintenta). -->
         <EstadoVacio
-          v-else-if="visibles.length === 0"
+          v-else-if="visibles.length === 0 && !error && filtrado"
+          class="mt-4 py-6"
+          icono="buscar"
+          compacto
+          :titulo="$t('tabla.sinCoincidencias')"
+          :texto="$t('tabla.ajustarBusqueda')"
+          data-prueba="sin-coincidencias-resenas"
+        >
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="quitarFiltros"
+          >
+            {{ $t("tabla.restablecer") }}
+          </button>
+        </EstadoVacio>
+        <EstadoVacio
+          v-else-if="visibles.length === 0 && !error"
           class="mt-4 py-6"
           icono="mensaje"
           compacto
-          :titulo="
-            resenas.length === 0
-              ? $t('resenas.vacio')
-              : $t('listadosVisual.resenas.sinCoincidencias')
-          "
+          :titulo="$t('resenas.vacio')"
         />
-        <ul v-else class="rs-lista mt-4" data-prueba="resenas">
+        <ul
+          v-else-if="visibles.length > 0"
+          class="rs-lista mt-4"
+          data-prueba="resenas"
+        >
           <li
             v-for="r in visibles"
             :key="r.id"

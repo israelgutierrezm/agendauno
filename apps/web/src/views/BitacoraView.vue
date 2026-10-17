@@ -63,6 +63,8 @@ const accesos = ref<Acceso[]>([]);
 const abierto = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// El de la carga, aparte del de descargar: sin lista no es «sin cambios».
+const errorCarga = ref<string | null>(null);
 
 // Filtros de los cambios (fechas en la zona del negocio) y paginación.
 const desde = ref("");
@@ -75,6 +77,22 @@ const ultimaPagina = ref(1);
 const actores = ref<{ id: string; nombre: string }[]>([]);
 const categorias = ref<string[]>([]);
 const descargando = ref(false);
+// «Nada coincide con los filtros» no es «sin cambios registrados».
+const conFiltrosCambios = computed(
+  () =>
+    desde.value !== "" ||
+    hasta.value !== "" ||
+    usuario.value !== "" ||
+    categoria.value !== "" ||
+    texto.value.trim() !== "",
+);
+function limpiarFiltrosCambios(): void {
+  desde.value = "";
+  hasta.value = "";
+  usuario.value = "";
+  categoria.value = "";
+  texto.value = "";
+}
 
 // Filtros y página de las entradas.
 const buscarEntradas = ref("");
@@ -159,6 +177,7 @@ function diferencias(
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = null;
   try {
     if (pestana.value === "cambios") {
       const { data } = await api.get<{
@@ -199,7 +218,7 @@ async function cargar(): Promise<void> {
       metaEntradas.value = data.meta ?? null;
     }
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -420,11 +439,39 @@ onMounted(cargar);
         >
           {{ $t("comun.cargando") }}
         </p>
+        <div
+          v-else-if="errorCarga"
+          class="flex flex-wrap items-center justify-between gap-3 py-4 text-sm"
+          role="alert"
+          data-prueba="error-carga-bitacora"
+        >
+          <span style="color: var(--error)">{{ errorCarga }}</span>
+          <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+            {{ $t("comun.reintentar") }}
+          </button>
+        </div>
 
         <!-- Cambios -->
         <template v-else-if="pestana === 'cambios'">
           <EstadoVacio
-            v-if="cambios.length === 0"
+            v-if="cambios.length === 0 && conFiltrosCambios"
+            class="py-6"
+            icono="buscar"
+            compacto
+            :titulo="$t('tabla.sinCoincidencias')"
+            :texto="$t('tabla.ajustarBusqueda')"
+            data-prueba="cambios-sin-coincidencias"
+          >
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              @click="limpiarFiltrosCambios"
+            >
+              {{ $t("tabla.restablecer") }}
+            </button>
+          </EstadoVacio>
+          <EstadoVacio
+            v-else-if="cambios.length === 0"
             class="py-6"
             icono="lista"
             compacto

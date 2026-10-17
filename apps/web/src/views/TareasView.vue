@@ -89,6 +89,8 @@ const meta = ref<MetaTareas | null>(null);
 const pagina = ref(1);
 const estadoFiltro = ref<"pendiente" | "completada">("pendiente");
 const cargandoTareas = ref(true);
+// La bandeja no se pudo consultar: no es «todo al día».
+const errorTareas = ref(false);
 const accionando = ref(false);
 const mostrarNueva = ref(false);
 // La tarea que se crea o se edita (`editando`): con su persona y a quién se asigna.
@@ -491,6 +493,7 @@ async function guardarResultado(): Promise<void> {
 const reglas = ref<Regla[]>([]);
 const eventos = ref<string[]>([]);
 const cargandoReglas = ref(false);
+const errorReglas = ref(false);
 const mostrarRegla = ref(false);
 const editandoId = ref<string | null>(null);
 const errorRegla = ref<string | null>(null);
@@ -525,6 +528,7 @@ async function cargarTareas(): Promise<void> {
   const mia = ++peticion;
   cargandoTareas.value = true;
   error.value = null;
+  errorTareas.value = false;
   const q = busqueda.value.trim();
   try {
     const { data } = await api.get<{
@@ -559,9 +563,9 @@ async function cargarTareas(): Promise<void> {
     pendientes.value = data.pendientes;
     alcance.value = data.alcance ?? "equipo";
     meta.value = data.meta ?? null;
-  } catch (e) {
+  } catch {
     if (mia === peticion) {
-      error.value = mensajeDeError(e);
+      errorTareas.value = true;
     }
   } finally {
     if (mia === peticion) {
@@ -682,6 +686,7 @@ async function reabrir(tarea: Tarea): Promise<void> {
 async function cargarReglas(): Promise<void> {
   cargandoReglas.value = true;
   error.value = null;
+  errorReglas.value = false;
   try {
     const { data } = await api.get<{
       data: Regla[];
@@ -689,8 +694,8 @@ async function cargarReglas(): Promise<void> {
     }>(`${base.value}/automatizaciones`);
     reglas.value = data.data;
     eventos.value = data.catalogo.eventos;
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorReglas.value = true;
   } finally {
     cargandoReglas.value = false;
   }
@@ -1107,6 +1112,21 @@ onMounted(() => {
           </li>
         </ul>
 
+        <div
+          v-else-if="errorTareas"
+          class="flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+          role="alert"
+          data-prueba="error-carga-tareas"
+        >
+          <span style="color: var(--error)">{{ $t("tareas.errorCarga") }}</span>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="cargarTareas"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </div>
         <EstadoVacio
           v-else-if="tareas.length === 0 && hayFiltros"
           icono="buscar"
@@ -1574,6 +1594,23 @@ onMounted(() => {
       >
         {{ $t("comun.cargando") }}
       </p>
+      <div
+        v-else-if="errorReglas"
+        class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+        role="alert"
+        data-prueba="error-carga-reglas"
+      >
+        <span style="color: var(--error)">{{
+          $t("tareas.reglas.errorCarga")
+        }}</span>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          @click="cargarReglas"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </div>
       <EstadoVacio
         v-else-if="reglas.length === 0"
         class="mt-10"

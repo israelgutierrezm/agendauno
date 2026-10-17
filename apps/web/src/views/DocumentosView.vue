@@ -94,6 +94,8 @@ const docs = ref<Doc[]>([]);
 const consentimientosVigentes = ref<Consentimiento[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Las listas no se pudieron consultar: ninguna pestaña dice «aún no hay».
+const errorCarga = ref(false);
 const filtroEstado = ref("");
 // El listado va por páginas: ningún documento se queda fuera (antes, solo los
 // últimos 200).
@@ -133,6 +135,7 @@ function fecha(iso: string | null): string {
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const [t, d, c] = await Promise.all([
       api.get<{ data: TipoDoc[] }>(`${base.value}/tipos-documento`),
@@ -153,6 +156,7 @@ async function cargar(): Promise<void> {
     consentimientosVigentes.value = c.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
+    errorCarga.value = true;
   } finally {
     cargando.value = false;
   }
@@ -514,8 +518,17 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
-      {{ error }}
+    <p v-if="error" class="mt-4 text-sm" role="alert">
+      <span style="color: var(--error)">{{ error }}</span>
+      <button
+        v-if="errorCarga"
+        type="button"
+        class="tu-enlace ml-2"
+        data-prueba="reintentar-documentos"
+        @click="cargar"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
 
     <!-- Documentos cargados -->
@@ -543,14 +556,36 @@ onMounted(cargar);
           </div>
         </div>
 
+        <!-- Con el estado elegido, «ninguno así» no es «aún no hay documentos». -->
         <EstadoVacio
-          v-if="docs.length === 0"
+          v-if="docs.length === 0 && !errorCarga && filtroEstado !== ''"
+          class="py-8"
+          icono="buscar"
+          compacto
+          :titulo="$t('tabla.sinCoincidencias')"
+          :texto="$t('tabla.ajustarBusqueda')"
+          data-prueba="docs-sin-coincidencias"
+        >
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="
+              filtroEstado = '';
+              pagina = 1;
+              cargar();
+            "
+          >
+            {{ $t("tabla.restablecer") }}
+          </button>
+        </EstadoVacio>
+        <EstadoVacio
+          v-else-if="docs.length === 0 && !errorCarga"
           class="py-8"
           icono="documentos"
           compacto
           :titulo="$t('documentos.docs.vacio')"
         />
-        <table v-else class="tu-tabla">
+        <table v-else-if="docs.length > 0" class="tu-tabla">
           <thead>
             <tr>
               <th>{{ $t("documentosVisual.col.persona") }}</th>
@@ -709,13 +744,13 @@ onMounted(cargar);
           </button>
         </div>
         <EstadoVacio
-          v-if="tipos.length === 0"
+          v-if="tipos.length === 0 && !errorCarga"
           class="mt-4 py-6"
           icono="documentos"
           compacto
           :titulo="$t('documentos.tipos.vacio')"
         />
-        <ul v-else class="mt-2">
+        <ul v-else-if="tipos.length > 0" class="mt-2">
           <li v-for="t2 in tipos" :key="t2.id" class="doc-fila text-sm">
             <ModalDialogo
               v-if="puedeGestionar && editandoTipo === t2.id"
@@ -952,13 +987,13 @@ onMounted(cargar);
       class="mt-5 tu-card p-5"
     >
       <EstadoVacio
-        v-if="consentimientosVigentes.length === 0"
+        v-if="consentimientosVigentes.length === 0 && !errorCarga"
         class="py-6"
         icono="documentos"
         compacto
         :titulo="$t('consentimientos.vacio')"
       />
-      <ul v-else>
+      <ul v-else-if="consentimientosVigentes.length > 0">
         <li
           v-for="c in consentimientosVigentes"
           :key="c.id"

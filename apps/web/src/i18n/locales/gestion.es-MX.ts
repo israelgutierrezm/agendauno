@@ -184,7 +184,7 @@ export const comunicacionesAuto = {
   canalWhatsApp: "WhatsApp",
   textoWhatsApp: "Texto del mensaje",
   ayudaWhatsApp:
-    "Es el texto aprobado por WhatsApp; no se puede cambiar, solo encender o apagar. Le llega a quien aceptó recibir avisos por WhatsApp y tiene su celular registrado.",
+    "Es el texto aprobado por WhatsApp; no se puede cambiar, solo encender o apagar. Le llega a quien aceptó recibir avisos por WhatsApp y tiene su celular registrado. Solo envía avisos: si tu cliente contesta, su respuesta no llega aquí; para platicar con él, usa tu propio WhatsApp.",
   asunto: "Asunto",
   asuntoPush: "Título",
   cuerpo: "Mensaje",
@@ -197,6 +197,7 @@ export const comunicacionesAuto = {
   confirmarEliminar: "¿Quitar este mensaje automático?",
   eliminado: "Mensaje automático quitado.",
   salidaVacia: "Aún no se envían mensajes.",
+  errorSalida: "No se pudieron cargar los mensajes enviados.",
   todos: "Todos",
   estados: {
     encolado: "En cola",
@@ -1260,6 +1261,7 @@ export const bajas = {
   otraPersonaAyuda: "El teléfono se le quita a quien está dado de baja.",
   verBajas: "Ver dados de baja",
   verEquipo: "Ver equipo",
+  sinBajas: "Nadie está dado de baja.",
 };
 
 export const corteCaja = {
@@ -1326,6 +1328,7 @@ export const bloqueosAgenda = {
   ayuda:
     "Comida, vacaciones, ausencias o cierres. Ese horario deja de ofrecerse y no se puede agendar; lo que ya estaba agendado no se cancela solo.",
   vacio: "Sin bloqueos próximos.",
+  errorCarga: "No se pudieron cargar los bloqueos.",
   sede: "Toda la sede ({sede})",
   todaLaSede: "toda la sede",
   unaSala: "Una sala",

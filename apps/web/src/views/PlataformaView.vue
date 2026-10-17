@@ -1337,7 +1337,14 @@ function borrar(): void {
         :filas="estudios"
         :buscar="false"
         :por-pagina="metaEstudios?.per_page ?? 50"
-        :vacio="$t('plataforma.estudios.vacio')"
+        :vacio="
+          buscarEstudios.trim() !== '' ||
+          filtroEstudios.producto !== '' ||
+          filtroEstudios.estado !== '' ||
+          filtroEstudios.adeudo
+            ? $t('tabla.sinCoincidencias')
+            : $t('plataforma.estudios.vacio')
+        "
         clave-vista="plataforma-estudios"
       >
         <template #col-nombre="{ fila }">

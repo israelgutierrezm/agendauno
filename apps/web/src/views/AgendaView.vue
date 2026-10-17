@@ -19,6 +19,7 @@ import CambiarSerie from "@/components/CambiarSerie.vue";
 import CheckinsClase from "@/components/CheckinsClase.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -182,8 +183,12 @@ const bloqueos = ref<BloqueoAgenda[]>([]);
 const cargando = ref(true);
 const cargandoSesiones = ref(false);
 const error = ref<string | null>(null);
+// Las sesiones no se pudieron consultar: el día no está «sin clases».
+const errorSesiones = ref(false);
 // Lo que no se pudo cargar de las listas de apoyo (no lo borra recargar sesiones).
 const errorReferencias = ref<string | null>(null);
+// Sin ofertas o sucursales por error no es «primero crea una» (Nueva clase).
+const errorOfertasSucursales = ref(false);
 // Fechas de una clase recurrente que no se pudieron generar (y por qué).
 const avisoSerie = ref<string | null>(null);
 // El rango trae más clases de las que el servidor manda de una vez (`meta.truncado`):
@@ -608,6 +613,7 @@ const COLOR_ESTADO: Record<string, string> = {
 async function cargarReferencias(): Promise<void> {
   cargando.value = true;
   errorReferencias.value = null;
+  errorOfertasSucursales.value = false;
   const pedir = async <T,>(
     ruta: string,
     params?: Record<string, string>,
@@ -622,16 +628,28 @@ async function cargarReferencias(): Promise<void> {
   ];
   if (puedeVerCatalogo.value) {
     tareas.push(
-      pedir<Oferta[]>("/ofertas", { archivados: "1" }).then((d) => {
-        todasOfertas.value = d;
-      }),
+      pedir<Oferta[]>("/ofertas", { archivados: "1" }).then(
+        (d) => {
+          todasOfertas.value = d;
+        },
+        (e: unknown) => {
+          errorOfertasSucursales.value = true;
+          throw e;
+        },
+      ),
     );
   }
   if (puedeVerSucursales.value) {
     tareas.push(
-      pedir<Sucursal[]>("/sucursales").then((d) => {
-        sucursales.value = d;
-      }),
+      pedir<Sucursal[]>("/sucursales").then(
+        (d) => {
+          sucursales.value = d;
+        },
+        (e: unknown) => {
+          errorOfertasSucursales.value = true;
+          throw e;
+        },
+      ),
     );
   }
   if (sesion.esCitas) {
@@ -688,6 +706,7 @@ async function cargarSesiones(): Promise<void> {
 async function cargarSesionesAhora(): Promise<void> {
   cargandoSesiones.value = true;
   error.value = null;
+  errorSesiones.value = false;
   try {
     const params: Record<string, string> = { ...rangoCarga.value };
     if (sucursalFiltro.value !== "") {
@@ -727,6 +746,7 @@ async function cargarSesionesAhora(): Promise<void> {
     }
   } catch (e) {
     error.value = mensajeDeError(e);
+    errorSesiones.value = true;
   } finally {
     cargandoSesiones.value = false;
   }
@@ -1064,6 +1084,8 @@ const tarjetasKpi = computed<Indicador[]>(() => {
 const detalle = ref<Sesion | null>(null);
 const roster = ref<Reserva[]>([]);
 const cargandoRoster = ref(false);
+// Que no se pudo consultar quién va no es «sin reservas».
+const errorRoster = ref(false);
 const reservarModel = ref({
   miembroId: "",
   esperar: false,
@@ -1402,13 +1424,15 @@ async function cargarRoster(id: string): Promise<void> {
     return;
   }
   cargandoRoster.value = true;
+  errorRoster.value = false;
   try {
     const { data } = await api.get<{ data: Reserva[] }>(
       `${base.value}/sesiones/${id}/reservas`,
     );
     roster.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    roster.value = [];
+    errorRoster.value = true;
   } finally {
     cargandoRoster.value = false;
   }
@@ -2578,13 +2602,52 @@ onMounted(async () => {
             </button>
           </li>
         </ul>
-        <p
-          v-if="sesionesDe(diaSelInfo.iso).length === 0"
-          class="mt-6 text-center text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
+        <template
+          v-if="sesionesDe(diaSelInfo.iso).length === 0 && !cargandoSesiones"
         >
-          {{ $t("agenda.sinClasesDia") }}
-        </p>
+          <p
+            v-if="errorSesiones"
+            class="mt-6 text-center text-sm"
+            role="alert"
+            data-prueba="dia-error"
+          >
+            <span style="color: var(--error)">{{
+              $t("agenda.errorCarga")
+            }}</span>
+            <button
+              type="button"
+              class="tu-enlace ml-2"
+              @click="cargarSesiones"
+            >
+              {{ $t("comun.reintentar") }}
+            </button>
+          </p>
+          <EstadoVacio
+            v-else-if="filtrosActivos > 0"
+            class="mt-4"
+            icono="buscar"
+            compacto
+            :titulo="$t('tabla.sinCoincidencias')"
+            :texto="$t('tabla.ajustarBusqueda')"
+            data-prueba="dia-sin-coincidencias"
+          >
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              @click="quitarFiltros"
+            >
+              {{ $t("tabla.restablecer") }}
+            </button>
+          </EstadoVacio>
+          <p
+            v-else
+            class="mt-6 text-center text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="dia-vacio"
+          >
+            {{ $t("agenda.sinClasesDia") }}
+          </p>
+        </template>
       </div>
     </div>
 
@@ -2912,6 +2975,23 @@ onMounted(async () => {
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ $t("comun.cargando") }}
+              </p>
+              <p
+                v-else-if="errorRoster"
+                class="mt-2 text-sm"
+                role="alert"
+                data-prueba="roster-error"
+              >
+                <span style="color: var(--error)">{{
+                  $t("agenda.roster.errorCarga")
+                }}</span>
+                <button
+                  type="button"
+                  class="tu-enlace ml-2"
+                  @click="cargarRoster(detalle.id)"
+                >
+                  {{ $t("comun.reintentar") }}
+                </button>
               </p>
               <p
                 v-else-if="roster.length === 0"
@@ -3426,7 +3506,20 @@ onMounted(async () => {
       @cerrar="cerrarNuevaClase"
     >
       <p
-        v-if="ofertas.length === 0"
+        v-if="errorOfertasSucursales"
+        class="text-sm"
+        role="alert"
+        data-prueba="nueva-error-carga"
+      >
+        <span style="color: var(--error)">{{
+          $t("agenda.nueva.errorCarga")
+        }}</span>
+        <button type="button" class="tu-enlace ml-2" @click="cargarReferencias">
+          {{ $t("comun.reintentar") }}
+        </button>
+      </p>
+      <p
+        v-else-if="ofertas.length === 0"
         class="text-sm"
         :style="{ color: 'var(--texto-suave)' }"
       >

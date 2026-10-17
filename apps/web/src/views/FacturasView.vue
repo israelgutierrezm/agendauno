@@ -259,7 +259,9 @@ onMounted(cargar);
       {{ $t("comun.cargando") }}
     </p>
 
-    <template v-else>
+    <!-- Si la primera carga falló, el aviso de arriba lo dice (con Reintentar): la
+         tabla vacía diría «aún no has emitido facturas». -->
+    <template v-else-if="cargadoUnaVez">
       <div class="fa-filtros mt-6" data-prueba="filtros-facturas">
         <input
           v-model="buscar"

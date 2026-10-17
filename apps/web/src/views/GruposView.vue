@@ -151,6 +151,8 @@ const inscripciones = ref<Inscripcion[]>([]);
 const totalInscritos = ref(0);
 const buscarInscrito = ref("");
 const cargandoInscritos = ref(false);
+// La primera página no se pudo consultar: no es «aún no hay inscritos».
+const errorInscritos = ref(false);
 const INSCRITOS_POR_PAGINA = 20;
 const miembroId = ref("");
 const inscribiendo = ref(false);
@@ -255,6 +257,7 @@ async function cargarInscritos(pagina: number): Promise<void> {
   if (g === null) return;
   const mio = ++turnoInscritos;
   cargandoInscritos.value = true;
+  errorInscritos.value = false;
   const q = buscarInscrito.value.trim();
   try {
     const { data } = await api.get<{
@@ -272,7 +275,13 @@ async function cargarInscritos(pagina: number): Promise<void> {
       pagina === 1 ? data.data : [...inscripciones.value, ...data.data];
     totalInscritos.value = data.meta.total;
   } catch (e) {
-    if (mio === turnoInscritos) errorDetalle.value = mensajeDeError(e);
+    if (mio !== turnoInscritos) return;
+    if (pagina === 1) {
+      inscripciones.value = [];
+      errorInscritos.value = true;
+    } else {
+      errorDetalle.value = mensajeDeError(e);
+    }
   } finally {
     if (mio === turnoInscritos) cargandoInscritos.value = false;
   }
@@ -756,6 +765,23 @@ const indicadores = computed<Indicador[]>(() => {
                   </button>
                 </li>
               </ul>
+              <p
+                v-else-if="errorInscritos && !cargandoInscritos"
+                class="mt-4 text-sm"
+                role="alert"
+                data-prueba="error-inscritos"
+              >
+                <span style="color: var(--error)">{{
+                  $t("cursos.errorInscritos")
+                }}</span>
+                <button
+                  type="button"
+                  class="tu-enlace ml-2"
+                  @click="cargarInscritos(1)"
+                >
+                  {{ $t("comun.reintentar") }}
+                </button>
+              </p>
               <p
                 v-else-if="!cargandoInscritos"
                 class="mt-4 text-sm"

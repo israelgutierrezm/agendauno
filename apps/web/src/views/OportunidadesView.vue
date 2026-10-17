@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -188,6 +189,20 @@ watch(dias, cargar);
 watch([busqueda, sucursal, instructor, soloEspera], () => {
   pagina.value = 1;
 });
+// «Ninguna coincide con los filtros» no es «no hay clases con lugares libres».
+const filtrado = computed(
+  () =>
+    busqueda.value.trim() !== "" ||
+    sucursal.value !== "" ||
+    instructor.value !== "" ||
+    soloEspera.value,
+);
+function quitarFiltros(): void {
+  busqueda.value = "";
+  sucursal.value = "";
+  instructor.value = "";
+  soloEspera.value = false;
+}
 onMounted(cargar);
 </script>
 
@@ -267,7 +282,26 @@ onMounted(cargar);
             </button>
           </div>
         </div>
-        <p v-if="filtradas.length === 0 && !error" class="tu-sin-resultados">
+        <EstadoVacio
+          v-if="filtradas.length === 0 && !error && filtrado"
+          icono="buscar"
+          compacto
+          :titulo="$t('tabla.sinCoincidencias')"
+          :texto="$t('tabla.ajustarBusqueda')"
+          data-prueba="sin-coincidencias-oportunidades"
+        >
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="quitarFiltros"
+          >
+            {{ $t("tabla.restablecer") }}
+          </button>
+        </EstadoVacio>
+        <p
+          v-else-if="filtradas.length === 0 && !error"
+          class="tu-sin-resultados"
+        >
           {{ $t("oportunidades.vacio") }}
         </p>
         <table v-else-if="filtradas.length > 0" class="tu-tabla">

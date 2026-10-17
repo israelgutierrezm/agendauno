@@ -259,4 +259,23 @@ describe("vender un plan", () => {
     expect(texto).toContain("$4,500.00");
     expect(texto).toContain("9");
   });
+
+  it("si no se pudo consultar, lo dice y deja reintentar (no «Primero crea un producto»)", async () => {
+    const base = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation(() => Promise.reject(new Error("caído")));
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-carga-ventas"]').text()).toContain(
+      "No se pudieron cargar los planes y las ventas.",
+    );
+    expect(w.text()).not.toContain("Primero crea un producto.");
+    expect(w.text()).not.toContain("Sin ventas aún.");
+
+    mocks.get.mockImplementation(base);
+    await w.get('[data-prueba="error-carga-ventas"] button').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-prueba="error-carga-ventas"]').exists()).toBe(false);
+    expect(w.findAll('[data-prueba="plan"]').length).toBe(2);
+  });
 });

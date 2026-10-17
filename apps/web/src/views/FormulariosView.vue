@@ -83,6 +83,9 @@ const formularios = ref<Formulario[]>([]);
 const seleccionadoId = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Los de la carga, aparte del de guardar: sin lista no es «aún no hay fichas».
+const errorCarga = ref(false);
+const errorRespuestas = ref(false);
 
 const nuevo = ref({ nombre: "", aplica_a: "miembro" });
 const creando = ref(false);
@@ -183,6 +186,7 @@ function expediente(r: Respuesta): string | null {
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const url = `${base.value}/formularios`;
     const f = verArchivadas.value
@@ -198,8 +202,8 @@ async function cargar(): Promise<void> {
     ) {
       seleccionadoId.value = formularios.value[0].id;
     }
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCarga.value = true;
   } finally {
     cargando.value = false;
   }
@@ -314,6 +318,7 @@ async function cargarRespuestas(): Promise<void> {
   respuestas.value = [];
   metaRespuestas.value = null;
   abierta.value = null;
+  errorRespuestas.value = false;
   // Solo en la vista de respuestas: el diseño no las consulta.
   if (
     !soloRespuestas.value ||
@@ -340,8 +345,8 @@ async function cargarRespuestas(): Promise<void> {
     versionActual.value =
       (data.meta as { version_actual?: number } | undefined)?.version_actual ??
       null;
-  } catch (e) {
-    error.value = mensajeDeError(e, t("formulariosRespuestas.cargarError"));
+  } catch {
+    errorRespuestas.value = true;
   } finally {
     cargandoRespuestas.value = false;
   }
@@ -639,8 +644,21 @@ onMounted(cargar);
           />
           {{ $t("operacion.fichas.verArchivadas") }}
         </label>
+        <p
+          v-if="errorCarga"
+          class="text-sm"
+          role="alert"
+          data-prueba="error-carga-formularios"
+        >
+          <span style="color: var(--error)">{{
+            $t("formularios.errorCarga")
+          }}</span>
+          <button type="button" class="tu-enlace ml-2" @click="cargar">
+            {{ $t("comun.reintentar") }}
+          </button>
+        </p>
         <EstadoVacio
-          v-if="formularios.length === 0"
+          v-else-if="formularios.length === 0"
           class="py-6"
           icono="formularios"
           compacto
@@ -1309,6 +1327,23 @@ onMounted(cargar);
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{ $t("comun.cargando") }}
+            </p>
+            <p
+              v-else-if="errorRespuestas"
+              class="mt-4 text-sm"
+              role="alert"
+              data-prueba="error-respuestas"
+            >
+              <span style="color: var(--error)">{{
+                $t("formulariosRespuestas.cargarError")
+              }}</span>
+              <button
+                type="button"
+                class="tu-enlace ml-2"
+                @click="cargarRespuestas"
+              >
+                {{ $t("comun.reintentar") }}
+              </button>
             </p>
             <p
               v-else-if="respuestas.length === 0"

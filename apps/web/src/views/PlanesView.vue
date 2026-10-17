@@ -258,12 +258,21 @@ onMounted(cargar);
       </template>
     </EncabezadoSeccion>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
-      {{ error }}
-    </p>
     <p v-if="cargando" class="mt-6" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+    <!-- No se pudo consultar: no es «aún no tienes planes». -->
+    <div
+      v-else-if="error"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-carga-planes"
+    >
+      <span style="color: var(--error)">{{ error }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
     <EstadoVacio
       v-else-if="planes.length === 0"
       class="tu-card mt-6"

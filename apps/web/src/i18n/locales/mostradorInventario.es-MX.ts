@@ -1,6 +1,7 @@
 // Mostrador (views/PosView.vue) e Inventario (views/InventarioView.vue).
 export const mostradorVisual = {
   titulo: "Mostrador",
+  errorCarga: "No se pudieron cargar los productos y las sucursales.",
   subtitulo: "Vende productos de tu inventario y cobra en caja.",
   buscar: "Buscar producto o SKU",
   sinResultados: "Ningún producto coincide con la búsqueda.",
@@ -91,6 +92,7 @@ export const mostradorVisual = {
 };
 
 export const inventarioVisual = {
+  errorCarga: "No se pudieron cargar los artículos.",
   // Extras del producto (ADR 0139): lo que se le puede agregar, con su precio.
   extras: {
     titulo: "Extras",
@@ -382,6 +384,7 @@ export const gruposVisual = {
 
 // Lealtad (views/LealtadView.vue) con el patrón de los listados.
 export const lealtadVisual = {
+  errorCarga: "No se pudo cargar el programa de lealtad.",
   subtitulo:
     "Puntos por asistir y por comprar, y las recompensas que se canjean.",
   inactivo: "Apagado",
