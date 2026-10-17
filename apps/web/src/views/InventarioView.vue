@@ -18,6 +18,7 @@ import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -399,6 +400,15 @@ function limpiarErroresProducto(): void {
   errorProducto.value = null;
   erroresProducto.value = {};
 }
+// Con cambios sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartarProducto = useDescartarCambios({
+  abierto: dialogoProducto,
+  valor: () => ({ form: form.value, extras: extras.value }),
+  guardando,
+});
+function cerrarProducto(): void {
+  void descartarProducto.cerrar();
+}
 function nuevoProducto(): void {
   editando.value = null;
   form.value = {
@@ -412,6 +422,7 @@ function nuevoProducto(): void {
   extras.value = [];
   olvidarFotoNueva();
   limpiarErroresProducto();
+  descartarProducto.fijar();
   dialogoProducto.value = true;
 }
 function editar(a: Articulo): void {
@@ -429,6 +440,7 @@ function editar(a: Articulo): void {
     precio: String(e.precio_minor / 100),
   }));
   limpiarErroresProducto();
+  descartarProducto.fijar();
   dialogoProducto.value = true;
 }
 function agregarExtra(): void {
@@ -488,6 +500,7 @@ async function guardarProducto(): Promise<void> {
       }
       toast.exito(t("inventarioVisual.creado"));
     }
+    descartarProducto.fijar();
     dialogoProducto.value = false;
     await cargar();
   } catch (e) {
@@ -543,6 +556,20 @@ const movimiento = ref<{
 }>({ sucursal_id: "", tipo: "entrada", cantidad: "", motivo: "", detalle: "" });
 const errorMovimiento = ref<string | null>(null);
 const erroresMovimiento = ref<Record<string, string>>({});
+const moviendoAbierto = computed({
+  get: () => moviendo.value !== null,
+  set: (v: boolean) => {
+    if (!v) moviendo.value = null;
+  },
+});
+const descartarMovimiento = useDescartarCambios({
+  abierto: moviendoAbierto,
+  valor: () => movimiento.value,
+  guardando,
+});
+function cerrarMovimiento(): void {
+  void descartarMovimiento.cerrar();
+}
 function abrirMovimiento(a: Articulo): void {
   moviendo.value = a;
   movimiento.value = {
@@ -554,6 +581,7 @@ function abrirMovimiento(a: Articulo): void {
   };
   errorMovimiento.value = null;
   erroresMovimiento.value = {};
+  descartarMovimiento.fijar();
 }
 const motivoTexto = computed(() => {
   const m = movimiento.value;
@@ -595,6 +623,7 @@ async function guardarMovimiento(): Promise<void> {
       ...(motivoTexto.value !== "" ? { motivo: motivoTexto.value } : {}),
     });
     toast.exito(t("inventarioVisual.movido"));
+    descartarMovimiento.fijar();
     moviendo.value = null;
     await irPagina(pagina.value);
   } catch (e) {
@@ -922,7 +951,7 @@ onMounted(cargar);
       "
       icono="pos"
       :ocupado="guardando"
-      @cerrar="dialogoProducto = false"
+      @cerrar="cerrarProducto"
     >
       <form
         id="iv-producto"
@@ -1148,7 +1177,7 @@ onMounted(cargar);
           type="button"
           class="tu-btn tu-btn-fantasma"
           :disabled="guardando"
-          @click="dialogoProducto = false"
+          @click="cerrarProducto"
         >
           {{ $t("pos.inventario.cancelar") }}
         </button>
@@ -1251,7 +1280,7 @@ onMounted(cargar);
       :titulo="moviendo?.nombre ?? ''"
       icono="pos"
       :ocupado="guardando"
-      @cerrar="moviendo = null"
+      @cerrar="cerrarMovimiento"
     >
       <form
         id="iv-movimiento"
@@ -1364,7 +1393,7 @@ onMounted(cargar);
           type="button"
           class="tu-btn tu-btn-fantasma"
           :disabled="guardando"
-          @click="moviendo = null"
+          @click="cerrarMovimiento"
         >
           {{ $t("pos.inventario.cancelar") }}
         </button>
