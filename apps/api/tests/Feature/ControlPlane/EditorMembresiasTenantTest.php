@@ -159,9 +159,12 @@ it('archivar retira el producto de la venta pero lo conserva en el editor', func
     expect($vendibles->pluck('id'))->not->toContain($producto);
 
     // ...pero visible en el editor con ?incluir=todos.
-    $todos = collect($this->getJson("/api/v1/app/{$e['slug']}/productos?incluir=todos", conBearer($e['bearer']))
-        ->assertOk()->json('data'));
-    expect($todos->pluck('id'))->toContain($producto);
+    $respuesta = $this->getJson("/api/v1/app/{$e['slug']}/productos?incluir=todos", conBearer($e['bearer']))->assertOk();
+    $todos = collect($respuesta->json('data'));
+    expect($todos->pluck('id'))->toContain($producto)
+        // Los que están a la venta primero; nada se corta en silencio.
+        ->and($todos->last()['id'])->toBe($producto)
+        ->and($respuesta->json('meta.truncado'))->toBeFalse();
 
     // Y ausente del escaparate público.
     $publico = collect($this->getJson("/api/v1/app/{$e['slug']}/escaparate")

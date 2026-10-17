@@ -202,6 +202,8 @@ export const ventasVisual = {
 
 // Planes y paquetes (views/PlanesView.vue) con el patrón de los listados.
 export const planesVisual = {
+  truncado:
+    "Se muestran los {n} planes más recientes (primero los que están a la venta). Archiva o elimina los que ya no uses para ver el resto.",
   buscar: "Buscar plan",
   todos: "Todos",
   aLaVenta: "A la venta",

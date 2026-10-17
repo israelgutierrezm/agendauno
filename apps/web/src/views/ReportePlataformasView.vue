@@ -61,21 +61,26 @@ interface Visitante {
   ultima_visita_en: string | null;
   es_alumno: boolean;
 }
+interface VisitaDetalle {
+  id: string;
+  fecha: string;
+  clase: string | null;
+  sesion_inicia_en: string | null;
+  estado: string;
+  origen: string;
+}
+interface ReservaDetalle {
+  id: string;
+  clase: string | null;
+  sesion_inicia_en: string | null;
+  estado: string;
+}
 interface Detalle extends Visitante {
-  historial: {
-    id: string;
-    fecha: string;
-    clase: string | null;
-    sesion_inicia_en: string | null;
-    estado: string;
-    origen: string;
-  }[];
-  reservas?: {
-    id: string;
-    clase: string | null;
-    sesion_inicia_en: string | null;
-    estado: string;
-  }[];
+  // Las 20 más recientes de cada una; las demás, con «Ver más».
+  historial: VisitaDetalle[];
+  historial_total?: number;
+  reservas?: ReservaDetalle[];
+  reservas_total?: number;
 }
 interface Meta {
   total: number;
@@ -203,6 +208,36 @@ async function ver(v: Visitante): Promise<void> {
     error.value = mensajeDeError(e);
   }
 }
+// Las demás visitas o reservas de un cliente frecuente, de 20 en 20.
+const POR_PAGINA_DETALLE = 20;
+const cargandoMas = ref<"visitas" | "reservas" | null>(null);
+async function verMas(cual: "visitas" | "reservas"): Promise<void> {
+  const d = detalle.value;
+  if (d === null || cargandoMas.value !== null) {
+    return;
+  }
+  const actuales = cual === "visitas" ? d.historial : (d.reservas ?? []);
+  cargandoMas.value = cual;
+  try {
+    const { data } = await api.get<{
+      data: (VisitaDetalle & ReservaDetalle)[];
+    }>(`${base.value}/visitantes-plataforma/${d.id}/${cual}`, {
+      params: {
+        page: Math.floor(actuales.length / POR_PAGINA_DETALLE) + 1,
+        per_page: POR_PAGINA_DETALLE,
+      },
+    });
+    if (cual === "visitas") {
+      d.historial = [...d.historial, ...data.data];
+    } else {
+      d.reservas = [...(d.reservas ?? []), ...data.data];
+    }
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cargandoMas.value = null;
+  }
+}
 
 function fecha(iso: string | null, conHora = false): string {
   if (!iso) {
@@ -224,8 +259,49 @@ function diaCorto(dia: string): string {
     timeZone: "UTC",
   }).format(new Date(`${dia}T12:00:00Z`));
 }
+// Con un rango largo, las visitas se juntan por semana (más de dos meses) o por mes
+// (más de seis): no 365 renglones.
+const agrupacionSerie = computed<"dia" | "semana" | "mes">(() => {
+  const n = resumen.value?.por_dia.length ?? 0;
+  return n > 186 ? "mes" : n > 62 ? "semana" : "dia";
+});
+function inicioDeSemana(dia: string): string {
+  const f = new Date(`${dia}T12:00:00Z`);
+  const desplazamiento = (f.getUTCDay() + 6) % 7;
+  f.setUTCDate(f.getUTCDate() - desplazamiento);
+  return f.toISOString().slice(0, 10);
+}
+const serieVisitas = computed(() => {
+  const dias = resumen.value?.por_dia ?? [];
+  const modo = agrupacionSerie.value;
+  if (modo === "dia") {
+    return dias.map((d) => ({
+      clave: d.fecha,
+      etiqueta: diaCorto(d.fecha),
+      visitas: d.visitas,
+    }));
+  }
+  const grupos = new Map<string, number>();
+  for (const d of dias) {
+    const clave =
+      modo === "mes" ? d.fecha.slice(0, 7) : inicioDeSemana(d.fecha);
+    grupos.set(clave, (grupos.get(clave) ?? 0) + d.visitas);
+  }
+  return [...grupos].map(([clave, visitas]) => ({
+    clave,
+    etiqueta:
+      modo === "mes"
+        ? new Intl.DateTimeFormat("es-MX", {
+            month: "short",
+            year: "numeric",
+            timeZone: "UTC",
+          }).format(new Date(`${clave}-15T12:00:00Z`))
+        : t("operacion.plataformas.semanaDel", { dia: diaCorto(clave) }),
+    visitas,
+  }));
+});
 const maxDia = computed(() =>
-  Math.max(1, ...(resumen.value?.por_dia.map((d) => d.visitas) ?? [1])),
+  Math.max(1, ...serieVisitas.value.map((d) => d.visitas)),
 );
 // Cómo quedaron las reservas desde la app, sin mostrar lo que está en cero.
 const reservasApp = computed(() => {
@@ -437,10 +513,22 @@ onMounted(() => {
       </div>
 
       <div class="tu-card p-4 sm:p-5 rp-ancha">
-        <h2 class="rp-titulo">{{ $t("operacion.plataformas.porDia") }}</h2>
-        <ul v-if="resumen.por_dia.length > 0" class="mt-3 space-y-1.5">
-          <li v-for="d in resumen.por_dia" :key="d.fecha" class="rp-dia">
-            <span class="rp-dia-fecha">{{ diaCorto(d.fecha) }}</span>
+        <h2 class="rp-titulo">
+          {{
+            agrupacionSerie === "mes"
+              ? $t("operacion.plataformas.porMes")
+              : agrupacionSerie === "semana"
+                ? $t("operacion.plataformas.porSemana")
+                : $t("operacion.plataformas.porDia")
+          }}
+        </h2>
+        <ul
+          v-if="serieVisitas.length > 0"
+          class="mt-3 space-y-1.5"
+          data-prueba="serie-visitas"
+        >
+          <li v-for="d in serieVisitas" :key="d.clave" class="rp-dia">
+            <span class="rp-dia-fecha">{{ d.etiqueta }}</span>
             <span class="rp-barra" aria-hidden="true">
               <span
                 class="rp-barra-relleno"
@@ -607,6 +695,24 @@ onMounted(() => {
               >
             </li>
           </ul>
+          <button
+            v-if="detalle.historial.length < (detalle.historial_total ?? 0)"
+            type="button"
+            class="tu-enlace mt-2 text-sm"
+            :disabled="cargandoMas !== null"
+            data-prueba="mas-visitas"
+            @click="verMas('visitas')"
+          >
+            {{
+              $t(
+                "operacion.plataformas.detalle.verMas",
+                {
+                  n: (detalle.historial_total ?? 0) - detalle.historial.length,
+                },
+                (detalle.historial_total ?? 0) - detalle.historial.length,
+              )
+            }}
+          </button>
         </div>
         <div v-if="detalle.reservas && detalle.reservas.length > 0">
           <h3 class="rp-titulo">
@@ -636,6 +742,24 @@ onMounted(() => {
               >
             </li>
           </ul>
+          <button
+            v-if="detalle.reservas.length < (detalle.reservas_total ?? 0)"
+            type="button"
+            class="tu-enlace mt-2 text-sm"
+            :disabled="cargandoMas !== null"
+            data-prueba="mas-reservas"
+            @click="verMas('reservas')"
+          >
+            {{
+              $t(
+                "operacion.plataformas.detalle.verMas",
+                {
+                  n: (detalle.reservas_total ?? 0) - detalle.reservas.length,
+                },
+                (detalle.reservas_total ?? 0) - detalle.reservas.length,
+              )
+            }}
+          </button>
         </div>
       </div>
     </PanelLateral>

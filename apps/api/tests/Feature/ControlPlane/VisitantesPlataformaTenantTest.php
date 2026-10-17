@@ -246,7 +246,15 @@ it('los visitantes se ven en Reportes, aparte de los alumnos; si el negocio lo r
         'id_externo' => '1234567890123', 'visitas' => 1, 'es_alumno' => false,
     ]);
     $id = (string) $lista->json('data.0.id');
-    expect($this->getJson("/api/v1/app/{$e['slug']}/visitantes-plataforma/{$id}", conBearer($e['bearer']))->json('data.historial'))->toHaveCount(1);
+    $detalle = $this->getJson("/api/v1/app/{$e['slug']}/visitantes-plataforma/{$id}", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($detalle['historial'])->toHaveCount(1)
+        ->and($detalle['historial_total'])->toBe(1)
+        ->and($detalle['reservas_total'])->toBe(0);
+    // Las demás visitas y reservas, por páginas.
+    $this->getJson("/api/v1/app/{$e['slug']}/visitantes-plataforma/{$id}/visitas?page=1&per_page=10", conBearer($e['bearer']))
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('meta.total', 1);
+    $this->getJson("/api/v1/app/{$e['slug']}/visitantes-plataforma/{$id}/reservas?page=1", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('meta.total', 0);
 
     // No está en el directorio de alumnos.
     expect(collect($this->getJson("/api/v1/app/{$e['slug']}/miembros", conBearer($e['bearer']))->json('data'))->pluck('email'))

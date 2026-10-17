@@ -722,6 +722,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/reportes/plataformas', [VisitantesPlataformaTenantController::class, 'resumen'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('reportes.plataformas');
             Route::get('/visitantes-plataforma', [VisitantesPlataformaTenantController::class, 'index'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.index');
             Route::get('/visitantes-plataforma/{visitante}', [VisitantesPlataformaTenantController::class, 'show'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.show');
+            Route::get('/visitantes-plataforma/{visitante}/visitas', [VisitantesPlataformaTenantController::class, 'visitas'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.visitas');
+            Route::get('/visitantes-plataforma/{visitante}/reservas', [VisitantesPlataformaTenantController::class, 'reservas'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.reservas');
             Route::get('/reportes/equipo', ReporteEquipoTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.equipo');
             // Analitica de demanda (R31): mapa dia x hora + por actividad (ocupacion y espera).
             Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.demanda');

@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -49,13 +50,26 @@ function fecha(iso: string | null): string {
   }).format(new Date(soloDia ? `${iso}T12:00:00Z` : iso));
 }
 
+// Por páginas (las pendientes primero): antes se cortaban en 200 sin decirlo.
+const meta = ref<{
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+  pendientes: number;
+} | null>(null);
+const pagina = ref(1);
 async function cargar(): Promise<void> {
   cargando.value = true;
   try {
-    const { data } = await api.get<{ data: Solicitud[] }>(
-      `${base.value}/solicitudes-privacidad`,
-    );
+    const { data } = await api.get<{
+      data: Solicitud[];
+      meta: NonNullable<typeof meta.value>;
+    }>(`${base.value}/solicitudes-privacidad`, {
+      params: { page: pagina.value, per_page: 20 },
+    });
     solicitudes.value = data.data;
+    meta.value = data.meta;
   } catch (e) {
     toast.error(mensajeDeError(e));
   } finally {
@@ -209,6 +223,17 @@ onMounted(cargar);
           </form>
         </li>
       </ul>
+      <PaginacionListado
+        v-if="meta && meta.ultima_pagina > 1"
+        :page="meta.page"
+        :ultima-pagina="meta.ultima_pagina"
+        :total="meta.total"
+        :per-page="meta.per_page"
+        @ir="
+          pagina = $event;
+          cargar();
+        "
+      />
     </div>
   </section>
 </template>

@@ -487,6 +487,9 @@ export default {
     },
     porClase: "Clases con más visitas",
     porDia: "Visitas por día",
+    porSemana: "Visitas por semana",
+    porMes: "Visitas por mes",
+    semanaDel: "Sem. del {dia}",
     visitasDe: "{n} visitas · {v} visitantes",
     sinVisitas: "Sin visitas en el periodo.",
     lista: {
@@ -511,6 +514,7 @@ export default {
       historial: "Visitas",
       reservas: "Reservas desde la app",
       sinClase: "Sin clase asignada",
+      verMas: "Ver 1 más | Ver {n} más",
       esAlumnoAyuda:
         "Ya lo registraste como alumno con el mismo correo. Aquí siguen sus visitas por la plataforma.",
     },

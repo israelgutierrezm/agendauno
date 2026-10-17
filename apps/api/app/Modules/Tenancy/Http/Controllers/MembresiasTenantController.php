@@ -56,15 +56,20 @@ class MembresiasTenantController
     {
         // Por defecto solo vendibles (no archivados). El editor pide `?incluir=todos`
         // para poder ver y reactivar los archivados.
+        // Los que están a la venta primero: si hubiera más de LIMITE, sobran archivados.
+        // Nada se corta en silencio: `meta.truncado` lo dice.
         $productos = ProductoTenant::query()
             ->when((string) $request->query('incluir') !== 'todos', fn ($q) => $q->where('archivado', false))
             ->with(['actividad', 'sucursal'])
+            ->orderBy('archivado')
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
+            ->limit(self::LIMITE + 1)
             ->get();
+        $truncado = $productos->count() > self::LIMITE;
 
         return response()->json([
-            'data' => $productos->map(fn (ProductoTenant $producto): array => $this->presentarProducto($producto))->all(),
+            'data' => $productos->take(self::LIMITE)->map(fn (ProductoTenant $producto): array => $this->presentarProducto($producto))->values()->all(),
+            'meta' => ['truncado' => $truncado, 'limite' => self::LIMITE],
         ]);
     }
 

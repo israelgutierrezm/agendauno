@@ -12,8 +12,10 @@ use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -33,6 +35,9 @@ use Illuminate\Validation\ValidationException;
 class VisitantesPlataformaTenantController
 {
     private const POR_PAGINA = 25;
+
+    /** Las visitas y reservas que trae el detalle; las demás, por páginas. */
+    private const RECIENTES = 20;
 
     /** El resumen recorre hasta un año. */
     private const DIAS_MAXIMOS = 366;
@@ -164,45 +169,134 @@ class VisitantesPlataformaTenantController
         ]);
     }
 
+    /**
+     * Un visitante con sus visitas y sus reservas más recientes (20 de cada una) y
+     * cuántas tiene en total; las demás, por páginas con {@see visitas()} y
+     * {@see reservas()} (un cliente frecuente junta cientos).
+     */
     public function show(Request $request): JsonResponse
     {
-        $visitante = VisitantePlataformaTenant::query()
+        $visitante = $this->visitante($request);
+        $visitas = $this->consultaVisitas($visitante);
+        $reservas = $this->consultaReservas($visitante);
+
+        return response()->json(['data' => [
+            ...$this->presentar($visitante, $this->correosDeAlumnos(collect([$visitante]))),
+            'historial' => (clone $visitas)->limit(self::RECIENTES)->get()->map(fn (CheckinTenant $c): array => $this->presentarVisita($c))->all(),
+            'historial_total' => (clone $visitas)->count(),
+            // Sus reservas desde la app de la plataforma (ADR 0149).
+            'reservas' => (clone $reservas)->limit(self::RECIENTES)->get()->map(fn (LugarPlataformaTenant $l): array => $this->presentarReserva($l))->all(),
+            'reservas_total' => (clone $reservas)->count(),
+        ]]);
+    }
+
+    /** Sus visitas por páginas, de la más reciente a la más vieja. */
+    public function visitas(Request $request): JsonResponse
+    {
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $pagina = $this->consultaVisitas($this->visitante($request))
+            ->paginate((int) ($validado['per_page'] ?? self::RECIENTES), ['*'], 'page', (int) ($validado['page'] ?? 1));
+
+        return response()->json([
+            'data' => collect($pagina->items())->map(fn (CheckinTenant $c): array => $this->presentarVisita($c))->all(),
+            'meta' => $this->meta($pagina),
+        ]);
+    }
+
+    /** Sus reservas desde la app de la plataforma, por páginas. */
+    public function reservas(Request $request): JsonResponse
+    {
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $pagina = $this->consultaReservas($this->visitante($request))
+            ->paginate((int) ($validado['per_page'] ?? self::RECIENTES), ['*'], 'page', (int) ($validado['page'] ?? 1));
+
+        return response()->json([
+            'data' => collect($pagina->items())->map(fn (LugarPlataformaTenant $l): array => $this->presentarReserva($l))->all(),
+            'meta' => $this->meta($pagina),
+        ]);
+    }
+
+    private function visitante(Request $request): VisitantePlataformaTenant
+    {
+        return VisitantePlataformaTenant::query()
             ->withCount(['checkins as visitas' => fn (Builder $c) => $c->whereIn('estado', self::VISITAS)])
             ->where('ulid', (string) $request->route('visitante'))
             ->firstOrFail();
-        $visitas = CheckinTenant::query()
+    }
+
+    /**
+     * @return Builder<CheckinTenant>
+     */
+    private function consultaVisitas(VisitantePlataformaTenant $visitante): Builder
+    {
+        return CheckinTenant::query()
             ->with('sesion.oferta')
             ->where('visitante_id', $visitante->getKey())
             ->whereIn('estado', self::VISITAS)
             ->orderByDesc('registrado_en')
-            ->limit(100)
-            ->get();
-        $reservas = LugarPlataformaTenant::query()
+            ->orderByDesc('id');
+    }
+
+    /**
+     * @return Builder<LugarPlataformaTenant>
+     */
+    private function consultaReservas(VisitantePlataformaTenant $visitante): Builder
+    {
+        return LugarPlataformaTenant::query()
             ->with('sesion.oferta')
             ->where('visitante_id', $visitante->getKey())
             ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
-            ->orderByDesc('id')
-            ->limit(100)
-            ->get();
+            ->orderByDesc('id');
+    }
 
-        return response()->json(['data' => [
-            ...$this->presentar($visitante, $this->correosDeAlumnos(collect([$visitante]))),
-            'historial' => $visitas->map(fn (CheckinTenant $c): array => [
-                'id' => $c->ulid,
-                'fecha' => $c->registrado_en->toIso8601String(),
-                'clase' => $c->sesion?->oferta?->nombre,
-                'sesion_inicia_en' => $c->sesion?->inicia_en->toIso8601String(),
-                'estado' => $c->estado,
-                'origen' => $c->origen,
-            ])->all(),
-            // Sus reservas desde la app de la plataforma (ADR 0149).
-            'reservas' => $reservas->map(fn (LugarPlataformaTenant $l): array => [
-                'id' => (string) $l->getAttribute('ulid'),
-                'clase' => $l->sesion?->oferta?->nombre,
-                'sesion_inicia_en' => $l->sesion?->inicia_en->toIso8601String(),
-                'estado' => $l->estado,
-            ])->all(),
-        ]]);
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarVisita(CheckinTenant $c): array
+    {
+        return [
+            'id' => $c->ulid,
+            'fecha' => $c->registrado_en->toIso8601String(),
+            'clase' => $c->sesion?->oferta?->nombre,
+            'sesion_inicia_en' => $c->sesion?->inicia_en->toIso8601String(),
+            'estado' => $c->estado,
+            'origen' => $c->origen,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarReserva(LugarPlataformaTenant $l): array
+    {
+        return [
+            'id' => (string) $l->getAttribute('ulid'),
+            'clase' => $l->sesion?->oferta?->nombre,
+            'sesion_inicia_en' => $l->sesion?->inicia_en->toIso8601String(),
+            'estado' => $l->estado,
+        ];
+    }
+
+    /**
+     * @template TModelo of Model
+     *
+     * @param  LengthAwarePaginator<int, TModelo>  $pagina
+     * @return array{total: int, page: int, per_page: int, ultima_pagina: int}
+     */
+    private function meta(LengthAwarePaginator $pagina): array
+    {
+        return [
+            'total' => $pagina->total(),
+            'page' => $pagina->currentPage(),
+            'per_page' => $pagina->perPage(),
+            'ultima_pagina' => $pagina->lastPage(),
+        ];
     }
 
     /**

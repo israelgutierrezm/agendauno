@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CuotasNegocio from "@/components/CuotasNegocio.vue";
 import EditorPlan from "@/components/EditorPlan.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -190,14 +191,17 @@ const indicadores = computed<Indicador[]>(() => {
   ];
 });
 
+const truncado = ref<number | null>(null);
 async function cargar(): Promise<void> {
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Plan[] }>(
-      `${base.value}/productos`,
-      { params: { incluir: "todos" } },
-    );
+    const { data } = await api.get<{
+      data: Plan[];
+      meta?: { truncado: boolean; limite: number };
+    }>(`${base.value}/productos`, { params: { incluir: "todos" } });
     planes.value = data.data;
+    // Nada se corta en silencio: si hay más de los que caben, se dice.
+    truncado.value = data.meta?.truncado ? data.meta.limite : null;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -269,6 +273,14 @@ onMounted(cargar);
 
     <template v-else>
       <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
+      <AvisoTono
+        v-if="truncado !== null"
+        tono="aviso"
+        class="mt-4"
+        data-prueba="planes-truncado"
+      >
+        {{ $t("planesVisual.truncado", { n: truncado }) }}
+      </AvisoTono>
 
       <div class="tu-card mt-5">
         <div class="pv-filtros">

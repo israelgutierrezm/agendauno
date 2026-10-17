@@ -181,4 +181,88 @@ describe("reportes: plataformas", () => {
       "Reservada",
     );
   });
+
+  it("las demás visitas se piden con «Ver más»", async () => {
+    const base = api.get.getMockImplementation()!;
+    api.get.mockImplementation((url: string, opciones?: unknown) => {
+      if (url.endsWith("/visitantes-plataforma/v1")) {
+        return (
+          base(url, opciones) as Promise<{ data: { data: object } }>
+        ).then((r) => ({
+          data: {
+            data: {
+              ...r.data.data,
+              // Las 20 más recientes de 21.
+              historial: Array.from({ length: 20 }, (_, i) => ({
+                id: `c${i + 1}`,
+                fecha: "2026-10-01T12:00:00Z",
+                clase: "Pole Sport",
+                sesion_inicia_en: null,
+                estado: "validado",
+                origen: "automatico",
+              })),
+              historial_total: 21,
+              reservas_total: 1,
+            },
+          },
+        }));
+      }
+      if (url.endsWith("/visitantes-plataforma/v1/visitas")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "c0",
+                fecha: "2026-09-02T14:00:00Z",
+                clase: "Yoga",
+                sesion_inicia_en: null,
+                estado: "validado",
+                origen: "automatico",
+              },
+            ],
+          },
+        });
+      }
+      return base(url, opciones);
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="visitante"]').trigger("click");
+    await flushPromises();
+
+    await w.get('[data-prueba="mas-visitas"]').trigger("click");
+    await flushPromises();
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/fluo/visitantes-plataforma/v1/visitas",
+      { params: { page: 2, per_page: 20 } },
+    );
+    expect(w.get('[data-prueba="historial-visitante"]').text()).toContain(
+      "Yoga",
+    );
+    expect(w.find('[data-prueba="mas-visitas"]').exists()).toBe(false);
+  });
+
+  it("con un rango largo, las visitas se juntan por semana", async () => {
+    const base = api.get.getMockImplementation()!;
+    api.get.mockImplementation((url: string, opciones?: unknown) => {
+      if (url.endsWith("/reportes/plataformas")) {
+        const dias = Array.from({ length: 70 }, (_, i) => {
+          const f = new Date(Date.UTC(2026, 7, 3 + i));
+          return { fecha: f.toISOString().slice(0, 10), visitas: 1 };
+        });
+        return Promise.resolve({
+          data: { data: { ...resumen, por_dia: dias } },
+        });
+      }
+      return base(url, opciones);
+    });
+    const w = montar();
+    await flushPromises();
+
+    const filas = w.get('[data-prueba="serie-visitas"]').findAll("li");
+    // 70 días desde un lunes: 10 semanas de 7 visitas.
+    expect(filas).toHaveLength(10);
+    expect(filas[0]!.text()).toContain("7");
+    expect(w.text()).toContain("Visitas por semana");
+  });
 });

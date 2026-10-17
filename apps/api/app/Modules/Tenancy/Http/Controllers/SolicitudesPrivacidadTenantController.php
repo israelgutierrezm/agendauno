@@ -18,11 +18,34 @@ class SolicitudesPrivacidadTenantController
 {
     public function __construct(private readonly BajaDePersonaTenant $baja) {}
 
-    public function index(): JsonResponse
+    /**
+     * Las pendientes primero y luego las más recientes. Con `page`, por páginas (20 por
+     * omisión) y con cuántas siguen pendientes; sin ella, las últimas 200 como antes.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $solicitudes = SolicitudPrivacidadTenant::query()->with('persona')->orderByRaw("case when estado = 'pendiente' then 0 else 1 end")->orderByDesc('id')->limit(200)->get();
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $consulta = SolicitudPrivacidadTenant::query()->with('persona')->orderByRaw("case when estado = 'pendiente' then 0 else 1 end")->orderByDesc('id');
 
-        return response()->json(['data' => $solicitudes->map(fn (SolicitudPrivacidadTenant $s): array => $this->presentar($s))->all()]);
+        if (! isset($validado['page'])) {
+            return response()->json(['data' => $consulta->limit(200)->get()->map(fn (SolicitudPrivacidadTenant $s): array => $this->presentar($s))->all()]);
+        }
+
+        $pagina = $consulta->paginate((int) ($validado['per_page'] ?? 20), ['*'], 'page', (int) $validado['page']);
+
+        return response()->json([
+            'data' => collect($pagina->items())->map(fn (SolicitudPrivacidadTenant $s): array => $this->presentar($s))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+                'pendientes' => SolicitudPrivacidadTenant::query()->where('estado', SolicitudPrivacidadTenant::PENDIENTE)->count(),
+            ],
+        ]);
     }
 
     public function atender(Request $request): JsonResponse

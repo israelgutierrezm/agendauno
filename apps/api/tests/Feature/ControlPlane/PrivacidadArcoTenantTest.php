@@ -117,6 +117,9 @@ it('el negocio puede rechazar la baja con motivo; la persona queda intacta', fun
     $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))->assertOk()->assertJsonCount(0, 'data');
     $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['password' => 'secreto123'], conBearer($vale['bearer']))->assertCreated();
     $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))->json('data.0.id');
+    // Por páginas, con cuántas siguen pendientes.
+    $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad?page=1", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.0.id', $id)->assertJsonPath('meta.total', 1)->assertJsonPath('meta.pendientes', 1);
 
     $this->postJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad/{$id}/rechazar", [], conBearer($e['bearer']))->assertStatus(422);
     $this->postJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad/{$id}/rechazar", ['respuesta' => 'Tiene un adeudo pendiente'], conBearer($e['bearer']))
