@@ -14,16 +14,20 @@ import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { eventosPorArea, useEventosNegocio } from "@/lib/eventosNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
  * Comunicación con los alumnos: difusiones a un segmento, mensajes automáticos
  * que se disparan con los eventos del negocio (plantillas por evento y canal) y la
- * bandeja de salida con el estado de cada mensaje.
+ * bandeja de salida con el estado de cada mensaje. Son tres cosas distintas y cada
+ * pestaña dice cuál es; las reglas que crean tareas están en Tareas › Automatización.
  */
 const { t } = useI18n();
 const toast = useToastStore();
+// Cada aviso con su nombre en palabras (nunca «pago.anulado»).
+const { nombreEvento } = useEventosNegocio();
 
 interface Segmento {
   clave: string;
@@ -82,6 +86,10 @@ const puedeAutomaticos = computed(() =>
   sesion.puede("comunicaciones.gestionar"),
 );
 const puedeSalida = computed(() => sesion.puede("comunicaciones.ver"));
+// Las reglas que crean tareas (Tareas › Automatización): se enlazan si las puede ver.
+const puedeReglasTareas = computed(() =>
+  sesion.puede("automatizaciones.gestionar"),
+);
 const puedeEliminar = computed(() => sesion.puede("comunicaciones.eliminar"));
 // Pausar, reanudar o cancelar una campaña en curso (B08).
 const puedeControlar = computed(() => sesion.puede("comunicaciones.gestionar"));
@@ -193,6 +201,14 @@ const marcadoresTexto = computed(() =>
   }),
 );
 
+// El estado de cada mensaje de la bandeja: punto de color y texto.
+const TONO_MENSAJE: Record<Mensaje["estado"], string> = {
+  encolado: "var(--aviso)",
+  enviado: "var(--exito)",
+  fallido: "var(--error)",
+  descartado: "var(--texto-suave)",
+};
+
 // Un WhatsApp enviado dice además si llegó o si ya lo leyeron.
 function estadoDeMensaje(m: Mensaje): string {
   if (m.estado === "enviado" && m.leido_en) {
@@ -292,6 +308,8 @@ async function enviar(): Promise<void> {
 // ---- Mensajes automáticos (plantillas por evento y canal) ----
 const plantillas = ref<Plantilla[]>([]);
 const eventos = ref<string[]>([]);
+// Por área (reservas, pagos…), para encontrar el aviso sin leer toda la lista.
+const eventosAgrupados = computed(() => eventosPorArea(eventos.value));
 const editor = ref<{ abierto: boolean; clave: string }>({
   abierto: false,
   clave: "",
@@ -673,11 +691,26 @@ function limpiarFiltrosSalida(): void {
   hastaSalida.value = "";
 }
 
+// Los mensajes automáticos: cargando, o no se pudieron consultar (con reintentar).
+const cargandoAuto = ref(false);
+const errorAuto = ref(false);
+async function abrirAutomaticos(): Promise<void> {
+  cargandoAuto.value = true;
+  errorAuto.value = false;
+  try {
+    await cargarAutomaticos();
+  } catch {
+    errorAuto.value = true;
+  } finally {
+    cargandoAuto.value = false;
+  }
+}
+
 async function irPestana(p: Pestana): Promise<void> {
   pestana.value = p;
   try {
     if (p === "automaticos") {
-      await cargarAutomaticos();
+      await abrirAutomaticos();
     } else if (p === "salida") {
       await cargarSalida();
     }
@@ -696,6 +729,8 @@ onMounted(cargar);
       :subtitulo="$t('comunicacionesVisual.subtitulo')"
     />
 
+    <!-- Tres cosas distintas: lo que escribes una vez, lo que se envía solo y lo
+         que ya salió. Cada pestaña dice cuál es. -->
     <div
       v-if="puedeAutomaticos || puedeSalida"
       class="tu-pestanas mt-6"
@@ -704,27 +739,37 @@ onMounted(cargar);
       <button
         type="button"
         :aria-pressed="pestana === 'difusion'"
+        data-prueba="pestana-difusion"
         @click="irPestana('difusion')"
       >
-        {{ $t("comunicacionesAuto.difusion") }}
+        {{ $t("comunicacionPantalla.pestanas.difusion.titulo") }}
       </button>
       <button
         v-if="puedeAutomaticos"
         type="button"
         :aria-pressed="pestana === 'automaticos'"
+        data-prueba="pestana-automaticos"
         @click="irPestana('automaticos')"
       >
-        {{ $t("comunicacionesAuto.automaticos") }}
+        {{ $t("comunicacionPantalla.pestanas.automaticos.titulo") }}
       </button>
       <button
         v-if="puedeSalida"
         type="button"
         :aria-pressed="pestana === 'salida'"
+        data-prueba="pestana-salida"
         @click="irPestana('salida')"
       >
-        {{ $t("comunicacionesAuto.salida") }}
+        {{ $t("comunicacionPantalla.pestanas.salida.titulo") }}
       </button>
     </div>
+    <p
+      class="mt-3 text-sm"
+      :style="{ color: 'var(--texto-suave)' }"
+      data-prueba="ayuda-pestana"
+    >
+      {{ $t(`comunicacionPantalla.pestanas.${pestana}.ayuda`) }}
+    </p>
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
@@ -981,21 +1026,19 @@ onMounted(cargar);
               <td>{{ d.asunto }}</td>
               <td class="text-right font-semibold">{{ d.total }}</td>
               <td data-prueba="estado-difusion">
-                <span class="inline-flex items-center gap-1.5 text-sm">
-                  <span
-                    class="inline-block size-1.5 rounded-full"
-                    :style="{
-                      background:
-                        d.estado === 'pausada'
-                          ? 'var(--aviso)'
-                          : d.estado === 'cancelada'
-                            ? 'var(--texto-suave)'
-                            : (d.pendientes ?? 0) > 0
-                              ? 'var(--primario)'
-                              : 'var(--exito)',
-                    }"
-                    aria-hidden="true"
-                  />
+                <span
+                  class="tu-estado text-sm"
+                  :style="{
+                    '--tono':
+                      d.estado === 'pausada'
+                        ? 'var(--aviso)'
+                        : d.estado === 'cancelada'
+                          ? 'var(--texto-suave)'
+                          : (d.pendientes ?? 0) > 0
+                            ? 'var(--primario)'
+                            : 'var(--exito)',
+                  }"
+                >
                   {{
                     d.estado === "pausada"
                       ? $t("comunicaciones.estados.pausada")
@@ -1061,46 +1104,104 @@ onMounted(cargar);
 
     <!-- Mensajes automáticos -->
     <div v-if="pestana === 'automaticos'" class="mt-5 tu-card p-5">
-      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("comunicacionesAuto.ayuda") }}
+      <p
+        v-if="cargandoAuto && eventos.length === 0"
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+        aria-busy="true"
+      >
+        {{ $t("operacion.listados.cargando") }}
       </p>
-      <ul class="mt-3">
-        <li v-for="ev in eventos" :key="ev" class="com-fila text-sm">
-          <div class="min-w-0">
-            <p class="font-medium">
-              {{ $t(`conexiones.webhook.tipos.${ev}`) }}
-            </p>
-            <p
-              class="mt-0.5 flex flex-wrap gap-1.5 text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
+      <p
+        v-else-if="errorAuto"
+        class="text-sm"
+        role="alert"
+        data-prueba="error-automaticos"
+      >
+        <span style="color: var(--error)">{{
+          $t("comunicacionPantalla.errorAutomaticos")
+        }}</span>
+        <button
+          type="button"
+          class="tu-enlace ml-2"
+          :disabled="cargandoAuto"
+          @click="abrirAutomaticos"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </p>
+      <template v-else>
+        <section
+          v-for="g in eventosAgrupados"
+          :key="g.area"
+          class="com-area"
+          :data-prueba="`area-${g.area}`"
+        >
+          <h3 class="com-area-titulo">
+            {{ $t(`comunicacionPantalla.areas.${g.area}`) }}
+          </h3>
+          <ul>
+            <li
+              v-for="ev in g.eventos"
+              :key="ev"
+              class="com-fila text-sm"
+              :data-prueba="`evento-${ev}`"
             >
-              <span
-                v-for="p in configuradas(ev)"
-                :key="p.id"
-                class="tu-badge"
-                :class="{ 'tu-badge-exito': p.activo }"
-                >{{
-                  p.destinatario === "profesional"
-                    ? `${$t("comunicacionesAuto.alProfesional")} · ${canalTexto(p.canal)}`
-                    : p.destinatario === "equipo"
-                      ? `${$t("comunicacionesAuto.alEquipo")} · ${canalTexto(p.canal)}`
-                      : canalTexto(p.canal)
-                }}</span
+              <div class="min-w-0">
+                <p class="font-medium" data-prueba="nombre-evento">
+                  {{ nombreEvento(ev) }}
+                </p>
+                <!-- Lo configurado: punto verde si está encendido. -->
+                <p
+                  class="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  <span
+                    v-for="p in configuradas(ev)"
+                    :key="p.id"
+                    class="tu-estado"
+                    :style="{
+                      '--tono': p.activo
+                        ? 'var(--exito)'
+                        : 'var(--texto-suave)',
+                    }"
+                    >{{
+                      p.destinatario === "profesional"
+                        ? `${$t("comunicacionesAuto.alProfesional")} · ${canalTexto(p.canal)}`
+                        : p.destinatario === "equipo"
+                          ? `${$t("comunicacionesAuto.alEquipo")} · ${canalTexto(p.canal)}`
+                          : canalTexto(p.canal)
+                    }}{{
+                      p.activo ? "" : ` · ${$t("comunicacionPantalla.apagado")}`
+                    }}</span
+                  >
+                  <span v-if="configuradas(ev).length === 0">{{
+                    $t("comunicacionesAuto.sinConfigurar")
+                  }}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="tu-enlace shrink-0"
+                @click="configurar(ev)"
               >
-              <span v-if="configuradas(ev).length === 0">{{
-                $t("comunicacionesAuto.sinConfigurar")
-              }}</span>
-            </p>
-          </div>
-          <button
-            type="button"
-            class="tu-enlace shrink-0"
-            @click="configurar(ev)"
-          >
-            {{ $t("comunicacionesAuto.configurar") }}
-          </button>
-        </li>
-      </ul>
+                {{ $t("comunicacionesAuto.configurar") }}
+              </button>
+            </li>
+          </ul>
+        </section>
+        <p
+          v-if="puedeReglasTareas"
+          class="mt-5 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="reglas-tareas"
+        >
+          {{ $t("comunicacionPantalla.reglasTareas") }}
+          <RouterLink :to="{ name: 'tareas' }" class="tu-enlace ml-1">{{
+            $t("comunicacionPantalla.irATareas")
+          }}</RouterLink>
+        </p>
+      </template>
     </div>
 
     <!-- Bandeja de salida: por páginas, con búsqueda, estado, canal y fechas -->
@@ -1230,11 +1331,9 @@ onMounted(cargar);
             </p>
           </div>
           <span
-            class="tu-badge shrink-0"
-            :class="{
-              'tu-badge-exito': m.estado === 'enviado',
-              'tu-badge-aviso': m.estado === 'encolado',
-            }"
+            class="tu-estado shrink-0"
+            :style="{ '--tono': TONO_MENSAJE[m.estado] }"
+            data-prueba="estado-mensaje"
             >{{ estadoDeMensaje(m) }}</span
           >
         </li>
@@ -1253,7 +1352,7 @@ onMounted(cargar);
       :abierto="editor.abierto"
       :titulo="
         editor.clave
-          ? $t(`conexiones.webhook.tipos.${editor.clave}`)
+          ? nombreEvento(editor.clave)
           : $t('comunicacionesAuto.editor')
       "
       :ocupado="guardandoPlantilla"
@@ -1420,6 +1519,15 @@ onMounted(cargar);
 }
 .com-fila:first-child {
   border-top: 0;
+}
+.com-area + .com-area {
+  margin-top: 1.25rem;
+}
+.com-area-titulo {
+  padding-bottom: 0.25rem;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 .com-canal {
   width: auto;

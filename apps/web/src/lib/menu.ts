@@ -90,11 +90,13 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
     descripcion: "configNegocio.descripciones.negocio",
     icono: "comercio",
     opciones: [
+      // Solo el logo: el nombre y el contacto no se cambian aquí, así que no se
+      // encuentra por ellos.
       o(
         "datos",
         "configuracion",
         "configNegocio.opciones.datos",
-        ["logo", "logotipo", "nombre", "imagen", "marca", "contacto"],
+        ["logo", "logotipo", "imagen", "marca"],
         { hash: "#datos" },
       ),
       o("sedes", "sedes", "configNegocio.opciones.sucursales", [

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
@@ -63,12 +66,32 @@ const respuesta = {
   mis_permisos: ["miembros.ver", "miembros.gestionar", "roles.gestionar"],
 };
 
+const i18n = createI18n({
+  legacy: false,
+  locale: "es-MX",
+  messages: { "es-MX": { ...esMX, operacion } },
+});
+
+/** El catálogo tal como lo expone el API (CatalogoDePermisosTenant::catalogo()). */
+function catalogoDelApi(): Record<string, string[]> {
+  const php = readFileSync(
+    resolve(
+      __dirname,
+      "../../../api/app/Modules/Tenancy/Application/CatalogoDePermisosTenant.php",
+    ),
+    "utf8",
+  );
+  const cuerpo =
+    php.split("public static function catalogo(): array")[1]?.split("];")[0] ??
+    "";
+  const grupos: Record<string, string[]> = {};
+  for (const m of cuerpo.matchAll(/'([a-z_]+)' => \[([^\]]*)\]/g)) {
+    grupos[m[1]] = [...m[2].matchAll(/'([a-z_]+\.[a-z_]+)'/g)].map((p) => p[1]);
+  }
+  return grupos;
+}
+
 function montar() {
-  const i18n = createI18n({
-    legacy: false,
-    locale: "es-MX",
-    messages: { "es-MX": { ...esMX, operacion } },
-  });
   return mount(RolesView, {
     global: {
       plugins: [i18n],
@@ -200,5 +223,106 @@ describe("roles y permisos", () => {
     expect(
       w.findAll(".tu-btn-primario").at(-1)!.attributes("disabled"),
     ).toBeDefined();
+  });
+
+  it("busca permisos por su nombre o el de su área, sin perder lo elegido", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.find(".tu-btn-primario").trigger("click");
+    const editor = w.find('[data-prueba="editor"]');
+    const opciones = () =>
+      editor.findAll("label.rp-opcion").map((o) => o.text());
+    await editor.findAll("label.rp-opcion")[0].find("input").trigger("change");
+
+    const buscar = editor.find('[data-prueba="buscar-permiso"]');
+    await buscar.setValue("pasarelas");
+    expect(opciones()).toEqual(["Configurar pasarelas de pago"]);
+    // El nombre del área también cuenta: «Alumnos» trae los de su área.
+    await buscar.setValue("ALUMNOS");
+    expect(opciones()).toEqual([
+      "Ver alumnos y su ficha",
+      "Dar de alta y editar alumnos",
+    ]);
+
+    await buscar.setValue("zzz");
+    expect(opciones()).toEqual([]);
+    const sin = editor.find('[data-prueba="sin-permisos"]');
+    expect(sin.text()).toContain("Ningún permiso coincide con «zzz».");
+    await sin.find("button").trigger("click");
+    expect(opciones()).toHaveLength(3);
+    expect(
+      (
+        editor.findAll("label.rp-opcion")[0].find("input")
+          .element as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+  });
+
+  it("dice en palabras a qué da acceso cada rol y lo elegido en el editor", async () => {
+    const w = montar();
+    await flushPromises();
+
+    const propios = w.findAll('[data-prueba="rol-propio"]');
+    expect(propios[0].get('[data-prueba="resumen-acceso"]').text()).toBe(
+      "Acceso a Alumnos (solo consulta).",
+    );
+    expect(propios[1].get('[data-prueba="resumen-acceso"]').text()).toBe(
+      "Acceso a Alumnos (solo consulta) y Negocio.",
+    );
+    // El dueño tiene todo: basta «Todos los permisos».
+    const dueno = w.findAll('[data-prueba="rol-sistema"]')[0];
+    expect(dueno.find('[data-prueba="resumen-acceso"]').exists()).toBe(false);
+
+    // Al ver los permisos, cada área dice su nivel.
+    await propios[1].findAll("button")[0].trigger("click");
+    expect(propios[1].find(".rp-permisos").text()).toContain("Solo consulta");
+    expect(propios[1].find(".rp-permisos").text()).toContain("Acceso completo");
+
+    await w.find(".tu-btn-primario").trigger("click");
+    const editor = w.find('[data-prueba="editor"]');
+    const elegido = () => editor.get('[data-prueba="acceso-elegido"]').text();
+    expect(elegido()).toContain("Todavía no da acceso a ninguna área.");
+    await editor.findAll("label.rp-opcion")[0].find("input").trigger("change");
+    await editor.findAll("label.rp-opcion")[1].find("input").trigger("change");
+    expect(elegido()).toContain("Acceso a Alumnos.");
+    expect(
+      editor.get('[data-prueba="grupo-clientes"] legend').text(),
+    ).toContain("Acceso completo");
+  });
+
+  it("ningún permiso ni área del catálogo del API se muestra con su llave", async () => {
+    const catalogo = catalogoDelApi();
+    const permisos = Object.values(catalogo).flat();
+    // La lectura del archivo del API no se rompió.
+    expect(Object.keys(catalogo)).toContain("captacion");
+    expect(permisos).toContain("prospectos.ver");
+
+    const sinTexto = [
+      ...Object.keys(catalogo)
+        .map((g) => `operacion.rolesPropios.grupos.${g}`)
+        .filter((llave) => !i18n.global.te(llave)),
+      ...permisos
+        .map((p) => `operacion.rolesPropios.permiso.${p}`)
+        .filter((llave) => !i18n.global.te(llave)),
+    ];
+    expect(sinTexto).toEqual([]);
+
+    api.get.mockResolvedValue({
+      data: { ...respuesta, catalogo, requisitos: {}, mis_permisos: ["*"] },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.find(".tu-btn-primario").trigger("click");
+    const editor = w.find('[data-prueba="editor"]');
+    const textos = [
+      ...editor.findAll("label.rp-opcion").map((o) => o.text()),
+      ...editor
+        .findAll("legend.rp-grupo-fila > span:first-child")
+        .map((l) => l.text()),
+    ];
+    expect(textos).toHaveLength(permisos.length + Object.keys(catalogo).length);
+    expect(textos.filter((x) => /^[a-z_]+(\.[a-z_]+)?$/.test(x))).toEqual([]);
+    expect(textos).toContain("Prospectos");
+    expect(textos).toContain("Ver prospectos");
   });
 });

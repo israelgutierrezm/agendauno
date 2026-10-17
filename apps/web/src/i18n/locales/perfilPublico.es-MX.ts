@@ -51,8 +51,6 @@ export default {
     sitio_web: "tunegocio.mx",
   },
   sucursal: {
-    titulo: "Perfil público de la sede",
-    ayuda: "Dirección, contacto, redes y horario que ve el público.",
     direccion: "Dirección",
     direccionPh: "Calle, número, colonia y ciudad",
     foto: "Foto de la sede",
@@ -77,6 +75,18 @@ export default {
     cierra: "Cierra",
     guardar: "Guardar perfil de la sede",
     guardado: "Perfil de la sede guardado.",
+    // El formulario de la sede por secciones (Sucursales).
+    secciones: {
+      datos: "Datos",
+      datosAyuda:
+        "Cómo se llama, su zona horaria, el impuesto que cobra y su foto.",
+      ubicacion: "Ubicación",
+      ubicacionAyuda:
+        "Dónde está: la dirección y el mapa que ven tus clientes al elegirla.",
+      contacto: "Contacto",
+      contactoAyuda: "Teléfono, WhatsApp y redes que se muestran en tu página.",
+      horarios: "Horarios",
+    },
   },
   catalogo: {
     descripcion: "Descripción para tus clientes",

@@ -9,9 +9,9 @@ import PromocionesView from "./PromocionesView.vue";
 | filtro de vigentes; el estado con punto.
 */
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
 vi.mock("@/lib/api", () => ({
-  api: { get: mocks.get, post: mocks.post, put: vi.fn(), delete: vi.fn() },
+  api: { get: mocks.get, post: mocks.post, put: mocks.put, delete: vi.fn() },
   mensajeDeError: () => "Error",
   erroresPorCampo: (e: {
     response?: { data?: { meta?: { errors?: Record<string, string[]> } } };
@@ -145,5 +145,49 @@ describe("promociones", () => {
     await flushPromises();
     expect(confirmar).toHaveBeenCalled();
     expect(w.find("#p-codigo").exists()).toBe(true);
+  });
+
+  it("editar abre con lo guardado, guarda con PUT lo cambiado y confirma qué quedó", async () => {
+    mocks.put.mockResolvedValue({ data: { data: {} } });
+    const w = mount(PromocionesView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+    await w.get('[data-prueba="editar-promo-1"]').trigger("click");
+
+    // El título dice cuál se edita y el formulario trae lo guardado.
+    expect(w.text()).toContain("Editar promoción VERANO");
+    expect((w.get("#p-codigo").element as HTMLInputElement).value).toBe(
+      "VERANO",
+    );
+    expect((w.get("#p-valor").element as HTMLInputElement).value).toBe("15");
+    expect((w.get("#p-tipo").element as HTMLSelectElement).value).toBe(
+      "porcentaje",
+    );
+
+    await w.get("#p-valor").setValue("20");
+    await w.get("#p-usos").setValue("50");
+    await w.get("#p-vence").setValue("2026-12-31");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Guardar")!
+      .trigger("click");
+    await flushPromises();
+
+    expect(mocks.put).toHaveBeenCalledWith("/api/v1/app/demo/promociones/1", {
+      codigo: "VERANO",
+      descripcion: null,
+      tipo: "porcentaje",
+      valor: 2000,
+      monto_minimo_minor: null,
+      usos_maximos: 50,
+      vence_en: "2026-12-31",
+      activa: true,
+    });
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(toast.exito).toHaveBeenCalledWith("Promoción VERANO guardada.");
+    // Se cierra y la lista se vuelve a consultar.
+    expect(w.find("#p-codigo").exists()).toBe(false);
+    expect(mocks.get).toHaveBeenCalledTimes(2);
   });
 });

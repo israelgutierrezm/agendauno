@@ -191,7 +191,7 @@ export default {
     },
     descripciones: {
       negocio:
-        "Datos e imagen del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
+        "El logo del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
       servicios:
         "Qué se ofrece y a qué precio: servicios, combos y bonos, y los espacios que usan.",
       serviciosClases:
@@ -205,7 +205,9 @@ export default {
         "Requisitos y consentimientos, fichas de datos, solicitudes de privacidad y bitácora.",
     },
     opciones: {
-      datos: "Datos e imagen del negocio",
+      // Aquí solo se cambia el logo (el nombre y el contacto no se editan desde el
+      // panel): se llama por lo que es.
+      datos: "Logo del negocio",
       pagina: "Página pública",
       sitio: "Sitio web",
       sucursales: "Sucursales",
@@ -1739,6 +1741,10 @@ export default {
       },
     },
   },
+  // Lugares libres filtrado por un día desde el Inicio (`?fecha=`).
+  oportunidadesFecha: {
+    solo: "Solo el {fecha} · Quitar",
+  },
   cobranza: {
     titulo: "Cobranza",
     morosos: "En mora",
@@ -2160,12 +2166,11 @@ export default {
     titulo: "Datos fiscales",
     razonSocial: "Razón social",
     rfc: "RFC",
-    regimenFiscal: "Régimen fiscal (clave SAT)",
+    // El régimen (catálogo del SAT) y los requisitos para timbrar:
+    // datosFiscalesSat.es-MX.ts.
     codigoPostal: "Código postal",
     guardar: "Guardar datos fiscales",
     guardando: "Guardando…",
-    guardado: "Datos fiscales guardados.",
-    ayudaRegimen: "Ej. 601 (General de Ley Personas Morales), 626 (RESICO).",
     sellos: {
       titulo: "Sello digital (CSD)",
       subtitulo:
@@ -2523,6 +2528,7 @@ export default {
       vacio: "Aún no hay canjes.",
       colMiembro: "Miembro",
       colRecompensa: "Recompensa",
+      colPuntos: "Puntos",
       colEstado: "Estado",
       colAccion: "Acción",
       entregar: "Entregar",

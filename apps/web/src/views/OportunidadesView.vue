@@ -44,8 +44,22 @@ const promoviendo = ref<string | null>(null);
 const busqueda = ref("");
 const sucursal = ref("");
 const instructor = ref("");
-// Desde el Inicio, «en espera» abre solo las clases con gente esperando (`?espera=1`).
-const soloEspera = ref(useRoute()?.query.espera === "1");
+// Desde el Inicio, «en espera» abre solo las clases con gente esperando (`?espera=1`)
+// y «mañana, a menos de la mitad» las de ese día (`?fecha=AAAA-MM-DD`).
+const consultaRuta = useRoute()?.query ?? {};
+const soloEspera = ref(consultaRuta.espera === "1");
+const fecha = ref(
+  typeof consultaRuta.fecha === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(consultaRuta.fecha)
+    ? consultaRuta.fecha
+    : "",
+);
+// El día de una clase en su zona (AAAA-MM-DD).
+function diaDe(o: Oportunidad): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: o.zona_horaria ?? sesion.zonaHoraria,
+  }).format(new Date(o.inicia_en));
+}
 const pagina = ref(1);
 const porPagina = 20;
 const sucursales = computed(() =>
@@ -73,6 +87,7 @@ const filtradas = computed(() => {
       (!sucursal.value || o.sucursal === sucursal.value) &&
       (!instructor.value || o.instructor === instructor.value) &&
       (!soloEspera.value || o.en_espera > 0) &&
+      (!fecha.value || diaDe(o) === fecha.value) &&
       (!q ||
         `${o.oferta ?? ""} ${o.actividad ?? ""} ${o.sucursal ?? ""} ${o.instructor ?? ""}`
           .toLocaleLowerCase("es-MX")
@@ -188,7 +203,7 @@ const indicadores = computed<Indicador[]>(() => {
 });
 
 watch(dias, cargar);
-watch([busqueda, sucursal, instructor, soloEspera], () => {
+watch([busqueda, sucursal, instructor, soloEspera, fecha], () => {
   pagina.value = 1;
 });
 // «Ninguna coincide con los filtros» no es «no hay clases con lugares libres».
@@ -197,13 +212,15 @@ const filtrado = computed(
     busqueda.value.trim() !== "" ||
     sucursal.value !== "" ||
     instructor.value !== "" ||
-    soloEspera.value,
+    soloEspera.value ||
+    fecha.value !== "",
 );
 function quitarFiltros(): void {
   busqueda.value = "";
   sucursal.value = "";
   instructor.value = "";
   soloEspera.value = false;
+  fecha.value = "";
 }
 onMounted(cargar);
 </script>
@@ -268,6 +285,16 @@ onMounted(cargar);
               $t("oportunidadesVisual.filtros.soloEspera")
             }}</label
           >
+          <!-- Llegó del Inicio con un día: se ve y se puede quitar. -->
+          <button
+            v-if="fecha"
+            type="button"
+            class="tu-btn tu-btn-fantasma tu-btn-chico"
+            data-prueba="filtro-fecha"
+            @click="fecha = ''"
+          >
+            {{ $t("oportunidadesFecha.solo", { fecha }) }}
+          </button>
           <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
             $t("oportunidades.horizonte")
           }}</span>

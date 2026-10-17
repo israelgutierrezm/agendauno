@@ -152,7 +152,7 @@ class SegmentosRetencionTenant
         foreach ($this->ultimasAsistencias($conPlan) as $pid => $ultima) {
             $sin = (int) $ultima->diffInDays($hoy);
             if ($sin >= $dias) {
-                $filas[] = ['persona_id' => $pid, 'dato' => $ultima->toDateString(), 'detalle' => "Su última {$sesion} fue hace {$sin} días.", 'orden' => -$sin];
+                $filas[] = ['persona_id' => $pid, 'dato' => $ultima->toDateString(), 'detalle' => "Su última {$sesion} fue ".self::hace($sin).'.', 'orden' => -$sin];
             }
         }
 
@@ -172,7 +172,7 @@ class SegmentosRetencionTenant
             ->whereDate('valido_hasta', '>=', $hoy->toDateString())
             ->whereDate('valido_hasta', '<=', $hoy->addDays($aviso)->toDateString())
             ->get();
-        $sesiones = $this->modalidad->esCitas() ? 'citas' : 'clases';
+        $citas = $this->modalidad->esCitas();
         $porPersona = [];
         foreach ($derechos as $derecho) {
             $acuerdo = $derecho->acuerdo;
@@ -183,11 +183,17 @@ class SegmentosRetencionTenant
             $pid = (int) $acuerdo->persona_id;
             $vence = CarbonImmutable::parse($derecho->valido_hasta->toDateString());
             $quedan = rtrim(rtrim(number_format($disponible / 1000, 1, '.', ''), '0'), '.');
+            $unidad = $quedan === '1' ? ($citas ? 'cita' : 'clase') : ($citas ? 'citas' : 'clases');
+            $faltan = (int) $hoy->diffInDays($vence);
             $porPersona[$pid] ??= [
                 'persona_id' => $pid,
                 'dato' => $vence->toDateString(),
-                'detalle' => "Le quedan {$quedan} {$sesiones}; vence en ".((int) $hoy->diffInDays($vence)).' días.',
-                'orden' => (int) $hoy->diffInDays($vence),
+                'detalle' => ($quedan === '1' ? 'Le queda' : 'Le quedan')." {$quedan} {$unidad}; vence ".match ($faltan) {
+                    0 => 'hoy',
+                    1 => 'mañana',
+                    default => "en {$faltan} días",
+                }.'.',
+                'orden' => $faltan,
             ];
         }
 
@@ -215,7 +221,7 @@ class SegmentosRetencionTenant
         foreach ($this->ultimasAsistencias() as $pid => $ultima) {
             $hace = (int) $ultima->diffInDays($hoy);
             if ($hace <= $dias && ! $compraron->has($pid)) {
-                $filas[] = ['persona_id' => $pid, 'dato' => $ultima->toDateString(), 'detalle' => "Vino hace {$hace} días y no ha comprado un plan.", 'orden' => $hace];
+                $filas[] = ['persona_id' => $pid, 'dato' => $ultima->toDateString(), 'detalle' => 'Vino '.self::hace($hace).' y no ha comprado un plan.', 'orden' => $hace];
             }
         }
 
@@ -295,12 +301,22 @@ class SegmentosRetencionTenant
                 $filas[$pid] = [
                     'persona_id' => $pid,
                     'dato' => $ultima->toDateString(),
-                    'detalle' => "Su último {$oferta->nombre} fue hace {$hace} días; suele regresar cada {$oferta->regreso_dias}.",
+                    'detalle' => "Su último {$oferta->nombre} fue ".self::hace($hace)."; suele regresar cada {$oferta->regreso_dias} días.",
                     'orden' => -$atraso,
                 ];
             });
 
         return self::ordenar(array_values($filas));
+    }
+
+    /** «hoy», «ayer» o «hace N días». */
+    private static function hace(int $dias): string
+    {
+        return match ($dias) {
+            0 => 'hoy',
+            1 => 'ayer',
+            default => "hace {$dias} días",
+        };
     }
 
     /** Un momento guardado en UTC como su día del negocio (comparable con `dia()`). */

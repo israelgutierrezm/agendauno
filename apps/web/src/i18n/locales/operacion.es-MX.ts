@@ -84,8 +84,24 @@ export default {
     guardadoNombre: "Rol «{nombre}» guardado.",
     eliminado: "Rol eliminado.",
     vacio: "Aún no hay roles propios. Crea el primero con «Nuevo rol».",
+    // Buscar entre los permisos del editor (por su nombre o el de su área).
+    buscarPermiso: "Buscar permiso",
+    sinCoincidencias: "Ningún permiso coincide con «{q}».",
+    borrarBusqueda: "Borrar búsqueda",
+    // Lo que el rol deja hacer, en palabras: por área y en una línea.
+    niveles: {
+      ninguno: "Sin acceso",
+      consulta: "Solo consulta",
+      parcial: "Parcial · {n} de {total}",
+      completo: "Acceso completo",
+    },
+    accesoA: "Acceso a {lista}.",
+    soloConsulta: "{area} (solo consulta)",
+    sinAcceso: "Todavía no da acceso a ninguna área.",
+    conLoElegido: "Con lo elegido",
     grupos: {
       agenda: "Agenda",
+      captacion: "Prospectos",
       clientes: "Alumnos",
       membresias: "Membresías y catálogo",
       cobros: "Cobros",
@@ -119,6 +135,12 @@ export default {
         eliminar: "Dar de baja alumnos",
       },
       derechos: { ver: "Ver paquetes y créditos de cada alumno" },
+      prospectos: {
+        ver: "Ver prospectos",
+        gestionar: "Atender prospectos y editar los formularios de captación",
+        convertir: "Darle acceso a un prospecto (pasa a ser alumno)",
+        eliminar: "Borrar los datos de un prospecto",
+      },
       documentos: {
         subir: "Subir documentos",
         gestionar: "Administrar documentos y plantillas",
@@ -169,13 +191,13 @@ export default {
         equipo: "Ver y atender las tareas de todo el equipo",
       },
       comunicaciones: {
-        ver: "Ver comunicaciones",
-        gestionar: "Enviar avisos y campañas",
-        eliminar: "Borrar plantillas de mensajes",
+        ver: "Ver difusiones y mensajes enviados",
+        gestionar: "Enviar difusiones y editar mensajes automáticos",
+        eliminar: "Quitar mensajes automáticos",
       },
       automatizaciones: {
-        gestionar: "Configurar automatizaciones",
-        eliminar: "Borrar automatizaciones",
+        gestionar: "Crear reglas que generan tareas",
+        eliminar: "Borrar reglas que generan tareas",
       },
       lealtad: {
         ver: "Ver el programa de lealtad",
@@ -309,6 +331,7 @@ export default {
         listas: "Listas por registrar",
         enEspera: "En lista de espera",
         porVencer: "Planes por vencer",
+        mananaPoca: "Mañana, a menos de la mitad",
       },
     },
   },

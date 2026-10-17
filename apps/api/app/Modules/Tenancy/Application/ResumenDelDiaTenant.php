@@ -71,6 +71,8 @@ class ResumenDelDiaTenant
             'modalidad' => $modalidad->value,
             'agenda' => $veAgenda ? $this->agenda($usuario, $fecha, $permitidas) : null,
             'libres' => $veAgenda && $modalidad === ModalidadServicio::Citas ? $this->libres($usuario, $fecha, $permitidas) : null,
+            // Clases: mañana, cuántas van a menos de la mitad de su cupo (para llenarlas a tiempo).
+            'manana' => $veAgenda && $modalidad === ModalidadServicio::Clases ? $this->mananaPocaOcupacion($usuario, $fecha->addDay(), $permitidas) : null,
             'cobros' => $usuario->puede('facturacion.ver') ? $this->cobros($permitidas) : null,
             'renovaciones' => $usuario->puede('miembros.gestionar') ? $this->renovaciones($permitidas) : null,
             // Lo que espera a alguien del equipo (M08): solicitudes de acceso nuevas y
@@ -87,6 +89,24 @@ class ResumenDelDiaTenant
                     : null,
             ],
         ];
+    }
+
+    /**
+     * Las clases de ese día que van a menos de la mitad de su cupo (con el mismo alcance
+     * por sucursal que la agenda del día).
+     *
+     * @param  list<int>|null  $permitidas
+     * @return array{fecha: string, poca_ocupacion: int}
+     */
+    private function mananaPocaOcupacion(Usuario $usuario, CarbonImmutable $fecha, ?array $permitidas): array
+    {
+        $sesiones = (array) ($this->agenda($usuario, $fecha, $permitidas)['sesiones'] ?? []);
+        $pocas = array_filter($sesiones, static fn (array $s): bool => ($s['tipo'] ?? null) === 'clase'
+            && ! ($s['cancelada'] ?? false)
+            && (int) ($s['capacidad'] ?? 0) > 0
+            && (int) ($s['esperados'] ?? 0) * 2 < (int) $s['capacidad']);
+
+        return ['fecha' => $fecha->toDateString(), 'poca_ocupacion' => count($pocas)];
     }
 
     /**

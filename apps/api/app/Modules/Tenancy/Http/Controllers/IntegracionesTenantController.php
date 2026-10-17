@@ -9,9 +9,12 @@ use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\IntegracionSoloMexico;
 use App\Modules\Tenancy\Integraciones\ClienteTotalPass;
+use App\Modules\Tenancy\Models\CheckinTenant;
+use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -30,6 +33,11 @@ use Illuminate\Validation\ValidationException;
  *
  * No se activa sin las llaves con que valida un check-in (las ya guardadas cuentan):
  * encendida sin ellas, la plataforma rechazaría a cada visitante.
+ *
+ * La conexión se informa por lo que de verdad pasó, como en las pasarelas:
+ * `sin_configurar` → `credenciales` (llaves guardadas, apagada) → `activa_sin_comprobar`
+ * → `comprobada` (la plataforma ya respondió: un check-in que aprobó o un aviso suyo
+ * que llegó a la dirección del negocio). Guardar llaves o encenderla no la comprueba.
  */
 class IntegracionesTenantController
 {
@@ -133,10 +141,22 @@ class IntegracionesTenantController
     {
         $llaves = $config instanceof IntegracionTenant ? $config->llaves() : [];
         $token = $config instanceof IntegracionTenant ? (string) $config->token_webhook : '';
+        $activa = $config instanceof IntegracionTenant && $config->activa;
+        $evidencia = $llaves !== [] && $activa ? $this->evidencia($proveedor) : null;
 
         return [
             'proveedor' => $proveedor->value,
-            'activa' => $config instanceof IntegracionTenant ? $config->activa : false,
+            'activa' => $activa,
+            // sin_configurar → credenciales → activa_sin_comprobar → comprobada.
+            'estado_conexion' => match (true) {
+                $llaves === [] => 'sin_configurar',
+                ! $activa => 'credenciales',
+                $evidencia === null => 'activa_sin_comprobar',
+                default => 'comprobada',
+            },
+            // Lo último que llegó de la plataforma y qué fue (`checkin` o `aviso`).
+            'comprobada_en' => $evidencia['en'] ?? null,
+            'comprobada_por' => $evidencia['por'] ?? null,
             // Las que pide el proveedor y las que ya se capturaron.
             'llaves' => $proveedor->credenciales(),
             'llaves_configuradas' => array_keys($llaves),
@@ -154,6 +174,33 @@ class IntegracionesTenantController
                 'registrado_en' => $config?->webhook_registrado_en?->toIso8601String(),
             ],
         ];
+    }
+
+    /**
+     * La prueba más reciente de que la plataforma sí responde: un check-in que aprobó
+     * (de recepción o automático; no una excepción ni uno sin verificar) o un aviso suyo
+     * que llegó a la dirección del negocio (con su token y, en Wellhub, su firma).
+     *
+     * @return array{en: string, por: 'checkin'|'aviso'}|null
+     */
+    private function evidencia(ProveedorPartner $proveedor): ?array
+    {
+        $checkin = CheckinTenant::query()
+            ->where('proveedor', $proveedor->value)
+            ->where('estado', CheckinTenant::VALIDADO)
+            ->max('registrado_en');
+        $aviso = EventoPlataformaTenant::query()
+            ->where('proveedor', $proveedor->value)
+            ->max('recibido_en');
+
+        $enCheckin = $checkin !== null ? CarbonImmutable::parse((string) $checkin) : null;
+        $enAviso = $aviso !== null ? CarbonImmutable::parse((string) $aviso) : null;
+
+        if ($enAviso !== null && ($enCheckin === null || $enAviso->greaterThan($enCheckin))) {
+            return ['en' => $enAviso->toIso8601String(), 'por' => 'aviso'];
+        }
+
+        return $enCheckin !== null ? ['en' => $enCheckin->toIso8601String(), 'por' => 'checkin'] : null;
     }
 
     /** La dirección donde la plataforma avisa al negocio (check-in y reservas). */

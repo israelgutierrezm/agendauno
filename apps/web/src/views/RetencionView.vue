@@ -214,7 +214,16 @@ watch(dias, () => {
   pagina.value = 1;
   void cargar();
 });
-onMounted(cargar);
+// La tabla se pide al verla: abrir directo «Para recuperar» no la carga de más.
+let tablaCargada = false;
+function cargarTabla(): void {
+  if (vista.value === "renovaciones" && !tablaCargada) {
+    tablaCargada = true;
+    void cargar();
+  }
+}
+watch(vista, cargarTabla);
+onMounted(cargarTabla);
 </script>
 
 <template>

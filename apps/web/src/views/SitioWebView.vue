@@ -831,7 +831,9 @@ onBeforeUnmount(() => {
               {{ $t("sitioWeb.estilo.ayuda") }}
             </p>
             <div class="mt-4 space-y-5">
-              <div>
+              <!-- El color de las páginas públicas, aparte del de la app del negocio
+                   (color_marca, en Configuración › Perfil público). -->
+              <div data-prueba="color-sitio">
                 <span class="tu-label">{{ $t("sitioWeb.estilo.color") }}</span>
                 <div class="flex flex-wrap items-center gap-3">
                   <input
@@ -839,6 +841,7 @@ onBeforeUnmount(() => {
                     class="sw-color"
                     :value="colorDelSitio"
                     :aria-label="$t('sitioWeb.estilo.color')"
+                    aria-describedby="sw-color-ayuda"
                     data-prueba="estilo-color"
                     @change="elegirColor"
                   />
@@ -857,6 +860,34 @@ onBeforeUnmount(() => {
                     {{ $t("sitioWeb.estilo.usarMarca") }}
                   </button>
                 </div>
+                <p id="sw-color-ayuda" class="sw-ayuda">
+                  {{ $t("sitioWeb.estilo.colorAyuda") }}
+                </p>
+              </div>
+              <div class="sw-color-app" data-prueba="color-app">
+                <span class="tu-label">{{
+                  $t("sitioWeb.estilo.colorApp")
+                }}</span>
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                  <span
+                    v-if="datos.color_marca"
+                    class="sw-muestra"
+                    :style="{ background: datos.color_marca }"
+                    aria-hidden="true"
+                  />
+                  <span>{{
+                    datos.color_marca ?? $t("sitioWeb.estilo.colorAppSin")
+                  }}</span>
+                </div>
+                <p class="sw-ayuda">
+                  {{ $t("sitioWeb.estilo.colorAppAyuda") }}
+                  <RouterLink
+                    :to="{ name: 'configuracion', hash: '#pagina-publica' }"
+                    class="tu-enlace"
+                    data-prueba="ir-color-app"
+                    >{{ $t("sitioWeb.estilo.colorAppDonde") }}</RouterLink
+                  >.
+                </p>
               </div>
               <div>
                 <span class="tu-label">{{
@@ -1951,6 +1982,19 @@ onBeforeUnmount(() => {
   border-radius: 0.5rem;
   background: transparent;
   cursor: pointer;
+}
+/* El color de la app, solo para consultarlo: se cambia en Configuración. */
+.sw-color-app {
+  padding: 0.75rem 0.9rem;
+  border: 1px dashed var(--borde);
+  border-radius: 0.6rem;
+}
+.sw-muestra {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border: 1px solid var(--borde);
+  border-radius: 0.3rem;
 }
 .sw-tipografias {
   display: grid;

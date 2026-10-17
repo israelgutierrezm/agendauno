@@ -86,6 +86,8 @@ interface Hoy {
     en_mora: number;
   } | null;
   renovaciones: { por_vencer: number; vencidas: number; dias: number } | null;
+  // Clases: mañana, cuántas van a menos de la mitad de su cupo.
+  manana?: { fecha: string; poca_ocupacion: number } | null;
   // Lo que espera al equipo (M08); null = no le toca verlo.
   atencion?: { solicitudes: number | null; seguimientos: number | null };
 }
@@ -481,6 +483,20 @@ const indicadores = computed<Indicador[]>(() => {
       valor: String(r.por_vencer),
       icono: "pulso",
       to: aRenovaciones("por_vencer"),
+    });
+  }
+  // Mañana con poca gente: abre Lugares libres de ese día, para llenarlas a tiempo.
+  const m = hoy.value?.manana;
+  if (m) {
+    lista.push({
+      clave: "mananaPoca",
+      valor: String(m.poca_ocupacion),
+      icono: "personas",
+      aviso: m.poca_ocupacion > 0,
+      to: destino("oportunidades", {
+        name: "oportunidades",
+        query: { fecha: m.fecha },
+      }),
     });
   }
   return lista.map((i) => ({

@@ -156,6 +156,33 @@ export default {
     primeraVezAyuda:
       "Solo la compra, una vez, quien nunca ha venido: sin planes antes y sin asistencias registradas.",
   },
+  // Antes de guardar un plan, lo que quedará en una sola vista (en el pie del editor).
+  // Se usa con llave dinámica (`planes.antesDeGuardar.${clave}`).
+  antesDeGuardar: {
+    titulo: "Así quedará",
+    ayuda:
+      "Revisa el precio, dónde se usa, para qué sirve y sus condiciones antes de guardar.",
+    precio: "Precio",
+    sinPrecio: "Falta el precio",
+    sucursales: "Sucursales",
+    todasSucursales: "Todas las sucursales",
+    comoElPaquete: "Las del paquete al que se suma",
+    ningunaSucursal: "Elige al menos una sucursal",
+    sirvePara: "Sirve para",
+    mismasDelPaquete: "Lo mismo que el paquete al que se suma",
+    incluye: "Incluye",
+    sumaClases: "Suma 1 clase al paquete | Suma {n} clases al paquete",
+    vigencia: "Vigencia",
+    seRenueva: "Se renueva cada mes mientras se pague",
+    condiciones: "Condiciones",
+    sinCondiciones: "Sin condiciones especiales",
+    primeraVez: "Solo para quien nunca ha venido",
+    permanencia: "Permanencia de 1 mes | Permanencia de {n} meses",
+    inscripcion: "Cobra inscripción",
+    anualidad: "Cobra anualidad",
+    destacado: "Destacado en tu página",
+    archivado: "Archivado: ya no se vende",
+  },
   // Permanencia de una membresía (B04).
   permanencia: {
     titulo: "Permanencia",

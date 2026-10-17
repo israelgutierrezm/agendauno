@@ -116,6 +116,8 @@ import planes from "./locales/planes.es-MX";
 import presupuestos from "./locales/presupuestos.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
+import comunicacionPantalla from "./locales/comunicacionPantalla.es-MX";
+import datosFiscalesSat from "./locales/datosFiscalesSat.es-MX";
 
 // Textos base (sin adaptar a ningún negocio).
 const mensajesBase = {
@@ -220,6 +222,8 @@ const mensajesBase = {
   sucursalesVisual,
   comunicacionesVisual,
   medicion,
+  comunicacionPantalla,
+  datosFiscalesSat,
 };
 
 export const i18n = createI18n({

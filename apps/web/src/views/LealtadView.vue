@@ -15,7 +15,10 @@ import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero } from "@/lib/formato";
-import { useDescartarCambios } from "@/lib/editorFormulario";
+import {
+  useDescartarCambios,
+  useEditorFormulario,
+} from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Programa {
@@ -123,9 +126,6 @@ watch(buscarCanjes, () => {
   }, 300);
 });
 
-const nueva = ref({ nombre: "", descripcion: "", costo_puntos: 100 });
-const nuevaRecompensa = ref(false);
-const creandoRecompensa = ref(false);
 const editorPrograma = ref(false);
 const guardandoPrograma = ref(false);
 const borradorPrograma = ref<Programa>({ ...programa.value });
@@ -134,11 +134,6 @@ const descartarPrograma = useDescartarCambios({
   abierto: editorPrograma,
   valor: () => borradorPrograma.value,
   guardando: guardandoPrograma,
-});
-const descartarRecompensa = useDescartarCambios({
-  abierto: nuevaRecompensa,
-  valor: () => nueva.value,
-  guardando: creandoRecompensa,
 });
 function abrirPrograma(): void {
   borradorPrograma.value = { ...programa.value };
@@ -149,13 +144,41 @@ function abrirPrograma(): void {
 function cerrarPrograma(): void {
   void descartarPrograma.cerrar();
 }
-function abrirRecompensa(): void {
-  error.value = null;
-  descartarRecompensa.fijar();
-  nuevaRecompensa.value = true;
+
+// Alta y edición de una recompensa con el patrón de los formularios: el error junto a
+// su campo, no se cierra mientras guarda, pregunta antes de descartar y confirma.
+const recompensaAbierta = ref(false);
+const editandoRecompensa = ref<Recompensa | null>(null);
+const formRecompensa = ref({
+  nombre: "",
+  descripcion: "",
+  costo_puntos: 100,
+  activa: true,
+});
+const editorRecompensa = useEditorFormulario({
+  abierto: recompensaAbierta,
+  valor: () => formRecompensa.value,
+  campos: ["nombre", "descripcion", "costo_puntos", "activa"],
+  formulario: "#form-recompensa",
+});
+const guardandoRecompensa = editorRecompensa.guardando;
+const erroresRecompensa = editorRecompensa.errores;
+const errorRecompensa = editorRecompensa.error;
+function abrirRecompensa(r: Recompensa | null): void {
+  editandoRecompensa.value = r;
+  formRecompensa.value = r
+    ? {
+        nombre: r.nombre,
+        descripcion: r.descripcion ?? "",
+        costo_puntos: r.costo_puntos,
+        activa: r.activa,
+      }
+    : { nombre: "", descripcion: "", costo_puntos: 100, activa: true };
+  editorRecompensa.empezar();
+  recompensaAbierta.value = true;
 }
 function cerrarRecompensa(): void {
-  void descartarRecompensa.cerrar();
+  void editorRecompensa.cerrar();
 }
 
 const miembroSel = ref("");
@@ -219,26 +242,44 @@ async function guardarPrograma(): Promise<void> {
   }
 }
 
-async function crearRecompensa(): Promise<void> {
-  if (!puedeGestionar.value || creandoRecompensa.value) return;
-  creandoRecompensa.value = true;
-  aviso.value = null;
-  error.value = null;
+// Solo el catálogo de recompensas (sin volver a cargar la pantalla entera).
+async function recargarRecompensas(): Promise<void> {
   try {
-    await api.post(`${base.value}/lealtad/recompensas`, {
-      nombre: nueva.value.nombre,
-      descripcion: nueva.value.descripcion || null,
-      costo_puntos: Number(nueva.value.costo_puntos) || 1,
-    });
-    aviso.value = t("lealtad.recompensaCreada", { nombre: nueva.value.nombre });
-    nueva.value = { nombre: "", descripcion: "", costo_puntos: 100 };
-    descartarRecompensa.fijar();
-    nuevaRecompensa.value = false;
-    await cargar();
+    const { data } = await api.get<{ data: Recompensa[] }>(
+      `${base.value}/lealtad/recompensas`,
+    );
+    recompensas.value = data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
-  } finally {
-    creandoRecompensa.value = false;
+  }
+}
+
+async function guardarRecompensa(): Promise<void> {
+  const f = formRecompensa.value;
+  if (!puedeGestionar.value || f.nombre.trim() === "") return;
+  aviso.value = null;
+  const cuerpo = {
+    nombre: f.nombre.trim(),
+    descripcion: f.descripcion.trim() || null,
+    costo_puntos: Number(f.costo_puntos) || 1,
+  };
+  const actual = editandoRecompensa.value;
+  // Editar manda también si se puede canjear (la API lo pide al actualizar).
+  const listo = await editorRecompensa.guardar(
+    (): Promise<unknown> =>
+      actual
+        ? api.put(`${base.value}/lealtad/recompensas/${actual.id}`, {
+            ...cuerpo,
+            activa: f.activa,
+          })
+        : api.post(`${base.value}/lealtad/recompensas`, cuerpo),
+    actual
+      ? t("lealtadVisual.recompensas.guardada", { nombre: cuerpo.nombre })
+      : t("lealtad.recompensaCreada", { nombre: cuerpo.nombre }),
+  );
+  if (listo !== undefined) {
+    recompensaAbierta.value = false;
+    await recargarRecompensas();
   }
 }
 
@@ -251,7 +292,7 @@ async function toggleRecompensa(r: Recompensa): Promise<void> {
       costo_puntos: r.costo_puntos,
       activa: !r.activa,
     });
-    await cargar();
+    await recargarRecompensas();
   } catch (e) {
     error.value = mensajeDeError(e);
   }
@@ -460,37 +501,139 @@ const indicadores = computed<Indicador[]>(() => {
 
     <template v-else>
       <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
-      <!-- Programa -->
-      <div class="mt-5 tu-card p-5">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="font-medium">{{ $t("lealtad.programa.titulo") }}</h2>
-          <span
-            class="tu-badge"
-            :class="programa.activa ? 'tu-badge-exito' : ''"
-            >{{
-              $t(
-                programa.activa
-                  ? "adminUsabilidad.estadoActivo"
-                  : "adminUsabilidad.estadoInactivo",
-              )
-            }}</span
-          >
+
+      <!-- 1. Configuración del programa: cómo se ganan puntos y qué se canjea -->
+      <section
+        class="mt-8"
+        aria-labelledby="le-sec-programa"
+        data-prueba="seccion-programa"
+      >
+        <header class="le-cabeza">
+          <h2 id="le-sec-programa">
+            {{ $t("lealtadVisual.secciones.programa") }}
+          </h2>
+          <p>{{ $t("lealtadVisual.secciones.programaAyuda") }}</p>
+        </header>
+
+        <div class="grid gap-6 lg:grid-cols-2">
+          <!-- Cómo se ganan puntos -->
+          <div class="tu-card p-5">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="font-medium">{{ $t("lealtad.programa.titulo") }}</h3>
+              <span
+                class="tu-estado text-sm"
+                :style="{
+                  '--tono': programa.activa
+                    ? 'var(--exito)'
+                    : 'var(--texto-suave)',
+                }"
+                data-prueba="estado-programa"
+                >{{
+                  $t(
+                    programa.activa
+                      ? "adminUsabilidad.estadoActivo"
+                      : "adminUsabilidad.estadoInactivo",
+                  )
+                }}</span
+              >
+            </div>
+            <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("lealtad.programa.porAsistencia") }}:
+              {{ programa.puntos_por_asistencia }} ·
+              {{ $t("lealtad.programa.porMoneda") }}:
+              {{ programa.puntos_por_moneda }}
+            </p>
+            <button
+              v-if="puedeGestionar"
+              type="button"
+              class="tu-btn tu-btn-fantasma mt-4"
+              @click="abrirPrograma"
+            >
+              {{ $t("adminUsabilidad.configurarPrograma") }}
+            </button>
+          </div>
+
+          <!-- Recompensas: el catálogo que se canjea -->
+          <div class="tu-card p-5" data-prueba="catalogo-recompensas">
+            <div class="flex flex-wrap justify-between gap-3 items-center">
+              <h3 class="font-medium">
+                {{ $t("lealtad.recompensas.titulo") }}
+              </h3>
+              <button
+                v-if="puedeGestionar"
+                type="button"
+                class="tu-btn tu-btn-fantasma"
+                @click="abrirRecompensa(null)"
+              >
+                {{ $t("adminUsabilidad.recompensas.nueva") }}
+              </button>
+            </div>
+            <EstadoVacio
+              v-if="recompensas.length === 0"
+              class="mt-3 py-6"
+              icono="lealtad"
+              compacto
+              :titulo="$t('lealtad.recompensas.vacio')"
+            />
+            <ul v-else class="mt-3 space-y-2">
+              <li
+                v-for="r in recompensas"
+                :key="r.id"
+                class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t pt-2"
+                :style="{ borderColor: 'var(--borde)' }"
+                data-prueba="recompensa"
+              >
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold truncate">{{ r.nombre }}</div>
+                  <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                    {{ r.costo_puntos }} {{ $t("lealtad.puntos")
+                    }}<template v-if="r.descripcion">
+                      · {{ r.descripcion }}</template
+                    >
+                  </div>
+                </div>
+                <span
+                  class="tu-estado text-sm"
+                  :style="{
+                    '--tono': r.activa ? 'var(--exito)' : 'var(--texto-suave)',
+                  }"
+                  >{{
+                    r.activa
+                      ? $t("lealtad.recompensas.activa")
+                      : $t("lealtad.recompensas.inactiva")
+                  }}</span
+                >
+                <span
+                  v-if="puedeGestionar"
+                  class="inline-flex gap-3 text-sm whitespace-nowrap"
+                >
+                  <button
+                    type="button"
+                    class="tu-enlace"
+                    :data-prueba="`editar-recompensa-${r.id}`"
+                    @click="abrirRecompensa(r)"
+                  >
+                    {{ $t("lealtadVisual.recompensas.editar") }}
+                  </button>
+                  <button
+                    type="button"
+                    class="tu-enlace"
+                    :data-prueba="`alternar-recompensa-${r.id}`"
+                    @click="toggleRecompensa(r)"
+                  >
+                    {{
+                      r.activa
+                        ? $t("lealtadVisual.recompensas.desactivar")
+                        : $t("lealtadVisual.recompensas.activar")
+                    }}
+                  </button>
+                </span>
+              </li>
+            </ul>
+          </div>
         </div>
-        <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("lealtad.programa.porAsistencia") }}:
-          {{ programa.puntos_por_asistencia }} ·
-          {{ $t("lealtad.programa.porMoneda") }}:
-          {{ programa.puntos_por_moneda }}
-        </p>
-        <button
-          v-if="puedeGestionar"
-          type="button"
-          class="tu-btn tu-btn-fantasma mt-4"
-          @click="abrirPrograma"
-        >
-          {{ $t("adminUsabilidad.configurarPrograma") }}
-        </button>
-      </div>
+      </section>
+
       <ModalDialogo
         v-if="puedeGestionar"
         :abierto="editorPrograma"
@@ -569,129 +712,140 @@ const indicadores = computed<Indicador[]>(() => {
         </form>
       </ModalDialogo>
 
-      <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <!-- Recompensas -->
-        <div class="tu-card p-5">
-          <div class="flex flex-wrap justify-between gap-3 items-center">
-            <h2 class="font-medium">{{ $t("lealtad.recompensas.titulo") }}</h2>
+      <!-- Alta y edición de una recompensa -->
+      <ModalDialogo
+        v-if="puedeGestionar"
+        :abierto="recompensaAbierta"
+        :titulo="
+          editandoRecompensa
+            ? $t('lealtadVisual.recompensas.editarTitulo', {
+                nombre: editandoRecompensa.nombre,
+              })
+            : $t('adminUsabilidad.recompensas.nueva')
+        "
+        tam="md"
+        icono="lealtad"
+        :ocupado="guardandoRecompensa"
+        @cerrar="cerrarRecompensa"
+      >
+        <form
+          id="form-recompensa"
+          class="space-y-4"
+          @submit.prevent="guardarRecompensa"
+        >
+          <AvisoTono v-if="errorRecompensa" tono="peligro" role="alert">
+            {{ errorRecompensa }}
+          </AvisoTono>
+          <div>
+            <label class="tu-label" for="lr-nombre">{{
+              $t("adminUsabilidad.recompensas.nombre")
+            }}</label>
+            <input
+              id="lr-nombre"
+              v-bind="editorRecompensa.marcar('nombre', 'lr-nombre-error')"
+              v-model="formRecompensa.nombre"
+              class="tu-input"
+              maxlength="120"
+              :placeholder="$t('adminUsabilidad.recompensas.ejemplo')"
+              required
+            />
+            <span
+              v-if="erroresRecompensa.nombre"
+              id="lr-nombre-error"
+              class="tu-error-campo"
+              >{{ erroresRecompensa.nombre }}</span
+            >
+          </div>
+          <div>
+            <label class="tu-label" for="lr-costo">{{
+              $t("adminUsabilidad.recompensas.costo")
+            }}</label>
+            <input
+              id="lr-costo"
+              v-bind="editorRecompensa.marcar('costo_puntos', 'lr-costo-error')"
+              v-model.number="formRecompensa.costo_puntos"
+              type="number"
+              min="1"
+              class="tu-input"
+              :placeholder="$t('lealtad.puntos')"
+              required
+            />
+            <span
+              v-if="erroresRecompensa.costo_puntos"
+              id="lr-costo-error"
+              class="tu-error-campo"
+              >{{ erroresRecompensa.costo_puntos }}</span
+            >
+          </div>
+          <div>
+            <label class="tu-label" for="lr-desc">{{
+              $t("lealtadVisual.recompensas.descripcion")
+            }}</label>
+            <input
+              id="lr-desc"
+              v-bind="editorRecompensa.marcar('descripcion', 'lr-desc-error')"
+              v-model="formRecompensa.descripcion"
+              class="tu-input"
+              maxlength="255"
+              :placeholder="$t('lealtadVisual.recompensas.descripcionPh')"
+            />
+            <span
+              v-if="erroresRecompensa.descripcion"
+              id="lr-desc-error"
+              class="tu-error-campo"
+              >{{ erroresRecompensa.descripcion }}</span
+            >
+          </div>
+          <template v-if="editandoRecompensa">
+            <InterruptorSiNo
+              v-model="formRecompensa.activa"
+              :etiqueta="$t('lealtadVisual.recompensas.seCanjea')"
+              prueba="recompensa-activa"
+            />
+            <p class="tu-hint">
+              {{ $t("lealtadVisual.recompensas.historial") }}
+            </p>
+          </template>
+          <div class="flex justify-end gap-2">
             <button
-              v-if="puedeGestionar"
               type="button"
               class="tu-btn tu-btn-fantasma"
-              @click="abrirRecompensa"
+              :disabled="guardandoRecompensa"
+              @click="cerrarRecompensa"
             >
-              {{ $t("adminUsabilidad.recompensas.nueva") }}
+              {{ $t("comun.cancelar") }}
+            </button>
+            <button
+              type="submit"
+              class="tu-btn tu-btn-primario whitespace-nowrap"
+              :disabled="guardandoRecompensa || !formRecompensa.nombre.trim()"
+            >
+              {{
+                editandoRecompensa
+                  ? $t("comun.guardar")
+                  : $t("lealtad.recompensas.crear")
+              }}
             </button>
           </div>
-          <EstadoVacio
-            v-if="recompensas.length === 0"
-            class="mt-3 py-6"
-            icono="lealtad"
-            compacto
-            :titulo="$t('lealtad.recompensas.vacio')"
-          />
-          <ul v-else class="mt-3 space-y-2">
-            <li
-              v-for="r in recompensas"
-              :key="r.id"
-              class="flex items-center justify-between gap-3 border-t pt-2"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <div class="min-w-0">
-                <div class="font-semibold truncate">{{ r.nombre }}</div>
-                <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                  {{ r.costo_puntos }} {{ $t("lealtad.puntos") }}
-                </div>
-              </div>
-              <button
-                v-if="puedeGestionar"
-                type="button"
-                class="tu-badge"
-                :class="r.activa ? 'tu-badge-exito' : ''"
-                @click="toggleRecompensa(r)"
-              >
-                {{
-                  r.activa
-                    ? $t("lealtad.recompensas.activa")
-                    : $t("lealtad.recompensas.inactiva")
-                }}
-              </button>
-              <span
-                v-else
-                class="tu-badge"
-                :class="r.activa ? 'tu-badge-exito' : ''"
-                >{{
-                  r.activa
-                    ? $t("lealtad.recompensas.activa")
-                    : $t("lealtad.recompensas.inactiva")
-                }}</span
-              >
-            </li>
-          </ul>
+        </form>
+      </ModalDialogo>
 
-          <ModalDialogo
-            v-if="puedeGestionar"
-            :abierto="nuevaRecompensa"
-            :titulo="$t('adminUsabilidad.recompensas.nueva')"
-            tam="md"
-            icono="lealtad"
-            :ocupado="creandoRecompensa"
-            @cerrar="cerrarRecompensa"
-          >
-            <form
-              v-if="puedeGestionar"
-              class="space-y-4"
-              @submit.prevent="crearRecompensa"
-            >
-              <p v-if="error" role="alert" :style="{ color: 'var(--error)' }">
-                {{ error }}
-              </p>
-              <label class="block"
-                ><span class="tu-label">{{
-                  $t("adminUsabilidad.recompensas.nombre")
-                }}</span
-                ><input
-                  v-model="nueva.nombre"
-                  class="tu-input"
-                  :placeholder="$t('adminUsabilidad.recompensas.ejemplo')"
-                  required
-              /></label>
-              <label class="block"
-                ><span class="tu-label">{{
-                  $t("adminUsabilidad.recompensas.costo")
-                }}</span
-                ><input
-                  v-model.number="nueva.costo_puntos"
-                  type="number"
-                  min="1"
-                  class="tu-input"
-                  :placeholder="$t('lealtad.puntos')"
-                  required
-              /></label>
-              <div class="flex justify-end gap-2">
-                <button
-                  type="button"
-                  class="tu-btn tu-btn-fantasma"
-                  :disabled="creandoRecompensa"
-                  @click="cerrarRecompensa"
-                >
-                  {{ $t("comun.cancelar") }}
-                </button>
-                <button
-                  type="submit"
-                  class="tu-btn tu-btn-primario whitespace-nowrap"
-                  :disabled="creandoRecompensa || !nueva.nombre.trim()"
-                >
-                  {{ $t("lealtad.recompensas.crear") }}
-                </button>
-              </div>
-            </form>
-          </ModalDialogo>
-        </div>
+      <!-- 2. Canjes y puntos: la operación del día con el programa -->
+      <section
+        class="le-separada mt-10"
+        aria-labelledby="le-sec-canjes"
+        data-prueba="seccion-canjes"
+      >
+        <header class="le-cabeza">
+          <h2 id="le-sec-canjes">
+            {{ $t("lealtadVisual.secciones.canjes") }}
+          </h2>
+          <p>{{ $t("lealtadVisual.secciones.canjesAyuda") }}</p>
+        </header>
 
-        <!-- Consulta por miembro -->
+        <!-- Puntos de un miembro: saldo, canjear y ajustar -->
         <div class="tu-card p-5">
-          <h2 class="font-medium">{{ $t("lealtad.miembro.titulo") }}</h2>
+          <h3 class="font-medium">{{ $t("lealtad.miembro.titulo") }}</h3>
           <BuscarPersona
             v-model="miembroSel"
             class="mt-3"
@@ -796,131 +950,152 @@ const indicadores = computed<Indicador[]>(() => {
             </button>
           </template>
         </div>
-      </div>
 
-      <!-- Canjes recientes -->
-      <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 class="font-medium">
-          {{ $t("lealtad.canjes.titulo") }}
-        </h2>
-        <div class="tu-segmentado" role="group" data-prueba="vista-canjes">
-          <button
-            v-for="v in ['pendientes', 'historial'] as const"
-            :key="v"
-            type="button"
-            :aria-pressed="vistaCanjes === v"
-            :data-prueba="`canjes-${v}`"
-            @click="vistaCanjes = v"
-          >
-            {{
-              v === "pendientes"
-                ? $t("operacion.canjes.porEntregar")
-                : $t("operacion.canjes.historial")
-            }}
-            <span
-              v-if="metaCanjes?.conteos"
-              class="ml-1 tabular-nums"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{ metaCanjes.conteos[v] }}</span
+        <!-- Canjes: los que faltan por entregar y su historial -->
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <h3 class="font-medium">
+            {{ $t("lealtad.canjes.titulo") }}
+          </h3>
+          <div class="tu-segmentado" role="group" data-prueba="vista-canjes">
+            <button
+              v-for="v in ['pendientes', 'historial'] as const"
+              :key="v"
+              type="button"
+              :aria-pressed="vistaCanjes === v"
+              :data-prueba="`canjes-${v}`"
+              @click="vistaCanjes = v"
             >
-          </button>
+              {{
+                v === "pendientes"
+                  ? $t("operacion.canjes.porEntregar")
+                  : $t("operacion.canjes.historial")
+              }}
+              <span
+                v-if="metaCanjes?.conteos"
+                class="ml-1 tabular-nums"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ metaCanjes.conteos[v] }}</span
+              >
+            </button>
+          </div>
         </div>
-      </div>
-      <input
-        v-model="buscarCanjes"
-        type="search"
-        class="tu-input mt-3 max-w-sm"
-        :placeholder="$t('operacion.canjes.buscar')"
-        :aria-label="$t('operacion.canjes.buscar')"
-        data-prueba="buscar-canjes"
-      />
-      <EstadoVacio
-        v-if="canjes.length === 0"
-        class="mt-3 py-6"
-        icono="lealtad"
-        compacto
-        :titulo="
-          buscarCanjes.trim() !== ''
-            ? $t('operacion.listadosDos.sinResultados')
-            : vistaCanjes === 'pendientes'
-              ? $t('operacion.canjes.sinPendientes')
-              : $t('operacion.canjes.sinHistorial')
-        "
-      />
-      <div v-else class="mt-3 tu-card overflow-x-auto">
-        <table class="tu-tabla">
-          <thead>
-            <tr>
-              <th>
-                {{ $t("lealtad.canjes.colMiembro") }}
-              </th>
-              <th>
-                {{ $t("lealtad.canjes.colRecompensa") }}
-              </th>
-              <th class="text-right">
-                {{ $t("lealtad.puntos") }}
-              </th>
-              <th>
-                {{ $t("lealtad.canjes.colEstado") }}
-              </th>
-              <th class="text-right">
-                {{ $t("lealtad.canjes.colAccion") }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="c in canjes" :key="c.id">
-              <td class="font-semibold">{{ c.persona }}</td>
-              <td>{{ c.recompensa }}</td>
-              <td class="text-right">{{ c.puntos }}</td>
-              <td>
-                <span
-                  class="tu-badge"
-                  :class="
-                    c.estado === 'entregado'
-                      ? 'tu-badge-exito'
-                      : c.estado === 'cancelado'
-                        ? ''
-                        : 'tu-badge-aviso'
-                  "
-                >
-                  {{ $t(`lealtad.estados.${c.estado}`) }}
-                </span>
-              </td>
-              <td class="text-right">
-                <span
-                  v-if="puedeGestionar && c.estado === 'pendiente'"
-                  class="inline-flex gap-2 justify-end"
-                >
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-suave tu-tono-exito tu-btn-chico whitespace-nowrap"
-                    @click="accionCanje(c, 'entregar')"
-                  >
-                    {{ $t("lealtad.canjes.entregar") }}
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico whitespace-nowrap"
-                    @click="accionCanje(c, 'cancelar')"
-                  >
-                    {{ $t("lealtad.canjes.cancelar") }}
-                  </button>
-                </span>
-                <span v-else :style="{ color: 'var(--texto-suave)' }">—</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <PaginacionListado
-          v-if="metaCanjes && metaCanjes.ultima_pagina > 1"
-          :page="metaCanjes.page"
-          :ultima-pagina="metaCanjes.ultima_pagina"
-          :total="metaCanjes.total"
-          :per-page="metaCanjes.per_page"
-          @ir="irPaginaCanjes"
+        <input
+          v-model="buscarCanjes"
+          type="search"
+          class="tu-input mt-3 max-w-sm"
+          :placeholder="$t('operacion.canjes.buscar')"
+          :aria-label="$t('operacion.canjes.buscar')"
+          data-prueba="buscar-canjes"
         />
-      </div>
+        <EstadoVacio
+          v-if="canjes.length === 0"
+          class="mt-3 py-6"
+          icono="lealtad"
+          compacto
+          :titulo="
+            buscarCanjes.trim() !== ''
+              ? $t('operacion.listadosDos.sinResultados')
+              : vistaCanjes === 'pendientes'
+                ? $t('operacion.canjes.sinPendientes')
+                : $t('operacion.canjes.sinHistorial')
+          "
+        />
+        <div v-else class="mt-3 tu-card overflow-x-auto">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>
+                  {{ $t("lealtad.canjes.colMiembro") }}
+                </th>
+                <th>
+                  {{ $t("lealtad.canjes.colRecompensa") }}
+                </th>
+                <th class="text-right">
+                  {{ $t("lealtad.canjes.colPuntos") }}
+                </th>
+                <th>
+                  {{ $t("lealtad.canjes.colEstado") }}
+                </th>
+                <th class="text-right">
+                  {{ $t("lealtad.canjes.colAccion") }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in canjes" :key="c.id">
+                <td class="font-semibold">{{ c.persona }}</td>
+                <td>{{ c.recompensa }}</td>
+                <td class="text-right">{{ c.puntos }}</td>
+                <td>
+                  <span
+                    class="tu-estado"
+                    :style="{
+                      '--tono':
+                        c.estado === 'entregado'
+                          ? 'var(--exito)'
+                          : c.estado === 'cancelado'
+                            ? 'var(--texto-suave)'
+                            : 'var(--aviso)',
+                    }"
+                  >
+                    {{ $t(`lealtad.estados.${c.estado}`) }}
+                  </span>
+                </td>
+                <td class="text-right">
+                  <span
+                    v-if="puedeGestionar && c.estado === 'pendiente'"
+                    class="inline-flex gap-2 justify-end"
+                  >
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-suave tu-tono-exito tu-btn-chico whitespace-nowrap"
+                      @click="accionCanje(c, 'entregar')"
+                    >
+                      {{ $t("lealtad.canjes.entregar") }}
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico whitespace-nowrap"
+                      @click="accionCanje(c, 'cancelar')"
+                    >
+                      {{ $t("lealtad.canjes.cancelar") }}
+                    </button>
+                  </span>
+                  <span v-else :style="{ color: 'var(--texto-suave)' }">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <PaginacionListado
+            v-if="metaCanjes && metaCanjes.ultima_pagina > 1"
+            :page="metaCanjes.page"
+            :ultima-pagina="metaCanjes.ultima_pagina"
+            :total="metaCanjes.total"
+            :per-page="metaCanjes.per_page"
+            @ir="irPaginaCanjes"
+          />
+        </div>
+      </section>
     </template>
   </section>
 </template>
+
+<style scoped>
+/* Dos partes: configurar el programa y operar los canjes, cada una con su título. */
+.le-cabeza {
+  margin-bottom: 1rem;
+}
+.le-separada {
+  border-top: 1px solid var(--borde);
+  padding-top: 2rem;
+}
+.le-cabeza h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.le-cabeza p {
+  margin-top: 0.15rem;
+  color: var(--texto-suave);
+  font-size: 0.875rem;
+}
+</style>

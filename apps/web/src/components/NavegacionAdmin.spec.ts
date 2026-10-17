@@ -212,7 +212,7 @@ describe("configuración del negocio", () => {
 
     await w.get(".lc-lateral input").setValue("logo");
     expect(w.findAll(".lc-lateral .lc-resultado").map((r) => r.text())).toEqual(
-      ["Datos e imagen del negocioNegocio"],
+      ["Logo del negocioNegocio"],
     );
     await w.get(".lc-lateral input").setValue("conectar pagos");
     expect(w.find(".lc-lateral .lc-resultado").text()).toContain(

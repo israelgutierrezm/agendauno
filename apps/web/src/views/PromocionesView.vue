@@ -45,6 +45,8 @@ const accionando = ref(false);
 
 const mostrarForm = ref(false);
 const editandoId = ref<string | null>(null);
+// El código con que se abrió (el título dice cuál se edita, aunque se cambie).
+const editandoCodigo = ref("");
 const form = ref({
   codigo: "",
   descripcion: "",
@@ -122,6 +124,7 @@ function nueva(): void {
 
 function editar(p: Promo): void {
   editandoId.value = p.id;
+  editandoCodigo.value = p.codigo;
   form.value = {
     codigo: p.codigo,
     descripcion: p.descripcion ?? "",
@@ -296,7 +299,9 @@ onMounted(cargar);
     <PanelLateral
       :abierto="mostrarForm"
       :titulo="
-        editandoId !== null ? $t('promociones.editar') : $t('promociones.nueva')
+        editandoId !== null
+          ? $t('promocionesVisual.editarTitulo', { codigo: editandoCodigo })
+          : $t('promociones.nueva')
       "
       :ocupado="guardando"
       @cerrar="cerrarForm"
@@ -588,6 +593,7 @@ onMounted(cargar);
                   class="tu-enlace text-sm"
                   type="button"
                   :disabled="accionando"
+                  :data-prueba="`editar-promo-${p.id}`"
                   @click="editar(p)"
                 >
                   {{ $t("promociones.editar") }}

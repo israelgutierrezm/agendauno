@@ -1,6 +1,8 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { onBeforeRouteLeave } from "vue-router";
+
 import { i18n } from "@/i18n";
 import SitioWebView from "./SitioWebView.vue";
 
@@ -562,6 +564,86 @@ describe("estilo del sitio y versiones (ADR 0146, fase 3)", () => {
     await color.trigger("change");
     await w.get('[data-prueba="estilo-color-marca"]').trigger("click");
     expect((color.element as HTMLInputElement).value).toBe("#aa3366");
+    w.unmount();
+  });
+
+  it("el color de la página web no es el de la app del negocio: cada uno dice dónde se usa", async () => {
+    const w = montar();
+    await flushPromises();
+    const sitio = w.get('[data-prueba="color-sitio"]');
+    expect(sitio.text()).toContain("Color de tu página web");
+    expect(sitio.text()).toContain("El mismo de tu app");
+    expect(sitio.text()).toContain("No cambia la app de tu negocio.");
+    const app = w.get('[data-prueba="color-app"]');
+    expect(app.text()).toContain("Color de la app de tu negocio");
+    expect(app.text()).toContain("#aa3366");
+    expect(app.get('[data-prueba="ir-color-app"]').text()).toBe(
+      "Configuración › Perfil público",
+    );
+    // El de la app solo se consulta aquí: no hay con qué cambiarlo.
+    expect(app.find("input").exists()).toBe(false);
+
+    // Con un color propio, el sitio cambia y el de la app sigue igual.
+    await w.get('[data-prueba="estilo-color"]').setValue("#123456");
+    await w.get('[data-prueba="estilo-color"]').trigger("change");
+    expect(sitio.text()).toContain("#123456");
+    expect(sitio.text()).toContain("Usar el color de tu app");
+    expect(app.text()).toContain("#aa3366");
+    w.unmount();
+  });
+
+  it("sin color de la app, dice que usa el de la plataforma", async () => {
+    api.get.mockResolvedValue({
+      data: { data: conEstilo({ color_marca: null }) },
+    });
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="color-app"]').text()).toContain(
+      "El de la plataforma",
+    );
+    w.unmount();
+  });
+
+  it("salir con cambios sin guardar pregunta antes; guardados, sale sin preguntar", async () => {
+    const w = montar();
+    await flushPromises();
+    const guardias = vi
+      .mocked(onBeforeRouteLeave)
+      .mock.calls.map(([guardia]) => guardia);
+    expect(guardias.length).toBeGreaterThan(0);
+    async function salir(): Promise<boolean> {
+      for (const guardia of guardias) {
+        const sigue = await (
+          guardia as unknown as (
+            a: { path: string },
+            b: { path: string },
+          ) => Promise<boolean> | boolean
+        )({ path: "/panel" }, { path: "/sitio" });
+        if (sigue === false) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Sin cambios: sale sin preguntar.
+    expect(await salir()).toBe(true);
+    expect(confirmar).not.toHaveBeenCalled();
+
+    // Con un cambio sin guardar: pregunta y, si no se confirma, se queda.
+    await w.get('[data-prueba="tipografia-elegante"]').trigger("click");
+    confirmar.mockResolvedValueOnce(false);
+    expect(await salir()).toBe(false);
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(confirmar.mock.calls[0]![0]).toBe(
+      i18n.global.t("comun.cambiosSinGuardar"),
+    );
+
+    // Guardado el borrador, ya no hay nada que perder.
+    await w.get('[data-prueba="guardar-sitio"]').trigger("click");
+    await flushPromises();
+    expect(await salir()).toBe(true);
+    expect(confirmar).toHaveBeenCalledTimes(1);
     w.unmount();
   });
 

@@ -16,8 +16,23 @@ const sesion = vi.hoisted(() => ({
   moneda: "MXN",
   pais: "MX",
 }));
-vi.mock("@/lib/api", () => ({ api, mensajeDeError: String }));
-vi.mock("@/lib/confirmar", () => ({ confirmar: vi.fn() }));
+vi.mock("@/lib/api", () => ({
+  api,
+  mensajeDeError: String,
+  erroresPorCampo: (e: {
+    response?: { data?: { meta?: { errors?: Record<string, string[]> } } };
+  }) =>
+    Object.fromEntries(
+      Object.entries(e.response?.data?.meta?.errors ?? {}).map(([c, m]) => [
+        c,
+        m[0]!,
+      ]),
+    ),
+}));
+const confirmar = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
+const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
+vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));
@@ -192,6 +207,132 @@ describe("canjes por entregar y su historial", () => {
       },
     );
     expect(w.text()).not.toContain("Entregar");
+    w.unmount();
+  });
+});
+
+describe("configurar el programa, aparte de operar los canjes", () => {
+  const botella = {
+    id: "r1",
+    nombre: "Botella",
+    descripcion: null,
+    costo_puntos: 300,
+    activa: true,
+  };
+  beforeEach(() => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/programa")
+            ? { activa: true, puntos_por_asistencia: 10, puntos_por_moneda: 1 }
+            : url.endsWith("/recompensas")
+              ? [botella]
+              : [],
+        },
+      }),
+    );
+  });
+  function montarLealtad() {
+    return mount(LealtadView, {
+      global: {
+        plugins: [i18n],
+        stubs: { BuscarPersona: true, Teleport: true },
+      },
+    });
+  }
+
+  it("el programa y sus recompensas van en una sección; los puntos y canjes, en otra", async () => {
+    const w = montarLealtad();
+    await flushPromises();
+    const programa = w.get('[data-prueba="seccion-programa"]');
+    const canjes = w.get('[data-prueba="seccion-canjes"]');
+    expect(programa.get("h2").text()).toBe("Configuración del programa");
+    expect(canjes.get("h2").text()).toBe("Canjes y puntos");
+
+    // Configurar: reglas de puntos y catálogo de recompensas.
+    expect(programa.text()).toContain("Configurar programa");
+    expect(programa.text()).toContain("Nueva recompensa");
+    expect(programa.find('[data-prueba="recompensa"]').exists()).toBe(true);
+    expect(programa.find('[data-prueba="vista-canjes"]').exists()).toBe(false);
+    // Operar: saldo de un miembro y los canjes por entregar.
+    expect(canjes.find("buscar-persona-stub").exists()).toBe(true);
+    expect(canjes.find('[data-prueba="vista-canjes"]').exists()).toBe(true);
+    expect(canjes.text()).not.toContain("Configurar programa");
+    // El estado, con punto y texto.
+    expect(w.get('[data-prueba="estado-programa"]').classes()).toContain(
+      "tu-estado",
+    );
+    w.unmount();
+  });
+
+  it("edita una recompensa: abre con lo guardado, la guarda con PUT y lo canjeado no cambia", async () => {
+    api.put.mockResolvedValue({ data: { data: {} } });
+    const w = montarLealtad();
+    await flushPromises();
+    await w.get('[data-prueba="editar-recompensa-r1"]').trigger("click");
+
+    const dialogo = w.get('[role="dialog"]');
+    expect(dialogo.text()).toContain("Editar recompensa: Botella");
+    expect(dialogo.text()).toContain(
+      "Los canjes ya hechos conservan el nombre y los puntos",
+    );
+    expect((w.get("#lr-nombre").element as HTMLInputElement).value).toBe(
+      "Botella",
+    );
+    expect((w.get("#lr-costo").element as HTMLInputElement).value).toBe("300");
+
+    await w.get("#lr-nombre").setValue("Botella de agua");
+    await w.get("#lr-costo").setValue(250);
+    await w.get("#lr-desc").setValue("De 600 ml");
+    await w.get('[data-prueba="recompensa-activa"]').trigger("click");
+    await w.get("#form-recompensa").trigger("submit");
+    await flushPromises();
+
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/lealtad/recompensas/r1",
+      {
+        nombre: "Botella de agua",
+        descripcion: "De 600 ml",
+        costo_puntos: 250,
+        activa: false,
+      },
+    );
+    expect(api.post).not.toHaveBeenCalled();
+    expect(toast.exito).toHaveBeenCalledWith(
+      "Recompensa «Botella de agua» guardada.",
+    );
+    expect(w.find('[role="dialog"]').exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("el error de un campo queda junto a él y no se descarta sin preguntar", async () => {
+    api.put.mockRejectedValueOnce({
+      response: {
+        data: {
+          meta: { errors: { costo_puntos: ["Debe ser al menos 1."] } },
+        },
+      },
+    });
+    confirmar.mockResolvedValue(false);
+    const w = montarLealtad();
+    await flushPromises();
+    await w.get('[data-prueba="editar-recompensa-r1"]').trigger("click");
+    await w.get("#lr-costo").setValue(0);
+    await w.get("#form-recompensa").trigger("submit");
+    await flushPromises();
+
+    expect(w.get("#lr-costo-error").text()).toBe("Debe ser al menos 1.");
+    expect(w.get("#lr-costo").attributes("aria-invalid")).toBe("true");
+    expect(w.text()).toContain("Revisa los campos marcados");
+
+    await w
+      .get('[role="dialog"]')
+      .findAll("button")
+      .find((b) => b.text() === "Cancelar")!
+      .trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalled();
+    expect(w.find("#lr-costo").exists()).toBe(true);
     w.unmount();
   });
 });

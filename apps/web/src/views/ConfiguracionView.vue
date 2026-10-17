@@ -148,16 +148,22 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <!-- Logo del estudio (Configuración › Negocio › Datos e imagen) -->
+      <!-- Logo del estudio (Configuración › Negocio › Logo del negocio). Solo se
+           cambia el logo: el nombre y el contacto no se editan desde el panel. -->
       <div
         v-show="visible('datos')"
         id="datos"
         class="mt-6 tu-card p-6 scroll-mt-24"
       >
-        <h2 class="font-medium text-lg">
+        <!-- Sola, el encabezado de la página ya lo nombra. -->
+        <h2 v-if="seccion !== 'datos'" class="font-medium text-lg">
           {{ $t("configuracion.logoTitulo") }}
         </h2>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        <p
+          class="text-sm"
+          :class="{ 'mt-1': seccion !== 'datos' }"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
           {{ $t("configuracion.logoDesc") }}
         </p>
 

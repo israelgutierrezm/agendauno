@@ -214,6 +214,7 @@ describe("el día de hoy en el Inicio", () => {
             en_mora: 1,
           },
           renovaciones: { por_vencer: 3, vencidas: 2, dias: 7 },
+          manana: { fecha: "2026-10-02", poca_ocupacion: 2 },
           atencion: { solicitudes: 2, seguimientos: 1 },
         },
       },
@@ -247,6 +248,11 @@ describe("el día de hoy en el Inicio", () => {
     expect(
       w.get('[data-prueba="pendiente-seguimientos"]').attributes("data-to"),
     ).toBe(JSON.stringify({ name: "tareas", query: { tipo: "seguimiento" } }));
+    // Mañana con poca gente (el enlace a Lugares libres de ese día lo cuida su
+    // permiso de clases; aquí, la cifra).
+    expect(w.get('[data-prueba="indicador-mananaPoca"]').text()).toContain(
+      "Mañana, a menos de la mitad",
+    );
   });
 
   it("se pone al día con «Actualizar» y al volver a la pestaña, sin quitar lo que se ve", async () => {

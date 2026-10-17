@@ -257,3 +257,18 @@ it('lo que espera al equipo: solicitudes nuevas y seguimientos abiertos, solo a 
     $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy", conBearer($instructor))->assertOk()
         ->assertJsonPath('data.atencion.solicitudes', null);
 });
+
+it('en clases dice cuántas de mañana van a menos de la mitad de su cupo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    // Mañana: una casi vacía (1 de 10) y una casi llena (6 de 10).
+    $vacia = crearSesionTenant($e, $semilla, 10, '2026-10-02 08:00:00');
+    $llena = crearSesionTenant($e, $semilla, 10, '2026-10-02 10:00:00');
+    reservarAlumnoNuevo($e, $vacia, 'Ana');
+    foreach (['Bea', 'Cris', 'Dani', 'Eli', 'Fer', 'Gabi'] as $nombre) {
+        reservarAlumnoNuevo($e, $llena, $nombre);
+    }
+
+    $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.manana', ['fecha' => '2026-10-02', 'poca_ocupacion' => 1]);
+});

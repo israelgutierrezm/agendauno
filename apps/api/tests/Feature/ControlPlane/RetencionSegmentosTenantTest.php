@@ -133,7 +133,7 @@ it('en citas: quien ya debería regresar por su servicio y no tiene otra cita', 
     expect($segmentos->has('vino_sin_comprar'))->toBeFalse()
         ->and($segmentos['debe_regresar']['total'])->toBe(1);
     $lista = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/debe_regresar", conBearer($e['bearer']))->assertOk()->json('data');
-    expect($lista[0]['detalle'])->toContain('fue hace 30 días; suele regresar cada 21.');
+    expect($lista[0]['detalle'])->toContain('fue hace 30 días; suele regresar cada 21 días.');
 
     $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/vino_sin_comprar", conBearer($e['bearer']))->assertNotFound();
 });

@@ -9,6 +9,7 @@ import SelectorOpciones from "@/components/SelectorOpciones.vue";
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { instantanea } from "@/lib/cambiosPendientes";
 import type { EstadoEditor } from "@/lib/editorFormulario";
+import { dinero } from "@/lib/formato";
 import {
   UNIDADES_POR_CLASE,
   fechaLarga,
@@ -51,6 +52,8 @@ const ofertas = ref<Opcion[]>([]);
 const sucursales = ref<Opcion[]>([]);
 
 const p = props.plan;
+// La moneda del plan (o la del negocio, si es nuevo).
+const moneda = computed(() => p?.moneda ?? sesion.moneda ?? "MXN");
 const form = reactive({
   tipo: (p?.tipo ?? "paquete") as TipoPlan,
   nombre: p?.nombre ?? "",
@@ -191,6 +194,122 @@ const opcionesOfertas = computed(() =>
     grupo: o.actividad ?? null,
   })),
 );
+
+// Antes de guardar, lo que quedará en una sola vista: precio, dónde se usa, para qué
+// sirve, qué incluye, cuánto dura y sus condiciones. Lo que falta, marcado.
+interface FilaResumen {
+  clave: string;
+  etiqueta: string;
+  valor: string;
+  falta?: boolean;
+}
+function ra(clave: string, n?: number): string {
+  return n === undefined
+    ? t(`planes.antesDeGuardar.${clave}`)
+    : t(`planes.antesDeGuardar.${clave}`, { n }, n);
+}
+const resumen = computed<FilaResumen[]>(() => {
+  const precio = numero(form.precio);
+  const clasesN = Math.max(0, Math.round(numero(form.clases) ?? 0));
+  const porMesN = Math.max(0, Math.round(numero(form.clasesPorMes) ?? 0));
+  const cantidad = Math.max(0, Math.round(numero(form.cantidad) ?? 0));
+
+  const incluye = esMembresia.value
+    ? form.ilimitado
+      ? t("planes.resumen.ilimitado")
+      : t("planes.resumen.porMes", { n: porMesN }, porMesN)
+    : esSuelta.value
+      ? t("planes.resumen.clases", { n: 1 }, 1)
+      : esExtra.value
+        ? ra("sumaClases", clasesN)
+        : t("planes.resumen.clases", { n: clasesN }, clasesN);
+
+  let vigencia: string;
+  if (esExtra.value) {
+    vigencia = t("planes.resumen.conElPaquete");
+  } else if (esMembresia.value) {
+    vigencia = ra("seRenueva");
+  } else if (form.vigencia === "dias") {
+    vigencia = t("planes.resumen.dias", { n: cantidad }, cantidad);
+  } else if (form.vigencia === "meses") {
+    vigencia = t("planes.resumen.meses", { n: cantidad }, cantidad);
+  } else if (form.vigencia === "fin_de_mes") {
+    vigencia = t("planes.resumen.finDeMes", { n: cantidad }, cantidad);
+  } else {
+    vigencia = t("planes.resumen.sinVencimiento");
+  }
+
+  const elegidas = sucursales.value
+    .filter((s) => form.sucursalIds.includes(s.id))
+    .map((s) => s.nombre);
+  const enSucursales = esExtra.value
+    ? { valor: ra("comoElPaquete") }
+    : form.cobertura === "todas" || sucursales.value.length <= 1
+      ? { valor: ra("todasSucursales") }
+      : elegidas.length > 0
+        ? { valor: elegidas.join(", ") }
+        : { valor: ra("ningunaSucursal"), falta: true };
+
+  const ofertasElegidas = ofertasElegibles.value
+    .filter((o) => form.ofertas.has(o.id))
+    .map((o) => o.nombre);
+  const sirvePara = esExtra.value
+    ? { valor: ra("mismasDelPaquete") }
+    : form.todas
+      ? { valor: tx("todas") }
+      : ofertasElegidas.length > 0
+        ? { valor: ofertasElegidas.join(", ") }
+        : { valor: tx("eligeClases"), falta: true };
+
+  const condiciones: string[] = [];
+  if (admitePrimeraVez.value && form.primeraVez) {
+    condiciones.push(ra("primeraVez"));
+  }
+  const meses = Math.round(numero(form.permanencia) ?? 0);
+  if (esMembresia.value && !esCitas.value && meses > 0) {
+    const modo = t(`planes.permanencia.modos.${form.bajaAnticipada}`);
+    const detalle =
+      form.bajaAnticipada === "monto_fijo"
+        ? ` (${dinero(Math.round((numero(form.penalizacion) ?? 0) * 100), moneda.value, sesion.pais)})`
+        : form.bajaAnticipada === "meses_restantes" &&
+            (numero(form.porcentaje) ?? 100) < 100
+          ? ` (${Math.max(1, Math.round(numero(form.porcentaje) ?? 100))} %)`
+          : "";
+    condiciones.push(`${ra("permanencia", meses)} · ${modo}${detalle}`);
+  }
+  if (!esCitas.value && !esExtra.value && form.cobraInscripcion) {
+    condiciones.push(ra("inscripcion"));
+  }
+  if (!esCitas.value && !esExtra.value && form.cobraAnualidad) {
+    condiciones.push(ra("anualidad"));
+  }
+  if (form.destacado) {
+    condiciones.push(ra("destacado"));
+  }
+  if (props.plan && form.archivado) {
+    condiciones.push(ra("archivado"));
+  }
+
+  return [
+    {
+      clave: "precio",
+      etiqueta: ra("precio"),
+      ...(precio !== null && precio >= 0
+        ? { valor: dinero(Math.round(precio * 100), moneda.value, sesion.pais) }
+        : { valor: ra("sinPrecio"), falta: true }),
+    },
+    { clave: "sucursales", etiqueta: ra("sucursales"), ...enSucursales },
+    { clave: "aplica", etiqueta: ra("sirvePara"), ...sirvePara },
+    { clave: "incluye", etiqueta: ra("incluye"), valor: incluye },
+    { clave: "vigencia", etiqueta: ra("vigencia"), valor: vigencia },
+    {
+      clave: "condiciones",
+      etiqueta: ra("condiciones"),
+      valor:
+        condiciones.length > 0 ? condiciones.join(" · ") : ra("sinCondiciones"),
+    },
+  ];
+});
 
 const valido = computed(
   () =>
@@ -795,6 +914,35 @@ onMounted(async () => {
       </div>
     </details>
 
+    <!-- Así quedará: lo que se guarda, revisado antes de guardar -->
+    <section
+      class="ep-resumen"
+      aria-labelledby="ep-resumen-titulo"
+      data-prueba="resumen-plan"
+    >
+      <header>
+        <h3 id="ep-resumen-titulo">
+          {{ $t("planes.antesDeGuardar.titulo") }}
+        </h3>
+        <p>{{ $t("planes.antesDeGuardar.ayuda") }}</p>
+      </header>
+      <dl>
+        <div
+          v-for="f in resumen"
+          :key="f.clave"
+          :data-prueba="`resumen-${f.clave}`"
+        >
+          <dt>{{ f.etiqueta }}</dt>
+          <dd
+            :class="{ 'tu-estado': f.falta }"
+            :style="f.falta ? { '--tono': 'var(--aviso)' } : undefined"
+          >
+            {{ f.valor }}
+          </dd>
+        </div>
+      </dl>
+    </section>
+
     <p v-if="plan" class="text-xs" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("planes.editor.soloFuturo") }}
     </p>
@@ -852,5 +1000,39 @@ onMounted(async () => {
 .ep-opcion:has(input:checked) {
   border-color: var(--primario);
   background: color-mix(in srgb, var(--primario) 8%, var(--superficie));
+}
+/* Así quedará: una ficha sobria, con cada dato en su renglón. */
+.ep-resumen {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--superficie-2) 45%, var(--superficie));
+}
+.ep-resumen h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.ep-resumen header p {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+.ep-resumen dl {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+}
+.ep-resumen dl > div {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 9rem) 1fr;
+  gap: 0.75rem;
+}
+.ep-resumen dt {
+  color: var(--texto-suave);
+}
+.ep-resumen dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 </style>

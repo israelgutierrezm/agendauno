@@ -503,7 +503,7 @@ onMounted(cargar);
       </div>
     </template>
 
-    <!-- Formulario amplio: identidad y ubicación primero; perfil y horarios debajo. -->
+    <!-- Formulario amplio por secciones: Datos, Ubicación, Contacto y Horarios. -->
     <ModalDialogo
       :abierto="abierto"
       :titulo="esNueva ? $t('sedes.nueva') : $t('sedes.editarTitulo')"
@@ -512,253 +512,288 @@ onMounted(cargar);
       :ocupado="guardando"
       @cerrar="cerrar"
     >
-      <form
-        id="s-form"
-        class="grid gap-4 sm:grid-cols-2"
-        @submit.prevent="guardar"
-      >
+      <form id="s-form" class="grid gap-6" @submit.prevent="guardar">
         <AvisoTono
           v-if="errorGuardar"
           tono="peligro"
           role="alert"
-          class="sm:col-span-2"
           data-prueba="error-sucursal"
         >
           {{ errorGuardar }}
         </AvisoTono>
-        <div v-if="esNueva && organizaciones.length > 1" class="sm:col-span-2">
-          <label class="tu-label" for="s-org">{{
-            $t("sedes.organizacion")
-          }}</label>
-          <select id="s-org" v-model="orgId" class="tu-input">
-            <option v-for="o in organizaciones" :key="o.id" :value="o.id">
-              {{ o.nombre }}
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="tu-label" for="s-nombre"
-            >{{ $t("sedes.nombre")
-            }}<span class="tu-obligatorio" aria-hidden="true">*</span></label
-          >
-          <input
-            id="s-nombre"
-            v-model="form.nombre"
-            class="tu-input"
-            required
-            maxlength="255"
-            :placeholder="$t('sedes.nombrePh')"
-            :aria-invalid="errores.nombre ? 'true' : undefined"
-            :aria-describedby="errores.nombre ? 's-nombre-error' : undefined"
-          />
-          <span
-            v-if="errores.nombre"
-            id="s-nombre-error"
-            class="tu-error-campo"
-            >{{ errores.nombre }}</span
-          >
-        </div>
-        <div>
-          <label class="tu-label" for="s-region">{{
-            $t("sedes.region")
-          }}</label>
-          <input
-            id="s-region"
-            v-model="form.region"
-            class="tu-input"
-            maxlength="255"
-            :placeholder="$t('sedes.regionPh')"
-            :aria-invalid="errores.region ? 'true' : undefined"
-            :aria-describedby="errores.region ? 's-region-error' : undefined"
-          />
-          <span
-            v-if="errores.region"
-            id="s-region-error"
-            class="tu-error-campo"
-            >{{ errores.region }}</span
-          >
-        </div>
-        <div>
-          <label class="tu-label" for="s-zona">{{ $t("sedes.zona") }}</label>
-          <SelectorBuscable
-            id="s-zona"
-            v-model="form.zona_horaria"
-            :opciones="zonas"
-            :aria-invalid="errores.zona_horaria ? 'true' : undefined"
-            :aria-describedby="
-              errores.zona_horaria ? 's-zona-error' : undefined
-            "
-          />
-          <span
-            v-if="errores.zona_horaria"
-            id="s-zona-error"
-            class="tu-error-campo"
-            >{{ errores.zona_horaria }}</span
-          >
-        </div>
-        <div>
-          <label class="tu-label" for="s-iva">{{ $t("sedes.ivaLabel") }}</label>
-          <input
-            id="s-iva"
-            v-model="form.iva"
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
-            class="tu-input"
-            :aria-invalid="errores.impuesto_tasa_bps ? 'true' : undefined"
-            :aria-describedby="
-              errores.impuesto_tasa_bps ? 's-iva-error' : undefined
-            "
-          />
-          <span
-            v-if="errores.impuesto_tasa_bps"
-            id="s-iva-error"
-            class="tu-error-campo"
-            >{{ errores.impuesto_tasa_bps }}</span
-          >
-        </div>
-        <div>
-          <label class="tu-label" for="s-ubicacion">{{
-            $t("operacion.sedes.ubicacion")
-          }}</label>
-          <input
-            id="s-ubicacion"
-            v-model="form.ubicacion"
-            class="tu-input"
-            :placeholder="$t('operacion.sedes.ubicacionPh')"
-            :aria-invalid="
-              coordenadas === 'invalida' || errores.latitud || errores.longitud
-                ? 'true'
-                : undefined
-            "
-          />
-          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("operacion.sedes.ubicacionAyuda") }}
-          </p>
-          <p v-if="coordenadas === 'invalida'" class="tu-error-campo">
-            {{ $t("operacion.sedes.invalida") }}
-          </p>
-          <p
-            v-else-if="errores.latitud || errores.longitud"
-            class="tu-error-campo"
-          >
-            {{ errores.latitud || errores.longitud }}
-          </p>
-          <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
-            <button
-              type="button"
-              class="tu-enlace"
-              :disabled="ubicando"
-              @click="usarMiUbicacion"
-            >
-              {{
-                ubicando
-                  ? $t("operacion.sedes.ubicando")
-                  : $t("operacion.sedes.usarMiUbicacion")
-              }}
-            </button>
-            <a
-              v-if="enlaceMapa"
-              :href="enlaceMapa"
-              target="_blank"
-              rel="noopener"
-              class="tu-enlace"
-              >{{ $t("operacion.sedes.verMapa") }}
-              <IconoNav
-                nombre="flecha"
-                :tam="14"
-                class="inline align-[-0.15em]"
-            /></a>
-          </div>
-          <p v-if="errorUbicacion" class="tu-error-campo">
-            {{ errorUbicacion }}
-          </p>
-        </div>
 
-        <!-- Perfil público de la sede -->
-        <div
-          class="border-t pt-4 space-y-4 sm:col-span-2"
-          :style="{ borderColor: 'var(--borde)' }"
-          data-prueba="perfil-sede"
+        <!-- Datos: cómo se llama, su zona, su impuesto y su foto -->
+        <section
+          class="su-seccion"
+          aria-labelledby="s-sec-datos"
+          data-prueba="seccion-datos"
         >
-          <div>
-            <h3 class="text-sm font-semibold">
-              {{ $t("perfilPublico.sucursal.titulo") }}
+          <header>
+            <h3 id="s-sec-datos">
+              {{ $t("perfilPublico.sucursal.secciones.datos") }}
             </h3>
-            <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("perfilPublico.sucursal.ayuda") }}
-            </p>
-          </div>
-          <div data-prueba="foto-sede">
-            <span class="tu-label">{{
-              $t("perfilPublico.sucursal.foto")
-            }}</span>
-            <CargadorImagen
-              v-if="!esNueva"
-              :url="fotoSede"
-              :ruta="`sucursales/${editandoId}/foto`"
-              campo="foto"
-              clave="foto_url"
-              proporcion="16 / 9"
-              :arrastra="$t('perfilPublico.sucursal.fotoArrastra')"
-              :ayuda="$t('perfilPublico.sucursal.fotoAyuda')"
-              :quitar-texto="$t('perfilPublico.sucursal.fotoQuitar')"
-              :puede-gestionar="puedeGestionar"
-              @update:url="fotoCambiada"
-            />
-            <p v-else class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("perfilPublico.sucursal.fotoAlGuardar") }}
-            </p>
-          </div>
-          <div>
-            <label class="tu-label" for="s-direccion">{{
-              $t("perfilPublico.sucursal.direccion")
-            }}</label>
-            <input
-              id="s-direccion"
-              v-model="form.direccion"
-              class="tu-input"
-              maxlength="255"
-              :placeholder="$t('perfilPublico.sucursal.direccionPh')"
-              :aria-invalid="errores.direccion ? 'true' : undefined"
-              :aria-describedby="
-                errores.direccion ? 's-direccion-error' : undefined
-              "
-            />
-            <span
-              v-if="errores.direccion"
-              id="s-direccion-error"
-              class="tu-error-campo"
-              >{{ errores.direccion }}</span
+            <p>{{ $t("perfilPublico.sucursal.secciones.datosAyuda") }}</p>
+          </header>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div
+              v-if="esNueva && organizaciones.length > 1"
+              class="sm:col-span-2"
             >
+              <label class="tu-label" for="s-org">{{
+                $t("sedes.organizacion")
+              }}</label>
+              <select id="s-org" v-model="orgId" class="tu-input">
+                <option v-for="o in organizaciones" :key="o.id" :value="o.id">
+                  {{ o.nombre }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="tu-label" for="s-nombre"
+                >{{ $t("sedes.nombre")
+                }}<span class="tu-obligatorio" aria-hidden="true"
+                  >*</span
+                ></label
+              >
+              <input
+                id="s-nombre"
+                v-model="form.nombre"
+                class="tu-input"
+                required
+                maxlength="255"
+                :placeholder="$t('sedes.nombrePh')"
+                :aria-invalid="errores.nombre ? 'true' : undefined"
+                :aria-describedby="
+                  errores.nombre ? 's-nombre-error' : undefined
+                "
+              />
+              <span
+                v-if="errores.nombre"
+                id="s-nombre-error"
+                class="tu-error-campo"
+                >{{ errores.nombre }}</span
+              >
+            </div>
+            <div>
+              <label class="tu-label" for="s-region">{{
+                $t("sedes.region")
+              }}</label>
+              <input
+                id="s-region"
+                v-model="form.region"
+                class="tu-input"
+                maxlength="255"
+                :placeholder="$t('sedes.regionPh')"
+                :aria-invalid="errores.region ? 'true' : undefined"
+                :aria-describedby="
+                  errores.region ? 's-region-error' : undefined
+                "
+              />
+              <span
+                v-if="errores.region"
+                id="s-region-error"
+                class="tu-error-campo"
+                >{{ errores.region }}</span
+              >
+            </div>
+            <div>
+              <label class="tu-label" for="s-zona">{{
+                $t("sedes.zona")
+              }}</label>
+              <SelectorBuscable
+                id="s-zona"
+                v-model="form.zona_horaria"
+                :opciones="zonas"
+                :aria-invalid="errores.zona_horaria ? 'true' : undefined"
+                :aria-describedby="
+                  errores.zona_horaria ? 's-zona-error' : undefined
+                "
+              />
+              <span
+                v-if="errores.zona_horaria"
+                id="s-zona-error"
+                class="tu-error-campo"
+                >{{ errores.zona_horaria }}</span
+              >
+            </div>
+            <div>
+              <label class="tu-label" for="s-iva">{{
+                $t("sedes.ivaLabel")
+              }}</label>
+              <input
+                id="s-iva"
+                v-model="form.iva"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                class="tu-input"
+                :aria-invalid="errores.impuesto_tasa_bps ? 'true' : undefined"
+                :aria-describedby="
+                  errores.impuesto_tasa_bps ? 's-iva-error' : undefined
+                "
+              />
+              <span
+                v-if="errores.impuesto_tasa_bps"
+                id="s-iva-error"
+                class="tu-error-campo"
+                >{{ errores.impuesto_tasa_bps }}</span
+              >
+            </div>
+            <div class="sm:col-span-2" data-prueba="foto-sede">
+              <span class="tu-label">{{
+                $t("perfilPublico.sucursal.foto")
+              }}</span>
+              <CargadorImagen
+                v-if="!esNueva"
+                :url="fotoSede"
+                :ruta="`sucursales/${editandoId}/foto`"
+                campo="foto"
+                clave="foto_url"
+                proporcion="16 / 9"
+                :arrastra="$t('perfilPublico.sucursal.fotoArrastra')"
+                :ayuda="$t('perfilPublico.sucursal.fotoAyuda')"
+                :quitar-texto="$t('perfilPublico.sucursal.fotoQuitar')"
+                :puede-gestionar="puedeGestionar"
+                @update:url="fotoCambiada"
+              />
+              <p v-else class="su-ayuda">
+                {{ $t("perfilPublico.sucursal.fotoAlGuardar") }}
+              </p>
+            </div>
           </div>
-          <div>
-            <label class="tu-label" for="s-mapa">{{
-              $t("perfilPublico.sucursal.mapa")
-            }}</label>
-            <input
-              id="s-mapa"
-              v-model="form.mapa_url"
-              class="tu-input"
-              inputmode="url"
-              maxlength="500"
-              placeholder="https://maps.app.goo.gl/…"
-              :aria-invalid="errores.mapa_url ? 'true' : undefined"
-            />
-            <p v-if="errores.mapa_url" class="tu-error-campo">
-              {{ errores.mapa_url }}
-            </p>
-            <p
-              v-else
-              class="mt-1 text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t("perfilPublico.sucursal.mapaAyuda") }}
-            </p>
+        </section>
+
+        <!-- Ubicación: dirección, punto en el mapa y enlace de Google Maps -->
+        <section
+          class="su-seccion"
+          aria-labelledby="s-sec-ubicacion"
+          data-prueba="seccion-ubicacion"
+        >
+          <header>
+            <h3 id="s-sec-ubicacion">
+              {{ $t("perfilPublico.sucursal.secciones.ubicacion") }}
+            </h3>
+            <p>{{ $t("perfilPublico.sucursal.secciones.ubicacionAyuda") }}</p>
+          </header>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="sm:col-span-2">
+              <label class="tu-label" for="s-direccion">{{
+                $t("perfilPublico.sucursal.direccion")
+              }}</label>
+              <input
+                id="s-direccion"
+                v-model="form.direccion"
+                class="tu-input"
+                maxlength="255"
+                :placeholder="$t('perfilPublico.sucursal.direccionPh')"
+                :aria-invalid="errores.direccion ? 'true' : undefined"
+                :aria-describedby="
+                  errores.direccion ? 's-direccion-error' : undefined
+                "
+              />
+              <span
+                v-if="errores.direccion"
+                id="s-direccion-error"
+                class="tu-error-campo"
+                >{{ errores.direccion }}</span
+              >
+            </div>
+            <div>
+              <label class="tu-label" for="s-ubicacion">{{
+                $t("operacion.sedes.ubicacion")
+              }}</label>
+              <input
+                id="s-ubicacion"
+                v-model="form.ubicacion"
+                class="tu-input"
+                :placeholder="$t('operacion.sedes.ubicacionPh')"
+                :aria-invalid="
+                  coordenadas === 'invalida' ||
+                  errores.latitud ||
+                  errores.longitud
+                    ? 'true'
+                    : undefined
+                "
+              />
+              <p class="mt-1 su-ayuda">
+                {{ $t("operacion.sedes.ubicacionAyuda") }}
+              </p>
+              <p v-if="coordenadas === 'invalida'" class="tu-error-campo">
+                {{ $t("operacion.sedes.invalida") }}
+              </p>
+              <p
+                v-else-if="errores.latitud || errores.longitud"
+                class="tu-error-campo"
+              >
+                {{ errores.latitud || errores.longitud }}
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                <button
+                  type="button"
+                  class="tu-enlace"
+                  :disabled="ubicando"
+                  @click="usarMiUbicacion"
+                >
+                  {{
+                    ubicando
+                      ? $t("operacion.sedes.ubicando")
+                      : $t("operacion.sedes.usarMiUbicacion")
+                  }}
+                </button>
+                <a
+                  v-if="enlaceMapa"
+                  :href="enlaceMapa"
+                  target="_blank"
+                  rel="noopener"
+                  class="tu-enlace"
+                  >{{ $t("operacion.sedes.verMapa") }}
+                  <IconoNav
+                    nombre="flecha"
+                    :tam="14"
+                    class="inline align-[-0.15em]"
+                /></a>
+              </div>
+              <p v-if="errorUbicacion" class="tu-error-campo">
+                {{ errorUbicacion }}
+              </p>
+            </div>
+            <div>
+              <label class="tu-label" for="s-mapa">{{
+                $t("perfilPublico.sucursal.mapa")
+              }}</label>
+              <input
+                id="s-mapa"
+                v-model="form.mapa_url"
+                class="tu-input"
+                inputmode="url"
+                maxlength="500"
+                placeholder="https://maps.app.goo.gl/…"
+                :aria-invalid="errores.mapa_url ? 'true' : undefined"
+              />
+              <p v-if="errores.mapa_url" class="tu-error-campo">
+                {{ errores.mapa_url }}
+              </p>
+              <p v-else class="mt-1 su-ayuda">
+                {{ $t("perfilPublico.sucursal.mapaAyuda") }}
+              </p>
+            </div>
           </div>
-          <!-- Con su lada (ADR 0103): la del negocio si no se elige otra. -->
-          <div class="grid gap-3">
+        </section>
+
+        <!-- Contacto: teléfono, WhatsApp (con su lada, ADR 0103) y redes -->
+        <section
+          class="su-seccion"
+          aria-labelledby="s-sec-contacto"
+          data-prueba="seccion-contacto"
+        >
+          <header>
+            <h3 id="s-sec-contacto">
+              {{ $t("perfilPublico.sucursal.secciones.contacto") }}
+            </h3>
+            <p>{{ $t("perfilPublico.sucursal.secciones.contactoAyuda") }}</p>
+          </header>
+          <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="tu-label" for="s-telefono">{{
                 $t("perfilPublico.sucursal.telefono")
@@ -769,6 +804,9 @@ onMounted(cargar);
                 maxlength="24"
                 :aria-invalid="errores.telefono ? 'true' : undefined"
               />
+              <p v-if="errores.telefono" class="tu-error-campo">
+                {{ errores.telefono }}
+              </p>
             </div>
             <div>
               <label class="tu-label" for="s-whatsapp">{{
@@ -780,28 +818,21 @@ onMounted(cargar);
                 maxlength="24"
                 :aria-invalid="errores.whatsapp ? 'true' : undefined"
               />
+              <p v-if="errores.whatsapp" class="tu-error-campo">
+                {{ errores.whatsapp }}
+              </p>
             </div>
           </div>
-          <p
-            v-if="errores.telefono || errores.whatsapp"
-            class="tu-error-campo -mt-2"
-          >
-            {{ errores.telefono || errores.whatsapp }}
-          </p>
-
           <fieldset>
             <legend class="tu-label">
               {{ $t("perfilPublico.sucursal.redes") }}
             </legend>
-            <p
-              class="-mt-1 mb-2 text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
+            <p class="-mt-1 mb-2 su-ayuda">
               {{ $t("perfilPublico.sucursal.redesAyuda") }}
             </p>
             <div class="grid gap-2 grid-cols-2">
               <label v-for="r in REDES" :key="r" class="block">
-                <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                <span class="su-ayuda">
                   {{ $t(`perfilPublico.redes.${r}`) }}
                 </span>
                 <input
@@ -816,57 +847,59 @@ onMounted(cargar);
               </label>
             </div>
           </fieldset>
+        </section>
 
-          <fieldset>
-            <legend class="tu-label">
-              {{ $t("perfilPublico.sucursal.horario") }}
-            </legend>
-            <p
-              class="-mt-1 mb-2 text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
+        <!-- Horarios: los días y horas en que atiende -->
+        <section
+          class="su-seccion"
+          aria-labelledby="s-sec-horarios"
+          data-prueba="seccion-horarios"
+        >
+          <header>
+            <h3 id="s-sec-horarios">
+              {{ $t("perfilPublico.sucursal.secciones.horarios") }}
+            </h3>
+            <p>{{ $t("perfilPublico.sucursal.horarioAyuda") }}</p>
+          </header>
+          <ul class="space-y-1.5" data-prueba="horario-sede">
+            <li
+              v-for="d in form.horario"
+              :key="d.dia"
+              class="flex flex-wrap items-center gap-2 text-sm"
             >
-              {{ $t("perfilPublico.sucursal.horarioAyuda") }}
-            </p>
-            <ul class="space-y-1.5" data-prueba="horario-sede">
-              <li
-                v-for="d in form.horario"
-                :key="d.dia"
-                class="flex flex-wrap items-center gap-2 text-sm"
-              >
-                <label class="flex w-28 items-center gap-2">
-                  <input v-model="d.abierto" type="checkbox" />
-                  {{ $t(`perfilPublico.dias.${d.dia}`) }}
-                </label>
-                <template v-if="d.abierto">
-                  <input
-                    v-model="d.abre"
-                    type="time"
-                    class="tu-input w-auto"
-                    :aria-label="$t('perfilPublico.sucursal.abre')"
-                  />
-                  <span :style="{ color: 'var(--texto-suave)' }">–</span>
-                  <input
-                    v-model="d.cierra"
-                    type="time"
-                    class="tu-input w-auto"
-                    :aria-label="$t('perfilPublico.sucursal.cierra')"
-                    :aria-invalid="errorDelDia(d) ? 'true' : undefined"
-                  />
-                  <span
-                    v-if="errorDelDia(d)"
-                    class="text-xs"
-                    style="color: var(--error)"
-                  >
-                    {{ errorDelDia(d) }}
-                  </span>
-                </template>
-                <span v-else :style="{ color: 'var(--texto-suave)' }">{{
-                  $t("perfilPublico.publico.cerrado")
-                }}</span>
-              </li>
-            </ul>
-          </fieldset>
-        </div>
+              <label class="flex w-28 items-center gap-2">
+                <input v-model="d.abierto" type="checkbox" />
+                {{ $t(`perfilPublico.dias.${d.dia}`) }}
+              </label>
+              <template v-if="d.abierto">
+                <input
+                  v-model="d.abre"
+                  type="time"
+                  class="tu-input w-auto"
+                  :aria-label="$t('perfilPublico.sucursal.abre')"
+                />
+                <span :style="{ color: 'var(--texto-suave)' }">–</span>
+                <input
+                  v-model="d.cierra"
+                  type="time"
+                  class="tu-input w-auto"
+                  :aria-label="$t('perfilPublico.sucursal.cierra')"
+                  :aria-invalid="errorDelDia(d) ? 'true' : undefined"
+                />
+                <span
+                  v-if="errorDelDia(d)"
+                  class="text-xs"
+                  style="color: var(--error)"
+                >
+                  {{ errorDelDia(d) }}
+                </span>
+              </template>
+              <span v-else :style="{ color: 'var(--texto-suave)' }">{{
+                $t("perfilPublico.publico.cerrado")
+              }}</span>
+            </li>
+          </ul>
+        </section>
       </form>
 
       <template #pie>
@@ -898,6 +931,27 @@ onMounted(cargar);
 </template>
 
 <style scoped>
+/* Secciones del formulario: título y una línea de qué va en cada una. */
+.su-seccion {
+  display: grid;
+  gap: 1rem;
+}
+.su-seccion + .su-seccion {
+  border-top: 1px solid var(--borde);
+  padding-top: 1.25rem;
+}
+.su-seccion > header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.su-seccion > header p,
+.su-ayuda {
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+}
+.su-seccion > header p {
+  margin-top: 0.15rem;
+}
 .su-foto {
   width: 4.5rem;
   height: 4.5rem;

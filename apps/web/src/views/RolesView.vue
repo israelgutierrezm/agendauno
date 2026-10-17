@@ -5,8 +5,10 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { filtrarOpciones } from "@/lib/buscable";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -53,6 +55,8 @@ const editandoId = ref<string | null>(null);
 const nombre = ref("");
 const faceta = ref<FacetaPropia>("equipo");
 const seleccion = ref<Set<string>>(new Set());
+// Buscar entre los permisos (por su nombre o el de su área); no cuenta como cambio.
+const busquedaPermiso = ref("");
 // El patrón común de los formularios (errores junto al campo, no cerrar mientras
 // guarda, preguntar antes de descartar, confirmar lo guardado).
 const {
@@ -83,9 +87,88 @@ function nombreDe(rol: Rol): string {
     : rol.clave;
 }
 
+// Una llave sin texto (un permiso nuevo del API) no se muestra cruda:
+// «prospectos.ver» se lee «Prospectos ver» mientras le ponen su nombre.
+function textoLegible(clave: string): string {
+  const texto = clave.replace(/[._]+/g, " ").trim();
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 function etiquetaPermiso(clave: string): string {
   const llave = `operacion.rolesPropios.permiso.${clave}`;
-  return te(llave) ? t(llave) : clave;
+  return te(llave) ? t(llave) : textoLegible(clave);
+}
+
+function etiquetaGrupo(grupo: string): string {
+  const llave = `operacion.rolesPropios.grupos.${grupo}`;
+  return te(llave) ? t(llave) : textoLegible(grupo);
+}
+
+// Lo que el rol deja hacer en cada área, en palabras: sin acceso, solo consulta,
+// parcial o completo.
+type Nivel = "ninguno" | "consulta" | "parcial" | "completo";
+interface NivelArea {
+  nivel: Nivel;
+  n: number;
+  total: number;
+}
+const TONO_NIVEL: Record<Nivel, string> = {
+  ninguno: "var(--texto-suave)",
+  consulta: "var(--primario)",
+  parcial: "var(--primario)",
+  completo: "var(--exito)",
+};
+
+function nivelDe(permisos: string[], tiene: (p: string) => boolean): NivelArea {
+  const suyos = permisos.filter(tiene);
+  const n = suyos.length;
+  const total = permisos.length;
+  const nivel: Nivel =
+    n === 0
+      ? "ninguno"
+      : n === total
+        ? "completo"
+        : suyos.every((p) => p.endsWith(".ver"))
+          ? "consulta"
+          : "parcial";
+  return { nivel, n, total };
+}
+
+function textoNivel(x: NivelArea): string {
+  return t(`operacion.rolesPropios.niveles.${x.nivel}`, {
+    n: x.n,
+    total: x.total,
+  });
+}
+
+/** «Agenda, Alumnos y Cobros». */
+function unirLista(partes: string[]): string {
+  return partes.length < 2
+    ? (partes[0] ?? "")
+    : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1)}`;
+}
+
+/** Las áreas a las que da acceso, en una línea: «Acceso a Agenda (solo consulta) y Alumnos.» */
+function resumenAcceso(tiene: (p: string) => boolean): string {
+  const areas = Object.entries(catalogo.value).flatMap(([grupo, permisos]) => {
+    const { nivel } = nivelDe(permisos, tiene);
+    if (nivel === "ninguno") {
+      return [];
+    }
+    const area = etiquetaGrupo(grupo);
+    return [
+      nivel === "consulta"
+        ? t("operacion.rolesPropios.soloConsulta", { area })
+        : area,
+    ];
+  });
+  return areas.length === 0
+    ? t("operacion.rolesPropios.sinAcceso")
+    : t("operacion.rolesPropios.accesoA", { lista: unirLista(areas) });
+}
+
+function tieneRol(rol: Rol): (p: string) => boolean {
+  return (p) => rol.permisos.includes("*") || rol.permisos.includes(p);
 }
 
 /** ¿Lo puede dar quien arma el rol? (nadie da lo que no tiene) */
@@ -99,13 +182,16 @@ function cuantos(rol: Rol): string {
     : t("operacion.rolesPropios.cuantosPermisos", rol.permisos.length);
 }
 
-/** Los permisos del rol, agrupados como en el catálogo. */
-function agrupados(rol: Rol): { grupo: string; permisos: string[] }[] {
-  const todos = rol.permisos.includes("*");
+/** Los permisos del rol, agrupados como en el catálogo, con su nivel por área. */
+function agrupados(
+  rol: Rol,
+): { grupo: string; permisos: string[]; nivel: NivelArea }[] {
+  const tiene = tieneRol(rol);
   return Object.entries(catalogo.value)
     .map(([grupo, permisos]) => ({
       grupo,
-      permisos: permisos.filter((p) => todos || rol.permisos.includes(p)),
+      permisos: permisos.filter(tiene),
+      nivel: nivelDe(permisos, tiene),
     }))
     .filter((g) => g.permisos.length > 0);
 }
@@ -146,6 +232,7 @@ function abrirNuevo(): void {
   nombre.value = "";
   faceta.value = "equipo";
   seleccion.value = new Set();
+  busquedaPermiso.value = "";
   empezar();
   editorAbierto.value = true;
 }
@@ -155,6 +242,7 @@ function abrirEdicion(rol: Rol): void {
   nombre.value = rol.nombre ?? "";
   faceta.value = rol.faceta === "instructor" ? "instructor" : "equipo";
   seleccion.value = new Set(rol.permisos);
+  busquedaPermiso.value = "";
   empezar();
   editorAbierto.value = true;
 }
@@ -179,6 +267,40 @@ const sinAgenda = computed(
 const incompleto = computed(
   () => Object.keys(faltantes.value).length > 0 || sinAgenda.value,
 );
+
+// Las áreas del editor con los permisos que coinciden con la búsqueda. Un área sin
+// coincidencias se oculta, salvo que a un permiso suyo le falte algo por agregar.
+const tieneSeleccion = (p: string): boolean => seleccion.value.has(p);
+const gruposEditor = computed(() =>
+  Object.entries(catalogo.value)
+    .map(([grupo, permisos]) => {
+      const etiqueta = etiquetaGrupo(grupo);
+      const visibles = filtrarOpciones(
+        permisos.map((p) => ({
+          valor: p,
+          etiqueta: etiquetaPermiso(p),
+          busqueda: etiqueta,
+        })),
+        busquedaPermiso.value,
+      ).map((o) => o.valor);
+      return {
+        grupo,
+        etiqueta,
+        permisos,
+        visibles,
+        nivel: nivelDe(permisos, tieneSeleccion),
+      };
+    })
+    .filter(
+      (g) =>
+        g.visibles.length > 0 ||
+        g.permisos.some((p) => faltantes.value[p] !== undefined),
+    ),
+);
+const sinCoincidencias = computed(() =>
+  gruposEditor.value.every((g) => g.visibles.length === 0),
+);
+const resumenSeleccion = computed(() => resumenAcceso(tieneSeleccion));
 
 // A la vista y a petición: nunca se agregan solos.
 function agregarNecesarios(permiso: string): void {
@@ -295,6 +417,13 @@ onMounted(cargar);
                 {{ cuantos(rol) }} ·
                 {{ $t("operacion.rolesPropios.personas", rol.personas) }}
               </p>
+              <p
+                v-if="!rol.permisos.includes('*')"
+                class="rp-resumen"
+                data-prueba="resumen-acceso"
+              >
+                {{ resumenAcceso(tieneRol(rol)) }}
+              </p>
             </div>
             <div class="rp-acciones">
               <button
@@ -333,8 +462,13 @@ onMounted(cargar);
           </p>
           <div v-if="abiertos.has(rol.clave)" class="rp-permisos">
             <div v-for="g in agrupados(rol)" :key="g.grupo">
-              <p class="rp-grupo">
-                {{ $t(`operacion.rolesPropios.grupos.${g.grupo}`) }}
+              <p class="rp-grupo rp-grupo-fila">
+                <span>{{ etiquetaGrupo(g.grupo) }}</span>
+                <span
+                  class="tu-estado rp-nivel"
+                  :style="{ '--tono': TONO_NIVEL[g.nivel.nivel] }"
+                  >{{ textoNivel(g.nivel) }}</span
+                >
               </p>
               <p class="rp-detalle">
                 {{ g.permisos.map(etiquetaPermiso).join(" · ") }}
@@ -359,6 +493,13 @@ onMounted(cargar);
                 {{ cuantos(rol) }} ·
                 {{ $t("operacion.rolesPropios.personas", rol.personas) }}
               </p>
+              <p
+                v-if="!rol.permisos.includes('*')"
+                class="rp-resumen"
+                data-prueba="resumen-acceso"
+              >
+                {{ resumenAcceso(tieneRol(rol)) }}
+              </p>
             </div>
             <button
               type="button"
@@ -374,8 +515,13 @@ onMounted(cargar);
           </div>
           <div v-if="abiertos.has(rol.clave)" class="rp-permisos">
             <div v-for="g in agrupados(rol)" :key="g.grupo">
-              <p class="rp-grupo">
-                {{ $t(`operacion.rolesPropios.grupos.${g.grupo}`) }}
+              <p class="rp-grupo rp-grupo-fila">
+                <span>{{ etiquetaGrupo(g.grupo) }}</span>
+                <span
+                  class="tu-estado rp-nivel"
+                  :style="{ '--tono': TONO_NIVEL[g.nivel.nivel] }"
+                  >{{ textoNivel(g.nivel) }}</span
+                >
               </p>
               <p class="rp-detalle">
                 {{ g.permisos.map(etiquetaPermiso).join(" · ") }}
@@ -459,12 +605,57 @@ onMounted(cargar);
             {{ $t("operacion.rolesPropios.agregarNecesarios") }}
           </button>
         </p>
-        <fieldset v-for="(permisos, grupo) in catalogo" :key="grupo">
-          <legend class="rp-grupo">
-            {{ $t(`operacion.rolesPropios.grupos.${grupo}`) }}
+        <div data-prueba="acceso-elegido">
+          <p class="rp-grupo">
+            {{ $t("operacion.rolesPropios.conLoElegido") }}
+          </p>
+          <p class="rp-detalle">{{ resumenSeleccion }}</p>
+        </div>
+        <label class="tu-buscar block">
+          <IconoNav nombre="buscar" :tam="16" />
+          <input
+            v-model="busquedaPermiso"
+            type="search"
+            class="tu-input"
+            :placeholder="$t('operacion.rolesPropios.buscarPermiso')"
+            :aria-label="$t('operacion.rolesPropios.buscarPermiso')"
+            data-prueba="buscar-permiso"
+          />
+        </label>
+        <p
+          v-if="sinCoincidencias"
+          class="rp-detalle"
+          role="status"
+          data-prueba="sin-permisos"
+        >
+          {{
+            $t("operacion.rolesPropios.sinCoincidencias", {
+              q: busquedaPermiso.trim(),
+            })
+          }}
+          <button
+            type="button"
+            class="rp-agregar"
+            @click="busquedaPermiso = ''"
+          >
+            {{ $t("operacion.rolesPropios.borrarBusqueda") }}
+          </button>
+        </p>
+        <fieldset
+          v-for="g in gruposEditor"
+          :key="g.grupo"
+          :data-prueba="`grupo-${g.grupo}`"
+        >
+          <legend class="rp-grupo rp-grupo-fila">
+            <span>{{ g.etiqueta }}</span>
+            <span
+              class="tu-estado rp-nivel"
+              :style="{ '--tono': TONO_NIVEL[g.nivel.nivel] }"
+              >{{ textoNivel(g.nivel) }}</span
+            >
           </legend>
           <label
-            v-for="p in permisos"
+            v-for="p in g.visibles"
             :key="p"
             class="rp-opcion"
             :class="{ 'rp-opcion--bloqueada': !puedeDar(p) }"
@@ -479,7 +670,7 @@ onMounted(cargar);
             />
             <span>{{ etiquetaPermiso(p) }}</span>
           </label>
-          <template v-for="p in permisos" :key="`n-${p}`">
+          <template v-for="p in g.permisos" :key="`n-${p}`">
             <p
               v-if="faltantes[p]"
               class="rp-necesita"
@@ -591,6 +782,23 @@ onMounted(cargar);
   font-size: 0.8rem;
   font-weight: 600;
   margin-bottom: 0.3rem;
+}
+.rp-grupo-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+.rp-nivel {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--texto-suave);
+}
+.rp-resumen {
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
 }
 .rp-necesita {
   margin: 0.25rem 0 0.5rem 1.6rem;

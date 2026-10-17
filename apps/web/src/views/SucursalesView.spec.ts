@@ -204,6 +204,58 @@ describe("sedes: foto y enlace de Google Maps", () => {
   });
 });
 
+describe("sedes: el formulario por secciones", () => {
+  it("agrupa los campos en Datos, Ubicación, Contacto y Horarios, en ese orden", async () => {
+    const w = await montar();
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "sedes.editar")!
+      .trigger("click");
+
+    const secciones = w.findAll('[data-prueba^="seccion-"]');
+    expect(secciones.map((s) => s.attributes("data-prueba"))).toEqual([
+      "seccion-datos",
+      "seccion-ubicacion",
+      "seccion-contacto",
+      "seccion-horarios",
+    ]);
+    expect(secciones.map((s) => s.get("h3").text())).toEqual([
+      "Datos",
+      "Ubicación",
+      "Contacto",
+      "Horarios",
+    ]);
+    // Cada sección se anuncia con su título.
+    for (const s of secciones) {
+      expect(s.element.tagName).toBe("SECTION");
+      expect(s.attributes("aria-labelledby")).toBe(
+        s.get("h3").attributes("id"),
+      );
+    }
+
+    const [datos, ubicacion, contacto, horarios] = secciones;
+    for (const id of ["#s-nombre", "#s-region", "#s-zona", "#s-iva"]) {
+      expect(datos!.find(id).exists()).toBe(true);
+    }
+    expect(datos!.find('[data-prueba="foto-sede"]').exists()).toBe(true);
+    for (const id of ["#s-direccion", "#s-ubicacion", "#s-mapa"]) {
+      expect(ubicacion!.find(id).exists()).toBe(true);
+    }
+    for (const id of ["#s-telefono", "#s-whatsapp"]) {
+      expect(contacto!.find(id).exists()).toBe(true);
+    }
+    expect(contacto!.find('input[placeholder="@tu_negocio"]').exists()).toBe(
+      true,
+    );
+    expect(horarios!.find('[data-prueba="horario-sede"]').exists()).toBe(true);
+    // Los mismos campos de siempre: nada quedó fuera de una sección.
+    expect(
+      w.findAll("#s-form input, #s-form select").length -
+        secciones.reduce((n, s) => n + s.findAll("input, select").length, 0),
+    ).toBe(0);
+  });
+});
+
 describe("sedes: teléfono con lada y zona horaria", () => {
   it("el teléfono y el WhatsApp llevan lada; lo guardado sin «+» se queda si no se toca", async () => {
     api.put.mockResolvedValue({ data: { data: roma } });

@@ -186,10 +186,18 @@ export default {
   estilo: {
     titulo: "Estilo del sitio",
     ayuda:
-      "El color, la letra y las esquinas de todas tus páginas, y si se ven claras u oscuras.",
-    color: "Color principal",
-    deTuMarca: "El de tu marca",
-    usarMarca: "Usar el de mi marca",
+      "Cómo se ven tus páginas públicas: el color, la letra, las esquinas y si se ven claras u oscuras.",
+    // El del sitio (estilo.color) no es el de la app del negocio (color_marca).
+    color: "Color de tu página web",
+    deTuMarca: "El mismo de tu app",
+    usarMarca: "Usar el color de tu app",
+    colorAyuda:
+      "Solo cambia tus páginas públicas, las que ven tus clientes en internet. No cambia la app de tu negocio.",
+    colorApp: "Color de la app de tu negocio",
+    colorAppSin: "El de la plataforma",
+    colorAppAyuda:
+      "Lo usa la app que tus clientes instalan en su teléfono; tu página lo toma si no eliges otro. Se cambia en",
+    colorAppDonde: "Configuración › Perfil público",
     tipografia: "Tipografía",
     tipografias: {
       predeterminada: "La de siempre",

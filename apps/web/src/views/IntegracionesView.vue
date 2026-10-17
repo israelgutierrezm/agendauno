@@ -42,6 +42,11 @@ interface Integracion {
   llaves_configuradas: string[];
   // Sin estas no se puede activar.
   llaves_obligatorias?: string[];
+  // La conexión por lo que de verdad pasó (como las pasarelas): sin llaves, con
+  // llaves y apagada, activa sin comprobar o comprobada (la plataforma ya respondió).
+  estado_conexion?: EstadoConexion;
+  comprobada_en?: string | null;
+  comprobada_por?: "checkin" | "aviso" | null;
   // Check-in automático (ADR 0148): dónde avisa la plataforma y si ya está activo.
   automatico?: {
     aviso_url: string | null;
@@ -49,6 +54,8 @@ interface Integracion {
     registrado_en: string | null;
   };
 }
+type EstadoConexion =
+  "sin_configurar" | "credenciales" | "activa_sin_comprobar" | "comprobada";
 interface LlaveApi {
   id: string;
   nombre: string;
@@ -132,6 +139,40 @@ function faltanLlaves(i: Integracion): string[] {
       !i.llaves_configuradas.includes(llave) &&
       (escritas[llave] ?? "").trim() === "",
   );
+}
+
+// La conexión, con punto y texto: verde comprobada, ámbar activa sin comprobar.
+const TONO_CONEXION: Record<EstadoConexion, string> = {
+  sin_configurar: "var(--texto-suave)",
+  credenciales: "var(--texto-suave)",
+  activa_sin_comprobar: "var(--aviso)",
+  comprobada: "var(--exito)",
+};
+// En la zona del negocio (ADR 0099) y con el año: la última prueba puede ser vieja.
+function fechaEvidencia(iso: string | null | undefined): string {
+  if (!iso) {
+    return "—";
+  }
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: sesion.zonaHoraria || undefined,
+  }).format(new Date(iso));
+}
+function textoConexion(i: Integracion): string {
+  const estado = i.estado_conexion;
+  if (estado === undefined) {
+    return "";
+  }
+  if (estado === "comprobada") {
+    return t(
+      i.comprobada_por === "aviso"
+        ? "adminUsabilidad.integraciones.conexion.comprobadaAviso"
+        : "adminUsabilidad.integraciones.conexion.comprobadaCheckin",
+      { fecha: fechaEvidencia(i.comprobada_en) },
+    );
+  }
+  return t(`adminUsabilidad.integraciones.conexion.${estado}`);
 }
 
 function nombresDeLlaves(proveedor: string, llaves: string[]): string {
@@ -523,6 +564,15 @@ onMounted(cargar);
             </h2>
             <p class="mt-0.5 text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ $t(`integraciones.ayuda.${i.proveedor}`) }}
+            </p>
+            <p
+              v-if="i.estado_conexion"
+              class="mt-1 text-sm tu-estado"
+              :style="{ '--tono': TONO_CONEXION[i.estado_conexion] }"
+              :data-prueba="`conexion-${i.proveedor}`"
+              :data-estado="i.estado_conexion"
+            >
+              {{ textoConexion(i) }}
             </p>
           </div>
           <InterruptorSiNo

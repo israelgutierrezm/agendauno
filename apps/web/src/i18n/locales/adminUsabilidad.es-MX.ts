@@ -95,5 +95,17 @@ export default {
       "Elige un nombre y los permisos de lectura que necesita la conexión.",
     webhook:
       "Indica dónde enviar los avisos y qué eventos debe recibir tu sistema.",
+    // Wellhub y TotalPass, por lo que de verdad pasó (como las pasarelas): activarla
+    // no la comprueba. Llave dinámica (`adminUsabilidad.integraciones.conexion.${estado}`).
+    conexion: {
+      sin_configurar: "Conexión: sin configurar. Captura sus llaves.",
+      credenciales: "Conexión: llaves guardadas, sin activar.",
+      activa_sin_comprobar:
+        "Conexión: activada, aún sin comprobar. Se comprueba con el primer check-in que la plataforma valide o con su primer aviso.",
+      comprobadaCheckin:
+        "Conexión comprobada: último check-in validado el {fecha}.",
+      comprobadaAviso:
+        "Conexión comprobada: último aviso de la plataforma recibido el {fecha}.",
+    },
   },
 };

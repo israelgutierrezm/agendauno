@@ -132,6 +132,7 @@ export const conexiones = {
       orden: { pagada: "Venta pagada (recibo)" },
       pago: {
         reembolsado: "Pago reembolsado",
+        anulado: "Cobro anulado",
         tardio: "Pago tardío (apartado vencido)",
         duplicado: "Cobro doble",
       },
@@ -157,12 +158,8 @@ export const conexiones = {
   },
 };
 
+// Las pestañas de Comunicación y lo que es cada una: comunicacionPantalla.es-MX.ts.
 export const comunicacionesAuto = {
-  difusion: "Difusión",
-  automaticos: "Automáticos",
-  salida: "Bandeja de salida",
-  ayuda:
-    "Un mensaje automático se envía solo: cuando pasa algo (una reserva, una asistencia, una compra…) o antes de una clase o cita, como recordatorio.",
   configurar: "Configurar",
   activo: "Activo",
   sinConfigurar: "Sin mensaje",

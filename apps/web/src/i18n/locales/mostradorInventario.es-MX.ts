@@ -298,6 +298,7 @@ export const equipoVisual = {
 export const promocionesVisual = {
   subtitulo:
     "Códigos de descuento: cuánto descuentan, cuántas veces y hasta cuándo.",
+  editarTitulo: "Editar promoción {codigo}",
   buscar: "Buscar código",
   sinResultados: "Ninguna promoción coincide con los filtros.",
   desde: "En compras desde {monto}",
@@ -393,6 +394,27 @@ export const lealtadVisual = {
     recompensas: "Recompensas activas",
     pendientes: "Canjes por entregar",
     canjeados: "Puntos canjeados",
+  },
+  // Configurar el programa, aparte de operar los canjes.
+  secciones: {
+    programa: "Configuración del programa",
+    programaAyuda:
+      "Cómo se ganan puntos y qué recompensas se pueden canjear. Lo que cambies aplica desde ahora.",
+    canjes: "Canjes y puntos",
+    canjesAyuda:
+      "Consulta o ajusta los puntos de un miembro, canjea recompensas y marca lo que ya recibió.",
+  },
+  recompensas: {
+    editar: "Editar",
+    editarTitulo: "Editar recompensa: {nombre}",
+    descripcion: "Descripción (opcional)",
+    descripcionPh: "Ej. Válida en cualquier clase grupal",
+    seCanjea: "Se puede canjear",
+    activar: "Activar",
+    desactivar: "Desactivar",
+    guardada: "Recompensa «{nombre}» guardada.",
+    historial:
+      "Los canjes ya hechos conservan el nombre y los puntos con que se canjearon.",
   },
 };
 
