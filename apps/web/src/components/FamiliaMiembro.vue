@@ -8,6 +8,7 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -61,12 +62,28 @@ const nuevo = ref<{ participante: string; parentesco: string }>({
 const guardando = ref(false);
 // Lo que no se pudo vincular se ve en su panel (no en la ficha de atrás).
 const errorVincular = ref<string | null>(null);
+// Con lo elegido sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartar = useDescartarCambios({
+  abierto: agregando,
+  valor: () => nuevo.value,
+  guardando,
+});
 function abrirAgregar(): void {
   errorVincular.value = null;
+  descartar.fijar();
   agregando.value = true;
+}
+function cerrarAgregar(): void {
+  void descartar.cerrar();
 }
 // El vínculo cuya autorización se registra en el mostrador y quién la aceptó.
 const enMostrador = ref<{ vinculo: Vinculo; responsable: string } | null>(null);
+// Lo que no se pudo registrar se ve en el diálogo (no en un aviso flotante).
+const errorMostrador = ref<string | null>(null);
+function abrirMostrador(vinculo: Vinculo, responsable: string): void {
+  errorMostrador.value = null;
+  enMostrador.value = { vinculo, responsable };
+}
 
 async function cargar(): Promise<void> {
   try {
@@ -117,8 +134,9 @@ async function vincular(): Promise<void> {
       participante_id: nuevo.value.participante,
       parentesco: nuevo.value.parentesco,
     });
-    agregando.value = false;
     nuevo.value = { participante: "", parentesco: "madre_padre" };
+    descartar.fijar();
+    agregando.value = false;
     toast.exito(t("familias.ficha.vinculado"));
     await cargar();
   } catch (e) {
@@ -134,6 +152,7 @@ async function registrarEnMostrador(): Promise<void> {
     return;
   }
   guardando.value = true;
+  errorMostrador.value = null;
   try {
     await api.post(`${base.value}/tutelas/${v.id}/autorizar`, {
       version: familia.value.version,
@@ -142,7 +161,7 @@ async function registrarEnMostrador(): Promise<void> {
     toast.exito(t("familias.ficha.registrada"));
     await cargar();
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    errorMostrador.value = mensajeDeError(e);
     await cargar();
   } finally {
     guardando.value = false;
@@ -256,11 +275,10 @@ async function retirar(
                 type="button"
                 class="tu-enlace"
                 @click="
-                  enMostrador = {
-                    vinculo: v,
-                    responsable:
-                      grupo.clave === 'aSuCargo' ? nombre : v.persona.nombre,
-                  }
+                  abrirMostrador(
+                    v,
+                    grupo.clave === 'aSuCargo' ? nombre : v.persona.nombre,
+                  )
                 "
               >
                 {{ $t("familias.ficha.registrarMostrador") }}
@@ -295,7 +313,7 @@ async function retirar(
       :abierto="agregando"
       :titulo="$t('familias.ficha.agregar')"
       :ocupado="guardando"
-      @cerrar="agregando = false"
+      @cerrar="cerrarAgregar"
     >
       <form class="grid gap-4" @submit.prevent="vincular">
         <AvisoTono
@@ -342,7 +360,7 @@ async function retirar(
             type="button"
             class="tu-btn tu-btn-fantasma"
             :disabled="guardando"
-            @click="agregando = false"
+            @click="cerrarAgregar"
           >
             {{ $t("comun.cancelar") }}
           </button>
@@ -383,6 +401,9 @@ async function retirar(
         <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("familias.version", { n: familia.version }) }}
         </p>
+        <AvisoTono v-if="errorMostrador" tono="peligro" role="alert">
+          {{ errorMostrador }}
+        </AvisoTono>
       </div>
       <template #pie>
         <div class="flex justify-end gap-2">
