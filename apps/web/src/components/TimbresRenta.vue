@@ -2,23 +2,16 @@
 import { onMounted, ref } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
-import PaginacionListado from "@/components/PaginacionListado.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Timbres para facturar a los clientes (ADR 0107): cuántos quedan, sus movimientos y
- * la compra de un paquete (en la página de Stripe). Solo se muestra a quien puede
- * facturar (México y, en citas, el plan Pro): si no, la API dice por qué.
+ * Timbres para facturar a los clientes (ADR 0107), en resumen: cuántos quedan, los
+ * usados este mes y la compra de un paquete (en la página de Stripe). El uso por mes y
+ * todos los movimientos viven en su pantalla (/renta/timbres). Solo se muestra a quien
+ * puede facturar (México y, en citas, el plan Pro): si no, la API dice por qué.
  */
-interface Movimiento {
-  id: string;
-  tipo: "compra" | "consumo" | "ajuste";
-  cantidad: number;
-  saldo_despues: number;
-  detalle: string | null;
-  fecha: string | null;
-}
 interface Timbres {
   disponibles: number;
   precio_timbre_minor: number;
@@ -27,7 +20,7 @@ interface Timbres {
   paquetes: { cantidad: number; precio_minor: number }[];
   posible: boolean;
   motivo: string | null;
-  movimientos: Movimiento[];
+  resumen?: { usados_mes: number };
 }
 
 const props = defineProps<{ base: string; pagado?: boolean }>();
@@ -38,51 +31,11 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const paquete = ref<number | null>(null);
 const comprando = ref(false);
-// Los movimientos llegan con los últimos 20; los demás, por páginas.
-const paginaMovimientos = ref(1);
-const metaMovimientos = ref<{
-  total: number;
-  page: number;
-  per_page: number;
-  ultima_pagina: number;
-} | null>(null);
-async function cargarMovimientos(n: number): Promise<void> {
-  try {
-    const { data } = await api.get<{
-      data: Movimiento[];
-      meta: {
-        total: number;
-        page: number;
-        per_page: number;
-        ultima_pagina: number;
-      };
-    }>(`${props.base}/timbres/movimientos`, { params: { page: n } });
-    if (timbres.value) {
-      timbres.value.movimientos = data.data;
-    }
-    metaMovimientos.value = data.meta;
-    paginaMovimientos.value = n;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
-}
-// Al abrir la lista se sabe cuántas páginas hay.
-function alAbrirMovimientos(e: Event): void {
-  if ((e.target as HTMLDetailsElement).open && metaMovimientos.value === null) {
-    void cargarMovimientos(1);
-  }
-}
-
 function dinero(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
     currency: timbres.value?.moneda ?? "MXN",
   }).format(minor / 100);
-}
-function fecha(iso: string): string {
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
-    new Date(iso),
-  );
 }
 
 async function cargar(): Promise<void> {
@@ -148,6 +101,19 @@ defineExpose({ cargar });
           )
         }}
       </p>
+      <p
+        v-if="timbres.resumen"
+        class="mt-1 text-sm tm-suave"
+        data-prueba="timbres-usados-mes"
+      >
+        {{
+          $t(
+            "suscripcion.timbres.usadosMes",
+            { n: timbres.resumen.usados_mes },
+            timbres.resumen.usados_mes,
+          )
+        }}
+      </p>
       <p class="mt-1 text-sm tm-suave">{{ $t("suscripcion.timbres.ayuda") }}</p>
       <AvisoTono
         v-if="timbres.posible && timbres.disponibles === 0"
@@ -203,40 +169,14 @@ defineExpose({ cargar });
           }}
         </button>
       </div>
-      <details
-        v-if="timbres.movimientos.length > 0"
-        class="mt-4 text-sm"
-        @toggle="alAbrirMovimientos"
+      <RouterLink
+        :to="{ name: 'timbres' }"
+        class="tu-enlace mt-4 inline-flex items-center gap-1 text-sm"
+        data-prueba="ver-timbres"
       >
-        <summary class="tu-enlace cursor-pointer">
-          {{ $t("suscripcion.timbres.movimientos") }}
-        </summary>
-        <ul class="mt-2 space-y-1">
-          <li
-            v-for="m in timbres.movimientos"
-            :key="m.id"
-            class="flex justify-between gap-3"
-          >
-            <span>
-              {{ $t(`suscripcion.timbres.${m.tipo}`) }}
-              <span v-if="m.fecha" class="tm-suave"
-                >· {{ fecha(m.fecha) }}</span
-              >
-            </span>
-            <span class="tm-numero">{{
-              m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad
-            }}</span>
-          </li>
-        </ul>
-        <PaginacionListado
-          v-if="metaMovimientos && metaMovimientos.ultima_pagina > 1"
-          :page="metaMovimientos.page"
-          :ultima-pagina="metaMovimientos.ultima_pagina"
-          :total="metaMovimientos.total"
-          :per-page="metaMovimientos.per_page"
-          @ir="cargarMovimientos"
-        />
-      </details>
+        {{ $t("suscripcion.timbres.verDetalle") }}
+        <IconoNav nombre="flecha" :tam="14" />
+      </RouterLink>
     </template>
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}

@@ -134,6 +134,7 @@ export const POLITICAS: Record<string, Politica> = {
 
   // ---- Mi suscripción (lo que el negocio paga a AgendaUno) ----
   renta: { permiso: "facturacion.ver" },
+  timbres: { permiso: "facturacion.ver" },
   // En citas se cobra por profesional (ver Renta → quién cuenta).
   padron: { permiso: "facturacion.ver", modalidad: "clases" },
 

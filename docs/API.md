@@ -304,6 +304,24 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Timbres para facturar (pantalla propia)
+
+- `GET /timbres` suma:
+  - `resumen`: `usados_mes`, `usados_mes_anterior`, `promedio_mensual` (los 3 meses
+    completos anteriores), `alcanza_meses` (`null` sin uso con qué estimar) y `por_mes`
+    (12 meses en la zona del negocio: `mes`, `usados`, `comprados`);
+  - `compra_pendiente`: la compra empezada y sin pagar (`id`, `cantidad`, `monto_minor`,
+    `moneda`, `emitido_en`), que se paga con `POST /renta/cargos/{id}/pagar`.
+- `GET /timbres/movimientos` filtra por `tipo` (`consumo`, `compra`, `ajuste`), `desde` y
+  `hasta` (días del negocio) y `q` (cliente, RFC o folio fiscal de la factura), pagina
+  con `page` y `per_page` (hasta 100) y exporta con `?formato=csv`. Cada fila trae:
+  - `factura` (`id`, `cliente`, `rfc`, `total_minor`, `moneda`, `estado`, `uuid`) si es
+    un consumo; quien está acotado a sus sedes recibe `cliente` y `rfc` en `null` y no
+    puede buscar por cliente;
+  - `compra` (`id`, `monto_minor`, `moneda`) si es una compra.
+- `POST /timbres/comprar` acepta `retorno` (`/renta` o `/renta/timbres`): a dónde
+  vuelve tras pagar.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`

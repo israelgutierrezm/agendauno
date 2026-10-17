@@ -45,6 +45,8 @@ class CobrarCargoRenta
 
         $cobrado = DB::transaction(function () use ($cargo, $proveedor): CargoRenta {
             $bloqueado = CargoRenta::query()->whereKey($cargo->getKey())->lockForUpdate()->firstOrFail();
+            // A dónde vuelve tras pagar no se guarda: viaja con el cargo que se cobra.
+            $bloqueado->retorno = $cargo->retorno;
 
             if ($bloqueado->estado !== EstadoCargoRenta::Pendiente) {
                 throw new CargoRentaNoPagable('El cargo no admite cobro.');
