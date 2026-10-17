@@ -58,6 +58,11 @@ function rutasExclusivasPorModalidad(): array
         'grupos.store' => 'clases',
         'grupos.inscripciones.index' => 'clases',
         'grupos.inscripciones.store' => 'clases',
+        // Salidas con fecha y cierre del grupo.
+        'grupos.inscripciones.baja' => 'clases',
+        'grupos.inscripciones.cambiar' => 'clases',
+        'grupos.cerrar' => 'clases',
+        'grupos.reabrir' => 'clases',
         'ofertas.capacidad-canal.index' => 'clases',
         'ofertas.capacidad-canal.guardar' => 'clases',
         'capacidad-canal.destroy' => 'clases',
@@ -77,6 +82,9 @@ function rutasExclusivasPorModalidad(): array
         'reportes.plataformas' => 'clases',
         'visitantes-plataforma.index' => 'clases',
         'visitantes-plataforma.show' => 'clases',
+        // Su historial por páginas.
+        'visitantes-plataforma.visitas' => 'clases',
+        'visitantes-plataforma.reservas' => 'clases',
         'miembros.padron' => 'clases',
         // Calendario público por fecha (M02, ADR 0118).
         'calendario' => 'clases',
@@ -274,6 +282,9 @@ it('un negocio de la otra modalidad recibe 403 MODALITY_NOT_AVAILABLE y uno de l
         if ($delNegocio === 'citas') {
             pasarNegocioACitas($e);
         }
+        // Cada vuelta en su propio minuto: juntas pasan del límite de 120 por minuto
+        // del panel y las últimas responderían 429 en vez de su modalidad.
+        $this->travel(61)->seconds();
         $obtenido = [];
         $esperado = [];
         foreach (rutasExclusivasPorModalidad() as $nombre => $modalidad) {
