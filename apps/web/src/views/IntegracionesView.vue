@@ -14,6 +14,7 @@ import PaginacionListado from "@/components/PaginacionListado.vue";
 import ReservasBienestar from "@/components/ReservasBienestar.vue";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -187,26 +188,39 @@ const nuevaLlave = ref<{ nombre: string; scopes: string[] }>({
   nombre: "",
   scopes: [],
 });
-const creandoLlave = ref(false);
 const secretoLlave = ref<string | null>(null);
 const modalLlave = ref(false);
+// El patrón común de los formularios: el error dentro del diálogo y junto a su campo,
+// no se cierra mientras guarda y pregunta antes de descartar. La llave creada se
+// confirma mostrando su secreto (una sola vez).
+const llave = useEditorFormulario({
+  abierto: modalLlave,
+  valor: () => nuevaLlave.value,
+  campos: ["nombre", "scopes"],
+  formulario: "#integracion-llave",
+});
+const creandoLlave = llave.guardando;
+const erroresLlave = llave.errores;
+const errorLlave = llave.error;
+function abrirLlave(): void {
+  nuevaLlave.value = { nombre: "", scopes: [] };
+  llave.empezar();
+  modalLlave.value = true;
+}
 
 async function crearLlave(): Promise<void> {
-  creandoLlave.value = true;
-  try {
-    const { data } = await api.post<{ data: LlaveApi & { secreto: string } }>(
+  const respuesta = await llave.guardar(() =>
+    api.post<{ data: LlaveApi & { secreto: string } }>(
       `${base.value}/llaves-api`,
       nuevaLlave.value,
-    );
-    secretoLlave.value = data.data.secreto;
-    modalLlave.value = false;
-    nuevaLlave.value = { nombre: "", scopes: [] };
-    await cargarLlaves();
-  } catch (e) {
-    toast.error(mensajeDeError(e));
-  } finally {
-    creandoLlave.value = false;
+    ),
+  );
+  if (respuesta === undefined) {
+    return;
   }
+  secretoLlave.value = respuesta.data.data.secreto;
+  modalLlave.value = false;
+  await cargarLlaves();
 }
 
 async function revocar(l: LlaveApi): Promise<void> {
@@ -240,9 +254,22 @@ const nuevoWebhook = ref<{ url: string; eventos: string[] }>({
   url: "",
   eventos: [],
 });
-const creandoWebhook = ref(false);
 const secretoWebhook = ref<string | null>(null);
 const modalWebhook = ref(false);
+const webhook = useEditorFormulario({
+  abierto: modalWebhook,
+  valor: () => nuevoWebhook.value,
+  campos: ["url", "eventos"],
+  formulario: "#integracion-webhook",
+});
+const creandoWebhook = webhook.guardando;
+const erroresWebhook = webhook.errores;
+const errorWebhook = webhook.error;
+function abrirWebhook(): void {
+  nuevoWebhook.value = { url: "", eventos: [] };
+  webhook.empezar();
+  modalWebhook.value = true;
+}
 const entregasDe = ref<string | null>(null);
 const entregas = ref<Entrega[]>([]);
 // Por páginas (antes, solo las últimas 100) y por estado, con sus cuentas.
@@ -304,9 +331,8 @@ async function cargarWebhooks(): Promise<void> {
 }
 
 async function crearWebhook(): Promise<void> {
-  creandoWebhook.value = true;
-  try {
-    const { data } = await api.post<{ data: Webhook & { secreto: string } }>(
+  const respuesta = await webhook.guardar(() =>
+    api.post<{ data: Webhook & { secreto: string } }>(
       `${base.value}/webhooks-salientes`,
       {
         url: nuevoWebhook.value.url,
@@ -315,16 +341,14 @@ async function crearWebhook(): Promise<void> {
             ? nuevoWebhook.value.eventos
             : null,
       },
-    );
-    secretoWebhook.value = data.data.secreto;
-    modalWebhook.value = false;
-    nuevoWebhook.value = { url: "", eventos: [] };
-    await cargarWebhooks();
-  } catch (e) {
-    toast.error(mensajeDeError(e));
-  } finally {
-    creandoWebhook.value = false;
+    ),
+  );
+  if (respuesta === undefined) {
+    return;
   }
+  secretoWebhook.value = respuesta.data.data.secreto;
+  modalWebhook.value = false;
+  await cargarWebhooks();
 }
 
 async function eliminarWebhook(w: Webhook): Promise<void> {
@@ -402,7 +426,7 @@ onMounted(cargar);
           class="tu-btn tu-btn-primario tu-btn-crear"
           type="button"
           data-prueba="nueva-llave"
-          @click="modalLlave = true"
+          @click="abrirLlave"
         >
           {{ $t("conexiones.llave.nueva") }}
         </button>
@@ -411,7 +435,7 @@ onMounted(cargar);
           class="tu-btn tu-btn-primario tu-btn-crear"
           type="button"
           data-prueba="nuevo-webhook"
-          @click="modalWebhook = true"
+          @click="abrirWebhook"
         >
           {{ $t("conexiones.webhook.nuevo") }}
         </button>
@@ -655,24 +679,34 @@ onMounted(cargar);
         tam="md"
         :descripcion="$t('adminUsabilidad.integraciones.llave')"
         :ocupado="creandoLlave"
-        @cerrar="modalLlave = false"
+        @cerrar="llave.cerrar"
       >
         <form
           id="integracion-llave"
           class="space-y-4"
           @submit.prevent="crearLlave"
         >
+          <AvisoTono v-if="errorLlave" tono="peligro" role="alert">
+            {{ errorLlave }}
+          </AvisoTono>
           <div>
             <label class="tu-label" for="ll-nombre">{{
               $t("conexiones.llave.nombre")
             }}</label>
             <input
               id="ll-nombre"
+              v-bind="llave.marcar('nombre', 'll-nombre-error')"
               v-model="nuevaLlave.nombre"
               class="tu-input"
               :placeholder="$t('conexiones.llave.nombrePh')"
               required
             />
+            <span
+              v-if="erroresLlave.nombre"
+              id="ll-nombre-error"
+              class="tu-error-campo"
+              >{{ erroresLlave.nombre }}</span
+            >
           </div>
           <fieldset>
             <legend class="tu-label">
@@ -682,6 +716,9 @@ onMounted(cargar);
               <input v-model="nuevaLlave.scopes" type="checkbox" :value="s" />
               {{ $t(`conexiones.llave.scopes.${s}`) }}
             </label>
+            <span v-if="erroresLlave.scopes" class="tu-error-campo">{{
+              erroresLlave.scopes
+            }}</span>
           </fieldset>
         </form>
         <template #pie>
@@ -689,7 +726,7 @@ onMounted(cargar);
             type="button"
             class="tu-btn tu-btn-fantasma"
             :disabled="creandoLlave"
-            @click="modalLlave = false"
+            @click="llave.cerrar"
           >
             {{ $t("comun.cancelar") }}
           </button>
@@ -896,25 +933,35 @@ onMounted(cargar);
         icono="integraciones"
         :descripcion="$t('adminUsabilidad.integraciones.webhook')"
         :ocupado="creandoWebhook"
-        @cerrar="modalWebhook = false"
+        @cerrar="webhook.cerrar"
       >
         <form
           id="integracion-webhook"
           class="space-y-4"
           @submit.prevent="crearWebhook"
         >
+          <AvisoTono v-if="errorWebhook" tono="peligro" role="alert">
+            {{ errorWebhook }}
+          </AvisoTono>
           <div>
             <label class="tu-label" for="wh-url">{{
               $t("conexiones.webhook.url")
             }}</label>
             <input
               id="wh-url"
+              v-bind="webhook.marcar('url', 'wh-url-error')"
               v-model="nuevoWebhook.url"
               class="tu-input"
               type="url"
               :placeholder="$t('conexiones.webhook.urlPh')"
               required
             />
+            <span
+              v-if="erroresWebhook.url"
+              id="wh-url-error"
+              class="tu-error-campo"
+              >{{ erroresWebhook.url }}</span
+            >
           </div>
           <fieldset>
             <legend class="tu-label">
@@ -935,6 +982,9 @@ onMounted(cargar);
               />
               {{ $t(`conexiones.webhook.tipos.${ev}`) }}
             </label>
+            <span v-if="erroresWebhook.eventos" class="tu-error-campo">{{
+              erroresWebhook.eventos
+            }}</span>
           </fieldset>
         </form>
         <template #pie>
@@ -942,7 +992,7 @@ onMounted(cargar);
             type="button"
             class="tu-btn tu-btn-fantasma"
             :disabled="creandoWebhook"
-            @click="modalWebhook = false"
+            @click="webhook.cerrar"
           >
             {{ $t("comun.cancelar") }}
           </button>

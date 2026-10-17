@@ -15,6 +15,7 @@ import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero } from "@/lib/formato";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Programa {
@@ -126,6 +127,34 @@ const creandoRecompensa = ref(false);
 const editorPrograma = ref(false);
 const guardandoPrograma = ref(false);
 const borradorPrograma = ref<Programa>({ ...programa.value });
+// Con cambios sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartarPrograma = useDescartarCambios({
+  abierto: editorPrograma,
+  valor: () => borradorPrograma.value,
+  guardando: guardandoPrograma,
+});
+const descartarRecompensa = useDescartarCambios({
+  abierto: nuevaRecompensa,
+  valor: () => nueva.value,
+  guardando: creandoRecompensa,
+});
+function abrirPrograma(): void {
+  borradorPrograma.value = { ...programa.value };
+  error.value = null;
+  descartarPrograma.fijar();
+  editorPrograma.value = true;
+}
+function cerrarPrograma(): void {
+  void descartarPrograma.cerrar();
+}
+function abrirRecompensa(): void {
+  error.value = null;
+  descartarRecompensa.fijar();
+  nuevaRecompensa.value = true;
+}
+function cerrarRecompensa(): void {
+  void descartarRecompensa.cerrar();
+}
 
 const miembroSel = ref("");
 const saldo = ref<number | null>(null);
@@ -178,6 +207,7 @@ async function guardarPrograma(): Promise<void> {
     );
     programa.value = data.data;
     aviso.value = t("lealtad.guardado");
+    descartarPrograma.fijar();
     editorPrograma.value = false;
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -197,7 +227,9 @@ async function crearRecompensa(): Promise<void> {
       descripcion: nueva.value.descripcion || null,
       costo_puntos: Number(nueva.value.costo_puntos) || 1,
     });
+    aviso.value = t("lealtad.recompensaCreada", { nombre: nueva.value.nombre });
     nueva.value = { nombre: "", descripcion: "", costo_puntos: 100 };
+    descartarRecompensa.fijar();
     nuevaRecompensa.value = false;
     await cargar();
   } catch (e) {
@@ -437,11 +469,7 @@ const indicadores = computed<Indicador[]>(() => {
           v-if="puedeGestionar"
           type="button"
           class="tu-btn tu-btn-fantasma mt-4"
-          @click="
-            borradorPrograma = { ...programa };
-            error = null;
-            editorPrograma = true;
-          "
+          @click="abrirPrograma"
         >
           {{ $t("adminUsabilidad.configurarPrograma") }}
         </button>
@@ -452,7 +480,7 @@ const indicadores = computed<Indicador[]>(() => {
         :titulo="$t('adminUsabilidad.configurarPrograma')"
         icono="lealtad"
         :ocupado="guardandoPrograma"
-        @cerrar="editorPrograma = false"
+        @cerrar="cerrarPrograma"
       >
         <form @submit.prevent="guardarPrograma">
           <AvisoTono v-if="error" tono="peligro" class="mb-4" role="alert">
@@ -508,7 +536,7 @@ const indicadores = computed<Indicador[]>(() => {
               type="button"
               class="tu-btn tu-btn-fantasma"
               :disabled="guardandoPrograma"
-              @click="editorPrograma = false"
+              @click="cerrarPrograma"
             >
               {{ $t("comun.cancelar") }}
             </button>
@@ -533,10 +561,7 @@ const indicadores = computed<Indicador[]>(() => {
               v-if="puedeGestionar"
               type="button"
               class="tu-btn tu-btn-fantasma"
-              @click="
-                error = null;
-                nuevaRecompensa = true;
-              "
+              @click="abrirRecompensa"
             >
               {{ $t("adminUsabilidad.recompensas.nueva") }}
             </button>
@@ -594,7 +619,7 @@ const indicadores = computed<Indicador[]>(() => {
             tam="md"
             icono="lealtad"
             :ocupado="creandoRecompensa"
-            @cerrar="nuevaRecompensa = false"
+            @cerrar="cerrarRecompensa"
           >
             <form
               v-if="puedeGestionar"
@@ -631,7 +656,7 @@ const indicadores = computed<Indicador[]>(() => {
                   type="button"
                   class="tu-btn tu-btn-fantasma"
                   :disabled="creandoRecompensa"
-                  @click="nuevaRecompensa = false"
+                  @click="cerrarRecompensa"
                 >
                   {{ $t("comun.cancelar") }}
                 </button>

@@ -2401,6 +2401,7 @@ export default {
     },
   },
   lealtad: {
+    recompensaCreada: "Recompensa «{nombre}» creada.",
     titulo: "Lealtad",
     puntos: "puntos",
     guardado: "Programa actualizado.",

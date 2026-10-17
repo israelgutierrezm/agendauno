@@ -9,6 +9,7 @@ const campos = vi.hoisted(() => ({ lista: [] as string[] }));
 vi.mock("@/lib/api", () => ({
   api,
   camposConError: () => campos.lista,
+  erroresPorCampo: () => ({}),
   mensajeDeError: () => "Para activar Wellhub captura sus llaves.",
 }));
 vi.mock("@/stores/sesionTenant", () => ({

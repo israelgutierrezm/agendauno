@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: () => "No se pudo guardar",
+  erroresPorCampo: () => ({}),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", esCitas: true, estudio: {} }),
