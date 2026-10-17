@@ -10,6 +10,7 @@ import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { codigoEmbebido } from "@/lib/captacion";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import {
   rutaWidget,
   urlWidget,
@@ -55,31 +56,34 @@ async function cargar(): Promise<void> {
   } finally {
     cargando.value = false;
   }
+}
+
+// Las opciones de los filtros, aparte: si no se pueden leer, se dice (no es lo mismo
+// que no tener sucursales) y el widget queda con «Todas» mientras se reintenta.
+const opciones = ref<"cargando" | "listo" | "error">("cargando");
+async function cargarOpciones(): Promise<void> {
+  opciones.value = "cargando";
   try {
     const { data } = await api.get<{ data: Opcion[] }>(
       `${base.value}/sucursales`,
     );
     sucursales.value = data.data.map((s) => ({ id: s.id, nombre: s.nombre }));
-  } catch {
-    sucursales.value = [];
-  }
-  // Las actividades con clases, las mismas que filtra el calendario público.
-  if (!sesion.esCitas) {
-    try {
-      const { data } = await api.get<{
+    // Las actividades con clases, las mismas que filtra el calendario público.
+    if (!sesion.esCitas) {
+      const cal = await api.get<{
         data: { filtros: { actividades: Opcion[] } };
       }>(`${base.value}/calendario`, { params: { dias: 7 } });
-      actividades.value = data.data.filtros.actividades;
-    } catch {
-      actividades.value = [];
+      actividades.value = cal.data.data.filtros.actividades;
     }
+    opciones.value = "listo";
+  } catch {
+    opciones.value = "error";
   }
 }
 
 // ---- Editor ----
 const editando = ref<Widget | null>(null);
 const abierto = ref(false);
-const guardando = ref(false);
 const form = reactive({
   tipo: "planes" as TipoWidget,
   nombre: "",
@@ -91,7 +95,38 @@ const form = reactive({
   activo: true,
 });
 
-function nuevo(): void {
+// El patrón común de los formularios: el error junto a su campo, y con cambios sin
+// guardar, cambiar de widget, cerrar o salir pregunta antes.
+const {
+  guardando,
+  errores,
+  error: errorEditor,
+  empezar,
+  cerrar,
+  marcar,
+  guardar: guardarConAviso,
+} = useEditorFormulario({
+  abierto,
+  valor: () => form,
+  campos: ["tipo", "nombre", "tema", "acento", "dominios", "activo"],
+  formulario: "#editor-widget",
+});
+// El API marca cada dominio por su posición (`dominios.0`): se muestra el primero.
+const errorDominios = computed(
+  () =>
+    errores.value.dominios ??
+    Object.entries(errores.value).find(([k]) =>
+      k.startsWith("dominios."),
+    )?.[1] ??
+    null,
+);
+/** Antes de abrir otro: si hay uno abierto con cambios, pregunta. */
+async function puedeCambiar(): Promise<boolean> {
+  return !abierto.value || (await cerrar());
+}
+
+async function nuevo(): Promise<void> {
+  if (!(await puedeCambiar())) return;
   editando.value = null;
   Object.assign(form, {
     tipo: sesion.esCitas ? "planes" : "calendario",
@@ -103,9 +138,11 @@ function nuevo(): void {
     dominios: [""],
     activo: true,
   });
+  empezar();
   abierto.value = true;
 }
-function editar(w: Widget): void {
+async function editar(w: Widget): Promise<void> {
+  if (editando.value?.id !== w.id && !(await puedeCambiar())) return;
   editando.value = w;
   Object.assign(form, {
     tipo: w.tipo,
@@ -117,6 +154,7 @@ function editar(w: Widget): void {
     dominios: w.dominios.length > 0 ? [...w.dominios] : [""],
     activo: w.activo,
   });
+  empezar();
   abierto.value = true;
 }
 function agregarDominio(): void {
@@ -130,7 +168,6 @@ function quitarDominio(i: number): void {
 }
 
 async function guardar(): Promise<void> {
-  guardando.value = true;
   const datos = {
     tipo: form.tipo,
     nombre: form.nombre.trim(),
@@ -143,25 +180,22 @@ async function guardar(): Promise<void> {
     dominios: form.dominios.map((d) => d.trim()).filter((d) => d !== ""),
     activo: form.activo,
   };
-  try {
-    const { data } = editando.value
-      ? await api.put<{ data: Widget }>(
-          `${base.value}/captacion/widgets/${editando.value.id}`,
-          datos,
-        )
-      : await api.post<{ data: Widget }>(
-          `${base.value}/captacion/widgets`,
-          datos,
-        );
-    editando.value = data.data;
-    toast.exito(t("captacion.widgets.guardado"));
-    version.value++;
-    await cargar();
-  } catch (e) {
-    toast.error(mensajeDeError(e));
-  } finally {
-    guardando.value = false;
-  }
+  const id = editando.value?.id;
+  const respuesta = await guardarConAviso(
+    () =>
+      id
+        ? api.put<{ data: Widget }>(
+            `${base.value}/captacion/widgets/${id}`,
+            datos,
+          )
+        : api.post<{ data: Widget }>(`${base.value}/captacion/widgets`, datos),
+    t("captacion.widgets.guardadoNombre", { nombre: datos.nombre }),
+  );
+  if (respuesta === undefined) return;
+  // Sigue abierto: con su vista previa y su código para copiar.
+  editando.value = respuesta.data.data;
+  version.value++;
+  await cargar();
 }
 
 async function eliminar(w: Widget): Promise<void> {
@@ -211,6 +245,7 @@ async function copiar(): Promise<void> {
   }
 }
 
+onMounted(cargarOpciones);
 onMounted(() => {
   window.addEventListener("message", alMensaje);
   void cargar();
@@ -223,19 +258,18 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
     <EncabezadoSeccion
       :titulo="$t('captacion.widgets.titulo')"
       :subtitulo="$t('captacion.widgets.descripcion')"
-    />
-
-    <div class="mt-5 flex justify-end">
-      <button
-        v-if="puedeGestionar"
-        type="button"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        data-prueba="nuevo-widget"
-        @click="nuevo"
-      >
-        {{ $t("captacion.widgets.nuevo") }}
-      </button>
-    </div>
+    >
+      <template v-if="puedeGestionar" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          data-prueba="nuevo-widget"
+          @click="nuevo"
+        >
+          {{ $t("captacion.widgets.nuevo") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <!-- Con la página del negocio oculta, ningún widget se muestra en otra web. -->
     <AvisoTono
@@ -256,9 +290,27 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
         >
       </template>
     </AvisoTono>
-    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">{{
-      error
-    }}</AvisoTono>
+    <p
+      v-if="cargando && widgets.length === 0"
+      class="mt-6 text-sm"
+      role="status"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("comun.cargando") }}
+    </p>
+    <AvisoTono
+      v-else-if="error"
+      tono="peligro"
+      class="mt-4"
+      role="alert"
+      data-prueba="error-widgets"
+      >{{ error }}
+      <template #acciones>
+        <button type="button" class="tu-btn tu-btn-contorno" @click="cargar">
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <EstadoVacio
       v-else-if="!cargando && widgets.length === 0 && !abierto"
       class="mt-4"
@@ -314,10 +366,19 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
     <!-- Editor, vista previa y código: una columna en el teléfono. -->
     <div v-if="abierto" class="mt-6 grid gap-6 lg:grid-cols-2">
       <form
+        id="editor-widget"
         class="tu-card p-5 grid gap-4 h-fit"
         data-prueba="editor-widget"
         @submit.prevent="guardar"
       >
+        <AvisoTono
+          v-if="errorEditor"
+          tono="peligro"
+          role="alert"
+          data-prueba="error-editor-widget"
+        >
+          {{ errorEditor }}
+        </AvisoTono>
         <fieldset class="grid gap-2">
           <legend class="tu-label">{{ $t("captacion.widgets.titulo") }}</legend>
           <div class="tu-segmentado w-full" role="group">
@@ -345,19 +406,56 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           <span class="tu-label">{{ $t("captacion.widgets.nombre") }}</span>
           <input
             v-model="form.nombre"
+            v-bind="marcar('nombre', 'widget-nombre-error')"
             class="tu-input"
             maxlength="120"
             required
             data-prueba="nombre-widget"
           />
+          <span
+            v-if="errores.nombre"
+            id="widget-nombre-error"
+            class="tu-error-campo"
+            >{{ errores.nombre }}</span
+          >
         </label>
         <fieldset class="grid gap-2 sm:grid-cols-2">
           <legend class="tu-label sm:col-span-2">
             {{ $t("captacion.widgets.filtros") }}
           </legend>
+          <p
+            v-if="opciones === 'cargando'"
+            class="text-xs sm:col-span-2"
+            role="status"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("captacion.widgets.opcionesCargando") }}
+          </p>
+          <AvisoTono
+            v-else-if="opciones === 'error'"
+            tono="aviso"
+            class="sm:col-span-2"
+            role="alert"
+            data-prueba="error-opciones-widget"
+          >
+            {{ $t("captacion.widgets.opcionesError") }}
+            <template #acciones>
+              <button
+                type="button"
+                class="tu-btn tu-btn-contorno tu-btn-chico"
+                @click="cargarOpciones"
+              >
+                {{ $t("comun.reintentar") }}
+              </button>
+            </template>
+          </AvisoTono>
           <label class="block">
             <span class="text-sm">{{ $t("captacion.widgets.sucursal") }}</span>
-            <select v-model="form.sucursal" class="tu-input">
+            <select
+              v-model="form.sucursal"
+              class="tu-input"
+              :disabled="opciones !== 'listo'"
+            >
               <option value="">{{ $t("captacion.widgets.todas") }}</option>
               <option v-for="s in sucursales" :key="s.id" :value="s.id">
                 {{ s.nombre }}
@@ -366,7 +464,11 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           </label>
           <label v-if="form.tipo === 'calendario'" class="block">
             <span class="text-sm">{{ $t("captacion.widgets.actividad") }}</span>
-            <select v-model="form.actividad" class="tu-input">
+            <select
+              v-model="form.actividad"
+              class="tu-input"
+              :disabled="opciones !== 'listo'"
+            >
               <option value="">{{ $t("captacion.widgets.todas") }}</option>
               <option v-for="a in actividades" :key="a.id" :value="a.id">
                 {{ a.nombre }}
@@ -443,6 +545,12 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           >
             {{ $t("captacion.widgets.agregarDominio") }}
           </button>
+          <span
+            v-if="errorDominios"
+            class="tu-error-campo"
+            data-prueba="error-dominios"
+            >{{ errorDominios }}</span
+          >
         </fieldset>
         <InterruptorSiNo
           v-model="form.activo"
@@ -450,14 +558,29 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           :etiqueta="$t('captacion.widgets.activo')"
           prueba="widget-activo"
         />
-        <button
-          type="submit"
-          class="tu-btn tu-btn-primario justify-self-start"
-          :disabled="guardando || form.nombre.trim() === ''"
-          data-prueba="guardar-widget"
-        >
-          {{ $t("captacion.widgets.guardar") }}
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            class="tu-btn tu-btn-primario"
+            :disabled="guardando || form.nombre.trim() === ''"
+            data-prueba="guardar-widget"
+          >
+            {{
+              guardando
+                ? $t("captacion.widgets.guardando")
+                : $t("captacion.widgets.guardar")
+            }}
+          </button>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="guardando"
+            data-prueba="cerrar-widget"
+            @click="cerrar"
+          >
+            {{ $t("captacion.widgets.cerrar") }}
+          </button>
+        </div>
       </form>
 
       <div v-if="previa" class="grid gap-4 h-fit">

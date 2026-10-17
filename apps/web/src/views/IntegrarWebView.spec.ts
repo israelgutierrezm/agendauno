@@ -16,7 +16,12 @@ const api = vi.hoisted(() => ({
   put: vi.fn(),
   delete: vi.fn(),
 }));
-vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
+vi.mock("@/lib/api", () => ({
+  api,
+  mensajeDeError: () => "Error",
+  // Los errores de campo vienen en `campos` de la prueba.
+  erroresPorCampo: (e: { campos?: Record<string, string> }) => e.campos ?? {},
+}));
 vi.mock("@/lib/confirmar", () => ({ confirmar: vi.fn(() => true) }));
 const sesion = vi.hoisted(() => ({
   slug: "demo",
@@ -46,7 +51,10 @@ function montar() {
   return mount(IntegrarWebView, {
     global: {
       plugins: [i18n],
-      stubs: { EncabezadoSeccion: true, RouterLink: true },
+      stubs: {
+        EncabezadoSeccion: { template: "<div><slot name='acciones' /></div>" },
+        RouterLink: true,
+      },
     },
   });
 }
@@ -145,5 +153,63 @@ describe("integrar en mi web", () => {
     expect(otra.find('[data-prueba="widgets-pagina-oculta"]').exists()).toBe(
       false,
     );
+  });
+
+  it("si no se cargan las sucursales lo dice (no es una lista vacía) y deja reintentar", async () => {
+    let falla = true;
+    api.get.mockImplementation((url: string) =>
+      url.endsWith("/sucursales") && falla
+        ? Promise.reject(new Error("red"))
+        : Promise.resolve({
+            data: {
+              data: url.endsWith("/captacion/widgets")
+                ? []
+                : url.endsWith("/sucursales")
+                  ? [{ id: "s1", nombre: "Roma Norte" }]
+                  : { filtros: { actividades: [] } },
+            },
+          }),
+    );
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="nuevo-widget"]').trigger("click");
+
+    expect(w.get('[data-prueba="error-opciones-widget"]').text()).toContain(
+      "No se pudieron cargar las sucursales",
+    );
+    expect(
+      w.get('[data-prueba="editor-widget"] select').attributes("disabled"),
+    ).toBeDefined();
+
+    falla = false;
+    await w
+      .get('[data-prueba="error-opciones-widget"] button')
+      .trigger("click");
+    await flushPromises();
+    expect(w.find('[data-prueba="error-opciones-widget"]').exists()).toBe(
+      false,
+    );
+    expect(w.text()).toContain("Roma Norte");
+  });
+
+  it("el error al guardar queda junto a su campo y lo capturado no se pierde", async () => {
+    api.post.mockRejectedValueOnce({
+      campos: { "dominios.0": "Escribe una dirección web válida." },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="nuevo-widget"]').trigger("click");
+    await w.get('[data-prueba="nombre-widget"]').setValue("Horario");
+    await w.get('[data-prueba="dominio-widget"]').setValue("no es web");
+    await w.get('[data-prueba="editor-widget"]').trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-dominios"]').text()).toBe(
+      "Escribe una dirección web válida.",
+    );
+    expect(
+      (w.get('[data-prueba="dominio-widget"]').element as HTMLInputElement)
+        .value,
+    ).toBe("no es web");
   });
 });

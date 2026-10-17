@@ -40,6 +40,12 @@ export default {
     apagado: "Apagado",
     guardar: "Guardar",
     guardado: "Widget guardado.",
+    guardadoNombre: "«{nombre}» quedó guardado.",
+    guardando: "Guardando…",
+    cerrar: "Cerrar",
+    opcionesCargando: "Cargando las sucursales y clases para filtrar…",
+    opcionesError:
+      "No se pudieron cargar las sucursales y clases para filtrar. Mientras, el widget muestra todas.",
     eliminar: "Eliminar",
     confirmarEliminar: "¿Eliminar este widget? Dejará de verse en tu web.",
     vistaPrevia: "Vista previa",
