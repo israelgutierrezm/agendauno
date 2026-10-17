@@ -18,6 +18,7 @@ import {
 } from "@/lib/agenda";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { api, mensajeDeError } from "@/lib/api";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -85,6 +86,26 @@ const ofrecerWhatsApp = computed(
 );
 const guardando = ref(false);
 const error = ref<string | null>(null);
+// Con lo capturado sin agendar, cerrar o salir pregunta antes (patrón de formularios).
+const abiertoAqui = computed({
+  get: () => props.abierto,
+  set: (v: boolean) => {
+    if (!v) emit("cerrar");
+  },
+});
+const descartar = useDescartarCambios({
+  abierto: abiertoAqui,
+  valor: () => ({
+    form: form.value,
+    cliente: clienteSel.value?.id ?? null,
+    nuevo: nuevo.value,
+    nuevoCliente: nuevoCliente.value,
+  }),
+  guardando,
+});
+function cerrar(): void {
+  void descartar.cerrar();
+}
 
 // Al abrir, se precarga con el hueco elegido en la agenda.
 watch(
@@ -108,6 +129,7 @@ watch(
     nuevo.value = false;
     nuevoCliente.value = { nombre: "", celular: "", whatsapp: false };
     error.value = null;
+    descartar.fijar();
   },
 );
 
@@ -257,6 +279,7 @@ async function agendar(): Promise<void> {
         hora: form.value.hora,
       }),
     );
+    descartar.fijar();
     emit("agendada");
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -271,7 +294,8 @@ async function agendar(): Promise<void> {
   <PanelLateral
     :abierto="abierto"
     :titulo="$t('agendaVisual.nuevaCita.titulo')"
-    @cerrar="emit('cerrar')"
+    :ocupado="guardando"
+    @cerrar="cerrar"
   >
     <form class="space-y-4 p-5" @submit.prevent="agendar">
       <!-- Cliente: buscar o dar de alta al vuelo -->
@@ -454,7 +478,8 @@ async function agendar(): Promise<void> {
       <button
         type="button"
         class="tu-btn tu-btn-fantasma"
-        @click="emit('cerrar')"
+        :disabled="guardando"
+        @click="cerrar"
       >
         {{ $t("comun.cancelar") }}
       </button>

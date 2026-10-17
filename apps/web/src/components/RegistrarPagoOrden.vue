@@ -132,6 +132,7 @@ async function registrar(): Promise<void> {
     :abierto="orden !== null"
     :titulo="$t('cobranza.pendientes.registrarTitulo')"
     tam="md"
+    :ocupado="procesando || exentando !== null"
     @cerrar="emit('cerrar')"
   >
     <form v-if="orden" class="space-y-4" @submit.prevent="registrar">
@@ -224,6 +225,7 @@ async function registrar(): Promise<void> {
         <button
           type="button"
           class="tu-btn tu-btn-fantasma"
+          :disabled="procesando"
           @click="emit('cerrar')"
         >
           {{ $t("comun.cancelar") }}
