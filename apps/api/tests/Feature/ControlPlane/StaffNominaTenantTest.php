@@ -140,3 +140,15 @@ it('la nómina separa lo devengado de lo proyectado y paga cada clase con la tar
         ->assertOk()->json('data.profesionales'))->keyBy('id');
     expect($equipo[$coach]['costo_minor'])->toBe(20000);
 });
+
+it('al cambiar la moneda del negocio, la nómina sigue en la moneda nueva (con sus tarifas por fecha)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $coach = instructorConUlid($e, 'coach@correo.mx', 'Coach');
+    $this->putJson("/api/v1/app/{$e['slug']}/staff/{$coach}/esquema-pago", ['tipo' => 'por_clase', 'monto_minor' => 20000, 'moneda' => 'MXN'], conBearer($e['bearer']))->assertCreated();
+
+    $this->putJson("/api/v1/app/{$e['slug']}/negocio/region", ['moneda' => 'usd'], conBearer($e['bearer']))->assertOk();
+
+    $fila = collect($this->getJson("/api/v1/app/{$e['slug']}/nomina?desde=2026-10-01&hasta=2026-10-31", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->firstWhere('usuario_id', $coach);
+    expect($fila['moneda'])->toBe('USD');
+});

@@ -8,6 +8,8 @@ import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import { isAxiosError } from "axios";
+
 import { api, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
@@ -37,6 +39,8 @@ interface Resumen {
   valido_hasta: string;
   total_minor: number;
   moneda: string;
+  // Sube con cada guardado: enviar o aceptar mandan la que se confirmó.
+  revision?: number;
 }
 interface Linea {
   tipo: Tipo;
@@ -508,17 +512,33 @@ async function accion(
   }
   guardando.value = true;
   errorEditor.value = null;
+  const id = actual.value.id;
   try {
     const { data } = await api.post<{ data: Presupuesto }>(
-      `${base.value}/presupuestos/${actual.value.id}/${ruta}`,
+      `${base.value}/presupuestos/${id}/${ruta}`,
       datos,
     );
     return data.data;
   } catch (e) {
     errorEditor.value = mensajeDeError(e);
+    // Alguien lo cambió después de revisarlo: se muestra la versión actual (el aviso
+    // se queda) para revisarla antes de volver a enviarla o aceptarla.
+    if (isAxiosError(e) && e.response?.status === 409) {
+      await recargarActual(id);
+    }
     return null;
   } finally {
     guardando.value = false;
+  }
+}
+async function recargarActual(id: string): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: Presupuesto }>(
+      `${base.value}/presupuestos/${id}`,
+    );
+    cargarEnEditor(data.data);
+  } catch {
+    // Sin la versión actual, el aviso ya pide revisarla.
   }
 }
 
@@ -537,7 +557,7 @@ async function enviar(): Promise<void> {
   ) {
     return;
   }
-  const p = await accion("enviar");
+  const p = await accion("enviar", { revision: guardado.revision });
   if (p) {
     cargarEnEditor(p);
     toast.exito(
@@ -559,7 +579,7 @@ async function aceptar(): Promise<void> {
   ) {
     return;
   }
-  const p = await accion("aceptar");
+  const p = await accion("aceptar", { revision: guardado.revision });
   if (p) {
     cargarEnEditor(p);
     await cargar();

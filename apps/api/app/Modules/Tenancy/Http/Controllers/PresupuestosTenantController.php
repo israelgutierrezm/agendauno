@@ -115,7 +115,8 @@ class PresupuestosTenantController
     /** Lo envía por correo al cliente (o al contacto) y queda como enviado. */
     public function enviar(Request $request): JsonResponse
     {
-        $presupuesto = $this->presupuesto($request);
+        // Se envía la revisión que se confirmó (y su contenido de ese momento).
+        $presupuesto = $this->presupuestos->paraEnviar($this->presupuesto($request), $this->revision($request));
         $correo = $presupuesto->persona->email ?? $presupuesto->email_contacto;
         if ($correo === null || $correo === '') {
             throw new PresupuestoNoPermitido('El cliente no tiene correo: compártelo impreso o en PDF.', 'sin_correo');
@@ -136,7 +137,15 @@ class PresupuestosTenantController
 
     public function aceptar(Request $request): JsonResponse
     {
-        return response()->json(['data' => $this->presentar($this->presupuestos->aceptar($this->presupuesto($request), $this->actor($request)))]);
+        return response()->json(['data' => $this->presentar($this->presupuestos->aceptar($this->presupuesto($request), $this->actor($request), $this->revision($request)))]);
+    }
+
+    /** La revisión que se confirmó al enviar o aceptar (opcional). */
+    private function revision(Request $request): ?int
+    {
+        $validado = $request->validate(['revision' => ['nullable', 'integer', 'min:1']]);
+
+        return isset($validado['revision']) ? (int) $validado['revision'] : null;
     }
 
     public function rechazar(Request $request): JsonResponse
@@ -274,6 +283,7 @@ class PresupuestosTenantController
             'valido_hasta' => $p->valido_hasta->toDateString(),
             'total_minor' => $p->total_minor,
             'moneda' => $p->moneda,
+            'revision' => $p->revision,
             'sucursal' => $p->sucursal?->nombre,
             'creado_en' => $p->created_at?->toIso8601String(),
         ];

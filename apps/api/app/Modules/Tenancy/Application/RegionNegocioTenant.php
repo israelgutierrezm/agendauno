@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
+use App\Modules\Tenancy\Models\EsquemaPagoVersionTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -190,6 +191,8 @@ class RegionNegocioTenant
             ProductoTenant::query()->update(['moneda' => $codigo]);
             ArticuloTenant::query()->update(['moneda' => $codigo]);
             EsquemaPagoTenant::query()->update(['moneda' => $codigo]);
+            // Y sus versiones (ADR 0153): la nómina lee la tarifa de cada fecha.
+            EsquemaPagoVersionTenant::query()->update(['moneda' => $codigo]);
             OrdenTenant::query()->where('estado', EstadoOrden::Pendiente->value)->update(['moneda' => $codigo]);
         });
         $this->auditoria->registrar($actor, 'negocio.moneda', 'estudio', null, ['moneda' => $actual], ['moneda' => $codigo]);

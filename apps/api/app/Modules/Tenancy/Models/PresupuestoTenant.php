@@ -42,6 +42,8 @@ class PresupuestoTenant extends Model
         'estado', 'valido_hasta', 'moneda', 'impuestos', 'tasa_impuesto_bp',
         'subtotal_minor', 'descuento_minor', 'impuesto_minor', 'total_minor', 'notas',
         'enviado_en', 'respondido_en', 'motivo_rechazo', 'orden_id', 'creado_por_id',
+        // Sube con cada guardado: enviar o aceptar la confirman (no otra versión).
+        'revision',
     ];
 
     /**
@@ -49,6 +51,7 @@ class PresupuestoTenant extends Model
      */
     protected $casts = [
         'folio' => 'integer',
+        'revision' => 'integer',
         'estado' => EstadoPresupuesto::class,
         'impuestos' => ModoImpuestos::class,
         'tasa_impuesto_bp' => 'integer',

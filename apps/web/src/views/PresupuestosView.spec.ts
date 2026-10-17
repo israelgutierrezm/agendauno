@@ -258,6 +258,7 @@ describe("presupuestos", () => {
         data: {
           ...borrador,
           total_minor: 174000,
+          revision: 2,
           lineas: [{ ...borrador.lineas[0]!, precio_unitario_minor: 150000 }],
         },
       },
@@ -275,9 +276,10 @@ describe("presupuestos", () => {
       expect.stringContaining("$1,740.00 a diego@correo.mx"),
       expect.anything(),
     );
+    // Con la revisión que se confirmó: si alguien la cambió, el API no la envía.
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/barberia/presupuestos/p1/enviar",
-      {},
+      { revision: 2 },
     );
   });
 

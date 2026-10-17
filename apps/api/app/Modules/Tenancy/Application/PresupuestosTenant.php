@@ -87,6 +87,7 @@ class PresupuestosTenant
 
             $presupuesto = new PresupuestoTenant([
                 'folio' => $config->ultimo_folio,
+                'revision' => 1,
                 'estado' => EstadoPresupuesto::Borrador->value,
                 'moneda' => $this->region->moneda(),
                 'impuestos' => $config->impuestos->value,
@@ -113,6 +114,10 @@ class PresupuestosTenant
         $lineas = $this->normalizarLineas($datos['lineas'] ?? []);
 
         return DB::connection('tenant')->transaction(function () use ($presupuesto, $datos, $lineas, $actor): PresupuestoTenant {
+            // Bajo candado: no se edita mientras alguien lo acepta o lo envía.
+            $presupuesto = PresupuestoTenant::query()->whereKey($presupuesto->getKey())->lockForUpdate()->firstOrFail();
+            $this->exigirEditable($presupuesto);
+            $presupuesto->revision = $presupuesto->revision + 1;
             $antes = ['total_minor' => $presupuesto->total_minor, 'valido_hasta' => $presupuesto->valido_hasta->toDateString()];
             $this->asignarCliente($presupuesto, $datos);
             $presupuesto->sucursal_id = $datos['sucursal_id'] ?? null;
@@ -130,6 +135,20 @@ class PresupuestosTenant
         });
     }
 
+    /**
+     * El que se va a enviar, tal como está ahora y bajo candado: si se dice qué
+     * revisión se confirmó y ya no es esa, no se envía (alguien lo cambió después).
+     */
+    public function paraEnviar(PresupuestoTenant $presupuesto, ?int $revision): PresupuestoTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($presupuesto, $revision): PresupuestoTenant {
+            $bloqueado = PresupuestoTenant::query()->whereKey($presupuesto->getKey())->lockForUpdate()->firstOrFail();
+            $this->exigirRevision($bloqueado, $revision);
+
+            return $bloqueado->load(['persona', 'sucursal', 'lineas', 'orden', 'creadoPor']);
+        });
+    }
+
     public function marcarEnviado(PresupuestoTenant $presupuesto): void
     {
         if ($presupuesto->estado === EstadoPresupuesto::Borrador) {
@@ -139,16 +158,21 @@ class PresupuestosTenant
         $presupuesto->save();
     }
 
-    public function aceptar(PresupuestoTenant $presupuesto, ?Usuario $actor): PresupuestoTenant
+    public function aceptar(PresupuestoTenant $presupuesto, ?Usuario $actor, ?int $revision = null): PresupuestoTenant
     {
-        $this->exigirEditable($presupuesto);
-        if ($this->vencido($presupuesto)) {
-            throw new PresupuestoNoPermitido('Este presupuesto ya venció: cambia su vigencia antes de marcarlo aceptado.', 'vencido');
-        }
-        $presupuesto->fill(['estado' => EstadoPresupuesto::Aceptado->value, 'respondido_en' => now(), 'motivo_rechazo' => null])->save();
-        $this->auditoria->registrar($actor, 'presupuesto.aceptado', 'presupuesto', (string) $presupuesto->ulid, null, ['total_minor' => $presupuesto->total_minor]);
+        return DB::connection('tenant')->transaction(function () use ($presupuesto, $actor, $revision): PresupuestoTenant {
+            // Se acepta lo que se vio: bajo candado y con la revisión confirmada.
+            $bloqueado = PresupuestoTenant::query()->whereKey($presupuesto->getKey())->lockForUpdate()->firstOrFail();
+            $this->exigirEditable($bloqueado);
+            $this->exigirRevision($bloqueado, $revision);
+            if ($this->vencido($bloqueado)) {
+                throw new PresupuestoNoPermitido('Este presupuesto ya venció: cambia su vigencia antes de marcarlo aceptado.', 'vencido');
+            }
+            $bloqueado->fill(['estado' => EstadoPresupuesto::Aceptado->value, 'respondido_en' => now(), 'motivo_rechazo' => null])->save();
+            $this->auditoria->registrar($actor, 'presupuesto.aceptado', 'presupuesto', (string) $bloqueado->ulid, null, ['total_minor' => $bloqueado->total_minor, 'revision' => $bloqueado->revision]);
 
-        return $presupuesto;
+            return $bloqueado;
+        });
     }
 
     public function rechazar(PresupuestoTenant $presupuesto, ?string $motivo, ?Usuario $actor): PresupuestoTenant
@@ -238,6 +262,14 @@ class PresupuestosTenant
         $resto = $tasaBp % 100;
 
         return ($resto === 0 ? (string) $entero : $entero.'.'.rtrim(str_pad((string) $resto, 2, '0', STR_PAD_LEFT), '0')).' %';
+    }
+
+    /** Con la revisión que se confirmó, que siga siendo la guardada. */
+    private function exigirRevision(PresupuestoTenant $presupuesto, ?int $revision): void
+    {
+        if ($revision !== null && $revision !== $presupuesto->revision) {
+            throw new PresupuestoNoPermitido('Alguien cambió este presupuesto desde que lo revisaste: revisa la versión actual antes de continuar.', 'cambio');
+        }
     }
 
     private function exigirEditable(PresupuestoTenant $presupuesto): void

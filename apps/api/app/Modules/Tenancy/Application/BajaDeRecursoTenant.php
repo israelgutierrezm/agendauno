@@ -21,6 +21,8 @@ use Illuminate\Validation\ValidationException;
  * - Si es el único espacio activo de un servicio en su sede, no se puede: hay que
  *   activar otro o quitárselo al servicio antes. (Eliminado, el servicio dejaría de
  *   pedir espacio; desactivado, se quedaría sin dónde agendarse.)
+ * - Aunque ya esté inactivo, si es el único espacio de un servicio no se elimina: el
+ *   servicio dejaría de pedir espacio y se agendaría sin uno.
  * - Si una serie vigente lo usa, primero se le cambia el espacio o se deja de repetir.
  * - Sus citas y clases próximas se mueven a otro espacio libre del servicio, a la
  *   misma hora. Si alguna no tiene a dónde, no se hace nada y se dice cuáles son,
@@ -33,7 +35,10 @@ class BajaDeRecursoTenant
     /** Cuántas citas sin lugar se nombran en el mensaje. */
     private const NOMBRADAS = 5;
 
-    public function __construct(private readonly ElegirRecursoTenant $recursos) {}
+    public function __construct(
+        private readonly ElegirRecursoTenant $recursos,
+        private readonly FechasNegocioTenant $fechas,
+    ) {}
 
     /**
      * Revisa y mueve sus citas próximas. `$campo` es el campo del error (`activo` al
@@ -52,6 +57,13 @@ class BajaDeRecursoTenant
                 throw ValidationException::withMessages([$campo => [
                     'Es el único espacio activo de '.$this->lista($sinOtro)
                     .' en esta sede: activa otro o quítaselo al servicio antes.',
+                ]]);
+            }
+            $sinNinguno = $this->serviciosQueDejanDePedirEspacio($bloqueado);
+            if ($sinNinguno !== []) {
+                throw ValidationException::withMessages([$campo => [
+                    'Es el único espacio de '.$this->lista($sinNinguno)
+                    .': sin él, el servicio dejaría de pedir espacio y se agendaría sin uno. Agrégale otro o quítaselo al servicio antes.',
                 ]]);
             }
 
@@ -106,13 +118,33 @@ class BajaDeRecursoTenant
     }
 
     /**
+     * Los servicios para los que es su único espacio (de cualquier sede, activo o no):
+     * sin él dejarían de pedir espacio. Uno activo ya lo cubre la regla de la sede.
+     *
+     * @return list<string>
+     */
+    private function serviciosQueDejanDePedirEspacio(RecursoTenant $recurso): array
+    {
+        if ($recurso->activo) {
+            return [];
+        }
+
+        return $recurso->ofertas()->get()
+            ->filter(fn (OfertaTenant $oferta): bool => ! $oferta->recursos()->whereKeyNot($recurso->getKey())->exists())
+            ->map(static fn (OfertaTenant $oferta): string => (string) $oferta->nombre)
+            ->values()
+            ->all();
+    }
+
+    /**
      * Las series que siguen generando fechas con este espacio.
      *
      * @return list<string>
      */
     private function seriesQueLoUsan(RecursoTenant $recurso): array
     {
-        $hoy = CarbonImmutable::now()->toDateString();
+        // Hoy en el negocio: una serie que termina hoy sigue vigente hoy.
+        $hoy = $this->fechas->hoy();
 
         return PlantillaHorarioTenant::query()->with('oferta')
             ->where('recurso_id', $recurso->getKey())

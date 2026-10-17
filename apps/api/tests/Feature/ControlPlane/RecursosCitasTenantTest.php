@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 use Illuminate\Testing\TestResponse;
@@ -172,4 +174,21 @@ it('eliminar un espacio sigue las reglas de desactivarlo y pasa sus citas a otro
     $this->putJson("/api/v1/app/{$e['slug']}/recursos/{$cabina2}", ['activo' => false], conBearer($e['bearer']))
         ->assertUnprocessable()
         ->assertJsonPath('meta.errors.activo.0', fn (string $m): bool => str_starts_with($m, 'Es el único espacio activo de «'));
+});
+
+it('el único espacio de un servicio no se elimina aunque ya esté inactivo: el servicio dejaría de pedir espacio', function (): void {
+    $s = spaConCabinas(['Cabina 1']);
+    $e = $s['e'];
+    // Un estado heredado: su única cabina quedó inactiva.
+    app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn () => RecursoTenant::query()->where('ulid', $s['cabinas'][0])->update(['activo' => false]),
+    );
+
+    $this->deleteJson("/api/v1/app/{$e['slug']}/recursos/{$s['cabinas'][0]}", [], conBearer($e['bearer']))
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.recurso.0', fn (string $m): bool => str_starts_with($m, 'Es el único espacio de «Nivel 1»: sin él, el servicio dejaría de pedir espacio'));
+    // El servicio sigue pidiendo su cabina.
+    $this->getJson("/api/v1/app/{$e['slug']}/ofertas", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.0.recursos', [$s['cabinas'][0]]);
 });

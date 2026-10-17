@@ -442,6 +442,18 @@ estos endpoints responden como antes (para versiones anteriores de la app):
   fechas son días del negocio. La web muestra las horas en la zona del negocio y dice
   cuál es.
 
+## Presupuestos: se envía y se acepta la versión revisada
+
+- Cada presupuesto trae `revision`, que sube con cada guardado. `POST
+  /presupuestos/{id}/enviar` y `/aceptar` aceptan `revision`: si ya no es la guardada
+  (alguien lo cambió después), responden 409 con `meta.motivo: cambio` y no envían ni
+  aceptan nada. Guardar y aceptar bloquean la fila.
+
+## Espacios: el único espacio de un servicio
+
+- Eliminar un espacio inactivo que es el único de un servicio da 422 en `recurso`: sin
+  él, el servicio dejaría de pedir espacio y se agendaría sin uno.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`

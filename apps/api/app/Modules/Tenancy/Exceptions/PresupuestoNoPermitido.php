@@ -21,6 +21,12 @@ class PresupuestoNoPermitido extends TenancyException
         return 'QUOTE_NOT_ALLOWED';
     }
 
+    /** Cambió desde que se revisó: un conflicto, no un dato inválido. */
+    public function estadoHttp(): int
+    {
+        return $this->motivo === 'cambio' ? 409 : 422;
+    }
+
     /**
      * @return array<string, mixed>
      */

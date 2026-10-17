@@ -163,3 +163,29 @@ it('solo en negocios de citas y con permiso', function (): void {
     $barbero = personalConSesion($e['slug'], $e['bearer'], 'barbero@correo.mx', 'instructor');
     $this->getJson("/api/v1/app/{$e['slug']}/presupuestos", conBearer($barbero))->assertForbidden();
 });
+
+it('se envía y se acepta la versión que se revisó: si alguien la cambió después, no', function (): void {
+    Mail::fake();
+    $e = estudioConSesion('barberia-p', 'b@correo.mx', 'barberia');
+    $linea = fn (int $precio): array => [['tipo' => 'libre', 'descripcion' => 'Peinado', 'cantidad' => 1, 'precio_unitario_minor' => $precio]];
+    $creado = $this->postJson("/api/v1/app/{$e['slug']}/presupuestos", [
+        'nombre_contacto' => 'Rita Pérez', 'email_contacto' => 'rita@correo.mx', 'lineas' => $linea(100000),
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.revision', 1)->json('data');
+    $url = "/api/v1/app/{$e['slug']}/presupuestos/{$creado['id']}";
+
+    // Otra persona cambia el importe: sube la revisión.
+    $this->putJson($url, ['nombre_contacto' => 'Rita Pérez', 'email_contacto' => 'rita@correo.mx', 'lineas' => $linea(150000)], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.revision', 2);
+
+    // Quien revisó la 1 no la envía ni la acepta sin ver la actual.
+    $this->postJson("{$url}/enviar", ['revision' => 1], conBearer($e['bearer']))
+        ->assertStatus(409)->assertJsonPath('meta.motivo', 'cambio');
+    $this->postJson("{$url}/aceptar", ['revision' => 1], conBearer($e['bearer']))
+        ->assertStatus(409)->assertJsonPath('meta.motivo', 'cambio');
+    Mail::assertNotQueued(CorreoPresupuesto::class);
+
+    // Con la que sí es, se envía esa.
+    $this->postJson("{$url}/enviar", ['revision' => 2], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.total_minor', 150000);
+    Mail::assertQueued(CorreoPresupuesto::class);
+    $this->postJson("{$url}/aceptar", ['revision' => 2], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estado', 'aceptado');
+});
