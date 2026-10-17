@@ -588,7 +588,7 @@ class MiTenantController
 
         $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
-        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
+        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::paraAgendar($validado['oferta_id']) : null;
         // Quien agenda por su cuenta no decide cuánto dura: la del servicio o, sin ella, la
         // del negocio (`citas.duracion_defecto`); no la que mande la pantalla.
         [$duracion, $margenes] = $disponibilidad->duracionYMargenes($oferta, null);
@@ -626,7 +626,7 @@ class MiTenantController
             $whatsapp->aceptar($persona, true);
         }
 
-        $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
+        $oferta = OfertaTenant::paraAgendar($validado['oferta_id']);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         // Sin profesional («cualquier profesional disponible»), se asigna uno libre.
         $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;

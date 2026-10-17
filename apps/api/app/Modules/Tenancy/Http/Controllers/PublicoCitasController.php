@@ -117,7 +117,7 @@ class PublicoCitasController
         $instructor = $this->profesionalElegido($validado);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
-        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
+        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::paraAgendar($validado['oferta_id']) : null;
         // Quien agenda desde la página no decide cuánto dura: la del servicio o, sin ella,
         // la del negocio (`citas.duracion_defecto`).
         [$duracion, $margenes] = $this->disponibilidad->duracionYMargenes($oferta, null);
@@ -198,7 +198,7 @@ class PublicoCitasController
             ]);
         }
 
-        $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
+        $oferta = OfertaTenant::paraAgendar($validado['oferta_id']);
         // Desde la página pública solo se agendan servicios que se pagan: uno que se toma
         // con la membresía se reserva desde la cuenta (con sesión).
         if ($oferta->politica_reserva !== PoliticaReservaTenant::Pago) {

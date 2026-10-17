@@ -377,6 +377,21 @@ estos endpoints responden como antes (para versiones anteriores de la app):
 - `PUT /staff/{usuario}/esquema-pago` acepta `vigente_desde` (AAAA-MM-DD; por omisión,
   hoy) y responde desde cuándo vale; la primera tarifa de cada quien vale desde siempre.
 
+## Servicios y clases: corregir y archivar (ADR 0154)
+
+- `PUT /ofertas/{oferta}` acepta `nombre` y, solo en clases (grupales), `capacidad`
+  (lugares por clase, 1 a 1000, `null` = sin cupo). El cupo nuevo vale para lo que se
+  agende desde ahora; cada fecha ya agendada conserva el suyo. Archivada responde 409.
+  Un nombre o un cupo corregidos quedan en la bitácora (`oferta.actualizada`).
+- `POST /ofertas/{oferta}/archivar`: ya no se agenda, no se vende, no se incluye en un
+  paquete ni aparece en línea; lo ya agendado sigue (`meta.sesiones_futuras`) y su
+  historial también. 422 en `oferta` si un paquete vigente lo incluye o si una clase
+  que se repite sigue generando fechas con él. `POST /ofertas/{oferta}/restaurar` lo
+  vuelve a ofrecer. Los dos, con `catalogo.gestionar` y en la bitácora.
+- `GET /ofertas` trae solo lo que se ofrece; con `archivados=1`, también lo archivado
+  (`archivado: true`). Agendar, ver huecos o crear una serie con uno archivado da 422
+  en `oferta_id`.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`

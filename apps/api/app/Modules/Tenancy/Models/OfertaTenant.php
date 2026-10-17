@@ -7,10 +7,13 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Support\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Oferta de una actividad (clase vendible/agendable), tenant-local. La descripción
@@ -22,6 +25,7 @@ use Illuminate\Support\Facades\Storage;
  * @property bool $para_principiantes apta para quien empieza (C03)
  * @property string|null $requisitos qué se necesita saber antes de tomarla
  * @property string|null $que_llevar qué llevar a la clase
+ * @property Carbon|null $archivado_en retirado del catálogo (ADR 0154)
  */
 class OfertaTenant extends Model
 {
@@ -31,7 +35,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en'];
 
     /**
      * @var array<string, string>
@@ -46,7 +50,38 @@ class OfertaTenant extends Model
         'preparacion_min' => 'integer',
         'limpieza_min' => 'integer',
         'para_principiantes' => 'boolean',
+        'archivado_en' => 'datetime',
     ];
+
+    /**
+     * Las que se ofrecen: una archivada ya no se agenda, no se vende ni aparece en
+     * línea, pero su historial sigue apuntando a ella (ADR 0154).
+     *
+     * @param  Builder<OfertaTenant>  $consulta
+     */
+    public function scopeVigentes(Builder $consulta): void
+    {
+        $consulta->whereNull('archivado_en');
+    }
+
+    public function archivada(): bool
+    {
+        return $this->archivado_en !== null;
+    }
+
+    /**
+     * El que se va a agendar (o cotizar): que exista y que se ofrezca. Archivado
+     * responde con un mensaje claro en el campo, no con un «no existe».
+     */
+    public static function paraAgendar(string $ulid, string $campo = 'oferta_id'): self
+    {
+        $oferta = self::query()->where('ulid', $ulid)->firstOrFail();
+        if ($oferta->archivada()) {
+            throw ValidationException::withMessages([$campo => ['«'.$oferta->nombre.'» ya no se ofrece (está archivado).']]);
+        }
+
+        return $oferta;
+    }
 
     /**
      * Espacios o equipos que puede usar el servicio (2.4); vacío = no requiere.

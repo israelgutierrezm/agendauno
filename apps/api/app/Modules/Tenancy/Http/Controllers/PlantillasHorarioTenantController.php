@@ -104,7 +104,7 @@ class PlantillasHorarioTenantController
             'activo' => ['boolean'],
         ]);
 
-        $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
+        $oferta = OfertaTenant::paraAgendar($validado['oferta_id']);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
         $plantilla = PlantillaHorarioTenant::query()->create([

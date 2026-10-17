@@ -122,6 +122,7 @@ class OpcionesCitaTenant
 
         // Se cobran al agendar: `pago` dice cómo se habilita la reserva, no si es cita.
         $deCobro = OfertaTenant::query()
+            ->vigentes()
             ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
             ->with(['actividad', 'incluidas'])
             ->get();
@@ -164,6 +165,7 @@ class OpcionesCitaTenant
     private function conPlan(): Builder
     {
         return OfertaTenant::query()
+            ->vigentes()
             ->where('politica_reserva', '!=', PoliticaReservaTenant::Pago->value);
     }
 }

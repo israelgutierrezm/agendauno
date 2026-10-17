@@ -62,6 +62,8 @@ interface Oferta {
   precio_clase_minor?: number | null;
   politica_reserva?: string;
   duracion_minutos?: number | null;
+  // Retirado del catálogo (ADR 0154): ya no se agenda, pero lo agendado lo nombra.
+  archivado?: boolean;
 }
 interface Sucursal {
   id: string;
@@ -164,7 +166,10 @@ const CANALES = [
   "otro",
 ] as const;
 
-const ofertas = ref<Oferta[]>([]);
+// Todo el catálogo, con lo archivado: sus colores no cambian al archivar uno y lo ya
+// agendado con él se sigue nombrando; para agendar, solo lo que se ofrece (ADR 0154).
+const todasOfertas = ref<Oferta[]>([]);
+const ofertas = computed(() => todasOfertas.value.filter((o) => !o.archivado));
 const sucursales = ref<Sucursal[]>([]);
 const sesiones = ref<Sesion[]>([]);
 // Profesionales con las sucursales donde atienden (vacío = no tienen sucursal propia).
@@ -617,8 +622,8 @@ async function cargarReferencias(): Promise<void> {
   ];
   if (puedeVerCatalogo.value) {
     tareas.push(
-      pedir<Oferta[]>("/ofertas").then((d) => {
-        ofertas.value = d;
+      pedir<Oferta[]>("/ofertas", { archivados: "1" }).then((d) => {
+        todasOfertas.value = d;
       }),
     );
   }
@@ -809,7 +814,10 @@ const diaTexto = computed(() => {
 // los puede ver; si no, los que aparecen en las sesiones que ve.
 const ofertasAgenda = computed<{ id: string; nombre: string }[]>(() =>
   puedeVerCatalogo.value
-    ? ofertas.value
+    ? todasOfertas.value.filter(
+        // Archivado, solo si hay algo suyo en lo que se ve.
+        (o) => !o.archivado || sesiones.value.some((s) => s.oferta_id === o.id),
+      )
     : unicos(sesiones.value, (s) =>
         s.oferta_id !== null && s.oferta !== null
           ? { id: s.oferta_id, nombre: s.oferta }
@@ -842,7 +850,11 @@ function unicos<T extends { id: string }>(
   }
   return [...vistos.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
-const catalogo = computed(() => ofertasAgenda.value.map((o) => o.id));
+const catalogo = computed(() =>
+  (puedeVerCatalogo.value ? todasOfertas.value : ofertasAgenda.value).map(
+    (o) => o.id,
+  ),
+);
 const zonaAgenda = computed(
   () =>
     sucursalesAgenda.value.find((s) => s.id === sucursalFiltro.value)

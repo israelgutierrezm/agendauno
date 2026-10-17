@@ -238,6 +238,7 @@ class ResumenDelDiaTenant
     private function libres(Usuario $usuario, CarbonImmutable $fecha, ?array $permitidas): array
     {
         $servicio = OfertaTenant::query()
+            ->vigentes()
             ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
             ->orderBy('duracion_minutos')
             ->first();

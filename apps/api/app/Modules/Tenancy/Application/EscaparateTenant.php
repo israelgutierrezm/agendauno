@@ -177,6 +177,7 @@ class EscaparateTenant
         $moneda = app(ParametrosTenant::class)->moneda();
 
         return OfertaTenant::query()
+            ->vigentes()
             ->with(['actividad.niveles', 'incluidas'])
             ->orderBy('nombre')
             ->get()

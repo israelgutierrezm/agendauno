@@ -68,7 +68,7 @@ class ImportarClasesTenant
                         $this->error('referencia', 'La referencia está repetida en este archivo.');
                     }
                     $vistas[$referencia] = true;
-                    $oferta = $this->resolver(OfertaTenant::query(), $datos['clase'], 'nombre', 'clase');
+                    $oferta = $this->resolver(OfertaTenant::query()->vigentes(), $datos['clase'], 'nombre', 'clase');
                     $sucursal = $this->resolver(SucursalTenant::query(), $datos['sucursal'], 'nombre', 'sucursal');
                     if (! $this->acceso->permiteSucursal($actor, (int) $sucursal->id)) {
                         $this->error('sucursal', 'No tienes acceso a esta sucursal.');

@@ -51,6 +51,22 @@ export default {
     filasIncompletas:
       "Completa o quita las filas marcadas: así como están no se pueden guardar.",
     deTotal: "{n} de {total}",
+    // Corregir y archivar (ADR 0154).
+    nombreRequerido: "Escribe su nombre.",
+    cupoBase: "Lugares por clase",
+    cupoBaseAyuda:
+      "Para lo que agendes desde ahora; las fechas ya agendadas conservan los suyos.",
+    cupoBaseInvalido: "Un número entero de 1 a {max}, o déjalo vacío.",
+    enCatalogo: "En catálogo ({n})",
+    archivados: "Archivados ({n})",
+    archivar: "Archivar",
+    confirmarArchivar:
+      "¿Archivar «{nombre}»? Ya no se podrá agendar, vender ni aparecerá en tu página. Lo ya agendado sigue y su historial se conserva.",
+    archivadoListo: "Se archivó «{nombre}».",
+    archivadoConFechas:
+      "Se archivó «{nombre}». Sigue en pie 1 fecha ya agendada. | Se archivó «{nombre}». Siguen en pie {n} fechas ya agendadas.",
+    restaurar: "Volver a ofrecer",
+    restaurado: "«{nombre}» se ofrece de nuevo.",
     kpi: {
       servicios: "Servicios",
       clases: "Clases",

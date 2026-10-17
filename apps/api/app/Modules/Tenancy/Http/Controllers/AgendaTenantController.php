@@ -95,7 +95,7 @@ class AgendaTenantController
             'capacidad' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
+        $oferta = OfertaTenant::paraAgendar($validado['oferta_id']);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
         // Hora local (zona de la sucursal) → UTC; snapshot de zona en la sesión.
@@ -153,7 +153,7 @@ class AgendaTenantController
         ]);
 
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
-        $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
+        $oferta = OfertaTenant::paraAgendar($validado['oferta_id']);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
 

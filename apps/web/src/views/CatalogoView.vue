@@ -14,6 +14,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import {
   aMinor,
   aTexto,
@@ -52,6 +53,8 @@ interface Oferta {
   para_principiantes?: boolean;
   requisitos?: string | null;
   que_llevar?: string | null;
+  // Retirado del catálogo: ya no se agenda ni se vende; su historial sigue (ADR 0154).
+  archivado?: boolean;
 }
 interface Recurso {
   id: string;
@@ -87,7 +90,18 @@ function efectoPolitica(o: Oferta): string {
     : t("catalogo.politicaCitas.apareceConPrecio", { servicio: o.nombre });
 }
 
-const ofertas = ref<Oferta[]>([]);
+// Todo el catálogo, con lo archivado; lo que se ofrece es lo demás (ADR 0154).
+const todas = ref<Oferta[]>([]);
+const ofertas = computed(() => todas.value.filter((o) => !o.archivado));
+const archivados = computed(() => todas.value.filter((o) => o.archivado));
+const verArchivados = ref(false);
+const listado = computed(() =>
+  verArchivados.value ? archivados.value : ofertas.value,
+);
+// Sin archivados que ver, de vuelta a lo que se ofrece.
+watch(archivados, (lista) => {
+  if (lista.length === 0) verArchivados.value = false;
+});
 // El catálogo de una clínica o un salón junta decenas de servicios: se busca por nombre
 // o actividad y se ve por páginas.
 const buscarServicio = ref("");
@@ -96,8 +110,8 @@ const SERVICIOS_POR_PAGINA = 20;
 const serviciosVisibles = computed(() => {
   const q = buscarServicio.value.trim().toLowerCase();
   return q === ""
-    ? ofertas.value
-    : ofertas.value.filter(
+    ? listado.value
+    : listado.value.filter(
         (o) =>
           o.nombre.toLowerCase().includes(q) ||
           (o.actividad ?? "").toLowerCase().includes(q),
@@ -112,7 +126,7 @@ const serviciosEnPagina = computed(() =>
     paginaServicios.value * SERVICIOS_POR_PAGINA,
   ),
 );
-watch(buscarServicio, () => {
+watch([buscarServicio, verArchivados], () => {
   paginaServicios.value = 1;
 });
 const recursos = ref<Recurso[]>([]);
@@ -147,6 +161,9 @@ const error = ref<string | null>(null);
 // Oferta en edición (una a la vez) + su formulario.
 const editandoId = ref<string | null>(null);
 const form = ref<{
+  nombre: string;
+  // Lugares por clase (cupo base): lo que se agende desde ahora; vacío = sin cupo.
+  capacidad: string;
   descripcion: string;
   politica: Politica;
   precio: string;
@@ -160,6 +177,8 @@ const form = ref<{
   requisitos: string;
   queLlevar: string;
 }>({
+  nombre: "",
+  capacidad: "",
   descripcion: "",
   politica: "entitlement",
   precio: "",
@@ -218,8 +237,19 @@ const duracionInvalida = computed(
   () =>
     form.value.politica === "pago" && (Number(form.value.duracion) || 0) <= 0,
 );
+// Sin nombre no se guarda; el cupo base, un entero de 1 a 1000 (o vacío).
+const nombreInvalido = computed(() => form.value.nombre.trim() === "");
+const CUPO_MAXIMO = 1000;
+const cupoBaseInvalido = computed(() => {
+  const texto = form.value.capacidad.trim();
+  if (esCitas.value || texto === "") return false;
+  const n = Number(texto);
+  return !Number.isInteger(n) || n < 1 || n > CUPO_MAXIMO;
+});
 const formInvalido = computed(
   () =>
+    nombreInvalido.value ||
+    cupoBaseInvalido.value ||
     precioEdicionIlegible.value ||
     precioInvalido.value ||
     duracionInvalida.value,
@@ -229,8 +259,11 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Oferta[] }>(`${base.value}/ofertas`);
-    ofertas.value = data.data;
+    const { data } = await api.get<{ data: Oferta[] }>(
+      `${base.value}/ofertas`,
+      { params: { archivados: 1 } },
+    );
+    todas.value = data.data;
     // Espacios del negocio (si no hay, la sección no aparece).
     const r = await api.get<{ data: Recurso[] }>(`${base.value}/recursos`);
     recursos.value = r.data.data.filter((x) => x.activo);
@@ -246,6 +279,8 @@ function configurar(o: Oferta): void {
   guardadoId.value = null;
   errorEdicion.value = null;
   form.value = {
+    nombre: o.nombre,
+    capacidad: o.capacidad !== null ? String(o.capacidad) : "",
     descripcion: o.descripcion ?? "",
     politica: o.politica_reserva,
     precio:
@@ -464,7 +499,14 @@ async function guardar(o: Oferta): Promise<void> {
   try {
     const precioMinor = precioEdicion.value ?? 0;
     const duracion = Number(form.value.duracion) || 0;
+    const nombre = form.value.nombre.trim();
+    const cupo = form.value.capacidad.trim();
     await api.put(`${base.value}/ofertas/${o.id}`, {
+      nombre,
+      // Una cita es de una persona: solo las clases llevan cupo base.
+      ...(esCitas.value
+        ? {}
+        : { capacidad: cupo === "" ? null : Number(cupo) }),
       lugares: Number(form.value.lugares) || 0,
       descripcion: form.value.descripcion.trim(),
       // Con pago, mandamos el precio; sin precio lo limpiamos (null).
@@ -486,14 +528,65 @@ async function guardar(o: Oferta): Promise<void> {
     guardadoId.value = o.id;
     descartarEdicion.fijar();
     editandoId.value = null;
-    toast.exito(
-      t("listadosVisual.catalogo.servicioGuardado", { nombre: o.nombre }),
-    );
+    toast.exito(t("listadosVisual.catalogo.servicioGuardado", { nombre }));
     await cargar();
   } catch (e) {
     errorEdicion.value = mensajeDeError(e);
   } finally {
     guardando.value = false;
+  }
+}
+
+// Retirarlo del catálogo (ADR 0154): lo ya agendado sigue y su historial también.
+const archivando = ref(false);
+async function archivar(o: Oferta): Promise<void> {
+  if (
+    !(await confirmar(
+      t("listadosVisual.catalogo.confirmarArchivar", { nombre: o.nombre }),
+      { peligro: true, aceptar: t("listadosVisual.catalogo.archivar") },
+    ))
+  ) {
+    return;
+  }
+  archivando.value = true;
+  errorEdicion.value = null;
+  try {
+    const { data } = await api.post<{ meta: { sesiones_futuras: number } }>(
+      `${base.value}/ofertas/${o.id}/archivar`,
+    );
+    const n = data.meta.sesiones_futuras;
+    // Los cambios sin guardar se van con él: ya no se edita archivado.
+    descartarEdicion.fijar();
+    editandoId.value = null;
+    toast.exito(
+      n > 0
+        ? t(
+            "listadosVisual.catalogo.archivadoConFechas",
+            { nombre: o.nombre, n },
+            n,
+          )
+        : t("listadosVisual.catalogo.archivadoListo", { nombre: o.nombre }),
+    );
+    await cargar();
+  } catch (e) {
+    // Lo que lo impide (un paquete, una clase que se repite), dentro del diálogo.
+    errorEdicion.value = mensajeDeError(e);
+  } finally {
+    archivando.value = false;
+  }
+}
+
+const restaurandoId = ref<string | null>(null);
+async function restaurar(o: Oferta): Promise<void> {
+  restaurandoId.value = o.id;
+  try {
+    await api.post(`${base.value}/ofertas/${o.id}/restaurar`);
+    toast.exito(t("listadosVisual.catalogo.restaurado", { nombre: o.nombre }));
+    await cargar();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    restaurandoId.value = null;
   }
 }
 
@@ -537,7 +630,7 @@ onMounted(cargar);
 
     <template v-if="!cargando">
       <EstadoVacio
-        v-if="ofertas.length === 0"
+        v-if="todas.length === 0"
         class="mt-8"
         icono="etiqueta"
         :titulo="esCitas ? $t('catalogo.vacio') : $t('catalogo.vacioClases')"
@@ -548,9 +641,41 @@ onMounted(cargar);
 
         <div class="tu-card mt-5 overflow-x-auto">
           <div
-            v-if="ofertas.length > SERVICIOS_POR_PAGINA / 2"
+            v-if="
+              ofertas.length > SERVICIOS_POR_PAGINA / 2 || archivados.length > 0
+            "
             class="tu-filtros"
           >
+            <div
+              v-if="archivados.length > 0"
+              class="tu-segmentado"
+              role="group"
+              data-prueba="filtro-archivados"
+            >
+              <button
+                type="button"
+                :aria-pressed="!verArchivados"
+                @click="verArchivados = false"
+              >
+                {{
+                  $t("listadosVisual.catalogo.enCatalogo", {
+                    n: ofertas.length,
+                  })
+                }}
+              </button>
+              <button
+                type="button"
+                :aria-pressed="verArchivados"
+                data-prueba="ver-archivados"
+                @click="verArchivados = true"
+              >
+                {{
+                  $t("listadosVisual.catalogo.archivados", {
+                    n: archivados.length,
+                  })
+                }}
+              </button>
+            </div>
             <label class="tu-buscar">
               <IconoNav nombre="buscar" :tam="16" />
               <input
@@ -666,16 +791,28 @@ onMounted(cargar);
                     }}</span
                   >
                 </td>
-                <td class="text-right">
-                  <button
-                    v-if="puedeGestionar"
-                    class="tu-enlace text-sm"
-                    type="button"
-                    data-prueba="configurar"
-                    @click="configurar(o)"
-                  >
-                    {{ $t("catalogo.configurar") }}
-                  </button>
+                <td class="text-right whitespace-nowrap">
+                  <template v-if="puedeGestionar">
+                    <button
+                      v-if="o.archivado"
+                      class="tu-enlace text-sm"
+                      type="button"
+                      data-prueba="restaurar"
+                      :disabled="restaurandoId === o.id"
+                      @click="restaurar(o)"
+                    >
+                      {{ $t("listadosVisual.catalogo.restaurar") }}
+                    </button>
+                    <button
+                      v-else
+                      class="tu-enlace text-sm"
+                      type="button"
+                      data-prueba="configurar"
+                      @click="configurar(o)"
+                    >
+                      {{ $t("catalogo.configurar") }}
+                    </button>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -713,6 +850,45 @@ onMounted(cargar);
         {{ errorEdicion }}
       </AvisoTono>
       <template v-for="o in editandoLista" :key="o.id">
+        <div class="mb-4 grid gap-3 sm:grid-cols-2">
+          <div :class="{ 'sm:col-span-2': esCitas }">
+            <label class="tu-label" :for="`c-nombre-${o.id}`">{{
+              $t("listadosVisual.catalogo.nombre")
+            }}</label>
+            <input
+              :id="`c-nombre-${o.id}`"
+              v-model="form.nombre"
+              class="tu-input"
+              maxlength="255"
+              :aria-invalid="nombreInvalido"
+              data-prueba="nombre-servicio"
+            />
+            <span v-if="nombreInvalido" class="tu-error-campo">{{
+              $t("listadosVisual.catalogo.nombreRequerido")
+            }}</span>
+          </div>
+          <div v-if="!esCitas">
+            <label class="tu-label" :for="`c-cupo-${o.id}`">{{
+              $t("listadosVisual.catalogo.cupoBase")
+            }}</label>
+            <input
+              :id="`c-cupo-${o.id}`"
+              v-model="form.capacidad"
+              class="tu-input"
+              inputmode="numeric"
+              :aria-invalid="cupoBaseInvalido"
+              data-prueba="cupo-base"
+            />
+            <span v-if="cupoBaseInvalido" class="tu-error-campo">{{
+              $t("listadosVisual.catalogo.cupoBaseInvalido", {
+                max: CUPO_MAXIMO,
+              })
+            }}</span>
+            <span v-else class="tu-hint">{{
+              $t("listadosVisual.catalogo.cupoBaseAyuda")
+            }}</span>
+          </div>
+        </div>
         <div class="mb-4" data-prueba="foto-servicio">
           <span class="tu-label">{{ $t("perfilPublico.catalogo.foto") }}</span>
           <CargadorImagen
@@ -985,9 +1161,19 @@ onMounted(cargar);
       </template>
       <template #pie>
         <button
+          v-if="editando"
+          class="tu-btn tu-btn-contorno tu-tono-peligro mr-auto"
+          type="button"
+          data-prueba="archivar"
+          :disabled="guardando || archivando"
+          @click="archivar(editando)"
+        >
+          {{ $t("listadosVisual.catalogo.archivar") }}
+        </button>
+        <button
           class="tu-btn tu-btn-fantasma"
           type="button"
-          :disabled="guardando"
+          :disabled="guardando || archivando"
           @click="cerrar"
         >
           {{ $t("catalogo.cerrar") }}
@@ -995,7 +1181,7 @@ onMounted(cargar);
         <button
           class="tu-btn tu-btn-primario"
           type="button"
-          :disabled="guardando || formInvalido"
+          :disabled="guardando || archivando || formInvalido"
           @click="editando && guardar(editando)"
         >
           {{ guardando ? $t("catalogo.guardando") : $t("catalogo.guardar") }}

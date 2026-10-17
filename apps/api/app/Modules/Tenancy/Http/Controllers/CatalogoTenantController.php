@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AltaRapidaCatalogoTenant;
+use App\Modules\Tenancy\Application\ArchivoDeServiciosTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ActividadTenant;
@@ -12,6 +14,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,9 +45,20 @@ class CatalogoTenantController
      */
     private const MAX_PRECIO_MINOR = 999_999_999_999;
 
+    /** Cupo base de una clase (el de cada fecha se ajusta en la agenda). */
+    private const MAX_CUPO = 1000;
+
+    public function __construct(
+        private readonly ArchivoDeServiciosTenant $archivo,
+        private readonly RegistrarAuditoria $auditoria,
+    ) {}
+
     public function programas(): JsonResponse
     {
-        $programas = ProgramaTenant::query()->with('actividades.ofertas')->orderBy('id')->get();
+        $programas = ProgramaTenant::query()
+            ->with(['actividades.ofertas' => fn ($q) => $q->vigentes()])
+            ->orderBy('id')
+            ->get();
 
         return response()->json([
             'data' => $programas->map(fn (ProgramaTenant $programa): array => [
@@ -142,7 +156,7 @@ class CatalogoTenantController
             // Lo que ve quien la elige en línea (página pública y agendar).
             'descripcion' => ['nullable', 'string', 'max:'.self::MAX_DESCRIPCION],
             'modalidad' => ['required', Rule::enum(ModalidadOfertaTenant::class), Rule::in([$forma->value])],
-            'capacidad' => ['nullable', 'integer', 'min:1'],
+            'capacidad' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_CUPO],
             'lugares' => ['nullable', 'integer', 'min:0', 'max:1000'],
             // Política de reserva (citas): entitlement (default) o pago-para-reservar.
             'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
@@ -186,12 +200,20 @@ class CatalogoTenantController
     }
 
     /**
-     * Actualiza el mapa de lugares (y datos básicos) de una oferta (R4).
+     * Corrige un servicio o clase: su nombre, su cupo base (lo que se agende desde
+     * ahora; cada fecha ya agendada conserva el suyo), el mapa de lugares (R4) y lo
+     * demás. Archivado no se edita: primero se vuelve a ofrecer (ADR 0154).
      */
     public function actualizarOferta(Request $request): JsonResponse
     {
         $oferta = OfertaTenant::query()->where('ulid', (string) $request->route('oferta'))->firstOrFail();
+        abort_if($oferta->archivada(), 409, 'Vuelve a ofrecerlo para editarlo.');
         $validado = $request->validate([
+            'nombre' => ['sometimes', 'required', 'string', 'max:255'],
+            // Solo las clases (grupales) tienen cupo; una cita es de una persona.
+            'capacidad' => $oferta->modalidad === ModalidadOfertaTenant::Grupal
+                ? ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::MAX_CUPO]
+                : ['prohibited'],
             'lugares' => ['required', 'integer', 'min:0', 'max:1000'],
             'descripcion' => ['nullable', 'string', 'max:'.self::MAX_DESCRIPCION],
             'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:'.self::MAX_PRECIO_MINOR],
@@ -213,6 +235,12 @@ class CatalogoTenantController
 
         // Primero se valida todo; después se guarda todo junto (ver abajo).
         $cambios = ['lugares' => (int) $validado['lugares']];
+        if (array_key_exists('nombre', $validado)) {
+            $cambios['nombre'] = trim((string) $validado['nombre']);
+        }
+        if (array_key_exists('capacidad', $validado)) {
+            $cambios['capacidad'] = $validado['capacidad'] !== null ? (int) $validado['capacidad'] : null;
+        }
         if ($request->has('para_principiantes')) {
             $cambios['para_principiantes'] = (bool) $validado['para_principiantes'];
         }
@@ -262,6 +290,9 @@ class CatalogoTenantController
             self::exigirPrecioParaPagar(array_key_exists('precio_clase_minor', $cambios) ? $cambios['precio_clase_minor'] : $oferta->precio_clase_minor);
         }
 
+        // Qué era antes, para la bitácora (un nombre o un cupo corregidos).
+        $antes = $oferta->only(['nombre', 'capacidad']);
+
         // Se guarda todo o no cambia nada: espacios, servicios incluidos (que validan
         // bajo candado lo que no se puede saber antes) y los datos del servicio.
         DB::connection('tenant')->transaction(function () use ($oferta, $validado, $recursos, $cambios): void {
@@ -274,7 +305,44 @@ class CatalogoTenantController
             $oferta->update($cambios);
         });
 
+        $despues = $oferta->only(['nombre', 'capacidad']);
+        if ($despues !== $antes) {
+            $this->auditoria->registrar($this->actor($request), 'oferta.actualizada', 'oferta', (string) $oferta->ulid, $antes, $despues);
+        }
+
         return response()->json(['data' => $this->presentarOferta($oferta->refresh())]);
+    }
+
+    /**
+     * Lo retira del catálogo (ADR 0154): ya no se agenda, no se vende ni aparece en
+     * línea; lo ya agendado sigue en pie (`sesiones_futuras`) y su historial se
+     * conserva.
+     */
+    public function archivar(Request $request): JsonResponse
+    {
+        $oferta = OfertaTenant::query()->where('ulid', (string) $request->route('oferta'))->firstOrFail();
+        $resultado = $this->archivo->archivar($oferta, $this->actor($request));
+
+        return response()->json([
+            'data' => $this->presentarOferta($oferta->refresh()),
+            'meta' => $resultado,
+        ]);
+    }
+
+    /** Lo vuelve a ofrecer, como estaba. */
+    public function restaurar(Request $request): JsonResponse
+    {
+        $oferta = OfertaTenant::query()->where('ulid', (string) $request->route('oferta'))->firstOrFail();
+        $this->archivo->restaurar($oferta, $this->actor($request));
+
+        return response()->json(['data' => $this->presentarOferta($oferta->refresh())]);
+    }
+
+    private function actor(Request $request): ?Usuario
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+
+        return $actor instanceof Usuario ? $actor : null;
     }
 
     /**
@@ -320,9 +388,17 @@ class CatalogoTenantController
         }
     }
 
-    public function ofertas(): JsonResponse
+    /**
+     * Los servicios o clases que se ofrecen. Con `archivados=1`, también los
+     * archivados (la pantalla del catálogo, para volver a ofrecerlos).
+     */
+    public function ofertas(Request $request): JsonResponse
     {
-        $ofertas = OfertaTenant::query()->with(['actividad', 'recursos', 'incluidas'])->orderBy('nombre')->get();
+        $ofertas = OfertaTenant::query()
+            ->with(['actividad', 'recursos', 'incluidas'])
+            ->when(! $request->boolean('archivados'), fn ($q) => $q->vigentes())
+            ->orderBy('nombre')
+            ->get();
 
         return response()->json([
             'data' => $ofertas->map(fn (OfertaTenant $oferta): array => array_merge(
@@ -348,6 +424,9 @@ class CatalogoTenantController
 
             if ($incluidas->count() !== count($ulids)) {
                 throw ValidationException::withMessages(['incluye' => ['Algún servicio no existe.']]);
+            }
+            if ($incluidas->contains(static fn (OfertaTenant $o): bool => $o->archivada())) {
+                throw ValidationException::withMessages(['incluye' => ['Algún servicio está archivado; vuelve a ofrecerlo para incluirlo.']]);
             }
             if ($incluidas->has((string) $oferta->ulid)) {
                 throw ValidationException::withMessages(['incluye' => ['Un servicio no puede incluirse a sí mismo.']]);
@@ -401,6 +480,7 @@ class CatalogoTenantController
             // Servicios que incluye (paquete), en orden.
             'incluye' => $oferta->incluidas->pluck('ulid')->values()->all(),
             'foto_url' => $oferta->fotoUrl(),
+            'archivado' => $oferta->archivada(),
         ];
     }
 

@@ -160,7 +160,7 @@ class PresupuestosTenantController
     public function catalogo(): JsonResponse
     {
         return response()->json(['data' => [
-            'servicios' => OfertaTenant::query()->orderBy('nombre')->get()
+            'servicios' => OfertaTenant::query()->vigentes()->orderBy('nombre')->get()
                 ->map(fn (OfertaTenant $o): array => ['id' => $o->ulid, 'nombre' => $o->nombre, 'precio_minor' => (int) $o->precio_clase_minor, 'duracion_minutos' => $o->duracion_minutos])->all(),
             // Bonos y paquetes: en citas no hay membresías (ADR 0130).
             'productos' => app(MembresiasPorModalidadTenant::class)

@@ -71,8 +71,8 @@ class PuestaEnMarchaTenant
             'negocio' => SucursalTenant::query()->exists(),
             // En un negocio de citas toda oferta es un servicio (ADR 0104): se cobre al
             // agendar o se tome con un bono.
-            'servicios' => OfertaTenant::query()->exists(),
-            'clases' => OfertaTenant::query()->exists(),
+            'servicios' => OfertaTenant::query()->vigentes()->exists(),
+            'clases' => OfertaTenant::query()->vigentes()->exists(),
             'equipo', 'horario' => $this->horariosListos($estudio),
             'planes' => ProductoTenant::query()->exists(),
             'reglas' => $this->reglasRevisadas($estudio),
@@ -132,6 +132,7 @@ class PuestaEnMarchaTenant
     private function primeraCita(): array
     {
         $servicio = OfertaTenant::query()
+            ->vigentes()
             ->orderBy('duracion_minutos')
             ->first();
         if (! $servicio instanceof OfertaTenant) {

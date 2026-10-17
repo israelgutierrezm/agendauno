@@ -110,7 +110,7 @@ class DisponibilidadTenantController
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
-        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
+        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::paraAgendar($validado['oferta_id']) : null;
         [$duracion, $margenes] = $this->disponibilidad->duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
 
         $slots = $this->disponibilidad->paraFecha(

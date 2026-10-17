@@ -193,6 +193,7 @@ class ReservasPlataformaTenantController
     {
         $publicaciones = PublicacionPlataformaTenant::query()->where('proveedor', $proveedor->value)->get()->keyBy('oferta_id');
         $ofertas = OfertaTenant::query()
+            ->vigentes()
             ->where('modalidad', ModalidadOfertaTenant::Grupal->value)
             ->with('actividad')
             ->get()

@@ -355,4 +355,88 @@ describe("catálogo", () => {
     expect(filas).toHaveLength(1);
     expect(filas[0]!.text()).toContain("Limpieza dental");
   });
+
+  it("corrige el nombre y los lugares por clase; un cupo imposible no deja guardar", async () => {
+    sesion.esCitas = false;
+    api.put.mockResolvedValue({ data: { data: {} } });
+    const w = await montar([
+      oferta({
+        nombre: "Pole 1",
+        modalidad: "grupal",
+        capacidad: 12,
+        politica_reserva: "entitlement",
+        precio_clase_minor: null,
+      }),
+    ]);
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    const guardar = () =>
+      w.findAll("button").find((b) => b.text() === "catalogo.guardar")!;
+
+    await w.get('[data-prueba="nombre-servicio"]').setValue("Pole Nivel 1");
+    await w.get('[data-prueba="cupo-base"]').setValue("0");
+    expect(guardar().attributes("disabled")).toBeDefined();
+
+    await w.get('[data-prueba="cupo-base"]').setValue("15");
+    await guardar().trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/a/ofertas/o1",
+      expect.objectContaining({ nombre: "Pole Nivel 1", capacidad: 15 }),
+    );
+  });
+
+  it("una cita no manda cupo, y sin nombre no se guarda", async () => {
+    api.put.mockResolvedValue({ data: { data: {} } });
+    const w = await montar([oferta({})]);
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    expect(w.find('[data-prueba="cupo-base"]').exists()).toBe(false);
+    const guardar = () =>
+      w.findAll("button").find((b) => b.text() === "catalogo.guardar")!;
+
+    await w.get('[data-prueba="nombre-servicio"]').setValue("  ");
+    expect(guardar().attributes("disabled")).toBeDefined();
+    await w.get('[data-prueba="nombre-servicio"]').setValue("Masaje relajante");
+    await guardar().trigger("click");
+    await flushPromises();
+    const carga = api.put.mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(carga.nombre).toBe("Masaje relajante");
+    expect(carga).not.toHaveProperty("capacidad");
+  });
+
+  it("archiva con confirmación y lo archivado se ve aparte para volver a ofrecerlo", async () => {
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
+    api.post.mockResolvedValue({
+      data: { data: {}, meta: { sesiones_futuras: 2 } },
+    });
+    const w = await montar([
+      oferta({ id: "o1", nombre: "Masaje", incluye: [] }),
+      oferta({
+        id: "o2",
+        nombre: "Facial viejo",
+        archivado: true,
+        incluye: [],
+      }),
+    ]);
+    // Lo que se ofrece, primero; lo archivado, aparte.
+    expect(w.findAll('[data-prueba="servicio"]')).toHaveLength(1);
+    await w.get('[data-prueba="ver-archivados"]').trigger("click");
+    const filas = w.findAll('[data-prueba="servicio"]');
+    expect(filas).toHaveLength(1);
+    expect(filas[0]!.text()).toContain("Facial viejo");
+    await filas[0]!.get('[data-prueba="restaurar"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/o2/restaurar");
+
+    // Archivar pregunta antes y avisa lo que ya estaba agendado.
+    w.findAll("button")
+      .find((b) => b.attributes("aria-pressed") === "false")
+      ?.trigger("click");
+    await flushPromises();
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    await w.get('[data-prueba="archivar"]').trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalled();
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/o1/archivar");
+    confirmar.mockRestore();
+  });
 });

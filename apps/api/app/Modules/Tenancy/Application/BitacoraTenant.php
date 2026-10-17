@@ -29,7 +29,7 @@ class BitacoraTenant
         'alumnos' => ['miembro.'],
         'pagos' => ['pago.', 'orden.'],
         'membresias' => ['membresia.', 'credito.', 'pago_automatico.'],
-        'catalogo' => ['producto.', 'promocion.', 'plantilla', 'recurso.', 'automatizacion.', 'capacidad.', 'excepcion_horario.', 'webhook.', 'asignacion.'],
+        'catalogo' => ['oferta.', 'producto.', 'promocion.', 'plantilla', 'recurso.', 'automatizacion.', 'capacidad.', 'excepcion_horario.', 'webhook.', 'asignacion.'],
         'privacidad' => ['privacidad.'],
         'configuracion' => ['pasarela.', 'estudio.'],
     ];
@@ -130,6 +130,10 @@ class BitacoraTenant
             'pago.reembolso' => 'Devolvió '.self::dinero($despues),
             'credito.top_up' => 'Agregó créditos'.(isset($despues['unidades']) ? ' ('.((int) $despues['unidades'] / 1000).')' : ''),
             'producto.actualizado' => 'Editó el producto'.($nombre !== '' ? " {$nombre}" : ''),
+            // Servicios y clases (ADR 0154): retirados y vueltos a ofrecer, con su historial.
+            'oferta.archivada' => 'Archivó'.($nombre !== '' ? " {$nombre}" : ' un servicio'),
+            'oferta.restaurada' => 'Volvió a ofrecer'.($nombre !== '' ? " {$nombre}" : ' un servicio'),
+            'oferta.actualizada' => self::ofertaCorregida($antes, $despues),
             'membresia.pausada' => 'Pausó una membresía'.(isset($despues['hasta']) ? ' hasta el '.$despues['hasta'] : ''),
             'membresia.reanudada' => 'Reanudó una membresía',
             'privacidad.baja_atendida' => 'Canceló los datos personales (ARCO) de una persona',
@@ -145,6 +149,28 @@ class BitacoraTenant
             'integracion.reservas' => (($despues['activas'] ?? false) ? 'Publicó sus clases en ' : 'Dejó de publicar sus clases en ').self::plataforma($a),
             default => self::eliminacion($a->accion, $antes, $despues) ?? $a->accion,
         };
+    }
+
+    /**
+     * «Renombró A a B», «Cambió el cupo de A de 12 a 15» o los dos.
+     *
+     * @param  array<string, mixed>  $antes
+     * @param  array<string, mixed>  $despues
+     */
+    private static function ofertaCorregida(array $antes, array $despues): string
+    {
+        $nombreAntes = (string) ($antes['nombre'] ?? '');
+        $nombre = (string) ($despues['nombre'] ?? $nombreAntes);
+        $partes = [];
+        if ($nombreAntes !== '' && $nombre !== $nombreAntes) {
+            $partes[] = "Renombró {$nombreAntes} a {$nombre}";
+        }
+        if (($antes['capacidad'] ?? null) !== ($despues['capacidad'] ?? null)) {
+            $partes[] = ($partes === [] ? "Cambió el cupo de {$nombre}" : 'cambió su cupo')
+                .' de '.($antes['capacidad'] ?? 'sin cupo').' a '.($despues['capacidad'] ?? 'sin cupo');
+        }
+
+        return $partes === [] ? "Editó {$nombre}" : implode(' y ', $partes);
     }
 
     /** El nombre de la plataforma de bienestar de una integración. */

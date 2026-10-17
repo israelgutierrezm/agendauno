@@ -692,6 +692,9 @@ Route::prefix('v1')->group(function (): void {
             // Servicios o clases en una línea (nombre, duración y precio o cupo).
             Route::post('/ofertas/rapidas', [CatalogoTenantController::class, 'altaRapida'])->middleware('puede:catalogo.gestionar')->name('ofertas.rapidas');
             Route::put('/ofertas/{oferta}', [CatalogoTenantController::class, 'actualizarOferta'])->middleware('puede:catalogo.gestionar')->name('ofertas.update');
+            // Retirarlo del catálogo y volver a ofrecerlo, con su historial (ADR 0154).
+            Route::post('/ofertas/{oferta}/archivar', [CatalogoTenantController::class, 'archivar'])->middleware('puede:catalogo.gestionar')->name('ofertas.archivar');
+            Route::post('/ofertas/{oferta}/restaurar', [CatalogoTenantController::class, 'restaurar'])->middleware('puede:catalogo.gestionar')->name('ofertas.restaurar');
             // Foto del servicio (la que ve el cliente al elegirlo, ADR 0066).
             Route::post('/ofertas/{oferta}/foto', [CatalogoTenantController::class, 'subirFoto'])->middleware('puede:catalogo.gestionar')->name('ofertas.foto.store');
             Route::delete('/ofertas/{oferta}/foto', [CatalogoTenantController::class, 'eliminarFoto'])->middleware('puede:catalogo.gestionar')->name('ofertas.foto.destroy');

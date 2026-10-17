@@ -27,7 +27,7 @@ class ImportarClasesTenantController
         $sedes = SucursalTenant::query()->get()->filter(fn ($s): bool => app(ResolverAccesoTenant::class)->permiteSucursal($actor, (int) $s->id));
 
         return response()->json(['data' => [
-            'clases' => OfertaTenant::query()->orderBy('nombre')->get()->map(fn ($o): array => ['id' => $o->ulid, 'nombre' => $o->nombre, 'cupo' => $o->capacidad]),
+            'clases' => OfertaTenant::query()->vigentes()->orderBy('nombre')->get()->map(fn ($o): array => ['id' => $o->ulid, 'nombre' => $o->nombre, 'cupo' => $o->capacidad]),
             'sucursales' => $sedes->map(fn ($s): array => ['id' => $s->ulid, 'nombre' => $s->nombre, 'zona_horaria' => $s->zona_horaria])->values(),
             'instructores' => Usuario::query()->profesionales()->where('activo', true)->orderBy('name')->get()
                 ->filter(fn ($u): bool => $sedes->contains(fn ($s): bool => app(ResolverAccesoTenant::class)->permiteSucursal($u, (int) $s->id)))
