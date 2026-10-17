@@ -2318,6 +2318,7 @@ export default {
     eliminar: "Eliminar",
     sinPromos: "Aún no hay promociones. Crea la primera.",
     confirmarEliminar: "¿Eliminar esta promoción?",
+    guardada: "Promoción {codigo} guardada.",
     guardar: "Guardar",
     cancelar: "Cancelar",
     vigente: "Vigente",

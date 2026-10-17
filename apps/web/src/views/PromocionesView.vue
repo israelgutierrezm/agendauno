@@ -13,6 +13,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -52,6 +53,30 @@ const form = ref({
   vence: "",
   activa: true,
 });
+// El patrón común de los formularios: errores junto al campo, no se cierra mientras
+// guarda, pregunta antes de descartar y confirma lo guardado.
+const {
+  guardando,
+  errores,
+  error: errorForm,
+  empezar,
+  cerrar: cerrarForm,
+  marcar,
+  guardar: guardarForm,
+} = useEditorFormulario({
+  abierto: mostrarForm,
+  valor: () => form.value,
+  campos: [
+    "codigo",
+    "tipo",
+    "valor",
+    "monto_minimo_minor",
+    "usos_maximos",
+    "vence_en",
+    "descripcion",
+  ],
+  formulario: "#form-promo",
+});
 
 // En la moneda del negocio y con los números de su país.
 function dinero(minor: number): string {
@@ -89,6 +114,7 @@ function nueva(): void {
     vence: "",
     activa: true,
   };
+  empezar();
   mostrarForm.value = true;
 }
 
@@ -105,6 +131,7 @@ function editar(p: Promo): void {
     vence: p.vence_en ?? "",
     activa: p.activa,
   };
+  empezar();
   mostrarForm.value = true;
 }
 
@@ -112,8 +139,6 @@ async function guardar(): Promise<void> {
   if (form.value.codigo.trim() === "") {
     return;
   }
-  accionando.value = true;
-  error.value = null;
   // % (15) -> 1500 bps; monto ($100) -> 10000 minor: en ambos casos x100.
   const carga = {
     codigo: form.value.codigo,
@@ -129,18 +154,17 @@ async function guardar(): Promise<void> {
     vence_en: form.value.vence !== "" ? form.value.vence : null,
     activa: form.value.activa,
   };
-  try {
-    if (editandoId.value !== null) {
-      await api.put(`${base.value}/promociones/${editandoId.value}`, carga);
-    } else {
-      await api.post(`${base.value}/promociones`, carga);
-    }
+  const id = editandoId.value;
+  const listo = await guardarForm(
+    () =>
+      id !== null
+        ? api.put(`${base.value}/promociones/${id}`, carga)
+        : api.post(`${base.value}/promociones`, carga),
+    t("promociones.guardada", { codigo: carga.codigo.trim().toUpperCase() }),
+  );
+  if (listo !== undefined) {
     mostrarForm.value = false;
     await cargar();
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    accionando.value = false;
   }
 }
 
@@ -272,11 +296,12 @@ onMounted(cargar);
       :titulo="
         editandoId !== null ? $t('promociones.editar') : $t('promociones.nueva')
       "
-      @cerrar="mostrarForm = false"
+      :ocupado="guardando"
+      @cerrar="cerrarForm"
     >
-      <form class="grid gap-4" @submit.prevent="guardar">
-        <AvisoTono v-if="error" tono="peligro" role="alert">
-          {{ error }}
+      <form id="form-promo" class="grid gap-4" @submit.prevent="guardar">
+        <AvisoTono v-if="errorForm" tono="peligro" role="alert">
+          {{ errorForm }}
         </AvisoTono>
         <div>
           <label class="tu-label" for="p-codigo">{{
@@ -284,16 +309,28 @@ onMounted(cargar);
           }}</label>
           <input
             id="p-codigo"
+            v-bind="marcar('codigo', 'p-codigo-error')"
             v-model="form.codigo"
             class="tu-input uppercase"
             required
           />
+          <span
+            v-if="errores.codigo"
+            id="p-codigo-error"
+            class="tu-error-campo"
+            >{{ errores.codigo }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="p-tipo">{{
             $t("promociones.campos.tipo")
           }}</label>
-          <select id="p-tipo" v-model="form.tipo" class="tu-input">
+          <select
+            id="p-tipo"
+            v-bind="marcar('tipo', 'p-tipo-error')"
+            v-model="form.tipo"
+            class="tu-input"
+          >
             <option value="porcentaje">
               {{ $t("promociones.tipos.porcentaje") }}
             </option>
@@ -301,6 +338,9 @@ onMounted(cargar);
               {{ $t("promociones.tipos.monto_fijo") }}
             </option>
           </select>
+          <span v-if="errores.tipo" id="p-tipo-error" class="tu-error-campo">{{
+            errores.tipo
+          }}</span>
         </div>
         <div>
           <label class="tu-label" for="p-valor">
@@ -312,6 +352,7 @@ onMounted(cargar);
           </label>
           <input
             id="p-valor"
+            v-bind="marcar('valor', 'p-valor-error')"
             v-model.number="form.valor"
             type="number"
             min="1"
@@ -320,6 +361,12 @@ onMounted(cargar);
             class="tu-input"
             required
           />
+          <span
+            v-if="errores.valor"
+            id="p-valor-error"
+            class="tu-error-campo"
+            >{{ errores.valor }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="p-min">{{
@@ -327,12 +374,19 @@ onMounted(cargar);
           }}</label>
           <input
             id="p-min"
+            v-bind="marcar('monto_minimo_minor', 'p-min-error')"
             v-model="form.minimo"
             type="number"
             min="0"
             step="0.01"
             class="tu-input"
           />
+          <span
+            v-if="errores.monto_minimo_minor"
+            id="p-min-error"
+            class="tu-error-campo"
+            >{{ errores.monto_minimo_minor }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="p-usos">{{
@@ -340,11 +394,18 @@ onMounted(cargar);
           }}</label>
           <input
             id="p-usos"
+            v-bind="marcar('usos_maximos', 'p-usos-error')"
             v-model="form.usosMaximos"
             type="number"
             min="1"
             class="tu-input"
           />
+          <span
+            v-if="errores.usos_maximos"
+            id="p-usos-error"
+            class="tu-error-campo"
+            >{{ errores.usos_maximos }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="p-vence">{{
@@ -352,16 +413,34 @@ onMounted(cargar);
           }}</label>
           <input
             id="p-vence"
+            v-bind="marcar('vence_en', 'p-vence-error')"
             v-model="form.vence"
             type="date"
             class="tu-input"
           />
+          <span
+            v-if="errores.vence_en"
+            id="p-vence-error"
+            class="tu-error-campo"
+            >{{ errores.vence_en }}</span
+          >
         </div>
         <div>
           <label class="tu-label" for="p-desc">{{
             $t("promociones.campos.descripcion")
           }}</label>
-          <input id="p-desc" v-model="form.descripcion" class="tu-input" />
+          <input
+            id="p-desc"
+            v-bind="marcar('descripcion', 'p-desc-error')"
+            v-model="form.descripcion"
+            class="tu-input"
+          />
+          <span
+            v-if="errores.descripcion"
+            id="p-desc-error"
+            class="tu-error-campo"
+            >{{ errores.descripcion }}</span
+          >
         </div>
         <label class="flex items-center gap-2 text-sm">
           <input v-model="form.activa" type="checkbox" />
@@ -374,14 +453,15 @@ onMounted(cargar);
           <button
             class="tu-btn tu-btn-fantasma"
             type="button"
-            @click="mostrarForm = false"
+            :disabled="guardando"
+            @click="cerrarForm"
           >
             {{ $t("promociones.cancelar") }}
           </button>
           <button
             class="tu-btn tu-btn-primario"
             type="button"
-            :disabled="accionando || form.codigo.trim() === ''"
+            :disabled="guardando || form.codigo.trim() === ''"
             @click="guardar"
           >
             {{ $t("promociones.guardar") }}
