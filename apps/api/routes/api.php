@@ -534,6 +534,7 @@ Route::prefix('v1')->group(function (): void {
             // Quiénes pueden atenderlos (ADR 0138); antes de {prospecto}.
             Route::get('/prospectos/responsables', [ProspectosTenantController::class, 'responsables'])->middleware('puede:prospectos.ver')->name('prospectos.responsables');
             Route::get('/prospectos/{prospecto}', [ProspectosTenantController::class, 'show'])->middleware('puede:prospectos.ver')->name('prospectos.show');
+            Route::get('/prospectos/{prospecto}/eventos', [ProspectosTenantController::class, 'eventos'])->middleware('puede:prospectos.ver')->name('prospectos.eventos');
             Route::put('/prospectos/{prospecto}/estado', [ProspectosTenantController::class, 'estado'])->middleware('puede:prospectos.gestionar')->name('prospectos.estado');
             Route::put('/prospectos/{prospecto}/responsable', [ProspectosTenantController::class, 'responsable'])->middleware('puede:prospectos.gestionar')->name('prospectos.responsable');
             Route::put('/prospectos/{prospecto}/seguimiento', [ProspectosTenantController::class, 'seguimiento'])->middleware('puede:prospectos.gestionar')->name('prospectos.seguimiento');

@@ -92,4 +92,10 @@ it('un día cerrado eliminado se restaura al volver a cerrarlo', function (): vo
 
     $this->postJson("/api/v1/app/{$e['slug']}/excepciones-horario", ['fecha' => $fecha, 'motivo' => 'Inventario'], conBearer($e['bearer']))
         ->assertCreated()->assertJsonPath('data.id', $id)->assertJsonPath('data.motivo', 'Inventario');
+
+    // Con `desde`, solo los que faltan: los pasados no se descargan.
+    $pasado = now()->subDays(40)->toDateString();
+    $this->postJson("/api/v1/app/{$e['slug']}/excepciones-horario", ['fecha' => $pasado, 'motivo' => 'Viejo'], conBearer($e['bearer']))->assertCreated();
+    expect(collect($this->getJson("/api/v1/app/{$e['slug']}/excepciones-horario?desde=".now()->toDateString(), conBearer($e['bearer']))->json('data'))->pluck('fecha')->all())
+        ->toBe([$fecha]);
 });

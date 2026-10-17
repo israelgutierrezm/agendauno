@@ -79,6 +79,10 @@ it('escribirle o llamarle queda en su historia y cuenta como haberlo atendido', 
 
     $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$id}/contactos", ['canal' => 'whatsapp'], conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.eventos.0.tipo', 'contacto')->assertJsonPath('data.eventos.0.detalle.canal', 'whatsapp');
+    // Todo su historial, por páginas (del más reciente al más viejo).
+    $eventos = $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}/eventos?page=1&per_page=1", conBearer($e['bearer']))->assertOk();
+    expect($eventos->json('data.0.tipo'))->toBe('contacto')
+        ->and($eventos->json('meta.total'))->toBe($this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", conBearer($e['bearer']))->json('data.eventos_total'));
     expect(detalleAtencion($e, $id)['primer_contacto_en'])->not->toBeNull();
     $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$id}/contactos", ['canal' => 'paloma'], conBearer($e['bearer']))
         ->assertUnprocessable();

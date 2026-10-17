@@ -14,6 +14,9 @@ import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import PaginacionListado from "@/components/PaginacionListado.vue";
+import FiltroFilasImportacion from "@/components/FiltroFilasImportacion.vue";
+import { useFilasImportacion } from "@/lib/filasImportacion";
 
 interface FilaPreview {
   fila: number;
@@ -36,6 +39,17 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const archivo = ref<File | null>(null);
 const nombreArchivo = ref("");
 const preview = ref<Resultado | null>(null);
+// La vista previa de 50 en 50, y solo lo que hay que corregir si se pide.
+const {
+  soloErrores,
+  pagina: paginaFilas,
+  enPagina: filasEnPagina,
+  ultimaPagina: ultimaPaginaFilas,
+  total: totalFilas,
+  todas: todasFilas,
+  conErrores: filasConErrores,
+  porPagina: filasPorPagina,
+} = useFilasImportacion(() => preview.value?.filas);
 const analizando = ref(false);
 const importando = ref(false);
 const creados = ref<number | null>(null);
@@ -254,6 +268,11 @@ function descargarPlantilla(): void {
           {{ $t("importar.corrige") }}
         </AvisoTono>
 
+        <FiltroFilasImportacion
+          v-model="soloErrores"
+          :todas="todasFilas"
+          :con-errores="filasConErrores"
+        />
         <div class="mt-4 tu-card overflow-x-auto relative">
           <table class="tu-tabla">
             <thead>
@@ -267,7 +286,7 @@ function descargarPlantilla(): void {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="f in preview.filas" :key="f.fila">
+              <tr v-for="f in filasEnPagina" :key="f.fila">
                 <td :style="{ color: 'var(--texto-suave)' }">
                   {{ f.fila }}
                 </td>
@@ -288,6 +307,14 @@ function descargarPlantilla(): void {
             </tbody>
           </table>
         </div>
+        <PaginacionListado
+          v-if="ultimaPaginaFilas > 1"
+          :page="paginaFilas"
+          :ultima-pagina="ultimaPaginaFilas"
+          :total="totalFilas"
+          :per-page="filasPorPagina"
+          @ir="paginaFilas = $event"
+        />
 
         <p
           v-if="puedeImportar"

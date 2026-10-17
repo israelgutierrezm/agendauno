@@ -173,7 +173,10 @@ async function cargar(): Promise<void> {
         data: Politica[];
         por_defecto?: Omit<FormPolitica, "actividad_id">;
       }>(`${base.value}/politicas-cancelacion`),
-      api.get<{ data: DiaCerrado[] }>(`${base.value}/excepciones-horario`),
+      // Solo de hoy en adelante: los pasados se juntan año con año y aquí no se usan.
+      api.get<{ data: DiaCerrado[] }>(`${base.value}/excepciones-horario`, {
+        params: { desde: hoy },
+      }),
       conProgramacion.value
         ? api.get<{ data: SerieProgramada[] }>(
             `${base.value}/plantillas-horario`,

@@ -132,6 +132,7 @@ export default {
       interes: "Lo que le interesa",
       respuestas: "Lo que respondió",
       historial: "Historial",
+      verMasHistorial: "Ver 1 más | Ver {n} más",
       seguimiento: "Próximo seguimiento",
       sinSeguimiento: "Sin fecha",
       responsable: "Responsable",

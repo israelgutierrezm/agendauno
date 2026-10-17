@@ -30,6 +30,9 @@ use Illuminate\Validation\Rule;
  */
 class ProspectosTenantController
 {
+    /** Lo que trae el detalle de su historial; lo demás, por páginas. */
+    private const EVENTOS_RECIENTES = 30;
+
     private const POR_PAGINA = 50;
 
     public function __construct(
@@ -362,12 +365,48 @@ class ProspectosTenantController
             // De dónde llegó (ADR 0142): la campaña acreditada y su primer origen; null =
             // sin atribución.
             'campana' => $detalle ? $this->campana($p) : null,
-            'eventos' => $detalle ? $p->eventos()->with('autor')->limit(100)->get()->map(fn (EventoProspectoTenant $e): array => [
-                'tipo' => $e->tipo->value,
-                'detalle' => $e->detalle ?? [],
-                'autor' => $e->autor?->name,
-                'en' => $e->created_at->toIso8601String(),
-            ])->all() : null,
+            // Lo más reciente de su historial; lo demás, por páginas con eventos().
+            'eventos' => $detalle ? $p->eventos()->with('autor')->limit(self::EVENTOS_RECIENTES)->get()
+                ->map(fn (EventoProspectoTenant $e): array => $this->presentarEvento($e))->all() : null,
+            'eventos_total' => $detalle ? $p->eventos()->count() : null,
+        ];
+    }
+
+    /**
+     * Su historial por páginas, del más reciente al más viejo (un prospecto de meses
+     * junta cientos de seguimientos).
+     */
+    public function eventos(Request $request): JsonResponse
+    {
+        $prospecto = ProspectoTenant::query()->where('ulid', (string) $request->route('prospecto'))->firstOrFail();
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $pagina = $prospecto->eventos()->with('autor')
+            ->paginate((int) ($validado['per_page'] ?? self::EVENTOS_RECIENTES), ['*'], 'page', (int) ($validado['page'] ?? 1));
+
+        return response()->json([
+            'data' => collect($pagina->items())->map(fn (EventoProspectoTenant $e): array => $this->presentarEvento($e))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarEvento(EventoProspectoTenant $e): array
+    {
+        return [
+            'tipo' => $e->tipo->value,
+            'detalle' => $e->detalle ?? [],
+            'autor' => $e->autor?->name,
+            'en' => $e->created_at->toIso8601String(),
         ];
     }
 }

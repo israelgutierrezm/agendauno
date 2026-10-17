@@ -7,6 +7,9 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import PaginacionListado from "@/components/PaginacionListado.vue";
+import FiltroFilasImportacion from "@/components/FiltroFilasImportacion.vue";
+import { useFilasImportacion } from "@/lib/filasImportacion";
 
 type Modo = "fechas" | "semanal";
 interface Registro {
@@ -50,6 +53,17 @@ const modo = ref<Modo>("fechas");
 const archivo = ref<File | null>(null);
 const catalogos = ref<Catalogos | null>(null);
 const preview = ref<Resultado | null>(null);
+// La vista previa de 50 en 50, y solo lo que hay que corregir si se pide.
+const {
+  soloErrores,
+  pagina: paginaFilas,
+  enPagina: filasEnPagina,
+  ultimaPagina: ultimaPaginaFilas,
+  total: totalFilas,
+  todas: todasFilas,
+  conErrores: filasConErrores,
+  porPagina: filasPorPagina,
+} = useFilasImportacion(() => preview.value?.filas);
 const exito = ref<Resultado | null>(null);
 const error = ref("");
 const ocupado = ref(false);
@@ -414,6 +428,11 @@ async function descargar() {
         <p v-else-if="!preview.resumen.sesiones" class="mt-4" role="status">
           {{ t("importarClases.sinNuevas") }}
         </p>
+        <FiltroFilasImportacion
+          v-model="soloErrores"
+          :todas="todasFilas"
+          :con-errores="filasConErrores"
+        />
         <div class="tu-card mt-4 overflow-x-auto">
           <table class="w-full text-left text-sm tabla-preview">
             <thead>
@@ -425,7 +444,7 @@ async function descargar() {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="fila in preview.filas" :key="fila.fila">
+              <tr v-for="fila in filasEnPagina" :key="fila.fila">
                 <td>
                   {{ fila.fila
                   }}<small class="block">{{ fila.datos.referencia }}</small>
@@ -457,7 +476,7 @@ async function descargar() {
                         })
                       }}
                     </summary>
-                    <ul class="mt-1">
+                    <ul class="mt-1 tu-lista-acotada">
                       <li v-for="fecha in fila.sesiones" :key="fecha.fecha">
                         {{ fecha.fecha }}
                         <span v-if="fecha.estado === 'cancelada'"
@@ -500,6 +519,14 @@ async function descargar() {
             </tbody>
           </table>
         </div>
+        <PaginacionListado
+          v-if="ultimaPaginaFilas > 1"
+          :page="paginaFilas"
+          :ultima-pagina="ultimaPaginaFilas"
+          :total="totalFilas"
+          :per-page="filasPorPagina"
+          @ir="paginaFilas = $event"
+        />
         <div class="mt-4 flex flex-wrap items-center justify-between gap-4">
           <p class="max-w-xl text-sm" style="color: var(--texto-suave)">
             {{ t("importarClases.seguro") }}

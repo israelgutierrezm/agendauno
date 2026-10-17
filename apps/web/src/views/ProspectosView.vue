@@ -512,6 +512,26 @@ const acceso = reactive({
   ficha: "" as string,
 });
 
+// Lo demás de su historial, de 30 en 30 (el detalle trae lo más reciente).
+const cargandoEventos = ref(false);
+async function masEventos(): Promise<void> {
+  const p = actual.value;
+  if (p === null || p.eventos === null || cargandoEventos.value) {
+    return;
+  }
+  cargandoEventos.value = true;
+  try {
+    const { data } = await api.get<{ data: EventoProspecto[] }>(
+      `${base.value}/prospectos/${p.id}/eventos`,
+      { params: { page: Math.floor(p.eventos.length / 30) + 1, per_page: 30 } },
+    );
+    p.eventos = [...p.eventos, ...data.data];
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    cargandoEventos.value = false;
+  }
+}
 async function abrir(p: Prospecto): Promise<void> {
   actual.value = p;
   descartando.abierto = false;
@@ -1365,6 +1385,22 @@ async function crear(): Promise<void> {
               </div>
             </li>
           </ol>
+          <button
+            v-if="actual.eventos.length < (actual.eventos_total ?? 0)"
+            type="button"
+            class="tu-enlace mt-2 text-sm"
+            :disabled="cargandoEventos"
+            data-prueba="mas-eventos"
+            @click="masEventos"
+          >
+            {{
+              $t(
+                "captacion.prospectos.detalle.verMasHistorial",
+                { n: (actual.eventos_total ?? 0) - actual.eventos.length },
+                (actual.eventos_total ?? 0) - actual.eventos.length,
+              )
+            }}
+          </button>
         </section>
 
         <button

@@ -400,7 +400,10 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
         <p style="color: var(--aviso)">
           {{ $t("bloqueosAgenda.afectadas", { n: afectadas.length }) }}
         </p>
-        <ul class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+        <ul
+          class="mt-1 tu-lista-acotada"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
           <li v-for="a in afectadas" :key="a.sesion">
             {{ horaDe(a) }} · {{ a.oferta ?? "—" }}
             <template v-if="a.reservas > 0">

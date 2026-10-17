@@ -750,6 +750,13 @@
   .tu-buscar > input {
     padding-left: 2.25rem;
   }
+  /* Una lista que puede ser muy larga (fechas afectadas, generadas…): se desplaza
+     dentro de su alto en vez de estirar el formulario. */
+  .tu-lista-acotada {
+    max-height: 12rem;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
   .tu-sin-resultados {
     padding: 2rem 1rem;
     border-top: 1px solid var(--borde);

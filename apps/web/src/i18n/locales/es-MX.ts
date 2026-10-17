@@ -1521,6 +1521,10 @@ export default {
     colRazon: "Razón de cobro",
   },
   importar: {
+    filtro: {
+      todas: "Todas ({n})",
+      conErrores: "Con errores (1) | Con errores ({n})",
+    },
     titulo: "Importar miembros",
     instrucciones:
       "Sube un archivo CSV con una fila por alumno. Primero lo revisamos sin guardar: te decimos qué filas están listas, cuáles ya estaban (no se repiten) y cuáles hay que corregir.",

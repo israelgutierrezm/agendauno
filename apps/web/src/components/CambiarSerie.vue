@@ -192,7 +192,10 @@ async function enviar(previsualizar: boolean): Promise<void> {
         <p class="mt-1" style="color: var(--aviso)">
           {{ $t("cambiarSerie.omitidas", { n: vista.omitidas?.length }) }}
         </p>
-        <ul class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+        <ul
+          class="mt-1 tu-lista-acotada"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
           <li v-for="o in vista.omitidas" :key="o.fecha">
             {{ fechaLarga(o.fecha) }} · {{ o.motivo }}
           </li>
@@ -202,7 +205,10 @@ async function enviar(previsualizar: boolean): Promise<void> {
         <p class="mt-1" style="color: var(--aviso)">
           {{ $t("cambiarSerie.conservadas", { n: vista.conservadas.length }) }}
         </p>
-        <ul class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+        <ul
+          class="mt-1 tu-lista-acotada"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
           <li v-for="c in vista.conservadas" :key="c.fecha">
             {{ fechaLarga(c.fecha) }} · {{ c.motivo }}
           </li>

@@ -17,9 +17,17 @@ use Illuminate\Support\Carbon;
  */
 class ExcepcionesHorarioTenantController
 {
-    public function index(): JsonResponse
+    /**
+     * Los días cerrados, en orden. Con `desde` (AAAA-MM-DD), solo de ese día en
+     * adelante: los pasados se juntan año con año y la pantalla no los usa.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $excepciones = ExcepcionHorarioTenant::query()->orderBy('fecha')->get();
+        $validado = $request->validate(['desde' => ['nullable', 'date_format:Y-m-d']]);
+        $excepciones = ExcepcionHorarioTenant::query()
+            ->when($validado['desde'] ?? null, fn ($q, string $desde) => $q->whereDate('fecha', '>=', $desde))
+            ->orderBy('fecha')
+            ->get();
 
         return response()->json([
             'data' => $excepciones->map(fn (ExcepcionHorarioTenant $e): array => [
