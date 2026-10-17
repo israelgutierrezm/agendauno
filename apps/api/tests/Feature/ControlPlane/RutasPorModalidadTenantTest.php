@@ -109,6 +109,10 @@ function rutasExclusivasPorModalidad(): array
         'citas.agendar' => 'citas',
         'reservas.historial' => 'citas',
         'reservas.cobro' => 'citas',
+        'importaciones.citas.catalogos' => 'citas',
+        'importaciones.citas.plantilla' => 'citas',
+        'importaciones.citas.preview' => 'citas',
+        'importaciones.citas.store' => 'citas',
         'presupuestos.index' => 'citas',
         'presupuestos.catalogo' => 'citas',
         'presupuestos.configuracion' => 'citas',
@@ -277,7 +281,8 @@ it('la modalidad se revisa con el negocio resuelto, tras la sesión y el límite
 
 it('un negocio de la otra modalidad recibe 403 MODALITY_NOT_AVAILABLE y uno de la suya sigue de largo', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $negada = fn (TestResponse $r): bool => $r->status() === 403 && $r->json('code') === 'MODALITY_NOT_AVAILABLE';
+    // getStatusCode: una plantilla permitida responde en flujo (StreamedResponse).
+    $negada = fn (TestResponse $r): bool => $r->getStatusCode() === 403 && $r->json('code') === 'MODALITY_NOT_AVAILABLE';
 
     foreach (['clases', 'citas'] as $delNegocio) {
         if ($delNegocio === 'citas') {

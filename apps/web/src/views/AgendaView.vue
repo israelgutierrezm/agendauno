@@ -1939,6 +1939,12 @@ onMounted(async () => {
             ruta="importar-clases"
             :texto="$t('importarClases.titulo')"
           />
+          <BotonImportar
+            v-if="puedeEntrar('importar-citas', sesion)"
+            class="max-sm:hidden"
+            ruta="importar-citas"
+            :texto="$t('importarCitas.titulo')"
+          />
           <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
           <button
             v-if="sesion.esCitas && puedeReservar"

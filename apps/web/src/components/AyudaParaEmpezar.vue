@@ -40,10 +40,10 @@ const CONTENIDO: Record<
       "Tus clientes, con sus datos de contacto",
       "Tu equipo",
       "Los bonos vigentes de cada cliente, a la fecha de corte que elijas (sin registrarlos como ventas)",
+      "Las citas que ya tenías agendadas, sin avisarle nada a tus clientes",
     ],
     noSeTraslada: [
       "El historial de pagos y citas anteriores: queda en tu sistema anterior",
-      "Las citas ya agendadas: se capturan de nuevo en la agenda",
     ],
     configuras: [
       "Tu sucursal",

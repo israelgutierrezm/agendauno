@@ -227,6 +227,17 @@ class SeguimientoTenant
     }
 
     /**
+     * Desde un segmento de retención (ADR 0159): la tarea de hoy con las mismas reglas
+     * (sin repetir, sin quien no desea promociones si es comercial). true si la creó.
+     */
+    public function crearPorSegmento(int $personaId, MotivoSeguimiento $motivo, ?string $dato): bool
+    {
+        $hoy = CarbonImmutable::parse($this->fechas->hoy(), $this->fechas->zona());
+
+        return $this->crear($personaId, $motivo, $hoy, $dato) === 1;
+    }
+
+    /**
      * Crea la tarea si toca: alumno vigente, no excluido y sin una igual reciente.
      * Devuelve 1 si la creó.
      */

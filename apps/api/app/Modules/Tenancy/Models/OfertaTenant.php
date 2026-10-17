@@ -26,6 +26,7 @@ use Illuminate\Validation\ValidationException;
  * @property string|null $requisitos qué se necesita saber antes de tomarla
  * @property string|null $que_llevar qué llevar a la clase
  * @property Carbon|null $archivado_en retirado del catálogo (ADR 0154)
+ * @property int|null $regreso_dias cada cuántos días suele regresar un cliente (ADR 0159)
  */
 class OfertaTenant extends Model
 {
@@ -35,7 +36,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en', 'regreso_dias'];
 
     /**
      * @var array<string, string>
@@ -51,6 +52,7 @@ class OfertaTenant extends Model
         'limpieza_min' => 'integer',
         'para_principiantes' => 'boolean',
         'archivado_en' => 'datetime',
+        'regreso_dias' => 'integer',
     ];
 
     /**

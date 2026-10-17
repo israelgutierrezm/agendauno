@@ -32,12 +32,13 @@ class DifusionesTenantController
         $conteos = $resolver->conteos();
 
         return response()->json([
-            'data' => array_map(fn (SegmentoComunicacion $s): array => [
+            // Solo los de su modalidad (ADR 0104): los que no cuentan no se ofrecen.
+            'data' => array_values(array_map(fn (SegmentoComunicacion $s): array => [
                 'clave' => $s->value,
                 'etiqueta' => $s->etiqueta(),
                 'descripcion' => $s->descripcion(),
                 'total' => $conteos[$s->value] ?? 0,
-            ], SegmentoComunicacion::cases()),
+            ], array_filter(SegmentoComunicacion::cases(), static fn (SegmentoComunicacion $s): bool => array_key_exists($s->value, $conteos)))),
             // Push solo aparece si la plataforma tiene FCM configurado.
             'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::paraDifusiones()),
         ]);

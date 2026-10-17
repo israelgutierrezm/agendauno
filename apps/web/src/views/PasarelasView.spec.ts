@@ -82,3 +82,37 @@ describe("pasarela lista de verdad (M07)", () => {
     );
   });
 });
+
+describe("activada no es comprobada (H)", () => {
+  it("dice si la conexión ya se comprobó con un pago aprobado o sigue sin comprobar", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            ...pasarela("stripe"),
+            activa: true,
+            lista: true,
+            estado_conexion: "activa_sin_comprobar",
+          },
+          {
+            ...pasarela("mercadopago"),
+            activa: true,
+            lista: true,
+            estado_conexion: "comprobada",
+            comprobada_en: "2026-10-03T18:00:00Z",
+          },
+        ],
+        meta: { en_linea_disponible: true },
+      },
+    });
+    const w = mount(PasarelasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    expect(w.get('[data-prueba="conexion-stripe"]').text()).toContain(
+      "activada, aún sin comprobar",
+    );
+    expect(w.get('[data-prueba="conexion-mercadopago"]').text()).toContain(
+      "Conexión comprobada",
+    );
+  });
+});

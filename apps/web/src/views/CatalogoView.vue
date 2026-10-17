@@ -40,6 +40,8 @@ interface Oferta {
   // Preparación antes y limpieza después: ocupan la agenda, no se le dicen al cliente.
   preparacion_min?: number;
   limpieza_min?: number;
+  // Cada cuántos días suele regresar un cliente (retención, ADR 0159).
+  regreso_dias?: number | null;
   // Espacios o equipos que puede usar (2.4); vacío = no requiere.
   recursos?: string[];
   actividad: string | null;
@@ -178,6 +180,7 @@ const form = ref<{
   principiantes: boolean;
   requisitos: string;
   queLlevar: string;
+  regreso: string;
 }>({
   nombre: "",
   capacidad: "",
@@ -193,6 +196,7 @@ const form = ref<{
   principiantes: false,
   requisitos: "",
   queLlevar: "",
+  regreso: "",
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
@@ -301,6 +305,7 @@ function configurar(o: Oferta): void {
     principiantes: o.para_principiantes ?? false,
     requisitos: o.requisitos ?? "",
     queLlevar: o.que_llevar ?? "",
+    regreso: o.regreso_dias ? String(o.regreso_dias) : "",
   };
   descartarEdicion.fijar();
 }
@@ -529,6 +534,15 @@ async function guardar(o: Oferta): Promise<void> {
         : { para_principiantes: form.value.principiantes }),
       requisitos: form.value.requisitos.trim() || null,
       que_llevar: form.value.queLlevar.trim() || null,
+      // Citas: con esto, retención encuentra a quien ya debería haber regresado.
+      ...(esCitas.value
+        ? {
+            regreso_dias:
+              Number(form.value.regreso) > 0
+                ? Number(form.value.regreso)
+                : null,
+          }
+        : {}),
     });
     guardadoId.value = o.id;
     descartarEdicion.fijar();
@@ -1121,6 +1135,22 @@ onMounted(cargar);
               class="tu-input"
             />
             <span class="tu-hint">{{ $t("margenesServicio.ayuda") }}</span>
+          </div>
+          <!-- Cada cuántos días suele regresar (retención, ADR 0159): solo citas. -->
+          <div v-if="esCitas">
+            <label class="tu-label" :for="`regreso-${o.id}`">{{
+              $t("catalogo.regreso")
+            }}</label>
+            <input
+              :id="`regreso-${o.id}`"
+              v-model="form.regreso"
+              type="number"
+              min="1"
+              max="730"
+              class="tu-input"
+              data-prueba="regreso-servicio"
+            />
+            <span class="tu-hint">{{ $t("catalogo.regresoAyuda") }}</span>
           </div>
           <!-- Espacios que usa (2.4): solo si el negocio tiene espacios. -->
           <fieldset v-if="recursos.length > 0" class="sm:col-span-2">

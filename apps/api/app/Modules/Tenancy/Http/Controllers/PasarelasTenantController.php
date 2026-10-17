@@ -8,9 +8,11 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -67,9 +69,24 @@ class PasarelasTenantController
     private function presentar(string $proveedor, ?ConfiguracionPasarelaTenant $config): array
     {
         $enLinea = in_array($proveedor, ProveedorPasarela::enLinea(), true);
+        $llaves = $config instanceof ConfiguracionPasarelaTenant ? array_keys($config->llaves()) : [];
+        $lista = $this->registro->activa($proveedor);
+        // La prueba de que la conexión funciona: un pago que el proveedor aprobó (no
+        // basta con guardar llaves ni con activarla).
+        $comprobada = $enLinea ? PagoTenant::query()->where('proveedor', $proveedor)->whereNotNull('aprobado_en')->max('aprobado_en') : null;
 
         return [
             'proveedor' => $proveedor,
+            // sin_configurar → credenciales (capturadas) → activa_sin_comprobar → comprobada.
+            // Solo las que cobran en línea (la de caja no se conecta a nada).
+            'estado_conexion' => match (true) {
+                ! $enLinea => null,
+                $llaves === [] => 'sin_configurar',
+                ! $lista => 'credenciales',
+                $comprobada === null => 'activa_sin_comprobar',
+                default => 'comprobada',
+            },
+            'comprobada_en' => $comprobada !== null ? CarbonImmutable::parse((string) $comprobada)->toIso8601String() : null,
             'activa' => $config instanceof ConfiguracionPasarelaTenant ? $config->activa : false,
             'modo' => $config instanceof ConfiguracionPasarelaTenant ? $config->modo : 'test',
             'llaves_configuradas' => $config instanceof ConfiguracionPasarelaTenant

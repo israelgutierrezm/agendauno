@@ -61,6 +61,8 @@ class GenerarRecordatoriosTenant
 
         ReservaTenant::query()
             ->where('estado', EstadoReserva::Confirmada->value)
+            // Importada sin recordatorios (ADR 0160): no se le avisa.
+            ->where('sin_avisos', false)
             ->whereNull($recordatorio->columna())
             ->whereHas('sesion', fn (Builder $q) => $q
                 ->where('estado', EstadoSesionTenant::Programada->value)

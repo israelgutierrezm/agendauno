@@ -54,9 +54,9 @@ describe("ayuda para empezar", () => {
 
     const citas = mount(AyudaParaEmpezar, { props: { modo: "citas" } });
     expect(citas.text()).toContain("Los bonos vigentes de cada cliente");
-    // Hoy no hay importador de citas: no se promete.
+    // Las citas ya agendadas se importan (ADR 0160), sin avisarle a nadie.
     expect(citas.text()).toContain(
-      "Las citas ya agendadas: se capturan de nuevo en la agenda",
+      "Las citas que ya tenías agendadas, sin avisarle nada a tus clientes",
     );
   });
 });

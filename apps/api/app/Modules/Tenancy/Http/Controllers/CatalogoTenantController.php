@@ -231,6 +231,8 @@ class CatalogoTenantController
             'para_principiantes' => ['sometimes', 'boolean'],
             'requisitos' => ['sometimes', 'nullable', 'string', 'max:300'],
             'que_llevar' => ['sometimes', 'nullable', 'string', 'max:300'],
+            // Cada cuántos días suele regresar un cliente (retención, ADR 0159).
+            'regreso_dias' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:730'],
         ]);
 
         // Primero se valida todo; después se guarda todo junto (ver abajo).
@@ -243,6 +245,9 @@ class CatalogoTenantController
         }
         if ($request->has('para_principiantes')) {
             $cambios['para_principiantes'] = (bool) $validado['para_principiantes'];
+        }
+        if (array_key_exists('regreso_dias', $validado)) {
+            $cambios['regreso_dias'] = $validado['regreso_dias'] !== null ? (int) $validado['regreso_dias'] : null;
         }
         foreach (['requisitos', 'que_llevar'] as $campo) {
             if ($request->has($campo)) {
@@ -481,6 +486,7 @@ class CatalogoTenantController
             'incluye' => $oferta->incluidas->pluck('ulid')->values()->all(),
             'foto_url' => $oferta->fotoUrl(),
             'archivado' => $oferta->archivada(),
+            'regreso_dias' => $oferta->regreso_dias,
         ];
     }
 

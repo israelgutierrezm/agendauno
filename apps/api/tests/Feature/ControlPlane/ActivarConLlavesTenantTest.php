@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Testing\TestResponse;
@@ -116,6 +120,33 @@ it('no activa una pasarela en línea sin las llaves con que cobra; la ventanilla
         ->assertOk()->assertJsonPath('data.lista', true);
     $this->putJson("{$url}/ventanilla", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.activa', true);
+});
+
+it('activar una pasarela no es lo mismo que tener la conexión comprobada (un pago aprobado)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $url = "/api/v1/app/{$e['slug']}/pasarelas";
+    $estado = fn (): ?string => collect($this->getJson($url, conBearer($e['bearer']))->assertOk()->json('data'))->keyBy('proveedor')['stripe']['estado_conexion'];
+
+    expect($estado())->toBe('sin_configurar');
+    $this->putJson("{$url}/stripe", ['activa' => false, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_x']], conBearer($e['bearer']))->assertOk();
+    expect($estado())->toBe('credenciales');
+    $this->putJson("{$url}/stripe", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))->assertOk();
+    expect($estado())->toBe('activa_sin_comprobar');
+
+    // Un pago que Stripe aprobó comprueba la conexión.
+    $persona = crearMiembroTenant($e, 'Ana');
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), function () use ($persona): void {
+        $orden = OrdenTenant::query()->create([
+            'persona_id' => PersonaTenant::query()->where('ulid', $persona)->value('id'), 'estado' => 'pagada', 'total_minor' => 10000, 'moneda' => 'MXN',
+        ]);
+        PagoTenant::query()->create([
+            'orden_id' => $orden->id, 'proveedor' => 'stripe', 'metodo' => 'tarjeta', 'estado' => 'aprobado',
+            'monto_minor' => 10000, 'moneda' => 'MXN', 'aprobado_en' => now(),
+        ]);
+    });
+    expect($estado())->toBe('comprobada');
+    // La de caja no se conecta a nada.
+    expect(collect($this->getJson($url, conBearer($e['bearer']))->json('data'))->keyBy('proveedor')['ventanilla']['estado_conexion'])->toBeNull();
 });
 
 it('la plataforma no activa Stripe para la renta sin su llave secreta', function (): void {

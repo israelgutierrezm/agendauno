@@ -24,7 +24,11 @@ use Illuminate\Database\Eloquent\Collection;
 class ResolverSegmentoTenant
 {
     /** "Por vencer" y "vencida recuperable": ventanas que fija el negocio (ADR 0047). */
-    public function __construct(private readonly ParametrosTenant $parametros) {}
+    public function __construct(
+        private readonly ParametrosTenant $parametros,
+        private readonly SegmentosRetencionTenant $retencion,
+        private readonly ModalidadNegocioTenant $modalidad,
+    ) {}
 
     /**
      * @return Collection<int, PersonaTenant>
@@ -36,6 +40,11 @@ class ResolverSegmentoTenant
             SegmentoComunicacion::PorVencer => $this->porVencimiento(true),
             SegmentoComunicacion::Vencidos => $this->porVencimiento(false),
             SegmentoComunicacion::Primerizos => $this->primerizos(),
+            // Retención (ADR 0159): las mismas personas que en Renovaciones › Para recuperar.
+            default => $this->miembros()
+                ->whereIn('id', array_column($this->retencion->personas($segmento->value), 'persona_id'))
+                ->orderBy('id')
+                ->get(),
         };
     }
 
@@ -47,7 +56,8 @@ class ResolverSegmentoTenant
     public function conteos(): array
     {
         $conteos = [];
-        foreach (SegmentoComunicacion::cases() as $segmento) {
+        $citas = $this->modalidad->esCitas();
+        foreach (array_filter(SegmentoComunicacion::cases(), static fn (SegmentoComunicacion $s): bool => $s->aplica($citas)) as $segmento) {
             $conteos[$segmento->value] = $this->resolver($segmento)->count();
         }
 

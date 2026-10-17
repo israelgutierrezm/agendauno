@@ -29,6 +29,14 @@ interface Pasarela {
   webhook_url?: string | null;
   // OpenPay: el código que manda al registrar el webhook.
   codigo_verificacion?: string | null;
+  // Lo que de verdad pasó con la conexión (solo las de cobro en línea).
+  estado_conexion?:
+    | "sin_configurar"
+    | "credenciales"
+    | "activa_sin_comprobar"
+    | "comprobada"
+    | null;
+  comprobada_en?: string | null;
 }
 
 // Llaves que pide cada proveedor (para el formulario).
@@ -283,6 +291,31 @@ onMounted(cargar);
             </div>
             <p class="mt-0.5 text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ $t(`operacion.pasarelas.descripcion.${p.proveedor}`) }}
+            </p>
+            <p
+              v-if="p.estado_conexion"
+              class="mt-1 text-sm tu-estado"
+              :style="{
+                '--tono':
+                  p.estado_conexion === 'comprobada'
+                    ? 'var(--exito)'
+                    : p.estado_conexion === 'activa_sin_comprobar'
+                      ? 'var(--aviso)'
+                      : 'var(--texto-suave)',
+              }"
+              :data-prueba="`conexion-${p.proveedor}`"
+            >
+              {{
+                $t(`pasarelasEstado.conexion.${p.estado_conexion}`, {
+                  fecha: p.comprobada_en
+                    ? new Date(p.comprobada_en).toLocaleDateString("es-MX", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "",
+                })
+              }}
             </p>
           </div>
           <InterruptorSiNo

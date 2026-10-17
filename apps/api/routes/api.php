@@ -52,6 +52,7 @@ use App\Modules\Tenancy\Http\Controllers\FormulariosController;
 use App\Modules\Tenancy\Http\Controllers\FrontDeskTenantController;
 use App\Modules\Tenancy\Http\Controllers\GruposTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportacionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\ImportarCitasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportarClasesTenantController;
 use App\Modules\Tenancy\Http\Controllers\IncidenciasCobroTenantController;
 use App\Modules\Tenancy\Http\Controllers\InicioHoyTenantController;
@@ -533,6 +534,11 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/importaciones/clases/plantilla', [ImportarClasesTenantController::class, 'plantilla'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.plantilla');
             Route::post('/importaciones/clases/preview', [ImportarClasesTenantController::class, 'preview'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.preview');
             Route::post('/importaciones/clases', [ImportarClasesTenantController::class, 'importar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.store');
+            // Citas futuras de otro sistema (ADR 0160): correspondencias, vista previa, sin avisos.
+            Route::get('/importaciones/citas/catalogos', [ImportarCitasTenantController::class, 'catalogos'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('importaciones.citas.catalogos');
+            Route::get('/importaciones/citas/plantilla', [ImportarCitasTenantController::class, 'plantilla'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('importaciones.citas.plantilla');
+            Route::post('/importaciones/citas/preview', [ImportarCitasTenantController::class, 'preview'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('importaciones.citas.preview');
+            Route::post('/importaciones/citas', [ImportarCitasTenantController::class, 'importar'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('importaciones.citas.store');
 
             // Prospectos (ADR 0117): quien todavía no es cliente, aparte de Miembros.
             Route::get('/prospectos', [ProspectosTenantController::class, 'index'])->middleware('puede:prospectos.ver')->name('prospectos.index');
@@ -748,6 +754,10 @@ Route::prefix('v1')->group(function (): void {
             // Retención (Etapa 2): radar de membresías por vencer / vencidas para renovar.
             // Es operativo (recepción hace la gestión), por eso `miembros.ver`. `?formato=csv`.
             Route::get('/retencion/por-vencer', [RetencionTenantController::class, 'porVencer'])->middleware('puede:miembros.ver')->name('retencion.por-vencer');
+            // Retención por segmentos (ADR 0159): grupos para recuperar y su seguimiento.
+            Route::get('/retencion/segmentos', [RetencionTenantController::class, 'segmentos'])->middleware('puede:miembros.ver')->name('retencion.segmentos');
+            Route::get('/retencion/segmentos/{segmento}', [RetencionTenantController::class, 'segmento'])->middleware('puede:miembros.ver')->name('retencion.segmento');
+            Route::post('/retencion/segmentos/{segmento}/seguimientos', [RetencionTenantController::class, 'seguimientos'])->middleware(['puede:miembros.gestionar', 'puede:tareas.gestionar'])->name('retencion.seguimientos');
 
             // Agenda (data plane del tenant): materializa una Oferta en una Sucursal
             // a una hora concreta. La hora local (zona de la sucursal) se guarda en UTC

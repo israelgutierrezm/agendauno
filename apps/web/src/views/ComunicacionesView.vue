@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -233,6 +234,7 @@ function fecha(iso: string | null): string {
   }).format(new Date(iso));
 }
 
+const ruta = useRoute();
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
@@ -246,6 +248,15 @@ async function cargar(): Promise<void> {
     ]);
     segmentos.value = seg.data.data;
     canalesDifusion.value = seg.data.canales ?? ["interno", "email"];
+    // Desde Renovaciones › Para recuperar: «Escribirles» llega con su grupo elegido.
+    const pedido = ruta?.query.segmento;
+    if (
+      form.value.segmento === "" &&
+      typeof pedido === "string" &&
+      segmentos.value.some((s) => s.clave === pedido)
+    ) {
+      form.value.segmento = pedido;
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
     errorCarga.value = true;

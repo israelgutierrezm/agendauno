@@ -116,6 +116,9 @@ final class CatalogoParametros
                 'Días desde su última clase, con un plan en vigor.', $e, 21, 7, 180, 'días'),
             new DefinicionParametro('seguimiento.dias_sin_reservar', 'Seguimiento', 'Seguimiento a quien compró y no ha reservado a los',
                 'Días desde que pagó su plan sin reservar ninguna clase.', $e, 3, 1, 30, 'días'),
+            // Retención por segmentos (ADR 0159): quien vino y no ha comprado nada.
+            new DefinicionParametro('seguimiento.dias_vino_sin_comprar', 'Seguimiento', 'Buscar a quien vino y no ha comprado durante',
+                'Días desde su última clase, sin ningún plan comprado.', $e, 30, 7, 180, 'días', modalidad: 'clases'),
             new DefinicionParametro('seguimiento.dias_entre_contactos', 'Seguimiento', 'No repetir un seguimiento por el mismo motivo antes de',
                 'Días desde el anterior con esa persona.', $e, 30, 1, 365, 'días'),
             new DefinicionParametro('membresias.max_dias_pausa', 'Membresías', 'Una pausa puede durar hasta',

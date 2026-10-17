@@ -148,6 +148,11 @@ export const POLITICAS: Record<string, Politica> = {
   },
   "importar-instructores": { permiso: "usuarios.invitar" },
   "importar-clases": { permiso: "agenda.gestionar", modalidad: "clases" },
+  // Citas futuras de otro sistema (ADR 0160).
+  "importar-citas": {
+    permiso: ["agenda.gestionar", "reservas.gestionar"],
+    modalidad: "citas",
+  },
   // Cada paso crea algo distinto: sede, catálogo, planes, equipo.
   onboarding: {
     permiso: [

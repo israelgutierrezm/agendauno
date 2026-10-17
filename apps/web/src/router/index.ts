@@ -254,6 +254,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: "/agenda/importar-citas",
+      name: "importar-citas",
+      component: () => import("@/views/ImportarCitasView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/instructores",
       name: "instructores",
       component: () => import("@/views/InstructoresView.vue"),

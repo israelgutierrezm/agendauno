@@ -7,6 +7,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import SegmentosRetencion from "@/components/SegmentosRetencion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -40,6 +41,10 @@ const dias = ref(
   Number.isInteger(diasPedidos) && diasPedidos > 0 ? diasPedidos : 14,
 );
 const VENTANAS = [7, 14, 30, 90];
+// Dos vistas: vencimientos (la tabla) y grupos para recuperar (`?vista=recuperar`).
+const vista = ref<"renovaciones" | "recuperar">(
+  rutaActual?.query.vista === "recuperar" ? "recuperar" : "renovaciones",
+);
 const estado = ref<"" | "por_vencer" | "vencida">(
   rutaActual?.query.estado === "por_vencer" ||
     rutaActual?.query.estado === "vencida"
@@ -198,213 +203,247 @@ onMounted(cargar);
       }}
     </p>
 
-    <div class="mt-6 flex flex-wrap items-center gap-3">
-      <div class="tu-card px-5 py-3">
-        <div class="text-2xl font-semibold" :style="{ color: 'var(--aviso)' }">
-          {{ resumen?.por_vencer ?? "—" }}
-        </div>
-        <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("retencion.porVencer") }}
-        </div>
-      </div>
-      <div class="tu-card px-5 py-3">
-        <div class="text-2xl font-semibold" :style="{ color: 'var(--error)' }">
-          {{ resumen?.vencidas ?? "—" }}
-        </div>
-        <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("retencion.vencidas") }}
-        </div>
-      </div>
-      <label class="ml-auto flex items-center gap-2 text-sm">
-        <span :style="{ color: 'var(--texto-suave)' }">{{
-          $t("retencion.ventanaLabel")
-        }}</span>
-        <select v-model.number="dias" class="tu-input w-auto">
-          <option v-if="!VENTANAS.includes(dias)" :value="dias">
-            {{ $t("retencion.ventana", { n: dias }) }}
-          </option>
-          <option :value="7">{{ $t("retencion.ventana", { n: 7 }) }}</option>
-          <option :value="14">{{ $t("retencion.ventana", { n: 14 }) }}</option>
-          <option :value="30">{{ $t("retencion.ventana", { n: 30 }) }}</option>
-          <option :value="90">{{ $t("retencion.ventana", { n: 90 }) }}</option>
-        </select>
-      </label>
-      <label class="flex items-center gap-2 text-sm">
-        <span :style="{ color: 'var(--texto-suave)' }">{{
-          $t("retencion.mostrar")
-        }}</span>
-        <select
-          v-model="estado"
-          class="tu-input w-auto"
-          data-prueba="filtro-estado"
-        >
-          <option value="">{{ $t("retencion.todas") }}</option>
-          <option value="por_vencer">{{ $t("retencion.porVencer") }}</option>
-          <option value="vencida">{{ $t("retencion.vencidas") }}</option>
-        </select>
-      </label>
-      <input
-        v-model="buscar"
-        type="search"
-        class="tu-input w-56"
-        :placeholder="$t('operacion.listadosTres.buscarPadron')"
-        :aria-label="$t('operacion.listadosTres.buscarPadron')"
-        data-prueba="buscar-retencion"
-      />
-      <button
-        class="tu-btn tu-btn-primario"
-        type="button"
-        :disabled="exportando || cargando || (meta?.total ?? 0) === 0"
-        data-prueba="exportar-retencion"
-        @click="exportar"
-      >
-        {{ exportando ? $t("retencion.exportando") : $t("retencion.exportar") }}
-      </button>
-    </div>
-
-    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
-      {{ error }}
-    </AvisoTono>
-    <p
-      v-if="cargando"
-      class="mt-6 text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("comun.cargando") }}
-    </p>
-
     <div
-      v-else-if="errorCarga"
-      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
-      role="alert"
+      class="tu-segmentado mt-4"
+      role="group"
+      :aria-label="$t('retencion.titulo')"
     >
-      <span style="color: var(--error)">{{
-        $t("operacion.renovaciones.errorCarga")
-      }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
-        {{ $t("comun.reintentar") }}
+      <button
+        v-for="v in ['renovaciones', 'recuperar'] as const"
+        :key="v"
+        type="button"
+        :aria-pressed="vista === v"
+        :data-prueba="`vista-${v}`"
+        @click="vista = v"
+      >
+        {{ $t(`retencion.vistas.${v}`) }}
       </button>
     </div>
 
+    <SegmentosRetencion v-if="vista === 'recuperar'" />
     <template v-else>
-      <EstadoVacio
-        v-if="visibles.length === 0 && filtrado"
-        class="tu-card mt-6"
-        icono="buscar"
-        :titulo="$t('tabla.sinCoincidencias')"
-        :texto="$t('tabla.ajustarBusqueda')"
-        data-prueba="sin-coincidencias-retencion"
-      >
-        <button
-          type="button"
-          class="tu-btn tu-btn-fantasma"
-          @click="quitarFiltros"
-        >
-          {{ $t("tabla.restablecer") }}
-        </button>
-      </EstadoVacio>
-      <EstadoVacio
-        v-else-if="visibles.length === 0"
-        class="tu-card mt-6"
-        icono="pulso"
-        :titulo="
-          $t(
-            sesion.esCitas
-              ? 'operacion.renovaciones.vacioCitas'
-              : 'operacion.renovaciones.vacio',
-          )
-        "
-      />
-      <div v-else class="mt-4 tu-card overflow-x-auto">
-        <table class="tu-tabla">
-          <thead>
-            <tr>
-              <th>
-                {{ $t("retencion.colAlumno") }}
-              </th>
-              <th>
-                {{ $t("retencion.colVence") }}
-              </th>
-              <th class="hidden sm:table-cell">
-                {{
-                  $t(
-                    sesion.esCitas
-                      ? "retencion.colActividadCitas"
-                      : "retencion.colActividad",
-                  )
-                }}
-              </th>
-              <th class="text-right"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="m in visibles" :key="m.id">
-              <td>
-                <RouterLink
-                  :to="{ name: 'ficha-miembro', params: { id: m.id } }"
-                  class="font-semibold tu-enlace"
-                  >{{ m.nombre_completo }}</RouterLink
-                >
-                <span
-                  v-if="m.email"
-                  class="block text-xs"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ m.email }}</span
-                >
-              </td>
-              <td>
-                <span
-                  class="tu-badge"
-                  :style="
-                    m.estado === 'vencida'
-                      ? {
-                          background: 'var(--error-suave)',
-                          color: 'var(--error)',
-                        }
-                      : {
-                          background: 'var(--aviso-suave)',
-                          color: 'var(--aviso)',
-                        }
-                  "
-                  >{{ $t(`retencion.estados.${m.estado}`) }}</span
-                >
-                <span
-                  class="block text-xs"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ fechaCorta(m.vence) }} · {{ venceTexto(m) }}</span
-                >
-              </td>
-              <td
-                class="hidden sm:table-cell"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ asistTexto(m) }}
-              </td>
-              <td class="text-right whitespace-nowrap">
-                <a
-                  v-if="m.email"
-                  :href="`mailto:${m.email}`"
-                  class="tu-enlace text-sm mr-3"
-                  >{{ $t("retencion.contactar") }}</a
-                >
-                <RouterLink
-                  :to="{ name: 'ficha-miembro', params: { id: m.id } }"
-                  class="tu-enlace text-sm"
-                  >{{ $t("retencion.verFicha") }}</RouterLink
-                >
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <PaginacionListado
-          v-if="meta && meta.ultima_pagina > 1"
-          :page="meta.page"
-          :ultima-pagina="meta.ultima_pagina"
-          :total="meta.total"
-          :per-page="meta.per_page"
-          @ir="irPagina"
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <div class="tu-card px-5 py-3">
+          <div
+            class="text-2xl font-semibold"
+            :style="{ color: 'var(--aviso)' }"
+          >
+            {{ resumen?.por_vencer ?? "—" }}
+          </div>
+          <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("retencion.porVencer") }}
+          </div>
+        </div>
+        <div class="tu-card px-5 py-3">
+          <div
+            class="text-2xl font-semibold"
+            :style="{ color: 'var(--error)' }"
+          >
+            {{ resumen?.vencidas ?? "—" }}
+          </div>
+          <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("retencion.vencidas") }}
+          </div>
+        </div>
+        <label class="ml-auto flex items-center gap-2 text-sm">
+          <span :style="{ color: 'var(--texto-suave)' }">{{
+            $t("retencion.ventanaLabel")
+          }}</span>
+          <select v-model.number="dias" class="tu-input w-auto">
+            <option v-if="!VENTANAS.includes(dias)" :value="dias">
+              {{ $t("retencion.ventana", { n: dias }) }}
+            </option>
+            <option :value="7">{{ $t("retencion.ventana", { n: 7 }) }}</option>
+            <option :value="14">
+              {{ $t("retencion.ventana", { n: 14 }) }}
+            </option>
+            <option :value="30">
+              {{ $t("retencion.ventana", { n: 30 }) }}
+            </option>
+            <option :value="90">
+              {{ $t("retencion.ventana", { n: 90 }) }}
+            </option>
+          </select>
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <span :style="{ color: 'var(--texto-suave)' }">{{
+            $t("retencion.mostrar")
+          }}</span>
+          <select
+            v-model="estado"
+            class="tu-input w-auto"
+            data-prueba="filtro-estado"
+          >
+            <option value="">{{ $t("retencion.todas") }}</option>
+            <option value="por_vencer">{{ $t("retencion.porVencer") }}</option>
+            <option value="vencida">{{ $t("retencion.vencidas") }}</option>
+          </select>
+        </label>
+        <input
+          v-model="buscar"
+          type="search"
+          class="tu-input w-56"
+          :placeholder="$t('operacion.listadosTres.buscarPadron')"
+          :aria-label="$t('operacion.listadosTres.buscarPadron')"
+          data-prueba="buscar-retencion"
         />
+        <button
+          class="tu-btn tu-btn-primario"
+          type="button"
+          :disabled="exportando || cargando || (meta?.total ?? 0) === 0"
+          data-prueba="exportar-retencion"
+          @click="exportar"
+        >
+          {{
+            exportando ? $t("retencion.exportando") : $t("retencion.exportar")
+          }}
+        </button>
       </div>
+
+      <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
+        {{ error }}
+      </AvisoTono>
+      <p
+        v-if="cargando"
+        class="mt-6 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
+
+      <div
+        v-else-if="errorCarga"
+        class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+        role="alert"
+      >
+        <span style="color: var(--error)">{{
+          $t("operacion.renovaciones.errorCarga")
+        }}</span>
+        <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+          {{ $t("comun.reintentar") }}
+        </button>
+      </div>
+
+      <template v-else>
+        <EstadoVacio
+          v-if="visibles.length === 0 && filtrado"
+          class="tu-card mt-6"
+          icono="buscar"
+          :titulo="$t('tabla.sinCoincidencias')"
+          :texto="$t('tabla.ajustarBusqueda')"
+          data-prueba="sin-coincidencias-retencion"
+        >
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="quitarFiltros"
+          >
+            {{ $t("tabla.restablecer") }}
+          </button>
+        </EstadoVacio>
+        <EstadoVacio
+          v-else-if="visibles.length === 0"
+          class="tu-card mt-6"
+          icono="pulso"
+          :titulo="
+            $t(
+              sesion.esCitas
+                ? 'operacion.renovaciones.vacioCitas'
+                : 'operacion.renovaciones.vacio',
+            )
+          "
+        />
+        <div v-else class="mt-4 tu-card overflow-x-auto">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>
+                  {{ $t("retencion.colAlumno") }}
+                </th>
+                <th>
+                  {{ $t("retencion.colVence") }}
+                </th>
+                <th class="hidden sm:table-cell">
+                  {{
+                    $t(
+                      sesion.esCitas
+                        ? "retencion.colActividadCitas"
+                        : "retencion.colActividad",
+                    )
+                  }}
+                </th>
+                <th class="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in visibles" :key="m.id">
+                <td>
+                  <RouterLink
+                    :to="{ name: 'ficha-miembro', params: { id: m.id } }"
+                    class="font-semibold tu-enlace"
+                    >{{ m.nombre_completo }}</RouterLink
+                  >
+                  <span
+                    v-if="m.email"
+                    class="block text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ m.email }}</span
+                  >
+                </td>
+                <td>
+                  <span
+                    class="tu-badge"
+                    :style="
+                      m.estado === 'vencida'
+                        ? {
+                            background: 'var(--error-suave)',
+                            color: 'var(--error)',
+                          }
+                        : {
+                            background: 'var(--aviso-suave)',
+                            color: 'var(--aviso)',
+                          }
+                    "
+                    >{{ $t(`retencion.estados.${m.estado}`) }}</span
+                  >
+                  <span
+                    class="block text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ fechaCorta(m.vence) }} · {{ venceTexto(m) }}</span
+                  >
+                </td>
+                <td
+                  class="hidden sm:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ asistTexto(m) }}
+                </td>
+                <td class="text-right whitespace-nowrap">
+                  <a
+                    v-if="m.email"
+                    :href="`mailto:${m.email}`"
+                    class="tu-enlace text-sm mr-3"
+                    >{{ $t("retencion.contactar") }}</a
+                  >
+                  <RouterLink
+                    :to="{ name: 'ficha-miembro', params: { id: m.id } }"
+                    class="tu-enlace text-sm"
+                    >{{ $t("retencion.verFicha") }}</RouterLink
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <PaginacionListado
+            v-if="meta && meta.ultima_pagina > 1"
+            :page="meta.page"
+            :ultima-pagina="meta.ultima_pagina"
+            :total="meta.total"
+            :per-page="meta.per_page"
+            @ir="irPagina"
+          />
+        </div>
+      </template>
     </template>
   </section>
 </template>

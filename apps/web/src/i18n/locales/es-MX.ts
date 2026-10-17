@@ -723,7 +723,7 @@ export default {
         },
         migracion: {
           q: "¿Puedo traer a mis clientes desde otro sistema?",
-          a: "Sí. Importas a tus clientes y a tu equipo con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los bonos que trae cada cliente se cargan a la fecha de corte que elijas, sin registrar ventas; las citas futuras se agendan de nuevo aquí.",
+          a: "Sí. Importas a tus clientes y a tu equipo con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los bonos que trae cada cliente se cargan a la fecha de corte que elijas, sin registrar ventas, y las citas que ya tenías agendadas se importan sin avisarle nada a tus clientes.",
         },
         preparacion: {
           q: "¿Cuánto tarda dejarlo listo?",
@@ -1582,9 +1582,9 @@ export default {
       "Acuerda una fecha de corte: desde ese día los saldos se operan solo aquí, no en los dos sistemas.",
     pasoReservas:
       "Las reservas futuras no se copian: tras el corte, reserva aquí las clases de cada alumno (o que lo hagan ellos).",
-    // La agenda futura del sistema anterior no se importa (ADR 0125), tampoco en citas.
+    // En citas, la agenda futura se importa con su archivo (ADR 0160); en clases, no (ADR 0125).
     pasoReservasCitas:
-      "Las citas futuras no se copian: tras el corte, agéndalas aquí (o que las agenden tus clientes desde tu página).",
+      "Las citas que ya tenías agendadas se importan en Agenda › Importar citas, sin avisarle nada a tus clientes.",
     corte: "Fecha de corte",
     evidencia: "De dónde salen los saldos",
     evidenciaEjemplo:
@@ -1688,6 +1688,45 @@ export default {
     verFicha: "Ver ficha",
     // Se usa con llave dinámica (`retencion.estados.${estado}`, RetencionView).
     estados: { por_vencer: "Por vencer", vencida: "Vencida" },
+    vistas: {
+      renovaciones: "Por vencer y vencidas",
+      recuperar: "Para recuperar",
+    },
+    // Retención por segmentos (ADR 0159, components/SegmentosRetencion.vue).
+    segmentos: {
+      ayuda:
+        "Grupos por una señal que el sistema verifica. Escríbeles a todos o crea su seguimiento: una tarea por persona con un mensaje sugerido, sin repetir a quien ya tiene una.",
+      cargando: "Buscando a quién recuperar…",
+      error: "No se pudieron cargar los grupos para recuperar.",
+      vacio: "Nadie por recuperar por ahora.",
+      personas: "1 persona | {n} personas",
+      ver: "Ver quiénes",
+      ocultar: "Ocultar",
+      escribirles: "Escribirles",
+      sinPromociones:
+        "Nadie de este grupo acepta promociones: no se les puede escribir una difusión.",
+      crearSeguimiento: "Crear seguimiento",
+      confirmarSeguimiento:
+        "Crear una tarea de seguimiento para cada una de las {n} personas de «{grupo}». A quien ya tiene una abierta o reciente por lo mismo no se le repite.",
+      creadas:
+        "Se creó 1 tarea de seguimiento. | Se crearon {n} tareas de seguimiento.",
+      ningunaNueva: "Todos ya tenían su seguimiento: no se creó ninguna tarea.",
+      yaTiene: "Ya tiene seguimiento",
+      noPromociones: "No desea promociones",
+      errorLista: "No se pudo cargar a las personas de este grupo.",
+      // Se usa con llave dinámica (`retencion.segmentos.desc.${clave}`).
+      desc: {
+        sin_asistir:
+          "Tienen un plan en vigor y no vienen desde hace los días que fijas en Seguimiento.",
+        saldo_por_vencer:
+          "Su paquete vence pronto y aún les queda saldo sin usar.",
+        vino_sin_comprar: "Vinieron hace poco y nunca han comprado un plan.",
+        pago_fallido:
+          "Falló el cobro automático de su plan (en mora o con la membresía suspendida).",
+        debe_regresar:
+          "Ya pasó el tiempo en que suelen repetir su servicio y no tienen otra cita. Se fija en cada servicio del catálogo.",
+      },
+    },
   },
   cobranza: {
     titulo: "Cobranza",
@@ -1966,6 +2005,9 @@ export default {
       "Cuánto dura la clase; con esto se calcula su hora de término.",
     lugares: "Lugares numerados",
     lugaresAyuda: "0 = sin numerar. Útil para salas con lugar asignado.",
+    regreso: "Suele regresar cada (días)",
+    regresoAyuda:
+      "Opcional. Con esto, en Renovaciones › Para recuperar ves a quien ya debería haber vuelto.",
     configurar: "Configurar",
     cerrar: "Cerrar",
     guardar: "Guardar",

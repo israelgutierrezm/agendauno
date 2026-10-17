@@ -398,6 +398,42 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
   favor, − en su contra; `motivo`). Solo para un corte pagado (antes, se reabre). No
   cambia el corte.
 
+## Importar citas futuras (ADR 0160)
+
+Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
+
+- `GET /importaciones/citas/catalogos`: servicios, profesionales y sucursales (para las
+  correspondencias) y `max_filas`.
+- `GET /importaciones/citas/plantilla`: el CSV con sus columnas.
+- `POST /importaciones/citas/preview` (multipart): `archivo`, `correspondencias` (JSON
+  `{"servicio": {"nombre en el archivo": "<ulid>"}}`) y `recordatorios` (0/1).
+  - Responde `ok`, `resumen` (`total`, `validas`, `invalidas`, `omitidas`,
+    `clientes_nuevos`), `faltantes` por campo y `filas` (errores, avisos, `cliente` y
+    `inicia_en`).
+  - Con `ok`, trae también `confirmacion`.
+- `POST /importaciones/citas`: lo mismo y `confirmacion`. Todo o nada; 201 con
+  `creados`.
+
+## Retención por segmentos (ADR 0159)
+
+- `GET /retencion/segmentos` (`miembros.ver`; no para quien imparte): los grupos de su
+  modalidad con `clave`, `etiqueta`, `total` y `con_promociones`:
+  - `sin_asistir`;
+  - `saldo_por_vencer`;
+  - `vino_sin_comprar` (clases);
+  - `pago_fallido`;
+  - `debe_regresar` (citas).
+- `GET /retencion/segmentos/{clave}` (`q`, `page`): `id`, `nombre`, `detalle` (el
+  porqué), `recibe_promociones` y `seguimiento_abierto`. Una clave de otra modalidad
+  responde 404.
+- `POST /retencion/segmentos/{clave}/seguimientos` (`miembros.gestionar` y
+  `tareas.gestionar`): una tarea por persona, sin repetir; responde `creadas` y
+  `omitidas`.
+- Las mismas claves son segmentos de `POST /comunicaciones/difusiones`.
+  `GET /comunicaciones/segmentos` solo lista los de la modalidad del negocio.
+- `PUT /ofertas/{oferta}` acepta `regreso_dias` (1 a 730, `null` lo quita): cada
+  cuántos días suele regresar un cliente por ese servicio.
+
 ## Citas: cobrar al terminar (ADR 0158)
 
 - `POST /reservas/{reserva}/cobro` (solo citas, `ordenes.gestionar`): `metodo`

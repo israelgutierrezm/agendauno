@@ -1066,6 +1066,15 @@ export const pasarelasEstado = {
   sinConfirmacion:
     "Falta el secreto del webhook: sin él la pasarela no puede confirmar los pagos y, en producción, no se cobra en línea.",
   enPrueba: "Modo de prueba: no se cobra de verdad.",
+  // La conexión, por lo que de verdad pasó (H): activarla no la comprueba.
+  // Se usa con llave dinámica (`pasarelasEstado.conexion.${estado}`).
+  conexion: {
+    sin_configurar: "Conexión: sin configurar.",
+    credenciales: "Conexión: llaves capturadas, sin activar.",
+    activa_sin_comprobar:
+      "Conexión: activada, aún sin comprobar. Se comprueba con el primer pago que apruebe el proveedor; haz uno de prueba.",
+    comprobada: "Conexión comprobada: último pago aprobado el {fecha}.",
+  },
   lista: "Lista para cobrar",
   webhook: "URL para avisos (webhook)",
   copiar: "Copiar",

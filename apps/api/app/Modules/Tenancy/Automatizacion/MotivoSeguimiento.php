@@ -15,6 +15,11 @@ enum MotivoSeguimiento: string
     case PlanVencido = 'plan_vencido';
     case SinAsistir = 'sin_asistir';
     case CompraSinReservar = 'compro_sin_reservar';
+    // Retención por segmentos (ADR 0159).
+    case SaldoPorVencer = 'saldo_por_vencer';
+    case VinoSinComprar = 'vino_sin_comprar';
+    case PagoFallido = 'pago_fallido';
+    case DebeRegresar = 'debe_regresar';
 
     /** Con las palabras de la modalidad del negocio (clases o citas; ADR 0104). */
     public function etiqueta(bool $citas = false): string
@@ -25,6 +30,10 @@ enum MotivoSeguimiento: string
             self::PlanVencido => 'Plan vencido',
             self::SinAsistir => 'Sin asistir',
             self::CompraSinReservar => $citas ? 'Compró y no ha agendado' : 'Compró y no ha reservado',
+            self::SaldoPorVencer => $citas ? 'Paquete por vencer con citas sin usar' : 'Paquete por vencer con clases sin usar',
+            self::VinoSinComprar => 'Vino y no ha comprado',
+            self::PagoFallido => 'Su pago falló',
+            self::DebeRegresar => 'Ya debería regresar',
         };
     }
 
@@ -35,7 +44,7 @@ enum MotivoSeguimiento: string
     public function comercial(): bool
     {
         return match ($this) {
-            self::PlanPorVencer, self::PlanVencido, self::SinAsistir => true,
+            self::PlanPorVencer, self::PlanVencido, self::SinAsistir, self::SaldoPorVencer, self::VinoSinComprar, self::DebeRegresar => true,
             default => false,
         };
     }
@@ -49,12 +58,20 @@ enum MotivoSeguimiento: string
             self::PlanVencido => "Hola {$nombre}, tu plan venció el {$dato}. Te esperamos de vuelta cuando quieras; te ayudamos a elegir un plan.",
             self::SinAsistir => "Hola {$nombre}, te extrañamos: tu última cita fue el {$dato}. ¿Te ayudamos a agendar la próxima?",
             self::CompraSinReservar => "Hola {$nombre}, ya tienes tu plan listo. ¿Te ayudamos a agendar tu primera cita?",
+            self::SaldoPorVencer => "Hola {$nombre}, tu paquete vence el {$dato} y aún tienes citas sin usar. ¿Te ayudamos a agendarlas?",
+            self::VinoSinComprar => "Hola {$nombre}, gracias por venir el {$dato}. Si quieres volver, te ayudamos a elegir un plan.",
+            self::PagoFallido => "Hola {$nombre}, no pudimos cobrar tu plan el {$dato}. ¿Te ayudamos a revisar tu forma de pago?",
+            self::DebeRegresar => "Hola {$nombre}, ya pasó un tiempo desde tu última visita ({$dato}). ¿Te agendamos la siguiente?",
         } : match ($this) {
             self::PrimeraAsistencia => "Hola {$nombre}, gracias por venir a tu primera clase. ¿Cómo te sentiste? Si quieres, te ayudamos a elegir tu siguiente clase.",
             self::PlanPorVencer => "Hola {$nombre}, tu plan vence el {$dato}. Si quieres seguir, te ayudamos a renovarlo.",
             self::PlanVencido => "Hola {$nombre}, tu plan venció el {$dato}. Te esperamos de vuelta cuando quieras; te ayudamos a elegir un plan.",
             self::SinAsistir => "Hola {$nombre}, te extrañamos: tu última clase fue el {$dato}. ¿Te ayudamos a apartar tu lugar en la próxima?",
             self::CompraSinReservar => "Hola {$nombre}, ya tienes tu plan listo. ¿Te ayudamos a reservar tu primera clase?",
+            self::SaldoPorVencer => "Hola {$nombre}, tu paquete vence el {$dato} y aún tienes clases sin usar. ¿Te ayudamos a apartar tus lugares?",
+            self::VinoSinComprar => "Hola {$nombre}, gracias por venir el {$dato}. Si quieres seguir, te ayudamos a elegir un plan.",
+            self::PagoFallido => "Hola {$nombre}, no pudimos cobrar tu plan el {$dato}. ¿Te ayudamos a revisar tu forma de pago?",
+            self::DebeRegresar => "Hola {$nombre}, ya pasó un tiempo desde tu última clase ({$dato}). ¿Te apartamos un lugar?",
         };
     }
 
@@ -72,6 +89,10 @@ enum MotivoSeguimiento: string
             self::PlanVencido => "Hola {$responsable}, el plan de {$participante} venció el {$dato}. Los esperamos de vuelta cuando quieran; les ayudamos a elegir un plan.",
             self::SinAsistir => "Hola {$responsable}, extrañamos a {$participante}: su última {$sesion} fue el {$dato}. ¿Les ayudamos con la próxima?",
             self::CompraSinReservar => "Hola {$responsable}, el plan de {$participante} ya está listo. ¿Les ayudamos a ".($citas ? 'agendar su primera cita' : 'reservar su primera clase').'?',
+            self::SaldoPorVencer => "Hola {$responsable}, el paquete de {$participante} vence el {$dato} y aún tiene {$sesion}s sin usar. ¿Les ayudamos a apartarlas?",
+            self::VinoSinComprar => "Hola {$responsable}, gracias por traer a {$participante} el {$dato}. Si quieren seguir, les ayudamos a elegir un plan.",
+            self::PagoFallido => "Hola {$responsable}, no pudimos cobrar el plan de {$participante} el {$dato}. ¿Les ayudamos a revisar la forma de pago?",
+            self::DebeRegresar => "Hola {$responsable}, ya pasó un tiempo desde la última {$sesion} de {$participante} ({$dato}). ¿Les apartamos la siguiente?",
         };
     }
 }
