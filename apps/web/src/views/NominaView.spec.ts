@@ -151,4 +151,53 @@ describe("nómina", () => {
       .trigger("click");
     expect(w.get('[data-prueba="simbolo-monto"]').text()).toBe("€");
   });
+  it("separa lo devengado de lo por venir y avisa si la tarifa cambió", async () => {
+    mocks.get.mockImplementation(async (url: string) =>
+      url.endsWith("/usuarios")
+        ? { data: { data: USUARIOS } }
+        : {
+            data: {
+              data: [
+                {
+                  usuario_id: "u1",
+                  usuario: "Juan Pérez",
+                  tipo: "por_clase",
+                  unidades: 2,
+                  monto_minor: 20000,
+                  monto_total_minor: 40000,
+                  unidades_por_venir: 0,
+                  por_venir_minor: 0,
+                  vigente_desde: null,
+                  moneda: "MXN",
+                },
+                {
+                  usuario_id: "u1",
+                  usuario: "Juan Pérez",
+                  tipo: "por_clase",
+                  unidades: 1,
+                  monto_minor: 30000,
+                  monto_total_minor: 30000,
+                  unidades_por_venir: 3,
+                  por_venir_minor: 90000,
+                  vigente_desde: "2026-10-10",
+                  moneda: "MXN",
+                },
+              ],
+            },
+          },
+    );
+    const w = montar();
+    await flushPromises();
+
+    const fila = w.findAll("tbody tr")[0]!;
+    // Una sola fila por persona: lo devengado suma las dos tarifas.
+    expect(w.findAll("tbody tr")).toHaveLength(2);
+    expect(fila.text()).toContain("$700.00");
+    expect(fila.text()).toContain("$900.00");
+    expect(fila.get('[data-prueba="cambio-tarifa"]').text()).toBe(
+      "Tarifa nueva desde el 10/10/2026",
+    );
+    expect(w.get("tfoot").text()).toContain("$700.00");
+    w.unmount();
+  });
 });

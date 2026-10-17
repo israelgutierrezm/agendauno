@@ -117,7 +117,8 @@ it('un sustituto imparte y cobra en lugar del profesional de la sesión, tambié
 
     // Cada uno, una clase: el coach la suya (sin asignarlo aparte) y el suplente la que cubrió.
     $nomina = collect($this->getJson("/api/v1/app/{$e['slug']}/nomina?desde=2026-10-01&hasta=2026-10-31", conBearer($e['bearer']))->assertOk()->json('data'));
-    expect($nomina->pluck('monto_total_minor')->all())->toBe([20000, 20000]);
+    // Aún no se imparten: es lo proyectado al cierre del periodo.
+    expect($nomina->pluck('al_cierre_minor')->all())->toBe([20000, 20000]);
 
     $r = collect($this->getJson("/api/v1/app/{$e['slug']}/reportes/equipo?desde=2026-10-01&hasta=2026-10-31", conBearer($e['bearer']))
         ->assertOk()->json('data.profesionales'))->keyBy('id');

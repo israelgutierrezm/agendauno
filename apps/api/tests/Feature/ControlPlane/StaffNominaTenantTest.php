@@ -65,6 +65,8 @@ it('calcula la nomina por clase (monto por sesion impartida)', function (): void
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$s1}/staff", ['usuario_id' => $coach, 'rol' => 'instructor'], conBearer($e['bearer']))->assertCreated();
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$s2}/staff", ['usuario_id' => $coach, 'rol' => 'instructor'], conBearer($e['bearer']))->assertCreated();
 
+    // Ya impartidas las dos.
+    $this->travelTo('2026-10-03 12:00:00');
     $nomina = $this->getJson("/api/v1/app/{$e['slug']}/nomina?desde=2026-09-01&hasta=2026-12-31", conBearer($e['bearer']))->assertOk()->json('data');
 
     expect($nomina)->toHaveCount(1);
@@ -87,6 +89,10 @@ it('calcula la nomina por asistente (monto por presente)', function (): void {
     $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated()->json('data.id');
     $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => 'presente'], conBearer($e['bearer']))->assertCreated();
 
+    // Antes de la clase es una proyección (con las reservas confirmadas); después, devengado.
+    $nomina = $this->getJson("/api/v1/app/{$e['slug']}/nomina?desde=2026-09-01&hasta=2026-12-31", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($nomina[0])->toMatchArray(['monto_total_minor' => 0, 'por_venir_minor' => 5000, 'al_cierre_minor' => 5000]);
+    $this->travelTo('2026-10-02 12:00:00');
     $nomina = $this->getJson("/api/v1/app/{$e['slug']}/nomina?desde=2026-09-01&hasta=2026-12-31", conBearer($e['bearer']))->assertOk()->json('data');
     expect($nomina[0]['monto_total_minor'])->toBe(5000); // 1 presente x 50.00
 });
@@ -99,3 +105,39 @@ it('gestionar esquemas de pago exige estudio.gestionar', function (): void {
     $this->putJson("/api/v1/app/{$e['slug']}/staff/{$coach}/esquema-pago", ['tipo' => 'por_clase', 'monto_minor' => 10000, 'moneda' => 'MXN'], conBearer($recep))
         ->assertStatus(403);
 });
+
+it('la nómina separa lo devengado de lo proyectado y paga cada clase con la tarifa de su día', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $coach = instructorConUlid($e, 'coach@correo.mx', 'Coach');
+    $esquema = "/api/v1/app/{$e['slug']}/staff/{$coach}/esquema-pago";
+    $this->putJson($esquema, ['tipo' => 'por_clase', 'monto_minor' => 20000], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.vigente_desde', null);
+
+    // A las 19:00 de la Ciudad de México del 5 (la 01:00 UTC del 6) y el 20.
+    foreach (['2026-10-05 19:00:00', '2026-10-20 19:00:00'] as $cuando) {
+        $sesion = crearSesionTenant($e, $semilla, cuando: $cuando);
+        $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/staff", ['usuario_id' => $coach, 'rol' => 'instructor'], conBearer($e['bearer']))->assertCreated();
+    }
+
+    // El 10 sube su tarifa: vale desde ese día; la clase del 5 se queda a la de antes.
+    $this->travelTo('2026-10-10 12:00:00');
+    $this->putJson($esquema, ['tipo' => 'por_clase', 'monto_minor' => 30000], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.vigente_desde', '2026-10-10');
+
+    $this->travelTo('2026-10-15 12:00:00');
+    $nomina = $this->getJson("/api/v1/app/{$e['slug']}/nomina?desde=2026-10-01&hasta=2026-10-31", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($nomina)->toHaveCount(2)
+        ->and($nomina[0])->toMatchArray(['monto_minor' => 20000, 'vigente_desde' => null, 'monto_total_minor' => 20000, 'por_venir_minor' => 0])
+        ->and($nomina[1])->toMatchArray(['monto_minor' => 30000, 'vigente_desde' => '2026-10-10', 'monto_total_minor' => 0, 'por_venir_minor' => 30000, 'al_cierre_minor' => 30000]);
+
+    // El periodo son días del negocio: la clase de las 19:00 del 5 es del 5.
+    $delCinco = $this->getJson("/api/v1/app/{$e['slug']}/nomina?desde=2026-10-05&hasta=2026-10-05", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($delCinco)->toHaveCount(1)->and($delCinco[0]['monto_total_minor'])->toBe(20000);
+
+    // El reporte del equipo también paga la del 5 con la tarifa de entonces.
+    $equipo = collect($this->getJson("/api/v1/app/{$e['slug']}/reportes/equipo?desde=2026-10-01&hasta=2026-10-09", conBearer($e['bearer']))
+        ->assertOk()->json('data.profesionales'))->keyBy('id');
+    expect($equipo[$coach]['costo_minor'])->toBe(20000);
+});
+

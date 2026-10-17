@@ -19,9 +19,12 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
  * Nómina del equipo: el esquema de pago de cada quien (por clase o cita, por
- * asistente o por hora) y lo que le toca en un periodo. Se calcula al vuelo con lo
- * agendado (no hay periodos cerrados): al abrir, el mes en curso. Quien no tiene
- * esquema aparece sin él, para definirlo desde su fila.
+ * asistente o por hora) y lo que le toca en un periodo (al abrir, el mes en curso).
+ * Quien no tiene esquema aparece sin él, para definirlo desde su fila.
+ *
+ * Para pagar (ADR 0153): lo devengado es solo lo ya impartido; lo que falta del
+ * periodo se ve aparte como «por venir» (una proyección). Cada sesión se paga con la
+ * tarifa vigente su día: si cambió en el periodo, la fila lo dice.
  */
 interface Persona {
   id: string;
@@ -36,7 +39,13 @@ interface FilaNomina {
   tipo: TipoPago;
   unidades: number;
   monto_minor?: number;
+  // Lo ya impartido (devengado).
   monto_total_minor: number;
+  // Lo que falta del periodo (proyección).
+  unidades_por_venir?: number;
+  por_venir_minor?: number;
+  // Desde cuándo vale esa tarifa (null = desde siempre).
+  vigente_desde?: string | null;
   moneda: string;
 }
 interface FilaVista {
@@ -44,7 +53,11 @@ interface FilaVista {
   nombre: string;
   rol: string | null;
   foto: string | null;
+  // Su tarifa vigente (la última del periodo) y, si cambió, una fila por tarifa.
   fila: FilaNomina | null;
+  filas: FilaNomina[];
+  devengado: number;
+  porVenir: number;
 }
 
 const { t } = useI18n();
@@ -143,35 +156,76 @@ function rolDe(rol: string | null): string {
 
 // El equipo (sin clientes) con lo que le toca; quien tiene esquema pero ya no está
 // en el equipo (p. ej. dado de baja) también se ve.
+function sumas(suyas: FilaNomina[]): {
+  fila: FilaNomina | null;
+  filas: FilaNomina[];
+  devengado: number;
+  porVenir: number;
+} {
+  return {
+    fila: suyas.at(-1) ?? null,
+    filas: suyas,
+    devengado: suyas.reduce((s, f) => s + f.monto_total_minor, 0),
+    porVenir: suyas.reduce((s, f) => s + (f.por_venir_minor ?? 0), 0),
+  };
+}
 const filasVista = computed<FilaVista[]>(() => {
   const usadas = new Set<FilaNomina>();
   const deEquipo = equipo.value.map((u) => {
-    const fila =
-      filas.value.find((f) => f.usuario_id === u.id) ??
-      filas.value.find((f) => !f.usuario_id && f.usuario === u.nombre) ??
-      null;
-    if (fila) {
-      usadas.add(fila);
+    let suyas = filas.value.filter((f) => f.usuario_id === u.id);
+    if (suyas.length === 0) {
+      suyas = filas.value.filter(
+        (f) => !f.usuario_id && f.usuario === u.nombre,
+      );
     }
+    suyas.forEach((f) => usadas.add(f));
     return {
       id: u.id,
       nombre: u.nombre,
       rol: u.rol,
       foto: u.foto_url ?? null,
-      fila,
+      ...sumas(suyas),
     };
   });
-  const otras = filas.value
-    .filter((f) => !usadas.has(f))
-    .map((f) => ({
-      id: f.usuario_id ?? null,
-      nombre: f.usuario ?? "—",
+  // Quien tiene esquema pero ya no está en el equipo, una fila por persona.
+  const otras = new Map<string, FilaNomina[]>();
+  for (const f of filas.value.filter((x) => !usadas.has(x))) {
+    const clave = f.usuario_id ?? f.usuario ?? "—";
+    otras.set(clave, [...(otras.get(clave) ?? []), f]);
+  }
+  return [
+    ...deEquipo,
+    ...[...otras.values()].map((suyas) => ({
+      id: suyas[0]!.usuario_id ?? null,
+      nombre: suyas[0]!.usuario ?? "—",
       rol: null,
       foto: null,
-      fila: f,
-    }));
-  return [...deEquipo, ...otras];
+      ...sumas(suyas),
+    })),
+  ];
 });
+// Lo impartido de alguien: si su tarifa cambió de tipo en el periodo, cada una aparte.
+function cantidadDe(x: FilaVista, porVenir = false): string {
+  const unidades = (f: FilaNomina): number =>
+    porVenir ? (f.unidades_por_venir ?? 0) : f.unidades;
+  const tipos = new Set(x.filas.map((f) => f.tipo));
+  if (tipos.size <= 1 && x.fila) {
+    return cantidad({
+      ...x.fila,
+      unidades: x.filas.reduce((s, f) => s + unidades(f), 0),
+    });
+  }
+  return x.filas
+    .map((f) => cantidad({ ...f, unidades: unidades(f) }))
+    .join(" + ");
+}
+// Desde cuándo vale su tarifa, si cambió dentro del periodo.
+function cambioDeTarifa(x: FilaVista): string | null {
+  const desde = x.filas.length > 1 ? x.fila?.vigente_desde : null;
+  return desde
+    ? t("nominaVisual.tarifaDesde", { fecha: fechaCorta(desde) })
+    : null;
+}
 const conEsquema = computed(
   () => filasVista.value.filter((x) => x.fila !== null).length,
 );
@@ -180,6 +234,9 @@ const sinEsquema = computed(
 );
 const total = computed(() =>
   filas.value.reduce((s, f) => s + f.monto_total_minor, 0),
+);
+const totalPorVenir = computed(() =>
+  filas.value.reduce((s, f) => s + (f.por_venir_minor ?? 0), 0),
 );
 const moneda = computed(() => filas.value[0]?.moneda ?? sesion.moneda);
 
@@ -208,6 +265,15 @@ const indicadores = computed<Indicador[]>(() => [
     valor: calculado.value ? dinero(total.value, moneda.value) : "—",
     icono: "dinero",
     tono: "verde",
+  },
+  {
+    clave: "alCierre",
+    etiqueta: t("nominaVisual.kpi.alCierre"),
+    valor: calculado.value
+      ? dinero(total.value + totalPorVenir.value, moneda.value)
+      : "—",
+    icono: "agenda",
+    tono: "azul",
   },
 ]);
 
@@ -300,14 +366,16 @@ function exportar(): void {
       t("nominaVisual.colEsquema"),
       t("nominaVisual.colCantidad"),
       t("nominaVisual.colTotal"),
+      t("nominaVisual.colPorVenir"),
     ],
     ...filasVista.value
       .filter((x) => x.fila !== null)
       .map((x) => [
         x.nombre,
         etiquetaTipo(x.fila!.tipo),
-        cantidad(x.fila!),
-        (x.fila!.monto_total_minor / 100).toFixed(2),
+        cantidadDe(x),
+        (x.devengado / 100).toFixed(2),
+        (x.porVenir / 100).toFixed(2),
       ]),
   ].map((l) => l.map(celda).join(","));
   const blob = new Blob(["\uFEFF" + lineas.join("\r\n")], {
@@ -457,6 +525,8 @@ onMounted(async () => {
                 </label>
               </div>
             </fieldset>
+            <!-- Cambiar la tarifa no recalcula lo ya trabajado (ADR 0153). -->
+            <p class="tu-hint mt-3">{{ $t("nominaVisual.cambioDesdeHoy") }}</p>
 
             <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
               <p
@@ -586,6 +656,7 @@ onMounted(async () => {
               <th>{{ $t("nominaVisual.colEsquema") }}</th>
               <th>{{ $t("nominaVisual.colCantidad") }}</th>
               <th class="text-right">{{ $t("nominaVisual.colTotal") }}</th>
+              <th class="text-right">{{ $t("nominaVisual.colPorVenir") }}</th>
               <th>{{ $t("nominaVisual.colEstado") }}</th>
               <th>
                 <span class="sr-only">{{
@@ -617,14 +688,25 @@ onMounted(async () => {
                   >{{ etiquetaTipo(x.fila.tipo) }}</span
                 >
                 <span v-else class="nm-sub">—</span>
+                <span
+                  v-if="cambioDeTarifa(x)"
+                  class="block nm-sub mt-1"
+                  data-prueba="cambio-tarifa"
+                  >{{ cambioDeTarifa(x) }}</span
+                >
               </td>
               <td class="tabular-nums">
-                {{ x.fila ? cantidad(x.fila) : "—" }}
+                {{ x.fila ? cantidadDe(x) : "—" }}
               </td>
               <td class="text-right font-semibold tabular-nums">
-                {{
-                  x.fila ? dinero(x.fila.monto_total_minor, x.fila.moneda) : "—"
-                }}
+                {{ x.fila ? dinero(x.devengado, x.fila.moneda) : "—" }}
+              </td>
+              <td class="text-right tabular-nums nm-sub">
+                <template v-if="x.fila && x.porVenir > 0">
+                  {{ dinero(x.porVenir, x.fila.moneda) }}
+                  <span class="block">{{ cantidadDe(x, true) }}</span>
+                </template>
+                <template v-else>—</template>
               </td>
               <td>
                 <span
@@ -660,6 +742,9 @@ onMounted(async () => {
               </td>
               <td class="text-right font-semibold tabular-nums">
                 {{ dinero(total, moneda) }}
+              </td>
+              <td class="text-right tabular-nums nm-sub">
+                {{ totalPorVenir > 0 ? dinero(totalPorVenir, moneda) : "—" }}
               </td>
               <td colspan="2"></td>
             </tr>

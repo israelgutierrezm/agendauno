@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularNominaTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
+use App\Modules\Tenancy\Models\EsquemaPagoVersionTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
@@ -74,25 +76,43 @@ class StaffTenantController
         ]);
     }
 
-    public function esquemaPago(Request $request): JsonResponse
+    /**
+     * Fija el esquema de pago de alguien del equipo. Cambiarlo no recalcula lo ya
+     * trabajado (ADR 0153): queda una versión nueva que vale desde `vigente_desde` (por
+     * omisión, hoy en el negocio). La primera vale desde siempre.
+     */
+    public function esquemaPago(Request $request, FechasNegocioTenant $fechas): JsonResponse
     {
         $usuario = Usuario::query()->where('ulid', (string) $request->route('usuario'))->firstOrFail();
         $validado = $request->validate([
             'tipo' => ['required', Rule::enum(TipoPago::class)],
             'monto_minor' => ['required', 'integer', 'min:0'],
             'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
+            'vigente_desde' => ['nullable', 'date_format:Y-m-d'],
         ]);
+        $datos = [
+            'tipo' => $validado['tipo'],
+            'monto_minor' => (int) $validado['monto_minor'],
+            'moneda' => mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())),
+        ];
 
-        $esquema = EsquemaPagoTenant::query()->updateOrCreate(
-            ['usuario_id' => $usuario->getKey()],
-            ['tipo' => $validado['tipo'], 'monto_minor' => (int) $validado['monto_minor'], 'moneda' => mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())), 'activo' => true],
-        );
+        [$esquema, $version] = DB::connection('tenant')->transaction(function () use ($usuario, $datos, $validado, $fechas): array {
+            $esquema = EsquemaPagoTenant::query()->updateOrCreate(['usuario_id' => $usuario->getKey()], $datos + ['activo' => true]);
+            $primera = ! EsquemaPagoVersionTenant::query()->where('usuario_id', $usuario->getKey())->exists();
+            $version = EsquemaPagoVersionTenant::query()->updateOrCreate(
+                ['usuario_id' => $usuario->getKey(), 'vigente_desde' => $primera ? null : ($validado['vigente_desde'] ?? $fechas->hoy())],
+                $datos,
+            );
+
+            return [$esquema, $version];
+        });
 
         return response()->json(['data' => [
             'usuario' => $usuario->ulid,
             'tipo' => $esquema->tipo->value,
             'monto_minor' => $esquema->monto_minor,
             'moneda' => $esquema->moneda,
+            'vigente_desde' => $version->vigente_desde?->toDateString(),
         ]], 201);
     }
 

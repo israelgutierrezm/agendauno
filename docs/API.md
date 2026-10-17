@@ -367,6 +367,16 @@ estos endpoints responden como antes (para versiones anteriores de la app):
   domiciliada; `por_suspender`, dentro de `renta.dias_aviso_suspension` días antes de
   la suspensión.
 
+## Nómina: devengado y tarifas con versiones (ADR 0153)
+
+- `GET /nomina?desde&hasta`: el periodo son días del negocio. Cada fila trae
+  `monto_total_minor` (devengado: solo sesiones que ya terminaron),
+  `unidades_por_venir` y `por_venir_minor` (lo que falta del periodo; por asistente,
+  con las reservas confirmadas), `al_cierre_minor` y `vigente_desde` de su tarifa. Si
+  la tarifa de alguien cambió en el periodo, sale una fila por tarifa.
+- `PUT /staff/{usuario}/esquema-pago` acepta `vigente_desde` (AAAA-MM-DD; por omisión,
+  hoy) y responde desde cuándo vale; la primera tarifa de cada quien vale desde siempre.
+
 ## Revisión para producción (ADR 0151)
 
 - `GET /sesiones` trae hasta 1500 sesiones; si el rango tiene más, `meta.truncado: true`

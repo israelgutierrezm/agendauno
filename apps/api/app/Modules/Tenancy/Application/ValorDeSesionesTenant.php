@@ -6,7 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
-use App\Modules\Tenancy\Models\EsquemaPagoTenant;
+use App\Modules\Tenancy\Models\EsquemaPagoVersionTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Nomina\TipoPago;
@@ -22,12 +22,15 @@ use Illuminate\Support\Collection;
  *   no, los créditos consumidos × precio por crédito del paquete. Quien asistió sin
  *   valor por crédito (membresía ilimitada, cortesía) cuenta en `sin_costo`.
  * - Pago: el esquema de cada participante ({@see PersonalDeSesionTenant}) por clase,
- *   por asistente o por hora.
+ *   por asistente o por hora, con la tarifa vigente el día de la sesión
+ *   ({@see TarifasDePagoTenant}, ADR 0153).
  *
  * Montos en minor.
  */
 class ValorDeSesionesTenant
 {
+    public function __construct(private readonly FechasNegocioTenant $fechas) {}
+
     /**
      * @param  Collection<int, SesionTenant>  $sesiones  no canceladas, con su oferta
      * @return array<int, array{imparte: int|null, minutos: int, presentes: int, ausentes: int, canceladas: int, ingreso: int, sin_costo: int, pagos: array<int, int>}> por sesión
@@ -39,7 +42,7 @@ class ValorDeSesionesTenant
             return [];
         }
 
-        $esquemas = EsquemaPagoTenant::query()->where('activo', true)->get()->keyBy('usuario_id');
+        $tarifas = new TarifasDePagoTenant($this->fechas);
         $asignaciones = AsignacionSesionTenant::query()->whereIn('sesion_id', $sesionIds)->get()->groupBy('sesion_id');
         $reservas = ReservaTenant::query()
             ->whereIn('sesion_id', $sesionIds)
@@ -61,9 +64,9 @@ class ValorDeSesionesTenant
 
             $pagos = [];
             foreach (array_keys(PersonalDeSesionTenant::participantes($sesion, $suyas)) as $usuarioId) {
-                $esquema = $esquemas->get($usuarioId);
-                if ($esquema instanceof EsquemaPagoTenant) {
-                    $pagos[$usuarioId] = $this->pagoDe($esquema, $presentes->count(), $minutos);
+                $tarifa = $tarifas->para((int) $usuarioId, $sesion->inicia_en);
+                if ($tarifa instanceof EsquemaPagoVersionTenant) {
+                    $pagos[$usuarioId] = $this->pagoDe($tarifa, $presentes->count(), $minutos);
                 }
             }
 
@@ -108,11 +111,11 @@ class ValorDeSesionesTenant
         return [$ingreso, $sinCosto];
     }
 
-    private function pagoDe(EsquemaPagoTenant $esquema, int $presentes, int $minutos): int
+    private function pagoDe(EsquemaPagoVersionTenant $tarifa, int $presentes, int $minutos): int
     {
-        $monto = (int) $esquema->monto_minor;
+        $monto = $tarifa->monto_minor;
 
-        return match ($esquema->tipo) {
+        return match ($tarifa->tipo) {
             TipoPago::PorClase => $monto,
             TipoPago::PorAsistente => $monto * $presentes,
             TipoPago::PorHora => intdiv($monto * $minutos, 60),
