@@ -7,6 +7,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import {
+  fechaTarifa,
   type NivelPlan,
   type PlanCitas,
   NIVELES_PLAN,
@@ -407,6 +408,13 @@ const enlaceWhatsApp = computed(() =>
             : $t("suscripcion.plan.enDolares")
         }}
         {{ $t("suscripcion.plan.subir") }}
+        <template v-if="plan.tarifa_vigente_desde">
+          {{
+            $t("suscripcion.plan.vigenteDesde", {
+              fecha: fechaTarifa(plan.tarifa_vigente_desde),
+            })
+          }}
+        </template>
       </p>
       <p class="mt-1 text-xs pc-suave">
         {{ $t("suscripcion.plan.masDe", { n: plan.max_profesionales }) }}

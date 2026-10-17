@@ -53,8 +53,10 @@ export default {
     mas: "Uno más",
     aproximado: "≈ {monto} al tipo de cambio de hoy",
     tipoCambio:
-      "Precios en dólares. Te cobramos en pesos al tipo de cambio del día del cobro (hoy 1 USD = {valor} MXN).",
+      "Precios en dólares. Te cobramos en pesos al tipo de cambio FIX del Banco de México vigente el día en que se emite el cargo (hoy 1 USD = {valor} MXN).",
     enDolares: "Precios en dólares, más impuestos.",
+    // La misma tarifa (y fecha) que publica la landing.
+    vigenteDesde: "Tarifa vigente desde el {fecha}.",
     masDe: "¿Más de {n} profesionales? Pide una cotización:",
     cotizarCorreo: "escríbenos a {correo}",
     cotizarWhatsApp: "o por WhatsApp",

@@ -26,18 +26,25 @@ class PreciosPublicosController
 {
     public function __invoke(TimbresTenant $timbres, ParametrosTenant $parametros): JsonResponse
     {
-        $clases = TarifaSaas::vigente(ModalidadServicio::Clases)->definicion ?? [];
-        $citas = TarifaSaas::vigente(ModalidadServicio::Citas)->definicion ?? [];
+        $tarifaClases = TarifaSaas::vigente(ModalidadServicio::Clases);
+        $tarifaCitas = TarifaSaas::vigente(ModalidadServicio::Citas);
+        $clases = $tarifaClases->definicion ?? [];
+        $citas = $tarifaCitas->definicion ?? [];
         $porNiveles = is_array($citas['niveles'] ?? null);
 
         return response()->json(['data' => [
             'clases' => [
                 'moneda' => MonedaDeCobroSaas::deTarifa($clases),
+                // Desde cuándo rige: la landing y la contratación dicen la misma.
+                'vigente_desde' => $tarifaClases?->vigente_desde?->toDateString(),
+                'iva_porcentaje' => (int) ($clases['iva_porcentaje'] ?? 16),
                 'dias_prueba' => (int) ($clases['dias_prueba'] ?? 30),
                 'bandas' => is_array($clases['bandas'] ?? null) ? array_values($clases['bandas']) : [],
             ],
             'citas' => [
                 'moneda' => MonedaDeCobroSaas::deTarifa($citas),
+                'vigente_desde' => $tarifaCitas?->vigente_desde?->toDateString(),
+                'iva_porcentaje' => (int) ($citas['iva_porcentaje'] ?? 16),
                 'dias_prueba' => (int) ($citas['dias_prueba'] ?? 30),
                 'meses_anual' => CalcularRentaSaas::mesesAnual($citas),
                 'niveles' => $porNiveles ? $citas['niveles'] : null,

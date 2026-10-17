@@ -266,11 +266,14 @@ class FacturacionController
         if ($estudio->modo_cobro === ModoCobroSaas::Fijo) {
             return null;
         }
-        $definicion = TarifaSaas::vigente($estudio->modalidad())->definicion ?? [];
+        $vigente = TarifaSaas::vigente($estudio->modalidad());
+        $definicion = $vigente->definicion ?? [];
         $monedaTarifa = MonedaDeCobroSaas::deTarifa($definicion);
         $tipo = $estudio->enMexico() && $monedaTarifa === 'USD' ? $this->tipos->ultimo() : null;
 
         return [
+            // La misma tarifa que publica la landing (`GET /precios`).
+            'vigente_desde' => $vigente?->vigente_desde?->toDateString(),
             'moneda_tarifa' => $monedaTarifa,
             'moneda_cobro' => MonedaDeCobroSaas::deCobro($estudio, $monedaTarifa),
             'iva_porcentaje' => (int) (MonedaDeCobroSaas::conIvaDelPais($definicion, $estudio)['iva_porcentaje'] ?? 16),

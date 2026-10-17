@@ -526,7 +526,7 @@ export default {
         },
         precio: {
           q: "¿Cómo se calcula el precio de AgendaUno?",
-          a: "Por rangos de alumnos activos en el mes: cuenta quien tuvo una reserva confirmada en una clase no cancelada o una compra pagada. No cuenta solo por estar registrado. Los precios están en dólares, más impuestos; en México se cobran en pesos al tipo de cambio del día del cobro, más IVA.",
+          a: "Por rangos de alumnos activos en el mes: cuenta quien tuvo una reserva confirmada en una clase no cancelada o una compra pagada. No cuenta solo por estar registrado. Los precios están en dólares, más impuestos; en México se cobran en pesos al tipo de cambio FIX del Banco de México vigente el día en que se emite el cargo, más IVA.",
         },
       },
       final: {
@@ -736,7 +736,7 @@ export default {
         },
         precio: {
           q: "¿Cómo se calcula el precio de AgendaUno?",
-          a: "Eliges un plan (Individual, Premium o Pro) y cuántos profesionales contratas, y pagas por adelantado, cada mes o cada año (el anual cuesta 10 meses). Puedes cambiar de plan cuando quieras. Los precios están en dólares, más impuestos; en México se cobran en pesos al tipo de cambio del día del cobro, más IVA.",
+          a: "Eliges un plan (Individual, Premium o Pro) y cuántos profesionales contratas, y pagas por adelantado, cada mes o cada año (el anual cuesta {mesesAnual} meses). Puedes cambiar de plan cuando quieras. Los precios están en dólares, más impuestos; en México se cobran en pesos al tipo de cambio FIX del Banco de México vigente el día en que se emite el cargo, más IVA.",
         },
       },
       final: {

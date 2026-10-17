@@ -1,12 +1,17 @@
 /**
  * Precios públicos de la suscripción (ADR 0107). La fuente es lo que publica el
- * superadmin: la landing los lee de `GET /api/v1/precios` (`preciosPublicos.ts`). Lo
- * de aquí es solo el respaldo: lo que muestra el HTML pre-generado (buscadores) y la
- * página mientras llega la respuesta. Debe coincidir con la tarifa vigente
- * (migración 2026_10_08_000200_tarifas_en_usd). Importes en centavos de dólar.
+ * superadmin: la landing los lee de `GET /api/v1/precios` (`preciosPublicos.ts`) y la
+ * contratación, de la misma tarifa vigente. El respaldo es lo que muestra el HTML
+ * pre-generado (buscadores) y la página mientras llega la respuesta:
+ * - al pre-generar con `PRECIOS_API_URL`, lo publicado en ese momento
+ *   (`scripts/build-marketing.mjs` lo pasa en `VITE_PRECIOS_PUBLICADOS`);
+ * - si no, `precios-respaldo.json`, que una prueba del API compara con la tarifa que
+ *   siembran las migraciones (PreciosRespaldoCoherentesTest).
+ * Importes en centavos de dólar.
  */
 // Relativo y con extensión: lo importa `vite.config` (por seoConfig), sin alias `@/`.
 import type { Producto } from "../lib/producto.ts";
+import respaldo from "./precios-respaldo.json" with { type: "json" };
 
 export type NivelCitas = "individual" | "premium" | "pro";
 
@@ -16,9 +21,19 @@ export interface Banda {
 }
 
 export interface PreciosPublicos {
-  clases: { moneda: string; dias_prueba: number; bandas: Banda[] };
+  clases: {
+    moneda: string;
+    /** Desde cuándo rige la tarifa (AAAA-MM-DD): la misma que ve la contratación. */
+    vigente_desde?: string | null;
+    /** IVA en México sobre la suscripción. */
+    iva_porcentaje?: number;
+    dias_prueba: number;
+    bandas: Banda[];
+  };
   citas: {
     moneda: string;
+    vigente_desde?: string | null;
+    iva_porcentaje?: number;
     dias_prueba: number;
     meses_anual: number;
     niveles: Partial<Record<NivelCitas, Record<string, number>>> | null;
@@ -38,55 +53,36 @@ export interface PreciosPublicos {
   registro: { agendauno: boolean; turnouno: boolean };
 }
 
-const PREMIUM = [
-  24, 28, 33, 37, 41, 45, 50, 54, 58, 62, 67, 71, 75, 79, 84, 88, 92, 96, 101,
-];
-const PRO = [
-  33, 50, 50, 50, 58, 67, 75, 84, 92, 101, 109, 118, 126, 135, 143, 152, 160,
-  169, 177,
-];
-const porProfesionales = (precios: number[]): Record<string, number> =>
-  Object.fromEntries(precios.map((usd, i) => [String(i + 2), usd * 100]));
+/** Lo publicado al pre-generar, si se pidió (en la aplicación y en las pruebas, no). */
+function publicadosAlGenerar(): Partial<PreciosPublicos> | null {
+  // Sin `import.meta.env` cuando lo importa `vite.config` (Node).
+  const json = (import.meta as { env?: Record<string, string | undefined> }).env
+    ?.VITE_PRECIOS_PUBLICADOS;
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as Partial<PreciosPublicos>;
+  } catch {
+    return null;
+  }
+}
 
-/** El respaldo: la tarifa publicada al escribir esto. */
-export const PRECIOS_POR_OMISION: PreciosPublicos = {
-  clases: {
-    moneda: "USD",
-    dias_prueba: 30,
-    bandas: [
-      { hasta: 40, monto_minor: 2100 },
-      { hasta: 60, monto_minor: 3000 },
-      { hasta: 80, monto_minor: 3900 },
-      { hasta: 100, monto_minor: 4800 },
-      { hasta: 150, monto_minor: 6800 },
-      { hasta: 200, monto_minor: 8400 },
-      { hasta: 300, monto_minor: 11100 },
-      { hasta: 500, monto_minor: 16400 },
-      { hasta: 1000, monto_minor: 29700 },
-      { hasta: null, monto_minor: 29700 },
-    ],
-  },
-  citas: {
-    moneda: "USD",
-    dias_prueba: 30,
-    meses_anual: 10,
-    niveles: {
-      individual: { "1": 900 },
-      premium: porProfesionales(PREMIUM),
-      pro: porProfesionales(PRO),
-    },
-    funciones: null,
-  },
-  ventas: { correo: "ventas@agendauno.mx", whatsapp: null },
-  timbres: {
-    moneda: "MXN",
-    precio_minor: 180,
-    paquetes: [50, 100, 200, 350, 500],
-  },
-  // Los dos productos reciben registros (TurnoUno se lanzó). Debe coincidir con
-  // `registro.abierto_*` del API: es lo que dice el HTML pre-generado.
-  registro: { agendauno: true, turnouno: true },
-};
+/**
+ * El respaldo: lo publicado al pre-generar o, sin eso, `precios-respaldo.json` (la
+ * tarifa que siembran las migraciones; los dos productos reciben registros).
+ */
+export const PRECIOS_POR_OMISION: PreciosPublicos = (() => {
+  const base = respaldo as PreciosPublicos;
+  const publicados = publicadosAlGenerar();
+  return publicados === null
+    ? base
+    : {
+        clases: { ...base.clases, ...publicados.clases },
+        citas: { ...base.citas, ...publicados.citas },
+        ventas: { ...base.ventas, ...publicados.ventas },
+        timbres: { ...base.timbres, ...publicados.timbres },
+        registro: { ...base.registro, ...publicados.registro },
+      };
+})();
 
 const numero = (n: number) => n.toLocaleString("es-MX");
 

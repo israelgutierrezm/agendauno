@@ -20,6 +20,33 @@ if (!PRODUCTOS.includes(producto)) {
 }
 process.env.VITE_PRODUCTO = producto;
 
+/*
+| Precios del HTML pre-generado: con `PRECIOS_API_URL` (la API de producción), los que
+| están publicados al generar, para que el HTML, la tabla y la contratación digan lo
+| mismo. Sin ella, o si no responde, el respaldo de precios-respaldo.json (y se avisa).
+*/
+const preciosUrl = (process.env.PRECIOS_API_URL ?? "")
+  .trim()
+  .replace(/\/$/, "");
+if (preciosUrl !== "") {
+  try {
+    const respuesta = await fetch(`${preciosUrl}/api/v1/precios`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+    const { data } = await respuesta.json();
+    process.env.VITE_PRECIOS_PUBLICADOS = JSON.stringify(data);
+    console.log(
+      `Precios publicados de ${preciosUrl} en el HTML de ${producto}.`,
+    );
+  } catch (error) {
+    console.warn(
+      `No se pudieron leer los precios de ${preciosUrl} (${error.message}): el HTML lleva el respaldo de precios-respaldo.json.`,
+    );
+  }
+}
+
 const root = fileURLToPath(new URL("../", import.meta.url));
 const salida = `dist/${producto}`;
 const ssr = `dist-ssr/${producto}`;

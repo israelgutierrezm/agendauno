@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
+import CalculadoraRenta from "@/components/CalculadoraRenta.vue";
 import { trackEvent } from "@/lib/analytics";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { funcionesPorNivel } from "@/lib/suscripcion";
@@ -10,6 +11,7 @@ import {
   desdeCitas,
   dolares,
   maxAlumnos,
+  pesos,
   rangosClases,
   tablaCitas,
 } from "@/marketing/precios";
@@ -69,6 +71,37 @@ const NOMBRE_MONEDA: Record<string, string> = {
 const nombreMoneda = computed(
   () => NOMBRE_MONEDA[moneda.value] ?? moneda.value,
 );
+const iva = computed(() => precios.datos[modo.value].iva_porcentaje ?? 16);
+// Desde cuándo rige la tarifa que se ve: la misma fecha que muestra la contratación.
+const vigenteDesde = computed(() => {
+  const fecha = precios.datos[modo.value].vigente_desde;
+  return fecha
+    ? new Intl.DateTimeFormat("es-MX", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(`${fecha}T12:00:00Z`))
+    : null;
+});
+// Los ejemplos de «Así se cobra», con los precios publicados (no cifras fijas).
+const ejemploClases = computed(() => {
+  const banda = rangos.value[1] ?? rangos.value[0];
+  return banda
+    ? { capacidad: banda.capacidad.toLowerCase(), importe: banda.subtotal }
+    : null;
+});
+const ejemploCitas = computed(() => {
+  const fila = tabla.value.find((f) => f.profesionales === 3) ?? tabla.value[0];
+  return fila
+    ? {
+        profesionales: fila.profesionales,
+        mensual: fila.premium,
+        anual: fila.premium * mesesAnual.value,
+      }
+    : null;
+});
+const timbre = computed(() => precios.datos.timbres);
 
 const beneficiosClases = [
   "Agenda de clases y control de cupos",
@@ -351,11 +384,13 @@ function elegirModo(valor: Modo) {
       </ul>
     </section>
 
+    <CalculadoraRenta :modo="modo" :precios="precios.datos" :anual="anual" />
+
     <p class="precios-aclaracion">
       Precios en {{ nombreMoneda }}, más impuestos.
       <template v-if="moneda !== 'MXN'">
-        En México se cobran en pesos al tipo de cambio del día del cobro, más
-        IVA.
+        En México se cobran en pesos al tipo de cambio FIX del Banco de México
+        vigente el día en que se emite el cargo, más IVA.
       </template>
       <template v-if="modo === 'clases'">
         Todas las herramientas para clases, desde el primer plan; la tarifa
@@ -369,6 +404,63 @@ function elegirModo(valor: Modo) {
         cuesta {{ mesesAnual }} meses y se paga por adelantado.
       </template>
     </p>
+
+    <!-- Cómo se cobra, con ejemplos de los precios publicados. -->
+    <section class="precios-ejemplos" aria-labelledby="precios-ejemplos-titulo">
+      <h3 id="precios-ejemplos-titulo">Así se cobra</h3>
+      <dl>
+        <div>
+          <dt>Qué se cobra</dt>
+          <dd v-if="modo === 'clases' && ejemploClases">
+            Los alumnos activos de cada mes, al cerrarlo. Por ejemplo, con
+            {{ ejemploClases.capacidad }} en octubre, octubre cuesta
+            {{ dolares(ejemploClases.importe) }} {{ monedaClases }}.
+          </dd>
+          <dd v-else-if="modo === 'citas' && ejemploCitas">
+            El plan y los profesionales que contratas, por adelantado. Por
+            ejemplo, Premium con {{ ejemploCitas.profesionales }} profesionales:
+            {{ dolares(ejemploCitas.mensual) }} {{ monedaCitas }} al mes o
+            {{ dolares(ejemploCitas.anual) }} {{ monedaCitas }} al año.
+          </dd>
+        </div>
+        <div>
+          <dt>Moneda e impuestos</dt>
+          <dd>
+            En {{ moneda
+            }}<template v-if="moneda !== 'MXN'"
+              >; en México, en pesos al tipo de cambio FIX del Banco de México
+              vigente el día en que se emite el cargo</template
+            >, más IVA del {{ iva }} %. Fuera de México, sin IVA. Puedes pedir
+            la factura de cada cargo.
+          </dd>
+        </div>
+        <div>
+          <dt>Cobros en línea a tus clientes*</dt>
+          <dd>
+            Llegan a tu propia cuenta de Stripe, Mercado Pago u OpenPay: el
+            procesador descuenta su comisión antes de depositarte, según lo que
+            tengas contratado con él. {{ marca }} no cobra comisión sobre tus
+            ventas.
+          </dd>
+        </div>
+        <div v-if="timbre.precio_minor > 0">
+          <dt>Facturar a tus clientes*</dt>
+          <dd>
+            Cada factura usa un timbre: {{ pesos(timbre.precio_minor) }} MXN por
+            timbre, en paquetes desde {{ timbre.paquetes[0] }}. Solo si
+            facturas.
+          </dd>
+        </div>
+      </dl>
+      <p
+        v-if="vigenteDesde"
+        class="precios-vigencia"
+        data-prueba="precios-vigencia"
+      >
+        Tarifa vigente desde el {{ vigenteDesde }}: la misma que verás al
+        contratar.
+      </p>
+    </section>
 
     <details :key="modo" class="precios-detalle">
       <summary>
@@ -503,6 +595,37 @@ function elegirModo(valor: Modo) {
 <style scoped>
 .precios {
   margin-top: 2.25rem;
+}
+.precios-ejemplos {
+  margin-top: 1.5rem;
+}
+.precios-ejemplos h3 {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.precios-ejemplos dl {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+}
+@media (min-width: 768px) {
+  .precios-ejemplos dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.precios-ejemplos dt {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.precios-ejemplos dd {
+  margin-top: 0.2rem;
+  font-size: 0.875rem;
+  color: var(--texto-suave);
+}
+.precios-vigencia {
+  margin-top: 0.9rem;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
 }
 .precios-contacto {
   display: flex;

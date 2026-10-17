@@ -69,7 +69,7 @@ describe("precios públicos (ADR 0107)", () => {
       "Precios en dólares estadounidenses, más impuestos.",
     );
     expect(vista.text()).toContain(
-      "En México se cobran en pesos al tipo de cambio del día del cobro, más IVA.",
+      "En México se cobran en pesos al tipo de cambio FIX del Banco de México vigente el día en que se emite el cargo, más IVA.",
     );
     expect(vista.text()).not.toContain("+ impuestos");
     expect(vista.get("article").text()).toContain("Probar 30 días gratis");
@@ -85,7 +85,8 @@ describe("precios públicos (ADR 0107)", () => {
       "Sin alumnos activos, la suscripción de ese mes es de $0 USD.",
     );
     expect(vista.text()).not.toContain("renta por uso");
-    expect(vista.text()).not.toMatch(/MXN|\+ IVA/);
+    // Las tarjetas, en dólares: los pesos y el IVA van en los ejemplos.
+    expect(vista.get(".precios-tarjetas").text()).not.toMatch(/MXN|\+ IVA/);
     vista.unmount();
   });
   it("presenta ambos modelos y sus negocios antes de elegir", () => {

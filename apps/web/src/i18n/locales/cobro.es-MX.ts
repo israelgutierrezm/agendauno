@@ -106,9 +106,10 @@ export default {
     publicando: "Publicando…",
     incompleta:
       "Completa los campos marcados: un precio vacío no se publica como 0.",
-    publicada: "Se publicó la versión {n}.",
+    publicada:
+      "Se publicó la versión {n}. Las landings la muestran al cargar; su HTML para buscadores, al publicar las landings de nuevo.",
     confirmarPublicar:
-      "¿Publicar una versión nueva de la tarifa de {modalidad}? No se puede editar ni deshacer: los cobros siguientes y la landing usarán estos precios.",
+      "¿Publicar una versión nueva de la tarifa de {modalidad}? No se puede editar ni deshacer: los cobros siguientes, la contratación y la landing usarán estos precios (el HTML para buscadores, al publicar las landings de nuevo).",
   },
   modalidad: {
     clases: "Clases",

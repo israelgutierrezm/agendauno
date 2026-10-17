@@ -71,19 +71,37 @@ $1.80 cada uno ($90, $180, $360, $630 y $900), para clases y citas Pro en Méxic
 
 ## Dónde se presentan
 
-- **Portada (`/#precios`)**: dos tarjetas «desde…», una por modalidad, con el importe
-  de entrada de `precios.ts` («Clases con cupo · Por alumnos activos · desde $21» y
-  «Citas 1 a 1 · Por plan y profesionales · desde $9», USD al mes más impuestos).
-  Llevan a `/clases#precios` y `/citas#precios`.
-- **`/clases#precios`**: `PreciosLanding` fijo en clases: tres tarjetas de rangos, la
-  tabla completa, qué cuenta como alumno activo y el contacto para más de 1,000.
-- **`/citas#precios`**: `PreciosLanding` fijo en citas: Individual, Premium y Pro con
-  sus funciones, mensual o anual, la tabla de 2 a 20 profesionales y el contacto para
-  más de 20.
-- **Páginas por giro**: dicen cómo se cobra su modalidad y enlazan a `/{modo}#precios`.
-- Las tarjetas llevan al registro con su modalidad (`/registro?modo=clases|citas`).
+Todo lee la misma tarifa vigente (`TarifaSaas`), publicada por el superadmin:
+
+- **Portada de cada marca (`/#precios`)**: `PreciosLanding` fijo en su modalidad. Trae
+  las tarjetas, la calculadora «Calcula tu mensualidad» (`CalculadoraRenta`), «Así se
+  cobra», la tabla completa y el contacto para cotizar.
+  - «Así se cobra» da ejemplos con los precios publicados: qué se cobra, moneda e IVA,
+    comisiones del procesador (van a la cuenta del negocio; la plataforma no cobra
+    comisión) y timbres.
+  - También dice «Tarifa vigente desde el…».
+- **Páginas por giro**: dicen cómo se cobra su modalidad y enlazan a `/#precios`.
+- **Contratación (Renta del panel)**: el resumen de la tarifa o del plan de citas trae
+  la misma «Tarifa vigente desde el…» (`tarifa.vigente_desde`,
+  `plan.tarifa_vigente_desde`).
 - Lo que depende de México (pagos en línea, facturación) lleva «*» y la nota
-  «* Solo para clientes de México» (ADR 0099).
+  «* Solo para negocios en México» (ADR 0099).
+
+## Que digan lo mismo
+
+- `GET /api/v1/precios` trae, por modalidad, `vigente_desde` e `iva_porcentaje`, además
+  de bandas, niveles, meses del anual y días de prueba.
+- La landing pide esos precios al cargar.
+- El HTML pre-generado (lo que leen los buscadores) lleva:
+  - con `PRECIOS_API_URL` al construir, los precios publicados en ese momento;
+    `imagenes.yml` lo pasa como `https://$DOMINIO`;
+  - si no, o si la API no responde, `apps/web/src/marketing/precios-respaldo.json`.
+- `PreciosRespaldoCoherentesTest` (API) compara ese respaldo con la tarifa que siembran
+  las migraciones. Si cambia una sin la otra, el CI falla.
+- Al publicar una tarifa nueva, el HTML de las landings cambia cuando se vuelven a
+  construir y publicar (`./actualizar.sh --solo landing-agendauno`, con una imagen
+  nueva). Mientras, la página muestra lo nuevo al cargar. El aviso de publicar del
+  superadmin lo dice.
 
 ## Referencias de presentación
 
@@ -93,9 +111,9 @@ $1.80 cada uno ($90, $180, $360, $630 y $900), para clases y citas Pro en Méxic
 
 ## Mantenimiento antes de publicar cambios de tarifa
 
-Los importes públicos están centralizados en `apps/web/src/marketing/precios.ts`.
-Son una referencia comercial estática, no una consulta automática de facturación.
-Antes de publicar otra versión desde el panel de plataforma, actualizar esta referencia,
-`precios.ts` y sus pruebas, y volver a generar el sitio. Validar también que las
-tarifas del entorno de producción coincidan con las anunciadas. La fuente operativa es
-la tarifa versionada del backend.
+- La fuente es la tarifa versionada del backend: se publica desde el panel de
+  plataforma.
+- Si una migración siembra otra tarifa, hay que actualizar `precios-respaldo.json` y
+  esta referencia (la prueba lo exige).
+- Después de publicar, hay que construir y publicar de nuevo las landings para que su
+  HTML coincida.

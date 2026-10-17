@@ -170,7 +170,8 @@ const preguntas = computed(() => {
           ? `faq.${clave}.aSinWhatsapp`
           : `faq.${clave}.a`,
       ),
-      soporte,
+      // Lo que cambia con la tarifa publicada, de la misma fuente que la tabla.
+      { ...soporte, mesesAnual: precios.datos.citas.meses_anual },
     ),
   }));
 });

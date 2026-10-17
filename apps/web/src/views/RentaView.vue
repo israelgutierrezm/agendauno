@@ -16,7 +16,11 @@ import TimbresRenta from "@/components/TimbresRenta.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useRetornoPago } from "@/lib/retornoPago";
-import type { PlanCitas, TipoCambio } from "@/lib/suscripcion";
+import {
+  fechaTarifa,
+  type PlanCitas,
+  type TipoCambio,
+} from "@/lib/suscripcion";
 import { maxAlumnos } from "@/marketing/precios";
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -87,6 +91,8 @@ interface Renta {
   cobro?: "plan" | "uso";
   plan?: PlanCitas | null;
   tarifa?: {
+    /** Desde cuándo rige (la misma que publica la landing). */
+    vigente_desde?: string | null;
     moneda_tarifa: string;
     moneda_cobro: string;
     tipo_cambio: TipoCambio | null;
@@ -475,6 +481,13 @@ onMounted(() => {
                   })
                 : $t("suscripcion.plan.enDolares")
             }}
+            <template v-if="renta.tarifa.vigente_desde">
+              {{
+                $t("suscripcion.plan.vigenteDesde", {
+                  fecha: fechaTarifa(renta.tarifa.vigente_desde),
+                })
+              }}
+            </template>
           </p>
           <p
             v-if="

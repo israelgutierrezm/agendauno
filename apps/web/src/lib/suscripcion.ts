@@ -14,6 +14,16 @@ export interface TipoCambio {
   fuente: string;
 }
 
+/** «8 de octubre de 2026», tal cual (sin moverlo de zona). */
+export function fechaTarifa(fecha: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${fecha.slice(0, 10)}T12:00:00Z`));
+}
+
 export interface PlanCitas {
   nivel: NivelPlan;
   profesionales: number;
@@ -30,6 +40,8 @@ export interface PlanCitas {
   limite_profesionales: number | null;
   max_profesionales: number;
   meses_anual: number;
+  /** Desde cuándo rige la tarifa (la misma que publica la landing). */
+  tarifa_vigente_desde?: string | null;
   moneda_tarifa: string;
   moneda_cobro: string;
   iva_porcentaje: number;

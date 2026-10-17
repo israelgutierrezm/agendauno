@@ -132,6 +132,8 @@ jobs:
           fi
           if [ -n "$PRODUCTO" ]; then
             argumentos+=(--build-arg "PRODUCTO=$PRODUCTO")
+            # El HTML de la landing con los precios publicados al construirla.
+            argumentos+=(--build-arg "PRECIOS_API_URL=https://$DOMINIO")
           fi
           docker buildx build . \
             --file "$DOCKERFILE" \

@@ -31,6 +31,9 @@ ARG VITE_TURNOUNO_SOPORTE_CORREO=""
 ARG VITE_SOPORTE_WHATSAPP=""
 ARG VITE_APP_VERSION="dev"
 ARG GOOGLE_SITE_VERIFICATION=""
+# La API de donde se leen los precios publicados al pre-generar (p. ej. https://agendauno.mx):
+# el HTML para buscadores dice lo mismo que la tabla y la contratación. Vacía: el respaldo.
+ARG PRECIOS_API_URL=""
 # Sin mapas de origen: no se publican (ADR 0082).
 RUN case "$PRODUCTO" in agendauno|turnouno) ;; *) echo "PRODUCTO desconocido: $PRODUCTO" >&2; exit 1 ;; esac \
  && npm run "build:$PRODUCTO" \

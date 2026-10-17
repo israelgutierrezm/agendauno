@@ -273,13 +273,16 @@ class PlanCitasSaas
      */
     public function resumen(Estudio $estudio): array
     {
-        $definicion = $this->tarifa()->definicion ?? [];
+        $tarifa = $this->tarifa();
+        $definicion = $tarifa->definicion ?? [];
         $actuales = $this->profesionalesActuales($estudio);
         $actual = $this->planActual($estudio, $actuales);
         $monedaTarifa = MonedaDeCobroSaas::deTarifa($definicion);
         $tipo = $estudio->enMexico() && $monedaTarifa === 'USD' ? $this->tipos->ultimo() : null;
 
         return [
+            // La misma tarifa que publica la landing (`GET /precios`).
+            'tarifa_vigente_desde' => $tarifa?->vigente_desde?->toDateString(),
             'nivel' => $actual['nivel'],
             'profesionales' => $actual['profesionales'],
             'periodicidad' => $actual['periodicidad'],
