@@ -193,23 +193,23 @@ const modalLlave = ref(false);
 // El patrón común de los formularios: el error dentro del diálogo y junto a su campo,
 // no se cierra mientras guarda y pregunta antes de descartar. La llave creada se
 // confirma mostrando su secreto (una sola vez).
-const llave = useEditorFormulario({
+const editorLlave = useEditorFormulario({
   abierto: modalLlave,
   valor: () => nuevaLlave.value,
   campos: ["nombre", "scopes"],
   formulario: "#integracion-llave",
 });
-const creandoLlave = llave.guardando;
-const erroresLlave = llave.errores;
-const errorLlave = llave.error;
+const creandoLlave = editorLlave.guardando;
+const erroresLlave = editorLlave.errores;
+const errorLlave = editorLlave.error;
 function abrirLlave(): void {
   nuevaLlave.value = { nombre: "", scopes: [] };
-  llave.empezar();
+  editorLlave.empezar();
   modalLlave.value = true;
 }
 
 async function crearLlave(): Promise<void> {
-  const respuesta = await llave.guardar(() =>
+  const respuesta = await editorLlave.guardar(() =>
     api.post<{ data: LlaveApi & { secreto: string } }>(
       `${base.value}/llaves-api`,
       nuevaLlave.value,
@@ -256,18 +256,18 @@ const nuevoWebhook = ref<{ url: string; eventos: string[] }>({
 });
 const secretoWebhook = ref<string | null>(null);
 const modalWebhook = ref(false);
-const webhook = useEditorFormulario({
+const editorWebhook = useEditorFormulario({
   abierto: modalWebhook,
   valor: () => nuevoWebhook.value,
   campos: ["url", "eventos"],
   formulario: "#integracion-webhook",
 });
-const creandoWebhook = webhook.guardando;
-const erroresWebhook = webhook.errores;
-const errorWebhook = webhook.error;
+const creandoWebhook = editorWebhook.guardando;
+const erroresWebhook = editorWebhook.errores;
+const errorWebhook = editorWebhook.error;
 function abrirWebhook(): void {
   nuevoWebhook.value = { url: "", eventos: [] };
-  webhook.empezar();
+  editorWebhook.empezar();
   modalWebhook.value = true;
 }
 const entregasDe = ref<string | null>(null);
@@ -331,7 +331,7 @@ async function cargarWebhooks(): Promise<void> {
 }
 
 async function crearWebhook(): Promise<void> {
-  const respuesta = await webhook.guardar(() =>
+  const respuesta = await editorWebhook.guardar(() =>
     api.post<{ data: Webhook & { secreto: string } }>(
       `${base.value}/webhooks-salientes`,
       {
@@ -679,7 +679,7 @@ onMounted(cargar);
         tam="md"
         :descripcion="$t('adminUsabilidad.integraciones.llave')"
         :ocupado="creandoLlave"
-        @cerrar="llave.cerrar"
+        @cerrar="editorLlave.cerrar"
       >
         <form
           id="integracion-llave"
@@ -695,7 +695,7 @@ onMounted(cargar);
             }}</label>
             <input
               id="ll-nombre"
-              v-bind="llave.marcar('nombre', 'll-nombre-error')"
+              v-bind="editorLlave.marcar('nombre', 'll-nombre-error')"
               v-model="nuevaLlave.nombre"
               class="tu-input"
               :placeholder="$t('conexiones.llave.nombrePh')"
@@ -726,7 +726,7 @@ onMounted(cargar);
             type="button"
             class="tu-btn tu-btn-fantasma"
             :disabled="creandoLlave"
-            @click="llave.cerrar"
+            @click="editorLlave.cerrar"
           >
             {{ $t("comun.cancelar") }}
           </button>
@@ -933,7 +933,7 @@ onMounted(cargar);
         icono="integraciones"
         :descripcion="$t('adminUsabilidad.integraciones.webhook')"
         :ocupado="creandoWebhook"
-        @cerrar="webhook.cerrar"
+        @cerrar="editorWebhook.cerrar"
       >
         <form
           id="integracion-webhook"
@@ -949,7 +949,7 @@ onMounted(cargar);
             }}</label>
             <input
               id="wh-url"
-              v-bind="webhook.marcar('url', 'wh-url-error')"
+              v-bind="editorWebhook.marcar('url', 'wh-url-error')"
               v-model="nuevoWebhook.url"
               class="tu-input"
               type="url"
@@ -992,7 +992,7 @@ onMounted(cargar);
             type="button"
             class="tu-btn tu-btn-fantasma"
             :disabled="creandoWebhook"
-            @click="webhook.cerrar"
+            @click="editorWebhook.cerrar"
           >
             {{ $t("comun.cancelar") }}
           </button>

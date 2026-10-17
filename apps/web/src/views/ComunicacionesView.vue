@@ -12,6 +12,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -334,7 +335,33 @@ function configuradas(clave: string): Plantilla[] {
       .filter((p): p is Plantilla => p !== undefined),
   );
 }
-const guardandoPlantilla = ref(false);
+// El patrón común de los formularios: el error dentro del panel y junto a su campo,
+// no se cierra mientras guarda y pregunta antes de descartar (también al cambiar de
+// canal o de destinatario, que carga otro texto).
+const editorAbierto = computed({
+  get: () => editor.value.abierto,
+  set: (v: boolean) => {
+    editor.value.abierto = v;
+  },
+});
+const plantillaForm = useEditorFormulario({
+  abierto: editorAbierto,
+  valor: () => borrador.value,
+  campos: ["asunto", "cuerpo", "canal", "destinatario"],
+  formulario: "#form-plantilla",
+});
+const guardandoPlantilla = plantillaForm.guardando;
+const erroresPlantilla = plantillaForm.errores;
+const errorPlantilla = plantillaForm.error;
+async function seguirSinGuardar(): Promise<boolean> {
+  return (
+    !plantillaForm.sucio.value ||
+    confirmar(t("comun.cambiosSinGuardar"), {
+      aceptar: t("comun.salirSinGuardar"),
+      peligro: true,
+    })
+  );
+}
 
 // Marcadores de los correos que traen datos legibles (confirmación, recordatorios,
 // recibo, bienvenida); el resto usa los datos del evento.
@@ -431,6 +458,8 @@ function cargarBorrador(): void {
     cuerpo: existente?.cuerpo ?? "",
     activo: existente?.activo ?? true,
   };
+  // Lo que se carga es lo guardado: desde aquí cuentan los cambios.
+  plantillaForm.empezar();
 }
 
 function configurar(clave: string): void {
@@ -442,7 +471,10 @@ function configurar(clave: string): void {
   cargarBorrador();
 }
 
-function elegirCanal(canal: Canal): void {
+async function elegirCanal(canal: Canal): Promise<void> {
+  if (canal === borrador.value.canal || !(await seguirSinGuardar())) {
+    return;
+  }
   borrador.value.canal = canal;
   cargarBorrador();
 }
@@ -450,7 +482,13 @@ function elegirCanal(canal: Canal): void {
 // Configurado por WhatsApp: su texto no se edita (lo pone el servidor).
 const esWhatsApp = computed(() => borrador.value.canal === "whatsapp");
 
-function elegirDestinatario(destinatario: Destinatario): void {
+async function elegirDestinatario(destinatario: Destinatario): Promise<void> {
+  if (
+    destinatario === borrador.value.destinatario ||
+    !(await seguirSinGuardar())
+  ) {
+    return;
+  }
   borrador.value.destinatario = destinatario;
   const canales = canalesDelBorrador.value;
   if (!canales.includes(borrador.value.canal)) {
@@ -481,19 +519,17 @@ async function cargarAutomaticos(): Promise<void> {
 }
 
 async function guardarPlantilla(): Promise<void> {
-  guardandoPlantilla.value = true;
-  try {
-    await api.put(`${base.value}/plantillas-mensaje`, {
-      clave: editor.value.clave,
-      ...borrador.value,
-    });
-    toast.exito(t("comunicacionesAuto.guardado"));
+  const listo = await plantillaForm.guardar(
+    () =>
+      api.put(`${base.value}/plantillas-mensaje`, {
+        clave: editor.value.clave,
+        ...borrador.value,
+      }),
+    t("comunicacionesAuto.guardado"),
+  );
+  if (listo !== undefined) {
     editor.value.abierto = false;
     await cargarAutomaticos();
-  } catch (e) {
-    toast.error(mensajeDeError(e));
-  } finally {
-    guardandoPlantilla.value = false;
   }
 }
 
@@ -1171,13 +1207,17 @@ onMounted(cargar);
           ? $t(`conexiones.webhook.tipos.${editor.clave}`)
           : $t('comunicacionesAuto.editor')
       "
-      @cerrar="editor.abierto = false"
+      :ocupado="guardandoPlantilla"
+      @cerrar="plantillaForm.cerrar"
     >
       <form
         id="form-plantilla"
         class="space-y-4 p-5"
         @submit.prevent="guardarPlantilla"
       >
+        <AvisoTono v-if="errorPlantilla" tono="peligro" role="alert">
+          {{ errorPlantilla }}
+        </AvisoTono>
         <div>
           <span class="tu-label">{{ $t("comunicacionesAuto.para") }}</span>
           <div class="tu-segmentado" role="group">
@@ -1236,11 +1276,18 @@ onMounted(cargar);
           }}</label>
           <input
             id="pl-asunto"
+            v-bind="plantillaForm.marcar('asunto', 'pl-asunto-error')"
             v-model="borrador.asunto"
             class="tu-input"
             maxlength="255"
             required
           />
+          <span
+            v-if="erroresPlantilla.asunto"
+            id="pl-asunto-error"
+            class="tu-error-campo"
+            >{{ erroresPlantilla.asunto }}</span
+          >
         </div>
         <div v-if="!esWhatsApp">
           <label class="tu-label" for="pl-cuerpo">{{
@@ -1248,12 +1295,19 @@ onMounted(cargar);
           }}</label>
           <textarea
             id="pl-cuerpo"
+            v-bind="plantillaForm.marcar('cuerpo', 'pl-cuerpo-error')"
             v-model="borrador.cuerpo"
             class="tu-input"
             rows="6"
             maxlength="5000"
             required
           />
+          <span
+            v-if="erroresPlantilla.cuerpo"
+            id="pl-cuerpo-error"
+            class="tu-error-campo"
+            >{{ erroresPlantilla.cuerpo }}</span
+          >
           <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
             {{ marcadoresAuto }}
           </p>
@@ -1282,6 +1336,14 @@ onMounted(cargar);
             @click="eliminarPlantilla"
           >
             {{ $t("comunicacionesAuto.eliminar") }}
+          </button>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="guardandoPlantilla"
+            @click="plantillaForm.cerrar"
+          >
+            {{ $t("comun.cancelar") }}
           </button>
           <button
             type="submit"
