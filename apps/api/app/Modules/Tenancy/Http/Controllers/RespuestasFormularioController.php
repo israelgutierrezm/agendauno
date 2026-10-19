@@ -119,6 +119,10 @@ class RespuestasFormularioController
         if ($formulario->archivado_en !== null) {
             throw ValidationException::withMessages(['formulario' => ['Esta ficha de datos está archivada.']]);
         }
+        // Un borrador no se responde: aún no se publica (ADR 0166).
+        if (! $formulario->activo) {
+            throw ValidationException::withMessages(['formulario' => ['Esta ficha de datos aún no está publicada.']]);
+        }
         if (! in_array($formulario->aplica_a, [$persona->tipo->value, 'todos'], true)) {
             throw ValidationException::withMessages([
                 'persona_id' => ['Esta ficha de datos no aplica a esta persona.'],

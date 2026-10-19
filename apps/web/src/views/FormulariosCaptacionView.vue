@@ -7,6 +7,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import {
   codigoEmbebido,
   TIPOS_CAMPO,
@@ -79,6 +80,20 @@ interface Borrador {
 }
 const editor = ref<Borrador | null>(null);
 const guardando = ref(false);
+// Cerrar con cambios sin guardar pregunta antes, como en los demás editores.
+const editorAbierto = computed({
+  get: () => editor.value !== null,
+  set: (abierto: boolean) => {
+    if (!abierto) {
+      editor.value = null;
+    }
+  },
+});
+const descartar = useDescartarCambios({
+  abierto: editorAbierto,
+  valor: () => editor.value,
+  guardando,
+});
 
 function editar(f: FormularioCaptacion | null): void {
   editor.value = {
@@ -96,6 +111,7 @@ function editar(f: FormularioCaptacion | null): void {
       opcionesTexto: (c.opciones ?? []).join("\n"),
     })),
   };
+  descartar.fijar();
 }
 function agregarPregunta(): void {
   editor.value?.campos.push({
@@ -339,7 +355,7 @@ function descargarQr(): void {
           : $t('captacion.formularios.editor.tituloNuevo')
       "
       :ocupado="guardando"
-      @cerrar="editor = null"
+      @cerrar="descartar.cerrar()"
     >
       <form v-if="editor" class="grid gap-4 text-sm" @submit.prevent="guardar">
         <label class="block">

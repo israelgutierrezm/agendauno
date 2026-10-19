@@ -11,7 +11,7 @@ export default {
     buscarDirectorio: "Buscar otro cliente en el directorio",
     filtrarAtencion: "Filtrar por atención",
     atencion: {
-      todas: "Todas",
+      todas: "Activas",
       pendientes: "Por atender",
       sinRegistrar: "Sin registrar",
       llegaron: "Llegaron",
@@ -422,6 +422,9 @@ export default {
     total: "Total",
     estadoActual: "Estado actual: no depende del periodo elegido.",
     periodo: "Cifras del {desde} al {hasta}.",
+    periodoZona: "Cifras del {desde} al {hasta} ({zona}).",
+    lugaresDe: "{n} de {total} lugares",
+    faltasDe: "{n} de {total} con asistencia registrada",
     sinClientes:
       "Aún no hay altas suficientes para medir conversión y permanencia.",
     pestanas: {
@@ -802,6 +805,11 @@ export default {
     enviar: "Enviar ahora",
     cancelar: "Cancelar",
     sinDestinatarios: "Nadie cumple con este segmento: no hay a quién enviar.",
+    // Quién queda fuera antes de enviar (ADR 0166).
+    fuera: "Quedan fuera: {motivos}.",
+    sinConsentimiento: "1 no desea promociones | {n} no desean promociones",
+    sinEmail: "1 sin correo | {n} sin correo",
+    sinApp: "1 sin la app | {n} sin la app",
   },
   // Integraciones con Wellhub y TotalPass.
   integraciones: {
@@ -828,7 +836,11 @@ export default {
   },
   // Fichas de datos: ciclo de edición completo y versiones (ADR 0150).
   fichas: {
-    creada: "Ficha «{nombre}» creada.",
+    creada:
+      "Ficha «{nombre}» creada como borrador: publícala cuando tenga sus preguntas.",
+    publicar: "Publicar",
+    publicada: "Ficha «{nombre}» publicada: ya se pide a quien le toca.",
+    publicarVersion: "Publicar la versión nueva",
     preguntaAgregada: "Pregunta «{etiqueta}» agregada.",
     editarDatos: "Editar datos",
     descripcion: "Descripción (opcional)",

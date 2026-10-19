@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\EnviarMensajesTenant;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -127,4 +128,27 @@ it('quien ya renovó sale solo del seguimiento de su vencimiento', function (): 
     $tarea = enNegocioCampanas(fn () => TareaTenant::query()->where('motivo', 'plan_por_vencer')->firstOrFail());
     expect($tarea->estado->value)->toBe('completada')
         ->and($tarea->resultado?->value)->toBe('renovo');
+});
+
+it('antes de enviar dice a cuántos llega y quién queda fuera; después, cuántos no se pudieron enviar', function (): void {
+    Mail::fake();
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    foreach (['Ana' => 'ana@correo.mx', 'Beto' => null, 'Carla' => 'carla@correo.mx'] as $nombre => $correo) {
+        $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => $nombre, 'email' => $correo, 'tipo' => 'miembro'], conBearer($e['bearer']))->assertCreated();
+    }
+    enNegocioCampanas(fn () => PersonaTenant::query()->where('nombre', 'Carla')->update(['recibe_promociones' => false]));
+
+    // Por correo llega solo a Ana: Beto no tiene correo y Carla no quiere promociones.
+    $this->getJson("/api/v1/app/{$e['slug']}/comunicaciones/alcance?segmento=todos&canal=email", conBearer($e['bearer']))
+        ->assertOk()->assertExactJson(['data' => ['elegibles' => 1, 'sin_consentimiento' => 1, 'sin_email' => 1, 'sin_app' => 0]]);
+    $difusion = (string) $this->postJson("/api/v1/app/{$e['slug']}/comunicaciones/difusiones", [
+        'segmento' => 'todos', 'canal' => 'email', 'asunto' => 'Promo', 'cuerpo' => 'Dos clases gratis.',
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.total', 1)->json('data.id');
+
+    // Su mensaje agota los intentos: ya no se presenta como «enviándose».
+    enNegocioCampanas(fn () => MensajeTenant::query()->whereHas('difusion', fn ($q) => $q->where('ulid', $difusion))
+        ->update(['estado' => 'fallido', 'intentos' => EnviarMensajesTenant::MAX_INTENTOS]));
+    $fila = collect($this->getJson("/api/v1/app/{$e['slug']}/comunicaciones/difusiones", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->firstWhere('id', $difusion);
+    expect($fila)->toMatchArray(['pendientes' => 0, 'fallidos' => 1, 'enviados' => 0]);
 });

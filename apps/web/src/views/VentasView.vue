@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -16,14 +16,13 @@ import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { crearVenta } from "@/lib/venta";
-import { dinero as dineroDelPais } from "@/lib/formato";
 import {
-  SECCIONES,
-  clasesDe,
-  fechaLarga,
-  seccionDe,
-  type Plan,
-} from "@/lib/planes";
+  queIncluyePlan,
+  reglasDePlan,
+  useCuotasDeVenta,
+} from "@/lib/ventaDePlan";
+import { dinero as dineroDelPais } from "@/lib/formato";
+import { SECCIONES, fechaLarga, seccionDe, type Plan } from "@/lib/planes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -82,17 +81,10 @@ const venta = ref<{
 }>({ compradorId: "", productoId: "", metodo: "efectivo", codigoPromo: "" });
 const vendiendo = ref(false);
 const promoPreview = ref<{ descuento: number; total: number } | null>(null);
-// Inscripción (B04): la que se sumaría a esta venta, dicha antes de cobrar; quien
-// puede la exenta con un motivo (queda en la bitácora).
-const inscripcion = ref(0);
+// Inscripción (B04): quien puede la exenta con un motivo (queda en la bitácora).
 const exentarInscripcion = ref(false);
 const motivoExencion = ref("");
 const puedeExentar = computed(() => sesion.puede("cuotas.exentar"));
-// Permanencia (B04): el cliente acepta las condiciones del plan antes de cobrar.
-const aceptaCondiciones = ref(false);
-const pideCondiciones = computed(
-  () => (productoSel.value?.permanencia_meses ?? 0) > 0,
-);
 const validandoPromo = ref(false);
 
 // Solo los vendibles (no archivados), agrupados por tipo.
@@ -108,26 +100,33 @@ const gruposVendibles = computed(() =>
 const productoSel = computed(
   () => productos.value.find((p) => p.id === venta.value.productoId) ?? null,
 );
+// La inscripción que se sumaría (dicha antes de cobrar) y las condiciones que acepta
+// el cliente (permanencia), igual que en la venta rápida de la ficha.
+const { inscripcion, aceptaCondiciones, pideCondiciones } = useCuotasDeVenta(
+  base,
+  computed(() => venta.value.compradorId),
+  productoSel,
+  () => {
+    exentarInscripcion.value = false;
+    motivoExencion.value = "";
+  },
+);
+// Dónde vale, qué deja reservar y sus reglas, antes de cobrar.
+const reglasSel = computed(() =>
+  productoSel.value
+    ? reglasDePlan(productoSel.value, t, {
+        variasSedes: (sesion.usuario?.sucursales?.length ?? 0) > 1,
+        esCitas: sesion.esCitas,
+      })
+    : [],
+);
 
 // En la moneda del negocio (ADR 0099) y con los números de su país.
 function dinero(minor: number, moneda = sesion.moneda): string {
   return dineroDelPais(minor, moneda, sesion.pais);
 }
 function queIncluye(p: Plan): string {
-  if (p.tipo === "membresia") {
-    return p.ilimitado
-      ? t("planes.resumen.ilimitado")
-      : t(
-          "planes.resumen.porMes",
-          { n: clasesDe(p.unidades_por_ciclo) },
-          clasesDe(p.unidades_por_ciclo),
-        );
-  }
-  if (p.ilimitado) {
-    return t("planes.resumen.ilimitado");
-  }
-  const n = clasesDe(p.creditos_incluidos);
-  return t("planes.resumen.clases", { n }, n);
+  return queIncluyePlan(p, t);
 }
 function nombreMetodo(m: string | null | undefined): string {
   if (!m) {
@@ -224,30 +223,6 @@ const total = computed(
   () =>
     (promoPreview.value?.total ?? productoSel.value?.precio_minor ?? 0) +
     (cobraInscripcion.value ? inscripcion.value : 0),
-);
-let pedidoInscripcion = 0;
-watch(
-  () => [venta.value.compradorId, productoSel.value?.id] as const,
-  async ([compradorId]) => {
-    const mio = ++pedidoInscripcion;
-    inscripcion.value = 0;
-    aceptaCondiciones.value = false;
-    exentarInscripcion.value = false;
-    motivoExencion.value = "";
-    if (compradorId === "" || !productoSel.value?.cobra_inscripcion) {
-      return;
-    }
-    try {
-      const { data } = await api.get<{ data: { inscripcion_minor: number } }>(
-        `${base.value}/miembros/${compradorId}/cuotas`,
-      );
-      if (mio === pedidoInscripcion) {
-        inscripcion.value = data.data.inscripcion_minor;
-      }
-    } catch {
-      // Sin el dato, la orden la suma igual si toca: el recibo lo dirá.
-    }
-  },
 );
 
 // Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra).
@@ -467,6 +442,14 @@ onMounted(cargar);
               <template v-if="productoSel">
                 <p class="font-medium">{{ productoSel.nombre }}</p>
                 <p class="vv-sub">{{ queIncluye(productoSel) }}</p>
+                <p
+                  v-for="r in reglasSel"
+                  :key="r"
+                  class="vv-sub"
+                  data-prueba="regla-plan"
+                >
+                  {{ r }}
+                </p>
                 <p v-if="productoSel.tipo === 'add_on'" class="vv-sub">
                   {{ $t("planes.vender.extraAyuda") }}
                 </p>

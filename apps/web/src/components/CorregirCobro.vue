@@ -85,6 +85,10 @@ async function corregirMetodo(): Promise<void> {
     abierta.value = null;
     return;
   }
+  // Cambia cómo cuadra el corte: se dice por qué (queda en la bitácora).
+  if (motivo.value.trim() === "") {
+    return;
+  }
   if (
     !(await confirmar(
       t("corregirCobro.confirmarMetodo", {
@@ -102,6 +106,7 @@ async function corregirMetodo(): Promise<void> {
       props.urlMetodo ?? `${props.base}/pagos/${props.pago.id}/metodo`,
       {
         metodo: metodo.value,
+        motivo: motivo.value.trim(),
       },
     );
     toast.exito(t("corregirCobro.okMetodo"));
@@ -169,10 +174,25 @@ async function anular(): Promise<void> {
       </button>
     </p>
 
-    <div v-else-if="abierta === 'metodo'" class="space-y-2">
+    <form
+      v-else-if="abierta === 'metodo'"
+      class="space-y-2"
+      @submit.prevent="corregirMetodo"
+    >
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("corregirCobro.corregirMetodoAyuda") }}
       </p>
+      <label class="block">
+        <span class="tu-label">{{ $t("corregirCobro.motivo") }}</span>
+        <input
+          v-model="motivo"
+          class="tu-input"
+          required
+          maxlength="255"
+          :placeholder="$t('corregirCobro.motivoMetodoPh')"
+          data-prueba="motivo-metodo"
+        />
+      </label>
       <div class="flex flex-wrap items-stretch gap-2">
         <select
           v-model="metodo"
@@ -186,7 +206,7 @@ async function anular(): Promise<void> {
         <button
           type="button"
           class="tu-btn tu-btn-primario flex-1"
-          :disabled="guardando"
+          :disabled="guardando || motivo.trim() === ''"
           @click="corregirMetodo"
         >
           {{ $t("corregirCobro.guardarMetodo") }}
@@ -200,7 +220,7 @@ async function anular(): Promise<void> {
           {{ $t("comun.cancelar") }}
         </button>
       </div>
-    </div>
+    </form>
 
     <form v-else class="space-y-2" @submit.prevent="anular">
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">

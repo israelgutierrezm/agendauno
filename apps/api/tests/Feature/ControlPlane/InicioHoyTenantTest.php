@@ -272,3 +272,20 @@ it('en clases dice cuántas de mañana van a menos de la mitad de su cupo', func
     $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy", conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('data.manana', ['fecha' => '2026-10-02', 'poca_ocupacion' => 1]);
 });
+
+it('con la sucursal de la barra cuenta solo esa; una sucursal ajena no se pide (ADR 0166)', function (): void {
+    $this->travelTo('2026-10-01 12:00:00');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $roma = agendaSemilla($e);
+    $org = (string) $this->postJson("/api/v1/app/{$e['slug']}/organizaciones", ['nombre' => 'Otra'], conBearer($e['bearer']))->json('data.id');
+    $polanco = (string) $this->postJson("/api/v1/app/{$e['slug']}/organizaciones/{$org}/sucursales", [
+        'nombre' => 'Polanco', 'zona_horaria' => 'America/Mexico_City',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    crearSesionTenant($e, $roma, 10, '2026-10-01 18:00:00');
+    crearSesionTenant($e, ['oferta' => $roma['oferta'], 'sucursal' => $polanco], 10, '2026-10-01 19:00:00');
+    $hoy = fn (array $params = []) => $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?".http_build_query(['fecha' => '2026-10-01', ...$params]), conBearer($e['bearer']));
+
+    expect($hoy()->assertOk()->json('data.agenda.totales.sesiones'))->toBe(2)
+        ->and($hoy(['sucursal_id' => $polanco])->assertOk()->json('data.agenda.totales.sesiones'))->toBe(1);
+    $hoy(['sucursal_id' => '01J0000000000000000000000Z'])->assertForbidden();
+});

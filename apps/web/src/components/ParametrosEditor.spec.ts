@@ -152,3 +152,39 @@ describe("editor de parámetros", () => {
     ]);
   });
 });
+
+describe("errores junto a su campo (ADR 0166)", () => {
+  it("lo que el servidor rechazó se dice debajo del campo, no solo arriba", () => {
+    const w = mount(ParametrosEditor, {
+      props: {
+        parametros,
+        modo: "negocio",
+        errores: {
+          "valores.reservas.minutos_para_pagar": "Debe ser al menos 5.",
+        },
+      },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { parametrosConfig } },
+          }),
+        ],
+      },
+    });
+    expect(
+      w.get('[data-prueba="error-reservas.minutos_para_pagar"]').text(),
+    ).toBe("Debe ser al menos 5.");
+    expect(
+      w
+        .get('[id="par-reservas.minutos_para_pagar"]')
+        .attributes("aria-invalid"),
+    ).toBe("true");
+    expect(
+      w
+        .get('[id="par-recordatorios.segundo_horas"]')
+        .attributes("aria-invalid"),
+    ).toBeUndefined();
+  });
+});

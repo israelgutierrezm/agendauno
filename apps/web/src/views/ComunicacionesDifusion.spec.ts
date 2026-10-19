@@ -135,3 +135,70 @@ describe("una campaña en curso se controla (B08)", () => {
     );
   });
 });
+
+describe("antes y después de enviar (ADR 0166)", () => {
+  it("la revisión dice a cuántos llega por ese canal y quién queda fuera; el historial, cómo salió", async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/comunicaciones/segmentos")
+            ? [
+                {
+                  clave: "todos",
+                  etiqueta: "Todos",
+                  descripcion: "",
+                  total: 40,
+                },
+              ]
+            : url.endsWith("/comunicaciones/alcance")
+              ? {
+                  elegibles: 35,
+                  sin_consentimiento: 3,
+                  sin_email: 2,
+                  sin_app: 0,
+                }
+              : url.endsWith("/comunicaciones/difusiones")
+                ? [
+                    {
+                      ...difusion,
+                      pendientes: 0,
+                      fallidos: 2,
+                      descartados: 3,
+                      enviados: 35,
+                    },
+                  ]
+                : [],
+        },
+      }),
+    );
+    const w = mount(ComunicacionesView, {
+      global: {
+        plugins: [i18n],
+        stubs: { EncabezadoSeccion: true, PanelLateral: true, teleport: true },
+      },
+    });
+    await flushPromises();
+    expect(w.get('[data-prueba="resultado-difusion"]').text()).toBe(
+      "35 enviados · 2 no se pudieron enviar · 3 no se mandaron (no desean promociones o se canceló)",
+    );
+
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("Todos"))!
+      .trigger("click");
+    await w.get("#com-asunto").setValue("Promo");
+    await w.get("#com-cuerpo").setValue("Hola");
+    await w.get('[data-prueba="revisar-difusion"]').trigger("click");
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/comunicaciones/alcance",
+      { params: { segmento: "todos", canal: "interno" } },
+    );
+    const dialogo = w.get('[role="dialog"]');
+    expect(dialogo.text()).toContain("35");
+    expect(w.get('[data-prueba="excluidos-difusion"]').text()).toBe(
+      "Quedan fuera: 3 no desean promociones · 2 sin correo.",
+    );
+  });
+});

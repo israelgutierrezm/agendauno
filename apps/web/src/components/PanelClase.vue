@@ -65,9 +65,10 @@ function abrirCobro(r: Reserva): void {
     };
   }
 }
-async function alCobrar(): Promise<void> {
+async function alCobrar(resultado: string): Promise<void> {
   cobrando.value = null;
   await cargar();
+  aviso.value = resultado;
 }
 
 const roster = ref<Reserva[]>([]);
@@ -215,10 +216,22 @@ async function cancelar(
   r: Reserva,
   por: "cliente" | "negocio" | null = null,
 ): Promise<void> {
-  await accion(() =>
-    api.post(`${base.value}/reservas/${r.id}/cancelar`, por ? { por } : {}),
-  );
+  let efecto: string | null = null;
+  await accion(async () => {
+    const { data } = await api.post<{
+      meta?: { efecto?: { mensaje: string } };
+    }>(`${base.value}/reservas/${r.id}/cancelar`, por ? { por } : {});
+    efecto = data.meta?.efecto?.mensaje ?? null;
+  });
   cancelando.value = null;
+  // La persona sale de la lista: queda a la vista a quién se canceló y qué pasó
+  // con su crédito.
+  if (error.value === null) {
+    aviso.value = t("agenda.roster.reservaCancelada", {
+      persona: r.persona ?? "—",
+      efecto: efecto ?? "",
+    }).trim();
+  }
 }
 
 async function promover(): Promise<void> {

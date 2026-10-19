@@ -12,7 +12,6 @@ use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
-use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -127,10 +126,35 @@ class PuestaEnMarchaTenant
             ['clave' => 'servicios', 'hecho' => OfertaTenant::query()->vigentes()->exists(), 'ruta' => 'catalogo'],
             ['clave' => 'disponibilidad', 'hecho' => $this->horariosListos($estudio) && $primera !== null, 'ruta' => $citas ? 'horarios' : 'agenda'],
             ['clave' => 'precios', 'hecho' => $conPrecio || ProductoTenant::query()->exists(), 'ruta' => $citas ? 'catalogo' : 'ventas'],
-            ['clave' => 'cobro', 'hecho' => PagoTenant::query()->whereNotNull('aprobado_en')->exists(), 'ruta' => 'pasarelas'],
-            ['clave' => 'prueba', 'hecho' => ReservaTenant::query()->exists(), 'ruta' => 'agenda'],
-            ['clave' => 'publicar', 'hecho' => $estudio->paginaPublica(), 'ruta' => 'sitio-web'],
+            // Un cobro registrado (en caja o en línea): se hace donde se cobra, no hace
+            // falta una pasarela para quien cobra en caja (ADR 0166).
+            ['clave' => 'cobro', 'hecho' => PagoTenant::query()->whereNotNull('aprobado_en')->exists(), 'ruta' => $citas ? 'agenda' : 'ventas'],
+            // Una reserva de verdad hecha por un cliente (desde la página o su cuenta),
+            // no una del equipo; o que el negocio ya opera.
+            ['clave' => 'prueba', 'hecho' => $this->pruebaHecha($estudio), 'ruta' => 'onboarding'],
+            // Abrir la página (no publicar el contenido del sitio): en el paso de publicación.
+            ['clave' => 'publicar', 'hecho' => $estudio->paginaPublica(), 'ruta' => 'onboarding'],
         ];
+    }
+
+    /** ¿Ya entró una reserva de un cliente de verdad (o el negocio ya opera)? */
+    public function pruebaHecha(Estudio $estudio): bool
+    {
+        return array_key_exists('prueba', $estudio->onboarding_pasos ?? []) || $estudio->primera_operacion_en !== null;
+    }
+
+    /**
+     * Un cliente reservó desde la página o su cuenta: la prueba del recorrido está hecha
+     * (ADR 0166). Se anota una vez.
+     */
+    public function anotarPrueba(mixed $estudio): void
+    {
+        if (! $estudio instanceof Estudio || array_key_exists('prueba', $estudio->onboarding_pasos ?? [])) {
+            return;
+        }
+        $pasos = $estudio->onboarding_pasos ?? [];
+        $pasos['prueba'] = true;
+        $estudio->forceFill(['onboarding_pasos' => $pasos])->save();
     }
 
     public function reglasRevisadas(Estudio $estudio): bool
@@ -158,8 +182,11 @@ class PuestaEnMarchaTenant
      */
     private function primeraCita(): array
     {
+        // Lo que un cliente agenda en línea: los servicios que se pagan al agendar (los
+        // de bono los toma quien ya tiene uno; ADR 0166), como en el Inicio.
         $servicio = OfertaTenant::query()
             ->vigentes()
+            ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
             ->orderBy('duracion_minutos')
             ->first();
         if (! $servicio instanceof OfertaTenant) {

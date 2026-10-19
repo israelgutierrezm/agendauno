@@ -26,6 +26,18 @@ class AsistenciaTenantController
         private readonly AccesoSesionTenant $acceso,
     ) {}
 
+    /**
+     * Qué pasaría con su crédito si se marca que no vino (antes de confirmarlo).
+     */
+    public function efectoDeInasistencia(Request $request): JsonResponse
+    {
+        $reserva = ReservaTenant::query()->with(['sesion', 'retencion'])->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($reserva->sesion !== null && $this->acceso->puedeOperar($reserva->sesion, $usuario instanceof Usuario ? $usuario : null), 403);
+
+        return response()->json(['data' => $this->asistencia->efectoDeInasistencia($reserva)]);
+    }
+
     public function marcar(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->with('sesion')->where('ulid', (string) $request->route('reserva'))->firstOrFail();

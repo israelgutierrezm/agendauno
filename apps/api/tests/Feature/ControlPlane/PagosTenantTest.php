@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -57,6 +62,35 @@ it('cobro manual aprueba y hace fulfillment de inmediato', function (): void {
         ->assertJsonPath('data.orden.estado', 'pagada');
 
     expect(saldoComprador($e, $o['comprador']))->toBe(8000);
+});
+
+it('la lista de pagos dice aparte si está por conciliar y cómo va su recibo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $o = ordenPendiente($e);
+    $pago = (string) $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$o['orden']}/cobrar", [
+        'proveedor' => 'manual', 'metodo' => 'efectivo',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.pago');
+    $fila = fn (): array => collect($this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->firstWhere('id', $pago);
+    expect($fila())->toMatchArray(['estado' => 'aprobado', 'por_conciliar' => false]);
+
+    // Una incidencia abierta y un recibo que no llegó: pagado no es lo mismo.
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, function () use ($pago, $o): void {
+        $p = PagoTenant::query()->where('ulid', $pago)->firstOrFail();
+        IncidenciaCobroTenant::query()->create([
+            'tipo' => IncidenciaCobroTenant::MONTO_DISTINTO, 'estado' => IncidenciaCobroTenant::ABIERTA,
+            'pago_id' => $p->getKey(), 'orden_id' => $p->orden_id, 'detalle' => 'Llegó otro monto.',
+        ]);
+        $evento = EventoOutboxTenant::query()->where('tipo', 'orden.pagada')->where('agregado_id', $o['orden'])->firstOrFail();
+        MensajeTenant::query()->create([
+            'persona_id' => PersonaTenant::query()->where('ulid', $o['comprador'])->value('id'),
+            'canal' => 'email', 'destinatario' => 'ana@correo.mx', 'asunto' => 'Tu recibo', 'cuerpo' => 'Gracias',
+            'estado' => 'fallido', 'intentos' => 3, 'evento_ulid' => $evento->ulid,
+        ]);
+    });
+
+    expect($fila())->toMatchArray(['estado' => 'aprobado', 'por_conciliar' => true, 'comprobante' => 'fallido']);
 });
 
 it('rechaza cobrar con una pasarela no activa (GATEWAY_UNAVAILABLE)', function (): void {

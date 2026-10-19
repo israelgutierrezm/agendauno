@@ -138,17 +138,20 @@ class ReporteCohortesTenantController
      */
     private function mesesActivosPorPersona(CarbonImmutable $desde, string $zona, ?array $sedes): array
     {
+        // El mes es el de la clase o la cita (la fecha del hecho), no el de cuándo se
+        // registró la asistencia (ADR 0166).
         $filas = ReservaTenant::query()
             ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
-            ->when($sedes !== null, fn ($q) => $q->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')->whereIn('sesiones.sucursal_id', $sedes))
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->when($sedes !== null, fn ($q) => $q->whereIn('sesiones.sucursal_id', $sedes))
             ->where('asistencias.estado', EstadoAsistencia::Presente->value)
-            ->where('asistencias.registrada_en', '>=', $desde->utc())
-            ->get(['reservas.persona_id', 'asistencias.registrada_en']);
+            ->where('sesiones.inicia_en', '>=', $desde->utc())
+            ->get(['reservas.persona_id', 'sesiones.inicia_en']);
 
         $mapa = [];
         foreach ($filas as $fila) {
             $pid = (int) $fila->getAttribute('persona_id');
-            $mes = CarbonImmutable::parse((string) $fila->getAttribute('registrada_en'))->setTimezone($zona)->format('Y-m');
+            $mes = CarbonImmutable::parse((string) $fila->getAttribute('inicia_en'))->setTimezone($zona)->format('Y-m');
             $mapa[$pid][$mes] = true;
         }
 

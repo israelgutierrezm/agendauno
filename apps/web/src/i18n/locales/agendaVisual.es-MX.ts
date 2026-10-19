@@ -31,6 +31,7 @@ export default {
   },
   estadosCita: {
     confirmada: "Agendada",
+    apartada: "Apartada",
     sin_registrar: "Sin registrar",
     llego: "Llegó",
     en_servicio: "En servicio",
@@ -120,6 +121,9 @@ export default {
     confirmarLlegada: "¿Marcar que {cliente} llegó a su cita?",
     confirmarNoAsistio:
       "¿Marcar que {cliente} no asistió? Según la política del negocio, puede perder el crédito o el pago de la cita.",
+    confirmarNoAsistioCon: "¿Marcar que {cliente} no asistió? {efecto}",
+    // Después de cancelarla: qué pasó con su crédito, su pago o su anticipo.
+    cancelada: "Se canceló la cita. {efecto}",
     confirmarCorreccion:
       "{cliente} está marcado como «{antes}». ¿Cambiarlo a «{ahora}»? Si aplica, el crédito se ajusta en su saldo.",
     corregirANoAsistio: "Corregir: no asistió",

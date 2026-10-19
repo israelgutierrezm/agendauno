@@ -489,6 +489,52 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
   celular ni `cliente_ref`, la fila es un error; la misma cita con otros datos, también.
   `resumen` suma `por_cobrar`, `por_cobrar_minor`, `pagadas_antes` y `moneda`.
 
+## Revisión operativa por áreas (ADR 0166)
+
+- **Agenda:** `estado_atencion` suma `apartada` (cita apartada en línea que espera su
+  pago). El pago de una cita cancelada (`estado_pago`) es null. Una cita cancelada
+  conserva su titular en `cita` (su última reserva): de quién era y su historial.
+- `POST /reservas/{reserva}/cancelar` suma `meta.efecto`, lo mismo que la vista previa
+  (`GET /reservas/{reserva}/cancelacion`): qué pasó con el crédito, el pago o el
+  anticipo.
+- `GET /reservas/{reserva}/inasistencia` (`asistencia.marcar`): qué pasaría con su
+  crédito si se marca que no vino. Devuelve `con_credito`, `penaliza`, `tolerada`,
+  `pierde_credito` y `unidades`. La regla es la misma de `POST …/asistencia`.
+- **Ficha** (`GET /miembros/{persona}/ficha`): cada derecho suma `todas_sucursales`,
+  `sucursales`, `actividad` y `aplica_a` (qué deja reservar y dónde). El resumen
+  (`GET /miembros/{persona}/resumen`) suma `sucursal` y `profesional` en
+  `proxima_reserva`.
+- **Portal** (`GET /mi/productos`): cada plan suma `ofertas`, `se_renueva` y
+  `cobra_anualidad`.
+- **Inicio** (`GET /inicio/hoy`): acepta `sucursal_id` (403 si no es suya). «Por cobrar»
+  no cuenta las citas a las que el cliente no vino. «Seguimientos» se cuenta con el
+  alcance de la lista de tareas.
+- **Puesta en marcha** (`GET /onboarding/quickstart`):
+  - «prueba» pide una reserva de un cliente (página pública o su cuenta);
+  - las rutas de «cobro», «prueba» y «publicar» llevan a donde se hace.
+- **Pagos** (`GET /pagos`): cada pago suma `por_conciliar` (incidencia abierta) y
+  `comprobante` (`enviado`, `fallido`, `pendiente` o null).
+  `PUT /pagos/{pago}/metodo` y `PUT /pos/ventas/{venta}/metodo` exigen `motivo`.
+- **Nómina** (`PUT /staff/{usuario}/esquema-pago`): 422 en `vigente_desde` si cae en un
+  periodo ya cerrado en un corte.
+- **Fichas**:
+  - `POST /formularios` acepta `borrador: true`; `POST /formularios/{formulario}/publicar`
+    la publica (422 en `campos` si no tiene preguntas);
+  - un borrador no se responde (422 en `formulario`);
+  - `PUT /formularios/{formulario}` con respuestas y cambios de preguntas pide
+    `confirmar_nueva_version: true` (si no, 409 `FORM_NEW_VERSION_UNCONFIRMED` con
+    `meta.respuestas` y `meta.version`);
+  - en `GET /formularios`, quien no diseña fichas ve solo las publicadas que le tocan, con
+    `respuestas: null`.
+- **Comunicaciones**:
+  - `GET /comunicaciones/alcance?segmento=&canal=` (`comunicaciones.gestionar`): devuelve
+    `elegibles`, `sin_consentimiento`, `sin_email` y `sin_app`;
+  - cada difusión suma `fallidos` (agotaron sus intentos); `pendientes` ya no los cuenta.
+- **Reportes**:
+  - `GET /reportes/negocio` no cuenta las clases canceladas;
+  - `GET /reportes/embudo` se acota a las sedes de quien lo pide.
+- **Orden pagada después**: concede el plan como se vendió (`lineas_orden.plan`).
+
 ## Citas: cobrar al terminar (ADR 0158)
 
 - `POST /reservas/{reserva}/cobro` (solo citas, `ordenes.gestionar`): `metodo`

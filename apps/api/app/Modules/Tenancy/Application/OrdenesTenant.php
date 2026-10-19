@@ -124,6 +124,8 @@ class OrdenesTenant
                     // Las condiciones que aceptó (plan con permanencia; B04).
                     'condiciones' => $aceptacion === null ? null
                         : CondicionesDePlan::aceptadas($producto, $aceptacion['via'], $aceptacion['usuario'], $aceptacion['ip']),
+                    // El plan como se vende hoy: si se paga después, se concede esto.
+                    'plan' => $renovacion ? null : $producto->condicionesDeVenta(),
                 ]);
             }
 

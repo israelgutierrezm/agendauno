@@ -64,8 +64,14 @@ describe("agenda / estado de la cita", () => {
 
   it("distingue pagada de pendiente de pago", () => {
     expect(estadoCita(cita("confirmada", null), antes)).toBe("confirmada");
-    // El pago va aparte: apartada en línea sigue "agendada" en atención.
-    expect(estadoCita(cita("pendiente_pago", null), antes)).toBe("confirmada");
+    // Apartada en línea: espera su pago; no se presenta como agendada (en verde).
+    expect(estadoCita(cita("pendiente_pago", null), antes)).toBe("apartada");
+  });
+
+  it("una cita cancelada no está pagada ni por cobrar", () => {
+    const pagada = cita("cancelada", null, { estado: "cancelada" });
+    pagada.cita = { ...pagada.cita!, orden_id: "o1", por_cobrar: false };
+    expect(pagoCita(pagada)).toBeNull();
   });
 
   it("con asistencia: llegó, en servicio o completada según la hora", () => {

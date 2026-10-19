@@ -1375,6 +1375,9 @@ export const reprogramar = {
   guardar: "Cambiar",
   volver: "Volver",
   hecho: "Movida: antes {antes}, ahora {ahora}.",
+  // Una clase con gente: su lugar va con la clase a la nueva hora.
+  conReservas:
+    "1 persona tiene lugar en esta clase: su reserva se mueve con ella a la nueva hora. | {n} personas tienen lugar en esta clase: sus reservas se mueven con ella a la nueva hora.",
   moverTitulo: "Mover a otra fecha",
   mover: "Mover",
   otraFecha: "A otra fecha de esta clase",
@@ -1410,6 +1413,7 @@ export const cambiarSerie = {
   quitadas: "Se quitan {n} fechas de los días que ya no van.",
   creadas: "Se crean {n} fechas en los días nuevos.",
   omitidas: "{n} fechas nuevas no se pueden crear:",
+  aplicado: "Listo: se aplicó el cambio a esta y las siguientes fechas.",
 };
 
 // Agenda como centro de operación (fase 2, punto 2.6).

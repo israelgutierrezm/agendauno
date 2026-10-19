@@ -24,6 +24,7 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) =>
     (e as { mensaje?: string })?.mensaje ?? "Error",
   camposConError: (e: unknown) => (e as { campos?: string[] })?.campos ?? [],
+  codigoDeError: (e: unknown) => (e as { codigo?: string })?.codigo ?? null,
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 const sesion = vi.hoisted(() => ({
@@ -353,6 +354,7 @@ describe("ventas recientes del mostrador", () => {
       .findAll("select")
       .find((s) => s.text().includes("Transferencia"))!;
     await metodo.setValue("tarjeta");
+    await w.get('[data-prueba="motivo-metodo"]').setValue("Fue con tarjeta");
     await w
       .findAll("button")
       .find((b) => b.text() === "Guardar forma de pago")!
@@ -361,7 +363,7 @@ describe("ventas recientes del mostrador", () => {
 
     expect(mocks.put).toHaveBeenCalledWith(
       "/api/v1/app/demo/pos/ventas/v1/metodo",
-      { metodo: "tarjeta" },
+      { metodo: "tarjeta", motivo: "Fue con tarjeta" },
     );
   });
 
@@ -499,6 +501,25 @@ describe("ventas recientes del mostrador", () => {
       (mocks.post.mock.calls[1]![1] as { items: { precio_minor: number }[] })
         .items[0]!.precio_minor,
     ).toBe(30000);
+  });
+
+  it("si otra venta se llevó las últimas piezas, vuelve a leer las existencias", async () => {
+    respuestas(ARTICULOS);
+    mocks.confirmar.mockResolvedValue(true);
+    mocks.post.mockRejectedValueOnce({
+      mensaje: "Stock insuficiente de Pomada mate en la sucursal.",
+      codigo: "STOCK_INSUFFICIENT",
+    });
+    const w = montarConDialogo();
+    await flushPromises();
+    await w.get('[data-prueba="producto"]').trigger("click");
+    const lecturas = mocks.get.mock.calls.length;
+
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+
+    expect(w.text()).toContain("Stock insuficiente de Pomada mate");
+    expect(mocks.get.mock.calls.length).toBeGreaterThan(lecturas);
   });
 
   it("cambiar de sucursal a media venta pide confirmación; si no, la venta sigue en su sede", async () => {

@@ -29,6 +29,7 @@ use App\Modules\Tenancy\Application\PoliticaCancelacion;
 use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\PrimeraVezTenant;
+use App\Modules\Tenancy\Application\PuestaEnMarchaTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverDerechoTenant;
 use App\Modules\Tenancy\Application\VentanaDeReservaTenant;
@@ -39,6 +40,7 @@ use App\Modules\Tenancy\Medicion\Atribucion;
 use App\Modules\Tenancy\Medicion\IdentificadoresNavegador;
 use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
+use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\ConfiguracionCuotasTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
@@ -477,6 +479,8 @@ class MiTenantController
             CanalReserva::Directo->value,
             isset($validado['lugar']) ? (int) $validado['lugar'] : null,
         );
+        // La reserva de un cliente de verdad: la prueba del recorrido (ADR 0166).
+        app(PuestaEnMarchaTenant::class)->anotarPrueba($request->attributes->get('estudio'));
 
         return response()->json(['data' => $this->presentarReserva($reserva->load('sesion.oferta'))], 201);
     }
@@ -647,6 +651,7 @@ class MiTenantController
         }
         $reserva->load(['sesion.oferta', 'sesion.instructor', 'orden', 'saldoOrden']);
         $profesional = $reserva->sesion?->instructor;
+        app(PuestaEnMarchaTenant::class)->anotarPrueba($request->attributes->get('estudio'));
 
         return response()->json(['data' => [
             ...$this->presentarReserva($reserva),
@@ -933,7 +938,7 @@ class MiTenantController
         }
         // En citas, sin membresías (ADR 0130).
         $productos = app(MembresiasPorModalidadTenant::class)
-            ->vendibles(ProductoTenant::query()->with('actividad')->where('archivado', false))
+            ->vendibles(ProductoTenant::query()->with(['actividad', 'ofertas'])->where('archivado', false))
             ->orderBy('precio_minor')->get();
         // La clase de prueba solo se ofrece a quien nunca vino (B03).
         $persona = $this->persona($request);
@@ -963,6 +968,11 @@ class MiTenantController
                 'destacado' => $p->destacado,
                 'primera_vez' => $p->primera_vez,
                 'actividad' => $p->actividad?->nombre,
+                // A qué clases o servicios aplica (vacío = a todos los de su actividad),
+                // si se renueva y si cobra la anualidad: lo que se sabe antes de pagar.
+                'ofertas' => $p->ofertas->map(fn (OfertaTenant $o): array => ['id' => $o->ulid, 'nombre' => $o->nombre])->values()->all(),
+                'se_renueva' => $p->tipo === TipoProducto::Membresia,
+                'cobra_anualidad' => (bool) $p->cobra_anualidad,
                 // ¿Lo puede comprar? (la clase de prueba, solo la primera vez).
                 'disponible' => ! $p->primera_vez || $primeraVez,
                 // Lo que se suma de inscripción si lo compra hoy (0 = nada).

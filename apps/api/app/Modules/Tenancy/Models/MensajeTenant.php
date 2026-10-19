@@ -31,6 +31,15 @@ class MensajeTenant extends Model
     ];
 
     /**
+     * Promocional (una campaña) o de operación (recordatorios, recibos, avisos): solo lo
+     * promocional respeta «no quiero promociones» (ADR 0166).
+     */
+    public function esPromocional(): bool
+    {
+        return $this->difusion_id !== null;
+    }
+
+    /**
      * @var array<string, string>
      */
     protected $casts = [

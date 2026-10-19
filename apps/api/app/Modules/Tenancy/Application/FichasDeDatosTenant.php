@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Exceptions\NuevaVersionSinConfirmar;
 use App\Modules\Tenancy\Models\CampoFormulario;
 use App\Modules\Tenancy\Models\Formulario;
 use App\Modules\Tenancy\Models\RespuestaFormulario;
@@ -26,7 +27,7 @@ class FichasDeDatosTenant
     /**
      * @param  array{nombre: string, descripcion?: string|null, aplica_a?: string|null, campos?: list<array{id?: string|null, etiqueta: string, tipo: string, obligatorio?: bool|null, opciones?: list<string|null>|null}>}  $datos
      */
-    public function guardar(Formulario $formulario, array $datos): Formulario
+    public function guardar(Formulario $formulario, array $datos, bool $confirmado = true): Formulario
     {
         $campos = $datos['campos'] ?? [];
         if (count($campos) > self::MAX_PREGUNTAS) {
@@ -38,7 +39,7 @@ class FichasDeDatosTenant
             }
         }
 
-        return DB::connection('tenant')->transaction(function () use ($formulario, $datos, $campos): Formulario {
+        return DB::connection('tenant')->transaction(function () use ($formulario, $datos, $campos, $confirmado): Formulario {
             // Dos personas editando a la vez no se pisan la versión.
             $bloqueado = Formulario::query()->whereKey($formulario->getKey())->lockForUpdate()->firstOrFail();
             $conRespuestas = RespuestaFormulario::query()->where('formulario_id', $bloqueado->getKey())->exists();
@@ -82,6 +83,13 @@ class FichasDeDatosTenant
 
             $bloqueado->unsetRelation('campos');
             if ($conRespuestas && self::huella($bloqueado) !== $antes) {
+                // Una versión nueva se publica a sabiendas (ADR 0166); si no, se deshace.
+                if (! $confirmado) {
+                    throw new NuevaVersionSinConfirmar(
+                        RespuestaFormulario::query()->where('formulario_id', $bloqueado->getKey())->count(),
+                        $bloqueado->version + 1,
+                    );
+                }
                 $bloqueado->version = $bloqueado->version + 1;
             }
             $bloqueado->save();

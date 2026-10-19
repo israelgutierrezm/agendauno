@@ -8,6 +8,10 @@ use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
+use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -17,6 +21,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
@@ -113,6 +118,13 @@ class PagosTenantController
             ->orderByDesc('id')
             ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
         $pagos = collect($pagina->items());
+        // Lo que pide atención aparte de su estado (ADR 0166), para la página en bloque:
+        // si tiene una incidencia abierta (por conciliar) y cómo va su comprobante.
+        $porConciliar = IncidenciaCobroTenant::query()
+            ->where('estado', IncidenciaCobroTenant::ABIERTA)
+            ->whereIn('pago_id', $pagos->map(fn (PagoTenant $p): int => (int) $p->getKey()))
+            ->pluck('pago_id')->map(fn (mixed $id): int => (int) $id)->flip();
+        $comprobantes = $this->comprobantes($pagos);
 
         $aprobados = $encontrados()->where('estado', EstadoPago::Aprobado->value);
         $resumen = [
@@ -133,7 +145,7 @@ class PagosTenantController
                 'ultima_pagina' => $pagina->lastPage(),
                 'resumen' => $resumen,
             ],
-            'data' => $pagos->map(function (PagoTenant $pago) use ($anular, $corregir): array {
+            'data' => $pagos->map(function (PagoTenant $pago) use ($anular, $corregir, $porConciliar, $comprobantes): array {
                 $reembolsado = (int) ($pago->getAttribute('reembolsado_minor') ?? 0);
                 $comprometido = (int) ($pago->getAttribute('comprometido_minor') ?? 0);
 
@@ -155,6 +167,9 @@ class PagosTenantController
                     'metodo_caja' => $pago->proveedor === 'manual' ? $pago->orden?->metodo_pago : null,
                     'corregible' => $corregir->impedimento($pago, conFactura: false) === null,
                     'anulable' => $anular->impedimento($pago, completo: false) === null,
+                    // Pagado no es lo mismo que conciliado ni que comprobante enviado.
+                    'por_conciliar' => $porConciliar->has((int) $pago->getKey()),
+                    'comprobante' => $comprobantes[(string) $pago->orden?->ulid] ?? null,
                 ];
             })->all(),
         ]);
@@ -235,14 +250,15 @@ class PagosTenantController
 
     /**
      * Corrige la forma de pago de un cobro en caja (ADR 0086): mismo monto, otra forma.
-     * Con motivo opcional; queda en la bitácora.
+     * Cambia cómo cuadra el corte, así que pide el motivo (ADR 0166); queda en la
+     * bitácora con quién lo hizo.
      */
     public function corregirMetodo(Request $request, CorregirMetodoPagoTenant $corregir): JsonResponse
     {
         $pago = $this->pagoDeMiSede($request, $this->acceso);
         $validado = $request->validate([
             'metodo' => ['required', Rule::in(CorregirMetodoPagoTenant::METODOS)],
-            'motivo' => ['nullable', 'string', 'max:255'],
+            'motivo' => ['required', 'string', 'max:255'],
         ]);
         $actor = $request->attributes->get('usuario_tenant');
 
@@ -250,7 +266,7 @@ class PagosTenantController
             $pago,
             (string) $validado['metodo'],
             $actor instanceof Usuario ? $actor : null,
-            $validado['motivo'] ?? null,
+            (string) $validado['motivo'],
         );
 
         return response()->json(['data' => [
@@ -274,5 +290,47 @@ class PagosTenantController
         );
 
         return $pago;
+    }
+
+    /**
+     * Cómo va el comprobante de cada orden de la página (el recibo que se le manda al
+     * cliente al pagarse): `enviado`, `fallido` o `pendiente`; sin entrada, no se mandó
+     * (el negocio no lo envía o el cliente no tiene a dónde).
+     *
+     * @param  Collection<int, PagoTenant>  $pagos
+     * @return array<string, string> por ULID de la orden
+     */
+    private function comprobantes($pagos): array
+    {
+        $ordenes = $pagos->map(fn (PagoTenant $p): ?string => $p->orden?->ulid)->filter()->unique()->values();
+        if ($ordenes->isEmpty()) {
+            return [];
+        }
+        $eventos = EventoOutboxTenant::query()
+            ->where('tipo', 'orden.pagada')
+            ->whereIn('agregado_id', $ordenes)
+            ->pluck('agregado_id', 'ulid');
+        $estados = [];
+        MensajeTenant::query()
+            ->whereIn('evento_ulid', $eventos->keys())
+            // El recibo es del cliente; los avisos al equipo no son su comprobante.
+            ->whereNotNull('persona_id')
+            ->get(['evento_ulid', 'estado'])
+            ->each(function (MensajeTenant $m) use ($eventos, &$estados): void {
+                $orden = (string) $eventos[$m->evento_ulid];
+                $estado = match ($m->estado) {
+                    EstadoMensaje::Enviado => 'enviado',
+                    EstadoMensaje::Fallido => 'fallido',
+                    EstadoMensaje::Encolado => 'pendiente',
+                    default => null,
+                };
+                // Basta con que uno haya llegado; si no, el que pide atención.
+                $previo = $estados[$orden] ?? null;
+                if ($estado !== null && $previo !== 'enviado' && ($previo === null || $estado !== 'pendiente')) {
+                    $estados[$orden] = $estado;
+                }
+            });
+
+        return $estados;
     }
 }

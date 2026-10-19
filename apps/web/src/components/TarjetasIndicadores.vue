@@ -31,6 +31,8 @@ export interface Indicador {
   tendencia?: Tendencia;
   // A dónde lleva (M08): el listado ya filtrado; toda la tarjeta es el enlace.
   to?: RouteLocationRaw;
+  // La base de un porcentaje («12 de 40»): de dónde sale el número.
+  detalle?: string;
 }
 
 const props = withDefaults(
@@ -125,6 +127,12 @@ const columnasMedio = computed(() =>
             />
             {{ k.tendencia.texto }}
           </span>
+          <span
+            v-if="k.detalle"
+            class="ti-detalle"
+            :data-prueba="`detalle-${k.clave}`"
+            >{{ k.detalle }}</span
+          >
         </dd>
       </div>
     </dl>
@@ -201,6 +209,13 @@ const columnasMedio = computed(() =>
     margin-top: 0.15rem;
     font-size: 1.2rem;
   }
+}
+.ti-detalle {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--texto-suave);
 }
 .ti-etiqueta {
   display: flex;

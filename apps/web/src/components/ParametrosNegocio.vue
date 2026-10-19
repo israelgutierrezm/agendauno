@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import ParametrosEditor from "@/components/ParametrosEditor.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import type { Parametro } from "@/lib/parametros";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -21,6 +21,8 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const parametros = ref<Parametro[]>([]);
 const guardando = ref(false);
 const error = ref<string | null>(null);
+// Lo rechazado por campo, para mostrarlo junto a cada uno.
+const errores = ref<Record<string, string>>({});
 
 async function cargar(): Promise<void> {
   try {
@@ -36,6 +38,7 @@ async function cargar(): Promise<void> {
 async function guardar(valores: Record<string, number | null>): Promise<void> {
   guardando.value = true;
   error.value = null;
+  errores.value = {};
   try {
     const { data } = await api.put<{ data: Parametro[] }>(
       `${base.value}/parametros`,
@@ -45,6 +48,7 @@ async function guardar(valores: Record<string, number | null>): Promise<void> {
     toast.exito(t("parametrosConfig.guardado"));
   } catch (e) {
     error.value = mensajeDeError(e);
+    errores.value = erroresPorCampo(e);
   } finally {
     guardando.value = false;
   }
@@ -68,6 +72,7 @@ onMounted(cargar);
       :parametros="parametros"
       modo="negocio"
       :guardando="guardando"
+      :errores="errores"
       @guardar="guardar"
     />
   </div>

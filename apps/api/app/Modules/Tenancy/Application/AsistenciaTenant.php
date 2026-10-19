@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\AsistenciaAunNoAbre;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaNoConfirmada;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -175,17 +176,23 @@ class AsistenciaTenant
      *
      * @return int cuántas se marcaron
      */
-    public function marcarInasistenciasAlTerminar(): int
+    public function marcarInasistenciasAlTerminar(?DateTimeInterface $reabrioEn = null): int
     {
         if (! $this->parametros->siNo('asistencia.no_asistio_al_terminar')) {
             return 0;
         }
         $ahora = CarbonImmutable::now();
+        // Las del último día; si el negocio reabrió hace menos (estuvo suspendido), solo
+        // desde que reabrió: las de antes nadie las pudo registrar (ADR 0166).
+        $desde = $ahora->subDay();
+        if ($reabrioEn !== null && CarbonImmutable::instance($reabrioEn)->greaterThan($desde)) {
+            $desde = CarbonImmutable::instance($reabrioEn);
+        }
         $marcadas = 0;
         SesionTenant::query()
             ->where('estado', EstadoSesionTenant::Programada->value)
             ->where('termina_en', '<=', $ahora)
-            ->where('termina_en', '>', $ahora->subDay())
+            ->where('termina_en', '>', $desde)
             ->whereHas('reservas', fn ($q) => $q->where('estado', EstadoReserva::Confirmada->value)->whereDoesntHave('asistencia'))
             ->get()
             ->each(function (SesionTenant $sesion) use (&$marcadas): void {
@@ -228,6 +235,32 @@ class AsistenciaTenant
 
             throw new AsistenciaAunNoAbre("La asistencia se registra desde las {$hora}.");
         }
+    }
+
+    /**
+     * Qué pasaría con su crédito si se marca que no vino, con las mismas reglas que
+     * {@see marcar()}: la recepción lo lee antes de confirmar.
+     *
+     * - `con_credito`: la reserva tiene crédito apartado (si no, la falta no mueve saldo).
+     * - `penaliza`: su política cobra las faltas.
+     * - `tolerada`: esta falta entra en la tolerancia de su política.
+     * - `pierde_credito`: con todo lo anterior, lo pierde.
+     *
+     * @return array{con_credito: bool, penaliza: bool, tolerada: bool, pierde_credito: bool, unidades: int}
+     */
+    public function efectoDeInasistencia(ReservaTenant $reserva): array
+    {
+        $retencion = $reserva->retencion;
+        $penaliza = (bool) ($reserva->penaliza_no_show ?? true);
+        $tolerada = $penaliza && $this->tolerada($reserva);
+
+        return [
+            'con_credito' => $retencion !== null,
+            'penaliza' => $penaliza,
+            'tolerada' => $tolerada,
+            'pierde_credito' => $retencion !== null && $penaliza && ! $tolerada,
+            'unidades' => (int) ($retencion->unidades ?? 0),
+        ];
     }
 
     /**

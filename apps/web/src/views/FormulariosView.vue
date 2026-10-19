@@ -9,7 +9,7 @@ import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, codigoDeError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -220,6 +220,8 @@ async function crearFormulario(): Promise<void> {
       {
         nombre: nuevo.value.nombre,
         aplica_a: nuevo.value.aplica_a,
+        // En borrador: nadie la ve ni la responde hasta publicarla (ADR 0166).
+        borrador: true,
       },
     );
     toast.exito(t("operacion.fichas.creada", { nombre: nuevo.value.nombre }));
@@ -415,26 +417,47 @@ async function guardarFicha(
   }
   guardandoFicha.value = true;
   error.value = null;
+  const cuerpo = {
+    nombre: datos.nombre ?? f.nombre,
+    descripcion:
+      datos.descripcion !== undefined ? datos.descripcion : f.descripcion,
+    aplica_a: datos.aplica_a ?? f.aplica_a,
+    campos: campos.map((c) => ({
+      id: c.id,
+      etiqueta: c.etiqueta,
+      tipo: c.tipo,
+      obligatorio: c.obligatorio,
+      opciones: c.tipo === "seleccion" ? c.opciones : null,
+    })),
+  };
   try {
-    const { data } = await api.put<{ data: Formulario }>(
-      `${base.value}/formularios/${f.id}`,
-      {
-        nombre: datos.nombre ?? f.nombre,
-        descripcion:
-          datos.descripcion !== undefined ? datos.descripcion : f.descripcion,
-        aplica_a: datos.aplica_a ?? f.aplica_a,
-        campos: campos.map((c) => ({
-          id: c.id,
-          etiqueta: c.etiqueta,
-          tipo: c.tipo,
-          obligatorio: c.obligatorio,
-          opciones: c.tipo === "seleccion" ? c.opciones : null,
-        })),
-      },
-    );
+    let respuesta;
+    try {
+      respuesta = await api.put<{ data: Formulario }>(
+        `${base.value}/formularios/${f.id}`,
+        cuerpo,
+      );
+    } catch (e) {
+      // Con respuestas, el cambio se publica como versión nueva: se confirma
+      // (ADR 0166). Si no se confirma, no cambia nada.
+      if (codigoDeError(e) !== "FORM_NEW_VERSION_UNCONFIRMED") {
+        throw e;
+      }
+      if (
+        !(await confirmar(mensajeDeError(e), {
+          aceptar: t("operacion.fichas.publicarVersion"),
+        }))
+      ) {
+        return false;
+      }
+      respuesta = await api.put<{ data: Formulario }>(
+        `${base.value}/formularios/${f.id}`,
+        { ...cuerpo, confirmar_nueva_version: true },
+      );
+    }
     const i = formularios.value.findIndex((x) => x.id === f.id);
     if (i >= 0) {
-      formularios.value[i] = data.data;
+      formularios.value[i] = respuesta.data.data;
     }
     return true;
   } catch (e) {
@@ -442,6 +465,21 @@ async function guardarFicha(
     return false;
   } finally {
     guardandoFicha.value = false;
+  }
+}
+// Publicar un borrador: desde ahí se pide a quien le toca (ADR 0166).
+async function publicar(f: Formulario): Promise<void> {
+  try {
+    const { data } = await api.post<{ data: Formulario }>(
+      `${base.value}/formularios/${f.id}/publicar`,
+    );
+    const i = formularios.value.findIndex((x) => x.id === f.id);
+    if (i >= 0) {
+      formularios.value[i] = data.data;
+    }
+    toast.exito(t("operacion.fichas.publicada", { nombre: f.nombre }));
+  } catch (e) {
+    error.value = mensajeDeError(e);
   }
 }
 function mover(i: number, delta: number): void {
@@ -528,7 +566,7 @@ async function archivar(f: Formulario): Promise<void> {
   if (
     !(await confirmar(
       t("operacion.fichas.archivarConfirmar", { nombre: f.nombre }),
-      { aceptar: t("operacion.fichas.archivar") },
+      { aceptar: t("operacion.fichas.archivar"), peligro: true },
     ))
   ) {
     return;
@@ -720,7 +758,7 @@ onMounted(cargar);
                     : $t(
                         f.activo
                           ? "adminUsabilidad.fichas.activa"
-                          : "adminUsabilidad.fichas.inactiva",
+                          : "adminUsabilidad.fichas.borrador",
                       )
                 }}</span
               >
@@ -900,11 +938,22 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-contorno tu-tono-neutral"
+                  class="tu-btn tu-btn-contorno tu-tono-peligro"
                   data-prueba="archivar-ficha"
                   @click="archivar(seleccionado)"
                 >
                   {{ $t("operacion.fichas.archivar") }}
+                </button>
+                <!-- Borrador: se publica cuando ya tiene sus preguntas. -->
+                <button
+                  v-if="!seleccionado.activo && !seleccionado.archivado"
+                  type="button"
+                  class="tu-btn tu-btn-primario"
+                  data-prueba="publicar-ficha"
+                  :disabled="seleccionado.campos.length === 0"
+                  @click="publicar(seleccionado)"
+                >
+                  {{ $t("operacion.fichas.publicar") }}
                 </button>
                 <button
                   class="tu-btn tu-btn-primario tu-btn-crear"

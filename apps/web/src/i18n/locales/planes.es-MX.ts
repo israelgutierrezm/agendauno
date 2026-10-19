@@ -141,6 +141,9 @@ export default {
     acumulaLimitado: "Pasan, hasta un máximo",
     acumulaMax: "Máximo de clases que pasan",
     archivar: "Archivado (ya no se vende; lo vendido sigue igual)",
+    confirmarArchivar:
+      "¿Archivar «{nombre}»? Ya no se vende; quien lo tiene lo conserva igual.",
+    archivarAceptar: "Archivar el plan",
     guardar: "Guardar",
     guardando: "Guardando…",
     cancelar: "Cancelar",

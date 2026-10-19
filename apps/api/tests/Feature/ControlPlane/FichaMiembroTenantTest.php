@@ -46,6 +46,13 @@ it('la ficha consolida derechos, historial de reservas y de compras', function (
     expect($ficha['derechos'][0]['saldo_unidades'])->toBe(8000);
     // La reserva retiene 1 crédito: disponible < saldo.
     expect($ficha['derechos'][0]['disponible_unidades'])->toBe(7000);
+    // Qué puede reservar y dónde: el pack no restringe sedes, actividad ni clases.
+    expect($ficha['derechos'][0])->toMatchArray(['todas_sucursales' => true, 'sucursales' => [], 'actividad' => null, 'aplica_a' => []]);
+
+    // Su próxima reserva dice a qué sede tiene que ir.
+    $resumen = $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$comprador}/resumen", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect($resumen['proxima_reserva']['sucursal'])->toBe('Roma Norte');
 
     expect($ficha['reservas'])->toHaveCount(1);
     expect($ficha['reservas'][0]['clase'])->toBe('Nivel 1');

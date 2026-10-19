@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\DifundirComunicacionTenant;
+use App\Modules\Tenancy\Application\EnviarMensajesTenant;
 use App\Modules\Tenancy\Application\ResolverSegmentoTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
@@ -13,6 +14,7 @@ use App\Modules\Tenancy\Models\DifusionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -42,6 +44,20 @@ class DifusionesTenantController
             // Push solo aparece si la plataforma tiene FCM configurado.
             'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::paraDifusiones()),
         ]);
+    }
+
+    /**
+     * Antes de enviar (ADR 0166): a cuántos llegaría por ese canal y quiénes quedan fuera
+     * y por qué (no quieren promociones, sin correo, sin la app).
+     */
+    public function alcance(Request $request, DifundirComunicacionTenant $difundir): JsonResponse
+    {
+        $validado = $request->validate([
+            'segmento' => ['required', Rule::enum(SegmentoComunicacion::class)],
+            'canal' => ['required', Rule::in(array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::paraDifusiones()))],
+        ]);
+
+        return response()->json(['data' => $difundir->alcance(SegmentoComunicacion::from($validado['segmento']), CanalComunicacion::from($validado['canal']))]);
     }
 
     public function index(Request $request): JsonResponse
@@ -83,17 +99,21 @@ class DifusionesTenantController
 
         $segmento = SegmentoComunicacion::from($validado['segmento']);
         $canal = CanalComunicacion::from($validado['canal']);
-        // La misma campaña no se manda dos veces el mismo día (B08).
-        $repetida = DifusionTenant::query()
-            ->where('huella', DifundirComunicacionTenant::huella($segmento, $canal, $validado['asunto'], $validado['cuerpo']))
-            ->where('estado', '!=', DifusionTenant::CANCELADA)
-            ->where('created_at', '>=', now()->subDay())
-            ->exists();
-        if ($repetida) {
-            throw ValidationException::withMessages(['cuerpo' => ['Ya mandaste esta misma difusión en las últimas 24 horas.']]);
-        }
+        $huella = DifundirComunicacionTenant::huella($segmento, $canal, $validado['asunto'], $validado['cuerpo']);
+        // La misma campaña no se manda dos veces el mismo día (B08). Con el candado, dos
+        // envíos a la vez (un doble clic, un reintento) no pasan los dos la revisión.
+        $difusion = Cache::lock('difusion:'.$huella, 30)->block(10, function () use ($huella, $difundir, $segmento, $canal, $validado): DifusionTenant {
+            $repetida = DifusionTenant::query()
+                ->where('huella', $huella)
+                ->where('estado', '!=', DifusionTenant::CANCELADA)
+                ->where('created_at', '>=', now()->subDay())
+                ->exists();
+            if ($repetida) {
+                throw ValidationException::withMessages(['cuerpo' => ['Ya mandaste esta misma difusión en las últimas 24 horas.']]);
+            }
 
-        $difusion = $difundir->ejecutar($segmento, $canal, $validado['asunto'], $validado['cuerpo']);
+            return $difundir->ejecutar($segmento, $canal, $validado['asunto'], $validado['cuerpo']);
+        });
 
         return response()->json(['data' => $this->presentar($difusion)], 201);
     }
@@ -158,7 +178,11 @@ class DifusionesTenantController
             // B08: en qué va y cuánto falta.
             'estado' => $difusion->estado ?? DifusionTenant::ENVIANDO,
             'enviados' => $difusion->mensajes()->where('estado', EstadoMensaje::Enviado->value)->count(),
-            'pendientes' => $difusion->mensajes()->whereIn('estado', [EstadoMensaje::Encolado->value, EstadoMensaje::Fallido->value])->count(),
+            // Lo que aún se intentará; lo que agotó sus intentos ya no está «enviándose».
+            'pendientes' => $difusion->mensajes()->whereIn('estado', [EstadoMensaje::Encolado->value, EstadoMensaje::Fallido->value])
+                ->where('intentos', '<', EnviarMensajesTenant::MAX_INTENTOS)->count(),
+            'fallidos' => $difusion->mensajes()->where('estado', EstadoMensaje::Fallido->value)
+                ->where('intentos', '>=', EnviarMensajesTenant::MAX_INTENTOS)->count(),
             'descartados' => $difusion->mensajes()->where('estado', EstadoMensaje::Descartado->value)->count(),
         ];
     }

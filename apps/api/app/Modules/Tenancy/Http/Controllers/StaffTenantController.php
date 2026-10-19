@@ -11,16 +11,19 @@ use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
+use App\Modules\Tenancy\Models\CorteNominaTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoVersionTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\RolSesionTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Staff multi + sustitucion + nomina del estudio (R17): asigna varios miembros del
@@ -90,6 +93,21 @@ class StaffTenantController
             'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
             'vigente_desde' => ['nullable', 'date_format:Y-m-d'],
         ]);
+        // Lo ya cerrado en un corte no cambia de tarifa (ADR 0166): la nueva vale después
+        // del último periodo cerrado de esta persona; si no, el corte mostraría como
+        // diferencia por pagar un periodo ya pagado.
+        $cerradoHasta = CorteNominaTenant::query()
+            ->whereHas('lineas', fn ($q) => $q->where('usuario_id', $usuario->getKey()))
+            ->max('hasta');
+        $desde = (string) ($validado['vigente_desde'] ?? $fechas->hoy());
+        $hayVersiones = EsquemaPagoVersionTenant::query()->where('usuario_id', $usuario->getKey())->exists();
+        if ($hayVersiones && $cerradoHasta !== null && $desde <= substr((string) $cerradoHasta, 0, 10)) {
+            $siguiente = CarbonImmutable::parse(substr((string) $cerradoHasta, 0, 10))->addDay();
+            throw ValidationException::withMessages(['vigente_desde' => [
+                'La nómina de esta persona ya se cerró hasta el '.$siguiente->subDay()->format('d/m/Y')
+                .': la tarifa nueva puede valer desde el '.$siguiente->format('d/m/Y').'.',
+            ]]);
+        }
         $datos = [
             'tipo' => $validado['tipo'],
             'monto_minor' => (int) $validado['monto_minor'],

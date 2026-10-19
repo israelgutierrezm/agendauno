@@ -251,15 +251,16 @@ class PuntoDeVentaTenantController
 
     /**
      * Corrige la forma de pago de una venta registrada con la equivocada (ADR 0089).
+     * Cambia cómo cuadra el corte: pide el motivo (ADR 0166).
      */
     public function corregirMetodo(Request $request): JsonResponse
     {
         $venta = $this->ventaDeMiSede($request);
         $validado = $request->validate([
             'metodo' => ['required', Rule::in(CorregirVentaPosTenant::METODOS)],
-            'motivo' => ['nullable', 'string', 'max:255'],
+            'motivo' => ['required', 'string', 'max:255'],
         ]);
-        $venta = $this->corregir->corregirMetodo($venta, $validado['metodo'], $this->actor($request), $validado['motivo'] ?? null);
+        $venta = $this->corregir->corregirMetodo($venta, $validado['metodo'], $this->actor($request), (string) $validado['motivo']);
 
         return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo', 'persona']))]);
     }

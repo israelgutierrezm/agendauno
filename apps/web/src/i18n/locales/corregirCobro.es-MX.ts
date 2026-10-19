@@ -12,6 +12,7 @@ export default {
     "Para un cobro registrado por error: el dinero no entró. La venta vuelve a quedar por cobrar y, si dio créditos o una membresía sin usar, se retiran. Queda en la bitácora.",
   motivo: "Motivo",
   motivoPh: "Ej. Se registró dos veces, aún no paga",
+  motivoMetodoPh: "Ej. Pagó con tarjeta, se marcó efectivo",
   confirmarAnular:
     "¿Anular este cobro? Se marca como anulado, la venta vuelve a quedar por cobrar y se retira lo que dio. No se puede deshacer.",
   okAnulado: "Cobro anulado; la venta quedó por cobrar.",

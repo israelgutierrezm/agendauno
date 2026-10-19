@@ -62,6 +62,12 @@ it('la atención de una cita depende de si llegó y de la hora', function (?stri
     'no asistió' => ['ausente', '11:05', 'no_asistio'],
 ]);
 
+it('una cita apartada en línea no se presenta como agendada mientras no se pague', function (): void {
+    $ahora = CarbonImmutable::parse('2026-10-03 09:00:00', 'UTC');
+
+    expect(EstadoAtencionCita::de(sesionContratoUnit(), reservaContratoUnit('pendiente_pago'), $ahora))->toBe(EstadoAtencionCita::Apartada);
+});
+
 it('una cita cancelada (la sesión o su reserva) está cancelada', function (): void {
     $ahora = CarbonImmutable::parse('2026-10-03 09:00:00', 'UTC');
 
@@ -78,6 +84,7 @@ it('el pago de una cita va aparte de su atención', function (string $reserva, ?
     'pagada' => ['confirmada', 'pagada', 'pagada'],
     'con su plan, sin cobro' => ['confirmada', null, null],
     'su orden se canceló' => ['cancelada', 'cancelada', null],
+    'la cita se canceló ya pagada' => ['cancelada', 'pagada', null],
 ]);
 
 it('la ocupación que se muestra es la del cupo de una clase, con tope de 100', function (): void {

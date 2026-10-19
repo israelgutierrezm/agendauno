@@ -22,6 +22,8 @@ use Carbon\CarbonInterface;
 enum EstadoAtencionCita: string
 {
     case Confirmada = 'confirmada';
+    // Apartada en línea: el lugar espera el pago y se libera si no llega.
+    case Apartada = 'apartada';
     case SinRegistrar = 'sin_registrar';
     case Llego = 'llego';
     case EnServicio = 'en_servicio';
@@ -49,6 +51,9 @@ enum EstadoAtencionCita: string
             }
 
             return $ahora->lessThan($sesion->termina_en) ? self::EnServicio : self::Completada;
+        }
+        if ($reserva->estado === EstadoReserva::PendientePago) {
+            return self::Apartada;
         }
 
         return $ahora->lessThan($sesion->termina_en) ? self::Confirmada : self::SinRegistrar;

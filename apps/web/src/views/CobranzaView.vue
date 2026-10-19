@@ -81,6 +81,9 @@ interface Pago {
   metodo_caja?: string | null;
   corregible?: boolean;
   anulable?: boolean;
+  // Aparte de su estado (ADR 0166): una incidencia abierta y cómo va el recibo.
+  por_conciliar?: boolean;
+  comprobante?: "enviado" | "fallido" | "pendiente" | null;
 }
 interface Suscripcion {
   id: string;
@@ -1153,6 +1156,26 @@ watch(vista, cargar, { immediate: true });
                         '--tono': TONO_PAGO[p.estado] ?? 'var(--aviso)',
                       }"
                       >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
+                    >
+                    <!-- Pagado no es lo mismo que conciliado ni que el recibo enviado. -->
+                    <span
+                      v-if="p.por_conciliar"
+                      class="block text-xs"
+                      :style="{ color: 'var(--aviso)' }"
+                      data-prueba="pago-por-conciliar"
+                      >{{ $t("cobranza.porConciliar") }}</span
+                    >
+                    <span
+                      v-if="p.comprobante"
+                      class="block text-xs"
+                      :style="{
+                        color:
+                          p.comprobante === 'fallido'
+                            ? 'var(--error)'
+                            : 'var(--texto-suave)',
+                      }"
+                      data-prueba="pago-comprobante"
+                      >{{ $t(`cobranza.comprobante.${p.comprobante}`) }}</span
                     >
                   </td>
                   <td class="text-right">

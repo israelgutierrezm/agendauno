@@ -15,7 +15,8 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
  *   anticipo y falta el saldo (ADR 0161);
  * - `pagada`.
  *
- * Null: no lleva cobro (la toma con su plan) o su orden se canceló.
+ * Null: no lleva cobro (la toma con su plan), su orden se canceló o la cita se
+ * canceló (lo que pasó con su pago está en su historial).
  */
 enum EstadoPagoCita: string
 {
@@ -28,6 +29,9 @@ enum EstadoPagoCita: string
      */
     public static function de(ReservaTenant $reserva): ?self
     {
+        if (in_array($reserva->estado, [EstadoReserva::Cancelada, EstadoReserva::Expirada], true)) {
+            return null;
+        }
         if ($reserva->estado === EstadoReserva::PendientePago) {
             return self::PorPagar;
         }

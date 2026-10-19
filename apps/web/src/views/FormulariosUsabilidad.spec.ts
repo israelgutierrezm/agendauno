@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api", () => ({
   api: mocks,
-  mensajeDeError: () => "No se pudo crear",
+  mensajeDeError: (e: unknown) =>
+    (e as { mensaje?: string })?.mensaje ?? "No se pudo crear",
+  codigoDeError: (e: unknown) => (e as { codigo?: string })?.codigo ?? null,
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 vi.mock("@/stores/toast", () => ({
@@ -110,6 +112,8 @@ describe("alta de fichas sin estorbar al diseñador", () => {
     expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/formularios", {
       nombre: "Encuesta de satisfacción",
       aplica_a: "miembro",
+      // Nace en borrador: nadie la ve hasta publicarla.
+      borrador: true,
     });
     expect(w.get('[role="alert"]').text()).toBe("No se pudo crear");
     expect((w.get("#nombre-ficha").element as HTMLInputElement).value).toBe(
@@ -127,7 +131,7 @@ describe("alta de fichas sin estorbar al diseñador", () => {
     const w = await montar();
     expect(w.text()).toContain("Cuestionario de salud");
     expect(w.text()).toContain("1 campo");
-    expect(w.text()).toContain("Activa");
+    expect(w.text()).toContain("Publicada");
     expect(w.text()).not.toContain("Contacto de emergencia");
     await w
       .get('button[aria-label="Gestionar ficha: Cuestionario de salud"]')
@@ -274,6 +278,54 @@ describe("alta de fichas sin estorbar al diseñador", () => {
       expect.objectContaining({
         campos: [expect.objectContaining({ id: "c2" })],
       }),
+    );
+    w.unmount();
+  });
+
+  it("con respuestas, guardar una versión nueva se confirma; un borrador se publica", async () => {
+    const ficha = { ...fichaSalud, respuestas: 2, version: 1 };
+    mocks.get.mockResolvedValue({ data: { data: [ficha] } });
+    mocks.put
+      .mockRejectedValueOnce({
+        codigo: "FORM_NEW_VERSION_UNCONFIRMED",
+        mensaje:
+          "Esta ficha ya tiene 2 respuesta(s): el cambio se publica como versión 2.",
+      })
+      .mockResolvedValueOnce({ data: { data: { ...ficha, version: 2 } } });
+    mocks.confirmar.mockResolvedValue(true);
+    const w = await montar();
+    await w
+      .get('button[aria-label="Gestionar ficha: Cuestionario de salud"]')
+      .trigger("click");
+    await w.get('[data-prueba="quitar-c1"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.confirmar).toHaveBeenLastCalledWith(
+      expect.stringContaining("versión 2"),
+      expect.anything(),
+    );
+    expect(mocks.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/formularios/salud",
+      expect.objectContaining({ confirmar_nueva_version: true }),
+    );
+    w.unmount();
+  });
+
+  it("un borrador dice que lo es y se publica", async () => {
+    const borrador = { ...fichaSalud, activo: false };
+    mocks.get.mockResolvedValue({ data: { data: [borrador] } });
+    mocks.post.mockResolvedValue({
+      data: { data: { ...borrador, activo: true } },
+    });
+    const w = await montar();
+    expect(w.text()).toContain("Borrador");
+    await w
+      .get('button[aria-label="Gestionar ficha: Cuestionario de salud"]')
+      .trigger("click");
+    await w.get('[data-prueba="publicar-ficha"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/formularios/salud/publicar",
     );
     w.unmount();
   });

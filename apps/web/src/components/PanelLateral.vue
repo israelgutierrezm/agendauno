@@ -51,8 +51,8 @@ const capa = useFocoPanel(() => props.abierto, panel, cerrar);
             lateral
               ? 'h-full max-w-md'
               : amplio
-                ? 'max-h-[92vh] max-w-5xl rounded-xl'
-                : 'max-h-[92vh] max-w-3xl rounded-xl'
+                ? 'max-h-[92dvh] max-w-5xl rounded-xl'
+                : 'max-h-[92dvh] max-w-3xl rounded-xl'
           "
           :style="{ background: 'var(--superficie)' }"
           role="dialog"

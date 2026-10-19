@@ -16,7 +16,7 @@ import TarjetasIndicadores, {
 import VentasMostrador, {
   type ResumenVentas,
 } from "@/components/VentasMostrador.vue";
-import { api, camposConError, mensajeDeError } from "@/lib/api";
+import { api, camposConError, codigoDeError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoComprador } from "@/lib/mostrador";
@@ -508,10 +508,12 @@ async function cobrar(): Promise<void> {
   } catch (e) {
     const mensaje = mensajeDeError(e);
     error.value = mensaje;
-    // Un precio que cambió o un producto que se desactivó: se trae lo vigente (y el
-    // aviso se conserva para que se revise el total).
+    // Un precio que cambió, un producto que se desactivó o que otra venta se llevó
+    // las últimas piezas: se trae lo vigente (y el aviso se conserva para que se
+    // revise el carrito).
     const campos = camposConError(e);
     if (
+      codigoDeError(e) === "STOCK_INSUFFICIENT" ||
       campos.some(
         (c) => c.endsWith(".precio_minor") || c.endsWith(".articulo_id"),
       )

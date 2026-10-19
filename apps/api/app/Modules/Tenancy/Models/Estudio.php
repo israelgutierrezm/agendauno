@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $publicado_en la primera vez que publicó su página (C02)
  * @property Carbon|null $primera_operacion_en su primera operación real (C02/C08)
  * @property bool $es_demo negocio de demostración: no cuenta en el embudo de la plataforma
+ * @property Carbon|null $reactivado_en cuándo volvió a abrir tras una suspensión (ADR 0166)
  * @property array<string, mixed>|null $seo_sitio el SEO de su sitio publicado (ADR 0146), para la cabecera del servidor
  * @property string|null $plan_nivel el nivel contratado de un negocio de citas (ADR 0107): individual, premium o pro
  * @property int|null $plan_profesionales los profesionales contratados
@@ -81,6 +82,7 @@ class Estudio extends Model
         'suspendido_por',
         'suspendido_en',
         'sin_suspension_hasta',
+        'reactivado_en',
         'trial_inicia_en',
         'trial_termina_en',
         'plan',
@@ -143,6 +145,7 @@ class Estudio extends Model
         'seo_sitio' => 'array',
         'suspendido_en' => 'datetime',
         'sin_suspension_hasta' => 'date',
+        'reactivado_en' => 'datetime',
     ];
 
     /**

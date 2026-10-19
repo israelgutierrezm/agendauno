@@ -18,6 +18,8 @@ const props = defineProps<{
   /** Solo en citas: con quién (vacío = el mismo). */
   profesionales?: { id: string; nombre: string }[];
   profesionalId?: string | null;
+  /** Solo en clases: cuántas personas tienen lugar (se mueven con la clase). */
+  reservas?: number;
 }>();
 
 const emit = defineEmits<{
@@ -111,6 +113,12 @@ async function guardar(): Promise<void> {
     </div>
     <p :style="{ color: 'var(--texto-suave)' }">
       {{ $t("reprogramar.ayuda") }}
+    </p>
+    <p
+      v-if="reservas !== undefined && reservas > 0"
+      data-prueba="reprogramar-reservas"
+    >
+      {{ $t("reprogramar.conReservas", { n: reservas }, reservas) }}
     </p>
     <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
     <div class="flex flex-wrap gap-2">

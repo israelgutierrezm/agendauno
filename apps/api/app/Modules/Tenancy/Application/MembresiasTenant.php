@@ -199,6 +199,8 @@ class MembresiasTenant
                     ? ($politicaReset === PoliticaReset::Calendario ? 1 : Aniversario::diaDe($inicio))
                     : null,
                 'estado' => 'activo',
+                // La anualidad, como estaba el plan al contratarlo (ADR 0166).
+                'cobra_anualidad' => (bool) $producto->cobra_anualidad,
                 // Permanencia (B04): lo pactado se congela; editar el plan no lo cambia.
                 ...$this->permanencia($producto, $inicio, $condiciones),
             ]);
@@ -223,7 +225,9 @@ class MembresiasTenant
                 'valido_hasta' => $validoHasta,
             ]);
             // A qué clases aplica, copiado: editar el plan después no cambia lo vendido.
-            $derecho->ofertas()->sync($producto->ofertas()->pluck('ofertas.id')->all());
+            $derecho->ofertas()->sync($producto->relationLoaded('ofertas')
+                ? $producto->ofertas->modelKeys()
+                : $producto->ofertas()->pluck('ofertas.id')->all());
 
             if (! $producto->ilimitado) {
                 $concesion = $recurrente

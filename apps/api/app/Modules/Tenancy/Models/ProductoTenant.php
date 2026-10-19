@@ -101,6 +101,47 @@ class ProductoTenant extends Model
             || (bool) ($atributos['cobra_anualidad'] ?? false);
     }
 
+    /** Lo que define qué se concede al venderlo (se copia en la línea de la orden). */
+    public const CONDICIONES_DE_VENTA = [
+        'tipo', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad',
+        'actividad_id', 'sucursal_id', 'sucursales_ids', 'politica_reset', 'unidades_por_ciclo',
+        'politica_rollover', 'rollover_max', 'cobra_anualidad',
+        'permanencia_meses', 'baja_anticipada', 'penalizacion_minor', 'penalizacion_porcentaje',
+    ];
+
+    /**
+     * El plan como se vende ahora (ADR 0166): sus atributos tal como están guardados y
+     * a qué clases aplica. Se copia en la línea de la orden al crearla, para que una
+     * orden que se paga después conceda lo que se compró, aunque el catálogo cambie.
+     *
+     * @return array{atributos: array<string, mixed>, ofertas: list<int>}
+     */
+    public function condicionesDeVenta(): array
+    {
+        return [
+            'atributos' => array_intersect_key($this->getAttributes(), array_flip(self::CONDICIONES_DE_VENTA)),
+            'ofertas' => $this->ofertas()->pluck('ofertas.id')->map(fn (mixed $id): int => (int) $id)->values()->all(),
+        ];
+    }
+
+    /**
+     * Una copia del producto con las condiciones con que se vendió (sin guardarla):
+     * lo que se concede al pagar. Sin copia (órdenes anteriores), el producto tal cual.
+     *
+     * @param  array{atributos?: array<string, mixed>, ofertas?: list<int>}|null  $vendido
+     */
+    public function comoSeVendio(?array $vendido): self
+    {
+        if ($vendido === null || ! isset($vendido['atributos'])) {
+            return $this;
+        }
+        $copia = clone $this;
+        $copia->setRawAttributes(array_merge($this->getAttributes(), array_intersect_key($vendido['atributos'], array_flip(self::CONDICIONES_DE_VENTA))));
+        $copia->setRelation('ofertas', OfertaTenant::query()->whereIn('id', $vendido['ofertas'] ?? [])->get());
+
+        return $copia;
+    }
+
     public function esMembresia(): bool
     {
         return self::esMembresiaSegun($this->only(['tipo', 'politica_reset', 'ilimitado', 'permanencia_meses', 'cobra_inscripcion', 'cobra_anualidad']));

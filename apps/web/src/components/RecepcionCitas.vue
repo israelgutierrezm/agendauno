@@ -79,9 +79,12 @@ const visibles = computed(() => {
   const q = normalizar(busqueda.value.trim());
   return citas.value.filter((s) => {
     const estado = estadoCita(s, new Date());
+    // «Activas» (la clave `todas`): las de la jornada sin las canceladas, que tienen
+    // su propio filtro; así abre lo mismo que cuenta el Inicio (ADR 0166).
     const coincide =
-      filtro.value === "todas" ||
-      (filtro.value === "pendientes" && estado === "confirmada") ||
+      (filtro.value === "todas" && estado !== "cancelada") ||
+      (filtro.value === "pendientes" &&
+        (estado === "confirmada" || estado === "apartada")) ||
       (filtro.value === "sinRegistrar" && estado === "sin_registrar") ||
       (filtro.value === "llegaron" &&
         s.estado === "programada" &&
@@ -192,8 +195,8 @@ const resumen = computed<ResumenCitas>(() => {
     llegaron: activas.value.filter((s) => s.cita?.asistencia === "presente")
       .length,
     // Por atender: aún no terminan. Sin registrar: terminaron y nadie dijo si vino.
-    porAtender: activas.value.filter(
-      (s) => estadoCita(s, ahora) === "confirmada",
+    porAtender: activas.value.filter((s) =>
+      ["confirmada", "apartada"].includes(estadoCita(s, ahora)),
     ).length,
     sinRegistrar: activas.value.filter(
       (s) => estadoCita(s, ahora) === "sin_registrar",
@@ -221,6 +224,7 @@ function atencion(s: SesionAgenda): { texto: string; tono: string } {
     no_asistio: "var(--error)",
     cancelada: "var(--texto-suave)",
     sin_registrar: "var(--aviso)",
+    apartada: "var(--aviso)",
   };
   // Llegó tarde o la marcó el sistema al terminar (ADR 0101): se dice.
   const texto =

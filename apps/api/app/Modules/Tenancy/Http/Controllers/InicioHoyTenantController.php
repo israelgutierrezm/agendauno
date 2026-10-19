@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\ResumenDelDiaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -23,10 +25,19 @@ class InicioHoyTenantController
 {
     public function __invoke(Request $request, ResumenDelDiaTenant $resumen): JsonResponse
     {
-        $validado = $request->validate(['fecha' => ['nullable', 'date_format:Y-m-d']]);
+        $validado = $request->validate([
+            'fecha' => ['nullable', 'date_format:Y-m-d'],
+            // La sucursal elegida en la barra (ADR 0166).
+            'sucursal_id' => ['nullable', 'string'],
+        ]);
 
         $usuario = $request->attributes->get('usuario_tenant');
         abort_unless($usuario instanceof Usuario, 403);
+        $sucursalId = null;
+        if (($validado['sucursal_id'] ?? '') !== '') {
+            $sucursalId = (int) SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->value('id');
+            abort_unless($sucursalId > 0 && app(ResolverAccesoTenant::class)->permiteSucursal($usuario, $sucursalId), 403);
+        }
 
         $zona = app(FechasNegocioTenant::class)->zona();
         $dia = isset($validado['fecha']) ? (string) $validado['fecha'] : CarbonImmutable::now($zona)->toDateString();
@@ -34,6 +45,6 @@ class InicioHoyTenantController
         $estudio = $request->attributes->get('estudio');
         $modalidad = $estudio instanceof Estudio ? $estudio->modalidad() : ModalidadServicio::Clases;
 
-        return response()->json(['data' => $resumen->para($usuario, CarbonImmutable::parse($dia, 'UTC'), $modalidad)]);
+        return response()->json(['data' => $resumen->para($usuario, CarbonImmutable::parse($dia, 'UTC'), $modalidad, $sucursalId)]);
     }
 }

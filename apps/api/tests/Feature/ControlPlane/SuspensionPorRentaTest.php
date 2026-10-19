@@ -7,7 +7,9 @@ use App\Modules\Tenancy\Application\ConfirmarCargoRenta;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
@@ -106,6 +108,50 @@ it('avisa antes, suspende tras la gracia y, al pagar, lo reactiva solo', functio
         ->and($estudio->suspendido_por)->toBeNull();
     $this->getJson('/api/v1/app/estudio-a/miembros', conBearer($n['bearer']))->assertOk();
     entrarComo('estudio-a', 'vale@correo.mx')->assertOk();
+});
+
+it('al reabrir no cobra a sus clientes lo que pasó con el negocio cerrado', function (): void {
+    $n = negocioConRentaPorPagar();
+    $e = ['slug' => $n['slug'], 'bearer' => $n['bearer']];
+    $suspende = $n['cargo']->vence_en->copy()->addDays(15)->setTime(18, 0);
+    $sede = agendaSemilla($e);
+    $ana = venderPackAMiembroTenant($e, 8000, 'Ana');
+    // Una clase que termina mientras el negocio está cerrado, y un socio en mora cuya
+    // gracia corre durante esos días.
+    $clase = $suspende->copy()->addHours(2)->setTimezone('America/Mexico_City')->format('Y-m-d H:i:s');
+    $sesion = crearSesionTenant($e, $sede, 5, $clase);
+    $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $ana['persona']], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $estudio = Estudio::query()->where('slug', 'estudio-a')->firstOrFail();
+    $gracia = $suspende->copy()->addDays(3);
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, function () use ($ana, $gracia): void {
+        ProcesoDunningTenant::query()->create([
+            'acuerdo_id' => DerechoTenant::query()->where('ulid', $ana['derecho'])->value('acuerdo_id'),
+            'estado' => 'en_mora', 'intentos' => 1, 'gracia_hasta' => $gracia,
+        ]);
+    });
+
+    $this->travelTo($suspende);
+    $this->artisan('agendauno:suspender-por-renta')->assertSuccessful();
+    expect(estadoDelNegocio())->toBe('suspended');
+
+    // Cinco días después paga y reabre.
+    $this->travelTo($suspende->copy()->addDays(5));
+    $n['cargo']->forceFill(['referencia_pago' => 'pi_prueba'])->save();
+    app(ConfirmarCargoRenta::class)->porReferencia('pi_prueba', 'stripe');
+    expect(estadoDelNegocio())->not->toBe('suspended')
+        ->and($estudio->refresh()->reactivado_en)->not->toBeNull();
+
+    // Nadie pudo pasar lista con el panel cerrado: esa clase no se marca como falta.
+    $this->travel(1)->hours();
+    $this->artisan('agendauno:marcar-inasistencias')->assertSuccessful();
+    $roster = collect($this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", conBearer($e['bearer']))->assertOk()->json('data'));
+    expect($roster->firstWhere('id', $reserva)['asistencia'])->toBeNull()
+        ->and((int) $this->getJson("/api/v1/app/{$e['slug']}/derechos/{$ana['derecho']}/movimientos", conBearer($e['bearer']))->json('saldo'))->toBe(8000);
+
+    // Su gracia se recorrió los días que estuvo cerrado (no pudo pagar).
+    $graciaAhora = app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => ProcesoDunningTenant::query()->firstOrFail()->gracia_hasta);
+    expect($graciaAhora->toDateString())->toBe($gracia->copy()->addDays(5)->toDateString());
 });
 
 it('si el superadmin lo reactiva a mano, no se vuelve a suspender solo en otros días de gracia', function (): void {

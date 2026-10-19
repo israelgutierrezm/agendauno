@@ -69,10 +69,12 @@ class ReporteNegocioTenantController
             ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->count();
 
-        // Clases del periodo (por hora de inicio) + capacidad.
+        // Clases del periodo (por hora de inicio) + capacidad. Las canceladas no cuentan
+        // (ADR 0166): ni como clase ni como lugares, igual que la pestaña Ocupación.
         $sesiones = SesionTenant::query()
             ->whereBetween('inicia_en', [$inicio, $fin])
             ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
+            ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
             ->get(['id', 'capacidad']);
         $sesionIds = $sesiones->pluck('id');
         $capacidad = (int) $sesiones->sum(fn (SesionTenant $s): int => (int) ($s->capacidad ?? 0));

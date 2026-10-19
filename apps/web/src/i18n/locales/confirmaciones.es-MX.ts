@@ -53,6 +53,16 @@ export default {
   asistencia: {
     noVino:
       "¿Marcar que {persona} no vino? Según la política del negocio, puede perder el crédito.",
+    // Con el efecto exacto que calcula el sistema con su política.
+    noVinoCon: "¿Marcar que {persona} no vino? {efecto}",
+    efecto: {
+      pierde: "Pierde 1 crédito de su plan. | Pierde {n} créditos de su plan.",
+      tolerada:
+        "Esta falta entra en la tolerancia de su política: no pierde el crédito.",
+      noPenaliza:
+        "Su política no cobra las faltas: el crédito vuelve a su saldo.",
+      sinCredito: "No usó créditos en esta reserva: su saldo no cambia.",
+    },
     correccion:
       "{persona} está marcado como «{antes}». ¿Cambiarlo a «{ahora}»? Si aplica, el crédito se ajusta en su saldo.",
     llego: "Llegó",

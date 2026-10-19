@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\PuestaEnMarchaTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\VerificarRecaptcha;
 use App\Modules\Tenancy\Application\WaiversTenant;
@@ -232,6 +233,8 @@ class PublicoCitasController
             $reserva->orden->update(['contexto_medicion_id' => $contexto->getKey()]);
         }
         $profesional = $reserva->sesion?->instructor;
+        // La reserva de un cliente de verdad: la prueba del recorrido (ADR 0166).
+        app(PuestaEnMarchaTenant::class)->anotarPrueba($request->attributes->get('estudio'));
 
         return response()->json(['data' => [
             'reserva' => $reserva->ulid,

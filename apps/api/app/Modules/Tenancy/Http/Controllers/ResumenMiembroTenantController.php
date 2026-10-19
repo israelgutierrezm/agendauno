@@ -76,7 +76,7 @@ class ResumenMiembroTenantController
             ->where('sesiones.inicia_en', '>=', $ahora)
             ->orderBy('sesiones.inicia_en')
             ->select('reservas.*')
-            ->with('sesion.oferta')
+            ->with(['sesion.oferta', 'sesion.sucursal', 'sesion.instructor'])
             ->first();
 
         // Su última visita (la más reciente a la que llegó).
@@ -155,6 +155,9 @@ class ResumenMiembroTenantController
             'documentos_pendientes' => $documentosPendientes,
             'proxima_reserva' => $proxima instanceof ReservaTenant ? [
                 'clase' => $proxima->sesion?->oferta?->nombre,
+                // Dónde y con quién: la ficha dice a qué sede tiene que ir.
+                'sucursal' => $proxima->sesion?->sucursal?->nombre,
+                'profesional' => $proxima->sesion?->instructor?->name,
                 'inicia_en' => $proxima->sesion?->inicia_en->toIso8601String(),
                 'zona_horaria' => $proxima->sesion?->zona_horaria,
             ] : null,

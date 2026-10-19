@@ -363,18 +363,33 @@ class AgendaTenantController
      */
     private function titularesDeCitas(Collection $sesiones): array
     {
-        $citas = $sesiones->filter(fn (SesionTenant $s): bool => $s->esCita())->pluck('id');
+        $citas = $sesiones->filter(fn (SesionTenant $s): bool => $s->esCita());
         if ($citas->isEmpty()) {
             return [];
         }
+        // Una cita cancelada conserva a quién era (su última reserva): el panel dice de
+        // quién era y su historial muestra qué pasó con el crédito o el pago.
+        $canceladas = $citas->filter(fn (SesionTenant $s): bool => $s->estado !== EstadoSesionTenant::Programada)
+            ->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
-        return ReservaTenant::query()
-            ->whereIn('sesion_id', $citas)
-            ->whereIn('estado', self::OCUPAN_LUGAR)
+        $titulares = [];
+        ReservaTenant::query()
+            ->whereIn('sesion_id', $citas->pluck('id'))
+            ->where(fn ($q) => $q->whereIn('estado', self::OCUPAN_LUGAR)->orWhereIn('sesion_id', $canceladas))
             ->with(['persona', 'asistencia', 'orden.pagos', 'saldoOrden.pagos'])
+            ->orderBy('id')
             ->get()
-            ->keyBy(fn (ReservaTenant $r): int => (int) $r->sesion_id)
-            ->all();
+            ->each(function (ReservaTenant $r) use (&$titulares): void {
+                $sesionId = (int) $r->sesion_id;
+                $ocupa = in_array($r->estado->value, self::OCUPAN_LUGAR, true);
+                $previa = $titulares[$sesionId] ?? null;
+                // La que ocupa lugar manda; si ninguna lo ocupa, la más reciente.
+                if ($ocupa || $previa === null || ! in_array($previa->estado->value, self::OCUPAN_LUGAR, true)) {
+                    $titulares[$sesionId] = $r;
+                }
+            });
+
+        return $titulares;
     }
 
     /**

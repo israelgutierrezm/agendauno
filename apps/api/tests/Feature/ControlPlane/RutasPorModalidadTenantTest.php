@@ -61,6 +61,8 @@ function rutasExclusivasPorModalidad(): array
         // Salidas con fecha y cierre del grupo.
         'grupos.inscripciones.baja' => 'clases',
         'grupos.inscripciones.cambiar' => 'clases',
+        // El resultado de un cambio de grupo y su vista previa (R08, ADR 0164).
+        'grupos.inscripciones.cambio' => 'clases',
         'grupos.cerrar' => 'clases',
         'grupos.reabrir' => 'clases',
         'ofertas.capacidad-canal.index' => 'clases',

@@ -8,6 +8,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import SelectorOpciones from "@/components/SelectorOpciones.vue";
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { instantanea } from "@/lib/cambiosPendientes";
+import { confirmar } from "@/lib/confirmar";
 import type { EstadoEditor } from "@/lib/editorFormulario";
 import { dinero } from "@/lib/formato";
 import {
@@ -320,6 +321,18 @@ const valido = computed(
 );
 
 async function guardar(): Promise<void> {
+  // Archivar es la baja del plan: se confirma aparte (ADR 0166), no pasa con «Guardar».
+  if (
+    p &&
+    form.archivado &&
+    !p.archivado &&
+    !(await confirmar(
+      t("planes.editor.confirmarArchivar", { nombre: form.nombre.trim() }),
+      { peligro: true, aceptar: t("planes.editor.archivarAceptar") },
+    ))
+  ) {
+    return;
+  }
   guardando.value = true;
   error.value = null;
   errores.value = {};

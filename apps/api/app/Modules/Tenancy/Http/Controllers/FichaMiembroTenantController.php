@@ -8,8 +8,10 @@ use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -184,7 +186,7 @@ class FichaMiembroTenantController
         $hoy = app(FechasNegocioTenant::class)->hoy();
         $deLaPersona = fn () => DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
-            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta']);
+            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta', 'ofertas']);
         $derechos = $deLaPersona()
             ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhere('valido_hasta', '>=', $hoy))
             ->orderByDesc('id')
@@ -194,7 +196,12 @@ class FichaMiembroTenantController
                 ->orderByDesc('valido_hasta')->orderByDesc('id')
                 ->limit(self::HISTORIAL_PLANES)->get());
 
-        return $derechos->map(function (DerechoTenant $derecho): array {
+        // La actividad de cada plan, en una sola consulta.
+        $actividades = ActividadTenant::query()
+            ->whereIn('id', $derechos->pluck('actividad_id')->filter()->unique()->values())
+            ->pluck('nombre', 'id');
+
+        return $derechos->map(function (DerechoTenant $derecho) use ($actividades): array {
             $saldo = $derecho->ilimitado ? null : $this->libro->saldo($derecho);
             $disponible = $derecho->ilimitado ? null : $this->libro->disponible($derecho);
 
@@ -215,6 +222,11 @@ class FichaMiembroTenantController
                 'saldo_unidades' => $saldo,
                 'disponible_unidades' => $disponible,
                 'valido_hasta' => $derecho->valido_hasta?->toDateString(),
+                // Qué puede reservar y dónde (lo que se aplica al reservar): sus sedes
+                // (todas, si no se eligieron), su actividad y las clases que cubre.
+                ...$derecho->coberturaSucursales(),
+                'actividad' => $derecho->actividad_id !== null ? $actividades[$derecho->actividad_id] ?? null : null,
+                'aplica_a' => $derecho->ofertas->map(fn (OfertaTenant $o): string => (string) $o->nombre)->values()->all(),
             ];
         })->all();
     }

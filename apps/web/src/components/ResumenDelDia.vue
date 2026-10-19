@@ -20,6 +20,7 @@ import { lugarDelClima, useClima } from "@/lib/clima";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { fotoNegocio } from "@/lib/fotoNegocio";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
+import { useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -234,6 +235,9 @@ const detalleSiguiente = computed(() => {
  * Trae el día. En segundo plano (al volver a la pestaña, cada pocos minutos o con
  * «Actualizar») no quita lo que se ve mientras llega lo nuevo.
  */
+// La sucursal de la barra: los contadores cuentan lo mismo que abren sus listas, que
+// ya la aplican (ADR 0166).
+const sucursales = useSucursales();
 async function cargar(enSegundoPlano = false): Promise<void> {
   if (enSegundoPlano && hoy.value !== null) {
     actualizando.value = true;
@@ -248,6 +252,9 @@ async function cargar(enSegundoPlano = false): Promise<void> {
         params: {
           // El día del negocio (su zona horaria), no el del navegador.
           fecha: hoyEnNegocio(sesion.zonaHoraria),
+          ...(sucursales.fija.value
+            ? { sucursal_id: sucursales.fija.value }
+            : {}),
         },
       },
     );
@@ -279,6 +286,11 @@ onMounted(() => {
   }, 3 * 60_000);
 });
 onUnmounted(() => clearInterval(periodico));
+// Otra sucursal en la barra: se vuelve a contar para esa.
+watch(
+  () => sucursales.fija.value,
+  () => void cargar(true),
+);
 
 function hora(s: SesionHoy): string {
   return aHora(minutosLocal(s.inicia_en, s.zona_horaria));
@@ -405,10 +417,11 @@ const indicadores = computed<Indicador[]>(() => {
     const porCobrar = tot.por_cobrar ?? 0;
     return [
       {
+        // Las citas de hoy sin las canceladas: Recepción › Activas.
         clave: "citas",
         valor: String(tot.sesiones),
         icono: "agenda",
-        to: destino("agenda", { name: "agenda" }),
+        to: aRecepcion("todas"),
       },
       {
         clave: "llegaron",
@@ -444,10 +457,14 @@ const indicadores = computed<Indicador[]>(() => {
   const listas = tot.listas_pendientes ?? 0;
   const lista: Omit<Indicador, "etiqueta">[] = [
     {
+      // Las clases de hoy: la jornada en Recepción (no la semana de la agenda).
       clave: "clases",
       valor: String(tot.sesiones),
       icono: "agenda",
-      to: destino("agenda", { name: "agenda" }),
+      to: destino("recepcion", {
+        name: "recepcion",
+        query: { fecha: hoy.value?.fecha ?? "" },
+      }),
     },
     {
       clave: "ocupados",

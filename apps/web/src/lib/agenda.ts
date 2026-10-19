@@ -216,6 +216,7 @@ export function iniciales(nombre: string | null): string {
  */
 export type EstadoCita =
   | "confirmada"
+  | "apartada"
   | "sin_registrar"
   | "llego"
   | "en_servicio"
@@ -229,6 +230,7 @@ export type EstadoCita =
  */
 export const COLOR_ESTADO_CITA: Record<EstadoCita, string> = {
   confirmada: "var(--exito)",
+  apartada: "var(--aviso)",
   sin_registrar: "var(--aviso)",
   llego: "var(--acento)",
   en_servicio: "var(--acento)",
@@ -259,6 +261,11 @@ export function estadoCita(s: SesionAgenda, ahora: Date): EstadoCita {
     }
     return t < new Date(s.termina_en).getTime() ? "en_servicio" : "completada";
   }
+  // Apartada en línea: el lugar espera el pago y se libera si no llega. No se
+  // presenta como agendada (en verde) mientras no esté confirmada.
+  if (s.cita.estado === "pendiente_pago") {
+    return "apartada";
+  }
   // Agendada (pagada o no; el pago se muestra aparte). Ya terminada sin registro.
   return ahora.getTime() < new Date(s.termina_en).getTime()
     ? "confirmada"
@@ -275,7 +282,9 @@ export type PagoCita = "pagada" | "por_cobrar" | "por_pagar";
  */
 export function pagoCita(s: SesionAgenda): PagoCita | null {
   const c = s.cita;
-  if (!c) {
+  // Una cita cancelada no está «pagada» ni «por cobrar»: lo que pasó con su pago se
+  // ve en su historial.
+  if (!c || s.estado !== "programada") {
     return null;
   }
   if (c.estado === "pendiente_pago") {

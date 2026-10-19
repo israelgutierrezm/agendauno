@@ -280,7 +280,8 @@ it('en la cuenta del cliente de un negocio de citas: su cita dice en qué va y n
         // Sin anticipo (ADR 0161): nada pagado al apartar ni saldo aparte.
         'anticipo_minor' => null, 'saldo_minor' => null, 'saldo_orden_id' => null,
         'nota' => 'Solo la barba', 'asiste' => null,
-        'estado_atencion' => 'confirmada', 'estado_pago' => 'por_pagar',
+        // Apartada hasta que la pague (no «agendada» en verde).
+        'estado_atencion' => 'apartada', 'estado_pago' => 'por_pagar',
     ];
     expect($agendada['tipo'])->toBe('cita')
         ->and($agendada['clase'])->toBeNull()

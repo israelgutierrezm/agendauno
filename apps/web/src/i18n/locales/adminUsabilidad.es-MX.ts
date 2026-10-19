@@ -58,8 +58,10 @@ export default {
     editorAyuda:
       "Consulta las preguntas existentes y agrega nuevos campos a esta ficha.",
     campos: "Sin campos | 1 campo | {n} campos",
-    activa: "Activa",
+    activa: "Publicada",
     inactiva: "Inactiva",
+    // Aún no se pide a nadie (ADR 0166).
+    borrador: "Borrador",
     nuevaPregunta: "Agregar pregunta",
     preguntaAyuda: "Esta pregunta se agregará a «{nombre}».",
     pregunta: "Pregunta o nombre del campo",

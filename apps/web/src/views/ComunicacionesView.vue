@@ -47,7 +47,16 @@ interface Difusion {
   estado?: "enviando" | "pausada" | "cancelada";
   enviados?: number;
   pendientes?: number;
+  // Agotaron sus intentos (ya no se reintentan).
+  fallidos?: number;
   descartados?: number;
+}
+// A cuántos llega por ese canal y quién queda fuera (ADR 0166), antes de enviar.
+interface Alcance {
+  elegibles: number;
+  sin_consentimiento: number;
+  sin_email: number;
+  sin_app: number;
 }
 
 type Canal = "interno" | "email" | "push" | "whatsapp";
@@ -166,13 +175,51 @@ const form = ref({
 const segmentoSel = computed(() =>
   segmentos.value.find((s) => s.clave === form.value.segmento),
 );
-const destinatarios = computed(() => segmentoSel.value?.total ?? 0);
+// A cuántos llega de verdad por el canal elegido (lo calcula el API con la regla del
+// envío); mientras no llega, el total del segmento.
+const alcance = ref<Alcance | null>(null);
+const destinatarios = computed(
+  () => alcance.value?.elegibles ?? segmentoSel.value?.total ?? 0,
+);
+// Quién queda fuera y por qué, en una línea.
+const excluidos = computed(() => {
+  const a = alcance.value;
+  if (a === null) {
+    return null;
+  }
+  const partes = [
+    a.sin_consentimiento > 0
+      ? t(
+          "operacion.comunicacion.sinConsentimiento",
+          { n: a.sin_consentimiento },
+          a.sin_consentimiento,
+        )
+      : null,
+    a.sin_email > 0
+      ? t("operacion.comunicacion.sinEmail", { n: a.sin_email }, a.sin_email)
+      : null,
+    a.sin_app > 0
+      ? t("operacion.comunicacion.sinApp", { n: a.sin_app }, a.sin_app)
+      : null,
+  ].filter(Boolean);
+  return partes.length > 0 ? partes.join(" · ") : null;
+});
 
 // Antes de un envío masivo: a cuántos, por qué canal y cómo se verá (revisión).
 const revisando = ref(false);
-function abrirRevision(): void {
+async function abrirRevision(): Promise<void> {
   errorEnvio.value = null;
+  alcance.value = null;
   revisando.value = true;
+  try {
+    const { data } = await api.get<{ data: Alcance }>(
+      `${base.value}/comunicaciones/alcance`,
+      { params: { segmento: form.value.segmento, canal: form.value.canal } },
+    );
+    alcance.value = data.data;
+  } catch {
+    // Sin el cálculo se queda el total del segmento; el envío dice a cuántos llegó.
+  }
 }
 const EJEMPLO: Record<string, string> = {
   persona_nombre: "Ana López",
@@ -926,6 +973,15 @@ onMounted(cargar);
             })
           }}
         </p>
+        <!-- Quién queda fuera y por qué: lo que se ve es lo que se manda. -->
+        <p
+          v-if="excluidos"
+          class="mt-1 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="excluidos-difusion"
+        >
+          {{ $t("operacion.comunicacion.fuera", { motivos: excluidos }) }}
+        </p>
         <p class="mt-5 text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("operacion.comunicacion.vistaPrevia") }}
         </p>
@@ -1051,6 +1107,37 @@ onMounted(cargar);
                           : $t("comunicaciones.estados.enviada")
                   }}
                 </span>
+                <!-- El resultado del envío: llegó, no se pudo, no se mandó. -->
+                <span
+                  v-if="
+                    (d.enviados ?? 0) +
+                      (d.fallidos ?? 0) +
+                      (d.descartados ?? 0) >
+                    0
+                  "
+                  class="block text-xs mt-1"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  data-prueba="resultado-difusion"
+                  >{{
+                    [
+                      $t("comunicaciones.resultado.enviados", {
+                        n: d.enviados ?? 0,
+                      }),
+                      (d.fallidos ?? 0) > 0
+                        ? $t("comunicaciones.resultado.fallidos", {
+                            n: d.fallidos ?? 0,
+                          })
+                        : null,
+                      (d.descartados ?? 0) > 0
+                        ? $t("comunicaciones.resultado.descartados", {
+                            n: d.descartados ?? 0,
+                          })
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  }}</span
+                >
                 <span
                   v-if="
                     puedeControlar &&

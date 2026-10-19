@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import type { Parametro } from "@/lib/parametros";
 
 /**
@@ -13,6 +14,8 @@ const props = defineProps<{
   parametros: Parametro[];
   modo: "negocio" | "plataforma";
   guardando?: boolean;
+  // Lo que el API rechazó, por campo (`valores.<clave>`): junto a su campo.
+  errores?: Record<string, string>;
 }>();
 
 const emit = defineEmits<{
@@ -67,6 +70,11 @@ const cambios = computed(() => {
   return out;
 });
 const hayCambios = computed(() => Object.keys(cambios.value).length > 0);
+// Salir con cambios sin guardar pregunta antes (ADR 0166).
+useCambiosPendientes(() => hayCambios.value);
+function errorDe(p: Parametro): string | undefined {
+  return props.errores?.[`valores.${p.clave}`];
+}
 </script>
 
 <template>
@@ -102,6 +110,7 @@ const hayCambios = computed(() => Object.keys(cambios.value).length > 0);
             :id="`par-${p.clave}`"
             v-model="campos[p.clave]"
             class="tu-input w-auto"
+            :aria-invalid="errorDe(p) ? 'true' : undefined"
           >
             <option value="">
               {{ $t("parametrosConfig.usarReferencia") }}
@@ -114,6 +123,7 @@ const hayCambios = computed(() => Object.keys(cambios.value).length > 0);
             :id="`par-${p.clave}`"
             v-model="campos[p.clave]"
             class="tu-input w-auto"
+            :aria-invalid="errorDe(p) ? 'true' : undefined"
           >
             <option value="">
               {{ $t("parametrosConfig.usarReferencia") }}
@@ -132,6 +142,7 @@ const hayCambios = computed(() => Object.keys(cambios.value).length > 0);
               step="1"
               class="tu-input w-24"
               :placeholder="String(referencia(p))"
+              :aria-invalid="errorDe(p) ? 'true' : undefined"
             />
             <span
               class="w-10 text-xs"
@@ -139,6 +150,15 @@ const hayCambios = computed(() => Object.keys(cambios.value).length > 0);
               >{{ p.unidad }}</span
             >
           </span>
+          <p
+            v-if="errorDe(p)"
+            class="w-full text-xs"
+            role="alert"
+            :style="{ color: 'var(--error)' }"
+            :data-prueba="`error-${p.clave}`"
+          >
+            {{ errorDe(p) }}
+          </p>
         </div>
       </div>
     </fieldset>

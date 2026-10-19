@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -85,6 +86,9 @@ class FulfillmentTenant
             // sede de la orden.
             $articuloId = $linea->getAttribute('articulo_id');
             if ($articuloId !== null && $orden->sucursal_id !== null) {
+                // Ya se pagó: no se rechaza, pero se bloquea el artículo para que una
+                // venta del mostrador a la vez vea la existencia que queda.
+                ArticuloTenant::query()->whereKey((int) $articuloId)->lockForUpdate()->first();
                 $this->inventario->registrar((int) $articuloId, (int) $orden->sucursal_id, -max(1, (int) $linea->cantidad), TipoMovimientoInventario::Salida, 'Cobro '.$orden->ulid);
 
                 continue;
@@ -95,6 +99,8 @@ class FulfillmentTenant
             if (! $beneficiario instanceof PersonaTenant || ! $producto instanceof ProductoTenant) {
                 continue;
             }
+            // Lo que se compró, aunque el plan se haya editado entre la compra y el pago.
+            $producto = $producto->comoSeVendio($linea->plan);
             // La clase de prueba (B03) una sola vez, aunque otra orden pagada a la vez ya
             // se la haya dado: esta no se concede y el pago queda para devolverlo.
             if (isset($repetidas[$linea->getKey()])) {

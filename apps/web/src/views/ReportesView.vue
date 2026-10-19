@@ -29,6 +29,11 @@ interface Negocio {
   // Horas agendadas entre las disponibles (ADR 0081): la de negocios de citas.
   ocupacion_agenda_pct?: number | null;
   no_show_pct: number | null;
+  // Las bases de los porcentajes (ADR 0166): se muestran junto al %.
+  confirmadas?: number;
+  capacidad_total?: number;
+  presentes?: number;
+  ausentes?: number;
   alumnos_activos: number;
   arpu_minor: number | null;
   // Por moneda (nunca se suman): vendido, cobrado, devuelto y neto.
@@ -342,12 +347,27 @@ const tarjetas = computed<Indicador[]>(() => {
       valor: pct(
         porAgenda.value ? (n.ocupacion_agenda_pct ?? null) : n.ocupacion_pct,
       ),
+      // De dónde sale: lugares ocupados de los que hubo.
+      detalle:
+        !porAgenda.value && (n.capacidad_total ?? 0) > 0
+          ? t("operacion.reportes.lugaresDe", {
+              n: n.confirmadas ?? 0,
+              total: n.capacidad_total ?? 0,
+            })
+          : undefined,
       icono: "pulso",
       tono: "morado",
     },
     {
       clave: "noShow",
       valor: pct(n.no_show_pct),
+      detalle:
+        (n.presentes ?? 0) + (n.ausentes ?? 0) > 0
+          ? t("operacion.reportes.faltasDe", {
+              n: n.ausentes ?? 0,
+              total: (n.presentes ?? 0) + (n.ausentes ?? 0),
+            })
+          : undefined,
       icono: "ausente",
       tono: "rosa",
     },
@@ -572,11 +592,28 @@ const periodoTexto = computed(() => {
       month: "short",
       year: "numeric",
     }).format(new Date(`${ymd}T12:00:00`));
-  return t("operacion.reportes.periodo", {
+  // Los días son los del negocio: se dice en qué hora (ADR 0166).
+  return t("operacion.reportes.periodoZona", {
     desde: f(desde.value),
     hasta: f(hasta.value),
+    zona: nombreZona(sesion.zonaHoraria),
   });
 });
+
+// «hora del centro»: el nombre de la zona del negocio, en español.
+function nombreZona(zona: string): string {
+  try {
+    const parte = new Intl.DateTimeFormat("es-MX", {
+      timeZone: zona,
+      timeZoneName: "longGeneric",
+    })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName");
+    return parte?.value ?? zona;
+  } catch {
+    return zona;
+  }
+}
 
 function esteMes(): void {
   desde.value = inicioMes();

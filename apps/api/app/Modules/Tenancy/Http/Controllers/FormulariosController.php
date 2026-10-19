@@ -31,15 +31,21 @@ class FormulariosController
         $archivados = $request->boolean('archivados');
         $usuario = $request->attributes->get('usuario_tenant');
         abort_if($archivados && ! ($usuario instanceof Usuario && $usuario->puede('formularios.gestionar')), 403);
+        // Quien no diseña fichas solo ve las publicadas que le tocan, sin cuántas
+        // respuestas tienen (ADR 0166): diseñar y responder son permisos distintos.
+        $disena = $usuario instanceof Usuario && $usuario->puede('formularios.gestionar');
+        $comoMiembro = $usuario instanceof Usuario && $usuario->rolActivo() === 'miembro';
         $formularios = Formulario::query()
             ->with('campos')
-            ->withCount('respuestas')
+            ->when($disena, fn ($q) => $q->withCount('respuestas'))
             ->when($archivados, fn ($q) => $q->whereNotNull('archivado_en'), fn ($q) => $q->whereNull('archivado_en'))
+            ->when(! $disena, fn ($q) => $q->where('activo', true))
+            ->when($comoMiembro, fn ($q) => $q->whereIn('aplica_a', ['miembro', 'todos']))
             ->orderBy('id')
             ->get();
 
         return response()->json([
-            'data' => $formularios->map(fn (Formulario $formulario): array => $this->presentar($formulario))->all(),
+            'data' => $formularios->map(fn (Formulario $formulario): array => $this->presentar($formulario, $disena))->all(),
         ]);
     }
 
@@ -49,13 +55,15 @@ class FormulariosController
             'nombre' => ['required', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string', 'max:1000'],
             'aplica_a' => ['nullable', 'in:miembro,instructor,todos'],
+            // Como borrador (ADR 0166): nadie la ve ni la responde hasta publicarla.
+            'borrador' => ['sometimes', 'boolean'],
         ]);
 
         $formulario = Formulario::query()->create([
             'nombre' => $validado['nombre'],
             'descripcion' => $validado['descripcion'] ?? null,
             'aplica_a' => $validado['aplica_a'] ?? 'miembro',
-            'activo' => true,
+            'activo' => ! ($validado['borrador'] ?? false),
         ]);
 
         return response()->json(['data' => $this->presentar($formulario->load('campos'))], 201);
@@ -82,9 +90,11 @@ class FormulariosController
             'campos.*.obligatorio' => ['nullable', 'boolean'],
             'campos.*.opciones' => ['nullable', 'array', 'max:30'],
             'campos.*.opciones.*' => ['nullable', 'string', 'max:255'],
+            // Con respuestas, cambiar sus preguntas publica una versión nueva: se confirma.
+            'confirmar_nueva_version' => ['sometimes', 'boolean'],
         ]);
 
-        $guardado = $this->fichas->guardar($formulario, $datos)->loadCount('respuestas');
+        $guardado = $this->fichas->guardar($formulario, $datos, $request->boolean('confirmar_nueva_version'))->loadCount('respuestas');
 
         return response()->json(['data' => $this->presentar($guardado)]);
     }
@@ -97,6 +107,22 @@ class FormulariosController
     {
         $formulario = $this->resolver($request);
         $formulario->update(['archivado_en' => now(), 'activo' => false]);
+
+        return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount('respuestas'))]);
+    }
+
+    /**
+     * Publica un borrador (ADR 0166): desde ahí se pide a quien le toca. Necesita al
+     * menos una pregunta.
+     */
+    public function publicar(Request $request): JsonResponse
+    {
+        $formulario = $this->resolver($request);
+        abort_if($formulario->archivado_en !== null, 409, 'Restaura la ficha para publicarla.');
+        if (! $formulario->campos()->whereNull('archivado_en')->exists()) {
+            throw ValidationException::withMessages(['campos' => ['Agrega al menos una pregunta antes de publicarla.']]);
+        }
+        $formulario->update(['activo' => true]);
 
         return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount('respuestas'))]);
     }
@@ -152,7 +178,7 @@ class FormulariosController
     /**
      * @return array<string, mixed>
      */
-    private function presentar(Formulario $formulario): array
+    private function presentar(Formulario $formulario, bool $conRespuestas = true): array
     {
         return [
             'id' => $formulario->ulid,
@@ -163,7 +189,8 @@ class FormulariosController
             // Versiones (ADR 0150): con respuestas, cambiar sus preguntas sube la versión.
             'version' => $formulario->version,
             'archivado' => $formulario->archivado_en !== null,
-            'respuestas' => (int) ($formulario->getAttribute('respuestas_count') ?? 0),
+            // Cuántas respuestas tiene: solo para quien diseña fichas.
+            'respuestas' => $conRespuestas ? (int) ($formulario->getAttribute('respuestas_count') ?? 0) : null,
             'campos' => $formulario->campos->map(fn (CampoFormulario $campo): array => $this->presentarCampo($campo))->all(),
         ];
     }

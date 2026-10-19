@@ -61,6 +61,7 @@ class ReembolsarPagoTenant
         private readonly RegistrarEventoTenant $eventos,
         private readonly IncidenciasCobroTenant $incidencias,
         private readonly DerechosDeOrdenTenant $derechos,
+        private readonly InventarioTenant $inventario,
     ) {}
 
     /**
@@ -327,6 +328,8 @@ class ReembolsarPagoTenant
         ]);
 
         if ($esTotal && $revertir && $orden !== null) {
+            // Los artículos que salieron con el cobro vuelven a su sede (ADR 0166).
+            $this->inventario->devolverDeOrden($orden, 'Devolución '.$orden->ulid, $actor);
             $orden->update([
                 'estado' => EstadoOrden::Cancelada->value,
                 'cancelada_en' => now(),

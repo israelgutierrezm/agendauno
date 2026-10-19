@@ -125,6 +125,25 @@ it('lo pagado no se reabre: lo que cambie después se ajusta aparte y se ve la d
         ->toContain('Ajustó la nómina del 2026-10-01 al 2026-10-04 de Personal: Clase del 3 registrada tarde');
 });
 
+it('la tarifa nueva no vale dentro de lo ya cerrado: no se sugiere pagar dos veces', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $datos = nominaConDosClasesImpartidas($e);
+    $url = "/api/v1/app/{$e['slug']}/nomina/cortes";
+    $corte = (string) $this->postJson($url, ['desde' => '2026-10-01', 'hasta' => '2026-10-04'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $tarifa = fn (string $desde) => $this->putJson("/api/v1/app/{$e['slug']}/staff/{$datos['coach']}/esquema-pago", [
+        'tipo' => 'por_clase', 'monto_minor' => 30000, 'moneda' => 'MXN', 'vigente_desde' => $desde,
+    ], conBearer($e['bearer']));
+
+    $tarifa('2026-10-02')->assertStatus(422)->assertJsonValidationErrors(['vigente_desde'], 'meta.errors')
+        ->assertJsonPath('meta.errors.vigente_desde.0', 'La nómina de esta persona ya se cerró hasta el 04/10/2026: la tarifa nueva puede valer desde el 05/10/2026.');
+    $tarifa('2026-10-05')->assertCreated();
+
+    // El periodo cerrado se queda como se cerró: sin diferencias por la tarifa nueva.
+    $detalle = $this->getJson("{$url}/{$corte}", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($detalle['total_minor'])->toBe(40000)
+        ->and(collect($detalle['diferencias'])->sum('diferencia_minor'))->toBe(0);
+});
+
 it('un periodo cerrado sin pagar se reabre y vuelve a calcularse al vuelo', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     nominaConDosClasesImpartidas($e);

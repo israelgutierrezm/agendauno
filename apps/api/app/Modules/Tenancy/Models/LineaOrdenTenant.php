@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ConceptoCuota|null $concepto
  * @property string|null $referencia
  * @property array<string, mixed>|null $condiciones las que aceptó el cliente (plan con permanencia; B04)
+ * @property array{atributos?: array<string, mixed>, ofertas?: list<int>}|null $plan el plan como se vendió (ADR 0166)
  */
 class LineaOrdenTenant extends Model
 {
@@ -32,6 +33,8 @@ class LineaOrdenTenant extends Model
         'orden_id', 'producto_comercial_id', 'beneficiario_id',
         'cantidad', 'precio_unitario_minor', 'subtotal_minor',
         'concepto', 'referencia', 'condiciones',
+        // El plan como se vendió (ADR 0166): lo que se concede al pagarla.
+        'plan',
         // De un presupuesto (ADR 0127): un concepto escrito y, si es un artículo, cuál.
         'descripcion', 'articulo_id',
     ];
@@ -45,6 +48,7 @@ class LineaOrdenTenant extends Model
         'subtotal_minor' => 'integer',
         'concepto' => ConceptoCuota::class,
         'condiciones' => 'array',
+        'plan' => 'array',
     ];
 
     /**

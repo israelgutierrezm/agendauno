@@ -128,6 +128,8 @@ class BloqueClase {
 /// respuesta.
 enum EstadoCita {
   confirmada('confirmada', 'Confirmada'),
+  // Apartada en línea: espera el pago (se libera si no llega).
+  apartada('apartada', 'Apartada'),
   sinRegistrar('sin_registrar', 'Sin registrar'),
   llego('llego', 'Llegó'),
   enServicio('en_servicio', 'En servicio'),

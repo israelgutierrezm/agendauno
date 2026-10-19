@@ -12,7 +12,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { participanteEnUso } from "@/lib/participanteEnUso";
-import { textoCobertura } from "@/lib/cobertura";
+import { listaDeNombres, textoCobertura } from "@/lib/cobertura";
 import {
   cuandoCorto,
   dinero,
@@ -506,6 +506,41 @@ onMounted(() => void cuenta.asegurar());
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{ vigencia(p) }}
+            </p>
+            <!-- Para qué sirve y sus reglas, antes de pagar. -->
+            <p
+              v-if="(p.ofertas ?? []).length > 0"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="plan-clases"
+            >
+              {{
+                $t(
+                  sesion.esCitas
+                    ? "escaparate.planes.soloServicios"
+                    : "escaparate.planes.soloClases",
+                  {
+                    lista: listaDeNombres(
+                      (p.ofertas ?? []).map((o) => o.nombre),
+                    ),
+                  },
+                )
+              }}
+            </p>
+            <p
+              v-if="p.se_renueva"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("escaparate.planes.renueva") }}
+            </p>
+            <p
+              v-if="p.cobra_anualidad"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="plan-anualidad"
+            >
+              {{ $t("miCuenta.comprar.conAnualidad") }}
             </p>
             <!-- La inscripción que se suma, antes de comprar (B04). -->
             <p

@@ -23,6 +23,9 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ResolverSegmentoTenant
 {
+    /** Al contar quién quedó fuera por no querer promociones ({@see sinConsentimiento()}). */
+    private bool $conQuienNoQuierePromociones = false;
+
     /** "Por vencer" y "vencida recuperable": ventanas que fija el negocio (ADR 0047). */
     public function __construct(
         private readonly ParametrosTenant $parametros,
@@ -46,6 +49,22 @@ class ResolverSegmentoTenant
                 ->orderBy('id')
                 ->get(),
         };
+    }
+
+    /**
+     * Cuántos del segmento quedan fuera por no querer promociones (oposición ARCO), para
+     * decirlo antes de enviar (ADR 0166).
+     */
+    public function sinConsentimiento(SegmentoComunicacion $segmento): int
+    {
+        $this->conQuienNoQuierePromociones = true;
+        try {
+            $todos = $this->resolver($segmento)->count();
+        } finally {
+            $this->conQuienNoQuierePromociones = false;
+        }
+
+        return max(0, $todos - $this->resolver($segmento)->count());
     }
 
     /**
@@ -75,7 +94,7 @@ class ResolverSegmentoTenant
             ->where('tipo', TipoPersonaTenant::Miembro->value)
             ->where('archivado', false)
             // Oposición (ARCO): quien no quiere promociones no entra en las difusiones.
-            ->where('recibe_promociones', true);
+            ->when(! $this->conQuienNoQuierePromociones, fn (Builder $q) => $q->where('recibe_promociones', true));
     }
 
     /**

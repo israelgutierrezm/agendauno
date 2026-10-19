@@ -105,6 +105,11 @@ export interface Producto {
   // Permanencia (B04): las condiciones que acepta al comprarlo.
   permanencia_meses?: number | null;
   condiciones?: string | null;
+  // A qué clases o servicios aplica (vacío = todos), si se renueva y si cobra la
+  // anualidad: lo que se sabe antes de pagar.
+  ofertas?: { id: string; nombre: string }[];
+  se_renueva?: boolean;
+  cobra_anualidad?: boolean;
 }
 export interface Orden {
   id: string;

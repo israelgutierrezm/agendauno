@@ -60,9 +60,14 @@ class ResumenDelDiaTenant
     /**
      * @return array{fecha: string, modalidad: string, agenda: array<string, mixed>|null, libres: list<array<string, mixed>>|null, cobros: array<string, mixed>|null, renovaciones: array<string, mixed>|null, atencion: array{solicitudes: int|null, seguimientos: int|null}}
      */
-    public function para(Usuario $usuario, CarbonImmutable $fecha, ModalidadServicio $modalidad = ModalidadServicio::Clases): array
+    public function para(Usuario $usuario, CarbonImmutable $fecha, ModalidadServicio $modalidad = ModalidadServicio::Clases, ?int $sucursalId = null): array
     {
         $permitidas = $this->resolver->sucursalesPermitidas($usuario);
+        // La sucursal elegida en la barra (ADR 0166): los contadores cuentan lo mismo que
+        // abren sus listas, que ya la aplican.
+        if ($sucursalId !== null) {
+            $permitidas = [$sucursalId];
+        }
         $veAgenda = $usuario->puede('agenda.ver');
 
         return [
@@ -83,8 +88,13 @@ class ResumenDelDiaTenant
                         ->when($permitidas !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('sucursal_id')->orWhereIn('sucursal_id', $permitidas)))
                         ->count()
                     : null,
+                // Con el mismo alcance que la lista de tareas: sus sedes y, sin
+                // `tareas.equipo`, solo las suyas.
                 'seguimientos' => $usuario->puede('tareas.ver')
-                    ? TareaTenant::query()->whereNotNull('motivo')->where('estado', EstadoTarea::Pendiente->value)->count()
+                    ? app(AlcancePersonaTenant::class)->acotadaSalvoLoSuyoDe(TareaTenant::query(), $usuario, 'responsable_id')
+                        ->whereNotNull('motivo')->where('estado', EstadoTarea::Pendiente->value)
+                        ->when(! $usuario->puede('tareas.equipo'), fn ($q) => $q->where('responsable_id', $usuario->getKey()))
+                        ->count()
                     : null,
             ],
         ];
@@ -188,7 +198,9 @@ class ResumenDelDiaTenant
             // Por marcar: ya empezó y hay quien no tiene asistencia (ni presente ni falta).
             $sinMarcar = ! $cancelada && $empezo ? max(0, $esperados - $llegaron - $faltaron) : 0;
             $titular = $titulares->get((int) $s->getKey());
-            $porCobrar = $titular instanceof ReservaTenant && $titular->ordenPorCobrar() !== null;
+            // Una cita a la que no vino no se cobra en caja (como en recepción).
+            $porCobrar = $titular instanceof ReservaTenant && $titular->ordenPorCobrar() !== null
+                && $titular->asistencia?->estado !== EstadoAsistencia::Ausente;
 
             if (! $cancelada) {
                 $totales['sesiones']++;

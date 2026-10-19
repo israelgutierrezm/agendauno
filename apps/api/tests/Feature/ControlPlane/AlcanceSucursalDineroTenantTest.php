@@ -76,7 +76,7 @@ it('quien está acotado a una sede no corrige, anula ni devuelve un cobro de otr
     $caja = personalConSesion($e['slug'], $e['bearer'], 'caja@correo.mx', $rol);
     asignarSucursal($e, usuarioIdPorEmail($e, 'caja@correo.mx'), $sedeA);
 
-    $this->putJson("/api/v1/app/{$e['slug']}/pagos/{$pagoB}/metodo", ['metodo' => 'transferencia'], conBearer($caja))->assertStatus(403);
+    $this->putJson("/api/v1/app/{$e['slug']}/pagos/{$pagoB}/metodo", ['metodo' => 'transferencia', 'motivo' => 'Error de captura'], conBearer($caja))->assertStatus(403);
     $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pagoB}/anular", ['motivo' => 'Error'], conBearer($caja))->assertStatus(403);
     $this->getJson("/api/v1/app/{$e['slug']}/pagos/{$pagoB}/reembolsos", conBearer($caja))->assertStatus(403);
     $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pagoB}/reembolsos", ['motivo' => 'Error'], conBearer($caja))->assertStatus(403);

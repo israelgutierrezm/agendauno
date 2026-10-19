@@ -689,6 +689,8 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/formularios/{formulario}', [FormulariosController::class, 'update'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.update');
             Route::post('/formularios/{formulario}/archivar', [FormulariosController::class, 'archivar'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.archivar');
             Route::post('/formularios/{formulario}/restaurar', [FormulariosController::class, 'restaurar'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.restaurar');
+            // Publicar un borrador (ADR 0166).
+            Route::post('/formularios/{formulario}/publicar', [FormulariosController::class, 'publicar'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.publicar');
             Route::get('/formularios/{formulario}/respuestas', [RespuestasFormularioController::class, 'index'])->middleware('puede:formularios.gestionar')->name('formularios.respuestas.index');
             Route::post('/formularios/{formulario}/respuestas', [RespuestasFormularioController::class, 'store'])->middleware('puede:formularios.responder')->name('formularios.respuestas.store');
 
@@ -915,6 +917,8 @@ Route::prefix('v1')->group(function (): void {
             // Transferir/regalar el lugar a otra persona (R9).
             Route::post('/reservas/{reserva}/transferir', [ReservasTenantController::class, 'transferir'])->middleware('puede:reservas.gestionar')->name('reservas.transferir');
             Route::post('/reservas/{reserva}/asistencia', [AsistenciaTenantController::class, 'marcar'])->middleware('puede:asistencia.marcar')->name('reservas.asistencia.store');
+            // Qué pasa con su crédito si no vino, para decirlo antes de marcarlo.
+            Route::get('/reservas/{reserva}/inasistencia', [AsistenciaTenantController::class, 'efectoDeInasistencia'])->middleware('puede:asistencia.marcar')->name('reservas.inasistencia');
             // Terminar de pasar lista: quien no tiene registro «no se presentó» (ADR 0101).
             Route::post('/sesiones/{sesion}/terminar-lista', [AsistenciaTenantController::class, 'terminar'])->middleware('puede:asistencia.marcar')->name('sesiones.terminar-lista');
 
@@ -1059,6 +1063,8 @@ Route::prefix('v1')->group(function (): void {
             // Comunicaciones segmentadas (difusiones): audiencia dinámica (todos/por
             // vencer/vencidos/primerizos) + envío puntual que encola un mensaje por
             // destinatario (lo entrega el relay R28) + historial.
+            // Antes de enviar: a cuántos llega y quién queda fuera (ADR 0166).
+            Route::get('/comunicaciones/alcance', [DifusionesTenantController::class, 'alcance'])->middleware('puede:comunicaciones.gestionar')->name('comunicaciones.alcance');
             Route::get('/comunicaciones/segmentos', [DifusionesTenantController::class, 'segmentos'])->middleware('puede:comunicaciones.ver')->name('difusiones.segmentos');
             Route::get('/comunicaciones/difusiones', [DifusionesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('difusiones.index');
             Route::post('/comunicaciones/difusiones', [DifusionesTenantController::class, 'difundir'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes'])->name('difusiones.store');

@@ -7,6 +7,7 @@ import CambiarHorario from "@/components/CambiarHorario.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import CobroCita from "@/components/CobroCita.vue";
 import CorregirCobro from "@/components/CorregirCobro.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import {
@@ -21,6 +22,10 @@ import {
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import {
+  leerEfectoInasistencia,
+  textoInasistencia,
+} from "@/lib/confirmarAsistencia";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -154,7 +159,9 @@ function nombreMetodo(m: string | null | undefined): string {
 // Cómo va el pago: color (solo lo que pide atención) y texto.
 const pagoEstado = computed<{ texto: string; color: string } | null>(() => {
   const c = cita.value;
-  if (c === null || c.orden_id == null) {
+  // Cancelada: no está «pagada» ni «por cobrar»; lo que pasó con su pago está en
+  // su historial.
+  if (c === null || c.orden_id == null || estado.value === "cancelada") {
     return null;
   }
   if (c.estado === "pendiente_pago") {
@@ -256,7 +263,15 @@ async function marcar(asistencia: Asistencia, retardo = false): Promise<void> {
     e === "presente"
       ? t("agendaVisual.cita.marcarLlegada")
       : t("agendaVisual.cita.noAsistio");
-  // Marcar o corregir mueve créditos: se confirma con su efecto a la vista.
+  // Marcar o corregir mueve créditos: se confirma con su efecto a la vista (el
+  // exacto, según su política, al marcar que no vino).
+  const efecto =
+    asistencia === "ausente" && !c.asistencia
+      ? textoInasistencia(
+          t,
+          await leerEfectoInasistencia(props.base, c.reserva_id),
+        )
+      : null;
   const mensaje = c.asistencia
     ? t("agendaVisual.cita.confirmarCorreccion", {
         cliente: cliente.value,
@@ -265,7 +280,12 @@ async function marcar(asistencia: Asistencia, retardo = false): Promise<void> {
       })
     : asistencia === "presente"
       ? t("agendaVisual.cita.confirmarLlegada", { cliente: cliente.value })
-      : t("agendaVisual.cita.confirmarNoAsistio", { cliente: cliente.value });
+      : efecto
+        ? t("agendaVisual.cita.confirmarNoAsistioCon", {
+            cliente: cliente.value,
+            efecto,
+          })
+        : t("agendaVisual.cita.confirmarNoAsistio", { cliente: cliente.value });
   if (
     !(await confirmar(mensaje, {
       aceptar: nombre(asistencia),
@@ -420,20 +440,25 @@ function reprogramada(datos: { antes: string; ahora: string }): void {
   );
   emit("cambiada");
 }
+// Lo que pasó al cancelarla (su crédito, su pago o su anticipo): queda a la vista
+// en el panel, no solo en un aviso que se va.
+const resultado = ref<string | null>(null);
 function cancelar(por: "cliente" | "negocio" | null): void {
   const c = cita.value;
   if (c === null) {
     return;
   }
-  void accion(
-    () =>
-      api.post(
-        `${props.base}/reservas/${c.reserva_id}/cancelar`,
-        por ? { por } : {},
-      ),
-    t("agendaVisual.cita.okCancelada"),
-  ).then(() => {
+  let efecto: string | null = null;
+  void accion(async () => {
+    const { data } = await api.post<{
+      meta?: { efecto?: { mensaje: string } };
+    }>(`${props.base}/reservas/${c.reserva_id}/cancelar`, por ? { por } : {});
+    efecto = data.meta?.efecto?.mensaje ?? null;
+  }, t("agendaVisual.cita.okCancelada")).then(() => {
     cancelando.value = false;
+    if (efecto !== null) {
+      resultado.value = t("agendaVisual.cita.cancelada", { efecto });
+    }
   });
 }
 function abrirCancelacion(): void {
@@ -453,6 +478,7 @@ watch(
     historial.value = null;
     reprogramando.value = false;
     cancelando.value = false;
+    resultado.value = null;
   },
 );
 // Tras un cambio llega la cita actualizada: el historial se vuelve a leer.
@@ -575,6 +601,15 @@ watch(
           </div>
         </div>
       </dl>
+
+      <AvisoTono
+        v-if="resultado"
+        tono="exito"
+        role="status"
+        data-prueba="resultado-cita"
+      >
+        {{ resultado }}
+      </AvisoTono>
 
       <!-- Reprogramar o cancelar: en lugar de las pestañas, con su confirmación -->
       <section v-if="reprogramando && cita !== null" class="tu-detalle-seccion">

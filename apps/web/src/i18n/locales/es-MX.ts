@@ -168,7 +168,7 @@ export default {
       membresias: "Membresías y paquetes",
       paquetesCitas: "Bonos",
       presupuestos: "Presupuestos",
-      suscripcion: "Suscripción y pagos",
+      suscripcion: "Pagos de tu suscripción",
       usoFacturable: "Uso facturable",
       prospectos: "Prospectos",
       formulariosCaptacion: "Formularios de captación",
@@ -1226,6 +1226,9 @@ export default {
       // Dónde vale (M06): nunca «multisucursal» sin decir cuáles.
       todasLasSedes: "Todas las sedes incluidas",
       soloEn: "Solo en {sedes}",
+      // Qué deja reservar un plan restringido a unas clases o servicios.
+      soloClases: "Clases: {lista}",
+      soloServicios: "Servicios: {lista}",
       deSede: "Planes que valen en {sede}.",
       verTodos: "Ver todos",
       porMes: "1 crédito al mes | {n} créditos al mes",
@@ -1653,6 +1656,12 @@ export default {
       pausada: "En pausa",
       cancelada: "Cancelada",
     },
+    // Cómo salió cada campaña (ADR 0166).
+    resultado: {
+      enviados: "{n} enviados",
+      fallidos: "{n} no se pudieron enviar",
+      descartados: "{n} no se mandaron (no desean promociones o se canceló)",
+    },
     pausar: "Pausar",
     reanudar: "Reanudar",
     cancelar: "Cancelar el resto",
@@ -1802,6 +1811,13 @@ export default {
       reembolsado: "Devuelto",
       rechazado: "Incidencia: rechazado",
       anulado: "Anulado (se registró por error)",
+    },
+    // Aparte del estado del pago (ADR 0166).
+    porConciliar: "Por conciliar",
+    comprobante: {
+      enviado: "Recibo enviado",
+      fallido: "El recibo no se pudo enviar",
+      pendiente: "Recibo por enviar",
     },
     reembolso: {
       titulo: "Reembolsar pago",
@@ -2517,7 +2533,8 @@ export default {
       disponibilidad: "Hay una fecha que se puede reservar",
       precios: "Tienen precio (o hay un plan para entrar)",
       cobro: "Ya se registró un cobro (en caja o aprobado en línea)",
-      prueba: "Ya se hizo una reserva (de prueba o real)",
+      prueba:
+        "Un cliente ya reservó desde tu página o su cuenta (haz una prueba con «Ver como cliente»)",
       publicar: "Tu página está publicada",
     },
   },
@@ -3002,6 +3019,8 @@ export default {
       documentos: "Documentos pendientes",
       vender: "Vender / cobrar",
       elegirProducto: "Elige un producto o membresía",
+      // Se suma al plan si es su alta o regresa tras un tiempo (B04).
+      conInscripcion: "Más inscripción de {monto}: se cobran {total}.",
       efectivo: "Efectivo",
       tarjeta: "Tarjeta (terminal)",
       transferencia: "Transferencia",
@@ -3144,6 +3163,10 @@ export default {
       confirmarTransfer: "Transferir",
       primeraVez: "1ª vez",
       primeraVezAyuda: "Es su primera clase: dale la bienvenida.",
+      // Lo que falta pagar de la reserva (aparte de si vino).
+      porCobrar: "Por cobrar {monto}",
+      // Después de cancelar: a quién y qué pasó con su crédito o su pago.
+      reservaCancelada: "Se canceló la reserva de {persona}. {efecto}",
       adeudo: "Adeudo",
       documentos: "Documentos",
       documentosAyuda:
@@ -3283,6 +3306,7 @@ export default {
       primeraVez: "Para tu primera vez",
       vence: "Si la pagas hoy, se puede usar hasta el {fecha}.",
       masInscripcion: "Más {monto} de inscripción (no da clases).",
+      conAnualidad: "Con este plan se cobra también la anualidad del negocio.",
       aceptoCondiciones: "Leí y acepto estas condiciones",
       creditos: "1 crédito | {n} créditos",
       tipos: {

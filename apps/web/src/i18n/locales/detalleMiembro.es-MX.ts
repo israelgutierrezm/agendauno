@@ -88,6 +88,8 @@ export default {
     vacio: "Sin compras.",
     alCorriente: "Está al corriente.",
     registrar: "Registrar pago",
+    cuantos: "1 cobro pendiente | {n} cobros pendientes",
+    verPendientes: "Ver y cobrar",
   },
   // La tabla de Miembros (views/MiembrosView.vue).
   tabla: {

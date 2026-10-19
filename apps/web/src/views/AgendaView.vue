@@ -130,6 +130,10 @@ interface Reserva {
     moneda: string;
     concepto: string | null;
   } | null;
+  // Cobro recurrente fallido y documentos por firmar (los mismos avisos que el
+  // pase de lista).
+  adeudo?: boolean;
+  documentos_pendientes?: number;
 }
 interface ReglaCanal {
   id: string;
@@ -183,6 +187,9 @@ const bloqueos = ref<BloqueoAgenda[]>([]);
 const cargando = ref(true);
 const cargandoSesiones = ref(false);
 const error = ref<string | null>(null);
+// Lo que pasó con la última acción del detalle (cancelar, cobrar): queda a la vista
+// hasta cerrar el detalle o hacer otra cosa.
+const resultadoDetalle = ref<string | null>(null);
 // Las sesiones no se pudieron consultar: el día no está «sin clases».
 const errorSesiones = ref(false);
 // Lo que no se pudo cargar de las listas de apoyo (no lo borra recargar sesiones).
@@ -229,6 +236,7 @@ const diaSel = ref(isoDe(fechaInicial));
 // Los estados de una cita que explica la leyenda de la semana.
 const LEYENDA_CITAS = [
   "confirmada",
+  "apartada",
   "llego",
   "sin_registrar",
   "no_asistio",
@@ -415,6 +423,21 @@ function lineaRoster(r: Reserva): { texto: string; color: string }[] {
       texto: t(`paseLista.estados.${estado}`),
       color: colorEstado(estado),
     });
+  }
+  // El pago va aparte de la reserva y de la asistencia: lo que falta, con su monto.
+  if (r.orden) {
+    out.push({
+      texto: t("agenda.roster.porCobrar", {
+        monto: dineroDelPais(r.orden.total_minor, r.orden.moneda, sesion.pais),
+      }),
+      color: "var(--aviso)",
+    });
+  }
+  if (r.adeudo) {
+    out.push({ texto: t("agenda.roster.adeudo"), color: "var(--error)" });
+  }
+  if ((r.documentos_pendientes ?? 0) > 0) {
+    out.push({ texto: t("agenda.roster.documentos"), color: "var(--aviso)" });
   }
   if (r.canal && r.canal !== "directo") {
     out.push({
@@ -1392,11 +1415,12 @@ function abrirCobroReserva(r: Reserva, sesionId: string): void {
     moneda: r.orden.moneda,
   };
 }
-async function alCobrarReserva(): Promise<void> {
+async function alCobrarReserva(resultado: string): Promise<void> {
   cobrandoReserva.value = null;
   if (sesionCobrada.value !== null) {
     await refrescarTras(sesionCobrada.value);
   }
+  resultadoDetalle.value = resultado;
 }
 function abrirDesdeAgenda(s: SesionAgenda): void {
   const original = sesiones.value.find((x) => x.id === s.id);
@@ -1418,6 +1442,7 @@ async function alCambiarCita(): Promise<void> {
 function cerrarDetalle(): void {
   detalle.value = null;
   error.value = null;
+  resultadoDetalle.value = null;
 }
 
 async function cargarRoster(id: string): Promise<void> {
@@ -1534,11 +1559,33 @@ const cancelandoSesion = ref(false);
 const cambiandoHorario = ref(false);
 // "Esta y las siguientes" de una clase recurrente (2.5).
 const cambiandoSerie = ref(false);
-async function horarioCambiado(): Promise<void> {
+async function horarioCambiado(datos?: {
+  antes: string;
+  ahora: string;
+}): Promise<void> {
+  const zona = detalle.value?.zona_horaria ?? sesion.zonaHoraria;
   cambiandoHorario.value = false;
   cambiandoSerie.value = false;
   cerrarDetalle();
   await cargarSesiones();
+  // El detalle se cierra: lo que cambió se dice con su antes y su ahora (la serie,
+  // que ya mostró cuántas fechas mueve, solo confirma).
+  if (!datos) {
+    toast.exito(t("cambiarSerie.aplicado"));
+    return;
+  }
+  const f = (iso: string): string =>
+    new Intl.DateTimeFormat("es-MX", {
+      timeZone: zona,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  toast.exito(
+    t("reprogramar.hecho", { antes: f(datos.antes), ahora: f(datos.ahora) }),
+  );
 }
 async function cancelarReserva(
   reservaId: string,
@@ -1547,13 +1594,19 @@ async function cancelarReserva(
 ): Promise<void> {
   accionando.value = true;
   error.value = null;
+  resultadoDetalle.value = null;
+  const persona = roster.value.find((r) => r.id === reservaId)?.persona;
   try {
-    await api.post(
-      `${base.value}/reservas/${reservaId}/cancelar`,
-      por ? { por } : {},
-    );
+    const { data } = await api.post<{
+      meta?: { efecto?: { mensaje: string } };
+    }>(`${base.value}/reservas/${reservaId}/cancelar`, por ? { por } : {});
     cancelandoReserva.value = null;
     await refrescarTras(sesionId);
+    // Sale de la lista: queda a la vista a quién se canceló y qué pasó con su crédito.
+    resultadoDetalle.value = t("agenda.roster.reservaCancelada", {
+      persona: persona ?? "—",
+      efecto: data.meta?.efecto?.mensaje ?? "",
+    }).trim();
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -2255,9 +2308,31 @@ onMounted(async () => {
       />
 
       <!-- ===== Vista POR PROFESIONAL (citas): el día en columnas ===== -->
+      <!-- La misma leyenda que la semana: el punto = cómo va la cita; el símbolo
+           de la moneda = falta cobrarla. -->
+      <div
+        v-if="vista === 'profesionales'"
+        class="mt-4 hidden lg:flex flex-wrap items-center gap-4 text-xs"
+        :style="{ color: 'var(--texto-suave)' }"
+        data-prueba="leyenda-profesionales"
+      >
+        <span
+          v-for="e in LEYENDA_CITAS"
+          :key="e"
+          class="inline-flex items-center gap-1.5"
+          ><span
+            class="tu-estado-dot"
+            :style="{ background: COLOR_ESTADO_CITA[e] }"
+          />{{ $t(`agendaVisual.estadosCita.${e}`) }}</span
+        >
+        <span class="inline-flex items-center gap-1.5"
+          ><span class="ag-por-cobrar">{{ simboloCobro }}</span
+          >{{ $t("agendaVisual.cita.porCobrar") }}</span
+        >
+      </div>
       <AgendaProfesionales
         v-if="vista === 'profesionales'"
-        class="mt-4 hidden lg:block"
+        class="mt-2 hidden lg:block"
         :fecha="diaSel"
         :zona="zonaAgenda"
         :sesiones="sesionesVisibles"
@@ -2268,6 +2343,7 @@ onMounted(async () => {
         :catalogo="catalogo"
         :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
         :puede-crear="puedeReservar"
+        :simbolo-cobro="simboloCobro"
         @abrir="abrirDesdeAgenda"
         @crear="abrirNuevaCita"
       />
@@ -2756,6 +2832,14 @@ onMounted(async () => {
         >
           {{ error }}
         </p>
+        <AvisoTono
+          v-else-if="resultadoDetalle"
+          tono="exito"
+          role="status"
+          data-prueba="resultado-detalle"
+        >
+          {{ resultadoDetalle }}
+        </AvisoTono>
 
         <!-- Quién la da, dónde y cuánto dura -->
         <dl class="tu-detalle-franja">
@@ -2821,6 +2905,7 @@ onMounted(async () => {
             :url="`${base}/sesiones/${detalle.id}/reprogramar`"
             :zona="detalle.zona_horaria"
             :inicia-en="detalle.inicia_en"
+            :reservas="detalle.tipo === 'cita' ? undefined : detalle.ocupados"
             @hecho="horarioCambiado"
             @cerrar="cambiandoHorario = false"
           />

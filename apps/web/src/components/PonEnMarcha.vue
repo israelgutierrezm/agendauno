@@ -213,7 +213,11 @@ const avance = computed(() =>
           }}</span>
           <RouterLink
             v-else
-            :to="{ name: c.ruta }"
+            :to="
+              c.ruta === 'onboarding'
+                ? { name: 'onboarding', query: { paso: 'publicacion' } }
+                : { name: c.ruta }
+            "
             class="pm-opcional-enlace"
             >{{ $t(`quickstart.comprobaciones.${c.clave}`) }}</RouterLink
           >

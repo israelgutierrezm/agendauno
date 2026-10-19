@@ -50,7 +50,25 @@ const props = defineProps<{
   bloqueos?: BloqueoAgenda[];
   // La sucursal que se ve ("" o sin ella = todas): su horario y sus cierres.
   sucursal?: string;
+  // Símbolo de la moneda del negocio: marca la cita que falta cobrar.
+  simboloCobro?: string;
 }>();
+
+// Estado y pago en texto (para quien no distingue el punto de color): va en el
+// título y en la etiqueta accesible de cada tarjeta.
+function rotulo(tj: Tarjeta): string {
+  const partes = [`${tj.hora}, ${tj.titulo}, ${tj.servicio}`];
+  if (tj.estado) {
+    partes.push(t(`agendaVisual.estadosCita.${tj.estado}`));
+  }
+  if (faltaCobrar(tj)) {
+    partes.push(t(`agendaOperacion.pago.${tj.pago}`));
+  }
+  return partes.join(", ");
+}
+function faltaCobrar(tj: Tarjeta): boolean {
+  return tj.pago === "por_cobrar" || tj.pago === "por_pagar";
+}
 
 // ¿Algo de esta sucursal (o de ninguna en particular) cuenta en lo que se ve?
 function deLaSucursal(sucursalId: string | null): boolean {
@@ -558,13 +576,20 @@ watch(() => props.fecha, enfocar);
               '--tf': tj.fondo,
               '--tt': tj.tinta,
             }"
-            :aria-label="`${tj.hora}, ${tj.titulo}, ${tj.servicio}${tj.estado ? ', ' + $t(`agendaVisual.estadosCita.${tj.estado}`) : ''}`"
+            :aria-label="rotulo(tj)"
+            :title="rotulo(tj)"
             @click="emit('abrir', tj.sesion)"
           >
             <template v-if="tj.alto < 44">
               <span class="ag-linea1">
                 <span class="truncate flex-1"
                   >{{ tj.hora.slice(0, 5) }} · {{ tj.titulo }}</span
+                >
+                <span
+                  v-if="faltaCobrar(tj)"
+                  class="ag-cobro"
+                  data-prueba="tarjeta-por-cobrar"
+                  >{{ simboloCobro ?? "$" }}</span
                 >
                 <span
                   v-if="tj.estado"
@@ -578,6 +603,12 @@ watch(() => props.fecha, enfocar);
                 <span class="truncate flex-1 font-semibold">{{
                   tj.titulo
                 }}</span>
+                <span
+                  v-if="tj.alto < 72 && faltaCobrar(tj)"
+                  class="ag-cobro"
+                  data-prueba="tarjeta-por-cobrar"
+                  >{{ simboloCobro ?? "$" }}</span
+                >
                 <span
                   v-if="tj.estado && tj.alto < 72"
                   class="ag-punto"
@@ -808,6 +839,12 @@ watch(() => props.fecha, enfocar);
   height: 7px;
   border-radius: 999px;
   flex-shrink: 0;
+}
+.ag-cobro {
+  flex-shrink: 0;
+  color: var(--aviso);
+  font-weight: 700;
+  font-size: 0.72rem;
 }
 .ag-estado {
   display: inline-flex;

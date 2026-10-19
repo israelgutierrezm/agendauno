@@ -84,3 +84,57 @@ describe("columna sin citas", () => {
     expect(w.text()).toContain("No atiende este día");
   });
 });
+
+describe("tarjetas de cita", () => {
+  // Cita de 30 min a las 10:00 (tarjeta chica), agendada por el negocio sin cobrar.
+  function conCita() {
+    return mount(AgendaProfesionales, {
+      props: {
+        fecha: "2030-01-10",
+        zona: "America/Mexico_City",
+        sesiones: [
+          {
+            id: "c1",
+            tipo: "cita",
+            oferta: "Corte",
+            oferta_id: "o1",
+            instructor: "Sofía",
+            instructor_id: "p1",
+            sala: null,
+            inicia_en: "2030-01-10T16:00:00Z",
+            termina_en: "2030-01-10T16:30:00Z",
+            zona_horaria: "America/Mexico_City",
+            capacidad: 1,
+            ocupados: 1,
+            en_espera: 0,
+            estado: "programada",
+            cita: {
+              reserva_id: "r1",
+              cliente: "Ana",
+              estado: "confirmada",
+              asistencia: null,
+              orden_id: "o1",
+              por_cobrar: true,
+            },
+          },
+        ],
+        profesionales: [{ id: "p1", nombre: "Sofía" }],
+        ventanas: [],
+        catalogo: [],
+        seleccionada: null,
+        puedeCrear: true,
+        simboloCobro: "$",
+      },
+      global: { plugins: [i18n] },
+    });
+  }
+
+  it("una tarjeta chica dice en texto cómo va y que falta cobrarla", () => {
+    const tarjeta = conCita().get(".ag-tarjeta");
+    // El punto de color no basta: el estado y el pago van en su título y su etiqueta.
+    expect(tarjeta.attributes("title")).toContain("Agendada");
+    expect(tarjeta.attributes("title")).toContain("Por cobrar");
+    expect(tarjeta.attributes("aria-label")).toContain("Por cobrar");
+    expect(tarjeta.find('[data-prueba="tarjeta-por-cobrar"]').text()).toBe("$");
+  });
+});

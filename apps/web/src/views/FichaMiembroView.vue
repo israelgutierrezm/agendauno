@@ -22,6 +22,7 @@ import RegistrarPagoOrden, {
 import VentasMostrador from "@/components/VentasMostrador.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { textoAlcance } from "@/lib/cobertura";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
 import { useRegreso } from "@/lib/regreso";
@@ -48,6 +49,9 @@ interface Resumen {
     clase: string | null;
     inicia_en: string;
     zona_horaria: string | null;
+    // Dónde y con quién: a qué sede tiene que ir.
+    sucursal?: string | null;
+    profesional?: string | null;
   } | null;
   // La más reciente a la que llegó (en citas, qué y con quién).
   ultima_visita?: {
@@ -74,6 +78,11 @@ interface Derecho {
   recurrente?: boolean;
   permanencia_hasta?: string | null;
   baja_efectiva_el?: string | null;
+  // Qué puede reservar y dónde (lo que se aplica al reservar).
+  todas_sucursales?: boolean;
+  sucursales?: { id: string; nombre: string }[];
+  actividad?: string | null;
+  aplica_a?: string[];
 }
 interface Movimiento {
   id: string;
@@ -515,6 +524,21 @@ const vendiendo = ref(false);
 function dinero(minor: number, moneda: string): string {
   return dineroDelPais(minor, moneda, sesion.pais);
 }
+// Dónde vale cada plan y qué deja reservar, en una línea (null = nada que aclarar).
+function alcanceDe(d: Derecho): string | null {
+  return textoAlcance(d, t, {
+    variasSedes: (sesion.usuario?.sucursales?.length ?? 0) > 1,
+    esCitas: sesion.esCitas,
+  });
+}
+// La próxima reserva con su sede (y en citas, con quién).
+function dondeProxima(): string | null {
+  const p = resumen.value?.proxima_reserva;
+  if (!p) {
+    return null;
+  }
+  return [p.sucursal, p.profesional].filter(Boolean).join(" · ") || null;
+}
 function fechaHora(iso: string | null, zona: string | null): string {
   if (iso === null) {
     return "—";
@@ -809,10 +833,15 @@ const regreso = useRegreso({
                     <dd v-if="resumen.proxima_reserva">
                       {{ resumen.proxima_reserva.clase ?? "—" }}
                       <span class="fi-visitas-detalle first-letter:uppercase">{{
-                        fechaHora(
-                          resumen.proxima_reserva.inicia_en,
-                          resumen.proxima_reserva.zona_horaria,
-                        )
+                        [
+                          fechaHora(
+                            resumen.proxima_reserva.inicia_en,
+                            resumen.proxima_reserva.zona_horaria,
+                          ),
+                          dondeProxima(),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
                       }}</span>
                     </dd>
                     <dd v-else class="fi-visitas-vacio">
@@ -921,6 +950,15 @@ const regreso = useRegreso({
                                   })
                                 : $t("ficha.derechos.sinVence")
                             }}</span>
+                          </p>
+                          <!-- Qué puede reservar y dónde (lo que se aplica al reservar). -->
+                          <p
+                            v-if="i < derechosVigentes.length && alcanceDe(d)"
+                            class="mt-0.5 text-xs"
+                            :style="{ color: 'var(--texto-suave)' }"
+                            data-prueba="alcance-plan"
+                          >
+                            {{ alcanceDe(d) }}
                           </p>
                         </div>
                         <div class="text-right shrink-0">
@@ -1522,11 +1560,17 @@ const regreso = useRegreso({
                   <span
                     class="block text-xs font-normal"
                     :style="{ color: 'var(--texto-suave)' }"
+                    data-prueba="proxima-donde"
                     >{{
-                      fechaHora(
-                        resumen.proxima_reserva.inicia_en,
-                        resumen.proxima_reserva.zona_horaria,
-                      )
+                      [
+                        fechaHora(
+                          resumen.proxima_reserva.inicia_en,
+                          resumen.proxima_reserva.zona_horaria,
+                        ),
+                        dondeProxima(),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
                     }}</span
                   >
                 </dd>

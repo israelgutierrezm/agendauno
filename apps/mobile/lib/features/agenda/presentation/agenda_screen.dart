@@ -660,6 +660,7 @@ String cupoTexto(SesionAgenda s) {
 (Color, Color) estiloEstado(ColoresAgendaUno c, EstadoCita e) {
   final (fondo, tinta) = switch (e) {
     EstadoCita.confirmada => (const Color(0xFFE3F5EB), const Color(0xFF0F6B3E)),
+    EstadoCita.apartada => (const Color(0xFFFFF1CC), const Color(0xFF7A5200)),
     EstadoCita.sinRegistrar => (
       const Color(0xFFFFEAD5),
       const Color(0xFF9A3412),

@@ -76,14 +76,15 @@ describe("recepción en un negocio de citas", () => {
     });
     await flushPromises();
 
+    // «Activas»: las dos que cuenta el Inicio; la cancelada va en su filtro.
     const filas = w.findAll(".rc-fila").map((f) => f.text());
-    expect(filas).toHaveLength(3);
+    expect(filas).toHaveLength(2);
     expect(filas[0]).toContain("Ana");
     expect(filas[0]).toContain("Llegó");
     expect(filas[0]).toContain("Por cobrar");
     expect(filas[1]).toContain("Bea");
     expect(filas[1]).toContain("Agendada");
-    expect(filas[2]).toContain("Cancelada");
+    expect(w.find('[aria-pressed="true"]').text()).toBe("Activas");
     // Ni «lugares» ni «llena»: una cita es de una persona.
     expect(w.text()).not.toContain("lugares");
 
@@ -141,7 +142,7 @@ describe("recepción en un negocio de citas", () => {
     await w.get('[data-prueba="actualizar"]').trigger("click");
     await flushPromises();
 
-    expect(w.findAll(".rc-fila")).toHaveLength(3);
+    expect(w.findAll(".rc-fila")).toHaveLength(2);
     expect(w.get('[data-prueba="desactualizado"]').text()).toContain(
       "No se pudo actualizar",
     );
@@ -159,7 +160,7 @@ describe("recepción en un negocio de citas", () => {
       .findAll("button")
       .find((b) => b.text() === "Limpiar filtros")!
       .trigger("click");
-    expect(w.findAll(".rc-fila")).toHaveLength(3);
+    expect(w.findAll(".rc-fila")).toHaveLength(2);
   });
 
   it("una cita que ya terminó sin registro va a «Sin registrar», no a «Por atender»", async () => {

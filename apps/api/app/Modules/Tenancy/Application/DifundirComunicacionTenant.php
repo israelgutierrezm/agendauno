@@ -34,7 +34,7 @@ class DifundirComunicacionTenant
         string $asunto,
         string $cuerpo,
     ): DifusionTenant {
-        $personas = $this->resolver->resolver($segmento);
+        ['enviables' => $personas] = $this->destinatarios($this->resolver->resolver($segmento), $canal);
 
         return DB::connection('tenant')->transaction(function () use ($segmento, $canal, $asunto, $cuerpo, $personas): DifusionTenant {
             $difusion = DifusionTenant::query()->create([
@@ -48,19 +48,7 @@ class DifundirComunicacionTenant
             ]);
 
             $total = 0;
-            foreach ($personas as $persona) {
-                $destinatario = null;
-                if ($canal === CanalComunicacion::Email) {
-                    $email = $persona->email;
-                    if (! is_string($email) || $email === '') {
-                        continue; // sin correo no se puede encolar un email
-                    }
-                    $destinatario = $email;
-                }
-                if ($canal === CanalComunicacion::Push && ! $this->push->puedeRecibir($persona)) {
-                    continue; // sin la app con sesión no hay a dónde mandarla
-                }
-
+            foreach ($personas as [$persona, $destinatario]) {
                 $contexto = $this->contexto($persona);
 
                 MensajeTenant::query()->create([
@@ -83,6 +71,59 @@ class DifundirComunicacionTenant
 
             return $difusion;
         });
+    }
+
+    /**
+     * A cuántos llegaría la campaña por ese canal y quiénes quedan fuera y por qué, con
+     * la misma regla que el envío (ADR 0166): lo que se ve antes de enviar es lo que se
+     * manda.
+     *
+     * @return array{elegibles: int, sin_consentimiento: int, sin_email: int, sin_app: int}
+     */
+    public function alcance(SegmentoComunicacion $segmento, CanalComunicacion $canal): array
+    {
+        $calculo = $this->destinatarios($this->resolver->resolver($segmento), $canal);
+
+        return [
+            'elegibles' => count($calculo['enviables']),
+            'sin_consentimiento' => $this->resolver->sinConsentimiento($segmento),
+            'sin_email' => $calculo['sin_email'],
+            'sin_app' => $calculo['sin_app'],
+        ];
+    }
+
+    /**
+     * A quién se le puede mandar por ese canal (con su destinatario) y cuántos no: sin
+     * correo no hay email; sin la app con sesión, no hay push.
+     *
+     * @param  iterable<PersonaTenant>  $personas
+     * @return array{enviables: list<array{0: PersonaTenant, 1: string|null}>, sin_email: int, sin_app: int}
+     */
+    private function destinatarios(iterable $personas, CanalComunicacion $canal): array
+    {
+        $enviables = [];
+        $sinEmail = 0;
+        $sinApp = 0;
+        foreach ($personas as $persona) {
+            $destinatario = null;
+            if ($canal === CanalComunicacion::Email) {
+                $email = $persona->email;
+                if (! is_string($email) || $email === '') {
+                    $sinEmail++;
+
+                    continue;
+                }
+                $destinatario = $email;
+            }
+            if ($canal === CanalComunicacion::Push && ! $this->push->puedeRecibir($persona)) {
+                $sinApp++;
+
+                continue;
+            }
+            $enviables[] = [$persona, $destinatario];
+        }
+
+        return ['enviables' => $enviables, 'sin_email' => $sinEmail, 'sin_app' => $sinApp];
     }
 
     /**

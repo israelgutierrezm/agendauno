@@ -98,6 +98,35 @@ describe("detalle de la clase", () => {
     expect(api.post).not.toHaveBeenCalled();
     w.unmount();
   });
+  it("al cancelar una reserva queda a la vista a quién y qué pasó con su crédito", async () => {
+    permisos.add("reservas.ver");
+    permisos.add("reservas.gestionar");
+    api.get.mockResolvedValue({
+      data: { data: [reserva("e", "en_espera", null)] },
+    });
+    api.post.mockResolvedValue({
+      data: {
+        data: {},
+        meta: {
+          efecto: { mensaje: "Sale de la lista de espera. No usa créditos." },
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    const cancelar = w.findAll("button").find((b) => b.text() === "Cancelar");
+    await cancelar!.trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/reservas/e/cancelar",
+      {},
+    );
+    expect(w.text()).toContain(
+      "Se canceló la reserva de Persona e. Sale de la lista de espera. No usa créditos.",
+    );
+  });
+
   it("sin permiso no ofrece pasar lista ni acciones de gestión", async () => {
     api.get.mockResolvedValue({
       data: { data: [reserva("a", "confirmada", null)] },

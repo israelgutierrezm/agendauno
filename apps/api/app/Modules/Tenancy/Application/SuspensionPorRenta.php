@@ -6,11 +6,14 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
+use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Http\Middleware\ResolverEstudio;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Collection;
@@ -106,14 +109,54 @@ class SuspensionPorRenta
         }
 
         $enPrueba = $estudio->trial_termina_en !== null && ! $estudio->trial_termina_en->isPast();
+        $suspendidoEn = $estudio->suspendido_en;
         $estudio->forceFill([
             'estado' => ($enPrueba ? EstadoEstudio::Trialing : EstadoEstudio::Active)->value,
             'suspendido_por' => null,
             'suspendido_en' => null,
         ])->save();
+        $this->alReabrir($estudio, $suspendidoEn);
         Log::info('plataforma.estudio.reactivado_por_pago', ['estudio' => $estudio->slug]);
 
         return true;
+    }
+
+    /**
+     * Al volver a abrir un negocio suspendido (por pago o a mano; ADR 0166), lo que pasó
+     * mientras estuvo cerrado no se le cobra a sus clientes:
+     *
+     * - guarda cuándo reabrió: las faltas automáticas cuentan desde ahí, no las clases
+     *   que nadie pudo registrar con el panel cerrado;
+     * - la gracia de los socios en mora se recorre los días que estuvo cerrado: no
+     *   pudieron pagar con el portal cerrado.
+     */
+    public function alReabrir(Estudio $estudio, ?DateTimeInterface $suspendidoEn): void
+    {
+        $estudio->forceFill(['reactivado_en' => now()])->save();
+        if ($suspendidoEn === null) {
+            return;
+        }
+        $desde = CarbonImmutable::instance($suspendidoEn);
+        $segundos = max(0, (int) $desde->diffInSeconds(now(), true));
+        $gestor = app(GestorDeConexionTenant::class);
+        if ($segundos === 0 || ! $gestor->baseDeDatosExiste($estudio)) {
+            return;
+        }
+        $gestor->ejecutarAislado($estudio, function () use ($desde, $segundos): int {
+            $recorridos = 0;
+            ProcesoDunningTenant::query()
+                ->where('estado', EstadoDunning::EnMora->value)
+                // Su gracia corría cuando se suspendió el negocio.
+                ->where('gracia_hasta', '>=', $desde)
+                ->get()
+                ->each(function (ProcesoDunningTenant $proceso) use ($segundos, &$recorridos): void {
+                    $proceso->gracia_hasta = $proceso->gracia_hasta->copy()->addSeconds($segundos);
+                    $proceso->save();
+                    $recorridos++;
+                });
+
+            return $recorridos;
+        }, 0);
     }
 
     /**

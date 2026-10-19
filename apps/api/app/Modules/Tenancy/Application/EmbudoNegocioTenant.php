@@ -39,6 +39,9 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class EmbudoNegocioTenant
 {
+    /** @var list<int>|null las sedes que ve quien lo pide (null = todas; ADR 0166) */
+    private ?array $sedes = null;
+
     public function __construct(
         private readonly FechasNegocioTenant $fechas,
         private readonly VisitasPaginaTenant $visitas,
@@ -46,10 +49,12 @@ class EmbudoNegocioTenant
     ) {}
 
     /**
+     * @param  list<int>|null  $sedes  las que ve quien lo pide (null = todas)
      * @return array<string, mixed>
      */
-    public function calcular(string $desde, string $hasta): array
+    public function calcular(string $desde, string $hasta, ?array $sedes = null): array
     {
+        $this->sedes = $sedes;
         $zona = $this->fechas->zona();
         $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay()->utc();
         $fin = CarbonImmutable::parse($hasta, $zona)->endOfDay()->utc();
@@ -57,6 +62,7 @@ class EmbudoNegocioTenant
         $solicitudes = ProspectoTenant::query()
             ->where('origen', OrigenProspecto::Formulario->value)
             ->whereBetween('created_at', [$inicio, $fin])
+            ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes ?? []))
             ->get(['id', 'persona_id', 'convertido_en', 'created_at', 'primer_contacto_en', 'canal']);
         $porCanal = $solicitudes->countBy(static fn (ProspectoTenant $p): string => (string) ($p->canal ?? ''));
         $conVisita = array_sum(array_map(static fn (string $c): int => (int) $porCanal->get($c, 0), CaptacionTenant::CANALES_CON_VISITA));
@@ -90,6 +96,7 @@ class EmbudoNegocioTenant
                     'equipo' => ProspectoTenant::query()
                         ->where('origen', OrigenProspecto::Manual->value)
                         ->whereBetween('created_at', [$inicio, $fin])
+                        ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes ?? []))
                         ->count(),
                 ],
             ],
@@ -99,8 +106,10 @@ class EmbudoNegocioTenant
             ],
             'compra_a_asistencia' => $this->compraAAsistencia($inicio, $fin),
             'renovacion' => [
-                'por_renovar' => OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->whereBetween('created_at', [$inicio, $fin])->count(),
+                'por_renovar' => OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->whereBetween('created_at', [$inicio, $fin])
+                    ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes ?? []))->count(),
                 'renovadas' => OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->whereBetween('created_at', [$inicio, $fin])
+                    ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes ?? []))
                     ->where('estado', EstadoOrden::Pagada->value)->count(),
             ],
             'tiempo_respuesta' => [
@@ -131,7 +140,9 @@ class EmbudoNegocioTenant
      */
     private function citas(CarbonImmutable $inicio, CarbonImmutable $fin): array
     {
-        $deCitas = static fn (Builder $q) => $q->where('tipo', TipoSesionTenant::Cita->value);
+        $sedes = $this->sedes;
+        $deCitas = static fn (Builder $q) => $q->where('tipo', TipoSesionTenant::Cita->value)
+            ->when($sedes !== null, fn (Builder $s) => $s->whereIn('sucursal_id', $sedes ?? []));
 
         $agendadas = ReservaTenant::query()->whereHas('sesion', $deCitas)->whereBetween('created_at', [$inicio, $fin]);
         $confirmadas = (clone $agendadas)
@@ -179,6 +190,7 @@ class EmbudoNegocioTenant
             ->where('ordenes.estado', EstadoOrden::Pagada->value)
             ->whereNotNull('lineas_orden.producto_comercial_id')
             ->whereNull('ordenes.renueva_acuerdo_id')
+            ->when($this->sedes !== null, fn ($q) => $q->whereIn('ordenes.sucursal_id', $this->sedes ?? []))
             ->selectRaw('COALESCE(lineas_orden.beneficiario_id, ordenes.persona_id) as pid, MIN(ordenes.pagada_en) as primera')
             ->groupByRaw('COALESCE(lineas_orden.beneficiario_id, ordenes.persona_id)')
             ->get()

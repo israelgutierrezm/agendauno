@@ -96,10 +96,22 @@ class PuntoDeVentaTenant
                 'huella_intento' => $huella,
             ]);
 
+            // Serializa ventas concurrentes de los mismos artículos (no-sobreventa),
+            // bloqueándolos siempre en el mismo orden (por id): dos ventas con los mismos
+            // artículos en otro orden no se esperan una a la otra (deadlock).
+            $bloqueados = ArticuloTenant::query()
+                ->whereIn('id', array_map(static fn (array $item): int => (int) $item['articulo']->getKey(), $items))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
             $total = 0;
             foreach ($items as $n => $item) {
-                // Serializa ventas concurrentes del mismo articulo (no-sobreventa).
-                $articulo = ArticuloTenant::query()->whereKey($item['articulo']->getKey())->lockForUpdate()->firstOrFail();
+                $articulo = $bloqueados->get((int) $item['articulo']->getKey());
+                if (! $articulo instanceof ArticuloTenant) {
+                    throw ValidationException::withMessages(["items.{$n}.articulo_id" => ['Ese artículo ya no existe: quítalo de la venta.']]);
+                }
                 $cantidad = max(1, $item['cantidad']);
                 // Se desactivó con el carrito abierto: ya no se vende.
                 if (! $articulo->activo) {

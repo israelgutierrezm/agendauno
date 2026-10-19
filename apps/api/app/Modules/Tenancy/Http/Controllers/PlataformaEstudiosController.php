@@ -223,6 +223,7 @@ class PlataformaEstudiosController
         }
 
         $enPrueba = $modelo->trial_termina_en !== null && ! $modelo->trial_termina_en->isPast();
+        $suspendidoEn = $modelo->suspendido_en;
         $modelo->update([
             'estado' => ($enPrueba ? EstadoEstudio::Trialing : EstadoEstudio::Active)->value,
             'suspendido_por' => null,
@@ -231,6 +232,8 @@ class PlataformaEstudiosController
                 ? now()->addDays(max(1, $suspension->diasGracia()))->toDateString()
                 : $modelo->sin_suspension_hasta,
         ]);
+        // Lo que pasó mientras estuvo cerrado no se le cobra a sus clientes (ADR 0166).
+        $suspension->alReabrir($modelo, $suspendidoEn);
         Log::info('plataforma.estudio.reactivado', ['estudio' => $modelo->slug]);
 
         return response()->json(['data' => self::resumen($modelo->refresh())]);

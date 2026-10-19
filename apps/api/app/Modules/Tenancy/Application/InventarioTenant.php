@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\MovimientoInventarioTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Support\Facades\DB;
 
@@ -95,6 +96,23 @@ class InventarioTenant
 
             return $this->registrar($articuloId, $sucursalId, $delta, $tipo, $motivo, $actor);
         });
+    }
+
+    /**
+     * Lo que una orden cobrada sacó del inventario (los artículos de un presupuesto;
+     * ADR 0127) vuelve a la sede de la orden al anular su cobro o devolverla completa
+     * (ADR 0166). Bloquea cada artículo, como la venta del mostrador.
+     */
+    public function devolverDeOrden(OrdenTenant $orden, string $motivo, ?Usuario $actor = null): void
+    {
+        if ($orden->sucursal_id === null) {
+            return;
+        }
+        foreach ($orden->lineas()->whereNotNull('articulo_id')->orderBy('articulo_id')->get() as $linea) {
+            $articuloId = (int) $linea->getAttribute('articulo_id');
+            ArticuloTenant::query()->whereKey($articuloId)->lockForUpdate()->first();
+            $this->registrar($articuloId, (int) $orden->sucursal_id, max(1, (int) $linea->cantidad), TipoMovimientoInventario::Entrada, $motivo, $actor);
+        }
     }
 
     /**

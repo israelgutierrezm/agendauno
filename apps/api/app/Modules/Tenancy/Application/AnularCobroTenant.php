@@ -40,6 +40,7 @@ class AnularCobroTenant
         private readonly DerechosDeOrdenTenant $derechos,
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly InventarioTenant $inventario,
     ) {}
 
     /**
@@ -110,6 +111,8 @@ class AnularCobroTenant
                 'Cobro anulado',
                 $actor,
             );
+            // Los artículos que salieron con el cobro vuelven a su sede (ADR 0166).
+            $this->inventario->devolverDeOrden($orden, 'Cobro anulado '.$orden->ulid, $actor);
             $bloqueado->update(['estado' => EstadoPago::Anulado->value]);
             $orden->update([
                 'estado' => EstadoOrden::Pendiente->value,

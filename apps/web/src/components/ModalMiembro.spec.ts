@@ -183,6 +183,66 @@ describe("detalle de un cliente en un modal", () => {
     expect(info).toContain("No binario");
   });
 
+  it("el resumen dice qué debe, dónde vale su plan y a qué sede va", async () => {
+    datosResumen = resumen({
+      proxima_reserva: {
+        clase: "Pole Fitness Intermedio",
+        inicia_en: "2026-10-07T01:00:00Z",
+        zona_horaria: "America/Mexico_City",
+        sucursal: "Roma",
+        profesional: "Sofía",
+      },
+    });
+    ficha = {
+      reservas: [],
+      ordenes: [],
+      pendientes: [
+        {
+          id: "o1",
+          fecha: null,
+          estado: "pendiente",
+          total_minor: 50000,
+          moneda: "MXN",
+        },
+        {
+          id: "o2",
+          fecha: null,
+          estado: "pendiente",
+          total_minor: 25000,
+          moneda: "MXN",
+        },
+      ],
+      derechos: [
+        {
+          producto: "Plan mensual 12 clases",
+          valido_hasta: null,
+          todas_sucursales: false,
+          sucursales: [{ id: "s1", nombre: "Roma" }],
+          actividad: null,
+          aplica_a: [],
+        },
+      ],
+    };
+    const w = montar();
+    await flushPromises();
+
+    const debe = w.get('[data-prueba="por-cobrar"]');
+    expect(debe.text()).toContain("750");
+    expect(debe.text()).toContain("2 cobros pendientes");
+    expect(w.get('[data-prueba="alcance-plan"]').text()).toBe("Solo en Roma");
+    expect(w.get('[data-prueba="proxima-donde"]').text()).toBe(
+      "Pole Fitness Intermedio · Roma · Sofía",
+    );
+  });
+
+  it("al corriente, lo dice en el resumen", async () => {
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="por-cobrar"]').text()).toContain(
+      "Está al corriente.",
+    );
+  });
+
   it("las estadísticas cambian de periodo", async () => {
     const w = montar();
     await flushPromises();

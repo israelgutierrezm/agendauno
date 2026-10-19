@@ -18,7 +18,9 @@ import { fechaLocal } from "@/lib/agenda";
 import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { textoAlcance, type AlcancePlan } from "@/lib/cobertura";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -61,6 +63,9 @@ interface Resumen {
     clase: string | null;
     inicia_en: string;
     zona_horaria: string | null;
+    // Dónde y con quién.
+    sucursal?: string | null;
+    profesional?: string | null;
   } | null;
   ultima_visita: {
     clase: string | null;
@@ -103,10 +108,16 @@ interface Orden {
   concepto?: string | null;
   cuotas?: CuotaPorCobrar[];
 }
+// Lo que un plan deja reservar y dónde (de la ficha).
+interface DerechoFicha extends AlcancePlan {
+  producto: string | null;
+  valido_hasta: string | null;
+}
 interface Ficha {
   reservas: Reserva[];
   ordenes: Orden[] | null;
   pendientes?: Orden[] | null;
+  derechos?: DerechoFicha[];
 }
 type Pestana = "resumen" | "planes" | "historial" | "pagos" | "notas";
 
@@ -228,6 +239,35 @@ function fechaHora(iso: string | null, zona: string | null): string {
 function dinero(minor: number, moneda: string): string {
   return dineroDelPais(minor, moneda, sesion.pais);
 }
+
+// Dónde vale su plan vigente y qué deja reservar (el de la tarjeta, o el primero).
+const alcancePlan = computed(() => {
+  const hoy = hoyEnNegocio(sesion.zonaHoraria);
+  const vigentes = (ficha.value?.derechos ?? []).filter(
+    (d) => d.valido_hasta === null || d.valido_hasta.slice(0, 10) >= hoy,
+  );
+  const plan =
+    vigentes.find((d) => d.producto === resumen.value?.membresia.plan) ??
+    vigentes[0];
+  return plan
+    ? textoAlcance(plan, t, {
+        variasSedes: (sesion.usuario?.sucursales?.length ?? 0) > 1,
+        esCitas: sesion.esCitas,
+      })
+    : null;
+});
+// Lo que debe, en el resumen (no solo en «Pagos»): cuántas y cuánto por moneda.
+const porCobrar = computed(() => {
+  const pendientes = ficha.value?.pendientes ?? [];
+  const porMoneda = new Map<string, number>();
+  for (const o of pendientes) {
+    porMoneda.set(o.moneda, (porMoneda.get(o.moneda) ?? 0) + o.total_minor);
+  }
+  return {
+    n: pendientes.length,
+    total: [...porMoneda].map(([m, minor]) => dinero(minor, m)).join(" + "),
+  };
+});
 
 const planTexto = computed(() => {
   const m = resumen.value?.membresia;
@@ -649,6 +689,13 @@ function colorAlerta(codigo: string): string {
                   }}
                 </p>
                 <p v-if="planTexto" class="dm-suave">{{ planTexto }}</p>
+                <p
+                  v-if="alcancePlan"
+                  class="dm-suave"
+                  data-prueba="alcance-plan"
+                >
+                  {{ alcancePlan }}
+                </p>
               </div>
             </div>
             <button
@@ -722,6 +769,45 @@ function colorAlerta(codigo: string): string {
             </div>
           </section>
 
+          <!-- Lo que falta pagar, a la vista sin abrir «Pagos». -->
+          <section v-if="ficha" class="dm-tarjeta" data-prueba="por-cobrar">
+            <h3 class="dm-titulo">
+              {{ $t("detalleMiembro.pagos.pendientes") }}
+            </h3>
+            <div class="dm-dato">
+              <span class="dm-icono" aria-hidden="true"
+                ><IconoNav nombre="dinero" :tam="22"
+              /></span>
+              <div class="min-w-0">
+                <template v-if="porCobrar.n > 0">
+                  <p class="dm-valor" :style="{ color: 'var(--aviso)' }">
+                    {{ porCobrar.total }}
+                  </p>
+                  <p class="dm-suave">
+                    {{
+                      $t(
+                        "detalleMiembro.pagos.cuantos",
+                        { n: porCobrar.n },
+                        porCobrar.n,
+                      )
+                    }}
+                  </p>
+                </template>
+                <p v-else class="dm-suave">
+                  {{ $t("detalleMiembro.pagos.alCorriente") }}
+                </p>
+              </div>
+            </div>
+            <button
+              v-if="porCobrar.n > 0"
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm dm-boton"
+              @click="pestana = 'pagos'"
+            >
+              {{ $t("detalleMiembro.pagos.verPendientes") }}
+            </button>
+          </section>
+
           <section class="dm-tarjeta" data-prueba="proxima-reserva">
             <h3 class="dm-titulo">{{ $t("detalleMiembro.proxima.titulo") }}</h3>
             <div class="dm-dato">
@@ -738,8 +824,16 @@ function colorAlerta(codigo: string): string {
                       )
                     }}
                   </p>
-                  <p class="dm-suave">
-                    {{ resumen.proxima_reserva.clase ?? "—" }}
+                  <p class="dm-suave" data-prueba="proxima-donde">
+                    {{
+                      [
+                        resumen.proxima_reserva.clase ?? "—",
+                        resumen.proxima_reserva.sucursal,
+                        resumen.proxima_reserva.profesional,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    }}
                   </p>
                 </template>
                 <p v-else class="dm-suave">

@@ -68,14 +68,23 @@ it('con respuestas, editar sube la versión y lo respondido conserva sus pregunt
         'persona_id' => $rosa, 'valores' => [$f['alergias'] => 'Penicilina', $f['talla'] => 'M'],
     ], conBearer($e['bearer']))->assertCreated();
 
-    // Se quita «Alergias», «Talla» pasa a texto y se agrega una nueva, primero.
-    $nueva = $this->putJson("/api/v1/app/{$e['slug']}/formularios/{$f['ficha']}", [
+    // Se quita «Alergias», «Talla» pasa a texto y se agrega una nueva, primero. Con
+    // respuestas, publicar una versión nueva se confirma (ADR 0166): sin confirmarlo no
+    // cambia nada.
+    $cambio = [
         'nombre' => 'Ficha médica',
         'campos' => [
             ['etiqueta' => 'Contacto de emergencia', 'tipo' => 'texto', 'obligatorio' => true],
             ['id' => $f['talla'], 'etiqueta' => 'Talla', 'tipo' => 'texto'],
         ],
-    ], conBearer($e['bearer']))->assertOk()
+    ];
+    $this->putJson("/api/v1/app/{$e['slug']}/formularios/{$f['ficha']}", $cambio, conBearer($e['bearer']))
+        ->assertStatus(409)->assertJsonPath('code', 'FORM_NEW_VERSION_UNCONFIRMED')
+        ->assertJsonPath('meta.respuestas', 1)->assertJsonPath('meta.version', 2);
+    $this->getJson("/api/v1/app/{$e['slug']}/formularios", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.0.version', 1)->assertJsonCount(2, 'data.0.campos');
+
+    $nueva = $this->putJson("/api/v1/app/{$e['slug']}/formularios/{$f['ficha']}", [...$cambio, 'confirmar_nueva_version' => true], conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('data.version', 2)
         ->assertJsonPath('data.respuestas', 1)
         ->json('data.campos');
@@ -124,6 +133,31 @@ it('una ficha archivada no se pide ni se responde, y se restaura', function (): 
     // Las archivadas solo las ve quien diseña las fichas.
     $alumno = alumnoConSesion($e);
     $this->getJson("{$url}?archivados=1", conBearer($alumno['bearer']))->assertForbidden();
+});
+
+it('una ficha nueva en borrador no se pide ni se responde hasta publicarla', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $url = "/api/v1/app/{$e['slug']}/formularios";
+    $ficha = (string) $this->postJson($url, ['nombre' => 'Ficha médica', 'borrador' => true], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.activo', false)->json('data.id');
+    $alumno = alumnoConSesion($e);
+    $rosa = crearMiembroTenant($e, 'Rosa');
+
+    // Sin preguntas no se publica.
+    $this->postJson("{$url}/{$ficha}/publicar", [], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['campos'], 'meta.errors');
+    $campo = (string) $this->putJson("{$url}/{$ficha}", ['nombre' => 'Ficha médica', 'campos' => [['etiqueta' => 'Alergias', 'tipo' => 'texto']]], conBearer($e['bearer']))
+        ->assertOk()->json('data.campos.0.id');
+
+    // En borrador: el alumno no la ve y nadie la responde.
+    $this->getJson($url, conBearer($alumno['bearer']))->assertOk()->assertJsonCount(0, 'data');
+    $this->postJson("{$url}/{$ficha}/respuestas", ['persona_id' => $rosa, 'valores' => [$campo => 'Ninguna']], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['formulario'], 'meta.errors');
+
+    $this->postJson("{$url}/{$ficha}/publicar", [], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.activo', true);
+    // Publicada: el alumno la ve, sin cuántas respuestas tiene (eso es de quien la diseña).
+    $this->getJson($url, conBearer($alumno['bearer']))->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.respuestas', null);
+    $this->postJson("{$url}/{$ficha}/respuestas", ['persona_id' => $rosa, 'valores' => [$campo => 'Ninguna']], conBearer($e['bearer']))->assertCreated();
 });
 
 it('una pregunta de opción necesita dos opciones, marcada en su campo', function (): void {

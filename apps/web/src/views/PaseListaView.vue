@@ -11,7 +11,11 @@ import { asistenciaAbierta } from "@/lib/agenda";
 import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
-import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
+import {
+  confirmarAsistencia,
+  leerEfectoInasistencia,
+  textoInasistencia,
+} from "@/lib/confirmarAsistencia";
 import {
   colorEstado,
   estadoEnLista,
@@ -269,9 +273,20 @@ async function marcar(
 ): Promise<void> {
   // Solo cambiar si llegó tarde no mueve créditos: no hace falta confirmarlo.
   const soloRetardo = r.asistencia === "presente" && estado === "presente";
+  // «No vino» dice qué pasa con su crédito según su política (no un «puede»).
+  const efecto =
+    estado === "ausente" && !r.asistencia
+      ? textoInasistencia(t, await leerEfectoInasistencia(base.value, r.id))
+      : null;
   if (
     !soloRetardo &&
-    !(await confirmarAsistencia(t, r.persona ?? "", r.asistencia, estado))
+    !(await confirmarAsistencia(
+      t,
+      r.persona ?? "",
+      r.asistencia,
+      estado,
+      efecto,
+    ))
   ) {
     return;
   }

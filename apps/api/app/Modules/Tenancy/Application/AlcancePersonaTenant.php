@@ -111,7 +111,20 @@ final class AlcancePersonaTenant
      */
     public function acotadaSalvoLoSuyo(Builder $consulta, Request $request, string $columnaResponsable, string $columna = 'persona_id'): Builder
     {
-        $actor = self::actor($request);
+        return $this->acotadaSalvoLoSuyoDe($consulta, self::actor($request), $columnaResponsable, $columna);
+    }
+
+    /**
+     * Lo mismo que {@see acotadaSalvoLoSuyo()} para un actor ya resuelto (p. ej. los
+     * contadores del Inicio, que deben contar lo mismo que abre su lista).
+     *
+     * @template TConsulta of Builder<*>
+     *
+     * @param  TConsulta  $consulta
+     * @return TConsulta
+     */
+    public function acotadaSalvoLoSuyoDe(Builder $consulta, ?Usuario $actor, string $columnaResponsable, string $columna = 'persona_id'): Builder
+    {
         $personas = $this->personasVisibles($actor);
         if ($actor instanceof Usuario && $personas !== null) {
             $consulta->where(fn ($w) => $w

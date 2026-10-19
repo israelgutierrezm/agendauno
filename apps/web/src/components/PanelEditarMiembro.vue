@@ -254,14 +254,6 @@ async function guardar(): Promise<void> {
         </label>
       </div>
 
-      <button
-        class="tu-btn tu-btn-primario w-full"
-        type="submit"
-        :disabled="guardando"
-      >
-        {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}
-      </button>
-
       <div
         v-if="sesion.puede('miembros.eliminar')"
         class="border-t pt-4 space-y-2"
@@ -287,5 +279,28 @@ async function guardar(): Promise<void> {
         </button>
       </div>
     </form>
+    <!-- Guardar va en el pie fijo: en el teléfono queda a la vista sin tapar los
+         campos ni el teclado (ADR 0166). La baja sigue aparte, en el cuerpo. -->
+    <template #pie>
+      <div class="flex justify-end gap-2">
+        <button
+          class="tu-btn tu-btn-fantasma"
+          type="button"
+          :disabled="guardando || dandoDeBaja"
+          @click="cerrar"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          class="tu-btn tu-btn-primario"
+          type="submit"
+          form="form-editar-miembro"
+          :disabled="guardando || dandoDeBaja"
+          data-prueba="guardar-miembro"
+        >
+          {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}
+        </button>
+      </div>
+    </template>
   </PanelLateral>
 </template>

@@ -160,10 +160,35 @@ it('el staff ve en su agenda a quién atiende cada cita y la cuenta como ocupada
     expect($sesion['cita']['cliente'])->toBe('Ana');
     expect($sesion['cita']['estado'])->toBe('pendiente_pago');
     expect($sesion['cita']['asistencia'])->toBeNull();
+    // Apartada en línea: no se presenta como agendada mientras no se pague.
+    expect($sesion['cita']['estado_atencion'])->toBe('apartada')
+        ->and($sesion['cita']['estado_pago'])->toBe('por_pagar');
 
     // El roster de la cita también la muestra (recepción puede cobrarla).
     $this->getJson("/api/v1/app/{$ctx['e']['slug']}/sesiones/{$cita['sesion_id']}/reservas", conBearer($ctx['e']['bearer']))
         ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.estado', 'pendiente_pago');
+});
+
+it('una cita cancelada sigue diciendo de quién era y la cancelación dice qué pasó', function (): void {
+    $ctx = estudioConServicioDeCitas();
+    $ana = alumnoConSesion($ctx['e'], 'Ana', 'ana@correo.mx');
+    $cita = agendarCitaComo($ctx, $ana['bearer']);
+    $dia = substr($ctx['hora'], 0, 10);
+
+    $efecto = $this->postJson("/api/v1/app/{$ctx['e']['slug']}/reservas/{$cita['id']}/cancelar", ['por' => 'negocio'], conBearer($ctx['e']['bearer']))
+        ->assertOk()->assertJsonPath('data.estado', 'cancelada')->json('meta.efecto');
+    expect($efecto['cancelable'])->toBeTrue()
+        ->and($efecto['mensaje'])->toBeString()->not->toBe('');
+
+    $sesion = collect($this->getJson("/api/v1/app/{$ctx['e']['slug']}/sesiones?desde={$dia}&hasta={$dia}", conBearer($ctx['e']['bearer']))
+        ->assertOk()->json('data'))->firstWhere('id', $cita['sesion_id']);
+    // La cita se canceló, pero el panel sabe de quién era (para su historial); su
+    // pago no se presenta como pagado ni por cobrar.
+    expect($sesion['estado'])->toBe('cancelada')
+        ->and($sesion['cita']['cliente'])->toBe('Ana')
+        ->and($sesion['cita']['reserva_id'])->toBe($cita['id'])
+        ->and($sesion['cita']['estado_atencion'])->toBe('cancelada')
+        ->and($sesion['cita']['estado_pago'])->toBeNull();
 });
 
 it('el cliente agenda desde su cuenta: ve servicios y horarios libres aunque el negocio no esté en el directorio', function (): void {

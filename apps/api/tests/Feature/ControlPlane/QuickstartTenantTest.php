@@ -151,8 +151,20 @@ it('la lista para empezar se comprueba con los datos y en orden; activar una pas
     $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/ventanilla", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))->assertOk();
     expect($comprobado()['cobro'])->toBeFalse();
 
-    // Una reserva hecha comprueba la prueba de reserva.
+    // Una reserva que hace el equipo no prueba el recorrido del cliente (ADR 0166)...
     $sesion = crearSesionTenant($e, $semilla, 8, '2026-10-02 08:00:00');
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated();
+    expect($comprobado()['prueba'])->toBeFalse();
+
+    // ...la de un cliente desde su cuenta, sí.
+    $luz = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Luz', 'email' => 'luz@correo.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $luz, 'producto_id' => crearPackTenant($e, 8000)], conBearer($e['bearer']))->assertCreated();
+    $cuenta = personalConSesion($e['slug'], $e['bearer'], 'luz@correo.mx', 'miembro');
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($cuenta))->assertCreated();
     expect($comprobado()['prueba'])->toBeTrue();
+
+    // Publicar y probar se hacen en el paso de publicación; el cobro, donde se cobra.
+    $rutas = collect($this->getJson($url, conBearer($e['bearer']))->json('data.comprobaciones'))->pluck('ruta', 'clave');
+    expect($rutas->only(['cobro', 'prueba', 'publicar'])->all())->toBe(['cobro' => 'ventas', 'prueba' => 'onboarding', 'publicar' => 'onboarding']);
 });

@@ -55,7 +55,10 @@ class AnualidadesTenant
         // La fecha de alta de cada quien tiene un plan en vigor que la cobra.
         $altas = AcuerdoTenant::query()
             ->where('estado', '!=', EstadoAcuerdo::Cancelado->value)
-            ->whereHas('producto', fn (Builder $q) => $q->where('cobra_anualidad', true))
+            // Lo que se pactó al contratar; los contratados antes, según su plan.
+            ->where(fn (Builder $q) => $q->where('cobra_anualidad', true)
+                ->orWhere(fn (Builder $antes) => $antes->whereNull('cobra_anualidad')
+                    ->whereHas('producto', fn (Builder $p) => $p->where('cobra_anualidad', true))))
             ->selectRaw('persona_id, MIN(fecha_inicio) as alta')
             ->groupBy('persona_id')
             ->get();

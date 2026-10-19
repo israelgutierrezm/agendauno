@@ -198,6 +198,15 @@ export function noEncontrado(e: unknown): boolean {
   return axios.isAxiosError(e) && e.response?.status === 404;
 }
 
+/** El código de error de la API (p. ej. `STOCK_INSUFFICIENT`); null si no lo hay. */
+export function codigoDeError(e: unknown): string | null {
+  if (!axios.isAxiosError(e)) {
+    return null;
+  }
+  const codigo = (e.response?.data as { code?: unknown } | undefined)?.code;
+  return typeof codigo === "string" ? codigo : null;
+}
+
 /** Los campos que la API rechazó (`meta.errors` de un 422); vacío si no los hay. */
 export function camposConError(e: unknown): string[] {
   if (!axios.isAxiosError(e)) {

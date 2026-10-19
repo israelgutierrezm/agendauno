@@ -88,13 +88,20 @@ it('corrige la forma de pago sin cambiar el monto y lo deja en la bitácora', fu
     expect($registro['motivo'])->toBe('Pagó por transferencia');
 });
 
+it('sin motivo no se corrige: cambia cómo cuadra el corte', function (): void {
+    $c = citaCobradaEnEfectivo();
+
+    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia'], conBearer($c['e']['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['motivo'], 'meta.errors');
+});
+
 it('si el negocio no lo permite, no se corrige ni se ofrece', function (): void {
     $c = citaCobradaEnEfectivo();
     $this->putJson("/api/v1/app/{$c['e']['slug']}/parametros", ['valores' => ['pagos.permitir_corregir_metodo' => 0]], conBearer($c['e']['bearer']))
         ->assertOk();
 
     expect(citaPagadaEnAgenda($c['e'], $c['dia'], $c['sesion'])['cita']['pago']['corregible'])->toBeFalse();
-    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia'], conBearer($c['e']['bearer']))
+    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia', 'motivo' => 'Pagó por transferencia'], conBearer($c['e']['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_CORRECTABLE');
 });
 
@@ -102,7 +109,7 @@ it('pasado el plazo ya no se corrige', function (): void {
     $c = citaCobradaEnEfectivo();
     $this->travel(49)->hours();
 
-    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia'], conBearer($c['e']['bearer']))
+    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia', 'motivo' => 'Pagó por transferencia'], conBearer($c['e']['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_CORRECTABLE');
 });
 
@@ -118,7 +125,7 @@ it('una venta facturada no se corrige: su forma de pago va en el CFDI', function
         ]);
     });
 
-    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia'], conBearer($c['e']['bearer']))
+    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia', 'motivo' => 'Pagó por transferencia'], conBearer($c['e']['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_CORRECTABLE');
 });
 
@@ -126,6 +133,6 @@ it('quien no cobra en caja no corrige', function (): void {
     $c = citaCobradaEnEfectivo();
     $instructor = personalConSesion($c['e']['slug'], $c['e']['bearer'], 'otro@barberia-pago.mx', 'instructor');
 
-    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia'], conBearer($instructor))
+    $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia', 'motivo' => 'Pagó por transferencia'], conBearer($instructor))
         ->assertForbidden();
 });

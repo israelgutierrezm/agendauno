@@ -35,7 +35,8 @@ class MarcarInasistencias extends Command
                         continue;
                     }
 
-                    $marcadas += $gestor->ejecutarAislado($estudio, fn (): int => app(AsistenciaTenant::class)->marcarInasistenciasAlTerminar(), 0);
+                    // Si reabrió tras una suspensión, desde que reabrió (ADR 0166).
+                    $marcadas += $gestor->ejecutarAislado($estudio, fn (): int => app(AsistenciaTenant::class)->marcarInasistenciasAlTerminar($estudio->reactivado_en), 0);
                 }
             });
 

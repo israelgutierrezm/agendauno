@@ -70,6 +70,31 @@ it('tolera las primeras faltas de la ventana y cobra las siguientes', function (
         ->and(faltaA($e, $sede, $ana, '2030-01-04 08:00:00'))->toBe(7000); // 3.ª: se cobra
 });
 
+it('antes de marcar la falta dice si se tolera o si pierde el crédito', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/politicas-cancelacion", [
+        'horas_limite' => 6, 'penaliza_tarde' => true, 'penaliza_no_show' => true,
+        'tolerancia_no_show' => 1, 'ventana_no_show_dias' => 30,
+    ], conBearer($e['bearer']))->assertCreated();
+    $sede = agendaSemilla($e);
+    $ana = alumnaParaFaltar($e);
+    $efecto = function (string $cuando) use ($e, $sede, $ana): array {
+        $sesion = crearSesionTenant($e, $sede, 5, $cuando);
+        $reserva = (string) test()->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $ana['persona']], conBearer($e['bearer']))
+            ->assertCreated()->json('data.id');
+
+        return test()->getJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/inasistencia", conBearer($e['bearer']))->assertOk()->json('data');
+    };
+
+    // La primera falta entra en la tolerancia: no pierde el crédito.
+    expect($efecto('2030-01-02 08:00:00'))->toMatchArray(['con_credito' => true, 'penaliza' => true, 'tolerada' => true, 'pierde_credito' => false, 'unidades' => 1000]);
+
+    // Ya tiene una falta: la siguiente lo pierde (y eso es lo que pasa al marcarla).
+    faltaA($e, $sede, $ana, '2030-01-03 08:00:00');
+    expect($efecto('2030-01-04 08:00:00'))->toMatchArray(['tolerada' => false, 'pierde_credito' => true, 'unidades' => 1000])
+        ->and(faltaA($e, $sede, $ana, '2030-01-05 08:00:00'))->toBe(7000);
+});
+
 it('las faltas fuera de la ventana ya no cuentan', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $this->putJson("/api/v1/app/{$e['slug']}/politicas-cancelacion", [

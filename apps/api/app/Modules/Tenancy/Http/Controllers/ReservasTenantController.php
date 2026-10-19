@@ -260,15 +260,19 @@ class ReservasTenantController
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
         $this->exigirSesion($request, $reserva->sesion);
         $usuario = $request->attributes->get('usuario_tenant');
+        $quien = $this->quienCancela($request);
+        // Lo que pasa con el crédito o el pago, con la misma regla que la vista previa:
+        // la recepción lo ve después de cancelar, no solo antes.
+        $efecto = $this->reservas->efectoDeCancelar($reserva, $quien);
 
-        $this->reservas->cancelar($reserva, $this->quienCancela($request), $usuario instanceof Usuario ? $usuario : null);
+        $this->reservas->cancelar($reserva, $quien, $usuario instanceof Usuario ? $usuario : null);
 
-        return response()->json(['data' => $this->presentar($reserva->refresh())]);
+        return response()->json([
+            'data' => $this->presentar($reserva->refresh()),
+            'meta' => ['efecto' => $efecto->toArray()],
+        ]);
     }
 
-    /**
-     * Vista previa: qué pasará con el crédito si se cancela ahora (con el mismo `por`).
-     */
     /**
      * Historial de una cita (agendada, recordatorios, reprogramaciones, cobro,
      * asistencia, cancelación). Un instructor acotado solo ve el de SUS sesiones.
@@ -282,6 +286,9 @@ class ReservasTenantController
         return response()->json(['data' => $this->historial->de($reserva)]);
     }
 
+    /**
+     * Vista previa: qué pasará con el crédito si se cancela ahora (con el mismo `por`).
+     */
     public function previsualizarCancelacion(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();

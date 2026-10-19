@@ -8,7 +8,13 @@ import { RouterLink } from "vue-router";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { type Plan } from "@/lib/planes";
 import { crearVenta } from "@/lib/venta";
+import {
+  queIncluyePlan,
+  reglasDePlan,
+  useCuotasDeVenta,
+} from "@/lib/ventaDePlan";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoParaPersona } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -118,16 +124,35 @@ const resumen = ref<Resumen | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
-// Venta rápida + cobro en ventanilla: crea la orden y la liquida (fulfillment).
-interface Producto {
-  id: string;
-  nombre: string;
-  precio_minor: number;
-  moneda: string;
-}
+// Venta rápida + cobro en ventanilla: crea la orden y la liquida (fulfillment). Dice
+// lo mismo que Ventas antes de cobrar: qué incluye, dónde vale, sus reglas, la
+// inscripción que se suma y las condiciones que acepta el cliente.
+type Producto = Plan;
 const vendiendo = ref(false);
 const productos = ref<Producto[]>([]);
 const productoSel = ref("");
+// Solo lo que sigue a la venta.
+const vendibles = computed(() => productos.value.filter((p) => !p.archivado));
+const elegido = computed(
+  () => productos.value.find((p) => p.id === productoSel.value) ?? null,
+);
+const { inscripcion, aceptaCondiciones, pideCondiciones } = useCuotasDeVenta(
+  base,
+  computed(() => props.personaId),
+  elegido,
+);
+const reglas = computed(() =>
+  elegido.value
+    ? reglasDePlan(elegido.value, t, {
+        variasSedes: (sesionStore.usuario?.sucursales?.length ?? 0) > 1,
+        esCitas: sesionStore.esCitas,
+      })
+    : [],
+);
+// Lo que se cobra: el plan y, si le toca, su inscripción (lo que suma el servidor).
+const totalVenta = computed(
+  () => (elegido.value?.precio_minor ?? 0) + inscripcion.value,
+);
 const metodo = ref("efectivo");
 const procesando = ref(false);
 const avisoVenta = ref<string | null>(null);
@@ -158,13 +183,17 @@ async function vender(): Promise<void> {
   if (productoSel.value === "") {
     return;
   }
-  // Vender cobra en el momento: se confirma qué, cuánto, cómo y a quién.
-  const producto = productos.value.find((p) => p.id === productoSel.value);
+  // Vender cobra en el momento: se confirma qué, cuánto (con la inscripción, si le
+  // toca), cómo y a quién.
+  const producto = elegido.value;
+  if (pideCondiciones.value && !aceptaCondiciones.value) {
+    return;
+  }
   if (
     !(await confirmar(
       t("confirmaciones.venta", {
         producto: producto?.nombre ?? "",
-        monto: producto ? dinero(producto.precio_minor, producto.moneda) : "",
+        monto: producto ? dinero(totalVenta.value, producto.moneda) : "",
         metodo: t(`recepcion.miembro.${metodo.value}`),
         persona: resumen.value?.nombre_completo ?? props.nombre,
       }),
@@ -182,6 +211,7 @@ async function vender(): Promise<void> {
       {
         comprador_id: props.personaId,
         items: [{ producto_id: productoSel.value, cantidad: 1 }],
+        ...(pideCondiciones.value ? { acepta_condiciones: true } : {}),
       },
       metodo.value,
     );
@@ -535,10 +565,41 @@ function cancelarVenta(): void {
             <option value="" disabled>
               {{ $t("recepcion.miembro.elegirProducto") }}
             </option>
-            <option v-for="p in productos" :key="p.id" :value="p.id">
+            <option v-for="p in vendibles" :key="p.id" :value="p.id">
               {{ p.nombre }} — {{ dinero(p.precio_minor, p.moneda) }}
             </option>
           </select>
+          <!-- Antes de cobrar: qué incluye, dónde vale y sus reglas. -->
+          <div
+            v-if="elegido"
+            class="space-y-0.5 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="detalle-venta"
+          >
+            <p>{{ queIncluyePlan(elegido, $t) }}</p>
+            <p v-for="r in reglas" :key="r">{{ r }}</p>
+            <p v-if="inscripcion > 0" data-prueba="inscripcion-venta">
+              {{
+                $t("recepcion.miembro.conInscripcion", {
+                  monto: dinero(inscripcion, elegido.moneda),
+                  total: dinero(totalVenta, elegido.moneda),
+                })
+              }}
+            </p>
+          </div>
+          <!-- Permanencia (B04): las condiciones que acepta el cliente. -->
+          <div
+            v-if="pideCondiciones && elegido?.condiciones"
+            class="space-y-2 rounded-lg p-3 text-sm"
+            :style="{ background: 'var(--superficie-2)' }"
+            data-prueba="condiciones-venta"
+          >
+            <p>{{ elegido.condiciones }}</p>
+            <label class="flex items-start gap-2">
+              <input v-model="aceptaCondiciones" type="checkbox" class="mt-1" />
+              {{ $t("ventas.vender.aceptaCondiciones") }}
+            </label>
+          </div>
           <select v-model="metodo" class="tu-input">
             <option value="efectivo">
               {{ $t("recepcion.miembro.efectivo") }}
@@ -554,7 +615,11 @@ function cancelarVenta(): void {
             <button
               type="button"
               class="tu-btn tu-btn-primario flex-1 text-sm"
-              :disabled="procesando || productoSel === ''"
+              :disabled="
+                procesando ||
+                productoSel === '' ||
+                (pideCondiciones && !aceptaCondiciones)
+              "
               @click="vender"
             >
               {{

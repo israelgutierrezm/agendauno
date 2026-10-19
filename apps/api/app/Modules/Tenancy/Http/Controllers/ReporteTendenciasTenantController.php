@@ -9,7 +9,9 @@ use App\Modules\Tenancy\Application\MovimientosDePagoTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Cuotas\ConceptoCuota;
+use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\LineaVentaPosTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use Carbon\CarbonImmutable;
@@ -160,7 +162,9 @@ class ReporteTendenciasTenantController
 
     /**
      * Lo vendido por producto (subtotal de línea) en la moneda del negocio: compras
-     * no canceladas, por la fecha de la compra, de las sedes que ve quien consulta.
+     * no canceladas, por la fecha de la compra, de las sedes que ve quien consulta. Suma
+     * también los artículos del mostrador (ventas no anuladas), como el total «Vendido»
+     * (ADR 0166).
      *
      * @param  list<int>|null  $sedes
      * @return list<array{producto: string, ventas_minor: int, unidades: int}>
@@ -184,6 +188,20 @@ class ReporteTendenciasTenantController
             ->whereIn('id', $filas->pluck('pid')->filter()->all())
             ->pluck('nombre', 'id');
 
+        $mostrador = LineaVentaPosTenant::query()
+            ->join('ventas_pos', 'ventas_pos.id', '=', 'lineas_venta_pos.venta_pos_id')
+            ->whereNull('ventas_pos.anulada_en')
+            ->where('ventas_pos.moneda', $moneda)
+            ->when($sedes !== null, fn ($q) => $q->whereIn('ventas_pos.sucursal_id', $sedes))
+            ->whereBetween('ventas_pos.created_at', [$inicio, $fin])
+            ->groupBy('lineas_venta_pos.articulo_id')
+            ->selectRaw('lineas_venta_pos.articulo_id as aid, SUM(lineas_venta_pos.subtotal_minor) as vendido, SUM(lineas_venta_pos.cantidad) as unidades')
+            ->toBase()
+            ->get();
+        $articulos = ArticuloTenant::query()
+            ->whereIn('id', $mostrador->pluck('aid')->filter()->all())
+            ->pluck('nombre', 'id');
+
         return $filas
             ->map(static fn (object $f): array => [
                 // Las cuotas (B04) se nombran por su concepto.
@@ -193,6 +211,11 @@ class ReporteTendenciasTenantController
                 'ventas_minor' => (int) $f->vendido,
                 'unidades' => (int) $f->unidades,
             ])
+            ->concat($mostrador->map(static fn (object $f): array => [
+                'producto' => (string) ($articulos->get((int) ($f->aid ?? 0)) ?? '—'),
+                'ventas_minor' => (int) $f->vendido,
+                'unidades' => (int) $f->unidades,
+            ]))
             ->sortByDesc('ventas_minor')
             ->values()
             ->all();

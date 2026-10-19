@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * `origen` = `apertura`: lo traía de otro sistema al migrar (C07), sin venta ni pago aquí.
  *
  * @property array<string, mixed>|null $condiciones
+ * @property bool|null $cobra_anualidad si su plan cobraba la anualidad al contratarlo (ADR 0166)
  */
 class AcuerdoTenant extends Model
 {
@@ -33,6 +34,8 @@ class AcuerdoTenant extends Model
         'persona_id', 'producto_comercial_id', 'linea_orden_id', 'fecha_inicio', 'proxima_cobro_en', 'dia_ancla', 'estado',
         'permanencia_hasta', 'baja_anticipada', 'penalizacion_minor', 'penalizacion_porcentaje', 'condiciones', 'baja_efectiva_el',
         'origen', 'referencia_apertura',
+        // Si su plan cobraba la anualidad al contratarlo (ADR 0166; null = antes).
+        'cobra_anualidad',
     ];
 
     /** Saldo de apertura: cargado al migrar, no vendido aquí (C07). */
@@ -42,6 +45,7 @@ class AcuerdoTenant extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'cobra_anualidad' => 'boolean',
         'fecha_inicio' => 'date',
         'proxima_cobro_en' => 'date',
         // Día del mes de sus aniversarios (ciclos y cobro), ver Aniversario.

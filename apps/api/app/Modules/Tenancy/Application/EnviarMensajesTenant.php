@@ -61,7 +61,7 @@ class EnviarMensajesTenant
             ->each(function (MensajeTenant $mensaje) use (&$enviados): void {
                 // Una campaña no le llega a quien pidió no recibir promociones, aunque
                 // lo pidiera después de encolarla (B08).
-                if ($mensaje->difusion_id !== null && $mensaje->persona_id !== null
+                if ($mensaje->esPromocional() && $mensaje->persona_id !== null
                     && PersonaTenant::query()->whereKey($mensaje->persona_id)->where('recibe_promociones', false)->exists()) {
                     $mensaje->estado = EstadoMensaje::Descartado;
                     $mensaje->ultimo_error = 'No desea recibir promociones.';

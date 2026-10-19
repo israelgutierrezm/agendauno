@@ -421,6 +421,45 @@ docker compose --env-file web.env exec api rm /tmp/archivos.tar.gz
 
 Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diarias.
 
+### Recuperar un negocio y su renta
+
+Los pasos del superadministrador van contra la API de la plataforma
+(`/api/v1/plataforma`, con `PLATFORM_ADMIN_TOKEN`) o desde su panel.
+
+**Restaurar un solo negocio sin apagar la plataforma:**
+
+1. Ciérralo para todos: `POST /estudios/SLUG/suspender`. `artisan down` apagaría a todos
+   los negocios.
+2. Restaura su base: `agendauno:restaurar-estudio SLUG --force`.
+3. Ponla al día: `agendauno:migrar-estudios --estudio=SLUG`.
+4. Aclara lo que pasó entre el respaldo y ahora:
+   - `agendauno:conciliar-pagos`: pagos en línea cuyo aviso no quedó guardado;
+   - `agendauno:conciliar-reembolsos`: devoluciones.
+5. Reábrelo: `POST /estudios/SLUG/reactivar`.
+
+Al reabrir, lo que pasó mientras estuvo cerrado no se le cobra a sus clientes. No se
+marcan faltas automáticas de esos días y la gracia de los socios en mora se recorre lo
+que duró cerrado (ADR 0166).
+
+**Un negocio suspendido por la renta:**
+
+- Al pagarla (en línea, con la pasarela de la plataforma) se reactiva solo. Si el aviso
+  de Stripe no llegó, `agendauno:conciliar-renta` (cada 15 min) lo confirma.
+- El superadministrador puede:
+  - reactivarlo a mano (`POST /estudios/SLUG/reactivar`): no se vuelve a suspender
+    durante los días de gracia;
+  - condonar un cargo (`POST /cargos/CARGO/condonar`).
+- `agendauno:suspender-por-renta` suspende y reactiva según lo que se deba. Corre solo
+  a diario, y también se puede correr a mano.
+
+**Un cargo de renta que no se pudo cobrar:**
+
+- Con tarjeta domiciliada, `agendauno:cobrar-renta-domiciliada` reintenta a los 3 y a los
+  7 días. Si el banco pide autenticación, el dueño paga el cargo desde **Mi
+  suscripción**, que abre la página de pago.
+- Un cobro de renta nunca toca los pagos de los clientes del negocio. Son otra pasarela
+  (la de la plataforma), otras tablas en la base central y otra pantalla.
+
 ### Altas sin activar
 
 `agendauno:limpiar-altas-sin-activar` (diario, 03:50 de CDMX) borra los negocios cuyo

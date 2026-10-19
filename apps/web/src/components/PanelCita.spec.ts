@@ -192,11 +192,17 @@ describe("forma de pago de un cobro en caja", () => {
 
     await w.get('[data-prueba="corregir-pago"]').trigger("click");
     await w.get("select").setValue("transferencia");
+    // Cambia cómo cuadra el corte: sin motivo no se guarda.
+    expect(
+      boton(w, "Guardar forma de pago").attributes("disabled"),
+    ).toBeDefined();
+    await w.get('[data-prueba="motivo-metodo"]').setValue("Pagó por SPEI");
     await boton(w, "Guardar forma de pago").trigger("click");
     await flushPromises();
 
     expect(mocks.put).toHaveBeenCalledWith("/api/v1/app/demo/pagos/p1/metodo", {
       metodo: "transferencia",
+      motivo: "Pagó por SPEI",
     });
   });
 
