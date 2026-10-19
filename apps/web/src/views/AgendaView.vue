@@ -1136,7 +1136,8 @@ const pestanasClase = computed<PestanaClase[]>(() => {
   if (d?.oferta_id && (puedeGestionar.value || puedeCatalogo.value)) {
     lista.push("lugares");
   }
-  if (puedeGestionar.value) {
+  // Asignar personal y sustituciones: solo con equipo (quien trabaja solo no lo necesita).
+  if (puedeGestionar.value && sesion.conEquipo !== false) {
     lista.push("equipo");
   }
   // Wellhub y TotalPass: solo con negocios en México.
@@ -1207,7 +1208,9 @@ async function abrirDetalle(s: Sesion): Promise<void> {
   staffModel.value = { usuarioId: "", rol: "instructor", sustituyeA: "" };
   await cargarRoster(s.id);
   if (puedeGestionar.value) {
-    await cargarStaffSesion(s.id);
+    if (sesion.conEquipo !== false) {
+      await cargarStaffSesion(s.id);
+    }
     if (s.oferta_id !== null) {
       await cargarReglasCanal(s.oferta_id);
     }
