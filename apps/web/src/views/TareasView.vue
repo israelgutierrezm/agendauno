@@ -3,6 +3,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useEventosNegocio } from "@/lib/eventosNegocio";
 import { useRoute } from "vue-router";
 
 import BarraListado from "@/components/BarraListado.vue";
@@ -20,7 +21,8 @@ import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+const { nombreEvento } = useEventosNegocio();
 
 // Los marcadores van como parámetros: `{{ }}` en la plantilla sería interpolación.
 const ayudaPlantilla = computed(() =>
@@ -516,8 +518,11 @@ function cerrarRegla(): void {
   void descartarRegla.cerrar();
 }
 
+// Cómo se dice en Tareas («Se crea una reserva»); un evento nuevo sin ese texto usa
+// el nombre común de los avisos, nunca la llave técnica.
 function etiquetaEvento(ev: string): string {
-  return t(`tareas.eventos.${ev.replace(/\./g, "_")}`);
+  const llave = `tareas.eventos.${ev.replace(/\./g, "_")}`;
+  return te(llave) ? t(llave) : nombreEvento(ev);
 }
 
 // «mias»: sin permiso para las del equipo, solo ve y atiende las suyas.

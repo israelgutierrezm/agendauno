@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Tenancy\Facturacion;
+
+/**
+ * Las claves de los catálogos del SAT (CFDI 4.0) que el negocio elige al facturar: un
+ * uso del CFDI o una forma de pago fuera del catálogo se rechaza aquí, antes de
+ * mandarla a timbrar. Las descripciones viven en la web (`lib/catalogosSat.ts`).
+ */
+final class CatalogosSat
+{
+    /** c_UsoCFDI; los de personas físicas solamente, aparte. */
+    public const USOS_CFDI = [
+        'G01', 'G02', 'G03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'I07', 'I08',
+        'D01', 'D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08', 'D09', 'D10',
+        'S01', 'CP01', 'CN01',
+    ];
+
+    /** Usos que solo puede usar una persona física (RFC de 13 caracteres). */
+    public const USOS_SOLO_FISICAS = ['D01', 'D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08', 'D09', 'D10', 'CN01'];
+
+    /** c_FormaPago. */
+    public const FORMAS_PAGO = [
+        '01', '02', '03', '04', '05', '06', '08', '12', '13', '14', '15', '17',
+        '23', '24', '25', '26', '27', '28', '29', '30', '31', '99',
+    ];
+}

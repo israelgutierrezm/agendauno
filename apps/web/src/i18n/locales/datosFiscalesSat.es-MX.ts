@@ -3,6 +3,21 @@
  * buscador) y arriba se ve, como lista, lo que falta para timbrar facturas.
  */
 export default {
+  // Al emitir una factura (FacturasView): el receptor y los catálogos del CFDI.
+  factura: {
+    regimenReceptor: "Régimen fiscal del receptor",
+    regimenReceptorPh: "Busca por clave o nombre",
+    regimenReceptorAyuda:
+      "El de su Constancia de Situación Fiscal. El SAT lo pide en el CFDI 4.0.",
+    usoPh: "Busca por clave o uso, p. ej. G03 o gastos",
+    usoAyuda:
+      "Lo decide quien recibe la factura; el más común es G03 · Gastos en general.",
+    paraElRfc: "Para su RFC",
+    otrosUsos: "Otros usos",
+    usoNoCorresponde:
+      "Ese uso es solo para personas físicas y el RFC es de persona moral: el SAT lo rechazará.",
+    formaPh: "Busca por clave o forma, p. ej. 03 o transferencia",
+  },
   regimen: {
     etiqueta: "Régimen fiscal",
     placeholder: "Busca por clave o nombre, p. ej. 626 o RESICO",

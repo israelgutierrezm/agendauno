@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "@/i18n";
 import { confirmar } from "@/lib/confirmar";
 import FacturasView from "./FacturasView.vue";
+import SelectorBuscable from "@/components/SelectorBuscable.vue";
 
 /*
 | Facturas: por páginas, con búsqueda, estado (con sus cuentas) y fechas del negocio.
@@ -135,6 +136,45 @@ describe("facturas: búsqueda, filtros y páginas", () => {
     );
     expect((w.get("#fa-nombre").element as HTMLInputElement).value).toBe(
       "Ana López",
+    );
+    w.unmount();
+  });
+
+  it("el receptor, el uso y la forma de pago se eligen del catálogo del SAT", async () => {
+    vi.mocked(confirmar).mockResolvedValue(true);
+    api.post.mockResolvedValue({ data: { data: factura("3", "timbrada") } });
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+    const selectores = w.findAllComponents(SelectorBuscable);
+    expect(selectores).toHaveLength(3);
+
+    // RFC de persona moral (12 caracteres): un uso solo de personas físicas avisa.
+    await w.get("#fa-nombre").setValue("Estudio Sol SA");
+    await w.get("#fa-rfc").setValue("ESO800101AB1");
+    await w.get("#fa-cp").setValue("06700");
+    const [regimen, uso, forma] = selectores;
+    await uso!.setValue("D10");
+    expect(w.get('[data-prueba="aviso-uso-cfdi"]').text()).toContain(
+      "solo para personas físicas",
+    );
+    await uso!.setValue("G03");
+    expect(w.find('[data-prueba="aviso-uso-cfdi"]').exists()).toBe(false);
+    await regimen!.setValue("601");
+    await forma!.setValue("03");
+    await w.get("#fa-desc-0").setValue("Clase de yoga");
+    await w.get("#fa-precio-0").setValue("100");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/facturas",
+      expect.objectContaining({
+        receptor: expect.objectContaining({ regimen_fiscal: "601" }),
+        uso_cfdi: "G03",
+        forma_pago: "03",
+      }),
     );
     w.unmount();
   });

@@ -9,8 +9,18 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
+import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import {
+  opcionesFormaPago,
+  opcionesRegimen,
+  opcionesUsoCfdi,
+  regimenCorresponde,
+  tipoPersonaDeRfc,
+  usoCfdiCorresponde,
+  type TipoPersona,
+} from "@/lib/catalogosSat";
 import { confirmar } from "@/lib/confirmar";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -111,7 +121,47 @@ function conceptoNuevo(): Concepto {
   };
 }
 
-const receptor = ref({ nombre: "", rfc: "", email: "", codigo_postal: "" });
+const receptor = ref({
+  nombre: "",
+  rfc: "",
+  email: "",
+  codigo_postal: "",
+  regimen_fiscal: "",
+});
+// Del catálogo del SAT (CFDI 4.0), con buscador: nadie tiene que saberse las claves.
+const tipoReceptor = computed(() => tipoPersonaDeRfc(receptor.value.rfc));
+function textoPersonas(personas: TipoPersona[]): string {
+  return personas.length > 1
+    ? t("datosFiscalesSat.regimen.personas.ambas")
+    : t(`datosFiscalesSat.regimen.personas.${personas[0] ?? "fisica"}`);
+}
+const opcionesRegimenReceptor = computed(() =>
+  opcionesRegimen(tipoReceptor.value, {
+    persona: textoPersonas,
+    paraTuRfc: t("datosFiscalesSat.factura.paraElRfc"),
+    otros: t("datosFiscalesSat.regimen.otros"),
+  }),
+);
+const opcionesUso = computed(() =>
+  opcionesUsoCfdi(tipoReceptor.value, {
+    paraElRfc: t("datosFiscalesSat.factura.paraElRfc"),
+    otros: t("datosFiscalesSat.factura.otrosUsos"),
+  }),
+);
+const opcionesForma = opcionesFormaPago();
+const avisoRegimenReceptor = computed(() => {
+  const tipo = tipoReceptor.value;
+  return tipo !== null &&
+    receptor.value.regimen_fiscal !== "" &&
+    !regimenCorresponde(receptor.value.regimen_fiscal, tipo)
+    ? t(`datosFiscalesSat.regimen.noCorresponde.${tipo}`)
+    : null;
+});
+const avisoUso = computed(() =>
+  usoCfdiCorresponde(usoCfdi.value, tipoReceptor.value)
+    ? null
+    : t("datosFiscalesSat.factura.usoNoCorresponde"),
+);
 const usoCfdi = ref("G03");
 const formaPago = ref("01");
 const conceptos = ref<Concepto[]>([conceptoNuevo()]);
@@ -189,6 +239,7 @@ async function emitir(): Promise<void> {
         rfc: receptor.value.rfc,
         email: receptor.value.email || null,
         codigo_postal: receptor.value.codigo_postal,
+        regimen_fiscal: receptor.value.regimen_fiscal || null,
       },
       uso_cfdi: usoCfdi.value,
       forma_pago: formaPago.value,
@@ -201,7 +252,13 @@ async function emitir(): Promise<void> {
       })),
     });
     mensaje.value = "ok";
-    receptor.value = { nombre: "", rfc: "", email: "", codigo_postal: "" };
+    receptor.value = {
+      nombre: "",
+      rfc: "",
+      email: "",
+      codigo_postal: "",
+      regimen_fiscal: "",
+    };
     conceptos.value = [conceptoNuevo()];
     await cargar();
   } catch (e) {
@@ -459,6 +516,30 @@ onMounted(cargar);
                   required
                 />
               </div>
+              <div class="sm:col-span-2">
+                <label class="tu-label" for="fa-regimen">{{
+                  $t("datosFiscalesSat.factura.regimenReceptor")
+                }}</label>
+                <SelectorBuscable
+                  id="fa-regimen"
+                  v-model="receptor.regimen_fiscal"
+                  :opciones="opcionesRegimenReceptor"
+                  :placeholder="
+                    $t('datosFiscalesSat.factura.regimenReceptorPh')
+                  "
+                  data-prueba="regimen-receptor"
+                />
+                <p
+                  v-if="avisoRegimenReceptor"
+                  class="tu-error-campo"
+                  data-prueba="aviso-regimen-receptor"
+                >
+                  {{ avisoRegimenReceptor }}
+                </p>
+                <p v-else class="tu-hint">
+                  {{ $t("datosFiscalesSat.factura.regimenReceptorAyuda") }}
+                </p>
+              </div>
               <div>
                 <label class="tu-label" for="fa-uso"
                   >{{ $t("facturas.nueva.usoCfdi") }}
@@ -466,13 +547,23 @@ onMounted(cargar);
                     >*</span
                   ></label
                 >
-                <input
+                <SelectorBuscable
                   id="fa-uso"
                   v-model="usoCfdi"
-                  class="tu-input uppercase"
-                  maxlength="4"
-                  required
+                  :opciones="opcionesUso"
+                  :placeholder="$t('datosFiscalesSat.factura.usoPh')"
+                  data-prueba="uso-cfdi"
                 />
+                <p
+                  v-if="avisoUso"
+                  class="tu-error-campo"
+                  data-prueba="aviso-uso-cfdi"
+                >
+                  {{ avisoUso }}
+                </p>
+                <p v-else class="tu-hint">
+                  {{ $t("datosFiscalesSat.factura.usoAyuda") }}
+                </p>
               </div>
               <div>
                 <label class="tu-label" for="fa-forma"
@@ -481,12 +572,12 @@ onMounted(cargar);
                     >*</span
                   ></label
                 >
-                <input
+                <SelectorBuscable
                   id="fa-forma"
                   v-model="formaPago"
-                  class="tu-input"
-                  maxlength="2"
-                  required
+                  :opciones="opcionesForma"
+                  :placeholder="$t('datosFiscalesSat.factura.formaPh')"
+                  data-prueba="forma-pago"
                 />
               </div>
             </div>

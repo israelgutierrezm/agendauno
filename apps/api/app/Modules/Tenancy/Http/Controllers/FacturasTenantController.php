@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Facturacion\CatalogosSat;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
@@ -114,8 +115,9 @@ class FacturasTenantController
             'receptor.email' => ['nullable', 'email', 'max:255'],
             'receptor.regimen_fiscal' => ['nullable', 'string', 'regex:/^[0-9]{3,4}$/'],
             'receptor.codigo_postal' => ['required', 'string', 'regex:/^[0-9]{5}$/'],
-            'uso_cfdi' => ['required', 'string', 'max:4'],
-            'forma_pago' => ['nullable', 'string', 'max:2'],
+            // Del catálogo del SAT: lo que no esté ahí, el SAT lo rechazaría al timbrar.
+            'uso_cfdi' => ['required', 'string', Rule::in(CatalogosSat::USOS_CFDI)],
+            'forma_pago' => ['nullable', 'string', Rule::in(CatalogosSat::FORMAS_PAGO)],
             'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
             'items' => ['required', 'array', 'min:1'],
             'items.*.descripcion' => ['required', 'string', 'max:1000'],
@@ -124,6 +126,10 @@ class FacturasTenantController
             'items.*.clave_prod_serv' => ['required', 'string', 'max:8'],
             'items.*.clave_unidad' => ['required', 'string', 'max:3'],
         ]);
+        // Un uso solo de personas físicas con un RFC de persona moral (12 caracteres).
+        if (strlen((string) $validado['receptor']['rfc']) === 12 && in_array($validado['uso_cfdi'], CatalogosSat::USOS_SOLO_FISICAS, true)) {
+            throw ValidationException::withMessages(['uso_cfdi' => ['Ese uso del CFDI es solo para personas físicas y el RFC es de persona moral.']]);
+        }
 
         $datos = DatosFiscalesTenant::query()->first();
         if (! $datos instanceof DatosFiscalesTenant) {

@@ -132,3 +132,22 @@ it('con la tasa de la región fronteriza factura con IVA 8 %; otras tasas no se 
     expect($r->json('data.impuesto_minor'))->toEqual(8000)
         ->and($r->json('data.total_minor'))->toEqual(108000);
 });
+
+it('el uso del CFDI y la forma de pago salen del catálogo del SAT y concuerdan con el RFC', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    cargarDatosFiscales($e);
+    $url = "/api/v1/app/{$e['slug']}/facturas";
+
+    $inventado = cfdiValido();
+    $inventado['uso_cfdi'] = 'Z99';
+    $inventado['forma_pago'] = '77';
+    $this->postJson($url, $inventado, conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['uso_cfdi', 'forma_pago'], 'meta.errors');
+
+    // Colegiaturas (D10) son solo de personas físicas; este RFC (12) es de persona moral.
+    $moral = cfdiValido();
+    $moral['receptor']['rfc'] = 'ESO800101AB1';
+    $moral['uso_cfdi'] = 'D10';
+    $this->postJson($url, $moral, conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['uso_cfdi'], 'meta.errors');
+});
