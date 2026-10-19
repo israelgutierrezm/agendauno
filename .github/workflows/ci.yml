@@ -120,8 +120,24 @@ jobs:
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
 
       # Toda la suite en un proceso: con más de mil pruebas, 512 MB ya no alcanzan.
+      # El reporte JUnit deja, si algo falla, el nombre y el mensaje de cada prueba
+      # como anotación del trabajo: se leen sin abrir el registro.
       - name: Tests (Pest)
-        run: php artisan test
+        run: php artisan test --log-junit storage/logs/junit.xml
+
+      - name: Pruebas que fallaron
+        if: failure()
+        run: |
+          php -r '
+            $x = @simplexml_load_file("storage/logs/junit.xml");
+            if ($x === false) { exit(0); }
+            foreach ($x->xpath("//testcase[failure or error]") as $c) {
+              $m = (string) $c->failure !== "" ? (string) $c->failure : (string) $c->error;
+              $m = str_replace("%", "%25", substr(preg_replace("/\s+/", " ", $m), 0, 600));
+              $donde = (string) ($c["file"] ?? "") !== "" ? (string) $c["file"] : (string) $c["class"];
+              echo "::error title=" . str_replace([":", ","], " ", basename($donde)) . "::" . $c["name"] . " | " . $m . PHP_EOL;
+            }
+          '
 
       # Las pruebas usan SQLite para los negocios, que no tiene candados de fila ni
       # escrituras simultáneas: aquí se comprueba en MySQL con procesos a la vez
