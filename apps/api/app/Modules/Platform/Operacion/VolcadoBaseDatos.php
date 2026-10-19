@@ -17,16 +17,21 @@ use Symfony\Component\Process\Process;
 /**
  * Lo común de los respaldos (de cada negocio, de la plataforma y de los archivos):
  * volcar y cargar una base (MySQL con mysqldump/mysql; SQLite con VACUUM INTO),
- * comprimir, guardar en el disco de respaldos (en producción, fuera del servidor)
- * con su suma sha256 al lado, y comprobarla antes de restaurar.
+ * comprimir, cifrar (ADR 0171), guardar en el disco de respaldos (en producción,
+ * fuera del servidor) con su suma sha256 al lado, y comprobarla antes de restaurar.
  */
 class VolcadoBaseDatos
 {
     /** Sufijo del archivo con la suma de verificación de cada respaldo. */
     public const SUMA = '.sha256';
 
+    /** Sufijo de los respaldos cifrados (ADR 0171). */
+    public const CIFRADO = '.enc';
+
     /** Inventario de lo que trae un respaldo (p. ej. los negocios de la plataforma). */
     public const INVENTARIO = '.inventario.json';
+
+    public function __construct(private readonly CifradoRespaldos $cifrado = new CifradoRespaldos) {}
 
     /**
      * Vuelca la base de una conexión ya configurada a un archivo local.
@@ -164,15 +169,23 @@ class VolcadoBaseDatos
     }
 
     /**
-     * Guarda un archivo local (lo comprime si hace falta) en el disco de respaldos,
-     * con su suma al lado. Devuelve la ruta en el disco.
+     * Guarda un archivo local (lo comprime si hace falta y, con llave, lo cifra) en el
+     * disco de respaldos, con su suma al lado. Devuelve la ruta en el disco.
      */
     public function guardar(string $local, string $carpeta, string $nombre, bool $comprimir = true): string
     {
         $archivo = $comprimir ? $this->comprimir($local) : $local;
+        $cifrado = null;
         try {
-            $suma = hash_file('sha256', $archivo);
-            $ruta = $this->disco()->putFileAs($carpeta, new ArchivoHttp($archivo), $nombre);
+            // Cifrado antes de salir del servidor (ADR 0171); la suma es la de lo que se sube.
+            if ($this->cifrado->activo()) {
+                $cifrado = $archivo.self::CIFRADO;
+                $this->cifrado->cifrar($archivo, $cifrado);
+                $nombre .= self::CIFRADO;
+            }
+            $subir = $cifrado ?? $archivo;
+            $suma = hash_file('sha256', $subir);
+            $ruta = $this->disco()->putFileAs($carpeta, new ArchivoHttp($subir), $nombre);
             if (! is_string($ruta) || $suma === false) {
                 throw new RuntimeException('No se pudo guardar el respaldo.');
             }
@@ -185,11 +198,15 @@ class VolcadoBaseDatos
             if ($comprimir) {
                 @unlink($archivo);
             }
+            if ($cifrado !== null) {
+                @unlink($cifrado);
+            }
         }
     }
 
     /**
-     * Baja un respaldo a un archivo local, comprobando su suma (si la tiene) y
+     * Baja un respaldo a un archivo local, comprobando su suma (si la tiene),
+     * descifrándolo (si viene cifrado, con la llave con que se guardó) y
      * descomprimiéndolo (si `$descomprimir`).
      */
     public function bajar(string $ruta, string $destino, bool $descomprimir = true): void
@@ -200,7 +217,8 @@ class VolcadoBaseDatos
         if (! is_resource($entrada)) {
             throw new RuntimeException('No se pudo leer el respaldo.');
         }
-        $bajado = $descomprimir ? $destino.'.gz' : $destino;
+        $bajado = $destino.'.descarga';
+        $plano = $bajado;
         $salida = fopen($bajado, 'wb');
         if ($salida === false) {
             fclose($entrada);
@@ -221,15 +239,22 @@ class VolcadoBaseDatos
                     throw new RuntimeException('El respaldo está dañado: su suma de verificación no coincide.');
                 }
             }
+            if ($this->cifrado->estaCifrado($bajado)) {
+                $plano = $destino.'.plano';
+                $this->cifrado->descifrar($bajado, $plano);
+            }
             if ($descomprimir) {
-                $this->descomprimir($bajado, $destino);
+                $this->descomprimir($plano, $destino);
+            } elseif (! rename($plano, $destino)) {
+                throw new RuntimeException('No se pudo guardar el respaldo.');
             }
         } catch (RuntimeException $e) {
             @unlink($destino);
             throw $e;
         } finally {
-            if ($descomprimir) {
-                @unlink($bajado);
+            @unlink($bajado);
+            if ($plano !== $bajado) {
+                @unlink($plano);
             }
         }
     }

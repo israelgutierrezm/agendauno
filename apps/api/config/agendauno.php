@@ -186,6 +186,12 @@ return [
     */
     'respaldos' => [
         'disco' => env('RESPALDOS_DISCO', 'local'),
+        // Cifrado (ADR 0171): 32 bytes en base64 (openssl rand -base64 32). Sin ella
+        // se guardan sin cifrar. Al cambiarla, la de antes va en las anteriores
+        // (separadas por comas) para restaurar lo viejo. Guárdala FUERA del servidor:
+        // sin ella no se puede restaurar.
+        'llave' => env('RESPALDOS_LLAVE'),
+        'llaves_anteriores' => env('RESPALDOS_LLAVES_ANTERIORES', ''),
         'carpeta' => env('RESPALDOS_CARPETA', 'respaldos'),
         'dias' => (int) env('RESPALDOS_DIAS', 14),
         'mysqldump' => env('RESPALDOS_MYSQLDUMP', 'mysqldump'),

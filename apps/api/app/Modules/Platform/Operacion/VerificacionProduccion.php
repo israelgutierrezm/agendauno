@@ -288,6 +288,9 @@ class VerificacionProduccion
 
         return [
             $this->punto('Respaldos', 'Copias fuera del servidor', $disco !== 'local' && $disco !== '', "Ahora: {$disco}. Usa RESPALDOS_DISCO=s3 con un bucket externo."),
+            // ADR 0171: lo que sale del servidor va cifrado.
+            $this->punto('Respaldos', 'Respaldos cifrados', $this->cifradoActivo(),
+                'Define RESPALDOS_LLAVE (openssl rand -base64 32) y guárdala también fuera del servidor: sin ella no se pueden restaurar.'),
             $this->punto('Respaldos', 'Base central respaldada en las últimas '.self::HORAS_RESPALDO.' h', $plataformaReciente, 'Corre php artisan agendauno:respaldar-plataforma.'),
             $this->punto('Respaldos', 'Archivos subidos respaldados en las últimas '.self::HORAS_RESPALDO.' h', $archivosRecientes, 'Corre php artisan agendauno:respaldar-plataforma.'),
             $this->punto(
@@ -304,6 +307,16 @@ class VerificacionProduccion
                 $sinRespaldo === [] ? '' : 'Sin respaldo reciente: '.implode(', ', array_slice($sinRespaldo, 0, 10)).(count($sinRespaldo) > 10 ? '…' : ''),
             ),
         ];
+    }
+
+    /** ¿Hay llave para cifrar los respaldos? Una llave mal escrita cuenta como que no. */
+    private function cifradoActivo(): bool
+    {
+        try {
+            return app(CifradoRespaldos::class)->activo();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**

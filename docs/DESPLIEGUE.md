@@ -408,16 +408,39 @@ docker compose --env-file web.env exec -u www-data api php artisan agendauno:res
 docker compose --env-file web.env exec -u www-data api php artisan up
 ```
 
-Los archivos subidos se restauran descomprimiendo `respaldos/_archivos/archivos-….tar.gz`
-dentro del volumen `storage` (`private/` → `storage/app/private`, `public/` →
-`storage/app/public`). Descárgalo del bucket y descomprímelo **como `www-data`**: con
-root, la aplicación ya no podría reemplazar ni borrar esos archivos.
+Los archivos subidos se restauran descomprimiendo el último paquete de
+`respaldos/_archivos/` dentro del volumen `storage` (`private/` → `storage/app/private`,
+`public/` → `storage/app/public`). `agendauno:bajar-respaldo` lo baja del bucket,
+comprueba su suma y lo descifra (`--respaldo=RUTA` para otro). Descomprímelo **como
+`www-data`**: con root, la aplicación ya no podría reemplazar ni borrar esos archivos.
 
 ```bash
-docker compose --env-file web.env cp archivos-FECHA.tar.gz api:/tmp/archivos.tar.gz
+docker compose --env-file web.env exec -u www-data api php artisan agendauno:bajar-respaldo /tmp/archivos.tar.gz
 docker compose --env-file web.env exec -u www-data api tar -xzf /tmp/archivos.tar.gz -C storage/app
 docker compose --env-file web.env exec api rm /tmp/archivos.tar.gz
 ```
+
+### Respaldos cifrados
+
+Con `RESPALDOS_LLAVE` en `api.env`, cada respaldo sale del servidor cifrado (ADR 0171):
+la base central, la de cada negocio y los archivos (`….gz.enc`). Restaurar y el
+simulacro los descifran solos.
+
+1. Genera la llave y ponla en `api.env` (luego como en «Cambiar `api.env`»):
+
+   ```bash
+   openssl rand -base64 32
+   ```
+
+2. **Guárdala también fuera del servidor**, en tu gestor de contraseñas, junto a
+   `APP_KEY`. Si el servidor se pierde y la llave solo estaba en él, los respaldos no se
+   pueden abrir.
+3. Para cambiarla, pon la nueva en `RESPALDOS_LLAVE` y la de antes en
+   `RESPALDOS_LLAVES_ANTERIORES` (varias, separadas por comas) hasta que los respaldos
+   viejos venzan (`RESPALDOS_DIAS`).
+
+Sin llave, los respaldos se guardan sin cifrar y `agendauno:verificar-produccion` lo
+marca. Los que ya estaban sin cifrar se siguen restaurando igual.
 
 Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diarias.
 
