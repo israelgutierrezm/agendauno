@@ -28,6 +28,9 @@ class PagoTenant extends Model
         'orden_id', 'proveedor', 'metodo', 'estado', 'monto_minor', 'moneda',
         'referencia_externa', 'idempotency_key', 'domiciliacion_id', 'registrado_por',
         'aprobado_en', 'revisado_en', 'cerrado_sin_confirmar',
+        // Contracargo (ADR 0168): abierto, ganado o perdido.
+        'contracargo_estado', 'contracargo_referencia', 'contracargo_monto_minor', 'contracargo_motivo',
+        'contracargo_vence_en', 'contracargo_en', 'contracargo_cerrado_en',
     ];
 
     /**
@@ -62,6 +65,10 @@ class PagoTenant extends Model
         // Conciliación: última consulta a la pasarela y si se cerró sin su confirmación.
         'revisado_en' => 'datetime',
         'cerrado_sin_confirmar' => 'boolean',
+        'contracargo_monto_minor' => 'integer',
+        'contracargo_vence_en' => 'datetime',
+        'contracargo_en' => 'datetime',
+        'contracargo_cerrado_en' => 'datetime',
     ];
 
     /**

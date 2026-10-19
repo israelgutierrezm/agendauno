@@ -121,6 +121,8 @@ function titulo(i: Incidencia): string {
       return t("porConciliar.pagoDuplicado", { monto });
     case "primera_vez_repetida":
       return t("porConciliar.primeraVezRepetida", { monto });
+    case "contracargo":
+      return t("porConciliar.contracargo", { monto });
     default:
       return t("porConciliar.pagoTardio", { monto });
   }

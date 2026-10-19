@@ -130,6 +130,31 @@ describe("por conciliar", () => {
     expect(w.emitted("cambio")).toHaveLength(1);
   });
 
+  it("un contracargo dice su monto y qué hacer (ADR 0168)", async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: "i3",
+            tipo: "contracargo",
+            detalle:
+              "El banco del cliente disputa el pago de $899.00 MXN. Responde en Stripe antes del 2026-10-27.",
+            fecha: null,
+            persona: "Ana",
+            monto_minor: 89900,
+            moneda: "MXN",
+            reembolso: null,
+          },
+        ],
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.text()).toContain("Contracargo de");
+    expect(w.text()).toContain("Responde en Stripe");
+  });
+
   it("un pago tardío se devuelve desde la bandeja", async () => {
     api.get.mockResolvedValueOnce({
       data: {

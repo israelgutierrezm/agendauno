@@ -1828,6 +1828,12 @@ export default {
     },
     // Aparte del estado del pago (ADR 0166).
     porConciliar: "Por conciliar",
+    // El banco del cliente lo disputó (ADR 0168).
+    contracargo: {
+      abierto: "Contracargo abierto: responde en la pasarela",
+      ganado: "Contracargo ganado",
+      perdido: "Contracargo perdido: se devolvió al cliente",
+    },
     comprobante: {
       enviado: "Recibo enviado",
       fallido: "El recibo no se pudo enviar",

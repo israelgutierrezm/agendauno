@@ -320,6 +320,22 @@ class ClienteStripe
     }
 
     /**
+     * La sesión de Checkout que generó un PaymentIntent (para ubicar un pago guardado
+     * con la sesión, p. ej. al llegar un contracargo; ADR 0168).
+     */
+    public function sesionDeIntent(string $intentId): ?string
+    {
+        /** @var array{data?: list<array{id?: string}>} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/checkout/sessions', ['payment_intent' => $intentId, 'limit' => 1])
+            ->throw()
+            ->json();
+        $id = $json['data'][0]['id'] ?? null;
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /**
      * El PaymentIntent (cobro) que generó una sesión de Checkout ya pagada.
      */
     public function paymentIntentDeSesion(string $sesionId): ?string

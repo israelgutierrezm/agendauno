@@ -6,10 +6,12 @@ namespace App\Modules\Tenancy\Pasarelas\MercadoPago;
 
 use App\Modules\Tenancy\Application\ConciliarSuscripcionTenant;
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
+use App\Modules\Tenancy\Application\ContracargosTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pasarelas\MontoDecimal;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 
 /**
@@ -25,6 +27,7 @@ class NotificacionesMercadoPago
         private readonly ConfirmarPagoTenant $confirmar,
         private readonly ReembolsarPagoTenant $reembolsos,
         private readonly ConciliarSuscripcionTenant $suscripciones,
+        private readonly ContracargosTenant $contracargos,
     ) {}
 
     public function procesar(string $tipo, string $id): void
@@ -43,6 +46,8 @@ class NotificacionesMercadoPago
             'subscription_authorized_payment', 'authorized_payment' => $this->suscripcion(
                 (string) ($api->cuota($id)['preapproval_id'] ?? ''),
             ),
+            // Un contracargo (ADR 0168): se releen sus pagos, que dicen en qué va.
+            'chargebacks', 'chargeback' => $this->contracargo($api, $id),
             default => null,
         };
     }
@@ -76,6 +81,18 @@ class NotificacionesMercadoPago
         }
 
         $cobroId = (string) ($cobro['id'] ?? '');
+        // Contracargo (ADR 0168): en proceso (abierto), «settled» (perdido: el dinero
+        // se devolvió al cliente) o «reimbursed» (ganado: el dinero volvió al negocio).
+        if ((string) ($cobro['status'] ?? '') === 'charged_back' && $cobroId !== '') {
+            $monto = MontoDecimal::aCentavos((float) ($cobro['transaction_amount'] ?? 0));
+            match ((string) ($cobro['status_detail'] ?? '')) {
+                'settled' => $this->contracargos->cerrado($pago, $cobroId, false, $monto),
+                'reimbursed' => $this->contracargos->cerrado($pago, $cobroId, true, $monto),
+                default => $this->contracargos->abierto($pago, $cobroId, $monto, 'Contracargo en Mercado Pago'),
+            };
+
+            return;
+        }
         match ((string) ($cobro['status'] ?? '')) {
             'approved' => $this->confirmar->aprobar($pago, $cobroId),
             // El cobro existe pero falta (p. ej. el ticket de OXXO): la referencia pasa a
@@ -97,6 +114,19 @@ class NotificacionesMercadoPago
             $estado = (string) ($devolucion['status'] ?? '');
             if (in_array($estado, ['approved', 'rejected', 'cancelled', 'canceled'], true)) {
                 $this->reembolsos->conciliar((string) ($devolucion['id'] ?? ''), $estado === 'approved');
+            }
+        }
+    }
+
+    /**
+     * El aviso de un contracargo: se releen sus pagos (de ahí sale en qué va).
+     */
+    private function contracargo(ClienteMercadoPago $api, string $id): void
+    {
+        $pagos = $api->contracargo($id)['payments'] ?? [];
+        foreach (is_array($pagos) ? $pagos : [] as $cobroId) {
+            if (is_scalar($cobroId) && (string) $cobroId !== '') {
+                $this->pago($api->pago((string) $cobroId));
             }
         }
     }

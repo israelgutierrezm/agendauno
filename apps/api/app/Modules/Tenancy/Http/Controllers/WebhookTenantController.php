@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
+use App\Modules\Tenancy\Application\ContracargosTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pasarelas\MercadoPago\NotificacionesMercadoPago;
 use App\Modules\Tenancy\Pasarelas\MercadoPago\VerificarFirmaMercadoPago;
 use App\Modules\Tenancy\Pasarelas\OpenPay\NotificacionesOpenPay;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
 use App\Modules\Tenancy\Pasarelas\Stripe\TarjetasStripe;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,6 +36,7 @@ class WebhookTenantController
         private readonly TarjetasStripe $tarjetas,
         private readonly NotificacionesMercadoPago $mercadoPago,
         private readonly NotificacionesOpenPay $openPay,
+        private readonly ContracargosTenant $contracargos,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -116,6 +121,49 @@ class WebhookTenantController
     }
 
     /**
+     * Una disputa de Stripe: se ubica su pago por el PaymentIntent (o por la sesión de
+     * Checkout que lo generó) y se abre o se cierra el contracargo.
+     *
+     * @param  array<string, mixed>  $disputa
+     */
+    private function disputaStripe(string $tipo, array $disputa): void
+    {
+        $intent = $disputa['payment_intent'] ?? null;
+        $intent = is_array($intent) ? ($intent['id'] ?? null) : $intent;
+        $referencia = (string) ($disputa['id'] ?? '');
+        if (! is_string($intent) || $intent === '' || $referencia === '') {
+            return;
+        }
+        $pago = PagoTenant::query()->where('proveedor', 'stripe')->where('referencia_externa', $intent)->first();
+        if (! $pago instanceof PagoTenant) {
+            $llave = $this->registro->llaves('stripe')['secret_key'] ?? '';
+            $sesion = $llave !== '' ? (new ClienteStripe($llave))->sesionDeIntent($intent) : null;
+            $pago = $sesion !== null ? PagoTenant::query()->where('proveedor', 'stripe')->where('referencia_externa', $sesion)->first() : null;
+        }
+        if (! $pago instanceof PagoTenant) {
+            return;
+        }
+
+        $monto = (int) ($disputa['amount'] ?? 0);
+        if ($tipo === 'charge.dispute.closed') {
+            $estado = (string) ($disputa['status'] ?? '');
+            if (in_array($estado, ['won', 'lost'], true)) {
+                $this->contracargos->cerrado($pago, $referencia, $estado === 'won', $monto);
+            }
+
+            return;
+        }
+        $vence = $disputa['evidence_details']['due_by'] ?? null;
+        $this->contracargos->abierto(
+            $pago,
+            $referencia,
+            $monto,
+            isset($disputa['reason']) ? (string) $disputa['reason'] : null,
+            is_numeric($vence) ? CarbonImmutable::createFromTimestamp((int) $vence) : null,
+        );
+    }
+
+    /**
      * @return array{0: string, 1: string}
      */
     private static function credencialesBasic(?string $encabezado): array
@@ -190,6 +238,11 @@ class WebhookTenantController
             if (in_array($estado, ['succeeded', 'failed', 'canceled'], true)) {
                 $this->reembolsos->conciliar($referencia, $estado === 'succeeded');
             }
+        }
+
+        // Contracargo (ADR 0168): el banco del cliente disputa el cobro.
+        if (in_array($tipo, ['charge.dispute.created', 'charge.dispute.closed'], true) && is_array($objeto)) {
+            $this->disputaStripe($tipo, $objeto);
         }
 
         // El intento ya no se puede pagar: la sesión venció o el pago en tienda (OXXO)

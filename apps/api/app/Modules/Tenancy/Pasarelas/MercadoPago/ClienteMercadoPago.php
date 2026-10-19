@@ -90,6 +90,23 @@ class ClienteMercadoPago
     }
 
     /**
+     * Un contracargo (ADR 0168): sus pagos (`payments`), su monto y su estado.
+     *
+     * @return array<string, mixed>
+     */
+    public function contracargo(string $id): array
+    {
+        /** @var array<string, mixed> $json */
+        $json = Http::withToken($this->accessToken)
+            ->acceptJson()
+            ->get(self::BASE.'/v1/chargebacks/'.rawurlencode($id))
+            ->throw()
+            ->json();
+
+        return $json;
+    }
+
+    /**
      * Los pagos hechos para una referencia (nuestro pago), del más reciente al más
      * antiguo.
      *

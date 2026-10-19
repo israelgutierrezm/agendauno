@@ -1253,6 +1253,16 @@ subdominio del negocio):
 visible si no hay ninguna), con solo las secciones visibles y los banners vigentes hoy
 en el negocio.
 
+### Contracargos (ADR 0168)
+
+- Los webhooks de pasarela atienden contracargos:
+  - Stripe: `charge.dispute.created` y `charge.dispute.closed`;
+  - Mercado Pago: un pago `charged_back` y el aviso `chargebacks`;
+  - OpenPay: `chargeback.created`, `chargeback.accepted` y `chargeback.rejected`.
+- `GET /pagos`: cada pago suma `contracargo` (`abierto`, `ganado`, `perdido` o null).
+- `GET /incidencias-cobro`: tipo `contracargo`. Si se perdió, la devolución sale en
+  `GET /pagos/movimientos` como `devolucion`.
+
 ### Sitio web en Captación y «Plus» (ADR 0167)
 
 - `GET /sitio` suma `publicacion` {`publicado`, `privado`}: abierta, solo con el enlace

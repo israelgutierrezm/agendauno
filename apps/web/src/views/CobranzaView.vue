@@ -84,6 +84,8 @@ interface Pago {
   // Aparte de su estado (ADR 0166): una incidencia abierta y cómo va el recibo.
   por_conciliar?: boolean;
   comprobante?: "enviado" | "fallido" | "pendiente" | null;
+  // El banco del cliente lo disputó (ADR 0168).
+  contracargo?: "abierto" | "ganado" | "perdido" | null;
 }
 interface Suscripcion {
   id: string;
@@ -1164,6 +1166,18 @@ watch(vista, cargar, { immediate: true });
                       :style="{ color: 'var(--aviso)' }"
                       data-prueba="pago-por-conciliar"
                       >{{ $t("cobranza.porConciliar") }}</span
+                    >
+                    <span
+                      v-if="p.contracargo"
+                      class="block text-xs"
+                      :style="{
+                        color:
+                          p.contracargo === 'ganado'
+                            ? 'var(--texto-suave)'
+                            : 'var(--error)',
+                      }"
+                      data-prueba="pago-contracargo"
+                      >{{ $t(`cobranza.contracargo.${p.contracargo}`) }}</span
                     >
                     <span
                       v-if="p.comprobante"

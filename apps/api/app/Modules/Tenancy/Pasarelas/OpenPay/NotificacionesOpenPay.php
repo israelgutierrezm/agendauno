@@ -6,10 +6,12 @@ namespace App\Modules\Tenancy\Pasarelas\OpenPay;
 
 use App\Modules\Tenancy\Application\ConciliarSuscripcionTenant;
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
+use App\Modules\Tenancy\Application\ContracargosTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Pasarelas\MontoDecimal;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 
 /**
@@ -28,6 +30,7 @@ class NotificacionesOpenPay
         private readonly ConfirmarPagoTenant $confirmar,
         private readonly ReembolsarPagoTenant $reembolsos,
         private readonly ConciliarSuscripcionTenant $suscripciones,
+        private readonly ContracargosTenant $contracargos,
     ) {}
 
     /**
@@ -65,6 +68,25 @@ class NotificacionesOpenPay
         if ($tipo === 'subscription.charge.failed' || ($suscripcion instanceof DomiciliacionTenant && ($transaccion['order_id'] ?? null) === null)) {
             if ($suscripcion instanceof DomiciliacionTenant) {
                 $this->suscripciones->actualizar($suscripcion);
+            }
+
+            return;
+        }
+
+        // Contracargo (ADR 0168): se relee el cargo en OpenPay para ubicar su pago.
+        if (in_array($tipo, ['chargeback.created', 'chargeback.accepted', 'chargeback.rejected'], true)) {
+            $modo = ConfiguracionPasarelaTenant::query()->where('proveedor', 'openpay')->value('modo');
+            $cargo = (new ClienteOpenPay($llaves['merchant_id'], $llaves['private_key'], $modo !== 'live'))->cargo($id);
+            $pago = PagoTenant::query()->where('ulid', (string) ($cargo['order_id'] ?? ''))->where('proveedor', 'openpay')->first();
+            if ($pago instanceof PagoTenant) {
+                $monto = MontoDecimal::aCentavos((float) ($cargo['amount'] ?? 0));
+                match ($tipo) {
+                    // Aceptado: el negocio lo perdió (se devolvió al cliente).
+                    'chargeback.accepted' => $this->contracargos->cerrado($pago, $id, false, $monto),
+                    // Rechazado: el negocio lo ganó.
+                    'chargeback.rejected' => $this->contracargos->cerrado($pago, $id, true, $monto),
+                    default => $this->contracargos->abierto($pago, $id, $monto, 'Contracargo en OpenPay'),
+                };
             }
 
             return;

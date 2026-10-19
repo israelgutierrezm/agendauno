@@ -169,6 +169,8 @@ class PagosTenantController
                     'anulable' => $anular->impedimento($pago, completo: false) === null,
                     // Pagado no es lo mismo que conciliado ni que comprobante enviado.
                     'por_conciliar' => $porConciliar->has((int) $pago->getKey()),
+                    // Contracargo (ADR 0168): abierto, ganado o perdido; null si no hubo.
+                    'contracargo' => $pago->contracargo_estado,
                     'comprobante' => $comprobantes[(string) $pago->orden?->ulid] ?? null,
                 ];
             })->all(),

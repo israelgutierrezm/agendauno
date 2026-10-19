@@ -36,6 +36,9 @@ class IncidenciaCobroTenant extends Model
     /** La pasarela cobró otro importe u otra moneda que la renovación. */
     public const MONTO_DISTINTO = 'monto_distinto';
 
+    /** El banco del cliente disputa un pago en línea (ADR 0168). */
+    public const CONTRACARGO = 'contracargo';
+
     /** Se pagó una clase de prueba que la persona ya había usado (ADR 0137). */
     public const PRIMERA_VEZ_REPETIDA = 'primera_vez_repetida';
 
