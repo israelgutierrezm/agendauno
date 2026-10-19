@@ -126,3 +126,14 @@ it('las promociones son tenant-local: el codigo de un estudio no aplica en otro'
     // En B ese codigo no existe.
     crearOrdenConPromo($b, 'SOLOA')->assertStatus(422)->assertJsonPath('code', 'PROMO_INVALID');
 });
+
+it('crear y editar una promoción queda en la bitácora con lo que cambió', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $promo = crearPromocion($e, ['codigo' => 'OTONO', 'tipo' => 'porcentaje', 'valor' => 1000]);
+    $this->putJson("/api/v1/app/{$e['slug']}/promociones/{$promo}", ['codigo' => 'OTONO', 'tipo' => 'porcentaje', 'valor' => 1500, 'vence_en' => '2026-11-30'], conBearer($e['bearer']))
+        ->assertOk();
+
+    $descripciones = collect($this->getJson("/api/v1/app/{$e['slug']}/auditorias?categoria=catalogo", conBearer($e['bearer']))->json('data'))->pluck('descripcion');
+    expect($descripciones)->toContain('Creó la promoción OTONO')
+        ->toContain('Editó la promoción OTONO: cambió el valor y la vigencia');
+});

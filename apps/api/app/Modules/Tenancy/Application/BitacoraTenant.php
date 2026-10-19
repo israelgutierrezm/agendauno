@@ -29,7 +29,7 @@ class BitacoraTenant
         'alumnos' => ['miembro.', 'grupo.'],
         'pagos' => ['pago.', 'orden.'],
         'membresias' => ['membresia.', 'credito.', 'pago_automatico.'],
-        'catalogo' => ['oferta.', 'producto.', 'promocion.', 'plantilla', 'recurso.', 'automatizacion.', 'capacidad.', 'excepcion_horario.', 'webhook.', 'asignacion.'],
+        'catalogo' => ['oferta.', 'producto.', 'promocion.', 'lealtad.', 'plantilla', 'recurso.', 'automatizacion.', 'capacidad.', 'excepcion_horario.', 'webhook.', 'asignacion.'],
         'privacidad' => ['privacidad.'],
         'configuracion' => ['pasarela.', 'estudio.'],
     ];
@@ -146,6 +146,23 @@ class BitacoraTenant
             'oferta.archivada' => 'Archivó'.($nombre !== '' ? " {$nombre}" : ' un servicio'),
             'oferta.restaurada' => 'Volvió a ofrecer'.($nombre !== '' ? " {$nombre}" : ' un servicio'),
             'oferta.actualizada' => self::ofertaCorregida($antes, $despues),
+            // Promociones y lealtad: quién las creó o cambió y qué cambió.
+            'promocion.creada' => 'Creó la promoción '.((string) ($despues['codigo'] ?? '')),
+            'promocion.actualizada' => self::corregido('Editó la promoción '.((string) ($despues['codigo'] ?? $antes['codigo'] ?? '')), $antes, $despues, [
+                'codigo' => 'el código', 'descripcion' => 'la descripción', 'tipo' => 'el tipo', 'valor' => 'el valor',
+                'monto_minimo_minor' => 'el monto mínimo', 'usos_maximos' => 'los usos', 'vence_en' => 'la vigencia', 'activa' => 'si está activa',
+            ]),
+            'lealtad.programa' => (bool) ($despues['activa'] ?? false) !== (bool) ($antes['activa'] ?? false)
+                ? ((bool) ($despues['activa'] ?? false) ? 'Activó el programa de lealtad' : 'Pausó el programa de lealtad')
+                : self::corregido('Cambió cómo se ganan puntos', $antes, $despues, [
+                    'puntos_por_asistencia' => 'por asistir', 'puntos_por_moneda' => 'por comprar',
+                ]),
+            'lealtad.recompensa_creada' => 'Creó la recompensa '.((string) ($despues['nombre'] ?? '')),
+            'lealtad.recompensa_actualizada' => (bool) ($despues['activa'] ?? true) !== (bool) ($antes['activa'] ?? true)
+                ? ((bool) ($despues['activa'] ?? true) ? 'Volvió a ofrecer' : 'Dejó de ofrecer').' la recompensa '.((string) ($despues['nombre'] ?? ''))
+                : self::corregido('Editó la recompensa '.((string) ($despues['nombre'] ?? '')), $antes, $despues, [
+                    'nombre' => 'el nombre', 'descripcion' => 'la descripción', 'costo_puntos' => 'los puntos',
+                ]),
             'membresia.pausada' => 'Pausó una membresía'.(isset($despues['hasta']) ? ' hasta el '.$despues['hasta'] : ''),
             'membresia.reanudada' => 'Reanudó una membresía',
             'privacidad.baja_atendida' => 'Canceló los datos personales (ARCO) de una persona',
@@ -193,6 +210,29 @@ class BitacoraTenant
         return 'Reservó a los inscritos del grupo '.((string) ($despues['grupo'] ?? ''))
             .' en '.$fechas.($fechas === 1 ? ' fecha nueva' : ' fechas nuevas')
             .($partes !== [] ? ': '.implode(', ', $partes) : '');
+    }
+
+    /**
+     * «Editó X: cambió el valor y la vigencia» (lo que cambió, en palabras).
+     *
+     * @param  array<string, mixed>  $antes
+     * @param  array<string, mixed>  $despues
+     * @param  array<string, string>  $etiquetas
+     */
+    private static function corregido(string $inicio, array $antes, array $despues, array $etiquetas): string
+    {
+        $cambios = [];
+        foreach ($etiquetas as $campo => $etiqueta) {
+            if (($antes[$campo] ?? null) != ($despues[$campo] ?? null)) {
+                $cambios[] = $etiqueta;
+            }
+        }
+        if ($cambios === []) {
+            return $inicio;
+        }
+        $ultimo = array_pop($cambios);
+
+        return $inicio.': cambió '.($cambios === [] ? $ultimo : implode(', ', $cambios).' y '.$ultimo);
     }
 
     /**

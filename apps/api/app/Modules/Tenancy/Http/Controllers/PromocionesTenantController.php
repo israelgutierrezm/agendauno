@@ -6,7 +6,9 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Application\GestionarPromocionesTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Models\PromocionTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +23,13 @@ use Illuminate\Validation\ValidationException;
  */
 class PromocionesTenantController
 {
-    public function __construct(private readonly GestionarPromocionesTenant $promociones) {}
+    /** Lo que se compara al editar (para decir qué cambió en la bitácora). */
+    private const CAMPOS_BITACORA = ['codigo', 'descripcion', 'tipo', 'valor', 'monto_minimo_minor', 'usos_maximos', 'vence_en', 'activa'];
+
+    public function __construct(
+        private readonly GestionarPromocionesTenant $promociones,
+        private readonly RegistrarAuditoria $auditoria,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -52,6 +60,7 @@ class PromocionesTenantController
         }
 
         $promocion = $this->promociones->crear($datos);
+        $this->auditoria->registrar($this->actor($request), 'promocion.creada', 'promocion', (string) $promocion->ulid, null, $this->foto($promocion));
 
         return response()->json(['data' => $this->presentar($promocion)], 201);
     }
@@ -69,9 +78,37 @@ class PromocionesTenantController
             throw ValidationException::withMessages(['codigo' => ['Ya existe una promoción con ese código.']]);
         }
 
+        $antes = $this->foto($promocion);
         $this->promociones->actualizar($promocion, $datos);
+        $despues = $this->foto($promocion->refresh());
+        if ($antes !== $despues) {
+            $this->auditoria->registrar($this->actor($request), 'promocion.actualizada', 'promocion', (string) $promocion->ulid, $antes, $despues);
+        }
 
-        return response()->json(['data' => $this->presentar($promocion->refresh())]);
+        return response()->json(['data' => $this->presentar($promocion)]);
+    }
+
+    /**
+     * Lo que se guarda en la bitácora de una promoción (comparable antes y después).
+     *
+     * @return array<string, mixed>
+     */
+    private function foto(PromocionTenant $promocion): array
+    {
+        $foto = [];
+        foreach (self::CAMPOS_BITACORA as $campo) {
+            $valor = $promocion->getAttribute($campo);
+            $foto[$campo] = $valor instanceof \BackedEnum ? $valor->value : ($valor instanceof \DateTimeInterface ? $valor->format('Y-m-d') : $valor);
+        }
+
+        return $foto;
+    }
+
+    private function actor(Request $request): ?Usuario
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+
+        return $actor instanceof Usuario ? $actor : null;
     }
 
     public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse

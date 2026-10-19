@@ -165,3 +165,20 @@ it('lealtad exige permiso: el instructor no accede', function (): void {
         'nombre' => 'x', 'costo_puntos' => 10,
     ], conBearer($coach))->assertStatus(403);
 });
+
+it('el programa y las recompensas dejan registro en la bitácora', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $url = "/api/v1/app/{$e['slug']}/lealtad";
+    $this->putJson("{$url}/programa", ['activa' => true, 'puntos_por_asistencia' => 10, 'puntos_por_moneda' => 1], conBearer($e['bearer']))->assertOk();
+    $this->putJson("{$url}/programa", ['activa' => true, 'puntos_por_asistencia' => 15, 'puntos_por_moneda' => 1], conBearer($e['bearer']))->assertOk();
+    $rec = (string) $this->postJson("{$url}/recompensas", ['nombre' => 'Clase gratis', 'costo_puntos' => 100], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $this->putJson("{$url}/recompensas/{$rec}", ['nombre' => 'Clase gratis', 'costo_puntos' => 150, 'activa' => true], conBearer($e['bearer']))->assertOk();
+    $this->putJson("{$url}/recompensas/{$rec}", ['nombre' => 'Clase gratis', 'costo_puntos' => 150, 'activa' => false], conBearer($e['bearer']))->assertOk();
+
+    $descripciones = collect($this->getJson("/api/v1/app/{$e['slug']}/auditorias?categoria=catalogo", conBearer($e['bearer']))->json('data'))->pluck('descripcion');
+    expect($descripciones)->toContain('Activó el programa de lealtad')
+        ->toContain('Cambió cómo se ganan puntos: cambió por asistir')
+        ->toContain('Creó la recompensa Clase gratis')
+        ->toContain('Editó la recompensa Clase gratis: cambió los puntos')
+        ->toContain('Dejó de ofrecer la recompensa Clase gratis');
+});

@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\LibroPuntosTenant;
 use App\Modules\Tenancy\Application\PuntosTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Lealtad\EstadoCanje;
 use App\Modules\Tenancy\Listeners\AcumularPuntos;
 use App\Modules\Tenancy\Models\CanjeLealtadTenant;
@@ -51,11 +52,16 @@ class LealtadTenantController
         }
 
         $programa = $this->programaActual();
+        $antes = $programa->only(['activa', 'puntos_por_asistencia', 'puntos_por_moneda']);
         $programa->update([
             'activa' => (bool) $validado['activa'],
             'puntos_por_asistencia' => (int) $validado['puntos_por_asistencia'],
             'puntos_por_moneda' => (int) $validado['puntos_por_moneda'],
         ]);
+        $despues = $programa->only(['activa', 'puntos_por_asistencia', 'puntos_por_moneda']);
+        if ($antes != $despues) {
+            app(RegistrarAuditoria::class)->registrar($this->actor($request), 'lealtad.programa', 'programa_lealtad', (string) $programa->getKey(), $antes, $despues);
+        }
 
         return response()->json(['data' => $this->presentarPrograma($programa)]);
     }
@@ -81,6 +87,7 @@ class LealtadTenantController
             'costo_puntos' => (int) $validado['costo_puntos'],
             'activa' => true,
         ]);
+        app(RegistrarAuditoria::class)->registrar($this->actor($request), 'lealtad.recompensa_creada', 'recompensa_lealtad', (string) $recompensa->ulid, null, $recompensa->only(['nombre', 'costo_puntos', 'activa']));
 
         return response()->json(['data' => $this->presentarRecompensa($recompensa)], 201);
     }
@@ -96,12 +103,17 @@ class LealtadTenantController
             'activa' => ['required', 'boolean'],
         ]);
 
+        $antes = $modelo->only(['nombre', 'descripcion', 'costo_puntos', 'activa']);
         $modelo->update([
             'nombre' => $validado['nombre'],
             'descripcion' => $validado['descripcion'] ?? null,
             'costo_puntos' => (int) $validado['costo_puntos'],
             'activa' => (bool) $validado['activa'],
         ]);
+        $despues = $modelo->only(['nombre', 'descripcion', 'costo_puntos', 'activa']);
+        if ($antes != $despues) {
+            app(RegistrarAuditoria::class)->registrar($this->actor($request), 'lealtad.recompensa_actualizada', 'recompensa_lealtad', (string) $modelo->ulid, $antes, $despues);
+        }
 
         return response()->json(['data' => $this->presentarRecompensa($modelo)]);
     }
