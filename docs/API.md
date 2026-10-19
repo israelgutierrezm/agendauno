@@ -1262,6 +1262,17 @@ en el negocio.
   Sin ella, `PUT /sitio` y `POST /sitio/vista-previa` responden 403
   `PLAN_FEATURE_NOT_INCLUDED` (`meta.funcion` = `sitio_avanzado`) si se agrega o cambia
   algo de eso. Lo que ya tenía se conserva tal cual y se puede quitar.
+- El borrador suma `ocultos` {`servicios`, `productos`, `equipo`}: ids públicos que el
+  sitio no muestra (siguen a la venta y se agendan). `GET /escaparate` y la vista previa
+  los quitan de `servicios`, `productos` e `instructores`, y no publican la lista.
+- `GET /sitio/oferta` (`sitio.editar`): todo lo que se puede mostrar, sin quitar lo
+  oculto. Devuelve `servicios`, `productos`, `instructores` (con `id`), `sucursales`,
+  `horario_clases` y `captacion`.
+- Permisos:
+  - `sitio.editar`: `GET`/`PUT /sitio`, la vista previa, las imágenes, descartar,
+    restaurar, la oferta y `GET /perfil-publico`;
+  - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
+    y la portada (`/marca/portada`).
 
 ### Bloques propios del sitio (ADR 0146)
 

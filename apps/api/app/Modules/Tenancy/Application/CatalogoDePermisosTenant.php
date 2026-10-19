@@ -40,6 +40,7 @@ class CatalogoDePermisosTenant
                 'lealtad.ver', 'lealtad.gestionar',
                 'inventario.ver', 'inventario.gestionar', 'pos.vender',
                 'prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar',
+                'sitio.editar', 'sitio.publicar',
             ],
             'recepcionista' => [
                 'miembros.gestionar', 'miembros.ver', 'documentos.subir', 'formularios.responder',
@@ -82,8 +83,9 @@ class CatalogoDePermisosTenant
             // Registrar como excepción una visita que Wellhub/TotalPass no pudo verificar
             // va aparte de registrar entradas (M10).
             'agenda' => ['agenda.ver', 'agenda.gestionar', 'agenda.eliminar', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar', 'checkins.excepcion'],
-            // Quien todavía no es cliente (ADR 0117): aparte de Miembros.
-            'captacion' => ['prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar'],
+            // Quien todavía no es cliente (ADR 0117), aparte de Miembros, y el sitio web
+            // (ADR 0167): prepararlo va aparte de publicarlo.
+            'captacion' => ['prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar', 'sitio.editar', 'sitio.publicar'],
             'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
             'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             // Exentar una cuota (inscripción, anualidad, penalización; B04) va aparte.
@@ -174,6 +176,7 @@ class CatalogoDePermisosTenant
             'sucursales.gestionar' => ['sucursales.ver', 'organizaciones.ver'],
             'organizaciones.gestionar' => ['organizaciones.ver'],
             'usuarios.gestionar' => ['usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
+            'sitio.publicar' => ['sitio.editar'],
             'usuarios.eliminar' => ['usuarios.gestionar', 'usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
             'prospectos.gestionar' => ['prospectos.ver'],
             'prospectos.eliminar' => ['prospectos.gestionar', 'prospectos.ver'],

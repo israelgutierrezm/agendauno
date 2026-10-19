@@ -20,13 +20,18 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 type Visibilidad = "publica" | "enlace" | "cerrada";
 
 const seo = defineModel<SeoSitio>("seo", { required: true });
-const props = defineProps<{
-  catalogo: { max_seo_titulo: number; max_seo_descripcion: number };
-  errores: Record<string, string[]>;
-  publicacion: { publicado: boolean; privado: boolean };
-  paginas: number;
-  conPlus: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    catalogo: { max_seo_titulo: number; max_seo_descripcion: number };
+    errores: Record<string, string[]>;
+    publicacion: { publicado: boolean; privado: boolean };
+    paginas: number;
+    conPlus: boolean;
+    // Abrir o cerrar la página va en vivo: lo hace quien publica.
+    puedePublicar?: boolean;
+  }>(),
+  { puedePublicar: true },
+);
 const emit = defineEmits<{
   publicacion: [valor: { publicado: boolean; privado: boolean }];
   irAPaginas: [];
@@ -124,7 +129,7 @@ async function copiar(): Promise<void> {
         </button>
       </div>
 
-      <fieldset class="mt-5">
+      <fieldset class="mt-5" :disabled="!puedePublicar">
         <legend class="tu-label">
           {{ $t("sitioWeb.dominio.comoSePublica") }}
         </legend>
@@ -164,7 +169,7 @@ async function copiar(): Promise<void> {
       >
         {{ errorVisibilidad }}
       </p>
-      <div class="mt-3 flex justify-end">
+      <div v-if="puedePublicar" class="mt-3 flex justify-end">
         <button
           type="button"
           class="tu-btn tu-btn-primario"

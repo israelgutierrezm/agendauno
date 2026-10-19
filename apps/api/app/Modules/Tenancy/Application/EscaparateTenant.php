@@ -56,6 +56,13 @@ class EscaparateTenant
         // Solo clases o solo citas (ADR 0104): la modalidad guardada, no sus ofertas.
         $modalidad = $estudio->modalidad();
         $esCitas = $modalidad === ModalidadServicio::Citas;
+        // Lo que el sitio no muestra (ADR 0167): se quita de sus listas y no se publica.
+        $ocultos = SitioWebTenant::ocultos((array) ($sitio['ocultos'] ?? []));
+        unset($sitio['ocultos']);
+        $visibles = static fn (array $lista, string $clave): array => array_values(array_filter(
+            $lista,
+            static fn (array $item): bool => ! in_array((string) ($item['id'] ?? ''), $ocultos[$clave], true),
+        ));
 
         return [
             'estudio' => [
@@ -83,10 +90,10 @@ class EscaparateTenant
                 'en_directorio' => $estudio->enDirectorio(),
             ],
             'sucursales' => $this->sucursales($lada),
-            'instructores' => $this->instructores(),
-            'servicios' => $this->servicios($esCitas),
+            'instructores' => $visibles($this->instructores(), 'equipo'),
+            'servicios' => $visibles($this->servicios($esCitas), 'servicios'),
             'horario_clases' => $this->horarioClases(),
-            'productos' => $this->productos(),
+            'productos' => $visibles($this->productos(), 'productos'),
             'proximas_sesiones' => $this->proximasSesiones(),
             'resenas' => $this->resenas(),
             'sitio' => $sitio,
@@ -159,7 +166,7 @@ class EscaparateTenant
             ->profesionales()
             ->orderBy('name')
             ->get()
-            ->map(static fn (Usuario $u): array => ['nombre' => (string) $u->name, 'foto_url' => $u->fotoUrl(), 'semblanza' => $u->semblanza])
+            ->map(static fn (Usuario $u): array => ['id' => (string) $u->ulid, 'nombre' => (string) $u->name, 'foto_url' => $u->fotoUrl(), 'semblanza' => $u->semblanza])
             ->values()
             ->all();
     }

@@ -636,7 +636,7 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/onboarding', [OnboardingController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('onboarding.guardar');
             // Servicios o clases en una línea (configuración inicial, ADR 0088).
             Route::post('/onboarding/catalogo', [CatalogoTenantController::class, 'altaRapida'])->middleware('puede:estudio.gestionar')->name('onboarding.catalogo');
-            Route::put('/publicacion', [OnboardingController::class, 'publicacion'])->middleware('puede:estudio.gestionar')->name('publicacion');
+            Route::put('/publicacion', [OnboardingController::class, 'publicacion'])->middleware('puede:sitio.publicar')->name('publicacion');
             // Perfil de negocio / industria (R35): defaults/terminologia/feature-flags.
             Route::put('/perfil', [OnboardingController::class, 'perfil'])->middleware('puede:estudio.gestionar')->name('perfil');
 
@@ -644,24 +644,26 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/marca/logo', [MarcaEstudioController::class, 'subirLogo'])->middleware('puede:estudio.gestionar')->name('marca.logo.store');
             Route::delete('/marca/logo', [MarcaEstudioController::class, 'eliminarLogo'])->middleware('puede:estudio.gestionar')->name('marca.logo.destroy');
             // Perfil público: portada, descripción y redes (página pública y de enlaces).
-            Route::post('/marca/portada', [MarcaEstudioController::class, 'subirPortada'])->middleware('puede:estudio.gestionar')->name('marca.portada.store');
-            Route::delete('/marca/portada', [MarcaEstudioController::class, 'eliminarPortada'])->middleware('puede:estudio.gestionar')->name('marca.portada.destroy');
+            Route::post('/marca/portada', [MarcaEstudioController::class, 'subirPortada'])->middleware('puede:sitio.publicar')->name('marca.portada.store');
+            Route::delete('/marca/portada', [MarcaEstudioController::class, 'eliminarPortada'])->middleware('puede:sitio.publicar')->name('marca.portada.destroy');
             // Moneda y zona horaria del negocio (ADR 0099).
             Route::get('/negocio/region', [RegionNegocioTenantController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('negocio.region.show');
             Route::put('/negocio/region', [RegionNegocioTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('negocio.region.guardar');
-            Route::get('/perfil-publico', [PerfilPublicoController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.show');
-            Route::put('/perfil-publico', [PerfilPublicoController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.guardar');
-            // Sitio del negocio (ADR 0114): borrador, vista previa y publicar.
-            Route::get('/sitio', [SitioWebController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('sitio.show');
-            Route::put('/sitio', [SitioWebController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('sitio.guardar');
-            Route::post('/sitio/publicar', [SitioWebController::class, 'publicar'])->middleware('puede:estudio.gestionar')->name('sitio.publicar');
-            Route::post('/sitio/descartar', [SitioWebController::class, 'descartar'])->middleware('puede:estudio.gestionar')->name('sitio.descartar');
+            Route::get('/perfil-publico', [PerfilPublicoController::class, 'mostrar'])->middleware('puede:sitio.editar')->name('perfil-publico.show');
+            Route::put('/perfil-publico', [PerfilPublicoController::class, 'guardar'])->middleware('puede:sitio.publicar')->name('perfil-publico.guardar');
+            // Sitio del negocio (ADR 0114): borrador, vista previa y publicar. Prepararlo
+            // (`sitio.editar`) va aparte de publicarlo y de lo que va en vivo (`sitio.publicar`, ADR 0167).
+            Route::get('/sitio', [SitioWebController::class, 'mostrar'])->middleware('puede:sitio.editar')->name('sitio.show');
+            Route::put('/sitio', [SitioWebController::class, 'guardar'])->middleware('puede:sitio.editar')->name('sitio.guardar');
+            Route::post('/sitio/publicar', [SitioWebController::class, 'publicar'])->middleware('puede:sitio.publicar')->name('sitio.publicar');
+            Route::post('/sitio/descartar', [SitioWebController::class, 'descartar'])->middleware('puede:sitio.editar')->name('sitio.descartar');
             // Volver a una versión publicada (ADR 0146, fase 3): queda como borrador.
-            Route::post('/sitio/versiones/{version}/restaurar', [SitioWebController::class, 'restaurar'])->middleware('puede:estudio.gestionar')->name('sitio.versiones.restaurar');
-            Route::get('/sitio/vista-previa', [SitioWebController::class, 'vistaPrevia'])->middleware('puede:estudio.gestionar')->name('sitio.vista-previa');
+            Route::post('/sitio/versiones/{version}/restaurar', [SitioWebController::class, 'restaurar'])->middleware('puede:sitio.editar')->name('sitio.versiones.restaurar');
+            Route::get('/sitio/oferta', [SitioWebController::class, 'oferta'])->middleware('puede:sitio.editar')->name('sitio.oferta');
+            Route::get('/sitio/vista-previa', [SitioWebController::class, 'vistaPrevia'])->middleware('puede:sitio.editar')->name('sitio.vista-previa');
             // La del editor visual, con el borrador sin guardar (ADR 0146, fase 3).
-            Route::post('/sitio/vista-previa', [SitioWebController::class, 'vistaPreviaEnVivo'])->middleware('puede:estudio.gestionar')->name('sitio.vista-previa.vivo');
-            Route::post('/sitio/imagenes', [SitioWebController::class, 'subirImagen'])->middleware('puede:estudio.gestionar')->name('sitio.imagenes.store');
+            Route::post('/sitio/vista-previa', [SitioWebController::class, 'vistaPreviaEnVivo'])->middleware('puede:sitio.editar')->name('sitio.vista-previa.vivo');
+            Route::post('/sitio/imagenes', [SitioWebController::class, 'subirImagen'])->middleware('puede:sitio.editar')->name('sitio.imagenes.store');
 
             // Documentos: el admin define tipos requeridos; se cargan por persona y
             // el staff los valida (tenant-local, aislado).

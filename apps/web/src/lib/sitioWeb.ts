@@ -23,6 +23,13 @@ export type TipoSeccion =
 
 export type PlantillaSitio = "esencial" | "portada" | "compacta";
 
+/** Lo que el sitio no muestra de cada módulo (ADR 0167), por su id público. */
+export interface OcultosSitio {
+  servicios: string[];
+  productos: string[];
+  equipo: string[];
+}
+
 export const BLOQUES = [
   "texto_imagen",
   "galeria",

@@ -66,6 +66,7 @@ describe("reservas y ventas", () => {
               moneda: "MXN",
               duracion_minutos: 30,
             },
+            { id: "s2", nombre: "Corte con bono", duracion_minutos: 30 },
           ],
           productos: [],
           instructores: [{ nombre: "Leo" }],
@@ -75,12 +76,16 @@ describe("reservas y ventas", () => {
         },
       },
     });
-    const w = mount(SitioReservasVentas, { props: { secciones }, global });
+    const w = mount(SitioReservasVentas, {
+      props: {
+        secciones,
+        ocultos: { servicios: ["s2"], productos: [], equipo: [] },
+      },
+      global,
+    });
     await flushPromises();
 
-    expect(api.get).toHaveBeenCalledWith(
-      "/api/v1/app/barberia/sitio/vista-previa",
-    );
+    expect(api.get).toHaveBeenCalledWith("/api/v1/app/barberia/sitio/oferta");
     const servicios = w.get('[data-prueba="sitio-grupo-servicios"]');
     expect(servicios.text()).toContain("Corte de cabello");
     expect(servicios.text()).toContain("$250");
@@ -96,6 +101,25 @@ describe("reservas y ventas", () => {
 
     await w.get('[data-prueba="mostrar-servicios"]').trigger("click");
     expect(w.emitted("mostrar")).toEqual([["servicios", false]]);
+
+    // Cada servicio se ve o no (lo oculto sigue a la venta): se decide aquí.
+    expect(
+      w.get('[data-prueba="ver-servicios-s2"]').attributes("aria-checked"),
+    ).toBe("false");
+    await w.get('[data-prueba="ver-servicios-s1"]').trigger("click");
+    await w.get('[data-prueba="ver-servicios-s2"]').trigger("click");
+    expect(w.emitted("ocultar")).toEqual([
+      ["servicios", "s1", true],
+      ["servicios", "s2", false],
+    ]);
+    // Las sucursales se ven todas.
+    expect(
+      w
+        .find(
+          '[data-prueba="sitio-grupo-sucursales"] [role="switch"][data-prueba^="ver-"]',
+        )
+        .exists(),
+    ).toBe(false);
   });
 });
 
@@ -142,6 +166,16 @@ describe("dominio y SEO", () => {
     expect(w.emitted("publicacion")).toEqual([
       [{ publicado: true, privado: true }],
     ]);
+  });
+
+  it("sin permiso para publicar se ve cómo está, pero no se cambia", () => {
+    const w = mount(SitioDominio, {
+      props: { ...props, puedePublicar: false },
+      global,
+    });
+    expect(w.find('[data-prueba="guardar-visibilidad"]').exists()).toBe(false);
+    // Las opciones van en un grupo deshabilitado.
+    expect(w.get("fieldset").attributes("disabled")).toBeDefined();
   });
 
   it("cerrarla se confirma; el dominio propio es Plus y aún no está", async () => {

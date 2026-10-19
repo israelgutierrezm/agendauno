@@ -210,6 +210,8 @@ describe("menú del negocio", () => {
     expect(areas(conProspectos)).toContain("sitio");
     expect(areas(sinProspectos)).not.toContain("prospectos");
     expect(areas(sinProspectos)).not.toContain("sitio");
+    // Quien prepara el sitio entra aunque no atienda prospectos (ADR 0167).
+    expect(areas(sesion(["sitio.editar"]))).toContain("sitio");
   });
 
   it("Campañas pide ver los números del negocio y el reporte avanzado del plan", () => {

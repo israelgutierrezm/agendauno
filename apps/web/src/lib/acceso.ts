@@ -19,6 +19,8 @@ type Sesion = ReturnType<typeof useSesionTenantStore>;
 export interface Politica {
   // Permisos del rol ACTIVO; con varios hacen falta TODOS.
   permiso?: string | string[];
+  // Basta con CUALQUIERA de estos permisos (una pantalla con partes para cada uno).
+  algunPermiso?: string[];
   // Solo en negocios de esta modalidad: la misma clasificación que las rutas del
   // servidor con `modalidad:clases|citas` (ADR 0104).
   modalidad?: ModalidadServicio;
@@ -94,9 +96,9 @@ export const POLITICAS: Record<string, Politica> = {
 
   // ---- Configuración del negocio ----
   configuracion: { permiso: "estudio.gestionar" },
-  // Sitio web (ADR 0167): quien configura el negocio lo edita y lo publica; quien
-  // atiende prospectos entra solo a «Compartir» (enlaces, QR y widgets).
-  "sitio-web": { algunaDe: ["configuracion", "captacion-integrar"] },
+  // Sitio web (ADR 0167): quien lo prepara (`sitio.editar`) o quien atiende prospectos
+  // (solo «Compartir»: enlaces, QR y widgets).
+  "sitio-web": { algunPermiso: ["sitio.editar", "prospectos.ver"] },
   sedes: { permiso: "sucursales.gestionar" },
   "datos-fiscales": { permiso: "estudio.gestionar" },
   region: { permiso: "estudio.gestionar" },
@@ -235,6 +237,9 @@ export function puedeEntrar(
     sesion.estudio?.plan?.sin.includes(politica.funcion) === true
   ) {
     return false;
+  }
+  if (politica.algunPermiso !== undefined) {
+    return politica.algunPermiso.some((p) => sesion.puede(p));
   }
   if (politica.permiso === undefined) {
     return true;

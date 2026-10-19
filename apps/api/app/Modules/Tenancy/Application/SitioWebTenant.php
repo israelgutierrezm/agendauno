@@ -65,6 +65,7 @@ class SitioWebTenant
             'pie' => ['texto' => null],
             'estilo' => self::estilo([]),
             'encabezado' => self::encabezado([]),
+            'ocultos' => self::ocultos([]),
         ];
     }
 
@@ -143,6 +144,29 @@ class SitioWebTenant
             'pie' => ['texto' => self::texto($pie['texto'] ?? null)],
             'estilo' => self::estilo(is_array($contenido['estilo'] ?? null) ? $contenido['estilo'] : []),
             'encabezado' => self::encabezado(is_array($contenido['encabezado'] ?? null) ? $contenido['encabezado'] : []),
+            'ocultos' => self::ocultos(is_array($contenido['ocultos'] ?? null) ? $contenido['ocultos'] : []),
+        ];
+    }
+
+    /**
+     * Lo que el sitio no muestra de cada módulo (ADR 0167): servicios o clases, planes o
+     * bonos y profesionales, por su id público. Sigue a la venta y se agenda igual; solo
+     * no aparece en las secciones del sitio. Se publica con lo demás.
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array{servicios: list<string>, productos: list<string>, equipo: list<string>}
+     */
+    public static function ocultos(array $datos): array
+    {
+        $ids = static fn (mixed $lista): array => array_values(array_unique(array_filter(
+            is_array($lista) ? array_map(static fn (mixed $id): string => is_string($id) ? $id : '', $lista) : [],
+            static fn (string $id): bool => preg_match('/^[0-9A-Za-z]{10,26}$/', $id) === 1,
+        )));
+
+        return [
+            'servicios' => $ids($datos['servicios'] ?? []),
+            'productos' => $ids($datos['productos'] ?? []),
+            'equipo' => $ids($datos['equipo'] ?? []),
         ];
     }
 
@@ -340,6 +364,8 @@ class SitioWebTenant
             'pie' => $contenido['pie'] ?? ['texto' => null],
             'estilo' => $contenido['estilo'] ?? self::estilo([]),
             'encabezado' => $contenido['encabezado'] ?? self::encabezado([]),
+            // Para que el escaparate filtre (no sale en la respuesta pública).
+            'ocultos' => self::ocultos((array) ($contenido['ocultos'] ?? [])),
             'paginas' => array_values(array_map(static fn (array $p): array => [
                 ...$p,
                 'secciones' => self::seccionesPublicas((array) $p['secciones'], $formularios),

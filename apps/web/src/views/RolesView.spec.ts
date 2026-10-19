@@ -322,7 +322,7 @@ describe("roles y permisos", () => {
     ];
     expect(textos).toHaveLength(permisos.length + Object.keys(catalogo).length);
     expect(textos.filter((x) => /^[a-z_]+(\.[a-z_]+)?$/.test(x))).toEqual([]);
-    expect(textos).toContain("Prospectos");
+    expect(textos).toContain("Captación");
     expect(textos).toContain("Ver prospectos");
   });
 });

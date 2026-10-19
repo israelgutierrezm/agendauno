@@ -99,7 +99,39 @@ No depende de ningún ajuste del negocio: ni el editor ni un plan la quitan.
 - `GET /sitio` suma `publicacion` {`publicado`, `privado`}.
 - La vista previa del sitio se muestra como la página publicada, con su pie y su
   leyenda, no con el encabezado comercial.
-- Pendiente para otra fase:
-  - un interruptor «visible en el sitio» por servicio, plan y profesional;
-  - permisos separados para editar, publicar y administrar el dominio;
-  - el dominio propio, que requiere infraestructura.
+- Pendiente: el dominio propio (requiere infraestructura) y, con él, su permiso.
+
+## Fase 2: qué se ve de cada módulo
+
+En «Reservas y ventas», cada servicio o clase, plan o bono y profesional tiene «Se ve».
+Lo oculto va en el borrador del sitio:
+
+- se guarda como `ocultos` {`servicios`, `productos`, `equipo`}, una lista de ids
+  públicos por grupo;
+- se publica con lo demás;
+- no se agrega un campo a cada módulo: el sitio decide cómo mostrar, sin un segundo
+  catálogo.
+
+Lo oculto sigue a la venta y se agenda igual; solo no aparece en las secciones del
+sitio.
+
+En el servidor:
+
+- `EscaparateTenant` lo quita de sus listas y no publica qué está oculto;
+- `GET /sitio/oferta` lista todo, para decidir;
+- el escaparate suma el `id` de cada profesional.
+
+## Fase 3: permisos del sitio
+
+| Permiso | Qué permite |
+|---|---|
+| `sitio.editar` | Preparar el sitio: el borrador, la vista previa, las fotos, descartar y volver a una versión |
+| `sitio.publicar` | Lo que se ve al momento: publicar, abrir o cerrar la página (`PUT /publicacion`), el perfil público y la portada |
+
+- `sitio.publicar` pide `sitio.editar`.
+- Quien colabora prepara cambios y otro los publica.
+- El administrador del sistema tiene los dos.
+- La migración tenant 000162 da los dos a los roles propios que tenían
+  `estudio.gestionar`, para que nadie pierda acceso.
+- La entrada «Sitio web» se abre con `sitio.editar` o con `prospectos.ver`; con este
+  último, solo la pestaña Compartir.

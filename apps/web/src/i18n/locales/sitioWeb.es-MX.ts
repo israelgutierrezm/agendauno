@@ -355,6 +355,8 @@ export default {
   },
   barra: {
     verSitio: "Ver sitio",
+    sinPublicar:
+      "Puedes preparar y guardar cambios; los publica quien tiene permiso para publicar el sitio.",
   },
   // Lo avanzado es «Plus»: estilo propio, más páginas y bloques propios.
   plus: {
@@ -369,7 +371,7 @@ export default {
   },
   reservas: {
     ayuda:
-      "Lo que se muestra sale de tu negocio: aquí decides si se ve; cada cosa se edita en su lugar, así tu página y tu agenda dicen lo mismo.",
+      "Lo que se muestra sale de tu negocio: aquí decides qué se ve en tu sitio (lo que ocultes sigue a la venta y se agenda igual); cada cosa se edita en su lugar, así tu página y tu agenda dicen lo mismo. Se publica con tus demás cambios.",
     visitante: "Qué puede hacer quien visita tu página",
     agendar: "Agendar en línea",
     agendarClases: "Reservar sus clases en línea",
@@ -379,6 +381,7 @@ export default {
     inactivo: "Apagado",
     irFormularios: "Formularios de captación",
     seMuestra: "Se ve en tu sitio",
+    itemSeVe: "Se ve",
     vacio: "Aún no hay nada aquí.",
     servicios: "Servicios",
     serviciosClases: "Clases",

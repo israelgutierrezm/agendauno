@@ -39,6 +39,7 @@ import {
   type BannerSitio,
   type EncabezadoSitio,
   type EstiloSitio,
+  type OcultosSitio,
   type PaginaSitio,
   type PlantillaSitio,
   type SeccionSitio,
@@ -86,6 +87,8 @@ interface Borrador {
   pie: { texto: string | null };
   estilo: EstiloSitio;
   encabezado: EncabezadoSitio;
+  // Lo que no se muestra de cada módulo (ADR 0167), por su id.
+  ocultos: OcultosSitio;
 }
 interface VersionSitio {
   id: string;
@@ -139,12 +142,14 @@ const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}/sitio`);
 
 // Las partes del sitio, en pestañas (ADR 0167). Quien solo atiende prospectos entra
-// a «Compartir»; editar y publicar es de quien configura el negocio.
+// a «Compartir»; prepararlo (`sitio.editar`) va aparte de publicarlo y de lo que va en
+// vivo al momento (`sitio.publicar`): quien colabora prepara y otro publica.
 const route = useRoute();
 const router = useRouter();
 const PESTANAS = ["contenido", "reservas", "compartir", "dominio"] as const;
 type Pestana = (typeof PESTANAS)[number];
-const puedeEditar = computed(() => sesion.puede("estudio.gestionar"));
+const puedeEditar = computed(() => sesion.puede("sitio.editar"));
+const puedePublicar = computed(() => sesion.puede("sitio.publicar"));
 const pestanas = computed<Pestana[]>(() =>
   puedeEditar.value ? [...PESTANAS] : ["compartir"],
 );
@@ -243,6 +248,7 @@ function tomar(d: DatosSitio): void {
     tema: "automatico",
   };
   d.borrador.encabezado ??= { boton_texto: null, boton_enlace: null };
+  d.borrador.ocultos ??= { servicios: [], productos: [], equipo: [] };
   datos.value = d;
   // Una copia para editar: lo guardado queda como referencia de «sin guardar».
   guardadoComo.value = JSON.stringify(d.borrador);
@@ -726,6 +732,15 @@ function mostrarSeccion(tipo: TipoSeccion, visible: boolean): void {
     seccion.visible = visible;
   }
 }
+// Desde «Reservas y ventas»: mostrar u ocultar algo de un módulo (también borrador).
+function ocultar(grupo: keyof OcultosSitio, id: string, oculto: boolean): void {
+  const lista = borrador.value?.ocultos[grupo];
+  if (!lista) {
+    return;
+  }
+  const sin = lista.filter((x) => x !== id);
+  borrador.value!.ocultos[grupo] = oculto ? [...sin, id] : sin;
+}
 // Abrir o cerrar la página se aplica al momento (no es del borrador).
 function publicacionActualizada(p: {
   publicado: boolean;
@@ -831,6 +846,7 @@ onBeforeUnmount(() => {
               {{ $t("sitioWeb.acciones.guardar") }}
             </button>
             <button
+              v-if="puedePublicar"
               type="button"
               class="tu-btn tu-btn-primario"
               :disabled="ocupado || !hayCambios"
@@ -841,6 +857,14 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
+        <p
+          v-if="!puedePublicar"
+          class="mt-3 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="sin-publicar"
+        >
+          {{ $t("sitioWeb.barra.sinPublicar") }}
+        </p>
         <p
           v-if="!datos.pagina_publica"
           class="mt-3 text-sm"
@@ -878,7 +902,8 @@ onBeforeUnmount(() => {
            pestaña: la vista previa y lo que se edita siguen ahí). -->
       <div v-show="pestana === 'contenido'" data-prueba="sitio-contenido">
         <div class="mt-6">
-          <PerfilPublicoNegocio />
+          <!-- Se guarda en vivo: lo cambia quien publica. -->
+          <PerfilPublicoNegocio :puede-gestionar="puedePublicar" />
         </div>
         <div class="sw-columnas mt-6">
           <div class="min-w-0 space-y-6">
@@ -2078,7 +2103,9 @@ onBeforeUnmount(() => {
         v-if="pestana === 'reservas'"
         class="mt-6"
         :secciones="borrador.secciones"
+        :ocultos="borrador.ocultos"
         @mostrar="mostrarSeccion"
+        @ocultar="ocultar"
       />
       <SitioCompartir v-if="pestana === 'compartir'" class="mt-6" />
       <SitioDominio
@@ -2095,6 +2122,7 @@ onBeforeUnmount(() => {
         "
         :paginas="borrador.paginas.length"
         :con-plus="conPlus"
+        :puede-publicar="puedePublicar"
         @publicacion="publicacionActualizada"
         @ir-a-paginas="elegirPestana('contenido')"
       />

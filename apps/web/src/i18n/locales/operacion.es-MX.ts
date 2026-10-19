@@ -101,7 +101,7 @@ export default {
     conLoElegido: "Con lo elegido",
     grupos: {
       agenda: "Agenda",
-      captacion: "Prospectos",
+      captacion: "Captación",
       clientes: "Alumnos",
       membresias: "Membresías y catálogo",
       cobros: "Cobros",
@@ -140,6 +140,12 @@ export default {
         gestionar: "Atender prospectos y editar los formularios de captación",
         convertir: "Darle acceso a un prospecto (pasa a ser alumno)",
         eliminar: "Borrar los datos de un prospecto",
+      },
+      // El sitio web (ADR 0167): prepararlo va aparte de publicarlo.
+      sitio: {
+        editar: "Preparar el sitio web (sin publicarlo)",
+        publicar:
+          "Publicar el sitio, abrir o cerrar la página y cambiar su perfil público",
       },
       documentos: {
         subir: "Subir documentos",

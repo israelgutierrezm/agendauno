@@ -8,19 +8,24 @@ import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero } from "@/lib/formato";
 import { claveSegunModalidad } from "@/lib/menu";
-import type { TipoSeccion } from "@/lib/sitioWeb";
+import type { OcultosSitio, TipoSeccion } from "@/lib/sitioWeb";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
  * «Reservas y ventas» del sitio (ADR 0167): qué de tu negocio se muestra y qué puede
  * hacer quien visita. Servicios, precios, horarios, equipo y sucursales salen de sus
- * módulos (no hay un segundo catálogo): aquí se decide si su sección se ve, y cada
- * cosa se edita en su lugar, así el precio de la agenda es el de la página.
+ * módulos (no hay un segundo catálogo): aquí se decide si su sección se ve y qué de
+ * cada una (lo oculto sigue a la venta y se agenda igual), y cada cosa se edita en su
+ * lugar, así el precio de la agenda es el de la página. Todo es del borrador.
  */
 const props = defineProps<{
   secciones: { tipo: string; visible: boolean }[];
+  ocultos: OcultosSitio;
 }>();
-const emit = defineEmits<{ mostrar: [tipo: TipoSeccion, visible: boolean] }>();
+const emit = defineEmits<{
+  mostrar: [tipo: TipoSeccion, visible: boolean];
+  ocultar: [grupo: keyof OcultosSitio, id: string, oculto: boolean];
+}>();
 
 interface ConPrecio {
   id?: string;
@@ -32,7 +37,7 @@ interface ConPrecio {
 interface Escaparate {
   servicios: ConPrecio[];
   productos: ConPrecio[];
-  instructores: { nombre: string }[];
+  instructores: { id?: string; nombre: string }[];
   sucursales: { id: string; nombre: string; direccion?: string | null }[];
   horario_clases: { clase: string; dia: number; hora: string }[];
   captacion?: { activa: boolean } | null;
@@ -40,6 +45,8 @@ interface Escaparate {
 interface Grupo {
   tipo: TipoSeccion;
   titulo: string;
+  // Con qué lista de ocultos se decide cada uno (sin ella, se ven todos).
+  ocultable?: keyof OcultosSitio;
   items: { clave: string; nombre: string; detalle: string | null }[];
   ruta: string;
   editar: string;
@@ -77,6 +84,7 @@ const grupos = computed<Grupo[]>(() => {
     {
       tipo: "servicios",
       titulo: tm("sitioWeb.reservas.servicios"),
+      ocultable: "servicios",
       items: d.servicios.map((s) => ({
         clave: s.id ?? s.nombre,
         nombre: s.nombre,
@@ -88,6 +96,7 @@ const grupos = computed<Grupo[]>(() => {
     {
       tipo: "precios",
       titulo: tm("sitioWeb.reservas.precios"),
+      ocultable: "productos",
       items: d.productos.map((p) => ({
         clave: p.id ?? p.nombre,
         nombre: p.nombre,
@@ -110,8 +119,9 @@ const grupos = computed<Grupo[]>(() => {
     {
       tipo: "equipo",
       titulo: tm("sitioWeb.reservas.equipo"),
+      ocultable: "equipo",
       items: d.instructores.map((p, i) => ({
-        clave: `${p.nombre}-${i}`,
+        clave: p.id ?? `${p.nombre}-${i}`,
         nombre: p.nombre,
         detalle: null,
       })),
@@ -138,13 +148,23 @@ const agendaVisible = computed(() => visibles.value.get("agenda") === true);
 function mostrar(tipo: TipoSeccion, visible: boolean): void {
   emit("mostrar", tipo, visible);
 }
+function seVe(g: Grupo, clave: string): boolean {
+  return (
+    g.ocultable === undefined || !props.ocultos[g.ocultable].includes(clave)
+  );
+}
+function alternar(g: Grupo, clave: string, visible: boolean): void {
+  if (g.ocultable !== undefined) {
+    emit("ocultar", g.ocultable, clave, !visible);
+  }
+}
 
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
     const { data } = await api.get<{ data: Escaparate }>(
-      `/api/v1/app/${sesion.slug}/sitio/vista-previa`,
+      `/api/v1/app/${sesion.slug}/sitio/oferta`,
     );
     datos.value = data.data;
   } catch (e) {
@@ -240,12 +260,26 @@ onMounted(cargar);
           <li
             v-for="i in g.items"
             :key="i.clave"
-            class="flex flex-wrap items-baseline justify-between gap-2 py-2"
+            class="flex flex-wrap items-center justify-between gap-2 py-2"
+            :class="{ 'sr-oculto': !seVe(g, i.clave) }"
+            :data-prueba="`item-${g.tipo}`"
           >
-            <span class="font-medium">{{ i.nombre }}</span>
-            <span v-if="i.detalle" :style="{ color: 'var(--texto-suave)' }">{{
-              i.detalle
-            }}</span>
+            <span class="min-w-0">
+              <span class="font-medium">{{ i.nombre }}</span>
+              <span
+                v-if="i.detalle"
+                class="block"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ i.detalle }}</span
+              >
+            </span>
+            <InterruptorSiNo
+              v-if="g.ocultable"
+              :model-value="seVe(g, i.clave)"
+              :etiqueta="$t('sitioWeb.reservas.itemSeVe')"
+              :prueba="`ver-${g.tipo}-${i.clave}`"
+              @update:model-value="alternar(g, i.clave, $event)"
+            />
           </li>
         </ul>
         <p v-else class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -269,5 +303,8 @@ onMounted(cargar);
 }
 .sr-lista > li + li {
   border-top: 1px solid var(--borde);
+}
+.sr-oculto {
+  opacity: 0.6;
 }
 </style>

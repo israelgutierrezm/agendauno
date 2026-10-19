@@ -81,6 +81,14 @@ class SitioWebController
             'estilo.tema' => ['nullable', Rule::in(CatalogoSitioWeb::TEMAS)],
             'encabezado' => ['nullable', 'array'],
             'encabezado.boton_texto' => ['nullable', 'string', 'max:40'],
+            // Lo que no se muestra de cada módulo (ADR 0167), por su id público.
+            'ocultos' => ['nullable', 'array'],
+            'ocultos.servicios' => ['nullable', 'array', 'max:500'],
+            'ocultos.servicios.*' => ['string', 'max:26'],
+            'ocultos.productos' => ['nullable', 'array', 'max:500'],
+            'ocultos.productos.*' => ['string', 'max:26'],
+            'ocultos.equipo' => ['nullable', 'array', 'max:500'],
+            'ocultos.equipo.*' => ['string', 'max:26'],
             'encabezado.boton_enlace' => ['nullable', 'string', 'max:300', $enlace],
             'banners' => ['present', 'array', 'max:'.$parametros->entero('sitio.banners_maximos')],
             'banners.*.id' => ['nullable', 'string', 'max:26'],
@@ -189,6 +197,26 @@ class SitioWebController
             $estudio,
             $this->sitio->paraPublico($this->sitio->normalizar($validado, $estudio->modalidad())),
         )]);
+    }
+
+    /**
+     * Lo que el negocio puede mostrar en su sitio, sin quitar lo oculto (ADR 0167): para
+     * «Reservas y ventas», donde se decide qué se ve. Sale de sus módulos.
+     */
+    public function oferta(Request $request, EscaparateTenant $escaparate): JsonResponse
+    {
+        $estudio = $this->estudio($request);
+        $publico = $this->sitio->paraPublico($this->sitio->borrador($estudio->modalidad()));
+        $datos = $escaparate->datos($estudio, [...$publico, 'ocultos' => SitioWebTenant::ocultos([])]);
+
+        return response()->json(['data' => [
+            'servicios' => $datos['servicios'],
+            'productos' => $datos['productos'],
+            'instructores' => $datos['instructores'],
+            'sucursales' => $datos['sucursales'],
+            'horario_clases' => $datos['horario_clases'],
+            'captacion' => $datos['captacion'],
+        ]]);
     }
 
     /** Una foto para el sitio («Nosotros» o un banner): JPG, PNG o WebP de hasta 4 MB. */

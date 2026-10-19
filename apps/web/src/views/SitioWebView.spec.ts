@@ -862,6 +862,22 @@ describe("sitio web en Captación (ADR 0167)", () => {
     w.unmount();
   });
 
+  it("quien prepara el sitio guarda, pero publicar y lo que va en vivo es de quien publica", async () => {
+    sesionPrueba.permisos = ["sitio.editar"];
+    const w = montar();
+    await flushPromises();
+
+    expect(w.find('[data-prueba="guardar-sitio"]').exists()).toBe(true);
+    expect(w.find('[data-prueba="publicar-sitio"]').exists()).toBe(false);
+    expect(w.get('[data-prueba="sin-publicar"]').text()).toContain(
+      "los publica quien tiene permiso",
+    );
+    expect(
+      w.findComponent({ name: "PerfilPublicoNegocio" }).props("puedeGestionar"),
+    ).toBe(false);
+    w.unmount();
+  });
+
   it("quien solo atiende prospectos entra a Compartir, sin cargar ni editar el sitio", async () => {
     sesionPrueba.permisos = ["prospectos.ver"];
     const w = montar();

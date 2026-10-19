@@ -138,8 +138,9 @@ it('el escaparate trae el perfil del negocio y de cada sede, servicios con descr
     expect(collect($data['horario_clases'])->map(fn (array $f): string => "{$f['dia']} {$f['hora']} {$f['clase']}")->all())
         ->toBe(['1 19:00 Nivel 1', '3 19:00 Nivel 1'])
         ->and($data['horario_clases'][0]['instructor'])->toBe('Personal');
-    // Profesionales con nombre y foto (sin correo).
-    expect($data['instructores'][0])->toBe(['nombre' => 'Personal', 'foto_url' => null, 'semblanza' => null])
+    // Profesionales con su id público, nombre y foto (sin correo).
+    expect(array_keys($data['instructores'][0]))->toBe(['id', 'nombre', 'foto_url', 'semblanza'])
+        ->and($data['instructores'][0])->toMatchArray(['nombre' => 'Personal', 'foto_url' => null, 'semblanza' => null])
         ->and($instructora)->not->toBeEmpty();
 });
 
