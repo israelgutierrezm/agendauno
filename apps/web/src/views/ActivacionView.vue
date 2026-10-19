@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import AvisoTono from "@/components/AvisoTono.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import { trackEvent } from "@/lib/analytics";
+import { api, mensajeDeError } from "@/lib/api";
 import { facetaActiva } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -20,6 +21,11 @@ const token = ref(String(route.query.token ?? ""));
 const password = ref("");
 const passwordConfirm = ref("");
 const errorLocal = ref<string | null>(null);
+// El enlace no sirvió (venció o es de otro envío): se puede pedir uno nuevo al mismo
+// correo (ADR 0169). La respuesta no dice si la cuenta existe.
+const fallo = ref(false);
+const reenviando = ref(false);
+const reenviado = ref(false);
 
 // Si llegó desde el enlace del correo trae slug+email+token en la URL: no se piden
 // esos datos técnicos, solo definir la contraseña. `manual` los revela si hiciera falta.
@@ -34,6 +40,7 @@ const desdeCorreo = computed(
 
 async function enviar(): Promise<void> {
   errorLocal.value = null;
+  reenviado.value = false;
   if (password.value !== passwordConfirm.value) {
     errorLocal.value = t("validacion.contrasenasNoCoinciden");
     return;
@@ -59,6 +66,24 @@ async function enviar(): Promise<void> {
     void router.push({ name: "onboarding" });
   } catch {
     // El error queda en sesion.error.
+    fallo.value = true;
+  }
+}
+
+async function pedirOtro(): Promise<void> {
+  reenviando.value = true;
+  errorLocal.value = null;
+  try {
+    await api.post(
+      `/api/v1/app/${encodeURIComponent(slug.value)}/reenviar-activacion`,
+      { email: email.value },
+    );
+    reenviado.value = true;
+    fallo.value = false;
+  } catch (e) {
+    errorLocal.value = mensajeDeError(e);
+  } finally {
+    reenviando.value = false;
   }
 }
 </script>
@@ -136,8 +161,34 @@ async function enviar(): Promise<void> {
         />
       </div>
 
-      <AvisoTono v-if="errorLocal ?? sesion.error" tono="peligro" role="alert">
+      <AvisoTono
+        v-if="reenviado"
+        tono="exito"
+        role="status"
+        data-prueba="activacion-reenviada"
+      >
+        {{ $t("activacion.reenviado", { email }) }}
+      </AvisoTono>
+      <AvisoTono
+        v-else-if="errorLocal ?? sesion.error"
+        tono="peligro"
+        role="alert"
+      >
         {{ errorLocal ?? sesion.error }}
+        <button
+          v-if="fallo && slug !== '' && email !== ''"
+          type="button"
+          class="tu-enlace ml-1"
+          :disabled="reenviando"
+          data-prueba="activacion-pedir-otro"
+          @click="pedirOtro"
+        >
+          {{
+            reenviando
+              ? $t("activacion.pidiendoOtro")
+              : $t("activacion.pedirOtro")
+          }}
+        </button>
       </AvisoTono>
 
       <button

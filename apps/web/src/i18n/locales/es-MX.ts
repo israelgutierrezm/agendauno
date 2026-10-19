@@ -1135,6 +1135,11 @@ export default {
     irEntrar: "Entrar",
     desdeCorreo: "Vas a activar la cuenta {email}. Solo define tu contraseña.",
     otrosDatos: "Usar otros datos",
+    // El enlace venció o no sirvió (ADR 0169).
+    pedirOtro: "Enviarme un enlace nuevo",
+    pidiendoOtro: "Enviando…",
+    reenviado:
+      "Si la cuenta {email} sigue pendiente, te enviamos un enlace nuevo. Revisa tu correo.",
   },
   directorio: {
     etiqueta: "Acceso a negocios",

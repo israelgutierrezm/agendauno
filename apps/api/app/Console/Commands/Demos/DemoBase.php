@@ -383,6 +383,7 @@ abstract class DemoBase
             'activo' => true,
             'password' => $this->password,
             'activation_token' => null,
+            'activation_expira_en' => null,
         ]);
     }
 

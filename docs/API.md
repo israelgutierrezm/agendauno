@@ -30,6 +30,9 @@ resto exige sesión y un permiso (`puede:…`). Ver `docs/AUTHORIZATION.md`.
 - Quien tiene varios roles entra con uno; `GET /yo` trae `rol` y
   `roles_disponibles`, y `PUT /yo/rol-activo` cambia de rol (ADR 0055).
 - `POST /logout` revoca el token.
+- `POST /activar` rechaza con 422 `ACTIVATION_INVALID` un enlace que ya venció (sirve
+  `cuentas.dias_activar_cuenta` días, 7 por omisión). `POST /reenviar-activacion` manda
+  uno nuevo y deja sin efecto el anterior (ADR 0169).
 
 ## Convenciones
 

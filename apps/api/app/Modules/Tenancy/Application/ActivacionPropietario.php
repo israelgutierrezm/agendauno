@@ -15,14 +15,26 @@ use Illuminate\Support\Str;
  * Activación de la cuenta de un usuario tenant-local (propietario u otros): genera
  * un token de un solo uso (se guarda su hash en la BD del tenant) y, al activar,
  * fija la contraseña y marca la cuenta como activa. Sin contraseñas por defecto.
+ *
+ * El enlace vence (ADR 0169): sirve los días de `cuentas.dias_activar_cuenta`; pedir
+ * otro lo renueva e invalida el anterior.
  */
 class ActivacionPropietario
 {
+    public const CLAVE_DIAS = 'cuentas.dias_activar_cuenta';
+
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
         private readonly PersonaDeUsuarioTenant $personas,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly ParametrosTenant $parametros,
     ) {}
+
+    /** Cuántos días sirve el enlace (para decirlo en el correo). */
+    public function diasDeVigencia(): int
+    {
+        return $this->parametros->entero(self::CLAVE_DIAS);
+    }
 
     /**
      * Genera (o refresca) el token de activación y devuelve el valor en claro
@@ -32,10 +44,15 @@ class ActivacionPropietario
     {
         $token = Str::random(48);
         $correo = $email ?? $estudio->contacto_email;
+        $vence = now()->addDays($this->diasDeVigencia());
 
-        $this->gestor->ejecutarEn($estudio, function () use ($correo, $token): void {
+        $this->gestor->ejecutarEn($estudio, function () use ($correo, $token, $vence): void {
             $usuario = Usuario::query()->where('email', $correo)->firstOrFail();
-            $usuario->forceFill(['activation_token' => hash('sha256', $token), 'activo' => false])->save();
+            $usuario->forceFill([
+                'activation_token' => hash('sha256', $token),
+                'activation_expira_en' => $vence,
+                'activo' => false,
+            ])->save();
         });
 
         return $token;
@@ -59,11 +76,16 @@ class ActivacionPropietario
                 || ! hash_equals((string) $usuario->activation_token, hash('sha256', $token))) {
                 throw new ActivacionInvalida('El enlace de activación no es válido.');
             }
+            // Vencido: el token era correcto, así que se puede decir (y pedir otro).
+            if ($usuario->activation_expira_en === null || now()->greaterThan($usuario->activation_expira_en)) {
+                throw new ActivacionInvalida('El enlace de activación ya venció. Pide uno nuevo.');
+            }
 
             $usuario->forceFill([
                 'password' => $password, // el cast `hashed` lo hashea una vez
                 'activo' => true,
                 'activation_token' => null,
+                'activation_expira_en' => null,
                 'email_verified_at' => now(),
             ])->save();
 

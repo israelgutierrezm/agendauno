@@ -30,6 +30,8 @@ class CorreoActivacion extends Mailable implements ShouldQueue
         public readonly string $slug,
         public readonly string $email,
         public readonly string $token,
+        // Cuántos días sirve el enlace (ADR 0169); null en correos encolados antes.
+        public readonly ?int $diasVigencia = null,
     ) {}
 
     public function envelope(): Envelope
@@ -53,6 +55,10 @@ class CorreoActivacion extends Mailable implements ShouldQueue
         $html = '<p>Te damos la bienvenida a '.e($this->estudioNombre).'.</p>'
             .'<p>Activa tu cuenta y define tu contraseña:</p>'
             .'<p><a href="'.e($url).'">Activar mi cuenta</a></p>'
+            .($this->diasVigencia !== null
+                ? '<p>El enlace sirve '.($this->diasVigencia === 1 ? '1 día' : $this->diasVigencia.' días')
+                    .'. Si vence, pide uno nuevo desde la misma pantalla.</p>'
+                : '')
             .'<p>Si el botón no funciona, copia y pega este enlace en tu navegador:<br>'.e($url).'</p>';
 
         return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html, $producto));

@@ -136,6 +136,7 @@ class BajaDePersonaTenant
                     'foto_ruta' => null,
                     'activo' => false,
                     'activation_token' => null,
+                    'activation_expira_en' => null,
                     'reset_token' => null,
                     'email_nuevo' => null,
                     'email_nuevo_token' => null,

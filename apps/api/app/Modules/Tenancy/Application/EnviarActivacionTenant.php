@@ -27,6 +27,7 @@ class EnviarActivacionTenant
             (string) $estudio->slug,
             $email,
             $token,
+            $this->activacion->diasDeVigencia(),
         ));
 
         return $token;

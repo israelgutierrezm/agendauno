@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Parametros;
 
 use App\Modules\Platform\Operacion\LimpiezaDeAltasSinActivar;
+use App\Modules\Tenancy\Application\ActivacionPropietario;
 
 /**
  * Todos los límites y datos de negocio que se pueden configurar (ADR 0042). Nada de
@@ -207,6 +208,10 @@ final class CatalogoParametros
                 'Horas.', $e, 24, 1, 168, 'h', porNegocio: false),
             new DefinicionParametro('cuentas.minutos_restablecer_contrasena', 'Cuentas', 'Vigencia del enlace para restablecer la contraseña',
                 'Minutos.', $e, 60, 10, 1440, 'min', porNegocio: false),
+            // ADR 0169: vale para el dueño que registra su negocio y para quien el
+            // negocio invita (equipo o clientes).
+            new DefinicionParametro(ActivacionPropietario::CLAVE_DIAS, 'Cuentas', 'Vigencia del enlace para activar una cuenta',
+                'Días. Si vence, la persona pide otro desde la pantalla de activación o el negocio la vuelve a invitar.', $e, 7, 1, 30, 'días', porNegocio: false),
 
             // Registro público: las altas que nadie activa se borran (ADR 0102, solo la
             // plataforma). Al menos 3 días: el correo de activación puede leerse tarde.

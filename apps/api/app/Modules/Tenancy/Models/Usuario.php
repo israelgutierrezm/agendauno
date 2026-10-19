@@ -238,6 +238,7 @@ class Usuario extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'reset_expira_en' => 'datetime',
+            'activation_expira_en' => 'datetime',
             'email_nuevo_expira_en' => 'datetime',
             'calendario_token' => 'encrypted',
             'password' => 'hashed',
