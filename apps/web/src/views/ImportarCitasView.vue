@@ -48,6 +48,11 @@ interface Resultado {
     invalidas: number;
     omitidas: number;
     clientes_nuevos: number;
+    // Lo que quedará por cobrar en caja y lo ya pagado en el otro sistema (R14).
+    por_cobrar?: number;
+    por_cobrar_minor?: number;
+    pagadas_antes?: number;
+    moneda?: string;
   };
   faltantes: Record<Campo, string[]>;
   filas: Fila[];
@@ -58,7 +63,9 @@ const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}/importaciones/citas`);
 const CAMPOS: Campo[] = ["servicio", "profesional", "sucursal"];
 const COLUMNAS = [
+  "referencia",
   "cliente",
+  "cliente_ref",
   "email",
   "celular",
   "servicio",
@@ -66,7 +73,15 @@ const COLUMNAS = [
   "sucursal",
   "fecha",
   "hora",
+  "pagado",
 ];
+// Lo que queda por cobrar, en la moneda del negocio.
+function dinero(minor: number, moneda: string): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: moneda,
+  }).format(minor / 100);
+}
 
 const catalogos = ref<Catalogos | null>(null);
 const cargando = ref(true);
@@ -298,6 +313,8 @@ function fechaHora(iso: string | null): string {
         <ul class="mt-4 space-y-2 pl-5 text-sm lista-ayuda">
           <li>{{ t("importarCitas.reglaFormato") }}</li>
           <li>{{ t("importarCitas.reglaClientes") }}</li>
+          <li>{{ t("importarCitas.reglaReferencia") }}</li>
+          <li>{{ t("importarCitas.reglaCobro") }}</li>
           <li>{{ t("importarCitas.reglaNombres") }}</li>
           <li>{{ t("importarCitas.reglaTodo") }}</li>
         </ul>
@@ -424,6 +441,42 @@ function fechaHora(iso: string | null): string {
           role="alert"
         >
           {{ t("importarCitas.corrige") }}
+        </AvisoTono>
+        <!-- El efecto económico, antes de confirmar (R14). -->
+        <AvisoTono
+          v-if="
+            (preview.resumen.por_cobrar ?? 0) > 0 ||
+            (preview.resumen.pagadas_antes ?? 0) > 0
+          "
+          tono="aviso"
+          class="mt-4"
+          data-prueba="importar-por-cobrar"
+        >
+          <p v-if="(preview.resumen.por_cobrar ?? 0) > 0">
+            {{
+              t(
+                "importarCitas.porCobrar",
+                {
+                  n: preview.resumen.por_cobrar ?? 0,
+                  monto: dinero(
+                    preview.resumen.por_cobrar_minor ?? 0,
+                    preview.resumen.moneda ?? "MXN",
+                  ),
+                },
+                preview.resumen.por_cobrar ?? 0,
+              )
+            }}
+          </p>
+          <p v-if="(preview.resumen.pagadas_antes ?? 0) > 0" class="mt-1">
+            {{
+              t(
+                "importarCitas.pagadasAntes",
+                { n: preview.resumen.pagadas_antes ?? 0 },
+                preview.resumen.pagadas_antes ?? 0,
+              )
+            }}
+          </p>
+          <p class="mt-1">{{ t("importarCitas.porCobrarAyuda") }}</p>
         </AvisoTono>
         <FiltroFilasImportacion
           v-model="soloErrores"

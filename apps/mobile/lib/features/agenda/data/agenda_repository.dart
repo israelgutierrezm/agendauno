@@ -21,8 +21,9 @@ class AgendaRepository {
 
   Future<List<SesionAgenda>> sesionesDelDia(DateTime dia) => sesiones(dia, dia);
 
-  /// Sesiones entre dos días locales (ambos incluidos). A un instructor el
-  /// servidor solo le da las suyas.
+  /// Sesiones entre dos días (ambos incluidos) de la SUCURSAL de cada sesión: una
+  /// clase a las 23:30 de su sucursal es de ese día aunque el teléfono esté en otra
+  /// zona. A un instructor el servidor solo le da las suyas.
   Future<List<SesionAgenda>> sesiones(DateTime desde, DateTime hasta) async {
     final res = await _dio.get<Map<String, dynamic>>(
       '$_base/sesiones',
@@ -31,13 +32,15 @@ class AgendaRepository {
     final (a, b) = (ymd(desde), ymd(hasta));
     return ((res.data?['data'] ?? []) as List)
         .map((e) => SesionAgenda.desdeJson(e as Map<String, dynamic>))
-        // El servidor ensancha la ventana un día por lado (zonas): se filtran los días locales.
+        // El servidor ensancha la ventana un día por lado (zonas): se filtran por
+        // el día en la sucursal.
         .where(
           (s) =>
-              ymd(s.iniciaEn).compareTo(a) >= 0 &&
-              ymd(s.iniciaEn).compareTo(b) <= 0,
+              ymd(s.iniciaLocal).compareTo(a) >= 0 &&
+              ymd(s.iniciaLocal).compareTo(b) <= 0,
         )
         .toList()
+      // Por el instante real (el orden no depende de la zona).
       ..sort((x, y) => x.iniciaEn.compareTo(y.iniciaEn));
   }
 

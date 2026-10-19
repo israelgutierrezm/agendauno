@@ -106,6 +106,9 @@ export default {
         "Conexión comprobada: último check-in validado el {fecha}.",
       comprobadaAviso:
         "Conexión comprobada: último aviso de la plataforma recibido el {fecha}.",
+      // Lo que llegó con llaves anteriores: historial, no prueba (R13).
+      anterior:
+        " Con las llaves anteriores respondió por última vez el {fecha}; con las de ahora aún no.",
     },
   },
 };

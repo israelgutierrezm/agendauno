@@ -1732,6 +1732,8 @@ export default {
       desc: {
         sin_asistir:
           "Tienen un plan en vigor y no vienen desde hace los días que fijas en Seguimiento.",
+        sin_iniciar:
+          "Pagaron su plan hace los días que fijas en Seguimiento, nunca han venido y no tienen nada reservado.",
         saldo_por_vencer:
           "Su paquete vence pronto y aún les queda saldo sin usar.",
         vino_sin_comprar: "Vinieron hace poco y nunca han comprado un plan.",
@@ -2907,6 +2909,18 @@ export default {
     noCanceladas:
       "1 reserva no se pudo cancelar (ya empezó o tiene asistencia). | {n} reservas no se pudieron cancelar (ya empezaron o tienen asistencia).",
     bajaDesde: "Baja desde el {fecha}",
+    // Alta con fecha futura (al cambiar de grupo desde un día).
+    empiezaEl: "Empieza el {fecha}",
+    // Vista previa del cambio de grupo (R08).
+    previa: {
+      calculando: "Revisando qué pasaría…",
+      resumen:
+        "Se cancelan {canceladas} reservas de este grupo. En «{grupo}»: {reservadas} reservadas y {espera} en lista de espera.",
+      parcial:
+        "1 fecha no se podría reservar o cancelar: | {n} fechas no se podrían reservar o cancelar:",
+      aceptarParcial:
+        "Hacer el cambio de todos modos (esas fechas quedan sin reservar).",
+    },
     cerrarGrupo: "Cerrar grupo",
     cerrarTitulo: "Cerrar «{grupo}»",
     cerrarAyuda:

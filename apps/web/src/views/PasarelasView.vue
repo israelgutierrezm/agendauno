@@ -37,6 +37,8 @@ interface Pasarela {
     | "comprobada"
     | null;
   comprobada_en?: string | null;
+  // Último pago aprobado con llaves o modo anteriores: historial, no prueba (R13).
+  ultimo_exito_anterior_en?: string | null;
 }
 
 // Llaves que pide cada proveedor (para el formulario).
@@ -314,6 +316,26 @@ onMounted(cargar);
                         year: "numeric",
                       })
                     : "",
+                })
+              }}
+            </p>
+            <p
+              v-if="
+                p.estado_conexion === 'activa_sin_comprobar' &&
+                p.ultimo_exito_anterior_en
+              "
+              class="tu-hint"
+              :data-prueba="`conexion-anterior-${p.proveedor}`"
+            >
+              {{
+                $t("pasarelasEstado.anterior", {
+                  fecha: new Date(
+                    p.ultimo_exito_anterior_en,
+                  ).toLocaleDateString("es-MX", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  }),
                 })
               }}
             </p>

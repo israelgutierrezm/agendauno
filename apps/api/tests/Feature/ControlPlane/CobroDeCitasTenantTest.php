@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Mail\CorreoTicketVenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 
 /*
@@ -335,7 +338,9 @@ it('una cita ya cobrada solo admite agregar algo más (productos o propina)', fu
     $cita = agendarEnLinea($ctx)->assertCreated()->json('data');
     $url = "/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro";
     $this->postJson($url, ['metodo' => 'tarjeta'], conBearer($e['bearer']))
-        ->assertCreated()->assertJsonPath('data.servicio_minor', 25000)->assertJsonPath('data.ticket', null);
+        ->assertCreated()->assertJsonPath('data.servicio_minor', 25000)
+        // Todo cobro deja su comprobante, aun solo el servicio (R06).
+        ->assertJsonPath('data.ticket.servicio.monto_minor', 25000);
 
     $this->postJson($url, ['metodo' => 'tarjeta'], conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonValidationErrors(['reserva'], 'meta.errors');
@@ -352,4 +357,66 @@ it('vender productos al cobrar la cita pide el permiso del mostrador', function 
 
     $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro", ['metodo' => 'tarjeta', 'items' => [['articulo_id' => $cera, 'cantidad' => 1]]], conBearer($instructor))
         ->assertForbidden();
+});
+
+it('reintentar el cobro de solo el servicio con la misma clave recupera el mismo cobro, sin cobrar dos veces (R04)', function (): void {
+    $ctx = barberiaParaCobrar();
+    $e = $ctx['e'];
+    $cita = agendarEnLinea($ctx)->assertCreated()->json('data');
+    $url = "/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro";
+    $cobro = ['metodo' => 'efectivo', 'recibido_minor' => 30000, 'clave_intento' => 'solo-servicio-1'];
+
+    $primero = $this->postJson($url, $cobro, conBearer($e['bearer']))->assertCreated()->json('data');
+    expect($primero)->toMatchArray(['servicio_minor' => 25000, 'total_minor' => 25000, 'cambio_minor' => 5000])
+        ->and($primero['venta_id'])->not->toBeNull()
+        ->and($primero['ticket']['servicio']['monto_minor'])->toBe(25000);
+
+    // Se perdió la respuesta: el mismo intento devuelve el mismo cobro.
+    $otraVez = $this->postJson($url, $cobro, conBearer($e['bearer']))->assertCreated()->json('data');
+    expect($otraVez['venta_id'])->toBe($primero['venta_id'])->and($otraVez['total_minor'])->toBe(25000);
+    $pagos = collect($this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->assertOk()->json('data'));
+    expect($pagos)->toHaveCount(1);
+});
+
+it('la clave de un cobro no sirve para otra cita, otros importes ni el mostrador: 409 sin cobrar nada (R05)', function (): void {
+    $ctx = barberiaParaCobrar();
+    $e = $ctx['e'];
+    $a = agendarEnLinea($ctx)->assertCreated()->json('data');
+    $b = agendarEnLinea($ctx, ['nombre' => 'Ana', 'email' => 'ana@correo.mx', 'inicia_en_local' => now('America/Mexico_City')->addDays(3)->format('Y-m-d').' 12:00:00'])
+        ->assertCreated()->json('data');
+    $cobroA = ['metodo' => 'tarjeta', 'propina_minor' => 2000, 'clave_intento' => 'clave-a'];
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$a['reserva']}/cobro", $cobroA, conBearer($e['bearer']))->assertCreated();
+
+    // Otra cita con la misma clave: conflicto, y B sigue por cobrar.
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$b['reserva']}/cobro", $cobroA, conBearer($e['bearer']))->assertStatus(409);
+    $this->getJson("/api/v1/app/{$e['slug']}/ordenes/{$b['orden_id']}", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estado', 'pendiente');
+    // La misma cita con otros importes: conflicto.
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$a['reserva']}/cobro", [...$cobroA, 'propina_minor' => 5000], conBearer($e['bearer']))->assertStatus(409);
+    // Ni en el mostrador.
+    $cera = productoParaCobrarCita($ctx, 5000, 5);
+    $this->postJson("/api/v1/app/{$e['slug']}/pos/ventas", [
+        'sucursal_id' => $ctx['sede']['sucursal'], 'items' => [['articulo_id' => $cera, 'cantidad' => 1]], 'metodo_pago' => 'efectivo', 'clave_intento' => 'clave-a',
+    ], conBearer($e['bearer']))->assertStatus(409);
+    expect(existenciasDe($e, $cera))->toBe(5);
+});
+
+it('el ticket se manda también al cobrar solo el servicio; si el correo falla el cobro queda y se reenvía (R06)', function (): void {
+    $ctx = barberiaParaCobrar();
+    $e = $ctx['e'];
+    $cita = agendarEnLinea($ctx)->assertCreated()->json('data');
+    $url = "/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro";
+
+    // El correo falla: el cobro sí queda, y el envío dice que falló.
+    Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('Sin servidor de correo'));
+    $datos = $this->postJson($url, ['metodo' => 'efectivo', 'enviar_ticket' => true], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.ticket_envio', 'fallido')->json('data');
+    $this->getJson("/api/v1/app/{$e['slug']}/ordenes/{$cita['orden_id']}", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estado', 'pagada');
+
+    // Se reenvía aparte: solo el correo, sin cobrar otra vez.
+    Mail::swap(new MailManager(app()));
+    Mail::fake();
+    $this->postJson("/api/v1/app/{$e['slug']}/pos/ventas/{$datos['venta_id']}/ticket", [], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.ticket_envio', 'enviado');
+    Mail::assertQueued(CorreoTicketVenta::class, 1);
+    expect(collect($this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->json('data')))->toHaveCount(1);
 });

@@ -27,5 +27,12 @@ export default {
   recibido: "Recibido",
   cambio: "Cambio",
   folio: "Ticket {folio}",
+  // El stock de la sucursal de la cita (R07).
+  enEstaSucursal: "{n} aquí",
+  // El envío del ticket, aparte del cobro (R06).
+  ticketEnviado: "Le mandamos su ticket por correo.",
+  ticketFallido:
+    "El cobro quedó registrado, pero no se pudo mandar el ticket por correo.",
+  reenviarTicket: "Reenviar ticket",
   listo: "Listo",
 };

@@ -186,7 +186,7 @@ class _InicioNegocio extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         [
-                          Formato.hora(siguiente.iniciaEn),
+                          Formato.hora(siguiente.iniciaLocal),
                           if (esCitas) ?siguiente.oferta,
                           if (esCitas) ?siguiente.instructor,
                           ?siguiente.sucursal,

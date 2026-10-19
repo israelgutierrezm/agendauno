@@ -169,9 +169,14 @@ class HechoCita {
   );
 }
 
-/// Sesión de la agenda del staff (clase abierta o cita privada), en hora local. Lo
-/// propio de cada tipo va en su bloque: `clase` (cupo, lista de espera) o `cita`
-/// (a quién se atiende); el del otro tipo es null.
+/// Sesión de la agenda del staff (clase abierta o cita privada). Lo propio de cada
+/// tipo va en su bloque: `clase` (cupo, lista de espera) o `cita` (a quién se
+/// atiende); el del otro tipo es null.
+///
+/// Sus horas se MUESTRAN en la hora de la sucursal ([iniciaLocal], [terminaLocal]),
+/// esté donde esté el teléfono; el instante ([iniciaEn], [terminaEn]) es para
+/// ordenar y comparar con «ahora». Si el teléfono está en otra zona se avisa
+/// ([etiquetaHoraSucursal]).
 class SesionAgenda {
   const SesionAgenda({
     required this.id,
@@ -184,6 +189,9 @@ class SesionAgenda {
     this.sucursal,
     required this.iniciaEn,
     required this.terminaEn,
+    required this.iniciaLocal,
+    required this.terminaLocal,
+    this.desfaseMin,
     required this.capacidad,
     required this.ocupados,
     required this.enEspera,
@@ -204,8 +212,24 @@ class SesionAgenda {
   final String? instructorId;
   final String? sala;
   final String? sucursal;
+
+  /// El instante en que empieza y termina (en la zona del teléfono): para ordenar y
+  /// comparar con «ahora» (si ya empezó, la ventana de asistencia). No se muestra.
   final DateTime iniciaEn;
   final DateTime terminaEn;
+
+  /// La hora de pared de la sucursal, sin zona: sus campos (año… minuto) son el día
+  /// y la hora en la sucursal. Es lo que se muestra y lo que decide a qué día
+  /// pertenece la sesión. No es un instante: no se compara con «ahora» (para eso,
+  /// [iniciaEn]). Sin `inicia_local` del API (versión anterior) es la hora del
+  /// teléfono, como antes.
+  final DateTime iniciaLocal;
+  final DateTime terminaLocal;
+
+  /// Desfase (minutos respecto a UTC) de la zona de la sucursal en ese momento
+  /// (`utc_offset_min`, p. ej. -360 en la Ciudad de México); null si el API no lo
+  /// manda.
+  final int? desfaseMin;
   final int? capacidad;
   final int ocupados;
   final int enEspera;
@@ -233,6 +257,44 @@ class SesionAgenda {
   bool get esCita => tipo == TipoSesion.cita;
   bool get programada => estado == 'programada';
   int get duracionMin => terminaEn.difference(iniciaEn).inMinutes;
+
+  /// La hora de pared de la sucursal de un [instante] (desde cuándo se pasa lista,
+  /// un hecho del historial, «ahora»), con el desfase de la sesión. Sin desfase
+  /// (API anterior), la del teléfono.
+  DateTime enSucursal(DateTime instante) {
+    final desfase = desfaseMin;
+    return desfase == null
+        ? instante.toLocal()
+        : _paredDesdeDesfase(instante, desfase);
+  }
+
+  /// El día de hoy en la sucursal, según [ahora] (un instante).
+  DateTime hoyEnSucursal(DateTime ahora) {
+    final a = enSucursal(ahora);
+    return DateTime(a.year, a.month, a.day);
+  }
+
+  /// ¿Es del día [dia] en la sucursal? (solo cuentan año, mes y día).
+  bool esDelDia(DateTime dia) =>
+      iniciaLocal.year == dia.year &&
+      iniciaLocal.month == dia.month &&
+      iniciaLocal.day == dia.day;
+
+  /// ¿El teléfono está en otra zona que la sucursal? Se compara el desfase de la
+  /// sucursal con el del teléfono en ese mismo momento ([desfaseTelefonoMin]; por
+  /// omisión, el del teléfono cuando empieza la sesión): así un cambio de horario
+  /// de verano entre hoy y la sesión no la marca de más. Sin desfase del API, no.
+  bool enOtraZona([int? desfaseTelefonoMin]) {
+    final desfase = desfaseMin;
+    return desfase != null &&
+        desfase !=
+            (desfaseTelefonoMin ?? iniciaEn.toLocal().timeZoneOffset.inMinutes);
+  }
+
+  /// «Hora de Roma Norte» si el teléfono está en otra zona que su sucursal; null
+  /// si no (ver [etiquetaHoraSucursal]).
+  String? etiquetaHora([int? desfaseTelefonoMin]) =>
+      etiquetaHoraSucursal([this], desfaseTelefonoMin: desfaseTelefonoMin);
 
   /// Lo que se cobra: el total de la orden de la cita (fijo desde que se agendó);
   /// sin orden, el precio del catálogo.
@@ -271,6 +333,19 @@ class SesionAgenda {
   factory SesionAgenda.desdeJson(Map<String, dynamic> json) {
     final tipo = TipoSesion.desde(json['tipo']);
     final cita = json['cita'];
+    final inicia = DateTime.parse(json['inicia_en'] as String).toLocal();
+    final termina = DateTime.parse(json['termina_en'] as String).toLocal();
+    // La hora de la sucursal (`inicia_local`, sin zona) y su desfase. Tolerante:
+    // sin desfase se deduce de la hora local; sin hora local, se calcula con el
+    // desfase; sin ninguno (API anterior), la hora del teléfono, como antes.
+    final paredInicio = _horaDePared(json['inicia_local']);
+    final paredFin = _horaDePared(json['termina_local']);
+    final desfase =
+        (json['utc_offset_min'] as num?)?.toInt() ??
+        (paredInicio == null ? null : _desfaseEntre(paredInicio, inicia));
+    DateTime pared(DateTime? delApi, DateTime instante) =>
+        delApi ??
+        (desfase == null ? instante : _paredDesdeDesfase(instante, desfase));
     return SesionAgenda(
       id: json['id'] as String,
       tipo: tipo,
@@ -280,8 +355,11 @@ class SesionAgenda {
       instructorId: json['instructor_id'] as String?,
       sala: json['sala'] as String?,
       sucursal: json['sucursal'] as String?,
-      iniciaEn: DateTime.parse(json['inicia_en'] as String).toLocal(),
-      terminaEn: DateTime.parse(json['termina_en'] as String).toLocal(),
+      iniciaEn: inicia,
+      terminaEn: termina,
+      iniciaLocal: pared(paredInicio, inicia),
+      terminaLocal: pared(paredFin, termina),
+      desfaseMin: desfase,
       capacidad: json['capacidad'] as int?,
       ocupados: (json['ocupados'] ?? 0) as int,
       enEspera: (json['en_espera'] ?? 0) as int,
@@ -301,6 +379,73 @@ class SesionAgenda {
     );
   }
 }
+
+/// Lo que se avisa junto a las horas cuando el teléfono está en otra zona que la
+/// sucursal (las horas son siempre las de la sucursal): «Hora de Roma Norte»,
+/// «Hora de la sucursal» si no se sabe cuál o «Hora de cada sucursal» si son
+/// varias. Null si todas están en la zona del teléfono (o el API no manda el
+/// desfase). [desfaseTelefonoMin] fija el del teléfono (pruebas); si no, se toma el
+/// del teléfono en el momento de cada sesión.
+String? etiquetaHoraSucursal(
+  Iterable<SesionAgenda> sesiones, {
+  int? desfaseTelefonoMin,
+}) {
+  final otras = sesiones.where((s) => s.enOtraZona(desfaseTelefonoMin));
+  if (otras.isEmpty) {
+    return null;
+  }
+  final nombres = otras.map((s) => s.sucursal?.trim() ?? '').toSet();
+  if (nombres.length > 1) {
+    return 'Hora de cada sucursal';
+  }
+  return nombres.single.isEmpty
+      ? 'Hora de la sucursal'
+      : 'Hora de ${nombres.single}';
+}
+
+final _formatoPared = RegExp(
+  r'^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?',
+);
+
+/// `AAAA-MM-DDTHH:MM[:SS]` (sin zona; si trae una, se ignora) como hora de pared,
+/// o null si no vino o no se entiende.
+DateTime? _horaDePared(Object? valor) {
+  final m = valor is String ? _formatoPared.firstMatch(valor.trim()) : null;
+  if (m == null) {
+    return null;
+  }
+  int n(int i) => int.parse(m.group(i) ?? '0');
+  final (mes, dia, hora, minuto, segundo) = (n(2), n(3), n(4), n(5), n(6));
+  if (mes < 1 ||
+      mes > 12 ||
+      dia < 1 ||
+      dia > 31 ||
+      hora > 23 ||
+      minuto > 59 ||
+      segundo > 59) {
+    return null;
+  }
+  return DateTime(n(1), mes, dia, hora, minuto, segundo);
+}
+
+/// La hora de pared de [instante] en una zona con ese desfase (minutos).
+DateTime _paredDesdeDesfase(DateTime instante, int desfaseMin) {
+  final u = instante.toUtc().add(Duration(minutes: desfaseMin));
+  return DateTime(u.year, u.month, u.day, u.hour, u.minute, u.second);
+}
+
+/// El desfase (minutos) de la zona en la que [instante] se ve como [pared].
+int _desfaseEntre(DateTime pared, DateTime instante) =>
+    (DateTime.utc(
+              pared.year,
+              pared.month,
+              pared.day,
+              pared.hour,
+              pared.minute,
+              pared.second,
+            ).difference(instante.toUtc()).inSeconds /
+            60)
+        .round();
 
 /// Profesional/instructor (columna de la agenda de citas).
 class Profesional {

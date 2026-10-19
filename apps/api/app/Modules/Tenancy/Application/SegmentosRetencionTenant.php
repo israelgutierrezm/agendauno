@@ -26,6 +26,8 @@ use Carbon\CarbonImmutable;
  *
  * - **Sin asistir:** con un plan en vigor y sin venir desde hace los días de
  *   `seguimiento.dias_sin_asistir`.
+ * - **Compró y no ha iniciado:** con un plan en vigor desde hace los días de
+ *   `seguimiento.dias_sin_reservar`, nunca ha venido y no tiene nada reservado (R12).
  * - **Paquete por vencer con saldo:** vence en los días de `membresias.dias_por_vencer`
  *   y aún le queda saldo.
  * - **Vino y no ha comprado** (clases): vino en los días de
@@ -37,12 +39,16 @@ use Carbon\CarbonImmutable;
  *
  * Solo personas con perfil de miembro y no archivadas. Quien no desea promociones
  * aparece (para un seguimiento de servicio), pero no recibe las difusiones.
+ *
+ * La última visita es la fecha de la clase o la cita (la sesión), no la del registro de
+ * su asistencia: corregir hoy una asistencia vieja no la hace parecer reciente (R12).
  */
 class SegmentosRetencionTenant
 {
     /** clave => motivo de su seguimiento. */
     public const SEGMENTOS = [
         'sin_asistir' => MotivoSeguimiento::SinAsistir,
+        'sin_iniciar' => MotivoSeguimiento::CompraSinReservar,
         'saldo_por_vencer' => MotivoSeguimiento::SaldoPorVencer,
         'vino_sin_comprar' => MotivoSeguimiento::VinoSinComprar,
         'pago_fallido' => MotivoSeguimiento::PagoFallido,
@@ -88,6 +94,7 @@ class SegmentosRetencionTenant
         $hoy = $this->fechas->dia();
         $filas = match ($clave) {
             'sin_asistir' => $this->sinAsistir($hoy),
+            'sin_iniciar' => $this->sinIniciar($hoy),
             'saldo_por_vencer' => $this->saldoPorVencer($hoy),
             'vino_sin_comprar' => $this->vinoSinComprar($hoy),
             'pago_fallido' => $this->pagoFallido(),
@@ -108,7 +115,8 @@ class SegmentosRetencionTenant
     }
 
     /**
-     * Última asistencia (presente) de cada persona, como día del negocio.
+     * Última asistencia (presente) de cada persona, como día del negocio: el de la clase
+     * o la cita, no el día en que se registró.
      *
      * @param  list<int>|null  $personas
      * @return array<int, CarbonImmutable>
@@ -118,10 +126,11 @@ class SegmentosRetencionTenant
         $ultimas = [];
         ReservaTenant::query()
             ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
             ->where('asistencias.estado', EstadoAsistencia::Presente->value)
             ->when($personas !== null, fn ($q) => $q->whereIn('reservas.persona_id', $personas ?? []))
             ->groupBy('reservas.persona_id')
-            ->selectRaw('reservas.persona_id as pid, MAX(asistencias.registrada_en) as ultima')
+            ->selectRaw('reservas.persona_id as pid, MAX(sesiones.inicia_en) as ultima')
             ->get()
             ->each(function (ReservaTenant $fila) use (&$ultimas): void {
                 $ultimas[(int) $fila->getAttribute('pid')] = $this->diaDelNegocio((string) $fila->getAttribute('ultima'));
@@ -160,6 +169,49 @@ class SegmentosRetencionTenant
     }
 
     /**
+     * Compró y no ha iniciado (R12): plan en vigor desde hace los días de
+     * `seguimiento.dias_sin_reservar`, ninguna asistencia y nada reservado por venir.
+     *
+     * @return list<array{persona_id: int, dato: string|null, detalle: string}>
+     */
+    private function sinIniciar(CarbonImmutable $hoy): array
+    {
+        $dias = $this->parametros->entero('seguimiento.dias_sin_reservar');
+        $desde = [];
+        AcuerdoTenant::query()
+            ->where('estado', EstadoAcuerdo::Activo->value)
+            ->whereHas('derechos', fn ($q) => $q->where(fn ($w) => $w->whereNull('valido_hasta')->orWhereDate('valido_hasta', '>=', $hoy->toDateString())))
+            ->selectRaw('persona_id, MIN(created_at) as desde')
+            ->groupBy('persona_id')
+            ->get()
+            ->each(function (AcuerdoTenant $fila) use (&$desde): void {
+                $desde[(int) $fila->getAttribute('persona_id')] = $this->diaDelNegocio((string) $fila->getAttribute('desde'));
+            });
+        if ($desde === []) {
+            return [];
+        }
+        $yaVinieron = $this->ultimasAsistencias(array_keys($desde));
+        $conReserva = ReservaTenant::query()
+            ->whereIn('persona_id', array_keys($desde))
+            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>=', now()))
+            ->distinct()
+            ->pluck('persona_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->flip();
+        $sesion = $this->modalidad->esCitas() ? 'agenda su primera cita' : 'reserva su primera clase';
+        $filas = [];
+        foreach ($desde as $pid => $compro) {
+            $hace = (int) $compro->diffInDays($hoy);
+            if ($hace >= $dias && ! isset($yaVinieron[$pid]) && ! $conReserva->has($pid)) {
+                $filas[] = ['persona_id' => $pid, 'dato' => $compro->toDateString(), 'detalle' => 'Tiene su plan desde '.self::hace($hace)." y aún no {$sesion}.", 'orden' => -$hace];
+            }
+        }
+
+        return self::ordenar($filas);
+    }
+
+    /**
      * @return list<array{persona_id: int, dato: string|null, detalle: string}>
      */
     private function saldoPorVencer(CarbonImmutable $hoy): array
@@ -183,7 +235,8 @@ class SegmentosRetencionTenant
             $pid = (int) $acuerdo->persona_id;
             $vence = CarbonImmutable::parse($derecho->valido_hasta->toDateString());
             $quedan = rtrim(rtrim(number_format($disponible / 1000, 1, '.', ''), '0'), '.');
-            $unidad = $quedan === '1' ? ($citas ? 'cita' : 'clase') : ($citas ? 'citas' : 'clases');
+            // En clases, créditos: no todas las clases consumen lo mismo (R12).
+            $unidad = $quedan === '1' ? ($citas ? 'cita' : 'crédito') : ($citas ? 'citas' : 'créditos');
             $faltan = (int) $hoy->diffInDays($vence);
             $porPersona[$pid] ??= [
                 'persona_id' => $pid,

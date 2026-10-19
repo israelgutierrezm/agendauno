@@ -46,6 +46,8 @@ interface Integracion {
   // llaves y apagada, activa sin comprobar o comprobada (la plataforma ya respondió).
   estado_conexion?: EstadoConexion;
   comprobada_en?: string | null;
+  // Lo último que llegó con llaves anteriores: historial, no prueba (R13).
+  ultimo_exito_anterior_en?: string | null;
   comprobada_por?: "checkin" | "aviso" | null;
   // Check-in automático (ADR 0148): dónde avisa la plataforma y si ya está activo.
   automatico?: {
@@ -172,7 +174,14 @@ function textoConexion(i: Integracion): string {
       { fecha: fechaEvidencia(i.comprobada_en) },
     );
   }
-  return t(`adminUsabilidad.integraciones.conexion.${estado}`);
+  const texto = t(`adminUsabilidad.integraciones.conexion.${estado}`);
+  // Con llaves anteriores sí respondió: se dice, sin darla por comprobada (R13).
+  return estado === "activa_sin_comprobar" && i.ultimo_exito_anterior_en
+    ? texto +
+        t("adminUsabilidad.integraciones.conexion.anterior", {
+          fecha: fechaEvidencia(i.ultimo_exito_anterior_en),
+        })
+    : texto;
 }
 
 function nombresDeLlaves(proveedor: string, llaves: string[]): string {

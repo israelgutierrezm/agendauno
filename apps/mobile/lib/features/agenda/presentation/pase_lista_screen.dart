@@ -258,12 +258,23 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                                 ),
                               ),
                               Text(
-                                '${hhmm(s.iniciaEn)}–${hhmm(s.terminaEn)}${s.sala != null ? ' · ${s.sala}' : ''}',
+                                '${hhmm(s.iniciaLocal)}–${hhmm(s.terminaLocal)}${s.sala != null ? ' · ${s.sala}' : ''}',
                                 style: TextStyle(
                                   color: tono.tinta,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
+                              // El teléfono está en otra zona: es la hora de la
+                              // sucursal.
+                              if (s.etiquetaHora() case final etiqueta?)
+                                Text(
+                                  etiqueta,
+                                  key: const Key('hora-de-la-sucursal'),
+                                  style: TextStyle(
+                                    color: tono.tinta.withValues(alpha: 0.85),
+                                    fontSize: 12,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -308,7 +319,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    'La lista se abre a las ${hhmm(lista.asistenciaDesde!)}.',
+                    'La lista se abre a las ${hhmm(s.enSucursal(lista.asistenciaDesde!))}.',
                     style: TextStyle(color: context.colores.textoSuave),
                   ),
                 ),

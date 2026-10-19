@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * Baja lógica ({@see BajasTenant}): dada de baja
  * queda oculta en todo el sistema (`deleted_at`) con su historial; `eliminado_por`
  * es quién la dio de baja.
+ *
+ * @property string|null $referencia_externa su identificador en el sistema del que se importó (R14)
  */
 class PersonaTenant extends Model
 {
@@ -35,6 +37,8 @@ class PersonaTenant extends Model
         'email', 'celular', 'tipo', 'activo', 'es_facturable', 'archivado', 'usuario_id',
         'recibe_promociones', 'como_nos_conocio', 'whatsapp_aceptado_en',
         'fecha_nacimiento', 'genero',
+        // Su identificador en el sistema del que se importó (R14).
+        'referencia_externa',
     ];
 
     /**

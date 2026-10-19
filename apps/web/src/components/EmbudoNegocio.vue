@@ -32,25 +32,68 @@ export interface Embudo {
     atendidas: number;
     mediana_horas: number | null;
   };
+  // Negocio de citas (R11): su propio recorrido, cada paso con su base.
+  citas?: {
+    agendadas: { agendadas: number; confirmadas: number };
+    asistencia: { citas: number; asistieron: number };
+    cobro: { atendidas: number; cobradas: number };
+    siguiente: { clientes: number; volvieron: number };
+  } | null;
 }
 
 const props = defineProps<{ embudo: Embudo; citas?: boolean }>();
 const { t } = useI18n();
 
 interface Paso {
-  clave: "sitio" | "compra" | "asistencia" | "renovacion";
+  clave:
+    | "sitio"
+    | "compra"
+    | "asistencia"
+    | "renovacion"
+    | "confirmadas"
+    | "asistenciaCita"
+    | "cobro"
+    | "siguiente";
   cantidad: number;
   base: number;
 }
 
 const pasos = computed<Paso[]>(() => {
   const e = props.embudo;
+  const sitio: Paso = {
+    clave: "sitio",
+    cantidad: e.sitio_a_solicitud.solicitudes,
+    base: e.sitio_a_solicitud.visitas,
+  };
+  // En citas: cita → asistencia → cobro → siguiente visita (no planes ni renovaciones).
+  const c = e.citas;
+  if (props.citas && c) {
+    return [
+      sitio,
+      {
+        clave: "confirmadas",
+        cantidad: c.agendadas.confirmadas,
+        base: c.agendadas.agendadas,
+      },
+      {
+        clave: "asistenciaCita",
+        cantidad: c.asistencia.asistieron,
+        base: c.asistencia.citas,
+      },
+      {
+        clave: "cobro",
+        cantidad: c.cobro.cobradas,
+        base: c.cobro.atendidas,
+      },
+      {
+        clave: "siguiente",
+        cantidad: c.siguiente.volvieron,
+        base: c.siguiente.clientes,
+      },
+    ];
+  }
   return [
-    {
-      clave: "sitio",
-      cantidad: e.sitio_a_solicitud.solicitudes,
-      base: e.sitio_a_solicitud.visitas,
-    },
+    sitio,
     {
       clave: "compra",
       cantidad: e.solicitud_a_compra.compraron,
@@ -130,7 +173,11 @@ const mediana = computed(() => {
 <template>
   <div data-prueba="embudo">
     <h2 class="mt-4 font-medium text-lg">
-      {{ $t("operacion.reportes.embudo.titulo") }}
+      {{
+        citas && embudo.citas
+          ? $t("operacion.reportes.embudo.tituloCitas")
+          : $t("operacion.reportes.embudo.titulo")
+      }}
     </h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("operacion.reportes.embudo.subtitulo") }}

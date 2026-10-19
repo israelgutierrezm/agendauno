@@ -184,6 +184,80 @@ describe("entradas y salidas de un grupo", () => {
     );
   });
 
+  it("cambiar de grupo muestra antes lo que pasaría y un cambio parcial se confirma (R08)", async () => {
+    const base = api.get.getMockImplementation()!;
+    api.get.mockImplementation((url: string, opciones?: unknown) => {
+      if (url.endsWith("/grupos")) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "g1",
+                nombre: "Natación niños",
+                oferta: "Natación",
+                inscritos: 25,
+                activo: true,
+              },
+              {
+                id: "g2",
+                nombre: "Natación tarde",
+                oferta: "Natación",
+                inscritos: 3,
+                activo: true,
+              },
+            ],
+          },
+        });
+      }
+      if (url.endsWith("/inscripciones/i1/cambio")) {
+        return Promise.resolve({
+          data: {
+            data: {
+              baja: { canceladas: 7, no_canceladas: [] },
+              alta: {
+                reservadas: 6,
+                en_espera: 0,
+                no_reservadas: 1,
+                sesiones: [
+                  {
+                    sesion_id: "s8",
+                    inicia_en: "2026-10-09T00:00:00Z",
+                    estado: "no_reservada",
+                    motivo: "Su plan no tiene saldo o no cubre esta clase.",
+                  },
+                ],
+              },
+              completo: false,
+            },
+          },
+        });
+      }
+      return base(url, opciones);
+    });
+    api.post.mockResolvedValue({
+      data: { data: {}, meta: { baja: { canceladas: 7, no_canceladas: [] } } },
+    });
+    const w = await montarElegido();
+    await w.findAll('[data-prueba="dar-de-baja"]')[0]!.trigger("click");
+    await w.get('[data-prueba="salida-destino"]').setValue("g2");
+    await flushPromises();
+
+    const previa = w.get('[data-prueba="vista-previa-cambio"]').text();
+    expect(previa).toContain("Se cancelan 7 reservas de este grupo");
+    expect(previa).toContain("Su plan no tiene saldo");
+    // Sin confirmar el parcial no se puede hacer el cambio.
+    expect(
+      w.get('[data-prueba="confirmar-salida"]').attributes("disabled"),
+    ).toBeDefined();
+    await w.get('[data-prueba="aceptar-parcial"]').setValue(true);
+    await w.get('[data-prueba="confirmar-salida"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/grupos/g1/inscripciones/i1/cambiar",
+      expect.objectContaining({ grupo_id: "g2", parcial: true }),
+    );
+  });
+
   it("cerrar el grupo pide la fecha y avisa a cuántos dio de baja", async () => {
     api.post.mockResolvedValue({
       data: {

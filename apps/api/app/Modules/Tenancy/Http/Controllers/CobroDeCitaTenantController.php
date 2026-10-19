@@ -21,7 +21,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Cobrar al terminar una cita: servicio, productos y propina en un solo cobro, con su
- * comprobante (la regla vive en {@see CobroDeCitaTenant}).
+ * comprobante (la regla vive en {@see CobroDeCitaTenant}). El envío del ticket va
+ * aparte del cobro (R06): si el correo falla, el cobro queda y el ticket se reenvía
+ * con `POST /pos/ventas/{venta}/ticket`.
  */
 class CobroDeCitaTenantController
 {
@@ -75,28 +77,32 @@ class CobroDeCitaTenantController
         }
 
         $clave = $validado['clave_intento'] ?? null;
+        $cobrar = fn (): array => $this->cobro->cobrar(
+            $reserva,
+            $validado['metodo'],
+            $this->pos->lineasPedidas($pedidos),
+            (int) ($validado['propina_minor'] ?? 0),
+            isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
+            $validado['referencia'] ?? null,
+            $clave,
+            $actor,
+        );
         try {
-            $resumen = $this->cobro->cobrar(
-                $reserva,
-                $validado['metodo'],
-                $this->pos->lineasPedidas($pedidos),
-                (int) ($validado['propina_minor'] ?? 0),
-                isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
-                $validado['referencia'] ?? null,
-                $clave,
-                $actor,
-            );
+            $resumen = $cobrar();
         } catch (UniqueConstraintViolationException $e) {
-            // Dos intentos con la misma clave a la vez: el otro ya lo registró.
+            // Dos intentos con la misma clave a la vez: el otro ya lo registró (lo mismo
+            // lo recupera; otra operación con esa clave, 409).
             if ($clave === null || ! VentaPosTenant::query()->where('clave_intento', $clave)->exists()) {
                 throw $e;
             }
-            $resumen = $this->cobro->cobrar($reserva, $validado['metodo'], [], 0, null, null, $clave, $actor);
+            $resumen = $cobrar();
         }
 
+        // El ticket, aparte del cobro: un reintento no lo vuelve a mandar si ya salió.
         $venta = $resumen['venta'];
+        $envio = null;
         if ($enviarTicket && $venta !== null) {
-            $this->tickets->enviar($venta->load('persona'));
+            $envio = $venta->ticket_enviado_en !== null || $this->tickets->enviar($venta->load('persona')) ? 'enviado' : 'fallido';
         }
 
         return response()->json(['data' => [
@@ -109,8 +115,11 @@ class CobroDeCitaTenantController
             'moneda' => $resumen['moneda'],
             'metodo' => $resumen['metodo'],
             'orden_id' => $resumen['orden']?->ulid,
-            // El comprobante: el ticket de la venta (con el servicio), si hubo productos o propina.
+            // El comprobante de todo cobro (con el servicio) y cómo va su envío por correo:
+            // `enviado`, `fallido` (se reenvía aparte) o null si no se pidió.
+            'venta_id' => $venta?->ulid,
             'ticket' => $venta !== null ? $this->tickets->datos($venta) : null,
+            'ticket_envio' => $envio,
         ]], 201);
     }
 }

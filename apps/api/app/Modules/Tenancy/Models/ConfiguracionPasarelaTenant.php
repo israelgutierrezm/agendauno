@@ -6,11 +6,16 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Configuracion de una pasarela de pago del estudio (tenant-local). Las
  * `credenciales` se guardan cifradas y estan ocultas: nunca se serializan ni se
  * devuelven por la API (solo se informa que llaves estan configuradas).
+ *
+ * @property bool $activa
+ * @property string $modo
+ * @property Carbon|null $configurada_en
  */
 class ConfiguracionPasarelaTenant extends Model
 {
@@ -20,7 +25,7 @@ class ConfiguracionPasarelaTenant extends Model
 
     protected $table = 'configuraciones_pasarela';
 
-    protected $fillable = ['proveedor', 'activa', 'modo', 'credenciales', 'codigo_verificacion'];
+    protected $fillable = ['proveedor', 'activa', 'modo', 'credenciales', 'codigo_verificacion', 'configurada_en'];
 
     /**
      * @var list<string>
@@ -33,6 +38,8 @@ class ConfiguracionPasarelaTenant extends Model
     protected $casts = [
         'activa' => 'boolean',
         'credenciales' => 'encrypted:array',
+        // Cuándo cambió lo que la define (llaves o modo; R13).
+        'configurada_en' => 'datetime',
     ];
 
     /**

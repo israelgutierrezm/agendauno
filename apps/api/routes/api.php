@@ -827,6 +827,8 @@ Route::prefix('v1')->group(function (): void {
             // Salidas con fecha: baja, cambio de grupo y cierre (cancelan sus reservas del grupo desde ahí).
             Route::post('/grupos/{grupo}/inscripciones/{inscripcion}/baja', [GruposTenantController::class, 'baja'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.inscripciones.baja');
             Route::post('/grupos/{grupo}/inscripciones/{inscripcion}/cambiar', [GruposTenantController::class, 'cambiar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.inscripciones.cambiar');
+            // Lo que pasaría al cambiarla (R08): la misma operación, deshecha.
+            Route::get('/grupos/{grupo}/inscripciones/{inscripcion}/cambio', [GruposTenantController::class, 'vistaPreviaCambio'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.inscripciones.cambio');
             Route::post('/grupos/{grupo}/cerrar', [GruposTenantController::class, 'cerrar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.cerrar');
             Route::post('/grupos/{grupo}/reabrir', [GruposTenantController::class, 'reabrir'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.reabrir');
 
@@ -967,6 +969,8 @@ Route::prefix('v1')->group(function (): void {
             // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
             Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.metodo');
             Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');
+            // Reenviar el ticket (del mostrador o de una cita): solo el correo (R06).
+            Route::post('/pos/ventas/{venta}/ticket', [PuntoDeVentaTenantController::class, 'reenviarTicket'])->name('pos.ventas.ticket');
 
             // Lealtad (R24): programa de puntos, recompensas, canjes y saldo por miembro.
             Route::get('/lealtad/programa', [LealtadTenantController::class, 'programa'])->middleware(['puede:lealtad.ver', 'plan:lealtad'])->name('lealtad.programa');

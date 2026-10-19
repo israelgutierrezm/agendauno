@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\CompradoresPosTenant;
 use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
@@ -74,7 +75,7 @@ class PuntoDeVentaTenantController
             $persona = (int) PersonaTenant::withTrashed()->where('ulid', $filtros['persona_id'])->value('id');
         }
 
-        $deSusSedes = fn (): Builder => VentaPosTenant::query()
+        $deSusSedes = fn (): Builder => VentaPosTenant::query()->delMostrador()
             ->when($permitidas !== null, fn (Builder $q) => $q->whereIn('sucursal_id', $permitidas ?? []))
             ->when($sucursal !== null, fn (Builder $q) => $q->where('sucursal_id', $sucursal))
             ->when($persona !== null, fn (Builder $q) => $q->where('persona_id', $persona));
@@ -158,10 +159,23 @@ class PuntoDeVentaTenantController
             'clave_intento' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
 
-        // Ya se registró con esta clave (la respuesta se perdió): la misma venta.
+        // Ya se registró con esta clave (la respuesta se perdió): la misma venta, si es la
+        // misma operación; con otra (u otra cita), conflicto (R05).
         $clave = $validado['clave_intento'] ?? null;
+        $huella = PuntoDeVentaTenant::huella('mostrador', [
+            'sucursal' => $validado['sucursal_id'],
+            'items' => array_map(static fn (array $i): array => [
+                (string) $i['articulo_id'], (int) $i['cantidad'], array_values((array) ($i['extras'] ?? [])), $i['precio_minor'] ?? null,
+            ], array_values($validado['items'])),
+            'metodo' => $validado['metodo_pago'] ?? 'efectivo',
+            'propina' => (int) ($validado['propina_minor'] ?? 0),
+            'recibido' => $validado['recibido_minor'] ?? null,
+            'comprador' => $validado['comprador_id'] ?? null,
+        ]);
         $previa = $clave !== null ? VentaPosTenant::query()->where('clave_intento', $clave)->first() : null;
         if ($previa instanceof VentaPosTenant) {
+            PuntoDeVentaTenant::exigirMismaOperacion($previa, null, $huella);
+
             return response()->json(['data' => $this->presentar($previa->load(['sucursal', 'lineas.articulo', 'persona']))]);
         }
 
@@ -192,6 +206,7 @@ class PuntoDeVentaTenantController
                 (int) ($validado['propina_minor'] ?? 0), $comprador,
                 isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
                 $clave,
+                huella: $huella,
             );
         } catch (UniqueConstraintViolationException $e) {
             // Dos intentos con la misma clave a la vez: el otro ya la registró.
@@ -199,6 +214,7 @@ class PuntoDeVentaTenantController
             if (! $previa instanceof VentaPosTenant) {
                 throw $e;
             }
+            PuntoDeVentaTenant::exigirMismaOperacion($previa, null, $huella);
 
             return response()->json(['data' => $this->presentar($previa->load(['sucursal', 'lineas.articulo', 'persona']))]);
         }
@@ -207,6 +223,30 @@ class PuntoDeVentaTenantController
         }
 
         return response()->json(['data' => $this->presentar($venta->load(['sucursal', 'lineas.articulo', 'persona']))], 201);
+    }
+
+    /**
+     * Reenvía el ticket de una venta (del mostrador o del cobro de una cita) a su
+     * comprador (R06): solo manda el correo; el cobro, el dinero y el inventario no se
+     * tocan. Quien cobra en el mostrador o cobra citas, de su sede.
+     */
+    public function reenviarTicket(Request $request): JsonResponse
+    {
+        $venta = VentaPosTenant::query()->where('ulid', (string) $request->route('venta'))->with('persona')->firstOrFail();
+        $actor = $this->actor($request);
+        abort_unless($actor === null || $actor->puede('pos.vender') || $actor->puede('ordenes.gestionar'), 403);
+        abort_unless($actor === null || $this->acceso->permiteSucursal($actor, (int) $venta->sucursal_id), 403, 'Esta venta es de una sucursal que no tienes asignada.');
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $venta->persona);
+        if ($venta->anulada_en !== null) {
+            throw ValidationException::withMessages(['venta' => ['Esta venta está anulada: su ticket ya no se manda.']]);
+        }
+        if (($venta->persona->email ?? '') === '') {
+            throw ValidationException::withMessages(['venta' => ['No tiene correo: no se le puede mandar el ticket.']]);
+        }
+
+        $enviado = $this->tickets->enviar($venta);
+
+        return response()->json(['data' => ['ticket_envio' => $enviado ? 'enviado' : 'fallido']], $enviado ? 200 : 502);
     }
 
     /**
@@ -273,6 +313,8 @@ class PuntoDeVentaTenantController
                 'genero' => $persona->genero?->value,
             ] : null,
             'ticket_enviado_en' => $venta->ticket_enviado_en?->toIso8601String(),
+            // Cómo va el envío del ticket, aparte de la venta (R06).
+            'ticket_envio' => $venta->ticket_enviado_en !== null ? 'enviado' : ($venta->ticket_envio_fallido_en !== null ? 'fallido' : null),
             'total_minor' => $venta->total_minor,
             // Aparte de lo vendido (ADR 0139): la propina, lo cobrado y el cambio.
             'propina_minor' => $venta->propina_minor,

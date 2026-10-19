@@ -175,6 +175,14 @@ class CortesDeNominaTenant
             $enCorte[$clave] ??= ['usuario' => $linea->usuario_nombre, 'minor' => 0];
             $enCorte[$clave]['minor'] += $linea->total_minor;
         }
+        // Lo que ya se ajustó después de pagar (R09): cuenta como reconocido.
+        $ajustes = [];
+        $deAjustes = Usuario::query()->whereIn('id', $corte->ajustes()->whereNotNull('usuario_id')->select('usuario_id'))->pluck('ulid', 'id');
+        foreach ($corte->ajustes()->get() as $ajuste) {
+            $clave = $ajuste->usuario_id !== null ? (string) $deAjustes->get($ajuste->usuario_id) : '';
+            $ajustes[$clave] ??= ['usuario' => $ajuste->usuario_nombre, 'minor' => 0];
+            $ajustes[$clave]['minor'] += (int) $ajuste->monto_minor;
+        }
         $hoy = [];
         foreach ($this->nomina->calcular($corte->desde->toDateString(), $corte->hasta->toDateString()) as $fila) {
             $clave = (string) ($fila['usuario_id'] ?? '');
@@ -183,18 +191,24 @@ class CortesDeNominaTenant
         }
 
         $filas = [];
-        foreach (array_unique([...array_keys($enCorte), ...array_keys($hoy)]) as $clave) {
+        foreach (array_unique([...array_keys($enCorte), ...array_keys($hoy), ...array_keys($ajustes)]) as $clave) {
             $antes = $enCorte[$clave]['minor'] ?? 0;
+            $ajustado = $ajustes[$clave]['minor'] ?? 0;
             $ahora = $hoy[$clave]['minor'] ?? 0;
-            if ($antes === $ahora) {
+            if ($antes === $ahora && $ajustado === 0) {
                 continue;
             }
             $filas[] = [
                 'usuario_id' => $clave !== '' ? (string) $clave : null,
-                'usuario' => $enCorte[$clave]['usuario'] ?? $hoy[$clave]['usuario'] ?? null,
+                'usuario' => $enCorte[$clave]['usuario'] ?? $hoy[$clave]['usuario'] ?? $ajustes[$clave]['usuario'] ?? null,
                 'en_corte_minor' => $antes,
+                // Lo ya ajustado y lo reconocido (corte + ajustes).
+                'ajustes_minor' => $ajustado,
+                'reconocido_minor' => $antes + $ajustado,
                 'hoy_minor' => $ahora,
-                'diferencia_minor' => $ahora - $antes,
+                // Lo que falta (0 = ya se atendió) y, aparte, la de siempre: contra el corte.
+                'diferencia_minor' => $ahora - $antes - $ajustado,
+                'diferencia_original_minor' => $ahora - $antes,
             ];
         }
 

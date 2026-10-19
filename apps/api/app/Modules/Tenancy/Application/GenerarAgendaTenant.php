@@ -136,10 +136,11 @@ class GenerarAgendaTenant
                 }
             }
 
-            // Con un grupo abierto, sus inscritos también van en las fechas nuevas.
+            // Con inscritos vigentes en un grupo de la serie (abierto, o cerrado con fecha
+            // futura; R03), también van en las fechas nuevas.
             $conGrupo = $nuevas !== [] && GrupoTenant::query()
                 ->where('plantilla_id', $plantilla->getKey())
-                ->where('activo', true)
+                ->whereHas('inscripciones', fn ($q) => $q->vigentesDesde(app(FechasNegocioTenant::class)->hoy()))
                 ->exists();
             if ($conGrupo) {
                 $this->eventos->registrar(ReservarInscritosEnFechasNuevas::TIPO, 'plantilla_horario', (string) $plantilla->ulid, ['sesiones' => $nuevas]);

@@ -50,31 +50,56 @@ class BajasDeGrupoTenant
     }
 
     /**
-     * La baja en su grupo y la inscripción en otro, desde la misma fecha: primero se
+     * La baja en su grupo y la inscripción en otro, desde la misma fecha (R08): todo o
+     * nada, en una sola transacción, con el grupo nuevo bajo candado. Primero se
      * cancelan sus reservas (y regresan sus créditos) y luego se reserva en el nuevo.
      *
-     * @return array{baja: array{canceladas: int, no_canceladas: list<array{inicia_en: string, motivo: string}>}, alta: array<string, mixed>}
+     * Si en el nuevo alguna fecha no se puede reservar, o alguna del actual no se pudo
+     * cancelar, el cambio es parcial: solo se aplica con `$parcial` (confirmado por quien
+     * lo hace); si no, no cambia nada y responde con lo que habría pasado. Con
+     * `$simular` nunca se aplica: es la vista previa exacta (el mismo camino, deshecho).
+     *
+     * @return array{baja: array{canceladas: int, no_canceladas: list<array{inicia_en: string, motivo: string}>}, alta: array<string, mixed>, completo: bool, aplicado: bool}
      */
-    public function cambiar(InscripcionGrupoTenant $inscripcion, GrupoTenant $destino, string $desde, ?Usuario $actor): array
+    public function cambiar(InscripcionGrupoTenant $inscripcion, GrupoTenant $destino, string $desde, ?Usuario $actor, bool $parcial = false, bool $simular = false): array
     {
         $origen = $inscripcion->grupo;
         if ($origen === null || $origen->is($destino)) {
             throw ValidationException::withMessages(['grupo_id' => ['Elige un grupo distinto al actual.']]);
         }
-        if (! $destino->activo) {
-            throw ValidationException::withMessages(['grupo_id' => ['El grupo «'.$destino->nombre.'» está cerrado.']]);
-        }
         $persona = PersonaTenant::query()->whereKey($inscripcion->persona_id)->firstOrFail();
 
-        $baja = $this->baja($inscripcion, $desde, $actor);
-        $alta = $this->inscribir->inscribir($destino, $persona, $desde);
-        $this->auditoria->registrar($actor, 'grupo.cambio', 'inscripcion_grupo', (string) $inscripcion->ulid, ['grupo' => $origen->nombre], [
-            'nombre' => $persona->nombreCompleto(),
-            'grupo' => $destino->nombre,
-            'desde' => $desde,
-        ]);
+        try {
+            return DB::connection('tenant')->transaction(function () use ($inscripcion, $origen, $destino, $persona, $desde, $actor, $parcial, $simular): array {
+                // El destino, bajo candado y revisado ahí: no se cierra a la mitad.
+                $bloqueado = GrupoTenant::query()->whereKey($destino->getKey())->lockForUpdate()->firstOrFail();
+                if (! $bloqueado->activo) {
+                    throw ValidationException::withMessages(['grupo_id' => ['El grupo «'.$bloqueado->nombre.'» está cerrado.']]);
+                }
+                $baja = $this->baja($inscripcion, $desde, $actor);
+                $alta = $this->inscribir->inscribir($bloqueado, $persona, $desde);
+                $completo = $baja['no_canceladas'] === [] && $alta['no_reservadas'] === 0;
+                $resultado = ['baja' => $baja, 'alta' => $alta, 'completo' => $completo, 'aplicado' => false];
+                if ($simular || (! $completo && ! $parcial)) {
+                    // Se deshace todo: es la vista previa (o falta confirmar el parcial).
+                    throw new CambioDeGrupoNoAplicado($resultado);
+                }
+                $this->auditoria->registrar($actor, 'grupo.cambio', 'inscripcion_grupo', (string) $inscripcion->ulid, ['grupo' => $origen->nombre], [
+                    'nombre' => $persona->nombreCompleto(),
+                    'grupo' => $bloqueado->nombre,
+                    'desde' => $desde,
+                    'parcial' => ! $completo,
+                    'no_reservadas' => $alta['no_reservadas'],
+                    'no_canceladas' => count($baja['no_canceladas']),
+                ]);
 
-        return ['baja' => $baja, 'alta' => $alta];
+                return [...$resultado, 'aplicado' => true];
+            });
+        } catch (CambioDeGrupoNoAplicado $sinAplicar) {
+            $inscripcion->refresh();
+
+            return $sinAplicar->resultado;
+        }
     }
 
     /**

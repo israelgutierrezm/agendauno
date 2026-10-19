@@ -55,8 +55,12 @@ interface Detalle extends Corte {
     usuario_id: string | null;
     usuario: string | null;
     en_corte_minor: number;
+    // Lo ya ajustado y lo reconocido (corte + ajustes); la diferencia es lo que falta.
+    ajustes_minor?: number;
+    reconocido_minor?: number;
     hoy_minor: number;
     diferencia_minor: number;
+    diferencia_original_minor?: number;
   }[];
 }
 
@@ -498,11 +502,19 @@ defineExpose({ cargar });
 
         <AvisoTono
           v-if="detalle.diferencias.length > 0"
-          tono="aviso"
+          :tono="
+            detalle.diferencias.some((d) => d.diferencia_minor !== 0)
+              ? 'aviso'
+              : 'info'
+          "
           data-prueba="diferencias-corte"
         >
           <p class="font-medium">
-            {{ $t("nominaVisual.cortes.diferencias") }}
+            {{
+              detalle.diferencias.some((d) => d.diferencia_minor !== 0)
+                ? $t("nominaVisual.cortes.diferencias")
+                : $t("nominaVisual.cortes.diferenciasAtendidas")
+            }}
           </p>
           <ul class="mt-1 space-y-1">
             <li
@@ -511,17 +523,38 @@ defineExpose({ cargar });
               class="flex flex-wrap items-center justify-between gap-2"
             >
               <span>{{
-                $t("nominaVisual.cortes.diferenciaDe", {
-                  nombre: d.usuario ?? "—",
-                  antes: dinero(d.en_corte_minor, detalle.moneda),
-                  hoy: dinero(d.hoy_minor, detalle.moneda),
-                  diferencia:
-                    (d.diferencia_minor > 0 ? "+" : "−") +
-                    dinero(Math.abs(d.diferencia_minor), detalle.moneda),
-                })
+                d.diferencia_minor === 0
+                  ? $t("nominaVisual.cortes.diferenciaAtendida", {
+                      nombre: d.usuario ?? "—",
+                      antes: dinero(d.en_corte_minor, detalle.moneda),
+                      ajustes: dinero(d.ajustes_minor ?? 0, detalle.moneda),
+                      hoy: dinero(d.hoy_minor, detalle.moneda),
+                    })
+                  : (d.ajustes_minor ?? 0) !== 0
+                    ? $t("nominaVisual.cortes.diferenciaConAjustes", {
+                        nombre: d.usuario ?? "—",
+                        antes: dinero(d.en_corte_minor, detalle.moneda),
+                        ajustes: dinero(d.ajustes_minor ?? 0, detalle.moneda),
+                        hoy: dinero(d.hoy_minor, detalle.moneda),
+                        diferencia:
+                          (d.diferencia_minor > 0 ? "+" : "−") +
+                          dinero(Math.abs(d.diferencia_minor), detalle.moneda),
+                      })
+                    : $t("nominaVisual.cortes.diferenciaDe", {
+                        nombre: d.usuario ?? "—",
+                        antes: dinero(d.en_corte_minor, detalle.moneda),
+                        hoy: dinero(d.hoy_minor, detalle.moneda),
+                        diferencia:
+                          (d.diferencia_minor > 0 ? "+" : "−") +
+                          dinero(Math.abs(d.diferencia_minor), detalle.moneda),
+                      })
               }}</span>
               <button
-                v-if="detalle.estado === 'pagado' && d.usuario_id"
+                v-if="
+                  detalle.estado === 'pagado' &&
+                  d.usuario_id &&
+                  d.diferencia_minor !== 0
+                "
                 type="button"
                 class="tu-btn tu-btn-fantasma"
                 @click="usarDiferencia(d)"

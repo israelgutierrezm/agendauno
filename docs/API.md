@@ -450,6 +450,45 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
 - `PUT /ofertas/{oferta}` acepta `regreso_dias` (1 a 730, `null` lo quita): cada
   cuántos días suele regresar un cliente por ese servicio.
 
+## Fallos R01–R06 (ADR 0164)
+
+- **Grupos** (`/grupos…`): lista, contador y cada grupo por su ULID con el alcance de la
+  sucursal de su plantilla (403 fuera de él); quien imparte, solo los suyos. Inscribir
+  pide poder ver a la persona. Cada inscripción trae `alta_desde` y `baja_desde`; el
+  contador `inscritos` incluye a quien tiene su baja después de hoy.
+- **Cambio de grupo**: `GET /grupos/{grupo}/inscripciones/{inscripcion}/cambio?grupo_id=&desde=`
+  es la vista previa exacta (`baja`, `alta`, `completo`, `aplicado: false`). `POST …/cambiar`
+  es todo o nada; si es parcial responde 409 con esa misma vista en `meta` y no cambia
+  nada, salvo con `parcial: true`.
+- **Respuestas de una ficha** (`GET /formularios/{formulario}/respuestas`): solo las de
+  quienes el usuario puede abrir el expediente (también en la búsqueda y el total).
+- **Cobro de cita** (`POST /reservas/{reserva}/cobro`): siempre trae `venta_id` y
+  `ticket` (aun solo el servicio) y `ticket_envio` (`enviado` | `fallido` | null). La
+  misma `clave_intento` con lo mismo recupera el cobro; con otra cita, otros importes o
+  en `POST /pos/ventas`, 409 sin cobrar nada.
+- `POST /pos/ventas/{venta}/ticket` reenvía el ticket (solo el correo); 502 si vuelve a
+  fallar. Quien vende en el mostrador o cobra citas, de su sede. `GET /pos/ventas` y los
+  movimientos de caja no listan los comprobantes de solo servicio.
+
+## Riesgos R07–R14 (ADR 0165)
+
+- **Agenda** (`GET /sesiones`) e **Inicio** (`GET /inicio/hoy`): cada sesión trae
+  `inicia_local` (y en la agenda `termina_local`, `AAAA-MM-DDTHH:MM:SS` sin zona) y, en
+  la agenda, `utc_offset_min`: la hora de su sucursal para mostrarla y agrupar por día.
+- **Nómina** (`GET /nomina/cortes/{corte}`): cada diferencia trae `en_corte_minor`,
+  `ajustes_minor`, `reconocido_minor`, `hoy_minor`, `diferencia_minor` (lo que falta) y
+  `diferencia_original_minor`.
+- **Embudo** (`GET /reportes/embudo`): en un negocio de citas, `citas` con `agendadas`
+  (`agendadas`, `confirmadas`), `asistencia` (`citas`, `asistieron`), `cobro`
+  (`atendidas`, `cobradas`) y `siguiente` (`clientes`, `volvieron`); en clases, null.
+- **Retención**: segmento `sin_iniciar` (también en `GET /comunicaciones/segmentos`). La
+  última visita es la fecha de la sesión.
+- **Pasarelas e integraciones**: `ultimo_exito_anterior_en` (lo que funcionó con llaves o
+  modo anteriores); `comprobada` solo con evidencia posterior al último cambio.
+- **Importar citas**: columnas opcionales `cliente_ref` y `pagado` (pesos). Sin correo,
+  celular ni `cliente_ref`, la fila es un error; la misma cita con otros datos, también.
+  `resumen` suma `por_cobrar`, `por_cobrar_minor`, `pagadas_antes` y `moneda`.
+
 ## Citas: cobrar al terminar (ADR 0158)
 
 - `POST /reservas/{reserva}/cobro` (solo citas, `ordenes.gestionar`): `metodo`

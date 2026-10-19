@@ -224,6 +224,8 @@ class ResumenDelDiaTenant
                 'inicia_en' => $s->inicia_en->toIso8601String(),
                 'termina_en' => $s->termina_en->toIso8601String(),
                 'zona_horaria' => $s->zona_horaria,
+                // La hora de la sucursal ya calculada (R10): la app la muestra tal cual.
+                'inicia_local' => CarbonImmutable::instance($s->inicia_en)->setTimezone((string) ($s->zona_horaria ?: app(FechasNegocioTenant::class)->zona()))->format('Y-m-d\TH:i:s'),
                 'capacidad' => $s->capacidad,
                 'esperados' => $esperados,
                 'llegaron' => $llegaron,

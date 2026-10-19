@@ -11,6 +11,8 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ProspectoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -30,6 +32,9 @@ use Illuminate\Database\Eloquent\Builder;
  * - **Tiempo de respuesta:** de la solicitud al primer contacto registrado (mediana en
  *   horas) y cuántas siguen sin atender.
  *
+ * En un negocio de citas (R11) los pasos de planes no representan su operación: sale
+ * además `citas`, su propio recorrido, cada paso con su base ({@see self::citas()}).
+ *
  * Fechas en la zona del negocio; un pago cuenta una vez (por orden pagada).
  */
 class EmbudoNegocioTenant
@@ -37,6 +42,7 @@ class EmbudoNegocioTenant
     public function __construct(
         private readonly FechasNegocioTenant $fechas,
         private readonly VisitasPaginaTenant $visitas,
+        private readonly ModalidadNegocioTenant $modalidad,
     ) {}
 
     /**
@@ -102,6 +108,61 @@ class EmbudoNegocioTenant
                 'atendidas' => $horas->count(),
                 'mediana_horas' => self::mediana($horas->all()),
             ],
+            // Negocio de citas: cita → asistencia → cobro → siguiente visita.
+            'citas' => $this->modalidad->esCitas() ? $this->citas($inicio, $fin) : null,
+        ];
+    }
+
+    /**
+     * El recorrido de un negocio de citas (R11), del periodo y en la zona del negocio:
+     *
+     * - **Agendadas → confirmadas:** citas agendadas en el periodo y cuántas quedaron
+     *   confirmadas (no se vencieron sin pagar ni siguen apartadas).
+     * - **Cita → asistencia:** citas del periodo que ya pasaron (sin las canceladas) y en
+     *   cuántas llegó el cliente.
+     * - **Asistencia → cobro:** de las atendidas, cuántas ya están cobradas (su orden y,
+     *   con anticipo, su saldo; las de bono no deben nada).
+     * - **Siguiente visita:** de los clientes atendidos en el periodo, cuántos ya tienen
+     *   otra cita después.
+     *
+     * Cuenta la fecha de la cita (la sesión), no la del registro de su asistencia.
+     *
+     * @return array{agendadas: array{agendadas: int, confirmadas: int}, asistencia: array{citas: int, asistieron: int}, cobro: array{atendidas: int, cobradas: int}, siguiente: array{clientes: int, volvieron: int}}
+     */
+    private function citas(CarbonImmutable $inicio, CarbonImmutable $fin): array
+    {
+        $deCitas = static fn (Builder $q) => $q->where('tipo', TipoSesionTenant::Cita->value);
+
+        $agendadas = ReservaTenant::query()->whereHas('sesion', $deCitas)->whereBetween('created_at', [$inicio, $fin]);
+        $confirmadas = (clone $agendadas)
+            ->where('estado', '!=', EstadoReserva::PendientePago->value)
+            ->where(fn (Builder $q) => $q->whereNull('motivo_cancelacion')->orWhere('motivo_cancelacion', '!=', 'vencio_pago'));
+
+        // Las que ya pasaron en el periodo (por la hora de la cita).
+        $hasta = $fin->lessThan(now()) ? $fin : now()->toImmutable();
+        $pasadas = ReservaTenant::query()
+            ->whereHas('sesion', fn (Builder $q) => $deCitas($q)->whereBetween('inicia_en', [$inicio, $hasta]))
+            ->where('estado', '!=', EstadoReserva::Cancelada->value)
+            ->where('estado', '!=', EstadoReserva::Expirada->value);
+        $atendidas = (clone $pasadas)->whereHas('asistencia', fn (Builder $q) => $q->where('estado', EstadoAsistencia::Presente->value))
+            ->with(['orden', 'saldoOrden', 'sesion'])
+            ->get();
+        $cobradas = $atendidas->filter(static fn (ReservaTenant $r): bool => $r->ordenPorCobrar() === null)->count();
+
+        // De cada cliente atendido, su última visita del periodo: ¿tiene otra cita después?
+        $ultimas = $atendidas->groupBy('persona_id')
+            ->map(static fn ($suyas) => $suyas->max(static fn (ReservaTenant $r) => $r->sesion?->inicia_en));
+        $volvieron = $ultimas->filter(static fn ($ultima, $persona): bool => $ultima !== null && ReservaTenant::query()
+            ->where('persona_id', $persona)
+            ->whereNotIn('estado', [EstadoReserva::Cancelada->value, EstadoReserva::Expirada->value])
+            ->whereHas('sesion', fn (Builder $q) => $q->where('tipo', TipoSesionTenant::Cita->value)->where('inicia_en', '>', $ultima))
+            ->exists())->count();
+
+        return [
+            'agendadas' => ['agendadas' => $agendadas->count(), 'confirmadas' => $confirmadas->count()],
+            'asistencia' => ['citas' => $pasadas->count(), 'asistieron' => $atendidas->count()],
+            'cobro' => ['atendidas' => $atendidas->count(), 'cobradas' => $cobradas],
+            'siguiente' => ['clientes' => $ultimas->count(), 'volvieron' => $volvieron],
         ];
     }
 

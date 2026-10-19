@@ -23,8 +23,12 @@ abstract final class Formato {
     if (f == null) {
       return '—';
     }
-    return '${_dias[f.weekday - 1]} ${f.day} ${_meses[f.month - 1]} · ${hora(f)}';
+    return diaHora(f);
   }
+
+  /// "jue 25 sep · 09:30" tal cual (sin convertir de zona): p. ej. la hora de
+  /// pared de una sucursal.
+  static String diaHora(DateTime f) => '${dia(f)} · ${hora(f)}';
 
   /// "09:30".
   static String hora(DateTime f) => '${_dos(f.hour)}:${_dos(f.minute)}';

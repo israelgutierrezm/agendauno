@@ -24,6 +24,7 @@ enum SegmentoComunicacion: string
     case Vencidos = 'vencidos';
     case Primerizos = 'primerizos';
     case SinAsistir = 'sin_asistir';
+    case SinIniciar = 'sin_iniciar';
     case SaldoPorVencer = 'saldo_por_vencer';
     case VinoSinComprar = 'vino_sin_comprar';
     case PagoFallido = 'pago_fallido';
@@ -43,6 +44,7 @@ enum SegmentoComunicacion: string
             self::Vencidos => 'Membresía vencida',
             self::Primerizos => 'Primerizos (sin asistir aún)',
             self::SinAsistir => 'Con plan y sin venir',
+            self::SinIniciar => 'Compró y no ha iniciado',
             self::SaldoPorVencer => 'Paquete por vencer con saldo',
             self::VinoSinComprar => 'Vino y no ha comprado',
             self::PagoFallido => 'Su pago automático falló',
@@ -58,6 +60,7 @@ enum SegmentoComunicacion: string
             self::Vencidos => 'Miembros cuya membresía venció hace 14 días o menos (recuperables).',
             self::Primerizos => 'Miembros que aún no registran ninguna asistencia.',
             self::SinAsistir => 'Tienen un plan en vigor y no vienen desde hace los días que fija tu negocio en Seguimiento.',
+            self::SinIniciar => 'Tienen un plan en vigor, nunca han venido y no tienen nada reservado.',
             self::SaldoPorVencer => 'Su paquete vence pronto y aún les queda saldo sin usar.',
             self::VinoSinComprar => 'Vinieron hace poco y nunca han comprado un plan.',
             self::PagoFallido => 'Un cobro automático de su plan falló (en mora o suspendida).',

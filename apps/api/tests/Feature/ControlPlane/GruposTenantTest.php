@@ -176,7 +176,8 @@ it('una baja desde una fecha cancela sus reservas del grupo desde ahí y le devu
         ->assertJsonPath('meta.no_canceladas', []);
     // Le quedan las 3 primeras; los 4 créditos regresan.
     expect(disponibleDeAlumnaEnGrupo($e, $vp['persona']))->toBe(5000);
-    $this->getJson("/api/v1/app/{$e['slug']}/grupos", conBearer($e['bearer']))->assertJsonPath('data.0.inscritos', 0);
+    // Hasta el día de su baja sigue contando como inscrita (R03).
+    $this->getJson("/api/v1/app/{$e['slug']}/grupos", conBearer($e['bearer']))->assertJsonPath('data.0.inscritos', 1);
 
     // Dos veces, no.
     $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones/{$inscripcion}/baja", [], conBearer($e['bearer']))
@@ -313,4 +314,145 @@ it('el aviso interno de fechas nuevas nunca sale por un webhook suscrito a todo'
 
     expect($webhook->suscritoA('reserva.creada'))->toBeTrue()
         ->and($webhook->suscritoA(ReservarInscritosEnFechasNuevas::TIPO))->toBeFalse();
+});
+
+it('cada grupo es de la sucursal de su horario: quien está en una sede no ve ni opera los de otra (R01)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $dueno = conBearer($e['bearer']);
+    $roma = agendaSemilla($e);
+    $polanco = agendaSemilla($e);
+    $grupoRoma = grupoConSesiones($e, $roma, 'Natación Roma');
+    $grupoPolanco = grupoConSesiones($e, $polanco, 'Natación Polanco');
+    $ana = crearMiembroEnSucursal($e, 'Ana', $roma['sucursal']);
+    $beto = crearMiembroEnSucursal($e, 'Beto', $polanco['sucursal']);
+    $this->postJson("{$app}/grupos/{$grupoPolanco}/inscripciones", ['persona_id' => $beto], $dueno)->assertCreated();
+
+    // La recepción de Roma: solo sus grupos (con su contador) y ni los inscritos de Polanco.
+    $recep = conBearer(personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista'));
+    asignarSucursal($e, usuarioIdPorEmail($e, 'recep@correo.mx'), $roma['sucursal']);
+    expect(collect($this->getJson("{$app}/grupos", $recep)->assertOk()->json('data'))->pluck('nombre')->all())->toBe(['Natación Roma']);
+    $this->getJson("{$app}/grupos/{$grupoPolanco}/inscripciones", $recep)->assertForbidden();
+    $this->getJson("{$app}/grupos/{$grupoPolanco}/inscripciones?page=1&q=Beto", $recep)->assertForbidden();
+    $this->getJson("{$app}/grupos/{$grupoRoma}/inscripciones", $recep)->assertOk();
+    // El dueño ve todos; quien imparte, solo los grupos que imparte (aquí ninguno).
+    $this->getJson("{$app}/grupos", $dueno)->assertOk()->assertJsonCount(2, 'data');
+    $coach = conBearer(personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor'));
+    $this->getJson("{$app}/grupos", $coach)->assertOk()->assertJsonCount(0, 'data');
+    $this->getJson("{$app}/grupos/{$grupoRoma}/inscripciones", $coach)->assertForbidden();
+
+    // Escrituras: alguien de Roma que sí gestiona la agenda.
+    $rol = (string) $this->postJson("{$app}/roles", [
+        'nombre' => 'Coordinación', 'permisos' => ['agenda.ver', 'agenda.gestionar', 'catalogo.ver', 'sucursales.ver', 'miembros.ver'],
+    ], $dueno)->assertCreated()->json('data.clave');
+    $coord = conBearer(personalConSesion($e['slug'], $e['bearer'], 'coord@correo.mx', $rol));
+    asignarSucursal($e, usuarioIdPorEmail($e, 'coord@correo.mx'), $roma['sucursal']);
+
+    $this->postJson("{$app}/grupos/{$grupoPolanco}/inscripciones", ['persona_id' => $ana], $coord)->assertForbidden();
+    $this->postJson("{$app}/grupos/{$grupoRoma}/inscripciones", ['persona_id' => $beto], $coord)->assertForbidden();
+    $this->postJson("{$app}/grupos/{$grupoPolanco}/cerrar", [], $coord)->assertForbidden();
+    $this->postJson("{$app}/grupos/{$grupoRoma}/inscripciones", ['persona_id' => $ana], $coord)->assertCreated();
+    $inscripcion = (string) collect($this->getJson("{$app}/grupos/{$grupoRoma}/inscripciones", $coord)->assertOk()->json('data'))->firstWhere('persona', 'Ana')['id'];
+    $this->postJson("{$app}/grupos/{$grupoRoma}/inscripciones/{$inscripcion}/cambiar", ['grupo_id' => $grupoPolanco], $coord)->assertForbidden();
+    $this->postJson("{$app}/grupos/{$grupoRoma}/inscripciones/{$inscripcion}/baja", [], $coord)->assertOk();
+
+    // Tampoco crea un grupo con un horario de Polanco.
+    $plantillaPolanco = (string) $this->postJson("{$app}/plantillas-horario", [
+        'oferta_id' => $polanco['oferta'], 'sucursal_id' => $polanco['sucursal'],
+        'dias_semana' => [1], 'hora_local' => '07:00', 'duracion_minutos' => 60, 'capacidad' => 5,
+        'vigente_desde' => Carbon::now()->toDateString(),
+    ], $dueno)->assertCreated()->json('data.id');
+    $this->postJson("{$app}/grupos", ['nombre' => 'Otro', 'plantilla_id' => $plantillaPolanco], $coord)->assertForbidden();
+});
+
+/**
+ * Un grupo que sigue una plantilla diaria a otra hora, con `$dias` fechas desde mañana.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ * @param  array{oferta: string, sucursal: string}  $semilla
+ */
+function grupoConFechasParaCambio(array $e, array $semilla, string $nombre, int $dias): string
+{
+    $plantilla = (string) test()->postJson("/api/v1/app/{$e['slug']}/plantillas-horario", [
+        'oferta_id' => $semilla['oferta'], 'sucursal_id' => $semilla['sucursal'],
+        'dias_semana' => [1, 2, 3, 4, 5, 6, 7], 'hora_local' => '19:00', 'duracion_minutos' => 60,
+        'capacidad' => 10, 'vigente_desde' => Carbon::now()->toDateString(),
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    test()->postJson("/api/v1/app/{$e['slug']}/plantillas-horario/{$plantilla}/generar", [
+        'desde' => Carbon::now()->addDay()->toDateString(), 'hasta' => Carbon::now()->addDays($dias)->toDateString(),
+    ], conBearer($e['bearer']))->assertCreated();
+
+    return (string) test()->postJson("/api/v1/app/{$e['slug']}/grupos", ['nombre' => $nombre, 'plantilla_id' => $plantilla], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+}
+
+it('una baja o un cierre con fecha futura conservan las fechas anteriores, también las que se generan después (R03)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $dueno = conBearer($e['bearer']);
+    $semilla = agendaSemilla($e);
+    $grupo = grupoConSesiones($e, $semilla);
+    $ana = venderPackAMiembroTenant($e, 20000, 'Ana');
+    $beto = venderPackAMiembroTenant($e, 20000, 'Beto');
+    foreach ([$ana, $beto] as $vp) {
+        $this->postJson("{$app}/grupos/{$grupo}/inscripciones", ['persona_id' => $vp['persona']], $dueno)->assertCreated()->assertJsonPath('data.reservadas', 7);
+    }
+    $inscripcionAna = (string) collect($this->getJson("{$app}/grupos/{$grupo}/inscripciones", $dueno)->json('data'))
+        ->first(fn (array $i): bool => str_starts_with((string) $i['persona'], 'Ana'))['id'];
+
+    // Ana se va desde el día 10; el grupo cierra desde el 11.
+    $this->postJson("{$app}/grupos/{$grupo}/inscripciones/{$inscripcionAna}/baja", ['desde' => Carbon::now()->addDays(10)->toDateString()], $dueno)->assertOk();
+    $this->postJson("{$app}/grupos/{$grupo}/cerrar", ['desde' => Carbon::now()->addDays(11)->toDateString()], $dueno)->assertOk();
+    // Hasta su baja siguen contando como inscritos.
+    expect(collect($this->getJson("{$app}/grupos", $dueno)->json('data'))->firstWhere('id', $grupo)['inscritos'])->toBe(2);
+
+    // Se generan los días 8 a 12.
+    $plantilla = (string) $this->getJson("{$app}/plantillas-horario", $dueno)->json('data.0.id');
+    $this->postJson("{$app}/plantillas-horario/{$plantilla}/generar", [
+        'desde' => Carbon::now()->addDays(8)->toDateString(), 'hasta' => Carbon::now()->addDays(12)->toDateString(),
+    ], $dueno)->assertCreated()->assertJsonPath('data.creadas', 5);
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    // Ana: días 8 y 9 (antes de su baja) → 9 fechas. Beto: 8, 9 y 10 (antes del cierre) → 10.
+    // Sin duplicar ni cobrar dos veces aunque el relay pase dos veces.
+    expect(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(11000)
+        ->and(disponibleDeAlumnaEnGrupo($e, $beto['persona']))->toBe(10000);
+});
+
+it('cambiar de grupo es todo o nada: la vista previa no cambia nada y un cambio parcial se confirma (R08)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $dueno = conBearer($e['bearer']);
+    $semilla = agendaSemilla($e);
+    $origen = grupoConSesiones($e, $semilla, 'Natación 18:00');
+    // El destino tiene 8 fechas y a Ana le alcanzan 7 créditos: una no se puede reservar.
+    $destino = grupoConFechasParaCambio($e, $semilla, 'Natación 19:00', 8);
+    $ana = venderPackAMiembroTenant($e, 7000, 'Ana');
+    $this->postJson("{$app}/grupos/{$origen}/inscripciones", ['persona_id' => $ana['persona']], $dueno)->assertCreated()->assertJsonPath('data.reservadas', 7);
+    $inscripcion = (string) $this->getJson("{$app}/grupos/{$origen}/inscripciones", $dueno)->json('data.0.id');
+    $url = "{$app}/grupos/{$origen}/inscripciones/{$inscripcion}";
+    $nadaCambio = function () use ($app, $dueno, $origen, $destino, $e, $ana): void {
+        expect($this->getJson("{$app}/grupos/{$origen}/inscripciones", $dueno)->json('data.0.activo'))->toBeTrue()
+            ->and($this->getJson("{$app}/grupos/{$destino}/inscripciones", $dueno)->json('data'))->toBe([])
+            ->and(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(0);
+    };
+
+    // Vista previa: dice qué pasaría, fecha por fecha, sin cambiar nada.
+    $this->getJson("{$url}/cambio?grupo_id={$destino}", $dueno)->assertOk()
+        ->assertJsonPath('data.completo', false)->assertJsonPath('data.aplicado', false)
+        ->assertJsonPath('data.baja.canceladas', 7)
+        ->assertJsonPath('data.alta.reservadas', 7)->assertJsonPath('data.alta.no_reservadas', 1);
+    $nadaCambio();
+
+    // Sin confirmar el parcial: 409 y nada cambia.
+    $this->postJson("{$url}/cambiar", ['grupo_id' => $destino], $dueno)->assertStatus(409)
+        ->assertJsonPath('meta.completo', false)->assertJsonPath('meta.alta.no_reservadas', 1);
+    $nadaCambio();
+
+    // Confirmado: se aplica todo junto.
+    $this->postJson("{$url}/cambiar", ['grupo_id' => $destino, 'parcial' => true], $dueno)->assertOk()
+        ->assertJsonPath('meta.aplicado', true)->assertJsonPath('data.activo', false);
+    expect($this->getJson("{$app}/grupos/{$destino}/inscripciones", $dueno)->json('data.0.activo'))->toBeTrue()
+        ->and(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(0);
 });

@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * Punto de venta minorista tenant-local (R21): registra un ticket de caja y descuenta
@@ -65,13 +66,18 @@ class PuntoDeVentaTenant
      *
      * Al terminar una cita ({@see CobroDeCitaTenant}) la venta va ligada a su orden y
      * guarda cuánto fue del servicio (`$servicioMinor`): lo recibido alcanza para todo y
-     * el ticket es de todo. Ahí puede no llevar productos (solo la propina).
+     * el ticket es de todo. Ahí puede no llevar productos (solo la propina, o solo el
+     * servicio: todo cobro de cita deja su venta y su comprobante, R04/R06).
+     *
+     * La clave del intento va con la huella de lo pedido ({@see self::huella()}) y, en
+     * una cita, con su reserva: así un reintento se reconoce y otra operación con la
+     * misma clave es un conflicto (R05).
      *
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras?: list<ExtraArticuloTenant>, precio_minor?: int|null}>  $items
      */
-    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0): VentaPosTenant
+    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0, ?int $reservaId = null, ?string $huella = null): VentaPosTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor): VentaPosTenant {
+        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor, $reservaId, $huella): VentaPosTenant {
             $moneda = $items !== [] ? $items[0]['articulo']->moneda : ($orden->moneda ?? $this->region->moneda());
 
             // La propina va aparte de lo vendido: no es ingreso del negocio (ADR 0139).
@@ -86,6 +92,8 @@ class PuntoDeVentaTenant
                 'clave_intento' => $claveIntento,
                 'orden_id' => $orden?->getKey(),
                 'servicio_minor' => max(0, $servicioMinor),
+                'reserva_id' => $reservaId,
+                'huella_intento' => $huella,
             ]);
 
             $total = 0;
@@ -144,5 +152,30 @@ class PuntoDeVentaTenant
 
             return $venta->refresh();
         });
+    }
+
+    /**
+     * La huella de lo que se pidió cobrar (R05): con la misma clave del intento, solo
+     * lo mismo recupera la venta; otra operación (otra cita, otros importes, el
+     * mostrador) es un conflicto.
+     *
+     * @param  array<string, mixed>  $pedido
+     */
+    public static function huella(string $operacion, array $pedido): string
+    {
+        return hash('sha256', $operacion.'|'.json_encode($pedido, JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * ¿La venta registrada con esa clave es esta misma operación? Si no, la clave ya se
+     * usó para otra y se responde 409 sin tocar nada.
+     */
+    public static function exigirMismaOperacion(VentaPosTenant $previa, ?int $reservaId, string $huella): void
+    {
+        $misma = ($previa->reserva_id === null ? null : (int) $previa->reserva_id) === $reservaId
+            && ($previa->huella_intento === null || hash_equals((string) $previa->huella_intento, $huella));
+        if (! $misma) {
+            throw new ConflictHttpException('Esa clave de cobro ya se usó en otra operación: no se cobró nada. Vuelve a cobrar desde el principio.');
+        }
     }
 }

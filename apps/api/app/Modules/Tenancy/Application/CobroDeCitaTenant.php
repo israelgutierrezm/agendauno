@@ -24,7 +24,11 @@ use Illuminate\Validation\ValidationException;
  * - El pago del servicio es de su orden (corte, reportes y facturación como siempre);
  *   los productos y la propina son una venta del mostrador ligada a esa orden, con
  *   cuánto fue del servicio, para que el ticket y el cambio sean de todo.
- * - La clave del intento hace idempotente el reintento: devuelve el mismo cobro.
+ * - Todo cobro deja su venta, aunque sea solo el servicio (R04/R06): es la operación
+ *   que se recupera y el comprobante que se manda. Sus sumas no cuentan el servicio
+ *   dos veces (va aparte, en `servicio_minor`).
+ * - La clave del intento hace idempotente el reintento: lo mismo devuelve el mismo
+ *   cobro; la clave con otra cita u otros importes responde 409 (R05).
  *
  * @phpstan-type Resumen array{servicio_minor: int, productos_minor: int, propina_minor: int, total_minor: int, recibido_minor: int|null, cambio_minor: int|null, moneda: string, metodo: string, orden: OrdenTenant|null, venta: VentaPosTenant|null}
  */
@@ -34,23 +38,25 @@ class CobroDeCitaTenant
         private readonly OrdenesTenant $ordenes,
         private readonly PuntoDeVentaTenant $pos,
         private readonly RegistrarAuditoria $auditoria,
-        private readonly RegionNegocioTenant $region,
     ) {}
 
     /**
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras: list<ExtraArticuloTenant>, precio_minor: int|null}>  $items
      * @return Resumen
      */
-    public function cobrar(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?string $clave, ?Usuario $actor): array
+    public function cobrar(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?string $clave, ?Usuario $actor, ?string $huella = null): array
     {
+        $huella ??= self::huella($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia);
         if ($clave !== null) {
             $previa = VentaPosTenant::query()->where('clave_intento', $clave)->first();
             if ($previa instanceof VentaPosTenant) {
+                PuntoDeVentaTenant::exigirMismaOperacion($previa, (int) $reserva->getKey(), $huella);
+
                 return $this->resumenDeVenta($previa);
             }
         }
 
-        $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor): array {
+        $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor, $huella): array {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
             $sesion = $bloqueada->sesion;
             $sucursal = $sesion !== null ? SucursalTenant::query()->find($sesion->sucursal_id) : null;
@@ -85,37 +91,40 @@ class CobroDeCitaTenant
                 }
             }
 
-            $venta = null;
-            if ($items !== [] || $propinaMinor > 0) {
-                // Lo recibido alcanza para todo (la venta lo valida con el servicio).
-                $venta = $this->pos->vender(
-                    $sucursal, $items, $metodo, $actor, $propinaMinor, $bloqueada->persona,
-                    $metodo === 'efectivo' ? $recibidoMinor : null, $clave, $orden, $servicio,
-                );
-            } elseif ($metodo === 'efectivo' && $recibidoMinor !== null && $recibidoMinor < $servicio) {
-                throw ValidationException::withMessages(['recibido_minor' => ['Lo que recibiste no alcanza para cobrar la cita.']]);
-            }
+            // Siempre su venta (aun solo el servicio): lo recibido alcanza para todo (la
+            // venta lo valida con el servicio) y queda el comprobante.
+            $venta = $this->pos->vender(
+                $sucursal, $items, $metodo, $actor, $propinaMinor, $bloqueada->persona,
+                $metodo === 'efectivo' ? $recibidoMinor : null, $clave, $orden, $servicio,
+                (int) $bloqueada->getKey(), $huella,
+            );
 
-            if ($venta !== null) {
-                return $this->resumenDeVenta($venta);
-            }
-            $recibido = $metodo === 'efectivo' ? $recibidoMinor : null;
-
-            return [
-                'servicio_minor' => $servicio,
-                'productos_minor' => 0,
-                'propina_minor' => 0,
-                'total_minor' => $servicio,
-                'recibido_minor' => $recibido,
-                'cambio_minor' => $recibido !== null ? $recibido - $servicio : null,
-                'moneda' => $orden->moneda ?? $this->region->moneda(),
-                'metodo' => $metodo,
-                'orden' => $orden,
-                'venta' => null,
-            ];
+            return $this->resumenDeVenta($venta);
         });
 
         return $resumen;
+    }
+
+    /**
+     * La huella de lo pedido (R05): la cita, la forma de pago, los productos (con sus
+     * extras y el precio mostrado), la propina, lo recibido y la referencia.
+     *
+     * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras: list<ExtraArticuloTenant>, precio_minor: int|null}>  $items
+     */
+    public static function huella(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia): string
+    {
+        return PuntoDeVentaTenant::huella('cita', [
+            'reserva' => (string) $reserva->ulid,
+            'metodo' => $metodo,
+            'items' => array_map(static fn (array $i): array => [
+                (string) $i['articulo']->ulid, $i['cantidad'],
+                array_map(static fn (ExtraArticuloTenant $e): string => (string) $e->ulid, $i['extras']),
+                $i['precio_minor'],
+            ], $items),
+            'propina' => $propinaMinor,
+            'recibido' => $metodo === 'efectivo' ? $recibidoMinor : null,
+            'referencia' => $referencia,
+        ]);
     }
 
     /**

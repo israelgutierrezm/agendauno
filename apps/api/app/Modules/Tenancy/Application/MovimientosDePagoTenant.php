@@ -337,8 +337,10 @@ class MovimientosDePagoTenant
     private function ventas(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $ventas = VentaPosTenant::query()
-            // Una venta anulada nunca ocurrió (ADR 0089).
+            // Una venta anulada nunca ocurrió (ADR 0089); la de solo el servicio de una
+            // cita es su comprobante (su dinero es el pago de la orden).
             ->whereNull('anulada_en')
+            ->delMostrador()
             ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
             ->whereBetween('created_at', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))

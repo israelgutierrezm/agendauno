@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoDunning;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\AsistenciaTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -40,19 +41,26 @@ function enNegocioDeSegmentos(array $e, Closure $hacer): mixed
 }
 
 /**
- * Que vino (presente) a una sesión en ese momento.
+ * Que vino (presente) a una sesión de ese momento: una copia de la sesión dada a esa
+ * hora (la visita es la fecha de la sesión; R12). Con `$registrada`, la asistencia se
+ * registró en otro momento (p. ej. una corrección de hoy).
  *
  * @param  array{slug: string}  $e
  */
-function vinoEnSegmentos(array $e, string $persona, string $sesion, string $cuando): void
+function vinoEnSegmentos(array $e, string $persona, string $sesion, string $cuando, ?string $registrada = null): void
 {
-    enNegocioDeSegmentos($e, function () use ($persona, $sesion, $cuando): void {
+    enNegocioDeSegmentos($e, function () use ($persona, $sesion, $cuando, $registrada): void {
+        $copia = SesionTenant::query()->where('ulid', $sesion)->firstOrFail()->replicate();
+        $copia->ulid = null;
+        $copia->inicia_en = CarbonImmutable::parse($cuando);
+        $copia->termina_en = CarbonImmutable::parse($cuando)->addHour();
+        $copia->save();
         $reserva = ReservaTenant::query()->create([
-            'sesion_id' => SesionTenant::query()->where('ulid', $sesion)->value('id'),
+            'sesion_id' => $copia->getKey(),
             'persona_id' => PersonaTenant::query()->where('ulid', $persona)->value('id'),
             'estado' => 'confirmada',
         ]);
-        AsistenciaTenant::query()->create(['reserva_id' => $reserva->id, 'estado' => 'presente', 'registrada_en' => CarbonImmutable::parse($cuando)]);
+        AsistenciaTenant::query()->create(['reserva_id' => $reserva->id, 'estado' => 'presente', 'registrada_en' => CarbonImmutable::parse($registrada ?? $cuando)]);
     });
 }
 
@@ -67,7 +75,7 @@ it('con plan y sin venir: se ve con su porqué y crea su seguimiento una sola ve
     enNegocioDeSegmentos($e, fn () => DerechoTenant::query()->update(['valido_hasta' => '2026-12-31']));
 
     $segmentos = collect($this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos", conBearer($e['bearer']))->assertOk()->json('data'))->keyBy('clave');
-    expect($segmentos->keys()->all())->toBe(['sin_asistir', 'saldo_por_vencer', 'vino_sin_comprar', 'pago_fallido'])
+    expect($segmentos->keys()->all())->toBe(['sin_asistir', 'sin_iniciar', 'saldo_por_vencer', 'vino_sin_comprar', 'pago_fallido'])
         ->and($segmentos['sin_asistir']['total'])->toBe(1);
 
     $lista = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/sin_asistir", conBearer($e['bearer']))->assertOk()->json('data');
@@ -102,7 +110,7 @@ it('paquete por vencer con saldo, vino sin comprar y pago fallido', function ():
     });
 
     $porVencer = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/saldo_por_vencer", conBearer($e['bearer']))->assertOk()->json('data');
-    expect($porVencer)->toHaveCount(1)->and($porVencer[0]['detalle'])->toBe('Le quedan 8 clases; vence en 5 días.');
+    expect($porVencer)->toHaveCount(1)->and($porVencer[0]['detalle'])->toBe('Le quedan 8 créditos; vence en 5 días.');
 
     $vino = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/vino_sin_comprar", conBearer($e['bearer']))->assertOk()->json('data');
     expect(collect($vino)->pluck('id')->all())->toBe([$carla])
@@ -144,4 +152,29 @@ it('los segmentos son de todo el negocio: quien imparte no los ve', function ():
 
     $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos", conBearer($instructor))->assertForbidden();
     $this->postJson("/api/v1/app/{$e['slug']}/retencion/segmentos/sin_asistir/seguimientos", [], conBearer($instructor))->assertForbidden();
+});
+
+it('la última visita es la fecha de la clase, no la del registro; y quien compró y no ha iniciado (R12)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $ana = venderPackAMiembroTenant($e, 8000, 'Ana');
+    $beto = venderPackAMiembroTenant($e, 8000, 'Beto');
+    $carla = venderPackAMiembroTenant($e, 8000, 'Carla');
+    $sesion = crearSesionTenant($e, $semilla, cuando: '2026-10-01 08:00:00');
+    // La asistencia de Ana del 5 de septiembre se corrigió hoy: sigue siendo de hace 26 días.
+    vinoEnSegmentos($e, $ana['persona'], $sesion, '2026-09-05 14:00:00', '2026-10-01 05:00:00');
+    enNegocioDeSegmentos($e, function (): void {
+        DerechoTenant::query()->update(['valido_hasta' => '2026-12-31']);
+        // Beto y Carla compraron hace 20 días; Carla ya reservó, Beto no.
+        AcuerdoTenant::query()->update(['created_at' => '2026-09-11 12:00:00']);
+    });
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $carla['persona']], conBearer($e['bearer']))->assertCreated();
+
+    $sinAsistir = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/sin_asistir", conBearer($e['bearer']))->assertOk()->json('data');
+    expect(collect($sinAsistir)->pluck('id')->all())->toBe([$ana['persona']])
+        ->and($sinAsistir[0]['detalle'])->toBe('Su última clase fue hace 26 días.');
+
+    $sinIniciar = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/sin_iniciar", conBearer($e['bearer']))->assertOk()->json('data');
+    expect(collect($sinIniciar)->pluck('id')->all())->toBe([$beto['persona']])
+        ->and($sinIniciar[0]['detalle'])->toBe('Tiene su plan desde hace 20 días y aún no reserva su primera clase.');
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -42,7 +43,7 @@ class VentaPosTenant extends Model
     protected $fillable = [
         'sucursal_id', 'total_minor', 'moneda', 'metodo_pago', 'usuario_id', 'anulada_en', 'anulada_por', 'motivo_anulacion',
         'propina_minor', 'recibido_minor', 'persona_id', 'ticket_enviado_en', 'clave_intento',
-        'orden_id', 'servicio_minor',
+        'orden_id', 'servicio_minor', 'reserva_id', 'huella_intento', 'ticket_envio_fallido_en',
     ];
 
     /**
@@ -55,6 +56,7 @@ class VentaPosTenant extends Model
         'servicio_minor' => 'integer',
         'anulada_en' => 'datetime',
         'ticket_enviado_en' => 'datetime',
+        'ticket_envio_fallido_en' => 'datetime',
     ];
 
     /**
@@ -101,5 +103,18 @@ class VentaPosTenant extends Model
     public function cobradoMinor(): int
     {
         return $this->total_minor + $this->propina_minor + $this->servicio_minor;
+    }
+
+    /**
+     * Las que llevan algo del mostrador (productos o propina). El cobro de solo el
+     * servicio de una cita también deja su venta (su comprobante, R04/R06), pero su
+     * dinero es el pago de la orden: no es una venta del mostrador ni un movimiento
+     * aparte de la caja.
+     *
+     * @param  Builder<VentaPosTenant>  $consulta
+     */
+    public function scopeDelMostrador(Builder $consulta): void
+    {
+        $consulta->where(fn (Builder $w) => $w->where('total_minor', '>', 0)->orWhere('propina_minor', '>', 0));
     }
 }

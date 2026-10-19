@@ -159,9 +159,11 @@ class _Inicio extends ConsumerWidget {
             .toList();
         final proxima = pendientes.firstOrNull;
         final enCurso = proxima != null && !proxima.iniciaEn.isAfter(ahora);
+        // «Hoy» es el de la sucursal de cada una (su día, no el del teléfono).
         final deHoy = sesiones
-            .where((s) => Calendario.mismoDia(s.iniciaEn, ahora))
+            .where((s) => s.esDelDia(s.hoyEnSucursal(ahora)))
             .toList();
+        final horaSucursal = proxima?.etiquetaHora();
         final esperados = deHoy.fold<int>(0, (n, s) => n + s.ocupados);
         String cuantas(int n) =>
             n == 0 ? 'Sin $clases' : (n == 1 ? '1 $clase' : '$n $clases');
@@ -248,13 +250,21 @@ class _Inicio extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Text(
                           [
-                            Formato.fechaHora(
-                              proxima.iniciaEn.toIso8601String(),
-                            ),
+                            Formato.diaHora(proxima.iniciaLocal),
                             ?proxima.sucursal,
                             ?proxima.sala,
                           ].join(' · '),
                         ),
+                        // El teléfono está en otra zona: es la hora de la sucursal.
+                        if (horaSucursal != null)
+                          Text(
+                            horaSucursal,
+                            key: const Key('hora-de-la-sucursal'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.colores.textoSuave,
+                            ),
+                          ),
                         if (detalleSesion(proxima).isNotEmpty)
                           Text(
                             detalleSesion(proxima),
@@ -371,6 +381,7 @@ class _MisClases extends ConsumerWidget {
     // Al cambiar de rango se conserva lo anterior mientras llega lo nuevo.
     final sesiones = estado.value ?? const <SesionAgenda>[];
     final eventos = eventosDeClases(sesiones);
+    final horaSucursal = etiquetaHoraSucursal(sesiones);
 
     void abrir(EventoCal e) {
       final s = sesiones.where((x) => x.id == e.id).firstOrNull;
@@ -395,6 +406,20 @@ class _MisClases extends ConsumerWidget {
               child: Text(
                 'No se pudo cargar. Desliza hacia abajo para reintentar.',
                 style: TextStyle(color: context.colores.error),
+              ),
+            ),
+          // El teléfono está en otra zona: los días y las horas son los de la
+          // sucursal.
+          if (horaSucursal != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                horaSucursal,
+                key: const Key('hora-de-la-sucursal'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.colores.textoSuave,
+                ),
               ),
             ),
         ],
@@ -445,12 +470,22 @@ class _MisClases extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${Formato.fechaHora(s.iniciaEn.toIso8601String())}–${Formato.hora(s.terminaEn)}',
+                '${Formato.diaHora(s.iniciaLocal)}–${Formato.hora(s.terminaLocal)}',
               ),
               Text(
                 [?s.sucursal, ?s.sala].join(' · '),
                 style: TextStyle(color: context.colores.textoSuave),
               ),
+              // El teléfono está en otra zona: es la hora de la sucursal.
+              if (s.etiquetaHora() case final etiqueta?)
+                Text(
+                  etiqueta,
+                  key: const Key('hora-de-la-sucursal'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.colores.textoSuave,
+                  ),
+                ),
               if (detalleSesion(s).isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),

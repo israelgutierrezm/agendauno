@@ -42,17 +42,41 @@ final misClasesProvider = FutureProvider.autoDispose<List<SesionAgenda>>((
   return sesiones.where((s) => s.programada).toList();
 });
 
-/// Lo de hoy y los próximos 6 días (para su Inicio).
-final proximasMisClasesProvider =
-    FutureProvider.autoDispose<List<SesionAgenda>>((ref) async {
-      final repo = ref.watch(agendaRepositoryProvider);
-      if (repo == null) {
-        return const [];
-      }
-      final hoy = Calendario.dia(DateTime.now());
-      final sesiones = await repo.sesiones(hoy, Calendario.mas(hoy, 6));
-      return sesiones.where((s) => s.programada).toList();
-    });
+/// Lo de hoy y los próximos 6 días (para su Inicio), en los días de la sucursal.
+final proximasMisClasesProvider = FutureProvider.autoDispose<List<SesionAgenda>>((
+  ref,
+) async {
+  final repo = ref.watch(agendaRepositoryProvider);
+  if (repo == null) {
+    return const [];
+  }
+  final ahora = DateTime.now();
+  final hoy = Calendario.dia(ahora);
+  // Un día más por lado: el «hoy» de la sucursal puede no ser el del teléfono.
+  final sesiones = await repo.sesiones(
+    Calendario.mas(hoy, -1),
+    Calendario.mas(hoy, 7),
+  );
+  return deLosProximosDias(sesiones.where((s) => s.programada).toList(), ahora);
+});
+
+/// Lo de los próximos [dias] días (hoy incluido), con el «hoy» de la sucursal de
+/// cada sesión: una clase de hoy en su sucursal cuenta aunque en el teléfono ya
+/// sea mañana, y una de ayer en la sucursal no, aunque en el teléfono sea hoy.
+List<SesionAgenda> deLosProximosDias(
+  List<SesionAgenda> sesiones,
+  DateTime ahora, {
+  int dias = 7,
+}) => [
+  for (final s in sesiones)
+    if (_enLosProximosDias(s, ahora, dias)) s,
+];
+
+bool _enLosProximosDias(SesionAgenda s, DateTime ahora, int dias) {
+  final hoy = s.hoyEnSucursal(ahora);
+  final dia = Calendario.dia(s.iniciaLocal);
+  return !dia.isBefore(hoy) && dia.isBefore(Calendario.mas(hoy, dias));
+}
 
 /// El clima de su Inicio (el de su próxima clase o cita en su sede); se vuelve a
 /// pedir con sus clases.
@@ -77,14 +101,14 @@ String cupoDe(SesionAgenda s) {
 }
 
 /// Lo que pinta su calendario: todo es suyo (resaltado); lo que tiene lista de
-/// espera, en ámbar.
+/// espera, en ámbar. En el día y la hora de la sucursal.
 List<EventoCal> eventosDeClases(List<SesionAgenda> sesiones) => [
   for (final s in sesiones)
     EventoCal(
       id: s.id,
       titulo: s.oferta ?? '—',
-      inicio: s.iniciaEn,
-      fin: s.terminaEn,
+      inicio: s.iniciaLocal,
+      fin: s.terminaLocal,
       detalle: [s.sucursal, s.sala].whereType<String>().join(' · '),
       estado: cupoDe(s),
       tono: s.enEspera > 0 ? TonoEvento.aviso : TonoEvento.suave,

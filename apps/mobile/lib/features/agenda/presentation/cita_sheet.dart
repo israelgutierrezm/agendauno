@@ -291,12 +291,22 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                         ),
                       ),
                       Text(
-                        '${_hhmm(s.iniciaEn)}–${_hhmm(s.terminaEn)} · ${s.oferta ?? '—'}',
+                        '${_hhmm(s.iniciaLocal)}–${_hhmm(s.terminaLocal)} · ${s.oferta ?? '—'}',
                         style: TextStyle(
                           color: context.colores.textoSuave,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      // El teléfono está en otra zona: es la hora de la sucursal.
+                      if (s.etiquetaHora() case final etiqueta?)
+                        Text(
+                          etiqueta,
+                          key: const Key('hora-de-la-sucursal'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.colores.textoSuave,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -380,7 +390,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     'La asistencia se registra desde las '
-                    '${_hhmm(s.asistenciaDesde!)}.',
+                    '${_hhmm(s.enSucursal(s.asistenciaDesde!))}.',
                     key: const Key('asistencia-abre'),
                     style: TextStyle(color: context.colores.textoSuave),
                   ),
@@ -508,7 +518,7 @@ class _DialogoCancelarState extends State<_DialogoCancelar> {
   @override
   Widget build(BuildContext context) {
     final cliente = widget.sesion.cita?.cliente;
-    final hora = _hhmm(widget.sesion.iniciaEn);
+    final hora = _hhmm(widget.sesion.iniciaLocal);
     return AlertDialog(
       title: const Text('Cancelar cita'),
       content: Column(
@@ -638,6 +648,12 @@ class _HistorialCitaState extends ConsumerState<_HistorialCita> {
                 child: Text('Aún no hay movimientos.'),
               );
             }
+            // Cuándo pasó, en la hora de la sucursal (como el resto de la hoja).
+            String cuando(DateTime fecha) {
+              final f = widget.sesion.enSucursal(fecha);
+              return '${f.day}/${f.month} ${_hhmm(f)}';
+            }
+
             return Column(
               children: [
                 for (final h in hechos)
@@ -648,7 +664,7 @@ class _HistorialCitaState extends ConsumerState<_HistorialCita> {
                     subtitle: Text(
                       [
                         h.detalleEn(widget.moneda, Formato.dinero),
-                        '${h.fecha.day}/${h.fecha.month} ${_hhmm(h.fecha)}'
+                        '${cuando(h.fecha)}'
                             '${h.actor != null ? ' · por ${h.actor}' : ''}',
                       ].whereType<String>().join('\n'),
                     ),

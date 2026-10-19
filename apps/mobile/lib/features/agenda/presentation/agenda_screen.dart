@@ -57,6 +57,15 @@ class AgendaScreen extends ConsumerWidget {
     final sesion = ref.watch(sesionProvider);
     final dia = ref.watch(fechaAgendaProvider);
     final estado = ref.watch(agendaProvider);
+    // Los días y las horas son los de la sucursal: «hoy» también, cuando ya se sabe
+    // su zona (por las sesiones del día).
+    final ahora = DateTime.now();
+    final hoy =
+        estado.value?.hoyEnSucursal(ahora) ??
+        DateTime(ahora.year, ahora.month, ahora.day);
+    final horaSucursal = etiquetaHoraSucursal(
+      estado.value?.sesiones ?? const [],
+    );
 
     return Scaffold(
       backgroundColor: context.colores.fondo,
@@ -82,9 +91,9 @@ class AgendaScreen extends ConsumerWidget {
         ),
         toolbarHeight: 72,
         actions: [
-          if (!_mismoDiaQue(dia, DateTime.now()))
+          if (!_mismoDiaQue(dia, hoy))
             TextButton(
-              onPressed: () => ref.read(fechaAgendaProvider.notifier).hoy(),
+              onPressed: () => ref.read(fechaAgendaProvider.notifier).hoy(hoy),
               child: const Text('Hoy'),
             ),
           IconButton(
@@ -97,7 +106,24 @@ class AgendaScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          _TiraSemana(dia: dia),
+          _TiraSemana(dia: dia, hoy: hoy),
+          // El teléfono está en otra zona: las horas son las de la sucursal.
+          if (horaSucursal != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  horaSucursal,
+                  key: const Key('hora-de-la-sucursal'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.colores.textoSuave,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child: estado.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -127,14 +153,16 @@ class AgendaScreen extends ConsumerWidget {
 /// Semana del día elegido; toca un día para verlo. Las flechas pasan a la semana
 /// anterior o a la siguiente («Hoy», arriba, regresa).
 class _TiraSemana extends ConsumerWidget {
-  const _TiraSemana({required this.dia});
+  const _TiraSemana({required this.dia, required this.hoy});
 
   final DateTime dia;
+
+  /// Hoy en la sucursal (o en el teléfono, si aún no se sabe su zona).
+  final DateTime hoy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lunes = dia.subtract(Duration(days: dia.weekday - 1));
-    final hoy = DateTime.now();
     final fecha = ref.read(fechaAgendaProvider.notifier);
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
@@ -390,36 +418,40 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
     super.dispose();
   }
 
+  /// El minuto del día en la sucursal (la escala es la de su hora).
+  static int _minuto(DateTime pared) => pared.hour * 60 + pared.minute;
+
   (int, int) get _rango {
     var ini = 8 * 60;
     var fin = 20 * 60;
     for (final s in widget.citas) {
-      ini = math.min(
-        ini,
-        (s.iniciaEn.hour * 60 + s.iniciaEn.minute) ~/ 60 * 60,
-      );
-      fin = math.max(
-        fin,
-        ((s.terminaEn.hour * 60 + s.terminaEn.minute) / 60).ceil() * 60,
-      );
+      ini = math.min(ini, _minuto(s.iniciaLocal) ~/ 60 * 60);
+      // Si termina al día siguiente (p. ej. 23:30–00:30), llega al final del día.
+      final termina = _mismoDia(s.iniciaLocal, s.terminaLocal)
+          ? _minuto(s.terminaLocal)
+          : 24 * 60;
+      fin = math.max(fin, (termina / 60).ceil() * 60);
     }
     return (ini, math.min(fin, 24 * 60));
   }
 
   double _y(int minuto) => (minuto - _rango.$1) / 60 * _pxHora;
 
+  /// «Ahora» en la hora de la sucursal (la de las citas del día).
+  DateTime get _ahora {
+    final ahora = DateTime.now();
+    return widget.citas.isEmpty ? ahora : widget.citas.first.enSucursal(ahora);
+  }
+
   void _enfocar() {
     if (!_scroll.hasClients) {
       return;
     }
-    final ahora = DateTime.now();
+    final ahora = _ahora;
     final destino = _mismoDia(ahora, widget.dia)
-        ? _y(ahora.hour * 60 + ahora.minute)
+        ? _y(_minuto(ahora))
         : (widget.citas.isNotEmpty
-              ? _y(
-                  widget.citas.first.iniciaEn.hour * 60 +
-                      widget.citas.first.iniciaEn.minute,
-                )
+              ? _y(_minuto(widget.citas.first.iniciaLocal))
               : 0);
     _scroll.jumpTo(
       math.max(0, math.min(destino - 120, _scroll.position.maxScrollExtent)),
@@ -433,8 +465,8 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
   Widget build(BuildContext context) {
     final (ini, fin) = _rango;
     final alto = (fin - ini) / 60 * _pxHora;
-    final ahora = DateTime.now();
-    final minutoAhora = ahora.hour * 60 + ahora.minute;
+    final ahora = _ahora;
+    final minutoAhora = _minuto(ahora);
     final sesion = ref.watch(sesionProvider);
     final verAhora =
         _mismoDia(ahora, widget.dia) &&
@@ -522,7 +554,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
     final estilo = estado != null
         ? estiloEstado(context.colores, estado)
         : null;
-    final top = _y(s.iniciaEn.hour * 60 + s.iniciaEn.minute) + 1;
+    final top = _y(_minuto(s.iniciaLocal)) + 1;
     final alto = math.max(28.0, s.duracionMin / 60 * _pxHora - 3);
     final tenue =
         !s.programada ||
@@ -532,7 +564,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
       TipoSesion.cita => (s.cita?.cliente ?? 'Sin cliente', s.oferta ?? '—'),
       TipoSesion.clase => (s.oferta ?? '—', cupoTexto(s)),
     };
-    final detalle = '${_hhmm(s.iniciaEn)}–${_hhmm(s.terminaEn)} · $que';
+    final detalle = '${_hhmm(s.iniciaLocal)}–${_hhmm(s.terminaLocal)} · $que';
 
     return Positioned(
       left: 58,
@@ -747,7 +779,7 @@ class _TarjetaClase extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _hhmm(s.iniciaEn),
+                        _hhmm(s.iniciaLocal),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,

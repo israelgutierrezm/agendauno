@@ -69,9 +69,13 @@ it('pasa de sin configurar a llaves guardadas y a activa sin comprobar; encender
 
 it('la comprueba un aviso de la plataforma o un check-in que aprobó, con la fecha de lo último', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    // Configurada hace unos días (lo que llegue después la comprueba; R13).
+    $ahora = Carbon::now();
+    $this->travelTo($ahora->copy()->subDays(3));
     $this->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub", [
         'activa' => true, 'credenciales' => ['api_key' => 'wh_token', 'gym_id' => '445566'],
     ], conBearer($e['bearer']))->assertOk();
+    $this->travelTo($ahora);
 
     // Lo que no es de Wellhub o no lo aprobó Wellhub no la comprueba.
     enNegocioDeBienestar($e, function (): void {
@@ -118,4 +122,38 @@ it('la comprueba un aviso de la plataforma o un check-in que aprobó, con la fec
         ->assertOk()
         ->assertJsonPath('data.estado_conexion', 'credenciales')
         ->assertJsonPath('data.comprobada_en', null);
+});
+
+it('con otras llaves deja de estar comprobada; lo anterior queda como historial (R13)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $url = "/api/v1/app/{$e['slug']}/integraciones/wellhub";
+    $ahora = Carbon::now();
+    $this->travelTo($ahora->copy()->subDay());
+    $this->putJson($url, ['activa' => true, 'credenciales' => ['api_key' => 'wh_token', 'gym_id' => '445566']], conBearer($e['bearer']))->assertOk();
+    $this->travelTo($ahora);
+    enNegocioDeBienestar($e, function (): void {
+        CheckinTenant::query()->create([
+            'proveedor' => 'wellhub', 'referencia_externa' => 'wh-antes', 'estado' => CheckinTenant::VALIDADO, 'registrado_en' => now(),
+        ]);
+    });
+    expect(conexionBienestarDe($e, 'wellhub')['estado_conexion'])->toBe('comprobada');
+
+    // Otro gimnasio: lo que validó antes no prueba la conexión de ahora.
+    $this->travel(1)->minutes();
+    $this->putJson($url, ['activa' => true, 'credenciales' => ['gym_id' => '999999']], conBearer($e['bearer']))->assertOk();
+    $conexion = conexionBienestarDe($e, 'wellhub');
+    expect($conexion['estado_conexion'])->toBe('activa_sin_comprobar')
+        ->and($conexion['comprobada_en'])->toBeNull()
+        ->and($conexion['ultimo_exito_anterior_en'])->not->toBeNull();
+
+    // Un check-in validado con las llaves nuevas la comprueba otra vez.
+    $this->travel(1)->minutes();
+    enNegocioDeBienestar($e, function (): void {
+        CheckinTenant::query()->create([
+            'proveedor' => 'wellhub', 'referencia_externa' => 'wh-despues', 'estado' => CheckinTenant::VALIDADO, 'registrado_en' => now(),
+        ]);
+    });
+    expect(conexionBienestarDe($e, 'wellhub'))
+        ->estado_conexion->toBe('comprobada')
+        ->ultimo_exito_anterior_en->toBeNull();
 });

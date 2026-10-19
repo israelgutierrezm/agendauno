@@ -91,6 +91,10 @@ class IntegracionesTenantController
             $cambiadas = array_keys(array_filter($nuevas, static fn (string $valor, string $nombre): bool => ($actuales[$nombre] ?? null) !== $valor, ARRAY_FILTER_USE_BOTH));
             $config->credenciales = array_merge($actuales, $nuevas);
         }
+        // Otras llaves (u otra cuenta): la comprobación anterior ya no es de esta (R13).
+        if ($cambiadas !== [] || ! $config->exists) {
+            $config->configurada_en = now();
+        }
         if ($config->activa) {
             $this->exigirLlaves($proveedor, $config);
         }
@@ -142,7 +146,10 @@ class IntegracionesTenantController
         $llaves = $config instanceof IntegracionTenant ? $config->llaves() : [];
         $token = $config instanceof IntegracionTenant ? (string) $config->token_webhook : '';
         $activa = $config instanceof IntegracionTenant && $config->activa;
-        $evidencia = $llaves !== [] && $activa ? $this->evidencia($proveedor) : null;
+        $ultima = $llaves !== [] && $activa ? $this->evidencia($proveedor) : null;
+        // Solo cuenta la que llegó con sus llaves de ahora (R13); la anterior es historial.
+        $desde = $config?->configurada_en;
+        $evidencia = $ultima !== null && ($desde === null || CarbonImmutable::parse($ultima['en'])->greaterThanOrEqualTo($desde)) ? $ultima : null;
 
         return [
             'proveedor' => $proveedor->value,
@@ -157,6 +164,8 @@ class IntegracionesTenantController
             // Lo último que llegó de la plataforma y qué fue (`checkin` o `aviso`).
             'comprobada_en' => $evidencia['en'] ?? null,
             'comprobada_por' => $evidencia['por'] ?? null,
+            // Lo último que llegó con llaves anteriores (solo historial).
+            'ultimo_exito_anterior_en' => $evidencia === null ? ($ultima['en'] ?? null) : null,
             // Las que pide el proveedor y las que ya se capturaron.
             'llaves' => $proveedor->credenciales(),
             'llaves_configuradas' => array_keys($llaves),

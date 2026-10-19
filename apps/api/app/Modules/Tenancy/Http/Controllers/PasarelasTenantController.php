@@ -72,8 +72,12 @@ class PasarelasTenantController
         $llaves = $config instanceof ConfiguracionPasarelaTenant ? array_keys($config->llaves()) : [];
         $lista = $this->registro->activa($proveedor);
         // La prueba de que la conexión funciona: un pago que el proveedor aprobó (no
-        // basta con guardar llaves ni con activarla).
-        $comprobada = $enLinea ? PagoTenant::query()->where('proveedor', $proveedor)->whereNotNull('aprobado_en')->max('aprobado_en') : null;
+        // basta con guardar llaves ni con activarla), con la configuración vigente (R13):
+        // uno anterior a cambiar sus llaves o su modo es historial, no prueba.
+        $aprobado = $enLinea ? PagoTenant::query()->where('proveedor', $proveedor)->whereNotNull('aprobado_en')->max('aprobado_en') : null;
+        $ultimo = is_string($aprobado) && $aprobado !== '' ? CarbonImmutable::parse($aprobado) : null;
+        $desde = $config?->configurada_en;
+        $vigente = $ultimo !== null && ($desde === null || $ultimo->greaterThanOrEqualTo($desde));
 
         return [
             'proveedor' => $proveedor,
@@ -83,10 +87,12 @@ class PasarelasTenantController
                 ! $enLinea => null,
                 $llaves === [] => 'sin_configurar',
                 ! $lista => 'credenciales',
-                $comprobada === null => 'activa_sin_comprobar',
+                ! $vigente => 'activa_sin_comprobar',
                 default => 'comprobada',
             },
-            'comprobada_en' => $comprobada !== null ? CarbonImmutable::parse((string) $comprobada)->toIso8601String() : null,
+            'comprobada_en' => $vigente ? $ultimo->toIso8601String() : null,
+            // El último pago aprobado con una configuración anterior (solo historial).
+            'ultimo_exito_anterior_en' => $vigente ? null : $ultimo?->toIso8601String(),
             'activa' => $config instanceof ConfiguracionPasarelaTenant ? $config->activa : false,
             'modo' => $config instanceof ConfiguracionPasarelaTenant ? $config->modo : 'test',
             'llaves_configuradas' => $config instanceof ConfiguracionPasarelaTenant
@@ -142,6 +148,8 @@ class PasarelasTenantController
             ? ['proveedor' => $proveedor, 'activa' => $config->activa, 'modo' => $config->modo, 'llaves_configuradas' => array_keys($config->llaves())]
             : null;
         $config->activa = (bool) $validado['activa'];
+        // Otro modo (pruebas ↔ real) es otra conexión: se vuelve a comprobar (R13).
+        $cambio = $config->exists && $config->modo !== (string) $validado['modo'];
         $config->modo = (string) $validado['modo'];
 
         // Merge: solo actualiza las llaves provistas con valor; conserva las demas.
@@ -153,7 +161,13 @@ class PasarelasTenantController
                     $nuevas[(string) $nombre] = $valor;
                 }
             }
-            $config->credenciales = array_merge($config->llaves(), $nuevas);
+            $actuales = $config->llaves();
+            $cambio = $cambio || array_filter($nuevas, static fn (string $valor, string $nombre): bool => ($actuales[$nombre] ?? null) !== $valor, ARRAY_FILTER_USE_BOTH) !== [];
+            $config->credenciales = array_merge($actuales, $nuevas);
+        }
+        // Otras llaves u otro modo: la comprobación anterior ya no es de esta conexión.
+        if ($cambio || ! $config->exists) {
+            $config->configurada_en = now();
         }
 
         // Encendida sin las llaves con que cobra, el cliente vería «pagar en línea» y

@@ -47,7 +47,9 @@ class InscribirEnGrupoTenant
      */
     public function inscribir(GrupoTenant $grupo, PersonaTenant $persona, ?string $desde = null): array
     {
-        $inscripcion = DB::connection('tenant')->transaction(function () use ($grupo, $persona): InscripcionGrupoTenant {
+        // Su vigencia empieza ese día (R03): las fechas anteriores del grupo no son suyas.
+        $alta = $desde !== null && $desde > $this->fechas->hoy() ? $desde : $this->fechas->hoy();
+        $inscripcion = DB::connection('tenant')->transaction(function () use ($grupo, $persona, $alta): InscripcionGrupoTenant {
             // Bajo candado del grupo: no se inscribe en uno que se está cerrando.
             $bloqueado = GrupoTenant::query()->whereKey($grupo->getKey())->lockForUpdate()->firstOrFail();
             if (! $bloqueado->activo) {
@@ -58,7 +60,7 @@ class InscribirEnGrupoTenant
                 'persona_id' => $persona->getKey(),
             ]);
             // Volver a inscribir a quien se dio de baja la reactiva.
-            $inscripcion->fill(['activo' => true, 'baja_desde' => null, 'baja_en' => null])->save();
+            $inscripcion->fill(['activo' => true, 'alta_desde' => $alta, 'baja_desde' => null, 'baja_en' => null])->save();
 
             return $inscripcion;
         });

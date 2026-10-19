@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\InscribirEnGrupoTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -16,8 +17,10 @@ use App\Modules\Tenancy\Models\SesionTenant;
 /**
  * Las fechas que la agenda genera DESPUÉS de inscribir (la ventana que avanza cada
  * día, días nuevos de la serie) también son de los inscritos: al publicarse
- * `agenda.sesiones_generadas`, reserva a cada inscrito vigente de cada grupo abierto de
- * esa serie, con el mismo motor y los mismos motivos que al inscribir.
+ * `agenda.sesiones_generadas`, reserva a cada inscrito de esa serie en las fechas que
+ * caen en su vigencia (R03: desde su alta y hasta antes de su baja), con el mismo motor
+ * y los mismos motivos que al inscribir. Una baja o un cierre con fecha futura no quita
+ * las fechas anteriores a esa fecha.
  *
  * Idempotente (el relay es at-least-once): quien ya tuvo una reserva en esa fecha, aun
  * cancelada, no se vuelve a reservar. Lo que no se pudo reservar queda en la bitácora
@@ -51,22 +54,27 @@ class ReservarInscritosEnFechasNuevas
             return;
         }
         $serie = $sesiones->first()->serie_id;
+        $fechas = app(FechasNegocioTenant::class);
+        $primerDia = $fechas->fecha($sesiones->first()->inicia_en);
 
+        // También un grupo cerrado con fecha futura: sus inscritos siguen hasta ese día.
         GrupoTenant::query()
             ->where('plantilla_id', $serie)
-            ->where('activo', true)
             ->orderBy('id')
             ->get()
-            ->each(function (GrupoTenant $grupo) use ($sesiones): void {
+            ->each(function (GrupoTenant $grupo) use ($sesiones, $fechas, $primerDia): void {
                 $cuenta = [InscribirEnGrupoTenant::RESERVADA => 0, InscribirEnGrupoTenant::EN_ESPERA => 0, InscribirEnGrupoTenant::NO_RESERVADA => 0];
                 $sinReservar = [];
-                $grupo->inscripciones()->where('activo', true)->with('persona')->orderBy('id')->get()
-                    ->each(function (InscripcionGrupoTenant $inscripcion) use ($sesiones, &$cuenta, &$sinReservar): void {
+                $grupo->inscripciones()->vigentesDesde($primerDia)->with('persona')->orderBy('id')->get()
+                    ->each(function (InscripcionGrupoTenant $inscripcion) use ($sesiones, $fechas, &$cuenta, &$sinReservar): void {
                         $persona = $inscripcion->persona;
                         if ($persona === null) {
                             return;
                         }
                         foreach ($sesiones as $sesion) {
+                            if (! $inscripcion->vigenteEn($sesion->inicia_en, $fechas)) {
+                                continue;
+                            }
                             $tuvo = ReservaTenant::query()
                                 ->where('sesion_id', $sesion->getKey())
                                 ->where('persona_id', $persona->getKey())

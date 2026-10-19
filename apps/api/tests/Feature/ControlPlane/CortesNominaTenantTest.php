@@ -106,11 +106,18 @@ it('lo pagado no se reabre: lo que cambie después se ajusta aparte y se ve la d
     $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $datos['coach'], 'monto_minor' => 20000, 'motivo' => 'Clase del 3 registrada tarde'], conBearer($e['bearer']))
         ->assertCreated();
 
-    $this->getJson("{$url}/{$corte}", conBearer($e['bearer']))->assertOk()
+    $ajustado = $this->getJson("{$url}/{$corte}", conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('data.total_minor', 40000)
         ->assertJsonPath('data.ajustes_minor', 20000)
         ->assertJsonPath('data.total_con_ajustes_minor', 60000)
-        ->assertJsonPath('data.ajustes.0.motivo', 'Clase del 3 registrada tarde');
+        ->assertJsonPath('data.ajustes.0.motivo', 'Clase del 3 registrada tarde')
+        ->json('data');
+    // Ya ajustada, la diferencia no sigue pidiendo compensarse (R09): lo que falta es 0 y
+    // la diferencia contra el corte original queda aparte.
+    expect($ajustado['diferencias'][0])->toMatchArray([
+        'en_corte_minor' => 40000, 'ajustes_minor' => 20000, 'reconocido_minor' => 60000,
+        'hoy_minor' => 60000, 'diferencia_minor' => 0, 'diferencia_original_minor' => 20000,
+    ]);
 
     $descripciones = collect($this->getJson("/api/v1/app/{$e['slug']}/auditorias?categoria=equipo", conBearer($e['bearer']))->json('data'))->pluck('descripcion');
     expect($descripciones)->toContain('Cerró la nómina del 2026-10-01 al 2026-10-04')

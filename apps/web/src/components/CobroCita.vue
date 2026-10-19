@@ -5,7 +5,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import type { SesionAgenda } from "@/lib/agenda";
-import { api } from "@/lib/api";
+import { api, mensajeDeError } from "@/lib/api";
 import { useEditorFormulario } from "@/lib/editorFormulario";
 import { aMinor, dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -22,6 +22,8 @@ interface Articulo {
   precio_minor: number;
   activo: boolean;
   stock_total: number;
+  // Su stock por sucursal (las que ve quien cobra).
+  existencias?: { sucursal_id: string | null; stock: number }[];
 }
 interface Linea {
   articulo: Articulo;
@@ -34,7 +36,10 @@ interface Resultado {
   total_minor: number;
   recibido_minor: number | null;
   cambio_minor: number | null;
+  // El comprobante de todo cobro y cómo va su envío (R06), aparte del cobro.
+  venta_id?: string | null;
   ticket: { folio: string } | null;
+  ticket_envio?: "enviado" | "fallido" | null;
 }
 
 const props = defineProps<{
@@ -116,11 +121,18 @@ const falta = computed(() =>
     ? -cambio.value
     : 0,
 );
+// Lo que hay en la sucursal de la cita (R07): el stock de otra sede no se puede vender
+// aquí. Sin el dato (versión anterior del API), el total.
+function stockAqui(a: Articulo): number {
+  const sede = props.sesion?.sucursal_id;
+  if (!sede || a.existencias === undefined) return a.stock_total;
+  return a.existencias.find((e) => e.sucursal_id === sede)?.stock ?? 0;
+}
 const disponibles = computed(() =>
   articulos.value.filter(
     (a) =>
       a.activo &&
-      a.stock_total > 0 &&
+      stockAqui(a) > 0 &&
       !lineas.value.some((l) => l.articulo.id === a.id),
   ),
 );
@@ -193,6 +205,29 @@ async function cobrar(): Promise<void> {
   if (respuesta !== undefined) {
     resultado.value = respuesta.data.data;
     emit("cobrada");
+  } else {
+    // Pudo cambiar el stock mientras cobraba: se vuelve a leer el de la sucursal.
+    void cargarArticulos();
+  }
+}
+
+// Reenviar el ticket si el correo falló: solo el correo, el cobro ya quedó (R06).
+const reenviando = ref(false);
+const errorReenvio = ref<string | null>(null);
+async function reenviarTicket(): Promise<void> {
+  const r = resultado.value;
+  if (r?.venta_id == null) return;
+  reenviando.value = true;
+  errorReenvio.value = null;
+  try {
+    const { data } = await api.post<{
+      data: { ticket_envio: "enviado" | "fallido" };
+    }>(`${props.base}/pos/ventas/${r.venta_id}/ticket`);
+    r.ticket_envio = data.data.ticket_envio;
+  } catch (e) {
+    errorReenvio.value = mensajeDeError(e);
+  } finally {
+    reenviando.value = false;
   }
 }
 
@@ -247,6 +282,32 @@ async function cerrar(): Promise<void> {
       <p v-if="resultado.ticket" class="cc-suave">
         {{ $t("cobroCita.folio", { folio: resultado.ticket.folio }) }}
       </p>
+      <!-- El envío del ticket va aparte del cobro: si falla, el cobro ya quedó. -->
+      <p
+        v-if="resultado.ticket_envio === 'enviado'"
+        class="cc-suave"
+        data-prueba="ticket-enviado"
+      >
+        {{ $t("cobroCita.ticketEnviado") }}
+      </p>
+      <AvisoTono
+        v-else-if="resultado.ticket_envio === 'fallido'"
+        tono="aviso"
+        data-prueba="ticket-fallido"
+      >
+        {{ errorReenvio ?? $t("cobroCita.ticketFallido") }}
+        <template #acciones>
+          <button
+            type="button"
+            class="tu-btn tu-btn-contorno text-sm"
+            :disabled="reenviando"
+            data-prueba="reenviar-ticket"
+            @click="reenviarTicket"
+          >
+            {{ $t("cobroCita.reenviarTicket") }}
+          </button>
+        </template>
+      </AvisoTono>
       <div class="flex justify-end">
         <button type="button" class="tu-btn tu-btn-primario" @click="cerrar">
           {{ $t("cobroCita.listo") }}
@@ -279,7 +340,7 @@ async function cerrar(): Promise<void> {
               class="tu-input w-16"
               type="number"
               min="1"
-              :max="l.articulo.stock_total"
+              :max="stockAqui(l.articulo)"
               :aria-label="
                 $t('cobroCita.cantidad', { nombre: l.articulo.nombre })
               "
@@ -329,7 +390,8 @@ async function cerrar(): Promise<void> {
               }}
             </option>
             <option v-for="a in disponibles" :key="a.id" :value="a.id">
-              {{ a.nombre }} · {{ dinero(a.precio_minor) }}
+              {{ a.nombre }} · {{ dinero(a.precio_minor) }} ·
+              {{ $t("cobroCita.enEstaSucursal", { n: stockAqui(a) }) }}
             </option>
           </select>
           <button

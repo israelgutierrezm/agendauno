@@ -29,7 +29,7 @@ enum MotivoSeguimiento: string
             self::PlanPorVencer => 'Plan por vencer',
             self::PlanVencido => 'Plan vencido',
             self::SinAsistir => 'Sin asistir',
-            self::CompraSinReservar => $citas ? 'Compró y no ha agendado' : 'Compró y no ha reservado',
+            self::CompraSinReservar => $citas ? 'Compró y no ha iniciado (sin cita)' : 'Compró y no ha iniciado (sin reservar)',
             self::SaldoPorVencer => $citas ? 'Paquete por vencer con citas sin usar' : 'Paquete por vencer con clases sin usar',
             self::VinoSinComprar => 'Vino y no ha comprado',
             self::PagoFallido => 'Su pago falló',

@@ -148,3 +148,47 @@ it('solo en negocios de citas y con permiso de agenda', function (): void {
     $this->get("/api/v1/app/{$ctx['e']['slug']}/importaciones/citas/catalogos", conBearer($ctx['e']['bearer']))
         ->assertOk()->assertJsonPath('data.servicio.0.nombre', 'Nivel 1');
 });
+
+it('importar: reconoce al cliente por su número, distingue duplicado, ambiguo y cambio, y dice lo que queda por cobrar (R14)', function (): void {
+    $ctx = barberiaParaImportarCitas();
+    $e = $ctx['e'];
+    $url = "/api/v1/app/{$e['slug']}/importaciones/citas";
+    $csv = fn (array $filas): UploadedFile => UploadedFile::fake()->createWithContent('citas.csv',
+        "referencia,cliente,cliente_ref,email,celular,servicio,profesional,sucursal,fecha,hora,pagado\n".implode("\n", $filas)."\n");
+
+    // Sin correo, celular ni número de cliente no se importa: se duplicaría su ficha.
+    $sinDatos = $this->post("{$url}/preview", ['archivo' => $csv(['R0,Sin Datos,,,,Nivel 1,Personal,Roma Norte,2026-10-05,09:00,'])], conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect($sinDatos['filas'][0]['errores'][0])->toContain('Sin correo, celular ni número de cliente');
+
+    // Eva no tiene contacto, pero sí su número del otro sistema: una sola ficha. Lo ya
+    // pagado allá se descuenta de lo que queda por cobrar (sin registrarlo como ingreso).
+    $filas = [
+        'R1,Eva Paz,C-77,,,Nivel 1,Personal,Roma Norte,2026-10-05,10:00,250',
+        'R2,Eva Paz,C-77,,,Nivel 1,Personal,Roma Norte,2026-10-06,10:00,100',
+        'R3,Fer Gil,C-88,fer@correo.mx,,Nivel 1,Personal,Roma Norte,2026-10-07,10:00,',
+    ];
+    $previa = $this->post("{$url}/preview", ['archivo' => $csv($filas)], conBearer($e['bearer']))->assertOk()->json('data');
+    expect($previa['ok'])->toBeTrue()
+        ->and($previa['resumen'])->toMatchArray(['clientes_nuevos' => 2, 'por_cobrar' => 2, 'por_cobrar_minor' => 40000, 'pagadas_antes' => 1])
+        ->and($previa['filas'][0]['avisos'])->toContain('Pagada en el sistema anterior: no queda por cobrar (no se registra como ingreso).');
+    $this->post($url, ['archivo' => $csv($filas), 'confirmacion' => $previa['confirmacion']], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.creados', 3);
+    expect(collect(reservasImportadas($e))->pluck('persona_id')->unique())->toHaveCount(2);
+
+    // Reimportar lo mismo: duplicado idéntico, no se duplica.
+    $otra = $this->post("{$url}/preview", ['archivo' => $csv($filas)], conBearer($e['bearer']))->assertOk()->json('data');
+    expect($otra['resumen']['omitidas'])->toBe(3);
+
+    // La misma cita (su referencia) con otra hora: es un cambio que se decide en la agenda.
+    $cambio = $this->post("{$url}/preview", ['archivo' => $csv(['R1,Eva Paz,C-77,,,Nivel 1,Personal,Roma Norte,2026-10-05,12:00,'])], conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect($cambio['filas'][0]['errores'][0])->toContain('ya está agendada con otros datos');
+
+    // Correo de una ficha y celular de otra: dato ambiguo.
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Gil', 'email' => 'gil@correo.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Hugo', 'celular' => '5512345678', 'tipo' => 'miembro'], conBearer($e['bearer']))->assertCreated();
+    $ambiguo = $this->post("{$url}/preview", ['archivo' => $csv(['R9,Gil,,gil@correo.mx,5512345678,Nivel 1,Personal,Roma Norte,2026-10-08,10:00,'])], conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect($ambiguo['filas'][0]['errores'][0])->toContain('son de fichas distintas');
+});

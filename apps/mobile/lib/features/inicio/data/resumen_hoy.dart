@@ -127,6 +127,7 @@ class SesionHoy {
     required this.id,
     required this.tipo,
     required this.iniciaEn,
+    DateTime? iniciaLocal,
     required this.esperados,
     required this.sinMarcar,
     required this.momento,
@@ -134,13 +135,18 @@ class SesionHoy {
     this.instructor,
     this.sucursal,
     this.cliente,
-  });
+  }) : iniciaLocal = iniciaLocal ?? iniciaEn;
 
   factory SesionHoy.desdeJson(Map<String, dynamic> j) => SesionHoy(
     id: (j['id'] ?? '') as String,
     // Uno desconocido es un error (no se supone clase).
     tipo: TipoSesion.desde(j['tipo']),
     iniciaEn: DateTime.parse(j['inicia_en'] as String).toLocal(),
+    // La hora de la sucursal (sin zona): la que se muestra, aunque el teléfono esté en
+    // otra. Sin el dato (API anterior), la del teléfono.
+    iniciaLocal: j['inicia_local'] is String
+        ? DateTime.tryParse(j['inicia_local'] as String)
+        : null,
     esperados: (j['esperados'] as num? ?? 0).toInt(),
     sinMarcar: (j['sin_marcar'] as num? ?? 0).toInt(),
     momento: (j['momento'] ?? 'proxima') as String,
@@ -153,6 +159,9 @@ class SesionHoy {
   final String id;
   final TipoSesion tipo;
   final DateTime iniciaEn;
+
+  /// La hora de la sucursal, para mostrarla.
+  final DateTime iniciaLocal;
   final int esperados;
   final int sinMarcar;
 

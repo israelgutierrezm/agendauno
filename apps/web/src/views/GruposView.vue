@@ -40,7 +40,8 @@ interface Inscripcion {
   persona: string | null;
   persona_id?: string | null;
   activo: boolean;
-  // Día del negocio desde el que ya no viene.
+  // Su vigencia (R03): desde qué día cuenta y desde cuál ya no viene.
+  alta_desde?: string | null;
   baja_desde?: string | null;
 }
 // Cómo quedó cada fecha al inscribir: reservada, en espera o sin reservar y por qué.
@@ -355,7 +356,62 @@ const nombreDestino = computed(
 function abrirSalida(i: Inscripcion): void {
   salida.value = { inscripcion: i, desde: hoy.value, destino: "" };
   errorSalida.value = null;
+  previa.value = null;
+  aceptaParcial.value = false;
 }
+
+// Antes de cambiar de grupo (R08): lo que pasaría, fecha por fecha (la misma
+// operación, deshecha). Si alguna fecha no se puede reservar, se confirma aparte.
+interface VistaPreviaCambio {
+  baja: ResultadoBaja;
+  alta: ResultadoInscripcion;
+  completo: boolean;
+}
+const previa = ref<VistaPreviaCambio | null>(null);
+const cargandoPrevia = ref(false);
+const aceptaParcial = ref(false);
+let consultaPrevia = 0;
+async function cargarPrevia(): Promise<void> {
+  const s = salida.value;
+  const g = seleccionado.value;
+  previa.value = null;
+  aceptaParcial.value = false;
+  if (s === null || g === null || s.destino === "" || s.desde === "") return;
+  const actual = ++consultaPrevia;
+  cargandoPrevia.value = true;
+  try {
+    const { data } = await api.get<{ data: VistaPreviaCambio }>(
+      `${base.value}/grupos/${g.id}/inscripciones/${s.inscripcion.id}/cambio`,
+      { params: { grupo_id: s.destino, desde: s.desde } },
+    );
+    if (actual === consultaPrevia) previa.value = data.data;
+  } catch (e) {
+    if (actual === consultaPrevia) errorSalida.value = mensajeDeError(e);
+  } finally {
+    if (actual === consultaPrevia) cargandoPrevia.value = false;
+  }
+}
+watch(
+  () => [salida.value?.destino, salida.value?.desde],
+  () => void cargarPrevia(),
+);
+const sinReservarEnDestino = computed(() =>
+  (previa.value?.alta.sesiones ?? []).filter(
+    (f) => f.estado === "no_reservada",
+  ),
+);
+const fechasConProblema = computed(
+  () =>
+    sinReservarEnDestino.value.length +
+    (previa.value?.baja.no_canceladas.length ?? 0),
+);
+const faltaConfirmarParcial = computed(
+  () =>
+    salida.value?.destino !== "" &&
+    previa.value !== null &&
+    !previa.value.completo &&
+    !aceptaParcial.value,
+);
 function avisarNoCanceladas(b: ResultadoBaja): void {
   const n = b.no_canceladas.length;
   if (n > 0) toast.error(t("cursos.noCanceladas", { n }, n));
@@ -372,7 +428,11 @@ async function confirmarSalida(): Promise<void> {
       const destino = nombreDestino.value;
       const { data } = await api.post<{ meta: { baja: ResultadoBaja } }>(
         `${base.value}/grupos/${g.id}/inscripciones/${s.inscripcion.id}/cambiar`,
-        { grupo_id: s.destino, desde: s.desde },
+        {
+          grupo_id: s.destino,
+          desde: s.desde,
+          ...(aceptaParcial.value ? { parcial: true } : {}),
+        },
       );
       toast.exito(t("cursos.cambiado", { persona, grupo: destino }));
       avisarNoCanceladas(data.meta.baja);
@@ -391,6 +451,8 @@ async function confirmarSalida(): Promise<void> {
     await recargarElegido();
   } catch (e) {
     errorSalida.value = mensajeDeError(e);
+    // Cambió algo desde la vista previa (otro inscrito, otro saldo): se vuelve a ver.
+    if (s.destino !== "") void cargarPrevia();
   } finally {
     saliendo.value = false;
   }
@@ -754,6 +816,15 @@ const indicadores = computed<Indicador[]>(() => {
                         : $t("cursos.inscritoBaja")
                     }}</span
                   >
+                  <span
+                    v-else-if="i.alta_desde && i.alta_desde > hoy"
+                    class="text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    data-prueba="alta-futura"
+                    >{{
+                      $t("cursos.empiezaEl", { fecha: dia(i.alta_desde) })
+                    }}</span
+                  >
                   <button
                     v-else-if="puedeGestionar && seleccionado.activo"
                     type="button"
@@ -912,6 +983,65 @@ const indicadores = computed<Indicador[]>(() => {
               : $t("cursos.salidaAyuda")
           }}
         </p>
+        <!-- Lo que pasaría con el cambio, antes de hacerlo (R08). -->
+        <div
+          v-if="salida.destino"
+          class="mt-3 text-sm"
+          aria-live="polite"
+          data-prueba="vista-previa-cambio"
+        >
+          <p v-if="cargandoPrevia" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("cursos.previa.calculando") }}
+          </p>
+          <template v-else-if="previa">
+            <p>
+              {{
+                $t("cursos.previa.resumen", {
+                  canceladas: previa.baja.canceladas,
+                  grupo: nombreDestino,
+                  reservadas: previa.alta.reservadas,
+                  espera: previa.alta.en_espera,
+                })
+              }}
+            </p>
+            <AvisoTono
+              v-if="!previa.completo"
+              tono="aviso"
+              class="mt-2"
+              data-prueba="cambio-parcial"
+            >
+              <p>
+                {{
+                  $t(
+                    "cursos.previa.parcial",
+                    { n: fechasConProblema },
+                    fechasConProblema,
+                  )
+                }}
+              </p>
+              <ul class="mt-1 list-disc pl-5">
+                <li v-for="f in sinReservarEnDestino" :key="f.sesion_id">
+                  {{ dia(f.inicia_en) }} · {{ f.motivo }}
+                </li>
+                <li
+                  v-for="f in previa.baja.no_canceladas"
+                  :key="`baja-${f.inicia_en}`"
+                >
+                  {{ dia(f.inicia_en) }} · {{ f.motivo }}
+                </li>
+              </ul>
+              <label class="mt-2 flex items-start gap-2">
+                <input
+                  v-model="aceptaParcial"
+                  type="checkbox"
+                  class="mt-1"
+                  data-prueba="aceptar-parcial"
+                />
+                {{ $t("cursos.previa.aceptarParcial") }}
+              </label>
+            </AvisoTono>
+          </template>
+        </div>
       </template>
       <template #pie>
         <button
@@ -925,7 +1055,12 @@ const indicadores = computed<Indicador[]>(() => {
         <button
           type="button"
           class="tu-btn tu-btn-primario"
-          :disabled="saliendo || !salida?.desde"
+          :disabled="
+            saliendo ||
+            !salida?.desde ||
+            (salida?.destino !== '' &&
+              (cargandoPrevia || faltaConfirmarParcial))
+          "
           data-prueba="confirmar-salida"
           @click="confirmarSalida"
         >

@@ -436,6 +436,7 @@ export default {
     // El embudo del negocio (plan de mejoras C08): cantidad y denominador.
     embudo: {
       titulo: "Del interés a la renovación",
+      tituloCitas: "Del interés a la siguiente visita",
       subtitulo:
         "Cada paso con su cantidad y de cuántos sale. Las visitas a tu página se cuentan una por persona al día, sin guardar quién.",
       minutos: "{n} min",
@@ -467,6 +468,39 @@ export default {
           cifra: "{n} de {de}",
           ayuda: "Renovaciones que tocaron en el periodo y se pagaron.",
           ayudaCitas: "Renovaciones que tocaron en el periodo y se pagaron.",
+        },
+        // Negocio de citas (R11).
+        confirmadas: {
+          titulo: "Agendadas → confirmadas",
+          cifra: "{n} de {de}",
+          ayuda:
+            "Citas agendadas en el periodo que quedaron confirmadas (no se vencieron sin pagar).",
+          ayudaCitas:
+            "Citas agendadas en el periodo que quedaron confirmadas (no se vencieron sin pagar).",
+        },
+        asistenciaCita: {
+          titulo: "Cita → asistencia",
+          cifra: "{n} de {de}",
+          ayuda:
+            "Citas del periodo que ya pasaron (sin las canceladas) en las que llegó el cliente.",
+          ayudaCitas:
+            "Citas del periodo que ya pasaron (sin las canceladas) en las que llegó el cliente.",
+        },
+        cobro: {
+          titulo: "Asistencia → cobro",
+          cifra: "{n} de {de}",
+          ayuda:
+            "De las citas atendidas, las que ya están cobradas (las de bono no deben nada).",
+          ayudaCitas:
+            "De las citas atendidas, las que ya están cobradas (las de bono no deben nada).",
+        },
+        siguiente: {
+          titulo: "Siguiente visita",
+          cifra: "{n} de {de}",
+          ayuda:
+            "Clientes atendidos en el periodo que ya tienen otra cita después.",
+          ayudaCitas:
+            "Clientes atendidos en el periodo que ya tienen otra cita después.",
         },
       },
       // Lo que no pasa por una visita medida: aparte, sin porcentaje.

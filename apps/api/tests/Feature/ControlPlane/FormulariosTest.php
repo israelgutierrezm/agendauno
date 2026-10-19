@@ -108,3 +108,44 @@ it('el alumno ve sus formularios y responde los suyos, pero no los de otra perso
         ->assertOk()
         ->assertJsonPath('data.formularios.0.campos.0.valor', 'Ninguna');
 });
+
+it('las respuestas de una ficha solo se ven de quien se puede abrir el expediente (R02)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $dueno = conBearer($e['bearer']);
+    $roma = agendaSemilla($e)['sucursal'];
+    $polanco = agendaSemilla($e)['sucursal'];
+    $ana = crearMiembroEnSucursal($e, 'Ana', $roma);
+    $beto = crearMiembroEnSucursal($e, 'Beto', $polanco);
+    $form = (string) $this->postJson("{$app}/formularios", ['nombre' => 'Ficha de salud'], $dueno)->assertCreated()->json('data.id');
+    $campo = (string) $this->postJson("{$app}/formularios/{$form}/campos", [
+        'etiqueta' => 'Alergias', 'tipo' => 'texto', 'obligatorio' => true,
+    ], $dueno)->assertCreated()->json('data.id');
+    foreach ([$ana, $beto] as $persona) {
+        $this->postJson("{$app}/formularios/{$form}/respuestas", ['persona_id' => $persona, 'valores' => [$campo => 'Ninguna']], $dueno)
+            ->assertCreated();
+    }
+
+    // Alguien de Roma que diseña fichas y ve miembros: el expediente de Beto (Polanco)
+    // está prohibido, y sus respuestas tampoco salen en la lista, la búsqueda ni el total.
+    $rol = (string) $this->postJson("{$app}/roles", [
+        'nombre' => 'Fichas', 'permisos' => ['formularios.gestionar', 'formularios.responder', 'miembros.ver'],
+    ], $dueno)->assertCreated()->json('data.clave');
+    $fichas = conBearer(personalConSesion($e['slug'], $e['bearer'], 'fichas@correo.mx', $rol));
+    asignarSucursal($e, usuarioIdPorEmail($e, 'fichas@correo.mx'), $roma);
+    $this->getJson("{$app}/personas/{$beto}/expediente", $fichas)->assertForbidden();
+    $this->getJson("{$app}/formularios/{$form}/respuestas", $fichas)->assertOk()
+        ->assertJsonCount(1, 'data')->assertJsonPath('data.0.persona', 'Ana')->assertJsonPath('meta.total', 1);
+    $this->getJson("{$app}/formularios/{$form}/respuestas?q=Beto", $fichas)->assertOk()
+        ->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0);
+
+    // Diseñar fichas no basta para leer respuestas: sin ver miembros, ninguna.
+    $disena = (string) $this->postJson("{$app}/roles", [
+        'nombre' => 'Diseño', 'permisos' => ['formularios.gestionar', 'formularios.responder'],
+    ], $dueno)->assertCreated()->json('data.clave');
+    $diseno = conBearer(personalConSesion($e['slug'], $e['bearer'], 'diseno@correo.mx', $disena));
+    $this->getJson("{$app}/formularios/{$form}/respuestas", $diseno)->assertOk()->assertJsonPath('meta.total', 0);
+
+    // El dueño, todas.
+    $this->getJson("{$app}/formularios/{$form}/respuestas", $dueno)->assertOk()->assertJsonPath('meta.total', 2);
+});

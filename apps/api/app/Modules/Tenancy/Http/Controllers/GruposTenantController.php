@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\BajasDeGrupoTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\InscribirEnGrupoTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\InscripcionGrupoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\AccesoGrupoTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,6 +24,10 @@ use Illuminate\Http\Request;
  * cada fecha). Una baja, un cambio de grupo o el cierre del grupo tienen fecha y
  * cancelan las reservas del grupo desde ahí. Opera SIEMPRE sobre la BD del estudio
  * resuelto.
+ *
+ * Alcance (R01): cada grupo es de la sucursal de su plantilla; listas, contadores y
+ * cada grupo por su ULID respetan {@see AccesoGrupoTenant}, y solo se inscribe a quien
+ * se puede ver ({@see AlcancePersonaTenant}).
  */
 class GruposTenantController
 {
@@ -28,13 +35,15 @@ class GruposTenantController
         private readonly InscribirEnGrupoTenant $inscribir,
         private readonly BajasDeGrupoTenant $bajas,
         private readonly FechasNegocioTenant $fechas,
+        private readonly AccesoGrupoTenant $acceso,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         // Inscritos: quienes siguen (las bajas quedan en su historial, no cuentan).
-        $grupos = GrupoTenant::query()->with('plantilla.oferta')
-            ->withCount(['inscripciones' => fn ($q) => $q->where('activo', true)])
+        $grupos = $this->acceso->acotar(GrupoTenant::query(), $request)->with('plantilla.oferta')
+            // Inscritos vigentes: también quien tiene su baja con fecha futura (R03).
+            ->withCount(['inscripciones' => fn ($q) => $q->vigentesDesde($this->fechas->hoy())])
             ->orderByDesc('id')->get();
 
         return response()->json([
@@ -57,6 +66,13 @@ class GruposTenantController
         ]);
 
         $plantilla = PlantillaHorarioTenant::query()->where('ulid', $validado['plantilla_id'])->firstOrFail();
+        // Solo con horarios de una sede propia.
+        $actor = $this->actor($request);
+        abort_unless(
+            ! $actor instanceof Usuario || app(ResolverAccesoTenant::class)->permiteSucursal($actor, (int) $plantilla->sucursal_id),
+            403,
+            'Ese horario es de una sucursal que no tienes asignada.',
+        );
 
         $grupo = GrupoTenant::query()->create([
             'nombre' => $validado['nombre'],
@@ -69,9 +85,10 @@ class GruposTenantController
 
     public function inscribir(Request $request): JsonResponse
     {
-        $grupo = GrupoTenant::query()->where('ulid', (string) $request->route('grupo'))->firstOrFail();
+        $grupo = $this->grupo($request);
         $validado = $request->validate(['persona_id' => ['required', 'string']]);
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
 
         $resultado = $this->inscribir->inscribir($grupo, $persona);
 
@@ -94,24 +111,70 @@ class GruposTenantController
         return response()->json(['data' => $this->presentarInscripcion($inscripcion->refresh()), 'meta' => $resultado]);
     }
 
-    /** Pasa a otro grupo desde una fecha: baja en este y reservas en el nuevo. */
+    /**
+     * Pasa a otro grupo desde una fecha: baja en este y reservas en el nuevo, todo o
+     * nada (R08). Si es parcial (alguna fecha no se puede reservar o cancelar) responde
+     * 409 con lo que habría pasado y no cambia nada, salvo que se confirme con
+     * `parcial: true`.
+     */
     public function cambiar(Request $request): JsonResponse
+    {
+        [$inscripcion, $destino, $desde] = $this->cambio($request);
+        $parcial = (bool) ($request->validate(['parcial' => ['boolean']])['parcial'] ?? false);
+        $resultado = $this->bajas->cambiar($inscripcion, $destino, $desde, $this->actor($request), $parcial);
+        $cuerpo = [
+            'data' => $this->presentarInscripcion($inscripcion->refresh()),
+            'meta' => $this->resultadoCambio($resultado),
+        ];
+
+        return $resultado['aplicado']
+            ? response()->json($cuerpo)
+            : response()->json([...$cuerpo, 'message' => 'El cambio sería parcial: revisa las fechas y confírmalo, o resuélvelo antes.'], 409);
+    }
+
+    /** Lo que pasaría con el cambio (la misma operación, deshecha): no cambia nada. */
+    public function vistaPreviaCambio(Request $request): JsonResponse
+    {
+        [$inscripcion, $destino, $desde] = $this->cambio($request);
+        $resultado = $this->bajas->cambiar($inscripcion, $destino, $desde, $this->actor($request), simular: true);
+
+        return response()->json(['data' => $this->resultadoCambio($resultado)]);
+    }
+
+    /**
+     * @return array{0: InscripcionGrupoTenant, 1: GrupoTenant, 2: string}
+     */
+    private function cambio(Request $request): array
     {
         $inscripcion = $this->inscripcion($request);
         $validado = $request->validate(['grupo_id' => ['required', 'string']]);
         $destino = GrupoTenant::query()->where('ulid', $validado['grupo_id'])->firstOrFail();
-        $resultado = $this->bajas->cambiar($inscripcion, $destino, $this->desde($request), $this->actor($request));
+        $this->acceso->exigir($destino, $request);
 
-        return response()->json([
-            'data' => $this->presentarInscripcion($inscripcion->refresh()),
-            'meta' => ['baja' => $resultado['baja'], 'alta' => $this->comoQuedo($resultado['alta'])],
-        ]);
+        return [$inscripcion, $destino, $this->desde($request)];
+    }
+
+    /**
+     * @param  array{baja: array{canceladas: int, no_canceladas: list<array{inicia_en: string, motivo: string}>}, alta: array<string, mixed>, completo: bool, aplicado: bool}  $resultado
+     * @return array<string, mixed>
+     */
+    private function resultadoCambio(array $resultado): array
+    {
+        /** @var array{reservadas: int, en_espera: int, no_reservadas: int, sesiones: list<array<string, mixed>>} $alta */
+        $alta = $resultado['alta'];
+
+        return [
+            'baja' => $resultado['baja'],
+            'alta' => $this->comoQuedo($alta),
+            'completo' => $resultado['completo'],
+            'aplicado' => $resultado['aplicado'],
+        ];
     }
 
     /** Cierra el grupo: ya no inscribe y da de baja a quienes seguían desde la fecha. */
     public function cerrar(Request $request): JsonResponse
     {
-        $grupo = GrupoTenant::query()->where('ulid', (string) $request->route('grupo'))->firstOrFail();
+        $grupo = $this->grupo($request);
         $resultado = $this->bajas->cerrar($grupo, $this->desde($request), $this->actor($request));
 
         return response()->json(['data' => ['id' => $grupo->ulid, 'activo' => false], 'meta' => $resultado]);
@@ -119,7 +182,7 @@ class GruposTenantController
 
     public function reabrir(Request $request): JsonResponse
     {
-        $grupo = GrupoTenant::query()->where('ulid', (string) $request->route('grupo'))->firstOrFail();
+        $grupo = $this->grupo($request);
         $this->bajas->reabrir($grupo, $this->actor($request));
 
         return response()->json(['data' => ['id' => $grupo->ulid, 'activo' => true]]);
@@ -151,9 +214,18 @@ class GruposTenantController
         return (string) ($validado['desde'] ?? $hoy);
     }
 
-    private function inscripcion(Request $request): InscripcionGrupoTenant
+    /** El grupo de la ruta, si es de una sede a la que llega quien lo pide. */
+    private function grupo(Request $request): GrupoTenant
     {
         $grupo = GrupoTenant::query()->where('ulid', (string) $request->route('grupo'))->firstOrFail();
+        $this->acceso->exigir($grupo, $request);
+
+        return $grupo;
+    }
+
+    private function inscripcion(Request $request): InscripcionGrupoTenant
+    {
+        $grupo = $this->grupo($request);
         $inscripcion = $grupo->inscripciones()->where('ulid', (string) $request->route('inscripcion'))->firstOrFail();
         abort_unless($inscripcion->activo, 409, 'Ya se había dado de baja.');
 
@@ -177,6 +249,8 @@ class GruposTenantController
             'persona' => $i->persona?->nombreCompleto(),
             'persona_id' => $i->persona?->ulid,
             'activo' => $i->activo,
+            // Su vigencia (R03): desde cuándo y hasta antes de cuándo cuenta.
+            'alta_desde' => $i->alta_desde?->toDateString(),
             'baja_desde' => $i->baja_desde?->toDateString(),
         ];
     }
@@ -189,7 +263,7 @@ class GruposTenantController
      */
     public function inscripciones(Request $request): JsonResponse
     {
-        $grupo = GrupoTenant::query()->where('ulid', (string) $request->route('grupo'))->firstOrFail();
+        $grupo = $this->grupo($request);
         $validado = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],

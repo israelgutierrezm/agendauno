@@ -79,6 +79,12 @@ export default {
     sinAjustes: "Sin ajustes.",
     diferencias: "Desde el cierre cambió lo calculado",
     diferenciaDe: "{nombre}: {antes} en el corte, {hoy} hoy ({diferencia})",
+    // Con ajustes ya registrados (R09): lo que falta, no la diferencia de siempre.
+    diferenciaConAjustes:
+      "{nombre}: {antes} en el corte y {ajustes} en ajustes, {hoy} hoy (falta {diferencia})",
+    diferenciaAtendida:
+      "{nombre}: {antes} en el corte y {ajustes} en ajustes = {hoy} hoy. Ya se atendió.",
+    diferenciasAtendidas: "Lo que cambió desde el cierre ya se ajustó",
     usarDiferencia: "Ajustar",
     pago: {
       titulo: "Registrar el pago",

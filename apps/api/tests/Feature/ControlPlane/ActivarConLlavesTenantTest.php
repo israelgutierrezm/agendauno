@@ -147,6 +147,18 @@ it('activar una pasarela no es lo mismo que tener la conexión comprobada (un pa
     expect($estado())->toBe('comprobada');
     // La de caja no se conecta a nada.
     expect(collect($this->getJson($url, conBearer($e['bearer']))->json('data'))->keyBy('proveedor')['ventanilla']['estado_conexion'])->toBeNull();
+
+    // Otras llaves (R13): el pago anterior ya no comprueba esta conexión; queda de historial.
+    $this->travel(1)->minutes();
+    $this->putJson("{$url}/stripe", ['activa' => true, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_otra']], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.estado_conexion', 'activa_sin_comprobar')
+        ->assertJsonPath('data.comprobada_en', null);
+    $stripe = collect($this->getJson($url, conBearer($e['bearer']))->json('data'))->keyBy('proveedor')['stripe'];
+    expect($stripe['ultimo_exito_anterior_en'])->not->toBeNull();
+    // Guardar sin cambiar nada (o solo apagar y encender) no la invalida de nuevo.
+    $this->putJson("{$url}/stripe", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.estado_conexion', 'activa_sin_comprobar');
 });
 
 it('la plataforma no activa Stripe para la renta sin su llave secreta', function (): void {

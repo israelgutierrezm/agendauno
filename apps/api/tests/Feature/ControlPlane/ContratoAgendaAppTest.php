@@ -163,6 +163,9 @@ it('una cita de un negocio de citas trae a quién se atiende y en qué va, calcu
     $e = $c['e'];
 
     $cita = contratoAgendaCita($c);
+    // La hora de la sucursal ya calculada, con su desfase (R10).
+    expect($cita['inicia_local'])->toMatch('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/')
+        ->and($cita['utc_offset_min'])->toBe(-360);
     expect($cita['tipo'])->toBe('cita')
         ->and($cita['clase'])->toBeNull()
         ->and($cita['ocupacion'])->toBeNull()

@@ -142,6 +142,80 @@ describe("cobro al terminar la cita", () => {
     expect(w.get('[data-prueba="total-cita"]').text()).toContain("150.00");
   });
 
+  it("solo ofrece lo que hay en la sucursal de la cita y hasta su stock (R07)", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            id: "a1",
+            nombre: "Cera",
+            precio_minor: 5000,
+            activo: true,
+            stock_total: 7,
+            existencias: [
+              { sucursal_id: "roma", stock: 2 },
+              { sucursal_id: "polanco", stock: 5 },
+            ],
+          },
+          {
+            id: "a2",
+            nombre: "Shampoo",
+            precio_minor: 9000,
+            activo: true,
+            stock_total: 4,
+            existencias: [{ sucursal_id: "polanco", stock: 4 }],
+          },
+        ],
+      },
+    });
+    const w = montar({ ...sesion, sucursal_id: "roma" } as SesionAgenda);
+    await flushPromises();
+    const opciones = w.get('[data-prueba="producto-cita"]').text();
+    expect(opciones).toContain("Cera");
+    expect(opciones).toContain("2 aquí");
+    // Solo hay en Polanco: no se ofrece al cobrar en Roma.
+    expect(opciones).not.toContain("Shampoo");
+    await w.get('[data-prueba="producto-cita"]').setValue("a1");
+    await w.get('[data-prueba="agregar-producto-cita"]').trigger("click");
+    expect(w.get('input[type="number"]').attributes("max")).toBe("2");
+  });
+
+  it("si el correo del ticket falla, el cobro queda y el ticket se reenvía aparte (R06)", async () => {
+    api.post.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/ticket")
+            ? { ticket_envio: "enviado" }
+            : {
+                servicio_minor: 25000,
+                productos_minor: 0,
+                propina_minor: 0,
+                total_minor: 25000,
+                recibido_minor: null,
+                cambio_minor: null,
+                venta_id: "v1",
+                ticket: { folio: "AB12CD34" },
+                ticket_envio: "fallido",
+              },
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+    await w.get("#form-cobro-cita").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="ticket-fallido"]').text()).toContain(
+      "El cobro quedó registrado",
+    );
+    await w.get('[data-prueba="reenviar-ticket"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/pos/ventas/v1/ticket",
+    );
+    expect(w.find('[data-prueba="ticket-enviado"]').exists()).toBe(true);
+  });
+
   it("un error del servidor queda junto a su campo y no pierde lo capturado", async () => {
     api.post.mockRejectedValue({
       campos: {

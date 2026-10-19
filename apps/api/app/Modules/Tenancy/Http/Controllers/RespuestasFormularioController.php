@@ -32,10 +32,15 @@ class RespuestasFormularioController
      * Las respuestas de un formulario por páginas (antes, solo las últimas 200), con
      * quién respondió y cuándo; se buscan por la persona. El id de su usuario
      * (instructores) sirve para abrir su expediente desde la lista.
+     *
+     * Solo de quienes el usuario puede abrir el expediente (R02): la misma regla que
+     * el expediente, también en la búsqueda, las páginas y el total.
      */
     public function index(Request $request): JsonResponse
     {
         $formulario = Formulario::query()->where('ulid', (string) $request->route('formulario'))->firstOrFail();
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($usuario instanceof Usuario, 403);
         $filtros = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -43,9 +48,9 @@ class RespuestasFormularioController
         ]);
         $buscar = trim((string) ($filtros['q'] ?? ''));
 
-        $pagina = RespuestaFormulario::query()
-            ->with('persona')
-            ->where('formulario_id', $formulario->id)
+        $consulta = RespuestaFormulario::query()->with('persona')->where('formulario_id', $formulario->id);
+        AccesoExpedienteTenant::acotar($consulta, $usuario);
+        $pagina = $consulta
             ->when($buscar !== '', fn (Builder $q) => $q->whereHas('persona', fn (Builder $p) => $p->buscar($buscar)))
             ->orderByDesc('updated_at')
             ->orderByDesc('id')

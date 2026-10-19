@@ -5,7 +5,9 @@ import '../data/agenda_models.dart';
 import '../data/agenda_repository.dart';
 
 /// Día que se está viendo en la agenda (hoy por defecto). Vuelve a hoy al cambiar
-/// de sesión: quien entra después no arranca en el día que dejó el anterior.
+/// de sesión: quien entra después no arranca en el día que dejó el anterior. Es un
+/// día de la sucursal (así se filtran las sesiones); al abrir, antes de saber la
+/// zona de la sucursal, es el de hoy en el teléfono.
 class FechaAgenda extends Notifier<DateTime> {
   @override
   DateTime build() {
@@ -19,7 +21,9 @@ class FechaAgenda extends Notifier<DateTime> {
   /// La semana anterior o la siguiente (mismo día de la semana).
   void moverSemanas(int n) => elegir(state.add(Duration(days: 7 * n)));
 
-  void hoy() => elegir(DateTime.now());
+  /// Vuelve a hoy: [dia] es el de hoy en la sucursal si ya se sabe (ver
+  /// [AgendaDia.hoyEnSucursal]); si no, el del teléfono.
+  void hoy([DateTime? dia]) => elegir(dia ?? DateTime.now());
 }
 
 final fechaAgendaProvider = NotifierProvider<FechaAgenda, DateTime>(
@@ -46,6 +50,15 @@ class AgendaDia {
 
   final List<SesionAgenda> sesiones;
   final List<Profesional> profesionales;
+
+  /// El día de hoy en la sucursal (con el desfase de sus sesiones), o en el
+  /// teléfono si el día no trae sesiones con desfase.
+  DateTime hoyEnSucursal(DateTime ahora) {
+    final conZona = sesiones.where((s) => s.desfaseMin != null).firstOrNull;
+    final local = ahora.toLocal();
+    return conZona?.hoyEnSucursal(ahora) ??
+        DateTime(local.year, local.month, local.day);
+  }
 }
 
 /// Carga el día elegido y ejecuta las acciones de recepción (recarga al terminar).

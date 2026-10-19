@@ -11,7 +11,11 @@ export default {
   reglaFormato:
     "Una cita por fila. La fecha va como AAAA-MM-DD y la hora como HH:MM (24 horas), en la zona horaria de su sucursal. Solo citas futuras.",
   reglaClientes:
-    "Cada cliente se reconoce por su correo o su celular; si no lo tienes, se crea su ficha.",
+    "Cada cliente se reconoce por su número en tu sistema anterior (cliente_ref), su correo o su celular; si no existe, se crea su ficha. Sin ninguno de los tres la fila no se importa: se duplicaría la persona.",
+  reglaReferencia:
+    "Con la referencia de cada cita, al volver a importar se reconoce: si no cambió, no se duplica; si cambió (otra hora, profesional o sucursal), se avisa para que lo decidas en la agenda.",
+  reglaCobro:
+    "Las citas importadas quedan por cobrar en caja. Si ya te pagaron algo en tu sistema anterior (un anticipo o todo), ponlo en «pagado»: se descuenta y no se registra como ingreso nuevo.",
   reglaNombres:
     "Servicio, profesional y sucursal van con su nombre. Si en tu sistema anterior se llamaban distinto, aquí eliges a cuál corresponde.",
   reglaTodo:
@@ -33,6 +37,13 @@ export default {
   },
   revisar: "Revisar de nuevo",
   resultado: "3. Vista previa",
+  // Lo que queda por cobrar al importar (R14).
+  porCobrar:
+    "1 cita quedará por cobrar ({monto}). | {n} citas quedarán por cobrar ({monto} en total).",
+  pagadasAntes:
+    "1 ya estaba pagada en tu sistema anterior: no queda nada por cobrar. | {n} ya estaban pagadas en tu sistema anterior: no queda nada por cobrar.",
+  porCobrarAyuda:
+    "Lo que ya te pagaron allá no se registra aquí como ingreso. Si falta indicarlo, agrégalo en la columna «pagado» antes de importar.",
   indicadores: {
     filas: "Filas",
     nuevos: "Clientes nuevos",

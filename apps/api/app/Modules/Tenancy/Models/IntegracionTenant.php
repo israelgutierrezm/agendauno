@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property bool $reservas_activas
  * @property int|null $sucursal_id
  * @property Carbon|null $reservas_registradas_en
+ * @property Carbon|null $configurada_en
  */
 class IntegracionTenant extends Model
 {
@@ -31,7 +32,7 @@ class IntegracionTenant extends Model
 
     protected $fillable = [
         'proveedor', 'activa', 'credenciales', 'token_webhook', 'webhook_registrado_en',
-        'reservas_activas', 'sucursal_id', 'reservas_registradas_en',
+        'reservas_activas', 'sucursal_id', 'reservas_registradas_en', 'configurada_en',
     ];
 
     /**
@@ -46,6 +47,8 @@ class IntegracionTenant extends Model
         'activa' => 'boolean',
         'credenciales' => 'encrypted:array',
         'webhook_registrado_en' => 'datetime',
+        // Cuándo cambiaron sus llaves (R13).
+        'configurada_en' => 'datetime',
         'reservas_activas' => 'boolean',
         'sucursal_id' => 'integer',
         'reservas_registradas_en' => 'datetime',

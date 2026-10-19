@@ -91,10 +91,12 @@ class TicketVentaPosTenant
             ));
         } catch (Throwable $e) {
             report($e);
+            // El cobro queda; el envío falló y se puede reenviar (R06).
+            $venta->update(['ticket_envio_fallido_en' => now()]);
 
             return false;
         }
-        $venta->update(['ticket_enviado_en' => now()]);
+        $venta->update(['ticket_enviado_en' => now(), 'ticket_envio_fallido_en' => null]);
 
         return true;
     }

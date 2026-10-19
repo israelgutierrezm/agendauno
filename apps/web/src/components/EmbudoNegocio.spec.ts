@@ -71,6 +71,29 @@ describe("el embudo del negocio", () => {
     expect(w.get('[data-prueba="embudo-mediana"]').text()).toBe("30 min");
   });
 
+  it("en un negocio de citas mide cita → asistencia → cobro → siguiente visita, no planes (R11)", () => {
+    const w = montar(
+      {
+        ...base,
+        citas: {
+          agendadas: { agendadas: 20, confirmadas: 18 },
+          asistencia: { citas: 16, asistieron: 14 },
+          cobro: { atendidas: 14, cobradas: 13 },
+          siguiente: { clientes: 10, volvieron: 6 },
+        },
+      },
+      true,
+    );
+
+    expect(w.text()).toContain("Del interés a la siguiente visita");
+    expect(w.get('[data-paso="confirmadas"]').text()).toContain("18 de 20");
+    expect(w.get('[data-paso="asistenciaCita"]').text()).toContain("14 de 16");
+    expect(w.get('[data-paso="cobro"]').text()).toContain("13 de 14");
+    expect(w.get('[data-paso="siguiente"]').text()).toContain("6 de 10");
+    expect(w.find('[data-paso="renovacion"]').exists()).toBe(false);
+    expect(w.find('[data-paso="compra"]').exists()).toBe(false);
+  });
+
   it("solo compara con las visitas lo comparable; lo demás va aparte y sin porcentaje", () => {
     const w = montar({
       ...base,

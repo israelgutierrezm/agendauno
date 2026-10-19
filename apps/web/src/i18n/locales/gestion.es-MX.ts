@@ -1075,6 +1075,9 @@ export const pasarelasEstado = {
       "Conexión: activada, aún sin comprobar. Se comprueba con el primer pago que apruebe el proveedor; haz uno de prueba.",
     comprobada: "Conexión comprobada: último pago aprobado el {fecha}.",
   },
+  // Lo que funcionó con llaves o modo anteriores: historial, no prueba (R13).
+  anterior:
+    "Con la configuración anterior se aprobó un pago el {fecha}; con la de ahora aún no.",
   lista: "Lista para cobrar",
   webhook: "URL para avisos (webhook)",
   copiar: "Copiar",

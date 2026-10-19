@@ -44,6 +44,7 @@ export interface SesionAgenda {
   instructor_id: string | null;
   sala: string | null;
   sucursal?: string | null;
+  sucursal_id?: string | null;
   inicia_en: string;
   termina_en: string;
   // Desde cuándo se registra la asistencia (ADR 0101).
