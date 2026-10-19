@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
 use App\Modules\Tenancy\Reservas\QuienCancela;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -71,8 +72,13 @@ class BajasDeGrupoTenant
 
         try {
             return DB::connection('tenant')->transaction(function () use ($inscripcion, $origen, $destino, $persona, $desde, $actor, $parcial, $simular): array {
-                // El destino, bajo candado y revisado ahí: no se cierra a la mitad.
-                $bloqueado = GrupoTenant::query()->whereKey($destino->getKey())->lockForUpdate()->firstOrFail();
+                // Los dos grupos bajo candado y siempre en el mismo orden (por id), antes
+                // de tocar sus fechas: dos cambios a la vez en sentidos opuestos (A→B y
+                // B→A) se forman, en lugar de bloquearse entre sí (R08). El destino se
+                // revisa ahí: no se cierra a la mitad.
+                $grupos = GrupoTenant::query()->whereKey([$origen->getKey(), $destino->getKey()])
+                    ->orderBy('id')->lockForUpdate()->get()->keyBy(static fn (GrupoTenant $g): int => (int) $g->getKey());
+                $bloqueado = $grupos[(int) $destino->getKey()] ?? throw (new ModelNotFoundException)->setModel(GrupoTenant::class);
                 if (! $bloqueado->activo) {
                     throw ValidationException::withMessages(['grupo_id' => ['El grupo «'.$bloqueado->nombre.'» está cerrado.']]);
                 }
@@ -94,7 +100,7 @@ class BajasDeGrupoTenant
                 ]);
 
                 return [...$resultado, 'aplicado' => true];
-            });
+            }, 3);
         } catch (CambioDeGrupoNoAplicado $sinAplicar) {
             $inscripcion->refresh();
 
@@ -105,6 +111,8 @@ class BajasDeGrupoTenant
     /**
      * Cierra el grupo: ya no inscribe a nadie y quienes seguían inscritos se dan de
      * baja desde `$desde`. Su historial (inscripciones, reservas, asistencias) queda.
+     * También quien tenía su baja para después del cierre (R03): se adelanta al cierre,
+     * para que no conserve (ni se le cobren) fechas de un grupo ya cerrado.
      *
      * @return array{bajas: int, canceladas: int, no_canceladas: list<array{inicia_en: string, motivo: string}>}
      */
@@ -117,7 +125,9 @@ class BajasDeGrupoTenant
         });
 
         $total = ['bajas' => 0, 'canceladas' => 0, 'no_canceladas' => []];
-        $grupo->inscripciones()->where('activo', true)->orderBy('id')->get()
+        $grupo->inscripciones()
+            ->where(fn ($w) => $w->where('activo', true)->orWhereDate('baja_desde', '>', $desde))
+            ->orderBy('id')->get()
             ->each(function (InscripcionGrupoTenant $inscripcion) use ($desde, $actor, &$total): void {
                 $resultado = $this->baja($inscripcion, $desde, $actor);
                 $total['bajas']++;
@@ -145,15 +155,20 @@ class BajasDeGrupoTenant
     }
 
     /**
+     * La baja desde `$desde`, o desde la que ya tenía si era antes (R03): una baja se
+     * adelanta, no se pospone (para eso se vuelve a inscribir).
+     *
      * @return array{canceladas: int, no_canceladas: list<array{inicia_en: string, motivo: string}>}
      */
     private function baja(InscripcionGrupoTenant $inscripcion, string $desde, ?Usuario $actor): array
     {
-        $grupo = DB::connection('tenant')->transaction(function () use ($inscripcion, $desde): GrupoTenant {
+        [$grupo, $desde] = DB::connection('tenant')->transaction(function () use ($inscripcion, $desde): array {
             $bloqueada = InscripcionGrupoTenant::query()->whereKey($inscripcion->getKey())->lockForUpdate()->firstOrFail();
-            $bloqueada->update(['activo' => false, 'baja_desde' => $desde, 'baja_en' => now()]);
+            $previa = $bloqueada->baja_desde?->toDateString();
+            $efectiva = $previa !== null && $previa < $desde ? $previa : $desde;
+            $bloqueada->update(['activo' => false, 'baja_desde' => $efectiva, 'baja_en' => now()]);
 
-            return GrupoTenant::query()->whereKey($bloqueada->grupo_id)->firstOrFail();
+            return [GrupoTenant::query()->whereKey($bloqueada->grupo_id)->firstOrFail(), $efectiva];
         });
         $inscripcion->refresh();
 

@@ -1,4 +1,5 @@
 import '../../../core/agenda/contrato_agenda.dart';
+import '../../../core/hora_negocio.dart';
 
 /// El día de hoy para el Inicio del negocio (GET /inicio/hoy): la agenda del día
 /// con quién se espera, quién llegó y a quién falta pasar lista; y, si quien entra
@@ -128,6 +129,7 @@ class SesionHoy {
     required this.tipo,
     required this.iniciaEn,
     DateTime? iniciaLocal,
+    this.desfaseMin,
     required this.esperados,
     required this.sinMarcar,
     required this.momento,
@@ -137,24 +139,36 @@ class SesionHoy {
     this.cliente,
   }) : iniciaLocal = iniciaLocal ?? iniciaEn;
 
-  factory SesionHoy.desdeJson(Map<String, dynamic> j) => SesionHoy(
-    id: (j['id'] ?? '') as String,
-    // Uno desconocido es un error (no se supone clase).
-    tipo: TipoSesion.desde(j['tipo']),
-    iniciaEn: DateTime.parse(j['inicia_en'] as String).toLocal(),
-    // La hora de la sucursal (sin zona): la que se muestra, aunque el teléfono esté en
-    // otra. Sin el dato (API anterior), la del teléfono.
-    iniciaLocal: j['inicia_local'] is String
-        ? DateTime.tryParse(j['inicia_local'] as String)
-        : null,
-    esperados: (j['esperados'] as num? ?? 0).toInt(),
-    sinMarcar: (j['sin_marcar'] as num? ?? 0).toInt(),
-    momento: (j['momento'] ?? 'proxima') as String,
-    oferta: j['oferta'] as String?,
-    instructor: j['instructor'] as String?,
-    sucursal: j['sucursal'] as String?,
-    cliente: j['cliente'] as String?,
-  );
+  factory SesionHoy.desdeJson(Map<String, dynamic> j) {
+    final inicia = DateTime.parse(j['inicia_en'] as String).toLocal();
+    // La hora de la sucursal (`inicia_local`, sin zona) y su desfase
+    // (`utc_offset_min`): la que se muestra, aunque el teléfono esté en otra. Como
+    // en la agenda: sin desfase se deduce de la hora local; sin hora local se
+    // calcula con el desfase; sin ninguno (API anterior), la del teléfono.
+    final local = j['inicia_local'] is String
+        ? HoraNegocio.pared(j['inicia_local'] as String)
+        : null;
+    final desfase =
+        (j['utc_offset_min'] as num?)?.toInt() ??
+        (local == null ? null : HoraNegocio.desfaseEntre(local, inicia));
+    return SesionHoy(
+      id: (j['id'] ?? '') as String,
+      // Uno desconocido es un error (no se supone clase).
+      tipo: TipoSesion.desde(j['tipo']),
+      iniciaEn: inicia,
+      iniciaLocal:
+          local ??
+          (desfase == null ? null : HoraNegocio.enDesfase(inicia, desfase)),
+      desfaseMin: desfase,
+      esperados: (j['esperados'] as num? ?? 0).toInt(),
+      sinMarcar: (j['sin_marcar'] as num? ?? 0).toInt(),
+      momento: (j['momento'] ?? 'proxima') as String,
+      oferta: j['oferta'] as String?,
+      instructor: j['instructor'] as String?,
+      sucursal: j['sucursal'] as String?,
+      cliente: j['cliente'] as String?,
+    );
+  }
 
   final String id;
   final TipoSesion tipo;
@@ -162,6 +176,10 @@ class SesionHoy {
 
   /// La hora de la sucursal, para mostrarla.
   final DateTime iniciaLocal;
+
+  /// Desfase con UTC (minutos) de la zona de su sucursal en ese momento; null si
+  /// el API no lo manda.
+  final int? desfaseMin;
   final int esperados;
   final int sinMarcar;
 
@@ -176,6 +194,18 @@ class SesionHoy {
   String get nombre => tipo == TipoSesion.cita && cliente != null
       ? '${oferta ?? ''} · $cliente'
       : (oferta ?? '—');
+
+  /// ¿El teléfono está en otra zona que su sucursal? (con [desfaseTelefonoMin]; por
+  /// omisión, el del teléfono cuando empieza). Sin desfase del API, no.
+  bool enOtraZona([int? desfaseTelefonoMin]) =>
+      desfaseMin != null &&
+      desfaseMin !=
+          (desfaseTelefonoMin ?? HoraNegocio.desfaseTelefono(iniciaEn));
+
+  /// «Hora de Roma Norte» si el teléfono está en otra zona que su sucursal (como
+  /// en la agenda); null si no.
+  String? etiquetaHora([int? desfaseTelefonoMin]) =>
+      HoraNegocio.etiqueta([if (enOtraZona(desfaseTelefonoMin)) sucursal]);
 }
 
 /// Espacios libres de un profesional en una sede hoy (citas).
@@ -191,14 +221,18 @@ class LibreHoy {
     profesional: (j['profesional'] ?? '') as String,
     sucursal: j['sucursal'] as String?,
     huecos: (j['huecos'] as num? ?? 0).toInt(),
-    siguiente: DateTime.tryParse((j['siguiente'] ?? '') as String)?.toLocal(),
+    // En la hora de la sede (`siguiente_local`, sin zona); sin ella (API
+    // anterior), la del teléfono.
+    siguiente:
+        HoraNegocio.pared(j['siguiente_local'] as String?) ??
+        HoraNegocio.pared(j['siguiente'] as String?),
   );
 
   final String profesional;
   final String? sucursal;
   final int huecos;
 
-  /// Desde qué hora (local) hay espacio.
+  /// Desde qué hora (de la sede) hay espacio.
   final DateTime? siguiente;
 }
 

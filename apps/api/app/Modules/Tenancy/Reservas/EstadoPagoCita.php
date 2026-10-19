@@ -16,7 +16,8 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
  * - `pagada`.
  *
  * Null: no lleva cobro (la toma con su plan), su orden se canceló o la cita se
- * canceló (lo que pasó con su pago está en su historial).
+ * canceló (lo que pasó con su pago está en su historial). Una importada que se pagó
+ * toda en el sistema anterior (R14) está pagada, aunque aquí no haya pago.
  */
 enum EstadoPagoCita: string
 {
@@ -39,6 +40,11 @@ enum EstadoPagoCita: string
             return self::PorCobrar;
         }
 
-        return $reserva->orden?->estado === EstadoOrden::Pagada ? self::Pagada : null;
+        $orden = $reserva->orden;
+        if ($orden?->estado === EstadoOrden::Pagada) {
+            return self::Pagada;
+        }
+
+        return $orden !== null && $orden->total_minor === 0 && (int) $orden->pagado_fuera_minor > 0 ? self::Pagada : null;
     }
 }

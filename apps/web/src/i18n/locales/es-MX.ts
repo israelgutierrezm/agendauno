@@ -2886,6 +2886,7 @@ export default {
     inscritosTotal: "Sin inscritos | 1 inscrito | {n} inscritos",
     buscarInscrito: "Buscar inscrito",
     inscritoBaja: "Baja",
+    adelantarBaja: "Adelantar o cambiar",
     sinInscritos: "Aún no hay inscritos.",
     creado: "Grupo «{nombre}» creado.",
     sinInscritosBusqueda: "Nadie inscrito con ese nombre.",

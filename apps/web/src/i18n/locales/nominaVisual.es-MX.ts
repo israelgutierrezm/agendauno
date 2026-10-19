@@ -106,6 +106,8 @@ export default {
       enContra: "En su contra (se le pagó de más)",
       monto: "Importe",
       motivo: "Motivo",
+      compensa:
+        "Corrige una diferencia del cálculo (se descuenta de lo que falta; un bono, no)",
       guardar: "Agregar ajuste",
       hecho: "Ajuste agregado.",
     },

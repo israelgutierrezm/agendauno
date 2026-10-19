@@ -73,11 +73,11 @@ class PasarelasTenantController
         $lista = $this->registro->activa($proveedor);
         // La prueba de que la conexión funciona: un pago que el proveedor aprobó (no
         // basta con guardar llaves ni con activarla), con la configuración vigente (R13):
-        // uno anterior a cambiar sus llaves o su modo es historial, no prueba.
-        $aprobado = $enLinea ? PagoTenant::query()->where('proveedor', $proveedor)->whereNotNull('aprobado_en')->max('aprobado_en') : null;
-        $ultimo = is_string($aprobado) && $aprobado !== '' ? CarbonImmutable::parse($aprobado) : null;
-        $desde = $config?->configurada_en;
-        $vigente = $ultimo !== null && ($desde === null || $ultimo->greaterThanOrEqualTo($desde));
+        // uno iniciado antes de cambiar sus llaves o su modo es historial, no prueba.
+        $comprobada = $enLinea ? $config?->comprobadaEn() : null;
+        $vigente = $comprobada !== null;
+        $aprobado = $enLinea && ! $vigente ? PagoTenant::query()->where('proveedor', $proveedor)->whereNotNull('aprobado_en')->max('aprobado_en') : null;
+        $ultimo = $comprobada ?? (is_string($aprobado) && $aprobado !== '' ? CarbonImmutable::parse($aprobado) : null);
 
         return [
             'proveedor' => $proveedor,

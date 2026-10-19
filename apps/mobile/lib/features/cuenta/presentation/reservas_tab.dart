@@ -35,7 +35,12 @@ class ReservasTab extends ConsumerWidget {
         periodo != null && periodo.hasError && !periodo.isLoading;
     final sedes = periodo?.value?.sucursales ?? const <SedeAgenda>[];
     final filtro = ref.watch(filtroAgendaProvider);
-    final eventos = eventosDeCuenta(cuenta, clases: delPeriodo);
+    // En los días y las horas del negocio, no en los del teléfono.
+    final eventos = eventosDeCuenta(
+      cuenta,
+      clases: delPeriodo,
+      desfaseMin: sesion?.desfaseNegocioMin,
+    );
     final mias = eventos.where((e) => e.destacado).toList();
     final libres = eventos.where((e) => !e.destacado).toList();
 
@@ -58,6 +63,7 @@ class ReservasTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () => ref.refresh(cuentaProvider.future),
       child: CalendarioVistas(
+        hoy: sesion?.hoyEnNegocio(DateTime.now()),
         eventos: eventos,
         onAbrir: abrir,
         onRango: esCitas

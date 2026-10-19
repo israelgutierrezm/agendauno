@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\RolTenant;
 use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
@@ -138,6 +141,8 @@ it('las respuestas de una ficha solo se ven de quien se puede abrir el expedient
         ->assertJsonCount(1, 'data')->assertJsonPath('data.0.persona', 'Ana')->assertJsonPath('meta.total', 1);
     $this->getJson("{$app}/formularios/{$form}/respuestas?q=Beto", $fichas)->assertOk()
         ->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0);
+    // El contador de la ficha dice lo mismo que su lista: 1, no las 2 del negocio.
+    expect(collect($this->getJson("{$app}/formularios", $fichas)->assertOk()->json('data'))->firstWhere('id', $form)['respuestas'])->toBe(1);
 
     // Diseñar fichas no basta para leer respuestas: sin ver miembros, ninguna.
     $disena = (string) $this->postJson("{$app}/roles", [
@@ -148,4 +153,41 @@ it('las respuestas de una ficha solo se ven de quien se puede abrir el expedient
 
     // El dueño, todas.
     $this->getJson("{$app}/formularios/{$form}/respuestas", $dueno)->assertOk()->assertJsonPath('meta.total', 2);
+});
+
+it('las respuestas de alguien del equipo piden lo mismo que su expediente (R02)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $dueno = conBearer($e['bearer']);
+    personalConSesion($e['slug'], $e['bearer'], 'leo@correo.mx', 'instructor');
+    $instructor = (string) collect($this->getJson("{$app}/instructores", $dueno)->assertOk()->json('data'))->firstWhere('nombre', 'Personal')['id'];
+    $persona = (string) $this->getJson("{$app}/instructores/{$instructor}", $dueno)->assertOk()->json('data.persona_id');
+    $form = (string) $this->postJson("{$app}/formularios", ['nombre' => 'Contrato', 'aplica_a' => 'instructor'], $dueno)
+        ->assertCreated()->json('data.id');
+    $campo = (string) $this->postJson("{$app}/formularios/{$form}/campos", [
+        'etiqueta' => 'Contacto de emergencia', 'tipo' => 'texto', 'obligatorio' => true,
+    ], $dueno)->assertCreated()->json('data.id');
+    $this->postJson("{$app}/formularios/{$form}/respuestas", ['persona_id' => $persona, 'valores' => [$campo => 'Mamá']], $dueno)
+        ->assertCreated();
+
+    // Quien administra al equipo (con sus requisitos) lee el expediente y las respuestas.
+    $clave = (string) $this->postJson("{$app}/roles", [
+        'nombre' => 'Equipo', 'permisos' => ['formularios.gestionar', 'formularios.responder', 'usuarios.gestionar', 'usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
+    ], $dueno)->assertCreated()->json('data.clave');
+    $equipo = conBearer(personalConSesion($e['slug'], $e['bearer'], 'equipo@correo.mx', $clave));
+    $this->getJson("{$app}/personas/{$persona}/expediente", $equipo)->assertOk();
+    $this->getJson("{$app}/formularios/{$form}/respuestas", $equipo)->assertOk()
+        ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.valores.'.$campo, 'Mamá');
+
+    // Un rol anterior a los requisitos, sin «ver miembros»: la ruta del expediente lo
+    // rechaza, y las respuestas y su contador tampoco se le muestran.
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), function () use ($clave): void {
+        $rol = RolTenant::query()->where('clave', $clave)->firstOrFail();
+        $rol->update(['permisos' => array_values(array_diff($rol->permisos, ['miembros.ver']))]);
+    });
+    app(RolesTenant::class)->olvidar();
+    $this->getJson("{$app}/personas/{$persona}/expediente", $equipo)->assertForbidden();
+    $this->getJson("{$app}/formularios/{$form}/respuestas", $equipo)->assertOk()
+        ->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0);
+    expect(collect($this->getJson("{$app}/formularios", $equipo)->assertOk()->json('data'))->firstWhere('id', $form)['respuestas'])->toBe(0);
 });

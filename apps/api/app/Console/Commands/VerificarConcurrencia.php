@@ -123,10 +123,12 @@ class VerificarConcurrencia extends Command
             $this->modalidad(ModalidadServicio::Citas);
             $this->caso('Mismo profesional y horario (agendar y reprogramar)', fn () => $this->mismaCita($escenarios, $rondas, $procesos));
             $this->caso('Misma hora con cualquier profesional disponible', fn () => $this->cualquierProfesional($escenarios, $rondas, $procesos));
+            $this->caso('El mismo cobro de una cita dos veces a la vez', fn () => $this->mismoCobro($escenarios, $rondas));
             $this->modalidad(ModalidadServicio::Clases);
             $this->caso('Cancelar y reprogramar la misma reserva a la vez', fn () => $this->cancelarYReprogramar($escenarios, $rondas));
             $this->caso('Reprogramaciones y reservas por el último lugar', fn () => $this->reprogramarAlUltimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Una cancelación libera lugar mientras otros lo piden', fn () => $this->cancelacionLiberaLugar($escenarios, $rondas));
+            $this->caso('Cambios de grupo a la vez en sentidos opuestos', fn () => $this->cambiosDeGrupoOpuestos($escenarios, $rondas));
             $this->caso('Ajustes de inventario y una venta a la vez con poco stock', fn () => $this->inventarioSinNegativos($escenarios, $rondas));
             $this->caso('Ventas del mostrador a la vez por la última pieza', fn () => $this->ultimaPieza($escenarios, $rondas, $procesos));
             $this->caso('Ventas con los mismos artículos en distinto orden', fn () => $this->mismosArticulos($escenarios, $rondas));
@@ -256,6 +258,35 @@ class VerificarConcurrencia extends Command
             $this->inesperados($fallas, $res);
             $tipo = $moviendo > 0 ? " ({$moviendo} reprogramando)" : '';
             $this->detalle('ronda '.($r + 1).": {$procesos} solicitudes{$tipo} → {$encimadas} cita", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * El mismo cobro de solo el servicio llega dos veces a la vez (doble clic o un
+     * reintento de red) con la misma clave (R04): los dos devuelven el mismo
+     * comprobante, con un solo pago y una sola venta.
+     *
+     * @return list<string>
+     */
+    private function mismoCobro(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $profesional = $this->base['profesionales'][$r % 2];
+            $cita = $e->cita($this->base['servicio'], $this->base['sucursal'], $e->alumno(0), $profesional, $e->hueco(45 + $r, 12));
+            $clave = 'verificacion-cobro-'.$cita->getKey();
+            $res = $this->competir(array_fill(0, 2, ['accion' => 'cobrar-cita', 'reserva' => $cita->getKey(), 'clave' => $clave]));
+
+            $cobros = $e->cobrosDeCita((int) $cita->getKey(), $clave);
+            $hechos = $this->hechos($res);
+            $this->comprobar($fallas, $hechos === 2, "{$hechos} de 2 intentos devolvieron el cobro");
+            $this->comprobar($fallas, $hechos < 2 || $res[0]['detalle'] === $res[1]['detalle'], 'los dos intentos devolvieron comprobantes distintos');
+            $this->comprobar($fallas, $cobros['ventas'] === 1, "{$cobros['ventas']} comprobantes del mismo cobro");
+            $this->comprobar($fallas, $cobros['pagos'] === 1, "{$cobros['pagos']} pagos del servicio");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).": 2 intentos → {$hechos} con el mismo cobro, {$cobros['pagos']} pago", $res);
         }
 
         return $fallas;
@@ -432,6 +463,49 @@ class VerificarConcurrencia extends Command
             $this->comprobar($fallas, $hechos === 1, "{$hechos} movimientos pasaron con 5 piezas");
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).": 3 ajustes de −4 y una venta de 2 con 5 piezas → quedan {$stock}", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Dos personas cambian de grupo a la vez en sentidos opuestos (A→B y B→A) desde la
+     * misma fecha (R08): los dos cambios pasan completos, cada una queda en un solo
+     * grupo con sus fechas de antes en el anterior y las de después en el nuevo, y sus
+     * créditos cuadran (nada a medias por un deadlock).
+     *
+     * @return list<string>
+     */
+    private function cambiosDeGrupoOpuestos(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $dia = 60 + $r * 5;
+            $a = $e->grupo($this->base['clase'], $this->base['sucursal'], $dia, 4, 7);
+            $b = $e->grupo($this->base['clase'], $this->base['sucursal'], $dia, 4, 8);
+            $ana = $e->alumno(10);
+            $beto = $e->alumno(10);
+            $deAna = $e->inscribir($a, $ana);
+            $deBeto = $e->inscribir($b, $beto);
+            $desde = $e->dia($dia + 2);
+            $res = $this->competir([
+                ['accion' => 'cambiar-grupo', 'inscripcion' => $deAna->getKey(), 'destino' => $b->getKey(), 'desde' => $desde],
+                ['accion' => 'cambiar-grupo', 'inscripcion' => $deBeto->getKey(), 'destino' => $a->getKey(), 'desde' => $desde],
+            ]);
+
+            $hechos = $this->hechos($res);
+            $this->comprobar($fallas, $hechos === 2, "{$hechos} de 2 cambios pasaron");
+            foreach ([['Ana', $ana, $a, $b], ['Beto', $beto, $b, $a]] as [$quien, $persona, $origen, $destino]) {
+                $antes = $e->reservasEnGrupo($persona, $origen);
+                $despues = $e->reservasEnGrupo($persona, $destino);
+                $this->comprobar($fallas, ! $e->inscritaEn($persona, $origen) && $e->inscritaEn($persona, $destino), "{$quien} no quedó solo en su grupo nuevo");
+                $this->comprobar($fallas, $antes === 2 && $despues === 2, "{$quien} quedó con {$antes} fechas en el anterior y {$despues} en el nuevo (se esperaban 2 y 2)");
+                foreach ($e->creditosCuadran($persona) as $f) {
+                    $fallas[] = "{$quien}: {$f}";
+                }
+            }
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).": A→B y B→A a la vez → {$hechos} cambios", $res);
         }
 
         return $fallas;

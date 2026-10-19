@@ -98,11 +98,14 @@ class CobroDeCitaTenantController
             $resumen = $cobrar();
         }
 
-        // El ticket, aparte del cobro: un reintento no lo vuelve a mandar si ya salió.
+        // El ticket, aparte del cobro: un reintento no lo vuelve a pedir si ya se pidió
+        // (dice cómo va); si falló, se reenvía aparte.
         $venta = $resumen['venta'];
         $envio = null;
         if ($enviarTicket && $venta !== null) {
-            $envio = $venta->ticket_enviado_en !== null || $this->tickets->enviar($venta->load('persona')) ? 'enviado' : 'fallido';
+            $envio = $venta->ticket_solicitado_en !== null || $venta->ticket_enviado_en !== null
+                ? $venta->estadoTicket()
+                : $this->tickets->enviar($venta->load('persona'));
         }
 
         return response()->json(['data' => [
@@ -116,7 +119,8 @@ class CobroDeCitaTenantController
             'metodo' => $resumen['metodo'],
             'orden_id' => $resumen['orden']?->ulid,
             // El comprobante de todo cobro (con el servicio) y cómo va su envío por correo:
-            // `enviado`, `fallido` (se reenvía aparte) o null si no se pidió.
+            // `enviado`, `pendiente` (en la cola), `fallido` (se reenvía aparte) o null si
+            // no se pidió.
             'venta_id' => $venta?->ulid,
             'ticket' => $venta !== null ? $this->tickets->datos($venta) : null,
             'ticket_envio' => $envio,

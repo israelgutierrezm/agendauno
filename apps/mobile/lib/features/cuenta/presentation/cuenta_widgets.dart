@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/calendario/agregar_calendario.dart';
 import '../../../core/formato.dart';
+import '../../../core/hora_negocio.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../../../core/network/participante_en_uso.dart';
 import '../../../core/theme/tema_agendauno.dart';
@@ -359,12 +360,18 @@ class _DetalleReserva extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(cuentaProvider.notifier);
+    // Las horas que se muestran son las del negocio (no las del teléfono).
+    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
+    // Instantes (no horas de pared): el calendario del teléfono los pasa a UTC y
+    // los muestra en su zona.
     final inicio = r.iniciaEn == null
         ? null
         : DateTime.tryParse(r.iniciaEn!)?.toLocal();
     final fin = r.terminaEn == null
         ? null
         : DateTime.tryParse(r.terminaEn!)?.toLocal();
+    // Hasta cuándo se acepta un lugar ofrecido (en la hora del negocio).
+    final expira = HoraNegocio.pared(r.ofertaExpiraEn, desfaseMin: desfase);
     final aviso = r.estado != 'confirmada';
     // Con anticipo (ADR 0161): lo que ya pagó y lo que paga en el negocio.
     final anticipo = r.cita?.textoAnticipo(
@@ -391,7 +398,7 @@ class _DetalleReserva extends ConsumerWidget {
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            Text(Formato.fechaHora(r.iniciaEn)),
+            Text(Formato.fechaHora(r.iniciaEn, desfaseMin: desfase)),
             Text(
               [
                 r.sucursal,
@@ -426,12 +433,11 @@ class _DetalleReserva extends ConsumerWidget {
                 child: Text('Tu lugar: ${r.lugar}'),
               ),
             // Un lugar ofrecido se acepta a tiempo o pasa al siguiente.
-            if (r.estado == 'ofrecida' && r.ofertaExpiraEn != null)
+            if (r.estado == 'ofrecida' && expira != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Acéptalo antes de las '
-                  '${Formato.hora(DateTime.parse(r.ofertaExpiraEn!).toLocal())}.',
+                  'Acéptalo antes de las ${Formato.hora(expira)}.',
                   style: TextStyle(color: context.colores.aviso),
                 ),
               ),
@@ -541,6 +547,7 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
   @override
   Widget build(BuildContext context) {
     final notifier = ref.read(cuentaProvider.notifier);
+    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
     // Lo que pasará al reservar (M05); sin respuesta, se puede intentar igual.
     final antes = ref.watch(antesDeReservarProvider(c.id)).value;
     // Si alguien tomó el lugar (u otra cosa cambió), se dice y se vuelve a pedir la
@@ -579,7 +586,7 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            Text(Formato.fechaHora(c.iniciaEn)),
+            Text(Formato.fechaHora(c.iniciaEn, desfaseMin: desfase)),
             Text(
               [
                 c.sucursal,
@@ -620,7 +627,7 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
               for (final dato in [
                 antes.motivoTexto,
                 antes.consumoTexto,
-                antes.cancelacionTexto(DateTime.now()),
+                antes.cancelacionTexto(DateTime.now(), desfaseMin: desfase),
                 if (antes.queLlevar != null) 'Qué llevar: ${antes.queLlevar}',
               ])
                 if (dato != null)
@@ -758,8 +765,9 @@ class _CalificarClaseState extends ConsumerState<CalificarClaseCard> {
   @override
   Widget build(BuildContext context) {
     final r = widget.r;
+    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
     final detalle = [
-      if (r.fecha != null) Formato.fechaHora(r.fecha),
+      if (r.fecha != null) Formato.fechaHora(r.fecha, desfaseMin: desfase),
       if (r.con != null) r.con!,
     ].join(' · ');
 

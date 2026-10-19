@@ -228,6 +228,7 @@ class ResumenDelDiaTenant
                 $totales['por_cobrar'] += $porCobrar ? 1 : 0;
             }
 
+            $local = CarbonImmutable::instance($s->inicia_en)->setTimezone((string) ($s->zona_horaria ?: app(FechasNegocioTenant::class)->zona()));
             $lista[] = [
                 'id' => $s->ulid,
                 'tipo' => $s->tipo->value,
@@ -243,8 +244,10 @@ class ResumenDelDiaTenant
                 'inicia_en' => $s->inicia_en->toIso8601String(),
                 'termina_en' => $s->termina_en->toIso8601String(),
                 'zona_horaria' => $s->zona_horaria,
-                // La hora de la sucursal ya calculada (R10): la app la muestra tal cual.
-                'inicia_local' => CarbonImmutable::instance($s->inicia_en)->setTimezone((string) ($s->zona_horaria ?: app(FechasNegocioTenant::class)->zona()))->format('Y-m-d\TH:i:s'),
+                // La hora de la sucursal ya calculada (R10): la app la muestra tal cual, y
+                // con su desfase sabe qué día es allá.
+                'inicia_local' => $local->format('Y-m-d\TH:i:s'),
+                'utc_offset_min' => $local->utcOffset(),
                 'capacidad' => $s->capacidad,
                 'ocupados' => $s->esCita() ? null : CupoDeSesionTenant::ocupadosCargados($s),
                 'esperados' => $esperados,
@@ -343,6 +346,10 @@ class ResumenDelDiaTenant
                     'zona_horaria' => $sucursal->zona_horaria,
                     'huecos' => count($huecos),
                     'siguiente' => $huecos[0]['inicia'] ?? null,
+                    // En la hora de la sede (R10), sin depender de la zona del teléfono.
+                    'siguiente_local' => isset($huecos[0]['inicia'])
+                        ? CarbonImmutable::parse((string) $huecos[0]['inicia'])->setTimezone((string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona()))->format('Y-m-d\TH:i:s')
+                        : null,
                 ];
             }
         }

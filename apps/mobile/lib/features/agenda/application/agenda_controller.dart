@@ -57,14 +57,13 @@ class AgendaDia {
   final List<SesionAgenda> sesiones;
   final List<Profesional> profesionales;
 
-  /// El día de hoy en la sucursal (con el desfase de sus sesiones), o en el
-  /// teléfono si el día no trae sesiones con desfase.
-  DateTime hoyEnSucursal(DateTime ahora) {
-    final conZona = sesiones.where((s) => s.desfaseMin != null).firstOrNull;
-    final local = ahora.toLocal();
-    return conZona?.hoyEnSucursal(ahora) ??
-        DateTime(local.year, local.month, local.day);
-  }
+  /// El día de hoy en la sucursal (con el desfase de sus sesiones), o null si el
+  /// día no trae sesiones con desfase (un día vacío): entonces vale el del negocio
+  /// (`Sesion.hoyEnNegocio`), no el del teléfono.
+  DateTime? hoyEnSucursal(DateTime ahora) => sesiones
+      .where((s) => s.desfaseMin != null)
+      .firstOrNull
+      ?.hoyEnSucursal(ahora);
 }
 
 /// Carga el día elegido y ejecuta las acciones de recepción (recarga al terminar).

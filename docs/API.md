@@ -489,6 +489,51 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
   celular ni `cliente_ref`, la fila es un error; la misma cita con otros datos, también.
   `resumen` suma `por_cobrar`, `por_cobrar_minor`, `pagadas_antes` y `moneda`.
 
+### Segunda revisión de R01–R14 (ADR 0166)
+
+- **Grupos**:
+  - Una inscripción con su baja aún por llegar sigue en el grupo: se puede adelantar
+    la baja o cambiarla de grupo. Repetir la baja con la misma fecha o una posterior
+    responde 409: solo se adelanta.
+  - Cerrar un grupo adelanta al cierre las bajas que caían después.
+  - Volver a inscribir a quien sigue inscrito conserva su `alta_desde`.
+  - Cambiar de grupo exige que la persona sea del alcance de quien lo hace, también en
+    `GET …/cambio`.
+- **Fichas**: el expediente de alguien del equipo y sus respuestas piden `miembros.ver`
+  además de `usuarios.gestionar`. En `GET /formularios`, `respuestas` cuenta solo las
+  que quien pide puede leer.
+- **Cobro de citas y mostrador**:
+  - El mismo intento que llega dos veces a la vez devuelve el mismo cobro.
+  - En el mostrador, repetir la clave y el cuerpo de una venta de otra sede responde
+    403, no la venta.
+  - En Tendencias, un comprobante de solo el servicio o la propina no cuenta como venta.
+- **Ticket** (`ticket_envio`): suma `pendiente`, cuando ya se pidió y sigue en la cola.
+  `enviado` solo cuando el correo salió; `fallido` cuando agotó sus intentos.
+  `POST /pos/ventas/{venta}/ticket` tiene tope (10 por minuto).
+- **Nómina** (`POST /nomina/cortes/{corte}/ajustes`):
+  - acepta `compensa_diferencia` (bool, por omisión false); solo los que la compensan
+    se restan de la diferencia;
+  - cada diferencia suma `otros_ajustes_minor` (un bono, por ejemplo);
+  - los ajustes anteriores cuentan como compensación.
+- **Embudo de citas**: `citas.interes` {`solicitudes`, `con_cita`}, las solicitudes
+  cuya persona agendó después una cita que sigue en pie. `confirmadas` ya no cuenta
+  las canceladas ni las vencidas.
+- **Inicio** (`GET /inicio/hoy`): cada sesión suma `utc_offset_min`; cada fila de
+  `libres` suma `siguiente_local` (hora de la sede, sin zona).
+- **Seguimiento automático, radar de renovaciones y embudo** (compra → asistencia):
+  cuentan la fecha de la clase, no la del registro de la asistencia.
+- **Pasarelas**: la comprueba un pago aprobado que se creó con la configuración
+  vigente (un pago iniciado antes del cambio no cuenta). En el quickstart, «cobro» se
+  cumple solo con una pasarela en línea comprobada (la de caja no cuenta). En Wellhub,
+  la llave de avisos que genera el negocio renueva `configurada_en`.
+- **Importar citas**:
+  - Sin `referencia`, la misma persona y servicio ese día a otra hora es un error: si
+    se movió, se cambia en la agenda; si son dos, llevan referencia.
+  - Un celular de varias fichas (sin las archivadas), sin correo ni `cliente_ref`, es
+    un error.
+  - Lo pagado afuera queda en `ordenes.pagado_fuera_minor`, sin un pago.
+  - Una cita pagada toda afuera tiene `estado_pago` `pagada`.
+
 ## Revisión operativa por áreas (ADR 0166)
 
 - **Agenda:** `estado_atencion` suma `apartada` (cita apartada en línea que espera su

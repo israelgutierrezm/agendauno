@@ -221,11 +221,8 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
                         child: Text.rich(
                           TextSpan(
                             children: [
-                              TextSpan(
-                                text: Formato.fechaHora(
-                                  u.iniciaEn.toIso8601String(),
-                                ),
-                              ),
+                              // Ya en la hora del negocio (ver UsoPlan).
+                              TextSpan(text: Formato.diaHora(u.iniciaEn)),
                               TextSpan(
                                 text:
                                     ' · ${u.clase ?? '—'}${u.extra ? ' (extra)' : ''}',

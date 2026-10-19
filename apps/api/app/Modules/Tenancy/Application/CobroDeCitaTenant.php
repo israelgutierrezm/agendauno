@@ -58,6 +58,15 @@ class CobroDeCitaTenant
 
         $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor, $huella): array {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+            // Ya con la cita bajo candado: si el mismo intento llegó dos veces a la vez
+            // (doble clic, reintento de red), el segundo encuentra aquí el cobro del
+            // primero y lo devuelve, en lugar de responder que ya está cobrada (R04).
+            $previa = $clave !== null ? VentaPosTenant::query()->where('clave_intento', $clave)->first() : null;
+            if ($previa instanceof VentaPosTenant) {
+                PuntoDeVentaTenant::exigirMismaOperacion($previa, (int) $reserva->getKey(), $huella);
+
+                return $this->resumenDeVenta($previa);
+            }
             $sesion = $bloqueada->sesion;
             $sucursal = $sesion !== null ? SucursalTenant::query()->find($sesion->sucursal_id) : null;
             if ($sucursal === null) {

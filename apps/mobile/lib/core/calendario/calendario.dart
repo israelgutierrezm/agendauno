@@ -1,5 +1,8 @@
 /// Calendario personal (alumno o instructor): el evento que se pinta, las vistas y
-/// las cuentas de fechas. Todo en hora local del dispositivo; sin dependencias.
+/// las cuentas de fechas. Las fechas son horas de pared (sin zona): las de la
+/// sucursal o el negocio, no las del teléfono; sin dependencias. Solo el enlace
+/// para agregar al calendario del teléfono ([Calendario.enlaceGoogle]) recibe
+/// instantes.
 enum VistaCal { lista, dia, semana, mes }
 
 extension EtiquetaVista on VistaCal {
@@ -29,6 +32,9 @@ class EventoCal {
 
   final String id;
   final String titulo;
+
+  /// La hora de pared en que empieza y termina (la de la sucursal o el negocio):
+  /// decide en qué día se pinta.
   final DateTime inicio;
   final DateTime? fin;
 

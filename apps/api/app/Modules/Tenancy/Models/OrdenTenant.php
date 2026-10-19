@@ -28,6 +28,8 @@ class OrdenTenant extends Model
         'metodo_pago', 'referencia_pago', 'pagada_en', 'domiciliar', 'cancelada_en', 'cancelada_por', 'contexto_medicion_id',
         // Renovación: cuándo vence lo que renueva (ADR 0166).
         'renueva_vence_el',
+        // Lo pagado en otro sistema antes de importarla (R14): no es ingreso de aquí.
+        'pagado_fuera_minor',
     ];
 
     /**
@@ -39,6 +41,7 @@ class OrdenTenant extends Model
         'descuento_minor' => 'integer',
         'pagada_en' => 'datetime',
         'renueva_vence_el' => 'date',
+        'pagado_fuera_minor' => 'integer',
         'domiciliar' => 'boolean',
         'cancelada_en' => 'datetime',
     ];

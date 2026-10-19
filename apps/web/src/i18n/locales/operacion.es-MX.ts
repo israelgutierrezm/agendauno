@@ -481,13 +481,21 @@ export default {
           ayudaCitas: "Renovaciones que tocaron en el periodo y se pagaron.",
         },
         // Negocio de citas (R11).
+        interes: {
+          titulo: "Solicitud → cita confirmada",
+          cifra: "{n} de {de}",
+          ayuda:
+            "Solicitudes del periodo de quienes después agendaron una cita que sigue en pie.",
+          ayudaCitas:
+            "Solicitudes del periodo de quienes después agendaron una cita que sigue en pie.",
+        },
         confirmadas: {
           titulo: "Agendadas → confirmadas",
           cifra: "{n} de {de}",
           ayuda:
-            "Citas agendadas en el periodo que quedaron confirmadas (no se vencieron sin pagar).",
+            "Citas agendadas en el periodo que siguen confirmadas (no se cancelaron ni se vencieron sin pagar).",
           ayudaCitas:
-            "Citas agendadas en el periodo que quedaron confirmadas (no se vencieron sin pagar).",
+            "Citas agendadas en el periodo que siguen confirmadas (no se cancelaron ni se vencieron sin pagar).",
         },
         asistenciaCita: {
           titulo: "Cita → asistencia",

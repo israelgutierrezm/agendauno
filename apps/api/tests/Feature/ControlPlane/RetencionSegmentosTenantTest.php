@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\SeguimientoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
@@ -177,4 +178,30 @@ it('la última visita es la fecha de la clase, no la del registro; y quien compr
     $sinIniciar = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/sin_iniciar", conBearer($e['bearer']))->assertOk()->json('data');
     expect(collect($sinIniciar)->pluck('id')->all())->toBe([$beto['persona']])
         ->and($sinIniciar[0]['detalle'])->toBe('Tiene su plan desde hace 20 días y aún no reserva su primera clase.');
+});
+
+it('el seguimiento automático, el radar y el embudo también cuentan la fecha de la clase (R12)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    // Compró hoy su plan, con una orden pagada (la cuenta el embudo).
+    $ana = crearMiembroTenant($e, 'Ana');
+    compraPagadaTenant($e, $ana);
+    $sesion = crearSesionTenant($e, $semilla, cuando: '2026-10-01 08:00:00');
+    // Vino el 9 de septiembre (hace 22 días) y su asistencia se registró hoy.
+    vinoEnSegmentos($e, $ana, $sesion, '2026-09-09 14:00:00', '2026-10-01 05:00:00');
+    enNegocioDeSegmentos($e, fn () => DerechoTenant::query()->update(['valido_hasta' => '2026-10-05']));
+
+    // Radar de renovaciones: su última clase es la del 9.
+    $radar = collect($this->getJson("/api/v1/app/{$e['slug']}/retencion/por-vencer", conBearer($e['bearer']))->assertOk()->json('data.miembros'));
+    expect($radar->firstWhere('id', $ana))->toMatchArray(['ultima_asistencia' => '2026-09-09', 'dias_sin_asistir' => 22]);
+
+    // Seguimiento automático: «sin asistir» (21 días), no «primera asistencia» de hoy.
+    enNegocioDeSegmentos($e, fn () => app(SeguimientoTenant::class)->generar());
+    $motivos = collect($this->getJson("/api/v1/app/{$e['slug']}/tareas?tipo=seguimiento", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->pluck('motivo')->all();
+    expect($motivos)->toBe(['sin_asistir']);
+
+    // Embudo: compró hoy y esa clase fue antes de comprar; no cuenta como que vino.
+    expect($this->getJson("/api/v1/app/{$e['slug']}/reportes/embudo", conBearer($e['bearer']))->assertOk()->json('data.compra_a_asistencia'))
+        ->toBe(['compradores_nuevos' => 1, 'asistieron' => 0]);
 });

@@ -34,6 +34,8 @@ export interface Embudo {
   };
   // Negocio de citas (R11): su propio recorrido, cada paso con su base.
   citas?: {
+    // De la solicitud a una cita confirmada (ausente en un API anterior).
+    interes?: { solicitudes: number; con_cita: number };
     agendadas: { agendadas: number; confirmadas: number };
     asistencia: { citas: number; asistieron: number };
     cobro: { atendidas: number; cobradas: number };
@@ -50,6 +52,7 @@ interface Paso {
     | "compra"
     | "asistencia"
     | "renovacion"
+    | "interes"
     | "confirmadas"
     | "asistenciaCita"
     | "cobro"
@@ -65,11 +68,21 @@ const pasos = computed<Paso[]>(() => {
     cantidad: e.sitio_a_solicitud.solicitudes,
     base: e.sitio_a_solicitud.visitas,
   };
-  // En citas: cita → asistencia → cobro → siguiente visita (no planes ni renovaciones).
+  // En citas: interés → cita confirmada → asistencia → cobro → siguiente visita (no
+  // planes ni renovaciones).
   const c = e.citas;
   if (props.citas && c) {
     return [
       sitio,
+      ...(c.interes
+        ? [
+            {
+              clave: "interes" as const,
+              cantidad: c.interes.con_cita,
+              base: c.interes.solicitudes,
+            },
+          ]
+        : []),
       {
         clave: "confirmadas",
         cantidad: c.agendadas.confirmadas,

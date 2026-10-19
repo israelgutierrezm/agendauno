@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Los celulares de las personas del negocio se comparan como número, no como texto
@@ -27,26 +28,39 @@ class CelularesTenant
      */
     public function buscar(Builder $consulta, string $celular): ?PersonaTenant
     {
+        return $this->todas($consulta, $celular)->first();
+    }
+
+    /**
+     * Todas las personas de `$consulta` con ese celular (en el orden en que se dieron de
+     * alta): con más de una, el celular no basta para saber quién es (R14).
+     *
+     * @param  Builder<PersonaTenant>  $consulta
+     * @return Collection<int, PersonaTenant>
+     */
+    public function todas(Builder $consulta, string $celular): Collection
+    {
         $celular = trim($celular);
         if ($celular === '') {
-            return null;
+            return new Collection;
         }
         $lada = $this->region->lada();
         $numero = TelefonoWhatsApp::normalizar($celular, $lada);
         if ($numero === null) {
-            return $consulta->where('celular', $celular)->first();
+            return $consulta->where('celular', $celular)->orderBy('id')->get();
         }
 
         // Solo las fichas con sus últimos 7 dígitos en orden (con lo que sea entre ellos:
-        // espacios, guiones, la lada…); de esas, la que es el mismo número.
+        // espacios, guiones, la lada…); de esas, las que son el mismo número.
         $patron = '%'.implode('%', str_split(substr($numero, -7))).'%';
 
         return $consulta
             ->where(fn (Builder $q) => $q->where('celular', $celular)->orWhere('celular', 'like', $patron))
             ->orderBy('id')
             ->get()
-            ->first(static fn (PersonaTenant $persona): bool => trim((string) $persona->celular) === $celular
-                || TelefonoWhatsApp::normalizar($persona->celular, $lada) === $numero);
+            ->filter(static fn (PersonaTenant $persona): bool => trim((string) $persona->celular) === $celular
+                || TelefonoWhatsApp::normalizar($persona->celular, $lada) === $numero)
+            ->values();
     }
 
     /** La persona dada de baja que tiene ese celular, o null. */

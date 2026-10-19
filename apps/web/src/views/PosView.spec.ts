@@ -251,7 +251,8 @@ describe("a quién se le vende (ADR 0145)", () => {
   it("a una persona con correo le manda su ticket, salvo que se desmarque", async () => {
     mocks.post.mockResolvedValue({
       data: {
-        data: { cambio_minor: null, ticket_enviado_en: "2026-10-01T18:00Z" },
+        // Sale por la cola: pendiente hasta que se manda (R06).
+        data: { cambio_minor: null, ticket_envio: "pendiente" },
       },
     });
     const w = mount(PosView, { global: { plugins: [i18n] } });

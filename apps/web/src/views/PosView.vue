@@ -473,7 +473,12 @@ async function cobrar(): Promise<void> {
   claveIntento ??= nuevaClave();
   try {
     const { data } = await api.post<{
-      data: { cambio_minor: number | null; ticket_enviado_en?: string | null };
+      data: {
+        cambio_minor: number | null;
+        ticket_enviado_en?: string | null;
+        // Sale por la cola (R06): pendiente hasta que se manda.
+        ticket_envio?: "enviado" | "pendiente" | "fallido" | null;
+      };
     }>(`${base.value}/pos/ventas`, {
       clave_intento: claveIntento,
       sucursal_id: sucursalSel.value,
@@ -492,7 +497,10 @@ async function cobrar(): Promise<void> {
     });
     const vuelto = data?.data?.cambio_minor ?? null;
     const ticket =
-      data?.data?.ticket_enviado_en && a?.email
+      (data?.data?.ticket_envio === "enviado" ||
+        data?.data?.ticket_envio === "pendiente" ||
+        data?.data?.ticket_enviado_en) &&
+      a?.email
         ? " " +
           t("mostradorVisual.comprador.ticketEnviadoA", { correo: a.email })
         : "";

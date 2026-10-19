@@ -94,7 +94,8 @@ it('vende a público en general por omisión o a un alumno, y le manda su ticket
 
     // Marcado: le llega su ticket con el folio y el total.
     $conTicket = venderCafeA($c, ['comprador_id' => $vale['id'], 'enviar_ticket' => true, 'propina_minor' => 500]);
-    expect($conTicket['ticket_enviado_en'])->not->toBeNull();
+    // En la cola: pendiente hasta que sale (R06).
+    expect($conTicket['ticket_envio'])->toBe('pendiente');
     Mail::assertQueued(CorreoTicketVenta::class, function (CorreoTicketVenta $correo) use ($conTicket): bool {
         $html = (string) $correo->content()->htmlString;
 

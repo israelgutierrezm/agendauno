@@ -6,6 +6,9 @@ namespace App\Modules\Platform\Operacion;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
+use App\Modules\Tenancy\Application\BajasDeGrupoTenant;
+use App\Modules\Tenancy\Application\CobroDeCitaTenant;
+use App\Modules\Tenancy\Application\InscribirEnGrupoTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
@@ -23,10 +26,14 @@ use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
+use App\Modules\Tenancy\Models\InscripcionGrupoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -34,6 +41,7 @@ use App\Modules\Tenancy\Models\RetencionCreditoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
@@ -68,6 +76,9 @@ class EscenariosConcurrencia
         private readonly LibroMayorTenant $libro,
         private readonly InventarioTenant $inventario,
         private readonly PuntoDeVentaTenant $mostrador,
+        private readonly CobroDeCitaTenant $cobro,
+        private readonly InscribirEnGrupoTenant $inscribir,
+        private readonly BajasDeGrupoTenant $bajas,
     ) {}
 
     /**
@@ -155,6 +166,57 @@ class EscenariosConcurrencia
     }
 
     /**
+     * Un grupo (curso) con `$fechas` fechas diarias de la clase desde `$dia`, a la
+     * `$hora`: la serie de su horario.
+     */
+    public function grupo(int $claseId, int $sucursalId, int $dia, int $fechas, int $hora): GrupoTenant
+    {
+        $plantilla = PlantillaHorarioTenant::query()->create([
+            'oferta_id' => $claseId,
+            'sucursal_id' => $sucursalId,
+            'dias_semana' => [1, 2, 3, 4, 5, 6, 7],
+            'hora_local' => sprintf('%02d:00', $hora),
+            'duracion_minutos' => 60,
+            'capacidad' => 10,
+            'activo' => true,
+            'vigente_desde' => CarbonImmutable::now('America/Mexico_City')->toDateString(),
+        ]);
+        foreach (range(0, $fechas - 1) as $k) {
+            $this->sesion($claseId, $sucursalId, 10, $dia + $k, $hora)->update(['serie_id' => $plantilla->getKey()]);
+        }
+
+        return GrupoTenant::query()->create(['nombre' => 'Grupo '.Str::random(6), 'plantilla_id' => $plantilla->getKey(), 'activo' => true]);
+    }
+
+    /** Inscribe a la persona en el grupo (con sus reservas de todas sus fechas). */
+    public function inscribir(GrupoTenant $grupo, PersonaTenant $persona): InscripcionGrupoTenant
+    {
+        return $this->inscribir->inscribir($grupo, $persona)['inscripcion'];
+    }
+
+    /** El día del negocio a `$dia` días (como lo cuentan {@see self::sesion()} y {@see self::grupo()}). */
+    public function dia(int $dia): string
+    {
+        return CarbonImmutable::now('America/Mexico_City')->addDays(self::DIAS_BASE + $dia)->toDateString();
+    }
+
+    /** Reservas que siguen en pie de la persona en las fechas del grupo. */
+    public function reservasEnGrupo(PersonaTenant $persona, GrupoTenant $grupo): int
+    {
+        return ReservaTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::EnEspera->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])
+            ->whereHas('sesion', fn ($q) => $q->where('serie_id', $grupo->plantilla_id))
+            ->count();
+    }
+
+    /** Si la persona sigue inscrita (activa) en el grupo. */
+    public function inscritaEn(PersonaTenant $persona, GrupoTenant $grupo): bool
+    {
+        return InscripcionGrupoTenant::query()->where('grupo_id', $grupo->getKey())->where('persona_id', $persona->getKey())->where('activo', true)->exists();
+    }
+
+    /**
      * Un alumno (sin correo: nada le llega) con un paquete de `$creditos` clases.
      */
     public function alumno(int $creditos): PersonaTenant
@@ -212,6 +274,21 @@ class EscenariosConcurrencia
             30,
             porNegocio: true,
         );
+    }
+
+    /**
+     * Los comprobantes de un intento de cobro y los pagos de la orden de la cita.
+     *
+     * @return array{ventas: int, pagos: int}
+     */
+    public function cobrosDeCita(int $reservaId, string $clave): array
+    {
+        $orden = ReservaTenant::query()->findOrFail($reservaId)->orden_id;
+
+        return [
+            'ventas' => VentaPosTenant::query()->where('clave_intento', $clave)->count(),
+            'pagos' => PagoTenant::query()->where('orden_id', $orden)->count(),
+        ];
     }
 
     /**
@@ -314,10 +391,32 @@ class EscenariosConcurrencia
             'ajustar-inventario' => $this->prepararAjustarInventario((int) $paso['articulo'], (int) $paso['sucursal'], (int) $paso['delta']),
             'vender-mostrador' => $this->prepararVenderMostrador((int) $paso['articulo'], (int) $paso['sucursal'], (int) $paso['cantidad']),
             'vender-carrito' => $this->prepararVenderCarrito(array_map(intval(...), (array) $paso['articulos']), (int) $paso['sucursal']),
+            'cobrar-cita' => $this->prepararCobrarCita((int) $paso['reserva'], (string) $paso['clave']),
+            'cambiar-grupo' => $this->prepararCambiarGrupo((int) $paso['inscripcion'], (int) $paso['destino'], (string) $paso['desde']),
             'aprovisionar' => $this->prepararAprovisionar((int) $paso['estudio']),
             'migrar' => $this->prepararMigrar((int) $paso['estudio']),
             default => throw new InvalidArgumentException("Paso desconocido: {$paso['accion']}"),
         };
+    }
+
+    /**
+     * El cobro de solo el servicio de una cita, en efectivo, con la clave del intento
+     * (como el botón «Cobrar» del panel). Devuelve el comprobante.
+     */
+    private function prepararCobrarCita(int $reservaId, string $clave): callable
+    {
+        $reserva = ReservaTenant::query()->findOrFail($reservaId);
+
+        return fn (): string => (string) $this->cobro->cobrar($reserva, 'efectivo', [], 0, 100000, null, $clave, null)['venta']?->ulid;
+    }
+
+    /** El cambio de grupo de una persona desde un día (confirmado aunque sea parcial). */
+    private function prepararCambiarGrupo(int $inscripcionId, int $destinoId, string $desde): callable
+    {
+        $inscripcion = InscripcionGrupoTenant::query()->findOrFail($inscripcionId);
+        $destino = GrupoTenant::query()->findOrFail($destinoId);
+
+        return fn (): string => $this->bajas->cambiar($inscripcion, $destino, $desde, null, parcial: true)['aplicado'] ? 'aplicado' : 'sin aplicar';
     }
 
     /** Un ajuste a mano del inventario (con el artículo bloqueado, como en el panel). */

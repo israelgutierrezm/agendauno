@@ -31,6 +31,8 @@ use Illuminate\Support\Carbon;
  * @property int $servicio_minor lo que se cobró de esa cita en el mismo cobro
  * @property Carbon|null $anulada_en
  * @property Carbon|null $ticket_enviado_en
+ * @property Carbon|null $ticket_envio_fallido_en
+ * @property Carbon|null $ticket_solicitado_en cuándo se pidió mandarlo (sale por la cola)
  */
 class VentaPosTenant extends Model
 {
@@ -44,6 +46,7 @@ class VentaPosTenant extends Model
         'sucursal_id', 'total_minor', 'moneda', 'metodo_pago', 'usuario_id', 'anulada_en', 'anulada_por', 'motivo_anulacion',
         'propina_minor', 'recibido_minor', 'persona_id', 'ticket_enviado_en', 'clave_intento',
         'orden_id', 'servicio_minor', 'reserva_id', 'huella_intento', 'ticket_envio_fallido_en',
+        'ticket_solicitado_en',
     ];
 
     /**
@@ -57,7 +60,23 @@ class VentaPosTenant extends Model
         'anulada_en' => 'datetime',
         'ticket_enviado_en' => 'datetime',
         'ticket_envio_fallido_en' => 'datetime',
+        'ticket_solicitado_en' => 'datetime',
     ];
+
+    /**
+     * Cómo va el correo de su ticket (R06): `enviado` (la cola lo mandó), `fallido`
+     * (agotó sus intentos o no se pudo encolar; se reenvía), `pendiente` (pedido, aún en
+     * la cola) o null si nunca se pidió.
+     */
+    public function estadoTicket(): ?string
+    {
+        return match (true) {
+            $this->ticket_envio_fallido_en !== null => 'fallido',
+            $this->ticket_enviado_en !== null => 'enviado',
+            $this->ticket_solicitado_en !== null => 'pendiente',
+            default => null,
+        };
+    }
 
     /**
      * @return HasMany<LineaVentaPosTenant, $this>

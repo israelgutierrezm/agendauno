@@ -111,9 +111,14 @@ class CortesNominaTenantController
             'usuario_id' => ['required', 'string'],
             'monto_minor' => ['required', 'integer', 'between:-100000000000,100000000000'],
             'motivo' => ['required', 'string', 'max:250'],
+            // Corrige una diferencia del cálculo (R09): se resta de lo que falta.
+            'compensa_diferencia' => ['sometimes', 'boolean'],
         ]);
         $persona = Usuario::query()->where('ulid', $validado['usuario_id'])->firstOrFail();
-        $ajuste = $this->cortes->ajustar($this->corte($request), $persona, (int) $validado['monto_minor'], trim($validado['motivo']), $this->actor($request));
+        $ajuste = $this->cortes->ajustar(
+            $this->corte($request), $persona, (int) $validado['monto_minor'], trim($validado['motivo']), $this->actor($request),
+            (bool) ($validado['compensa_diferencia'] ?? false),
+        );
 
         return response()->json(['data' => ['id' => $ajuste->ulid, 'monto_minor' => $ajuste->monto_minor]], 201);
     }

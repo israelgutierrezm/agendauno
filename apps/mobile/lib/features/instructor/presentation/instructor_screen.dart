@@ -374,8 +374,8 @@ class _MisClases extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final terminos =
-        ref.watch(sesionProvider)?.terminologia ?? const Terminologia();
+    final sesion = ref.watch(sesionProvider);
+    final terminos = sesion?.terminologia ?? const Terminologia();
     final clases = terminos.sesiones.toLowerCase();
     final estado = ref.watch(misClasesProvider);
     // Al cambiar de rango se conserva lo anterior mientras llega lo nuevo.
@@ -394,6 +394,8 @@ class _MisClases extends ConsumerWidget {
       onRefresh: () => ref.refresh(misClasesProvider.future),
       child: CalendarioVistas(
         vistaInicial: vista,
+        // «Hoy» es el del negocio (como el rango de Mis clases), no el del teléfono.
+        hoy: hoyDelNegocio(sesion, DateTime.now()),
         eventos: eventos,
         onAbrir: abrir,
         onRango: (desde, hasta) =>

@@ -102,7 +102,10 @@ class InicioTab extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     [
-                      Formato.fechaHora(proxima.iniciaEn),
+                      Formato.fechaHora(
+                        proxima.iniciaEn,
+                        desfaseMin: sesion?.desfaseNegocioMin,
+                      ),
                       if (proxima.sucursal != null) proxima.sucursal!,
                     ].join(' · '),
                   ),
@@ -117,6 +120,8 @@ class InicioTab extends ConsumerWidget {
                     runSpacing: 4,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
+                      // Instantes: el calendario del teléfono los muestra en su
+                      // zona.
                       BotonAgregarCalendario(
                         primario: true,
                         evento: 'reserva-${proxima.id}',

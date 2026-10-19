@@ -47,7 +47,8 @@ class PublicadorWellhub implements PublicadorPlataforma
     {
         $llaves = $integracion->llaves();
         $secreto = $llaves['webhook_secret'] ?? '';
-        if ($secreto === '') {
+        $nuevo = $secreto === '';
+        if ($nuevo) {
             $secreto = Str::random(40);
         }
         $resultado = $this->cliente->registrarAvisos($llaves, $url, $secreto);
@@ -56,6 +57,10 @@ class PublicadorWellhub implements PublicadorPlataforma
         }
         // La llave solo se guarda si Wellhub ya firma con ella.
         $integracion->credenciales = [...$llaves, 'webhook_secret' => $secreto];
+        // Una llave nueva es otra configuración (R13): lo que llegó antes no la comprueba.
+        if ($nuevo) {
+            $integracion->configurada_en = now();
+        }
         $integracion->webhook_registrado_en = now();
         $integracion->reservas_registradas_en = now();
         $integracion->save();

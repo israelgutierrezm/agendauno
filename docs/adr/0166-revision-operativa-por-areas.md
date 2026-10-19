@@ -159,6 +159,77 @@ teléfono esté en otra zona, antes de cargar las sesiones, sin un paquete de zo
   - cómo reactivarlo;
   - qué hacer con un cargo de renta que no se cobró.
 
+## Segunda revisión de R01–R14
+
+Se repasaron los criterios de aceptación de R01–R14 (ADR 0165) contra el código y se
+corrigió lo que todavía fallaba.
+
+- **R01:** cambiar de grupo exige que la persona sea del alcance de quien lo hace, como
+  al inscribir.
+- **R02:** las respuestas de una ficha piden lo mismo que el expediente: `miembros.ver`
+  siempre y, las de alguien del equipo, además `usuarios.gestionar`. Así un rol
+  anterior a los requisitos no las lee. El contador de respuestas de cada ficha cuenta
+  solo las que quien lo ve puede leer.
+- **R03:**
+  - Cerrar un grupo antes de una baja futura adelanta esa baja al cierre: no conserva
+    ni se le cobran fechas de un grupo cerrado.
+  - Una baja futura se puede adelantar o cambiar de grupo, pero no posponer (409).
+  - Volver a inscribir a quien sigue inscrito conserva su alta: no adelanta el alta de
+    un cambio de grupo.
+- **R04:** dentro de la transacción, con la cita bajo candado, se vuelve a buscar el
+  intento: dos peticiones idénticas a la vez devuelven el mismo cobro. En Tendencias,
+  el comprobante de solo el servicio no cuenta como venta.
+- **R05:** en el mostrador, la venta previa se devuelve solo después de revisar la sede
+  y al comprador.
+- **R06:**
+  - Se puede pedir el ticket al cobrar solo el servicio y, si no se pidió, mandarlo
+    desde el comprobante.
+  - El correo sale por la cola: `ventas_pos.ticket_solicitado_en` lo deja `pendiente`,
+    y el propio correo marca `enviado` al salir o `fallido` al agotar sus intentos.
+  - Reenviar tiene tope.
+- **R07:** tras un conflicto, el carrito de la cita toma el precio y el stock de ahora.
+  Una cantidad mayor a la de la sucursal se dice y no se cobra.
+- **R08:**
+  - El cambio de grupo bloquea los dos grupos en orden de id antes de tocar sus fechas,
+    y se reintenta ante un deadlock.
+  - Un error de base de datos al reservar dentro del cambio deshace todo el cambio; ya
+    no se toma como «no reservada».
+  - La bitácora del cambio y la vista previa sin eventos quedan probadas.
+  - `agendauno:verificar-concurrencia` (MySQL, en CI) prueba dos cambios opuestos a la
+    vez y dos cobros iguales a la vez.
+- **R09:** solo los ajustes que corrigen una diferencia (`compensa_diferencia`, el
+  botón «Ajustar») se restan de lo que falta. Un bono va aparte. Los anteriores (null)
+  cuentan como corrección, como hasta ahora.
+- **R10:** la app muestra días y horas en la zona de la sucursal o del negocio:
+  - el inicio pide el día del negocio;
+  - en un día vacío la agenda usa el día del negocio;
+  - Mis clases;
+  - los huecos libres (`siguiente_local`);
+  - el portal del cliente;
+  - el desfase se actualiza al cambiar de rol.
+
+  «Agregar a mi calendario» sigue con el instante real.
+- **R11:** el embudo de citas suma «interés → cita confirmada» y no cuenta las
+  canceladas como confirmadas. Queda probado en el API.
+- **R12:** el seguimiento automático (sin asistir y primera asistencia), el radar de
+  renovaciones y el paso compra → asistencia del embudo usan la fecha de la clase.
+- **R13:**
+  - La evidencia de una pasarela es un pago creado con su configuración vigente.
+  - «Cobrar en línea» del quickstart pide una pasarela en línea comprobada.
+  - La llave de avisos que genera el negocio en Wellhub renueva `configurada_en`.
+- **R14:**
+  - Sin referencia, una cita movida ese mismo día no se agrega en silencio.
+  - Un celular de varias fichas pide el correo o el número de cliente.
+  - Lo pagado afuera queda en `ordenes.pagado_fuera_minor`, y una cita pagada toda
+    afuera aparece como pagada.
+  - Quedan probados la referencia repetida, el cambio de profesional, el número de
+    cliente en conflicto, que no hay ingreso nuevo y el resumen de la web.
+
+Sin cambiar a propósito:
+- Las fechas solo día (vencimientos, pausas) las calcula el servidor.
+- En el portal, una sucursal en otra zona que la del negocio se muestra en la hora del
+  negocio: el API del portal no manda el desfase de cada sede.
+
 ## Pendiente de decidir (dueño)
 
 - **Cobro mixto** (efectivo más tarjeta en una venta): pide pagos por venta y una

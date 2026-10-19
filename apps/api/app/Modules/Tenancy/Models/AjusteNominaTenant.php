@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $moneda
  * @property string $motivo
  * @property string|null $registrado_por_nombre
+ * @property bool|null $compensa_diferencia si corrige una diferencia del cálculo (R09); null = anterior
  */
 class AjusteNominaTenant extends Model
 {
@@ -27,12 +28,19 @@ class AjusteNominaTenant extends Model
 
     protected $table = 'ajustes_nomina';
 
-    protected $fillable = ['corte_id', 'usuario_id', 'usuario_nombre', 'monto_minor', 'moneda', 'motivo', 'registrado_por_id', 'registrado_por_nombre'];
+    protected $fillable = ['corte_id', 'usuario_id', 'usuario_nombre', 'monto_minor', 'moneda', 'motivo', 'registrado_por_id', 'registrado_por_nombre', 'compensa_diferencia'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
         'monto_minor' => 'integer',
+        'compensa_diferencia' => 'boolean',
     ];
+
+    /** Si se resta de lo que falta por la diferencia (las anteriores, sí). */
+    public function compensa(): bool
+    {
+        return $this->compensa_diferencia !== false;
+    }
 }

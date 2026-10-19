@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AccesoExpedienteTenant;
 use App\Modules\Tenancy\Application\FichasDeDatosTenant;
 use App\Modules\Tenancy\Models\CampoFormulario;
 use App\Modules\Tenancy\Models\Formulario;
+use App\Modules\Tenancy\Models\RespuestaFormulario;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\TipoCampo;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -37,7 +40,7 @@ class FormulariosController
         $comoMiembro = $usuario instanceof Usuario && $usuario->rolActivo() === 'miembro';
         $formularios = Formulario::query()
             ->with('campos')
-            ->when($disena, fn ($q) => $q->withCount('respuestas'))
+            ->when($disena, fn ($q) => $q->withCount($this->contarRespuestas($request)))
             ->when($archivados, fn ($q) => $q->whereNotNull('archivado_en'), fn ($q) => $q->whereNull('archivado_en'))
             ->when(! $disena, fn ($q) => $q->where('activo', true))
             ->when($comoMiembro, fn ($q) => $q->whereIn('aplica_a', ['miembro', 'todos']))
@@ -94,7 +97,7 @@ class FormulariosController
             'confirmar_nueva_version' => ['sometimes', 'boolean'],
         ]);
 
-        $guardado = $this->fichas->guardar($formulario, $datos, $request->boolean('confirmar_nueva_version'))->loadCount('respuestas');
+        $guardado = $this->fichas->guardar($formulario, $datos, $request->boolean('confirmar_nueva_version'))->loadCount($this->contarRespuestas($request));
 
         return response()->json(['data' => $this->presentar($guardado)]);
     }
@@ -108,7 +111,7 @@ class FormulariosController
         $formulario = $this->resolver($request);
         $formulario->update(['archivado_en' => now(), 'activo' => false]);
 
-        return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount('respuestas'))]);
+        return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount($this->contarRespuestas($request)))]);
     }
 
     /**
@@ -124,7 +127,7 @@ class FormulariosController
         }
         $formulario->update(['activo' => true]);
 
-        return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount('respuestas'))]);
+        return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount($this->contarRespuestas($request)))]);
     }
 
     public function restaurar(Request $request): JsonResponse
@@ -132,7 +135,7 @@ class FormulariosController
         $formulario = $this->resolver($request);
         $formulario->update(['archivado_en' => null, 'activo' => true]);
 
-        return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount('respuestas'))]);
+        return response()->json(['data' => $this->presentar($formulario->load('campos')->loadCount($this->contarRespuestas($request)))]);
     }
 
     private function resolver(Request $request): Formulario
@@ -173,6 +176,22 @@ class FormulariosController
         $this->fichas->cambioDePreguntas($formulario);
 
         return response()->json(['data' => $this->presentarCampo($campo)], 201);
+    }
+
+    /**
+     * Las respuestas que cuenta la ficha (R02): las que puede leer quien la pide, con
+     * la regla del expediente, para que el contador diga lo mismo que la lista.
+     *
+     * @return array<string, \Closure(Builder<RespuestaFormulario>): void>
+     */
+    private function contarRespuestas(Request $request): array
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($usuario instanceof Usuario, 401);
+
+        return ['respuestas' => static function (Builder $q) use ($usuario): void {
+            AccesoExpedienteTenant::acotar($q, $usuario);
+        }];
     }
 
     /**

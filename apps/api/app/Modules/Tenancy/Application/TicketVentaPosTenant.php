@@ -69,14 +69,19 @@ class TicketVentaPosTenant
     /**
      * Se lo manda a quien compró, si tiene correo. Si el correo no sale, la venta queda
      * registrada igual (se reporta el error y no se marca como enviado).
+     *
+     * El correo sale por la cola (R06): pedirlo lo deja `pendiente`, y el propio correo
+     * marca la venta como `enviado` al salir o `fallido` si agota sus intentos
+     * ({@see CorreoTicketVenta}). Devuelve cómo quedó: `enviado`, `pendiente` o `fallido`.
      */
-    public function enviar(VentaPosTenant $venta): bool
+    public function enviar(VentaPosTenant $venta): string
     {
         $persona = $venta->persona;
         $estudio = $this->gestor->actual();
         if ($persona === null || ($persona->email ?? '') === '' || $estudio === null) {
-            return false;
+            return 'fallido';
         }
+        $venta->update(['ticket_solicitado_en' => now(), 'ticket_enviado_en' => null, 'ticket_envio_fallido_en' => null]);
 
         $ticket = $this->datos($venta);
         $creado = $venta->created_at !== null ? CarbonImmutable::instance($venta->created_at) : CarbonImmutable::now();
@@ -88,16 +93,17 @@ class TicketVentaPosTenant
                 (string) $estudio->nombre,
                 $ticket + ['fecha' => $fecha, 'nombre' => (string) $persona->nombre],
                 $estudio->contacto_email,
+                (string) $venta->ulid,
             ));
         } catch (Throwable $e) {
             report($e);
             // El cobro queda; el envío falló y se puede reenviar (R06).
             $venta->update(['ticket_envio_fallido_en' => now()]);
 
-            return false;
+            return 'fallido';
         }
-        $venta->update(['ticket_enviado_en' => now(), 'ticket_envio_fallido_en' => null]);
 
-        return true;
+        // Con una cola en el acto (sync) ya salió; si no, sigue pendiente.
+        return $venta->refresh()->estadoTicket() ?? 'pendiente';
     }
 }

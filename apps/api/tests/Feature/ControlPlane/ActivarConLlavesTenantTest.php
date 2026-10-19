@@ -161,6 +161,50 @@ it('activar una pasarela no es lo mismo que tener la conexión comprobada (un pa
         ->assertJsonPath('data.estado_conexion', 'activa_sin_comprobar');
 });
 
+it('pasar de pruebas a real se vuelve a comprobar, y un pago iniciado antes del cambio no la comprueba (R13)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $url = "/api/v1/app/{$e['slug']}/pasarelas";
+    $mp = fn (): array => collect($this->getJson($url, conBearer($e['bearer']))->assertOk()->json('data'))->keyBy('proveedor')['mercadopago'];
+    $cobroEnLinea = fn (): bool => (bool) collect($this->getJson("/api/v1/app/{$e['slug']}/onboarding/quickstart", conBearer($e['bearer']))->assertOk()->json('data.tareas'))
+        ->firstWhere('clave', 'cobro')['hecho'];
+    $persona = crearMiembroTenant($e, 'Ana');
+    $pago = function (bool $aprobado) use ($e, $persona): int {
+        return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), function () use ($persona, $aprobado): int {
+            $orden = OrdenTenant::query()->create([
+                'persona_id' => PersonaTenant::query()->where('ulid', $persona)->value('id'), 'estado' => 'pendiente', 'total_minor' => 10000, 'moneda' => 'MXN',
+            ]);
+
+            return (int) PagoTenant::query()->create([
+                'orden_id' => $orden->id, 'proveedor' => 'mercadopago', 'metodo' => 'tarjeta', 'estado' => $aprobado ? 'aprobado' : 'pendiente',
+                'monto_minor' => 10000, 'moneda' => 'MXN', 'aprobado_en' => $aprobado ? now() : null,
+            ])->getKey();
+        });
+    };
+
+    // Solo la caja encendida: cobrar en línea no está hecho.
+    expect($cobroEnLinea())->toBeFalse();
+    $this->putJson("{$url}/mercadopago", ['activa' => true, 'modo' => 'test', 'credenciales' => ['access_token' => 'TEST-123']], conBearer($e['bearer']))->assertOk();
+    expect($cobroEnLinea())->toBeFalse();
+    $pago(true);
+    expect($mp()['estado_conexion'])->toBe('comprobada')->and($cobroEnLinea())->toBeTrue();
+
+    // Un pago se inicia en pruebas y pasa a real antes de que lo aprueben.
+    $pendiente = $pago(false);
+    $this->travel(1)->minutes();
+    $this->putJson("{$url}/mercadopago", ['activa' => true, 'modo' => 'live', 'credenciales' => ['access_token' => 'APP_USR-456']], conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.estado_conexion', 'activa_sin_comprobar');
+    $this->travel(1)->minutes();
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), fn () => PagoTenant::query()->whereKey($pendiente)->update(['estado' => 'aprobado', 'aprobado_en' => now()]));
+    // Aprobado después, pero es de la configuración anterior: no comprueba la real.
+    expect($mp())->toMatchArray(['estado_conexion' => 'activa_sin_comprobar', 'comprobada_en' => null])
+        ->and($mp()['ultimo_exito_anterior_en'])->not->toBeNull()
+        ->and($cobroEnLinea())->toBeFalse();
+
+    // Uno iniciado con la real sí.
+    $pago(true);
+    expect($mp()['estado_conexion'])->toBe('comprobada')->and($cobroEnLinea())->toBeTrue();
+});
+
 it('la plataforma no activa Stripe para la renta sin su llave secreta', function (): void {
     Config::set('agendauno.plataforma.token', 'token-plataforma');
     $cabeceras = ['Accept' => 'application/json', 'Authorization' => 'Bearer token-plataforma'];

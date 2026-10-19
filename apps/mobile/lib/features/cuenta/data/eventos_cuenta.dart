@@ -1,4 +1,5 @@
 import '../../../core/calendario/calendario.dart';
+import '../../../core/hora_negocio.dart';
 import 'cuenta_models.dart';
 
 /// Estados de una reserva que siguen en pie (las que ve en su calendario).
@@ -40,10 +41,16 @@ String lugaresTexto(ClaseMiembro c) {
 
 /// Lo que pinta su calendario: sus reservas resaltadas y las clases disponibles
 /// (las del periodo que se ve, si se pasan). El id de cada evento es el de la
-/// reserva o el de la clase.
-List<EventoCal> eventosDeCuenta(MiCuenta c, {List<ClaseMiembro>? clases}) {
+/// reserva o el de la clase. En los días y las horas del negocio ([desfaseMin], el
+/// de la sesión; el portal no recibe la hora de cada sucursal), no en los del
+/// teléfono.
+List<EventoCal> eventosDeCuenta(
+  MiCuenta c, {
+  List<ClaseMiembro>? clases,
+  int? desfaseMin,
+}) {
   DateTime? fecha(String? iso) =>
-      iso == null ? null : DateTime.tryParse(iso)?.toLocal();
+      HoraNegocio.pared(iso, desfaseMin: desfaseMin);
   String detalle(String? sucursal, String? instructor) => [
     sucursal,
     if (instructor != null) 'con $instructor',

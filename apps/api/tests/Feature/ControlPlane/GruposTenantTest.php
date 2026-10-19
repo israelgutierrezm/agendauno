@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Listeners\ReservarInscritosEnFechasNuevas;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\WebhookSalienteTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
@@ -179,8 +181,8 @@ it('una baja desde una fecha cancela sus reservas del grupo desde ahí y le devu
     // Hasta el día de su baja sigue contando como inscrita (R03).
     $this->getJson("/api/v1/app/{$e['slug']}/grupos", conBearer($e['bearer']))->assertJsonPath('data.0.inscritos', 1);
 
-    // Dos veces, no.
-    $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones/{$inscripcion}/baja", [], conBearer($e['bearer']))
+    // Dos veces, no (con su baja puesta solo se adelanta).
+    $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones/{$inscripcion}/baja", ['desde' => $desde], conBearer($e['bearer']))
         ->assertStatus(409);
 
     $asiento = $this->getJson("/api/v1/app/{$e['slug']}/auditorias?accion=grupo.baja", conBearer($e['bearer']))->json('data.0.descripcion');
@@ -363,6 +365,15 @@ it('cada grupo es de la sucursal de su horario: quien está en una sede no ve ni
         'vigente_desde' => Carbon::now()->toDateString(),
     ], $dueno)->assertCreated()->json('data.id');
     $this->postJson("{$app}/grupos", ['nombre' => 'Otro', 'plantilla_id' => $plantillaPolanco], $coord)->assertForbidden();
+
+    // Alguien de Polanco que el dueño inscribió en un grupo de Roma: Roma no la cambia a
+    // otro grupo (sería inscribir a alguien que no es de su sede), ni en la vista previa.
+    $otroRoma = grupoConFechasParaCambio($e, $roma, 'Natación Roma 19:00', 3);
+    $this->postJson("{$app}/grupos/{$grupoRoma}/inscripciones", ['persona_id' => $beto], $dueno)->assertCreated();
+    $deBeto = (string) collect($this->getJson("{$app}/grupos/{$grupoRoma}/inscripciones", $dueno)->json('data'))->firstWhere('persona', 'Beto')['id'];
+    $this->getJson("{$app}/grupos/{$grupoRoma}/inscripciones/{$deBeto}/cambio?grupo_id={$otroRoma}", $coord)->assertForbidden();
+    $this->postJson("{$app}/grupos/{$grupoRoma}/inscripciones/{$deBeto}/cambiar", ['grupo_id' => $otroRoma], $coord)->assertForbidden();
+    $this->postJson("{$app}/grupos/{$grupoRoma}/inscripciones/{$deBeto}/cambiar", ['grupo_id' => $otroRoma, 'parcial' => true], $dueno)->assertOk();
 });
 
 /**
@@ -438,6 +449,12 @@ it('cambiar de grupo es todo o nada: la vista previa no cambia nada y un cambio 
             ->and(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(0);
     };
 
+    $eventos = fn (): int => app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        static fn (): int => EventoOutboxTenant::query()->count(),
+    );
+    $antes = $eventos();
+
     // Vista previa: dice qué pasaría, fecha por fecha, sin cambiar nada.
     $this->getJson("{$url}/cambio?grupo_id={$destino}", $dueno)->assertOk()
         ->assertJsonPath('data.completo', false)->assertJsonPath('data.aplicado', false)
@@ -449,10 +466,72 @@ it('cambiar de grupo es todo o nada: la vista previa no cambia nada y un cambio 
     $this->postJson("{$url}/cambiar", ['grupo_id' => $destino], $dueno)->assertStatus(409)
         ->assertJsonPath('meta.completo', false)->assertJsonPath('meta.alta.no_reservadas', 1);
     $nadaCambio();
+    // Ni avisos pendientes (reservas, cancelaciones) ni registro en la bitácora.
+    expect($eventos())->toBe($antes);
+    $this->getJson("{$app}/auditorias?accion=grupo.cambio", $dueno)->assertOk()->assertJsonCount(0, 'data');
 
     // Confirmado: se aplica todo junto.
     $this->postJson("{$url}/cambiar", ['grupo_id' => $destino, 'parcial' => true], $dueno)->assertOk()
         ->assertJsonPath('meta.aplicado', true)->assertJsonPath('data.activo', false);
     expect($this->getJson("{$app}/grupos/{$destino}/inscripciones", $dueno)->json('data.0.activo'))->toBeTrue()
         ->and(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(0);
+    // Queda en la bitácora, con que fue parcial.
+    $this->getJson("{$app}/auditorias?accion=grupo.cambio", $dueno)->assertOk()->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.despues.parcial', true)->assertJsonPath('data.0.despues.no_reservadas', 1);
+});
+
+it('cerrar un grupo antes de una baja futura la adelanta al cierre, y una baja futura se puede adelantar (R03)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $dueno = conBearer($e['bearer']);
+    $semilla = agendaSemilla($e);
+    $grupo = grupoConFechasParaCambio($e, $semilla, 'Natación 19:00', 12);
+    $ana = venderPackAMiembroTenant($e, 20000, 'Ana');
+    $this->postJson("{$app}/grupos/{$grupo}/inscripciones", ['persona_id' => $ana['persona']], $dueno)->assertCreated()->assertJsonPath('data.reservadas', 12);
+    $inscripcion = (string) $this->getJson("{$app}/grupos/{$grupo}/inscripciones", $dueno)->json('data.0.id');
+    $url = "{$app}/grupos/{$grupo}/inscripciones/{$inscripcion}";
+
+    // Se va desde el día 10: conserva del 1 al 9.
+    $this->postJson("{$url}/baja", ['desde' => Carbon::now()->addDays(10)->toDateString()], $dueno)->assertOk();
+    expect(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(11000);
+
+    // Con su baja aún por llegar sigue en el grupo: se puede adelantar al 8.
+    $this->postJson("{$url}/baja", ['desde' => Carbon::now()->addDays(8)->toDateString()], $dueno)->assertOk()
+        ->assertJsonPath('data.baja_desde', Carbon::now()->addDays(8)->toDateString());
+    expect(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(13000);
+    // Pero no se pospone: queda la del 8.
+    $this->postJson("{$url}/baja", ['desde' => Carbon::now()->addDays(11)->toDateString()], $dueno)->assertStatus(409);
+    expect($this->getJson("{$app}/grupos/{$grupo}/inscripciones", $dueno)->json('data.0.baja_desde'))->toBe(Carbon::now()->addDays(8)->toDateString());
+
+    // El grupo cierra desde el 6, antes de su baja: también se le adelanta y conserva
+    // solo del 1 al 5, sin fechas de un grupo cerrado.
+    $this->postJson("{$app}/grupos/{$grupo}/cerrar", ['desde' => Carbon::now()->addDays(6)->toDateString()], $dueno)->assertOk()
+        ->assertJsonPath('meta.bajas', 1)->assertJsonPath('meta.canceladas', 2);
+    expect($this->getJson("{$app}/grupos/{$grupo}/inscripciones", $dueno)->json('data.0.baja_desde'))->toBe(Carbon::now()->addDays(6)->toDateString())
+        ->and(disponibleDeAlumnaEnGrupo($e, $ana['persona']))->toBe(15000);
+});
+
+it('volver a inscribir a quien entra después por un cambio de grupo no le adelanta el alta (R03)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $dueno = conBearer($e['bearer']);
+    $semilla = agendaSemilla($e);
+    $origen = grupoConSesiones($e, $semilla, 'Natación 18:00');
+    $destino = grupoConFechasParaCambio($e, $semilla, 'Natación 19:00', 7);
+    $beto = venderPackAMiembroTenant($e, 20000, 'Beto');
+    $this->postJson("{$app}/grupos/{$origen}/inscripciones", ['persona_id' => $beto['persona']], $dueno)->assertCreated();
+    $inscripcion = (string) $this->getJson("{$app}/grupos/{$origen}/inscripciones", $dueno)->json('data.0.id');
+
+    // Pasa al de las 19:00 desde el día 4: del 1 al 3 en uno, del 4 al 7 en el otro.
+    $dia4 = Carbon::now()->addDays(4)->toDateString();
+    $this->postJson("{$app}/grupos/{$origen}/inscripciones/{$inscripcion}/cambiar", ['grupo_id' => $destino, 'desde' => $dia4], $dueno)
+        ->assertOk()->assertJsonPath('meta.aplicado', true);
+    expect(disponibleDeAlumnaEnGrupo($e, $beto['persona']))->toBe(13000);
+
+    // Alguien lo vuelve a inscribir en el de las 19:00: conserva su alta del día 4 y no
+    // queda en los dos grupos los días 1 a 3.
+    $this->postJson("{$app}/grupos/{$destino}/inscripciones", ['persona_id' => $beto['persona']], $dueno)->assertCreated()
+        ->assertJsonPath('data.reservadas', 4);
+    expect($this->getJson("{$app}/grupos/{$destino}/inscripciones", $dueno)->json('data.0.alta_desde'))->toBe($dia4)
+        ->and(disponibleDeAlumnaEnGrupo($e, $beto['persona']))->toBe(13000);
 });

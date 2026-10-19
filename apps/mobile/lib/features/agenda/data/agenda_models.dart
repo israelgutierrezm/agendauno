@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import '../../../core/agenda/contrato_agenda.dart';
+import '../../../core/hora_negocio.dart';
 import '../../../core/theme/tema_agendauno.dart';
 
 export '../../../core/agenda/contrato_agenda.dart';
@@ -288,7 +289,7 @@ class SesionAgenda {
     final desfase = desfaseMin;
     return desfase != null &&
         desfase !=
-            (desfaseTelefonoMin ?? iniciaEn.toLocal().timeZoneOffset.inMinutes);
+            (desfaseTelefonoMin ?? HoraNegocio.desfaseTelefono(iniciaEn));
   }
 
   /// «Hora de Roma Norte» si el teléfono está en otra zona que su sucursal; null
@@ -389,19 +390,11 @@ class SesionAgenda {
 String? etiquetaHoraSucursal(
   Iterable<SesionAgenda> sesiones, {
   int? desfaseTelefonoMin,
-}) {
-  final otras = sesiones.where((s) => s.enOtraZona(desfaseTelefonoMin));
-  if (otras.isEmpty) {
-    return null;
-  }
-  final nombres = otras.map((s) => s.sucursal?.trim() ?? '').toSet();
-  if (nombres.length > 1) {
-    return 'Hora de cada sucursal';
-  }
-  return nombres.single.isEmpty
-      ? 'Hora de la sucursal'
-      : 'Hora de ${nombres.single}';
-}
+}) => HoraNegocio.etiqueta(
+  sesiones
+      .where((s) => s.enOtraZona(desfaseTelefonoMin))
+      .map((s) => s.sucursal),
+);
 
 final _formatoPared = RegExp(
   r'^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?',
@@ -429,23 +422,12 @@ DateTime? _horaDePared(Object? valor) {
 }
 
 /// La hora de pared de [instante] en una zona con ese desfase (minutos).
-DateTime _paredDesdeDesfase(DateTime instante, int desfaseMin) {
-  final u = instante.toUtc().add(Duration(minutes: desfaseMin));
-  return DateTime(u.year, u.month, u.day, u.hour, u.minute, u.second);
-}
+DateTime _paredDesdeDesfase(DateTime instante, int desfaseMin) =>
+    HoraNegocio.enDesfase(instante, desfaseMin);
 
 /// El desfase (minutos) de la zona en la que [instante] se ve como [pared].
 int _desfaseEntre(DateTime pared, DateTime instante) =>
-    (DateTime.utc(
-              pared.year,
-              pared.month,
-              pared.day,
-              pared.hour,
-              pared.minute,
-              pared.second,
-            ).difference(instante.toUtc()).inSeconds /
-            60)
-        .round();
+    HoraNegocio.desfaseEntre(pared, instante);
 
 /// Profesional/instructor (columna de la agenda de citas).
 class Profesional {

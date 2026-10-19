@@ -184,6 +184,40 @@ describe("entradas y salidas de un grupo", () => {
     );
   });
 
+  it("una baja que aún no llega se puede adelantar o cambiar de grupo (R03)", async () => {
+    const original = api.get.getMockImplementation()!;
+    api.get.mockImplementation(
+      (url: string, opciones?: { params?: { page?: number; q?: string } }) =>
+        url.endsWith("/grupos/g1/inscripciones")
+          ? Promise.resolve({
+              data: {
+                data: [
+                  inscrito(1),
+                  { ...inscrito(2), activo: false, baja_desde: "2099-01-10" },
+                  { ...inscrito(3), baja_desde: "2020-01-10" },
+                ],
+                meta: { total: 3 },
+              },
+            })
+          : original(url, opciones),
+    );
+    api.post.mockResolvedValue({
+      data: { data: {}, meta: { canceladas: 2, no_canceladas: [] } },
+    });
+    const w = await montarElegido();
+    // Solo la que aún no se va; la que ya se fue no se opera.
+    const adelantar = w.findAll('[data-prueba="adelantar-baja"]');
+    expect(adelantar).toHaveLength(1);
+    await adelantar[0]!.trigger("click");
+    await w.get('[data-prueba="salida-desde"]').setValue("2026-10-05");
+    await w.get('[data-prueba="confirmar-salida"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/grupos/g1/inscripciones/i2/baja",
+      { desde: "2026-10-05" },
+    );
+  });
+
   it("cambiar de grupo muestra antes lo que pasaría y un cambio parcial se confirma (R08)", async () => {
     const base = api.get.getMockImplementation()!;
     api.get.mockImplementation((url: string, opciones?: unknown) => {

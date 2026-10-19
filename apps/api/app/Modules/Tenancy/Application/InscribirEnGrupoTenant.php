@@ -48,8 +48,9 @@ class InscribirEnGrupoTenant
     public function inscribir(GrupoTenant $grupo, PersonaTenant $persona, ?string $desde = null): array
     {
         // Su vigencia empieza ese día (R03): las fechas anteriores del grupo no son suyas.
-        $alta = $desde !== null && $desde > $this->fechas->hoy() ? $desde : $this->fechas->hoy();
-        $inscripcion = DB::connection('tenant')->transaction(function () use ($grupo, $persona, $alta): InscripcionGrupoTenant {
+        $hoy = $this->fechas->hoy();
+        $alta = $desde !== null && $desde > $hoy ? $desde : $hoy;
+        $inscripcion = DB::connection('tenant')->transaction(function () use ($grupo, $persona, $alta, $hoy): InscripcionGrupoTenant {
             // Bajo candado del grupo: no se inscribe en uno que se está cerrando.
             $bloqueado = GrupoTenant::query()->whereKey($grupo->getKey())->lockForUpdate()->firstOrFail();
             if (! $bloqueado->activo) {
@@ -59,15 +60,28 @@ class InscribirEnGrupoTenant
                 'grupo_id' => $bloqueado->getKey(),
                 'persona_id' => $persona->getKey(),
             ]);
-            // Volver a inscribir a quien se dio de baja la reactiva.
-            $inscripcion->fill(['activo' => true, 'alta_desde' => $alta, 'baja_desde' => null, 'baja_en' => null])->save();
+            // Quien sigue inscrito (activo, o con su baja aún por llegar) conserva su alta
+            // (R03): inscribirlo otra vez no adelanta un alta futura (la de un cambio de
+            // grupo, que lo dejaría en dos grupos a la vez) ni borra desde cuándo está.
+            // Volver a inscribir a quien ya se fue lo reactiva desde `$alta`.
+            $sigue = $inscripcion->exists && $inscripcion->alta_desde !== null
+                && ($inscripcion->activo || ($inscripcion->baja_desde !== null && $inscripcion->baja_desde->toDateString() > $hoy));
+            $inscripcion->fill([
+                'activo' => true,
+                'alta_desde' => $sigue ? $inscripcion->alta_desde : $alta,
+                'baja_desde' => null,
+                'baja_en' => null,
+            ])->save();
 
             return $inscripcion;
         });
 
+        // Desde lo que pidió y nunca antes de su alta ni de ahora.
         $inicio = now()->toImmutable();
-        if ($desde !== null && $this->fechas->inicioDelDia($desde)->greaterThan($inicio)) {
-            $inicio = $this->fechas->inicioDelDia($desde);
+        foreach ([$alta, $inscripcion->alta_desde?->toDateString()] as $dia) {
+            if ($dia !== null && $this->fechas->inicioDelDia($dia)->greaterThan($inicio)) {
+                $inicio = $this->fechas->inicioDelDia($dia);
+            }
         }
 
         $sesiones = SesionTenant::query()
@@ -111,6 +125,12 @@ class InscribirEnGrupoTenant
         } catch (ReservaException $e) {
             return [...$fila, 'estado' => self::NO_RESERVADA, 'motivo' => self::motivo($e)];
         } catch (Throwable $e) {
+            // Dentro de una operación mayor (un cambio de grupo) un error de la base, como
+            // un deadlock, ya deshizo todo lo anterior: seguir guardaría lo demás suelto.
+            // Se propaga para que la operación completa se deshaga o se reintente (R08).
+            if (DB::connection('tenant')->transactionLevel() > 0) {
+                throw $e;
+            }
             // Lo inesperado no se calla: queda en el registro de errores del negocio.
             report($e);
 

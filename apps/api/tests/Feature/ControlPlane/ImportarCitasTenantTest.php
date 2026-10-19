@@ -5,7 +5,11 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Reservas\EstadoPagoCita;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 
@@ -191,4 +195,71 @@ it('importar: reconoce al cliente por su número, distingue duplicado, ambiguo y
     $ambiguo = $this->post("{$url}/preview", ['archivo' => $csv(['R9,Gil,,gil@correo.mx,5512345678,Nivel 1,Personal,Roma Norte,2026-10-08,10:00,'])], conBearer($e['bearer']))
         ->assertOk()->json('data');
     expect($ambiguo['filas'][0]['errores'][0])->toContain('son de fichas distintas');
+});
+
+it('lo pagado afuera queda como rastro sin ingreso, y no se duplica lo repetido, movido o ambiguo (R14)', function (): void {
+    $ctx = barberiaParaImportarCitas();
+    $e = $ctx['e'];
+    $url = "/api/v1/app/{$e['slug']}/importaciones/citas";
+    $csv = fn (array $filas): UploadedFile => UploadedFile::fake()->createWithContent('citas.csv',
+        "referencia,cliente,cliente_ref,email,celular,servicio,profesional,sucursal,fecha,hora,pagado\n".implode("\n", $filas)."\n");
+    $importar = function (array $filas, array $correspondencias = []) use ($url, $csv, $e): array {
+        $extra = $correspondencias !== [] ? ['correspondencias' => json_encode($correspondencias)] : [];
+        $previa = $this->post("{$url}/preview", ['archivo' => $csv($filas), ...$extra], conBearer($e['bearer']))->assertOk()->json('data');
+        if ($previa['ok']) {
+            $this->post($url, ['archivo' => $csv($filas), 'confirmacion' => $previa['confirmacion'], ...$extra], conBearer($e['bearer']))->assertCreated();
+        }
+
+        return $previa;
+    };
+    $enNegocio = fn (Closure $hacer): mixed => app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), $hacer);
+
+    // La misma referencia dos veces en el archivo: no se importa.
+    $repetida = $importar([
+        'R1,Eva Paz,C-77,,,Nivel 1,Personal,Roma Norte,2026-10-05,10:00,',
+        'R1,Eva Paz,C-77,,,Nivel 1,Personal,Roma Norte,2026-10-06,10:00,',
+    ]);
+    expect($repetida['ok'])->toBeFalse()->and($repetida['filas'][1]['errores'][0])->toContain('referencia está repetida');
+
+    // Una pagada toda afuera y otra con anticipo: queda cuánto, sin ningún pago aquí.
+    expect($importar([
+        'R1,Eva Paz,C-77,,,Nivel 1,Personal,Roma Norte,2026-10-05,10:00,250',
+        'R2,Eva Paz,C-77,,,Nivel 1,Personal,Roma Norte,2026-10-06,10:00,100',
+        ',Fer Gil,C-88,fer@correo.mx,,Nivel 1,Personal,Roma Norte,2026-10-07,10:00,',
+    ])['ok'])->toBeTrue();
+    $estado = $enNegocio(fn (): array => [
+        'pagos' => PagoTenant::query()->count(),
+        'ordenes' => OrdenTenant::query()->orderBy('id')->get(['total_minor', 'pagado_fuera_minor'])->map(fn (OrdenTenant $o): array => [$o->total_minor, $o->pagado_fuera_minor])->all(),
+        'pago' => ReservaTenant::query()->with(['orden', 'saldoOrden'])->orderBy('id')->get()->map(fn (ReservaTenant $r): ?string => EstadoPagoCita::de($r)?->value)->all(),
+    ]);
+    expect($estado)->toBe([
+        'pagos' => 0,
+        'ordenes' => [[0, 25000], [15000, 10000], [25000, null]],
+        'pago' => ['pagada', 'por_cobrar', 'por_cobrar'],
+    ]);
+
+    // Sin referencia, la de Fer movida a otra hora ese día no se agrega en silencio.
+    $movida = $importar([',Fer Gil,C-88,fer@correo.mx,,Nivel 1,Personal,Roma Norte,2026-10-07,12:00,']);
+    expect($movida['filas'][0]['errores'][0])->toContain('Ese día ya tiene esta cita a las 10:00');
+
+    // Su ficha ya tiene otro número de cliente: se revisa la fila.
+    $otroNumero = $importar([',Fer Gil,C-99,fer@correo.mx,,Nivel 1,Personal,Roma Norte,2026-10-08,10:00,']);
+    expect($otroNumero['filas'][0]['errores'][0])->toContain('ya tiene otro número de cliente (C-88)');
+
+    // Un celular de dos fichas no dice quién es; una archivada no cuenta.
+    $enNegocio(function (): void {
+        foreach (['Hugo' => false, 'Iván' => false, 'Juan' => true] as $nombre => $archivado) {
+            PersonaTenant::query()->create(['nombre' => $nombre, 'celular' => '5512345678', 'tipo' => 'miembro', 'activo' => true, 'archivado' => $archivado]);
+        }
+    });
+    $ambiguo = $importar([',Hugo,,,5512345678,Nivel 1,Personal,Roma Norte,2026-10-09,10:00,']);
+    expect($ambiguo['filas'][0]['errores'][0])->toContain('Ese celular está en 2 fichas');
+
+    // Con otro profesional (al final: se llama igual que el primero): es un cambio que se decide en la agenda.
+    personalConSesion($e['slug'], $e['bearer'], 'otro@barberia.mx', 'instructor');
+    $otro = (string) collect($this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data'))->firstWhere('id', '!=', $ctx['pro'])['id'];
+    $cambio = $importar(['R2,Eva Paz,C-77,,,Nivel 1,Otro,Roma Norte,2026-10-06,10:00,100'], ['profesional' => ['Otro' => $otro]]);
+    expect($cambio['filas'][0]['errores'][0])->toContain('ya está agendada con otros datos');
+
+    expect(reservasImportadas($e))->toHaveCount(3);
 });

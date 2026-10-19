@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
+import '../../../core/hora_negocio.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
@@ -34,11 +36,27 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   // versión no entiende).
   String? _error;
 
+  /// Desfase con UTC (minutos) de la zona del negocio: los días y las horas son
+  /// los de allá, no los del teléfono.
+  int? get _desfase => ref.read(sesionProvider)?.desfaseNegocioMin;
+
+  /// Hoy en el negocio.
+  DateTime get _hoy {
+    final ahora = HoraNegocio.enDesfase(DateTime.now(), _desfase);
+    return DateTime(ahora.year, ahora.month, ahora.day);
+  }
+
   @override
   void initState() {
     super.initState();
-    final inicio = widget.reserva.iniciaEn;
-    _dia = inicio == null ? DateTime.now() : DateTime.parse(inicio).toLocal();
+    // El día de la reserva en el negocio (el API no manda su hora local).
+    final inicio = HoraNegocio.pared(
+      widget.reserva.iniciaEn,
+      desfaseMin: _desfase,
+    );
+    _dia = inicio == null
+        ? _hoy
+        : DateTime(inicio.year, inicio.month, inicio.day);
     _cargar();
   }
 
@@ -80,10 +98,11 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   }
 
   Future<void> _elegirDia() async {
-    final hoy = DateTime.now();
+    final hoy = _hoy;
     final dia = await showDatePicker(
       context: context,
       initialDate: _dia.isBefore(hoy) ? hoy : _dia,
+      currentDate: hoy,
       firstDate: hoy,
       lastDate: hoy.add(const Duration(days: 90)),
     );
@@ -228,7 +247,13 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
                   (s) => RadioListTile<String>(
                     contentPadding: EdgeInsets.zero,
                     value: s.id,
-                    title: Text(Formato.fechaHora(s.iniciaEn)),
+                    // La hora de la clase en su sede; sin ella, la del negocio.
+                    title: Text(
+                      Formato.fechaHora(
+                        s.iniciaLocal ?? s.iniciaEn,
+                        desfaseMin: _desfase,
+                      ),
+                    ),
                   ),
                 )
                 .toList(),

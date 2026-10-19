@@ -163,7 +163,12 @@ class SesionController extends Notifier<Sesion?> {
         );
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
     final usuario = (data['usuario'] ?? {}) as Map<String, dynamic>;
-    state = actual.conUsuario(usuario, eligiendoRol: false);
+    // Con el negocio de la respuesta: su desfase de hoy (horario de verano).
+    state = actual.conUsuario(
+      usuario,
+      eligiendoRol: false,
+      estudio: data['estudio'] as Map<String, dynamic>?,
+    );
     await ref.read(almacenSesionProvider).guardar(state!.aJson());
   }
 
@@ -209,9 +214,10 @@ class SesionController extends Notifier<Sesion?> {
   /// Al volver a la app (y al entrar): confirma con el servidor que la sesión sigue
   /// viva (pudo cerrarse en la web u otro teléfono mientras estaba en segundo
   /// plano) y, como [refrescar], toma de /yo lo que pudo cambiar mientras tanto: sus
-  /// permisos, el plan, la modalidad, la terminología, el estado del negocio y la
-  /// versión mínima de la app. Sin red (o con un error pasajero) no pasa nada; con
-  /// 401 vuelve al login con el aviso.
+  /// permisos, el plan, la modalidad, la terminología, el estado del negocio, el
+  /// desfase de su zona (cambia con el horario de verano) y la versión mínima de la
+  /// app. Sin red (o con un error pasajero) no pasa nada; con 401 vuelve al login
+  /// con el aviso.
   Future<void> revisar() => _desdeYo();
 
   Future<void> _desdeYo() async {

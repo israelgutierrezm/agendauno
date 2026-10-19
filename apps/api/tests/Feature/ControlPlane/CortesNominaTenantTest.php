@@ -103,7 +103,7 @@ it('lo pagado no se reabre: lo que cambie después se ajusta aparte y se ve la d
 
     $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $datos['coach'], 'monto_minor' => 0, 'motivo' => 'x'], conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonValidationErrors(['monto_minor'], 'meta.errors');
-    $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $datos['coach'], 'monto_minor' => 20000, 'motivo' => 'Clase del 3 registrada tarde'], conBearer($e['bearer']))
+    $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $datos['coach'], 'monto_minor' => 20000, 'motivo' => 'Clase del 3 registrada tarde', 'compensa_diferencia' => true], conBearer($e['bearer']))
         ->assertCreated();
 
     $ajustado = $this->getJson("{$url}/{$corte}", conBearer($e['bearer']))->assertOk()
@@ -204,8 +204,12 @@ it('pago por asistente: corregir la asistencia después de pagar no cambia el co
     // Se registra tarde que Bea también vino: falta pagar una vez, no dos.
     $marcar($bea, 'presente');
     expect($diferencia())->toMatchArray(['en_corte_minor' => 10000, 'hoy_minor' => 20000, 'diferencia_minor' => 10000]);
-    $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $coach, 'monto_minor' => 10000, 'motivo' => 'Bea registrada tarde'], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $coach, 'monto_minor' => 10000, 'motivo' => 'Bea registrada tarde', 'compensa_diferencia' => true], conBearer($e['bearer']))->assertCreated();
     expect($diferencia())->toMatchArray(['ajustes_minor' => 10000, 'diferencia_minor' => 0]);
+
+    // Un bono no corrige la diferencia: va aparte y no cambia lo que falta.
+    $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $coach, 'monto_minor' => 50000, 'motivo' => 'Bono del mes'], conBearer($e['bearer']))->assertCreated();
+    expect($diferencia())->toMatchArray(['ajustes_minor' => 10000, 'otros_ajustes_minor' => 50000, 'diferencia_minor' => 0]);
 
     // Si después se corrige (no vino), solo aparece lo que cambió: se reconoció de más.
     $marcar($bea, 'ausente');

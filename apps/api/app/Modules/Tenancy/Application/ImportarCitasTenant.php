@@ -41,7 +41,11 @@ use Illuminate\Validation\ValidationException;
  * - **Reimportar:** una cita idéntica (persona, servicio, hora, sucursal y profesional;
  *   o la misma `referencia` con los mismos datos) no se duplica; la misma cita con otro
  *   profesional, otra sucursal u otra hora es un cambio que se decide en la agenda, no
- *   en silencio.
+ *   en silencio. Con `referencia` se reconoce aunque cambie todo; sin ella, la misma
+ *   persona y servicio a esa hora, o ese mismo día a otra hora (si se movió, se cambia
+ *   en la agenda; si son dos citas, se les pone su referencia).
+ * - **Un celular de varias fichas** no basta para saber quién es: se pide el correo o
+ *   el número de cliente (las fichas archivadas no cuentan).
  * - **Lo que se cobra (R14):** las citas quedan por cobrar en caja. Lo que ya se pagó
  *   en el otro sistema (`pagado`, un anticipo o todo) se descuenta de lo que queda por
  *   cobrar y no se registra como ingreso nuevo. El resumen dice cuántas quedan por
@@ -126,6 +130,9 @@ class ImportarCitasTenant
                     $pagado = $this->pagado($datos['pagado']);
 
                     [$persona, $esNueva] = $this->cliente($datos, $actor, (int) $sucursal->getKey());
+                    if ($datos['referencia'] === '') {
+                        $this->movidaElMismoDia($persona, $oferta, $sucursal, $inicia);
+                    }
                     $resultado['cliente'] = ['nombre' => $persona->nombreCompleto(), 'nueva' => $esNueva];
                     $resultado['inicia_en'] = $inicia->toIso8601String();
                     if ($this->yaImportada($datos['referencia'], $persona, $oferta, $sucursal, $profesional, $inicia)) {
@@ -256,9 +263,11 @@ class ImportarCitasTenant
         }
         $resto = max(0, (int) $orden->total_minor - $pagado);
         if ($pagado > 0) {
+            // Queda cuánto se pagó afuera (sin pago aquí: no es ingreso de este negocio).
+            $afuera = min($pagado, (int) $orden->total_minor);
             $orden->update($resto === 0
-                ? ['total_minor' => 0, 'estado' => EstadoOrden::Cancelada->value, 'cancelada_en' => now()]
-                : ['total_minor' => $resto]);
+                ? ['total_minor' => 0, 'pagado_fuera_minor' => $afuera, 'estado' => EstadoOrden::Cancelada->value, 'cancelada_en' => now()]
+                : ['total_minor' => $resto, 'pagado_fuera_minor' => $afuera]);
         }
         if ($resto === 0) {
             $porCobrar['pagadas_antes']++;
@@ -317,10 +326,16 @@ class ImportarCitasTenant
      */
     private function cliente(array $datos, Usuario $actor, int $sucursalId): array
     {
+        // Un celular de varias fichas (sin las archivadas) no dice quién es (R14).
+        $porCelular = $datos['celular'] !== '' ? $this->celulares->todas(PersonaTenant::query()->where('archivado', false), $datos['celular']) : null;
+        if ($porCelular !== null && $porCelular->count() > 1 && $datos['email'] === '' && $datos['cliente_ref'] === '') {
+            $this->error('celular', 'Ese celular está en '.$porCelular->count().' fichas: agrega su correo o su número de cliente, o une esas fichas antes de importar.');
+        }
         $candidatas = array_filter([
             'cliente_ref' => $datos['cliente_ref'] !== '' ? PersonaTenant::query()->where('referencia_externa', $datos['cliente_ref'])->first() : null,
             'email' => $datos['email'] !== '' ? PersonaTenant::query()->where('email', $datos['email'])->first() : null,
-            'celular' => $datos['celular'] !== '' ? $this->celulares->buscar(PersonaTenant::query(), $datos['celular']) : null,
+            // Con correo o número de cliente, el celular solo confirma si es una de ellas.
+            'celular' => $porCelular !== null && $porCelular->count() === 1 ? $porCelular->first() : null,
         ], static fn ($p): bool => $p instanceof PersonaTenant);
         $distintas = array_unique(array_map(static fn (PersonaTenant $p): int => (int) $p->getKey(), $candidatas));
         if (count($distintas) > 1) {
@@ -390,6 +405,29 @@ class ImportarCitasTenant
         }
 
         return true;
+    }
+
+    /**
+     * Sin `referencia` (R14): la misma persona con el mismo servicio ese día a otra hora
+     * es, casi siempre, la cita que se movió en el otro sistema. No se agrega otra en
+     * silencio: se cambia en la agenda o, si de verdad son dos, se les pone referencia.
+     */
+    private function movidaElMismoDia(PersonaTenant $persona, OfertaTenant $oferta, SucursalTenant $sucursal, CarbonImmutable $inicia): void
+    {
+        $zona = $sucursal->zona_horaria !== '' ? $sucursal->zona_horaria : 'America/Mexico_City';
+        $dia = $inicia->setTimezone($zona);
+        $otra = ReservaTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
+            ->whereHas('sesion', fn ($q) => $q->where('oferta_id', $oferta->getKey())
+                ->whereBetween('inicia_en', [$dia->startOfDay()->utc(), $dia->endOfDay()->utc()])
+                ->where('inicia_en', '!=', $inicia))
+            ->with('sesion')
+            ->first();
+        if ($otra instanceof ReservaTenant && $otra->sesion !== null) {
+            $hora = $otra->sesion->inicia_en->setTimezone($zona)->format('H:i');
+            $this->error('hora', "Ese día ya tiene esta cita a las {$hora}: si se movió, cámbiala en la agenda; si son dos citas, ponles su referencia.");
+        }
     }
 
     /**

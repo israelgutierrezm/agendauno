@@ -76,6 +76,7 @@ describe("el embudo del negocio", () => {
       {
         ...base,
         citas: {
+          interes: { solicitudes: 12, con_cita: 5 },
           agendadas: { agendadas: 20, confirmadas: 18 },
           asistencia: { citas: 16, asistieron: 14 },
           cobro: { atendidas: 14, cobradas: 13 },
@@ -86,6 +87,7 @@ describe("el embudo del negocio", () => {
     );
 
     expect(w.text()).toContain("Del interés a la siguiente visita");
+    expect(w.get('[data-paso="interes"]').text()).toContain("5 de 12");
     expect(w.get('[data-paso="confirmadas"]').text()).toContain("18 de 20");
     expect(w.get('[data-paso="asistenciaCita"]').text()).toContain("14 de 16");
     expect(w.get('[data-paso="cobro"]').text()).toContain("13 de 14");

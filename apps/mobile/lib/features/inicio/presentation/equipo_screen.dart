@@ -193,6 +193,16 @@ class _InicioNegocio extends ConsumerWidget {
                           if (!esCitas) ?siguiente.instructor,
                         ].join(' · '),
                       ),
+                      // El teléfono está en otra zona: es la hora de la sucursal.
+                      if (siguiente.etiquetaHora() case final horaSucursal?)
+                        Text(
+                          horaSucursal,
+                          key: const Key('hora-de-la-sucursal'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.colores.textoSuave,
+                          ),
+                        ),
                     ],
                     const SizedBox(height: 14),
                     _Indicadores(
@@ -225,7 +235,8 @@ class _InicioNegocio extends ConsumerWidget {
                   ResumenMesCard(
                     mes: value,
                     clientes: terminos.miembros,
-                    hoy: DateTime.now(),
+                    // El día del negocio: el mismo hasta el que se pidió el mes.
+                    hoy: sesion?.hoyEnNegocio(DateTime.now()) ?? DateTime.now(),
                   ),
                   const SizedBox(height: 12),
                 ],

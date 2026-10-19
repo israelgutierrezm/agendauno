@@ -110,7 +110,8 @@ class RadarRenovacionesTenant
     }
 
     /**
-     * Última asistencia (presente) por persona, en una sola consulta.
+     * Última asistencia (presente) por persona, en una sola consulta: la fecha de la
+     * clase, no la del registro (R12).
      *
      * @param  list<int>  $personaIds
      * @return Collection<int, string>
@@ -120,10 +121,11 @@ class RadarRenovacionesTenant
         /** @var Collection<int, string> $mapa */
         $mapa = ReservaTenant::query()
             ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
             ->where('asistencias.estado', EstadoAsistencia::Presente->value)
             ->whereIn('reservas.persona_id', $personaIds)
             ->groupBy('reservas.persona_id')
-            ->selectRaw('reservas.persona_id as pid, MAX(asistencias.registrada_en) as ultima')
+            ->selectRaw('reservas.persona_id as pid, MAX(sesiones.inicia_en) as ultima')
             ->pluck('ultima', 'pid');
 
         return $mapa;

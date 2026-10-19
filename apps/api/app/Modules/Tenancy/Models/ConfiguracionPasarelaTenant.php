@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -13,6 +14,7 @@ use Illuminate\Support\Carbon;
  * `credenciales` se guardan cifradas y estan ocultas: nunca se serializan ni se
  * devuelven por la API (solo se informa que llaves estan configuradas).
  *
+ * @property string $proveedor
  * @property bool $activa
  * @property string $modo
  * @property Carbon|null $configurada_en
@@ -53,5 +55,22 @@ class ConfiguracionPasarelaTenant extends Model
         $valor = $this->credenciales;
 
         return is_array($valor) ? $valor : [];
+    }
+
+    /**
+     * La prueba de que esta configuración cobra (R13): el último pago que el proveedor
+     * aprobó de los creados con ella (desde que cambiaron sus llaves o su modo). Un pago
+     * iniciado antes y aprobado después es de la anterior. Null = sin comprobar.
+     */
+    public function comprobadaEn(): ?CarbonImmutable
+    {
+        $desde = $this->configurada_en;
+        $ultimo = PagoTenant::query()
+            ->where('proveedor', $this->proveedor)
+            ->whereNotNull('aprobado_en')
+            ->when($desde !== null, fn ($q) => $q->where('created_at', '>=', $desde))
+            ->max('aprobado_en');
+
+        return is_string($ultimo) && $ultimo !== '' ? CarbonImmutable::parse($ultimo) : null;
     }
 }

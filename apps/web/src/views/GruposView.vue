@@ -806,16 +806,33 @@ const indicadores = computed<Indicador[]>(() => {
                   <span class="min-w-0 flex-1 truncate">{{
                     i.persona ?? "—"
                   }}</span>
-                  <span
-                    v-if="!i.activo"
-                    class="text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{
-                      i.baja_desde
-                        ? $t("cursos.bajaDesde", { fecha: dia(i.baja_desde) })
-                        : $t("cursos.inscritoBaja")
-                    }}</span
-                  >
+                  <template v-if="!i.activo">
+                    <span
+                      class="text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        i.baja_desde
+                          ? $t("cursos.bajaDesde", { fecha: dia(i.baja_desde) })
+                          : $t("cursos.inscritoBaja")
+                      }}</span
+                    >
+                    <!-- Con su baja aún por llegar sigue en el grupo: se puede adelantar o
+                         cambiarla de grupo (R03). -->
+                    <button
+                      v-if="
+                        puedeGestionar &&
+                        seleccionado.activo &&
+                        i.baja_desde &&
+                        i.baja_desde > hoy
+                      "
+                      type="button"
+                      class="tu-enlace text-xs"
+                      data-prueba="adelantar-baja"
+                      @click="abrirSalida(i)"
+                    >
+                      {{ $t("cursos.adelantarBaja") }}
+                    </button>
+                  </template>
                   <span
                     v-else-if="i.alta_desde && i.alta_desde > hoy"
                     class="text-xs"

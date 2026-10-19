@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * El embudo del negocio (plan de mejoras C08): de la visita a su página hasta que su
@@ -117,15 +118,17 @@ class EmbudoNegocioTenant
                 'mediana_horas' => self::mediana($horas->all()),
             ],
             // Negocio de citas: cita → asistencia → cobro → siguiente visita.
-            'citas' => $this->modalidad->esCitas() ? $this->citas($inicio, $fin) : null,
+            'citas' => $this->modalidad->esCitas() ? $this->citas($inicio, $fin, $solicitudes) : null,
         ];
     }
 
     /**
      * El recorrido de un negocio de citas (R11), del periodo y en la zona del negocio:
      *
-     * - **Agendadas → confirmadas:** citas agendadas en el periodo y cuántas quedaron
-     *   confirmadas (no se vencieron sin pagar ni siguen apartadas).
+     * - **Interés → cita:** solicitudes del periodo y de cuántas su persona agendó
+     *   después una cita confirmada.
+     * - **Agendadas → confirmadas:** citas agendadas en el periodo y cuántas siguen
+     *   confirmadas (no se cancelaron, no se vencieron sin pagar ni siguen apartadas).
      * - **Cita → asistencia:** citas del periodo que ya pasaron (sin las canceladas) y en
      *   cuántas llegó el cliente.
      * - **Asistencia → cobro:** de las atendidas, cuántas ya están cobradas (su orden y,
@@ -135,18 +138,28 @@ class EmbudoNegocioTenant
      *
      * Cuenta la fecha de la cita (la sesión), no la del registro de su asistencia.
      *
-     * @return array{agendadas: array{agendadas: int, confirmadas: int}, asistencia: array{citas: int, asistieron: int}, cobro: array{atendidas: int, cobradas: int}, siguiente: array{clientes: int, volvieron: int}}
+     * @param  Collection<int, ProspectoTenant>  $solicitudes  las del periodo
+     * @return array{interes: array{solicitudes: int, con_cita: int}, agendadas: array{agendadas: int, confirmadas: int}, asistencia: array{citas: int, asistieron: int}, cobro: array{atendidas: int, cobradas: int}, siguiente: array{clientes: int, volvieron: int}}
      */
-    private function citas(CarbonImmutable $inicio, CarbonImmutable $fin): array
+    private function citas(CarbonImmutable $inicio, CarbonImmutable $fin, Collection $solicitudes): array
     {
         $sedes = $this->sedes;
         $deCitas = static fn (Builder $q) => $q->where('tipo', TipoSesionTenant::Cita->value)
             ->when($sedes !== null, fn (Builder $s) => $s->whereIn('sucursal_id', $sedes ?? []));
+        // Sigue en pie: ni apartada esperando su pago, ni cancelada, ni vencida.
+        $sinCaer = [EstadoReserva::PendientePago->value, EstadoReserva::Cancelada->value, EstadoReserva::Expirada->value];
 
         $agendadas = ReservaTenant::query()->whereHas('sesion', $deCitas)->whereBetween('created_at', [$inicio, $fin]);
-        $confirmadas = (clone $agendadas)
-            ->where('estado', '!=', EstadoReserva::PendientePago->value)
-            ->where(fn (Builder $q) => $q->whereNull('motivo_cancelacion')->orWhere('motivo_cancelacion', '!=', 'vencio_pago'));
+        $confirmadas = (clone $agendadas)->whereNotIn('estado', $sinCaer);
+
+        // De cada solicitud, si su persona agendó después una cita que sigue en pie.
+        $conCita = $solicitudes->filter(fn (ProspectoTenant $p): bool => $p->persona_id !== null
+            && ReservaTenant::query()
+                ->where('persona_id', $p->persona_id)
+                ->where('created_at', '>=', $p->created_at)
+                ->whereNotIn('estado', $sinCaer)
+                ->whereHas('sesion', $deCitas)
+                ->exists())->count();
 
         // Las que ya pasaron en el periodo (por la hora de la cita).
         $hasta = $fin->lessThan(now()) ? $fin : now()->toImmutable();
@@ -169,6 +182,7 @@ class EmbudoNegocioTenant
             ->exists())->count();
 
         return [
+            'interes' => ['solicitudes' => $solicitudes->count(), 'con_cita' => $conCita],
             'agendadas' => ['agendadas' => $agendadas->count(), 'confirmadas' => $confirmadas->count()],
             'asistencia' => ['citas' => $pasadas->count(), 'asistieron' => $atendidas->count()],
             'cobro' => ['atendidas' => $atendidas->count(), 'cobradas' => $cobradas],
@@ -195,10 +209,12 @@ class EmbudoNegocioTenant
             ->get()
             ->filter(fn ($f): bool => CarbonImmutable::parse((string) $f->getAttribute('primera'))->betweenIncluded($inicio, $fin));
 
+        // Vino a una clase después de comprar: por la fecha de la clase, no la del
+        // registro de su asistencia (R12).
         $asistieron = $primeras->filter(fn ($f): bool => ReservaTenant::query()
             ->where('persona_id', (int) $f->getAttribute('pid'))
-            ->whereHas('asistencia', fn (Builder $q) => $q->where('estado', EstadoAsistencia::Presente->value)
-                ->where('registrada_en', '>=', (string) $f->getAttribute('primera')))
+            ->whereHas('asistencia', fn (Builder $q) => $q->where('estado', EstadoAsistencia::Presente->value))
+            ->whereHas('sesion', fn (Builder $q) => $q->where('inicia_en', '>=', (string) $f->getAttribute('primera')))
             ->exists())->count();
 
         return ['compradores_nuevos' => $primeras->count(), 'asistieron' => $asistieron];

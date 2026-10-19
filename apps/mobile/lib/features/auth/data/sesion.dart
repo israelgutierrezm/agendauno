@@ -1,4 +1,5 @@
 import '../../../core/config/producto_app.dart';
+import '../../../core/hora_negocio.dart';
 import '../../../core/version/version_app.dart';
 
 /// Cómo atiende el negocio a su gente: clases con cupo o citas 1 a 1 con un
@@ -287,15 +288,19 @@ class Sesion {
   /// Moneda del negocio (ISO 4217, ADR 0097): la de sus precios nuevos.
   final String moneda;
 
-  /// Desfase de la zona del negocio con UTC, en minutos (al entrar): qué día es
-  /// allá aunque el teléfono esté en otra zona. Null = un API anterior.
+  /// Desfase de la zona del negocio con UTC, en minutos (al entrar, y de nuevo con
+  /// cada /yo: cambia con el horario de verano): qué día es allá aunque el teléfono
+  /// esté en otra zona. Null = un API anterior.
   final int? desfaseNegocioMin;
+
+  /// La hora de pared del negocio en [instante] (con su desfase); sin él, la del
+  /// teléfono.
+  DateTime enNegocio(DateTime instante) =>
+      HoraNegocio.enDesfase(instante, desfaseNegocioMin);
 
   /// El día de hoy en el negocio (con su desfase); sin él, el del teléfono.
   DateTime hoyEnNegocio(DateTime ahora) {
-    final local = desfaseNegocioMin == null
-        ? ahora.toLocal()
-        : ahora.toUtc().add(Duration(minutes: desfaseNegocioMin!));
+    final local = enNegocio(ahora);
     return DateTime(local.year, local.month, local.day);
   }
 
@@ -481,10 +486,13 @@ class Sesion {
   /// del negocio.
   ///
   /// `versionMinima`: la que acaba de decir /yo (si no, se conserva la anterior).
+  /// `estudio`: el negocio que vino en la misma respuesta (p. ej. al cambiar de
+  /// rol); de él se toma su desfase de hoy, que cambia con el horario de verano.
   Sesion conUsuario(
     Map<String, dynamic> usuario, {
     bool? eligiendoRol,
     String? versionMinima,
+    Map<String, dynamic>? estudio,
   }) => Sesion(
     slug: slug,
     bearer: bearer,
@@ -530,7 +538,8 @@ class Sesion {
     terminologia: terminologia,
     estudioNombre: estudioNombre,
     moneda: moneda,
-    desfaseNegocioMin: desfaseNegocioMin,
+    desfaseNegocioMin:
+        (estudio?['zona_desfase_min'] as num?)?.toInt() ?? desfaseNegocioMin,
     pais: pais,
     lada: lada,
     sinSucursal: (usuario['sin_sucursal'] ?? sinSucursal) as bool,

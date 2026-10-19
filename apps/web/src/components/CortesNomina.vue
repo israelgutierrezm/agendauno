@@ -177,6 +177,8 @@ const ajuste = ref({
   sentido: "favor" as "favor" | "contra",
   monto: "",
   motivo: "",
+  // Corrige una diferencia del cálculo (R09): se resta de lo que falta. Un bono, no.
+  compensa: false,
 });
 const abiertoPago = computed(
   () => abierto.value && detalle.value?.estado === "cerrado",
@@ -205,7 +207,13 @@ async function verCorte(id: string): Promise<void> {
     const { data } = await api.get<{ data: Detalle }>(`${base.value}/${id}`);
     detalle.value = data.data;
     pago.value = { referencia: "" };
-    ajuste.value = { usuario_id: "", sentido: "favor", monto: "", motivo: "" };
+    ajuste.value = {
+      usuario_id: "",
+      sentido: "favor",
+      monto: "",
+      motivo: "",
+      compensa: false,
+    };
     editorPago.empezar();
     editorAjuste.empezar();
   } catch {
@@ -264,6 +272,7 @@ function usarDiferencia(d: Detalle["diferencias"][number]): void {
     sentido: d.diferencia_minor >= 0 ? "favor" : "contra",
     monto: String(Math.abs(d.diferencia_minor) / 100),
     motivo: ajuste.value.motivo,
+    compensa: true,
   };
 }
 
@@ -282,6 +291,7 @@ async function agregarAjuste(): Promise<void> {
               ? -importe
               : importe,
         motivo: ajuste.value.motivo,
+        compensa_diferencia: ajuste.value.compensa,
       }),
     t("nominaVisual.cortes.ajuste.hecho"),
   );
@@ -746,6 +756,14 @@ defineExpose({ cargar });
                 {{ editorAjuste.errores.value.motivo }}
               </p>
             </div>
+            <label class="flex items-center gap-2 text-sm">
+              <input
+                v-model="ajuste.compensa"
+                type="checkbox"
+                data-prueba="ajuste-compensa"
+              />
+              {{ $t("nominaVisual.cortes.ajuste.compensa") }}
+            </label>
             <div class="flex justify-end">
               <button
                 type="submit"

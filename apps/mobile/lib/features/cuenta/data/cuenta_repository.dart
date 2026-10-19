@@ -11,13 +11,23 @@ import 'formularios.dart';
 /// Acceso a los datos del autoservicio del miembro (`/app/{slug}/mi/*`), sobre el
 /// estudio de la sesion activa.
 class CuentaRepository {
-  CuentaRepository(this._dio, this._slug, [this._moneda = 'MXN']);
+  CuentaRepository(
+    this._dio,
+    this._slug, [
+    this._moneda = 'MXN',
+    this._desfaseMin,
+  ]);
 
   final Dio _dio;
   final String _slug;
 
   /// Moneda del negocio: la de los precios y adeudos que no traen la suya.
   final String _moneda;
+
+  /// Desfase con UTC (minutos) de la zona del negocio (el de la sesión): las
+  /// fechas que se leen aquí ya listas para mostrar van en su hora, no en la del
+  /// teléfono.
+  final int? _desfaseMin;
 
   String get _base => '/api/v1/app/$_slug';
 
@@ -137,6 +147,7 @@ class CuentaRepository {
       return OrdenPorPagar.pendientes(
         (res.data?['data'] ?? []) as List,
         moneda: _moneda,
+        desfaseMin: _desfaseMin,
       );
     } on DioException {
       return const [];
@@ -332,7 +343,13 @@ class CuentaRepository {
     return PaginaCompras(
       ordenes: ((res.data?['data'] ?? []) as List)
           .whereType<Map<String, dynamic>>()
-          .map((o) => OrdenPorPagar.desdeJson(o, moneda: _moneda))
+          .map(
+            (o) => OrdenPorPagar.desdeJson(
+              o,
+              moneda: _moneda,
+              desfaseMin: _desfaseMin,
+            ),
+          )
           .toList(),
       pagina: (meta['page'] as num? ?? pagina).toInt(),
       ultimaPagina: (meta['ultima_pagina'] as num? ?? pagina).toInt(),
@@ -460,7 +477,12 @@ class CuentaRepository {
   Future<List<PlanCorte>> planes() async {
     final res = await _dio.get<Map<String, dynamic>>('$_base/mi/planes');
     return ((res.data?['data'] ?? []) as List)
-        .map((e) => PlanCorte.desdeJson(e as Map<String, dynamic>))
+        .map(
+          (e) => PlanCorte.desdeJson(
+            e as Map<String, dynamic>,
+            desfaseMin: _desfaseMin,
+          ),
+        )
         .toList();
   }
 
@@ -475,7 +497,12 @@ class CuentaRepository {
       queryParameters: {'page': pagina, 'per_page': porPagina},
     );
     return ((res.data?['data'] ?? []) as List)
-        .map((e) => UsoPlan.desdeJson(e as Map<String, dynamic>))
+        .map(
+          (e) => UsoPlan.desdeJson(
+            e as Map<String, dynamic>,
+            desfaseMin: _desfaseMin,
+          ),
+        )
         .toList();
   }
 
@@ -630,7 +657,12 @@ final cuentaRepositoryProvider = Provider<CuentaRepository?>((ref) {
   // Al pasar a la cuenta de una persona a cargo (o volver), todo se lee de nuevo.
   ref.watch(participanteEnUsoProvider);
 
-  return CuentaRepository(ref.watch(dioProvider), sesion.slug, sesion.moneda);
+  return CuentaRepository(
+    ref.watch(dioProvider),
+    sesion.slug,
+    sesion.moneda,
+    sesion.desfaseNegocioMin,
+  );
 });
 
 /// La acción se completa en la web (p. ej. capturar la tarjeta con OpenPay.js).

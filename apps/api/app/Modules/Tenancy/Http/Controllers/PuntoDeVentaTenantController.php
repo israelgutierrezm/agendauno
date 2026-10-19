@@ -172,13 +172,6 @@ class PuntoDeVentaTenantController
             'recibido' => $validado['recibido_minor'] ?? null,
             'comprador' => $validado['comprador_id'] ?? null,
         ]);
-        $previa = $clave !== null ? VentaPosTenant::query()->where('clave_intento', $clave)->first() : null;
-        if ($previa instanceof VentaPosTenant) {
-            PuntoDeVentaTenant::exigirMismaOperacion($previa, null, $huella);
-
-            return response()->json(['data' => $this->presentar($previa->load(['sucursal', 'lineas.articulo', 'persona']))]);
-        }
-
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
         // Alcance por sucursal (R19): un acotado no vende en una sede ajena.
@@ -195,6 +188,16 @@ class PuntoDeVentaTenantController
         $comprador = ($validado['comprador_id'] ?? '') !== ''
             ? $this->compradores->resolver((string) $validado['comprador_id'], $actor)
             : null;
+
+        // El reintento devuelve la venta que ya se hizo, pero solo después de revisar la
+        // sede y al comprador (R05): repetir la clave y el cuerpo de una venta ajena no
+        // la muestra a quien no la podría hacer.
+        $previa = $clave !== null ? VentaPosTenant::query()->where('clave_intento', $clave)->first() : null;
+        if ($previa instanceof VentaPosTenant) {
+            PuntoDeVentaTenant::exigirMismaOperacion($previa, null, $huella);
+
+            return response()->json(['data' => $this->presentar($previa->load(['sucursal', 'lineas.articulo', 'persona']))]);
+        }
         $enviarTicket = $comprador !== null && (bool) ($validado['enviar_ticket'] ?? false);
         if ($enviarTicket && ($comprador->email ?? '') === '') {
             throw ValidationException::withMessages(['enviar_ticket' => ['No tiene correo: no se le puede mandar el ticket.']]);
@@ -244,9 +247,9 @@ class PuntoDeVentaTenantController
             throw ValidationException::withMessages(['venta' => ['No tiene correo: no se le puede mandar el ticket.']]);
         }
 
-        $enviado = $this->tickets->enviar($venta);
+        $envio = $this->tickets->enviar($venta);
 
-        return response()->json(['data' => ['ticket_envio' => $enviado ? 'enviado' : 'fallido']], $enviado ? 200 : 502);
+        return response()->json(['data' => ['ticket_envio' => $envio]], $envio === 'fallido' ? 502 : 200);
     }
 
     /**
@@ -315,7 +318,7 @@ class PuntoDeVentaTenantController
             ] : null,
             'ticket_enviado_en' => $venta->ticket_enviado_en?->toIso8601String(),
             // Cómo va el envío del ticket, aparte de la venta (R06).
-            'ticket_envio' => $venta->ticket_enviado_en !== null ? 'enviado' : ($venta->ticket_envio_fallido_en !== null ? 'fallido' : null),
+            'ticket_envio' => $venta->estadoTicket(),
             'total_minor' => $venta->total_minor,
             // Aparte de lo vendido (ADR 0139): la propina, lo cobrado y el cambio.
             'propina_minor' => $venta->propina_minor,

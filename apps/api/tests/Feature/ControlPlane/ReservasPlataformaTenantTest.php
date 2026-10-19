@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
+use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Http\Client\Request;
@@ -313,6 +314,32 @@ it('si no se le puede contestar a Wellhub a tiempo, la reserva se libera', funct
     $this->artisan('agendauno:procesar-plataformas')->assertSuccessful();
     expect($estado())->toBe('fallido')
         ->and(lugaresDeWellhub($e)[0])->toMatchArray(['estado' => 'rechazado', 'motivo' => 'SIN_RESPUESTA']);
+});
+
+it('la llave de avisos que genera el negocio al encender las reservas es otra configuración (R13)', function (): void {
+    wellhubDeReservasSimulado();
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    // Conectado sin llave de avisos: se genera una al encender las reservas.
+    $this->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub", [
+        'activa' => true, 'credenciales' => ['api_key' => 'wh_token', 'gym_id' => '445566'],
+    ], conBearer($e['bearer']))->assertOk();
+    $configurada = fn (): ?string => app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn (): ?string => IntegracionTenant::query()->where('proveedor', 'wellhub')->firstOrFail()->configurada_en?->toIso8601String(),
+    );
+    $antes = $configurada();
+
+    $this->travel(1)->minutes();
+    $this->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub/reservas", [
+        'activas' => true,
+        'sucursal_id' => $semilla['sucursal'],
+        'clases' => [['oferta_id' => $semilla['oferta'], 'publicada' => true, 'producto' => '987']],
+    ], conBearer($e['bearer']))->assertOk();
+
+    // Lo que llegó firmado sin ella ya no comprueba la conexión.
+    expect($configurada())->not->toBe($antes)
+        ->and($configurada())->toBe(now()->toIso8601String());
 });
 
 it('solo publica con la integración conectada y un producto por clase', function (): void {

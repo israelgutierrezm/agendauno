@@ -106,7 +106,11 @@ class GruposTenantController
     public function baja(Request $request): JsonResponse
     {
         $inscripcion = $this->inscripcion($request);
-        $resultado = $this->bajas->darDeBaja($inscripcion, $this->desde($request), $this->actor($request));
+        $desde = $this->desde($request);
+        // Con su baja ya puesta solo se adelanta (R03); posponerla es volver a inscribirla.
+        $previa = $inscripcion->baja_desde?->toDateString();
+        abort_if($previa !== null && $desde >= $previa, 409, "Ya tiene su baja desde el {$previa}: solo se puede adelantar.");
+        $resultado = $this->bajas->darDeBaja($inscripcion, $desde, $this->actor($request));
 
         return response()->json(['data' => $this->presentarInscripcion($inscripcion->refresh()), 'meta' => $resultado]);
     }
@@ -150,6 +154,9 @@ class GruposTenantController
         $validado = $request->validate(['grupo_id' => ['required', 'string']]);
         $destino = GrupoTenant::query()->where('ulid', $validado['grupo_id'])->firstOrFail();
         $this->acceso->exigir($destino, $request);
+        // Cambiarla es inscribirla en otro grupo: la persona tiene que ser de su alcance,
+        // como al inscribir (R01).
+        app(AlcancePersonaTenant::class)->exigirPersona($request, PersonaTenant::query()->whereKey($inscripcion->persona_id)->firstOrFail());
 
         return [$inscripcion, $destino, $this->desde($request)];
     }
@@ -227,7 +234,9 @@ class GruposTenantController
     {
         $grupo = $this->grupo($request);
         $inscripcion = $grupo->inscripciones()->where('ulid', (string) $request->route('inscripcion'))->firstOrFail();
-        abort_unless($inscripcion->activo, 409, 'Ya se había dado de baja.');
+        // Con su baja aún por llegar sigue en el grupo (R03): se puede adelantar o cambiar.
+        $porSalir = $inscripcion->baja_desde !== null && $inscripcion->baja_desde->toDateString() > $this->fechas->hoy();
+        abort_unless($inscripcion->activo || $porSalir, 409, 'Ya se había dado de baja.');
 
         return $inscripcion;
     }

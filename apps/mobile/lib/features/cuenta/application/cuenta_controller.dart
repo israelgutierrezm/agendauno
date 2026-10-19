@@ -94,14 +94,21 @@ final cuentaProvider =
     );
 
 /// Lo que ve el calendario de Reservas: el periodo (lo avisa el calendario al
-/// moverse) y la sucursal elegida (vacía = todas).
+/// moverse) y la sucursal elegida (vacía = todas). Son días del negocio: al abrir,
+/// desde hoy allá (no el día del teléfono).
 class FiltroAgenda
     extends Notifier<({DateTime desde, DateTime hasta, String sucursal})> {
   @override
   ({DateTime desde, DateTime hasta, String sucursal}) build() {
-    final hoy = DateTime.now();
-    final dia = DateTime(hoy.year, hoy.month, hoy.day);
-    return (desde: dia, hasta: dia.add(const Duration(days: 30)), sucursal: '');
+    final ahora = DateTime.now();
+    final dia =
+        ref.read(sesionProvider)?.hoyEnNegocio(ahora) ??
+        DateTime(ahora.year, ahora.month, ahora.day);
+    return (
+      desde: dia,
+      hasta: DateTime(dia.year, dia.month, dia.day + 30),
+      sucursal: '',
+    );
   }
 
   void fijarPeriodo(DateTime desde, DateTime hasta) {

@@ -4,15 +4,17 @@ import '../../../core/calendario/calendario.dart';
 import '../../agenda/data/agenda_models.dart';
 import '../../agenda/data/agenda_repository.dart';
 import '../../auth/application/sesion_controller.dart';
+import '../../auth/data/sesion.dart';
 import '../../cuenta/data/cuenta_models.dart';
 
 /// Rango de fechas que se ve en "Mis clases" (lo fija el calendario al moverse).
-/// Vuelve al de hoy al cambiar de sesión, como el día de la agenda.
+/// Vuelve al de hoy al cambiar de sesión, como el día de la agenda. Son días del
+/// negocio: al abrir, desde hoy allá (no el día del teléfono).
 class RangoMisClases extends Notifier<({DateTime desde, DateTime hasta})> {
   @override
   ({DateTime desde, DateTime hasta}) build() {
     ref.watch(sesionProvider.select((s) => (s?.slug, s?.bearer)));
-    final hoy = Calendario.dia(DateTime.now());
+    final hoy = hoyDelNegocio(ref.read(sesionProvider), DateTime.now());
     return (desde: hoy, hasta: Calendario.mas(hoy, 30));
   }
 
@@ -27,6 +29,11 @@ final rangoMisClasesProvider =
     NotifierProvider<RangoMisClases, ({DateTime desde, DateTime hasta})>(
       RangoMisClases.new,
     );
+
+/// El día de hoy en el negocio de [sesion] (con el desfase de su zona); sin
+/// sesión, el del teléfono.
+DateTime hoyDelNegocio(Sesion? sesion, DateTime ahora) =>
+    sesion?.hoyEnNegocio(ahora) ?? Calendario.dia(ahora);
 
 /// Lo que imparte en el rango visible (solo lo programado). Como todo lo de una
 /// sesión, se descarta al salir del portal (no pasa a la siguiente sesión).
@@ -51,8 +58,8 @@ final proximasMisClasesProvider = FutureProvider.autoDispose<List<SesionAgenda>>
     return const [];
   }
   final ahora = DateTime.now();
-  final hoy = Calendario.dia(ahora);
-  // Un día más por lado: el «hoy» de la sucursal puede no ser el del teléfono.
+  final hoy = hoyDelNegocio(ref.read(sesionProvider), ahora);
+  // Un día más por lado: el «hoy» de cada sucursal puede no ser el del negocio.
   final sesiones = await repo.sesiones(
     Calendario.mas(hoy, -1),
     Calendario.mas(hoy, 7),

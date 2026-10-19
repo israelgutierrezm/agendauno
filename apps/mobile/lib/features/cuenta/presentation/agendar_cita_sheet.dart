@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/formato.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
@@ -241,9 +242,14 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   static const _diasCalendario = 62;
 
   Future<void> _elegirDia() async {
+    // Hoy en el negocio, no en el teléfono: los días que se ofrecen son los de la
+    // sede (el API no manda el desfase de cada una; vale el del negocio).
     final ahora = DateTime.now();
-    final hoy = DateTime(ahora.year, ahora.month, ahora.day);
-    final ultimo = hoy.add(const Duration(days: _diasCalendario - 1));
+    final hoy =
+        ref.read(sesionProvider)?.hoyEnNegocio(ahora) ??
+        DateTime(ahora.year, ahora.month, ahora.day);
+    // Días de calendario (sumar 24 h falla al cambiar el horario de verano).
+    final ultimo = DateTime(hoy.year, hoy.month, hoy.day + _diasCalendario - 1);
     // Solo los días en que alguien atiende (ADR 0065); si no se pueden saber (sin
     // sede o sin red), cualquiera: el horario lo vuelve a revisar.
     Set<String>? abiertos;
@@ -268,7 +274,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         abiertos == null || abiertos.contains(Formato.iso(d));
     DateTime? inicial = _dia != null && sePuede(_dia!) ? _dia : null;
     for (var i = 0; inicial == null && i < _diasCalendario; i++) {
-      final d = hoy.add(Duration(days: i));
+      final d = DateTime(hoy.year, hoy.month, hoy.day + i);
       if (sePuede(d)) {
         inicial = d;
       }
@@ -284,6 +290,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     final dia = await showDatePicker(
       context: context,
       initialDate: inicial,
+      currentDate: hoy,
       firstDate: hoy,
       lastDate: ultimo,
       selectableDayPredicate: sePuede,

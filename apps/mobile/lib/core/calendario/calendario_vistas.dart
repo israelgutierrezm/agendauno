@@ -30,7 +30,8 @@ class CalendarioVistas extends StatefulWidget {
   /// Lo que va arriba del calendario (avisos, botones de la pantalla).
   final List<Widget> encabezado;
 
-  /// Para pruebas; si no, hoy.
+  /// El día de hoy en el negocio (quien lo usa lo da con el desfase de su zona);
+  /// si no se da, el del teléfono.
   final DateTime? hoy;
 
   @override
@@ -307,7 +308,8 @@ class FilaEvento extends StatelessWidget {
     ),
     subtitle: Text(
       [
-        if (conFecha) Formato.fechaHora(e.inicio.toIso8601String()),
+        // Ya es la hora de pared del evento (la del negocio o la sucursal).
+        if (conFecha) Formato.diaHora(e.inicio),
         if (e.detalle != null && e.detalle!.isNotEmpty) e.detalle!,
       ].join(' · '),
       maxLines: 2,

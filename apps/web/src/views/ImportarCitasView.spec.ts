@@ -166,6 +166,40 @@ describe("importar citas", () => {
     expect(w.text()).toContain("No se le avisó nada a tus clientes.");
   });
 
+  it("antes de confirmar dice cuántas quedan por cobrar, cuánto y cuántas ya estaban pagadas (R14)", async () => {
+    api.post.mockResolvedValueOnce({
+      data: {
+        data: {
+          ok: true,
+          confirmacion: "c1",
+          creados: 0,
+          resumen: {
+            total: 3,
+            validas: 3,
+            invalidas: 0,
+            omitidas: 0,
+            clientes_nuevos: 2,
+            por_cobrar: 2,
+            por_cobrar_minor: 40000,
+            pagadas_antes: 1,
+            moneda: "MXN",
+          },
+          faltantes: { servicio: [], profesional: [], sucursal: [] },
+          filas: [fila(), fila({ fila: 3 }), fila({ fila: 4 })],
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="zona"]').trigger("click");
+    await flushPromises();
+
+    const aviso = w.get('[data-prueba="importar-por-cobrar"]').text();
+    expect(aviso).toContain("2 citas quedarán por cobrar");
+    expect(aviso).toContain("400.00");
+    expect(aviso).toContain("1 ya estaba pagada en tu sistema anterior");
+  });
+
   it("si no se cargan los catálogos lo dice y no deja subir el archivo", async () => {
     api.get.mockRejectedValueOnce(new Error("red"));
     const w = montar();

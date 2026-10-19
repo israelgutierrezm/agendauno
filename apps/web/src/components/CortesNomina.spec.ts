@@ -199,7 +199,41 @@ describe("cortes de nómina", () => {
     await flushPromises();
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/nomina/cortes/c1/ajustes",
-      { usuario_id: "u1", monto_minor: -20000, motivo: "Clase cancelada" },
+      {
+        usuario_id: "u1",
+        monto_minor: -20000,
+        motivo: "Clase cancelada",
+        compensa_diferencia: true,
+      },
+    );
+  });
+
+  it("una diferencia ya atendida no ofrece ajustarla otra vez (R09)", async () => {
+    respuestas([{ ...corte, estado: "pagado" }], {
+      estado: "pagado",
+      referencia_pago: "SPEI 0099",
+      pagado_en: "2026-09-17T10:00:00-06:00",
+      diferencias: [
+        {
+          usuario_id: "u1",
+          usuario: "Coach",
+          en_corte_minor: 10000,
+          ajustes_minor: 10000,
+          hoy_minor: 20000,
+          diferencia_minor: 0,
+        },
+      ],
+    });
+    const w = montar(null);
+    await flushPromises();
+    await w.get('[data-prueba="ver-corte-c1"]').trigger("click");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="diferencias-corte"]').text()).toContain(
+      "ya se ajustó",
+    );
+    expect(w.find('[data-prueba="diferencias-corte"] button').exists()).toBe(
+      false,
     );
   });
 });

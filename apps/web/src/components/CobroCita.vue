@@ -39,8 +39,11 @@ interface Resultado {
   // El comprobante de todo cobro y cómo va su envío (R06), aparte del cobro.
   venta_id?: string | null;
   ticket: { folio: string } | null;
-  ticket_envio?: "enviado" | "fallido" | null;
+  ticket_envio?: EnvioTicket;
 }
+// Cómo va el correo del ticket (R06): sale por la cola, así que pedirlo lo deja
+// pendiente hasta que se manda o falla.
+type EnvioTicket = "enviado" | "pendiente" | "fallido" | null;
 
 const props = defineProps<{
   abierto: boolean;
@@ -128,6 +131,10 @@ function stockAqui(a: Articulo): number {
   if (!sede || a.existencias === undefined) return a.stock_total;
   return a.existencias.find((e) => e.sucursal_id === sede)?.stock ?? 0;
 }
+// Una cantidad que la sucursal ya no tiene (otra venta se llevó piezas) no se cobra.
+function excede(l: Linea): boolean {
+  return l.cantidad < 1 || l.cantidad > stockAqui(l.articulo);
+}
 const disponibles = computed(() =>
   articulos.value.filter(
     (a) =>
@@ -137,7 +144,11 @@ const disponibles = computed(() =>
   ),
 );
 const puedeCobrar = computed(
-  () => total.value > 0 && falta.value === 0 && !editor.guardando.value,
+  () =>
+    total.value > 0 &&
+    falta.value === 0 &&
+    !lineas.value.some(excede) &&
+    !editor.guardando.value,
 );
 
 async function cargarArticulos(): Promise<void> {
@@ -149,6 +160,12 @@ async function cargarArticulos(): Promise<void> {
       `${props.base}/articulos`,
     );
     articulos.value = data.data;
+    // Lo del carrito con su precio y su stock de ahora (R07): tras un conflicto, el
+    // reintento no repite lo que el servidor rechazó.
+    lineas.value = lineas.value.map((l) => {
+      const fresco = data.data.find((a) => a.id === l.articulo.id);
+      return fresco === undefined ? l : { ...l, articulo: fresco };
+    });
   } catch {
     errorArticulos.value = true;
   } finally {
@@ -221,7 +238,7 @@ async function reenviarTicket(): Promise<void> {
   errorReenvio.value = null;
   try {
     const { data } = await api.post<{
-      data: { ticket_envio: "enviado" | "fallido" };
+      data: { ticket_envio: EnvioTicket };
     }>(`${props.base}/pos/ventas/${r.venta_id}/ticket`);
     r.ticket_envio = data.data.ticket_envio;
   } catch (e) {
@@ -290,6 +307,33 @@ async function cerrar(): Promise<void> {
       >
         {{ $t("cobroCita.ticketEnviado") }}
       </p>
+      <p
+        v-else-if="resultado.ticket_envio === 'pendiente'"
+        class="cc-suave"
+        data-prueba="ticket-pendiente"
+      >
+        {{ $t("cobroCita.ticketPendiente") }}
+      </p>
+      <!-- No se pidió al cobrar: se manda desde aquí (también con solo el servicio). -->
+      <p
+        v-else-if="
+          resultado.ticket_envio == null && resultado.venta_id && cita?.email
+        "
+        class="cc-suave"
+      >
+        <button
+          type="button"
+          class="tu-enlace"
+          :disabled="reenviando"
+          data-prueba="mandar-ticket"
+          @click="reenviarTicket"
+        >
+          {{ $t("cobroCita.mandarTicket", { correo: cita.email }) }}
+        </button>
+        <span v-if="errorReenvio" class="tu-error-campo block" role="alert">{{
+          errorReenvio
+        }}</span>
+      </p>
       <AvisoTono
         v-else-if="resultado.ticket_envio === 'fallido'"
         tono="aviso"
@@ -341,10 +385,17 @@ async function cerrar(): Promise<void> {
               type="number"
               min="1"
               :max="stockAqui(l.articulo)"
+              :aria-invalid="excede(l) || undefined"
               :aria-label="
                 $t('cobroCita.cantidad', { nombre: l.articulo.nombre })
               "
             />
+            <span
+              v-if="excede(l)"
+              class="tu-error-campo"
+              :data-prueba="`excede-${l.articulo.id}`"
+              >{{ $t("cobroCita.soloHay", { n: stockAqui(l.articulo) }) }}</span
+            >
             <button type="button" class="tu-enlace text-sm" @click="quitar(i)">
               {{ $t("cobroCita.quitar") }}
             </button>
@@ -491,10 +542,8 @@ async function cerrar(): Promise<void> {
         </p>
       </div>
 
-      <label
-        v-if="cita?.email && (lineas.length > 0 || propina > 0)"
-        class="flex items-center gap-2 text-sm"
-      >
+      <!-- También con solo el servicio: todo cobro deja su comprobante (R06). -->
+      <label v-if="cita?.email" class="flex items-center gap-2 text-sm">
         <input v-model="enviarTicket" type="checkbox" />
         {{ $t("cobroCita.enviarTicket", { correo: cita.email }) }}
       </label>

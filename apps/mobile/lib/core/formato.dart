@@ -1,5 +1,8 @@
-/// Formatos de fecha (hora local del dispositivo) y dinero en español, sin depender
-/// de `intl`.
+import 'hora_negocio.dart';
+
+/// Formatos de fecha y dinero en español, sin depender de `intl`. Las fechas se
+/// muestran en la hora del negocio o de su sucursal (ver [HoraNegocio]), no en la
+/// del teléfono.
 abstract final class Formato {
   static const _dias = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
   static const _meses = [
@@ -17,9 +20,12 @@ abstract final class Formato {
     'dic',
   ];
 
-  /// "jue 25 sep · 09:30" (o "—" si no hay fecha).
-  static String fechaHora(String? iso) {
-    final f = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
+  /// "jue 25 sep · 09:30" (o "—" si no hay fecha) en la hora del negocio: un
+  /// instante del API se pasa a su zona con [desfaseMin] (el de la sesión); una
+  /// hora local sin zona se muestra tal cual. Sin desfase (API anterior), la del
+  /// teléfono.
+  static String fechaHora(String? iso, {int? desfaseMin}) {
+    final f = HoraNegocio.pared(iso, desfaseMin: desfaseMin);
     if (f == null) {
       return '—';
     }

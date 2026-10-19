@@ -219,9 +219,12 @@ class MovimientosDePagoTenant
             $sumar((string) $o->moneda, $o->created_at, 'ventas_minor', (int) $o->total_minor, true);
         }
 
-        // Mostrador: se vende y se cobra en el momento.
+        // Mostrador: se vende y se cobra en el momento. El comprobante de solo el
+        // servicio de una cita (o solo su propina) no es otra venta: el servicio ya cuenta
+        // por su orden (R04).
         $mostrador = VentaPosTenant::query()
             ->whereNull('anulada_en')
+            ->where('total_minor', '>', 0)
             ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
             ->whereBetween('created_at', [$inicio, $fin])
             ->toBase()

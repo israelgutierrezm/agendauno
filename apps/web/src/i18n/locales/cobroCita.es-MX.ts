@@ -29,8 +29,11 @@ export default {
   folio: "Ticket {folio}",
   // El stock de la sucursal de la cita (R07).
   enEstaSucursal: "{n} aquí",
+  soloHay: "Solo hay {n} aquí",
   // El envío del ticket, aparte del cobro (R06).
   ticketEnviado: "Le mandamos su ticket por correo.",
+  ticketPendiente: "Su ticket va en camino a su correo.",
+  mandarTicket: "Mandarle su ticket a {correo}",
   ticketFallido:
     "El cobro quedó registrado, pero no se pudo mandar el ticket por correo.",
   reenviarTicket: "Reenviar ticket",

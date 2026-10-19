@@ -104,11 +104,14 @@ class SeguimientoTenant
 
     private function primerasAsistencias(CarbonImmutable $hoy): int
     {
+        // La visita es la fecha de la clase, no la del registro (R12): una asistencia
+        // vieja corregida hoy no es una primera asistencia de hoy.
         $primeras = ReservaTenant::query()
             ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
             ->where('asistencias.estado', EstadoAsistencia::Presente->value)
             ->groupBy('reservas.persona_id')
-            ->selectRaw('reservas.persona_id as pid, MIN(asistencias.registrada_en) as primera')
+            ->selectRaw('reservas.persona_id as pid, MIN(sesiones.inicia_en) as primera')
             ->get();
 
         $creadas = 0;
@@ -172,12 +175,14 @@ class SeguimientoTenant
         if ($conPlan === []) {
             return 0;
         }
+        // Por la fecha de la clase (R12), como el segmento «sin asistir».
         $ultimas = ReservaTenant::query()
             ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
             ->where('asistencias.estado', EstadoAsistencia::Presente->value)
             ->whereIn('reservas.persona_id', $conPlan)
             ->groupBy('reservas.persona_id')
-            ->selectRaw('reservas.persona_id as pid, MAX(asistencias.registrada_en) as ultima')
+            ->selectRaw('reservas.persona_id as pid, MAX(sesiones.inicia_en) as ultima')
             ->get();
 
         $creadas = 0;

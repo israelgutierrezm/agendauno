@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 
@@ -115,16 +116,19 @@ class _MovimientosSheetState extends ConsumerState<MovimientosSheet> {
   }
 }
 
-class _Movimiento extends StatelessWidget {
+class _Movimiento extends ConsumerWidget {
   const _Movimiento(this.m);
 
   final MovimientoCredito m;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // En la hora del negocio, no en la del teléfono.
+    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
+    String cuando(String? iso) => Formato.fechaHora(iso, desfaseMin: desfase);
     final detalle = m.clase != null
-        ? '${m.clase} · ${Formato.fechaHora(m.claseIniciaEn)}'
-        : Formato.fechaHora(m.fecha);
+        ? '${m.clase} · ${cuando(m.claseIniciaEn)}'
+        : cuando(m.fecha);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(

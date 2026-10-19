@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Mail;
 
 use App\Modules\Tenancy\Application\TicketVentaPosTenant;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Mail\Factory;
+use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\SentMessage;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 /**
  * El ticket de una compra en el mostrador (ADR 0145): folio, fecha, lo que llevó, la
@@ -35,7 +42,45 @@ class CorreoTicketVenta extends Mailable implements ShouldQueue
         public readonly array $ticket,
         // Responder le escribe al negocio (su correo de contacto).
         public readonly ?string $responderA = null,
+        // La venta del ticket (ulid): se marca en ella cuando sale o falla de verdad (R06).
+        public readonly ?string $ventaId = null,
     ) {}
+
+    /**
+     * Lo manda y, ya que salió, lo marca como enviado en su venta (R06): encolarlo no
+     * es mandarlo.
+     *
+     * @param  Factory|Mailer  $mailer
+     * @return SentMessage|null
+     */
+    public function send($mailer)
+    {
+        $enviado = parent::send($mailer);
+        $this->marcar(['ticket_enviado_en' => now(), 'ticket_envio_fallido_en' => null]);
+
+        return $enviado;
+    }
+
+    /** Agotó sus intentos en la cola: falló y se puede reenviar (R06). */
+    public function failed(Throwable $e): void
+    {
+        $this->marcar(['ticket_envio_fallido_en' => now()]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $cambios
+     */
+    private function marcar(array $cambios): void
+    {
+        $estudio = $this->ventaId !== null ? Estudio::query()->where('slug', $this->slug)->first() : null;
+        if (! $estudio instanceof Estudio) {
+            return;
+        }
+        app(GestorDeConexionTenant::class)->ejecutarEn(
+            $estudio,
+            fn (): int => VentaPosTenant::query()->where('ulid', $this->ventaId)->update($cambios),
+        );
+    }
 
     public function envelope(): Envelope
     {

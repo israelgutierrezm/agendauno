@@ -216,6 +216,106 @@ describe("cobro al terminar la cita", () => {
     expect(w.find('[data-prueba="ticket-enviado"]').exists()).toBe(true);
   });
 
+  it("con solo el servicio se pide el ticket, y si no se pidió se manda desde el comprobante (R06)", async () => {
+    api.post.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/ticket")
+            ? { ticket_envio: "pendiente" }
+            : {
+                servicio_minor: 25000,
+                productos_minor: 0,
+                propina_minor: 0,
+                total_minor: 25000,
+                recibido_minor: null,
+                cambio_minor: null,
+                venta_id: "v1",
+                ticket: { folio: "AB12CD34" },
+                ticket_envio: null,
+              },
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+    // Sin productos ni propina la casilla está.
+    expect(w.find('input[type="checkbox"]').exists()).toBe(true);
+    await w.get("#form-cobro-cita").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/reservas/r1/cobro",
+      expect.objectContaining({ items: [], enviar_ticket: false }),
+    );
+
+    // No se pidió: se manda desde el comprobante y queda en camino.
+    await w.get('[data-prueba="mandar-ticket"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/pos/ventas/v1/ticket",
+    );
+    expect(w.get('[data-prueba="ticket-pendiente"]').text()).toContain(
+      "va en camino",
+    );
+  });
+
+  it("tras un conflicto vuelve a leer el precio y el stock de lo que lleva (R07)", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="producto-cita"]').setValue("a1");
+    await w.get('[data-prueba="agregar-producto-cita"]').trigger("click");
+
+    // Otra venta se llevó piezas y cambió el precio: el servidor lo rechaza.
+    api.post.mockRejectedValueOnce({
+      campos: { items: "Cambió el precio de Cera: revísalo." },
+    });
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: "a1",
+            nombre: "Cera",
+            precio_minor: 6000,
+            activo: true,
+            stock_total: 1,
+          },
+        ],
+      },
+    });
+    await w.get("#form-cobro-cita").trigger("submit");
+    await flushPromises();
+
+    // Más de lo que queda: se dice y no se cobra.
+    await w.get('input[type="number"]').setValue(2);
+    expect(w.get('[data-prueba="excede-a1"]').text()).toContain("Solo hay 1");
+    expect(
+      w.get('[data-prueba="cobrar-cita"]').attributes("disabled"),
+    ).toBeDefined();
+
+    // Con lo que hay, el reintento lleva el precio de ahora.
+    await w.get('input[type="number"]').setValue(1);
+    api.post.mockResolvedValueOnce({
+      data: {
+        data: {
+          servicio_minor: 25000,
+          productos_minor: 6000,
+          propina_minor: 0,
+          total_minor: 31000,
+          recibido_minor: null,
+          cambio_minor: null,
+          ticket: null,
+        },
+      },
+    });
+    await w.get("#form-cobro-cita").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/reservas/r1/cobro",
+      expect.objectContaining({
+        items: [{ articulo_id: "a1", cantidad: 1, precio_minor: 6000 }],
+      }),
+    );
+  });
+
   it("un error del servidor queda junto a su campo y no pierde lo capturado", async () => {
     api.post.mockRejectedValue({
       campos: {

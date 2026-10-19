@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\SugerenciasPerfil;
 use App\Modules\Tenancy\TipoPersonaTenant;
@@ -68,7 +69,15 @@ class OnboardingController
             'requerido' => true,
             'ruta' => 'onboarding',
         ], $this->marcha->pasos($estudio));
-        $tareas[] = ['clave' => 'cobro', 'hecho' => ConfiguracionPasarelaTenant::query()->where('activa', true)->exists(), 'requerido' => false, 'ruta' => 'pasarelas'];
+        // Cobrar en línea: una pasarela en línea encendida y comprobada con su
+        // configuración de ahora (R13); la de caja no cuenta.
+        $enLinea = ConfiguracionPasarelaTenant::query()->where('activa', true)->whereIn('proveedor', ProveedorPasarela::enLinea())->get();
+        $tareas[] = [
+            'clave' => 'cobro',
+            'hecho' => $enLinea->contains(static fn (ConfiguracionPasarelaTenant $c): bool => $c->comprobadaEn() !== null),
+            'requerido' => false,
+            'ruta' => 'pasarelas',
+        ];
         $tareas[] = ['clave' => 'miembros', 'hecho' => PersonaTenant::query()->where('tipo', TipoPersonaTenant::Miembro->value)->exists(), 'requerido' => false, 'ruta' => 'miembros'];
 
         $requeridas = array_filter($tareas, static fn (array $t): bool => $t['requerido']);

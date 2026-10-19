@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
+import '../../../core/hora_negocio.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
@@ -30,6 +31,10 @@ class FormulariosSeccion extends ConsumerWidget {
     if (datos == null || datos.personaId == null || datos.formularios.isEmpty) {
       return const SizedBox.shrink();
     }
+    // El día del negocio, no el del teléfono.
+    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
+    String respondido(DateTime en) =>
+        'Respondido el ${Formato.dia(HoraNegocio.enDesfase(en, desfase))}';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -44,7 +49,7 @@ class FormulariosSeccion extends ConsumerWidget {
                   subtitle: Text(
                     f.respondidoEn == null
                         ? 'Sin responder'
-                        : 'Respondido el ${Formato.dia(f.respondidoEn!)}',
+                        : respondido(f.respondidoEn!),
                     style: TextStyle(
                       color: f.respondidoEn == null
                           ? context.colores.aviso

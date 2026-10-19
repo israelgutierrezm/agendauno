@@ -338,6 +338,74 @@ void main() {
     expect(dia.hoyEnSucursal(ahora), DateTime(2026, 10, 2));
   });
 
+  group('dos sucursales con desfases distintos en la misma lista', () {
+    // Roma Norte, dos horas detrás del teléfono; Centro, una hora delante. Las
+    // 23:30 del 2 en Roma Norte son la 01:30 del 3 en el teléfono; las 00:30 del
+    // 3 en Centro son las 23:30 del 2 en el teléfono (el orden se invierte).
+    final centro = _telefono + 60;
+    final lista = [
+      _sesion(id: 'roma', dia: 2, hora: 23, minuto: 30),
+      _sesion(
+        id: 'centro',
+        dia: 3,
+        hora: 0,
+        minuto: 30,
+        desfase: centro,
+        sucursal: 'Centro',
+      ),
+    ];
+
+    test('cada una en su hora, su día y su «hoy»', () {
+      final roma = SesionAgenda.desdeJson(lista[0]);
+      final cdmx = SesionAgenda.desdeJson(lista[1]);
+
+      expect(_texto(roma.iniciaLocal), '2026-10-02 23:30');
+      expect(_texto(cdmx.iniciaLocal), '2026-10-03 00:30');
+      expect(roma.desfaseMin, _sucursal);
+      expect(cdmx.desfaseMin, centro);
+      expect(roma.esDelDia(DateTime(2026, 10, 2)), isTrue);
+      expect(cdmx.esDelDia(DateTime(2026, 10, 3)), isTrue);
+      // En el teléfono, Centro empieza antes que Roma Norte.
+      expect(cdmx.iniciaEn.isBefore(roma.iniciaEn), isTrue);
+
+      // A medianoche del 3 en el teléfono: el 2 en Roma Norte, el 3 en Centro.
+      final ahora = DateTime(2026, 10, 3);
+      expect(roma.hoyEnSucursal(ahora), DateTime(2026, 10, 2));
+      expect(cdmx.hoyEnSucursal(ahora), DateTime(2026, 10, 3));
+    });
+
+    test('la etiqueta dice «cada sucursal»; solo una, si la otra está en la '
+        'zona del teléfono', () {
+      final sesiones = lista.map(SesionAgenda.desdeJson).toList();
+
+      expect(
+        etiquetaHoraSucursal(sesiones, desfaseTelefonoMin: _telefono),
+        'Hora de cada sucursal',
+      );
+      expect(
+        etiquetaHoraSucursal(sesiones, desfaseTelefonoMin: centro),
+        'Hora de Roma Norte',
+      );
+    });
+
+    test(
+      'el día de la agenda filtra cada una por el día de su sucursal',
+      () async {
+        final api = _ApiSesiones(lista);
+        final repo = AgendaRepository(Dio()..httpClientAdapter = api, 'demo');
+
+        expect(
+          (await repo.sesionesDelDia(DateTime(2026, 10, 2))).map((s) => s.id),
+          ['roma'],
+        );
+        expect(
+          (await repo.sesionesDelDia(DateTime(2026, 10, 3))).map((s) => s.id),
+          ['centro'],
+        );
+      },
+    );
+  });
+
   group('AgendaScreen', () {
     Future<void> abrir(
       WidgetTester tester,
@@ -378,6 +446,26 @@ void main() {
 
       expect(find.text('23:30'), findsOneWidget);
       expect(find.byKey(const Key('hora-de-la-sucursal')), findsNothing);
+    });
+
+    testWidgets('dos sucursales con desfases distintos: cada una con su hora', (
+      tester,
+    ) async {
+      await abrir(tester, [
+        _sesion(id: 'roma', dia: 2, hora: 23, minuto: 30),
+        _sesion(
+          id: 'centro',
+          dia: 2,
+          hora: 9,
+          minuto: 0,
+          desfase: _telefono + 60,
+          sucursal: 'Centro',
+        ),
+      ]);
+
+      expect(find.text('23:30'), findsOneWidget);
+      expect(find.text('09:00'), findsOneWidget);
+      expect(find.text('Hora de cada sucursal'), findsOneWidget);
     });
   });
 }

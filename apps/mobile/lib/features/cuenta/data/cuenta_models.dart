@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/agenda/contrato_agenda.dart';
 import '../../../core/formato.dart';
+import '../../../core/hora_negocio.dart';
 import '../../../core/theme/tema_agendauno.dart';
 
 export '../../../core/agenda/contrato_agenda.dart';
@@ -168,8 +169,9 @@ class OpcionesReprogramar {
   /// Cita: cada horario libre (en la hora de la sede).
   final List<HorarioCita> horarios;
 
-  /// Clase: (id, inicio ISO) de cada fecha con lugar.
-  final List<({String id, String iniciaEn})> sesiones;
+  /// Clase: cada fecha con lugar: su id, su inicio (ISO) y, si el API la manda, la
+  /// hora en su sede (`AAAA-MM-DDTHH:MM`, sin zona).
+  final List<({String id, String iniciaEn, String? iniciaLocal})> sesiones;
 
   factory OpcionesReprogramar.desdeJson(Map<String, dynamic> j) =>
       OpcionesReprogramar(
@@ -184,6 +186,7 @@ class OpcionesReprogramar {
           return (
             id: (m['id'] ?? '') as String,
             iniciaEn: (m['inicia_en'] ?? '') as String,
+            iniciaLocal: m['inicia_local'] as String?,
           );
         }).toList(),
       );
@@ -709,7 +712,8 @@ class OrdenPorPagar {
   /// `pendiente`, `pagada` o `cancelada` (en el historial).
   final String estado;
 
-  /// Cuándo se pagó (o, si no, cuándo se creó), para el historial.
+  /// Cuándo se pagó (o, si no, cuándo se creó), para el historial: en la hora del
+  /// negocio.
   final DateTime? fecha;
 
   /// Para no pagar dos veces lo que ya se está pagando.
@@ -732,15 +736,21 @@ class OrdenPorPagar {
   static List<OrdenPorPagar> pendientes(
     List<dynamic> ordenes, {
     String moneda = 'MXN',
+    int? desfaseMin,
   }) => ordenes
       .whereType<Map<String, dynamic>>()
       .where((o) => o['estado'] == 'pendiente')
-      .map((o) => OrdenPorPagar.desdeJson(o, moneda: moneda))
+      .map(
+        (o) =>
+            OrdenPorPagar.desdeJson(o, moneda: moneda, desfaseMin: desfaseMin),
+      )
       .toList();
 
+  /// [desfaseMin]: el del negocio (el de la sesión): las fechas van en su hora.
   factory OrdenPorPagar.desdeJson(
     Map<String, dynamic> j, {
     String moneda = 'MXN',
+    int? desfaseMin,
   }) {
     final lineas = ((j['lineas'] ?? []) as List)
         .whereType<Map<String, dynamic>>()
@@ -771,7 +781,10 @@ class OrdenPorPagar {
           ? [
               if (sesion['profesional'] != null) 'Con ${sesion['profesional']}',
               if (sesion['inicia_en'] != null)
-                Formato.fechaHora(sesion['inicia_en'] as String),
+                Formato.fechaHora(
+                  sesion['inicia_en'] as String,
+                  desfaseMin: desfaseMin,
+                ),
               if (sesion['sucursal'] != null) sesion['sucursal'] as String,
             ].join(' · ')
           : null,
@@ -780,7 +793,7 @@ class OrdenPorPagar {
           ? ((enProceso['metodo'] as String?) ?? '')
           : null,
       estado: (j['estado'] as String?) ?? 'pendiente',
-      fecha: fecha == null ? null : DateTime.tryParse(fecha)?.toLocal(),
+      fecha: HoraNegocio.pared(fecha, desfaseMin: desfaseMin),
     );
   }
 }
@@ -1489,8 +1502,9 @@ class AntesDeReservar {
         '${_creditos(disponibleDespues ?? 0)}.';
   }
 
-  /// Hasta cuándo cancela sin costo y qué pasa después (la política que se congela).
-  String? cancelacionTexto(DateTime ahora) {
+  /// Hasta cuándo cancela sin costo y qué pasa después (la política que se congela),
+  /// con la hora del negocio ([desfaseMin], el de la sesión).
+  String? cancelacionTexto(DateTime ahora, {int? desfaseMin}) {
     final limite = limiteCancelacion == null
         ? null
         : DateTime.tryParse(limiteCancelacion!);
@@ -1502,9 +1516,9 @@ class AntesDeReservar {
         : penalizaTarde
         ? 'Después, cancelar descuenta la clase.'
         : 'Después también se devuelve el crédito.';
+    final hasta = Formato.fechaHora(limiteCancelacion, desfaseMin: desfaseMin);
     return limite.isAfter(ahora)
-        ? 'Cancela sin costo hasta el ${Formato.fechaHora(limiteCancelacion)}. '
-              '$despues'
+        ? 'Cancela sin costo hasta el $hasta. $despues'
         : 'Ya pasó el límite para cancelar sin costo. $despues';
   }
 

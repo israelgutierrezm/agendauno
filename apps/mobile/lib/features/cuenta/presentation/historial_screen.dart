@@ -132,16 +132,20 @@ class _HistorialState extends ConsumerState<HistorialScreen> {
   );
 }
 
-class _Fila extends StatelessWidget {
+class _Fila extends ConsumerWidget {
   const _Fila(this.i, {required this.onCalificar});
 
   final ItemHistorial i;
   final VoidCallback onCalificar;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final detalle = [
-      Formato.fechaHora(i.iniciaEn),
+      // En la hora del negocio, no en la del teléfono.
+      Formato.fechaHora(
+        i.iniciaEn,
+        desfaseMin: ref.watch(sesionProvider)?.desfaseNegocioMin,
+      ),
       if (i.sucursal != null) i.sucursal!,
       if (i.instructor != null) 'con ${i.instructor}',
     ].join(' · ');

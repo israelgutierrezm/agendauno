@@ -974,7 +974,8 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.metodo');
             Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');
             // Reenviar el ticket (del mostrador o de una cita): solo el correo (R06).
-            Route::post('/pos/ventas/{venta}/ticket', [PuntoDeVentaTenantController::class, 'reenviarTicket'])->name('pos.ventas.ticket');
+            // Con tope: reenviar no sirve para mandarle correos de más a nadie (R06).
+            Route::post('/pos/ventas/{venta}/ticket', [PuntoDeVentaTenantController::class, 'reenviarTicket'])->middleware('throttle:10,1,ticket-reenvio')->name('pos.ventas.ticket');
 
             // Lealtad (R24): programa de puntos, recompensas, canjes y saldo por miembro.
             Route::get('/lealtad/programa', [LealtadTenantController::class, 'programa'])->middleware(['puede:lealtad.ver', 'plan:lealtad'])->name('lealtad.programa');

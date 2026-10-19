@@ -127,13 +127,17 @@ class CortesDeNominaTenant
         $this->auditoria->registrar($actor, 'nomina.corte_reabierto', 'corte_nomina', (string) $corte->ulid, $resumen, null);
     }
 
-    /** Una corrección después de pagar, a favor (+) o en contra (−) de alguien. */
-    public function ajustar(CorteNominaTenant $corte, Usuario $persona, int $montoMinor, string $motivo, ?Usuario $actor): AjusteNominaTenant
+    /**
+     * Una corrección después de pagar, a favor (+) o en contra (−) de alguien. Con
+     * `$compensa` corrige una diferencia del cálculo y se resta de lo que falta (R09);
+     * sin él (un bono, otra corrección) se muestra aparte.
+     */
+    public function ajustar(CorteNominaTenant $corte, Usuario $persona, int $montoMinor, string $motivo, ?Usuario $actor, bool $compensa = false): AjusteNominaTenant
     {
         if ($montoMinor === 0) {
             throw ValidationException::withMessages(['monto_minor' => ['El ajuste no puede ser de cero.']]);
         }
-        $ajuste = DB::connection('tenant')->transaction(function () use ($corte, $persona, $montoMinor, $motivo, $actor): AjusteNominaTenant {
+        $ajuste = DB::connection('tenant')->transaction(function () use ($corte, $persona, $montoMinor, $motivo, $actor, $compensa): AjusteNominaTenant {
             $bloqueado = CorteNominaTenant::query()->whereKey($corte->getKey())->lockForUpdate()->firstOrFail();
             if ($bloqueado->estado !== EstadoCorteNomina::Pagado) {
                 throw ValidationException::withMessages(['corte' => ['Antes de pagar no hace falta un ajuste: reabre el periodo y vuelve a cerrarlo.']]);
@@ -147,6 +151,7 @@ class CortesDeNominaTenant
                 'motivo' => $motivo,
                 'registrado_por_id' => $actor?->getKey(),
                 'registrado_por_nombre' => $actor?->name,
+                'compensa_diferencia' => $compensa,
             ]);
         });
         $this->auditoria->registrar($actor, 'nomina.ajuste', 'corte_nomina', (string) $corte->ulid, null, [
@@ -163,7 +168,7 @@ class CortesDeNominaTenant
      * Lo que da hoy el cálculo del mismo periodo contra lo que quedó en el corte, por
      * persona (solo donde cambió). Sirve para decidir un ajuste; no cambia nada.
      *
-     * @return list<array{usuario_id: string|null, usuario: string|null, en_corte_minor: int, hoy_minor: int, diferencia_minor: int}>
+     * @return list<array{usuario_id: string|null, usuario: string|null, en_corte_minor: int, ajustes_minor: int, otros_ajustes_minor: int, reconocido_minor: int, hoy_minor: int, diferencia_minor: int, diferencia_original_minor: int}>
      */
     public function diferencias(CorteNominaTenant $corte): array
     {
@@ -175,13 +180,19 @@ class CortesDeNominaTenant
             $enCorte[$clave] ??= ['usuario' => $linea->usuario_nombre, 'minor' => 0];
             $enCorte[$clave]['minor'] += $linea->total_minor;
         }
-        // Lo que ya se ajustó después de pagar (R09): cuenta como reconocido.
+        // Lo que ya se ajustó después de pagar por una diferencia (R09): cuenta como
+        // reconocido. Los demás ajustes (un bono…) van aparte y no cambian lo que falta.
         $ajustes = [];
+        $otros = [];
         $deAjustes = Usuario::query()->whereIn('id', $corte->ajustes()->whereNotNull('usuario_id')->select('usuario_id'))->pluck('ulid', 'id');
         foreach ($corte->ajustes()->get() as $ajuste) {
             $clave = $ajuste->usuario_id !== null ? (string) $deAjustes->get($ajuste->usuario_id) : '';
-            $ajustes[$clave] ??= ['usuario' => $ajuste->usuario_nombre, 'minor' => 0];
-            $ajustes[$clave]['minor'] += (int) $ajuste->monto_minor;
+            if ($ajuste->compensa()) {
+                $ajustes[$clave] ??= ['usuario' => $ajuste->usuario_nombre, 'minor' => 0];
+                $ajustes[$clave]['minor'] += (int) $ajuste->monto_minor;
+            } else {
+                $otros[$clave] = ($otros[$clave] ?? 0) + (int) $ajuste->monto_minor;
+            }
         }
         $hoy = [];
         foreach ($this->nomina->calcular($corte->desde->toDateString(), $corte->hasta->toDateString()) as $fila) {
@@ -202,8 +213,10 @@ class CortesDeNominaTenant
                 'usuario_id' => $clave !== '' ? (string) $clave : null,
                 'usuario' => $enCorte[$clave]['usuario'] ?? $hoy[$clave]['usuario'] ?? $ajustes[$clave]['usuario'] ?? null,
                 'en_corte_minor' => $antes,
-                // Lo ya ajustado y lo reconocido (corte + ajustes).
+                // Lo ya ajustado por la diferencia y lo reconocido (corte + esos ajustes).
                 'ajustes_minor' => $ajustado,
+                // Otros ajustes de la persona (no corrigen la diferencia).
+                'otros_ajustes_minor' => $otros[$clave] ?? 0,
                 'reconocido_minor' => $antes + $ajustado,
                 'hoy_minor' => $ahora,
                 // Lo que falta (0 = ya se atendió) y, aparte, la de siempre: contra el corte.

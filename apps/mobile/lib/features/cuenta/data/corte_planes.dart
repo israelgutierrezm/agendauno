@@ -1,3 +1,4 @@
+import '../../../core/hora_negocio.dart';
 import '../../auth/data/sesion.dart';
 import 'cuenta_models.dart';
 
@@ -12,6 +13,8 @@ class UsoPlan {
   });
 
   final String? clase;
+
+  /// Cuándo fue la clase, en la hora de pared del negocio (no la del teléfono).
   final DateTime iniciaEn;
 
   /// asistio | no_asistio | cancelacion_tardia | proxima | tomada.
@@ -30,12 +33,17 @@ class UsoPlan {
   bool get pideAtencion =>
       estado == 'no_asistio' || estado == 'cancelacion_tardia';
 
-  factory UsoPlan.desdeJson(Map<String, dynamic> j) => UsoPlan(
-    clase: j['clase'] as String?,
-    iniciaEn: DateTime.parse(j['inicia_en'] as String).toLocal(),
-    estado: (j['estado'] ?? 'tomada') as String,
-    extra: (j['extra'] ?? false) as bool,
-  );
+  /// [desfaseMin]: el del negocio (el de la sesión); sin él, la hora del teléfono.
+  factory UsoPlan.desdeJson(Map<String, dynamic> j, {int? desfaseMin}) =>
+      UsoPlan(
+        clase: j['clase'] as String?,
+        iniciaEn: HoraNegocio.enDesfase(
+          DateTime.parse(j['inicia_en'] as String),
+          desfaseMin,
+        ),
+        estado: (j['estado'] ?? 'tomada') as String,
+        extra: (j['extra'] ?? false) as bool,
+      );
 }
 
 class ExtraPlan {
@@ -146,29 +154,31 @@ class PlanCorte {
     ];
   }
 
-  factory PlanCorte.desdeJson(Map<String, dynamic> j) => PlanCorte(
-    id: (j['id'] ?? '') as String,
-    derechoId: (j['derecho_id'] ?? '') as String,
-    producto: j['producto'] as String?,
-    desde: j['desde'] as String?,
-    hasta: j['hasta'] as String?,
-    cobertura: CoberturaSucursales.desdeJson(j),
-    estado: (j['estado'] ?? 'vigente') as String,
-    ilimitado: (j['ilimitado'] ?? false) as bool,
-    aplicaA: ((j['aplica_a'] ?? []) as List).whereType<String>().toList(),
-    unidades: ((j['unidades'] ?? {}) as Map<String, dynamic>).map(
-      (k, v) => MapEntry(k, (v ?? 0) as int),
-    ),
-    extras: ((j['extras'] ?? []) as List)
-        .whereType<Map<String, dynamic>>()
-        .map(ExtraPlan.desdeJson)
-        .toList(),
-    usos: ((j['usos'] ?? []) as List)
-        .whereType<Map<String, dynamic>>()
-        .map(UsoPlan.desdeJson)
-        .toList(),
-    usosTotal:
-        (j['usos_total'] as num?)?.toInt() ??
-        ((j['usos'] ?? []) as List).length,
-  );
+  /// [desfaseMin]: el del negocio, para la hora de sus usos.
+  factory PlanCorte.desdeJson(Map<String, dynamic> j, {int? desfaseMin}) =>
+      PlanCorte(
+        id: (j['id'] ?? '') as String,
+        derechoId: (j['derecho_id'] ?? '') as String,
+        producto: j['producto'] as String?,
+        desde: j['desde'] as String?,
+        hasta: j['hasta'] as String?,
+        cobertura: CoberturaSucursales.desdeJson(j),
+        estado: (j['estado'] ?? 'vigente') as String,
+        ilimitado: (j['ilimitado'] ?? false) as bool,
+        aplicaA: ((j['aplica_a'] ?? []) as List).whereType<String>().toList(),
+        unidades: ((j['unidades'] ?? {}) as Map<String, dynamic>).map(
+          (k, v) => MapEntry(k, (v ?? 0) as int),
+        ),
+        extras: ((j['extras'] ?? []) as List)
+            .whereType<Map<String, dynamic>>()
+            .map(ExtraPlan.desdeJson)
+            .toList(),
+        usos: ((j['usos'] ?? []) as List)
+            .whereType<Map<String, dynamic>>()
+            .map((u) => UsoPlan.desdeJson(u, desfaseMin: desfaseMin))
+            .toList(),
+        usosTotal:
+            (j['usos_total'] as num?)?.toInt() ??
+            ((j['usos'] ?? []) as List).length,
+      );
 }
