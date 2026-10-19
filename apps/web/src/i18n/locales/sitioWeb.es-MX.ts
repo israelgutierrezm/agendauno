@@ -343,7 +343,25 @@ export default {
     irAInicio: "Ir a Inicio",
     // El video carga hasta que la persona le da clic (sin cookies hasta entonces).
     verVideo: "Ver video",
+    // El equipo y los carruseles (ADR 0167).
+    anterior: "Anterior",
+    siguiente: "Siguiente",
+    verMas: "Ver más",
+    verPerfil: "Ver a {nombre}",
+    agendarCon: "Agendar con {nombre}",
+    susClases: "Sus próximas clases",
     videoAviso: "Al reproducirlo, el video se carga desde {proveedor}.",
+  },
+  // Cómo se muestra una sección o un bloque (ADR 0167, Plus).
+  presentacion: {
+    titulo: "Cómo se muestra",
+    siempre: "Como siempre",
+    tarjetas: "Tarjetas",
+    mosaico: "Mosaico",
+    carrusel: "Carrusel",
+    ayuda: "El carrusel se desliza con el dedo o con sus flechas.",
+    ayudaEquipo:
+      "Al tocar a alguien se abre su ficha: su foto, su semblanza y, en citas, agendar con esa persona. La semblanza y la foto se cambian en su perfil del equipo.",
   },
   // En Captación (ADR 0167): sus pestañas y la barra que siempre está a la vista.
   pestanas: {

@@ -862,6 +862,44 @@ describe("sitio web en Captación (ADR 0167)", () => {
     w.unmount();
   });
 
+  it("el equipo elige cómo se muestra (Plus); sin Plus no se cambia", async () => {
+    const w = montar();
+    await flushPromises();
+    await w
+      .get('[data-prueba="seccion-equipo"] button[aria-expanded]')
+      .trigger("click");
+    const control = w.get('[data-prueba="presentacion-equipo"]');
+    expect(control.findAll("button").map((b) => b.text())).toEqual([
+      "Como siempre",
+      "Tarjetas",
+      "Mosaico",
+      "Carrusel",
+    ]);
+    await control.findAll("button")[3]!.trigger("click");
+    await w.get('[data-prueba="guardar-sitio"]').trigger("click");
+    await flushPromises();
+    const enviado = api.put.mock.calls.at(-1)![1] as {
+      secciones: { tipo: string; presentacion?: string | null }[];
+    };
+    expect(
+      enviado.secciones.find((s) => s.tipo === "equipo")?.presentacion,
+    ).toBe("carrusel");
+    w.unmount();
+
+    sesionPrueba.estudio.plan.sin = ["sitio_avanzado"];
+    const sinPlus = montar();
+    await flushPromises();
+    await sinPlus
+      .get('[data-prueba="seccion-equipo"] button[aria-expanded]')
+      .trigger("click");
+    expect(
+      sinPlus
+        .get('[data-prueba="presentacion-equipo"] [role="group"]')
+        .attributes("inert"),
+    ).toBeDefined();
+    sinPlus.unmount();
+  });
+
   it("quien prepara el sitio guarda, pero publicar y lo que va en vivo es de quien publica", async () => {
     sesionPrueba.permisos = ["sitio.editar"];
     const w = montar();

@@ -38,7 +38,10 @@ vi.mock("vue-router", () => ({
       href: `/${r.name}/${r.params?.pagina ?? ""}`,
     }),
   }),
-  RouterLink: { template: "<a><slot /></a>" },
+  RouterLink: {
+    props: ["to"],
+    template: '<a :data-a="JSON.stringify(to)"><slot /></a>',
+  },
 }));
 
 function escaparate(resenas: unknown) {
@@ -136,7 +139,7 @@ describe("página pública del estudio", () => {
     const enlace = w
       .findAllComponents(RouterLink)
       .find((c) => c.attributes("data-prueba") === "ya-tengo-cuenta")!;
-    expect(enlace.vm.$attrs.to).toEqual({
+    expect(enlace.props("to")).toEqual({
       name: "entrar",
       query: { estudio: "estudio-a", volver: `/mi-cuenta?plan=${plan}` },
     });
@@ -877,6 +880,126 @@ describe("página pública del estudio", () => {
       expect(w.get('[data-prueba="pagina-cabecera"]').text()).toContain(
         "Nosotros",
       );
+    });
+  });
+
+  describe("el equipo y las reseñas (ADR 0167)", () => {
+    function conEquipo(
+      presentacion: string | null,
+      modalidad: "clases" | "citas" = "clases",
+    ) {
+      const respuesta = escaparate({
+        promedio: 5,
+        total: 2,
+        recientes: [
+          {
+            calificacion: 5,
+            comentario: "Excelente",
+            nombre: "Ana",
+            actividad: null,
+          },
+          {
+            calificacion: 4,
+            comentario: "Muy bien",
+            nombre: "Beto",
+            actividad: null,
+          },
+        ],
+      });
+      Object.assign(respuesta.data.data, {
+        estudio: {
+          ...respuesta.data.data.estudio,
+          modalidad,
+          capacidades: {
+            clases: modalidad === "clases",
+            citas: modalidad === "citas",
+          },
+        },
+        instructores: [
+          {
+            id: "u1",
+            nombre: "Diana Ruiz",
+            foto_url: null,
+            semblanza: "Instructora desde 2015.",
+          },
+          { id: "u2", nombre: "Leo", foto_url: null, semblanza: null },
+        ],
+        proximas_sesiones: [
+          {
+            id: "s1",
+            clase: "Pole Nivel 1",
+            inicia_en: "2026-10-02T01:00:00Z",
+            zona_horaria: "America/Mexico_City",
+            sucursal: "Roma",
+            instructor: "Diana Ruiz",
+            capacidad: 10,
+            lugares_libres: 3,
+          },
+        ],
+        sitio: {
+          plantilla: "esencial",
+          secciones: [
+            { tipo: "inicio", titulo: null, texto: null, foto_url: null },
+            {
+              tipo: "equipo",
+              titulo: null,
+              texto: null,
+              foto_url: null,
+              presentacion,
+            },
+            {
+              tipo: "resenas",
+              titulo: null,
+              texto: null,
+              foto_url: null,
+              presentacion: "carrusel",
+            },
+            { tipo: "contacto", titulo: null, texto: null, foto_url: null },
+          ],
+          banners: [],
+        },
+      });
+      return respuesta;
+    }
+
+    it("en carrusel, cada integrante abre su ficha con su semblanza y sus próximas clases", async () => {
+      mocks.get.mockResolvedValue(conEquipo("carrusel"));
+      const w = montar();
+      await flushPromises();
+
+      const carruseles = w.findAll('[data-prueba="carrusel"]');
+      expect(carruseles).toHaveLength(2);
+      expect(carruseles[0]!.findAll('[data-prueba="integrante"]')).toHaveLength(
+        2,
+      );
+      // Las reseñas, también en carrusel.
+      expect(carruseles[1]!.findAll('[data-prueba="resena"]')).toHaveLength(2);
+
+      await w.findAll('[data-prueba="integrante"]')[0]!.trigger("click");
+      const ficha = document.body.querySelector(
+        '[data-prueba="ficha-integrante"]',
+      );
+      expect(ficha?.textContent).toContain("Instructora desde 2015.");
+      expect(ficha?.textContent).toContain("Pole Nivel 1");
+      // En clases no se agenda con alguien.
+      expect(ficha?.querySelector('[data-prueba="agendar-con"]')).toBeNull();
+      w.unmount();
+    });
+
+    it("en mosaico; en citas la ficha ofrece agendar con esa persona", async () => {
+      mocks.get.mockResolvedValue(conEquipo("mosaico", "citas"));
+      const w = montar();
+      await flushPromises();
+
+      expect(w.find(".ep-mosaico").exists()).toBe(true);
+      await w.findAll('[data-prueba="integrante"]')[1]!.trigger("click");
+      const enlace = document.body.querySelector('[data-prueba="agendar-con"]');
+      expect(enlace?.textContent).toContain("Agendar con Leo");
+      expect(JSON.parse(enlace?.getAttribute("data-a") ?? "{}")).toMatchObject({
+        name: "agendar-cita",
+        query: { profesional: "u2" },
+      });
+      w.unmount();
     });
   });
 });

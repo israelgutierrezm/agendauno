@@ -1265,6 +1265,10 @@ en el negocio.
 - El borrador suma `ocultos` {`servicios`, `productos`, `equipo`}: ids públicos que el
   sitio no muestra (siguen a la venta y se agendan). `GET /escaparate` y la vista previa
   los quitan de `servicios`, `productos` e `instructores`, y no publican la lista.
+- Cómo se muestra (Plus): `secciones[].presentacion` en el equipo (`tarjetas`,
+  `mosaico`, `carrusel`) y en las reseñas (`carrusel`); `datos.presentacion` en los
+  bloques de galería (`mosaico`, `carrusel`) y de testimonios (`carrusel`). Null es
+  como siempre. Las opciones vienen en `catalogo.presentaciones`.
 - `GET /sitio/oferta` (`sitio.editar`): todo lo que se puede mostrar, sin quitar lo
   oculto. Devuelve `servicios`, `productos`, `instructores` (con `id`), `sucursales`,
   `horario_clases` y `captacion`.

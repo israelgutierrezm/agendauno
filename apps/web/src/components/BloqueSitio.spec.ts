@@ -123,4 +123,35 @@ describe("bloques del sitio en la página pública", () => {
       montar(b, false).find('[data-prueba="formulario-captacion"]').exists(),
     ).toBe(false);
   });
+
+  it("la galería en mosaico o en carrusel y los testimonios en carrusel (ADR 0167)", () => {
+    const fotos = [
+      { url: "https://cdn/1.jpg", pie: "Sala" },
+      { url: "https://cdn/2.jpg", pie: null },
+    ];
+    const mosaico = montar(
+      bloque({ tipo: "galeria", datos: { fotos, presentacion: "mosaico" } }),
+    );
+    expect(mosaico.find(".bs-mosaico").exists()).toBe(true);
+
+    const carrusel = montar(
+      bloque({ tipo: "galeria", datos: { fotos, presentacion: "carrusel" } }),
+    );
+    expect(
+      carrusel.get('[data-prueba="carrusel"]').findAll("img"),
+    ).toHaveLength(2);
+
+    const testimonios = montar(
+      bloque({
+        tipo: "testimonios",
+        datos: {
+          presentacion: "carrusel",
+          items: [{ texto: "Me encantó", nombre: "Ana" }],
+        },
+      }),
+    );
+    expect(testimonios.get('[data-prueba="carrusel"]').text()).toContain(
+      "Me encantó",
+    );
+  });
 });

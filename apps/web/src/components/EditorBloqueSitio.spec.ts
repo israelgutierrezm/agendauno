@@ -56,3 +56,32 @@ describe("bloque de formulario del sitio", () => {
     ).toBe(false);
   });
 });
+
+describe("cómo se muestra un bloque (ADR 0167)", () => {
+  it("la galería se elige como siempre, en mosaico o en carrusel", async () => {
+    const w = mount(EditorBloqueSitio, {
+      props: {
+        catalogo: CATALOGO,
+        prefijo: "secciones.3",
+        errores: {},
+        modelValue: {
+          tipo: "galeria",
+          visible: true,
+          datos: { fotos: [] },
+        } as unknown as SeccionSitio,
+        "onUpdate:modelValue": () => undefined,
+      },
+      global: { plugins: [i18n] },
+    });
+    expect(
+      w.get('[data-prueba="presentacion-siempre"]').attributes("aria-pressed"),
+    ).toBe("true");
+    await w.get('[data-prueba="presentacion-carrusel"]').trigger("click");
+    expect(
+      w.get('[data-prueba="presentacion-carrusel"]').attributes("aria-pressed"),
+    ).toBe("true");
+    expect(w.find('[data-prueba="presentacion-tarjetas"]').exists()).toBe(
+      false,
+    );
+  });
+});

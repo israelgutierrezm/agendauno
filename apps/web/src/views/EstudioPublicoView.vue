@@ -16,6 +16,8 @@ import InstalarApp from "@/components/InstalarApp.vue";
 import CalendarioPublico from "@/components/CalendarioPublico.vue";
 import TarjetaPlanPublico from "@/components/TarjetaPlanPublico.vue";
 import BloqueSitio from "@/components/BloqueSitio.vue";
+import CarruselSitio from "@/components/CarruselSitio.vue";
+import FichaIntegrante from "@/components/FichaIntegrante.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
@@ -153,6 +155,12 @@ interface Resena {
   actividad: string | null;
   fecha: string | null;
 }
+interface Integrante {
+  id?: string;
+  nombre: string;
+  foto_url: string | null;
+  semblanza?: string | null;
+}
 interface Escaparate {
   // Sus datos estructurados, los mismos que da la cabecera del servidor (ADR 0155).
   json_ld?: Record<string, unknown>;
@@ -182,11 +190,7 @@ interface Escaparate {
     whatsapp: string | null;
   };
   sucursales: Sucursal[];
-  instructores: {
-    nombre: string;
-    foto_url: string | null;
-    semblanza?: string | null;
-  }[];
+  instructores: Integrante[];
   servicios?: Servicio[];
   horario_clases?: ClaseHorario[];
   productos: Producto[];
@@ -522,6 +526,33 @@ function fechaHora(iso: string | null, zona: string | null): string {
     timeZone: zona ?? undefined,
   }).format(new Date(iso));
 }
+// La ficha de alguien del equipo (ADR 0167): su semblanza y qué hacer con él (agendar
+// en citas; sus próximas clases en clases).
+const fichaDe = ref<Integrante | null>(null);
+const agendarCon = computed(() =>
+  fichaDe.value?.id && usaCitas.value
+    ? {
+        name: "agendar-cita",
+        params: { slug: slug.value },
+        query: { profesional: fichaDe.value.id },
+      }
+    : null,
+);
+const clasesDe = computed(() => {
+  const persona = fichaDe.value;
+  if (persona === null || usaCitas.value) {
+    return [];
+  }
+  return (escaparate.value?.proximas_sesiones ?? [])
+    .filter((s) => s.instructor === persona.nombre)
+    .slice(0, 3)
+    .map((s) =>
+      [s.clase, fechaHora(s.inicia_en, s.zona_horaria), s.sucursal]
+        .filter(Boolean)
+        .join(" · "),
+    );
+});
+
 function iniciales(nombre: string): string {
   return nombre
     .split(" ")
@@ -1675,7 +1706,116 @@ onBeforeUnmount(() => {
                 })
               }}
             </p>
+            <!-- Carrusel (ADR 0167): una fila que se desliza -->
+            <CarruselSitio
+              v-if="sec.presentacion === 'carrusel'"
+              class="mt-6"
+              :items="escaparate.instructores"
+              :etiqueta="sec.titulo ?? tn('escaparate.instructores')"
+            >
+              <template #default="{ item: p }">
+                <button
+                  type="button"
+                  class="ep-integrante ep-integrante-tarjeta"
+                  data-prueba="integrante"
+                  @click="fichaDe = p"
+                >
+                  <img
+                    v-if="p.foto_url"
+                    :src="p.foto_url"
+                    alt=""
+                    class="ep-integrante-foto"
+                    loading="lazy"
+                  />
+                  <span
+                    v-else
+                    class="ep-integrante-foto ep-integrante-iniciales"
+                    aria-hidden="true"
+                    >{{ iniciales(p.nombre) }}</span
+                  >
+                  <span class="mt-3 block font-semibold">{{ p.nombre }}</span>
+                  <span
+                    v-if="p.semblanza"
+                    class="ep-integrante-semblanza mt-1 block text-sm"
+                    >{{ p.semblanza }}</span
+                  >
+                </button>
+              </template>
+            </CarruselSitio>
+
+            <!-- Mosaico (ADR 0167): sus fotos, con su nombre encima -->
             <ul
+              v-else-if="sec.presentacion === 'mosaico'"
+              class="ep-mosaico mt-6"
+            >
+              <li v-for="(p, i) in escaparate.instructores" :key="p.id ?? i">
+                <button
+                  type="button"
+                  class="ep-mosaico-celda"
+                  data-prueba="integrante"
+                  :aria-label="
+                    $t('sitioWeb.publico.verPerfil', { nombre: p.nombre })
+                  "
+                  @click="fichaDe = p"
+                >
+                  <img
+                    v-if="p.foto_url"
+                    :src="p.foto_url"
+                    alt=""
+                    loading="lazy"
+                  />
+                  <span
+                    v-else
+                    class="ep-integrante-iniciales"
+                    aria-hidden="true"
+                    >{{ iniciales(p.nombre) }}</span
+                  >
+                  <span class="ep-mosaico-nombre">{{ p.nombre }}</span>
+                </button>
+              </li>
+            </ul>
+
+            <!-- Tarjetas (ADR 0167): foto grande, nombre y el inicio de su semblanza -->
+            <ul
+              v-else-if="sec.presentacion === 'tarjetas'"
+              class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              <li v-for="(p, i) in escaparate.instructores" :key="p.id ?? i">
+                <button
+                  type="button"
+                  class="ep-integrante ep-integrante-tarjeta h-full"
+                  data-prueba="integrante"
+                  @click="fichaDe = p"
+                >
+                  <img
+                    v-if="p.foto_url"
+                    :src="p.foto_url"
+                    alt=""
+                    class="ep-integrante-foto"
+                    loading="lazy"
+                  />
+                  <span
+                    v-else
+                    class="ep-integrante-foto ep-integrante-iniciales"
+                    aria-hidden="true"
+                    >{{ iniciales(p.nombre) }}</span
+                  >
+                  <span class="mt-3 block font-semibold">{{ p.nombre }}</span>
+                  <span
+                    v-if="p.semblanza"
+                    class="ep-integrante-semblanza mt-1 block text-sm"
+                    >{{ p.semblanza }}</span
+                  >
+                  <span class="tu-enlace mt-2 block text-sm">{{
+                    $t("sitioWeb.publico.verMas")
+                  }}</span>
+                </button>
+              </li>
+            </ul>
+
+            <!-- Como siempre: en una línea o, con semblanzas, en tarjetas -->
+            <ul
+              v-else
               class="mt-6"
               :class="
                 equipoConSemblanza
@@ -1685,37 +1825,42 @@ onBeforeUnmount(() => {
             >
               <li
                 v-for="(p, i) in escaparate.instructores"
-                :key="i"
-                class="flex gap-3"
-                :class="equipoConSemblanza ? 'items-start' : 'items-center'"
+                :key="p.id ?? i"
                 data-prueba="integrante"
               >
-                <img
-                  v-if="p.foto_url"
-                  :src="p.foto_url"
-                  alt=""
-                  class="h-11 w-11 rounded-full object-cover"
-                />
-                <span
-                  v-else
-                  class="flex h-11 w-11 items-center justify-center rounded-full font-bold"
-                  :style="{
-                    background: 'var(--primario)',
-                    color: 'var(--primario-contraste)',
-                  }"
-                  aria-hidden="true"
-                  >{{ iniciales(p.nombre) }}</span
+                <!-- Con semblanza o para agendar con él, se abre su ficha. -->
+                <component
+                  :is="p.semblanza || usaCitas ? 'button' : 'div'"
+                  :type="p.semblanza || usaCitas ? 'button' : undefined"
+                  class="ep-integrante flex gap-3"
+                  :class="equipoConSemblanza ? 'items-start' : 'items-center'"
+                  @click="p.semblanza || usaCitas ? (fichaDe = p) : undefined"
                 >
-                <div class="min-w-0">
-                  <span class="font-semibold">{{ p.nombre }}</span>
-                  <p
-                    v-if="p.semblanza"
-                    class="mt-1 text-sm"
-                    :style="{ color: 'var(--texto-suave)' }"
+                  <img
+                    v-if="p.foto_url"
+                    :src="p.foto_url"
+                    alt=""
+                    class="h-11 w-11 rounded-full object-cover"
+                  />
+                  <span
+                    v-else
+                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-bold"
+                    :style="{
+                      background: 'var(--primario)',
+                      color: 'var(--primario-contraste)',
+                    }"
+                    aria-hidden="true"
+                    >{{ iniciales(p.nombre) }}</span
                   >
-                    {{ p.semblanza }}
-                  </p>
-                </div>
+                  <span class="min-w-0 text-left">
+                    <span class="block font-semibold">{{ p.nombre }}</span>
+                    <span
+                      v-if="p.semblanza"
+                      class="ep-integrante-semblanza mt-1 block text-sm"
+                      >{{ p.semblanza }}</span
+                    >
+                  </span>
+                </component>
               </li>
             </ul>
           </section>
@@ -1741,8 +1886,46 @@ onBeforeUnmount(() => {
                 tn("escaparate.totalResenas", escaparate.resenas?.total ?? 0)
               }}</span>
             </p>
+            <CarruselSitio
+              v-if="
+                sec.presentacion === 'carrusel' &&
+                (escaparate.resenas?.recientes ?? []).length > 0
+              "
+              class="mt-6"
+              :items="escaparate.resenas?.recientes ?? []"
+              :etiqueta="sec.titulo ?? tn('escaparate.resenas')"
+            >
+              <template #default="{ item: r }">
+                <div
+                  class="h-full rounded-lg border p-4"
+                  :style="{ borderColor: 'var(--borde)' }"
+                  data-prueba="resena"
+                >
+                  <p
+                    class="text-sm tracking-widest"
+                    :style="{ color: 'var(--aviso)' }"
+                    :aria-label="
+                      tn('escaparate.estrellas', { n: r.calificacion })
+                    "
+                    role="img"
+                  >
+                    {{ "★".repeat(r.calificacion)
+                    }}<span :style="{ color: 'var(--borde)' }">{{
+                      "★".repeat(5 - r.calificacion)
+                    }}</span>
+                  </p>
+                  <p class="mt-2">{{ r.comentario }}</p>
+                  <p
+                    class="mt-2 text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ [r.nombre, r.actividad].filter(Boolean).join(" · ") }}
+                  </p>
+                </div>
+              </template>
+            </CarruselSitio>
             <ul
-              v-if="(escaparate.resenas?.recientes ?? []).length > 0"
+              v-else-if="(escaparate.resenas?.recientes ?? []).length > 0"
               class="mt-6 grid gap-4 sm:grid-cols-2"
             >
               <li
@@ -1989,6 +2172,14 @@ onBeforeUnmount(() => {
         </div>
       </footer>
 
+      <!-- La ficha de alguien del equipo (ADR 0167) -->
+      <FichaIntegrante
+        :persona="fichaDe"
+        :agendar="agendarCon"
+        :clases="clasesDe"
+        @cerrar="fichaDe = null"
+      />
+
       <!-- Pedir acceso: el negocio da de alta a sus clientes (ADR 0093) -->
       <div
         v-if="pidiendoAcceso"
@@ -2089,6 +2280,85 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* El equipo (ADR 0167): tarjetas, mosaico y carrusel; cada integrante abre su ficha. */
+.ep-integrante {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+div.ep-integrante {
+  cursor: default;
+}
+.ep-integrante-tarjeta {
+  display: block;
+  padding: 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+  background: var(--superficie);
+}
+.ep-integrante:focus-visible,
+.ep-mosaico-celda:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: 2px;
+}
+.ep-integrante-foto {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+.ep-integrante-iniciales {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  font-weight: 700;
+  background: var(--primario);
+  color: var(--primario-contraste);
+}
+.ep-integrante-semblanza {
+  color: var(--texto-suave);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ep-mosaico {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: 0.5rem;
+}
+.ep-mosaico-celda {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0;
+  cursor: pointer;
+}
+.ep-mosaico-celda img,
+.ep-mosaico-celda .ep-integrante-iniciales {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ep-mosaico-nombre {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 1.5rem 0.75rem 0.5rem;
+  font-weight: 600;
+  text-align: left;
+  color: #fff;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.65));
+}
 /* Claro u oscuro fijo (ADR 0146, fase 3): los colores de las páginas públicas (los de
    .tu-public-business en style.css), sin seguir el modo de quien visita. */
 .ep-tema-claro {

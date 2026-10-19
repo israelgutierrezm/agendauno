@@ -36,6 +36,7 @@ import {
   moverSeccion,
   nuevaPagina,
   nuevoBloque,
+  PRESENTACIONES,
   type BannerSitio,
   type EncabezadoSitio,
   type EstiloSitio,
@@ -1612,6 +1613,44 @@ onBeforeUnmount(() => {
                       ></textarea>
                       <p v-if="s.tipo === 'inicio'" class="sw-ayuda">
                         {{ $t("sitioWeb.secciones.campos.textoInicioAyuda") }}
+                      </p>
+                    </div>
+                    <!-- Cómo se muestra (ADR 0167, Plus): el equipo y las reseñas -->
+                    <div
+                      v-if="PRESENTACIONES[s.tipo]"
+                      :data-prueba="`presentacion-${s.tipo}`"
+                    >
+                      <span class="tu-label flex items-center gap-2"
+                        >{{ $t("sitioWeb.presentacion.titulo") }}
+                        <span class="tu-badge">{{
+                          $t("sitioWeb.plus.etiqueta")
+                        }}</span></span
+                      >
+                      <div
+                        class="tu-segmentado"
+                        role="group"
+                        :aria-label="$t('sitioWeb.presentacion.titulo')"
+                        :class="{ 'sw-bloqueado': !conPlus }"
+                        :inert="!conPlus || undefined"
+                      >
+                        <button
+                          v-for="opcion in [null, ...PRESENTACIONES[s.tipo]!]"
+                          :key="opcion ?? 'siempre'"
+                          type="button"
+                          :aria-pressed="(s.presentacion ?? null) === opcion"
+                          @click="s.presentacion = opcion"
+                        >
+                          {{
+                            $t(`sitioWeb.presentacion.${opcion ?? "siempre"}`)
+                          }}
+                        </button>
+                      </div>
+                      <p class="sw-ayuda">
+                        {{
+                          s.tipo === "equipo"
+                            ? $t("sitioWeb.presentacion.ayudaEquipo")
+                            : $t("sitioWeb.presentacion.ayuda")
+                        }}
                       </p>
                     </div>
                     <div

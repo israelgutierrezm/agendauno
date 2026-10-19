@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CarruselSitio from "@/components/CarruselSitio.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import { urlReproductor, type SeccionSitio } from "@/lib/sitioWeb";
 
@@ -116,8 +117,27 @@ const proveedor = computed(() =>
           {{ bloque.texto }}
         </p>
 
-        <!-- Galería -->
-        <ul v-if="bloque.tipo === 'galeria'" class="bs-galeria mt-6">
+        <!-- Galería: en carrusel o en mosaico (ADR 0167), o en cuadrícula -->
+        <CarruselSitio
+          v-if="bloque.tipo === 'galeria' && datos.presentacion === 'carrusel'"
+          class="mt-6"
+          :items="datos.fotos ?? []"
+          :etiqueta="bloque.titulo ?? t('sitioWeb.bloques.nombres.galeria')"
+        >
+          <template #default="{ item: f }">
+            <figure class="bs-figura">
+              <img :src="f.url" :alt="f.pie ?? ''" loading="lazy" />
+              <figcaption v-if="f.pie">{{ f.pie }}</figcaption>
+            </figure>
+          </template>
+        </CarruselSitio>
+        <ul
+          v-else-if="bloque.tipo === 'galeria'"
+          class="mt-6"
+          :class="
+            datos.presentacion === 'mosaico' ? 'bs-mosaico' : 'bs-galeria'
+          "
+        >
           <li v-for="f in datos.fotos ?? []" :key="f.url">
             <figure>
               <img :src="f.url" :alt="f.pie ?? ''" loading="lazy" />
@@ -136,7 +156,26 @@ const proveedor = computed(() =>
           </details>
         </div>
 
-        <!-- Testimonios -->
+        <!-- Testimonios: en carrusel (ADR 0167) o en tarjetas -->
+        <CarruselSitio
+          v-else-if="
+            bloque.tipo === 'testimonios' && datos.presentacion === 'carrusel'
+          "
+          class="mt-6"
+          :items="datos.items ?? []"
+          :etiqueta="bloque.titulo ?? t('sitioWeb.bloques.nombres.testimonios')"
+        >
+          <template #default="{ item: p }">
+            <div class="bs-tarjeta h-full">
+              <blockquote class="whitespace-pre-line">
+                «{{ p.texto }}»
+              </blockquote>
+              <p v-if="p.nombre" class="mt-3 text-sm font-medium">
+                {{ p.nombre }}
+              </p>
+            </div>
+          </template>
+        </CarruselSitio>
         <ul v-else-if="bloque.tipo === 'testimonios'" class="bs-tarjetas mt-6">
           <li v-for="(p, i) in datos.items ?? []" :key="i" class="bs-tarjeta">
             <blockquote class="whitespace-pre-line">«{{ p.texto }}»</blockquote>
@@ -260,6 +299,30 @@ const proveedor = computed(() =>
 }
 .bs-centro .bs-llamado {
   margin-inline: auto;
+}
+/* Mosaico (ADR 0167): columnas que acomodan fotos de distinto alto. */
+.bs-mosaico {
+  columns: 3 12rem;
+  column-gap: 0.75rem;
+}
+.bs-mosaico li {
+  break-inside: avoid;
+  margin-bottom: 0.75rem;
+}
+.bs-mosaico img {
+  width: 100%;
+  border-radius: 0.5rem;
+}
+.bs-mosaico figcaption,
+.bs-figura figcaption {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+}
+.bs-figura img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.5rem;
 }
 .bs-galeria {
   display: grid;

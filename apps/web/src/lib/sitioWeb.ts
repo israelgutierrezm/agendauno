@@ -62,6 +62,8 @@ export interface DatosBloque {
   proveedor?: "youtube" | "vimeo" | null;
   video_id?: string | null;
   formulario_id?: string | null;
+  // Cómo se muestra la galería o los testimonios (ADR 0167, Plus).
+  presentacion?: string | null;
 }
 
 export interface SeccionSitio {
@@ -75,7 +77,23 @@ export interface SeccionSitio {
   foto_url: string | null;
   estilo?: { fondo: FondoBloque; alineacion: AlineacionBloque };
   datos?: DatosBloque;
+  // Cómo se muestra una sección del sistema (ADR 0167, Plus); null = como siempre.
+  presentacion?: string | null;
 }
+
+/**
+ * Cómo se puede mostrar cada sección o bloque (ADR 0167, Plus), como en el API: el
+ * equipo en tarjetas, mosaico o carrusel; reseñas, galería y testimonios en carrusel
+ * (la galería también en mosaico).
+ */
+export const PRESENTACIONES: Partial<
+  Record<TipoSeccion | TipoBloque, string[]>
+> = {
+  equipo: ["tarjetas", "mosaico", "carrusel"],
+  resenas: ["carrusel"],
+  galeria: ["mosaico", "carrusel"],
+  testimonios: ["carrusel"],
+};
 
 export interface BannerSitio {
   id?: string;

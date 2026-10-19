@@ -4,7 +4,11 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
-import { esEnlaceDeVideo, type SeccionSitio } from "@/lib/sitioWeb";
+import {
+  PRESENTACIONES,
+  esEnlaceDeVideo,
+  type SeccionSitio,
+} from "@/lib/sitioWeb";
 
 /**
  * Los campos de un bloque propio del sitio (ADR 0146), según su tipo: título, texto,
@@ -189,6 +193,27 @@ const id = computed(() => bloque.value.id ?? bloque.value.tipo);
       <p class="eb-ayuda sm:col-span-2">
         {{ t("sitioWeb.banners.campos.enlaceAyuda") }}
       </p>
+    </div>
+
+    <!-- Cómo se muestra (ADR 0167, Plus): la galería y los testimonios -->
+    <div v-if="lleva('galeria', 'testimonios')">
+      <span class="tu-label">{{ t("sitioWeb.presentacion.titulo") }}</span>
+      <div
+        class="tu-segmentado"
+        role="group"
+        :aria-label="t('sitioWeb.presentacion.titulo')"
+      >
+        <button
+          v-for="opcion in [null, ...(PRESENTACIONES[bloque.tipo] ?? [])]"
+          :key="opcion ?? 'siempre'"
+          type="button"
+          :aria-pressed="(datos.presentacion ?? null) === opcion"
+          :data-prueba="`presentacion-${opcion ?? 'siempre'}`"
+          @click="datos.presentacion = opcion"
+        >
+          {{ t(`sitioWeb.presentacion.${opcion ?? "siempre"}`) }}
+        </button>
+      </div>
     </div>
 
     <!-- Galería -->

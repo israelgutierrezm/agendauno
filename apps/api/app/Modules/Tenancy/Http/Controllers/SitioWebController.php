@@ -296,6 +296,8 @@ class SitioWebController
                 'tipografias' => CatalogoSitioWeb::TIPOGRAFIAS,
                 'esquinas' => CatalogoSitioWeb::ESQUINAS,
                 'temas' => CatalogoSitioWeb::TEMAS,
+                // Cómo se puede mostrar cada sección o bloque (ADR 0167, Plus).
+                'presentaciones' => CatalogoSitioWeb::PRESENTACIONES,
                 'formularios' => FormularioCaptacionTenant::query()->where('activo', true)->orderBy('nombre')->get()
                     ->map(static fn (FormularioCaptacionTenant $f): array => ['id' => $f->ulid, 'nombre' => $f->nombre])->all(),
             ],
@@ -318,6 +320,9 @@ class SitioWebController
             "{$prefijo}.*.titulo" => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TITULO],
             "{$prefijo}.*.texto" => ['nullable', 'string', 'max:'.CatalogoSitioWeb::MAX_TEXTO],
             "{$prefijo}.*.foto_url" => ['nullable', 'string', 'max:500', $foto],
+            // Cómo se muestra (ADR 0167, Plus): de una sección del sistema o de un bloque.
+            "{$prefijo}.*.presentacion" => ['nullable', 'string', Rule::in(array_merge(...array_values(CatalogoSitioWeb::PRESENTACIONES)))],
+            "{$prefijo}.*.datos.presentacion" => ['nullable', 'string', Rule::in(array_merge(...array_values(CatalogoSitioWeb::PRESENTACIONES)))],
             // Los bloques propios (ADR 0146): su id, su estilo y lo de su tipo.
             "{$prefijo}.*.id" => ['nullable', 'string', 'max:40'],
             "{$prefijo}.*.estilo" => ['nullable', 'array'],

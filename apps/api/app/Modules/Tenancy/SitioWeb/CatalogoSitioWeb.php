@@ -50,6 +50,24 @@ final class CatalogoSitioWeb
     /** Cuántas fotos, testimonios o beneficios caben en un bloque; cuántas preguntas. */
     public const MAX_ELEMENTOS = 12;
 
+    /**
+     * Cómo se muestra una sección o un bloque (ADR 0167, Plus): el equipo en tarjetas, en
+     * mosaico o en carrusel; las reseñas, la galería y los testimonios en carrusel (la
+     * galería también en mosaico). Null = como siempre.
+     */
+    public const PRESENTACIONES = [
+        'equipo' => ['tarjetas', 'mosaico', 'carrusel'],
+        'resenas' => ['carrusel'],
+        'galeria' => ['mosaico', 'carrusel'],
+        'testimonios' => ['carrusel'],
+    ];
+
+    /** La presentación si es una de su tipo; si no, null (como siempre). */
+    public static function presentacion(string $tipo, mixed $valor): ?string
+    {
+        return is_string($valor) && in_array($valor, self::PRESENTACIONES[$tipo] ?? [], true) ? $valor : null;
+    }
+
     public const MAX_PREGUNTAS = 20;
 
     /**

@@ -281,9 +281,20 @@ class SitioWebTenant
             }
         }
         $bloques = [];
+        $presentaciones = [];
         foreach ((array) ($actual['secciones'] ?? []) as $seccion) {
             if (CatalogoSitioWeb::esBloque((string) ($seccion['tipo'] ?? ''))) {
                 $bloques[(string) ($seccion['id'] ?? '')] = $seccion;
+            } else {
+                $presentaciones[(string) ($seccion['tipo'] ?? '')] = $seccion['presentacion'] ?? null;
+            }
+        }
+        // Cómo se muestra una sección del sistema (tarjetas, mosaico, carrusel).
+        foreach ((array) ($nuevo['secciones'] ?? []) as $seccion) {
+            $tipo = (string) ($seccion['tipo'] ?? '');
+            $presentacion = $seccion['presentacion'] ?? null;
+            if (! CatalogoSitioWeb::esBloque($tipo) && $presentacion !== null && $presentacion !== ($presentaciones[$tipo] ?? null)) {
+                return 'presentacion';
             }
         }
         foreach ((array) ($nuevo['secciones'] ?? []) as $seccion) {
@@ -490,6 +501,8 @@ class SitioWebTenant
             'titulo' => self::texto($datos['titulo'] ?? null),
             'texto' => in_array($tipo, CatalogoSitioWeb::CON_TEXTO, true) ? self::texto($datos['texto'] ?? null) : null,
             'foto_url' => in_array($tipo, CatalogoSitioWeb::CON_FOTO, true) ? self::texto($datos['foto_url'] ?? null) : null,
+            // Cómo se muestra (ADR 0167, Plus); null = como siempre.
+            'presentacion' => CatalogoSitioWeb::presentacion($tipo, $datos['presentacion'] ?? null),
         ];
     }
 
@@ -644,7 +657,10 @@ class SitioWebTenant
                     'pie' => self::texto($f['pie'] ?? null),
                 ], $lista('fotos', CatalogoSitioWeb::MAX_ELEMENTOS));
 
-                return ['fotos' => array_values(array_filter($fotos, static fn (array $f): bool => $f['url'] !== null))];
+                return [
+                    'fotos' => array_values(array_filter($fotos, static fn (array $f): bool => $f['url'] !== null)),
+                    'presentacion' => CatalogoSitioWeb::presentacion('galeria', $d['presentacion'] ?? null),
+                ];
             case 'preguntas':
                 $items = array_map(static fn (array $i): array => [
                     'pregunta' => self::texto($i['pregunta'] ?? null),
@@ -659,7 +675,10 @@ class SitioWebTenant
                     'foto_url' => self::texto($i['foto_url'] ?? null),
                 ], $lista('items', CatalogoSitioWeb::MAX_ELEMENTOS));
 
-                return ['items' => array_values(array_filter($items, static fn (array $i): bool => $i['texto'] !== null))];
+                return [
+                    'items' => array_values(array_filter($items, static fn (array $i): bool => $i['texto'] !== null)),
+                    'presentacion' => CatalogoSitioWeb::presentacion('testimonios', $d['presentacion'] ?? null),
+                ];
             case 'beneficios':
                 $items = array_map(static fn (array $i): array => [
                     'titulo' => self::texto($i['titulo'] ?? null),

@@ -776,6 +776,9 @@ onBeforeUnmount(() => {
   busquedaActual++;
 });
 
+// Con quién, si llega desde la ficha de alguien del equipo (?profesional=<id>, ADR
+// 0167): se elige al conocer la sede, si atiende ahí.
+const profesionalPedido = String(route.query.profesional ?? "");
 // Con quién de partida: el del filtro, el único profesional o «cualquiera».
 function profesionalDePartida(): string {
   const lista = profesionalesSede.value;
@@ -783,7 +786,9 @@ function profesionalDePartida(): string {
   return lista.length === 1 ? lista[0].id : CUALQUIERA;
 }
 watch(sucursalId, () => {
-  filtro.value = "";
+  filtro.value = profesionalesSede.value.some((p) => p.id === profesionalPedido)
+    ? profesionalPedido
+    : "";
   barberoId.value = profesionalDePartida();
   fecha.value = "";
 });

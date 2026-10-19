@@ -778,6 +778,24 @@ describe("agenda pública por pasos", () => {
     vista.unmount();
   });
 
+  it("desde la ficha de alguien del equipo (?profesional) ya llega con esa persona (ADR 0167)", async () => {
+    const antes = { ...mocks.query };
+    Object.assign(mocks.query, { profesional: "luis" });
+    try {
+      api(opciones(1));
+      const vista = montar();
+      await flushPromises();
+      await hastaHorario(vista);
+      expect(mocks.get).toHaveBeenCalledWith("/api/v1/app/demo/citas/dias", {
+        params: expect.objectContaining({ instructor_id: "luis" }),
+      });
+      vista.unmount();
+    } finally {
+      for (const k of Object.keys(mocks.query)) delete mocks.query[k];
+      Object.assign(mocks.query, antes);
+    }
+  });
+
   it("con alguien de preferencia ve solo sus días y horarios y ya no pregunta con quién", async () => {
     api(opciones(1));
     mocks.post.mockResolvedValue({

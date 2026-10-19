@@ -135,3 +135,27 @@ En el servidor:
   `estudio.gestionar`, para que nadie pierda acceso.
 - La entrada «Sitio web» se abre con `sitio.editar` o con `prospectos.ver`; con este
   último, solo la pestaña Compartir.
+
+## Más formas de mostrar lo que ya tiene
+
+Son opciones nuevas sobre lo que ya existe; no cambian la estructura del sitio.
+
+- **Cómo se muestra** (Plus):
+  - el equipo: como siempre, en tarjetas, en mosaico o en carrusel;
+  - las reseñas: como siempre o en carrusel;
+  - en los bloques: la galería en mosaico o en carrusel y los testimonios en carrusel.
+
+  Va en la sección (`presentacion`) o en los datos del bloque (`datos.presentacion`).
+  El catálogo del editor dice las opciones de cada tipo, y sin Plus no se cambia.
+- **El carrusel:**
+  - se desliza con el dedo, el teclado o sus flechas;
+  - no se mueve solo;
+  - sin animación si quien lo ve prefiere menos movimiento.
+- **La ficha de cada integrante**, para todos los planes: al tocar a alguien del equipo
+  se abre con su foto y su semblanza completa.
+  - En citas: «Agendar con…», que abre la página de agendar con esa persona ya elegida
+    (`/agendar/{slug}?profesional={id}`, si atiende en la sede que se elija).
+  - En clases: sus próximas clases.
+
+  La foto y la semblanza siguen editándose en el perfil de cada quien.
+
