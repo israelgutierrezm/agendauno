@@ -35,6 +35,11 @@ interface Factura {
   pdf_url: string | null;
   xml_url: string | null;
   motivo_error: string | null;
+  subtotal_minor?: number;
+  timbrada_en?: string | null;
+  // Factura de un anticipo y si ya se aplicó al facturar el resto (ADR 0163).
+  anticipo?: boolean;
+  anticipo_aplicado?: boolean;
 }
 
 interface Concepto {
@@ -166,6 +171,40 @@ const usoCfdi = ref("G03");
 const formaPago = ref("01");
 const conceptos = ref<Concepto[]>([conceptoNuevo()]);
 
+// Anticipos (ADR 0163, CFDI «por remanente»): la factura de un anticipo lleva un solo
+// concepto que fija el SAT; la del resto se relaciona con los anticipos de ese RFC.
+const esAnticipo = ref(false);
+const importeAnticipo = ref("");
+const anticiposDisponibles = ref<Factura[]>([]);
+const anticiposElegidos = ref<string[]>([]);
+const RFC_VALIDO = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i;
+async function buscarAnticipos(): Promise<void> {
+  const rfc = receptor.value.rfc.trim();
+  anticiposElegidos.value = [];
+  if (esAnticipo.value || !RFC_VALIDO.test(rfc)) {
+    anticiposDisponibles.value = [];
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: Factura[] }>(
+      `${base.value}/facturas`,
+      { params: { anticipos_de: rfc, per_page: 20 } },
+    );
+    anticiposDisponibles.value = data.data;
+  } catch {
+    // Sin la lista se factura como siempre; el anticipo se puede aplicar después.
+    anticiposDisponibles.value = [];
+  }
+}
+watch(() => [receptor.value.rfc, esAnticipo.value], buscarAnticipos);
+function fechaCorta(iso: string | null | undefined): string {
+  return iso
+    ? new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
+        new Date(iso),
+      )
+    : "";
+}
+
 const columnas = computed(() => [
   { clave: "receptor", etiqueta: t("facturas.colReceptor") },
   {
@@ -243,13 +282,34 @@ async function emitir(): Promise<void> {
       },
       uso_cfdi: usoCfdi.value,
       forma_pago: formaPago.value,
-      items: conceptos.value.map((c) => ({
-        descripcion: c.descripcion,
-        cantidad: Number(c.cantidad),
-        precio_unitario_minor: Math.round(Number(c.precio) * 100),
-        clave_prod_serv: c.clave_prod_serv,
-        clave_unidad: c.clave_unidad,
-      })),
+      ...(esAnticipo.value
+        ? {
+            anticipo: true,
+            // Clave, unidad y descripción las fija el SAT (el API las vuelve a poner).
+            items: [
+              {
+                descripcion: "Anticipo del bien o servicio",
+                cantidad: 1,
+                precio_unitario_minor: Math.round(
+                  Number(importeAnticipo.value) * 100,
+                ),
+                clave_prod_serv: "84111506",
+                clave_unidad: "ACT",
+              },
+            ],
+          }
+        : {
+            items: conceptos.value.map((c) => ({
+              descripcion: c.descripcion,
+              cantidad: Number(c.cantidad),
+              precio_unitario_minor: Math.round(Number(c.precio) * 100),
+              clave_prod_serv: c.clave_prod_serv,
+              clave_unidad: c.clave_unidad,
+            })),
+            ...(anticiposElegidos.value.length > 0
+              ? { anticipos: anticiposElegidos.value }
+              : {}),
+          }),
     });
     mensaje.value = "ok";
     receptor.value = {
@@ -260,6 +320,9 @@ async function emitir(): Promise<void> {
       regimen_fiscal: "",
     };
     conceptos.value = [conceptoNuevo()];
+    esAnticipo.value = false;
+    importeAnticipo.value = "";
+    anticiposElegidos.value = [];
     await cargar();
   } catch (e) {
     // El rechazo del proveedor llega como 422 con la factura en error + motivo.
@@ -398,7 +461,7 @@ onMounted(cargar);
         <template #col-total_minor="{ fila }">
           {{ dinero((fila as Factura).total_minor, (fila as Factura).moneda) }}
         </template>
-        <template #col-estado="{ valor }">
+        <template #col-estado="{ valor, fila }">
           <span
             class="tu-badge"
             :class="valor === 'timbrada' ? 'tu-badge-exito' : 'tu-badge-aviso'"
@@ -409,6 +472,17 @@ onMounted(cargar);
                 : $t("facturas.estado.error")
             }}
           </span>
+          <span
+            v-if="(fila as Factura).anticipo"
+            class="block text-xs mt-1"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="factura-anticipo"
+            >{{
+              (fila as Factura).anticipo_aplicado
+                ? $t("facturas.anticipo.aplicado")
+                : $t("facturas.anticipo.porAplicar")
+            }}</span
+          >
         </template>
         <template #col-uuid="{ fila }">
           <div v-if="(fila as Factura).uuid" class="flex items-center gap-2">
@@ -584,6 +658,72 @@ onMounted(cargar);
           </div>
 
           <div>
+            <label class="flex items-start gap-2 text-sm">
+              <input
+                v-model="esAnticipo"
+                type="checkbox"
+                class="mt-1"
+                data-prueba="es-anticipo"
+              />
+              <span>
+                <span class="font-medium">{{
+                  $t("facturas.anticipo.es")
+                }}</span>
+                <span class="tu-hint block">{{
+                  $t("facturas.anticipo.esAyuda")
+                }}</span>
+              </span>
+            </label>
+          </div>
+
+          <div v-if="esAnticipo" class="max-w-xs">
+            <label class="tu-label" for="fa-anticipo"
+              >{{ $t("facturas.anticipo.importe") }}
+              <span class="tu-obligatorio" aria-hidden="true">*</span></label
+            >
+            <input
+              id="fa-anticipo"
+              v-model="importeAnticipo"
+              class="tu-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              data-prueba="importe-anticipo"
+            />
+            <p class="tu-hint">{{ $t("facturas.anticipo.importeAyuda") }}</p>
+          </div>
+
+          <fieldset
+            v-if="!esAnticipo && anticiposDisponibles.length > 0"
+            data-prueba="anticipos-por-aplicar"
+          >
+            <legend class="font-semibold text-sm mb-2">
+              {{ $t("facturas.anticipo.porAplicarTitulo") }}
+            </legend>
+            <label
+              v-for="a in anticiposDisponibles"
+              :key="a.id"
+              class="flex items-center gap-2 text-sm mb-1"
+            >
+              <input
+                v-model="anticiposElegidos"
+                type="checkbox"
+                :value="a.id"
+                data-prueba="aplicar-anticipo"
+              />
+              {{
+                $t("facturas.anticipo.opcion", {
+                  total: dinero(a.total_minor, a.moneda),
+                  fecha: fechaCorta(a.timbrada_en),
+                  folio: (a.uuid ?? "").slice(0, 8),
+                })
+              }}
+            </label>
+            <p class="tu-hint">{{ $t("facturas.anticipo.restoAyuda") }}</p>
+          </fieldset>
+
+          <div v-if="!esAnticipo">
             <h3 class="font-semibold text-sm mb-2">
               {{ $t("facturas.nueva.conceptos") }}
             </h3>

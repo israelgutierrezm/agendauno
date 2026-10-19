@@ -910,10 +910,10 @@ class MiTenantController
             // Llegó (presente) / no asistió (ausente); null = aún sin marcar.
             'asistencia' => $reserva->asistencia?->estado->value,
             'orden_id' => $reserva->orden?->ulid,
-            // Con anticipo (ADR 0161): lo que pagó al apartar y lo que falta (en el negocio
-            // o en línea, con su orden).
+            // Con anticipo (ADR 0161): lo que pagó al apartar y, mientras falte, lo que
+            // queda por pagar (en el negocio o en línea, con su orden).
             'anticipo_minor' => $reserva->anticipoPagadoMinor(),
-            'saldo_minor' => $reserva->saldo_orden_id !== null ? $reserva->saldoOrden?->total_minor : null,
+            'saldo_minor' => $reserva->saldoOrden?->estado === EstadoOrden::Pendiente ? $reserva->saldoOrden->total_minor : null,
             'saldo_orden_id' => $reserva->saldoOrden?->estado === EstadoOrden::Pendiente ? $reserva->saldoOrden->ulid : null,
             // Lo que pidió que supieran al agendar y, si es para otra persona, quién asiste.
             'nota' => $reserva->nota_cliente,

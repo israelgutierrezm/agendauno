@@ -78,5 +78,6 @@ El dueño decidió (2026-10-18):
   pago» cobra solo lo que falta.
 - El catálogo de citas tiene el campo «Anticipo para apartar en línea», con el
   resultado en pesos a la vista.
-- Pendiente: el CFDI de un anticipo en México (factura del anticipo y aplicación con
-  forma de pago 30) no se automatiza. Hoy cada orden se factura por separado.
+- Facturar el anticipo y el resto se resuelve en el ADR 0163 (CFDI por remanente).
+- La app móvil ofrece la misma elección (anticipo o todo) y muestra el anticipo pagado
+  y lo que falta mientras falte.

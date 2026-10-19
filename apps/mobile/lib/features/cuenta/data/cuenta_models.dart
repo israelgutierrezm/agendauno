@@ -360,12 +360,30 @@ class CitaReserva {
     this.asiste,
     this.estadoAtencion,
     this.estadoPago,
+    this.anticipoMinor,
+    this.saldoMinor,
+    this.saldoOrdenId,
   });
 
   final String reservaId;
   final String estado;
   final String? asistencia; // presente | ausente | null
   final String? ordenId;
+
+  /// Con anticipo (ADR 0161): lo que ya pagó al apartar (null si no lleva anticipo
+  /// o aún no lo paga), lo que queda para pagar en el negocio y la orden de ese
+  /// resto mientras siga pendiente.
+  final int? anticipoMinor;
+  final int? saldoMinor;
+  final String? saldoOrdenId;
+
+  /// «Pagaste $X de anticipo; el resto ($Y) lo pagas en el negocio.» (null sin
+  /// anticipo pagado).
+  String? textoAnticipo(String moneda) =>
+      anticipoMinor == null || saldoMinor == null
+      ? null
+      : 'Pagaste ${Formato.dinero(anticipoMinor!, moneda)} de anticipo; '
+            'el resto (${Formato.dinero(saldoMinor!, moneda)}) lo pagas en el negocio.';
 
   /// Lo que pidió que supieran al agendar.
   final String? nota;
@@ -384,6 +402,9 @@ class CitaReserva {
     asiste: j['asiste'] as String?,
     estadoAtencion: EstadoCita.desde(j['estado_atencion']),
     estadoPago: EstadoPagoCita.desde(j['estado_pago']),
+    anticipoMinor: (j['anticipo_minor'] as num?)?.toInt(),
+    saldoMinor: (j['saldo_minor'] as num?)?.toInt(),
+    saldoOrdenId: j['saldo_orden_id'] as String?,
   );
 }
 
@@ -545,10 +566,35 @@ class OpcionCita {
     this.region,
     this.direccion,
     this.mapaUrl,
+    this.precioMinor,
+    this.moneda = 'MXN',
+    this.anticipoMinor,
   });
 
   final String id;
   final String nombre;
+
+  /// Servicio: su precio y la moneda del negocio.
+  final int? precioMinor;
+  final String moneda;
+
+  /// Lo que se paga en línea para apartar; el resto, en el negocio (ADR 0161). null
+  /// si no pide anticipo o el negocio no cobra en línea.
+  final int? anticipoMinor;
+
+  /// El anticipo que se ofrece al agendar: no en lo que se toma con su bono, y solo
+  /// si deja algo por pagar en el negocio (si no, se paga completo).
+  int? get anticipoAlAgendar {
+    final anticipo = anticipoMinor;
+    final precio = precioMinor;
+    return conPlan ||
+            anticipo == null ||
+            precio == null ||
+            anticipo <= 0 ||
+            anticipo >= precio
+        ? null
+        : anticipo;
+  }
 
   /// Sede: zona, dirección y cómo llegar (M06), para saber dónde será la cita.
   final String? region;
@@ -586,7 +632,10 @@ class OpcionCita {
       sucursalId == null ||
       sucursales!.contains(sucursalId);
 
-  factory OpcionCita.desdeJson(Map<String, dynamic> j) => OpcionCita(
+  factory OpcionCita.desdeJson(
+    Map<String, dynamic> j, {
+    String moneda = 'MXN',
+  }) => OpcionCita(
     id: (j['id'] ?? '') as String,
     nombre: (j['nombre'] ?? '') as String,
     duracionMinutos: j['duracion_minutos'] as int?,
@@ -600,6 +649,9 @@ class OpcionCita {
     region: j['region'] as String?,
     direccion: j['direccion'] as String?,
     mapaUrl: j['mapa_url'] as String?,
+    precioMinor: (j['precio_minor'] as num?)?.toInt(),
+    moneda: Formato.moneda(j['moneda'], moneda),
+    anticipoMinor: (j['anticipo_minor'] as num?)?.toInt(),
   );
 }
 

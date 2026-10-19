@@ -2233,6 +2233,20 @@ export default {
       emitiendo: "Timbrando…",
       timbrada: "Factura timbrada.",
     },
+    // Anticipos (ADR 0163): CFDI de anticipo y del resto («por remanente»).
+    anticipo: {
+      es: "Es la factura de un anticipo",
+      esAyuda:
+        "Un solo concepto con la clave 84111506, unidad ACT y «Anticipo del bien o servicio», como pide el SAT. Al facturar el resto, relaciónalo con este.",
+      importe: "Importe del anticipo (antes de IVA)",
+      importeAyuda: "Se le suma el IVA del negocio.",
+      porAplicarTitulo: "Anticipos de este RFC por aplicar",
+      opcion: "{total} · {fecha} · folio {folio}…",
+      restoAyuda:
+        "Factura aquí solo el resto: se relaciona con el anticipo (tipo 07) y lleva la leyenda «CFDI por remanente de un anticipo».",
+      porAplicar: "Anticipo por aplicar",
+      aplicado: "Anticipo aplicado",
+    },
     verPdf: "PDF",
   },
   // Avisos de AgendaUno al dueño, en su página de Renta (ADR 0072).

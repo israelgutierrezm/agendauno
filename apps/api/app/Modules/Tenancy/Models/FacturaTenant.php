@@ -23,6 +23,7 @@ class FacturaTenant extends Model
         'orden_id', 'receptor_nombre', 'receptor_rfc', 'receptor_email', 'uso_cfdi', 'receptor_cp',
         'moneda', 'subtotal_minor', 'impuesto_minor', 'total_minor', 'estado',
         'facturapi_id', 'uuid', 'pdf_url', 'xml_url', 'motivo_error', 'timbrada_en',
+        'anticipo', 'anticipo_aplicado_en',
     ];
 
     /**
@@ -34,5 +35,6 @@ class FacturaTenant extends Model
         'impuesto_minor' => 'integer',
         'total_minor' => 'integer',
         'timbrada_en' => 'datetime',
+        'anticipo' => 'boolean',
     ];
 }

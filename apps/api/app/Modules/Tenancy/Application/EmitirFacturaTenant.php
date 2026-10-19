@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Facturacion\CatalogosSat;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Emite (timbra) un CFDI tenant-local vía {@see ClienteFacturacion}. Calcula el
@@ -20,6 +22,11 @@ use Illuminate\Support\Facades\DB;
  *
  * Gasta un timbre del negocio por factura timbrada (ADR 0107): sin timbres no se
  * timbra, y si el proveedor la rechaza no se gasta.
+ *
+ * Anticipos (ADR 0163, CFDI «por remanente»): una factura puede ser de un anticipo
+ * (un solo concepto con la clave del SAT) y la del resto se relaciona con los
+ * anticipos que aplica (tipo 07) y lleva la leyenda del remanente. Cada anticipo se
+ * aplica una sola vez: se bloquea y se revalida en la misma transacción.
  */
 class EmitirFacturaTenant
 {
@@ -35,6 +42,7 @@ class EmitirFacturaTenant
     /**
      * @param  array{nombre: string, rfc: string, email?: string|null, codigo_postal: string, regimen_fiscal?: string|null}  $receptor
      * @param  list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string}>  $items
+     * @param  list<string>  $anticipos  ULID de las facturas de anticipo que aplica
      */
     public function emitir(
         DatosFiscalesTenant $emisor,
@@ -43,7 +51,17 @@ class EmitirFacturaTenant
         string $usoCfdi,
         string $formaPago = '01',
         string $moneda = 'MXN',
+        bool $anticipo = false,
+        array $anticipos = [],
     ): FacturaTenant {
+        if ($anticipo) {
+            $items = [['cantidad' => 1, 'precio_unitario_minor' => (int) $items[0]['precio_unitario_minor']] + CatalogosSat::ANTICIPO];
+        } elseif ($anticipos !== []) {
+            $items = array_map(static fn (array $i): array => [
+                ...$i,
+                'descripcion' => mb_substr($i['descripcion'].' - '.CatalogosSat::LEYENDA_REMANENTE, 0, 1000),
+            ], $items);
+        }
         $subtotal = array_sum(array_map(
             static fn (array $i): int => $i['cantidad'] * $i['precio_unitario_minor'],
             $items,
@@ -56,8 +74,23 @@ class EmitirFacturaTenant
         $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
-            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $llave, $cuerpo
+            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $llave, $cuerpo, $anticipo, $anticipos
         ): FacturaTenant {
+            // Los anticipos que aplica: suyos (mismo RFC), timbrados y aún sin aplicar.
+            $aplicados = FacturaTenant::query()->whereIn('ulid', $anticipos)->lockForUpdate()->get();
+            if ($aplicados->count() !== count(array_unique($anticipos))
+                || $aplicados->contains(fn (FacturaTenant $f): bool => ! $f->anticipo
+                    || $f->estado !== EstadoFactura::Timbrada
+                    || $f->anticipo_aplicado_en !== null
+                    || $f->receptor_rfc !== mb_strtoupper((string) $receptor['rfc']))) {
+                throw ValidationException::withMessages(['anticipos' => ['Algún anticipo ya se aplicó, no está timbrado o es de otro RFC.']]);
+            }
+            if ($aplicados->isNotEmpty()) {
+                $cuerpo['related_documents'] = [[
+                    'relationship' => CatalogosSat::RELACION_ANTICIPO,
+                    'documents' => $aplicados->pluck('uuid')->values()->all(),
+                ]];
+            }
             $saldo = $this->timbres->apartarParaTimbrar();
             $comun = [
                 'receptor_nombre' => $receptor['nombre'],
@@ -69,6 +102,7 @@ class EmitirFacturaTenant
                 'subtotal_minor' => $subtotal,
                 'impuesto_minor' => $impuesto,
                 'total_minor' => $total,
+                'anticipo' => $anticipo,
             ];
 
             try {
@@ -90,6 +124,7 @@ class EmitirFacturaTenant
                 'timbrada_en' => Carbon::now(),
             ]);
             $this->timbres->gastar($saldo, (string) $factura->ulid);
+            FacturaTenant::query()->whereKey($aplicados->modelKeys())->update(['anticipo_aplicado_en' => $factura->getKey()]);
 
             $this->eventos->registrar('factura.timbrada', 'factura', $factura->ulid, [
                 'factura' => $factura->ulid,

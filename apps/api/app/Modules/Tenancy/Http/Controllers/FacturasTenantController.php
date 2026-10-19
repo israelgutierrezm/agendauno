@@ -48,6 +48,8 @@ class FacturasTenantController
             'hasta' => ['nullable', 'date_format:Y-m-d'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            // Los anticipos timbrados y sin aplicar de ese RFC (para facturar el resto).
+            'anticipos_de' => ['nullable', 'string', 'max:13'],
         ]);
         if (isset($filtros['desde'], $filtros['hasta']) && $filtros['hasta'] < $filtros['desde']) {
             throw ValidationException::withMessages(['hasta' => ['La fecha final no puede ser antes que la inicial.']]);
@@ -64,7 +66,12 @@ class FacturasTenantController
                 ->orWhere('receptor_rfc', 'like', '%'.mb_strtoupper($buscar).'%')
                 ->orWhere('uuid', 'like', "%{$buscar}%")))
             ->when(isset($filtros['desde']), fn (Builder $q) => $q->where('created_at', '>=', $fechas->inicioDelDia((string) $filtros['desde'])))
-            ->when(isset($filtros['hasta']), fn (Builder $q) => $q->where('created_at', '<=', $fechas->finDelDia((string) $filtros['hasta'])));
+            ->when(isset($filtros['hasta']), fn (Builder $q) => $q->where('created_at', '<=', $fechas->finDelDia((string) $filtros['hasta'])))
+            ->when(isset($filtros['anticipos_de']), fn (Builder $q) => $q
+                ->where('anticipo', true)
+                ->where('estado', EstadoFactura::Timbrada->value)
+                ->whereNull('anticipo_aplicado_en')
+                ->where('receptor_rfc', mb_strtoupper((string) $filtros['anticipos_de'])));
         // De cada estado, con la búsqueda y las fechas (para los filtros).
         $conteos = (clone $consulta)->selectRaw('estado, COUNT(*) as total')->groupBy('estado')->pluck('total', 'estado')
             ->map(static fn ($n): int => (int) $n)->all();
@@ -125,7 +132,16 @@ class FacturasTenantController
             'items.*.precio_unitario_minor' => ['required', 'integer', 'min:1'],
             'items.*.clave_prod_serv' => ['required', 'string', 'max:8'],
             'items.*.clave_unidad' => ['required', 'string', 'max:3'],
+            // Factura de un anticipo (ADR 0163): un solo concepto, su importe; la clave,
+            // la unidad y la descripción las fija el SAT.
+            'anticipo' => ['boolean'],
+            // O la del resto: los anticipos (facturas) que aplica.
+            'anticipos' => ['nullable', 'array', 'max:20', 'prohibited_if:anticipo,true'],
+            'anticipos.*' => ['string', 'distinct'],
         ]);
+        if (($validado['anticipo'] ?? false) && count($validado['items']) !== 1) {
+            throw ValidationException::withMessages(['items' => ['La factura de un anticipo lleva un solo concepto: el importe del anticipo.']]);
+        }
         // Un uso solo de personas físicas con un RFC de persona moral (12 caracteres).
         if (strlen((string) $validado['receptor']['rfc']) === 12 && in_array($validado['uso_cfdi'], CatalogosSat::USOS_SOLO_FISICAS, true)) {
             throw ValidationException::withMessages(['uso_cfdi' => ['Ese uso del CFDI es solo para personas físicas y el RFC es de persona moral.']]);
@@ -148,6 +164,8 @@ class FacturasTenantController
             (string) $validado['uso_cfdi'],
             (string) ($validado['forma_pago'] ?? '01'),
             mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())),
+            (bool) ($validado['anticipo'] ?? false),
+            array_values($validado['anticipos'] ?? []),
         );
 
         $estado = $factura->estado === EstadoFactura::Timbrada ? 201 : 422;
@@ -175,6 +193,9 @@ class FacturasTenantController
             'motivo_error' => $factura->motivo_error,
             'timbrada_en' => $factura->timbrada_en?->toIso8601String(),
             'creado_en' => $factura->created_at?->toIso8601String(),
+            // Factura de un anticipo y si ya se aplicó al facturar el resto (ADR 0163).
+            'anticipo' => $factura->anticipo,
+            'anticipo_aplicado' => $factura->anticipo_aplicado_en !== null,
         ];
     }
 }

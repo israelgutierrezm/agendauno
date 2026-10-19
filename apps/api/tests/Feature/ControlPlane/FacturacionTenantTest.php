@@ -151,3 +151,76 @@ it('el uso del CFDI y la forma de pago salen del catálogo del SAT y concuerdan 
     $this->postJson($url, $moral, conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonValidationErrors(['uso_cfdi'], 'meta.errors');
 });
+
+it('factura un anticipo con el concepto del SAT y el resto lo relaciona (tipo 07), una sola vez', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    cargarDatosFiscales($e);
+    // Proveedor que guarda lo que se le manda a timbrar.
+    $enviadas = new ArrayObject;
+    app()->instance(ClienteFacturacion::class, new class($enviadas) implements ClienteFacturacion
+    {
+        public function __construct(private ArrayObject $enviadas) {}
+
+        public function timbrar(string $llaveOrganizacion, array $factura): ResultadoTimbre
+        {
+            $this->enviadas->append($factura);
+
+            return new ResultadoTimbre('fac_'.count($this->enviadas), 'UUID-'.count($this->enviadas));
+        }
+
+        public function descargar(string $llaveOrganizacion, string $facturaId, string $formato): string
+        {
+            return '';
+        }
+    });
+
+    // El anticipo: un solo concepto con su importe; clave, unidad y descripción del SAT.
+    $anticipo = cfdiValido();
+    $anticipo['anticipo'] = true;
+    $anticipo['items'] = [['descripcion' => 'Lo que sea', 'cantidad' => 3, 'precio_unitario_minor' => 20000, 'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48']];
+    $idAnticipo = (string) test()->postJson("/api/v1/app/{$e['slug']}/facturas", $anticipo, conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.anticipo', true)->assertJsonPath('data.subtotal_minor', 20000)->json('data.id');
+    expect($enviadas[0]['items'][0])->toMatchArray(['quantity' => 1])
+        ->and($enviadas[0]['items'][0]['product'])->toMatchArray([
+            'description' => 'Anticipo del bien o servicio', 'product_key' => '84111506', 'unit_key' => 'ACT', 'price' => 200,
+        ]);
+
+    // Aparece como anticipo por aplicar de ese RFC.
+    test()->getJson("/api/v1/app/{$e['slug']}/facturas?anticipos_de=xaxx010101000", conBearer($e['bearer']))
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $idAnticipo);
+
+    // El resto: relacionado con el anticipo y con la leyenda del remanente.
+    $resto = cfdiValido();
+    $resto['anticipos'] = [$idAnticipo];
+    test()->postJson("/api/v1/app/{$e['slug']}/facturas", $resto, conBearer($e['bearer']))->assertCreated();
+    expect($enviadas[1]['related_documents'])->toBe([['relationship' => '07', 'documents' => ['UUID-1']]])
+        ->and($enviadas[1]['items'][0]['product']['description'])->toBe('Pack 8 clases - CFDI por remanente de un anticipo');
+    test()->getJson("/api/v1/app/{$e['slug']}/facturas?anticipos_de=XAXX010101000", conBearer($e['bearer']))
+        ->assertOk()->assertJsonCount(0, 'data');
+
+    // Ya aplicado no se vuelve a aplicar (ni se gasta otro timbre).
+    test()->postJson("/api/v1/app/{$e['slug']}/facturas", $resto, conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['anticipos'], 'meta.errors');
+    expect($enviadas)->toHaveCount(2);
+});
+
+it('un anticipo de otro RFC no se puede aplicar y la factura de un anticipo lleva un solo concepto', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    cargarDatosFiscales($e);
+    $anticipo = cfdiValido();
+    $anticipo['anticipo'] = true;
+    $idAnticipo = (string) test()->postJson("/api/v1/app/{$e['slug']}/facturas", $anticipo, conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+
+    $otro = cfdiValido();
+    $otro['receptor']['rfc'] = 'GODE561231GR8';
+    $otro['anticipos'] = [$idAnticipo];
+    test()->postJson("/api/v1/app/{$e['slug']}/facturas", $otro, conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['anticipos'], 'meta.errors');
+
+    $dos = cfdiValido();
+    $dos['anticipo'] = true;
+    $dos['items'][] = $dos['items'][0];
+    test()->postJson("/api/v1/app/{$e['slug']}/facturas", $dos, conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['items'], 'meta.errors');
+});

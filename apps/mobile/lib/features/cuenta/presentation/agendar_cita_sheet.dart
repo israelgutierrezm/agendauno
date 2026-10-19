@@ -14,8 +14,9 @@ import 'elegir_profesional.dart';
 
 /// Agendar una cita desde la cuenta: servicio, sede, de quién ver horarios (todo el
 /// equipo o alguien, por su foto, como en la web), día y hora libre. Si el servicio
-/// se paga para reservar, la cita queda apartada hasta pagarla. Los servicios de
-/// su bono aparecen «Con tu bono» y no se pagan (ADR 0091).
+/// se paga para reservar, la cita queda apartada hasta pagarla; si pide anticipo,
+/// elige pagar solo el anticipo o todo (ADR 0161). Los servicios de su bono
+/// aparecen «Con tu bono» y no se pagan (ADR 0091).
 class AgendarCitaSheet extends ConsumerStatefulWidget {
   const AgendarCitaSheet({super.key});
 
@@ -53,6 +54,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   // aceptó y tiene celular.
   bool _ofrecerWhatsapp = false;
   bool _aceptaWhatsapp = false;
+  // Con anticipo (ADR 0161): paga solo el anticipo (por omisión) o todo.
+  bool _pagarTodo = false;
   // Nota para el negocio (opcional): alergias, preferencias, primera vez…
   final _nota = TextEditingController();
 
@@ -133,6 +136,9 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   String? get _idProfesional =>
       identical(_profesional, _cualquiera) ? null : _profesional?.id;
 
+  /// El anticipo del servicio elegido (null: se paga completo o con su bono).
+  int? get _anticipo => _servicio?.anticipoAlAgendar;
+
   bool get _listo =>
       _servicio != null &&
       _profesional != null &&
@@ -190,6 +196,13 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     setState(() => _agendando = true);
     final navegador = Navigator.of(context);
     final mensajero = ScaffoldMessenger.of(context);
+    // Solo un servicio con anticipo pregunta cuánto pagar ahora.
+    final conAnticipo = _anticipo != null;
+    final pagar = !conAnticipo
+        ? null
+        : _pagarTodo
+        ? 'todo'
+        : 'anticipo';
     await hacerConAviso(context, () async {
       final cita = await repo.agendarCita(
         servicioId: _servicio!.id,
@@ -200,6 +213,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         duracionMinutos: _servicio!.duracionMinutos ?? 60,
         nota: _nota.text.trim().isEmpty ? null : _nota.text.trim(),
         aceptaWhatsapp: _ofrecerWhatsapp && _aceptaWhatsapp,
+        pagar: pagar,
       );
       await ref.read(cuentaProvider.notifier).recargar();
       navegador.pop();
@@ -209,7 +223,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
           ? ' Te atenderá $quien.'
           : '';
       final aviso = cita.estado == 'pendiente_pago'
-          ? 'Tu cita quedó apartada. Págala para confirmarla.'
+          ? pagar == 'anticipo'
+                ? 'Tu cita quedó apartada. Paga el anticipo para confirmarla; '
+                      'el resto lo pagas en el negocio.'
+                : 'Tu cita quedó apartada. Págala para confirmarla.'
           : _servicio!.conPlan
           ? '¡Listo! Agendamos tu cita con tu bono.'
           : '¡Listo! Agendamos tu cita.';
@@ -326,7 +343,11 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                   ),
                   const SizedBox(height: 16),
                   _selector('Servicio', opciones.servicios, _servicio, (v) {
-                    setState(() => _servicio = v);
+                    setState(() {
+                      _servicio = v;
+                      // Otro servicio, otro anticipo: se vuelve a lo de omisión.
+                      _pagarTodo = false;
+                    });
                     _buscarHorarios();
                   }),
                   if (_servicio?.incluye.isNotEmpty ?? false)
@@ -477,6 +498,13 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                         'Quiero recibir la confirmación y los recordatorios de mi cita por WhatsApp',
                       ),
                     ),
+                  if (_anticipo != null)
+                    _ElegirAnticipo(
+                      servicio: _servicio!,
+                      anticipoMinor: _anticipo!,
+                      pagarTodo: _pagarTodo,
+                      alCambiar: (todo) => setState(() => _pagarTodo = todo),
+                    ),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: _hora == null || _agendando ? null : _agendar,
@@ -509,6 +537,68 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       onChanged: alCambiar,
     ),
   );
+}
+
+/// Cuánto pagar ahora en un servicio con anticipo (ADR 0161): el anticipo (por
+/// omisión, con lo que queda para el negocio) o todo. Lo pagado en línea se devuelve
+/// si cancela a tiempo.
+class _ElegirAnticipo extends StatelessWidget {
+  const _ElegirAnticipo({
+    required this.servicio,
+    required this.anticipoMinor,
+    required this.pagarTodo,
+    required this.alCambiar,
+  });
+
+  final OpcionCita servicio;
+  final int anticipoMinor;
+  final bool pagarTodo;
+  final ValueChanged<bool> alCambiar;
+
+  @override
+  Widget build(BuildContext context) {
+    final precio = servicio.precioMinor ?? anticipoMinor;
+    String dinero(int minor) => Formato.dinero(minor, servicio.moneda);
+    return Column(
+      key: const Key('elegir-anticipo'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          'Cuánto pagar ahora',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        RadioGroup<bool>(
+          groupValue: pagarTodo,
+          onChanged: (v) => alCambiar(v ?? false),
+          child: Column(
+            children: [
+              RadioListTile<bool>(
+                key: const Key('pagar-anticipo'),
+                contentPadding: EdgeInsets.zero,
+                value: false,
+                title: Text('Pagar el anticipo: ${dinero(anticipoMinor)}'),
+                subtitle: Text(
+                  'El resto (${dinero(precio - anticipoMinor)}) lo pagas en el negocio.',
+                ),
+              ),
+              RadioListTile<bool>(
+                key: const Key('pagar-todo'),
+                contentPadding: EdgeInsets.zero,
+                value: true,
+                title: Text('Pagar todo ahora: ${dinero(precio)}'),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          'Si cancelas a tiempo, se te devuelve lo que pagaste; si cancelas '
+          'tarde, el negocio lo conserva.',
+          style: TextStyle(color: context.colores.textoSuave),
+        ),
+      ],
+    );
+  }
 }
 
 /// La sede de la cita con su dirección y cómo llegar (M06).

@@ -11,6 +11,22 @@ namespace App\Modules\Tenancy\Facturacion;
  */
 final class CatalogosSat
 {
+    /**
+     * El concepto de un CFDI de anticipo (Anexo 20, apéndice de anticipos recibidos):
+     * clave, unidad y descripción que fija el SAT.
+     */
+    public const ANTICIPO = [
+        'descripcion' => 'Anticipo del bien o servicio',
+        'clave_prod_serv' => '84111506',
+        'clave_unidad' => 'ACT',
+    ];
+
+    /** La leyenda del CFDI por el resto de una operación con anticipo (remanente). */
+    public const LEYENDA_REMANENTE = 'CFDI por remanente de un anticipo';
+
+    /** Tipo de relación del CFDI por remanente con el de su anticipo. */
+    public const RELACION_ANTICIPO = '07';
+
     /** c_UsoCFDI; los de personas físicas solamente, aparte. */
     public const USOS_CFDI = [
         'G01', 'G02', 'G03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'I07', 'I08',

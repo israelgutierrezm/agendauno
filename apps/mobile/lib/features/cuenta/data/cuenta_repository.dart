@@ -516,7 +516,10 @@ class CuentaRepository {
     );
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
     List<OpcionCita> lista(String clave) => ((data[clave] ?? []) as List)
-        .map((e) => OpcionCita.desdeJson(e as Map<String, dynamic>))
+        .map(
+          (e) =>
+              OpcionCita.desdeJson(e as Map<String, dynamic>, moneda: _moneda),
+        )
         .toList();
 
     return OpcionesCita(
@@ -579,6 +582,7 @@ class CuentaRepository {
 
   /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar)
   /// y quién la atenderá (sin [profesionalId], el negocio asigna a quien esté libre).
+  /// [pagar] solo en un servicio con anticipo (ADR 0161): `anticipo` o `todo`.
   Future<({String estado, String? profesional})> agendarCita({
     required String servicioId,
     required String sucursalId,
@@ -587,6 +591,7 @@ class CuentaRepository {
     required int duracionMinutos,
     String? nota,
     bool aceptaWhatsapp = false,
+    String? pagar,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/citas',
@@ -600,6 +605,8 @@ class CuentaRepository {
         'nota': ?nota,
         // Pidió los avisos por WhatsApp al agendar (ADR 0069).
         if (aceptaWhatsapp) 'acepta_whatsapp': true,
+        // Con anticipo: pagar solo el anticipo (por omisión) o todo (ADR 0161).
+        'pagar': ?pagar,
       },
     );
 

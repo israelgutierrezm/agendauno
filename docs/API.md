@@ -467,6 +467,16 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
   - en `items.N.*` si un producto o extra ya no está a la venta.
 - La misma clave devuelve el mismo cobro.
 
+## Facturas: anticipos (ADR 0163)
+
+- `POST /facturas` acepta `anticipo: true` (un solo concepto: el API fija la clave
+  `84111506`, la unidad `ACT`, la cantidad 1 y «Anticipo del bien o servicio»; toma
+  solo el importe) o `anticipos` (ULID de facturas de anticipo que aplica: mismo RFC,
+  timbradas y sin aplicar). Con `anticipos` se relaciona con tipo `07` y cada concepto
+  lleva «CFDI por remanente de un anticipo»; si alguno no cuadra, 422 en `anticipos`.
+- Cada factura trae `anticipo` y `anticipo_aplicado`. `GET /facturas?anticipos_de=<RFC>`
+  lista los anticipos timbrados y sin aplicar de ese RFC.
+
 ## Citas: anticipo para apartar (ADR 0161)
 
 - `PUT /ofertas/{oferta}` (y el alta) aceptan `anticipo_minor` (monto, menor que el
@@ -480,8 +490,8 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
   - `POST /citas` responde `total_minor` (lo que se paga ahora) y `saldo_minor` (lo que
     queda para el negocio; `null` sin anticipo o pagando todo);
   - `GET /citas/orden/{orden}` también trae `saldo_minor`;
-  - `POST /mi/citas` trae en `cita` `anticipo_minor` (pagado), `saldo_minor` y
-    `saldo_orden_id` (mientras falte).
+  - `POST /mi/citas` (y las reservas de Mi cuenta) traen en `cita` `anticipo_minor`
+    (pagado) y, mientras falte el resto, `saldo_minor` y `saldo_orden_id`.
 - Lo que agenda el negocio (`POST /agenda/citas`) no lleva anticipo.
 - Agenda (`cita`): `total_minor` es lo que cuesta la cita; `anticipo_minor`, lo pagado
   al apartar; `por_cobrar_minor`, lo que falta. `POST /reservas/{reserva}/cobro` cobra

@@ -8,6 +8,7 @@ import '../../../core/formato.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../../../core/network/participante_en_uso.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
@@ -365,6 +366,10 @@ class _DetalleReserva extends ConsumerWidget {
         ? null
         : DateTime.tryParse(r.terminaEn!)?.toLocal();
     final aviso = r.estado != 'confirmada';
+    // Con anticipo (ADR 0161): lo que ya pagó y lo que paga en el negocio.
+    final anticipo = r.cita?.textoAnticipo(
+      ref.watch(sesionProvider)?.moneda ?? 'MXN',
+    );
     // Al terminar una acción, se cierra la hoja (la cuenta ya se recargó).
     Future<void> y(Future<void> Function() accion, String exito) async {
       final nav = Navigator.of(context);
@@ -440,6 +445,12 @@ class _DetalleReserva extends ConsumerWidget {
                     fontSize: 13,
                   ),
                 ),
+              ),
+            if (anticipo != null)
+              Padding(
+                key: const Key('anticipo-pagado'),
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(anticipo),
               ),
             const SizedBox(height: 16),
             if (inicio != null &&

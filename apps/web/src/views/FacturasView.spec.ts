@@ -129,8 +129,14 @@ describe("facturas: búsqueda, filtros y páginas", () => {
     await flushPromises();
 
     expect(api.post).toHaveBeenCalledTimes(1);
-    // Se recargó la lista y el error sigue a la vista, junto al formulario.
-    expect(api.get).toHaveBeenCalledTimes(2);
+    // Se recargó la lista (sin contar la búsqueda de anticipos del RFC) y el error
+    // sigue a la vista, junto al formulario.
+    const recargas = api.get.mock.calls.filter(
+      ([, opciones]) =>
+        (opciones as { params?: Record<string, unknown> } | undefined)?.params
+          ?.anticipos_de === undefined,
+    );
+    expect(recargas).toHaveLength(2);
     expect(w.get('[data-prueba="error-emision"]').text()).toBe(
       "RFC no registrado en el SAT",
     );
@@ -175,6 +181,86 @@ describe("facturas: búsqueda, filtros y páginas", () => {
         uso_cfdi: "G03",
         forma_pago: "03",
       }),
+    );
+    w.unmount();
+  });
+
+  it("factura un anticipo con el concepto del SAT y al facturar el resto lo aplica (ADR 0163)", async () => {
+    vi.mocked(confirmar).mockResolvedValue(true);
+    api.post.mockResolvedValue({ data: { data: factura("3", "timbrada") } });
+    // Un anticipo timbrado y sin aplicar de ese RFC.
+    api.get.mockImplementation(
+      (url: string, opciones?: { params?: Record<string, unknown> }) =>
+        Promise.resolve({
+          data:
+            opciones?.params?.anticipos_de !== undefined
+              ? {
+                  data: [
+                    {
+                      ...factura("9", "timbrada"),
+                      anticipo: true,
+                      anticipo_aplicado: false,
+                      timbrada_en: "2026-10-01T12:00:00-06:00",
+                    },
+                  ],
+                }
+              : {
+                  data: [],
+                  meta: { total: 0, page: 1, per_page: 20, ultima_pagina: 1 },
+                },
+        }),
+    );
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+    await w.get("#fa-nombre").setValue("Cliente Final");
+    await w.get("#fa-cp").setValue("06700");
+    const uso = w.findAllComponents(SelectorBuscable)[1]!;
+    await uso.setValue("G03");
+
+    // El anticipo: solo su importe; sin conceptos libres ni anticipos por aplicar.
+    await w.get('[data-prueba="es-anticipo"]').setValue(true);
+    await w.get("#fa-rfc").setValue("XAXX010101000");
+    await flushPromises();
+    expect(w.find('[data-prueba="concepto"]').exists()).toBe(false);
+    expect(w.find('[data-prueba="anticipos-por-aplicar"]').exists()).toBe(
+      false,
+    );
+    await w.get('[data-prueba="importe-anticipo"]').setValue("200");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/facturas",
+      expect.objectContaining({
+        anticipo: true,
+        items: [
+          expect.objectContaining({
+            cantidad: 1,
+            precio_unitario_minor: 20000,
+            clave_prod_serv: "84111506",
+            clave_unidad: "ACT",
+          }),
+        ],
+      }),
+    );
+
+    // El resto: ofrece el anticipo de ese RFC y lo manda para relacionarlo.
+    await w.get("#fa-nombre").setValue("Cliente Final");
+    await w.get("#fa-cp").setValue("06700");
+    await w.get("#fa-rfc").setValue("XAXX010101000");
+    await flushPromises();
+    expect(w.get('[data-prueba="anticipos-por-aplicar"]').text()).toContain(
+      "UUID-9",
+    );
+    await w.get('[data-prueba="aplicar-anticipo"]').setValue(true);
+    await w.get("#fa-desc-0").setValue("Corte y color");
+    await w.get("#fa-precio-0").setValue("300");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/facturas",
+      expect.objectContaining({ anticipos: ["9"] }),
     );
     w.unmount();
   });
