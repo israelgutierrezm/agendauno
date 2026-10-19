@@ -508,7 +508,14 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
   `cobra_anualidad`.
 - **Inicio** (`GET /inicio/hoy`): acepta `sucursal_id` (403 si no es suya). «Por cobrar»
   no cuenta las citas a las que el cliente no vino. «Seguimientos» se cuenta con el
-  alcance de la lista de tareas.
+  alcance de la lista de tareas. `totales.ocupados` y cada sesión `ocupados` siguen la
+  regla del cupo (incluye Wellhub y TotalPass). `agenda.bloqueos[]`: `id`, `motivo`,
+  `de`, `tipo` (`profesional`, `sala`, `sucursal`), `desde`, `hasta`, `todo_el_dia`,
+  `zona_horaria`.
+- **Sesión** (`POST /login`, `GET /yo`): `estudio.zona_desfase_min`, el desfase de hoy
+  de la zona del negocio con UTC (minutos).
+- **Embudo** (`GET /reportes/embudo`): `renovacion` cuenta las órdenes de renovación por
+  la fecha en que vencía lo renovado (`ordenes.renueva_vence_el`), no por su creación.
 - **Puesta en marcha** (`GET /onboarding/quickstart`):
   - «prueba» pide una reserva de un cliente (página pública o su cuenta);
   - las rutas de «cobro», «prueba» y «publicar» llevan a donde se hace.

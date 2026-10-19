@@ -26,6 +26,8 @@ class OrdenTenant extends Model
     protected $fillable = [
         'persona_id', 'sucursal_id', 'sesion_id', 'renueva_acuerdo_id', 'estado', 'total_minor', 'descuento_minor', 'promocion_id', 'moneda',
         'metodo_pago', 'referencia_pago', 'pagada_en', 'domiciliar', 'cancelada_en', 'cancelada_por', 'contexto_medicion_id',
+        // Renovación: cuándo vence lo que renueva (ADR 0166).
+        'renueva_vence_el',
     ];
 
     /**
@@ -36,6 +38,7 @@ class OrdenTenant extends Model
         'total_minor' => 'integer',
         'descuento_minor' => 'integer',
         'pagada_en' => 'datetime',
+        'renueva_vence_el' => 'date',
         'domiciliar' => 'boolean',
         'cancelada_en' => 'datetime',
     ];

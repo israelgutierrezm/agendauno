@@ -72,6 +72,8 @@ async function enviar(): Promise<void> {
         v-model="elegido"
         class="tu-input w-full sm:w-80"
         data-prueba="giro"
+        :aria-invalid="error ? 'true' : undefined"
+        :aria-describedby="error ? 'giro-negocio-error' : undefined"
       >
         <option v-for="g in giros" :key="g" :value="g">
           {{ $t(`registro.perfiles.${g}`) }}
@@ -94,6 +96,7 @@ async function enviar(): Promise<void> {
     </form>
     <AvisoTono
       v-if="error"
+      id="giro-negocio-error"
       tono="peligro"
       class="mt-3"
       role="alert"

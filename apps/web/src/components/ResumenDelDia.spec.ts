@@ -255,6 +255,62 @@ describe("el día de hoy en el Inicio", () => {
     );
   });
 
+  it("las tarjetas de clases abren lo que cuentan y se ven los bloqueos del día (ADR 0166)", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          agenda: {
+            totales: {
+              sesiones: 2,
+              esperados: 3,
+              ocupados: 4,
+              llegaron: 0,
+              sin_marcar: 1,
+              capacidad: 20,
+              listas_pendientes: 1,
+              en_espera: 2,
+            },
+            sesiones: [sesion({})],
+            bloqueos: [
+              {
+                id: "b1",
+                motivo: "Comida",
+                de: "Caro",
+                tipo: "profesional",
+                desde: "2026-10-01T20:00:00Z",
+                hasta: "2026-10-01T21:00:00Z",
+                todo_el_dia: false,
+                zona_horaria: "America/Mexico_City",
+              },
+            ],
+          },
+          cobros: null,
+          renovaciones: null,
+          manana: { fecha: "2026-10-02", poca_ocupacion: 2 },
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    const destino = (clave: string) =>
+      JSON.parse(
+        w.get(`[data-prueba="indicador-${clave}"] a`).attributes("data-to")!,
+      );
+    // Los ocupados con la regla de cupo (4), no los esperados (3).
+    expect(w.get('[data-prueba="indicador-ocupados"]').text()).toContain("4");
+    expect(destino("clases").query.filtro).toBe("activas");
+    expect(destino("listas").query.filtro).toBe("listas");
+    expect(destino("enEspera")).toEqual({
+      name: "recepcion",
+      query: { fecha: "2026-10-01", filtro: "enEspera" },
+    });
+    expect(w.get('[data-prueba="bloqueos-hoy"]').text()).toContain(
+      "Caro · 14:00–15:00 · Comida",
+    );
+  });
+
   it("se pone al día con «Actualizar» y al volver a la pestaña, sin quitar lo que se ve", async () => {
     const dia = (sesiones: number) => ({
       data: {

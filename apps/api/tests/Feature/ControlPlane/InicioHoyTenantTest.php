@@ -65,8 +65,9 @@ it('el día local: esperados, llegaron y por marcar en las que ya empezaron', fu
         ->assertJsonPath('data.libres', null)
         ->assertJsonPath('data.agenda.totales', [
             'sesiones' => 3, 'esperados' => 3, 'llegaron' => 1, 'sin_marcar' => 1,
-            // 30 lugares; una lista por registrar (la que ya terminó).
-            'capacidad' => 30, 'listas_pendientes' => 1, 'en_espera' => 0,
+            // 30 lugares (3 ocupados, como los cuenta recepción); una lista por
+            // registrar (la que ya terminó).
+            'capacidad' => 30, 'ocupados' => 3, 'listas_pendientes' => 1, 'en_espera' => 0,
             'por_atender' => 0, 'por_cobrar' => 0,
             // Estados de las citas (aquí no hay citas).
             'por_llegar' => 0, 'en_atencion' => 0, 'pendientes_registrar' => 0,
@@ -288,4 +289,23 @@ it('con la sucursal de la barra cuenta solo esa; una sucursal ajena no se pide (
     expect($hoy()->assertOk()->json('data.agenda.totales.sesiones'))->toBe(2)
         ->and($hoy(['sucursal_id' => $polanco])->assertOk()->json('data.agenda.totales.sesiones'))->toBe(1);
     $hoy(['sucursal_id' => '01J0000000000000000000000Z'])->assertForbidden();
+});
+
+it('cuenta los lugares ocupados como recepción y dice lo que está cerrado hoy (ADR 0166)', function (): void {
+    $this->travelTo('2026-10-01 12:00:00');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    $clase = crearSesionTenant($e, $sede, 10, '2026-10-01 18:00:00');
+    reservarAlumnoNuevo($e, $clase, 'Ana');
+    reservarAlumnoNuevo($e, $clase, 'Bea');
+    $this->postJson("/api/v1/app/{$e['slug']}/bloqueos", [
+        'sucursal_id' => $sede['sucursal'], 'desde_local' => '2026-10-01 14:00', 'hasta_local' => '2026-10-01 15:00', 'motivo' => 'Fumigación',
+    ], conBearer($e['bearer']))->assertCreated();
+
+    $agenda = $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?fecha=2026-10-01", conBearer($e['bearer']))->assertOk()->json('data.agenda');
+
+    expect($agenda['totales']['ocupados'])->toBe(2)
+        ->and($agenda['sesiones'][0]['ocupados'])->toBe(2)
+        ->and($agenda['bloqueos'])->toHaveCount(1)
+        ->and($agenda['bloqueos'][0])->toMatchArray(['motivo' => 'Fumigación', 'tipo' => 'sucursal', 'de' => 'Roma Norte']);
 });

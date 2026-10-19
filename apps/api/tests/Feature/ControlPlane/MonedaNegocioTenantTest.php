@@ -61,7 +61,9 @@ it('por omisión trabaja en pesos mexicanos y con la hora de la Ciudad de Méxic
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.estudio.moneda', 'MXN')
-        ->assertJsonPath('data.estudio.zona_horaria', 'America/Mexico_City');
+        ->assertJsonPath('data.estudio.zona_horaria', 'America/Mexico_City')
+        // Su desfase de hoy con UTC: la app sabe qué día es en el negocio (ADR 0166).
+        ->assertJsonPath('data.estudio.zona_desfase_min', -360);
     expect(monedaDeProductoNuevo($e))->toBe('MXN');
 });
 

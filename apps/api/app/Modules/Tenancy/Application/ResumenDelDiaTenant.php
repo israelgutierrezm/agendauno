@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Captacion\EstadoProspecto;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadServicio;
+use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ProspectoTenant;
@@ -110,10 +111,11 @@ class ResumenDelDiaTenant
     private function mananaPocaOcupacion(Usuario $usuario, CarbonImmutable $fecha, ?array $permitidas): array
     {
         $sesiones = (array) ($this->agenda($usuario, $fecha, $permitidas)['sesiones'] ?? []);
+        // Con los lugares ocupados de la regla de cupo, como Lugares libres (ADR 0166).
         $pocas = array_filter($sesiones, static fn (array $s): bool => ($s['tipo'] ?? null) === 'clase'
             && ! ($s['cancelada'] ?? false)
             && (int) ($s['capacidad'] ?? 0) > 0
-            && (int) ($s['esperados'] ?? 0) * 2 < (int) $s['capacidad']);
+            && (int) ($s['ocupados'] ?? 0) * 2 < (int) $s['capacidad']);
 
         return ['fecha' => $fecha->toDateString(), 'poca_ocupacion' => count($pocas)];
     }
@@ -156,6 +158,9 @@ class ResumenDelDiaTenant
             ->when($this->acceso->esInstructorAcotado($usuario), fn ($q) => $q->where('instructor_id', $usuario->getKey()))
             ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->withCount([
+                // Los lugares ocupados con la regla única de cupo (reservas y plataformas),
+                // los mismos que dicen Recepción y Lugares libres (ADR 0166).
+                ...CupoDeSesionTenant::conteos(),
                 'reservas as esperados' => fn ($q) => $q->whereIn('estado', $esperan),
                 'reservas as llegaron' => fn ($q) => $q->whereIn('estado', $esperan)
                     ->whereHas('asistencia', fn ($a) => $a->where('estado', EstadoAsistencia::Presente->value)),
@@ -177,8 +182,9 @@ class ResumenDelDiaTenant
         $ahora = CarbonImmutable::now();
         $totales = [
             'sesiones' => 0, 'esperados' => 0, 'llegaron' => 0, 'sin_marcar' => 0,
-            // Lugares de las clases con cupo, listas por registrar y lista de espera.
-            'capacidad' => 0, 'listas_pendientes' => 0, 'en_espera' => 0,
+            // Lugares de las clases con cupo (y los ocupados), listas por registrar y
+            // lista de espera.
+            'capacidad' => 0, 'ocupados' => 0, 'listas_pendientes' => 0, 'en_espera' => 0,
             // Lo que falta atender (aún no termina y nadie registró la llegada) y lo
             // que falta cobrar.
             'por_atender' => 0, 'por_cobrar' => 0,
@@ -208,6 +214,7 @@ class ResumenDelDiaTenant
                 $totales['llegaron'] += $llegaron;
                 $totales['sin_marcar'] += $sinMarcar;
                 $totales['capacidad'] += $s->esCita() ? 0 : (int) ($s->capacidad ?? 0);
+                $totales['ocupados'] += $s->esCita() ? 0 : CupoDeSesionTenant::ocupadosCargados($s);
                 $totales['listas_pendientes'] += $sinMarcar > 0 ? 1 : 0;
                 $totales['en_espera'] += $enEspera;
                 if ($s->esCita()) {
@@ -239,6 +246,7 @@ class ResumenDelDiaTenant
                 // La hora de la sucursal ya calculada (R10): la app la muestra tal cual.
                 'inicia_local' => CarbonImmutable::instance($s->inicia_en)->setTimezone((string) ($s->zona_horaria ?: app(FechasNegocioTenant::class)->zona()))->format('Y-m-d\TH:i:s'),
                 'capacidad' => $s->capacidad,
+                'ocupados' => $s->esCita() ? null : CupoDeSesionTenant::ocupadosCargados($s),
                 'esperados' => $esperados,
                 'llegaron' => $llegaron,
                 'sin_marcar' => $sinMarcar,
@@ -257,7 +265,44 @@ class ResumenDelDiaTenant
             'totales' => $totales,
             'sesiones' => array_slice($lista, 0, self::LIMITE_SESIONES),
             'truncado' => count($lista) > self::LIMITE_SESIONES,
+            'bloqueos' => $this->bloqueos($usuario, $fecha, $permitidas),
         ];
+    }
+
+    /**
+     * Lo que está cerrado o fuera hoy (ADR 0166): comida o vacaciones de alguien, una
+     * sede cerrada o una sala fuera de servicio, con el mismo alcance que la agenda
+     * del día. Hasta 20.
+     *
+     * @param  list<int>|null  $permitidas
+     * @return list<array<string, mixed>>
+     */
+    private function bloqueos(Usuario $usuario, CarbonImmutable $fecha, ?array $permitidas): array
+    {
+        $zona = app(FechasNegocioTenant::class)->zona();
+        $inicio = CarbonImmutable::parse($fecha->toDateString(), $zona)->startOfDay();
+
+        return BloqueoAgendaTenant::query()
+            ->entre($inicio->utc(), $inicio->addDay()->utc())
+            ->when($this->acceso->esInstructorAcotado($usuario), fn ($q) => $q->where('instructor_id', $usuario->getKey()))
+            // De sus sedes, o de alguien del equipo sin sede.
+            ->when($permitidas !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('sucursal_id')->orWhereIn('sucursal_id', $permitidas ?? [])))
+            ->with(['instructor', 'sucursal', 'recurso'])
+            ->orderBy('desde')
+            ->limit(20)
+            ->get()
+            ->map(static fn (BloqueoAgendaTenant $b): array => [
+                'id' => $b->ulid,
+                'motivo' => $b->motivo,
+                // A quién o qué cierra: un profesional, una sala o la sede.
+                'de' => $b->instructor->name ?? $b->recurso->nombre ?? $b->sucursal?->nombre,
+                'tipo' => $b->instructor_id !== null ? 'profesional' : ($b->recurso_id !== null ? 'sala' : 'sucursal'),
+                'desde' => $b->desde->toIso8601String(),
+                'hasta' => $b->hasta->toIso8601String(),
+                'todo_el_dia' => (bool) $b->todo_el_dia,
+                'zona_horaria' => $b->zona_horaria ?: $zona,
+            ])
+            ->all();
     }
 
     /**

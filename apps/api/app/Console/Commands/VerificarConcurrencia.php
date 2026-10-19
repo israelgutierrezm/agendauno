@@ -128,6 +128,8 @@ class VerificarConcurrencia extends Command
             $this->caso('Reprogramaciones y reservas por el último lugar', fn () => $this->reprogramarAlUltimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Una cancelación libera lugar mientras otros lo piden', fn () => $this->cancelacionLiberaLugar($escenarios, $rondas));
             $this->caso('Ajustes de inventario y una venta a la vez con poco stock', fn () => $this->inventarioSinNegativos($escenarios, $rondas));
+            $this->caso('Ventas del mostrador a la vez por la última pieza', fn () => $this->ultimaPieza($escenarios, $rondas, $procesos));
+            $this->caso('Ventas con los mismos artículos en distinto orden', fn () => $this->mismosArticulos($escenarios, $rondas));
             $this->caso('Respaldo y restauración de un negocio', fn () => $this->respaldoYRestauracion($gestor));
             $this->caso('Migraciones de varios negocios', fn () => $this->migraciones($gestor, is_string($base)));
         } catch (Throwable $e) {
@@ -430,6 +432,60 @@ class VerificarConcurrencia extends Command
             $this->comprobar($fallas, $hechos === 1, "{$hechos} movimientos pasaron con 5 piezas");
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).": 3 ajustes de −4 y una venta de 2 con 5 piezas → quedan {$stock}", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Varias ventas del mostrador a la vez por la última pieza (ADR 0166): solo una
+     * pasa y el stock queda en cero.
+     *
+     * @return list<string>
+     */
+    private function ultimaPieza(EscenariosConcurrencia $e, int $rondas, int $procesos): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $articulo = (int) $e->articulo($this->base['sucursal'], 1)->getKey();
+            $venta = ['accion' => 'vender-mostrador', 'articulo' => $articulo, 'sucursal' => $this->base['sucursal'], 'cantidad' => 1];
+            $res = $this->competir(array_fill(0, max(2, $procesos), $venta));
+
+            $stock = $e->stock($articulo, $this->base['sucursal']);
+            $hechos = $this->hechos($res);
+            $this->comprobar($fallas, $stock === 0, "quedaron {$stock} piezas");
+            $this->comprobar($fallas, $hechos === 1, "{$hechos} ventas se llevaron la última pieza");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).': '.count($res)." ventas por 1 pieza → {$hechos} vendida, quedan {$stock}", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Dos ventas con los mismos dos artículos, uno en cada orden (A, B y B, A), a la vez:
+     * el mostrador los bloquea siempre en el mismo orden, así que ninguna espera a la
+     * otra para siempre (deadlock) y las dos pasan.
+     *
+     * @return list<string>
+     */
+    private function mismosArticulos(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $a = (int) $e->articulo($this->base['sucursal'], 10)->getKey();
+            $b = (int) $e->articulo($this->base['sucursal'], 10)->getKey();
+            $res = $this->competir([
+                ['accion' => 'vender-carrito', 'articulos' => [$a, $b], 'sucursal' => $this->base['sucursal']],
+                ['accion' => 'vender-carrito', 'articulos' => [$b, $a], 'sucursal' => $this->base['sucursal']],
+            ]);
+
+            $quedan = [$e->stock($a, $this->base['sucursal']), $e->stock($b, $this->base['sucursal'])];
+            $hechos = $this->hechos($res);
+            $this->comprobar($fallas, $hechos === 2, "{$hechos} de 2 ventas pasaron");
+            $this->comprobar($fallas, $quedan === [8, 8], 'quedaron '.implode(' y ', $quedan).' piezas');
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).": A,B y B,A a la vez → {$hechos} ventas, quedan ".implode(' y ', $quedan), $res);
         }
 
         return $fallas;

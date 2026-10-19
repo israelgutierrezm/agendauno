@@ -244,6 +244,14 @@ export default {
   // Inicio del negocio: el día de hoy.
   hoy: {
     titulo: "Hoy",
+    // Lo que está cerrado o fuera hoy (ADR 0166).
+    bloqueos: {
+      titulo: "No disponible hoy",
+      todoElDia: "todo el día",
+      profesional: "Profesional",
+      sala: "Sala",
+      sucursal: "Sucursal cerrada",
+    },
     enCurso: "En curso",
     loQueSigue: "Lo que sigue hoy",
     diaTerminado: "No quedan clases por comenzar hoy",
@@ -795,6 +803,14 @@ export default {
     sinActividadFiltros:
       "No hay clases este día en la sucursal elegida. Prueba con todas las sucursales.",
     irAgenda: "Ir a la agenda →",
+    // Lo que abre cada tarjeta del Inicio (ADR 0166).
+    filtrosClases: {
+      activas: "Clases de hoy ({n}), sin las canceladas.",
+      listas: "Clases con lista por pasar ({n}).",
+      enEspera: "Clases con gente en lista de espera ({n}).",
+      verTodas: "Ver todas",
+      ninguna: "Ninguna clase de hoy cumple con este filtro.",
+    },
   },
   comunicacion: {
     revisar: "Revisar y enviar",

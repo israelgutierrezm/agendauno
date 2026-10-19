@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoVersionTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -46,7 +47,7 @@ class ValorDeSesionesTenant
         $asignaciones = AsignacionSesionTenant::query()->whereIn('sesion_id', $sesionIds)->get()->groupBy('sesion_id');
         $reservas = ReservaTenant::query()
             ->whereIn('sesion_id', $sesionIds)
-            ->with(['asistencia', 'derecho.acuerdo.producto'])
+            ->with(['asistencia', 'orden', 'saldoOrden', 'derecho.acuerdo.producto', 'derecho.acuerdo.lineaOrden'])
             ->get()
             ->groupBy('sesion_id');
 
@@ -91,21 +92,40 @@ class ValorDeSesionesTenant
      */
     private function ingresoDe(?int $precioClase, Collection $presentes): array
     {
-        if ($precioClase !== null && $precioClase > 0) {
-            return [$presentes->count() * $precioClase, 0];
-        }
-
         $ingreso = 0;
         $sinCosto = 0;
         foreach ($presentes as $reserva) {
-            $producto = $reserva->derecho?->acuerdo?->producto;
-            $precioMinor = (int) ($producto->precio_minor ?? 0);
-            $creditos = (int) ($producto->creditos_incluidos ?? 0);
-            if ($precioMinor > 0 && $creditos > 0) {
-                $ingreso += intdiv($precioMinor * (int) $reserva->costo_unidades, $creditos);
-            } else {
-                $sinCosto++;
+            // Pagó esta clase: lo que se le cobró (fijo desde que reservó), no el precio
+            // de hoy (ADR 0166).
+            $cobrado = $reserva->totalCitaMinor();
+            if ($cobrado !== null && $cobrado > 0) {
+                $ingreso += $cobrado;
+
+                continue;
             }
+            // Con precio por clase, ese precio (como siempre).
+            if ($precioClase !== null && $precioClase > 0) {
+                $ingreso += $precioClase;
+
+                continue;
+            }
+            // Con su paquete: el precio y los créditos con que se vendió (la línea de su
+            // orden); si se vendió sin orden, los del plan.
+            $acuerdo = $reserva->derecho?->acuerdo;
+            if ($acuerdo instanceof AcuerdoTenant) {
+                $linea = $acuerdo->lineaOrden;
+                $precioMinor = (int) ($linea->precio_unitario_minor ?? $acuerdo->producto->precio_minor ?? 0);
+                $vendido = $linea?->plan['atributos']['creditos_incluidos'] ?? null;
+                $creditos = (int) ($vendido ?? $acuerdo->producto->creditos_incluidos ?? 0);
+                if ($precioMinor > 0 && $creditos > 0) {
+                    $ingreso += intdiv($precioMinor * (int) $reserva->costo_unidades, $creditos);
+                } else {
+                    $sinCosto++;
+                }
+
+                continue;
+            }
+            $sinCosto++;
         }
 
         return [$ingreso, $sinCosto];

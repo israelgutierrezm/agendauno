@@ -26,6 +26,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -325,6 +326,9 @@ class AuthTenantController
             // línea y (en México) factura.
             'moneda' => app(ParametrosTenant::class)->moneda(),
             'zona_horaria' => app(FechasNegocioTenant::class)->zona(),
+            // Su desfase de hoy con UTC (minutos): la app sabe qué día es en el negocio
+            // antes de cargar su agenda, sin un paquete de zonas (ADR 0166).
+            'zona_desfase_min' => CarbonImmutable::now(app(FechasNegocioTenant::class)->zona())->utcOffset(),
             // Su país y su lada (ADR 0103): la de los celulares que se capturan sin «+».
             'pais' => app(RegionNegocioTenant::class)->pais(),
             'lada' => app(RegionNegocioTenant::class)->lada(),

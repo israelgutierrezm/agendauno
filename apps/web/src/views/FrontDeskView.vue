@@ -46,6 +46,7 @@ interface SesionDia {
   estado: string;
   capacidad: number | null;
   confirmadas: number;
+  pendientes_pago?: number;
   ofrecidas: number;
   en_espera: number;
   presentes: number;
@@ -81,6 +82,14 @@ const fecha = ref(
 // `?filtro=` (desde una tarjeta del Inicio): la jornada ya filtrada.
 const filtroPedido =
   typeof ruta?.query.filtro === "string" ? ruta.query.filtro : undefined;
+// Clases: las que cuenta cada tarjeta del Inicio (ADR 0166). Null = todas.
+const FILTROS_CLASES = ["activas", "listas", "enEspera"] as const;
+type FiltroClases = (typeof FILTROS_CLASES)[number];
+const filtroClases = ref<FiltroClases | null>(
+  (FILTROS_CLASES as readonly string[]).includes(filtroPedido ?? "")
+    ? (filtroPedido as FiltroClases)
+    : null,
+);
 let sesionPedida: string | null =
   typeof ruta?.query.sesion === "string" && ruta.query.sesion !== ""
     ? ruta.query.sesion
@@ -96,6 +105,31 @@ const sesiones = ref<SesionDia[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const sesionActiva = ref<SesionDia | null>(null);
+// Con el filtro del Inicio: activas (sin canceladas), listas por pasar (ya empezó y
+// alguien sigue sin registro) o con gente en lista de espera.
+const sesionesVisibles = computed(() => {
+  const f = filtroClases.value;
+  if (f === null) {
+    return sesiones.value;
+  }
+  const ahora = Date.now();
+  return sesiones.value.filter((s) => {
+    if (s.estado !== "programada") {
+      return false;
+    }
+    if (f === "enEspera") {
+      return s.en_espera > 0;
+    }
+    if (f === "listas") {
+      const esperados = s.confirmadas + (s.pendientes_pago ?? 0);
+      return (
+        new Date(s.inicia_en).getTime() <= ahora &&
+        esperados - s.presentes - s.ausentes > 0
+      );
+    }
+    return true;
+  });
+});
 
 // En escritorio el detalle va a la derecha, a la altura de la lista (debajo de los
 // indicadores): al abrir una clase se baja hasta él, sin buscarlo con el scroll.
@@ -721,70 +755,97 @@ onMounted(async () => {
               >{{ $t("operacion.recepcion.irAgenda") }}</RouterLink
             >
           </EstadoVacio>
-          <ul v-else class="fd-lista">
-            <li v-for="s in sesiones" :key="s.id">
+          <template v-else>
+            <p
+              v-if="filtroClases"
+              class="px-5 pt-3 text-sm flex flex-wrap items-center gap-2"
+              data-prueba="filtro-clases"
+            >
+              <span :style="{ color: 'var(--texto-suave)' }">{{
+                $t(`operacion.recepcion.filtrosClases.${filtroClases}`, {
+                  n: sesionesVisibles.length,
+                })
+              }}</span>
               <button
                 type="button"
-                class="fd-clase"
-                :class="{
-                  'fd-activa': sesionActiva?.id === s.id,
-                  'fd-cancelada': s.estado !== 'programada',
-                }"
-                :aria-pressed="sesionActiva?.id === s.id"
-                @click="abrir(s)"
+                class="tu-enlace"
+                @click="filtroClases = null"
               >
-                <span class="fd-hora">{{
-                  horaCorta(s.inicia_en, s.zona_horaria)
-                }}</span>
-                <span class="min-w-0 flex-1">
-                  <span class="block font-semibold fd-nombre"
-                    >{{ s.oferta ?? "—"
-                    }}<span
-                      v-if="s.estado !== 'programada'"
-                      class="ml-1.5 text-xs font-normal"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >· {{ $t("recepcion.cancelada") }}</span
-                    ></span
-                  >
-                  <span
-                    class="block text-xs fd-detalle"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{
-                      [s.instructor, lugares(s)].filter(Boolean).join(" · ")
-                    }}</span
-                  >
-                </span>
-                <span class="shrink-0 text-right text-xs">
-                  <span
-                    v-if="s.estado === 'programada' && s.confirmadas > 0"
-                    class="fd-progreso"
-                    :title="$t('operacion.admin.progresoAsistencia')"
-                    aria-hidden="true"
-                    ><span :style="{ width: `${progreso(s)}%` }"
-                  /></span>
-                  <span
-                    v-if="s.en_espera > 0"
-                    class="block font-medium"
-                    :style="{ color: 'var(--aviso)' }"
-                    >{{
-                      $t("recepcionVisual.enEspera", { n: s.en_espera })
-                    }}</span
-                  >
-                  <span
-                    v-if="s.confirmadas > 0"
-                    class="block"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{
-                      $t("recepcionVisual.llegaron", {
-                        n: s.presentes,
-                        total: s.confirmadas,
-                      })
-                    }}</span
-                  >
-                </span>
+                {{ $t("operacion.recepcion.filtrosClases.verTodas") }}
               </button>
-            </li>
-          </ul>
+            </p>
+            <p
+              v-if="sesionesVisibles.length === 0"
+              class="px-5 py-8 text-center text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("operacion.recepcion.filtrosClases.ninguna") }}
+            </p>
+            <ul v-else class="fd-lista">
+              <li v-for="s in sesionesVisibles" :key="s.id">
+                <button
+                  type="button"
+                  class="fd-clase"
+                  :class="{
+                    'fd-activa': sesionActiva?.id === s.id,
+                    'fd-cancelada': s.estado !== 'programada',
+                  }"
+                  :aria-pressed="sesionActiva?.id === s.id"
+                  @click="abrir(s)"
+                >
+                  <span class="fd-hora">{{
+                    horaCorta(s.inicia_en, s.zona_horaria)
+                  }}</span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block font-semibold fd-nombre"
+                      >{{ s.oferta ?? "—"
+                      }}<span
+                        v-if="s.estado !== 'programada'"
+                        class="ml-1.5 text-xs font-normal"
+                        :style="{ color: 'var(--texto-suave)' }"
+                        >· {{ $t("recepcion.cancelada") }}</span
+                      ></span
+                    >
+                    <span
+                      class="block text-xs fd-detalle"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        [s.instructor, lugares(s)].filter(Boolean).join(" · ")
+                      }}</span
+                    >
+                  </span>
+                  <span class="shrink-0 text-right text-xs">
+                    <span
+                      v-if="s.estado === 'programada' && s.confirmadas > 0"
+                      class="fd-progreso"
+                      :title="$t('operacion.admin.progresoAsistencia')"
+                      aria-hidden="true"
+                      ><span :style="{ width: `${progreso(s)}%` }"
+                    /></span>
+                    <span
+                      v-if="s.en_espera > 0"
+                      class="block font-medium"
+                      :style="{ color: 'var(--aviso)' }"
+                      >{{
+                        $t("recepcionVisual.enEspera", { n: s.en_espera })
+                      }}</span
+                    >
+                    <span
+                      v-if="s.confirmadas > 0"
+                      class="block"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        $t("recepcionVisual.llegaron", {
+                          n: s.presentes,
+                          total: s.confirmadas,
+                        })
+                      }}</span
+                    >
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </template>
         </div>
 
         <!-- Detalle de la clase (escritorio): al lado, sobre fondo gris -->

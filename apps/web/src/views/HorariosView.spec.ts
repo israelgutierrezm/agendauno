@@ -11,6 +11,8 @@ const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
 vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
+  erroresPorCampo: (e: unknown) =>
+    (e as { errores?: Record<string, string> })?.errores ?? {},
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
@@ -208,5 +210,29 @@ describe("horarios de atención", () => {
     expect(cerrar()).toBe(true);
     w.unmount();
     expect(cerrar()).toBe(false);
+  });
+
+  it("lo que el servidor rechaza de una franja se dice junto a ella (ADR 0166)", async () => {
+    api.put.mockRejectedValue({
+      errores: { "horarios.0.hora_fin": "Se encima con otra franja." },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.find("#h-prov").setValue("beto");
+    await flushPromises();
+    pendientes.get("beto")!(horario("10:00:00"));
+    await flushPromises();
+    await aLista(w);
+    await w.find("#d1-i0-fin").setValue("19:00");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === horariosVisual.guardarCambios)!
+      .trigger("click");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-franja-1-0"]').text()).toBe(
+      "Se encima con otra franja.",
+    );
+    expect(w.get("#d1-i0-fin").attributes("aria-invalid")).toBe("true");
   });
 });

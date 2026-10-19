@@ -12,7 +12,12 @@ import RegionNegocioView from "./RegionNegocioView.vue";
 */
 
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
-vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
+vi.mock("@/lib/api", () => ({
+  api,
+  mensajeDeError: () => "Error",
+  erroresPorCampo: (e: unknown) =>
+    (e as { errores?: Record<string, string> })?.errores ?? {},
+}));
 vi.mock("@/lib/confirmar", () => ({ confirmar: () => Promise.resolve(true) }));
 const cargarYo = vi.hoisted(() => vi.fn());
 vi.mock("@/stores/sesionTenant", () => ({
@@ -111,6 +116,24 @@ describe("país, moneda y zona horaria del negocio", () => {
       zona_horaria: "America/Tijuana",
     });
     expect(cargarYo).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("lo que el servidor rechaza se dice junto a su campo (ADR 0166)", async () => {
+    api.get.mockResolvedValue({ data: { data: region() } });
+    api.put.mockRejectedValue({
+      errores: { zona_horaria: "Esa zona no es válida para el país." },
+    });
+    const w = montar();
+    await flushPromises();
+
+    await elegir(w, "zona-negocio", "tijuana");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-zona"]').text()).toBe(
+      "Esa zona no es válida para el país.",
+    );
     w.unmount();
   });
 

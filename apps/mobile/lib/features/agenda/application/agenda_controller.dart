@@ -6,14 +6,16 @@ import '../data/agenda_repository.dart';
 
 /// Día que se está viendo en la agenda (hoy por defecto). Vuelve a hoy al cambiar
 /// de sesión: quien entra después no arranca en el día que dejó el anterior. Es un
-/// día de la sucursal (así se filtran las sesiones); al abrir, antes de saber la
-/// zona de la sucursal, es el de hoy en el teléfono.
+/// día de la sucursal (así se filtran las sesiones); al abrir, antes de cargarlas,
+/// es el de hoy en el negocio (con el desfase de su zona; ADR 0166) y, con un API
+/// anterior, el del teléfono.
 class FechaAgenda extends Notifier<DateTime> {
   @override
   DateTime build() {
     ref.watch(sesionProvider.select((s) => (s?.slug, s?.bearer)));
-    final hoy = DateTime.now();
-    return DateTime(hoy.year, hoy.month, hoy.day);
+    final ahora = DateTime.now();
+    return ref.read(sesionProvider)?.hoyEnNegocio(ahora) ??
+        DateTime(ahora.year, ahora.month, ahora.day);
   }
 
   void elegir(DateTime dia) => state = DateTime(dia.year, dia.month, dia.day);
@@ -22,8 +24,12 @@ class FechaAgenda extends Notifier<DateTime> {
   void moverSemanas(int n) => elegir(state.add(Duration(days: 7 * n)));
 
   /// Vuelve a hoy: [dia] es el de hoy en la sucursal si ya se sabe (ver
-  /// [AgendaDia.hoyEnSucursal]); si no, el del teléfono.
-  void hoy([DateTime? dia]) => elegir(dia ?? DateTime.now());
+  /// [AgendaDia.hoyEnSucursal]); si no, el del negocio (o el del teléfono).
+  void hoy([DateTime? dia]) => elegir(
+    dia ??
+        ref.read(sesionProvider)?.hoyEnNegocio(DateTime.now()) ??
+        DateTime.now(),
+  );
 }
 
 final fechaAgendaProvider = NotifierProvider<FechaAgenda, DateTime>(

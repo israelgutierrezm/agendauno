@@ -362,6 +362,7 @@ export const oportunidadesVisual = {
     instructor: "Filtrar por instructor",
     todosInstructores: "Todos los instructores",
     soloEspera: "Con lista de espera",
+    soloPoca: "A menos de la mitad",
   },
 };
 

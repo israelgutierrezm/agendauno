@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
-import { mensajeDeError } from "@/lib/api";
+import { erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import type {
   DatosTerminologia,
@@ -43,6 +43,8 @@ const elegidos = ref<Record<Termino, string>>({
 const guardando = ref(false);
 const listo = ref(false);
 const error = ref<string | null>(null);
+// Lo rechazado por término, junto a su campo.
+const errores = ref<Record<string, string>>({});
 
 function tomar(d: DatosTerminologia): void {
   datos.value = d;
@@ -62,6 +64,7 @@ async function enviar(): Promise<void> {
   guardando.value = true;
   listo.value = false;
   error.value = null;
+  errores.value = {};
   try {
     const d = await props.guardar({
       sesion: elegidos.value.sesion || null,
@@ -72,7 +75,11 @@ async function enviar(): Promise<void> {
     listo.value = true;
     emit("guardado", d.vigente);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errores.value = erroresPorCampo(e);
+    // Si no es de un término, el aviso general.
+    if (!TERMINOS.some((t) => errores.value[t])) {
+      error.value = mensajeDeError(e);
+    }
   } finally {
     guardando.value = false;
   }
@@ -110,6 +117,7 @@ onMounted(async () => {
           v-model="elegidos[t]"
           class="tu-input w-full"
           :disabled="!puedeGestionar"
+          :aria-invalid="errores[t] ? 'true' : undefined"
         >
           <option value="">
             {{
@@ -122,6 +130,15 @@ onMounted(async () => {
             {{ o }}
           </option>
         </select>
+        <p
+          v-if="errores[t]"
+          class="text-xs sm:col-start-2"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+          :data-prueba="`error-${t}`"
+        >
+          {{ errores[t] }}
+        </p>
       </div>
 
       <div v-if="puedeGestionar" class="flex flex-wrap items-center gap-3">

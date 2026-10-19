@@ -62,6 +62,7 @@ class AgendaScreen extends ConsumerWidget {
     final ahora = DateTime.now();
     final hoy =
         estado.value?.hoyEnSucursal(ahora) ??
+        sesion?.hoyEnNegocio(ahora) ??
         DateTime(ahora.year, ahora.month, ahora.day);
     final horaSucursal = etiquetaHoraSucursal(
       estado.value?.sesiones ?? const [],

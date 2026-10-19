@@ -17,8 +17,11 @@ vi.mock("@/stores/sesionTenant", () => ({
     zonaHoraria: "America/Mexico_City",
   }),
 }));
+const consulta = vi.hoisted(() => ({
+  valor: { fecha: "2026-10-02" } as Record<string, string>,
+}));
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: { fecha: "2026-10-02" } }),
+  useRoute: () => ({ query: consulta.valor }),
 }));
 
 const clase = (id: string, inicia_en: string) => ({
@@ -53,4 +56,23 @@ it("abre solo las clases de ese día y deja quitar el filtro", async () => {
   expect(w.findAll('[data-prueba="oportunidad"]')).toHaveLength(2);
   await w.get('[data-prueba="filtro-fecha"]').trigger("click");
   expect(w.findAll('[data-prueba="oportunidad"]')).toHaveLength(3);
+});
+
+it("con «a menos de la mitad» (`?poca=1`) abre solo las que contó el Inicio", async () => {
+  consulta.valor = { fecha: "2026-10-02", poca: "1" };
+  get.mockResolvedValue({
+    data: {
+      data: [
+        clase("a", "2026-10-02T14:00:00Z"),
+        { ...clase("b", "2026-10-02T16:00:00Z"), ocupados: 6, libres: 4 },
+      ],
+    },
+  });
+  const w = mount(OportunidadesView, { global: { plugins: [i18n] } });
+  await flushPromises();
+
+  expect(w.findAll('[data-prueba="oportunidad"]')).toHaveLength(1);
+  await w.get('[data-prueba="solo-poca"]').setValue(false);
+  expect(w.findAll('[data-prueba="oportunidad"]')).toHaveLength(2);
+  consulta.valor = { fecha: "2026-10-02" };
 });

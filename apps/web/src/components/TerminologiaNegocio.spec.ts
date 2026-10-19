@@ -8,6 +8,8 @@ import TerminologiaNegocio from "./TerminologiaNegocio.vue";
 
 vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
+  erroresPorCampo: (e: unknown) =>
+    (e as { errores?: Record<string, string> })?.errores ?? {},
 }));
 
 const barberia: DatosTerminologia = {
@@ -67,5 +69,32 @@ describe("cómo se llaman las cosas", () => {
       instructores: "Estilistas",
     });
     expect(w.text()).toContain("tus pantallas ya usan estas palabras");
+  });
+
+  it("un término rechazado se marca en su campo (ADR 0166)", async () => {
+    const guardar = vi.fn().mockRejectedValue({
+      errores: { instructor: "Elige una de las opciones." },
+    });
+    const w = mount(TerminologiaNegocio, {
+      props: { cargar: () => Promise.resolve(barberia), guardar },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { terminologiaNegocio } },
+          }),
+        ],
+      },
+    });
+    await flushPromises();
+    await w.get("#term-instructor").setValue("Estilista");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-instructor"]').text()).toBe(
+      "Elige una de las opciones.",
+    );
+    expect(w.get("#term-instructor").attributes("aria-invalid")).toBe("true");
   });
 });

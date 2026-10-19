@@ -5,7 +5,8 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
+import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
 import { opcionesPais, opcionesZona } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -44,6 +45,8 @@ const zona = ref("America/Mexico_City");
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const guardando = ref(false);
+// Lo rechazado por campo (pais, moneda, zona_horaria), junto a cada uno.
+const errores = ref<Record<string, string>>({});
 
 const cambios = computed(
   () =>
@@ -52,6 +55,8 @@ const cambios = computed(
       moneda.value !== region.value.moneda ||
       zona.value !== region.value.zona_horaria),
 );
+// Salir con cambios sin guardar pregunta antes.
+useCambiosPendientes(() => cambios.value);
 
 // Los países con buscador (los más usados primero) y las zonas, con las del país
 // elegido primero.
@@ -95,6 +100,7 @@ async function guardar(): Promise<void> {
     return;
   }
   guardando.value = true;
+  errores.value = {};
   try {
     const { data } = await api.put<{ data: Region }>(
       `${base.value}/negocio/region`,
@@ -111,7 +117,11 @@ async function guardar(): Promise<void> {
     await sesion.cargarYo();
     toast.exito(t("region.guardado"));
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    errores.value = erroresPorCampo(e);
+    // Lo que no es de un campo, como aviso.
+    if (Object.keys(errores.value).length === 0) {
+      toast.error(mensajeDeError(e));
+    }
   } finally {
     guardando.value = false;
   }
@@ -174,6 +184,15 @@ onMounted(cargar);
           {{ region.motivo_pais ?? $t("region.pais.bloqueado") }}
         </p>
         <p v-else class="tu-hint mt-1">{{ $t("region.pais.ayuda") }}</p>
+        <p
+          v-if="errores.pais"
+          class="tu-hint mt-1"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+          data-prueba="error-pais"
+        >
+          {{ errores.pais }}
+        </p>
         <AvisoTono
           v-if="pais !== 'MX'"
           tono="aviso"
@@ -210,6 +229,15 @@ onMounted(cargar);
           {{ $t("region.moneda.bloqueada", { moneda: region.moneda }) }}
         </p>
         <p v-else class="tu-hint mt-1">{{ $t("region.moneda.ayuda") }}</p>
+        <p
+          v-if="errores.moneda"
+          class="tu-hint mt-1"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+          data-prueba="error-moneda"
+        >
+          {{ errores.moneda }}
+        </p>
 
         <!-- Qué funciona con esta moneda -->
         <dl class="rg-avisos" data-prueba="region-avisos">
@@ -261,6 +289,15 @@ onMounted(cargar);
           data-prueba="zona-negocio"
         />
         <p class="tu-hint mt-1">{{ $t("region.zona.ayuda") }}</p>
+        <p
+          v-if="errores.zona_horaria"
+          class="tu-hint mt-1"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+          data-prueba="error-zona"
+        >
+          {{ errores.zona_horaria }}
+        </p>
       </section>
 
       <div class="flex justify-end lg:col-span-2">

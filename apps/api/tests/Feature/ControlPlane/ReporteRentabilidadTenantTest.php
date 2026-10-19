@@ -89,6 +89,29 @@ it('usa el precio de clase configurado en la oferta cuando existe (en vez de cr�
     expect($r['ofertas'][0]['margen_minor'])->toBe(15000);
 });
 
+it('una asistencia con paquete vale lo que se pagó por él, aunque el plan cambie de precio (ADR 0166)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $sesion = crearSesionTenant($e, $semilla, cuando: '2026-10-01 08:00:00');
+    // Se vende con una orden a $899 por 8 créditos…
+    $ana = crearMiembroTenant($e, 'Ana');
+    $pack = crearPackTenant($e, 8000);
+    $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
+        'comprador_id' => $ana, 'items' => [['producto_id' => $pack, 'cantidad' => 1]],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    // …y después el plan sube a $1,999.
+    $this->putJson("/api/v1/app/{$e['slug']}/productos/{$pack}", ['precio_minor' => 199900], conBearer($e['bearer']))->assertOk();
+    $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $ana], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => 'presente'], conBearer($e['bearer']))->assertCreated();
+
+    $r = $this->getJson("/api/v1/app/{$e['slug']}/reportes/rentabilidad?desde=2026-10-01&hasta=2026-10-01", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    // 89900 * 1000 / 8000, no el precio de hoy.
+    expect($r['ofertas'][0]['ingreso_minor'])->toBe(11237);
+});
+
 it('el reporte de rentabilidad exige permiso de facturación', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $coach = personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');

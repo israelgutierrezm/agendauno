@@ -313,6 +313,7 @@ class EscenariosConcurrencia
             'mover-cita' => $this->prepararMoverCita((int) $paso['reserva'], (string) $paso['inicia']),
             'ajustar-inventario' => $this->prepararAjustarInventario((int) $paso['articulo'], (int) $paso['sucursal'], (int) $paso['delta']),
             'vender-mostrador' => $this->prepararVenderMostrador((int) $paso['articulo'], (int) $paso['sucursal'], (int) $paso['cantidad']),
+            'vender-carrito' => $this->prepararVenderCarrito(array_map(intval(...), (array) $paso['articulos']), (int) $paso['sucursal']),
             'aprovisionar' => $this->prepararAprovisionar((int) $paso['estudio']),
             'migrar' => $this->prepararMigrar((int) $paso['estudio']),
             default => throw new InvalidArgumentException("Paso desconocido: {$paso['accion']}"),
@@ -323,6 +324,20 @@ class EscenariosConcurrencia
     private function prepararAjustarInventario(int $articuloId, int $sucursalId, int $delta): callable
     {
         return fn (): string => (string) $this->inventario->ajustar($articuloId, $sucursalId, $delta, TipoMovimientoInventario::Ajuste)->cantidad;
+    }
+
+    /**
+     * Una venta del mostrador con varios artículos (una pieza de cada uno), en el orden
+     * dado.
+     *
+     * @param  list<int>  $articulos
+     */
+    private function prepararVenderCarrito(array $articulos, int $sucursalId): callable
+    {
+        $items = array_map(static fn (int $id): array => ['articulo' => ArticuloTenant::query()->findOrFail($id), 'cantidad' => 1], $articulos);
+        $sucursal = SucursalTenant::query()->findOrFail($sucursalId);
+
+        return fn (): string => (string) $this->mostrador->vender($sucursal, $items, 'efectivo')->total_minor;
     }
 
     /** Una venta del mostrador. */

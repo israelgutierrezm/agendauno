@@ -12,7 +12,7 @@ import SemanaHorario from "@/components/SemanaHorario.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSucursalOperativa, useSucursales } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
@@ -111,6 +111,12 @@ function vaciarEditor(): void {
   cargadoPara.value = null;
   semana.value = semanaVacia();
   original.value = JSON.stringify(semana.value);
+}
+
+// Lo que el servidor rechazó de cada franja («día-índice» → mensaje), junto a ella.
+const erroresFranja = ref<Record<string, string>>({});
+function errorFranja(d: number, i: number): string | undefined {
+  return erroresFranja.value[`${d}-${i}`];
 }
 
 // Una franja es válida si tiene inicio y fin y el fin es posterior al inicio.
@@ -233,7 +239,10 @@ async function guardar(): Promise<void> {
   }
   guardando.value = true;
   error.value = null;
+  erroresFranja.value = {};
   okGuardado.value = false;
+  // De qué día y franja es cada renglón que se manda (para ubicar sus errores).
+  const origen: Array<[number, number]> = [];
   try {
     const horarios: Array<{
       dia_semana: number;
@@ -241,13 +250,14 @@ async function guardar(): Promise<void> {
       hora_fin: string;
     }> = [];
     for (const d of DIAS) {
-      for (const f of semana.value[d]) {
+      semana.value[d].forEach((f, i) => {
         horarios.push({
           dia_semana: d,
           hora_inicio: f.hora_inicio,
           hora_fin: f.hora_fin,
         });
-      }
+        origen.push([d, i]);
+      });
     }
     await api.put(`${base.value}/horarios-atencion`, {
       instructor_id: proveedorId.value,
@@ -258,6 +268,16 @@ async function guardar(): Promise<void> {
     okGuardado.value = true;
   } catch (e) {
     error.value = mensajeDeError(e);
+    // `horarios.N.campo` → la franja N, junto a ella.
+    const porFranja: Record<string, string> = {};
+    for (const [campo, mensaje] of Object.entries(erroresPorCampo(e))) {
+      const m = /^horarios\.(\d+)\./.exec(campo);
+      const lugar = m ? origen[Number(m[1])] : undefined;
+      if (lugar) {
+        porFranja[`${lugar[0]}-${lugar[1]}`] = mensaje;
+      }
+    }
+    erroresFranja.value = porFranja;
   } finally {
     guardando.value = false;
   }
@@ -744,6 +764,7 @@ onMounted(cargarReferencias);
                       type="time"
                       class="tu-input w-auto"
                       :disabled="!puedeGestionar"
+                      :aria-invalid="errorFranja(d, i) ? 'true' : undefined"
                       @change="okGuardado = false"
                     />
                     <span :style="{ color: 'var(--texto-suave)' }">–</span>
@@ -761,6 +782,7 @@ onMounted(cargarReferencias);
                           : {}
                       "
                       :disabled="!puedeGestionar"
+                      :aria-invalid="errorFranja(d, i) ? 'true' : undefined"
                       @change="okGuardado = false"
                     />
                     <button
@@ -772,6 +794,15 @@ onMounted(cargarReferencias);
                     >
                       <IconoNav nombre="cerrar" :tam="16" />
                     </button>
+                    <p
+                      v-if="errorFranja(d, i)"
+                      class="w-full text-xs"
+                      role="alert"
+                      :style="{ color: 'var(--error)' }"
+                      :data-prueba="`error-franja-${d}-${i}`"
+                    >
+                      {{ errorFranja(d, i) }}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1045,6 +1076,14 @@ onMounted(cargarReferencias);
           >
             <IconoNav nombre="cerrar" :tam="16" />
           </button>
+          <p
+            v-if="errorFranja(diaEditando, i)"
+            class="w-full text-xs"
+            role="alert"
+            :style="{ color: 'var(--error)' }"
+          >
+            {{ errorFranja(diaEditando, i) }}
+          </p>
         </div>
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
           <button

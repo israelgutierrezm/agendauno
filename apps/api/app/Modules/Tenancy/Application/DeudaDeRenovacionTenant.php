@@ -60,7 +60,11 @@ class DeudaDeRenovacionTenant
                 $item['precio_minor'] = $contratado['monto_minor'];
             }
             $orden = $this->ordenes->crear($persona, [$item], renovacion: true);
-            $orden->update(['renueva_acuerdo_id' => $acuerdo->getKey()]);
+            // Y cuándo vence lo que renueva: la orden puede nacer antes, con el aviso.
+            $orden->update([
+                'renueva_acuerdo_id' => $acuerdo->getKey(),
+                'renueva_vence_el' => $acuerdo->proxima_cobro_en?->toDateString(),
+            ]);
 
             return $orden;
         });

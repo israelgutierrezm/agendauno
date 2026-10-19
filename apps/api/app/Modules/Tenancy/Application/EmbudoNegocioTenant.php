@@ -105,12 +105,11 @@ class EmbudoNegocioTenant
                 'compraron' => $compraron,
             ],
             'compra_a_asistencia' => $this->compraAAsistencia($inicio, $fin),
+            // Las renovaciones que tocaban en el periodo (por cuándo vencía lo que
+            // renuevan; las anteriores, por cuándo se creó su orden), y cuántas se pagaron.
             'renovacion' => [
-                'por_renovar' => OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->whereBetween('created_at', [$inicio, $fin])
-                    ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes ?? []))->count(),
-                'renovadas' => OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->whereBetween('created_at', [$inicio, $fin])
-                    ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes ?? []))
-                    ->where('estado', EstadoOrden::Pagada->value)->count(),
+                'por_renovar' => $this->renovaciones($desde, $hasta, $inicio, $fin)->count(),
+                'renovadas' => $this->renovaciones($desde, $hasta, $inicio, $fin)->where('estado', EstadoOrden::Pagada->value)->count(),
             ],
             'tiempo_respuesta' => [
                 'solicitudes' => $solicitudes->count(),
@@ -203,6 +202,21 @@ class EmbudoNegocioTenant
             ->exists())->count();
 
         return ['compradores_nuevos' => $primeras->count(), 'asistieron' => $asistieron];
+    }
+
+    /**
+     * Las órdenes de renovación de lo que vencía entre esos días, de las sedes que ve
+     * quien lo pide.
+     *
+     * @return Builder<OrdenTenant>
+     */
+    private function renovaciones(string $desde, string $hasta, CarbonImmutable $inicio, CarbonImmutable $fin): Builder
+    {
+        return OrdenTenant::query()
+            ->whereNotNull('renueva_acuerdo_id')
+            ->where(fn (Builder $q) => $q->whereBetween('renueva_vence_el', [$desde, $hasta])
+                ->orWhere(fn (Builder $antes) => $antes->whereNull('renueva_vence_el')->whereBetween('created_at', [$inicio, $fin])))
+            ->when($this->sedes !== null, fn (Builder $q) => $q->whereIn('sucursal_id', $this->sedes ?? []));
     }
 
     /**

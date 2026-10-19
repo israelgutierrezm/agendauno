@@ -175,3 +175,39 @@ it('la sesión dice si el negocio trabaja con equipo (para no ofrecerle la nómi
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.estudio.con_equipo', true);
 });
+
+it('pago por asistente: corregir la asistencia después de pagar no cambia el corte ni pide pagar dos veces (ADR 0166)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $coach = instructorConUlidParaCortes($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/staff/{$coach}/esquema-pago", ['tipo' => 'por_asistente', 'monto_minor' => 10000, 'moneda' => 'MXN'], conBearer($e['bearer']))->assertCreated();
+    $sesion = crearSesionTenant($e, $semilla, 10, '2026-10-01 08:00:00');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/staff", ['usuario_id' => $coach, 'rol' => 'instructor'], conBearer($e['bearer']))->assertCreated();
+    $reservar = fn (string $nombre): string => (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", [
+        'persona_id' => venderPackAMiembroTenant($e, 8000, $nombre)['persona'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $ana = $reservar('Ana');
+    $bea = $reservar('Bea');
+    $marcar = fn (string $reserva, string $estado) => $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => $estado], conBearer($e['bearer']))->assertCreated();
+
+    // En la clase solo se registra a Ana; se cierra y se paga: 1 asistente.
+    $this->travelTo('2026-10-01 14:30:00');
+    $marcar($ana, 'presente');
+    $this->travelTo('2026-10-05 12:00:00');
+    $url = "/api/v1/app/{$e['slug']}/nomina/cortes";
+    $corte = (string) $this->postJson($url, ['desde' => '2026-10-01', 'hasta' => '2026-10-04'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.total_minor', 10000)->json('data.id');
+    $this->postJson("{$url}/{$corte}/pagar", ['referencia' => 'SPEI 1'], conBearer($e['bearer']))->assertOk();
+    $diferencia = fn (): array => $this->getJson("{$url}/{$corte}", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.total_minor', 10000)->json('data.diferencias.0') ?? [];
+
+    // Se registra tarde que Bea también vino: falta pagar una vez, no dos.
+    $marcar($bea, 'presente');
+    expect($diferencia())->toMatchArray(['en_corte_minor' => 10000, 'hoy_minor' => 20000, 'diferencia_minor' => 10000]);
+    $this->postJson("{$url}/{$corte}/ajustes", ['usuario_id' => $coach, 'monto_minor' => 10000, 'motivo' => 'Bea registrada tarde'], conBearer($e['bearer']))->assertCreated();
+    expect($diferencia())->toMatchArray(['ajustes_minor' => 10000, 'diferencia_minor' => 0]);
+
+    // Si después se corrige (no vino), solo aparece lo que cambió: se reconoció de más.
+    $marcar($bea, 'ausente');
+    expect($diferencia())->toMatchArray(['reconocido_minor' => 20000, 'hoy_minor' => 10000, 'diferencia_minor' => -10000]);
+});

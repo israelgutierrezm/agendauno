@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\DeudaDeRenovacionTenant;
 use App\Modules\Tenancy\Captacion\OrigenProspecto;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProspectoTenant;
@@ -134,4 +136,22 @@ it('el embudo del negocio cuenta visitas, solicitudes, compras, asistencias y re
         ->and($embudo['solicitud_a_compra'])->toBe(['solicitudes' => 4, 'compraron' => 1])
         ->and($embudo['compra_a_asistencia'])->toBe(['compradores_nuevos' => 1, 'asistieron' => 0])
         ->and($embudo['tiempo_respuesta'])->toMatchArray(['solicitudes' => 4, 'atendidas' => 1]);
+});
+
+it('el embudo cuenta las renovaciones que tocaban en el periodo, aunque su orden naciera antes (ADR 0166)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $persona = crearMiembroTenant($e, 'Ana');
+    $plan = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
+        'nombre' => 'Mensualidad', 'tipo' => 'membresia', 'precio_minor' => 120000, 'moneda' => 'MXN',
+        'ilimitado' => true, 'politica_reset' => 'aniversario',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
+    // El aviso de renovación abre hoy (1 de octubre) la orden de lo que vence el 1 de noviembre.
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-a')->firstOrFail(),
+        fn () => app(DeudaDeRenovacionTenant::class)->de(AcuerdoTenant::query()->firstOrFail()));
+    $renovacion = fn (string $desde, string $hasta): array => $this->getJson("/api/v1/app/{$e['slug']}/reportes/embudo?desde={$desde}&hasta={$hasta}", conBearer($e['bearer']))
+        ->assertOk()->json('data.renovacion');
+
+    expect($renovacion('2026-10-01', '2026-10-15'))->toBe(['por_renovar' => 0, 'renovadas' => 0])
+        ->and($renovacion('2026-11-01', '2026-11-05'))->toBe(['por_renovar' => 1, 'renovadas' => 0]);
 });

@@ -48,6 +48,8 @@ const instructor = ref("");
 // y «mañana, a menos de la mitad» las de ese día (`?fecha=AAAA-MM-DD`).
 const consultaRuta = useRoute()?.query ?? {};
 const soloEspera = ref(consultaRuta.espera === "1");
+// «A menos de la mitad» (`?poca=1`): las mismas que contó el Inicio (ADR 0166).
+const soloPoca = ref(consultaRuta.poca === "1");
 const fecha = ref(
   typeof consultaRuta.fecha === "string" &&
     /^\d{4}-\d{2}-\d{2}$/.test(consultaRuta.fecha)
@@ -87,6 +89,7 @@ const filtradas = computed(() => {
       (!sucursal.value || o.sucursal === sucursal.value) &&
       (!instructor.value || o.instructor === instructor.value) &&
       (!soloEspera.value || o.en_espera > 0) &&
+      (!soloPoca.value || o.ocupados * 2 < o.capacidad) &&
       (!fecha.value || diaDe(o) === fecha.value) &&
       (!q ||
         `${o.oferta ?? ""} ${o.actividad ?? ""} ${o.sucursal ?? ""} ${o.instructor ?? ""}`
@@ -203,7 +206,7 @@ const indicadores = computed<Indicador[]>(() => {
 });
 
 watch(dias, cargar);
-watch([busqueda, sucursal, instructor, soloEspera, fecha], () => {
+watch([busqueda, sucursal, instructor, soloEspera, soloPoca, fecha], () => {
   pagina.value = 1;
 });
 // «Ninguna coincide con los filtros» no es «no hay clases con lugares libres».
@@ -213,6 +216,7 @@ const filtrado = computed(
     sucursal.value !== "" ||
     instructor.value !== "" ||
     soloEspera.value ||
+    soloPoca.value ||
     fecha.value !== "",
 );
 function quitarFiltros(): void {
@@ -220,6 +224,7 @@ function quitarFiltros(): void {
   sucursal.value = "";
   instructor.value = "";
   soloEspera.value = false;
+  soloPoca.value = false;
   fecha.value = "";
 }
 onMounted(cargar);
@@ -284,6 +289,13 @@ onMounted(cargar);
             ><input v-model="soloEspera" type="checkbox" />{{
               $t("oportunidadesVisual.filtros.soloEspera")
             }}</label
+          >
+          <label class="flex items-center gap-2 text-sm"
+            ><input
+              v-model="soloPoca"
+              type="checkbox"
+              data-prueba="solo-poca"
+            />{{ $t("oportunidadesVisual.filtros.soloPoca") }}</label
           >
           <!-- Llegó del Inicio con un día: se ve y se puede quitar. -->
           <button

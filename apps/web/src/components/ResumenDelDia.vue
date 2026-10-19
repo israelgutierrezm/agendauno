@@ -63,6 +63,16 @@ interface Libre {
   huecos: number;
   siguiente: string | null;
 }
+interface BloqueoHoy {
+  id: string;
+  motivo: string | null;
+  de: string | null;
+  tipo: "profesional" | "sala" | "sucursal";
+  desde: string;
+  hasta: string;
+  todo_el_dia: boolean;
+  zona_horaria: string;
+}
 interface Hoy {
   fecha: string;
   agenda: {
@@ -72,6 +82,8 @@ interface Hoy {
       llegaron: number;
       sin_marcar: number;
       capacidad?: number;
+      // Lugares ocupados con la regla de cupo (como Recepción y Lugares libres).
+      ocupados?: number;
       listas_pendientes?: number;
       en_espera?: number;
       por_atender?: number;
@@ -79,6 +91,8 @@ interface Hoy {
       por_cobrar?: number;
     };
     sesiones: SesionHoy[];
+    // Lo que está cerrado o fuera hoy (ADR 0166).
+    bloqueos?: BloqueoHoy[];
   } | null;
   libres?: Libre[] | null;
   cobros: {
@@ -457,40 +471,40 @@ const indicadores = computed<Indicador[]>(() => {
   const listas = tot.listas_pendientes ?? 0;
   const lista: Omit<Indicador, "etiqueta">[] = [
     {
-      // Las clases de hoy: la jornada en Recepción (no la semana de la agenda).
+      // Las clases de hoy (sin las canceladas): la jornada en Recepción.
       clave: "clases",
       valor: String(tot.sesiones),
       icono: "agenda",
-      to: destino("recepcion", {
-        name: "recepcion",
-        query: { fecha: hoy.value?.fecha ?? "" },
-      }),
+      to: aRecepcion("activas"),
     },
     {
+      // Los lugares ocupados con la regla de cupo, como los cuenta Recepción.
       clave: "ocupados",
       valor:
         capacidad > 0
-          ? t("operacion.hoy.cupo", { n: tot.esperados, total: capacidad })
-          : String(tot.esperados),
+          ? t("operacion.hoy.cupo", {
+              n: tot.ocupados ?? tot.esperados,
+              total: capacidad,
+            })
+          : String(tot.ocupados ?? tot.esperados),
       icono: "personas",
-      to: destino("recepcion", { name: "recepcion" }),
+      to: aRecepcion("activas"),
     },
     {
+      // Las clases que ya empezaron y tienen a alguien sin registrar.
       clave: "listas",
       valor: String(listas),
       icono: "lista",
       aviso: listas > 0,
-      to: destino("recepcion", { name: "recepcion" }),
+      to: aRecepcion("listas"),
     },
     {
       // Abre las clases con gente en espera (Lugares libres), no la agenda entera.
       clave: "enEspera",
       valor: String(tot.en_espera ?? 0),
       icono: "reloj",
-      to: destino("oportunidades", {
-        name: "oportunidades",
-        query: { espera: "1" },
-      }),
+      // Las clases de hoy con gente esperando un lugar (llenas o no).
+      to: aRecepcion("enEspera"),
     },
   ];
   const r = hoy.value?.renovaciones;
@@ -510,9 +524,10 @@ const indicadores = computed<Indicador[]>(() => {
       valor: String(m.poca_ocupacion),
       icono: "personas",
       aviso: m.poca_ocupacion > 0,
+      // Las de ese día a menos de la mitad de su cupo, como se contaron.
       to: destino("oportunidades", {
         name: "oportunidades",
-        query: { fecha: m.fecha },
+        query: { fecha: m.fecha, poca: "1" },
       }),
     });
   }
@@ -521,6 +536,17 @@ const indicadores = computed<Indicador[]>(() => {
     etiqueta: t(`operacion.hoy.clases.kpi.${i.clave}`),
   }));
 });
+
+// Lo que está cerrado o fuera hoy: de quién y cuándo, en una línea cada uno.
+const bloqueos = computed(() => hoy.value?.agenda?.bloqueos ?? []);
+function textoBloqueo(b: BloqueoHoy): string {
+  const cuando = b.todo_el_dia
+    ? t("operacion.hoy.bloqueos.todoElDia")
+    : `${horaIso(b.desde, b.zona_horaria)}–${horaIso(b.hasta, b.zona_horaria)}`;
+  return [b.de ?? t(`operacion.hoy.bloqueos.${b.tipo}`), cuando, b.motivo]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 // Espacios libres de hoy (citas): quién tiene huecos y desde qué hora.
 function horaIso(iso: string, zona: string | null): string {
@@ -695,6 +721,18 @@ onMounted(() => {
               class="inline align-[-0.15em]"
             />
           </RouterLink>
+        </div>
+        <!-- Lo que está cerrado o fuera hoy, aparte de lo agendado. -->
+        <div
+          v-if="bloqueos.length > 0"
+          class="mt-3 rounded-lg border px-3 py-2 text-sm"
+          :style="{ borderColor: 'var(--borde)' }"
+          data-prueba="bloqueos-hoy"
+        >
+          <p class="font-medium">{{ $t("operacion.hoy.bloqueos.titulo") }}</p>
+          <ul class="mt-1 space-y-0.5" :style="{ color: 'var(--texto-suave)' }">
+            <li v-for="b in bloqueos" :key="b.id">{{ textoBloqueo(b) }}</li>
+          </ul>
         </div>
         <div v-if="hoy.agenda.sesiones.length > 0" class="hoy-filtros">
           <label class="tu-campo-icono hoy-buscar">

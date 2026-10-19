@@ -17,6 +17,15 @@ dueño.
 - Las tarjetas de citas y clases llevan a la jornada en recepción, no a la agenda sin
   fecha. En recepción de citas, el filtro «Activas» (antes «Todas») no muestra las
   canceladas; tienen su propio filtro.
+- Cada tarjeta de clases abre exactamente lo que cuenta:
+  - «Clases» y «Ocupados» abren recepción con las clases activas;
+  - «Listas por pasar» y «En espera» abren recepción con ese filtro;
+  - «Mañana con poca gente» abre Oportunidades en esa fecha, solo las que van a menos
+    de la mitad.
+- «Ocupados» usa la regla del cupo (`CupoDeSesionTenant`): reservas que ocupan lugar
+  más los lugares de Wellhub y TotalPass, igual que la agenda.
+- El inicio muestra los bloqueos del día (profesional, sala o sucursal) de las sedes
+  de quien lo ve.
 
 ## Alta inicial
 
@@ -70,6 +79,10 @@ dueño.
   cobro o se devuelve completo, sus artículos vuelven a la sede de la orden.
 - Si otra venta se llevó las últimas piezas, el mostrador vuelve a leer las
   existencias.
+- `agendauno:verificar-concurrencia` (MySQL, en CI) prueba con procesos reales:
+  - varias ventas a la vez por la última pieza: una pasa y el stock queda en cero;
+  - dos ventas con los mismos artículos en distinto orden: las dos pasan, sin
+    deadlock.
 - Corregir la forma de pago pide motivo, porque cambia cómo cuadra el corte.
 - `GET /pagos` dice aparte `por_conciliar` (una incidencia abierta) y `comprobante`
   (`enviado`, `fallido` o `pendiente`).
@@ -79,6 +92,10 @@ dueño.
 La tarifa nueva de una persona no puede valer dentro de un periodo que ya se cerró en
 un corte (422 en `vigente_desde`). Si no, el corte mostraría como diferencia por pagar
 un periodo ya pagado.
+
+Una prueba cubre el pago por asistente: un asistente marcado después de pagar el corte
+es diferencia, el ajuste la salda y desmarcarlo la vuelve negativa sin cambiar el
+total del corte.
 
 ## Fichas de datos
 
@@ -107,6 +124,14 @@ un periodo ya pagado.
 - El periodo dice la zona horaria.
 - El embudo se acota a las sedes de quien lo pide.
 - En cohortes, el mes de actividad es el de la clase, no el del registro de asistencia.
+- El embudo cuenta las renovaciones que vencían en el periodo, no las órdenes creadas
+  en él. La orden de renovación nace días antes, con el aviso, y guarda
+  `ordenes.renueva_vence_el`. Las anteriores (null) usan su fecha de creación.
+- Rentabilidad usa lo que se cobró, no el precio de hoy:
+  - una clase pagada aparte: su total;
+  - con paquete: el precio y los créditos con que se vendió (la línea de su orden);
+  - sin orden: los del plan;
+  - si no hay nada de eso: el precio por clase.
 
 ## Configuración
 
@@ -114,6 +139,14 @@ un periodo ya pagado.
   su campo.
 - Archivar un plan y archivar una ficha se confirman como acción destructiva.
 - Los diálogos y paneles usan `92dvh`: en el teléfono, el teclado no tapa su pie.
+- Horarios, giro, terminología y región muestran cada error junto a su campo. Región
+  protege los cambios sin guardar.
+
+## App
+
+`GET /yo` y el login dicen `estudio.zona_desfase_min`, el desfase de hoy de la zona
+del negocio con UTC. La agenda de la app abre en el día de hoy del negocio aunque el
+teléfono esté en otra zona, antes de cargar las sesiones, sin un paquete de zonas.
 
 ## Suscripción del negocio
 

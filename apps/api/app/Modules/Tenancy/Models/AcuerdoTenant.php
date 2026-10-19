@@ -38,6 +38,16 @@ class AcuerdoTenant extends Model
         'cobra_anualidad',
     ];
 
+    /**
+     * La línea de la orden con que se vendió (precio pagado y plan vendido; ADR 0166).
+     *
+     * @return BelongsTo<LineaOrdenTenant, $this>
+     */
+    public function lineaOrden(): BelongsTo
+    {
+        return $this->belongsTo(LineaOrdenTenant::class, 'linea_orden_id');
+    }
+
     /** Saldo de apertura: cargado al migrar, no vendido aquí (C07). */
     public const ORIGEN_APERTURA = 'apertura';
 
