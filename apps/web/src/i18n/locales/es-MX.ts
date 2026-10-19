@@ -164,6 +164,7 @@ export default {
       conciliacion: "Conciliación",
       caja: "Caja",
       disponibilidad: "Disponibilidad",
+      rendimiento: "Rendimiento",
       membresias: "Membresías y paquetes",
       paquetesCitas: "Bonos",
       presupuestos: "Presupuestos",
@@ -2739,6 +2740,12 @@ export default {
       titulo: "Agenda del equipo",
       subtitulo:
         "Qué tan llena estuvo la agenda de cada instructor, cuánto dejó lo que atendió y cuánto se le paga.",
+      // Desde Equipo › Rendimiento.
+      rendimiento: "Rendimiento del equipo",
+      // Quien trabaja solo: su propia agenda.
+      tituloSolo: "Tu agenda",
+      subtituloSolo:
+        "Qué tan llena estuvo tu agenda, cuántas faltas hubo y cuánto dejó lo que atendiste.",
       vacio: "No hay instructores ni clases en el periodo.",
       colProfesional: "Instructor",
       colOcupacion: "Ocupación",

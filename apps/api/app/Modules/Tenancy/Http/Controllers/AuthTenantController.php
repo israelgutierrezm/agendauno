@@ -19,9 +19,13 @@ use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
 use App\Modules\Tenancy\Http\Requests\LoginTenantRequest;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
+use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
+use App\Modules\Tenancy\ProveedorPartner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -271,6 +275,19 @@ class AuthTenantController
         return $estudio;
     }
 
+    /** ¿Tiene conectado Wellhub o TotalPass, o ya recibió visitantes de alguno? */
+    private function conPlataformas(): bool
+    {
+        $integraciones = app(RegistroDeIntegracionesTenant::class);
+        foreach (ProveedorPartner::valores() as $proveedor) {
+            if ($integraciones->activa($proveedor)) {
+                return true;
+            }
+        }
+
+        return VisitantePlataformaTenant::query()->exists();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -315,6 +332,9 @@ class AuthTenantController
             'factura_posible' => app(RegionNegocioTenant::class)->factura(),
             // Wellhub y TotalPass solo operan en México.
             'bienestar_posible' => app(RegionNegocioTenant::class)->enMexico(),
+            // ¿Recibe visitantes de Wellhub o TotalPass (conectado, o con visitas ya
+            // registradas)? Solo entonces se ofrece su reporte (ADR 0148).
+            'plataformas_bienestar' => $estudio->modalidad() === ModalidadServicio::Clases && $this->conPlataformas(),
             // ¿La plataforma ya factura? En producción, solo con la llave de FacturAPI.
             'facturacion_disponible' => ConfiguracionPlataforma::facturacionDisponible(),
             // Su plan (ADR 0107): con el nivel de un negocio de citas, las funciones que no

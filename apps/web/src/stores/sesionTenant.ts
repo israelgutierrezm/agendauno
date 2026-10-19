@@ -128,6 +128,8 @@ export interface EstudioSesion {
   factura_posible?: boolean;
   // Wellhub y TotalPass solo operan con negocios en México.
   bienestar_posible?: boolean;
+  // ¿Recibe visitantes de Wellhub o TotalPass? Solo entonces se ofrece su reporte.
+  plataformas_bienestar?: boolean;
   // ¿La plataforma ya factura? En producción, solo con su proveedor configurado.
   facturacion_disponible?: boolean;
   // Su plan (ADR 0107): el nivel de un negocio de citas (null: todas las funciones)

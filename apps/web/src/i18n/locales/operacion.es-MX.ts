@@ -431,6 +431,7 @@ export default {
       clientes: "Clientes",
       embudo: "Embudo",
       equipo: "Equipo y sucursales",
+      equipoSolo: "Tu agenda y sucursales",
     },
     // El embudo del negocio (plan de mejoras C08): cantidad y denominador.
     embudo: {

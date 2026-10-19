@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EmbudoNegocio, { type Embudo } from "@/components/EmbudoNegocio.vue";
@@ -181,6 +182,11 @@ interface Cohortes {
 }
 
 const sesion = useSesionTenantStore();
+const route = useRoute();
+// Desde Equipo › Rendimiento (`?vista=equipo`): solo el reporte del equipo.
+const soloRendimiento = computed(() => route?.query.vista === "equipo");
+// Quien trabaja solo: el reporte del equipo es su propia agenda (sin pago ni margen).
+const trabajaSolo = computed(() => sesion.conEquipo === false);
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 // El mes en curso y «hoy» del negocio (su zona horaria), no del navegador.
@@ -492,7 +498,10 @@ const CARGAS: Record<Pestana, () => Promise<unknown>[]> = {
   ocupacion: () => [cargarDemanda()],
   clientes: () => [cargarCohortes()],
   embudo: () => [cargarEmbudo()],
-  equipo: () => [cargarEquipo(), cargarSucursales()],
+  equipo: () =>
+    soloRendimiento.value
+      ? [cargarEquipo()]
+      : [cargarEquipo(), cargarSucursales()],
 };
 const cargadas = new Set<Pestana>();
 async function cargar(): Promise<void> {
@@ -547,7 +556,7 @@ const pestanas = computed<Pestana[]>(() =>
     ? PESTANAS.filter((p) => p === "resumen" || p === "equipo")
     : PESTANAS,
 );
-const pestana = ref<Pestana>("resumen");
+const pestana = ref<Pestana>(soloRendimiento.value ? "equipo" : "resumen");
 const usaPeriodo = computed(
   () =>
     pestana.value === "resumen" ||
@@ -595,15 +604,28 @@ watch(agrupacion, async () => {
   }
 });
 watch(pestana, () => void cargar());
+// Entre Reportes y Rendimiento la pantalla es la misma: cambia lo que se pide.
+watch(soloRendimiento, (rendimiento) => {
+  pestana.value = rendimiento ? "equipo" : "resumen";
+  cargadas.delete("equipo");
+  void cargar();
+});
 
 onMounted(cargar);
 </script>
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('reportes.titulo')" icono="reportes" />
+    <EncabezadoSeccion
+      :titulo="
+        soloRendimiento
+          ? $t('reportes.equipo.rendimiento')
+          : $t('reportes.titulo')
+      "
+      icono="reportes"
+    />
 
-    <div class="tu-pestanas mt-6" role="group">
+    <div v-if="!soloRendimiento" class="tu-pestanas mt-6" role="group">
       <button
         v-for="p in pestanas"
         :key="p"
@@ -617,7 +639,9 @@ onMounted(cargar);
                 sesion.terminologia?.miembro ??
                   (sesion.esCitas ? "Cliente" : "Alumno"),
               )
-            : $t(`operacion.reportes.pestanas.${p}`)
+            : p === "equipo" && trabajaSolo
+              ? $t("operacion.reportes.pestanas.equipoSolo")
+              : $t(`operacion.reportes.pestanas.${p}`)
         }}
       </button>
     </div>
@@ -1145,11 +1169,19 @@ onMounted(cargar);
       <!-- Por sucursal -->
       <!-- Agenda del equipo (ADR 0081) -->
       <template v-if="pestana === 'equipo'">
-        <h2 class="mt-4 font-medium text-lg">
-          {{ $t("reportes.equipo.titulo") }}
+        <h2 v-if="!soloRendimiento" class="mt-4 font-medium text-lg">
+          {{
+            trabajaSolo
+              ? $t("reportes.equipo.tituloSolo")
+              : $t("reportes.equipo.titulo")
+          }}
         </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("reportes.equipo.subtitulo") }}
+          {{
+            trabajaSolo
+              ? $t("reportes.equipo.subtituloSolo")
+              : $t("reportes.equipo.subtitulo")
+          }}
         </p>
         <!-- Si la pestaña falló, el aviso de arriba lo dice: no es «sin datos». -->
         <template v-if="!equipo || equipo.profesionales.length === 0">
@@ -1182,12 +1214,14 @@ onMounted(cargar);
                   <th class="text-right">
                     {{ $t("reportes.equipo.colValor") }}
                   </th>
-                  <th class="text-right hidden sm:table-cell">
-                    {{ $t("reportes.equipo.colPago") }}
-                  </th>
-                  <th class="text-right">
-                    {{ $t("reportes.equipo.colMargen") }}
-                  </th>
+                  <template v-if="!trabajaSolo">
+                    <th class="text-right hidden sm:table-cell">
+                      {{ $t("reportes.equipo.colPago") }}
+                    </th>
+                    <th class="text-right">
+                      {{ $t("reportes.equipo.colMargen") }}
+                    </th>
+                  </template>
                 </tr>
               </thead>
               <tbody>
@@ -1242,21 +1276,23 @@ onMounted(cargar);
                   <td class="text-right">
                     {{ dinero(p.ingreso_minor, equipo.moneda) }}
                   </td>
-                  <td class="text-right hidden sm:table-cell">
-                    {{ dinero(p.costo_minor, equipo.moneda) }}
-                  </td>
-                  <td
-                    class="text-right font-semibold"
-                    :style="{
-                      color:
-                        p.margen_minor >= 0 ? 'var(--exito)' : 'var(--error)',
-                    }"
-                  >
-                    {{ dinero(p.margen_minor, equipo.moneda) }}
-                  </td>
+                  <template v-if="!trabajaSolo">
+                    <td class="text-right hidden sm:table-cell">
+                      {{ dinero(p.costo_minor, equipo.moneda) }}
+                    </td>
+                    <td
+                      class="text-right font-semibold"
+                      :style="{
+                        color:
+                          p.margen_minor >= 0 ? 'var(--exito)' : 'var(--error)',
+                      }"
+                    >
+                      {{ dinero(p.margen_minor, equipo.moneda) }}
+                    </td>
+                  </template>
                 </tr>
               </tbody>
-              <tfoot>
+              <tfoot v-if="!trabajaSolo">
                 <tr>
                   <td>{{ $t("reportes.equipo.total") }}</td>
                   <td v-if="sesion.esCitas">
@@ -1299,7 +1335,7 @@ onMounted(cargar);
         </template>
       </template>
 
-      <template v-if="pestana === 'equipo'">
+      <template v-if="pestana === 'equipo' && !soloRendimiento">
         <h2 class="mt-8 font-medium text-lg">
           {{ $t("reportes.porSucursal") }}
         </h2>

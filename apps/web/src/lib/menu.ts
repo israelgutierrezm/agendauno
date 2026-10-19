@@ -14,8 +14,26 @@ import type {
  * - Cada área muestra sus vistas en pestañas arriba de la pantalla.
  * - Configuración del negocio tiene un tercer nivel: categorías con sus opciones,
  *   en una navegación secundaria (`CATEGORIAS_CONFIGURACION`).
+ * - El menú se adapta al negocio (perfiles del menú): quien trabaja solo ve agenda,
+ *   clientes, cobros y su disponibilidad; con equipo aparecen sus personas, su
+ *   rendimiento y la nómina; lo avanzado aparece según lo que el negocio tiene
+ *   (plan, región, conexiones) y los permisos del rol, no por ser dueño.
  */
 type Sesion = ReturnType<typeof useSesionTenantStore>;
+
+/**
+ * Lo que el negocio debe tener para que una vista tenga sentido (además del permiso
+ * y del plan de su ruta):
+ * - `equipo`: trabaja con alguien más (quien trabaja solo no la necesita);
+ * - `plataformas`: recibe visitantes de Wellhub o TotalPass;
+ * - `factura`: puede facturar en su país.
+ */
+export type ContextoVista = "equipo" | "plataformas" | "factura";
+const CONTEXTOS: Record<ContextoVista, (sesion: Sesion) => boolean> = {
+  equipo: (sesion) => sesion.conEquipo !== false,
+  plataformas: (sesion) => sesion.estudio?.plataformas_bienestar === true,
+  factura: (sesion) => sesion.estudio?.factura_posible !== false,
+};
 
 export interface Vista {
   clave: string;
@@ -30,8 +48,8 @@ export interface Vista {
   modalidad?: ModalidadServicio;
   // Permisos que pide esta vista además de los de su ruta (todos).
   permiso?: string | string[];
-  // Solo con equipo (más de una persona): quien trabaja solo no la necesita.
-  equipo?: true;
+  // Lo que el negocio debe tener para ofrecerla (ver `ContextoVista`).
+  contexto?: ContextoVista;
 }
 
 export interface Area {
@@ -347,6 +365,9 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
         vistas: [
           v("calendario", "agenda", "nav.vistas.calendario"),
           v("recepcion", "recepcion", "nav.recepcion"),
+          // Los horarios de atención (citas): de quien trabaja solo o de cada
+          // profesional del equipo.
+          v("disponibilidad", "horarios", "nav.vistas.disponibilidad"),
           v("grupos", "grupos", "nav.cursos"),
           v("oportunidades", "oportunidades", "nav.vistas.lugares"),
         ],
@@ -396,7 +417,7 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
           v("caja", "cobranza", "nav.vistas.caja", {
             query: { vista: "caja" },
           }),
-          v("facturas", "facturas", "nav.facturas"),
+          v("facturas", "facturas", "nav.facturas", { contexto: "factura" }),
         ],
       },
       {
@@ -406,9 +427,14 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
         vistas: [
           v("personas", "instructores", "nav.instructores", {
             termino: "instructor",
+            contexto: "equipo",
           }),
-          v("disponibilidad", "horarios", "nav.vistas.disponibilidad"),
-          v("nomina", "nomina", "nav.nomina", { equipo: true }),
+          // Cómo le fue a cada quien en el periodo (del reporte del equipo).
+          v("rendimiento", "reportes", "nav.vistas.rendimiento", {
+            query: { vista: "equipo" },
+            contexto: "equipo",
+          }),
+          v("nomina", "nomina", "nav.nomina", { contexto: "equipo" }),
         ],
       },
     ],
@@ -461,9 +487,7 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
             "plataformas",
             "reportes-plataformas",
             "operacion.plataformas.tab",
-            {
-              modalidad: "clases",
-            },
+            { modalidad: "clases", contexto: "plataformas" },
           ),
         ],
       },
@@ -577,7 +601,7 @@ export function vistasVisibles(area: Area, sesion: Sesion): Vista[] {
   return area.vistas.filter(
     (x) =>
       (x.modalidad === undefined || x.modalidad === sesion.modalidad) &&
-      (x.equipo === undefined || sesion.conEquipo !== false) &&
+      (x.contexto === undefined || CONTEXTOS[x.contexto](sesion)) &&
       (x.permiso === undefined ||
         (Array.isArray(x.permiso) ? x.permiso : [x.permiso]).every((p) =>
           sesion.puede(p),

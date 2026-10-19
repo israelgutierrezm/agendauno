@@ -15,10 +15,17 @@ const sesion = vi.hoisted(() => ({
   slug: "demo",
   modalidad: "citas",
   esCitas: true,
+  conEquipo: true,
   puede: () => true,
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
+}));
+// Desde Equipo › Rendimiento llega con `?vista=equipo`.
+const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
+vi.mock("vue-router", async (original) => ({
+  ...(await original<typeof import("vue-router")>()),
+  useRoute: () => ruta,
 }));
 
 const cifras = {
@@ -159,6 +166,8 @@ async function irA(
 beforeEach(() => {
   vi.clearAllMocks();
   sesion.modalidad = "citas";
+  sesion.conEquipo = true;
+  ruta.query = {};
 });
 
 describe("agenda del equipo y ocupación por agenda", () => {
@@ -181,6 +190,40 @@ describe("agenda del equipo y ocupación por agenda", () => {
     expect(carlos).toContain("$1,800.00");
     // Quien no tiene horario de atención no tiene ocupación.
     expect(filas[1].text()).toContain("Sin horario");
+  });
+
+  it("desde Equipo › Rendimiento solo muestra el reporte del equipo: sin pestañas ni sucursales", async () => {
+    ruta.query = { vista: "equipo" };
+    const w = montar();
+    await flushPromises();
+
+    expect(w.find(".tu-pestanas").exists()).toBe(false);
+    expect(w.findAll('[data-prueba="profesional"]')).toHaveLength(2);
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/reportes/equipo",
+      expect.anything(),
+    );
+    expect(api.get).not.toHaveBeenCalledWith(
+      "/api/v1/app/demo/reportes/sucursales",
+    );
+    expect(api.get).not.toHaveBeenCalledWith(
+      "/api/v1/app/demo/reportes/negocio",
+      expect.anything(),
+    );
+  });
+
+  it("quien trabaja solo ve su propia agenda, sin pago ni margen", async () => {
+    sesion.conEquipo = false;
+    const w = montar();
+    await flushPromises();
+    await irA(w, "Tu agenda y sucursales");
+
+    expect(w.text()).toContain("Tu agenda");
+    const carlos = w.findAll('[data-prueba="profesional"]')[0].text();
+    expect(carlos).toContain("$3,000.00");
+    expect(carlos).not.toContain("$1,200.00");
+    expect(carlos).not.toContain("$1,800.00");
+    expect(w.text()).not.toContain("Margen");
   });
 
   it("en citas, el resumen y el mapa miden la agenda y no el cupo", async () => {

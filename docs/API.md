@@ -90,6 +90,11 @@ Cada negocio es solo de clases o solo de citas, y la modalidad está guardada
   (`{"clases": true, "citas": false}`); `perfil_config.modalidad` se conserva. `GET /yo`
   suma, en su nivel superior, `app: {version_minima}` (`APP_VERSION_MINIMA_APP`, por
   omisión `"0.0.0"`): una app más vieja pide actualizarse.
+- **Perfiles del menú (ADR 0162).** El mismo `estudio` trae `con_equipo` (hay más de
+  una persona del equipo) y `plataformas_bienestar` (en clases: tiene Wellhub o
+  TotalPass conectado o ya recibió visitantes). La web y la app ofrecen lo de un
+  equipo y el reporte de plataformas solo con ellos; el servidor no niega nada por
+  esto.
 - **Registro.** `POST /registro` toma la modalidad del giro (`perfil_negocio`; sin giro,
   `general` → clases) y la devuelve en `data.estudio.modalidad`. Quien no encuentra su
   giro elige el «otro» de su modalidad: `general` («Otro negocio con clases») o

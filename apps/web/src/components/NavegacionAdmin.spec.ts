@@ -62,11 +62,13 @@ async function montar(
 function entrar(
   permisos: string[],
   modalidad: "clases" | "citas" = "clases",
+  extra: Record<string, unknown> = {},
 ): void {
   const sesion = useSesionTenantStore();
   sesion.usuario = { rol: "admin", permisos } as never;
   sesion.estudio = {
     perfil_config: { modalidad, flags: { grupos: false } },
+    ...extra,
   } as never;
 }
 
@@ -178,8 +180,14 @@ describe("pestañas del área", () => {
     entrar(["facturacion.ver"], "citas");
     const otra = await montar(PestanasArea, { name: "reportes" });
     expect(otra.w.find('[data-prueba="pestanas-area"]').exists()).toBe(false);
-    // En uno de clases suma Plataformas: Wellhub y TotalPass (ADR 0148).
+    // En uno de clases que recibe visitantes de Wellhub o TotalPass suma Plataformas
+    // (ADR 0148); sin ellos, no (ADR 0162).
     entrar(["facturacion.ver"]);
+    const sinPlataformas = await montar(PestanasArea, { name: "reportes" });
+    expect(
+      sinPlataformas.w.find('[data-prueba="pestanas-area"]').exists(),
+    ).toBe(false);
+    entrar(["facturacion.ver"], "clases", { plataformas_bienestar: true });
     const clases = await montar(PestanasArea, { name: "reportes" });
     expect(clases.w.findAll('[data-prueba="pestanas-area"] a')).toHaveLength(2);
   });

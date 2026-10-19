@@ -10,6 +10,7 @@ import {
   menuVisible,
   rutasDelMenu,
   ubicacion,
+  vistasDeArea,
   vistasVisibles,
 } from "./menu";
 
@@ -24,6 +25,8 @@ function sesion(
     suspendido?: boolean;
     grupos?: boolean;
     conEquipo?: boolean;
+    plataformas?: boolean;
+    facturaPosible?: boolean;
   } = {},
 ): Sesion {
   return {
@@ -32,7 +35,11 @@ function sesion(
     puede: (p: string) => permisos.includes("*") || permisos.includes(p),
     usuario: { rol: extra.rol ?? "admin" },
     modalidad: extra.modalidad ?? "clases",
-    estudio: { perfil_config: { flags: { grupos: extra.grupos ?? false } } },
+    estudio: {
+      perfil_config: { flags: { grupos: extra.grupos ?? false } },
+      plataformas_bienestar: extra.plataformas ?? false,
+      factura_posible: extra.facturaPosible ?? true,
+    },
     terminologia: { sesion: "Clase", miembro: "Alumno", instructor: "Coach" },
   } as unknown as Sesion;
 }
@@ -193,10 +200,11 @@ describe("menú del negocio", () => {
     const clases = sesion(["*"], { modalidad: "clases" });
     const citas = sesion(["*"], { modalidad: "citas" });
 
+    // La disponibilidad (horarios de atención) vive en Agenda.
     expect(
-      vistasVisibles(area("equipo"), clases).map((x) => x.ruta),
+      vistasVisibles(area("agenda"), clases).map((x) => x.ruta),
     ).not.toContain("horarios");
-    expect(vistasVisibles(area("equipo"), citas).map((x) => x.ruta)).toContain(
+    expect(vistasVisibles(area("agenda"), citas).map((x) => x.ruta)).toContain(
       "horarios",
     );
     expect(
@@ -349,5 +357,53 @@ describe("ubicación de la pantalla actual", () => {
 
     expect(rutas(sesion(["*"], { conEquipo: false }))).not.toContain("nomina");
     expect(rutas(sesion(["*"], { conEquipo: true }))).toContain("nomina");
+  });
+
+  it("perfiles: quien trabaja solo ve agenda, clientes, cobros y su disponibilidad; con equipo, además personas, rendimiento y nómina", () => {
+    const solo = sesion(["*"], { modalidad: "citas", conEquipo: false });
+    const conEquipo = sesion(["*"], { modalidad: "citas", conEquipo: true });
+    const vistas = (s: Sesion, area: string) =>
+      vistasDeArea(
+        MENU_NEGOCIO.flatMap((g) => g.areas).find((a) => a.clave === area)!,
+        s,
+      ).map((x) => x.clave);
+
+    expect(areas(solo)).not.toContain("equipo");
+    expect(areas(solo)).toEqual(
+      expect.arrayContaining(["agenda", "clientes", "cobros"]),
+    );
+    expect(vistas(solo, "agenda")).toContain("disponibilidad");
+
+    expect(areas(conEquipo)).toContain("equipo");
+    expect(vistas(conEquipo, "equipo")).toEqual([
+      "personas",
+      "rendimiento",
+      "nomina",
+    ]);
+    expect(vistas(conEquipo, "agenda")).toContain("disponibilidad");
+    // Rendimiento abre el reporte del equipo y se marca en Equipo, no en Reportes.
+    expect(
+      ubicacion({ name: "reportes", query: { vista: "equipo" } })?.vista.clave,
+    ).toBe("rendimiento");
+    expect(ubicacion({ name: "reportes" })?.area.clave).toBe("reportes");
+  });
+
+  it("lo avanzado aparece según lo que el negocio tiene, no por ser dueño", () => {
+    const vistas = (s: Sesion, area: string) =>
+      vistasDeArea(
+        MENU_NEGOCIO.flatMap((g) => g.areas).find((a) => a.clave === area)!,
+        s,
+      ).map((x) => x.clave);
+
+    // Wellhub y TotalPass: solo si los recibe.
+    expect(vistas(sesion(["*"]), "reportes")).not.toContain("plataformas");
+    expect(vistas(sesion(["*"], { plataformas: true }), "reportes")).toContain(
+      "plataformas",
+    );
+    // Facturas: solo donde se puede facturar.
+    expect(
+      vistas(sesion(["*"], { facturaPosible: false }), "cobros"),
+    ).not.toContain("facturas");
+    expect(vistas(sesion(["*"]), "cobros")).toContain("facturas");
   });
 });
