@@ -79,6 +79,8 @@ const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
   "sucursales-estudio",
   "enlaces-estudio",
   "enlaces-subdominio",
+  // La vista previa del sitio se ve como la página publicada (con su leyenda).
+  "sitio-vista-previa",
 ]);
 // Un formulario de captación o un widget dentro del sitio del negocio: solo eso.
 const esEmbebido = computed(

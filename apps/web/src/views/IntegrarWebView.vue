@@ -31,6 +31,9 @@ interface Opcion {
   nombre: string;
 }
 
+// Dentro de Sitio web › Compartir (ADR 0167): sin encabezado de página.
+defineProps<{ enPestana?: boolean }>();
+
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
@@ -254,8 +257,29 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
 </script>
 
 <template>
-  <section class="tu-pagina">
+  <section :class="enPestana ? 'tu-card p-5' : 'tu-pagina'">
+    <div
+      v-if="enPestana"
+      class="flex flex-wrap items-start justify-between gap-3"
+    >
+      <div class="min-w-0">
+        <h2 class="font-semibold">{{ $t("captacion.widgets.titulo") }}</h2>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("captacion.widgets.descripcion") }}
+        </p>
+      </div>
+      <button
+        v-if="puedeGestionar"
+        type="button"
+        class="tu-btn tu-btn-primario tu-btn-crear"
+        data-prueba="nuevo-widget"
+        @click="nuevo"
+      >
+        {{ $t("captacion.widgets.nuevo") }}
+      </button>
+    </div>
     <EncabezadoSeccion
+      v-else
       :titulo="$t('captacion.widgets.titulo')"
       :subtitulo="$t('captacion.widgets.descripcion')"
     >
@@ -285,7 +309,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
       <template #acciones>
         <RouterLink
           class="tu-btn tu-btn-contorno tu-tono-aviso tu-btn-chico"
-          :to="{ name: 'configuracion' }"
+          :to="{ name: 'sitio-web', query: { pestana: 'dominio' } }"
           >{{ $t("operacion.widgets.irConfiguracion") }}</RouterLink
         >
       </template>

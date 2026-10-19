@@ -61,6 +61,8 @@ export const POLITICAS: Record<string, Politica> = {
   prospectos: { permiso: "prospectos.ver" },
   "captacion-formularios": { permiso: "prospectos.ver" },
   "captacion-integrar": { permiso: "prospectos.ver" },
+  // Campañas (ADR 0144/0167): el reporte por campaña, con su plan.
+  campanas: { permiso: "facturacion.ver", funcion: "reportes_avanzados" },
   retencion: { permiso: "miembros.gestionar" },
   documentos: { permiso: "documentos.subir" },
   formularios: { permiso: "formularios.gestionar", funcion: "formularios" },
@@ -92,7 +94,9 @@ export const POLITICAS: Record<string, Politica> = {
 
   // ---- Configuración del negocio ----
   configuracion: { permiso: "estudio.gestionar" },
-  "sitio-web": { permiso: "estudio.gestionar" },
+  // Sitio web (ADR 0167): quien configura el negocio lo edita y lo publica; quien
+  // atiende prospectos entra solo a «Compartir» (enlaces, QR y widgets).
+  "sitio-web": { algunaDe: ["configuracion", "captacion-integrar"] },
   sedes: { permiso: "sucursales.gestionar" },
   "datos-fiscales": { permiso: "estudio.gestionar" },
   region: { permiso: "estudio.gestionar" },
@@ -113,7 +117,6 @@ export const POLITICAS: Record<string, Politica> = {
   ajustes: {
     algunaDe: [
       "configuracion",
-      "sitio-web",
       "sedes",
       "region",
       "datos-fiscales",

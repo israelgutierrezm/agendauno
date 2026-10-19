@@ -224,6 +224,22 @@ describe("encabezado público", () => {
     );
     vista.unmount();
   });
+  it.each(["agendauno", "turnouno"] as const)(
+    "%s: la página de un negocio lleva la leyenda de su producto en el pie (ADR 0167)",
+    async (producto) => {
+      fijarProductoDeSesion(producto);
+      try {
+        const vista = await montar({ esRutaPublicaDeNegocio: true });
+        const leyenda = vista.get('footer [data-prueba="hecho-con"]');
+        const nombre = producto === "turnouno" ? "TurnoUno" : "AgendaUno";
+        expect(leyenda.text()).toBe(`Hecho con ${nombre}`);
+        expect(leyenda.attributes("href")).toMatch(/^https:\/\//);
+        vista.unmount();
+      } finally {
+        fijarProductoDeSesion(null);
+      }
+    },
+  );
   it("enlaza el aviso de privacidad desde el footer comercial", async () => {
     const vista = await montar();
     expect(vista.get('footer a[href="/aviso-de-privacidad"]').text()).toBe(

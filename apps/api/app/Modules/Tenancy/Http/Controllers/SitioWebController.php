@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EscaparateTenant;
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\SitioWebTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -109,6 +110,13 @@ class SitioWebController
         }
         foreach ((array) ($validado['paginas'] ?? []) as $p => $pagina) {
             $this->validarSecciones((array) ($pagina['secciones'] ?? []), $bloquesMaximos, "paginas.{$p}.secciones");
+        }
+        // Lo avanzado («Plus», ADR 0167) va con su plan: sin él, lo que ya tenía se
+        // conserva y se puede quitar, pero no se agrega ni se cambia.
+        $funciones = app(FuncionesPlan::class);
+        if (! $funciones->tiene($estudio, 'sitio_avanzado')
+            && $this->sitio->plusNuevo($this->sitio->normalizar($validado, $modalidad), $this->sitio->borrador($modalidad)) !== null) {
+            $funciones->exigir($estudio, 'sitio_avanzado');
         }
         /** @var list<array<string, mixed>> $banners */
         $banners = $validado['banners'];
@@ -221,6 +229,8 @@ class SitioWebController
             'publicado_en' => $ultima?->created_at?->toIso8601String(),
             // La página se ve en línea solo si el negocio la abrió (Configuración).
             'pagina_publica' => $estudio->paginaPublica(),
+            // Abierta, solo con el enlace o cerrada (ADR 0167), para «Dominio y SEO».
+            'publicacion' => ['publicado' => (bool) $estudio->publicado, 'privado' => (bool) $estudio->privado],
             // Las últimas versiones publicadas, para volver a una (ADR 0146, fase 3).
             'versiones' => $this->sitio->versiones(),
             // El color de su marca: el del sitio si no elige otro.

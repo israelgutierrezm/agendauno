@@ -987,7 +987,7 @@ export default {
     paginaOculta: "Tu página está oculta",
     paginaOcultaAyuda:
       "Mientras esté oculta, tus widgets no se muestran en ninguna web. Publícala en Configuración.",
-    irConfiguracion: "Ir a Configuración",
+    irConfiguracion: "Abrir mi página",
   },
   // Pasarelas de pago del negocio: con su propia cuenta.
   pasarelas: {

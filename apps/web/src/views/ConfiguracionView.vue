@@ -1,25 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import GiroNegocio from "@/components/GiroNegocio.vue";
-import IconoNav from "@/components/IconoNav.vue";
-import PerfilPublicoNegocio from "@/components/PerfilPublicoNegocio.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { confirmar } from "@/lib/confirmar";
 import type { DatosTerminologia, TerminosNegocio } from "@/lib/terminologia";
-import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
-const { t } = useI18n();
+// La página pública (portada, descripción, redes, si aparece en Explorar y su
+// enlace) pasó a Captación › Sitio web (ADR 0167).
 const route = useRoute();
 const secciones: Record<string, string> = {
   datos: "configNegocio.opciones.datos",
-  "pagina-publica": "configNegocio.opciones.pagina",
   "tipo-negocio": "modalidadNegocio.giro.titulo",
   terminologia: "configNegocio.opciones.terminologia",
 };
@@ -33,25 +28,16 @@ const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const puedeGestionar = computed(() => sesion.puede("estudio.gestionar"));
-const aparece = ref(sesion.estudio?.publicado ?? true);
 const cargando = ref(true);
-const guardando = ref(false);
-const guardado = ref(false);
 const error = ref<string | null>(null);
-const copiado = ref(false);
 
 // Logo (branding): la subida por arrastrar/soltar la maneja CargadorLogo.
 const logoUrl = ref<string | null>(null);
-
-const enlaceDirecto = computed(
-  () => `https://${urlPublicaEstudio(sesion.slug ?? "")}`,
-);
 
 async function cargar(): Promise<void> {
   cargando.value = true;
   try {
     await sesion.cargarYo();
-    aparece.value = sesion.estudio?.publicado ?? true;
     const { data } = await api.get<{ data: { logo_url: string | null } }>(
       `${base.value}/marca`,
     );
@@ -60,41 +46,6 @@ async function cargar(): Promise<void> {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
-  }
-}
-
-async function alternar(): Promise<void> {
-  if (guardando.value) {
-    return;
-  }
-  const nuevo = !aparece.value;
-  // Ocultarla deja a los clientes sin página ni agenda en línea: se confirma.
-  if (
-    !nuevo &&
-    !(await confirmar(t("confirmaciones.ocultarPagina"), {
-      aceptar: t("confirmaciones.ocultar"),
-      peligro: true,
-    }))
-  ) {
-    return;
-  }
-  guardando.value = true;
-  guardado.value = false;
-  error.value = null;
-  try {
-    const { data } = await api.put<{
-      data: { publicado: boolean; en_directorio: boolean };
-    }>(`${base.value}/publicacion`, { publicado: nuevo });
-    aparece.value = data.data.publicado;
-    if (sesion.estudio) {
-      sesion.estudio.publicado = data.data.publicado;
-      sesion.estudio.en_directorio = data.data.en_directorio;
-    }
-    guardado.value = true;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    guardando.value = false;
   }
 }
 
@@ -117,16 +68,6 @@ async function guardarTerminologia(
 function terminologiaGuardada(vigente: TerminosNegocio): void {
   if (sesion.estudio?.perfil_config) {
     sesion.estudio.perfil_config.terminologia = vigente;
-  }
-}
-
-async function copiar(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(enlaceDirecto.value);
-    copiado.value = true;
-    setTimeout(() => (copiado.value = false), 2000);
-  } catch {
-    // Sin portapapeles: el usuario puede copiar manualmente.
   }
 }
 
@@ -176,15 +117,6 @@ onMounted(cargar);
         </div>
       </div>
 
-      <!-- Portada, descripción y redes: la página pública y la de enlaces -->
-      <div
-        v-if="puedeGestionar"
-        v-show="visible('pagina-publica')"
-        id="pagina-publica"
-        class="mt-6 scroll-mt-24"
-      >
-        <PerfilPublicoNegocio />
-      </div>
       <!-- Tipo de negocio: solo los de su modalidad (ADR 0104) -->
       <div
         v-if="puedeGestionar"
@@ -207,88 +139,6 @@ onMounted(cargar);
           :guardar="guardarTerminologia"
           @guardado="terminologiaGuardada"
         />
-      </div>
-
-      <!-- Visibilidad en Explorar -->
-      <div v-show="visible('pagina-publica')" class="mt-6 tu-card p-6">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <h2 class="font-medium text-lg">
-              {{ $t("configuracion.directorioTitulo") }}
-            </h2>
-            <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("configuracion.directorioDesc") }}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            role="switch"
-            :aria-checked="aparece"
-            :disabled="!puedeGestionar || guardando"
-            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors"
-            :style="{
-              background: aparece ? 'var(--primario)' : 'var(--superficie-2)',
-              opacity: puedeGestionar ? 1 : 0.5,
-            }"
-            @click="alternar"
-          >
-            <span
-              class="inline-block h-5 w-5 rounded-full bg-white transition-transform"
-              :style="{
-                transform: aparece
-                  ? 'translateX(1.5rem)'
-                  : 'translateX(0.25rem)',
-              }"
-            />
-          </button>
-        </div>
-
-        <p
-          class="mt-4 text-sm font-semibold"
-          :style="{ color: aparece ? 'var(--exito)' : 'var(--texto-suave)' }"
-        >
-          {{
-            aparece
-              ? $t("configuracion.directorioActivo")
-              : $t("configuracion.directorioInactivo")
-          }}
-        </p>
-        <p
-          v-if="guardado"
-          class="mt-1 text-sm"
-          :style="{ color: 'var(--exito)' }"
-        >
-          {{ $t("configuracion.guardado") }}
-        </p>
-
-        <div
-          class="mt-6 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <label class="tu-label">{{
-            $t("configuracion.enlaceDirecto")
-          }}</label>
-          <div class="flex gap-2">
-            <input
-              class="tu-input font-mono text-sm"
-              :value="enlaceDirecto"
-              readonly
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-            <button
-              class="tu-btn tu-btn-fantasma shrink-0"
-              type="button"
-              @click="copiar"
-            >
-              <template v-if="copiado">
-                <IconoNav nombre="hecho" :tam="16" />
-                {{ $t("configuracion.copiado") }}
-              </template>
-              <template v-else>{{ $t("configuracion.copiar") }}</template>
-            </button>
-          </div>
-        </div>
       </div>
     </template>
   </section>

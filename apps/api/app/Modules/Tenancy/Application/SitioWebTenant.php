@@ -231,6 +231,46 @@ class SitioWebTenant
         return PublicacionSitioWebTenant::query()->orderByDesc('id')->first();
     }
 
+    /**
+     * Lo del sitio avanzado («Plus», ADR 0167) que `$nuevo` agrega o cambia respecto de
+     * `$actual` (los dos normalizados): el estilo propio, el botón del encabezado, las
+     * páginas propias y los bloques propios de Inicio. Quitarlo siempre se puede; lo que
+     * ya tenía se conserva tal cual. Null: nada nuevo de Plus.
+     *
+     * @param  array<string, mixed>  $nuevo
+     * @param  array<string, mixed>  $actual
+     */
+    public function plusNuevo(array $nuevo, array $actual): ?string
+    {
+        foreach (['estilo' => self::estilo([]), 'encabezado' => self::encabezado([])] as $parte => $porOmision) {
+            if (($nuevo[$parte] ?? $porOmision) !== ($actual[$parte] ?? $porOmision) && ($nuevo[$parte] ?? $porOmision) !== $porOmision) {
+                return $parte;
+            }
+        }
+        $paginas = [];
+        foreach ((array) ($actual['paginas'] ?? []) as $pagina) {
+            $paginas[(string) ($pagina['id'] ?? '')] = $pagina;
+        }
+        foreach ((array) ($nuevo['paginas'] ?? []) as $pagina) {
+            if (($paginas[(string) ($pagina['id'] ?? '')] ?? null) !== $pagina) {
+                return 'paginas';
+            }
+        }
+        $bloques = [];
+        foreach ((array) ($actual['secciones'] ?? []) as $seccion) {
+            if (CatalogoSitioWeb::esBloque((string) ($seccion['tipo'] ?? ''))) {
+                $bloques[(string) ($seccion['id'] ?? '')] = $seccion;
+            }
+        }
+        foreach ((array) ($nuevo['secciones'] ?? []) as $seccion) {
+            if (CatalogoSitioWeb::esBloque((string) ($seccion['tipo'] ?? '')) && ($bloques[(string) ($seccion['id'] ?? '')] ?? null) !== $seccion) {
+                return 'bloques';
+            }
+        }
+
+        return null;
+    }
+
     /** ¿El borrador tiene cambios sin publicar? */
     public function hayCambios(ModalidadServicio $modalidad): bool
     {

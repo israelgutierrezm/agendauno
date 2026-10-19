@@ -2,7 +2,7 @@
 // página pública (views/EstudioPublicoView.vue).
 export default {
   titulo: "Sitio web",
-  // Su rubro en Configuración del negocio.
+  // Su antiguo rubro en Configuración del negocio (ahora en Captación, ADR 0167).
   categoria: {
     titulo: "Sitio web",
     descripcion:
@@ -20,12 +20,12 @@ export default {
     nuncaPublicado:
       "Aún no publicas cambios: tus clientes ven la página de siempre.",
     paginaOculta:
-      "Tu página no está abierta al público. Ábrela en «Página pública» para que se vea.",
-    abrirPagina: "Ir a Página pública",
+      "Tu página no está abierta al público: tus clientes no la ven.",
+    abrirPagina: "Abrirla en Dominio y SEO",
   },
   acciones: {
     guardar: "Guardar borrador",
-    publicar: "Publicar",
+    publicar: "Publicar cambios",
     descartar: "Descartar cambios",
     vistaPrevia: "Vista previa",
     abrirPestana: "Abrir en otra pestaña",
@@ -56,7 +56,7 @@ export default {
     portadaDesc:
       "Tu foto de portada a todo lo ancho con tu nombre encima; primero lo que ofreces.",
     portadaSinFoto:
-      "Sube una portada en «Página pública»: sin ella se ve como la esencial.",
+      "Sube tu portada arriba, en «Perfil público»: sin ella se ve como la esencial.",
     compacta: "Compacta",
     compactaDesc: "Encabezado corto y directo a reservar.",
     elegida: "En uso",
@@ -111,7 +111,7 @@ export default {
       titularAyuda: "Vacío: el nombre de tu negocio.",
       texto: "Texto",
       textoInicio: "Texto de la portada",
-      textoInicioAyuda: "Vacío: tu descripción de «Página pública».",
+      textoInicioAyuda: "Vacío: tu descripción de «Perfil público».",
       foto: "Foto",
       fotoArrastra: "Arrastra una foto aquí o",
     },
@@ -197,7 +197,7 @@ export default {
     colorAppSin: "El de la plataforma",
     colorAppAyuda:
       "Lo usa la app que tus clientes instalan en su teléfono; tu página lo toma si no eliges otro. Se cambia en",
-    colorAppDonde: "Configuración › Perfil público",
+    colorAppDonde: "Perfil público, arriba",
     tipografia: "Tipografía",
     tipografias: {
       predeterminada: "La de siempre",
@@ -344,5 +344,100 @@ export default {
     // El video carga hasta que la persona le da clic (sin cookies hasta entonces).
     verVideo: "Ver video",
     videoAviso: "Al reproducirlo, el video se carga desde {proveedor}.",
+  },
+  // En Captación (ADR 0167): sus pestañas y la barra que siempre está a la vista.
+  pestanas: {
+    etiqueta: "Partes del sitio",
+    contenido: "Contenido",
+    reservas: "Reservas y ventas",
+    compartir: "Compartir",
+    dominio: "Dominio y SEO",
+  },
+  barra: {
+    verSitio: "Ver sitio",
+  },
+  // Lo avanzado es «Plus»: estilo propio, más páginas y bloques propios.
+  plus: {
+    etiqueta: "Plus",
+    ayuda:
+      "Tu estilo propio, más páginas y tus bloques son del sitio avanzado (Plus), desde el plan Premium. Lo que ya tienes se conserva.",
+    paginas:
+      "Más páginas son del sitio avanzado (Plus), desde el plan Premium.",
+    bloques:
+      "Tus bloques propios son del sitio avanzado (Plus), desde el plan Premium.",
+    cambiarPlan: "Ver mi suscripción",
+  },
+  reservas: {
+    ayuda:
+      "Lo que se muestra sale de tu negocio: aquí decides si se ve; cada cosa se edita en su lugar, así tu página y tu agenda dicen lo mismo.",
+    visitante: "Qué puede hacer quien visita tu página",
+    agendar: "Agendar en línea",
+    agendarClases: "Reservar sus clases en línea",
+    agendarCitas: "Agendar su cita en línea",
+    dejarDatos: "Dejar sus datos para que lo contactes",
+    activo: "Activo",
+    inactivo: "Apagado",
+    irFormularios: "Formularios de captación",
+    seMuestra: "Se ve en tu sitio",
+    vacio: "Aún no hay nada aquí.",
+    servicios: "Servicios",
+    serviciosClases: "Clases",
+    serviciosCitas: "Servicios",
+    editarServicios: "Editar servicios",
+    editarServiciosClases: "Editar clases",
+    editarServiciosCitas: "Editar servicios",
+    precios: "Planes",
+    preciosClases: "Planes y paquetes",
+    preciosCitas: "Bonos",
+    editarPrecios: "Editar planes",
+    editarPreciosClases: "Editar planes y paquetes",
+    editarPreciosCitas: "Editar bonos",
+    horario: "Horario semanal",
+    editarHorario: "Editar en la agenda",
+    equipo: "Equipo",
+    equipoClases: "Instructores",
+    equipoCitas: "Equipo",
+    editarEquipo: "Editar equipo",
+    editarEquipoClases: "Editar instructores",
+    editarEquipoCitas: "Editar equipo",
+    sucursales: "Sucursales",
+    editarSucursales: "Editar sucursales",
+    minutos: "{n} min",
+    dias: {
+      1: "Lun",
+      2: "Mar",
+      3: "Mié",
+      4: "Jue",
+      5: "Vie",
+      6: "Sáb",
+      7: "Dom",
+    },
+  },
+  compartir: {
+    enlaces: "Página de enlaces",
+    enlacesAyuda:
+      "Para la biografía de tus redes: reservar, tu WhatsApp, tu página y tus redes en un solo enlace.",
+    formularios: "Formularios de captación",
+    formulariosAyuda:
+      "Cada formulario tiene su enlace, su QR y su código para tu web.",
+    irFormularios: "Ver formularios",
+  },
+  dominio: {
+    direccion: "Dirección de tu página",
+    comoSePublica: "¿Cómo se publica?",
+    alMomento:
+      "Abrir o cerrar tu página se aplica al guardar, aparte de los cambios del sitio.",
+    guardarVisibilidad: "Guardar",
+    seo: "En buscadores y redes",
+    seoAyuda:
+      "El título, la descripción y la imagen de Inicio cuando la buscan o la comparten. Se publica con el sitio.",
+    seoPaginas: "Tus otras {n} páginas tienen el suyo en Contenido › Páginas.",
+    irPaginas: "Ir a Páginas",
+    propio: "Dominio propio",
+    propioAyuda:
+      "Tu página en tu dirección (p. ej. www.tunegocio.com) en lugar de la de la plataforma.",
+    propioPronto: "Aún no está disponible.",
+    propioPlus:
+      "Será del sitio avanzado (Plus), desde el plan Premium. Aún no está disponible.",
   },
 };

@@ -383,10 +383,16 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
-      // Integrar en mi web (ADR 0141): widgets de calendario y planes.
+      // Integrar en mi web (ADR 0141): ahora en Sitio web › Compartir (ADR 0167).
       path: "/captacion/integrar",
       name: "captacion-integrar",
-      component: () => import("@/views/IntegrarWebView.vue"),
+      redirect: { name: "sitio-web", query: { pestana: "compartir" } },
+    },
+    {
+      // Campañas (ADR 0167): el reporte por campaña, en Captación.
+      path: "/captacion/campanas",
+      name: "campanas",
+      component: () => import("@/views/CampanasView.vue"),
       meta: { requiereSesion: true },
     },
     {
@@ -502,9 +508,14 @@ const router = createRouter({
       name: "configuracion",
       component: () => import("@/views/ConfiguracionView.vue"),
       meta: { requiereSesion: true },
+      // La página pública pasó a Sitio web › Contenido (ADR 0167).
+      beforeEnter: (to) =>
+        to.hash === "#pagina-publica"
+          ? { name: "sitio-web", query: { pestana: "contenido" } }
+          : true,
     },
     {
-      // El sitio del negocio (ADR 0114): plantilla, secciones, banners y publicar.
+      // El sitio del negocio (ADR 0114, 0167): en Captación, con sus pestañas.
       path: "/sitio",
       name: "sitio-web",
       component: () => import("@/views/SitioWebView.vue"),

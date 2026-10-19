@@ -1253,6 +1253,16 @@ subdominio del negocio):
 visible si no hay ninguna), con solo las secciones visibles y los banners vigentes hoy
 en el negocio.
 
+### Sitio web en Captación y «Plus» (ADR 0167)
+
+- `GET /sitio` suma `publicacion` {`publicado`, `privado`}: abierta, solo con el enlace
+  o cerrada (se cambia con `PUT /publicacion`).
+- Función de plan `sitio_avanzado` («Plus», desde Premium en citas; los de clases la
+  tienen): estilo propio, botón del encabezado, páginas propias y bloques propios.
+  Sin ella, `PUT /sitio` y `POST /sitio/vista-previa` responden 403
+  `PLAN_FEATURE_NOT_INCLUDED` (`meta.funcion` = `sitio_avanzado`) si se agrega o cambia
+  algo de eso. Lo que ya tenía se conserva tal cual y se puede quitar.
+
 ### Bloques propios del sitio (ADR 0146)
 
 - En `secciones[]` caben, además, bloques propios con `tipo` = `texto_imagen`,

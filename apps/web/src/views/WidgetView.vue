@@ -5,6 +5,7 @@ import { useRoute } from "vue-router";
 
 import CalendarioPublico from "@/components/CalendarioPublico.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
+import HechoCon from "@/components/HechoCon.vue";
 import TarjetaPlanPublico, {
   type PlanPublico,
 } from "@/components/TarjetaPlanPublico.vue";
@@ -292,6 +293,10 @@ onBeforeUnmount(() => observador?.disconnect());
         </p>
       </template>
     </template>
+    <!-- La leyenda fija de la plataforma, también dentro de otra web (ADR 0167). -->
+    <p class="mt-4 text-center">
+      <HechoCon />
+    </p>
   </div>
 </template>
 

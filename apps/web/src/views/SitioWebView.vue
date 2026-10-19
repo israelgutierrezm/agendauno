@@ -8,14 +8,18 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EditorBloqueSitio from "@/components/EditorBloqueSitio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import PerfilPublicoNegocio from "@/components/PerfilPublicoNegocio.vue";
 import SeoPaginaSitio from "@/components/SeoPaginaSitio.vue";
+import SitioCompartir from "@/components/SitioCompartir.vue";
+import SitioDominio from "@/components/SitioDominio.vue";
+import SitioReservasVentas from "@/components/SitioReservasVentas.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { claveSegunModalidad } from "@/lib/menu";
@@ -44,6 +48,7 @@ import {
   type TipoSeccion,
 } from "@/lib/sitioWeb";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
+import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -63,6 +68,13 @@ import { useToastStore } from "@/stores/toast";
  * Fase 3: «Estilo del sitio» (color, tipografía de una lista, esquinas y claro u
  * oscuro), el botón principal del encabezado y «Versiones publicadas» para volver a
  * una (queda como borrador hasta publicarla).
+ *
+ * En Captación, con pestañas (ADR 0167): Contenido (su página pública y el
+ * constructor), Reservas y ventas (qué de su negocio se muestra), Compartir (enlace,
+ * QR, enlaces y widgets) y Dominio y SEO. Arriba, siempre a la vista, si hay borrador
+ * o está publicado, la vista previa, ver el sitio y publicar: guardar no publica. Lo
+ * avanzado (estilo propio, más páginas y bloques) es «Plus»: sin él se conserva lo que
+ * ya tenía, pero no se agrega ni se cambia (el servidor lo niega igual).
  */
 type SeccionBorrador = SeccionSitio & { visible: boolean };
 interface Borrador {
@@ -89,6 +101,8 @@ interface DatosSitio {
   tiene_portada: boolean;
   // Fase 3 (ADR 0146): las versiones publicadas y el color de su marca.
   versiones?: VersionSitio[];
+  // Si está abierta, solo con el enlace o cerrada (ADR 0167).
+  publicacion?: { publicado: boolean; privado: boolean };
   color_marca?: string | null;
   catalogo: {
     plantillas: { clave: PlantillaSitio; orden: TipoSeccion[] }[];
@@ -123,6 +137,32 @@ const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}/sitio`);
+
+// Las partes del sitio, en pestañas (ADR 0167). Quien solo atiende prospectos entra
+// a «Compartir»; editar y publicar es de quien configura el negocio.
+const route = useRoute();
+const router = useRouter();
+const PESTANAS = ["contenido", "reservas", "compartir", "dominio"] as const;
+type Pestana = (typeof PESTANAS)[number];
+const puedeEditar = computed(() => sesion.puede("estudio.gestionar"));
+const pestanas = computed<Pestana[]>(() =>
+  puedeEditar.value ? [...PESTANAS] : ["compartir"],
+);
+const pestana = computed<Pestana>(() => {
+  const pedida = String(route.query.pestana ?? "") as Pestana;
+  return pestanas.value.includes(pedida) ? pedida : pestanas.value[0]!;
+});
+function elegirPestana(p: Pestana): void {
+  void router.replace({ query: { ...route.query, pestana: p } });
+}
+// Lo avanzado es «Plus» (ADR 0167): estilo propio, más páginas y bloques propios.
+const conPlus = computed(
+  () => !(sesion.estudio?.plan?.sin ?? []).includes("sitio_avanzado"),
+);
+// «Ver sitio»: la página publicada (si está abierta).
+const urlSitio = computed(
+  () => `https://${urlPublicaEstudio(sesion.slug ?? "")}`,
+);
 
 const datos = ref<DatosSitio | null>(null);
 const borrador = ref<Borrador | null>(null);
@@ -678,9 +718,32 @@ function alMensajeDePrevia(evento: MessageEvent): void {
   }
 }
 
+// Desde «Reservas y ventas»: mostrar u ocultar la sección de algo del negocio (es
+// parte del borrador: se publica con lo demás).
+function mostrarSeccion(tipo: TipoSeccion, visible: boolean): void {
+  const seccion = borrador.value?.secciones.find((s) => s.tipo === tipo);
+  if (seccion) {
+    seccion.visible = visible;
+  }
+}
+// Abrir o cerrar la página se aplica al momento (no es del borrador).
+function publicacionActualizada(p: {
+  publicado: boolean;
+  privado: boolean;
+}): void {
+  if (datos.value) {
+    datos.value.publicacion = p;
+    datos.value.pagina_publica = p.publicado;
+  }
+}
+
 onMounted(() => {
   window.addEventListener("message", alMensajeDePrevia);
-  void cargar();
+  if (puedeEditar.value) {
+    void cargar();
+  } else {
+    cargando.value = false;
+  }
 });
 onBeforeUnmount(() => {
   window.removeEventListener("message", alMensajeDePrevia);
@@ -695,7 +758,12 @@ onBeforeUnmount(() => {
       :descripcion="$t('sitioWeb.descripcion')"
     />
 
-    <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
+    <SitioCompartir v-if="!puedeEditar" class="mt-6" />
+    <p
+      v-else-if="cargando"
+      class="mt-8"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
       {{ $t("comun.cargando") }}
     </p>
     <p v-else-if="error" class="mt-6 text-sm" style="color: var(--error)">
@@ -703,9 +771,10 @@ onBeforeUnmount(() => {
     </p>
 
     <template v-else-if="borrador && datos">
-      <!-- Estado y publicar -->
-      <div class="tu-card mt-6 p-5" data-prueba="estado-sitio">
-        <div class="flex flex-wrap items-center justify-between gap-4">
+      <!-- Siempre a la vista: si hay borrador o está publicado, la vista previa, ver el
+           sitio y publicar. Guardar el borrador no lo publica. -->
+      <div class="sw-barra tu-card mt-6 p-4" data-prueba="estado-sitio">
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
             <p class="flex items-center gap-2 font-medium">
               <span
@@ -725,7 +794,24 @@ onBeforeUnmount(() => {
               }}
             </p>
           </div>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <a
+              :href="urlPrevia"
+              target="_blank"
+              rel="noopener"
+              class="tu-btn tu-btn-fantasma"
+              data-prueba="abrir-vista-previa"
+              >{{ $t("sitioWeb.acciones.vistaPrevia") }}</a
+            >
+            <a
+              v-if="datos.pagina_publica"
+              :href="urlSitio"
+              target="_blank"
+              rel="noopener"
+              class="tu-btn tu-btn-fantasma"
+              data-prueba="ver-sitio"
+              >{{ $t("sitioWeb.barra.verSitio") }}</a
+            >
             <button
               v-if="datos.cambios_sin_publicar && !sinGuardar"
               type="button"
@@ -757,1167 +843,1278 @@ onBeforeUnmount(() => {
         </div>
         <p
           v-if="!datos.pagina_publica"
-          class="mt-4 text-sm"
+          class="mt-3 text-sm"
           data-prueba="pagina-oculta"
         >
           {{ $t("sitioWeb.estado.paginaOculta") }}
-          <RouterLink
-            :to="{ name: 'configuracion', hash: '#pagina-publica' }"
+          <button
+            type="button"
             class="tu-enlace"
-            >{{ $t("sitioWeb.estado.abrirPagina") }}</RouterLink
+            @click="elegirPestana('dominio')"
           >
+            {{ $t("sitioWeb.estado.abrirPagina") }}
+          </button>
         </p>
       </div>
 
-      <div class="sw-columnas mt-6">
-        <div class="min-w-0 space-y-6">
-          <!-- Plantilla -->
-          <div class="tu-card p-5">
-            <h2 class="text-lg font-medium">
-              {{ $t("sitioWeb.plantillas.titulo") }}
-            </h2>
-            <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("sitioWeb.plantillas.ayuda") }}
-            </p>
-            <div class="mt-4 grid gap-3 sm:grid-cols-3" role="radiogroup">
-              <button
-                v-for="p in datos.catalogo.plantillas"
-                :key="p.clave"
-                type="button"
-                role="radio"
-                :aria-checked="borrador.plantilla === p.clave"
-                class="sw-plantilla"
-                :class="{
-                  'sw-plantilla-activa': borrador.plantilla === p.clave,
-                }"
-                :data-prueba="`plantilla-${p.clave}`"
-                @click="usarPlantilla(p.clave)"
-              >
-                <span class="font-medium">{{
-                  $t(`sitioWeb.plantillas.${p.clave}`)
-                }}</span>
-                <span
-                  class="mt-1 block text-sm"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ $t(`sitioWeb.plantillas.${p.clave}Desc`) }}</span
-                >
-                <span
-                  v-if="borrador.plantilla === p.clave"
-                  class="mt-2 flex items-center gap-1.5 text-xs"
-                >
-                  <span
-                    class="sw-punto sw-punto-exito"
-                    aria-hidden="true"
-                  ></span>
-                  {{ $t("sitioWeb.plantillas.elegida") }}
-                </span>
-              </button>
-            </div>
-            <p
-              v-if="borrador.plantilla === 'portada' && !portadaSubida"
-              class="mt-3 text-sm"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t("sitioWeb.plantillas.portadaSinFoto") }}
-            </p>
-          </div>
+      <div
+        class="tu-pestanas mt-6"
+        role="group"
+        :aria-label="$t('sitioWeb.pestanas.etiqueta')"
+      >
+        <button
+          v-for="p in pestanas"
+          :key="p"
+          type="button"
+          :aria-pressed="pestana === p"
+          :data-prueba="`pestana-${p}`"
+          @click="elegirPestana(p)"
+        >
+          {{ $t(`sitioWeb.pestanas.${p}`) }}
+        </button>
+      </div>
 
-          <!-- Estilo del sitio (ADR 0146, fase 3) -->
-          <div class="tu-card p-5" data-prueba="estilo-sitio">
-            <h2 class="text-lg font-medium">
-              {{ $t("sitioWeb.estilo.titulo") }}
-            </h2>
-            <p class="mt-1 text-sm sw-suave">
-              {{ $t("sitioWeb.estilo.ayuda") }}
-            </p>
-            <div class="mt-4 space-y-5">
-              <!-- El color de las páginas públicas, aparte del de la app del negocio
-                   (color_marca, en Configuración › Perfil público). -->
-              <div data-prueba="color-sitio">
-                <span class="tu-label">{{ $t("sitioWeb.estilo.color") }}</span>
-                <div class="flex flex-wrap items-center gap-3">
-                  <input
-                    type="color"
-                    class="sw-color"
-                    :value="colorDelSitio"
-                    :aria-label="$t('sitioWeb.estilo.color')"
-                    aria-describedby="sw-color-ayuda"
-                    data-prueba="estilo-color"
-                    @change="elegirColor"
-                  />
-                  <span class="text-sm sw-suave">{{
-                    borrador.estilo.color
-                      ? borrador.estilo.color
-                      : $t("sitioWeb.estilo.deTuMarca")
-                  }}</span>
-                  <button
-                    v-if="borrador.estilo.color"
-                    type="button"
-                    class="tu-enlace text-sm"
-                    data-prueba="estilo-color-marca"
-                    @click="borrador.estilo.color = null"
-                  >
-                    {{ $t("sitioWeb.estilo.usarMarca") }}
-                  </button>
-                </div>
-                <p id="sw-color-ayuda" class="sw-ayuda">
-                  {{ $t("sitioWeb.estilo.colorAyuda") }}
-                </p>
-              </div>
-              <div class="sw-color-app" data-prueba="color-app">
-                <span class="tu-label">{{
-                  $t("sitioWeb.estilo.colorApp")
-                }}</span>
-                <div class="flex flex-wrap items-center gap-2 text-sm">
-                  <span
-                    v-if="datos.color_marca"
-                    class="sw-muestra"
-                    :style="{ background: datos.color_marca }"
-                    aria-hidden="true"
-                  />
-                  <span>{{
-                    datos.color_marca ?? $t("sitioWeb.estilo.colorAppSin")
-                  }}</span>
-                </div>
-                <p class="sw-ayuda">
-                  {{ $t("sitioWeb.estilo.colorAppAyuda") }}
-                  <RouterLink
-                    :to="{ name: 'configuracion', hash: '#pagina-publica' }"
-                    class="tu-enlace"
-                    data-prueba="ir-color-app"
-                    >{{ $t("sitioWeb.estilo.colorAppDonde") }}</RouterLink
-                  >.
-                </p>
-              </div>
-              <div>
-                <span class="tu-label">{{
-                  $t("sitioWeb.estilo.tipografia")
-                }}</span>
-                <div
-                  class="sw-tipografias"
-                  role="radiogroup"
-                  :aria-label="$t('sitioWeb.estilo.tipografia')"
-                >
-                  <button
-                    v-for="tipo in datos.catalogo.tipografias ?? []"
-                    :key="tipo"
-                    type="button"
-                    role="radio"
-                    class="sw-tipografia"
-                    :class="{
-                      'sw-tipografia-activa':
-                        borrador.estilo.tipografia === tipo,
-                    }"
-                    :aria-checked="borrador.estilo.tipografia === tipo"
-                    :style="{ fontFamily: letraDe(tipo) }"
-                    :data-prueba="`tipografia-${tipo}`"
-                    @click="borrador.estilo.tipografia = tipo"
-                  >
-                    <span class="block text-base">Aa</span>
-                    <span class="block text-xs">{{
-                      $t(`sitioWeb.estilo.tipografias.${tipo}`)
-                    }}</span>
-                  </button>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-x-6 gap-y-4">
-                <div>
-                  <span class="tu-label">{{
-                    $t("sitioWeb.estilo.esquinas")
-                  }}</span>
-                  <div class="tu-segmentado" role="group">
-                    <button
-                      v-for="e in datos.catalogo.esquinas ?? []"
-                      :key="e"
-                      type="button"
-                      :aria-pressed="borrador.estilo.esquinas === e"
-                      :data-prueba="`esquinas-${e}`"
-                      @click="borrador.estilo.esquinas = e"
-                    >
-                      {{ $t(`sitioWeb.estilo.esquinasOpciones.${e}`) }}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <span class="tu-label">{{ $t("sitioWeb.estilo.tema") }}</span>
-                  <div class="tu-segmentado" role="group">
-                    <button
-                      v-for="tm2 in datos.catalogo.temas ?? []"
-                      :key="tm2"
-                      type="button"
-                      :aria-pressed="borrador.estilo.tema === tm2"
-                      :data-prueba="`tema-${tm2}`"
-                      @click="borrador.estilo.tema = tm2"
-                    >
-                      {{ $t(`sitioWeb.estilo.temas.${tm2}`) }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <!-- El botón principal del encabezado -->
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label class="tu-label" for="sw-boton-principal">{{
-                    $t("sitioWeb.estilo.botonTexto")
-                  }}</label>
-                  <input
-                    id="sw-boton-principal"
-                    class="tu-input"
-                    maxlength="40"
-                    :placeholder="$t('sitioWeb.estilo.botonEjemplo')"
-                    :value="borrador.encabezado.boton_texto ?? ''"
-                    data-prueba="boton-principal-texto"
-                    @input="
-                      borrador.encabezado.boton_texto = texto(
-                        ($event.target as HTMLInputElement).value,
-                      )
-                    "
-                  />
-                </div>
-                <div>
-                  <label class="tu-label" for="sw-boton-enlace">{{
-                    $t("sitioWeb.estilo.botonEnlace")
-                  }}</label>
-                  <input
-                    id="sw-boton-enlace"
-                    class="tu-input"
-                    maxlength="300"
-                    placeholder="#agenda"
-                    :value="borrador.encabezado.boton_enlace ?? ''"
-                    data-prueba="boton-principal-enlace"
-                    @input="
-                      borrador.encabezado.boton_enlace = texto(
-                        ($event.target as HTMLInputElement).value,
-                      )
-                    "
-                  />
-                </div>
-                <p class="sw-ayuda sm:col-span-2">
-                  {{ $t("sitioWeb.estilo.botonAyuda") }}
-                </p>
-                <p
-                  v-if="
-                    errorDe('encabezado.boton_texto') ||
-                    errorDe('encabezado.boton_enlace') ||
-                    errorDe('estilo.color')
-                  "
-                  class="text-sm sm:col-span-2"
-                  style="color: var(--error)"
-                >
-                  {{
-                    errorDe("encabezado.boton_texto") ??
-                    errorDe("encabezado.boton_enlace") ??
-                    errorDe("estilo.color")
-                  }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Páginas (ADR 0146): Inicio y las propias -->
-          <div class="tu-card p-5" data-prueba="paginas-sitio">
-            <h2 class="text-lg font-medium">
-              {{ $t("sitioWeb.paginas.titulo") }}
-            </h2>
-            <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("sitioWeb.paginas.ayuda") }}
-            </p>
-            <ol class="mt-4 space-y-2">
-              <li
-                class="sw-seccion"
-                :class="{ 'sw-pagina-activa': paginaSel === null }"
-                data-prueba="pagina-inicio"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    class="min-w-0 flex-1 basis-40 text-left"
-                    :aria-pressed="paginaSel === null"
-                    @click="elegirPagina(null)"
-                  >
-                    <span class="block font-medium">{{
-                      $t("sitioWeb.paginas.inicio")
-                    }}</span>
-                    <span class="block text-xs sw-suave">/</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-fantasma shrink-0 text-sm"
-                    :aria-expanded="configAbierta === 'inicio'"
-                    data-prueba="config-inicio"
-                    @click="
-                      configAbierta =
-                        configAbierta === 'inicio' ? null : 'inicio'
-                    "
-                  >
-                    {{ $t("sitioWeb.paginas.seo") }}
-                  </button>
-                </div>
-                <div v-if="configAbierta === 'inicio'" class="mt-4">
-                  <SeoPaginaSitio
-                    v-model="borrador.seo"
-                    :catalogo="datos.catalogo"
-                    prefijo="seo"
-                    :errores="errores"
-                    :placeholder-titulo="sesion.estudio?.nombre ?? ''"
-                  />
-                </div>
-              </li>
-              <li
-                v-for="(p, n) in borrador.paginas"
-                :key="p.id ?? p.slug"
-                class="sw-seccion"
-                :class="{ 'sw-pagina-activa': paginaSel === p.id }"
-                :data-prueba="`pagina-${p.slug}`"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    class="min-w-0 flex-1 basis-40 text-left"
-                    :aria-pressed="paginaSel === p.id"
-                    @click="elegirPagina(p.id ?? null)"
-                  >
-                    <span class="block font-medium">{{ p.titulo }}</span>
-                    <span class="block text-xs sw-suave"
-                      >/p/{{ p.slug }} ·
-                      {{
-                        p.en_menu
-                          ? $t("sitioWeb.paginas.enMenu")
-                          : $t("sitioWeb.paginas.fueraMenu")
-                      }}</span
-                    >
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-icono-btn shrink-0"
-                    :disabled="n === 0"
-                    :aria-label="
-                      $t('sitioWeb.paginas.subir', { pagina: p.titulo })
-                    "
-                    @click="moverPagina(n, -1)"
-                  >
-                    <IconoNav nombre="arriba" :tam="16" />
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-icono-btn shrink-0"
-                    :disabled="n === borrador.paginas.length - 1"
-                    :aria-label="
-                      $t('sitioWeb.paginas.bajar', { pagina: p.titulo })
-                    "
-                    @click="moverPagina(n, 1)"
-                  >
-                    <IconoNav nombre="abajo" :tam="16" />
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-fantasma shrink-0 text-sm"
-                    :aria-expanded="configAbierta === p.id"
-                    :data-prueba="`config-${p.slug}`"
-                    @click="
-                      configAbierta =
-                        configAbierta === p.id ? null : (p.id ?? null)
-                    "
-                  >
-                    {{ $t("sitioWeb.paginas.configurar") }}
-                  </button>
-                </div>
-                <div v-if="configAbierta === p.id" class="mt-4 space-y-4">
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label class="tu-label" :for="`sw-pag-titulo-${n}`">{{
-                        $t("sitioWeb.paginas.campos.titulo")
-                      }}</label>
-                      <input
-                        :id="`sw-pag-titulo-${n}`"
-                        v-model="p.titulo"
-                        class="tu-input"
-                        :maxlength="datos.catalogo.max_titulo_pagina"
-                      />
-                    </div>
-                    <div>
-                      <label class="tu-label" :for="`sw-pag-dir-${n}`">{{
-                        $t("sitioWeb.paginas.campos.direccion")
-                      }}</label>
-                      <div class="sw-direccion">
-                        <span class="sw-suave">/p/</span>
-                        <input
-                          :id="`sw-pag-dir-${n}`"
-                          class="tu-input"
-                          :value="p.slug"
-                          :maxlength="datos.catalogo.max_direccion"
-                          :data-prueba="`direccion-${n}`"
-                          @change="
-                            cambiarDireccion(
-                              p,
-                              ($event.target as HTMLInputElement).value,
-                            )
-                          "
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <label class="flex items-center gap-2 text-sm">
-                    <input v-model="p.en_menu" type="checkbox" />
-                    {{ $t("sitioWeb.paginas.campos.enMenu") }}
-                  </label>
-                  <SeoPaginaSitio
-                    v-model="p.seo"
-                    :catalogo="datos.catalogo"
-                    :prefijo="`paginas.${n}.seo`"
-                    :errores="errores"
-                    :placeholder-titulo="p.titulo"
-                  />
-                  <p
-                    v-if="
-                      errorDe(`paginas.${n}.slug`) ||
-                      errorDe(`paginas.${n}.titulo`)
-                    "
-                    class="text-sm"
-                    style="color: var(--error)"
-                  >
-                    {{
-                      errorDe(`paginas.${n}.slug`) ??
-                      errorDe(`paginas.${n}.titulo`)
-                    }}
-                  </p>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
-                    :data-prueba="`quitar-pagina-${p.slug}`"
-                    @click="quitarPagina(n)"
-                  >
-                    {{ $t("sitioWeb.paginas.quitar") }}
-                  </button>
-                </div>
-              </li>
-            </ol>
-            <div class="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma"
-                :disabled="!cabenPaginas"
-                data-prueba="agregar-pagina"
-                @click="agregandoPagina = true"
-              >
-                {{ $t("sitioWeb.paginas.agregar") }}
-              </button>
-              <p v-if="!cabenPaginas" class="text-sm sw-suave">
-                {{
-                  $t("sitioWeb.paginas.tope", {
-                    n: datos.catalogo.paginas_maximas,
-                  })
-                }}
+      <!-- Contenido: su página pública y el constructor (se conserva al cambiar de
+           pestaña: la vista previa y lo que se edita siguen ahí). -->
+      <div v-show="pestana === 'contenido'" data-prueba="sitio-contenido">
+        <div class="mt-6">
+          <PerfilPublicoNegocio />
+        </div>
+        <div class="sw-columnas mt-6">
+          <div class="min-w-0 space-y-6">
+            <!-- Plantilla -->
+            <div class="tu-card p-5">
+              <h2 class="text-lg font-medium">
+                {{ $t("sitioWeb.plantillas.titulo") }}
+              </h2>
+              <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("sitioWeb.plantillas.ayuda") }}
               </p>
-            </div>
-            <p
-              v-if="errorDe('paginas')"
-              class="mt-2 text-sm"
-              style="color: var(--error)"
-            >
-              {{ errorDe("paginas") }}
-            </p>
-          </div>
-
-          <!-- Nueva página: su título (la dirección sale de él) -->
-          <ModalDialogo
-            :abierto="agregandoPagina"
-            :titulo="$t('sitioWeb.paginas.nueva')"
-            tam="md"
-            @cerrar="agregandoPagina = false"
-          >
-            <form @submit.prevent="crearPagina">
-              <label class="tu-label" for="sw-nueva-pagina">{{
-                $t("sitioWeb.paginas.campos.titulo")
-              }}</label>
-              <input
-                id="sw-nueva-pagina"
-                v-model="tituloNueva"
-                class="tu-input"
-                :maxlength="datos.catalogo.max_titulo_pagina"
-                :placeholder="$t('sitioWeb.paginas.ejemplo')"
-                data-prueba="titulo-pagina-nueva"
-              />
-              <p class="sw-ayuda">
-                {{
-                  $t("sitioWeb.paginas.direccionAyuda", {
-                    direccion: direccionDe(tituloNueva) || "…",
-                  })
-                }}
-              </p>
-              <button
-                type="submit"
-                class="tu-btn tu-btn-primario mt-4"
-                :disabled="tituloNueva.trim() === ''"
-                data-prueba="crear-pagina"
-              >
-                {{ $t("sitioWeb.paginas.crear") }}
-              </button>
-            </form>
-          </ModalDialogo>
-
-          <!-- Secciones -->
-          <div class="tu-card p-5">
-            <h2 class="text-lg font-medium" data-prueba="titulo-secciones">
-              {{
-                paginaEditada
-                  ? $t("sitioWeb.paginas.seccionesDe", {
-                      pagina: paginaEditada.titulo,
-                    })
-                  : $t("sitioWeb.secciones.titulo")
-              }}
-            </h2>
-            <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{
-                paginaEditada
-                  ? $t("sitioWeb.paginas.seccionesAyuda")
-                  : $t("sitioWeb.secciones.ayuda")
-              }}
-            </p>
-            <p
-              v-if="paginaEditada && paginaEditada.secciones.length === 0"
-              class="mt-4 text-sm sw-suave"
-              data-prueba="pagina-vacia"
-            >
-              {{ $t("sitioWeb.paginas.vacia") }}
-            </p>
-            <ol class="mt-4 space-y-2" data-prueba="secciones">
-              <li
-                v-for="(s, i) in seccionesActuales"
-                :key="claveSeccion(s)"
-                class="sw-seccion"
-                :class="{ 'sw-seccion-propia': esBloque(s.tipo) }"
-                :data-prueba="`seccion-${claveSeccion(s)}`"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <div class="min-w-0 flex-1 basis-40">
-                    <p class="font-medium">{{ nombreSeccion(s.tipo) }}</p>
-                    <p
-                      class="truncate text-xs"
-                      :style="{ color: 'var(--texto-suave)' }"
-                    >
-                      {{ detalleSeccion(s) }}
-                    </p>
-                  </div>
-                  <label
-                    v-if="!esFija(s.tipo)"
-                    class="flex shrink-0 items-center gap-1.5 text-sm"
-                  >
-                    <input
-                      v-model="s.visible"
-                      type="checkbox"
-                      :data-prueba="`visible-${s.tipo}`"
-                    />
-                    {{
-                      s.visible
-                        ? $t("sitioWeb.secciones.visible")
-                        : $t("sitioWeb.secciones.oculta")
-                    }}
-                  </label>
-                  <button
-                    type="button"
-                    class="tu-icono-btn shrink-0"
-                    :disabled="!puedeMover(i, -1)"
-                    :aria-label="
-                      $t('sitioWeb.secciones.subir', {
-                        seccion: nombreSeccion(s.tipo),
-                      })
-                    "
-                    :data-prueba="`subir-${s.tipo}`"
-                    @click="mover(i, -1)"
-                  >
-                    <IconoNav nombre="arriba" :tam="16" />
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-icono-btn shrink-0"
-                    :disabled="!puedeMover(i, 1)"
-                    :aria-label="
-                      $t('sitioWeb.secciones.bajar', {
-                        seccion: nombreSeccion(s.tipo),
-                      })
-                    "
-                    :data-prueba="`bajar-${s.tipo}`"
-                    @click="mover(i, 1)"
-                  >
-                    <IconoNav nombre="abajo" :tam="16" />
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-fantasma shrink-0 text-sm"
-                    :aria-expanded="abierta === claveSeccion(s)"
-                    :data-prueba="`editar-${claveSeccion(s)}`"
-                    @click="
-                      abierta =
-                        abierta === claveSeccion(s) ? null : claveSeccion(s)
-                    "
-                  >
-                    {{
-                      abierta === claveSeccion(s)
-                        ? $t("sitioWeb.secciones.cerrar")
-                        : $t("sitioWeb.secciones.editar")
-                    }}
-                  </button>
-                </div>
-
-                <!-- Un bloque propio: sus campos, duplicarlo o quitarlo -->
-                <div
-                  v-if="esBloque(s.tipo) && abierta === claveSeccion(s)"
-                  class="mt-4"
-                >
-                  <EditorBloqueSitio
-                    v-model="seccionesActuales[i]"
-                    :catalogo="datos.catalogo"
-                    :prefijo="`${prefijo}.${i}`"
-                    :errores="errores"
-                  />
-                  <div class="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      class="tu-btn tu-btn-fantasma text-sm"
-                      :disabled="!caben"
-                      :data-prueba="`duplicar-${claveSeccion(s)}`"
-                      @click="duplicar(i)"
-                    >
-                      {{ $t("sitioWeb.bloques.duplicar") }}
-                    </button>
-                    <button
-                      type="button"
-                      class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
-                      :data-prueba="`quitar-${claveSeccion(s)}`"
-                      @click="quitarBloque(i)"
-                    >
-                      {{ $t("sitioWeb.bloques.quitar") }}
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  v-else-if="abierta === claveSeccion(s)"
-                  class="mt-4 space-y-4"
-                >
-                  <div>
-                    <label class="tu-label" :for="`sw-titulo-${s.tipo}`">{{
-                      s.tipo === "inicio"
-                        ? $t("sitioWeb.secciones.campos.titular")
-                        : $t("sitioWeb.secciones.campos.titulo")
-                    }}</label>
-                    <input
-                      :id="`sw-titulo-${s.tipo}`"
-                      class="tu-input"
-                      :value="s.titulo ?? ''"
-                      :maxlength="datos.catalogo.max_titulo"
-                      :placeholder="
-                        s.tipo === 'inicio'
-                          ? (sesion.estudio?.nombre ?? '')
-                          : nombreSeccion(s.tipo)
-                      "
-                      @input="
-                        s.titulo = texto(
-                          ($event.target as HTMLInputElement).value,
-                        )
-                      "
-                    />
-                    <p class="sw-ayuda">
-                      {{
-                        s.tipo === "inicio"
-                          ? $t("sitioWeb.secciones.campos.titularAyuda")
-                          : $t("sitioWeb.secciones.campos.tituloAyuda")
-                      }}
-                    </p>
-                  </div>
-                  <div
-                    v-if="
-                      datos.catalogo.con_texto.includes(s.tipo as TipoSeccion)
-                    "
-                  >
-                    <label class="tu-label" :for="`sw-texto-${s.tipo}`">{{
-                      s.tipo === "inicio"
-                        ? $t("sitioWeb.secciones.campos.textoInicio")
-                        : $t("sitioWeb.secciones.campos.texto")
-                    }}</label>
-                    <textarea
-                      :id="`sw-texto-${s.tipo}`"
-                      class="tu-input"
-                      rows="5"
-                      :value="s.texto ?? ''"
-                      :maxlength="datos.catalogo.max_texto"
-                      @input="
-                        s.texto = texto(
-                          ($event.target as HTMLTextAreaElement).value,
-                        )
-                      "
-                    ></textarea>
-                    <p v-if="s.tipo === 'inicio'" class="sw-ayuda">
-                      {{ $t("sitioWeb.secciones.campos.textoInicioAyuda") }}
-                    </p>
-                  </div>
-                  <div
-                    v-if="
-                      datos.catalogo.con_foto.includes(s.tipo as TipoSeccion)
-                    "
-                  >
-                    <span class="tu-label">{{
-                      $t("sitioWeb.secciones.campos.foto")
-                    }}</span>
-                    <CargadorImagen
-                      :url="s.foto_url"
-                      ruta="sitio/imagenes"
-                      campo="imagen"
-                      clave="url"
-                      quitar-sin-borrar
-                      proporcion="4 / 3"
-                      :arrastra="$t('sitioWeb.secciones.campos.fotoArrastra')"
-                      @update:url="s.foto_url = $event"
-                    />
-                  </div>
-                  <p
-                    v-if="
-                      errorDe(`${prefijo}.${i}.titulo`) ||
-                      errorDe(`${prefijo}.${i}.texto`)
-                    "
-                    class="text-sm"
-                    style="color: var(--error)"
-                  >
-                    {{
-                      errorDe(`${prefijo}.${i}.titulo`) ??
-                      errorDe(`${prefijo}.${i}.texto`)
-                    }}
-                  </p>
-                  <!-- En una página propia, la sección del sistema se quita -->
-                  <button
-                    v-if="paginaEditada"
-                    type="button"
-                    class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
-                    :data-prueba="`quitar-${claveSeccion(s)}`"
-                    @click="quitarSeccion(i)"
-                  >
-                    {{ $t("sitioWeb.paginas.quitarSeccion") }}
-                  </button>
-                </div>
-              </li>
-            </ol>
-            <div class="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                class="tu-btn tu-btn-primario"
-                :disabled="!caben"
-                data-prueba="agregar-bloque"
-                @click="eligiendoBloque = true"
-              >
-                {{ $t("sitioWeb.bloques.agregar") }}
-              </button>
-              <p
-                v-if="!caben"
-                class="text-sm"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{
-                  $t("sitioWeb.bloques.tope", {
-                    n: datos.catalogo.bloques_maximos,
-                  })
-                }}
-              </p>
-            </div>
-            <p
-              v-if="errorDe(prefijo)"
-              class="mt-2 text-sm"
-              style="color: var(--error)"
-            >
-              {{ errorDe(prefijo) }}
-            </p>
-          </div>
-
-          <!-- Versiones publicadas: volver a una -->
-          <div
-            v-if="(datos.versiones ?? []).length > 0"
-            class="tu-card p-5"
-            data-prueba="versiones-sitio"
-          >
-            <h2 class="text-lg font-medium">
-              {{ $t("sitioWeb.versiones.titulo") }}
-            </h2>
-            <p class="mt-1 text-sm sw-suave">
-              {{ $t("sitioWeb.versiones.ayuda") }}
-            </p>
-            <ul class="mt-3 divide-y" :style="{ borderColor: 'var(--borde)' }">
-              <li
-                v-for="v in datos.versiones"
-                :key="v.id"
-                class="flex flex-wrap items-center justify-between gap-2 py-2.5"
-                data-prueba="version"
-              >
-                <span class="min-w-0 text-sm">
-                  <span class="block">{{
-                    v.publicada_en ? fecha(v.publicada_en) : "—"
-                  }}</span>
-                  <span v-if="v.publicada_por" class="block text-xs sw-suave">{{
-                    $t("sitioWeb.versiones.por", { nombre: v.publicada_por })
-                  }}</span>
-                </span>
-                <span
-                  v-if="v.actual"
-                  class="tu-estado text-sm"
-                  :style="{ '--tono': 'var(--exito)' }"
-                  >{{ $t("sitioWeb.versiones.actual") }}</span
-                >
+              <div class="mt-4 grid gap-3 sm:grid-cols-3" role="radiogroup">
                 <button
-                  v-else
+                  v-for="p in datos.catalogo.plantillas"
+                  :key="p.clave"
                   type="button"
-                  class="tu-btn tu-btn-fantasma text-sm"
-                  :disabled="ocupado"
-                  :data-prueba="`restaurar-${v.id}`"
-                  @click="restaurarVersion(v)"
-                >
-                  {{ $t("sitioWeb.versiones.volver") }}
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          <!-- Pie de página: en todas las páginas -->
-          <div class="tu-card p-5" data-prueba="pie-editor">
-            <h2 class="text-lg font-medium">
-              {{ $t("sitioWeb.pie.titulo") }}
-            </h2>
-            <p class="mt-1 text-sm sw-suave">{{ $t("sitioWeb.pie.ayuda") }}</p>
-            <textarea
-              v-model="borrador.pie.texto"
-              class="tu-input mt-3"
-              rows="3"
-              :maxlength="datos.catalogo.max_pie"
-              :aria-label="$t('sitioWeb.pie.titulo')"
-              :placeholder="$t('sitioWeb.pie.ejemplo')"
-            ></textarea>
-          </div>
-
-          <!-- Qué bloque agregar -->
-          <ModalDialogo
-            :abierto="eligiendoBloque"
-            :titulo="$t('sitioWeb.bloques.elegir')"
-            tam="lg"
-            @cerrar="eligiendoBloque = false"
-          >
-            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("sitioWeb.bloques.elegirAyuda") }}
-            </p>
-            <!-- En una página propia, también las secciones de tu negocio -->
-            <template v-if="seccionesDisponibles.length > 0">
-              <h3 class="mt-4 text-sm font-medium">
-                {{ $t("sitioWeb.paginas.delNegocio") }}
-              </h3>
-              <ul class="sw-catalogo mt-2" data-prueba="catalogo-secciones">
-                <li v-for="tipo in seccionesDisponibles" :key="tipo">
-                  <button
-                    type="button"
-                    class="sw-opcion-bloque"
-                    :data-prueba="`nueva-seccion-${tipo}`"
-                    @click="agregarSeccion(tipo)"
-                  >
-                    <span class="font-medium">{{ nombreSeccion(tipo) }}</span>
-                    <span class="mt-1 block text-sm sw-suave">{{
-                      tm(`sitioWeb.secciones.contenido.${tipo}`)
-                    }}</span>
-                  </button>
-                </li>
-              </ul>
-              <h3 class="mt-5 text-sm font-medium">
-                {{ $t("sitioWeb.paginas.propios") }}
-              </h3>
-            </template>
-            <ul class="sw-catalogo mt-4" data-prueba="catalogo-bloques">
-              <li v-for="tipo in datos.catalogo.bloques" :key="tipo">
-                <button
-                  type="button"
-                  class="sw-opcion-bloque"
-                  :data-prueba="`nuevo-${tipo}`"
-                  @click="agregarBloque(tipo)"
+                  role="radio"
+                  :aria-checked="borrador.plantilla === p.clave"
+                  class="sw-plantilla"
+                  :class="{
+                    'sw-plantilla-activa': borrador.plantilla === p.clave,
+                  }"
+                  :data-prueba="`plantilla-${p.clave}`"
+                  @click="usarPlantilla(p.clave)"
                 >
                   <span class="font-medium">{{
-                    $t(`sitioWeb.bloques.nombres.${tipo}`)
+                    $t(`sitioWeb.plantillas.${p.clave}`)
                   }}</span>
                   <span
                     class="mt-1 block text-sm"
                     :style="{ color: 'var(--texto-suave)' }"
-                    >{{ $t(`sitioWeb.bloques.descripciones.${tipo}`) }}</span
+                    >{{ $t(`sitioWeb.plantillas.${p.clave}Desc`) }}</span
                   >
+                  <span
+                    v-if="borrador.plantilla === p.clave"
+                    class="mt-2 flex items-center gap-1.5 text-xs"
+                  >
+                    <span
+                      class="sw-punto sw-punto-exito"
+                      aria-hidden="true"
+                    ></span>
+                    {{ $t("sitioWeb.plantillas.elegida") }}
+                  </span>
                 </button>
-              </li>
-            </ul>
-          </ModalDialogo>
-
-          <!-- Banners -->
-          <div class="tu-card p-5" data-prueba="banners">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 class="text-lg font-medium">
-                  {{ $t("sitioWeb.banners.titulo") }}
-                </h2>
-                <p
-                  class="mt-1 text-sm"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ $t("sitioWeb.banners.ayuda") }}
-                </p>
               </div>
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
-                :disabled="
-                  borrador.banners.length >= datos.catalogo.banners_maximos
-                "
-                data-prueba="agregar-banner"
-                @click="agregarBanner"
+              <p
+                v-if="borrador.plantilla === 'portada' && !portadaSubida"
+                class="mt-3 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("sitioWeb.banners.agregar") }}
-              </button>
+                {{ $t("sitioWeb.plantillas.portadaSinFoto") }}
+              </p>
             </div>
-            <p
-              v-if="borrador.banners.length === 0"
-              class="mt-4 text-sm"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t("sitioWeb.banners.vacio") }}
-            </p>
-            <p
-              v-else-if="
-                borrador.banners.length >= datos.catalogo.banners_maximos
-              "
-              class="mt-2 text-sm"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{
-                $t("sitioWeb.banners.tope", {
-                  n: datos.catalogo.banners_maximos,
-                })
-              }}
-            </p>
-            <ul class="mt-4 space-y-4">
-              <li
-                v-for="(b, i) in borrador.banners"
-                :key="b.id ?? `nuevo-${i}`"
-                class="sw-seccion space-y-4"
-                :data-prueba="`banner-${i}`"
+
+            <!-- Estilo del sitio (ADR 0146, fase 3) -->
+            <div class="tu-card p-5" data-prueba="estilo-sitio">
+              <h2 class="flex items-center gap-2 text-lg font-medium">
+                {{ $t("sitioWeb.estilo.titulo") }}
+                <span class="tu-badge">{{ $t("sitioWeb.plus.etiqueta") }}</span>
+              </h2>
+              <p class="mt-1 text-sm sw-suave">
+                {{ $t("sitioWeb.estilo.ayuda") }}
+              </p>
+              <p v-if="!conPlus" class="mt-3 text-sm" data-prueba="plus-estilo">
+                {{ $t("sitioWeb.plus.ayuda") }}
+                <RouterLink :to="{ name: 'renta' }" class="tu-enlace">{{
+                  $t("sitioWeb.plus.cambiarPlan")
+                }}</RouterLink>
+              </p>
+              <div
+                class="mt-4 space-y-5"
+                :class="{ 'sw-bloqueado': !conPlus }"
+                :inert="!conPlus || undefined"
               >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <label class="tu-label" :for="`sw-banner-titulo-${i}`">{{
-                      $t("sitioWeb.banners.campos.titulo")
-                    }}</label>
+                <!-- El color de las páginas públicas, aparte del de la app del negocio
+                   (color_marca, en Configuración › Perfil público). -->
+                <div data-prueba="color-sitio">
+                  <span class="tu-label">{{
+                    $t("sitioWeb.estilo.color")
+                  }}</span>
+                  <div class="flex flex-wrap items-center gap-3">
                     <input
-                      :id="`sw-banner-titulo-${i}`"
-                      v-model="b.titulo"
-                      class="tu-input"
-                      :maxlength="datos.catalogo.max_titulo"
+                      type="color"
+                      class="sw-color"
+                      :value="colorDelSitio"
+                      :aria-label="$t('sitioWeb.estilo.color')"
+                      aria-describedby="sw-color-ayuda"
+                      data-prueba="estilo-color"
+                      @change="elegirColor"
                     />
-                  </div>
-                  <button
-                    type="button"
-                    class="tu-icono-btn mt-6 shrink-0"
-                    :aria-label="$t('sitioWeb.banners.quitar')"
-                    @click="quitarBanner(i)"
-                  >
-                    <IconoNav nombre="cerrar" :tam="16" />
-                  </button>
-                </div>
-                <div>
-                  <label class="tu-label" :for="`sw-banner-texto-${i}`">{{
-                    $t("sitioWeb.banners.campos.texto")
-                  }}</label>
-                  <input
-                    :id="`sw-banner-texto-${i}`"
-                    class="tu-input"
-                    :value="b.texto ?? ''"
-                    maxlength="240"
-                    @input="
-                      b.texto = texto(($event.target as HTMLInputElement).value)
-                    "
-                  />
-                </div>
-                <div class="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label
-                      class="tu-label"
-                      :for="`sw-banner-enlace-texto-${i}`"
-                      >{{ $t("sitioWeb.banners.campos.enlaceTexto") }}</label
+                    <span class="text-sm sw-suave">{{
+                      borrador.estilo.color
+                        ? borrador.estilo.color
+                        : $t("sitioWeb.estilo.deTuMarca")
+                    }}</span>
+                    <button
+                      v-if="borrador.estilo.color"
+                      type="button"
+                      class="tu-enlace text-sm"
+                      data-prueba="estilo-color-marca"
+                      @click="borrador.estilo.color = null"
                     >
-                    <input
-                      :id="`sw-banner-enlace-texto-${i}`"
-                      class="tu-input"
-                      :value="b.enlace_texto ?? ''"
-                      maxlength="40"
-                      @input="
-                        b.enlace_texto = texto(
-                          ($event.target as HTMLInputElement).value,
-                        )
-                      "
-                    />
+                      {{ $t("sitioWeb.estilo.usarMarca") }}
+                    </button>
                   </div>
-                  <div>
-                    <label class="tu-label" :for="`sw-banner-enlace-${i}`">{{
-                      $t("sitioWeb.banners.campos.enlaceUrl")
-                    }}</label>
-                    <input
-                      :id="`sw-banner-enlace-${i}`"
-                      class="tu-input"
-                      :value="b.enlace_url ?? ''"
-                      maxlength="300"
-                      inputmode="url"
-                      @input="
-                        b.enlace_url = texto(
-                          ($event.target as HTMLInputElement).value,
-                        )
-                      "
-                    />
-                  </div>
+                  <p id="sw-color-ayuda" class="sw-ayuda">
+                    {{ $t("sitioWeb.estilo.colorAyuda") }}
+                  </p>
                 </div>
-                <p class="sw-ayuda -mt-2">
-                  {{ $t("sitioWeb.banners.campos.enlaceAyuda") }}
-                </p>
-                <div class="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label class="tu-label" :for="`sw-banner-desde-${i}`">{{
-                      $t("sitioWeb.banners.campos.desde")
-                    }}</label>
-                    <input
-                      :id="`sw-banner-desde-${i}`"
-                      type="date"
-                      class="tu-input"
-                      :value="b.desde ?? ''"
-                      @input="
-                        b.desde = texto(
-                          ($event.target as HTMLInputElement).value,
-                        )
-                      "
+                <div class="sw-color-app" data-prueba="color-app">
+                  <span class="tu-label">{{
+                    $t("sitioWeb.estilo.colorApp")
+                  }}</span>
+                  <div class="flex flex-wrap items-center gap-2 text-sm">
+                    <span
+                      v-if="datos.color_marca"
+                      class="sw-muestra"
+                      :style="{ background: datos.color_marca }"
+                      aria-hidden="true"
                     />
+                    <span>{{
+                      datos.color_marca ?? $t("sitioWeb.estilo.colorAppSin")
+                    }}</span>
                   </div>
-                  <div>
-                    <label class="tu-label" :for="`sw-banner-hasta-${i}`">{{
-                      $t("sitioWeb.banners.campos.hasta")
-                    }}</label>
-                    <input
-                      :id="`sw-banner-hasta-${i}`"
-                      type="date"
-                      class="tu-input"
-                      :value="b.hasta ?? ''"
-                      @input="
-                        b.hasta = texto(
-                          ($event.target as HTMLInputElement).value,
-                        )
-                      "
-                    />
-                  </div>
+                  <p class="sw-ayuda">
+                    {{ $t("sitioWeb.estilo.colorAppAyuda") }}
+                    <RouterLink
+                      :to="{
+                        name: 'sitio-web',
+                        query: { pestana: 'contenido' },
+                      }"
+                      class="tu-enlace"
+                      data-prueba="ir-color-app"
+                      >{{ $t("sitioWeb.estilo.colorAppDonde") }}</RouterLink
+                    >.
+                  </p>
                 </div>
-                <p class="sw-ayuda -mt-2">
-                  {{ $t("sitioWeb.banners.campos.vigenciaAyuda") }}
-                </p>
                 <div>
                   <span class="tu-label">{{
-                    $t("sitioWeb.banners.campos.foto")
+                    $t("sitioWeb.estilo.tipografia")
                   }}</span>
-                  <CargadorImagen
-                    :url="b.foto_url"
-                    ruta="sitio/imagenes"
-                    campo="imagen"
-                    clave="url"
-                    quitar-sin-borrar
-                    proporcion="16 / 7"
-                    :arrastra="$t('sitioWeb.secciones.campos.fotoArrastra')"
-                    @update:url="b.foto_url = $event"
-                  />
+                  <div
+                    class="sw-tipografias"
+                    role="radiogroup"
+                    :aria-label="$t('sitioWeb.estilo.tipografia')"
+                  >
+                    <button
+                      v-for="tipo in datos.catalogo.tipografias ?? []"
+                      :key="tipo"
+                      type="button"
+                      role="radio"
+                      class="sw-tipografia"
+                      :class="{
+                        'sw-tipografia-activa':
+                          borrador.estilo.tipografia === tipo,
+                      }"
+                      :aria-checked="borrador.estilo.tipografia === tipo"
+                      :style="{ fontFamily: letraDe(tipo) }"
+                      :data-prueba="`tipografia-${tipo}`"
+                      @click="borrador.estilo.tipografia = tipo"
+                    >
+                      <span class="block text-base">Aa</span>
+                      <span class="block text-xs">{{
+                        $t(`sitioWeb.estilo.tipografias.${tipo}`)
+                      }}</span>
+                    </button>
+                  </div>
                 </div>
-                <p
-                  v-for="campo in [
-                    'titulo',
-                    'texto',
-                    'enlace_texto',
-                    'enlace_url',
-                    'desde',
-                    'hasta',
-                    'foto_url',
-                  ]"
-                  v-show="errorDe(`banners.${i}.${campo}`)"
-                  :key="campo"
-                  class="text-sm"
-                  style="color: var(--error)"
-                >
-                  {{ errorDe(`banners.${i}.${campo}`) }}
-                </p>
-              </li>
-            </ul>
-          </div>
-        </div>
+                <div class="flex flex-wrap gap-x-6 gap-y-4">
+                  <div>
+                    <span class="tu-label">{{
+                      $t("sitioWeb.estilo.esquinas")
+                    }}</span>
+                    <div class="tu-segmentado" role="group">
+                      <button
+                        v-for="e in datos.catalogo.esquinas ?? []"
+                        :key="e"
+                        type="button"
+                        :aria-pressed="borrador.estilo.esquinas === e"
+                        :data-prueba="`esquinas-${e}`"
+                        @click="borrador.estilo.esquinas = e"
+                      >
+                        {{ $t(`sitioWeb.estilo.esquinasOpciones.${e}`) }}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <span class="tu-label">{{
+                      $t("sitioWeb.estilo.tema")
+                    }}</span>
+                    <div class="tu-segmentado" role="group">
+                      <button
+                        v-for="tm2 in datos.catalogo.temas ?? []"
+                        :key="tm2"
+                        type="button"
+                        :aria-pressed="borrador.estilo.tema === tm2"
+                        :data-prueba="`tema-${tm2}`"
+                        @click="borrador.estilo.tema = tm2"
+                      >
+                        {{ $t(`sitioWeb.estilo.temas.${tm2}`) }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <!-- El botón principal del encabezado -->
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label class="tu-label" for="sw-boton-principal">{{
+                      $t("sitioWeb.estilo.botonTexto")
+                    }}</label>
+                    <input
+                      id="sw-boton-principal"
+                      class="tu-input"
+                      maxlength="40"
+                      :placeholder="$t('sitioWeb.estilo.botonEjemplo')"
+                      :value="borrador.encabezado.boton_texto ?? ''"
+                      data-prueba="boton-principal-texto"
+                      @input="
+                        borrador.encabezado.boton_texto = texto(
+                          ($event.target as HTMLInputElement).value,
+                        )
+                      "
+                    />
+                  </div>
+                  <div>
+                    <label class="tu-label" for="sw-boton-enlace">{{
+                      $t("sitioWeb.estilo.botonEnlace")
+                    }}</label>
+                    <input
+                      id="sw-boton-enlace"
+                      class="tu-input"
+                      maxlength="300"
+                      placeholder="#agenda"
+                      :value="borrador.encabezado.boton_enlace ?? ''"
+                      data-prueba="boton-principal-enlace"
+                      @input="
+                        borrador.encabezado.boton_enlace = texto(
+                          ($event.target as HTMLInputElement).value,
+                        )
+                      "
+                    />
+                  </div>
+                  <p class="sw-ayuda sm:col-span-2">
+                    {{ $t("sitioWeb.estilo.botonAyuda") }}
+                  </p>
+                  <p
+                    v-if="
+                      errorDe('encabezado.boton_texto') ||
+                      errorDe('encabezado.boton_enlace') ||
+                      errorDe('estilo.color')
+                    "
+                    class="text-sm sm:col-span-2"
+                    style="color: var(--error)"
+                  >
+                    {{
+                      errorDe("encabezado.boton_texto") ??
+                      errorDe("encabezado.boton_enlace") ??
+                      errorDe("estilo.color")
+                    }}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-        <!-- Vista previa (en pantallas angostas, en otra pestaña) -->
-        <aside class="sw-previa" data-prueba="vista-previa">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 class="text-lg font-medium">
-              {{ $t("sitioWeb.acciones.vistaPrevia") }}
-            </h2>
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="tu-segmentado" role="group">
+            <!-- Páginas (ADR 0146): Inicio y las propias -->
+            <div class="tu-card p-5" data-prueba="paginas-sitio">
+              <h2 class="text-lg font-medium">
+                {{ $t("sitioWeb.paginas.titulo") }}
+              </h2>
+              <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("sitioWeb.paginas.ayuda") }}
+              </p>
+              <ol class="mt-4 space-y-2">
+                <li
+                  class="sw-seccion"
+                  :class="{ 'sw-pagina-activa': paginaSel === null }"
+                  data-prueba="pagina-inicio"
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      class="min-w-0 flex-1 basis-40 text-left"
+                      :aria-pressed="paginaSel === null"
+                      @click="elegirPagina(null)"
+                    >
+                      <span class="block font-medium">{{
+                        $t("sitioWeb.paginas.inicio")
+                      }}</span>
+                      <span class="block text-xs sw-suave">/</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                      :aria-expanded="configAbierta === 'inicio'"
+                      data-prueba="config-inicio"
+                      @click="
+                        configAbierta =
+                          configAbierta === 'inicio' ? null : 'inicio'
+                      "
+                    >
+                      {{ $t("sitioWeb.paginas.seo") }}
+                    </button>
+                  </div>
+                  <div v-if="configAbierta === 'inicio'" class="mt-4">
+                    <SeoPaginaSitio
+                      v-model="borrador.seo"
+                      :catalogo="datos.catalogo"
+                      prefijo="seo"
+                      :errores="errores"
+                      :placeholder-titulo="sesion.estudio?.nombre ?? ''"
+                    />
+                  </div>
+                </li>
+                <li
+                  v-for="(p, n) in borrador.paginas"
+                  :key="p.id ?? p.slug"
+                  class="sw-seccion"
+                  :class="{ 'sw-pagina-activa': paginaSel === p.id }"
+                  :data-prueba="`pagina-${p.slug}`"
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      class="min-w-0 flex-1 basis-40 text-left"
+                      :aria-pressed="paginaSel === p.id"
+                      @click="elegirPagina(p.id ?? null)"
+                    >
+                      <span class="block font-medium">{{ p.titulo }}</span>
+                      <span class="block text-xs sw-suave"
+                        >/p/{{ p.slug }} ·
+                        {{
+                          p.en_menu
+                            ? $t("sitioWeb.paginas.enMenu")
+                            : $t("sitioWeb.paginas.fueraMenu")
+                        }}</span
+                      >
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-icono-btn shrink-0"
+                      :disabled="n === 0"
+                      :aria-label="
+                        $t('sitioWeb.paginas.subir', { pagina: p.titulo })
+                      "
+                      @click="moverPagina(n, -1)"
+                    >
+                      <IconoNav nombre="arriba" :tam="16" />
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-icono-btn shrink-0"
+                      :disabled="n === borrador.paginas.length - 1"
+                      :aria-label="
+                        $t('sitioWeb.paginas.bajar', { pagina: p.titulo })
+                      "
+                      @click="moverPagina(n, 1)"
+                    >
+                      <IconoNav nombre="abajo" :tam="16" />
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                      :aria-expanded="configAbierta === p.id"
+                      :data-prueba="`config-${p.slug}`"
+                      @click="
+                        configAbierta =
+                          configAbierta === p.id ? null : (p.id ?? null)
+                      "
+                    >
+                      {{ $t("sitioWeb.paginas.configurar") }}
+                    </button>
+                  </div>
+                  <div v-if="configAbierta === p.id" class="mt-4 space-y-4">
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label class="tu-label" :for="`sw-pag-titulo-${n}`">{{
+                          $t("sitioWeb.paginas.campos.titulo")
+                        }}</label>
+                        <input
+                          :id="`sw-pag-titulo-${n}`"
+                          v-model="p.titulo"
+                          class="tu-input"
+                          :maxlength="datos.catalogo.max_titulo_pagina"
+                        />
+                      </div>
+                      <div>
+                        <label class="tu-label" :for="`sw-pag-dir-${n}`">{{
+                          $t("sitioWeb.paginas.campos.direccion")
+                        }}</label>
+                        <div class="sw-direccion">
+                          <span class="sw-suave">/p/</span>
+                          <input
+                            :id="`sw-pag-dir-${n}`"
+                            class="tu-input"
+                            :value="p.slug"
+                            :maxlength="datos.catalogo.max_direccion"
+                            :data-prueba="`direccion-${n}`"
+                            @change="
+                              cambiarDireccion(
+                                p,
+                                ($event.target as HTMLInputElement).value,
+                              )
+                            "
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm">
+                      <input v-model="p.en_menu" type="checkbox" />
+                      {{ $t("sitioWeb.paginas.campos.enMenu") }}
+                    </label>
+                    <SeoPaginaSitio
+                      v-model="p.seo"
+                      :catalogo="datos.catalogo"
+                      :prefijo="`paginas.${n}.seo`"
+                      :errores="errores"
+                      :placeholder-titulo="p.titulo"
+                    />
+                    <p
+                      v-if="
+                        errorDe(`paginas.${n}.slug`) ||
+                        errorDe(`paginas.${n}.titulo`)
+                      "
+                      class="text-sm"
+                      style="color: var(--error)"
+                    >
+                      {{
+                        errorDe(`paginas.${n}.slug`) ??
+                        errorDe(`paginas.${n}.titulo`)
+                      }}
+                    </p>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+                      :data-prueba="`quitar-pagina-${p.slug}`"
+                      @click="quitarPagina(n)"
+                    >
+                      {{ $t("sitioWeb.paginas.quitar") }}
+                    </button>
+                  </div>
+                </li>
+              </ol>
+              <div class="mt-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  :aria-pressed="anchoPrevia === 'telefono'"
-                  @click="anchoPrevia = 'telefono'"
+                  class="tu-btn tu-btn-fantasma"
+                  :disabled="!cabenPaginas || !conPlus"
+                  data-prueba="agregar-pagina"
+                  @click="agregandoPagina = true"
                 >
-                  {{ $t("sitioWeb.acciones.telefono") }}
+                  {{ $t("sitioWeb.paginas.agregar") }}
                 </button>
+                <span class="tu-badge">{{ $t("sitioWeb.plus.etiqueta") }}</span>
+                <p
+                  v-if="!conPlus"
+                  class="text-sm sw-suave"
+                  data-prueba="plus-paginas"
+                >
+                  {{ $t("sitioWeb.plus.paginas") }}
+                </p>
+                <p v-if="!cabenPaginas" class="text-sm sw-suave">
+                  {{
+                    $t("sitioWeb.paginas.tope", {
+                      n: datos.catalogo.paginas_maximas,
+                    })
+                  }}
+                </p>
+              </div>
+              <p
+                v-if="errorDe('paginas')"
+                class="mt-2 text-sm"
+                style="color: var(--error)"
+              >
+                {{ errorDe("paginas") }}
+              </p>
+            </div>
+
+            <!-- Nueva página: su título (la dirección sale de él) -->
+            <ModalDialogo
+              :abierto="agregandoPagina"
+              :titulo="$t('sitioWeb.paginas.nueva')"
+              tam="md"
+              @cerrar="agregandoPagina = false"
+            >
+              <form @submit.prevent="crearPagina">
+                <label class="tu-label" for="sw-nueva-pagina">{{
+                  $t("sitioWeb.paginas.campos.titulo")
+                }}</label>
+                <input
+                  id="sw-nueva-pagina"
+                  v-model="tituloNueva"
+                  class="tu-input"
+                  :maxlength="datos.catalogo.max_titulo_pagina"
+                  :placeholder="$t('sitioWeb.paginas.ejemplo')"
+                  data-prueba="titulo-pagina-nueva"
+                />
+                <p class="sw-ayuda">
+                  {{
+                    $t("sitioWeb.paginas.direccionAyuda", {
+                      direccion: direccionDe(tituloNueva) || "…",
+                    })
+                  }}
+                </p>
+                <button
+                  type="submit"
+                  class="tu-btn tu-btn-primario mt-4"
+                  :disabled="tituloNueva.trim() === ''"
+                  data-prueba="crear-pagina"
+                >
+                  {{ $t("sitioWeb.paginas.crear") }}
+                </button>
+              </form>
+            </ModalDialogo>
+
+            <!-- Secciones -->
+            <div class="tu-card p-5">
+              <h2 class="text-lg font-medium" data-prueba="titulo-secciones">
+                {{
+                  paginaEditada
+                    ? $t("sitioWeb.paginas.seccionesDe", {
+                        pagina: paginaEditada.titulo,
+                      })
+                    : $t("sitioWeb.secciones.titulo")
+                }}
+              </h2>
+              <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{
+                  paginaEditada
+                    ? $t("sitioWeb.paginas.seccionesAyuda")
+                    : $t("sitioWeb.secciones.ayuda")
+                }}
+              </p>
+              <p
+                v-if="paginaEditada && paginaEditada.secciones.length === 0"
+                class="mt-4 text-sm sw-suave"
+                data-prueba="pagina-vacia"
+              >
+                {{ $t("sitioWeb.paginas.vacia") }}
+              </p>
+              <ol class="mt-4 space-y-2" data-prueba="secciones">
+                <li
+                  v-for="(s, i) in seccionesActuales"
+                  :key="claveSeccion(s)"
+                  class="sw-seccion"
+                  :class="{ 'sw-seccion-propia': esBloque(s.tipo) }"
+                  :data-prueba="`seccion-${claveSeccion(s)}`"
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="min-w-0 flex-1 basis-40">
+                      <p class="font-medium">{{ nombreSeccion(s.tipo) }}</p>
+                      <p
+                        class="truncate text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{ detalleSeccion(s) }}
+                      </p>
+                    </div>
+                    <label
+                      v-if="!esFija(s.tipo)"
+                      class="flex shrink-0 items-center gap-1.5 text-sm"
+                    >
+                      <input
+                        v-model="s.visible"
+                        type="checkbox"
+                        :data-prueba="`visible-${s.tipo}`"
+                      />
+                      {{
+                        s.visible
+                          ? $t("sitioWeb.secciones.visible")
+                          : $t("sitioWeb.secciones.oculta")
+                      }}
+                    </label>
+                    <button
+                      type="button"
+                      class="tu-icono-btn shrink-0"
+                      :disabled="!puedeMover(i, -1)"
+                      :aria-label="
+                        $t('sitioWeb.secciones.subir', {
+                          seccion: nombreSeccion(s.tipo),
+                        })
+                      "
+                      :data-prueba="`subir-${s.tipo}`"
+                      @click="mover(i, -1)"
+                    >
+                      <IconoNav nombre="arriba" :tam="16" />
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-icono-btn shrink-0"
+                      :disabled="!puedeMover(i, 1)"
+                      :aria-label="
+                        $t('sitioWeb.secciones.bajar', {
+                          seccion: nombreSeccion(s.tipo),
+                        })
+                      "
+                      :data-prueba="`bajar-${s.tipo}`"
+                      @click="mover(i, 1)"
+                    >
+                      <IconoNav nombre="abajo" :tam="16" />
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                      :aria-expanded="abierta === claveSeccion(s)"
+                      :data-prueba="`editar-${claveSeccion(s)}`"
+                      @click="
+                        abierta =
+                          abierta === claveSeccion(s) ? null : claveSeccion(s)
+                      "
+                    >
+                      {{
+                        abierta === claveSeccion(s)
+                          ? $t("sitioWeb.secciones.cerrar")
+                          : $t("sitioWeb.secciones.editar")
+                      }}
+                    </button>
+                  </div>
+
+                  <!-- Un bloque propio: sus campos, duplicarlo o quitarlo -->
+                  <div
+                    v-if="esBloque(s.tipo) && abierta === claveSeccion(s)"
+                    class="mt-4"
+                  >
+                    <EditorBloqueSitio
+                      v-model="seccionesActuales[i]"
+                      :catalogo="datos.catalogo"
+                      :prefijo="`${prefijo}.${i}`"
+                      :errores="errores"
+                    />
+                    <div class="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        class="tu-btn tu-btn-fantasma text-sm"
+                        :disabled="!caben"
+                        :data-prueba="`duplicar-${claveSeccion(s)}`"
+                        @click="duplicar(i)"
+                      >
+                        {{ $t("sitioWeb.bloques.duplicar") }}
+                      </button>
+                      <button
+                        type="button"
+                        class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+                        :data-prueba="`quitar-${claveSeccion(s)}`"
+                        @click="quitarBloque(i)"
+                      >
+                        {{ $t("sitioWeb.bloques.quitar") }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    v-else-if="abierta === claveSeccion(s)"
+                    class="mt-4 space-y-4"
+                  >
+                    <div>
+                      <label class="tu-label" :for="`sw-titulo-${s.tipo}`">{{
+                        s.tipo === "inicio"
+                          ? $t("sitioWeb.secciones.campos.titular")
+                          : $t("sitioWeb.secciones.campos.titulo")
+                      }}</label>
+                      <input
+                        :id="`sw-titulo-${s.tipo}`"
+                        class="tu-input"
+                        :value="s.titulo ?? ''"
+                        :maxlength="datos.catalogo.max_titulo"
+                        :placeholder="
+                          s.tipo === 'inicio'
+                            ? (sesion.estudio?.nombre ?? '')
+                            : nombreSeccion(s.tipo)
+                        "
+                        @input="
+                          s.titulo = texto(
+                            ($event.target as HTMLInputElement).value,
+                          )
+                        "
+                      />
+                      <p class="sw-ayuda">
+                        {{
+                          s.tipo === "inicio"
+                            ? $t("sitioWeb.secciones.campos.titularAyuda")
+                            : $t("sitioWeb.secciones.campos.tituloAyuda")
+                        }}
+                      </p>
+                    </div>
+                    <div
+                      v-if="
+                        datos.catalogo.con_texto.includes(s.tipo as TipoSeccion)
+                      "
+                    >
+                      <label class="tu-label" :for="`sw-texto-${s.tipo}`">{{
+                        s.tipo === "inicio"
+                          ? $t("sitioWeb.secciones.campos.textoInicio")
+                          : $t("sitioWeb.secciones.campos.texto")
+                      }}</label>
+                      <textarea
+                        :id="`sw-texto-${s.tipo}`"
+                        class="tu-input"
+                        rows="5"
+                        :value="s.texto ?? ''"
+                        :maxlength="datos.catalogo.max_texto"
+                        @input="
+                          s.texto = texto(
+                            ($event.target as HTMLTextAreaElement).value,
+                          )
+                        "
+                      ></textarea>
+                      <p v-if="s.tipo === 'inicio'" class="sw-ayuda">
+                        {{ $t("sitioWeb.secciones.campos.textoInicioAyuda") }}
+                      </p>
+                    </div>
+                    <div
+                      v-if="
+                        datos.catalogo.con_foto.includes(s.tipo as TipoSeccion)
+                      "
+                    >
+                      <span class="tu-label">{{
+                        $t("sitioWeb.secciones.campos.foto")
+                      }}</span>
+                      <CargadorImagen
+                        :url="s.foto_url"
+                        ruta="sitio/imagenes"
+                        campo="imagen"
+                        clave="url"
+                        quitar-sin-borrar
+                        proporcion="4 / 3"
+                        :arrastra="$t('sitioWeb.secciones.campos.fotoArrastra')"
+                        @update:url="s.foto_url = $event"
+                      />
+                    </div>
+                    <p
+                      v-if="
+                        errorDe(`${prefijo}.${i}.titulo`) ||
+                        errorDe(`${prefijo}.${i}.texto`)
+                      "
+                      class="text-sm"
+                      style="color: var(--error)"
+                    >
+                      {{
+                        errorDe(`${prefijo}.${i}.titulo`) ??
+                        errorDe(`${prefijo}.${i}.texto`)
+                      }}
+                    </p>
+                    <!-- En una página propia, la sección del sistema se quita -->
+                    <button
+                      v-if="paginaEditada"
+                      type="button"
+                      class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+                      :data-prueba="`quitar-${claveSeccion(s)}`"
+                      @click="quitarSeccion(i)"
+                    >
+                      {{ $t("sitioWeb.paginas.quitarSeccion") }}
+                    </button>
+                  </div>
+                </li>
+              </ol>
+              <div class="mt-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  :aria-pressed="anchoPrevia === 'computadora'"
-                  @click="anchoPrevia = 'computadora'"
+                  class="tu-btn tu-btn-primario"
+                  :disabled="!caben || !conPlus"
+                  data-prueba="agregar-bloque"
+                  @click="eligiendoBloque = true"
                 >
-                  {{ $t("sitioWeb.acciones.computadora") }}
+                  {{ $t("sitioWeb.bloques.agregar") }}
+                </button>
+                <span class="tu-badge">{{ $t("sitioWeb.plus.etiqueta") }}</span>
+                <p
+                  v-if="!conPlus"
+                  class="text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  data-prueba="plus-bloques"
+                >
+                  {{ $t("sitioWeb.plus.bloques") }}
+                </p>
+                <p
+                  v-if="!caben"
+                  class="text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{
+                    $t("sitioWeb.bloques.tope", {
+                      n: datos.catalogo.bloques_maximos,
+                    })
+                  }}
+                </p>
+              </div>
+              <p
+                v-if="errorDe(prefijo)"
+                class="mt-2 text-sm"
+                style="color: var(--error)"
+              >
+                {{ errorDe(prefijo) }}
+              </p>
+            </div>
+
+            <!-- Versiones publicadas: volver a una -->
+            <div
+              v-if="(datos.versiones ?? []).length > 0"
+              class="tu-card p-5"
+              data-prueba="versiones-sitio"
+            >
+              <h2 class="text-lg font-medium">
+                {{ $t("sitioWeb.versiones.titulo") }}
+              </h2>
+              <p class="mt-1 text-sm sw-suave">
+                {{ $t("sitioWeb.versiones.ayuda") }}
+              </p>
+              <ul
+                class="mt-3 divide-y"
+                :style="{ borderColor: 'var(--borde)' }"
+              >
+                <li
+                  v-for="v in datos.versiones"
+                  :key="v.id"
+                  class="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                  data-prueba="version"
+                >
+                  <span class="min-w-0 text-sm">
+                    <span class="block">{{
+                      v.publicada_en ? fecha(v.publicada_en) : "—"
+                    }}</span>
+                    <span
+                      v-if="v.publicada_por"
+                      class="block text-xs sw-suave"
+                      >{{
+                        $t("sitioWeb.versiones.por", {
+                          nombre: v.publicada_por,
+                        })
+                      }}</span
+                    >
+                  </span>
+                  <span
+                    v-if="v.actual"
+                    class="tu-estado text-sm"
+                    :style="{ '--tono': 'var(--exito)' }"
+                    >{{ $t("sitioWeb.versiones.actual") }}</span
+                  >
+                  <button
+                    v-else
+                    type="button"
+                    class="tu-btn tu-btn-fantasma text-sm"
+                    :disabled="ocupado"
+                    :data-prueba="`restaurar-${v.id}`"
+                    @click="restaurarVersion(v)"
+                  >
+                    {{ $t("sitioWeb.versiones.volver") }}
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Pie de página: en todas las páginas -->
+            <div class="tu-card p-5" data-prueba="pie-editor">
+              <h2 class="text-lg font-medium">
+                {{ $t("sitioWeb.pie.titulo") }}
+              </h2>
+              <p class="mt-1 text-sm sw-suave">
+                {{ $t("sitioWeb.pie.ayuda") }}
+              </p>
+              <textarea
+                v-model="borrador.pie.texto"
+                class="tu-input mt-3"
+                rows="3"
+                :maxlength="datos.catalogo.max_pie"
+                :aria-label="$t('sitioWeb.pie.titulo')"
+                :placeholder="$t('sitioWeb.pie.ejemplo')"
+              ></textarea>
+            </div>
+
+            <!-- Qué bloque agregar -->
+            <ModalDialogo
+              :abierto="eligiendoBloque"
+              :titulo="$t('sitioWeb.bloques.elegir')"
+              tam="lg"
+              @cerrar="eligiendoBloque = false"
+            >
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("sitioWeb.bloques.elegirAyuda") }}
+              </p>
+              <!-- En una página propia, también las secciones de tu negocio -->
+              <template v-if="seccionesDisponibles.length > 0">
+                <h3 class="mt-4 text-sm font-medium">
+                  {{ $t("sitioWeb.paginas.delNegocio") }}
+                </h3>
+                <ul class="sw-catalogo mt-2" data-prueba="catalogo-secciones">
+                  <li v-for="tipo in seccionesDisponibles" :key="tipo">
+                    <button
+                      type="button"
+                      class="sw-opcion-bloque"
+                      :data-prueba="`nueva-seccion-${tipo}`"
+                      @click="agregarSeccion(tipo)"
+                    >
+                      <span class="font-medium">{{ nombreSeccion(tipo) }}</span>
+                      <span class="mt-1 block text-sm sw-suave">{{
+                        tm(`sitioWeb.secciones.contenido.${tipo}`)
+                      }}</span>
+                    </button>
+                  </li>
+                </ul>
+                <h3 class="mt-5 text-sm font-medium">
+                  {{ $t("sitioWeb.paginas.propios") }}
+                </h3>
+              </template>
+              <ul class="sw-catalogo mt-4" data-prueba="catalogo-bloques">
+                <li v-for="tipo in datos.catalogo.bloques" :key="tipo">
+                  <button
+                    type="button"
+                    class="sw-opcion-bloque"
+                    :data-prueba="`nuevo-${tipo}`"
+                    @click="agregarBloque(tipo)"
+                  >
+                    <span class="font-medium">{{
+                      $t(`sitioWeb.bloques.nombres.${tipo}`)
+                    }}</span>
+                    <span
+                      class="mt-1 block text-sm"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{ $t(`sitioWeb.bloques.descripciones.${tipo}`) }}</span
+                    >
+                  </button>
+                </li>
+              </ul>
+            </ModalDialogo>
+
+            <!-- Banners -->
+            <div class="tu-card p-5" data-prueba="banners">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-lg font-medium">
+                    {{ $t("sitioWeb.banners.titulo") }}
+                  </h2>
+                  <p
+                    class="mt-1 text-sm"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ $t("sitioWeb.banners.ayuda") }}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma text-sm"
+                  :disabled="
+                    borrador.banners.length >= datos.catalogo.banners_maximos
+                  "
+                  data-prueba="agregar-banner"
+                  @click="agregarBanner"
+                >
+                  {{ $t("sitioWeb.banners.agregar") }}
                 </button>
               </div>
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
-                @click="vuelta++"
+              <p
+                v-if="borrador.banners.length === 0"
+                class="mt-4 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("sitioWeb.acciones.actualizar") }}
-              </button>
-              <a
-                :href="urlPrevia"
-                target="_blank"
-                rel="noopener"
-                class="tu-enlace text-sm"
-                >{{ $t("sitioWeb.acciones.abrirPestana") }}</a
+                {{ $t("sitioWeb.banners.vacio") }}
+              </p>
+              <p
+                v-else-if="
+                  borrador.banners.length >= datos.catalogo.banners_maximos
+                "
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
               >
+                {{
+                  $t("sitioWeb.banners.tope", {
+                    n: datos.catalogo.banners_maximos,
+                  })
+                }}
+              </p>
+              <ul class="mt-4 space-y-4">
+                <li
+                  v-for="(b, i) in borrador.banners"
+                  :key="b.id ?? `nuevo-${i}`"
+                  class="sw-seccion space-y-4"
+                  :data-prueba="`banner-${i}`"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                      <label class="tu-label" :for="`sw-banner-titulo-${i}`">{{
+                        $t("sitioWeb.banners.campos.titulo")
+                      }}</label>
+                      <input
+                        :id="`sw-banner-titulo-${i}`"
+                        v-model="b.titulo"
+                        class="tu-input"
+                        :maxlength="datos.catalogo.max_titulo"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      class="tu-icono-btn mt-6 shrink-0"
+                      :aria-label="$t('sitioWeb.banners.quitar')"
+                      @click="quitarBanner(i)"
+                    >
+                      <IconoNav nombre="cerrar" :tam="16" />
+                    </button>
+                  </div>
+                  <div>
+                    <label class="tu-label" :for="`sw-banner-texto-${i}`">{{
+                      $t("sitioWeb.banners.campos.texto")
+                    }}</label>
+                    <input
+                      :id="`sw-banner-texto-${i}`"
+                      class="tu-input"
+                      :value="b.texto ?? ''"
+                      maxlength="240"
+                      @input="
+                        b.texto = texto(
+                          ($event.target as HTMLInputElement).value,
+                        )
+                      "
+                    />
+                  </div>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label
+                        class="tu-label"
+                        :for="`sw-banner-enlace-texto-${i}`"
+                        >{{ $t("sitioWeb.banners.campos.enlaceTexto") }}</label
+                      >
+                      <input
+                        :id="`sw-banner-enlace-texto-${i}`"
+                        class="tu-input"
+                        :value="b.enlace_texto ?? ''"
+                        maxlength="40"
+                        @input="
+                          b.enlace_texto = texto(
+                            ($event.target as HTMLInputElement).value,
+                          )
+                        "
+                      />
+                    </div>
+                    <div>
+                      <label class="tu-label" :for="`sw-banner-enlace-${i}`">{{
+                        $t("sitioWeb.banners.campos.enlaceUrl")
+                      }}</label>
+                      <input
+                        :id="`sw-banner-enlace-${i}`"
+                        class="tu-input"
+                        :value="b.enlace_url ?? ''"
+                        maxlength="300"
+                        inputmode="url"
+                        @input="
+                          b.enlace_url = texto(
+                            ($event.target as HTMLInputElement).value,
+                          )
+                        "
+                      />
+                    </div>
+                  </div>
+                  <p class="sw-ayuda -mt-2">
+                    {{ $t("sitioWeb.banners.campos.enlaceAyuda") }}
+                  </p>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label class="tu-label" :for="`sw-banner-desde-${i}`">{{
+                        $t("sitioWeb.banners.campos.desde")
+                      }}</label>
+                      <input
+                        :id="`sw-banner-desde-${i}`"
+                        type="date"
+                        class="tu-input"
+                        :value="b.desde ?? ''"
+                        @input="
+                          b.desde = texto(
+                            ($event.target as HTMLInputElement).value,
+                          )
+                        "
+                      />
+                    </div>
+                    <div>
+                      <label class="tu-label" :for="`sw-banner-hasta-${i}`">{{
+                        $t("sitioWeb.banners.campos.hasta")
+                      }}</label>
+                      <input
+                        :id="`sw-banner-hasta-${i}`"
+                        type="date"
+                        class="tu-input"
+                        :value="b.hasta ?? ''"
+                        @input="
+                          b.hasta = texto(
+                            ($event.target as HTMLInputElement).value,
+                          )
+                        "
+                      />
+                    </div>
+                  </div>
+                  <p class="sw-ayuda -mt-2">
+                    {{ $t("sitioWeb.banners.campos.vigenciaAyuda") }}
+                  </p>
+                  <div>
+                    <span class="tu-label">{{
+                      $t("sitioWeb.banners.campos.foto")
+                    }}</span>
+                    <CargadorImagen
+                      :url="b.foto_url"
+                      ruta="sitio/imagenes"
+                      campo="imagen"
+                      clave="url"
+                      quitar-sin-borrar
+                      proporcion="16 / 7"
+                      :arrastra="$t('sitioWeb.secciones.campos.fotoArrastra')"
+                      @update:url="b.foto_url = $event"
+                    />
+                  </div>
+                  <p
+                    v-for="campo in [
+                      'titulo',
+                      'texto',
+                      'enlace_texto',
+                      'enlace_url',
+                      'desde',
+                      'hasta',
+                      'foto_url',
+                    ]"
+                    v-show="errorDe(`banners.${i}.${campo}`)"
+                    :key="campo"
+                    class="text-sm"
+                    style="color: var(--error)"
+                  >
+                    {{ errorDe(`banners.${i}.${campo}`) }}
+                  </p>
+                </li>
+              </ul>
             </div>
           </div>
-          <p
-            class="mt-2 text-sm"
-            :style="{
-              color: previaValida ? 'var(--texto-suave)' : 'var(--aviso)',
-            }"
-            data-prueba="previa-estado"
-          >
-            {{
-              !previaValida
-                ? $t("sitioWeb.editor.incompleto")
-                : sinGuardar
-                  ? $t("sitioWeb.editor.enVivo")
-                  : $t("sitioWeb.editor.ayuda")
-            }}
-          </p>
-          <div class="sw-marco mt-3" :class="`sw-marco-${anchoPrevia}`">
-            <iframe
-              ref="marcoPrevia"
-              :key="vuelta"
-              :src="urlPrevia"
-              :title="$t('sitioWeb.acciones.vistaPrevia')"
-              loading="lazy"
-            ></iframe>
-          </div>
-        </aside>
+
+          <!-- Vista previa (en pantallas angostas, en otra pestaña) -->
+          <aside class="sw-previa" data-prueba="vista-previa">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-lg font-medium">
+                {{ $t("sitioWeb.acciones.vistaPrevia") }}
+              </h2>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="tu-segmentado" role="group">
+                  <button
+                    type="button"
+                    :aria-pressed="anchoPrevia === 'telefono'"
+                    @click="anchoPrevia = 'telefono'"
+                  >
+                    {{ $t("sitioWeb.acciones.telefono") }}
+                  </button>
+                  <button
+                    type="button"
+                    :aria-pressed="anchoPrevia === 'computadora'"
+                    @click="anchoPrevia = 'computadora'"
+                  >
+                    {{ $t("sitioWeb.acciones.computadora") }}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma text-sm"
+                  @click="vuelta++"
+                >
+                  {{ $t("sitioWeb.acciones.actualizar") }}
+                </button>
+                <a
+                  :href="urlPrevia"
+                  target="_blank"
+                  rel="noopener"
+                  class="tu-enlace text-sm"
+                  >{{ $t("sitioWeb.acciones.abrirPestana") }}</a
+                >
+              </div>
+            </div>
+            <p
+              class="mt-2 text-sm"
+              :style="{
+                color: previaValida ? 'var(--texto-suave)' : 'var(--aviso)',
+              }"
+              data-prueba="previa-estado"
+            >
+              {{
+                !previaValida
+                  ? $t("sitioWeb.editor.incompleto")
+                  : sinGuardar
+                    ? $t("sitioWeb.editor.enVivo")
+                    : $t("sitioWeb.editor.ayuda")
+              }}
+            </p>
+            <div class="sw-marco mt-3" :class="`sw-marco-${anchoPrevia}`">
+              <iframe
+                ref="marcoPrevia"
+                :key="vuelta"
+                :src="urlPrevia"
+                :title="$t('sitioWeb.acciones.vistaPrevia')"
+                loading="lazy"
+              ></iframe>
+            </div>
+          </aside>
+        </div>
       </div>
+
+      <SitioReservasVentas
+        v-if="pestana === 'reservas'"
+        class="mt-6"
+        :secciones="borrador.secciones"
+        @mostrar="mostrarSeccion"
+      />
+      <SitioCompartir v-if="pestana === 'compartir'" class="mt-6" />
+      <SitioDominio
+        v-if="pestana === 'dominio'"
+        v-model:seo="borrador.seo"
+        class="mt-6"
+        :catalogo="datos.catalogo"
+        :errores="errores"
+        :publicacion="
+          datos.publicacion ?? {
+            publicado: datos.pagina_publica,
+            privado: false,
+          }
+        "
+        :paginas="borrador.paginas.length"
+        :con-plus="conPlus"
+        @publicacion="publicacionActualizada"
+        @ir-a-paginas="elegirPestana('contenido')"
+      />
     </template>
   </section>
 </template>
 
 <style scoped>
+/* La barra del estado y publicar queda a la vista al bajar (debajo de la barra
+   superior del panel). En el teléfono no: con sus botones ocuparía media pantalla. */
+@media (min-width: 768px) {
+  .sw-barra {
+    position: sticky;
+    top: 4.5rem;
+    z-index: 5;
+  }
+}
+.sw-bloqueado {
+  opacity: 0.6;
+}
 .sw-columnas {
   display: grid;
   gap: 1.5rem;

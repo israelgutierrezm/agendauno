@@ -148,17 +148,30 @@ describe("registro de acceso", () => {
 });
 
 describe("menú del negocio", () => {
-  it("tres grupos: operación diaria, gestión y configuración", () => {
+  it("cuatro grupos: operación diaria, gestión, captación y configuración (ADR 0167)", () => {
     expect(MENU_NEGOCIO.map((g) => g.clave)).toEqual([
       "operacion",
       "gestion",
+      "captacion",
       "configuracion",
     ]);
     expect(MENU_NEGOCIO.map((g) => g.areas.map((a) => a.clave))).toEqual([
       ["inicio", "agenda", "clientes", "cobros"],
-      ["ventas", "captacion", "equipo", "marketing", "reportes"],
+      ["ventas", "equipo", "marketing", "reportes"],
+      ["prospectos", "sitio", "campanas"],
       ["configuracion", "suscripcion"],
     ]);
+  });
+
+  it("el sitio web es una entrada directa de Captación, fuera de Configuración", () => {
+    const captacion = MENU_NEGOCIO.find((g) => g.clave === "captacion")!;
+    const sitio = captacion.areas.find((a) => a.clave === "sitio")!;
+    expect(sitio.vistas.map((v) => v.ruta)).toEqual(["sitio-web"]);
+    expect(CATEGORIAS_CONFIGURACION.map((c) => c.clave)).not.toContain("sitio");
+    const configuracion = MENU_NEGOCIO.flatMap((g) => g.areas).find(
+      (a) => a.clave === "configuracion",
+    )!;
+    expect(configuracion.vistas.map((v) => v.ruta)).not.toContain("sitio-web");
   });
 
   it("ninguna pantalla se perdió: los 38 destinos del panel siguen en el menú", () => {
@@ -175,10 +188,12 @@ describe("menú del negocio", () => {
       "clientes",
       "cobros",
       "ventas",
-      "captacion",
       "equipo",
       "marketing",
       "reportes",
+      "prospectos",
+      "sitio",
+      "campanas",
       "configuracion",
       "suscripcion",
     ]);
@@ -189,9 +204,17 @@ describe("menú del negocio", () => {
   it("Captación (prospectos) va aparte de Miembros y solo con su permiso", () => {
     const conProspectos = sesion(["miembros.ver", "prospectos.ver"]);
     const sinProspectos = sesion(["miembros.ver", "agenda.ver"]);
-    expect(areas(conProspectos)).toContain("captacion");
-    expect(destino(conProspectos, "captacion")).toBe("prospectos");
-    expect(areas(sinProspectos)).not.toContain("captacion");
+    expect(areas(conProspectos)).toContain("prospectos");
+    expect(destino(conProspectos, "prospectos")).toBe("prospectos");
+    // Quien atiende prospectos también comparte el sitio (enlace, QR y widgets).
+    expect(areas(conProspectos)).toContain("sitio");
+    expect(areas(sinProspectos)).not.toContain("prospectos");
+    expect(areas(sinProspectos)).not.toContain("sitio");
+  });
+
+  it("Campañas pide ver los números del negocio y el reporte avanzado del plan", () => {
+    expect(areas(sesion(["facturacion.ver"]))).toContain("campanas");
+    expect(areas(sesion(["prospectos.ver"]))).not.toContain("campanas");
   });
 
   it("las vistas respetan la modalidad: Horarios en citas, Lugares disponibles en clases", () => {

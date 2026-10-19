@@ -40,10 +40,9 @@ async function montar(hash: string) {
       plugins: [router, i18n],
       stubs: {
         CargadorLogo: { template: "<div>Logo</div>" },
-        PerfilPublicoNegocio: {
-          template: '<div><input data-prueba="borrador-perfil" /></div>',
+        GiroNegocio: {
+          template: '<div><input data-prueba="borrador-giro" /></div>',
         },
-        GiroNegocio: { template: "<div>Giro</div>" },
         TerminologiaNegocio: { template: "<div>Terminología</div>" },
       },
     },
@@ -54,26 +53,30 @@ async function montar(hash: string) {
 
 describe("configuración acotada por opción", () => {
   it("muestra solamente el ajuste elegido y conserva el borrador al cambiar de sección", async () => {
-    const { w, router } = await montar("#pagina-publica");
-    expect(w.get("#pagina-publica").isVisible()).toBe(true);
+    const { w, router } = await montar("#tipo-negocio");
+    expect(w.get("#tipo-negocio").isVisible()).toBe(true);
     expect(w.get("#datos").isVisible()).toBe(false);
-    expect(w.get("#tipo-negocio").isVisible()).toBe(false);
-    await w.get('[data-prueba="borrador-perfil"]').setValue("Sin guardar");
+    expect(w.get("#terminologia").isVisible()).toBe(false);
+    await w.get('[data-prueba="borrador-giro"]').setValue("Sin guardar");
     await router.push({ name: "configuracion", hash: "#terminologia" });
     await flushPromises();
     expect(router.currentRoute.value.hash).toBe("#terminologia");
-    expect(w.get("#terminologia").isVisible()).toBe(true);
-    // JSDOM conserva el estilo calculado de nodos desconectados; verificamos
-    // el v-show aplicado al contenedor sin desmontar su formulario.
-    expect(w.get("#pagina-publica").attributes("style")).toContain(
+    expect(w.get("#terminologia").attributes("style") ?? "").not.toContain(
       "display: none",
     );
-    await router.push({ name: "configuracion", hash: "#pagina-publica" });
+    // JSDOM conserva el estilo calculado de nodos desconectados; verificamos
+    // el v-show aplicado al contenedor sin desmontar su formulario.
+    expect(w.get("#tipo-negocio").attributes("style")).toContain(
+      "display: none",
+    );
+    await router.push({ name: "configuracion", hash: "#tipo-negocio" });
     await flushPromises();
     expect(
-      (w.get('[data-prueba="borrador-perfil"]').element as HTMLInputElement)
+      (w.get('[data-prueba="borrador-giro"]').element as HTMLInputElement)
         .value,
     ).toBe("Sin guardar");
+    // La página pública ya no está aquí: pasó a Captación › Sitio web (ADR 0167).
+    expect(w.find("#pagina-publica").exists()).toBe(false);
     w.unmount();
   });
   it("mantiene la vista general sin ancla y no expone editores sin permiso", async () => {

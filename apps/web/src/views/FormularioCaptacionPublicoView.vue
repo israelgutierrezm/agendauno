@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
+import HechoCon from "@/components/HechoCon.vue";
 import type { FormularioPublico } from "@/lib/captacion";
 
 /**
@@ -71,5 +72,9 @@ onBeforeUnmount(() => observador?.disconnect());
         @enviado="avisarAltura"
       />
     </div>
+    <!-- Dentro de otra web no hay pie: la leyenda fija va aquí (ADR 0167). -->
+    <p v-if="embebido" class="mt-3 text-center">
+      <HechoCon />
+    </p>
   </section>
 </template>

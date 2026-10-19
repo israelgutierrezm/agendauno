@@ -105,6 +105,8 @@ export default {
     preguntas: "Preguntas",
     encontrarNegocio: "¿Buscas reservar? Encuentra tu negocio",
     reservasPor: "Reservas en línea con AgendaUno",
+    // La leyenda fija de la plataforma en las páginas de cada negocio (ADR 0167).
+    hechoCon: "Hecho con {marca}",
     panel: "Panel",
     miCuenta: "Mi cuenta",
     miembros: "Miembros",
@@ -144,6 +146,7 @@ export default {
       ventas: "Ventas",
       operacionDiaria: "Operación diaria",
       gestion: "Gestión",
+      captacion: "Captación",
       configuracion: "Configuración",
     },
     // Áreas del lateral (una por tema) y sus vistas en pestañas.
@@ -152,6 +155,9 @@ export default {
       configuracion: "Configuración del negocio",
       // Quien todavía no es cliente (ADR 0117), aparte de Miembros.
       captacion: "Captación",
+      // Captación (ADR 0167): su sitio web y sus campañas.
+      sitio: "Sitio web",
+      campanas: "Campañas",
     },
     vistas: {
       resumen: "Resumen",
@@ -173,6 +179,14 @@ export default {
       prospectos: "Prospectos",
       formulariosCaptacion: "Formularios de captación",
     },
+  },
+  // Campañas en Captación (ADR 0167): el reporte por campaña con su periodo.
+  campanasVista: {
+    descripcion:
+      "De dónde llegaron tus visitas, solicitudes y ventas, por campaña.",
+    desde: "Desde",
+    hasta: "Hasta",
+    periodoInvalido: "La fecha de inicio va antes de la de fin.",
   },
   // Configuración del negocio: portada, categorías y opciones.
   configNegocio: {

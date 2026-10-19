@@ -111,7 +111,12 @@ describe("barra lateral", () => {
     const { w } = await montar(NavLateral, { name: "ficha-miembro" });
 
     const titulos = w.findAll(".nl-titulo").map((t) => t.text());
-    expect(titulos).toEqual(["Operación diaria", "Gestión", "Configuración"]);
+    expect(titulos).toEqual([
+      "Operación diaria",
+      "Gestión",
+      "Captación",
+      "Configuración",
+    ]);
     const activas = w.findAll('[aria-current="page"]');
     expect(activas).toHaveLength(1);
     // La ficha de un alumno deja activa el área de alumnos.

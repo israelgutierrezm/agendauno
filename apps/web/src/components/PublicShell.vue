@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import HechoCon from "@/components/HechoCon.vue";
 import LogoProducto from "@/components/LogoProducto.vue";
 import { trackEvent } from "@/lib/analytics";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
@@ -209,10 +210,11 @@ defineEmits<{ alternarTema: [] }>();
     <footer class="tu-public-footer text-sm">
       <div class="tu-public-footer-inner mx-auto max-w-7xl px-4">
         <div class="tu-public-footer-brand">
-          <span>{{
-            esRutaPublicaDeNegocio
-              ? $t("nav.reservasPor")
-              : "© " + new Date().getFullYear() + " " + marca
+          <!-- En la página de un negocio, la leyenda fija de la plataforma (ADR 0167):
+               no depende de ningún ajuste del negocio. -->
+          <HechoCon v-if="esRutaPublicaDeNegocio" />
+          <span v-else>{{
+            "© " + new Date().getFullYear() + " " + marca
           }}</span>
           <p v-if="!esRutaPublicaDeNegocio" class="tu-public-footer-note">
             {{

@@ -110,4 +110,10 @@ describe("widget de planes", () => {
 
     expect(w.find('[data-prueba="widget-no-disponible"]').exists()).toBe(true);
   });
+
+  it("lleva la leyenda de la plataforma, también dentro de otra web (ADR 0167)", async () => {
+    const w = montar();
+    await flushPromises();
+    expect(w.find('[data-prueba="hecho-con"]').exists()).toBe(true);
+  });
 });

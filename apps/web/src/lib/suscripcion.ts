@@ -72,6 +72,7 @@ export type FuncionPlan =
   | "comisiones"
   | "promociones"
   | "documentos"
+  | "sitio_avanzado"
   | "facturacion"
   | "venta_en_linea"
   | "formularios"
@@ -107,6 +108,8 @@ export const ETIQUETAS_FUNCION: Record<FuncionPlan, string> = {
   inventario: "Mostrador e inventario",
   comisiones: "Comisiones y nómina",
   documentos: "Documentos y consentimientos",
+  // «Plus» del sitio (ADR 0167): estilo propio, más páginas y bloques.
+  sitio_avanzado: "Sitio web avanzado",
   facturacion: "Facturación electrónica*",
   venta_en_linea: "Venta en línea de bonos*",
   formularios: "Formularios personalizables",
@@ -130,6 +133,7 @@ export const NIVEL_POR_OMISION: Record<FuncionPlan, NivelPlan> = {
   inventario: "premium",
   comisiones: "premium",
   documentos: "premium",
+  sitio_avanzado: "premium",
   facturacion: "pro",
   venta_en_linea: "pro",
   formularios: "pro",

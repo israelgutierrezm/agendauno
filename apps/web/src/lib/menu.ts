@@ -156,34 +156,6 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
       ),
     ],
   },
-  // Su sitio, en un rubro propio: el constructor de páginas y la página pública
-  // (portada, descripción, redes y si aparece en Explorar).
-  {
-    clave: "sitio",
-    etiqueta: "sitioWeb.categoria.titulo",
-    descripcion: "sitioWeb.categoria.descripcion",
-    icono: "contenido",
-    opciones: [
-      // El constructor del sitio (ADR 0114).
-      o("sitio", "sitio-web", "sitioWeb.categoria.constructor", [
-        "sitio",
-        "plantilla",
-        "secciones",
-        "banners",
-        "promociones",
-        "nosotros",
-        "vista previa",
-        "publicar",
-      ]),
-      o(
-        "pagina",
-        "configuracion",
-        "configNegocio.opciones.pagina",
-        ["página pública", "portada", "directorio", "redes", "enlace"],
-        { hash: "#pagina-publica" },
-      ),
-    ],
-  },
   {
     clave: "servicios",
     etiqueta: "configNegocio.categorias.servicios",
@@ -387,22 +359,6 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
         ],
       },
       {
-        // Quien todavía no es cliente (ADR 0117): aparte de Miembros.
-        clave: "captacion",
-        etiqueta: "nav.areas.captacion",
-        icono: "captacion",
-        vistas: [
-          v("prospectos", "prospectos", "nav.vistas.prospectos"),
-          v(
-            "formularios-captacion",
-            "captacion-formularios",
-            "nav.vistas.formulariosCaptacion",
-          ),
-          // Widgets de calendario y planes para su web (ADR 0141).
-          v("integrar-web", "captacion-integrar", "captacion.widgets.nav"),
-        ],
-      },
-      {
         clave: "cobros",
         etiqueta: "planes.nav.cobros",
         icono: "facturas",
@@ -520,28 +476,69 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
   },
 ];
 
-// El trabajo inmediato queda primero. Captación y Equipo son gestión del negocio,
-// no pasos obligatorios para recibir, reservar o cobrar. Conservamos áreas, rutas
-// y pestañas: cambiar el grupo no cambia permisos ni destinos guardados.
-export const MENU_NEGOCIO: GrupoMenu[] = MENU_NEGOCIO_BASE.map((grupo) => {
+/**
+ * Captación (ADR 0167): conseguir clientes, aparte de operar el negocio. Su sitio web
+ * es una entrada directa (sus pestañas van dentro), no otra categoría de ajustes.
+ */
+const CAPTACION: GrupoMenu = {
+  clave: "captacion",
+  etiqueta: "nav.grupos.captacion",
+  areas: [
+    {
+      // Quien todavía no es cliente (ADR 0117): aparte de Miembros.
+      clave: "prospectos",
+      etiqueta: "nav.vistas.prospectos",
+      icono: "captacion",
+      vistas: [
+        v("prospectos", "prospectos", "nav.vistas.prospectos"),
+        v(
+          "formularios-captacion",
+          "captacion-formularios",
+          "nav.vistas.formulariosCaptacion",
+        ),
+      ],
+    },
+    {
+      clave: "sitio",
+      etiqueta: "nav.areas.sitio",
+      icono: "contenido",
+      vistas: [v("sitio-web", "sitio-web", "nav.areas.sitio")],
+    },
+    {
+      clave: "campanas",
+      etiqueta: "nav.areas.campanas",
+      icono: "reportes",
+      vistas: [v("campanas", "campanas", "nav.areas.campanas")],
+    },
+  ],
+};
+
+// El trabajo inmediato queda primero. Equipo es gestión del negocio, no un paso
+// obligatorio para recibir, reservar o cobrar; Captación va en su grupo, antes de la
+// configuración. Conservamos áreas, rutas y pestañas: cambiar el grupo no cambia
+// permisos ni destinos guardados.
+export const MENU_NEGOCIO: GrupoMenu[] = MENU_NEGOCIO_BASE.flatMap((grupo) => {
   if (grupo.clave === "operacion") {
-    return {
-      ...grupo,
-      areas: grupo.areas.filter(
-        (area) => !["captacion", "equipo"].includes(area.clave),
-      ),
-    };
+    return [
+      {
+        ...grupo,
+        areas: grupo.areas.filter((area) => area.clave !== "equipo"),
+      },
+    ];
   }
   if (grupo.clave === "gestion") {
-    const movidas = MENU_NEGOCIO_BASE.find(
+    const equipo = MENU_NEGOCIO_BASE.find(
       (g) => g.clave === "operacion",
-    )!.areas.filter((area) => ["captacion", "equipo"].includes(area.clave));
-    return {
-      ...grupo,
-      areas: [...grupo.areas.slice(0, 1), ...movidas, ...grupo.areas.slice(1)],
-    };
+    )!.areas.filter((area) => area.clave === "equipo");
+    return [
+      {
+        ...grupo,
+        areas: [...grupo.areas.slice(0, 1), ...equipo, ...grupo.areas.slice(1)],
+      },
+      CAPTACION,
+    ];
   }
-  return grupo;
+  return [grupo];
 });
 
 /** Portal del alumno o cliente y de quien imparte: su propio contexto. */

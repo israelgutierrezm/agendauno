@@ -16,20 +16,31 @@ const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 const confirmar = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/lib/confirmar", () => ({ confirmar }));
-vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({
-    slug: "fluo",
-    esCitas: false,
-    estudio: { nombre: "Fluō Pilates" },
-    puede: () => true,
-  }),
+// La sesión (permisos y plan) y la ruta (su pestaña) se cambian por prueba.
+const sesionPrueba = vi.hoisted(() => ({
+  slug: "fluo",
+  esCitas: false,
+  estudio: {
+    nombre: "Fluō Pilates",
+    plan: { nivel: null as string | null, sin: [] as string[] },
+  },
+  permisos: null as string[] | null,
+  puede(p: string): boolean {
+    return this.permisos === null || this.permisos.includes(p);
+  },
 }));
+vi.mock("@/stores/sesionTenant", () => ({
+  useSesionTenantStore: () => sesionPrueba,
+}));
+const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
 vi.mock("vue-router", () => ({
   RouterLink: { template: "<a><slot /></a>" },
   onBeforeRouteLeave: vi.fn(),
+  useRoute: () => ruta,
+  useRouter: () => ({ replace: vi.fn(() => Promise.resolve()) }),
 }));
 
 const ORDEN = [
@@ -95,7 +106,17 @@ function datos(cambios: Record<string, unknown> = {}) {
 function montar() {
   return mount(SitioWebView, {
     attachTo: document.body,
-    global: { plugins: [i18n], stubs: { CargadorImagen: true } },
+    global: {
+      plugins: [i18n],
+      // Las otras pestañas y la página pública se prueban aparte.
+      stubs: {
+        CargadorImagen: true,
+        PerfilPublicoNegocio: true,
+        SitioReservasVentas: true,
+        SitioCompartir: true,
+        SitioDominio: true,
+      },
+    },
   });
 }
 type Vista = ReturnType<typeof montar>;
@@ -578,7 +599,7 @@ describe("estilo del sitio y versiones (ADR 0146, fase 3)", () => {
     expect(app.text()).toContain("Color de la app de tu negocio");
     expect(app.text()).toContain("#aa3366");
     expect(app.get('[data-prueba="ir-color-app"]').text()).toBe(
-      "Configuración › Perfil público",
+      "Perfil público, arriba",
     );
     // El de la app solo se consulta aquí: no hay con qué cambiarlo.
     expect(app.find("input").exists()).toBe(false);
@@ -760,6 +781,95 @@ describe("editor visual (ADR 0146, fase 3)", () => {
     expect(w.get('[data-prueba="previa-estado"]').text()).toContain(
       "por completar",
     );
+    w.unmount();
+  });
+});
+
+describe("sitio web en Captación (ADR 0167)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ruta.query = {};
+    sesionPrueba.permisos = null;
+    sesionPrueba.estudio.plan.sin = [];
+    api.get.mockResolvedValue({ data: { data: datos() } });
+  });
+
+  it("arriba siempre: estado, vista previa, ver sitio y publicar; abre en Contenido con la página pública", async () => {
+    const w = montar();
+    await flushPromises();
+
+    const barra = w.get('[data-prueba="estado-sitio"]');
+    expect(barra.find('[data-prueba="abrir-vista-previa"]').exists()).toBe(
+      true,
+    );
+    expect(barra.get('[data-prueba="ver-sitio"]').attributes("href")).toContain(
+      "fluo.",
+    );
+    expect(barra.get('[data-prueba="publicar-sitio"]').text()).toBe(
+      "Publicar cambios",
+    );
+    expect(w.findAll('[data-prueba^="pestana-"]').map((b) => b.text())).toEqual(
+      ["Contenido", "Reservas y ventas", "Compartir", "Dominio y SEO"],
+    );
+    expect(
+      w.get('[data-prueba="pestana-contenido"]').attributes("aria-pressed"),
+    ).toBe("true");
+    expect(w.findComponent({ name: "PerfilPublicoNegocio" }).exists()).toBe(
+      true,
+    );
+    w.unmount();
+  });
+
+  it("cerrada al público no ofrece ver el sitio y lleva a Dominio y SEO", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: datos({
+          pagina_publica: false,
+          publicacion: { publicado: false, privado: false },
+        }),
+      },
+    });
+    ruta.query = { pestana: "dominio" };
+    const w = montar();
+    await flushPromises();
+
+    expect(w.find('[data-prueba="ver-sitio"]').exists()).toBe(false);
+    expect(w.get('[data-prueba="pagina-oculta"]').text()).toContain(
+      "Dominio y SEO",
+    );
+    const dominio = w.findComponent({ name: "SitioDominio" });
+    expect(dominio.exists()).toBe(true);
+    expect(dominio.props("publicacion")).toEqual({
+      publicado: false,
+      privado: false,
+    });
+    w.unmount();
+  });
+
+  it("sin Plus, el estilo, más páginas y los bloques se ven pero no se agregan", async () => {
+    sesionPrueba.estudio.plan.sin = ["sitio_avanzado"];
+    const w = montar();
+    await flushPromises();
+
+    expect(w.find('[data-prueba="plus-estilo"]').exists()).toBe(true);
+    expect(
+      w.get('[data-prueba="agregar-pagina"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(
+      w.get('[data-prueba="agregar-bloque"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(w.find('[data-prueba="plus-bloques"]').exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("quien solo atiende prospectos entra a Compartir, sin cargar ni editar el sitio", async () => {
+    sesionPrueba.permisos = ["prospectos.ver"];
+    const w = montar();
+    await flushPromises();
+
+    expect(w.findComponent({ name: "SitioCompartir" }).exists()).toBe(true);
+    expect(w.find('[data-prueba="estado-sitio"]').exists()).toBe(false);
+    expect(api.get).not.toHaveBeenCalled();
     w.unmount();
   });
 });
