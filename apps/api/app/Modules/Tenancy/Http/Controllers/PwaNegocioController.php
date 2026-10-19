@@ -6,9 +6,9 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\ProductoComercial;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -85,24 +85,29 @@ class PwaNegocioController
     }
 
     /**
-     * El logo del negocio, desde su propio origen (`/storage/...`), con su tamaño real.
+     * El logo del negocio con su tamaño real: en el volumen, desde su propio origen
+     * (`/storage/...`); en S3, desde su URL (ADR 0170).
      *
      * @return list<array{src: string, sizes: string, type: string, purpose: string}>
      */
     private static function iconoDelLogo(Estudio $estudio): array
     {
-        $ruta = parse_url((string) $estudio->logo_url, PHP_URL_PATH);
-        if (! is_string($ruta) || ! str_starts_with($ruta, '/storage/')) {
+        $url = (string) $estudio->logo_url;
+        $ruta = parse_url($url, PHP_URL_PATH);
+        $archivo = is_string($ruta) && str_starts_with($ruta, '/storage/')
+            ? ['disco' => DiscosDeArchivos::LEGADO_PUBLICO, 'ruta' => substr($ruta, strlen('/storage/')), 'src' => $ruta]
+            : [...(DiscosDeArchivos::rutaPublica($url) ?? ['disco' => '', 'ruta' => '']), 'src' => $url];
+        if ($archivo['ruta'] === '') {
             return [];
         }
-        $archivo = Storage::disk('public')->path(substr($ruta, strlen('/storage/')));
-        $medidas = is_file($archivo) ? @getimagesize($archivo) : false;
+        $contenido = DiscosDeArchivos::disco($archivo['disco'])->get($archivo['ruta']);
+        $medidas = is_string($contenido) ? @getimagesizefromstring($contenido) : false;
         if ($medidas === false) {
             return [];
         }
 
         return [[
-            'src' => $ruta,
+            'src' => $archivo['src'],
             'sizes' => "{$medidas[0]}x{$medidas[1]}",
             'type' => $medidas['mime'],
             'purpose' => 'any',

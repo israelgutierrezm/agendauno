@@ -16,11 +16,11 @@ use App\Modules\Tenancy\Models\ExtraArticuloTenant;
 use App\Modules\Tenancy\Models\MovimientoInventarioTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -237,7 +237,7 @@ class InventarioTenantController
         $ruta = $archivo->storeAs(
             'productos/'.$estudio->getKey(),
             Str::lower(Str::random(40)).'.'.$archivo->extension(),
-            'public',
+            DiscosDeArchivos::nombrePublico(),
         );
         $this->borrarFoto($articulo);
         $articulo->update(['foto_ruta' => (string) $ruta]);
@@ -257,7 +257,7 @@ class InventarioTenantController
     private function borrarFoto(ArticuloTenant $articulo): void
     {
         if ($articulo->foto_ruta !== null && $articulo->foto_ruta !== '') {
-            Storage::disk('public')->delete($articulo->foto_ruta);
+            DiscosDeArchivos::publico()->delete($articulo->foto_ruta);
         }
     }
 

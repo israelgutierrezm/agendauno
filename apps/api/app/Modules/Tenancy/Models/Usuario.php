@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Application\RolesTenant;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Usuario tenant-local: identidad operativa que vive en la BD del propio tenant
@@ -213,7 +213,7 @@ class Usuario extends Authenticatable
     public function fotoUrl(): ?string
     {
         return $this->foto_ruta !== null && $this->foto_ruta !== ''
-            ? Storage::disk('public')->url($this->foto_ruta)
+            ? DiscosDeArchivos::publico()->url($this->foto_ruta)
             : null;
     }
 

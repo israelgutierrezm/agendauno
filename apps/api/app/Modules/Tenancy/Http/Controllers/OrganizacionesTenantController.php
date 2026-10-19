@@ -12,13 +12,13 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Modules\Tenancy\Support\EnlaceMapa;
 use App\Modules\Tenancy\Support\HorarioSucursal;
 use App\Modules\Tenancy\Support\RedesSociales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -191,7 +191,7 @@ class OrganizacionesTenantController
         $ruta = $archivo->storeAs(
             'sucursales/'.$estudio->getKey(),
             Str::lower(Str::random(40)).'.'.$archivo->extension(),
-            'public',
+            DiscosDeArchivos::nombrePublico(),
         );
 
         $this->borrarFoto($sucursal);
@@ -214,7 +214,7 @@ class OrganizacionesTenantController
     private function borrarFoto(SucursalTenant $sucursal): void
     {
         if ($sucursal->foto_ruta !== null && $sucursal->foto_ruta !== '') {
-            Storage::disk('public')->delete($sucursal->foto_ruta);
+            DiscosDeArchivos::publico()->delete($sucursal->foto_ruta);
         }
     }
 

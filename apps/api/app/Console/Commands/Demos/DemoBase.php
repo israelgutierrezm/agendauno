@@ -21,13 +21,13 @@ use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\OrigenCliente;
 use App\Modules\Tenancy\PerfilNegocio;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Modules\Tenancy\Support\RedesSociales;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 use RuntimeException;
@@ -503,7 +503,7 @@ abstract class DemoBase
         imagedestroy($img);
 
         $ruta = 'estudios/'.$estudio->getKey().'/logo.png';
-        Storage::disk('public')->put($ruta, $png);
-        $estudio->update(['logo_url' => Storage::disk('public')->url($ruta)]);
+        DiscosDeArchivos::publico()->put($ruta, $png);
+        $estudio->update(['logo_url' => DiscosDeArchivos::publico()->url($ruta)]);
     }
 }

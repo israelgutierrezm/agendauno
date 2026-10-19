@@ -41,11 +41,11 @@ use App\Modules\Tenancy\Models\TipoDocumento;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Modules\Tenancy\TipoCampo;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -127,7 +127,7 @@ trait ApartadosDemo
             $tipo = $this->uno($modelos);
             $subido = $this->en($this->despuesDelAlta($persona, 1, 60));
             $archivo = 'documentos/'.$this->estudio->getKey().'/'.Str::random(40).'.pdf';
-            Storage::disk('local')->put($archivo, $this->pdf($tipo->nombre, $persona->nombreCompleto()));
+            DiscosDeArchivos::privado()->put($archivo, $this->pdf($tipo->nombre, $persona->nombreCompleto()));
             $estado = (string) $this->elegir([EstadoDocumento::Aprobado->value => 70, EstadoDocumento::Pendiente->value => 24, EstadoDocumento::Rechazado->value => 6]);
             $documento = Documento::query()->create([
                 'persona_id' => $persona->getKey(), 'tipo_documento_id' => $tipo->getKey(),

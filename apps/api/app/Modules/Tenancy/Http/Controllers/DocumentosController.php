@@ -12,10 +12,10 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TipoDocumento;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -83,7 +83,7 @@ class DocumentosController
 
         $archivo = $request->file('archivo');
         $extension = $archivo->extension() !== '' ? $archivo->extension() : 'bin';
-        $ruta = $archivo->storeAs("documentos/{$estudio->id}", Str::random(40).'.'.$extension, 'local');
+        $ruta = $archivo->storeAs("documentos/{$estudio->id}", Str::random(40).'.'.$extension, DiscosDeArchivos::nombrePrivado());
 
         $documento = Documento::query()->create([
             'persona_id' => $persona->id,
@@ -124,7 +124,7 @@ class DocumentosController
         $modelo = Documento::query()->where('ulid', (string) $request->route('documento'))->firstOrFail();
         $this->autorizar($this->usuario($request), $modelo);
 
-        return Storage::disk('local')->download($modelo->ruta, $modelo->nombre);
+        return DiscosDeArchivos::privado()->download($modelo->ruta, $modelo->nombre);
     }
 
     private function autorizar(Usuario $usuario, Documento $documento): void

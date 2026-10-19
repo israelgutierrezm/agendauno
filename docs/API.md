@@ -53,6 +53,9 @@ resto exige sesión y un permiso (`puede:…`). Ver `docs/AUTHORIZATION.md`.
   en el cuerpo: repetir la petición devuelve el mismo resultado. Los webhooks son
   idempotentes por la referencia de la pasarela.
 - Listas grandes paginan (`page`, `per_page`).
+- Las URL de imágenes (`logo_url`, `portada_url`, `foto_url`…) son absolutas y pueden
+  ser de otro dominio cuando los archivos se guardan en S3 (ADR 0170). Los documentos
+  nunca tienen URL: se descargan por la API con su permiso.
 - Cada respuesta lleva `X-Correlation-ID`; se acepta uno entrante si es seguro.
 - Límites de peticiones (`AppServiceProvider`, ADR 0102). En las rutas de un negocio
   el límite va después de resolver el negocio y la sesión, así que cuenta por usuario

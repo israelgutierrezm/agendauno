@@ -17,9 +17,9 @@ use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\QuienCancela;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -123,7 +123,7 @@ class BajaDePersonaTenant
             $usuario = $persona->usuario_id !== null ? Usuario::query()->find($persona->usuario_id) : null;
             if ($usuario instanceof Usuario) {
                 if (is_string($usuario->foto_ruta) && $usuario->foto_ruta !== '') {
-                    Storage::disk('public')->delete($usuario->foto_ruta);
+                    DiscosDeArchivos::publico()->delete($usuario->foto_ruta);
                 }
                 $usuario->forceFill([
                     'email' => 'baja-'.$usuario->ulid.'@baja.invalid',
@@ -176,7 +176,7 @@ class BajaDePersonaTenant
 
         // Los archivos se borran ya fuera de la transacción (no se pueden deshacer).
         foreach ($archivos as $ruta) {
-            Storage::disk('local')->delete((string) $ruta);
+            DiscosDeArchivos::privado()->delete((string) $ruta);
         }
 
         return $solicitud->refresh();

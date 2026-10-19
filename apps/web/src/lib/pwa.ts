@@ -120,13 +120,20 @@ export function marcarPwa(negocio: {
     name: "apple-mobile-web-app-title",
     content: negocio.nombre,
   });
-  // Su logo desde su propio origen (la API sirve /storage en cada dominio); sin logo,
-  // el ícono de su producto (no el de la plataforma).
+  // Su logo desde su propio origen (la API sirve /storage en cada dominio) o, si se
+  // guarda en S3 (ADR 0170), desde su bucket; sin logo, el ícono de su producto (no
+  // el de la plataforma).
+  const logo = negocio.logo_url
+    ? new URL(negocio.logo_url, window.location.href)
+    : null;
   enHead("link", {
     rel: "apple-touch-icon",
-    href: negocio.logo_url
-      ? new URL(negocio.logo_url, window.location.href).pathname
-      : `/assets/pwa/${productoActual()}-192.png`,
+    href:
+      logo === null
+        ? `/assets/pwa/${productoActual()}-192.png`
+        : logo.pathname.startsWith("/storage/")
+          ? logo.pathname
+          : logo.href,
   });
   if (negocio.color_marca) {
     enHead("meta", { name: "theme-color", content: negocio.color_marca });

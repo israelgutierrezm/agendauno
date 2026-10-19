@@ -62,6 +62,41 @@ return [
             'report' => false,
         ],
 
+        // Archivos de los negocios en S3 (ADR 0170): dos buckets, ninguno el de los
+        // respaldos (las mismas llaves si no se dan otras). El público se sirve por
+        // `ARCHIVOS_S3_URL` (su dominio o un CDN). El privado nunca se hace público:
+        // en R2 un bucket público expone todo lo que tiene.
+        's3_publicos' => [
+            'driver' => 's3',
+            'key' => env('ARCHIVOS_S3_KEY', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('ARCHIVOS_S3_SECRET', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('ARCHIVOS_S3_REGION', env('AWS_DEFAULT_REGION')),
+            'bucket' => env('ARCHIVOS_S3_BUCKET_PUBLICO'),
+            'url' => env('ARCHIVOS_S3_URL'),
+            'endpoint' => env('ARCHIVOS_S3_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('ARCHIVOS_S3_PATH_STYLE', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
+            'root' => 'publicos',
+            // Si el proveedor no maneja permisos por archivo (p. ej. R2), `private`: el
+            // bucket se hace público por su dominio.
+            'visibility' => env('ARCHIVOS_S3_VISIBILIDAD', 'public'),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        's3_privados' => [
+            'driver' => 's3',
+            'key' => env('ARCHIVOS_S3_KEY', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('ARCHIVOS_S3_SECRET', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('ARCHIVOS_S3_REGION', env('AWS_DEFAULT_REGION')),
+            'bucket' => env('ARCHIVOS_S3_BUCKET_PRIVADO'),
+            'endpoint' => env('ARCHIVOS_S3_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('ARCHIVOS_S3_PATH_STYLE', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
+            'root' => 'privados',
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

@@ -13,10 +13,10 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TokenAccesoTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -165,7 +165,7 @@ class PerfilTenantController
         $ruta = $archivo->storeAs(
             'usuarios/'.$this->estudio($request)->getKey(),
             Str::lower(Str::random(40)).'.'.$archivo->extension(),
-            'public',
+            DiscosDeArchivos::nombrePublico(),
         );
 
         $this->borrarFoto($usuario);
@@ -186,7 +186,7 @@ class PerfilTenantController
     private function borrarFoto(Usuario $usuario): void
     {
         if ($usuario->foto_ruta !== null && $usuario->foto_ruta !== '') {
-            Storage::disk('public')->delete($usuario->foto_ruta);
+            DiscosDeArchivos::publico()->delete($usuario->foto_ruta);
         }
     }
 

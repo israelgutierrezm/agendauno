@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Sucursal del estudio (con zona horaria), tenant-local. Base para materializar la
@@ -51,7 +51,7 @@ class SucursalTenant extends Model
     public function fotoUrl(): ?string
     {
         return $this->foto_ruta !== null && $this->foto_ruta !== ''
-            ? Storage::disk('public')->url($this->foto_ruta)
+            ? DiscosDeArchivos::publico()->url($this->foto_ruta)
             : null;
     }
 

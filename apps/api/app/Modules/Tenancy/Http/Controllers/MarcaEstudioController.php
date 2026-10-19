@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -82,9 +82,9 @@ class MarcaEstudioController
         $ruta = $archivo->storeAs(
             'estudios/'.$estudio->getKey(),
             $tipo.'_'.Str::lower(Str::random(8)).'.'.$archivo->extension(),
-            'public',
+            DiscosDeArchivos::nombrePublico(),
         );
-        $url = Storage::disk('public')->url((string) $ruta);
+        $url = DiscosDeArchivos::publico()->url((string) $ruta);
         $estudio->update([$tipo.'_url' => $url]);
 
         return $url;
@@ -99,7 +99,7 @@ class MarcaEstudioController
 
     private function borrarArchivos(Estudio $estudio, string $tipo): void
     {
-        $disco = Storage::disk('public');
+        $disco = DiscosDeArchivos::publico();
         foreach ($disco->files('estudios/'.$estudio->getKey()) as $archivo) {
             if (str_starts_with(basename($archivo), $tipo)) {
                 $disco->delete($archivo);

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Artículo minorista tenant-local (R21): producto de venta en caja (agua, ropa,
@@ -51,7 +51,7 @@ class ArticuloTenant extends Model
     public function fotoUrl(): ?string
     {
         return $this->foto_ruta !== null && $this->foto_ruta !== ''
-            ? Storage::disk('public')->url($this->foto_ruta)
+            ? DiscosDeArchivos::publico()->url($this->foto_ruta)
             : null;
     }
 

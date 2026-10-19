@@ -14,6 +14,7 @@ use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,7 @@ class VerificacionProduccion
             ...$this->procesos(),
             ...$this->correo(),
             ...$this->respaldos(),
+            ...$this->archivos(),
             ...$this->alertas(),
             ...$this->legales(),
             ...$this->facturacion($apertura || $this->aperturaComercial()),
@@ -302,6 +304,32 @@ class VerificacionProduccion
                 $sinRespaldo === [] ? '' : 'Sin respaldo reciente: '.implode(', ', array_slice($sinRespaldo, 0, 10)).(count($sinRespaldo) > 10 ? '…' : ''),
             ),
         ];
+    }
+
+    /**
+     * Los archivos de los negocios en S3 (ADR 0170): las imágenes necesitan una URL
+     * pública y los documentos un bucket privado que no sea el de las imágenes. En el
+     * volumen del servidor no hay nada que revisar (se respaldan a diario).
+     *
+     * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
+     */
+    private function archivos(): array
+    {
+        $publico = DiscosDeArchivos::nombrePublico();
+        $privado = DiscosDeArchivos::nombrePrivado();
+        $puntos = [];
+        if (! DiscosDeArchivos::esDelServidor($publico)) {
+            $puntos[] = $this->punto('Archivos', 'URL pública de las imágenes', (string) config("filesystems.disks.{$publico}.url") !== '',
+                'Define ARCHIVOS_S3_URL: el dominio del bucket de imágenes o su CDN.');
+        }
+        if (! DiscosDeArchivos::esDelServidor($privado)) {
+            $bucket = (string) config("filesystems.disks.{$privado}.bucket");
+            $puntos[] = $this->punto('Archivos', 'Documentos en un bucket privado propio',
+                $bucket !== '' && $bucket !== (string) config("filesystems.disks.{$publico}.bucket"),
+                'Define ARCHIVOS_S3_BUCKET_PRIVADO: un bucket que nunca se haga público y no sea el de las imágenes.');
+        }
+
+        return $puntos;
     }
 
     /**

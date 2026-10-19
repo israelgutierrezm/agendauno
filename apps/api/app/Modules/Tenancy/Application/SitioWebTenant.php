@@ -12,7 +12,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\SitioWeb\CatalogoSitioWeb;
 use App\Modules\Tenancy\SitioWeb\PlantillaSitio;
 use App\Modules\Tenancy\SitioWeb\VideoSitio;
-use Illuminate\Support\Facades\Storage;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Illuminate\Support\Str;
 
 /**
@@ -423,13 +423,17 @@ class SitioWebTenant
         return 'estudios/'.$estudioId.'/sitio';
     }
 
-    /** ¿Es la URL de una imagen subida para el sitio de este negocio? */
+    /**
+     * ¿Es la URL de una imagen subida para el sitio de este negocio? La del disco de
+     * archivos públicos o, mientras se mueven a S3, la del volumen (ADR 0170).
+     */
     public static function esImagenDelNegocio(string $url, int $estudioId): bool
     {
-        $prefijo = Storage::disk('public')->url(self::carpetaImagenes($estudioId).'/');
+        $ruta = DiscosDeArchivos::rutaPublica($url)['ruta'] ?? '';
+        $carpeta = self::carpetaImagenes($estudioId).'/';
 
-        return str_starts_with($url, $prefijo)
-            && preg_match('/^[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)$/', substr($url, strlen($prefijo))) === 1;
+        return str_starts_with($ruta, $carpeta)
+            && preg_match('/^[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)$/', substr($ruta, strlen($carpeta))) === 1;
     }
 
     /**
@@ -479,7 +483,7 @@ class SitioWebTenant
             }
         }
 
-        $disco = Storage::disk('public');
+        $disco = DiscosDeArchivos::publico();
         foreach ($disco->files(self::carpetaImagenes($estudioId)) as $archivo) {
             if (! isset($usadas[basename($archivo)])) {
                 $disco->delete($archivo);

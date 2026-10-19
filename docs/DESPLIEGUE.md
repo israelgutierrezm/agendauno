@@ -421,6 +421,46 @@ docker compose --env-file web.env exec api rm /tmp/archivos.tar.gz
 
 Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diarias.
 
+### Archivos de los negocios en S3 (opcional)
+
+Por omisión, los logos, las fotos, las imágenes del sitio y los documentos se guardan
+en el volumen `storage` y se respaldan cada noche (ADR 0170). Si el servidor se pierde,
+se pierde lo subido desde el último respaldo. Para guardarlos fuera del servidor:
+
+1. Crea **dos buckets** aparte del de los respaldos:
+   - el de imágenes, público por su dominio o un CDN;
+   - el de documentos, privado y **nunca** público. En R2, un bucket público expone
+     todo lo que tiene.
+2. En `api.env`:
+
+   ```
+   ARCHIVOS_DISCO_PUBLICO=s3_publicos
+   ARCHIVOS_DISCO_PRIVADO=s3_privados
+   ARCHIVOS_S3_BUCKET_PUBLICO=…
+   ARCHIVOS_S3_BUCKET_PRIVADO=…
+   ARCHIVOS_S3_URL=https://archivos.tu-dominio.com
+   ```
+
+   Usan las llaves y el endpoint de `AWS_*` salvo que pongas `ARCHIVOS_S3_KEY`,
+   `ARCHIVOS_S3_SECRET`, `ARCHIVOS_S3_REGION`, `ARCHIVOS_S3_ENDPOINT` y
+   `ARCHIVOS_S3_PATH_STYLE`. La URL apunta al bucket de imágenes; sus archivos quedan
+   bajo `publicos/`. Si el proveedor no maneja permisos por archivo (R2), pon
+   `ARCHIVOS_S3_VISIBILIDAD=private`.
+3. Aplica el cambio como en «Cambiar `api.env`» (`./compose.sh up -d`) y mueve lo que
+   ya estaba:
+
+   ```bash
+   docker compose --env-file web.env exec -u www-data api php artisan agendauno:mover-archivos --dry-run
+   docker compose --env-file web.env exec -u www-data api php artisan agendauno:mover-archivos
+   ```
+
+   Copia los archivos y cambia las URL guardadas del logo, la portada y el sitio. Los
+   originales se quedan en el volumen. Mientras tanto, el sitio sigue aceptando sus
+   imágenes de antes. Se puede repetir: lo que ya está igual no se vuelve a copiar.
+4. Activa el versionado de los dos buckets: lo que está en S3 ya no va en el respaldo
+   de archivos de cada noche. `agendauno:verificar-produccion` revisa la URL pública y
+   que los documentos tengan su propio bucket.
+
 ### Recuperar un negocio y su renta
 
 Los pasos del superadministrador van contra la API de la plataforma

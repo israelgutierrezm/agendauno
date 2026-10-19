@@ -6,13 +6,13 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -124,7 +124,7 @@ class OfertaTenant extends Model
     public function fotoUrl(): ?string
     {
         return $this->foto_ruta !== null && $this->foto_ruta !== ''
-            ? Storage::disk('public')->url($this->foto_ruta)
+            ? DiscosDeArchivos::publico()->url($this->foto_ruta)
             : null;
     }
 

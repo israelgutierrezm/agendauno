@@ -60,6 +60,20 @@ describe("PWA del negocio", () => {
     ).toBe("#b03a2e");
   });
 
+  it("con el logo en S3, el ícono de inicio sale de su bucket", async () => {
+    const pwa = await import("./pwa");
+    pwa.instalarPwa();
+    pwa.marcarPwa({
+      nombre: "Fluō Pilates",
+      logo_url: "https://archivos.agendauno.mx/publicos/estudios/8/logo.png",
+    });
+    expect(
+      document.head
+        .querySelector('link[rel="apple-touch-icon"]')
+        ?.getAttribute("href"),
+    ).toBe("https://archivos.agendauno.mx/publicos/estudios/8/logo.png");
+  });
+
   it("fuera del subdominio de un negocio no hace nada", async () => {
     host.subdominio = false;
     const pwa = await import("./pwa");

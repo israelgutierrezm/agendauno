@@ -11,9 +11,9 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TipoDocumento;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -80,7 +80,7 @@ class MisDocumentosTenantController
 
         $archivo = $request->file('archivo');
         $extension = $archivo->extension() !== '' ? $archivo->extension() : 'bin';
-        $ruta = $archivo->storeAs('documentos/'.$this->estudio($request)->getKey(), Str::random(40).'.'.$extension, 'local');
+        $ruta = $archivo->storeAs('documentos/'.$this->estudio($request)->getKey(), Str::random(40).'.'.$extension, DiscosDeArchivos::nombrePrivado());
 
         $documento = Documento::query()->create([
             'persona_id' => $persona->getKey(),
@@ -103,7 +103,7 @@ class MisDocumentosTenantController
             ->where('persona_id', $persona->getKey())
             ->firstOrFail();
 
-        return Storage::disk('local')->download($documento->ruta, $documento->nombre);
+        return DiscosDeArchivos::privado()->download($documento->ruta, $documento->nombre);
     }
 
     /**

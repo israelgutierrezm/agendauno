@@ -160,6 +160,18 @@ return [
     ],
 
     /*
+    | Archivos que suben los negocios (ADR 0170). `publicos`: lo que se ve en páginas
+    | públicas (logos, fotos, imágenes del sitio); `privados`: los documentos, que
+    | solo se descargan por la API. Por omisión, el volumen del servidor (`public` y
+    | `local`); en producción pueden ir a S3 (`s3_publicos` y `s3_privados`). Lo que ya
+    | estaba se mueve con `agendauno:mover-archivos`.
+    */
+    'archivos' => [
+        'publicos' => env('ARCHIVOS_DISCO_PUBLICO', 'public'),
+        'privados' => env('ARCHIVOS_DISCO_PRIVADO', 'local'),
+    ],
+
+    /*
     | Respaldos de la base de cada negocio y de la plataforma (diarios). En
     | producción conviene un disco S3 (otro lugar que el servidor). Se conservan
     | `dias` días. En MySQL usa los binarios mysqldump/mysql del servidor.

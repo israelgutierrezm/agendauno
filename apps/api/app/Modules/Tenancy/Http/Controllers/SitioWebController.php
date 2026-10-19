@@ -14,11 +14,11 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\SitioWeb\CatalogoSitioWeb;
 use App\Modules\Tenancy\SitioWeb\PlantillaSitio;
 use App\Modules\Tenancy\SitioWeb\VideoSitio;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -228,7 +228,7 @@ class SitioWebController
             'imagen' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ]);
         $carpeta = SitioWebTenant::carpetaImagenes((int) $estudio->getKey());
-        $disco = Storage::disk('public');
+        $disco = DiscosDeArchivos::publico();
         $maximo = $parametros->entero('sitio.imagenes_maximas');
         if (count($disco->files($carpeta)) >= $maximo) {
             throw ValidationException::withMessages([
@@ -237,7 +237,7 @@ class SitioWebController
         }
         $archivo = $request->file('imagen');
         abort_unless($archivo instanceof UploadedFile, 422);
-        $ruta = $archivo->storeAs($carpeta, Str::lower((string) Str::ulid()).'.'.$archivo->extension(), 'public');
+        $ruta = $archivo->storeAs($carpeta, Str::lower((string) Str::ulid()).'.'.$archivo->extension(), DiscosDeArchivos::nombrePublico());
 
         return response()->json(['data' => ['url' => $disco->url((string) $ruta)]], 201);
     }

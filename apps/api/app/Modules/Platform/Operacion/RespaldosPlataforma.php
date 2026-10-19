@@ -7,6 +7,7 @@ namespace App\Modules\Platform\Operacion;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Carbon\CarbonImmutable;
 use FilesystemIterator;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +75,21 @@ class RespaldosPlataforma
     }
 
     /**
+     * Qué lleva el paquete de archivos. Si los nuevos se guardan en S3 (ADR 0170) no
+     * están aquí: los cuida su bucket.
+     */
+    private static function leeme(): string
+    {
+        $enS3 = array_values(array_filter(
+            array_unique([DiscosDeArchivos::nombrePublico(), DiscosDeArchivos::nombrePrivado()]),
+            static fn (string $disco): bool => ! DiscosDeArchivos::esDelServidor($disco),
+        ));
+
+        return 'Archivos subidos de AgendaUno (discos local y public), '.CarbonImmutable::now()->toIso8601String().PHP_EOL
+            .($enS3 === [] ? '' : 'Los que se suben ahora se guardan en S3 ('.implode(', ', $enS3).') y no vienen aquí: los cuida su bucket (actívale el versionado).'.PHP_EOL);
+    }
+
+    /**
      * Empaqueta los archivos subidos (discos `local` y `public`, sin los respaldos
      * locales). Devuelve la ruta del respaldo en el disco.
      */
@@ -87,7 +103,7 @@ class RespaldosPlataforma
         try {
             $paquete = new PharData($tar);
             // Siempre lleva algo (y dice qué es), aunque aún no haya archivos subidos.
-            $paquete->addFromString('LEEME.txt', 'Archivos subidos de AgendaUno (discos local y public), '.CarbonImmutable::now()->toIso8601String().PHP_EOL);
+            $paquete->addFromString('LEEME.txt', self::leeme());
             foreach (['private' => 'local', 'public' => 'public'] as $prefijo => $disco) {
                 $raiz = rtrim(Storage::disk($disco)->path(''), '\\/');
                 if (! is_dir($raiz)) {
