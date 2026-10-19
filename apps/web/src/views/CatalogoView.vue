@@ -27,6 +27,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 type Politica = "entitlement" | "pago";
+type TipoAnticipo = "ninguno" | "monto" | "porcentaje";
+const TIPOS_ANTICIPO: TipoAnticipo[] = ["ninguno", "monto", "porcentaje"];
 
 interface Oferta {
   id: string;
@@ -42,6 +44,11 @@ interface Oferta {
   limpieza_min?: number;
   // Cada cuántos días suele regresar un cliente (retención, ADR 0159).
   regreso_dias?: number | null;
+  // Anticipo para apartar en línea (ADR 0161): un monto o un porcentaje, y lo que
+  // resulta con su precio (null = se paga completo).
+  anticipo_minor?: number | null;
+  anticipo_pct?: number | null;
+  anticipo_resultante_minor?: number | null;
   // Espacios o equipos que puede usar (2.4); vacío = no requiere.
   recursos?: string[];
   actividad: string | null;
@@ -181,6 +188,8 @@ const form = ref<{
   requisitos: string;
   queLlevar: string;
   regreso: string;
+  anticipoTipo: TipoAnticipo;
+  anticipo: string;
 }>({
   nombre: "",
   capacidad: "",
@@ -197,6 +206,8 @@ const form = ref<{
   requisitos: "",
   queLlevar: "",
   regreso: "",
+  anticipoTipo: "ninguno",
+  anticipo: "",
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
@@ -252,13 +263,51 @@ const cupoBaseInvalido = computed(() => {
   const n = Number(texto);
   return !Number.isInteger(n) || n < 1 || n > CUPO_MAXIMO;
 });
+// Anticipo para apartar en línea (ADR 0161): solo citas que se pagan al agendar.
+const conAnticipo = computed(
+  () =>
+    esCitas.value &&
+    form.value.politica === "pago" &&
+    form.value.anticipoTipo !== "ninguno",
+);
+// Lo que pagará al apartar con el precio de ahora (null si no se puede calcular).
+const anticipoMinor = computed<number | null>(() => {
+  if (!conAnticipo.value) return null;
+  if (form.value.anticipoTipo === "monto") {
+    return aMinor(form.value.anticipo, sesion.pais);
+  }
+  const pct = Number(form.value.anticipo);
+  return Number.isInteger(pct) && precioEdicion.value !== null
+    ? Math.round((precioEdicion.value * pct) / 100)
+    : null;
+});
+const anticipoInvalido = computed(() => {
+  if (!conAnticipo.value) return false;
+  if (form.value.anticipoTipo === "porcentaje") {
+    const pct = Number(form.value.anticipo);
+    return !Number.isInteger(pct) || pct < 1 || pct > 99;
+  }
+  const monto = anticipoMinor.value;
+  return monto === null || monto <= 0 || monto >= (precioEdicion.value ?? 0);
+});
+const resumenAnticipo = computed(() => {
+  const anticipo = anticipoMinor.value;
+  const precio = precioEdicion.value ?? 0;
+  return anticipo !== null && !anticipoInvalido.value && anticipo < precio
+    ? t("catalogo.anticipo.resumen", {
+        anticipo: dinero(anticipo),
+        resto: dinero(precio - anticipo),
+      })
+    : null;
+});
 const formInvalido = computed(
   () =>
     nombreInvalido.value ||
     cupoBaseInvalido.value ||
     precioEdicionIlegible.value ||
     precioInvalido.value ||
-    duracionInvalida.value,
+    duracionInvalida.value ||
+    anticipoInvalido.value,
 );
 
 async function cargar(): Promise<void> {
@@ -306,6 +355,18 @@ function configurar(o: Oferta): void {
     requisitos: o.requisitos ?? "",
     queLlevar: o.que_llevar ?? "",
     regreso: o.regreso_dias ? String(o.regreso_dias) : "",
+    anticipoTipo:
+      o.anticipo_minor != null
+        ? "monto"
+        : o.anticipo_pct != null
+          ? "porcentaje"
+          : "ninguno",
+    anticipo:
+      o.anticipo_minor != null
+        ? aTexto(o.anticipo_minor, sesion.pais)
+        : o.anticipo_pct != null
+          ? String(o.anticipo_pct)
+          : "",
   };
   descartarEdicion.fijar();
 }
@@ -534,12 +595,21 @@ async function guardar(o: Oferta): Promise<void> {
         : { para_principiantes: form.value.principiantes }),
       requisitos: form.value.requisitos.trim() || null,
       que_llevar: form.value.queLlevar.trim() || null,
-      // Citas: con esto, retención encuentra a quien ya debería haber regresado.
+      // Citas: con esto, retención encuentra a quien ya debería haber regresado; y
+      // el anticipo para apartar en línea (uno u otro; ninguno lo quita).
       ...(esCitas.value
         ? {
             regreso_dias:
               Number(form.value.regreso) > 0
                 ? Number(form.value.regreso)
+                : null,
+            anticipo_minor:
+              conAnticipo.value && form.value.anticipoTipo === "monto"
+                ? anticipoMinor.value
+                : null,
+            anticipo_pct:
+              conAnticipo.value && form.value.anticipoTipo === "porcentaje"
+                ? Number(form.value.anticipo)
                 : null,
           }
         : {}),
@@ -1135,6 +1205,77 @@ onMounted(cargar);
               class="tu-input"
             />
             <span class="tu-hint">{{ $t("margenesServicio.ayuda") }}</span>
+          </div>
+          <!-- Anticipo para apartar en línea (ADR 0161): citas que se pagan al agendar. -->
+          <div
+            v-if="esCitas && form.politica === 'pago'"
+            class="sm:col-span-2"
+            data-prueba="anticipo-servicio"
+          >
+            <label class="tu-label" :for="`anticipo-tipo-${o.id}`">{{
+              $t("catalogo.anticipo.etiqueta")
+            }}</label>
+            <div class="flex flex-wrap items-center gap-2">
+              <select
+                :id="`anticipo-tipo-${o.id}`"
+                v-model="form.anticipoTipo"
+                class="tu-input w-auto"
+                data-prueba="anticipo-tipo"
+              >
+                <option
+                  v-for="tipo in TIPOS_ANTICIPO"
+                  :key="tipo"
+                  :value="tipo"
+                >
+                  {{ $t(`catalogo.anticipo.tipos.${tipo}`) }}
+                </option>
+              </select>
+              <template v-if="form.anticipoTipo !== 'ninguno'">
+                <span
+                  v-if="form.anticipoTipo === 'monto'"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ simbolo }}</span
+                >
+                <input
+                  v-model="form.anticipo"
+                  :aria-label="
+                    $t(`catalogo.anticipo.tipos.${form.anticipoTipo}`)
+                  "
+                  :inputmode="
+                    form.anticipoTipo === 'monto' ? 'decimal' : 'numeric'
+                  "
+                  class="tu-input w-32"
+                  data-prueba="anticipo-valor"
+                  :aria-invalid="anticipoInvalido ? 'true' : undefined"
+                  :style="
+                    anticipoInvalido ? { borderColor: 'var(--error)' } : {}
+                  "
+                />
+                <span
+                  v-if="form.anticipoTipo === 'porcentaje'"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >%</span
+                >
+              </template>
+            </div>
+            <span
+              v-if="anticipoInvalido"
+              class="tu-error-campo"
+              data-prueba="anticipo-invalido"
+              >{{
+                $t(
+                  form.anticipoTipo === "porcentaje"
+                    ? "catalogo.anticipo.porcentajeInvalido"
+                    : "catalogo.anticipo.montoInvalido",
+                )
+              }}</span
+            >
+            <span v-else-if="resumenAnticipo" class="tu-hint">{{
+              resumenAnticipo
+            }}</span>
+            <span v-else class="tu-hint">{{
+              $t("catalogo.anticipo.ayuda")
+            }}</span>
           </div>
           <!-- Cada cuántos días suele regresar (retención, ADR 0159): solo citas. -->
           <div v-if="esCitas">

@@ -665,6 +665,62 @@ describe("agenda pública por pasos", () => {
     vista.unmount();
   });
 
+  it("con anticipo elige pagar el anticipo o todo, y al terminar dice lo de ahora y lo del negocio (ADR 0161)", async () => {
+    const op = opciones(1, { pago_obligatorio: false, pago_en_linea: true });
+    op.data.data.servicios[0] = {
+      ...op.data.data.servicios[0]!,
+      anticipo_minor: 5000,
+    } as (typeof op.data.data.servicios)[number];
+    api(op);
+    mocks.post.mockResolvedValue({
+      data: {
+        data: {
+          estado: "pendiente_pago",
+          orden_id: "orden",
+          total_minor: 5000,
+          saldo_minor: 15000,
+          moneda: "MXN",
+        },
+      },
+    });
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+
+    // Aunque el negocio no pida pagar en línea, el anticipo sí se paga para confirmar.
+    const eleccion = vista.get('[data-prueba="elegir-anticipo"]');
+    expect(eleccion.text()).toContain("Pagar el anticipo: $50");
+    expect(eleccion.text()).toContain(
+      "El resto ($150.00) lo pagas en el negocio.",
+    );
+    expect(eleccion.text()).toContain("Pagar todo ahora: $200");
+    expect(marcado(vista, '[data-prueba="pagar-anticipo"]')).toBe(true);
+    await agendarComo(vista);
+    expect(mocks.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({ pagar: "anticipo" }),
+    );
+    expect(vista.text()).toContain("$50.00 ahora · $150.00 en el negocio");
+
+    // Otra cita pagando todo.
+    await vista
+      .findAll("button")
+      .find((b) => b.text() === es.reservar.otra)!
+      .trigger("click");
+    await flushPromises();
+    await elegirHora(vista, "09:30");
+    await continuar(vista);
+    await vista.get('[data-prueba="pagar-todo"]').setValue();
+    await agendarComo(vista);
+    expect(mocks.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({ pagar: "todo" }),
+    );
+    vista.unmount();
+  });
+
   it("parte de «cualquier profesional»: ve los horarios de todo el equipo y dice quién atenderá", async () => {
     api(opciones(1));
     mocks.post.mockResolvedValue({
@@ -1291,9 +1347,7 @@ describe("bono (sin membresías en citas, ADR 0130)", () => {
     await flushPromises();
     await elegirHora(vista, "09:00");
     await continuar(vista);
-    expect(vista.text()).toContain(
-      "Se descuenta una sesión de tu bono",
-    );
+    expect(vista.text()).toContain("Se descuenta una sesión de tu bono");
     // No se paga al agendar: el botón solo agenda.
     expect(
       vista

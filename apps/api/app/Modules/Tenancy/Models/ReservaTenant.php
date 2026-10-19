@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,7 @@ class ReservaTenant extends Model
         'motivo_cancelacion', 'cancelada_en', 'cancelada_por', 'cancelada_por_usuario_id', 'reprogramaciones_cliente',
         'sin_avisos',
         'nota_cliente', 'asiste',
+        'anticipo_minor', 'saldo_orden_id',
     ];
 
     /**
@@ -40,6 +42,7 @@ class ReservaTenant extends Model
         'unidades' => 'integer',
         'sin_avisos' => 'boolean',
         'costo_unidades' => 'integer',
+        'anticipo_minor' => 'integer',
         'horas_limite' => 'integer',
         'penaliza_tarde' => 'boolean',
         'penaliza_no_show' => 'boolean',
@@ -89,6 +92,55 @@ class ReservaTenant extends Model
     public function orden(): BelongsTo
     {
         return $this->belongsTo(OrdenTenant::class, 'orden_id');
+    }
+
+    /**
+     * Con anticipo (ADR 0161): la orden del resto, que se cobra en el negocio (o en
+     * línea si el cliente quiere). `orden` es la del anticipo.
+     *
+     * @return BelongsTo<OrdenTenant, $this>
+     */
+    public function saldoOrden(): BelongsTo
+    {
+        return $this->belongsTo(OrdenTenant::class, 'saldo_orden_id');
+    }
+
+    /**
+     * La orden que falta cobrar de la cita: la suya si sigue pendiente; si no, la del
+     * saldo. Null si ya no falta nada (o se canceló).
+     */
+    public function ordenPorCobrar(): ?OrdenTenant
+    {
+        foreach ([$this->orden, $this->saldo_orden_id !== null ? $this->saldoOrden : null] as $orden) {
+            if ($orden instanceof OrdenTenant && $orden->estado === EstadoOrden::Pendiente) {
+                return $orden;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * El anticipo ya pagado de una cita que tiene saldo (null si no lleva anticipo o
+     * aún no lo paga).
+     */
+    public function anticipoPagadoMinor(): ?int
+    {
+        return $this->saldo_orden_id !== null && $this->orden?->estado === EstadoOrden::Pagada
+            ? (int) $this->orden->total_minor
+            : null;
+    }
+
+    /**
+     * Lo que cuesta la cita: su orden más la del saldo, si la tiene.
+     */
+    public function totalCitaMinor(): ?int
+    {
+        if ($this->orden === null) {
+            return null;
+        }
+
+        return (int) $this->orden->total_minor + (int) ($this->saldo_orden_id !== null ? $this->saldoOrden?->total_minor : 0);
     }
 
     /**

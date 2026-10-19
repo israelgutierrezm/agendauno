@@ -118,6 +118,23 @@ const monto = computed<number | null>(
 const precio = computed(() =>
   monto.value ? dinero(monto.value, monto.value % 100 === 0 ? 0 : 2) : null,
 );
+// Con anticipo (ADR 0161): lo que ya pagó al apartar y lo que falta.
+const anticipo = computed(() => {
+  const c = cita.value;
+  if (c?.anticipo_minor == null) {
+    return null;
+  }
+  const centavos = (n: number) => (n % 100 === 0 ? 0 : 2);
+  const falta = c.por_cobrar_minor ?? 0;
+  return falta > 0
+    ? t("detalleCita.cobro.anticipoFalta", {
+        anticipo: dinero(c.anticipo_minor, centavos(c.anticipo_minor)),
+        falta: dinero(falta, centavos(falta)),
+      })
+    : t("detalleCita.cobro.anticipoPagado", {
+        anticipo: dinero(c.anticipo_minor, centavos(c.anticipo_minor)),
+      });
+});
 const total = computed(() => (monto.value ? dinero(monto.value, 2) : null));
 const sucursal = computed(() =>
   [props.sesion?.sucursal, props.sesion?.sala].filter(Boolean).join(" · "),
@@ -736,6 +753,12 @@ watch(
               <span class="pc-total">{{
                 cita?.orden_id != null ? (total ?? "—") : "—"
               }}</span>
+              <span
+                v-if="anticipo"
+                class="pc-suave block text-sm"
+                data-prueba="anticipo-cita"
+                >{{ anticipo }}</span
+              >
             </div>
             <div>
               <span class="pc-etiqueta">{{

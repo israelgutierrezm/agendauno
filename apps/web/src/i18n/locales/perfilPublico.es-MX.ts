@@ -226,6 +226,16 @@ export default {
     pagoPrevio:
       "Para confirmar tu cita, completa el pago en el siguiente paso.",
     pagoFlexible: "Puedes pagar en línea o directamente en la sucursal.",
+    // Anticipo para apartar (ADR 0161).
+    anticipo: {
+      titulo: "Cuánto pagar ahora",
+      soloAnticipo: "Pagar el anticipo: {anticipo}",
+      restoEnNegocio: "El resto ({resto}) lo pagas en el negocio.",
+      todo: "Pagar todo ahora: {total}",
+      ayuda:
+        "Para confirmar tu cita pagas en línea en el siguiente paso. Si cancelas a tiempo, se te devuelve; si cancelas tarde, el negocio lo conserva.",
+      ahoraYResto: "{ahora} ahora · {resto} en el negocio",
+    },
     pagoEnLugar: "El pago se realiza directamente en la sucursal.",
     datosCliente: "Datos del cliente",
     datosAyuda:

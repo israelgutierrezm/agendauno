@@ -29,6 +29,9 @@ final readonly class EfectoCancelacion
         // Si el crédito vuelve a un plan ya vencido: la fecha en que venció (no recupera
         // vigencia; M05).
         public ?string $planVencio = null,
+        // Una cita con anticipo que cancela el cliente (ADR 0161): DEVUELVE o COBRA (el
+        // negocio lo conserva); null si no aplica.
+        public ?string $anticipo = null,
     ) {}
 
     public static function noCancelable(string $mensaje): self
@@ -47,7 +50,7 @@ final readonly class EfectoCancelacion
     }
 
     /**
-     * @return array{cancelable: bool, credito: string, unidades: int, a_tiempo: bool|null, limite: string|null, mensaje: string, plan_vencio: string|null}
+     * @return array{cancelable: bool, credito: string, unidades: int, a_tiempo: bool|null, limite: string|null, mensaje: string, plan_vencio: string|null, anticipo: string|null}
      */
     public function toArray(): array
     {
@@ -59,6 +62,7 @@ final readonly class EfectoCancelacion
             'limite' => $this->limite?->toIso8601String(),
             'mensaje' => $this->mensaje,
             'plan_vencio' => $this->planVencio,
+            'anticipo' => $this->anticipo,
         ];
     }
 }

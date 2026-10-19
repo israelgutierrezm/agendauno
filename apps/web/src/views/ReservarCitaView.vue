@@ -49,6 +49,8 @@ interface Servicio {
   duracion_minutos: number | null;
   // Se toma con su bono o membresía (solo con su cuenta, ADR 0091): no se paga.
   con_plan?: boolean;
+  // Lo que se paga para apartar; el resto, en el negocio (ADR 0161). Null = completo.
+  anticipo_minor?: number | null;
 }
 interface Sucursal {
   id: string;
@@ -114,6 +116,8 @@ interface PorPagar {
     mapa_url: string | null;
   } | null;
   total_minor: number | null;
+  // Con anticipo: lo que queda por pagar en el negocio.
+  saldo_minor?: number | null;
   moneda: string | null;
   vence_en: string | null;
   pago_en_linea: boolean;
@@ -275,7 +279,9 @@ const resultado = ref<{
   // Confirmada (se paga en línea o en la sucursal) o apartada hasta pagar.
   estado?: string;
   orden_id: string | null;
+  // Lo que se paga ahora y, con anticipo, lo que queda para el negocio.
   total_minor: number | null;
+  saldo_minor?: number | null;
   moneda: string | null;
   // Quién atenderá (el elegido o el que asignó el negocio).
   profesional?: { id: string; nombre: string } | null;
@@ -588,8 +594,18 @@ function precioDe(x: Servicio | null | undefined): string {
     : dinero(x?.precio_minor ?? null, x?.moneda ?? null);
 }
 // Se paga en línea para confirmar, salvo lo que se toma con su bono.
+// Anticipo (ADR 0161): paga una parte para confirmar (o todo, si lo elige) y el resto
+// en el negocio. Si cancela a tiempo, se le devuelve.
+const anticipoSel = computed(() =>
+  servicioSel.value?.con_plan === true
+    ? null
+    : (servicioSel.value?.anticipo_minor ?? null),
+);
+const pagarTodo = ref(false);
 const requierePago = computed(
-  () => pagoObligatorio.value && servicioSel.value?.con_plan !== true,
+  () =>
+    (pagoObligatorio.value || anticipoSel.value !== null) &&
+    servicioSel.value?.con_plan !== true,
 );
 // Visitante sin cuenta en un negocio con bonos: se le invita a entrar para usarlo.
 const avisoBono = computed(
@@ -841,6 +857,9 @@ async function agendar(): Promise<void> {
     ...(paraOtra.value && asiste.value.trim() !== ""
       ? { asiste: asiste.value.trim() }
       : {}),
+    ...(anticipoSel.value !== null
+      ? { pagar: pagarTodo.value ? "todo" : "anticipo" }
+      : {}),
   };
   try {
     if (clienteConCuenta.value) {
@@ -849,15 +868,22 @@ async function agendar(): Promise<void> {
         data: {
           estado: string;
           orden_id: string | null;
+          cita?: { saldo_minor?: number | null } | null;
           profesional?: { id: string; nombre: string } | null;
         };
       }>(`/api/v1/app/${slug.value}/mi/citas`, cita);
+      // Con anticipo, ahora se paga el precio menos lo que queda para el negocio.
+      const saldo = data.data.cita?.saldo_minor ?? null;
+      const precio = servicioSel.value?.precio_minor ?? null;
       resultado.value = {
         estado: data.data.estado,
         orden_id: data.data.orden_id,
         total_minor: servicioSel.value?.con_plan
           ? null
-          : (servicioSel.value?.precio_minor ?? null),
+          : precio !== null
+            ? precio - (saldo ?? 0)
+            : null,
+        saldo_minor: saldo,
         moneda: servicioSel.value?.moneda ?? null,
         profesional: data.data.profesional ?? null,
       };
@@ -867,6 +893,7 @@ async function agendar(): Promise<void> {
           estado?: string;
           orden_id: string | null;
           total_minor: number | null;
+          saldo_minor?: number | null;
           moneda: string | null;
           profesional?: { id: string; nombre: string } | null;
         };
@@ -984,6 +1011,7 @@ async function pagar(ordenId: string | null | undefined): Promise<void> {
 function otra(): void {
   resultado.value = null;
   pendientePago.value = false;
+  pagarTodo.value = false;
   slotSel.value = "";
   slots.value = [];
   slotsCargados.value = false;
@@ -1154,6 +1182,18 @@ onMounted(cargar);
               }}
             </p>
             <p
+              v-if="porPagar.saldo_minor"
+              class="mt-3 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="saldo-por-pagar"
+            >
+              {{
+                $t("perfilPublico.agendar.anticipo.restoEnNegocio", {
+                  resto: dinero(porPagar.saldo_minor, porPagar.moneda),
+                })
+              }}
+            </p>
+            <p
               v-if="pendientePago"
               class="mt-4 text-sm rounded-lg p-3"
               :style="{
@@ -1259,7 +1299,12 @@ onMounted(cargar);
           {{
             servicioSel?.con_plan
               ? $t("perfilPublico.agendar.conTuBono")
-              : dinero(resultado.total_minor, resultado.moneda)
+              : resultado.saldo_minor
+                ? $t("perfilPublico.agendar.anticipo.ahoraYResto", {
+                    ahora: dinero(resultado.total_minor, resultado.moneda),
+                    resto: dinero(resultado.saldo_minor, resultado.moneda),
+                  })
+                : dinero(resultado.total_minor, resultado.moneda)
           }}
         </p>
         <!-- Dónde: para no llegar a otra sede. -->
@@ -2063,16 +2108,66 @@ onMounted(cargar);
                   <span>{{ $t("perfilPublico.agendar.precioServicio") }}</span>
                   <strong>{{ precioDe(servicioSel) }}</strong>
                 </div>
+                <fieldset
+                  v-if="anticipoSel !== null"
+                  class="rc-anticipo"
+                  data-prueba="elegir-anticipo"
+                >
+                  <legend class="sr-only">
+                    {{ $t("perfilPublico.agendar.anticipo.titulo") }}
+                  </legend>
+                  <label class="rc-anticipo-opcion">
+                    <input
+                      v-model="pagarTodo"
+                      type="radio"
+                      :value="false"
+                      data-prueba="pagar-anticipo"
+                    />
+                    <span>
+                      <span class="font-medium">{{
+                        $t("perfilPublico.agendar.anticipo.soloAnticipo", {
+                          anticipo: dinero(
+                            anticipoSel,
+                            servicioSel?.moneda ?? null,
+                          ),
+                        })
+                      }}</span>
+                      <span class="block text-sm">{{
+                        $t("perfilPublico.agendar.anticipo.restoEnNegocio", {
+                          resto: dinero(
+                            (servicioSel?.precio_minor ?? 0) - anticipoSel,
+                            servicioSel?.moneda ?? null,
+                          ),
+                        })
+                      }}</span>
+                    </span>
+                  </label>
+                  <label class="rc-anticipo-opcion">
+                    <input
+                      v-model="pagarTodo"
+                      type="radio"
+                      :value="true"
+                      data-prueba="pagar-todo"
+                    />
+                    <span class="font-medium">{{
+                      $t("perfilPublico.agendar.anticipo.todo", {
+                        total: precioDe(servicioSel),
+                      })
+                    }}</span>
+                  </label>
+                </fieldset>
                 <p class="rc-pago-ayuda" data-prueba="pago-ayuda">
                   <IconoNav nombre="pasarelas" :tam="18" />{{
                     $t(
                       servicioSel?.con_plan
                         ? "perfilPublico.agendar.pagoConBono"
-                        : pagoObligatorio
-                          ? "perfilPublico.agendar.pagoPrevio"
-                          : pagoEnLinea
-                            ? "perfilPublico.agendar.pagoFlexible"
-                            : "perfilPublico.agendar.pagoEnLugar",
+                        : anticipoSel !== null
+                          ? "perfilPublico.agendar.anticipo.ayuda"
+                          : pagoObligatorio
+                            ? "perfilPublico.agendar.pagoPrevio"
+                            : pagoEnLinea
+                              ? "perfilPublico.agendar.pagoFlexible"
+                              : "perfilPublico.agendar.pagoEnLugar",
                     )
                   }}
                 </p>
@@ -3051,6 +3146,30 @@ button.rc-paso-marca:hover .rc-paso-texto {
 .rc-precio-resumen strong {
   font-size: 1.35rem;
   font-weight: 600;
+}
+.rc-anticipo {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.rc-anticipo-opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.rc-anticipo-opcion:has(input:checked) {
+  border-color: var(--primario);
+}
+.rc-anticipo-opcion input {
+  margin-top: 0.2rem;
+}
+.rc-anticipo-opcion .block {
+  color: var(--texto-suave);
 }
 .rc-pago-ayuda {
   display: flex;

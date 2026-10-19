@@ -45,6 +45,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Con «cualquier profesional disponible» ({@see agendarConCualquiera}) se intenta con
  * cada candidato, uno tras otro y cada uno con su candado.
+ *
+ * Anticipo (ADR 0161): si el servicio lo pide y el negocio cobra en línea, quien agenda
+ * por su cuenta paga el anticipo para confirmar (o todo, si lo elige con `$pagarTodo`) y
+ * el resto queda por cobrar. Lo que agenda el negocio no lleva anticipo.
  */
 class AgendarCitaTenant
 {
@@ -68,6 +72,7 @@ class AgendarCitaTenant
         CarbonImmutable $inicia,
         int $duracionMin,
         bool $porNegocio = false,
+        bool $pagarTodo = false,
     ): ReservaTenant {
         $this->exigirNegocioDeCitas();
 
@@ -90,7 +95,7 @@ class AgendarCitaTenant
         }
 
         try {
-            return $this->agendarEnTransaccion($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio);
+            return $this->agendarEnTransaccion($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo);
         } catch (QueryException $e) {
             if ($this->causedByConcurrencyError($e)) {
                 throw new SesionNoReservable('Ese horario ya no está disponible.');
@@ -114,6 +119,7 @@ class AgendarCitaTenant
         PersonaTenant $persona,
         CarbonImmutable $inicia,
         int $duracionMin,
+        bool $pagarTodo = false,
     ): ReservaTenant {
         $this->exigirNegocioDeCitas();
         if (! $inicia->isFuture()) {
@@ -141,7 +147,7 @@ class AgendarCitaTenant
         $ultimo = null;
         foreach ($candidatos->sortBy(static fn (Usuario $u): int => (int) ($carga[$u->getKey()] ?? 0)) as $profesional) {
             try {
-                return $this->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, $duracionMin);
+                return $this->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, $duracionMin, pagarTodo: $pagarTodo);
             } catch (SesionNoReservable $e) {
                 $ultimo = $e;
             }
@@ -195,8 +201,9 @@ class AgendarCitaTenant
         CarbonImmutable $inicia,
         CarbonImmutable $termina,
         bool $porNegocio,
+        bool $pagarTodo,
     ): ReservaTenant {
-        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo): ReservaTenant {
             // Punto de serialización por profesional (ver arriba). Debe ir antes de
             // leer su agenda para que la lectura vea lo que otra solicitud guardó.
             $this->agenda->bloquear($instructorId, null);
@@ -242,27 +249,23 @@ class AgendarCitaTenant
             ]);
 
             if ($oferta->politica_reserva === PoliticaReservaTenant::Pago) {
+                $precio = (int) ($oferta->precio_clase_minor ?? 0);
+                $moneda = app(ParametrosTenant::class)->monedaDe($sucursal);
+                // Con anticipo, quien agenda por su cuenta lo paga en línea para confirmar
+                // (o todo, si lo elige); sin cobro en línea no se puede pedir.
+                $anticipo = ! $porNegocio && $this->cobro->pagoEnLinea() ? $oferta->anticipoMinor() : null;
+                if ($anticipo !== null) {
+                    return $this->reservas->reservarConPago($sesion, $persona, $precio, $moneda, (int) $sucursal->getKey(), anticipoMinor: $anticipo, completo: $pagarTodo);
+                }
                 // El negocio agenda y cobra en caja (confirmada). El cliente paga en
                 // línea para confirmar (pendiente de pago, expira si no paga) solo si el
                 // negocio lo pide y puede cobrar en línea; si no, queda confirmada y
                 // paga en línea o en la sucursal (ADR 0065).
                 if ($porNegocio || ! $this->cobro->pagoObligatorio()) {
-                    return $this->reservas->reservarPorCobrar(
-                        $sesion,
-                        $persona,
-                        (int) ($oferta->precio_clase_minor ?? 0),
-                        app(ParametrosTenant::class)->monedaDe($sucursal),
-                        (int) $sucursal->getKey(),
-                    );
+                    return $this->reservas->reservarPorCobrar($sesion, $persona, $precio, $moneda, (int) $sucursal->getKey());
                 }
 
-                return $this->reservas->reservarConPago(
-                    $sesion,
-                    $persona,
-                    (int) ($oferta->precio_clase_minor ?? 0),
-                    app(ParametrosTenant::class)->monedaDe($sucursal),
-                    (int) $sucursal->getKey(),
-                );
+                return $this->reservas->reservarConPago($sesion, $persona, $precio, $moneda, (int) $sucursal->getKey());
             }
 
             return $this->reservas->crear($sesion, $persona);

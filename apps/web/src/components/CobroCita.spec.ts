@@ -42,9 +42,9 @@ const sesion = {
   },
 } as unknown as SesionAgenda;
 
-function montar() {
+function montar(s: SesionAgenda = sesion) {
   return mount(CobroCita, {
-    props: { abierto: true, base: "/api/v1/app/demo", sesion },
+    props: { abierto: true, base: "/api/v1/app/demo", sesion: s },
     global: {
       plugins: [i18n],
       stubs: {
@@ -131,6 +131,15 @@ describe("cobro al terminar la cita", () => {
     );
     expect(w.get('[data-prueba="cambio-cita"]').text()).toContain("15.00");
     expect(w.text()).toContain("AB12CD34");
+  });
+
+  it("con anticipo pagado solo cobra lo que falta (ADR 0161)", async () => {
+    const w = montar({
+      ...sesion,
+      cita: { ...sesion.cita!, anticipo_minor: 10000, por_cobrar_minor: 15000 },
+    } as SesionAgenda);
+    await flushPromises();
+    expect(w.get('[data-prueba="total-cita"]').text()).toContain("150.00");
   });
 
   it("un error del servidor queda junto a su campo y no pierde lo capturado", async () => {

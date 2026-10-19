@@ -136,6 +136,8 @@ class OpcionesCitaTenant
         // Sin duración propia, la que el negocio fijó para sus citas: la pantalla agenda
         // con ella (antes suponía 60 minutos).
         $duracionDefecto = app(ParametrosTenant::class)->entero('citas.duracion_defecto');
+        // El anticipo solo se pide si el negocio cobra en línea (ADR 0161).
+        $conAnticipo = app(CobroDeCitasTenant::class)->pagoEnLinea();
 
         return $deCobro->concat($canjeables)
             ->sortBy('nombre')
@@ -154,6 +156,8 @@ class OpcionesCitaTenant
                 'duracion_minutos' => $o->duracion_minutos !== null && $o->duracion_minutos > 0 ? (int) $o->duracion_minutos : $duracionDefecto,
                 // Se descuenta de su bono o membresía (no se paga al agendar).
                 'con_plan' => $o->politica_reserva !== PoliticaReservaTenant::Pago,
+                // Lo que se paga para apartar (el resto, en el negocio); null = completo.
+                'anticipo_minor' => $conAnticipo && $o->politica_reserva === PoliticaReservaTenant::Pago ? $o->anticipoMinor() : null,
             ])->values()->all();
     }
 

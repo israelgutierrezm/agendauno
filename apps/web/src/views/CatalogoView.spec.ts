@@ -403,6 +403,35 @@ describe("catálogo", () => {
     expect(carga).not.toHaveProperty("capacidad");
   });
 
+  it("el anticipo es un monto o un porcentaje: se valida contra el precio y se manda uno solo (ADR 0161)", async () => {
+    api.put.mockReset();
+    api.put.mockResolvedValue({ data: { data: {} } });
+    const w = await montar([oferta({ anticipo_pct: 30 })]);
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    const tipo = w.get('[data-prueba="anticipo-tipo"]');
+    expect((tipo.element as HTMLSelectElement).value).toBe("porcentaje");
+    expect(
+      (w.get('[data-prueba="anticipo-valor"]').element as HTMLInputElement)
+        .value,
+    ).toBe("30");
+    const guardar = () =>
+      w.findAll("button").find((b) => b.text() === "catalogo.guardar")!;
+
+    // Un monto igual al precio ($900) no es anticipo: se marca y no se guarda.
+    await tipo.setValue("monto");
+    await w.get('[data-prueba="anticipo-valor"]').setValue("900");
+    expect(w.find('[data-prueba="anticipo-invalido"]').exists()).toBe(true);
+    expect(guardar().attributes("disabled")).toBeDefined();
+
+    await w.get('[data-prueba="anticipo-valor"]').setValue("200");
+    await guardar().trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/a/ofertas/o1",
+      expect.objectContaining({ anticipo_minor: 20000, anticipo_pct: null }),
+    );
+  });
+
   it("archiva con confirmación y lo archivado se ve aparte para volver a ofrecerlo", async () => {
     const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
     api.post.mockResolvedValue({

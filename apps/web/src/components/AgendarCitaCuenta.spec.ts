@@ -131,6 +131,45 @@ describe("agendar desde la cuenta", () => {
     expect(w.find("[data-prueba='acepta-whatsapp']").exists()).toBe(false);
   });
 
+  it("con anticipo elige pagar solo el anticipo (por omisión) o todo (ADR 0161)", async () => {
+    extraServicios.lista = [
+      {
+        id: "color",
+        nombre: "Color",
+        precio_minor: 100000,
+        moneda: "MXN",
+        duracion_minutos: 30,
+        anticipo_minor: 30000,
+      },
+    ];
+    api.post.mockResolvedValue({
+      data: { data: { estado: "pendiente_pago" } },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("corte");
+    await flushPromises();
+    // Sin anticipo no se pregunta.
+    expect(w.find('[data-prueba="elegir-anticipo"]').exists()).toBe(false);
+
+    await w.get("#cc-servicio").setValue("color");
+    await flushPromises();
+    const eleccion = w.get('[data-prueba="elegir-anticipo"]');
+    expect(eleccion.text()).toContain("Pagar el anticipo: $300");
+    expect(eleccion.text()).toContain("lo pagas en el negocio");
+    await w.get('[data-prueba="pagar-todo"]').setValue();
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("16:00") || b.text().includes("10:00"))
+      ?.trigger("click");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/mi/citas",
+      expect.objectContaining({ oferta_id: "color", pagar: "todo" }),
+    );
+  });
+
   it("con varios profesionales, ve los horarios de todo el equipo o de alguien por su foto", async () => {
     equipo.lista = [
       { id: "ana", nombre: "Ana Pérez", foto_url: "/storage/ana.webp" },

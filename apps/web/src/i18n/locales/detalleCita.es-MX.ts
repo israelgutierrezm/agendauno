@@ -43,6 +43,8 @@ export default {
     pagada: "Pagada",
     membresia: "Con su bono",
     sinCobro: "No lleva cobro",
+    anticipoFalta: "Anticipo pagado: {anticipo} · falta {falta}",
+    anticipoPagado: "Incluye el anticipo de {anticipo}",
     movimientos: "Movimientos del pago",
     sinMovimientos: "Aún no hay cobros registrados.",
   },

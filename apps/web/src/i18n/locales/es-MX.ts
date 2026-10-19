@@ -2028,6 +2028,21 @@ export default {
     regreso: "Suele regresar cada (días)",
     regresoAyuda:
       "Opcional. Con esto, en Renovaciones › Para recuperar ves a quien ya debería haber vuelto.",
+    // Anticipo para apartar en línea (ADR 0161).
+    anticipo: {
+      etiqueta: "Anticipo para apartar en línea",
+      tipos: {
+        ninguno: "Sin anticipo: se paga completo",
+        monto: "Un monto fijo",
+        porcentaje: "Un porcentaje del precio",
+      },
+      ayuda:
+        "Con anticipo, quien agenda en línea paga una parte para confirmar (o todo, si quiere) y el resto en el negocio. Si cancela a tiempo, se le devuelve; si cancela tarde, lo conservas.",
+      resumen:
+        "Al agendar en línea paga {anticipo} para confirmar; el resto ({resto}) se cobra en el negocio.",
+      montoInvalido: "Escribe un monto mayor a 0 y menor que el precio.",
+      porcentajeInvalido: "Escribe un porcentaje entero del 1 al 99.",
+    },
     configurar: "Configurar",
     cerrar: "Cerrar",
     guardar: "Guardar",

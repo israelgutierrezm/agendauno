@@ -167,6 +167,9 @@ class CatalogoTenantController
             // ni se le comunican al cliente (2.3).
             'preparacion_min' => ['nullable', 'integer', 'min:0', 'max:240'],
             'limpieza_min' => ['nullable', 'integer', 'min:0', 'max:240'],
+            // Anticipo para apartar en línea (citas, ADR 0161): un monto o un porcentaje.
+            'anticipo_minor' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::MAX_PRECIO_MINOR, 'prohibits:anticipo_pct'],
+            'anticipo_pct' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:99'],
         ], [
             'modalidad.in' => $esCitas
                 ? 'En un negocio de citas cada servicio es individual.'
@@ -179,6 +182,7 @@ class CatalogoTenantController
         if (($validado['politica_reserva'] ?? null) === PoliticaReservaTenant::Pago->value) {
             self::exigirPrecioParaPagar($validado['precio_clase_minor'] ?? null);
         }
+        $anticipo = self::anticipo($validado, isset($validado['precio_clase_minor']) ? (int) $validado['precio_clase_minor'] : null);
 
         $oferta = $actividad->ofertas()->create([
             'nombre' => $validado['nombre'],
@@ -194,6 +198,7 @@ class CatalogoTenantController
                 : ($esCitas ? 30 : null),
             'preparacion_min' => (int) ($validado['preparacion_min'] ?? 0),
             'limpieza_min' => (int) ($validado['limpieza_min'] ?? 0),
+            ...($anticipo ?? []),
         ]);
 
         return response()->json(['data' => $this->presentarOferta($oferta)], 201);
@@ -233,6 +238,9 @@ class CatalogoTenantController
             'que_llevar' => ['sometimes', 'nullable', 'string', 'max:300'],
             // Cada cuántos días suele regresar un cliente (retención, ADR 0159).
             'regreso_dias' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:730'],
+            // Anticipo para apartar en línea (citas, ADR 0161): un monto o un porcentaje.
+            'anticipo_minor' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::MAX_PRECIO_MINOR, 'prohibits:anticipo_pct'],
+            'anticipo_pct' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:99'],
         ]);
 
         // Primero se valida todo; después se guarda todo junto (ver abajo).
@@ -293,6 +301,10 @@ class CatalogoTenantController
         if ((isset($validado['politica_reserva']) || $request->has('precio_clase_minor'))
             && $politica === PoliticaReservaTenant::Pago->value) {
             self::exigirPrecioParaPagar(array_key_exists('precio_clase_minor', $cambios) ? $cambios['precio_clase_minor'] : $oferta->precio_clase_minor);
+        }
+        $anticipo = self::anticipo($validado, array_key_exists('precio_clase_minor', $cambios) ? $cambios['precio_clase_minor'] : $oferta->precio_clase_minor);
+        if ($anticipo !== null) {
+            $cambios = [...$cambios, ...$anticipo];
         }
 
         // Qué era antes, para la bitácora (un nombre o un cupo corregidos).
@@ -487,6 +499,34 @@ class CatalogoTenantController
             'foto_url' => $oferta->fotoUrl(),
             'archivado' => $oferta->archivada(),
             'regreso_dias' => $oferta->regreso_dias,
+            // Anticipo para apartar en línea (ADR 0161): el monto o el porcentaje, y lo que
+            // resulta hoy con su precio (null = se paga completo).
+            'anticipo_minor' => $oferta->anticipo_minor,
+            'anticipo_pct' => $oferta->anticipo_pct,
+            'anticipo_resultante_minor' => $oferta->anticipoMinor(),
+        ];
+    }
+
+    /**
+     * El anticipo que se guarda, si vino en la petición: un monto (menor que el precio)
+     * o un porcentaje; elegir uno borra el otro. Null si no vino.
+     *
+     * @param  array<string, mixed>  $validado
+     * @return array{anticipo_minor: int|null, anticipo_pct: int|null}|null
+     */
+    private static function anticipo(array $validado, ?int $precioMinor): ?array
+    {
+        if (! array_key_exists('anticipo_minor', $validado) && ! array_key_exists('anticipo_pct', $validado)) {
+            return null;
+        }
+        $monto = isset($validado['anticipo_minor']) ? (int) $validado['anticipo_minor'] : null;
+        if ($monto !== null && $monto >= (int) ($precioMinor ?? 0)) {
+            throw ValidationException::withMessages(['anticipo_minor' => ['El anticipo debe ser menor que el precio; si es igual, se paga completo al agendar.']]);
+        }
+
+        return [
+            'anticipo_minor' => $monto,
+            'anticipo_pct' => $monto === null && isset($validado['anticipo_pct']) ? (int) $validado['anticipo_pct'] : null,
         ];
     }
 

@@ -60,6 +60,10 @@ class CobroDeCitaTenant
             $orden = $bloqueada->orden_id !== null
                 ? OrdenTenant::query()->whereKey($bloqueada->orden_id)->lockForUpdate()->first()
                 : null;
+            // Con anticipo ya pagado (ADR 0161), lo que falta es el saldo.
+            if ($orden !== null && $orden->estado === EstadoOrden::Pagada && $bloqueada->saldo_orden_id !== null) {
+                $orden = OrdenTenant::query()->whereKey($bloqueada->saldo_orden_id)->lockForUpdate()->first() ?? $orden;
+            }
             if ($orden !== null && $orden->estado === EstadoOrden::Cancelada) {
                 throw ValidationException::withMessages(['reserva' => ['El cobro de esta cita se canceló: no se puede cobrar.']]);
             }

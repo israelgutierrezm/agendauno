@@ -36,7 +36,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en', 'regreso_dias'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en', 'regreso_dias', 'anticipo_minor', 'anticipo_pct'];
 
     /**
      * @var array<string, string>
@@ -53,6 +53,8 @@ class OfertaTenant extends Model
         'para_principiantes' => 'boolean',
         'archivado_en' => 'datetime',
         'regreso_dias' => 'integer',
+        'anticipo_minor' => 'integer',
+        'anticipo_pct' => 'integer',
     ];
 
     /**
@@ -124,6 +126,23 @@ class OfertaTenant extends Model
         return $this->foto_ruta !== null && $this->foto_ruta !== ''
             ? Storage::disk('public')->url($this->foto_ruta)
             : null;
+    }
+
+    /**
+     * El anticipo que pide el servicio para apartar una cita en línea (ADR 0161): un
+     * monto fijo o un porcentaje de su precio. Null si no pide anticipo o si cubriría
+     * todo el precio (entonces se paga completo, como siempre).
+     */
+    public function anticipoMinor(): ?int
+    {
+        $precio = (int) ($this->precio_clase_minor ?? 0);
+        $anticipo = match (true) {
+            $this->anticipo_minor !== null => (int) $this->anticipo_minor,
+            $this->anticipo_pct !== null => intdiv($precio * (int) $this->anticipo_pct + 50, 100),
+            default => 0,
+        };
+
+        return $anticipo > 0 && $anticipo < $precio ? $anticipo : null;
     }
 
     /**

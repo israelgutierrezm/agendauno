@@ -86,10 +86,15 @@ class ReservasTenant
      * Al pagar esa orden, el fulfillment confirma la reserva. Devuelve la reserva (con
      * `orden_id`); el cobro/checkout lo dispara el controlador con el motor de pago que
      * ya existe. No resuelve un derecho: el acceso lo habilita el PAGO, no una membresía.
+     *
+     * Con `$anticipoMinor` (citas, ADR 0161) lo que se paga para confirmar es el
+     * anticipo y el resto queda en otra orden, por cobrar; con `$completo`, el cliente
+     * eligió pagar todo: una sola orden, pero la cita guarda el anticipo que pedía el
+     * servicio (si cancela a tiempo, lo pagado se le devuelve).
      */
-    public function reservarConPago(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null, string $canal = 'directo'): ReservaTenant
+    public function reservarConPago(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null, string $canal = 'directo', ?int $anticipoMinor = null, bool $completo = false): ReservaTenant
     {
-        return $this->reservarConOrden($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, EstadoReserva::PendientePago);
+        return $this->reservarConOrden($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, EstadoReserva::PendientePago, $anticipoMinor, $completo);
     }
 
     /**
@@ -108,9 +113,9 @@ class ReservasTenant
      * Reserva ligada a una orden por la sesión: `PendientePago` (retiene el cupo hasta
      * pagar en línea o expirar) o `Confirmada` (el negocio cobra en caja).
      */
-    private function reservarConOrden(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId, string $canal, EstadoReserva $estado): ReservaTenant
+    private function reservarConOrden(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId, string $canal, EstadoReserva $estado, ?int $anticipoMinor = null, bool $completo = false): ReservaTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, $estado): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, $estado, $anticipoMinor, $completo): ReservaTenant {
             $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
@@ -137,8 +142,11 @@ class ReservasTenant
                 throw new CupoLleno('La sesion esta llena.');
             }
 
-            // Orden por la sesión (pendiente de cobro) + la reserva que retiene el cupo.
-            $orden = $this->ordenes->crearPorSesion($persona, $bloqueada, $montoMinor, $moneda, $sucursalId);
+            // Orden por la sesión (pendiente de cobro) + la reserva que retiene el cupo. Con
+            // anticipo, la orden es la del anticipo y el resto va en la del saldo.
+            $conSaldo = $anticipoMinor !== null && ! $completo && $anticipoMinor < $montoMinor;
+            $orden = $this->ordenes->crearPorSesion($persona, $bloqueada, $conSaldo ? $anticipoMinor : $montoMinor, $moneda, $sucursalId);
+            $saldo = $conSaldo ? $this->ordenes->crearPorSesion($persona, $bloqueada, $montoMinor - $anticipoMinor, $moneda, $sucursalId) : null;
 
             $politica = $this->politicas->paraSesion($bloqueada);
 
@@ -146,6 +154,8 @@ class ReservasTenant
                 'sesion_id' => $bloqueada->getKey(),
                 'persona_id' => $persona->getKey(),
                 'orden_id' => $orden->getKey(),
+                'saldo_orden_id' => $saldo?->getKey(),
+                'anticipo_minor' => $anticipoMinor,
                 'estado' => $estado->value,
                 'canal' => $canal,
                 'unidades' => 0,
@@ -543,9 +553,17 @@ class ReservasTenant
                 $credito = EmitirReservaCanceladaTenant::creditoCobrado((int) ($bloqueada->horas_limite ?? $horasLimite));
             }
 
+            // El anticipo (ADR 0161): si cancela a tiempo se le devuelve (lo hace
+            // DevolverAnticipoAlCancelarATiempo); si cancela tarde, el negocio lo conserva.
+            if ($efecto->anticipo === EfectoCancelacion::COBRA) {
+                $credito = self::anticipoConservado($bloqueada, (int) ($bloqueada->horas_limite ?? $horasLimite));
+            } elseif ($efecto->anticipo === EfectoCancelacion::DEVUELVE && $this->pagadoEnLinea($bloqueada)) {
+                $credito = ($bloqueada->saldo_orden_id !== null ? 'Tu anticipo' : 'Tu pago').' se devolverá a tu forma de pago.';
+            }
+
             $bloqueada->update([
                 ...$quienCancelo,
-                'motivo_cancelacion' => $efecto->credito === EfectoCancelacion::COBRA ? 'tardia' : null,
+                'motivo_cancelacion' => $efecto->credito === EfectoCancelacion::COBRA || $efecto->anticipo === EfectoCancelacion::COBRA ? 'tardia' : null,
             ]);
             // Aviso al alumno (no al salir de la lista de espera ni de una reserva ya vencida).
             if ($avisar && in_array($estadoAnterior, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
@@ -594,6 +612,11 @@ class ReservasTenant
         $retencion = $reserva->retencion;
         if ($retencion === null || $retencion->estado !== EstadoRetencion::Activa) {
             $pagada = $reserva->orden !== null && $reserva->orden->estado === EstadoOrden::Pagada;
+            // Con anticipo (ADR 0161), si cancela el cliente lo pagado al apartar depende de
+            // si cancela a tiempo.
+            if ($pagada && $reserva->anticipo_minor !== null && $quien === QuienCancela::Cliente) {
+                return $this->efectoDelAnticipo($reserva, $sesion, $horasLimite);
+            }
 
             return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, match (true) {
                 ! $pagada => 'No usa créditos.',
@@ -633,6 +656,47 @@ class ReservasTenant
 
         return new EfectoCancelacion(true, EfectoCancelacion::COBRA, $unidades, false, $limite,
             'Se cobrará '.EfectoCancelacion::creditos($unidades).": se cancela con menos de {$horas} h de anticipación.");
+    }
+
+    /**
+     * Cancela el cliente una cita con anticipo ya pagado (ADR 0161): a tiempo (o si su
+     * política no penaliza cancelar tarde) se le devuelve; tarde, el negocio lo
+     * conserva. Pasado el límite, el negocio decide si él aún puede cancelar.
+     */
+    private function efectoDelAnticipo(ReservaTenant $reserva, SesionTenant $sesion, int $horasLimite): EfectoCancelacion
+    {
+        $horas = (int) ($reserva->horas_limite ?? $horasLimite);
+        $limite = $sesion->inicia_en->copy()->subHours($horas);
+        $aTiempo = now()->lessThanOrEqualTo($limite);
+        $que = $reserva->saldo_orden_id !== null ? 'anticipo' : 'pago';
+
+        if (! $aTiempo && ! $this->parametros->siNo('cancelacion.cliente_cancela_tarde')) {
+            return EfectoCancelacion::noCancelable("Ya pasó el límite para cancelar sin costo ({$horas} h antes). Escríbele al negocio para cancelar.");
+        }
+        if ($aTiempo || ! ($reserva->penaliza_tarde ?? true)) {
+            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, $aTiempo, $limite, $this->pagadoEnLinea($reserva)
+                ? "El {$que} pagado en línea se devolverá automáticamente."
+                : "El {$que} ya pagado se devuelve en el negocio.", anticipo: EfectoCancelacion::DEVUELVE);
+        }
+
+        return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, false, $limite,
+            "Se cancela con menos de {$horas} h de anticipación: el {$que} no se devuelve.", anticipo: EfectoCancelacion::COBRA);
+    }
+
+    /** La frase del aviso al cliente cuando el negocio conserva su anticipo. */
+    private static function anticipoConservado(ReservaTenant $reserva, int $horas): string
+    {
+        return "Como cancelaste con menos de {$horas} h de anticipación, tu ".($reserva->saldo_orden_id !== null ? 'anticipo' : 'pago').' no se devuelve.';
+    }
+
+    /** ¿Lo pagado para confirmar la reserva se pagó en línea (y se puede devolver solo)? */
+    private function pagadoEnLinea(ReservaTenant $reserva): bool
+    {
+        return $reserva->orden_id !== null && PagoTenant::query()
+            ->where('orden_id', $reserva->orden_id)
+            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
+            ->whereIn('proveedor', ProveedorPasarela::enLinea())
+            ->exists();
     }
 
     /**
@@ -967,6 +1031,12 @@ class ReservasTenant
             'cancelada_por' => null,
             'cancelada_por_usuario_id' => null,
         ]);
+        // Con anticipo, el saldo que se canceló al vencer vuelve a quedar por cobrar.
+        if ($bloqueada->saldo_orden_id !== null) {
+            OrdenTenant::query()->whereKey($bloqueada->saldo_orden_id)
+                ->where('estado', EstadoOrden::Cancelada->value)
+                ->update(['estado' => EstadoOrden::Pendiente->value, 'cancelada_en' => null]);
+        }
 
         return true;
     }
@@ -1072,13 +1142,7 @@ class ReservasTenant
      */
     private function seDevuelveSolo(ReservaTenant $reserva): bool
     {
-        return $reserva->orden_id !== null
-            && $this->parametros->siNo('cancelacion.devolver_pago_si_cancela_negocio')
-            && PagoTenant::query()
-                ->where('orden_id', $reserva->orden_id)
-                ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
-                ->whereIn('proveedor', ProveedorPasarela::enLinea())
-                ->exists();
+        return $this->parametros->siNo('cancelacion.devolver_pago_si_cancela_negocio') && $this->pagadoEnLinea($reserva);
     }
 
     private function tieneAsistencia(SesionTenant $sesion): bool
@@ -1162,16 +1226,18 @@ class ReservasTenant
     }
 
     /**
-     * Cancela la orden pendiente de una reserva de pago-para-reservar, para que no se
-     * pueda pagar algo que ya no se va a entregar. Una orden ya pagada no se toca.
+     * Cancela la orden pendiente de una reserva de pago-para-reservar (y la del saldo,
+     * si lleva anticipo), para que no se pueda pagar algo que ya no se va a entregar.
+     * Una orden ya pagada no se toca.
      */
     private function cancelarOrdenPendiente(ReservaTenant $reserva): void
     {
-        if ($reserva->orden_id === null) {
+        $ordenes = array_values(array_filter([$reserva->orden_id, $reserva->saldo_orden_id], static fn ($id): bool => $id !== null));
+        if ($ordenes === []) {
             return;
         }
 
-        OrdenTenant::query()->whereKey($reserva->orden_id)
+        OrdenTenant::query()->whereKey($ordenes)
             ->where('estado', EstadoOrden::Pendiente->value)
             ->update(['estado' => EstadoOrden::Cancelada->value, 'cancelada_en' => now()]);
     }

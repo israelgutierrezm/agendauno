@@ -18,7 +18,6 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;
-use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
@@ -161,7 +160,7 @@ class ResumenDelDiaTenant
         $titulares = ReservaTenant::query()
             ->whereIn('sesion_id', $sesiones->filter(fn (SesionTenant $s): bool => $s->esCita())->pluck('id'))
             ->whereIn('estado', $esperan)
-            ->with(['persona', 'orden', 'asistencia'])
+            ->with(['persona', 'orden', 'saldoOrden', 'asistencia'])
             ->get()
             ->keyBy(fn (ReservaTenant $r): int => (int) $r->sesion_id);
 
@@ -189,7 +188,7 @@ class ResumenDelDiaTenant
             // Por marcar: ya empezó y hay quien no tiene asistencia (ni presente ni falta).
             $sinMarcar = ! $cancelada && $empezo ? max(0, $esperados - $llegaron - $faltaron) : 0;
             $titular = $titulares->get((int) $s->getKey());
-            $porCobrar = $titular instanceof ReservaTenant && $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente;
+            $porCobrar = $titular instanceof ReservaTenant && $titular->ordenPorCobrar() !== null;
 
             if (! $cancelada) {
                 $totales['sesiones']++;

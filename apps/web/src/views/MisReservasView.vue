@@ -25,6 +25,7 @@ import { libresDeSesion } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   cuandoCorto,
+  dinero,
   presentarCobertura,
   useMiCuenta,
   type Clase,
@@ -501,6 +502,16 @@ function detallesMia(e: Evento): string[] {
   }
   if (r.estado === "pendiente_pago") {
     lineas.push(t("portal.miReserva.pagaParaConfirmar"));
+  }
+  // Con anticipo (ADR 0161): lo que ya pagó y lo que paga en el negocio.
+  const saldo = r.cita?.saldo_minor ?? null;
+  if (r.cita?.anticipo_minor != null && saldo !== null) {
+    lineas.push(
+      t("portal.miReserva.anticipoPagado", {
+        anticipo: dinero(r.cita.anticipo_minor, sesion.moneda),
+        resto: dinero(saldo, sesion.moneda),
+      }),
+    );
   }
   if (r.plan && r.estado !== "en_espera") {
     lineas.push(t("portal.miReserva.conPlan", { plan: r.plan }));

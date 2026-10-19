@@ -186,6 +186,8 @@ class PublicoCitasController
             'instructor_id' => ['nullable', 'string'],
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
+            // Si el servicio pide anticipo (ADR 0161): pagar solo el anticipo o todo.
+            'pagar' => ['nullable', Rule::in(['anticipo', 'todo'])],
             // De dónde llegó (ADR 0142): se guarda con su cita y su orden.
             ...Atribucion::reglas(),
             ...IdentificadoresNavegador::reglas(),
@@ -213,17 +215,18 @@ class PublicoCitasController
             $this->whatsapp->aceptar($persona, true);
         }
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
+        $pagarTodo = ($validado['pagar'] ?? null) === 'todo';
 
         try {
             $reserva = $instructor instanceof Usuario
-                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0)
-                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0);
+                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo)
+                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo);
         } catch (LimiteCitasPorPagar) {
             // Sin decir a un anónimo si ese correo es de un cliente ni cuánto debe.
             throw new LimiteCitasPorPagar('No se puede agendar con estos datos desde aquí. Entra a tu cuenta o comunícate con el negocio.');
         }
         $this->anotar($reserva, $validado['nota'] ?? null, $validado['asiste'] ?? null);
-        $reserva->load(['orden', 'sesion.instructor']);
+        $reserva->load(['orden', 'saldoOrden', 'sesion.instructor']);
         $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $persona, $validado['medicion'] ?? null, $request->ip(), $request->userAgent());
         if ($contexto !== null && $reserva->orden !== null) {
             $reserva->orden->update(['contexto_medicion_id' => $contexto->getKey()]);
@@ -234,7 +237,10 @@ class PublicoCitasController
             'reserva' => $reserva->ulid,
             'estado' => $reserva->estado->value,
             'orden_id' => $reserva->orden?->ulid,
+            // Lo que se paga ahora (con anticipo, el anticipo) y lo que queda por pagar en
+            // el negocio (null sin anticipo, o si eligió pagar todo).
             'total_minor' => $reserva->orden?->total_minor,
+            'saldo_minor' => $reserva->saldoOrden?->total_minor,
             'moneda' => $reserva->orden?->moneda,
             // Quién atenderá: el elegido o el que se asignó.
             'profesional' => $profesional instanceof Usuario ? ['id' => $profesional->ulid, 'nombre' => (string) $profesional->name] : null,
@@ -258,7 +264,7 @@ class PublicoCitasController
             ->firstOrFail();
         $reserva = ReservaTenant::query()
             ->where('orden_id', $orden->getKey())
-            ->with(['sesion.oferta', 'sesion.sucursal'])
+            ->with(['sesion.oferta', 'sesion.sucursal', 'saldoOrden'])
             ->latest('id')
             ->firstOrFail();
         $sesion = $reserva->sesion;
@@ -281,6 +287,8 @@ class PublicoCitasController
                 'mapa_url' => $sede->enlaceMapa(),
             ] : null,
             'total_minor' => $orden->total_minor,
+            // Con anticipo (ADR 0161): lo que queda por pagar en el negocio.
+            'saldo_minor' => $reserva->saldoOrden?->total_minor,
             'moneda' => $orden->moneda,
             'vence_en' => $vence?->toIso8601String(),
             'pago_en_linea' => $this->cobro->pagoEnLinea(),

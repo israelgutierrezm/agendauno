@@ -50,9 +50,11 @@ const METODOS = ["efectivo", "tarjeta", "transferencia"] as const;
 const PROPINAS = [0, 10, 15, 20] as const;
 
 const cita = computed(() => props.sesion?.cita ?? null);
-// Lo del servicio: solo si falta cobrarlo.
+// Lo del servicio: solo si falta cobrarlo (con anticipo, solo lo que falta).
 const servicio = computed(() =>
-  cita.value?.por_cobrar === true ? (cita.value.total_minor ?? 0) : 0,
+  cita.value?.por_cobrar === true
+    ? (cita.value.por_cobrar_minor ?? cita.value.total_minor ?? 0)
+    : 0,
 );
 const conMostrador = computed(() => puedeEntrar("pos", tenant));
 

@@ -273,7 +273,10 @@ it('en la cuenta del cliente de un negocio de citas: su cita dice en qué va y n
 
     $esperado = [
         'reserva_id' => $agendada['id'], 'estado' => 'pendiente_pago', 'asistencia' => null,
-        'orden_id' => $agendada['orden_id'], 'nota' => 'Solo la barba', 'asiste' => null,
+        'orden_id' => $agendada['orden_id'],
+        // Sin anticipo (ADR 0161): nada pagado al apartar ni saldo aparte.
+        'anticipo_minor' => null, 'saldo_minor' => null, 'saldo_orden_id' => null,
+        'nota' => 'Solo la barba', 'asiste' => null,
         'estado_atencion' => 'confirmada', 'estado_pago' => 'por_pagar',
     ];
     expect($agendada['tipo'])->toBe('cita')

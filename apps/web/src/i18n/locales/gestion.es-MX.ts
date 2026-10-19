@@ -387,6 +387,9 @@ export const citaCuenta = {
   // Servicio que se toma con su bono (ADR 0091, 0130).
   conTuBono: "con tu bono",
   conTuBonoAyuda: "Se descuenta una sesión de tu bono; no pagas al agendar.",
+  // Anticipo para apartar (ADR 0161).
+  anticipoAyuda:
+    "Si cancelas a tiempo, se te devuelve lo que pagaste; si cancelas tarde, el negocio lo conserva.",
   servicio: "Servicio",
   profesional: "Profesional",
   sede: "Sede",

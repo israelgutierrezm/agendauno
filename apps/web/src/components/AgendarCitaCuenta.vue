@@ -40,6 +40,8 @@ interface Servicio {
   duracion_minutos: number | null;
   // Se descuenta de su bono (ADR 0091).
   con_plan?: boolean;
+  // Lo que se paga para apartar; el resto, en el negocio (ADR 0161). Null = completo.
+  anticipo_minor?: number | null;
 }
 interface Opcion {
   id: string;
@@ -73,6 +75,8 @@ const sucursales = ref<Opcion[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const confirmacion = ref<Confirmacion | null>(null);
+// Con anticipo (ADR 0161): paga solo el anticipo (por omisión) o todo.
+const pagarTodo = ref(false);
 
 const servicioId = ref("");
 const profesionalId = ref("");
@@ -96,6 +100,14 @@ const verHorariosDe = computed<string>({
 const servicio = computed(
   () => servicios.value.find((s) => s.id === servicioId.value) ?? null,
 );
+const anticipo = computed(() =>
+  servicio.value?.con_plan === true
+    ? null
+    : (servicio.value?.anticipo_minor ?? null),
+);
+watch(servicioId, () => {
+  pagarTodo.value = false;
+});
 // Solo quienes atienden en la sede elegida: con alguien de otra sede no habría
 // fechas disponibles.
 const profesionalesSede = computed(() =>
@@ -232,6 +244,9 @@ async function agendar(): Promise<void> {
       duracion_minutos: servicio.value.duracion_minutos ?? 60,
       ...(ofrecerWhatsApp.value && aceptaWhatsApp.value
         ? { acepta_whatsapp: true }
+        : {}),
+      ...(anticipo.value !== null
+        ? { pagar: pagarTodo.value ? "todo" : "anticipo" }
         : {}),
     });
     // Ya los aceptó: no se le vuelve a preguntar.
@@ -541,6 +556,54 @@ onMounted(async () => {
       <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
       </AvisoTono>
+      <fieldset
+        v-if="anticipo !== null && servicio"
+        class="grid gap-1 text-sm"
+        data-prueba="elegir-anticipo"
+      >
+        <legend class="tu-label">
+          {{ $t("perfilPublico.agendar.anticipo.titulo") }}
+        </legend>
+        <label class="flex items-start gap-2">
+          <input
+            v-model="pagarTodo"
+            type="radio"
+            :value="false"
+            class="mt-1"
+            data-prueba="pagar-anticipo"
+          />
+          <span>
+            {{
+              $t("perfilPublico.agendar.anticipo.soloAnticipo", {
+                anticipo: dinero(anticipo, servicio.moneda),
+              })
+            }}
+            <span class="block" :style="{ color: 'var(--texto-suave)' }">{{
+              $t("perfilPublico.agendar.anticipo.restoEnNegocio", {
+                resto: dinero(
+                  (servicio.precio_minor ?? 0) - anticipo,
+                  servicio.moneda,
+                ),
+              })
+            }}</span>
+          </span>
+        </label>
+        <label class="flex items-start gap-2">
+          <input
+            v-model="pagarTodo"
+            type="radio"
+            :value="true"
+            class="mt-1"
+            data-prueba="pagar-todo"
+          />
+          {{
+            $t("perfilPublico.agendar.anticipo.todo", {
+              total: dinero(servicio.precio_minor ?? 0, servicio.moneda),
+            })
+          }}
+        </label>
+        <span class="tu-hint">{{ $t("citaCuenta.anticipoAyuda") }}</span>
+      </fieldset>
       <label v-if="ofrecerWhatsApp" class="flex items-center gap-2 text-sm">
         <input
           v-model="aceptaWhatsApp"

@@ -31,7 +31,7 @@ final class HistorialCitaTenant
      */
     public function de(ReservaTenant $reserva): array
     {
-        $reserva->loadMissing(['orden.pagos.registradoPor', 'asistencia']);
+        $reserva->loadMissing(['orden.pagos.registradoPor', 'saldoOrden.pagos.registradoPor', 'asistencia']);
         $hechos = [];
         $agregar = function (string $tipo, ?CarbonInterface $fecha, ?string $actor = null, array $detalle = []) use (&$hechos): void {
             if ($fecha !== null) {
@@ -43,7 +43,9 @@ final class HistorialCitaTenant
         $agregar('recordatorio', $reserva->recordatorio_24h_en, null, ['horas' => 24]);
         $agregar('recordatorio', $reserva->recordatorio_2h_en, null, ['horas' => 2]);
 
+        // Con anticipo (ADR 0161), también los cobros del saldo.
         $pagos = ($reserva->orden->pagos ?? collect())
+            ->concat($reserva->saldo_orden_id !== null ? ($reserva->saldoOrden->pagos ?? collect()) : collect())
             ->reject(fn (PagoTenant $p): bool => $p->estado === EstadoPago::Pendiente || $p->estado === EstadoPago::Rechazado);
         $ulidsPago = $pagos->map(fn (PagoTenant $p): string => (string) $p->ulid)->all();
 
@@ -59,7 +61,8 @@ final class HistorialCitaTenant
 
         foreach ($pagos as $pago) {
             $enCaja = $pago->proveedor === 'manual';
-            $metodo = $registrados->get((string) $pago->ulid)?->despues['metodo'] ?? ($enCaja ? $reserva->orden?->metodo_pago : null);
+            $deOrden = (int) $pago->orden_id === (int) $reserva->saldo_orden_id ? $reserva->saldoOrden : $reserva->orden;
+            $metodo = $registrados->get((string) $pago->ulid)?->despues['metodo'] ?? ($enCaja ? $deOrden?->metodo_pago : null);
             $agregar('cobrada', $pago->aprobado_en ?? $pago->created_at, $pago->registradoPor?->name, [
                 'monto_minor' => $pago->monto_minor,
                 'moneda' => $pago->moneda,

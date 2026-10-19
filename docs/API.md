@@ -151,8 +151,8 @@ respuesta; la web y la app no los deducen:
   registrar si vino), `llego` (antes de empezar), `en_servicio`, `completada`,
   `no_asistio` o `cancelada`.
 - `estado_pago`: `por_pagar` (apartada en línea, falta que el cliente pague),
-  `por_cobrar` (su orden sigue pendiente), `pagada` o `null` (no lleva cobro: la toma
-  con su plan).
+  `por_cobrar` (su orden sigue pendiente, o pagó el anticipo y falta el saldo; ADR
+  0161), `pagada` o `null` (no lleva cobro: la toma con su plan).
 
 `politica_reserva` de la oferta solo dice cómo se habilita la reserva (`pago` o
 derecho); nunca si es cita.
@@ -461,6 +461,29 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
   - en `reserva` si no hay nada que cobrar o la orden se canceló;
   - en `items.N.*` si un producto o extra ya no está a la venta.
 - La misma clave devuelve el mismo cobro.
+
+## Citas: anticipo para apartar (ADR 0161)
+
+- `PUT /ofertas/{oferta}` (y el alta) aceptan `anticipo_minor` (monto, menor que el
+  precio) o `anticipo_pct` (1 a 99), uno u otro; `null` lo quita. La oferta responde
+  `anticipo_minor`, `anticipo_pct` y `anticipo_resultante_minor` (lo que resulta con su
+  precio; `null` = se paga completo).
+- `GET /citas/opciones` (y `/mi/citas/opciones`): cada servicio trae `anticipo_minor`
+  (null sin anticipo o si el negocio no cobra en línea).
+- `POST /citas` y `POST /mi/citas` aceptan `pagar` (`anticipo` por omisión, o `todo`).
+  Con anticipo la cita queda `pendiente_pago`:
+  - `POST /citas` responde `total_minor` (lo que se paga ahora) y `saldo_minor` (lo que
+    queda para el negocio; `null` sin anticipo o pagando todo);
+  - `GET /citas/orden/{orden}` también trae `saldo_minor`;
+  - `POST /mi/citas` trae en `cita` `anticipo_minor` (pagado), `saldo_minor` y
+    `saldo_orden_id` (mientras falte).
+- Lo que agenda el negocio (`POST /agenda/citas`) no lleva anticipo.
+- Agenda (`cita`): `total_minor` es lo que cuesta la cita; `anticipo_minor`, lo pagado
+  al apartar; `por_cobrar_minor`, lo que falta. `POST /reservas/{reserva}/cobro` cobra
+  solo el saldo.
+- Vista previa de cancelar (`GET /mi/reservas/{reserva}/cancelacion`): `anticipo`
+  (`devuelve` | `cobra` | `null`). Si el cliente cancela a tiempo, lo pagado en línea
+  se devuelve solo; si cancela tarde, no.
 
 ## Servicios y clases: corregir y archivar (ADR 0154)
 

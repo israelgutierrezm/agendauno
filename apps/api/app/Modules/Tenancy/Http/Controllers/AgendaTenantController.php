@@ -370,7 +370,7 @@ class AgendaTenantController
         return ReservaTenant::query()
             ->whereIn('sesion_id', $citas)
             ->whereIn('estado', self::OCUPAN_LUGAR)
-            ->with(['persona', 'asistencia', 'orden.pagos'])
+            ->with(['persona', 'asistencia', 'orden.pagos', 'saldoOrden.pagos'])
             ->get()
             ->keyBy(fn (ReservaTenant $r): int => (int) $r->sesion_id)
             ->all();
@@ -454,7 +454,8 @@ class AgendaTenantController
      */
     private function pagoDeCita(ReservaTenant $titular): ?array
     {
-        $orden = $titular->orden;
+        // Con anticipo (ADR 0161), el último cobro: el del saldo si ya se pagó.
+        $orden = $titular->saldoOrden?->estado === EstadoOrden::Pagada ? $titular->saldoOrden : $titular->orden;
         if ($orden === null || $orden->estado !== EstadoOrden::Pagada) {
             return null;
         }
@@ -539,10 +540,13 @@ class AgendaTenantController
                 'asistencia_automatica' => (bool) $titular->asistencia?->automatica,
                 // Orden de la cita (servicio de pago) y si falta cobrarla en caja.
                 'orden_id' => $titular->orden?->ulid,
-                'por_cobrar' => $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente,
-                // Lo que se cobra: el total de su orden, fijo desde que se agendó (el
-                // precio del catálogo puede cambiar después).
-                'total_minor' => $titular->orden?->total_minor,
+                'por_cobrar' => $titular->ordenPorCobrar() !== null,
+                // Lo que cuesta: el total de su orden (y la del saldo), fijo desde que se
+                // agendó (el precio del catálogo puede cambiar después).
+                'total_minor' => $titular->totalCitaMinor(),
+                // Con anticipo (ADR 0161): lo ya pagado al apartar y lo que falta.
+                'anticipo_minor' => $titular->anticipoPagadoMinor(),
+                'por_cobrar_minor' => $titular->ordenPorCobrar()?->total_minor,
                 'moneda' => $titular->orden?->moneda,
                 // Con qué se pagó y si esa forma se puede corregir (ADR 0086).
                 'pago' => $this->pagoDeCita($titular),

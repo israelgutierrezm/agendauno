@@ -199,6 +199,8 @@ export default {
       "En la lista de espera no se descuenta nada hasta que te toque un lugar.",
     aceptaAntes: "Tienes un lugar: acéptalo antes de las {hora}.",
     pagaParaConfirmar: "Paga para confirmar tu lugar.",
+    anticipoPagado:
+      "Pagaste {anticipo} de anticipo; el resto ({resto}) lo pagas en el negocio.",
     queLlevar: "Qué llevar: {texto}",
     comoLlegar: "Cómo llegar",
     reservarConPlan: "Reserva una clase de tu plan →",

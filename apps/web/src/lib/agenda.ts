@@ -17,7 +17,10 @@ export interface CitaTitular {
   asistencia_automatica?: boolean; // la marcó el sistema al terminar sin registro
   orden_id?: string | null; // orden del servicio (si es de pago)
   por_cobrar?: boolean; // agendada por el negocio y aún sin cobrar en caja
-  total_minor?: number | null; // lo que se cobra: el total de su orden
+  total_minor?: number | null; // lo que cuesta: el total de su orden (y la del saldo)
+  // Con anticipo (ADR 0161): lo ya pagado al apartar y lo que falta cobrar.
+  anticipo_minor?: number | null;
+  por_cobrar_minor?: number | null;
   moneda?: string | null;
   nota?: string | null; // lo que el cliente pidió que supiéramos al agendar
   asiste?: string | null; // si la agendó para otra persona: quién asiste

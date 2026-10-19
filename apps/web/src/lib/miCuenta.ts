@@ -66,6 +66,11 @@ export interface Reserva {
   // Su lugar numerado y cuántos tiene la clase (0 = no numera; B06).
   lugar?: number | null;
   lugares?: number;
+  // Su cita (null si es clase): con anticipo, lo que pagó al apartar y lo que falta.
+  cita?: {
+    anticipo_minor?: number | null;
+    saldo_minor?: number | null;
+  } | null;
 }
 // Qué partes de su cuenta le sirven (ADR 0091).
 export interface PortalCuenta {

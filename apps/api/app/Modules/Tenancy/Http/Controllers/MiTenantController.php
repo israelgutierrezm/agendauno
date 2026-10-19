@@ -239,7 +239,7 @@ class MiTenantController
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
             ->with([
                 'sesion' => fn ($q) => $q->withCount(SesionTenantPresenter::conteos()),
-                'sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'orden', 'asistencia',
+                'sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'orden', 'saldoOrden', 'asistencia',
                 'derecho.acuerdo.producto',
             ])
             ->get()
@@ -465,7 +465,7 @@ class MiTenantController
                 (int) $sesion->sucursal_id,
             );
 
-            return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden']))], 201);
+            return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden', 'saldoOrden']))], 201);
         }
 
         $reserva = $this->reservas->crear(
@@ -621,6 +621,8 @@ class MiTenantController
             'asiste' => ['nullable', 'string', 'max:120'],
             // Pidió los avisos por WhatsApp al agendar (ADR 0069); sin marcar no cambia nada.
             'acepta_whatsapp' => ['boolean'],
+            // Si el servicio pide anticipo (ADR 0161): pagar solo el anticipo o todo.
+            'pagar' => ['nullable', Rule::in(['anticipo', 'todo'])],
         ]);
         if (($validado['acepta_whatsapp'] ?? false) && $whatsapp->enUso()) {
             $whatsapp->aceptar($persona, true);
@@ -632,9 +634,10 @@ class MiTenantController
         $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
+        $pagarTodo = ($validado['pagar'] ?? null) === 'todo';
         $reserva = $instructor instanceof Usuario
-            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0)
-            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0);
+            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo)
+            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo);
         $cambios = array_filter([
             'nota_cliente' => trim((string) ($validado['nota'] ?? '')),
             'asiste' => trim((string) ($validado['asiste'] ?? '')),
@@ -642,7 +645,7 @@ class MiTenantController
         if ($cambios !== []) {
             $reserva->update($cambios);
         }
-        $reserva->load(['sesion.oferta', 'sesion.instructor', 'orden']);
+        $reserva->load(['sesion.oferta', 'sesion.instructor', 'orden', 'saldoOrden']);
         $profesional = $reserva->sesion?->instructor;
 
         return response()->json(['data' => [
@@ -907,6 +910,11 @@ class MiTenantController
             // Llegó (presente) / no asistió (ausente); null = aún sin marcar.
             'asistencia' => $reserva->asistencia?->estado->value,
             'orden_id' => $reserva->orden?->ulid,
+            // Con anticipo (ADR 0161): lo que pagó al apartar y lo que falta (en el negocio
+            // o en línea, con su orden).
+            'anticipo_minor' => $reserva->anticipoPagadoMinor(),
+            'saldo_minor' => $reserva->saldo_orden_id !== null ? $reserva->saldoOrden?->total_minor : null,
+            'saldo_orden_id' => $reserva->saldoOrden?->estado === EstadoOrden::Pendiente ? $reserva->saldoOrden->ulid : null,
             // Lo que pidió que supieran al agendar y, si es para otra persona, quién asiste.
             'nota' => $reserva->nota_cliente,
             'asiste' => $reserva->asiste,
