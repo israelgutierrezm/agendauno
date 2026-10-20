@@ -210,8 +210,9 @@ it('las ventas recientes van por páginas y se filtran por días del negocio', f
     expect($pagina->json('meta'))->toMatchArray(['total' => 5, 'page' => 1, 'per_page' => 2, 'ultima_pagina' => 3])
         ->and($pagina->json('data.0.id'))->toBe($ultima['id'])
         ->and($pagina->json('data'))->toHaveCount(2)
-        ->and($pagina->json('meta.hoy'))->toBe(['ventas' => 2, 'vendido_minor' => 9000, 'propinas_minor' => 500])
-        ->and($pagina->json('meta.resumen'))->toBe(['ventas' => 5, 'vendido_minor' => 22500, 'propinas_minor' => 500]);
+        // Lo vendido ya sin lo devuelto (ADR 0178); aquí no hubo devoluciones.
+        ->and($pagina->json('meta.hoy'))->toBe(['ventas' => 2, 'vendido_minor' => 9000, 'propinas_minor' => 500, 'devuelto_minor' => 0])
+        ->and($pagina->json('meta.resumen'))->toBe(['ventas' => 5, 'vendido_minor' => 22500, 'propinas_minor' => 500, 'devuelto_minor' => 0]);
     expect($this->getJson("{$c['base']}/pos/ventas?per_page=2&page=3", conBearer($c['e']['bearer']))->json('data'))->toHaveCount(1);
 
     // El 30 del negocio es solo la de las 23:30.
