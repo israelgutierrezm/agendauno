@@ -128,7 +128,7 @@ function montar(paginas: Record<string, number> = {}) {
 
 async function abrirDetalle(w: ReturnType<typeof montar>) {
   await flushPromises();
-  await w.get("button.prospecto-fila").trigger("click");
+  await w.get("tr.prospecto-fila").trigger("click");
   await flushPromises();
 }
 
@@ -196,11 +196,14 @@ describe("prospectos: responsable, contacto e historia", () => {
     const w = montar();
     await flushPromises();
 
-    expect(w.get('[data-prueba="chip-sin-atender"]').text()).toContain(
+    // La tarjeta de «Sin atender» filtra la lista (propuesta del dueño, 2026-10-20).
+    expect(w.get('[data-prueba="indicador-sin-atender"]').text()).toContain(
       "Sin atender",
     );
     expect(w.find('[data-prueba="fila-sin-atender"]').exists()).toBe(true);
-    await w.get('[data-prueba="chip-sin-atender"]').trigger("click");
+    await w
+      .get('[data-prueba="indicador-sin-atender"] button')
+      .trigger("click");
     await flushPromises();
     expect(api.get).toHaveBeenLastCalledWith(
       "/api/v1/app/demo/prospectos",

@@ -80,10 +80,23 @@ export default {
     vacioFiltro: "No hay prospectos con estos filtros.",
     resumen: {
       nuevos: "Nuevos",
+      nuevosDetalle: "Contactos recientes",
       // Su responsable no lo atendió a tiempo (ADR 0138).
       sinAtender: "Sin atender",
+      sinAtenderDetalle: "Requieren seguimiento",
       vencidos: "Seguimientos vencidos",
+      vencidosDetalle: "Acción requerida",
       abiertos: "Abiertos",
+      abiertosDetalle: "En proceso de conversión",
+    },
+    tabla: {
+      contacto: "Contacto",
+      informacion: "Información",
+      estado: "Estado",
+      seguimiento: "Próximo seguimiento",
+      creado: "Llegó",
+      acciones: "Acciones",
+      ver: "Ver",
     },
     filtros: {
       estado: "Estado",
@@ -250,6 +263,8 @@ export default {
     prospectos: "{n} prospecto | {n} prospectos",
     editar: "Editar",
     compartir: "Compartir",
+    buscar: "Buscar formulario",
+    sinCoincidencias: "Ningún formulario coincide con la búsqueda.",
     editor: {
       tituloNuevo: "Nuevo formulario",
       tituloEditar: "Editar formulario",
@@ -288,12 +303,22 @@ export default {
     },
     compartirPanel: {
       titulo: "Compartir «{nombre}»",
-      enlace: "Enlace",
+      descripcion:
+        "Comparte este formulario por enlace o insértalo en tu sitio.",
+      enlaceTitulo: "Compartir formulario",
+      enlaceAyuda:
+        "Cualquier persona con el enlace podrá llenar este formulario.",
+      enlace: "Enlace público",
       copiar: "Copiar",
+      copiarEnlace: "Copiar enlace",
+      copiarCodigo: "Copiar código",
       copiado: "Copiado",
       qr: "Código QR",
+      qrAyuda:
+        "Escanea este código para abrir el formulario desde un teléfono.",
       descargarQr: "Descargar QR",
-      embeber: "Ponerlo en tu sitio",
+      abrir: "Abrir enlace",
+      embeber: "Insertar en tu sitio",
       embeberAyuda:
         "Copia este código en tu página web. El formulario se ve dentro de tu sitio y lo que envíen llega a tus prospectos.",
       apagado:

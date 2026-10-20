@@ -5,6 +5,8 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useDescartarCambios } from "@/lib/editorFormulario";
@@ -31,6 +33,16 @@ const puedeGestionar = computed(() => sesion.puede("prospectos.gestionar"));
 const puedeEncender = computed(() => sesion.puede("estudio.gestionar"));
 
 const formularios = ref<FormularioCaptacion[]>([]);
+// Con varios formularios, un buscador por nombre o título.
+const busqueda = ref("");
+const visibles = computed(() => {
+  const q = busqueda.value.trim().toLocaleLowerCase("es");
+  return q === ""
+    ? formularios.value
+    : formularios.value.filter((f) =>
+        `${f.nombre} ${f.titulo}`.toLocaleLowerCase("es").includes(q),
+      );
+});
 const activa = ref(true);
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -268,7 +280,31 @@ function descargarQr(): void {
       </button>
     </div>
 
-    <div class="mt-4 flex justify-end">
+    <AvisoTono
+      v-if="!cargando && !activa"
+      tono="aviso"
+      class="mt-4"
+      role="status"
+      data-prueba="captacion-apagada"
+    >
+      {{ $t("captacion.formularios.compartirPanel.captacionApagada") }}
+    </AvisoTono>
+
+    <div class="mt-4 flex flex-wrap items-center justify-end gap-3">
+      <label
+        v-if="formularios.length > 3"
+        class="tu-buscar min-w-0"
+        data-prueba="buscar-formulario"
+      >
+        <IconoNav nombre="buscar" :tam="16" />
+        <input
+          v-model="busqueda"
+          type="search"
+          class="tu-input"
+          :placeholder="$t('captacion.formularios.buscar')"
+          :aria-label="$t('captacion.formularios.buscar')"
+        />
+      </label>
       <button
         v-if="puedeGestionar"
         type="button"
@@ -289,9 +325,16 @@ function descargarQr(): void {
     >
       {{ $t("comun.cargando") }}
     </p>
+    <p
+      v-else-if="visibles.length === 0 && busqueda.trim() !== ''"
+      class="mt-4 text-sm"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("captacion.formularios.sinCoincidencias") }}
+    </p>
     <ul v-else class="mt-4 grid gap-3 sm:grid-cols-2">
       <li
-        v-for="f in formularios"
+        v-for="f in visibles"
         :key="f.id"
         class="tu-card p-4 grid gap-2"
         data-prueba="formulario-captacion-tarjeta"
@@ -329,17 +372,21 @@ function descargarQr(): void {
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+            data-prueba="compartir-tarjeta"
             @click="compartir(f)"
           >
+            <IconoNav nombre="enlace" :tam="16" />
             {{ $t("captacion.formularios.compartir") }}
           </button>
           <button
             v-if="puedeGestionar"
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+            data-prueba="editar-tarjeta"
             @click="editar(f)"
           >
+            <IconoNav nombre="editar" :tam="16" />
             {{ $t("captacion.formularios.editar") }}
           </button>
         </div>
@@ -527,8 +574,8 @@ function descargarQr(): void {
       </template>
     </PanelLateral>
 
-    <!-- Compartir -->
-    <PanelLateral
+    <!-- Compartir: enlace con su QR, y el código para insertarlo en otro sitio. -->
+    <ModalDialogo
       :abierto="compartiendo !== null"
       :titulo="
         compartiendo
@@ -537,92 +584,223 @@ function descargarQr(): void {
             })
           : ''
       "
+      :descripcion="$t('captacion.formularios.compartirPanel.descripcion')"
+      tam="lg"
       @cerrar="compartiendo = null"
     >
       <div
         v-if="compartiendo"
-        class="grid gap-5 text-sm"
+        class="grid gap-4 text-sm"
         data-prueba="compartir-formulario"
       >
         <AvisoTono v-if="!activa" tono="aviso" role="status">
           {{ $t("captacion.formularios.compartirPanel.captacionApagada") }}
         </AvisoTono>
-        <p
-          v-else-if="!compartiendo.activo"
-          role="status"
-          style="color: var(--aviso)"
-        >
+        <AvisoTono v-else-if="!compartiendo.activo" tono="aviso" role="status">
           {{ $t("captacion.formularios.compartirPanel.apagado") }}
-        </p>
-        <section class="grid gap-2">
-          <h3 class="tu-label">
-            {{ $t("captacion.formularios.compartirPanel.enlace") }}
-          </h3>
-          <a
-            :href="enlace"
-            target="_blank"
-            rel="noopener"
-            class="tu-enlace break-all"
-            >{{ enlace }}</a
-          >
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma justify-self-start"
-            @click="copiar(enlace, 'enlace')"
-          >
-            {{
-              copiado === "enlace"
-                ? $t("captacion.formularios.compartirPanel.copiado")
-                : $t("captacion.formularios.compartirPanel.copiar")
-            }}
-          </button>
+        </AvisoTono>
+
+        <section class="fc-bloque">
+          <span class="fc-icono" aria-hidden="true">
+            <IconoNav nombre="enlace" :tam="18" />
+          </span>
+          <div class="min-w-0 grid gap-3">
+            <div>
+              <h3 class="font-medium">
+                {{ $t("captacion.formularios.compartirPanel.enlaceTitulo") }}
+              </h3>
+              <p :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("captacion.formularios.compartirPanel.enlaceAyuda") }}
+              </p>
+            </div>
+            <div>
+              <p class="tu-label">
+                {{ $t("captacion.formularios.compartirPanel.enlace") }}
+              </p>
+              <div class="fc-enlace">
+                <span
+                  class="min-w-0 truncate"
+                  data-prueba="enlace-formulario"
+                  >{{ enlace }}</span
+                >
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5 shrink-0"
+                  data-prueba="copiar-enlace"
+                  @click="copiar(enlace, 'enlace')"
+                >
+                  <IconoNav nombre="copiar" :tam="16" />
+                  {{
+                    copiado === "enlace"
+                      ? $t("captacion.formularios.compartirPanel.copiado")
+                      : $t("captacion.formularios.compartirPanel.copiarEnlace")
+                  }}
+                </button>
+              </div>
+            </div>
+            <div
+              v-if="qr"
+              class="fc-qr pt-3 border-t"
+              :style="{ borderColor: 'var(--borde-fila)' }"
+            >
+              <img
+                :src="qr"
+                :alt="$t('captacion.formularios.compartirPanel.qr')"
+                width="128"
+                height="128"
+                class="rounded-lg border p-1.5"
+                :style="{ borderColor: 'var(--borde)' }"
+              />
+              <div class="min-w-0 grid gap-2 content-start">
+                <h4 class="font-medium">
+                  {{ $t("captacion.formularios.compartirPanel.qr") }}
+                </h4>
+                <p :style="{ color: 'var(--texto-suave)' }">
+                  {{ $t("captacion.formularios.compartirPanel.qrAyuda") }}
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+                    @click="descargarQr"
+                  >
+                    <IconoNav nombre="descargar" :tam="16" />
+                    {{ $t("captacion.formularios.compartirPanel.descargarQr") }}
+                  </button>
+                  <a
+                    :href="enlace"
+                    target="_blank"
+                    rel="noopener"
+                    class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+                  >
+                    <IconoNav nombre="externo" :tam="16" />
+                    {{ $t("captacion.formularios.compartirPanel.abrir") }}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
-        <section v-if="qr" class="grid gap-2">
-          <h3 class="tu-label">
-            {{ $t("captacion.formularios.compartirPanel.qr") }}
-          </h3>
-          <img
-            :src="qr"
-            :alt="$t('captacion.formularios.compartirPanel.qr')"
-            width="160"
-            height="160"
-            class="rounded-lg border"
-            :style="{ borderColor: 'var(--borde)' }"
-          />
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma justify-self-start"
-            @click="descargarQr"
-          >
-            {{ $t("captacion.formularios.compartirPanel.descargarQr") }}
-          </button>
-        </section>
-        <section class="grid gap-2">
-          <h3 class="tu-label">
-            {{ $t("captacion.formularios.compartirPanel.embeber") }}
-          </h3>
-          <p :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("captacion.formularios.compartirPanel.embeberAyuda") }}
-          </p>
-          <textarea
-            class="tu-input font-mono text-xs"
-            rows="5"
-            readonly
-            :value="codigo"
-          />
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma justify-self-start"
-            @click="copiar(codigo, 'codigo')"
-          >
-            {{
-              copiado === "codigo"
-                ? $t("captacion.formularios.compartirPanel.copiado")
-                : $t("captacion.formularios.compartirPanel.copiar")
-            }}
-          </button>
+
+        <section class="fc-bloque">
+          <span class="fc-icono" aria-hidden="true">
+            <IconoNav nombre="codigo" :tam="18" />
+          </span>
+          <div class="min-w-0 grid gap-3">
+            <div>
+              <h3 class="font-medium">
+                {{ $t("captacion.formularios.compartirPanel.embeber") }}
+              </h3>
+              <p :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("captacion.formularios.compartirPanel.embeberAyuda") }}
+              </p>
+            </div>
+            <div class="fc-codigo">
+              <pre data-prueba="codigo-formulario">{{ codigo }}</pre>
+              <button
+                type="button"
+                class="fc-copiar-codigo"
+                :aria-label="
+                  $t('captacion.formularios.compartirPanel.copiarCodigo')
+                "
+                @click="copiar(codigo, 'codigo')"
+              >
+                <IconoNav nombre="copiar" :tam="16" />
+              </button>
+            </div>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5 justify-self-start"
+              data-prueba="copiar-codigo"
+              @click="copiar(codigo, 'codigo')"
+            >
+              <IconoNav nombre="copiar" :tam="16" />
+              {{
+                copiado === "codigo"
+                  ? $t("captacion.formularios.compartirPanel.copiado")
+                  : $t("captacion.formularios.compartirPanel.copiarCodigo")
+              }}
+            </button>
+          </div>
         </section>
       </div>
-    </PanelLateral>
+    </ModalDialogo>
   </section>
 </template>
+
+<style scoped>
+/* Compartir (propuesta del dueño, 2026-10-20): dos bloques, cada uno con su ícono. */
+.fc-bloque {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--superficie);
+}
+.fc-icono {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+}
+.fc-enlace {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.35rem 0.35rem 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-boton);
+  background: var(--fondo);
+}
+.fc-qr {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.fc-codigo {
+  position: relative;
+}
+.fc-codigo pre {
+  margin: 0;
+  padding: 0.75rem 2.75rem 0.75rem 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-boton);
+  background: var(--fondo);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.fc-copiar-codigo {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radio-boton);
+  color: var(--texto-suave);
+}
+.fc-copiar-codigo:hover {
+  background: var(--superficie-2);
+  color: var(--texto);
+}
+@media (max-width: 30rem) {
+  .fc-bloque {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fc-icono {
+    display: none;
+  }
+  .fc-qr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+</style>

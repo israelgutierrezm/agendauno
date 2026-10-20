@@ -10,6 +10,9 @@ import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   abierto,
@@ -59,6 +62,62 @@ const resumen = ref({
 });
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// El resumen arriba (propuesta del dueño, 2026-10-20): cada tarjeta filtra la lista.
+const indicadores = computed<Indicador[]>(() => [
+  {
+    clave: "nuevos",
+    etiqueta: t("captacion.prospectos.resumen.nuevos"),
+    valor: String(resumen.value.nuevos),
+    detalle: t("captacion.prospectos.resumen.nuevosDetalle"),
+    icono: "personas",
+    tono: "azul",
+    activo: filtros.estado === "nuevo",
+    alElegir: () => {
+      filtros.estado = filtros.estado === "nuevo" ? "" : "nuevo";
+    },
+  },
+  {
+    clave: "sin-atender",
+    etiqueta: t("captacion.prospectos.resumen.sinAtender"),
+    valor: String(resumen.value.sin_atender),
+    detalle: t("captacion.prospectos.resumen.sinAtenderDetalle"),
+    icono: "reloj",
+    tono: "naranja",
+    activo: filtros.atencion === "sin_atender",
+    alElegir: () => {
+      filtros.atencion =
+        filtros.atencion === "sin_atender" ? "" : "sin_atender";
+    },
+  },
+  {
+    clave: "vencidos",
+    etiqueta: t("captacion.prospectos.resumen.vencidos"),
+    valor: String(resumen.value.seguimientos_vencidos),
+    detalle: t("captacion.prospectos.resumen.vencidosDetalle"),
+    icono: "agenda",
+    tono: "morado",
+    activo: filtros.seguimiento === "vencido",
+    alElegir: () => {
+      filtros.seguimiento = filtros.seguimiento === "vencido" ? "" : "vencido";
+    },
+  },
+  {
+    clave: "abiertos",
+    etiqueta: t("captacion.prospectos.resumen.abiertos"),
+    valor: String(resumen.value.abiertos),
+    detalle: t("captacion.prospectos.resumen.abiertosDetalle"),
+    icono: "hecho",
+    tono: "verde",
+  },
+]);
+function iniciales(nombre: string): string {
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((x) => x[0]?.toUpperCase() ?? "")
+    .join("");
+}
 // El inicio abre las solicitudes nuevas ya filtradas (`?estado=nuevo`; M08).
 const estadoInicial = useRoute()?.query.estado;
 // `estado` vacío: los abiertos (lo de siempre).
@@ -778,52 +837,12 @@ async function crear(): Promise<void> {
       :subtitulo="$t('adminUsabilidad.prospectosAyuda')"
     />
 
-    <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
-      <div
-        class="flex flex-wrap gap-2 text-sm"
-        data-prueba="resumen-prospectos"
-      >
-        <button
-          type="button"
-          class="tu-chip"
-          :aria-pressed="filtros.estado === 'nuevo'"
-          @click="filtros.estado = filtros.estado === 'nuevo' ? '' : 'nuevo'"
-        >
-          {{ $t("captacion.prospectos.resumen.nuevos") }}:
-          <strong>{{ resumen.nuevos }}</strong>
-        </button>
-        <button
-          type="button"
-          class="tu-chip"
-          data-prueba="chip-sin-atender"
-          :aria-pressed="filtros.atencion === 'sin_atender'"
-          @click="
-            filtros.atencion =
-              filtros.atencion === 'sin_atender' ? '' : 'sin_atender'
-          "
-        >
-          {{ $t("captacion.prospectos.resumen.sinAtender") }}:
-          <strong>{{ resumen.sin_atender }}</strong>
-        </button>
-        <button
-          type="button"
-          class="tu-chip"
-          data-prueba="chip-vencidos"
-          :aria-pressed="filtros.seguimiento === 'vencido'"
-          @click="
-            filtros.seguimiento =
-              filtros.seguimiento === 'vencido' ? '' : 'vencido'
-          "
-        >
-          {{ $t("captacion.prospectos.resumen.vencidos") }}:
-          <strong>{{ resumen.seguimientos_vencidos }}</strong>
-        </button>
-        <span class="tu-chip">
-          {{ $t("captacion.prospectos.resumen.abiertos") }}:
-          <strong>{{ resumen.abiertos }}</strong>
-        </span>
-      </div>
-    </div>
+    <!-- Lo que pide atención; cada tarjeta filtra la lista (la de abiertos la limpia). -->
+    <TarjetasIndicadores
+      class="mt-5"
+      :tarjetas="indicadores"
+      data-prueba="resumen-prospectos"
+    />
 
     <!-- Buscador, filtros y «Agregar», como en Miembros. -->
     <BarraListado
@@ -865,50 +884,102 @@ async function crear(): Promise<void> {
         "
         compacto
       />
-      <ul v-else class="divide-y" :style="{ borderColor: 'var(--borde)' }">
-        <li v-for="p in lista" :key="p.id">
-          <button
-            type="button"
-            class="prospecto-fila"
-            data-prueba="prospecto"
-            @click="abrir(p)"
-          >
-            <span class="min-w-0">
-              <span class="block font-medium truncate">{{ p.nombre }}</span>
-              <span class="tu-sub truncate">
-                {{ [p.email, p.telefono].filter(Boolean).join(" · ") }}
-              </span>
-              <span v-if="interes(p)" class="tu-sub truncate">{{
-                interes(p)
-              }}</span>
-            </span>
-            <span class="prospecto-meta">
-              <span
-                class="tu-estado text-sm"
-                :style="{ '--tono': tono(p.estado) }"
-              >
-                {{ $t(`captacion.prospectos.estados.${p.estado}`) }}
-              </span>
-              <span
-                v-if="vencido(p)"
-                class="tu-sub"
-                style="color: var(--aviso)"
-              >
-                {{ $t("captacion.prospectos.vencido") }}
-              </span>
-              <span
-                v-if="p.sin_atender_desde"
-                class="tu-estado text-xs"
-                :style="{ '--tono': 'var(--aviso)' }"
-                data-prueba="fila-sin-atender"
-              >
-                {{ $t("captacion.prospectos.resumen.sinAtender") }}
-              </span>
-              <span class="tu-sub">{{ fecha(p.creado_en) }}</span>
-            </span>
-          </button>
-        </li>
-      </ul>
+      <div v-else class="overflow-x-auto">
+        <table class="tu-tabla" data-prueba="tabla-prospectos">
+          <thead>
+            <tr>
+              <th>{{ $t("captacion.prospectos.tabla.contacto") }}</th>
+              <th class="hidden md:table-cell">
+                {{ $t("captacion.prospectos.tabla.informacion") }}
+              </th>
+              <th>{{ $t("captacion.prospectos.tabla.estado") }}</th>
+              <th class="hidden sm:table-cell">
+                {{ $t("captacion.prospectos.tabla.seguimiento") }}
+              </th>
+              <th class="hidden lg:table-cell">
+                {{ $t("captacion.prospectos.tabla.creado") }}
+              </th>
+              <th class="text-right">
+                <span class="sr-only">{{
+                  $t("captacion.prospectos.tabla.acciones")
+                }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="p in lista"
+              :key="p.id"
+              class="prospecto-fila"
+              data-prueba="prospecto"
+              @click="abrir(p)"
+            >
+              <td>
+                <span class="flex items-center gap-3 min-w-0">
+                  <span class="prospecto-avatar" aria-hidden="true">{{
+                    iniciales(p.nombre)
+                  }}</span>
+                  <span class="min-w-0">
+                    <span class="block font-medium truncate">{{
+                      p.nombre
+                    }}</span>
+                    <span class="tu-sub truncate">{{
+                      p.email ?? p.telefono ?? "—"
+                    }}</span>
+                  </span>
+                </span>
+              </td>
+              <td class="hidden md:table-cell">
+                <span class="block truncate">{{ p.telefono ?? "—" }}</span>
+                <span class="tu-sub truncate">{{ interes(p) || "—" }}</span>
+              </td>
+              <td>
+                <span
+                  class="tu-estado text-sm"
+                  :style="{ '--tono': tono(p.estado) }"
+                >
+                  {{ $t(`captacion.prospectos.estados.${p.estado}`) }}
+                </span>
+                <span
+                  v-if="p.sin_atender_desde"
+                  class="tu-sub"
+                  style="color: var(--aviso)"
+                  data-prueba="fila-sin-atender"
+                >
+                  {{ $t("captacion.prospectos.resumen.sinAtender") }}
+                </span>
+              </td>
+              <td class="hidden sm:table-cell">
+                <span
+                  v-if="vencido(p)"
+                  class="tu-estado text-sm"
+                  :style="{ '--tono': 'var(--error)' }"
+                >
+                  {{ $t("captacion.prospectos.vencido") }}
+                </span>
+                <span v-else-if="p.proximo_seguimiento_en">{{
+                  fecha(p.proximo_seguimiento_en)
+                }}</span>
+                <span v-else :style="{ color: 'var(--texto-suave)' }">—</span>
+              </td>
+              <td class="hidden lg:table-cell">
+                <span :style="{ color: 'var(--texto-suave)' }">{{
+                  fecha(p.creado_en)
+                }}</span>
+              </td>
+              <td class="text-right">
+                <button
+                  type="button"
+                  class="tu-enlace text-sm"
+                  @click.stop="abrir(p)"
+                >
+                  {{ $t("captacion.prospectos.tabla.ver") }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <PaginacionListado
         v-if="paginacion && paginacion.ultima_pagina > 1"
         :page="paginacion.page"
@@ -1475,25 +1546,23 @@ async function crear(): Promise<void> {
 
 <style scoped>
 .prospecto-fila {
-  display: flex;
-  width: 100%;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem 1rem;
-  text-align: left;
+  cursor: pointer;
 }
-.prospecto-fila:hover,
-.prospecto-fila:focus-visible {
-  background: var(--superficie-2);
+.prospecto-fila:hover {
+  background: var(--fondo);
 }
-.prospecto-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.15rem;
+/* Las iniciales de la persona, neutras (sin colores por persona). */
+.prospecto-avatar {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  text-align: right;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 .tu-sub {
   display: block;

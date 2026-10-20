@@ -31,6 +31,8 @@
   --texto: #031b4e;
   --texto-suave: #5e6b84;
   --borde: #d9e0ec;
+  /* La línea entre filas de un listado: el borde del tema, más tenue. */
+  --borde-fila: color-mix(in srgb, var(--borde) 55%, var(--superficie));
   /* Azul de marca: con texto blanco encima llega a 4.6:1 (AA). */
   --acento: #006df7;
   --primario: var(--acento);
@@ -207,6 +209,14 @@
 /* Base y componentes propios en capas de Tailwind v4: así las utilidades
    (w-auto, px-3, text-xs…) pueden ajustarlos, como se espera. */
 @layer base {
+  /* Tailwind v4 pinta un borde sin color (border-b, divide-y…) con el color del texto:
+     en los listados se veían líneas casi negras. Por omisión, el borde del tema. */
+  *,
+  ::before,
+  ::after,
+  ::backdrop {
+    border-color: var(--borde);
+  }
   html {
     font-size: 16px;
   }
@@ -715,7 +725,8 @@
   }
   .tu-tabla td {
     padding: 0.75rem 1rem;
-    border-top: 1px solid var(--borde);
+    /* Entre filas, una línea apenas visible (la del borde del tema, aclarada). */
+    border-top: 1px solid var(--borde-fila);
     vertical-align: middle;
   }
   .tu-tabla td.tu-celda-detalle {

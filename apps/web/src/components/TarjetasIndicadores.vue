@@ -33,6 +33,10 @@ export interface Indicador {
   to?: RouteLocationRaw;
   // La base de un porcentaje («12 de 40»): de dónde sale el número.
   detalle?: string;
+  // Filtra el listado de la misma pantalla al tocarla (p. ej. Prospectos): toda la
+  // tarjeta es el botón y `activo` dice si ese filtro está puesto.
+  alElegir?: () => void;
+  activo?: boolean;
 }
 
 const props = withDefaults(
@@ -102,6 +106,17 @@ const columnasMedio = computed(() =>
             :style="k.aviso ? { color: 'var(--aviso)' } : undefined"
             >{{ k.valor }}</RouterLink
           >
+          <button
+            v-else-if="k.alElegir"
+            type="button"
+            class="ti-enlace ti-boton"
+            :aria-label="`${k.etiqueta}: ${k.valor}`"
+            :aria-pressed="k.activo === true"
+            :style="k.aviso ? { color: 'var(--aviso)' } : undefined"
+            @click="k.alElegir()"
+          >
+            {{ k.valor }}
+          </button>
           <span
             v-else
             :style="k.aviso ? { color: 'var(--aviso)' } : undefined"
@@ -282,6 +297,17 @@ const columnasMedio = computed(() =>
 }
 .ti-enlace:focus-visible {
   outline: none;
+}
+.ti-boton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+/* El filtro puesto: la tarjeta se marca con una línea del color principal. */
+.ti-celda:has(.ti-boton[aria-pressed="true"]) {
+  box-shadow: inset 0 -2px 0 var(--primario);
 }
 .ti-celda:has(.ti-enlace:focus-visible) {
   outline: 2px solid var(--primario);
