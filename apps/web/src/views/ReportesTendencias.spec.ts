@@ -253,4 +253,60 @@ describe("tendencias del dinero", () => {
       "$75.00",
     );
   });
+
+  it("una respuesta vieja (otra agrupación) que llega tarde no pisa la nueva", async () => {
+    let soltarSemana: (v: unknown) => void = () => {};
+    const conNeto = (neto: number) => ({
+      data: {
+        data: {
+          ...tendencias,
+          otras_monedas: [],
+          totales: { ...tendencias.totales, neto_minor: neto },
+        },
+      },
+    });
+    api.get.mockImplementation(
+      (url: string, opciones?: { params?: { agrupacion?: string } }) => {
+        if (!url.endsWith("/reportes/tendencias")) {
+          return Promise.resolve({ data: { data: null } });
+        }
+        const agrupacion = opciones?.params?.agrupacion;
+        if (agrupacion === "semana") {
+          return new Promise((r) => (soltarSemana = r));
+        }
+        return Promise.resolve(conNeto(agrupacion === "mes" ? 9900 : 7500));
+      },
+    );
+    const w = mount(ReportesView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { ...esMX, operacion } },
+          }),
+        ],
+        stubs: { EncabezadoSeccion: true },
+      },
+    });
+    await flushPromises();
+    await w
+      .findAll(".tu-pestanas button")
+      .find((b) => b.text() === "Ingresos")!
+      .trigger("click");
+    await flushPromises();
+
+    const agrupar = w.get("select.tu-input");
+    await agrupar.setValue("semana");
+    await agrupar.setValue("mes");
+    await flushPromises();
+    soltarSemana(conNeto(1));
+    await flushPromises();
+
+    expect(w.get('[data-prueba="tendencias-totales"]').text()).toContain(
+      "$99.00",
+    );
+  });
 });

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Dar de baja una membresía (plan de mejoras B04): primero la simulación (fecha
@@ -38,14 +39,18 @@ class BajasMembresiaTenantController extends Controller
         $actor = $actor instanceof Usuario ? $actor : null;
         $exentar = (bool) ($validado['exentar_penalizacion'] ?? false);
         abort_if($exentar && ! ($actor?->puede('cuotas.exentar') ?? false), 403, 'No puedes exentar la penalización.');
+        $acuerdo = $this->acuerdo($request);
+        $motivo = isset($validado['motivo']) ? trim((string) $validado['motivo']) : null;
+        // Perdonar la mensualidad vencida es exentar una cuota: con `cuotas.exentar` y
+        // con motivo, como exentar la penalización.
+        $conservar = (bool) ($validado['conservar_adeudo'] ?? true);
+        $perdona = ! $conservar && $this->bajas->simular($acuerdo)['adeudo_minor'] > 0;
+        abort_if($perdona && ! ($actor?->puede('cuotas.exentar') ?? false), 403, 'No puedes perdonar la mensualidad pendiente.');
+        if (($exentar || $perdona) && ($motivo === null || $motivo === '')) {
+            throw ValidationException::withMessages(['motivo' => ['Escribe por qué se exenta.']]);
+        }
 
-        $baja = $this->bajas->ejecutar(
-            $this->acuerdo($request),
-            isset($validado['motivo']) ? trim((string) $validado['motivo']) : null,
-            $exentar,
-            (bool) ($validado['conservar_adeudo'] ?? true),
-            $actor,
-        );
+        $baja = $this->bajas->ejecutar($acuerdo, $motivo, $exentar, $conservar, $actor);
         $baja->loadMissing('acuerdo');
 
         return response()->json(['data' => [

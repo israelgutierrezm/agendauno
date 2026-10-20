@@ -68,7 +68,13 @@ const aCobrar = computed(() => {
     (conservarAdeudo.value ? s.adeudo_minor : 0)
   );
 });
-const motivoFalta = computed(() => exentar.value && motivo.value.trim() === "");
+// Exentar la penalización o perdonar la mensualidad vencida piden motivo.
+const perdona = computed(
+  () => !conservarAdeudo.value && (sim.value?.adeudo_minor ?? 0) > 0,
+);
+const motivoFalta = computed(
+  () => (exentar.value || perdona.value) && motivo.value.trim() === "",
+);
 
 onMounted(async () => {
   try {
@@ -178,7 +184,10 @@ async function confirmarBaja(): Promise<void> {
         <p class="mt-1">{{ sim.condiciones }}</p>
       </details>
 
-      <label v-if="sim.adeudo_minor > 0" class="flex items-start gap-2">
+      <label
+        v-if="puedeExentar && sim.adeudo_minor > 0"
+        class="flex items-start gap-2"
+      >
         <input v-model="conservarAdeudo" type="checkbox" class="mt-1" />
         <span>
           {{ $t("bajaMembresia.adeudo", { monto: dinero(sim.adeudo_minor) }) }}
@@ -202,7 +211,7 @@ async function confirmarBaja(): Promise<void> {
       </label>
       <div>
         <label class="tu-label" for="baja-motivo">{{
-          exentar
+          exentar || perdona
             ? $t("bajaMembresia.motivoObligatorio")
             : $t("bajaMembresia.motivo")
         }}</label>
@@ -211,7 +220,7 @@ async function confirmarBaja(): Promise<void> {
           v-model="motivo"
           class="tu-input"
           maxlength="300"
-          :required="exentar"
+          :required="exentar || perdona"
         />
       </div>
       <p class="font-medium" data-prueba="baja-total">

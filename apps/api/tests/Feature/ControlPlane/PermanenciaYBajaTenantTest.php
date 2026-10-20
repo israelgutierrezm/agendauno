@@ -188,3 +188,20 @@ it('en mora la baja es hoy y la mensualidad vencida se cobra aparte; un paquete 
     $this->getJson("/api/v1/app/{$e['slug']}/acuerdos/{$delPaquete}/baja", conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonPath('code', 'MEMBERSHIP_CANCEL_NOT_ALLOWED');
 });
+
+it('perdonar la mensualidad vencida al dar de baja pide permiso para exentar y un motivo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $ana = crearMiembroTenant($e, 'Ana');
+    $acuerdo = contratarConPermanencia($e, $ana, membresiaConPermanencia($e, 1));
+    $this->travelTo('2026-10-30 12:00:00');
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
+    $this->travelTo('2026-11-05 12:00:00');
+    $recepcion = personalConSesion($e['slug'], $e['bearer'], 'recepcion@correo.mx', 'recepcionista');
+    $url = "/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/baja";
+
+    $this->postJson($url, ['conservar_adeudo' => false, 'motivo' => 'Se mudó'], conBearer($recepcion))->assertForbidden();
+    $this->postJson($url, ['conservar_adeudo' => false], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['motivo'], 'meta.errors');
+    $this->postJson($url, ['conservar_adeudo' => false, 'motivo' => 'Se mudó de ciudad'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.adeudo_minor', 0);
+});

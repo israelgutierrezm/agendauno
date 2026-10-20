@@ -404,58 +404,48 @@ const tarjetas = computed<Indicador[]>(() => {
   }));
 });
 
-async function cargarNegocio(): Promise<void> {
-  const { data } = await api.get<{ data: Negocio }>(
-    `${base.value}/reportes/negocio`,
-    {
-      params: { desde: desde.value, hasta: hasta.value },
-    },
+// Cada reporte guarda cuál fue su última petición: si mientras llegaba se pidió otra
+// (otro periodo, otra agrupación), la respuesta vieja no pisa la nueva.
+const ultimas: Record<string, number> = {};
+async function pedir<T>(
+  reporte: string,
+  params?: Record<string, unknown>,
+): Promise<T | null> {
+  const n = (ultimas[reporte] = (ultimas[reporte] ?? 0) + 1);
+  const { data } = await api.get<{ data: T }>(
+    `${base.value}/reportes/${reporte}`,
+    params === undefined ? undefined : { params },
   );
-  negocio.value = data.data;
+  return ultimas[reporte] === n ? data.data : null;
+}
+const periodo = () => ({ desde: desde.value, hasta: hasta.value });
+
+async function cargarNegocio(): Promise<void> {
+  const r = await pedir<Negocio>("negocio", periodo());
+  if (r !== null) negocio.value = r;
 }
 
 async function cargarRentabilidad(): Promise<void> {
-  const { data } = await api.get<{ data: Rentabilidad }>(
-    `${base.value}/reportes/rentabilidad`,
-    {
-      params: { desde: desde.value, hasta: hasta.value },
-    },
-  );
-  rentabilidad.value = data.data;
+  const r = await pedir<Rentabilidad>("rentabilidad", periodo());
+  if (r !== null) rentabilidad.value = r;
 }
 
 async function cargarDemanda(): Promise<void> {
-  const { data } = await api.get<{ data: Demanda }>(
-    `${base.value}/reportes/demanda`,
-    {
-      params: { desde: desde.value, hasta: hasta.value },
-    },
-  );
-  demanda.value = data.data;
+  const r = await pedir<Demanda>("demanda", periodo());
+  if (r !== null) demanda.value = r;
 }
 
 async function cargarEquipo(): Promise<void> {
-  const { data } = await api.get<{ data: Equipo }>(
-    `${base.value}/reportes/equipo`,
-    {
-      params: { desde: desde.value, hasta: hasta.value },
-    },
-  );
-  equipo.value = data.data;
+  const r = await pedir<Equipo>("equipo", periodo());
+  if (r !== null) equipo.value = r;
 }
 
 async function cargarTendencias(): Promise<void> {
-  const { data } = await api.get<{ data: Tendencias }>(
-    `${base.value}/reportes/tendencias`,
-    {
-      params: {
-        desde: desde.value,
-        hasta: hasta.value,
-        agrupacion: agrupacion.value,
-      },
-    },
-  );
-  tendencias.value = data.data;
+  const r = await pedir<Tendencias>("tendencias", {
+    ...periodo(),
+    agrupacion: agrupacion.value,
+  });
+  if (r !== null) tendencias.value = r;
 }
 
 async function exportarTendencias(): Promise<void> {
@@ -486,28 +476,21 @@ async function exportarTendencias(): Promise<void> {
 }
 
 async function cargarCohortes(): Promise<void> {
-  const { data } = await api.get<{ data: Cohortes }>(
-    `${base.value}/reportes/cohortes`,
-    { params: { meses: 6 } },
-  );
-  cohortes.value = data.data;
+  const r = await pedir<Cohortes>("cohortes", { meses: 6 });
+  if (r !== null) cohortes.value = r;
 }
 
 async function cargarEmbudo(): Promise<void> {
-  const { data } = await api.get<{ data: Embudo }>(
-    `${base.value}/reportes/embudo`,
-    { params: { desde: desde.value, hasta: hasta.value } },
-  );
-  embudo.value = data.data;
+  const r = await pedir<Embudo>("embudo", periodo());
+  if (r !== null) embudo.value = r;
 }
 
 async function cargarSucursales(): Promise<void> {
-  const s = await api.get<{ data: ReporteSucursales }>(
-    `${base.value}/reportes/sucursales`,
-  );
-  sucursales.value = s.data.data.sucursales;
-  sinSucursal.value = s.data.data.sin_sucursal.miembros_activos;
-  totalesSucursales.value = s.data.data.totales;
+  const r = await pedir<ReporteSucursales>("sucursales");
+  if (r === null) return;
+  sucursales.value = r.sucursales;
+  sinSucursal.value = r.sin_sucursal.miembros_activos;
+  totalesSucursales.value = r.totales;
 }
 
 // Lo que pide cada pestaña. Se carga al abrirla (no todo al entrar: cada reporte
