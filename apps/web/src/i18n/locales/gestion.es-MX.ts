@@ -762,6 +762,9 @@ export const plataformaAdmin = {
       error: "Error",
       cobro_fallido: "Cobro",
       incidencia_cobro: "Incidencia de cobro",
+      // ADR 0173.
+      aviso_pasarela_fallido: "Aviso de pasarela que no se procesó",
+      evento_outbox_aparcado: "Evento que no se despachó",
       aviso_de_pago_perdido: "Aviso de pago perdido",
       correo_fallido: "Correo que no salió",
       whatsapp_fallido: "WhatsApp que no salió",

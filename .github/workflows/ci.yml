@@ -348,21 +348,38 @@ jobs:
           # Nadie enmarca la plataforma, salvo la vista previa del sitio en su panel (ADR 0114).
           cabeceras() { curl -sS -D - -o /dev/null -H "Host: $1" "http://127.0.0.1:8080$2" | tr -d '\r'; }
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /entrar)"
-          grep -qi "^content-security-policy: frame-ancestors 'none'$" <<<"$(cabeceras agendauno.test /)"
+          grep -qi "^content-security-policy: default-src 'self'; script-src 'self' .*; frame-ancestors 'none'$" <<<"$(cabeceras agendauno.test /)"
+          # El resto de la CSP (ADR 0174): sin JavaScript en línea ni eval, y en todas las páginas.
+          if grep -qi "^content-security-policy: .*script-src[^;]*'unsafe-" <<<"$(cabeceras fluo.agendauno.test /entrar)"; then exit 1; fi
+          grep -qi "^content-security-policy: .*object-src 'none'.*frame-ancestors 'none'$" <<<"$(cabeceras fluo.agendauno.test /entrar)"
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /estudio/otro/vista-previa-falsa)"
           grep -qi "^x-frame-options: SAMEORIGIN$" <<<"$(cabeceras fluo.agendauno.test /estudio/fluo/vista-previa)"
-          grep -qi "^content-security-policy: frame-ancestors 'self'$" <<<"$(cabeceras fluo.turnouno.test '/estudio/fluo/vista-previa?v=2')"
+          grep -qi "^content-security-policy: .*; frame-ancestors 'self'$" <<<"$(cabeceras fluo.turnouno.test '/estudio/fluo/vista-previa?v=2')"
           # Un formulario de captación se embebe en cualquier sitio (ADR 0117).
           if grep -qi "^x-frame-options:" <<<"$(cabeceras fluo.agendauno.test '/f/fluo/01jz0000000000000000000000?embed=1')"; then exit 1; fi
-          grep -qi "^content-security-policy: frame-ancestors \*$" <<<"$(cabeceras fluo.agendauno.test '/f/fluo/01jz0000000000000000000000?embed=1')"
+          grep -qi "^content-security-policy: .*; frame-ancestors \*$" <<<"$(cabeceras fluo.agendauno.test '/f/fluo/01jz0000000000000000000000?embed=1')"
           # Un widget también, y su vista previa en el panel (ADR 0141); otra ruta de /w/ no.
           if grep -qi "^x-frame-options:" <<<"$(cabeceras fluo.agendauno.test '/w/fluo/01jz0000000000000000000000')"; then exit 1; fi
-          grep -qi "^content-security-policy: frame-ancestors \*$" <<<"$(cabeceras fluo.turnouno.test '/w/fluo/01jz0000000000000000000000?vista_previa=1')"
+          grep -qi "^content-security-policy: .*; frame-ancestors \*$" <<<"$(cabeceras fluo.turnouno.test '/w/fluo/01jz0000000000000000000000?vista_previa=1')"
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test '/w/fluo/01jz0000000000000000000000/otra')"
+          # El chequeo de salud de web (ADR 0173): desde el contenedor, sí; de fuera, no.
+          docker exec web wget -q -O /dev/null http://127.0.0.1/_salud-web
+          test "$(pedir fluo.agendauno.test /_salud-web)" = 403
           # Sin la landing, la portada es la aplicación (no un 502).
           docker stop landing-turnouno
           test "$(pedir turnouno.test /)" = 200
           docker rm -f web landing-agendauno landing-turnouno
+
+      # El chequeo de salud de api (ADR 0173): PHP-FPM contesta su ping por FastCGI al
+      # comando del healthcheck; donde no escucha, el chequeo falla.
+      - name: Check API health check
+        run: |
+          set -euo pipefail
+          docker run -d --name api-salud -e APP_KEY="base64:$(openssl rand -base64 32)" -e APP_ENV=production agendauno-api:ci
+          for i in $(seq 1 30); do docker exec api-salud php artisan agendauno:salud-api && break; sleep 1; done
+          docker exec api-salud php artisan agendauno:salud-api
+          if docker exec api-salud php artisan agendauno:salud-api --puerto=9999 --segundos=1; then exit 1; fi
+          docker rm -f api-salud
 
       # Los respaldos usan el cliente de la imagen (MariaDB) contra MySQL 8.4: su usuario
       # normal entra con caching_sha2_password y TLS de certificado autofirmado (como

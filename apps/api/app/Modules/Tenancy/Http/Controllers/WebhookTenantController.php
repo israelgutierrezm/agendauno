@@ -4,39 +4,35 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AvisosPasarelaTenant;
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
-use App\Modules\Tenancy\Application\ContracargosTenant;
-use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
-use App\Modules\Tenancy\Models\PagoTenant;
-use App\Modules\Tenancy\Pasarelas\MercadoPago\NotificacionesMercadoPago;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\AvisoPasarelaTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Pasarelas\MercadoPago\VerificarFirmaMercadoPago;
-use App\Modules\Tenancy\Pasarelas\OpenPay\NotificacionesOpenPay;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
-use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
-use App\Modules\Tenancy\Pasarelas\Stripe\TarjetasStripe;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * Webhook publico de pasarela por estudio: `/webhooks/tenant/{estudio}/{proveedor}`.
- * El estudio se resuelve (y su BD se conecta) por `estudio.resolver`. Confirma el
- * pago pendiente correspondiente -> fulfillment. Idempotente. Verificación por
+ * El estudio se resuelve (y su BD se conecta) por `estudio.resolver`. Verificación por
  * pasarela: Stripe y Mercado Pago con la firma (`webhook_secret`); OpenPay con el
- * usuario y contraseña del webhook. Mercado Pago y OpenPay además releen el cobro
- * en su API antes de confirmar.
+ * usuario y contraseña del webhook.
+ *
+ * Con la firma comprobada, el aviso se guarda y se contesta al momento (ADR 0173):
+ * procesarlo (confirmar el pago y lo que compró; Mercado Pago y OpenPay además releen
+ * el cobro en su API) va después de responder, y si falla se reintenta aparte
+ * ({@see AvisosPasarelaTenant}). Así la pasarela no corta por tiempo ni repite el aviso.
  */
 class WebhookTenantController
 {
     public function __construct(
         private readonly ConfirmarPagoTenant $confirmar,
         private readonly RegistroDePasarelasTenant $registro,
-        private readonly ReembolsarPagoTenant $reembolsos,
-        private readonly TarjetasStripe $tarjetas,
-        private readonly NotificacionesMercadoPago $mercadoPago,
-        private readonly NotificacionesOpenPay $openPay,
-        private readonly ContracargosTenant $contracargos,
+        private readonly AvisosPasarelaTenant $avisos,
+        private readonly GestorDeConexionTenant $gestor,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -88,9 +84,8 @@ class WebhookTenantController
 
         $tipo = (string) ($request->query('type') ?? $request->json('type') ?? $request->query('topic') ?? '');
         $id = $dataId !== '' ? $dataId : (string) ($request->json('data.id') ?? $request->query('id') ?? '');
-        $this->mercadoPago->procesar($tipo, $id);
 
-        return response()->json(['data' => ['ok' => true]]);
+        return $this->guardarYContestar('mercadopago', $tipo, ['tipo' => $tipo, 'id' => $id]);
     }
 
     /**
@@ -115,52 +110,8 @@ class WebhookTenantController
 
         /** @var array<string, mixed> $evento */
         $evento = $request->json()->all();
-        $this->openPay->procesar($evento);
 
-        return response()->json(['data' => ['ok' => true]]);
-    }
-
-    /**
-     * Una disputa de Stripe: se ubica su pago por el PaymentIntent (o por la sesión de
-     * Checkout que lo generó) y se abre o se cierra el contracargo.
-     *
-     * @param  array<string, mixed>  $disputa
-     */
-    private function disputaStripe(string $tipo, array $disputa): void
-    {
-        $intent = $disputa['payment_intent'] ?? null;
-        $intent = is_array($intent) ? ($intent['id'] ?? null) : $intent;
-        $referencia = (string) ($disputa['id'] ?? '');
-        if (! is_string($intent) || $intent === '' || $referencia === '') {
-            return;
-        }
-        $pago = PagoTenant::query()->where('proveedor', 'stripe')->where('referencia_externa', $intent)->first();
-        if (! $pago instanceof PagoTenant) {
-            $llave = $this->registro->llaves('stripe')['secret_key'] ?? '';
-            $sesion = $llave !== '' ? (new ClienteStripe($llave))->sesionDeIntent($intent) : null;
-            $pago = $sesion !== null ? PagoTenant::query()->where('proveedor', 'stripe')->where('referencia_externa', $sesion)->first() : null;
-        }
-        if (! $pago instanceof PagoTenant) {
-            return;
-        }
-
-        $monto = (int) ($disputa['amount'] ?? 0);
-        if ($tipo === 'charge.dispute.closed') {
-            $estado = (string) ($disputa['status'] ?? '');
-            if (in_array($estado, ['won', 'lost'], true)) {
-                $this->contracargos->cerrado($pago, $referencia, $estado === 'won', $monto);
-            }
-
-            return;
-        }
-        $vence = $disputa['evidence_details']['due_by'] ?? null;
-        $this->contracargos->abierto(
-            $pago,
-            $referencia,
-            $monto,
-            isset($disputa['reason']) ? (string) $disputa['reason'] : null,
-            is_numeric($vence) ? CarbonImmutable::createFromTimestamp((int) $vence) : null,
-        );
+        return $this->guardarYContestar('openpay', isset($evento['type']) ? (string) $evento['type'] : null, $evento);
     }
 
     /**
@@ -196,59 +147,36 @@ class WebhookTenantController
 
         /** @var array<string, mixed> $payload */
         $payload = $request->json()->all();
-        $tipo = isset($payload['type']) ? (string) $payload['type'] : '';
-        $objeto = $payload['data']['object'] ?? [];
-        $referencia = is_array($objeto) && isset($objeto['id']) ? (string) $objeto['id'] : '';
 
-        // Checkout: la sesión pagada (tarjeta al momento; OXXO cuando se paga en tienda).
-        // PaymentIntent: cobros creados antes de usar Checkout.
-        $sesionPagada = ($tipo === 'checkout.session.completed' && is_array($objeto) && ($objeto['payment_status'] ?? '') === 'paid')
-            || $tipo === 'checkout.session.async_payment_succeeded';
+        // El id del aviso (`evt_…`): si Stripe lo repite, no se guarda dos veces.
+        return $this->guardarYContestar(
+            'stripe',
+            isset($payload['type']) ? (string) $payload['type'] : null,
+            $payload,
+            isset($payload['id']) ? (string) $payload['id'] : null,
+        );
+    }
 
-        // Un cargo automático trae su orden y su domiciliación: si su pago no quedó
-        // registrado (la pasarela no respondió a tiempo), se registra con ellas.
-        $metadatos = is_array($objeto) && is_array($objeto['metadata'] ?? null) ? $objeto['metadata'] : [];
-        if ($tipo === 'payment_intent.succeeded' && $referencia !== '' && isset($metadatos['orden'], $metadatos['domiciliacion'])) {
-            $this->confirmar->porCargoDomiciliado(
-                $referencia,
-                (string) $metadatos['orden'],
-                (string) $metadatos['domiciliacion'],
-                (int) ($objeto['amount_received'] ?? $objeto['amount'] ?? 0),
-                (string) ($objeto['currency'] ?? ''),
-            );
-        } elseif (($sesionPagada || $tipo === 'payment_intent.succeeded') && $referencia !== '') {
-            $this->confirmar->porReferencia($referencia);
-        }
-
-        // Tarjeta autorizada para pagos automáticos: desde la cuenta del alumno (modo
-        // setup) o al pagar una compra con domiciliación (tras concederla, arriba).
-        if ($tipo === 'checkout.session.completed' && is_array($objeto)
-            && (($objeto['mode'] ?? '') === 'setup' || $sesionPagada)) {
-            $this->tarjetas->sesionCompletada($objeto);
-        }
-
-        // Un cargo automático que el banco procesaba terminó rechazado.
-        if ($tipo === 'payment_intent.payment_failed' && $referencia !== '') {
-            $this->confirmar->rechazarPorReferencia($referencia);
-        }
-
-        // Devoluciones que quedaron pendientes: Stripe avisa cómo terminaron.
-        if (in_array($tipo, ['refund.updated', 'refund.failed', 'charge.refund.updated'], true) && is_array($objeto)) {
-            $estado = (string) ($objeto['status'] ?? '');
-            if (in_array($estado, ['succeeded', 'failed', 'canceled'], true)) {
-                $this->reembolsos->conciliar($referencia, $estado === 'succeeded');
-            }
-        }
-
-        // Contracargo (ADR 0168): el banco del cliente disputa el cobro.
-        if (in_array($tipo, ['charge.dispute.created', 'charge.dispute.closed'], true) && is_array($objeto)) {
-            $this->disputaStripe($tipo, $objeto);
-        }
-
-        // El intento ya no se puede pagar: la sesión venció o el pago en tienda (OXXO)
-        // no se completó. Queda cerrado y se puede reintentar.
-        if (in_array($tipo, ['checkout.session.expired', 'checkout.session.async_payment_failed'], true) && $referencia !== '') {
-            $this->confirmar->rechazarPorReferencia($referencia);
+    /**
+     * Guarda el aviso y contesta; se procesa después de responder (si falla, el comando
+     * de cada minuto lo reintenta).
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function guardarYContestar(string $proveedor, ?string $tipo, array $payload, ?string $clave = null): JsonResponse
+    {
+        $aviso = $this->avisos->recibir($proveedor, $tipo, $payload, $clave);
+        $estudio = $this->gestor->actual();
+        if ($aviso->estado === AvisoPasarelaTenant::PENDIENTE && $estudio instanceof Estudio) {
+            $id = (int) $aviso->getKey();
+            defer(function () use ($estudio, $id): void {
+                $this->gestor->ejecutarAislado($estudio, function () use ($id): void {
+                    $aviso = AvisoPasarelaTenant::query()->find($id);
+                    if ($aviso instanceof AvisoPasarelaTenant) {
+                        $this->avisos->procesar($aviso);
+                    }
+                }, null);
+            });
         }
 
         return response()->json(['data' => ['ok' => true]]);

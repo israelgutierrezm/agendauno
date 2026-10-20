@@ -613,7 +613,13 @@ const router = createRouter({
       name: "estudio-corto",
       component: () => import("@/views/EstudioPublicoView.vue"),
     },
-    { path: "/:pathMatch(.*)*", redirect: { name: "inicio" } },
+    {
+      // Lo que no existe se dice (ADR 0174), con el camino de vuelta; antes se mandaba
+      // al inicio sin avisar.
+      path: "/:pathMatch(.*)*",
+      name: "no-encontrada",
+      component: () => import("@/views/NoEncontradaView.vue"),
+    },
   ],
 });
 

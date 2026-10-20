@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
+use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -187,7 +188,7 @@ class PagosTenantController
     {
         $lineas = ['Fecha,Persona,Monto,Moneda,Devuelto,Estado,Forma de pago,Registró'];
         foreach ($pagos as $pago) {
-            $lineas[] = implode(',', array_map(fn (string $v): string => self::escapar($v), [
+            $lineas[] = implode(',', array_map(Csv::celda(...), [
                 $pago->created_at !== null ? CarbonImmutable::instance($pago->created_at)->setTimezone($this->fechas->zona())->format('Y-m-d H:i') : '',
                 (string) ($pago->orden?->persona?->nombreCompleto() ?? ''),
                 number_format($pago->monto_minor / 100, 2, '.', ''),
@@ -203,18 +204,6 @@ class PagosTenantController
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="movimientos.csv"',
         ]);
-    }
-
-    /** Un valor del CSV: entre comillas si hace falta y sin que se lea como fórmula. */
-    private static function escapar(string $valor): string
-    {
-        if ($valor !== '' && in_array($valor[0], ['=', '+', '-', '@'], true) && ! is_numeric($valor)) {
-            $valor = "'".$valor;
-        }
-
-        return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
-            ? '"'.str_replace('"', '""', $valor).'"'
-            : $valor;
     }
 
     /**

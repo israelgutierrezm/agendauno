@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\BitacoraTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
+use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -98,7 +99,7 @@ class AuditoriaController
         $zona = (string) ($this->gestor->actual()?->zona_horaria ?: 'America/Mexico_City');
         $lineas = ['Fecha,Quién,Qué pasó,Acción,Motivo,IP'];
         foreach ($asientos as $a) {
-            $lineas[] = implode(',', array_map(fn (string $v): string => $this->escapar($v), [
+            $lineas[] = implode(',', array_map(Csv::celda(...), [
                 $a->created_at !== null ? CarbonImmutable::parse($a->created_at)->setTimezone($zona)->format('Y-m-d H:i') : '',
                 (string) ($a->actor_nombre ?? 'Sistema'),
                 BitacoraTenant::descripcion($a),
@@ -112,17 +113,5 @@ class AuditoriaController
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="bitacora.csv"',
         ]);
-    }
-
-    private function escapar(string $valor): string
-    {
-        // Evita que una hoja de cálculo interprete fórmulas.
-        if ($valor !== '' && in_array($valor[0], ['=', '+', '-', '@'], true) && ! is_numeric($valor)) {
-            $valor = "'".$valor;
-        }
-
-        return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
-            ? '"'.str_replace('"', '""', $valor).'"'
-            : $valor;
     }
 }

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -89,7 +90,7 @@ class MovimientosPagoTenantController
         $lineas = ['Fecha,Tipo,Monto,Moneda,Método,Persona,Concepto,Quién,Referencia,Detalle'];
         foreach ($movimientos as $m) {
             $fecha = $m['fecha'] !== '' ? CarbonImmutable::parse((string) $m['fecha'])->setTimezone($zona)->format('Y-m-d H:i') : '';
-            $lineas[] = implode(',', array_map(fn (string $v): string => $this->escapar($v), [
+            $lineas[] = implode(',', array_map(Csv::celda(...), [
                 $fecha,
                 self::TIPOS[(string) $m['tipo']] ?? (string) $m['tipo'],
                 number_format(((int) $m['monto_minor']) / 100, 2, '.', ''),
@@ -115,18 +116,6 @@ class MovimientosPagoTenantController
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"movimientos-{$desde}-a-{$hasta}.csv\"",
         ]);
-    }
-
-    private function escapar(string $valor): string
-    {
-        // Evita que una hoja de cálculo interprete fórmulas.
-        if ($valor !== '' && in_array($valor[0], ['=', '+', '-', '@'], true) && ! is_numeric($valor)) {
-            $valor = "'".$valor;
-        }
-
-        return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
-            ? '"'.str_replace('"', '""', $valor).'"'
-            : $valor;
     }
 
     private function zona(): string

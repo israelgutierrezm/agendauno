@@ -26,6 +26,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\TipoPersonaTenant;
+use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -136,8 +137,7 @@ class MiembrosTenantController
                 $m = $r['membresia'] ?? null;
                 $ultima = $r['ultima'] ?? null;
                 $saldo = $m === null ? '' : ($m['ilimitado'] ? 'Ilimitado' : (string) intdiv((int) $m['saldo_unidades'], 1000));
-                $lineas[] = implode(',', array_map(
-                    fn (string $v): string => $this->escaparCsv($v),
+                $lineas[] = implode(',', array_map(Csv::celda(...),
                     [
                         $persona->nombreCompleto(),
                         (string) ($persona->email ?? ''),
@@ -622,8 +622,7 @@ class MiembrosTenantController
         $lineas = ['Nombre,Correo,Sucursal,Alta,Razon de cobro'];
         foreach ($miembros as $persona) {
             $sucursal = $persona->sucursal;
-            $lineas[] = implode(',', array_map(
-                fn (string $v): string => $this->escaparCsv($v),
+            $lineas[] = implode(',', array_map(Csv::celda(...),
                 [
                     $persona->nombreCompleto(),
                     (string) ($persona->email ?? ''),
@@ -638,17 +637,6 @@ class MiembrosTenantController
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="padron-facturable.csv"',
         ]);
-    }
-
-    private function escaparCsv(string $valor): string
-    {
-        if ($valor !== '' && str_contains('=+-@', $valor[0])) {
-            $valor = "'".$valor;
-        }
-
-        return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
-            ? '"'.str_replace('"', '""', $valor).'"'
-            : $valor;
     }
 
     /**

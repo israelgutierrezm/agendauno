@@ -270,6 +270,9 @@ final class CatalogoParametros
                 'Sirven para registrar la tarjeta del pago automático si el aviso de Stripe no llega; se revisan hasta 48 horas.', $e, 30, 3, 365, 'días', porNegocio: false),
             new DefinicionParametro('limpieza.dias_errores', 'Limpieza de registros', 'Días que se guarda un error que dejó de pasar',
                 'Contados desde la última vez que pasó, esté abierto, resuelto o ignorado.', $e, 90, 7, 730, 'días', porNegocio: false),
+            // ADR 0173: los pagos y su bitácora se quedan; esto es la copia del aviso.
+            new DefinicionParametro('limpieza.dias_avisos_pasarela', 'Limpieza de registros', 'Días que se guarda cada aviso de una pasarela de cobro ya procesado',
+                'La copia del aviso de Stripe, Mercado Pago u OpenPay, para revisar qué llegó. Los pendientes no se borran.', $e, 30, 7, 365, 'días', porNegocio: false),
 
             // Registro de negocios por producto (ADR 0108, solo la plataforma). TurnoUno
             // se lanza después: mientras esté cerrado, su landing junta interesados.

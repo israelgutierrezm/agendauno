@@ -12,6 +12,7 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
+import { lineaCsv } from "@/lib/csv";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { nombreDeRol } from "@/lib/roles";
@@ -374,9 +375,9 @@ function editar(x: FilaVista): void {
   editorEsquema.value = true;
 }
 
-// CSV del resumen (abre en Excel: BOM UTF-8 y separador coma).
+// CSV del resumen (abre en Excel: BOM UTF-8 y separador coma). Sin fórmulas: un
+// nombre que empiece con «=» no se ejecuta al abrirlo (ADR 0173).
 function exportar(): void {
-  const celda = (v: string): string => `"${v.replaceAll('"', '""')}"`;
   const lineas = [
     [
       t("nominaVisual.colMiembro"),
@@ -394,7 +395,7 @@ function exportar(): void {
         (x.devengado / 100).toFixed(2),
         (x.porVenir / 100).toFixed(2),
       ]),
-  ].map((l) => l.map(celda).join(","));
+  ].map(lineaCsv);
   const blob = new Blob(["\uFEFF" + lineas.join("\r\n")], {
     type: "text/csv;charset=utf-8",
   });

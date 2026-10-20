@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   describirError,
+  errorDeCsp,
   reiniciarReporteDeErrores,
   reportarError,
 } from "./errores";
@@ -62,6 +63,37 @@ describe("reporte de errores de la web", () => {
       reportarError(new Error(`Error ${n}`));
     }
     expect(fetchFalso).toHaveBeenCalledTimes(10);
+  });
+
+  it("lo que bloquea la CSP se reporta sin la query; lo de las extensiones, no (ADR 0174)", () => {
+    const error = errorDeCsp({
+      blockedURI: "https://h.online-metrix.net/fp/tags.js?org=1&session=abc",
+      effectiveDirective: "script-src-elem",
+      sourceFile: "",
+    });
+    reportarError(error);
+
+    expect(enviado()).toMatchObject({
+      origen: "web",
+      tipo: "CSP",
+      mensaje:
+        "Bloqueado https://h.online-metrix.net/fp/tags.js por script-src-elem",
+    });
+    expect(enviado()).not.toHaveProperty("lugar");
+    expect(
+      errorDeCsp({
+        blockedURI: "inline",
+        effectiveDirective: "script-src-elem",
+        sourceFile: "chrome-extension://abc/inyectado.js",
+      }),
+    ).toBeNull();
+    expect(
+      errorDeCsp({
+        blockedURI: "eval",
+        effectiveDirective: "script-src",
+        sourceFile: "",
+      })?.message,
+    ).toBe("Bloqueado eval por script-src");
   });
 
   it("describe un texto y descarta lo que no es un error", () => {

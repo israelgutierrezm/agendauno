@@ -7,9 +7,9 @@ Los archivos están en `infra/produccion/`; las decisiones, en los ADR 0048, 010
 
 | Servicio | Qué hace |
 |---|---|
-| `web` | nginx, la entrada de los dos dominios: la aplicación (`dist/app`, `app.html`), pasa `/api` y `/up` a PHP, sirve `/storage` (logos y fotos) y pasa la portada, las páginas por giro, el sitemap, el robots y `/assets-{producto}/` a la landing de su dominio (si la landing no tiene la página o no responde, la aplicación). En el subdominio de cada negocio, procesa `app.html` con SSI para que su página llegue con su cabecera, y pide a la API su sitemap y su robots (ADR 0128; si la API no responde, la cabecera genérica). Escucha solo en `127.0.0.1:8080` y, con Traefik, en su red. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
+| `web` | nginx, la entrada de los dos dominios: la aplicación (`dist/app`, `app.html`), pasa `/api` y `/up` a PHP, sirve `/storage` (logos y fotos) y pasa la portada, las páginas por giro, el sitemap, el robots y `/assets-{producto}/` a la landing de su dominio (si la landing no tiene la página o no responde, la aplicación). En el subdominio de cada negocio, procesa `app.html` con SSI para que su página llegue con su cabecera, y pide a la API su sitemap y su robots (ADR 0128; si la API no responde, la cabecera genérica). Escucha solo en `127.0.0.1:8080` y, con Traefik, en su red. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). Chequeo de salud: `/_salud-web`, solo desde el contenedor (ADR 0173). Manda la CSP completa (`nginx.conf.template`, ADR 0174): un servicio externo nuevo tiene que entrar ahí; si no, lo bloquea y aparece en Errores como CSP. `CSP_CONECTAR_EXTRA` (web.env) suma orígenes de conexión. |
 | `landing-agendauno`, `landing-turnouno` | La landing de cada producto (HTML completo pre-generado), cada una en su imagen (ADR 0112): se publican solas, sin tocar la aplicación ni la API. Solo las alcanza `web`. |
-| `api` | Laravel en PHP-FPM, con pool propio (`infra/produccion/php-fpm.conf`): hasta 24 peticiones a la vez, pensado para el servidor de 4 GB. Con otra memoria, ajusta `pm.max_children` (el archivo explica la cuenta). |
+| `api` | Laravel en PHP-FPM, con pool propio (`infra/produccion/php-fpm.conf`): hasta 24 peticiones a la vez, pensado para el servidor de 4 GB. Con otra memoria, ajusta `pm.max_children` (el archivo explica la cuenta). Chequeo de salud: PHP-FPM contesta su ping por FastCGI (`agendauno:salud-api`, ADR 0173). |
 | `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
 | `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos, alertas… Chequeo de salud: su latido. |
 | `redis` | Caché, colas y sesiones. |
@@ -560,6 +560,17 @@ del último simulacro y las alertas de los últimos 30 días
   webhooks de los negocios que dejaron de responder, respaldos fallidos, trabajos de
   la cola fallidos y la cola detenida. Lo
   que sigue pasando se vuelve a avisar a las 6 horas, no a cada vez.
+- **Avisos de las pasarelas** (ADR 0173): el webhook de Stripe, Mercado Pago u OpenPay
+  comprueba la firma, guarda el aviso y contesta al momento; se procesa después y, si
+  falla, `agendauno:procesar-avisos-pasarela` lo reintenta (2, 4, 8 y 16 minutos). Al
+  quinto intento llega la alerta «Aviso de pasarela que no se procesó».
+- **Eventos del outbox** que agotan sus intentos (correos, webhooks del negocio,
+  automatizaciones que no salieron) llegan como «Evento que no se despachó». Corregida
+  la causa, vuélvelos a la fila:
+
+  ```bash
+  docker compose --env-file web.env exec -u www-data api php artisan agendauno:despachar-outbox --reintentar-aparcados
+  ```
 - **Errores** (pestaña del superadmin, ADR 0080): los de la API, la web y la app,
   agrupados, con traza, contexto y versión, y lo sensible tachado. Se marcan
   resueltos o ignorados; uno resuelto que vuelve en otra versión se reabre y avisa.

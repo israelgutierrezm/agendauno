@@ -44,6 +44,9 @@ COPY --chmod=0755 infra/produccion/web-mapas.sh /docker-entrypoint.d/40-agendaun
 # Los dominios se ponen al arrancar (DOMINIO y DOMINIO_TURNOUNO), con las plantillas de
 # nginx.
 COPY infra/produccion/nginx.conf.template /etc/nginx/templates/default.conf.template
+# Orígenes extra de connect-src en la CSP (ADR 0174); vacío por omisión. Definida aquí
+# para que la plantilla siempre la sustituya.
+ENV CSP_CONECTAR_EXTRA=""
 COPY infra/produccion/nginx-comun.conf /etc/nginx/snippets/agendauno-comun.conf
 COPY infra/produccion/nginx-cabeceras.conf /etc/nginx/snippets/agendauno-cabeceras.conf
 COPY infra/produccion/nginx-landing-proxy.conf /etc/nginx/snippets/agendauno-landing-proxy.conf

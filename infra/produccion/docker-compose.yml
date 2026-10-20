@@ -70,6 +70,14 @@ services:
   # La API (PHP-FPM). nginx le pasa /api y /up.
   api:
     <<: *api
+    # Sana si PHP-FPM contesta su ping por FastCGI (no acepta conexiones o todos sus
+    # procesos están atorados: no contesta). ADR 0173.
+    healthcheck:
+      test: ["CMD", "php", "artisan", "agendauno:salud-api"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 1m
 
   # Correos y trabajos en cola.
   worker:
@@ -124,6 +132,8 @@ services:
       # De qué cabecera sale la IP real del cliente (CF-Connecting-IP con
       # docker-compose.cloudflare.yml).
       CABECERA_IP_REAL: ${CABECERA_IP_REAL:-X-Forwarded-For}
+      # Orígenes extra a los que la web se conecta (CSP, ADR 0174).
+      CSP_CONECTAR_EXTRA: ${CSP_CONECTAR_EXTRA:-}
     ports:
       - "127.0.0.1:8080:80"
     volumes:
@@ -135,6 +145,13 @@ services:
     # (nginx-comun.conf), así que si se recrea solo la API no hace falta reiniciarla.
     depends_on:
       - api
+    # Sana si nginx contesta su propia ruta de salud (sin pasar por la API). ADR 0173.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/_salud-web"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
     logging: *logging
 

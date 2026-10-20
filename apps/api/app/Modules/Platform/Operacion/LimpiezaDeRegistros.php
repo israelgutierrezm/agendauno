@@ -8,6 +8,7 @@ use App\Modules\Platform\Acceso\DesafioPlataforma;
 use App\Modules\Platform\Acceso\SesionPlataforma;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\AvisoPasarelaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\SesionTarjetaTenant;
 use App\Modules\Tenancy\Models\TokenAccesoTenant;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Borra los registros técnicos que ya cumplieron su función (ADR 0079). Cada plazo
@@ -31,6 +33,8 @@ use Illuminate\Support\Carbon;
  *   vez.
  * - Las sesiones de cada negocio que no se usan en su plazo
  *   (`sesion.dias_inactividad`): ya no sirven para entrar.
+ * - `avisos_pasarela` de cada negocio (ADR 0173): la copia de los avisos de Stripe,
+ *   Mercado Pago y OpenPay ya procesados o fallidos. Los pendientes se quedan.
  * - Del superadmin (ADR 0132): los códigos por correo vencidos hace más de un día y
  *   las sesiones vencidas o cerradas hace más de 30 días. La bitácora se queda.
  * Borra por lotes para no bloquear las tablas. No toca historial del negocio: los
@@ -46,7 +50,7 @@ class LimpiezaDeRegistros
     ) {}
 
     /**
-     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int, sesiones_vencidas: int, acceso_plataforma: int}
+     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int, sesiones_vencidas: int, acceso_plataforma: int, avisos_pasarela: int}
      */
     public function ejecutar(): array
     {
@@ -64,10 +68,12 @@ class LimpiezaDeRegistros
                 + $this->borrar(SesionPlataforma::query()->where(fn ($q) => $q
                     ->where('expira_en', '<', $ahora->copy()->subDays(30))
                     ->orWhere('cerrada_en', '<', $ahora->copy()->subDays(30)))),
+            'avisos_pasarela' => 0,
         ];
 
         $limiteSesiones = $this->limite($ahora, 'limpieza.dias_sesiones_tarjeta');
-        Estudio::query()->chunkById(100, function (Collection $estudios) use (&$borrados, $limiteSesiones): void {
+        $limiteAvisos = $this->limite($ahora, 'limpieza.dias_avisos_pasarela');
+        Estudio::query()->chunkById(100, function (Collection $estudios) use (&$borrados, $limiteSesiones, $limiteAvisos): void {
             /** @var Collection<int, Estudio> $estudios */
             foreach ($estudios as $estudio) {
                 if (! $this->gestor->baseDeDatosExiste($estudio)) {
@@ -76,6 +82,11 @@ class LimpiezaDeRegistros
                 $borrados['sesiones_tarjeta'] += $this->gestor->ejecutarEn($estudio, fn (): int => $this->borrar(
                     SesionTarjetaTenant::query()->where('created_at', '<', $limiteSesiones),
                 ));
+                $borrados['avisos_pasarela'] += $this->gestor->ejecutarEn($estudio, fn (): int => Schema::connection('tenant')->hasTable('avisos_pasarela')
+                    ? $this->borrar(AvisoPasarelaTenant::query()
+                        ->where('estado', '!=', AvisoPasarelaTenant::PENDIENTE)
+                        ->where('recibido_en', '<', $limiteAvisos))
+                    : 0);
                 // Con el plazo de cada negocio.
                 $borrados['sesiones_vencidas'] += $this->gestor->ejecutarEn($estudio, function (): int {
                     $limite = Carbon::now()->subDays($this->parametros->entero('sesion.dias_inactividad'));

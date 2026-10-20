@@ -30,6 +30,10 @@ Schedule::command('agendauno:despachar-outbox')->everyMinute()->withoutOverlappi
 // automático que no se procesó al llegar o que se reintenta (ADR 0148).
 Schedule::command('agendauno:procesar-plataformas')->everyMinute()->withoutOverlapping();
 
+// Retoma los avisos de Stripe, Mercado Pago y OpenPay pendientes de cada negocio: los
+// que no se procesaron al llegar y los que toca reintentar (ADR 0173).
+Schedule::command('agendauno:procesar-avisos-pasarela')->everyMinute()->withoutOverlapping();
+
 // Mantiene al día las clases publicadas en Wellhub y TotalPass (lugares, cambios y lo que
 // se retira) y cierra las reservas de la plataforma sin check-in (ADR 0149).
 Schedule::command('agendauno:sincronizar-plataformas')->everyFiveMinutes()->withoutOverlapping();

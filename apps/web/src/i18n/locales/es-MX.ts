@@ -1141,6 +1141,17 @@ export default {
     reenviado:
       "Si la cuenta {email} sigue pendiente, te enviamos un enlace nuevo. Revisa tu correo.",
   },
+  // La dirección no existe (ADR 0174).
+  noEncontrada: {
+    etiqueta: "Error 404",
+    titulo: "No encontramos esta página",
+    texto:
+      "Puede que la dirección esté mal escrita o que la página ya no exista.",
+    tituloPagina: "Página no encontrada",
+    inicio: "Ir al inicio",
+    miInicio: "Ir a mi inicio",
+    volver: "Volver",
+  },
   directorio: {
     etiqueta: "Acceso a negocios",
     titulo: "Encuentra tu negocio.",

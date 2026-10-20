@@ -95,6 +95,8 @@ class EnviarAlertas extends Command
             'error' => 'Errores',
             'cobro_fallido' => 'Cobros',
             'incidencia_cobro' => 'Incidencias de cobro',
+            'aviso_pasarela_fallido' => 'Avisos de pasarelas que no se procesaron',
+            'evento_outbox_aparcado' => 'Eventos que no se despacharon',
             'correo_fallido' => 'Correos que no salieron',
             'webhook_saliente_fallido' => 'Webhooks de los negocios',
             'respaldo_fallido' => 'Respaldos',

@@ -48,6 +48,7 @@ vi.mock("@/views/ReservarCitaView.vue", pantallaVacia);
 vi.mock("@/views/SucursalesEstudioView.vue", pantallaVacia);
 vi.mock("@/views/EnlacesEstudioView.vue", pantallaVacia);
 vi.mock("@/views/DirectorioView.vue", pantallaVacia);
+vi.mock("@/views/NoEncontradaView.vue", pantallaVacia);
 
 beforeEach(() => {
   vi.resetModules();
@@ -200,5 +201,12 @@ describe("rutas comerciales", () => {
     await router.push("/agendar/barberia");
     expect(router.currentRoute.value.name).toBe("agendar-cita");
     expect(navegador.salirA).not.toHaveBeenCalled();
+  });
+
+  it("lo que no existe se dice, no se manda al inicio (ADR 0174)", async () => {
+    const router = await routerComercial();
+    await router.push("/esto/no-existe?x=1");
+    expect(router.currentRoute.value.name).toBe("no-encontrada");
+    expect(router.currentRoute.value.fullPath).toBe("/esto/no-existe?x=1");
   });
 });

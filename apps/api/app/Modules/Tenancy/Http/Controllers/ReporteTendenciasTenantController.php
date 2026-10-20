@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\LineaVentaPosTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -235,7 +236,7 @@ class ReporteTendenciasTenantController
         usort($codigos, static fn (string $a, string $b): int => [$a !== $moneda, $a] <=> [$b !== $moneda, $b]);
         foreach ($codigos as $codigo) {
             foreach ($series[$codigo] as $fila) {
-                $lineas[] = implode(',', [
+                $lineas[] = Csv::linea([
                     $fila['fecha'], $codigo, (string) $fila['ventas'], $dinero($fila['ventas_minor']),
                     $dinero($fila['cobrado_minor']), $dinero($fila['devuelto_minor']), $dinero($fila['neto_minor']),
                 ]);

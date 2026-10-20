@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Automatizacion\MotivoSeguimiento;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Support\Csv;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -212,7 +213,7 @@ class RetencionTenantController
     {
         $lineas = ['Alumno,Correo,Estado,Vence,Dias restantes,Ultima asistencia'];
         foreach ($miembros as $m) {
-            $lineas[] = implode(',', array_map($this->escaparCsv(...), [
+            $lineas[] = implode(',', array_map(Csv::celda(...), [
                 (string) $m['nombre_completo'],
                 (string) ($m['email'] ?? ''),
                 $m['estado'] === 'por_vencer' ? 'Por vencer' : 'Vencida',
@@ -226,12 +227,5 @@ class RetencionTenantController
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="retencion-por-vencer.csv"',
         ]);
-    }
-
-    private function escaparCsv(string $valor): string
-    {
-        return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
-            ? '"'.str_replace('"', '""', $valor).'"'
-            : $valor;
     }
 }

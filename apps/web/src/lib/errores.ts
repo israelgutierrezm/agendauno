@@ -11,6 +11,10 @@ import { getCorrelationId } from "@/lib/correlationId";
  * No reporta los errores de la API (ya se registran allá), los de otros orígenes
  * (extensiones del navegador) ni ruido conocido del navegador. Cada error se manda
  * una sola vez por página, y como mucho 10. El servidor tacha lo sensible.
+ *
+ * También lo que bloquea la CSP (ADR 0174): para una página de la plataforma eso es
+ * algo que se rompió (un servicio que no está en la lista), no un ataque. Sin lo que
+ * inyectan las extensiones del navegador.
  */
 const MAXIMO_POR_PAGINA = 10;
 const RUIDO = [/ResizeObserver loop/i, /^Script error\.?$/i];
@@ -114,6 +118,42 @@ export function reportarError(error: unknown, archivo?: string): void {
   }).catch(() => undefined);
 }
 
+const EXTENSIONES = /^(chrome|moz|safari|ms-browser)-extension:/i;
+
+/** Lo que bloqueó la CSP, sin la query ni el resto de la dirección. */
+function bloqueado(uri: string): string {
+  if (uri === "" || !uri.includes(":")) {
+    return uri || "inline";
+  }
+  try {
+    const url = new URL(uri);
+    return url.origin === "null" ? url.protocol : url.origin + url.pathname;
+  } catch {
+    return uri.split(/[?#]/)[0] ?? uri;
+  }
+}
+
+/** Una violación de la CSP como error para el monitoreo; null si es ruido. */
+export function errorDeCsp(evento: {
+  blockedURI: string;
+  effectiveDirective: string;
+  sourceFile: string;
+}): Error | null {
+  if (
+    EXTENSIONES.test(evento.blockedURI) ||
+    EXTENSIONES.test(evento.sourceFile)
+  ) {
+    return null;
+  }
+  const error = new Error(
+    `Bloqueado ${bloqueado(evento.blockedURI)} por ${evento.effectiveDirective}`,
+  );
+  error.name = "CSP";
+  // El lugar no es nuestro código: no se manda una traza que no dice nada.
+  error.stack = "";
+  return error;
+}
+
 export function instalarReporteDeErrores(app: App, datos: Contexto): void {
   contexto = datos;
   app.config.errorHandler = (error) => {
@@ -125,5 +165,11 @@ export function instalarReporteDeErrores(app: App, datos: Contexto): void {
   });
   window.addEventListener("unhandledrejection", (evento) => {
     reportarError(evento.reason);
+  });
+  document.addEventListener("securitypolicyviolation", (evento) => {
+    const error = errorDeCsp(evento);
+    if (error !== null) {
+      reportarError(error);
+    }
   });
 }

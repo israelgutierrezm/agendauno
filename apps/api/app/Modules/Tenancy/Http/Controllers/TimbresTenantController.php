@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\MovimientoTimbreTenant;
 use App\Modules\Tenancy\Models\TarifaSaas;
+use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -234,7 +235,7 @@ class TimbresTenantController
                 /** @var array{cliente: string|null, rfc: string|null, total_minor: int, moneda: string, uuid: string|null}|null $f */
                 $f = $m['factura'];
                 $fecha = is_string($m['fecha']) ? CarbonImmutable::parse($m['fecha'])->setTimezone($zona)->format('Y-m-d H:i') : '';
-                $lineas[] = implode(',', array_map(fn (string $v): string => $this->escapar($v), [
+                $lineas[] = implode(',', array_map(Csv::celda(...), [
                     $fecha,
                     $tipos[(string) $m['tipo']] ?? (string) $m['tipo'],
                     (string) $m['cantidad'],
@@ -253,18 +254,6 @@ class TimbresTenantController
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="timbres-'.CarbonImmutable::now($zona)->format('Y-m-d').'.csv"',
         ]);
-    }
-
-    private function escapar(string $valor): string
-    {
-        // Evita que una hoja de cálculo interprete fórmulas.
-        if ($valor !== '' && in_array($valor[0], ['=', '+', '-', '@'], true) && ! is_numeric($valor)) {
-            $valor = "'".$valor;
-        }
-
-        return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
-            ? '"'.str_replace('"', '""', $valor).'"'
-            : $valor;
     }
 
     /**
