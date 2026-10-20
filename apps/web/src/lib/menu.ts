@@ -708,6 +708,7 @@ const AREA_DE_AUXILIAR: Record<string, { area: string; vista: string }> = {
   importar: { area: "clientes", vista: "directorio" },
   "presupuesto-impreso": { area: "ventas", vista: "presupuestos" },
   "importar-saldos": { area: "clientes", vista: "directorio" },
+  "importar-reservas": { area: "clientes", vista: "directorio" },
   "ficha-instructor": { area: "equipo", vista: "personas" },
   "importar-instructores": { area: "equipo", vista: "personas" },
   "importar-clases": { area: "agenda", vista: "calendario" },

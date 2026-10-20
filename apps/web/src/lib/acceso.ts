@@ -153,6 +153,8 @@ export const POLITICAS: Record<string, Politica> = {
   "importar-saldos": {
     permiso: ["membresias.gestionar", "creditos.gestionar"],
   },
+  // Reservas futuras de clases de otro sistema (ADR 0176).
+  "importar-reservas": { permiso: "reservas.gestionar", modalidad: "clases" },
   "importar-instructores": { permiso: "usuarios.invitar" },
   "importar-clases": { permiso: "agenda.gestionar", modalidad: "clases" },
   // Citas futuras de otro sistema (ADR 0160).

@@ -8,13 +8,20 @@ import { computed } from "vue";
  */
 const props = defineProps<{ estado?: string; errores: string[] }>();
 
-const ESTADOS = ["valida", "existente", "conflicto", "invalida"] as const;
+const ESTADOS = [
+  "valida",
+  "existente",
+  "conflicto",
+  "pendiente",
+  "invalida",
+] as const;
 type Estado = (typeof ESTADOS)[number];
 
 const COLOR: Record<Estado, string> = {
   valida: "var(--exito)",
   existente: "var(--texto-suave)",
   conflicto: "var(--aviso)",
+  pendiente: "var(--aviso)",
   invalida: "var(--error)",
 };
 
@@ -42,7 +49,12 @@ const estado = computed<Estado>(() =>
   <ul
     v-if="errores.length > 0"
     class="mt-1 space-y-0.5 text-xs"
-    :style="{ color: estado === 'conflicto' ? 'var(--texto)' : 'var(--error)' }"
+    :style="{
+      color:
+        estado === 'conflicto' || estado === 'pendiente'
+          ? 'var(--texto)'
+          : 'var(--error)',
+    }"
   >
     <li v-for="(er, i) in errores" :key="i">{{ er }}</li>
   </ul>

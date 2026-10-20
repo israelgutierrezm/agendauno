@@ -247,6 +247,13 @@ function descargarPlantilla(): void {
                   : "importarSaldos.pasoReservas",
               )
             }}
+            <RouterLink
+              v-if="!sesion.esCitas"
+              :to="{ name: 'importar-reservas' }"
+              class="tu-enlace ml-1"
+              data-prueba="ir-importar-reservas"
+              >{{ $t("importarReservas.ir") }}</RouterLink
+            >
           </li>
         </ul>
         <p class="mt-3 text-sm">

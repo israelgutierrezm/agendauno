@@ -26,6 +26,7 @@ const PASO: Record<string, string> = {
   importar: "nav.importar",
   "presupuesto-impreso": "presupuestos.acciones.imprimir",
   "importar-saldos": "importarSaldos.titulo",
+  "importar-reservas": "importarReservas.titulo",
   "importar-instructores": "nav.importar",
   "importar-clases": "importarClases.titulo",
   onboarding: "onboarding.titulo",

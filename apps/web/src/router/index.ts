@@ -228,6 +228,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Reservas futuras de clases de otro sistema (ADR 0176).
+      path: "/importar/reservas",
+      name: "importar-reservas",
+      component: () => import("@/views/ImportarReservasView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Presupuestos de los negocios de citas (ADR 0127).
       path: "/presupuestos",
       name: "presupuestos",

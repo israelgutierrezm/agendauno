@@ -55,6 +55,7 @@ use App\Modules\Tenancy\Http\Controllers\GruposTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportarCitasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportarClasesTenantController;
+use App\Modules\Tenancy\Http\Controllers\ImportarReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\IncidenciasCobroTenantController;
 use App\Modules\Tenancy\Http\Controllers\InicioHoyTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionApiTenantController;
@@ -540,6 +541,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/importaciones/citas/plantilla', [ImportarCitasTenantController::class, 'plantilla'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('importaciones.citas.plantilla');
             Route::post('/importaciones/citas/preview', [ImportarCitasTenantController::class, 'preview'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('importaciones.citas.preview');
             Route::post('/importaciones/citas', [ImportarCitasTenantController::class, 'importar'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('importaciones.citas.store');
+            // Reservas futuras de clases de otro sistema (ADR 0176): vista previa, por partes, sin avisos.
+            Route::get('/importaciones/reservas/plantilla', [ImportarReservasTenantController::class, 'plantilla'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('importaciones.reservas.plantilla');
+            Route::post('/importaciones/reservas/preview', [ImportarReservasTenantController::class, 'preview'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('importaciones.reservas.preview');
+            Route::post('/importaciones/reservas', [ImportarReservasTenantController::class, 'importar'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('importaciones.reservas.store');
 
             // Prospectos (ADR 0117): quien todavía no es cliente, aparte de Miembros.
             Route::get('/prospectos', [ProspectosTenantController::class, 'index'])->middleware('puede:prospectos.ver')->name('prospectos.index');

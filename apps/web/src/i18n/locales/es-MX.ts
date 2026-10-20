@@ -526,7 +526,7 @@ export default {
         },
         migracion: {
           q: "¿Puedo traer a mis alumnos desde otro sistema?",
-          a: "Sí. Importas a tus alumnos, instructores y clases con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los planes y créditos que trae cada alumno se cargan a la fecha de corte que elijas, sin registrar ventas; las reservas futuras se hacen de nuevo aquí.",
+          a: "Sí. Importas a tus alumnos, instructores y clases con archivos CSV (los sacas de Excel o de tu sistema actual). Antes de guardar revisamos cada archivo y te decimos qué filas están listas, cuáles ya estaban y cuáles hay que corregir. Los planes y créditos que trae cada alumno se cargan a la fecha de corte que elijas, sin registrar ventas, y sus reservas futuras se importan después, confirmadas o en lista de espera, sin descontar créditos dos veces.",
         },
         preparacion: {
           q: "¿Cuánto tarda dejarlo listo?",
@@ -1593,6 +1593,8 @@ export default {
       valida: "Lista",
       existente: "Ya está",
       conflicto: "Conflicto",
+      // Los datos sirven pero falta algo del negocio (p. ej. un plan con saldo).
+      pendiente: "Pendiente",
       invalida: "Con errores",
     },
     importarListas: "Cargar solo las {n} listas",
@@ -1622,8 +1624,9 @@ export default {
     pasoPlanes: "Crea los planes con el mismo nombre que usarás en el archivo.",
     pasoCorte:
       "Acuerda una fecha de corte: desde ese día los saldos se operan solo aquí, no en los dos sistemas.",
+    // Las reservas futuras de clases se importan después de los saldos (ADR 0176).
     pasoReservas:
-      "Las reservas futuras no se copian: tras el corte, reserva aquí las clases de cada alumno (o que lo hagan ellos).",
+      "Después de cargar los saldos, importa las reservas futuras de tus alumnos en «Importar reservas», sin avisarles nada.",
     // En citas, la agenda futura se importa con su archivo (ADR 0160); en clases, no (ADR 0125).
     pasoReservasCitas:
       "Las citas que ya tenías agendadas se importan en Agenda › Importar citas, sin avisarle nada a tus clientes.",

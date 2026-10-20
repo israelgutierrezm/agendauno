@@ -443,6 +443,24 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
 - `POST /importaciones/citas`: lo mismo y `confirmacion`. Todo o nada; 201 con
   `creados`.
 
+## Importar reservas futuras de clases (ADR 0176)
+
+Solo negocios de clases, con `reservas.gestionar`. Con `ya_descontadas` = 1, también
+`creditos.gestionar`.
+
+- `GET /importaciones/reservas/plantilla`: el CSV con `referencia`, `email`, `clase`,
+  `sucursal`, `fecha` (AAAA-MM-DD), `hora` (HH:MM), `estado` (`confirmada` o
+  `en_espera`) y `posicion` (orden en la lista de espera).
+- `POST /importaciones/reservas/preview` (multipart): `archivo`, `corte` (AAAA-MM-DD) y
+  `ya_descontadas` (0/1: si los saldos de apertura ya descontaron estas reservas).
+  - Responde `ok` (sin pendientes ni inválidas), `resumen` (`total`, `validas`,
+    `existentes`, `pendientes`, `invalidas`, `en_espera`, `creditos_reintegrados`),
+    `filas` (`estado`, `errores`, `avisos`, `alumno`, `clase`, `inicia_en`, `queda`) y
+    `confirmacion` (30 minutos, para ese archivo, corte y opción).
+- `POST /importaciones/reservas`: lo mismo, `confirmacion` y `parcial` (0/1).
+  - Sin `parcial`, todo o nada (422 si hay pendientes o inválidas).
+  - Con `parcial`, entran las válidas; 201 con `importadas`.
+
 ## Retención por segmentos (ADR 0159)
 
 - `GET /retencion/segmentos` (`miembros.ver`; no para quien imparte): los grupos de su

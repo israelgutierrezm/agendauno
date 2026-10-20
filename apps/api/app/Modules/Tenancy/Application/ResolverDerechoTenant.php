@@ -30,7 +30,39 @@ class ResolverDerechoTenant
 
     public function paraSesion(PersonaTenant $persona, SesionTenant $sesion, int $unidades): ?DerechoTenant
     {
-        $derechos = DerechoTenant::query()
+        $derechos = $this->candidatos($persona, $sesion);
+
+        $limitado = $derechos->first(
+            fn (DerechoTenant $derecho): bool => ! $derecho->ilimitado && $this->libro->disponible($derecho) >= $unidades,
+        );
+
+        if ($limitado !== null) {
+            return $limitado;
+        }
+
+        return $derechos->first(fn (DerechoTenant $derecho): bool => $derecho->ilimitado);
+    }
+
+    /**
+     * El paquete al que vuelve el crédito de una reserva importada que el otro sistema
+     * ya descontó, cuando ningún plan tiene saldo para ella (ADR 0176): el primero que
+     * la cubriría, en el mismo orden que al reservar, sin mirar su saldo. Null si
+     * ninguno con créditos la cubre.
+     */
+    public function paraReintegro(PersonaTenant $persona, SesionTenant $sesion): ?DerechoTenant
+    {
+        return $this->candidatos($persona, $sesion)->first(fn (DerechoTenant $derecho): bool => ! $derecho->ilimitado);
+    }
+
+    /**
+     * Los planes activos de la persona que cubren la sesión, en el orden en que se
+     * gastan.
+     *
+     * @return Collection<int, DerechoTenant>
+     */
+    private function candidatos(PersonaTenant $persona, SesionTenant $sesion): Collection
+    {
+        return DerechoTenant::query()
             ->whereHas('acuerdo', function (Builder $consulta) use ($persona): void {
                 $consulta->where('persona_id', $persona->getKey())
                     ->where('estado', EstadoAcuerdo::Activo->value);
@@ -44,17 +76,8 @@ class ResolverDerechoTenant
                 fn (DerechoTenant $a, DerechoTenant $b): int => ($a->valido_hasta?->toDateString() ?? '9999-12-31') <=> ($b->valido_hasta?->toDateString() ?? '9999-12-31'),
                 fn (DerechoTenant $a, DerechoTenant $b): int => ($a->extra_de_id !== null) <=> ($b->extra_de_id !== null),
                 fn (DerechoTenant $a, DerechoTenant $b): int => $a->getKey() <=> $b->getKey(),
-            ]);
-
-        $limitado = $derechos->first(
-            fn (DerechoTenant $derecho): bool => ! $derecho->ilimitado && $this->libro->disponible($derecho) >= $unidades,
-        );
-
-        if ($limitado !== null) {
-            return $limitado;
-        }
-
-        return $derechos->first(fn (DerechoTenant $derecho): bool => $derecho->ilimitado);
+            ])
+            ->values();
     }
 
     /**

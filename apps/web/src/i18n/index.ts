@@ -84,6 +84,7 @@ import captacion from "./locales/captacion.es-MX";
 import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
 import caja from "./locales/caja.es-MX";
+import importarReservas from "./locales/importarReservas.es-MX";
 import cobroCita from "./locales/cobroCita.es-MX";
 import importarCitas from "./locales/importarCitas.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
@@ -198,6 +199,7 @@ const mensajesBase = {
   confirmaciones,
   corregirCobro,
   caja,
+  importarReservas,
   cobroCita,
   importarCitas,
   nominaVisual,
