@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\ExtraArticuloTenant;
+use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -29,6 +30,7 @@ class PuntoDeVentaTenant
     public function __construct(
         private readonly InventarioTenant $inventario,
         private readonly RegionNegocioTenant $region,
+        private readonly CajasTenant $cajas,
     ) {}
 
     /**
@@ -78,6 +80,8 @@ class PuntoDeVentaTenant
     public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0, ?int $reservaId = null, ?string $huella = null): VentaPosTenant
     {
         return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor, $reservaId, $huella): VentaPosTenant {
+            // La caja de la sede (ADR 0175), bloqueada antes que los artículos.
+            $turno = $this->cajas->turnoParaMovimiento((int) $sucursal->getKey());
             $moneda = $items !== [] ? $items[0]['articulo']->moneda : ($orden->moneda ?? $this->region->moneda());
 
             // La propina va aparte de lo vendido: no es ingreso del negocio (ADR 0139).
@@ -161,6 +165,10 @@ class PuntoDeVentaTenant
                 throw ValidationException::withMessages(['recibido_minor' => ['Lo que recibiste no alcanza para cobrar la venta.']]);
             }
             $venta->update(['total_minor' => $total, 'recibido_minor' => $metodo === 'efectivo' ? $recibidoMinor : null]);
+            // Lo vendido y la propina (en la caja, aunque no sea ingreso; ADR 0139). El
+            // servicio de una cita entra por su cobro.
+            $this->cajas->asentar($turno, MovimientoCajaTenant::VENTA, CajasTenant::metodo($metodo), $total, ['venta_pos_id' => $venta->getKey()], $actor);
+            $this->cajas->asentar($turno, MovimientoCajaTenant::PROPINA, CajasTenant::metodo($metodo), (int) $venta->propina_minor, ['venta_pos_id' => $venta->getKey()], $actor);
 
             return $venta->refresh();
         });

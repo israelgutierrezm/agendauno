@@ -181,6 +181,11 @@ export default {
       cuotas: { exentar: "Exentar inscripción, anualidad o penalización" },
       facturacion: { ver: "Ver facturación e ingresos" },
       pos: { vender: "Vender en mostrador" },
+      // La caja de cada sucursal (ADR 0175).
+      caja: {
+        operar: "Abrir, contar y cerrar la caja",
+        supervisar: "Ver lo esperado y revisar los cierres de caja",
+      },
       inventario: {
         ver: "Ver inventario",
         gestionar: "Administrar inventario",

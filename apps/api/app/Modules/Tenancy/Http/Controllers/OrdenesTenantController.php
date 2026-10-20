@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -195,6 +196,7 @@ class OrdenesTenantController
             'proveedor' => ['required', 'string'],
             'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
+            'sucursal_id' => ['nullable', 'string'],
         ]);
 
         $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
@@ -202,7 +204,7 @@ class OrdenesTenantController
 
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
-        $pago = $this->cobrar->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/ventas', $actor);
+        $pago = $this->cobrar->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/ventas', $actor, $this->sucursalDeCaja($validado['sucursal_id'] ?? null, $actor));
         if ($pago->estado === EstadoPago::Aprobado && $pago->wasRecentlyCreated) {
             $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
                 'orden' => (string) $orden->ulid,
@@ -229,11 +231,13 @@ class OrdenesTenantController
         $validado = $request->validate([
             'metodo' => ['required', Rule::in(self::METODOS)],
             'referencia' => ['nullable', 'string', 'max:255'],
+            // Dónde se cobra (la sucursal de la barra): su caja lo registra (ADR 0175).
+            'sucursal_id' => ['nullable', 'string'],
         ]);
 
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
-        $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor);
+        $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor, $this->sucursalDeCaja($validado['sucursal_id'] ?? null, $actor));
 
         // Cobro en caja: queda quién lo registró (el pago lo guarda; aquí, la bitácora).
         if ($pago !== null) {
@@ -247,6 +251,20 @@ class OrdenesTenantController
         }
 
         return response()->json(['data' => $this->presentar($orden->refresh())]);
+    }
+
+    /** La sede donde se cobra en el mostrador, si es una de quien cobra (su caja; ADR 0175). */
+    private function sucursalDeCaja(?string $ulid, ?Usuario $actor): ?int
+    {
+        if ($ulid === null || $ulid === '') {
+            return null;
+        }
+        $id = SucursalTenant::query()->where('ulid', $ulid)->value('id');
+        if ($id === null || ($actor !== null && ! $this->acceso->permiteSucursal($actor, (int) $id))) {
+            throw ValidationException::withMessages(['sucursal_id' => ['No puedes cobrar en esa sucursal.']]);
+        }
+
+        return (int) $id;
     }
 
     /**

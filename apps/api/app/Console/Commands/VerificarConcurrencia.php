@@ -132,6 +132,7 @@ class VerificarConcurrencia extends Command
             $this->caso('Ajustes de inventario y una venta a la vez con poco stock', fn () => $this->inventarioSinNegativos($escenarios, $rondas));
             $this->caso('Ventas del mostrador a la vez por la última pieza', fn () => $this->ultimaPieza($escenarios, $rondas, $procesos));
             $this->caso('Ventas con los mismos artículos en distinto orden', fn () => $this->mismosArticulos($escenarios, $rondas));
+            $this->caso('Ventas del mostrador mientras se cuenta la caja', fn () => $this->ventasYConteoDeCaja($escenarios, $rondas, $procesos));
             $this->caso('Respaldo y restauración de un negocio', fn () => $this->respaldoYRestauracion($gestor));
             $this->caso('Migraciones de varios negocios', fn () => $this->migraciones($gestor, is_string($base)));
         } catch (Throwable $e) {
@@ -531,6 +532,37 @@ class VerificarConcurrencia extends Command
             $this->comprobar($fallas, $hechos === 1, "{$hechos} ventas se llevaron la última pieza");
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).': '.count($res)." ventas por 1 pieza → {$hechos} vendida, quedan {$stock}", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Varias ventas del mostrador mientras se cuenta la caja de su sede (ADR 0175): cada
+     * venta entra al libro antes del conteo (y el conteo la espera) o encuentra la caja
+     * contada y no se hace. Lo que el conteo esperó es exactamente lo asentado: ninguna
+     * venta se cuela después ni queda fuera de la caja.
+     *
+     * @return list<string>
+     */
+    private function ventasYConteoDeCaja(EscenariosConcurrencia $e, int $rondas, int $procesos): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $sede = $e->sedeConCaja($r + 1, 50);
+            $venta = ['accion' => 'vender-mostrador', 'articulo' => $sede['articulo'], 'sucursal' => $sede['sucursal'], 'cantidad' => 1];
+            $res = $this->competir([...array_fill(0, max(2, $procesos), $venta), ['accion' => 'contar-caja', 'turno' => $sede['turno']]]);
+
+            $conteo = array_pop($res);
+            $vendidas = $this->hechos($res);
+            $libro = $e->libroDeCaja($sede['turno']);
+            $this->comprobar($fallas, $conteo['hecho'], 'el conteo no se hizo: '.$conteo['detalle']);
+            $this->comprobar($fallas, $libro['ventas'] === $vendidas, "{$vendidas} ventas hechas y {$libro['ventas']} en el libro");
+            $this->comprobar($fallas, $libro['esperado'] === $libro['asentado'], "el conteo esperó {$libro['esperado']} y el libro tiene {$libro['asentado']}");
+            $this->comprobar($fallas, $libro['asentado'] === $vendidas * 2500, "el libro tiene {$libro['asentado']} por {$vendidas} ventas");
+            $this->comprobar($fallas, $e->stock($sede['articulo'], $sede['sucursal']) === 50 - $vendidas, 'el inventario no cuadra con las ventas');
+            $this->inesperados($fallas, [...$res, $conteo]);
+            $this->detalle('ronda '.($r + 1).': '.count($res)." ventas y un conteo → {$vendidas} en la caja, caja {$libro['estado']}", [...$res, $conteo]);
         }
 
         return $fallas;

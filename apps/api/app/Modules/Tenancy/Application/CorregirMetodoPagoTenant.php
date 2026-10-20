@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Models\FacturaTenant;
+use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -32,6 +33,7 @@ class CorregirMetodoPagoTenant
     public function __construct(
         private readonly ParametrosTenant $parametros,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly CajasTenant $cajas,
     ) {}
 
     /**
@@ -79,6 +81,14 @@ class CorregirMetodoPagoTenant
                 return $bloqueado;
             }
 
+            // En la caja abierta de hoy (ADR 0175): sale de una forma de pago y entra en otra.
+            $anterior = CajasTenant::metodoDelPago($bloqueado);
+            if ($anterior !== CajasTenant::metodo($metodo)) {
+                $turno = $this->cajas->turnoParaMovimiento($this->cajas->sucursalDelCobro($bloqueado));
+                $origen = ['pago_id' => $bloqueado->getKey()];
+                $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, $anterior, -$bloqueado->monto_minor, $origen, $actor, $motivo);
+                $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, CajasTenant::metodo($metodo), $bloqueado->monto_minor, $origen, $actor, $motivo);
+            }
             $bloqueado->update(['metodo' => self::metodoDeCaja($metodo)?->value]);
             $orden->update(['metodo_pago' => $metodo]);
 

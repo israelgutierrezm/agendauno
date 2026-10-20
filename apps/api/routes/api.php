@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BajaPromocionesController;
 use App\Modules\Tenancy\Http\Controllers\BajasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
+use App\Modules\Tenancy\Http\Controllers\CajasTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioPublicoController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
@@ -975,6 +976,18 @@ Route::prefix('v1')->group(function (): void {
             // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
             Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.metodo');
             Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');
+            // Cierre y arqueo de caja (ADR 0175): abrir con fondo, mover efectivo, contar a
+            // ciegas y cerrar (caja.operar); lo esperado, los cierres y su revisión
+            // (caja.supervisar).
+            Route::get('/caja', [CajasTenantController::class, 'actual'])->middleware('puede:caja.operar')->name('caja.actual');
+            Route::post('/caja/turnos', [CajasTenantController::class, 'abrir'])->middleware('puede:caja.operar')->name('caja.turnos.store');
+            Route::post('/caja/turnos/{turno}/movimientos', [CajasTenantController::class, 'moverEfectivo'])->middleware('puede:caja.operar')->name('caja.turnos.movimientos');
+            Route::post('/caja/turnos/{turno}/conteo', [CajasTenantController::class, 'contar'])->middleware('puede:caja.operar')->name('caja.turnos.conteo');
+            Route::post('/caja/turnos/{turno}/cierre', [CajasTenantController::class, 'cerrar'])->middleware('puede:caja.operar')->name('caja.turnos.cierre');
+            Route::get('/caja/turnos', [CajasTenantController::class, 'index'])->middleware('puede:caja.supervisar')->name('caja.turnos.index');
+            Route::get('/caja/turnos/{turno}', [CajasTenantController::class, 'show'])->middleware('puede:caja.supervisar')->name('caja.turnos.show');
+            Route::post('/caja/turnos/{turno}/revision', [CajasTenantController::class, 'revisar'])->middleware('puede:caja.supervisar')->name('caja.turnos.revision');
+
             // Reenviar el ticket (del mostrador o de una cita): solo el correo (R06).
             // Con tope: reenviar no sirve para mandarle correos de más a nadie (R06).
             Route::post('/pos/ventas/{venta}/ticket', [PuntoDeVentaTenantController::class, 'reenviarTicket'])->middleware('throttle:10,1,ticket-reenvio')->name('pos.ventas.ticket');

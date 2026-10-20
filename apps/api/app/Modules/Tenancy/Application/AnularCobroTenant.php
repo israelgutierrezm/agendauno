@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Models\FacturaTenant;
+use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -41,6 +42,7 @@ class AnularCobroTenant
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
         private readonly InventarioTenant $inventario,
+        private readonly CajasTenant $cajas,
     ) {}
 
     /**
@@ -104,6 +106,11 @@ class AnularCobroTenant
                 'orden' => $orden->estado->value,
                 'metodo' => $orden->metodo_pago,
             ];
+            // Sale de la caja abierta de la sede del cobro, hoy (ADR 0175): lo cerrado no
+            // cambia. Bloqueada antes del inventario que regresa.
+            $turno = $this->cajas->turnoParaMovimiento($this->cajas->sucursalDelCobro($bloqueado));
+            $this->cajas->asentar($turno, MovimientoCajaTenant::ANULACION, CajasTenant::metodoDelPago($bloqueado), -$bloqueado->monto_minor,
+                ['pago_id' => $bloqueado->getKey()], $actor, $motivo);
 
             $this->derechos->retirarTodo(
                 $orden,

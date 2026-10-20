@@ -70,6 +70,10 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
   var _ocupado = false;
   var _metodo = 'efectivo';
 
+  /// La clave del intento de cobro: la misma en cada reintento (un cobro que el
+  /// servidor ya registró no se repite) hasta que sale bien o cambia la forma.
+  String? _claveCobro;
+
   /// Ejecuta la acción (la agenda se recarga al terminar). Con [cerrar], la hoja se
   /// cierra si salió bien: una cita cancelada ya no vuelve en la agenda.
   Future<void> _hacer(
@@ -99,20 +103,62 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     }
   }
 
-  /// Un cobro en caja no se deshace: se confirma monto, forma y a quién.
-  Future<void> _cobrar(SesionAgenda s, String? monto) async {
-    final cliente = s.cita!.cliente ?? 'el cliente';
+  /// Un cobro en caja no se deshace: se confirma monto, forma y a quién. Con
+  /// anticipo (ADR 0161) se cobra el saldo y se dice cuánto ya pagó.
+  Future<void> _cobrar(SesionAgenda s, String moneda) async {
+    final cita = s.cita!;
+    final cliente = cita.cliente ?? 'el cliente';
+    String dinero(int minor) => Formato.dinero(minor, moneda);
+    final saldo = s.porCobrarMinor;
+    final monto = saldo != null ? dinero(saldo) : '';
+    final desglose = cita.anticipoMinor > 0 && cita.totalMinor != null
+        ? ' Total ${dinero(cita.totalMinor!)}, anticipo pagado '
+              '${dinero(cita.anticipoMinor)}.'
+        : '';
     if (!await _confirmar(
       context,
       titulo: 'Cobrar cita',
       mensaje:
-          '¿Registrar el cobro de ${monto ?? ''} en '
-          '${HechoCita.metodo(_metodo)} a $cliente? La cita queda pagada.',
-      aceptar: 'Cobrar ${monto ?? ''}'.trim(),
+          '¿Registrar el cobro de $monto en '
+          '${HechoCita.metodo(_metodo)} a $cliente?$desglose La cita queda pagada.',
+      aceptar: 'Cobrar $monto'.trim(),
     )) {
       return;
     }
-    await _hacer((c) => c.cobrar(s, _metodo), 'Cita cobrada.');
+    if (!mounted) {
+      return;
+    }
+    setState(() => _ocupado = true);
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      _claveCobro ??=
+          'app-${cita.reservaId}-${DateTime.now().microsecondsSinceEpoch}';
+      final cobrada = await ref
+          .read(agendaProvider.notifier)
+          .cobrar(s, _metodo, clave: _claveCobro);
+      if (cobrada) {
+        _claveCobro = null;
+      }
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(
+            cobrada
+                ? 'Cita cobrada.'
+                : 'El cobro no quedó registrado: la cita sigue por cobrar.',
+          ),
+        ),
+      );
+    } on DioException catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(mensajeDeError(e, porDefecto: 'No se pudo cobrar.')),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _ocupado = false);
+      }
+    }
   }
 
   /// Marcar o corregir la asistencia mueve créditos: se confirma con su efecto a la
@@ -131,14 +177,23 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
         ? (retardo ? 'Se registró que llegó tarde.' : 'Llegada registrada.')
         : 'Se marcó como no asistió.';
     if (cita.asistencia != asistencia) {
+      // Al marcar que no vino, el efecto exacto según su política (el crédito, o
+      // el anticipo o el pago que no se devuelven), como en la web.
+      final efecto = cita.asistencia == null && asistencia == 'ausente'
+          ? await ref.read(agendaProvider.notifier).efectoDeInasistencia(s)
+          : null;
+      if (!mounted) {
+        return;
+      }
       final mensaje = cita.asistencia != null
           ? '$cliente está marcado como «${nombre(cita.asistencia!)}». '
                 '¿Cambiarlo a «${nombre(asistencia)}»? Si aplica, el crédito se '
                 'ajusta en su saldo.'
           : asistencia == 'presente'
           ? '¿Marcar que $cliente llegó${retardo ? ' tarde' : ''} a su cita?'
-          : '¿Marcar que $cliente no asistió? Según la política del negocio, '
-                'puede perder el crédito o el pago de la cita.';
+          : '¿Marcar que $cliente no asistió? '
+                '${efecto?.texto ?? 'Según la política del negocio, puede perder '
+                        'el crédito o el pago de la cita.'}';
       if (!await _confirmar(
         context,
         titulo: 'Asistencia',
@@ -216,10 +271,14 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     final tono = TonoServicio.de(s.ofertaId).en(context.colores);
     // Cancelada, completada o sin asistencia: ya no hay acciones.
     final activa = !(estado?.cerrada ?? false);
-    // Lo que se cobra (el total de su orden), con centavos y en su moneda.
+    // Lo que cuesta (el total de su orden) y lo que falta cobrar (el saldo, si
+    // pagó anticipo), con centavos y en su moneda.
     final moneda = s.monedaDe(sesion?.moneda ?? 'MXN');
     final monto = s.montoMinor != null
         ? Formato.dinero(s.montoMinor!, moneda)
+        : null;
+    final porCobrar = s.porCobrarMinor != null
+        ? Formato.dinero(s.porCobrarMinor!, moneda)
         : null;
     // La asistencia se registra desde unos minutos antes (ADR 0101).
     final abierta = s.asistenciaAbierta(DateTime.now());
@@ -359,7 +418,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                       value: _metodo,
                       onChanged: _ocupado
                           ? null
-                          : (v) => setState(() => _metodo = v ?? 'efectivo'),
+                          : (v) => setState(() {
+                              _metodo = v ?? 'efectivo';
+                              // Otra forma de pago es otro intento.
+                              _claveCobro = null;
+                            }),
                       items: const [
                         DropdownMenuItem(
                           value: 'efectivo',
@@ -378,8 +441,8 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
-                        onPressed: _ocupado ? null : () => _cobrar(s, monto),
-                        child: Text('Cobrar ${monto ?? ''}'),
+                        onPressed: _ocupado ? null : () => _cobrar(s, moneda),
+                        child: Text('Cobrar ${porCobrar ?? ''}'.trim()),
                       ),
                     ),
                   ],

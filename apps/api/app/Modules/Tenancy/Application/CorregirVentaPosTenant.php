@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
+use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Pagos\Exceptions\CobroNoAnulable;
@@ -32,6 +33,7 @@ final class CorregirVentaPosTenant
         private readonly ParametrosTenant $parametros,
         private readonly InventarioTenant $inventario,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly CajasTenant $cajas,
     ) {}
 
     /** Por qué no se puede corregir su forma de pago, o null si sí. */
@@ -80,6 +82,14 @@ final class CorregirVentaPosTenant
             if ($antes === $metodo) {
                 return $bloqueada;
             }
+            // En la caja abierta de hoy (ADR 0175): sale de una forma de pago y entra en otra.
+            if (CajasTenant::metodo($antes) !== CajasTenant::metodo($metodo)) {
+                $turno = $this->cajas->turnoParaMovimiento((int) $bloqueada->sucursal_id);
+                $monto = (int) $bloqueada->total_minor + (int) $bloqueada->propina_minor;
+                $origen = ['venta_pos_id' => $bloqueada->getKey()];
+                $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, CajasTenant::metodo($antes), -$monto, $origen, $actor, $motivo);
+                $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, CajasTenant::metodo($metodo), $monto, $origen, $actor, $motivo);
+            }
             $bloqueada->update(['metodo_pago' => $metodo]);
             $this->auditoria->registrar($actor, 'pos.metodo_corregido', 'venta_pos', (string) $bloqueada->ulid,
                 ['metodo' => $antes],
@@ -99,6 +109,10 @@ final class CorregirVentaPosTenant
             if ($impedimento !== null) {
                 throw new CobroNoAnulable($impedimento);
             }
+            // Sale de la caja abierta de hoy (ADR 0175), bloqueada antes del inventario.
+            $turno = $this->cajas->turnoParaMovimiento((int) $bloqueada->sucursal_id);
+            $this->cajas->asentar($turno, MovimientoCajaTenant::ANULACION, CajasTenant::metodo((string) $bloqueada->metodo_pago),
+                -((int) $bloqueada->total_minor + (int) $bloqueada->propina_minor), ['venta_pos_id' => $bloqueada->getKey()], $actor, $motivo);
             // Lo vendido regresa al inventario de la sede donde se vendió.
             foreach ($bloqueada->lineas as $linea) {
                 $this->inventario->registrar(

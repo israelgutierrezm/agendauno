@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import '../../../core/agenda/contrato_agenda.dart';
+import '../../../core/formato.dart';
 import '../../../core/hora_negocio.dart';
 import '../../../core/theme/tema_agendauno.dart';
 
@@ -21,6 +22,8 @@ class CitaTitular {
     this.estadoAtencion,
     this.estadoPago,
     this.totalMinor,
+    this.anticipoMinor = 0,
+    this.porCobrarMinor,
     this.moneda,
     this.nota,
     this.asiste,
@@ -46,6 +49,12 @@ class CitaTitular {
   /// Lo que se cobra: el total de su orden, fijo desde que se agendó (el precio
   /// del catálogo puede cambiar después). Null sin orden.
   final int? totalMinor;
+
+  /// Con anticipo (ADR 0161): lo que ya pagó al apartar.
+  final int anticipoMinor;
+
+  /// Lo que falta cobrar en caja (el saldo, si pagó anticipo); null si nada.
+  final int? porCobrarMinor;
   final String? moneda;
 
   /// Lo que el cliente pidió que supiéramos al agendar (ADR 0067).
@@ -72,6 +81,8 @@ class CitaTitular {
     estadoAtencion: EstadoCita.desde(json['estado_atencion']),
     estadoPago: EstadoPagoCita.desde(json['estado_pago']),
     totalMinor: (json['total_minor'] as num?)?.toInt(),
+    anticipoMinor: (json['anticipo_minor'] as num?)?.toInt() ?? 0,
+    porCobrarMinor: (json['por_cobrar_minor'] as num?)?.toInt(),
     moneda: json['moneda'] as String?,
     nota: _texto(json['nota']),
     asiste: _texto(json['asiste']),
@@ -297,9 +308,13 @@ class SesionAgenda {
   String? etiquetaHora([int? desfaseTelefonoMin]) =>
       etiquetaHoraSucursal([this], desfaseTelefonoMin: desfaseTelefonoMin);
 
-  /// Lo que se cobra: el total de la orden de la cita (fijo desde que se agendó);
+  /// Lo que cuesta: el total de la orden de la cita (fijo desde que se agendó);
   /// sin orden, el precio del catálogo.
   int? get montoMinor => cita?.totalMinor ?? precioMinor;
+
+  /// Lo que falta cobrar en caja: el saldo si pagó anticipo (ADR 0161); si el
+  /// servidor no lo dice, el total.
+  int? get porCobrarMinor => cita?.porCobrarMinor ?? montoMinor;
 
   /// La moneda de lo que se cobra (la de su orden; si no, [respaldo]).
   String monedaDe(String respaldo) => cita?.moneda ?? respaldo;
@@ -556,6 +571,73 @@ class TonoServicio {
       h = (h * 31 + c) & 0x7fffffff;
     }
     return paleta[h % paleta.length];
+  }
+}
+
+/// Qué pasa si no asiste, como lo calcula el API con su política
+/// (`GET /reservas/{id}/inasistencia`): el crédito que pierde o no, o, sin
+/// crédito, lo ya pagado que el negocio conserva (el anticipo, ADR 0161).
+class EfectoInasistencia {
+  const EfectoInasistencia({
+    required this.conCredito,
+    required this.tolerada,
+    required this.pierdeCredito,
+    required this.unidades,
+    this.conserva,
+    this.conservaMinor,
+    this.moneda,
+  });
+
+  final bool conCredito;
+  final bool tolerada;
+  final bool pierdeCredito;
+
+  /// 1000 unidades = 1 crédito.
+  final int unidades;
+
+  /// Sin crédito: `anticipo` o `pago`, lo ya pagado que no se devuelve; null si
+  /// no pagó nada.
+  final String? conserva;
+  final int? conservaMinor;
+  final String? moneda;
+
+  factory EfectoInasistencia.desdeJson(Map<String, dynamic> j) =>
+      EfectoInasistencia(
+        conCredito: (j['con_credito'] ?? false) as bool,
+        tolerada: (j['tolerada'] ?? false) as bool,
+        pierdeCredito: (j['pierde_credito'] ?? false) as bool,
+        unidades: (j['unidades'] as num?)?.toInt() ?? 0,
+        conserva: j['conserva'] as String?,
+        conservaMinor: (j['conserva_minor'] as num?)?.toInt(),
+        moneda: j['moneda'] as String?,
+      );
+
+  /// El efecto en una frase, con las mismas palabras que la web
+  /// (`confirmaciones.asistencia.efecto`).
+  String get texto {
+    if (!conCredito) {
+      final monto = conservaMinor ?? 0;
+      if (conserva != null && monto > 0 && moneda != null) {
+        final dinero = Formato.dinero(monto, moneda!);
+        return conserva == 'anticipo'
+            ? 'El anticipo de $dinero no se devuelve: el negocio lo conserva.'
+            : 'Ya pagó $dinero: no se devuelve por no asistir.';
+      }
+      return 'No usó créditos en esta reserva: su saldo no cambia.';
+    }
+    if (pierdeCredito) {
+      if (unidades == 1000) {
+        return 'Pierde 1 crédito de su plan.';
+      }
+      final n = unidades / 1000;
+      final cifra = n == n.truncateToDouble()
+          ? n.toInt().toString()
+          : n.toStringAsFixed(1);
+      return 'Pierde $cifra créditos de su plan.';
+    }
+    return tolerada
+        ? 'Esta falta entra en la tolerancia de su política: no pierde el crédito.'
+        : 'Su política no cobra las faltas: el crédito vuelve a su saldo.';
   }
 }
 

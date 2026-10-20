@@ -88,7 +88,8 @@ class CobroDeCitaTenant
             }
 
             if ($servicio > 0) {
-                $pago = $this->ordenes->liquidar($orden, $metodo, $referencia, $actor);
+                // A la caja de la sede de la cita (ADR 0175).
+                $pago = $this->ordenes->liquidar($orden, $metodo, $referencia, $actor, (int) $sucursal->getKey());
                 if ($pago !== null) {
                     $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
                         'orden' => (string) $orden->ulid,

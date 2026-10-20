@@ -82,6 +82,8 @@ export const POLITICAS: Record<string, Politica> = {
   // Vende a un alumno y muestra las órdenes: sin eso la pantalla queda a medias.
   ventas: { permiso: ["productos.ver", "ordenes.ver", "miembros.ver"] },
   pos: { permiso: ["inventario.ver", "pos.vender"], funcion: "inventario" },
+  // La caja de la sucursal (ADR 0175): quien la opera; lo esperado y los cierres, quien supervisa.
+  caja: { permiso: "caja.operar" },
   inventario: { permiso: "inventario.gestionar", funcion: "inventario" },
   // Presupuestos (ADR 0127): de los negocios de citas.
   presupuestos: { permiso: "presupuestos.ver", modalidad: "citas" },

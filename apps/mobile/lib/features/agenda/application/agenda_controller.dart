@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/sesion_controller.dart';
@@ -92,8 +93,21 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
   Future<void> marcarNoAsistio(SesionAgenda s) =>
       _accion((r) => r.marcarAsistencia(s.cita!.reservaId, 'ausente'));
 
-  Future<void> cobrar(SesionAgenda s, String metodo) =>
-      _accion((r) => r.cobrar(s.cita!.ordenId!, metodo));
+  /// Cobra lo que falta de la cita (el saldo, si pagó anticipo) y dice si quedó
+  /// cobrada: con la agenda ya recargada, la cita ya no está por cobrar. Si el
+  /// servidor respondió pero la cita sigue por cobrar, no se anuncia como cobrada.
+  Future<bool> cobrar(SesionAgenda s, String metodo, {String? clave}) async {
+    final intento =
+        clave ??
+        'app-${s.cita!.reservaId}-${DateTime.now().microsecondsSinceEpoch}';
+    await _accion(
+      (r) => r.cobrarCita(s.cita!.reservaId, metodo, clave: intento),
+    );
+    final recargada = state.value?.sesiones
+        .where((x) => x.id == s.id)
+        .firstOrNull;
+    return recargada == null || !recargada.porCobrar;
+  }
 
   Future<void> cancelar(SesionAgenda s, {String por = 'negocio'}) =>
       _accion((r) => r.cancelarReserva(s.cita!.reservaId, por: por));
@@ -108,6 +122,20 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
       return const EfectoCancelacion(cancelable: false, mensaje: '');
     }
     return repo.efectoDeCancelar(s.cita!.reservaId, por: por);
+  }
+
+  /// Qué pasaría si no asiste (no cambia nada); null si no se pudo leer, y se
+  /// confirma con el texto general, como en la web.
+  Future<EfectoInasistencia?> efectoDeInasistencia(SesionAgenda s) async {
+    final repo = ref.read(agendaRepositoryProvider);
+    if (repo == null) {
+      return null;
+    }
+    try {
+      return await repo.efectoDeInasistencia(s.cita!.reservaId);
+    } on DioException {
+      return null;
+    }
   }
 
   /// Lo que ha pasado con la cita (no cambia nada).

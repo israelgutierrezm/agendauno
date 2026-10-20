@@ -157,18 +157,25 @@ describe("pestañas del área", () => {
     const clases = await montar(PestanasArea, { name: "pos" });
     const rutas = (w: typeof clases.w) =>
       w.findAll(".pa-pestanas a").map((p) => p.attributes("href"));
-    expect(rutas(clases.w)).toEqual(["/ventas", "/pos", "/inventario"]);
+    // La caja del turno, junto al mostrador (ADR 0175).
+    expect(rutas(clases.w)).toEqual([
+      "/ventas",
+      "/pos",
+      "/caja",
+      "/inventario",
+    ]);
 
     entrar(["*"], "citas");
     const citas = await montar(PestanasArea, { name: "pos" });
     // Con citas, además, los presupuestos (ADR 0127).
     expect(rutas(citas.w)).toEqual([
       "/pos",
+      "/caja",
       "/inventario",
       "/ventas",
       "/presupuestos",
     ]);
-    expect(citas.w.findAll(".pa-pestanas a").at(2)!.text()).toBe("Bonos");
+    expect(citas.w.findAll(".pa-pestanas a").at(3)!.text()).toBe("Bonos");
     const lateral = await montar(NavLateral, { name: "pos" });
     expect(
       lateral.w.find('[data-prueba="area-ventas"]').attributes("href"),
@@ -285,7 +292,11 @@ describe("barra superior", () => {
     });
 
     expect(w.get(".titulo").text()).toBe("Cobros");
-    expect(w.findAll(".miga").map((m) => m.text())).toEqual(["Cobros", "Caja"]);
+    // El reporte de movimientos es el «Corte de caja»; «Caja» es la del turno.
+    expect(w.findAll(".miga").map((m) => m.text())).toEqual([
+      "Cobros",
+      "Corte de caja",
+    ]);
   });
 
   it("en una ficha: el área, la vista de la que es y «Ficha»", async () => {

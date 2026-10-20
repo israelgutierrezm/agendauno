@@ -75,12 +75,27 @@ class _Agenda extends AgendaController {
   );
 
   @override
-  Future<void> cobrar(SesionAgenda s, String metodo) async =>
-      _hechas.add('cobrar:$metodo');
+  Future<bool> cobrar(SesionAgenda s, String metodo, {String? clave}) async {
+    _hechas.add('cobrar:$metodo');
+    return true;
+  }
 
   @override
   Future<void> marcarNoAsistio(SesionAgenda s) async =>
       _hechas.add('no_asistio');
+
+  /// Como lo diría el API de una cita con anticipo pagado (ADR 0161).
+  @override
+  Future<EfectoInasistencia?> efectoDeInasistencia(SesionAgenda s) async =>
+      const EfectoInasistencia(
+        conCredito: false,
+        tolerada: false,
+        pierdeCredito: false,
+        unidades: 0,
+        conserva: 'anticipo',
+        conservaMinor: 10000,
+        moneda: 'MXN',
+      );
 
   @override
   Future<void> marcarLlegada(SesionAgenda s, {bool retardo = false}) async =>
@@ -242,6 +257,37 @@ void main() {
     expect(_hechas, ['cobrar:efectivo']);
   });
 
+  testWidgets('con anticipo se cobra el saldo y se dice cuánto ya pagó', (
+    tester,
+  ) async {
+    // Servicio de $15, anticipo de $10 y saldo de $5 (ADR 0161).
+    await _abrirHoja(
+      tester,
+      _cita(
+        id: 'c1',
+        instructorId: 'p2',
+        instructor: 'Beto Ramírez',
+        extra: {'anticipo_minor': 1000, 'por_cobrar_minor': 500},
+      ),
+    );
+
+    expect(find.text('Cobrar \$5.00'), findsOneWidget);
+    expect(find.text('Cobrar \$15.00'), findsNothing);
+    await tester.tap(find.text('Cobrar \$5.00'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        '¿Registrar el cobro de \$5.00 en Efectivo a Ana López? Total \$15.00, '
+        'anticipo pagado \$10.00. La cita queda pagada.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Cobrar \$5.00').last);
+    await tester.pumpAndSettle();
+    expect(_hechas, ['cobrar:efectivo']);
+    expect(find.text('Cita cobrada.'), findsOneWidget);
+  });
+
   testWidgets('«No asistió» se confirma con su efecto', (tester) async {
     await _abrirHoja(
       tester,
@@ -250,10 +296,15 @@ void main() {
 
     await tester.tap(find.text('No asistió'));
     await tester.pumpAndSettle();
+    // El efecto exacto que calcula el API, no un «puede perder».
     expect(
-      find.textContaining('puede perder el crédito o el pago'),
+      find.text(
+        '¿Marcar que Ana López no asistió? El anticipo de \$100.00 no se '
+        'devuelve: el negocio lo conserva.',
+      ),
       findsOneWidget,
     );
+    expect(find.textContaining('puede perder'), findsNothing);
     await tester.tap(find.text('No asistió').last);
     await tester.pumpAndSettle();
     expect(_hechas, ['no_asistio']);

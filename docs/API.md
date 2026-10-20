@@ -558,6 +558,11 @@ Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
 - `GET /reservas/{reserva}/inasistencia` (`asistencia.marcar`): qué pasaría con su
   crédito si se marca que no vino. Devuelve `con_credito`, `penaliza`, `tolerada`,
   `pierde_credito` y `unidades`. La regla es la misma de `POST …/asistencia`.
+  - Sin crédito, `conserva` dice lo ya pagado que no se devuelve por no asistir: el
+    `anticipo` de una cita (ADR 0161) o el `pago` completo; null si no pagó nada.
+    `conserva_minor` y `moneda` dicen cuánto.
+  - La web y la app del equipo lo confirman con las mismas frases («Pierde 1 crédito de
+    su plan.», «El anticipo de $100.00 no se devuelve: el negocio lo conserva.»).
 - **Ficha** (`GET /miembros/{persona}/ficha`): cada derecho suma `todas_sucursales`,
   `sucursales`, `actividad` y `aplica_a` (qué deja reservar y dónde). El resumen
   (`GET /miembros/{persona}/resumen`) suma `sucursal` y `profesional` en
@@ -1265,6 +1270,27 @@ subdominio del negocio):
 `GET /escaparate` suma `sitio`: la versión publicada (o la plantilla esencial con todo
 visible si no hay ninguna), con solo las secciones visibles y los banners vigentes hoy
 en el negocio.
+
+### Caja de cada sucursal (ADR 0175)
+
+- `GET /caja?sucursal_id=` (`caja.operar`): `usa_caja` y el `turno` sin cerrar (o null).
+  Con la caja abierta, quien no tiene `caja.supervisar` no recibe `esperado` ni
+  `diferencia_minor`, y en `movimientos` solo sus retiros e ingresos (conteo a ciegas).
+- `POST /caja/turnos` {`sucursal_id`, `fondo_minor`, `nota`}: abre (409
+  `CASH_REGISTER_ALREADY_OPEN` si la sede ya tiene una sin cerrar).
+- `POST /caja/turnos/{t}/movimientos` {`tipo`: retiro|ingreso, `monto_minor`, `motivo`}.
+- `POST /caja/turnos/{t}/conteo` {`efectivo_minor`, `tarjeta_minor`,
+  `transferencia_minor`, `ventanilla_minor`}: una sola vez. Devuelve `cuadra`; si no
+  cuadra, el turno queda `contada` con sus `conteos`.
+- `POST /caja/turnos/{t}/cierre` {`motivo`}: cierra la contada; queda
+  `requiere_revision`.
+- `GET /caja/turnos` (`caja.supervisar`; `sucursal_id`, `desde`, `hasta`,
+  `revision=pendiente`, `page`), `GET /caja/turnos/{t}` (con su libro y su conteo) y
+  `POST /caja/turnos/{t}/revision` {`nota`}.
+- En una sede que usa caja, los cobros en caja, las ventas, las devoluciones en caja, las
+  anulaciones y los cambios de forma de pago responden 422 `CASH_REGISTER_CLOSED` sin una
+  caja abierta. `POST /ordenes/{o}/liquidar` y `/cobrar` aceptan `sucursal_id` (dónde se
+  cobra).
 
 ### Contracargos (ADR 0168)
 

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -30,6 +31,7 @@ export interface OrdenPorCobrar {
 
 const props = defineProps<{ base: string; orden: OrdenPorCobrar | null }>();
 const emit = defineEmits<{ cerrar: []; registrado: [aviso: string] }>();
+const sucursales = useSucursales();
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -108,9 +110,12 @@ async function registrar(): Promise<void> {
   procesando.value = true;
   error.value = null;
   try {
+    // En la sucursal de la barra: su caja lo registra (ADR 0175).
+    const sede = sucursales.fija.value;
     await api.post(`${props.base}/ordenes/${o.id}/liquidar`, {
       metodo: metodo.value,
       referencia: referencia.value.trim() || null,
+      ...(sede !== null ? { sucursal_id: sede } : {}),
     });
     emit(
       "registrado",

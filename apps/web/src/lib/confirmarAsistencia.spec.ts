@@ -56,4 +56,30 @@ describe("efecto de una falta", () => {
     ).toContain("su saldo no cambia");
     expect(textoInasistencia(t, null)).toBeNull();
   });
+
+  it("con lo ya pagado dice que el anticipo o el pago no se devuelven", () => {
+    const sinCredito = { con_credito: false, pierde_credito: false };
+    expect(
+      textoInasistencia(
+        t,
+        efecto({
+          ...sinCredito,
+          conserva: "anticipo",
+          conserva_minor: 10000,
+          moneda: "MXN",
+        }),
+      ),
+    ).toBe("El anticipo de $100.00 no se devuelve: el negocio lo conserva.");
+    expect(
+      textoInasistencia(
+        t,
+        efecto({
+          ...sinCredito,
+          conserva: "pago",
+          conserva_minor: 25000,
+          moneda: "MXN",
+        }),
+      ),
+    ).toBe("Ya pagó $250.00: no se devuelve por no asistir.");
+  });
 });

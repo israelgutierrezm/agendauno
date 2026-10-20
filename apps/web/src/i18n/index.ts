@@ -83,6 +83,7 @@ import sitioWeb from "./locales/sitioWeb.es-MX";
 import captacion from "./locales/captacion.es-MX";
 import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
+import caja from "./locales/caja.es-MX";
 import cobroCita from "./locales/cobroCita.es-MX";
 import importarCitas from "./locales/importarCitas.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
@@ -196,6 +197,7 @@ const mensajesBase = {
   sitioWeb,
   confirmaciones,
   corregirCobro,
+  caja,
   cobroCita,
   importarCitas,
   nominaVisual,

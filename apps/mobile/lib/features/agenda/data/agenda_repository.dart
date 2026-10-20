@@ -80,6 +80,16 @@ class AgendaRepository {
     data: {'estado': estado, 'retardo': retardo},
   );
 
+  /// Qué pasaría si no asiste, según su política (no cambia nada).
+  Future<EfectoInasistencia> efectoDeInasistencia(String reservaId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/reservas/$reservaId/inasistencia',
+    );
+    return EfectoInasistencia.desdeJson(
+      (res.data?['data'] as Map<String, dynamic>?) ?? const {},
+    );
+  }
+
   /// Terminar de pasar lista: quien sigue sin registro «no se presentó». Devuelve cuántos.
   Future<int> terminarLista(String sesionId) async {
     final res = await _dio.post<Map<String, dynamic>>(
@@ -107,11 +117,17 @@ class AgendaRepository {
   Future<void> aceptarLugar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/reservas/$reservaId/aceptar');
 
-  Future<void> cobrar(String ordenId, String metodo) =>
-      _dio.post<Map<String, dynamic>>(
-        '$_base/ordenes/$ordenId/liquidar',
-        data: {'metodo': metodo},
-      );
+  /// Cobra en caja lo que falta de la cita (el servicio o su saldo, si pagó
+  /// anticipo), como en la web. La clave del intento evita cobrar dos veces si la
+  /// petición se repite.
+  Future<void> cobrarCita(
+    String reservaId,
+    String metodo, {
+    required String clave,
+  }) => _dio.post<Map<String, dynamic>>(
+    '$_base/reservas/$reservaId/cobro',
+    data: {'metodo': metodo, 'clave_intento': clave},
+  );
 
   /// Cancelar una reserva. `por`: quién cancela; el negocio no penaliza, el
   /// cliente aplica su política (como en la web).

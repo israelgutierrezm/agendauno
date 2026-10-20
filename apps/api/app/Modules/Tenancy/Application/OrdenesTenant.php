@@ -216,7 +216,7 @@ class OrdenesTenant
      * pagó, no se cobra dos veces). Idempotente: una orden ya pagada no se vuelve a
      * cobrar (devuelve null). La orden cancelada no admite liquidación.
      */
-    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null): ?PagoTenant
+    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null, ?int $sucursalCaja = null): ?PagoTenant
     {
         $orden->refresh();
         if ($orden->estado === EstadoOrden::Pagada) {
@@ -226,8 +226,8 @@ class OrdenesTenant
             throw new OrdenNoLiquidable('La orden no admite liquidacion.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor): PagoTenant {
-            $pago = $this->cobrar->ejecutar($orden, 'manual', self::metodoDeCaja($metodo), null, null, $actor);
+        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja): PagoTenant {
+            $pago = $this->cobrar->ejecutar($orden, 'manual', self::metodoDeCaja($metodo), null, null, $actor, $sucursalCaja);
             $orden->update(['metodo_pago' => $metodo, 'referencia_pago' => $referencia]);
 
             return $pago;

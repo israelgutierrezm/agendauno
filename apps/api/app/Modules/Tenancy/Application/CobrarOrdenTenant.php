@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Exceptions\CobroNoConcluyente;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
+use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -32,12 +33,14 @@ class CobrarOrdenTenant
     public function __construct(
         private readonly RegistroDePasarelasTenant $registro,
         private readonly FulfillmentTenant $fulfillment,
+        private readonly CajasTenant $cajas,
     ) {}
 
     /**
      * @param  Usuario|null  $registradoPor  quién registra el cobro (en caja, o el alumno al pagar en línea)
+     * @param  int|null  $sucursalCaja  la sede donde se cobra en el mostrador (su caja; ADR 0175); si no, la de la orden
      */
-    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null, ?Usuario $registradoPor = null): PagoTenant
+    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null, ?Usuario $registradoPor = null, ?int $sucursalCaja = null): PagoTenant
     {
         if ($idempotencyKey !== null) {
             $previo = PagoTenant::query()->where('idempotency_key', $idempotencyKey)->first();
@@ -50,7 +53,7 @@ class CobrarOrdenTenant
             throw new PasarelaNoDisponible('La pasarela no está activa en este negocio.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor): PagoTenant {
+        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor, $sucursalCaja): PagoTenant {
             $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
@@ -80,7 +83,7 @@ class CobrarOrdenTenant
 
             $pago->retorno = $retorno;
             $resultado = $this->registro->resolver($proveedor)->cobrar($pago, $this->registro->llaves($proveedor));
-            $this->aplicar($pago, $bloqueada, $resultado);
+            $this->aplicar($pago, $bloqueada, $resultado, $sucursalCaja, $registradoPor);
 
             return $pago;
         });
@@ -143,12 +146,18 @@ class CobrarOrdenTenant
      * Asienta el desenlace del intento: aprobado (fulfillment), pendiente (el webhook
      * confirmará) o rechazado.
      */
-    private function aplicar(PagoTenant $pago, OrdenTenant $orden, ResultadoPago $resultado): void
+    private function aplicar(PagoTenant $pago, OrdenTenant $orden, ResultadoPago $resultado, ?int $sucursalCaja = null, ?Usuario $actor = null): void
     {
         $pago->checkout = $resultado->datos;
 
         if ($resultado->esAprobado()) {
+            // Dinero de mostrador (ADR 0175): a la caja abierta de la sede, bloqueada antes
+            // del inventario que mueve el fulfillment.
+            $turno = in_array($pago->proveedor, ['manual', 'efectivo'], true)
+                ? $this->cajas->turnoParaMovimiento($sucursalCaja ?? $orden->sucursal_id)
+                : null;
             $pago->update(['estado' => EstadoPago::Aprobado->value, 'referencia_externa' => $resultado->referencia, 'aprobado_en' => now()]);
+            $this->cajas->asentar($turno, MovimientoCajaTenant::COBRO, CajasTenant::metodoDelPago($pago), $pago->monto_minor, ['pago_id' => $pago->getKey()], $actor);
             // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
             $this->fulfillment->cumplir($orden);
         } elseif ($resultado->esPendiente()) {

@@ -4,6 +4,9 @@ import { crearVenta } from "./venta";
 
 const api = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api }));
+// La sucursal de la barra (ADR 0175): se cobra en su caja.
+const sede = vi.hoisted(() => ({ fija: { value: null as string | null } }));
+vi.mock("@/lib/sucursalOperativa", () => ({ useSucursales: () => sede }));
 
 const orden = {
   comprador_id: "p1",
@@ -11,7 +14,20 @@ const orden = {
 };
 
 describe("vender", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sede.fija.value = null;
+  });
+
+  it("cobra en la sucursal de la barra para que su caja lo registre", async () => {
+    sede.fija.value = "S1";
+    api.post.mockResolvedValue({ data: { data: { id: "o1" } } });
+    await crearVenta().vender("/b", orden, "efectivo");
+    expect(api.post).toHaveBeenLastCalledWith("/b/ordenes/o1/liquidar", {
+      metodo: "efectivo",
+      sucursal_id: "S1",
+    });
+  });
 
   it("si el cobro falla, reintentar cobra la misma orden y no crea otra", async () => {
     const venta = crearVenta();

@@ -7,6 +7,7 @@ namespace App\Modules\Platform\Operacion;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\BajasDeGrupoTenant;
+use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CobroDeCitaTenant;
 use App\Modules\Tenancy\Application\InscribirEnGrupoTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
@@ -19,6 +20,7 @@ use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Exceptions\CajaCerrada;
 use App\Modules\Tenancy\Inventario\Exceptions\InventarioException;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Membresias\TipoProducto;
@@ -29,6 +31,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\InscripcionGrupoTenant;
+use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -40,6 +43,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\RetencionCreditoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -79,6 +83,7 @@ class EscenariosConcurrencia
         private readonly CobroDeCitaTenant $cobro,
         private readonly InscribirEnGrupoTenant $inscribir,
         private readonly BajasDeGrupoTenant $bajas,
+        private readonly CajasTenant $cajas,
     ) {}
 
     /**
@@ -365,7 +370,7 @@ class EscenariosConcurrencia
 
         try {
             return ['hecho' => true, 'esperado' => true, 'detalle' => $accion()];
-        } catch (ReservaException|SaldoInsuficiente|InventarioException|ValidationException $e) {
+        } catch (ReservaException|SaldoInsuficiente|InventarioException|ValidationException|CajaCerrada $e) {
             return ['hecho' => false, 'esperado' => true, 'detalle' => class_basename($e).': '.$e->getMessage()];
         } catch (Throwable $e) {
             return ['hecho' => false, 'esperado' => false, 'detalle' => class_basename($e).': '.Str::limit($e->getMessage(), 300)];
@@ -393,6 +398,7 @@ class EscenariosConcurrencia
             'vender-carrito' => $this->prepararVenderCarrito(array_map(intval(...), (array) $paso['articulos']), (int) $paso['sucursal']),
             'cobrar-cita' => $this->prepararCobrarCita((int) $paso['reserva'], (string) $paso['clave']),
             'cambiar-grupo' => $this->prepararCambiarGrupo((int) $paso['inscripcion'], (int) $paso['destino'], (string) $paso['desde']),
+            'contar-caja' => $this->prepararContarCaja((int) $paso['turno']),
             'aprovisionar' => $this->prepararAprovisionar((int) $paso['estudio']),
             'migrar' => $this->prepararMigrar((int) $paso['estudio']),
             default => throw new InvalidArgumentException("Paso desconocido: {$paso['accion']}"),
@@ -408,6 +414,50 @@ class EscenariosConcurrencia
         $reserva = ReservaTenant::query()->findOrFail($reservaId);
 
         return fn (): string => (string) $this->cobro->cobrar($reserva, 'efectivo', [], 0, 100000, null, $clave, null)['venta']?->ulid;
+    }
+
+    /** El conteo a ciegas de la caja con el cajón vacío (ADR 0175): devuelve su estado. */
+    private function prepararContarCaja(int $turnoId): callable
+    {
+        $turno = TurnoCajaTenant::query()->findOrFail($turnoId);
+        $cajero = Usuario::query()->orderBy('id')->firstOrFail();
+
+        return fn (): string => $this->cajas->contar($turno, ['efectivo' => 0], $cajero)->estado;
+    }
+
+    /**
+     * Una sede nueva con su caja abierta (sin fondo) y un producto con `$stock` piezas
+     * (ADR 0175). Aparte de la sede base: las demás ventas no piden caja.
+     *
+     * @return array{sucursal: int, turno: int, articulo: int}
+     */
+    public function sedeConCaja(int $ronda, int $stock): array
+    {
+        $sucursal = OrganizacionTenant::query()->orderBy('id')->firstOrFail()->sucursales()
+            ->create(['nombre' => "Caja {$ronda}", 'zona_horaria' => 'America/Mexico_City']);
+        $turno = $this->cajas->abrir($sucursal, 0, null, Usuario::query()->orderBy('id')->firstOrFail());
+        $articulo = $this->articulo((int) $sucursal->getKey(), $stock);
+
+        return ['sucursal' => (int) $sucursal->getKey(), 'turno' => (int) $turno->getKey(), 'articulo' => (int) $articulo->getKey()];
+    }
+
+    /**
+     * El libro de una caja: sus ventas, lo asentado y lo que el conteo esperaba en
+     * efectivo (null si no se contó).
+     *
+     * @return array{estado: string, ventas: int, asentado: int, esperado: int|null}
+     */
+    public function libroDeCaja(int $turnoId): array
+    {
+        $turno = TurnoCajaTenant::query()->findOrFail($turnoId);
+        $esperado = $turno->conteos()->where('metodo', 'efectivo')->value('esperado_minor');
+
+        return [
+            'estado' => $turno->estado,
+            'ventas' => MovimientoCajaTenant::query()->where('turno_caja_id', $turnoId)->where('tipo', MovimientoCajaTenant::VENTA)->count(),
+            'asentado' => (int) MovimientoCajaTenant::query()->where('turno_caja_id', $turnoId)->sum('monto_minor'),
+            'esperado' => $esperado !== null ? (int) $esperado : null,
+        ];
     }
 
     /** El cambio de grupo de una persona desde un día (confirmado aunque sea parcial). */

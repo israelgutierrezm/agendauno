@@ -420,6 +420,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // La caja de cada sucursal: abrir, mover efectivo, contar y cerrar (ADR 0175).
+      path: "/caja",
+      name: "caja",
+      component: () => import("@/views/CajaView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Inventario: los productos del mostrador y su stock por sucursal.
       path: "/inventario",
       name: "inventario",

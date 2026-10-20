@@ -168,7 +168,9 @@ export default {
       porCobrar: "Por cobrar",
       movimientos: "Movimientos",
       conciliacion: "Conciliación",
-      caja: "Caja",
+      // El reporte de movimientos de dinero; la caja del turno es «cajaTurno» (ADR 0175).
+      caja: "Corte de caja",
+      cajaTurno: "Caja",
       disponibilidad: "Disponibilidad",
       rendimiento: "Rendimiento",
       membresias: "Membresías y paquetes",

@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero } from "@/lib/formato";
 
 type Asistencia = "presente" | "ausente";
 type Traducir = (
@@ -15,6 +16,13 @@ export interface EfectoInasistencia {
   tolerada: boolean;
   pierde_credito: boolean;
   unidades: number;
+  /**
+   * Sin crédito, lo que ya pagó y el negocio conserva: el anticipo de una cita
+   * (ADR 0161) o el pago completo; null si no pagó nada.
+   */
+  conserva?: "anticipo" | "pago" | null;
+  conserva_minor?: number | null;
+  moneda?: string | null;
 }
 
 /** Lo lee del API antes de confirmar; null si no se pudo (se usa el texto general). */
@@ -41,6 +49,12 @@ export function textoInasistencia(
     return null;
   }
   if (!e.con_credito) {
+    if (e.conserva && e.conserva_minor && e.moneda) {
+      const monto = dinero(e.conserva_minor, e.moneda);
+      return e.conserva === "anticipo"
+        ? t("confirmaciones.asistencia.efecto.conservaAnticipo", { monto })
+        : t("confirmaciones.asistencia.efecto.conservaPago", { monto });
+    }
     return t("confirmaciones.asistencia.efecto.sinCredito");
   }
   if (e.pierde_credito) {

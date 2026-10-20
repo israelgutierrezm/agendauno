@@ -62,6 +62,10 @@ export default {
       noPenaliza:
         "Su política no cobra las faltas: el crédito vuelve a su saldo.",
       sinCredito: "No usó créditos en esta reserva: su saldo no cambia.",
+      // Lo mismo dice la app del equipo (cita_sheet y pase de lista).
+      conservaAnticipo:
+        "El anticipo de {monto} no se devuelve: el negocio lo conserva.",
+      conservaPago: "Ya pagó {monto}: no se devuelve por no asistir.",
     },
     correccion:
       "{persona} está marcado como «{antes}». ¿Cambiarlo a «{ahora}»? Si aplica, el crédito se ajusta en su saldo.",

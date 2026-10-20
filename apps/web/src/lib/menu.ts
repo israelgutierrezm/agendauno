@@ -411,6 +411,8 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
             modalidad: "clases",
           }),
           v("mostrador", "pos", "planes.nav.mostrador"),
+          // La caja del turno (ADR 0175), junto al mostrador donde se cobra.
+          v("turno-caja", "caja", "nav.vistas.cajaTurno"),
           v("inventario", "inventario", "planes.nav.inventario"),
           v("paquetes", "ventas", "nav.vistas.paquetesCitas", {
             modalidad: "citas",

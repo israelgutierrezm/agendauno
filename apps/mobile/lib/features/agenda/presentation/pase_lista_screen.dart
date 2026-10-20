@@ -151,6 +151,18 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     });
   }
 
+  /// Qué pasaría si no viene; null si no se pudo leer (se usa el texto general).
+  Future<EfectoInasistencia?> _efectoDeFalta(
+    AgendaRepository repo,
+    String reservaId,
+  ) async {
+    try {
+      return await repo.efectoDeInasistencia(reservaId);
+    } on DioException {
+      return null;
+    }
+  }
+
   Future<void> _marcar(
     Asistente a,
     String estado, {
@@ -160,14 +172,32 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     if (repo == null) {
       return;
     }
-    // «No vino» puede cobrar la falta (según la política del negocio): se confirma.
-    if (estado == 'ausente') {
+    // Marcar o corregir mueve créditos, como en la web: «No vino» se confirma con
+    // su efecto exacto (según su política) y una corrección (llegó ↔ no vino),
+    // con el ajuste. «Llegó» la primera vez no pregunta.
+    String nombre(String e) =>
+        e == 'presente' ? (retardo ? 'Llegó tarde' : 'Llegó') : 'No vino';
+    final correccion = a.asistencia != null && a.asistencia != estado;
+    if (estado == 'ausente' || correccion) {
+      final String mensaje;
+      if (correccion) {
+        mensaje =
+            '${a.nombre} está marcado como «${a.asistencia == 'presente' ? 'Llegó' : 'No vino'}». '
+            '¿Cambiarlo a «${nombre(estado)}»? Si aplica, el crédito se ajusta en '
+            'su saldo.';
+      } else {
+        final efecto = await _efectoDeFalta(repo, a.reservaId);
+        if (!mounted) {
+          return;
+        }
+        mensaje =
+            '¿Marcar que ${a.nombre} no vino? '
+            '${efecto?.texto ?? 'Según la política del negocio, puede perder el crédito.'}';
+      }
       final seguir = await showDialog<bool>(
         context: context,
         builder: (contexto) => AlertDialog(
-          content: Text(
-            '¿Marcar que ${a.nombre} no vino? Según la política del negocio, puede perder el crédito.',
-          ),
+          content: Text(mensaje),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(contexto).pop(false),
@@ -175,7 +205,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(contexto).pop(true),
-              child: const Text('No vino'),
+              child: Text(nombre(estado)),
             ),
           ],
         ),

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -62,6 +63,7 @@ class ReembolsarPagoTenant
         private readonly IncidenciasCobroTenant $incidencias,
         private readonly DerechosDeOrdenTenant $derechos,
         private readonly InventarioTenant $inventario,
+        private readonly CajasTenant $cajas,
     ) {}
 
     /**
@@ -150,10 +152,16 @@ class ReembolsarPagoTenant
                 'via' => $via, 'total' => $esTotal, 'revertir_creditos' => $revertirCreditos,
             ], $motivo);
 
+            // En caja, el dinero sale de la caja abierta de la sede del cobro (ADR 0175),
+            // bloqueada antes del inventario que regresa una devolución total.
+            $turno = $via === 'caja' ? $this->cajas->turnoParaMovimiento($this->cajas->sucursalDelCobro($bloqueado)) : null;
+
             // En caja o declarada manual el dinero ya se devolvió: se aplica ahora.
             if ($via !== 'pasarela') {
                 $this->aplicarAprobado($bloqueado, $reembolso, $actor);
             }
+            $this->cajas->asentar($turno, MovimientoCajaTenant::DEVOLUCION, CajasTenant::metodoDelPago($bloqueado), -$monto,
+                ['pago_id' => $bloqueado->getKey(), 'reembolso_id' => $reembolso->getKey()], $actor, $motivo);
 
             return [$reembolso, true];
         });
