@@ -141,10 +141,11 @@ class _Fila extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detalle = [
-      // En la hora del negocio, no en la del teléfono.
+      // En la hora de su sede (o del negocio), no en la del teléfono.
       Formato.fechaHora(
         i.iniciaEn,
-        desfaseMin: ref.watch(sesionProvider)?.desfaseNegocioMin,
+        desfaseMin:
+            i.desfaseMin ?? ref.watch(sesionProvider)?.desfaseNegocioMin,
       ),
       if (i.sucursal != null) i.sucursal!,
       if (i.instructor != null) 'con ${i.instructor}',

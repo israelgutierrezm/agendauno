@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\SesionTenant;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -35,6 +36,30 @@ final class FechasNegocioTenant
     public function fecha(?CarbonInterface $momento = null): string
     {
         return CarbonImmutable::instance($momento ?? CarbonImmutable::now())->setTimezone($this->zona())->toDateString();
+    }
+
+    /**
+     * La hora de una sesión en la zona de su sucursal (o la del negocio):
+     * `inicia_local`, `termina_local` (AAAA-MM-DDTHH:MM:SS, sin zona) y el desfase en
+     * minutos cuando empieza (con el horario de verano de ese día). La app la muestra
+     * tal cual, en la hora de la sede y no en la del teléfono (ADR 0166 y 0172). Sin
+     * sesión, los tres en null.
+     *
+     * @return array{inicia_local: string|null, termina_local: string|null, utc_offset_min: int|null}
+     */
+    public function horaDeSesion(?SesionTenant $sesion): array
+    {
+        if ($sesion === null) {
+            return ['inicia_local' => null, 'termina_local' => null, 'utc_offset_min' => null];
+        }
+        $zona = (string) ($sesion->zona_horaria ?: $this->zona());
+        $inicia = CarbonImmutable::instance($sesion->inicia_en)->setTimezone($zona);
+
+        return [
+            'inicia_local' => $inicia->format('Y-m-d\TH:i:s'),
+            'termina_local' => CarbonImmutable::instance($sesion->termina_en)->setTimezone($zona)->format('Y-m-d\TH:i:s'),
+            'utc_offset_min' => $inicia->utcOffset(),
+        ];
     }
 
     /** Hoy en el negocio (AAAA-MM-DD). */

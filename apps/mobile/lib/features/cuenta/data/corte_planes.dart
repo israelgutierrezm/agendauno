@@ -33,13 +33,14 @@ class UsoPlan {
   bool get pideAtencion =>
       estado == 'no_asistio' || estado == 'cancelacion_tardia';
 
-  /// [desfaseMin]: el del negocio (el de la sesión); sin él, la hora del teléfono.
+  /// [desfaseMin]: el del negocio (el de la sesión); la clase va en la hora de su
+  /// sede si el API la manda (`utc_offset_min`); sin ninguno, la del teléfono.
   factory UsoPlan.desdeJson(Map<String, dynamic> j, {int? desfaseMin}) =>
       UsoPlan(
         clase: j['clase'] as String?,
         iniciaEn: HoraNegocio.enDesfase(
           DateTime.parse(j['inicia_en'] as String),
-          desfaseMin,
+          (j['utc_offset_min'] as num?)?.toInt() ?? desfaseMin,
         ),
         estado: (j['estado'] ?? 'tomada') as String,
         extra: (j['extra'] ?? false) as bool,

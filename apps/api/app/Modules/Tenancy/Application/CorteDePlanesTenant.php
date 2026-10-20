@@ -276,6 +276,8 @@ class CorteDePlanesTenant
                 'clase' => $sesion->oferta?->nombre,
                 'inicia_en' => $sesion->inicia_en->toIso8601String(),
                 'zona_horaria' => $sesion->zona_horaria,
+                // En la hora de su sede, para la app (ADR 0172).
+                'utc_offset_min' => app(FechasNegocioTenant::class)->horaDeSesion($sesion)['utc_offset_min'],
                 'estado' => $estado,
                 'unidades' => $unidades,
                 'extra' => in_array((int) $r->derecho_id, $extras, true),

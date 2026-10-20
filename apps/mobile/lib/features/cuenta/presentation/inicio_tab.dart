@@ -104,7 +104,8 @@ class InicioTab extends ConsumerWidget {
                     [
                       Formato.fechaHora(
                         proxima.iniciaEn,
-                        desfaseMin: sesion?.desfaseNegocioMin,
+                        desfaseMin:
+                            proxima.desfaseMin ?? sesion?.desfaseNegocioMin,
                       ),
                       if (proxima.sucursal != null) proxima.sucursal!,
                     ].join(' · '),

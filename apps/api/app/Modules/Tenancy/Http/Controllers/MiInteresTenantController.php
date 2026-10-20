@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CuentaEnUsoTenant;
 use App\Modules\Tenancy\Captacion\EstadoProspecto;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
@@ -82,7 +83,8 @@ class MiInteresTenantController
         $clase = $sesion instanceof SesionTenant && $sesion->estado === EstadoSesionTenant::Programada && $sesion->inicia_en->isFuture()
             && ! ReservaTenant::query()->where('persona_id', $persona->getKey())->where('sesion_id', $sesion->getKey())
                 ->whereNotIn('estado', [EstadoReserva::Cancelada->value, EstadoReserva::Expirada->value])->exists()
-            ? ['id' => $sesion->ulid, 'nombre' => $sesion->oferta?->nombre, 'inicia_en' => $sesion->inicia_en->toIso8601String(), 'zona_horaria' => $sesion->zona_horaria]
+            ? ['id' => $sesion->ulid, 'nombre' => $sesion->oferta?->nombre, 'inicia_en' => $sesion->inicia_en->toIso8601String(), 'zona_horaria' => $sesion->zona_horaria,
+                'utc_offset_min' => SesionTenantPresenter::horaLocal($sesion)['utc_offset_min']]
             : null;
 
         return response()->json(['data' => $plan === null && $clase === null ? null : ['plan' => $plan, 'clase' => $clase]]);

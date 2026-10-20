@@ -360,13 +360,16 @@ class _DetalleReserva extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(cuentaProvider.notifier);
-    // Las horas que se muestran son las del negocio (no las del teléfono).
-    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
+    // Las horas que se muestran son las de su sede o, si el API no la manda, las
+    // del negocio (no las del teléfono).
+    final desfase =
+        r.desfaseMin ?? ref.watch(sesionProvider)?.desfaseNegocioMin;
     // Instantes (no horas de pared): el calendario del teléfono los pasa a UTC y
     // los muestra en su zona.
     final inicio = r.iniciaEn == null
         ? null
         : DateTime.tryParse(r.iniciaEn!)?.toLocal();
+    final hora = _etiquetaHoraSede(r.desfaseMin, inicio, r.sucursal);
     final fin = r.terminaEn == null
         ? null
         : DateTime.tryParse(r.terminaEn!)?.toLocal();
@@ -399,6 +402,8 @@ class _DetalleReserva extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(Formato.fechaHora(r.iniciaEn, desfaseMin: desfase)),
+            if (hora != null)
+              Text(hora, style: TextStyle(color: context.colores.textoSuave)),
             Text(
               [
                 r.sucursal,
@@ -521,6 +526,15 @@ class _DetalleReserva extends ConsumerWidget {
   }
 }
 
+/// «Hora de Roma Norte» cuando el teléfono está en otra zona que la sede (sus
+/// horas son siempre las de la sede); null si es la misma o el API no la manda.
+String? _etiquetaHoraSede(int? desfaseSede, DateTime? inicio, String? sede) =>
+    desfaseSede == null ||
+        inicio == null ||
+        desfaseSede == HoraNegocio.desfaseTelefono(inicio)
+    ? null
+    : HoraNegocio.etiqueta([sede]);
+
 /// Detalle de una clase disponible: reservar o anotarse en la lista de espera.
 Future<void> mostrarDetalleClase(BuildContext context, ClaseMiembro c) =>
     showModalBottomSheet<void>(
@@ -547,7 +561,13 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
   @override
   Widget build(BuildContext context) {
     final notifier = ref.read(cuentaProvider.notifier);
-    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
+    // En la hora de su sede o, sin ella, la del negocio.
+    final desfase =
+        c.desfaseMin ?? ref.watch(sesionProvider)?.desfaseNegocioMin;
+    final inicio = c.iniciaEn == null
+        ? null
+        : DateTime.tryParse(c.iniciaEn!)?.toLocal();
+    final hora = _etiquetaHoraSede(c.desfaseMin, inicio, c.sucursal);
     // Lo que pasará al reservar (M05); sin respuesta, se puede intentar igual.
     final antes = ref.watch(antesDeReservarProvider(c.id)).value;
     // Si alguien tomó el lugar (u otra cosa cambió), se dice y se vuelve a pedir la
@@ -587,6 +607,8 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
             ),
             const SizedBox(height: 4),
             Text(Formato.fechaHora(c.iniciaEn, desfaseMin: desfase)),
+            if (hora != null)
+              Text(hora, style: TextStyle(color: context.colores.textoSuave)),
             Text(
               [
                 c.sucursal,
@@ -765,7 +787,8 @@ class _CalificarClaseState extends ConsumerState<CalificarClaseCard> {
   @override
   Widget build(BuildContext context) {
     final r = widget.r;
-    final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
+    final desfase =
+        r.desfaseMin ?? ref.watch(sesionProvider)?.desfaseNegocioMin;
     final detalle = [
       if (r.fecha != null) Formato.fechaHora(r.fecha, desfaseMin: desfase),
       if (r.con != null) r.con!,

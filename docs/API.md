@@ -233,6 +233,13 @@ viene vacía): cada una lleva `tipo: "clase"`, `clase`, `cita: null` y `ocupacio
 junto a sus campos de siempre (`cobertura` incluida). `POST /mi/reservas` reserva solo
 clases; en un negocio de citas responde 422 `SESSION_NOT_BOOKABLE`.
 
+La hora de cada sede (ADR 0172): las clases de `GET /mi/agenda` y las reservas de
+`GET /mi/perfil` (y lo que devuelven reservar, aceptar, elegir lugar y cancelar) traen
+`inicia_local`, `termina_local` (AAAA-MM-DDTHH:MM:SS, sin zona) y `utc_offset_min`, en
+la zona de su sucursal. La sesión de una orden, el historial (`/mi/historial`), las
+reseñas pendientes, los usos de un plan, la clase de cada movimiento de crédito y el
+interés guardado traen `utc_offset_min`. Son los mismos campos que la agenda del equipo.
+
 `GET /mi/sesiones/{sesion}/antes-de-reservar` (solo clases) dice, sin apartar nada, lo que
 pasará al reservar (ADR 0119): `resultado` (`reserva`, `lista_espera` o `no_disponible`),
 `codigo`, `motivo` y `accion` si no se puede, `plan` (`nombre`, `ilimitado`, `vence`,

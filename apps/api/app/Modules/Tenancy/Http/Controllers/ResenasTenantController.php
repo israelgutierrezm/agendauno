@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -82,6 +83,8 @@ class ResenasTenantController
                 'actividad' => $r->sesion?->oferta?->nombre,
                 'con' => $r->sesion?->instructor?->nombreCorto(),
                 'fecha' => $r->sesion?->inicia_en->toIso8601String(),
+                // En la hora de su sede, para la app (ADR 0172).
+                'utc_offset_min' => SesionTenantPresenter::horaLocal($r->sesion)['utc_offset_min'],
             ])->all(),
             'meta' => [
                 'page' => $pagina, 'ultima_pagina' => $ultima, 'total' => $total, 'per_page' => $porPagina,

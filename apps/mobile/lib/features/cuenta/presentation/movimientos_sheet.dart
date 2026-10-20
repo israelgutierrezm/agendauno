@@ -123,11 +123,12 @@ class _Movimiento extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // En la hora del negocio, no en la del teléfono.
+    // En la hora del negocio (la clase, en la de su sede), no en la del teléfono.
     final desfase = ref.watch(sesionProvider)?.desfaseNegocioMin;
-    String cuando(String? iso) => Formato.fechaHora(iso, desfaseMin: desfase);
+    String cuando(String? iso, [int? deLaSede]) =>
+        Formato.fechaHora(iso, desfaseMin: deLaSede ?? desfase);
     final detalle = m.clase != null
-        ? '${m.clase} · ${cuando(m.claseIniciaEn)}'
+        ? '${m.clase} · ${cuando(m.claseIniciaEn, m.claseDesfaseMin)}'
         : cuando(m.fecha);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),

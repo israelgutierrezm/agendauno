@@ -216,6 +216,7 @@ class MovimientoCredito {
     this.fecha,
     this.clase,
     this.claseIniciaEn,
+    this.claseDesfaseMin,
   });
 
   final String id;
@@ -225,6 +226,10 @@ class MovimientoCredito {
   final String? fecha;
   final String? clase;
   final String? claseIniciaEn;
+
+  /// El desfase con UTC de la sede de la clase (`utc_offset_min`); null si el
+  /// API no lo manda (se usa el del negocio).
+  final int? claseDesfaseMin;
 
   /// "+8", "-1", "-0.5" (1 crédito = 1000 unidades).
   static String creditos(int unidades, {bool conSigno = true}) {
@@ -245,6 +250,7 @@ class MovimientoCredito {
       fecha: j['fecha'] as String?,
       clase: clase?['nombre'] as String?,
       claseIniciaEn: clase?['inicia_en'] as String?,
+      claseDesfaseMin: (clase?['utc_offset_min'] as num?)?.toInt(),
     );
   }
 }
@@ -263,6 +269,7 @@ class ReservaMiembro {
     this.terminaEn,
     this.instructor,
     this.zonaHoraria,
+    this.desfaseMin,
     this.ofertaExpiraEn,
     this.ordenId,
     this.asiste,
@@ -306,6 +313,11 @@ class ReservaMiembro {
   /// Con quién (profesional o instructor), si el negocio lo asignó.
   final String? instructor;
   final String? zonaHoraria;
+
+  /// El desfase con UTC de su sede cuando empieza (`utc_offset_min`): sus horas
+  /// se muestran en la hora de la sede. Null si el API no lo manda (se usa el del
+  /// negocio).
+  final int? desfaseMin;
   // Hasta cuándo puede aceptar el lugar que le ofreció la lista de espera.
   final String? ofertaExpiraEn;
   // Orden a pagar para confirmar una cita apartada.
@@ -335,6 +347,7 @@ class ReservaMiembro {
       terminaEn: j['termina_en'] as String?,
       instructor: j['instructor'] as String?,
       zonaHoraria: j['zona_horaria'] as String?,
+      desfaseMin: (j['utc_offset_min'] as num?)?.toInt(),
       ofertaExpiraEn: j['oferta_expira_en'] as String?,
       ordenId: j['orden_id'] as String?,
       asiste: j['asiste'] as String?,
@@ -474,6 +487,7 @@ class ClaseMiembro {
     this.terminaEn,
     this.instructor,
     this.zonaHoraria,
+    this.desfaseMin,
     this.capacidad,
     this.ocupados = 0,
     this.clase,
@@ -488,6 +502,10 @@ class ClaseMiembro {
   final String? terminaEn;
   final String? instructor;
   final String? zonaHoraria;
+
+  /// El desfase con UTC de su sede cuando empieza (`utc_offset_min`); null si el
+  /// API no lo manda (se usa el del negocio).
+  final int? desfaseMin;
   final int? capacidad;
   final int ocupados;
 
@@ -523,6 +541,7 @@ class ClaseMiembro {
       terminaEn: j['termina_en'] as String?,
       instructor: j['instructor'] as String?,
       zonaHoraria: j['zona_horaria'] as String?,
+      desfaseMin: (j['utc_offset_min'] as num?)?.toInt(),
       capacidad: j['capacidad'] as int?,
       ocupados: (j['ocupados'] ?? 0) as int,
       clase: BloqueClase.desdeJson(j['clase'], respaldo: j),
@@ -746,7 +765,8 @@ class OrdenPorPagar {
       )
       .toList();
 
-  /// [desfaseMin]: el del negocio (el de la sesión): las fechas van en su hora.
+  /// [desfaseMin]: el del negocio (el de la sesión): las fechas van en su hora;
+  /// la de la cita, en la de su sede si el API la manda (`utc_offset_min`).
   factory OrdenPorPagar.desdeJson(
     Map<String, dynamic> j, {
     String moneda = 'MXN',
@@ -783,7 +803,8 @@ class OrdenPorPagar {
               if (sesion['inicia_en'] != null)
                 Formato.fechaHora(
                   sesion['inicia_en'] as String,
-                  desfaseMin: desfaseMin,
+                  desfaseMin:
+                      (sesion['utc_offset_min'] as num?)?.toInt() ?? desfaseMin,
                 ),
               if (sesion['sucursal'] != null) sesion['sucursal'] as String,
             ].join(' · ')
@@ -1081,6 +1102,7 @@ class ResenaPendiente {
     this.actividad,
     this.con,
     this.fecha,
+    this.desfaseMin,
   });
 
   final String reservaId;
@@ -1088,11 +1110,16 @@ class ResenaPendiente {
   final String? con;
   final String? fecha;
 
+  /// El desfase con UTC de su sede (`utc_offset_min`); null si el API no lo
+  /// manda (se usa el del negocio).
+  final int? desfaseMin;
+
   factory ResenaPendiente.desdeJson(Map<String, dynamic> j) => ResenaPendiente(
     reservaId: (j['reserva_id'] ?? '') as String,
     actividad: j['actividad'] as String?,
     con: j['con'] as String?,
     fecha: j['fecha'] as String?,
+    desfaseMin: (j['utc_offset_min'] as num?)?.toInt(),
   );
 }
 
@@ -1597,6 +1624,7 @@ class ItemHistorial {
     this.sucursal,
     this.instructor,
     this.iniciaEn,
+    this.desfaseMin,
     this.canceladaPor,
     this.reprogramada = false,
     this.retardo = false,
@@ -1612,6 +1640,10 @@ class ItemHistorial {
   final String? sucursal;
   final String? instructor;
   final String? iniciaEn;
+
+  /// El desfase con UTC de su sede (`utc_offset_min`); null si el API no lo
+  /// manda (se usa el del negocio).
+  final int? desfaseMin;
   final String? canceladaPor;
   final bool reprogramada;
 
@@ -1642,6 +1674,7 @@ class ItemHistorial {
       sucursal: j['sucursal'] as String?,
       instructor: j['instructor'] as String?,
       iniciaEn: j['inicia_en'] as String?,
+      desfaseMin: (j['utc_offset_min'] as num?)?.toInt(),
       canceladaPor: j['cancelada_por'] as String?,
       retardo: (j['retardo'] ?? false) as bool,
       reprogramada: (j['reprogramada'] ?? false) as bool,

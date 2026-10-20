@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\CuentaEnUsoTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
@@ -99,6 +100,7 @@ class MiHistorialTenantController
                     'instructor_id' => $sesion?->instructor?->ulid,
                     'inicia_en' => $sesion?->inicia_en->toIso8601String(),
                     'zona_horaria' => $sesion?->zona_horaria,
+                    'utc_offset_min' => SesionTenantPresenter::horaLocal($sesion)['utc_offset_min'],
                     'estado' => $this->estado($r),
                     // Asistió, pero llegó tarde.
                     'retardo' => (bool) $r->asistencia?->retardo,

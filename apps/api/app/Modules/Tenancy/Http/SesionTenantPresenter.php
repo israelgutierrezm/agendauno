@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http;
 
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -39,6 +40,16 @@ class SesionTenantPresenter
     public static function conteos(): array
     {
         return CupoDeSesionTenant::conteos();
+    }
+
+    /**
+     * La hora de la sesión en la zona de su sede: {@see FechasNegocioTenant::horaDeSesion()}.
+     *
+     * @return array{inicia_local: string|null, termina_local: string|null, utc_offset_min: int|null}
+     */
+    public static function horaLocal(?SesionTenant $sesion): array
+    {
+        return app(FechasNegocioTenant::class)->horaDeSesion($sesion);
     }
 
     /**

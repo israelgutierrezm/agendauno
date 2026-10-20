@@ -43,6 +43,7 @@ class PresentarMovimientosCreditoTenant
                     'nombre' => $sesion->oferta?->nombre,
                     'inicia_en' => $sesion->inicia_en->toIso8601String(),
                     'zona_horaria' => $sesion->zona_horaria,
+                    'utc_offset_min' => app(FechasNegocioTenant::class)->horaDeSesion($sesion)['utc_offset_min'],
                 ] : null,
             ];
         })->values()->all();

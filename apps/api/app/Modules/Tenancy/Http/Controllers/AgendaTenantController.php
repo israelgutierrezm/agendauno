@@ -8,7 +8,6 @@ use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
-use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
@@ -490,24 +489,6 @@ class AgendaTenantController
     }
 
     /**
-     * La hora de la sesión en la zona de su sucursal (o la del negocio): `inicia_local`,
-     * `termina_local` (AAAA-MM-DDTHH:MM:SS, sin zona) y su desfase en minutos.
-     *
-     * @return array{inicia_local: string, termina_local: string, utc_offset_min: int}
-     */
-    private static function horaLocal(SesionTenant $sesion): array
-    {
-        $zona = (string) ($sesion->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
-        $inicia = CarbonImmutable::instance($sesion->inicia_en)->setTimezone($zona);
-
-        return [
-            'inicia_local' => $inicia->format('Y-m-d\TH:i:s'),
-            'termina_local' => CarbonImmutable::instance($sesion->termina_en)->setTimezone($zona)->format('Y-m-d\TH:i:s'),
-            'utc_offset_min' => $inicia->utcOffset(),
-        ];
-    }
-
-    /**
      * Contrato de la agenda (ADR 0104): los campos de siempre más `tipo`, `clase` (o
      * null), `cita` (o null) y `ocupacion` (o null). Ver docs/API.md, «Agenda».
      *
@@ -548,7 +529,7 @@ class AgendaTenantController
             // La hora de la sucursal, ya calculada (R10): la app la muestra tal cual y
             // agrupa por ese día, aunque el teléfono esté en otra zona; con el desfase
             // sabe si debe decir que es la hora de la sucursal.
-            ...self::horaLocal($sesion),
+            ...SesionTenantPresenter::horaLocal($sesion),
             'capacidad' => $sesion->capacidad,
             'ocupados' => CupoDeSesionTenant::ocupadosCargados($sesion),
             'en_espera' => (int) ($sesion->getAttribute('en_espera') ?? 0),

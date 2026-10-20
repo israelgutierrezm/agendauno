@@ -374,6 +374,8 @@ class MiTenantController
                 'sucursal_id' => $s->sucursal?->ulid,
                 'inicia_en' => $s->inicia_en->toIso8601String(),
                 'termina_en' => $s->termina_en->toIso8601String(),
+                // En la hora de su sede, para la app (ADR 0172).
+                ...SesionTenantPresenter::horaLocal($s),
                 'instructor' => $s->instructor?->name,
                 'instructor_id' => $s->instructor?->ulid,
                 'zona_horaria' => $s->zona_horaria,
@@ -841,6 +843,8 @@ class MiTenantController
             // Si la agendó para otra persona: quién asiste (ADR 0068).
             'asiste' => $reserva->asiste,
             'zona_horaria' => $reserva->sesion?->zona_horaria,
+            // En la hora de su sede, para la app (ADR 0172).
+            ...SesionTenantPresenter::horaLocal($reserva->sesion),
             // Vencimiento de la oferta de lista de espera (si la reserva está ofrecida).
             'oferta_expira_en' => $reserva->oferta_expira_en?->toIso8601String(),
             // Lo que consume y de qué plan; hasta cuándo cancela sin costo, con la política
@@ -1180,6 +1184,7 @@ class MiTenantController
                 'profesional' => $sesion->instructor?->name,
                 'inicia_en' => $sesion->inicia_en->toIso8601String(),
                 'zona_horaria' => $sesion->zona_horaria,
+                'utc_offset_min' => SesionTenantPresenter::horaLocal($sesion)['utc_offset_min'],
                 'sucursal' => $sesion->sucursal?->nombre,
             ] : null,
             'estado' => $orden->estado->value,

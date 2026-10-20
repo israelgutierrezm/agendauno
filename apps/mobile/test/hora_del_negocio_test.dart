@@ -529,6 +529,98 @@ void main() {
       expect(opciones.sesiones.single.iniciaLocal, '2030-01-09T21:30');
     });
 
+    test('cada reserva y clase, en la hora de su sede si el API la manda', () {
+      // El negocio va seis horas detrás de UTC; la sede de Cancún, cinco.
+      final cuenta = MiCuenta(
+        derechos: const [],
+        reservas: [
+          ReservaMiembro.desdeJson({
+            'id': 'r1',
+            'tipo': 'clase',
+            'estado': 'confirmada',
+            'oferta': 'Pole Nivel 1',
+            'inicia_en': '2030-01-10T03:30:00+00:00',
+            'termina_en': '2030-01-10T04:30:00+00:00',
+            'utc_offset_min': -300,
+          }),
+        ],
+        clases: [
+          ClaseMiembro.desdeJson({
+            'id': 's2',
+            'oferta': 'Flexibilidad',
+            'inicia_en': '2030-01-10T15:00:00+00:00',
+            'utc_offset_min': -300,
+          }),
+          // Un API anterior no manda el de la sede: el del negocio.
+          ClaseMiembro.desdeJson({
+            'id': 's3',
+            'oferta': 'Aéreo',
+            'inicia_en': '2030-01-10T16:00:00+00:00',
+          }),
+        ],
+      );
+      final eventos = {
+        for (final e in eventosDeCuenta(cuenta, desfaseMin: -360)) e.id: e,
+      };
+
+      expect(eventos['r1']!.inicio, DateTime(2030, 1, 9, 22, 30));
+      expect(eventos['r1']!.fin, DateTime(2030, 1, 9, 23, 30));
+      expect(eventos['s2']!.inicio, DateTime(2030, 1, 10, 10));
+      expect(eventos['s3']!.inicio, DateTime(2030, 1, 10, 10));
+
+      final orden = OrdenPorPagar.desdeJson({
+        'id': 'o1',
+        'concepto': 'Corte',
+        'total_minor': 25000,
+        'sesion': {
+          'inicia_en': '2030-01-10T03:30:00+00:00',
+          'utc_offset_min': -300,
+          'sucursal': 'Cancún',
+        },
+      }, desfaseMin: -360);
+      expect(orden.detalle, 'mié 9 ene · 22:30 · Cancún');
+
+      final historial = ItemHistorial.desdeJson({
+        'id': 'h1',
+        'estado': 'asistio',
+        'inicia_en': '2030-01-10T03:30:00+00:00',
+        'utc_offset_min': -300,
+      });
+      final movimiento = MovimientoCredito.desdeJson({
+        'id': 'm1',
+        'concepto': 'Reserva',
+        'unidades': -1000,
+        'saldo_posterior': 0,
+        'clase': {
+          'nombre': 'Nivel 1',
+          'inicia_en': '2030-01-10T03:30:00+00:00',
+          'utc_offset_min': -300,
+        },
+      });
+      final plan = PlanCorte.desdeJson({
+        'id': 'a1',
+        'derecho_id': 'd1',
+        'unidades': <String, dynamic>{},
+        'usos': [
+          {
+            'clase': 'Nivel 1',
+            'inicia_en': '2030-01-10T03:30:00Z',
+            'utc_offset_min': -300,
+          },
+        ],
+      }, desfaseMin: -360);
+      expect(plan.usos.single.iniciaEn, DateTime(2030, 1, 9, 22, 30));
+      expect(historial.desfaseMin, -300);
+      expect(movimiento.claseDesfaseMin, -300);
+      expect(
+        ResenaPendiente.desdeJson({
+          'reserva_id': 'r1',
+          'utc_offset_min': -300,
+        }).desfaseMin,
+        -300,
+      );
+    });
+
     test('el calendario de Reservas arranca en el día del negocio', () {
       final ahora = DateTime.now();
       final sesion = _sesion(desfase: _desfaseDeOtroDia(ahora), rol: 'miembro');

@@ -41,16 +41,16 @@ String lugaresTexto(ClaseMiembro c) {
 
 /// Lo que pinta su calendario: sus reservas resaltadas y las clases disponibles
 /// (las del periodo que se ve, si se pasan). El id de cada evento es el de la
-/// reserva o el de la clase. En los días y las horas del negocio ([desfaseMin], el
-/// de la sesión; el portal no recibe la hora de cada sucursal), no en los del
-/// teléfono.
+/// reserva o el de la clase. En los días y las horas de su sede (`utc_offset_min`
+/// de cada una) o, si el API no lo manda, en los del negocio ([desfaseMin], el de
+/// la sesión); nunca en los del teléfono.
 List<EventoCal> eventosDeCuenta(
   MiCuenta c, {
   List<ClaseMiembro>? clases,
   int? desfaseMin,
 }) {
-  DateTime? fecha(String? iso) =>
-      HoraNegocio.pared(iso, desfaseMin: desfaseMin);
+  DateTime? fecha(String? iso, int? deLaSede) =>
+      HoraNegocio.pared(iso, desfaseMin: deLaSede ?? desfaseMin);
   String detalle(String? sucursal, String? instructor) => [
     sucursal,
     if (instructor != null) 'con $instructor',
@@ -61,8 +61,8 @@ List<EventoCal> eventosDeCuenta(
       EventoCal(
         id: r.id,
         titulo: r.oferta ?? '—',
-        inicio: fecha(r.iniciaEn)!,
-        fin: fecha(r.terminaEn),
+        inicio: fecha(r.iniciaEn, r.desfaseMin)!,
+        fin: fecha(r.terminaEn, r.desfaseMin),
         detalle: detalle(r.sucursal, r.instructor),
         estado: r.estado == 'confirmada' ? 'Reservada' : r.estadoTexto,
         tono: r.estado == 'confirmada' ? TonoEvento.primario : TonoEvento.aviso,
@@ -74,8 +74,8 @@ List<EventoCal> eventosDeCuenta(
       EventoCal(
         id: x.id,
         titulo: x.oferta ?? '—',
-        inicio: fecha(x.iniciaEn)!,
-        fin: fecha(x.terminaEn),
+        inicio: fecha(x.iniciaEn, x.desfaseMin)!,
+        fin: fecha(x.terminaEn, x.desfaseMin),
         detalle: detalle(x.sucursal, x.instructor),
         // Si su plan no la incluye, eso es lo primero que se dice.
         estado: x.reservable ? lugaresTexto(x) : x.cobertura!.texto,
