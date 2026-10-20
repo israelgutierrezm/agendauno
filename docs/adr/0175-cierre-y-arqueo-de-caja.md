@@ -58,6 +58,9 @@ El dueño eligió (2026-10-20):
     artículos; así nadie espera en orden cruzado.
   - Contar bloquea la misma fila. Un cobro entra al libro antes del conteo, o espera y
     encuentra la caja contada.
+  - Todos bloquean la caja por su clave. Un cobro la busca por la sede abierta sin
+    bloquear y después la bloquea por su clave; bloquearla por ese índice se cruzaba con
+    el cierre, que lo cambia, y MySQL abortaba una de las dos.
   - `agendauno:verificar-concurrencia` lo prueba en MySQL: ventas del mostrador a la vez
     mientras se cuenta la caja.
 

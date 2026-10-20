@@ -85,10 +85,14 @@ class CajasTenant
             return null;
         }
 
-        $turno = TurnoCajaTenant::query()->where('sucursal_abierta', $sucursalId)->lockForUpdate()->first();
+        // Se bloquea por su clave, como al contar y al cerrar. Bloquearla por el índice de
+        // la sede abierta cruzaría los bloqueos con el cierre, que cambia ese índice, y
+        // MySQL abortaría una de las dos (deadlock). Ya bloqueada, se vuelve a revisar.
+        $id = TurnoCajaTenant::query()->where('sucursal_abierta', $sucursalId)->value('id');
+        $turno = $id !== null ? TurnoCajaTenant::query()->whereKey($id)->lockForUpdate()->first() : null;
         if (! $turno instanceof TurnoCajaTenant || $turno->estado !== TurnoCajaTenant::ABIERTA) {
             $sede = SucursalTenant::query()->whereKey($sucursalId)->value('nombre');
-            throw new CajaCerrada($turno instanceof TurnoCajaTenant
+            throw new CajaCerrada($turno?->estado === TurnoCajaTenant::CONTADA
                 ? "La caja de {$sede} ya se contó: termina su cierre y abre otra para seguir."
                 : "Abre la caja de {$sede} para mover dinero en el mostrador.");
         }
