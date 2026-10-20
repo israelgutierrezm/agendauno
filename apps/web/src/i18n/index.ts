@@ -87,6 +87,7 @@ import caja from "./locales/caja.es-MX";
 import importarReservas from "./locales/importarReservas.es-MX";
 import formasDePago from "./locales/formasDePago.es-MX";
 import devolverVenta from "./locales/devolverVenta.es-MX";
+import facturarVenta from "./locales/facturarVenta.es-MX";
 import cobroCita from "./locales/cobroCita.es-MX";
 import importarCitas from "./locales/importarCitas.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
@@ -204,6 +205,7 @@ const mensajesBase = {
   importarReservas,
   formasDePago,
   devolverVenta,
+  facturarVenta,
   cobroCita,
   importarCitas,
   nominaVisual,

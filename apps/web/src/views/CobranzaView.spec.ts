@@ -34,7 +34,10 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.ruta,
   useRouter: () => ({ replace: mocks.replace }),
-  RouterLink: { props: ["to"], template: "<a><slot /></a>" },
+  RouterLink: {
+    props: ["to"],
+    template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
+  },
 }));
 
 const pago = (id: string, persona: string, estado: string) => ({
@@ -298,6 +301,42 @@ describe("cobros: movimientos", () => {
     expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/app/demo/pagos", {
       params: { formato: "csv", desde: "2026-10-01" },
       responseType: "blob",
+    });
+  });
+});
+
+describe("cobros: facturar la venta (ADR 0179)", () => {
+  it("un cobro aprobado se factura o lleva a su factura", async () => {
+    mocks.get.mockResolvedValue({
+      data: {
+        data: [
+          { ...pago("1", "Ana", "aprobado"), orden: "O1", facturable: true },
+          {
+            ...pago("2", "Bea", "aprobado"),
+            orden: "O2",
+            factura: { id: "F2", uuid: "U-2" },
+          },
+          { ...pago("3", "Caro", "aprobado"), orden: "O3", facturable: false },
+        ],
+        meta: resumen([{ moneda: "MXN", total_minor: 30000 }]),
+      },
+    });
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    const facturar = w.findAll('[data-prueba="pago-facturar"]');
+    expect(facturar).toHaveLength(1);
+    expect(JSON.parse(facturar[0]!.attributes("data-to")!)).toEqual({
+      name: "facturas",
+      query: { orden: "O1" },
+    });
+    const facturada = w.get('[data-prueba="pago-facturado"]');
+    expect(facturada.text()).toBe("Facturada");
+    expect(JSON.parse(facturada.attributes("data-to")!)).toEqual({
+      name: "facturas",
+      query: { q: "U-2" },
     });
   });
 });

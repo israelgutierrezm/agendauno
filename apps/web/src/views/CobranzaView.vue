@@ -24,6 +24,11 @@ import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { confirmar } from "@/lib/confirmar";
+import {
+  puedeFacturarVentas,
+  rutaFacturaDeVenta,
+  rutaFacturarVenta,
+} from "@/lib/facturarVenta";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 // Lo que ya se debe (GET /cobranza/pendientes): compras sin pagar y citas o clases
@@ -88,6 +93,10 @@ interface Pago {
   comprobante?: "enviado" | "fallido" | "pendiente" | null;
   // El banco del cliente lo disputó (ADR 0168).
   contracargo?: "abierto" | "ganado" | "perdido" | null;
+  // Su venta y su factura, o si ya se puede facturar (ADR 0179).
+  orden?: string | null;
+  factura?: { id: string; uuid: string | null } | null;
+  facturable?: boolean;
 }
 interface Suscripcion {
   id: string;
@@ -118,6 +127,7 @@ const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeRegularizar = computed(() => sesion.puede("ordenes.gestionar"));
 const puedeReembolsar = computed(() => sesion.puede("pagos.reembolsar"));
+const puedeFacturar = computed(() => puedeFacturarVentas(sesion));
 
 const pendientes = ref<Pendiente[]>([]);
 const metaPendientes = ref<MetaPendientes | null>(null);
@@ -1200,6 +1210,20 @@ watch(vista, cargar, { immediate: true });
                   </td>
                   <td class="text-right">
                     <span class="inline-flex flex-wrap justify-end gap-x-3">
+                      <RouterLink
+                        v-if="p.factura"
+                        class="tu-enlace text-sm"
+                        :to="rutaFacturaDeVenta(p.factura.uuid)"
+                        data-prueba="pago-facturado"
+                        >{{ $t("facturarVenta.facturada") }}</RouterLink
+                      >
+                      <RouterLink
+                        v-else-if="puedeFacturar && p.facturable && p.orden"
+                        class="tu-enlace text-sm"
+                        :to="rutaFacturarVenta({ orden: p.orden })"
+                        data-prueba="pago-facturar"
+                        >{{ $t("facturarVenta.facturar") }}</RouterLink
+                      >
                       <button
                         v-if="p.corregible || p.anulable"
                         class="tu-enlace text-sm"

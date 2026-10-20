@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
+use App\Modules\Tenancy\Application\FacturasDeVentasTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
@@ -17,6 +18,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\VentaPosTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,7 +34,32 @@ class FacturasTenantController
 {
     private const POR_PAGINA = 20;
 
-    public function __construct(private readonly EmitirFacturaTenant $emisor) {}
+    public function __construct(
+        private readonly EmitirFacturaTenant $emisor,
+        private readonly FacturasDeVentasTenant $ventas,
+    ) {}
+
+    /**
+     * Lo que se factura de una venta (ADR 0179): `orden` (un plan, una cita, una
+     * compra) o `venta` (del mostrador). Conceptos sin IVA, a quién y la forma de pago.
+     */
+    public function borrador(Request $request): JsonResponse
+    {
+        $validado = $request->validate([
+            'orden' => ['nullable', 'string', 'required_without:venta', 'prohibits:venta'],
+            'venta' => ['nullable', 'string'],
+        ]);
+        if (isset($validado['orden'])) {
+            $orden = $this->ordenDeMiSede($request, (string) $validado['orden']);
+            $this->ventas->exigirOrden($orden);
+
+            return response()->json(['data' => $this->ventas->borradorDeOrden($orden)]);
+        }
+        $venta = $this->ventaDeMiSede($request, (string) $validado['venta']);
+        $this->ventas->exigirVenta($venta);
+
+        return response()->json(['data' => $this->ventas->borradorDeVenta($venta)]);
+    }
 
     /**
      * Las facturas por páginas (antes, solo las últimas 100), de la más reciente a la
@@ -56,11 +83,13 @@ class FacturasTenantController
         }
         $buscar = trim((string) ($filtros['q'] ?? ''));
         $fechas = app(FechasNegocioTenant::class);
-        // Alcance por sucursal (R19): las de las compras de sus sedes (una factura sin
-        // compra es del negocio y no es de ninguna sede).
+        // Alcance por sucursal (R19): las de las compras y las ventas del mostrador de
+        // sus sedes (una factura sin venta es del negocio y no es de ninguna sede).
         $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
         $consulta = FacturaTenant::query()
-            ->when($sedes !== null, fn (Builder $q) => $q->whereIn('orden_id', OrdenTenant::query()->select('id')->whereIn('sucursal_id', $sedes)))
+            ->when($sedes !== null, fn (Builder $q) => $q->where(fn (Builder $w) => $w
+                ->whereIn('orden_id', OrdenTenant::query()->select('id')->whereIn('sucursal_id', $sedes))
+                ->orWhereIn('venta_pos_id', VentaPosTenant::query()->select('id')->whereIn('sucursal_id', $sedes))))
             ->when($buscar !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
                 ->where('receptor_nombre', 'like', "%{$buscar}%")
                 ->orWhere('receptor_rfc', 'like', '%'.mb_strtoupper($buscar).'%')
@@ -77,6 +106,7 @@ class FacturasTenantController
             ->map(static fn ($n): int => (int) $n)->all();
         $pagina = $consulta
             ->when(($filtros['estado'] ?? null) !== null, fn (Builder $q) => $q->where('estado', $filtros['estado']))
+            ->with(['orden', 'venta'])
             ->orderByDesc('id')
             ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
@@ -99,9 +129,14 @@ class FacturasTenantController
     {
         $factura = FacturaTenant::query()->where('ulid', (string) $request->route('factura'))->firstOrFail();
         $orden = $factura->orden_id !== null ? OrdenTenant::query()->find($factura->orden_id) : null;
-        $orden instanceof OrdenTenant
-            ? app(AlcancePersonaTenant::class)->exigirOrden($request, $orden)
-            : abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403);
+        $venta = $factura->venta_pos_id !== null ? VentaPosTenant::query()->find($factura->venta_pos_id) : null;
+        if ($orden instanceof OrdenTenant) {
+            app(AlcancePersonaTenant::class)->exigirOrden($request, $orden);
+        } elseif ($venta instanceof VentaPosTenant) {
+            $this->exigirSedeDeVenta($request, $venta);
+        } else {
+            abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403);
+        }
 
         return response()->json(['data' => $this->presentar($factura)]);
     }
@@ -138,7 +173,19 @@ class FacturasTenantController
             // O la del resto: los anticipos (facturas) que aplica.
             'anticipos' => ['nullable', 'array', 'max:20', 'prohibited_if:anticipo,true'],
             'anticipos.*' => ['string', 'distinct'],
+            // La venta que factura (ADR 0179): una orden o una venta del mostrador. Un
+            // anticipo no factura la venta: la factura del resto sí.
+            'orden_id' => ['nullable', 'string', 'prohibits:venta_id', 'prohibited_if:anticipo,true'],
+            'venta_id' => ['nullable', 'string', 'prohibited_if:anticipo,true'],
         ]);
+        $orden = isset($validado['orden_id']) ? $this->ordenDeMiSede($request, (string) $validado['orden_id']) : null;
+        $venta = isset($validado['venta_id']) ? $this->ventaDeMiSede($request, (string) $validado['venta_id']) : null;
+        if ($orden !== null) {
+            $this->ventas->exigirOrden($orden);
+        }
+        if ($venta !== null) {
+            $this->ventas->exigirVenta($venta);
+        }
         if (($validado['anticipo'] ?? false) && count($validado['items']) !== 1) {
             throw ValidationException::withMessages(['items' => ['La factura de un anticipo lleva un solo concepto: el importe del anticipo.']]);
         }
@@ -166,6 +213,8 @@ class FacturasTenantController
             mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())),
             (bool) ($validado['anticipo'] ?? false),
             array_values($validado['anticipos'] ?? []),
+            $orden !== null ? (int) $orden->getKey() : null,
+            $venta !== null ? (int) $venta->getKey() : null,
         );
 
         $estado = $factura->estado === EstadoFactura::Timbrada ? 201 : 422;
@@ -196,6 +245,33 @@ class FacturasTenantController
             // Factura de un anticipo y si ya se aplicó al facturar el resto (ADR 0163).
             'anticipo' => $factura->anticipo,
             'anticipo_aplicado' => $factura->anticipo_aplicado_en !== null,
+            // La venta que factura (ADR 0179).
+            'orden_id' => $factura->orden?->ulid,
+            'venta_id' => $factura->venta?->ulid,
         ];
+    }
+
+    /** La orden, si quien la factura alcanza a su cliente y su sede. */
+    private function ordenDeMiSede(Request $request, string $ulid): OrdenTenant
+    {
+        $orden = OrdenTenant::query()->where('ulid', $ulid)->firstOrFail();
+        app(AlcancePersonaTenant::class)->exigirOrden($request, $orden);
+
+        return $orden;
+    }
+
+    /** La venta del mostrador, si es de una sede de quien la factura (R19). */
+    private function ventaDeMiSede(Request $request, string $ulid): VentaPosTenant
+    {
+        $venta = VentaPosTenant::query()->where('ulid', $ulid)->firstOrFail();
+        $this->exigirSedeDeVenta($request, $venta);
+
+        return $venta;
+    }
+
+    private function exigirSedeDeVenta(Request $request, VentaPosTenant $venta): void
+    {
+        $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
+        abort_unless($sedes === null || in_array((int) $venta->sucursal_id, $sedes, true), 403);
     }
 }

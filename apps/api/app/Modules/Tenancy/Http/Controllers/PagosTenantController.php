@@ -10,12 +10,15 @@ use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
+use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\MetodoPago;
@@ -128,6 +131,12 @@ class PagosTenantController
             ->whereIn('pago_id', $pagos->map(fn (PagoTenant $p): int => (int) $p->getKey()))
             ->pluck('pago_id')->map(fn (mixed $id): int => (int) $id)->flip();
         $comprobantes = $this->comprobantes($pagos);
+        // Las facturas de sus ventas (ADR 0179), en una consulta.
+        $facturas = FacturaTenant::query()
+            ->where('estado', EstadoFactura::Timbrada->value)
+            ->whereIn('orden_id', $pagos->pluck('orden_id')->filter()->unique()->values())
+            ->get(['id', 'ulid', 'uuid', 'orden_id'])
+            ->keyBy('orden_id');
 
         $aprobados = $encontrados()->where('estado', EstadoPago::Aprobado->value);
         $resumen = [
@@ -148,7 +157,7 @@ class PagosTenantController
                 'ultima_pagina' => $pagina->lastPage(),
                 'resumen' => $resumen,
             ],
-            'data' => $pagos->map(function (PagoTenant $pago) use ($anular, $corregir, $porConciliar, $comprobantes): array {
+            'data' => $pagos->map(function (PagoTenant $pago) use ($anular, $corregir, $porConciliar, $comprobantes, $facturas): array {
                 $reembolsado = (int) ($pago->getAttribute('reembolsado_minor') ?? 0);
                 $comprometido = (int) ($pago->getAttribute('comprometido_minor') ?? 0);
 
@@ -178,6 +187,10 @@ class PagosTenantController
                     // Contracargo (ADR 0168): abierto, ganado o perdido; null si no hubo.
                     'contracargo' => $pago->contracargo_estado,
                     'comprobante' => $comprobantes[(string) $pago->orden?->ulid] ?? null,
+                    // Su factura (ADR 0179), o si ya se puede facturar: la venta pagada.
+                    'orden' => $pago->orden?->ulid,
+                    'factura' => ($f = $facturas->get($pago->orden_id)) !== null ? ['id' => $f->ulid, 'uuid' => $f->uuid] : null,
+                    'facturable' => $f === null && $pago->orden?->estado === EstadoOrden::Pagada,
                 ];
             })->all(),
         ]);

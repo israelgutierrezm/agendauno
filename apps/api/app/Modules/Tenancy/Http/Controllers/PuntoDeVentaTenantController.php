@@ -90,7 +90,7 @@ class PuntoDeVentaTenantController
 
         $hoy = $this->fechas->hoy();
         $pagina = (clone $consulta)
-            ->with(['sucursal', 'lineas.articulo', 'persona'])
+            ->with(['sucursal', 'lineas.articulo', 'persona', 'facturaTimbrada'])
             ->orderByDesc('id')
             ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
@@ -385,6 +385,11 @@ class PuntoDeVentaTenantController
             'anulable' => $this->corregir->impedimentoAnular($venta) === null,
             // Devoluciones parciales (ADR 0178): cuánto salió y si aún se puede devolver.
             'devuelto_minor' => (int) $venta->devoluciones()->sum('monto_minor'),
+            // Su factura, si ya se facturó (ADR 0179).
+            'factura' => $venta->facturaTimbrada !== null
+                ? ['id' => $venta->facturaTimbrada->ulid, 'uuid' => $venta->facturaTimbrada->uuid]
+                : null,
+            'facturable' => $venta->facturaTimbrada === null && $venta->anulada_en === null && (int) $venta->total_minor > 0,
             'devolvible' => $this->devoluciones->impedimento($venta) === null
                 && $venta->lineas->contains(fn ($l): bool => (int) $l->cantidad > (int) $l->cantidad_devuelta),
             'lineas' => $venta->lineas->map(fn ($l): array => [

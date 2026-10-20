@@ -10,6 +10,8 @@ use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\VentaPosTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +29,10 @@ use Illuminate\Validation\ValidationException;
  * (un solo concepto con la clave del SAT) y la del resto se relaciona con los
  * anticipos que aplica (tipo 07) y lleva la leyenda del remanente. Cada anticipo se
  * aplica una sola vez: se bloquea y se revalida en la misma transacción.
+ *
+ * La venta que factura (ADR 0179), si se dice: una orden o una venta del mostrador.
+ * Se bloquea y se revalida en la misma transacción, así dos timbrados a la vez no la
+ * facturan dos veces.
  */
 class EmitirFacturaTenant
 {
@@ -43,6 +49,8 @@ class EmitirFacturaTenant
      * @param  array{nombre: string, rfc: string, email?: string|null, codigo_postal: string, regimen_fiscal?: string|null}  $receptor
      * @param  list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string}>  $items
      * @param  list<string>  $anticipos  ULID de las facturas de anticipo que aplica
+     * @param  int|null  $ordenId  la orden que factura
+     * @param  int|null  $ventaPosId  la venta del mostrador que factura
      */
     public function emitir(
         DatosFiscalesTenant $emisor,
@@ -53,6 +61,8 @@ class EmitirFacturaTenant
         string $moneda = 'MXN',
         bool $anticipo = false,
         array $anticipos = [],
+        ?int $ordenId = null,
+        ?int $ventaPosId = null,
     ): FacturaTenant {
         if ($anticipo) {
             $items = [['cantidad' => 1, 'precio_unitario_minor' => (int) $items[0]['precio_unitario_minor']] + CatalogosSat::ANTICIPO];
@@ -74,8 +84,21 @@ class EmitirFacturaTenant
         $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
-            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $llave, $cuerpo, $anticipo, $anticipos
+            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $llave, $cuerpo, $anticipo, $anticipos, $ordenId, $ventaPosId
         ): FacturaTenant {
+            // La venta que factura, bloqueada: si otro timbrado ya la facturó, no otra vez.
+            if ($ordenId !== null) {
+                OrdenTenant::query()->whereKey($ordenId)->lockForUpdate()->first();
+                if (FacturasDeVentasTenant::deOrden($ordenId) !== null) {
+                    throw ValidationException::withMessages(['orden_id' => ['Esta venta ya está facturada.']]);
+                }
+            }
+            if ($ventaPosId !== null) {
+                VentaPosTenant::query()->whereKey($ventaPosId)->lockForUpdate()->first();
+                if (FacturasDeVentasTenant::deVenta($ventaPosId) !== null) {
+                    throw ValidationException::withMessages(['venta_id' => ['Esta venta ya está facturada.']]);
+                }
+            }
             // Los anticipos que aplica: suyos (mismo RFC), timbrados y aún sin aplicar.
             $aplicados = FacturaTenant::query()->whereIn('ulid', $anticipos)->lockForUpdate()->get();
             if ($aplicados->count() !== count(array_unique($anticipos))
@@ -103,6 +126,8 @@ class EmitirFacturaTenant
                 'impuesto_minor' => $impuesto,
                 'total_minor' => $total,
                 'anticipo' => $anticipo,
+                'orden_id' => $ordenId,
+                'venta_pos_id' => $ventaPosId,
             ];
 
             try {

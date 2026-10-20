@@ -13,11 +13,23 @@ import SelectorBuscable from "@/components/SelectorBuscable.vue";
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: vi.fn() }));
-vi.mock("vue-router", () => ({
-  useRoute: () => undefined,
-  useRouter: () => undefined,
-  RouterLink: { template: "<a><slot /></a>" },
-}));
+// La dirección: la venta que se factura llega como `?orden=` o `?venta=`.
+const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
+const reemplazar = vi.hoisted(() => vi.fn());
+vi.mock("vue-router", async () => {
+  const { reactive } = await import("vue");
+  const r = reactive(ruta);
+  return {
+    useRoute: () => r,
+    useRouter: () => ({
+      replace: (destino: { query: Record<string, string> }) => {
+        reemplazar(destino);
+        r.query = destino.query;
+      },
+    }),
+    RouterLink: { template: "<a><slot /></a>" },
+  };
+});
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
@@ -43,6 +55,7 @@ const factura = (id: string, estado: string) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  ruta.query = {};
   api.get.mockImplementation((url: string) =>
     Promise.resolve({
       data: url.endsWith("/facturas")
@@ -262,6 +275,108 @@ describe("facturas: búsqueda, filtros y páginas", () => {
       "/api/v1/app/demo/facturas",
       expect.objectContaining({ anticipos: ["9"] }),
     );
+    w.unmount();
+  });
+});
+
+describe("facturar una venta (ADR 0179)", () => {
+  const borrador = {
+    etiqueta: "Pack 8 clases",
+    receptor: {
+      nombre: "Público en general",
+      email: null,
+      rfc: "XAXX010101000",
+      codigo_postal: "06700",
+      uso_cfdi: "S01",
+    },
+    conceptos: [
+      {
+        descripcion: "Pack 8 clases",
+        cantidad: 1,
+        precio_unitario_minor: 77500,
+        clave_prod_serv: "86121600",
+        clave_unidad: "E48",
+      },
+    ],
+    forma_pago: "01",
+    total_minor: 89900,
+    moneda: "MXN",
+  };
+
+  it("el borrador llena el formulario y, al timbrar, la factura queda ligada a la venta", async () => {
+    vi.mocked(confirmar).mockResolvedValue(true);
+    api.post.mockResolvedValue({ data: { data: factura("3", "timbrada") } });
+    ruta.query = { orden: "ORD1" };
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/facturas/borrador")
+          ? { data: borrador }
+          : {
+              data: [],
+              meta: { total: 0, page: 1, per_page: 20, ultima_pagina: 1 },
+            },
+      }),
+    );
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/facturas/borrador", {
+      params: { orden: "ORD1" },
+    });
+    expect(w.get('[data-prueba="venta-ligada"]').text()).toContain(
+      "Pack 8 clases",
+    );
+    expect((w.get("#fa-rfc").element as HTMLInputElement).value).toBe(
+      "XAXX010101000",
+    );
+    expect((w.get("#fa-precio-0").element as HTMLInputElement).value).toBe(
+      "775.00",
+    );
+    // Un anticipo no factura la venta.
+    expect(w.find('[data-prueba="es-anticipo"]').exists()).toBe(false);
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/facturas",
+      expect.objectContaining({
+        orden_id: "ORD1",
+        uso_cfdi: "S01",
+        forma_pago: "01",
+        items: [expect.objectContaining({ precio_unitario_minor: 77500 })],
+      }),
+    );
+    // Ya facturada, la venta sale de la dirección y el formulario queda vacío.
+    expect(reemplazar).toHaveBeenLastCalledWith({ query: {} });
+    expect(w.find('[data-prueba="venta-ligada"]').exists()).toBe(false);
+    expect((w.get("#fa-rfc").element as HTMLInputElement).value).toBe("");
+    w.unmount();
+  });
+
+  it("una venta ya facturada no se liga: lo dice el API", async () => {
+    ruta.query = { venta: "VTA1" };
+    api.get.mockImplementation((url: string) =>
+      url.endsWith("/facturas/borrador")
+        ? Promise.reject(new Error("422"))
+        : Promise.resolve({
+            data: {
+              data: [],
+              meta: { total: 0, page: 1, per_page: 20, ultima_pagina: 1 },
+            },
+          }),
+    );
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/facturas/borrador", {
+      params: { venta: "VTA1" },
+    });
+    expect(w.get('[data-prueba="error-emision"]').text()).toBe("Error");
+    expect(w.find('[data-prueba="venta-ligada"]').exists()).toBe(false);
     w.unmount();
   });
 });

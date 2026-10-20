@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 
 import AvisoRegion from "@/components/AvisoRegion.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/catalogosSat";
 import { confirmar } from "@/lib/confirmar";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Factura {
@@ -40,6 +42,31 @@ interface Factura {
   // Factura de un anticipo y si ya se aplicó al facturar el resto (ADR 0163).
   anticipo?: boolean;
   anticipo_aplicado?: boolean;
+  // La venta que factura (ADR 0179).
+  orden_id?: string | null;
+  venta_id?: string | null;
+}
+
+// Lo que se factura de una venta (ADR 0179): conceptos sin IVA, a quién y la forma.
+interface Borrador {
+  etiqueta: string;
+  receptor: {
+    nombre: string | null;
+    email: string | null;
+    rfc: string | null;
+    codigo_postal: string | null;
+    uso_cfdi: string | null;
+  };
+  conceptos: {
+    descripcion: string;
+    cantidad: number;
+    precio_unitario_minor: number;
+    clave_prod_serv: string;
+    clave_unidad: string;
+  }[];
+  forma_pago: string;
+  total_minor: number;
+  moneda: string;
 }
 
 interface Concepto {
@@ -51,6 +78,8 @@ interface Concepto {
 }
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeEmitir = computed(() => sesion.puede("ordenes.gestionar"));
@@ -197,6 +226,95 @@ async function buscarAnticipos(): Promise<void> {
   }
 }
 watch(() => [receptor.value.rfc, esAnticipo.value], buscarAnticipos);
+
+// La venta que se factura (ADR 0179), si se llegó desde un cobro o el mostrador
+// (`?orden=` o `?venta=`): su borrador llena el formulario y, al timbrar, queda ligada.
+const ventaLigada = ref<{
+  tipo: "orden" | "venta";
+  id: string;
+  etiqueta: string;
+  total_minor: number;
+  moneda: string;
+} | null>(null);
+const formulario = ref<HTMLElement | null>(null);
+function textoDeConsulta(valor: unknown): string | null {
+  return typeof valor === "string" && valor !== "" ? valor : null;
+}
+function limpiarFormulario(): void {
+  receptor.value = {
+    nombre: "",
+    rfc: "",
+    email: "",
+    codigo_postal: "",
+    regimen_fiscal: "",
+  };
+  conceptos.value = [conceptoNuevo()];
+  esAnticipo.value = false;
+  importeAnticipo.value = "";
+  anticiposElegidos.value = [];
+}
+async function cargarBorrador(): Promise<void> {
+  const orden = textoDeConsulta(route.query.orden);
+  const venta = orden === null ? textoDeConsulta(route.query.venta) : null;
+  if (orden === null && venta === null) {
+    if (ventaLigada.value !== null) {
+      ventaLigada.value = null;
+      limpiarFormulario();
+    }
+    return;
+  }
+  if (!puedeEmitir.value) {
+    return;
+  }
+  errorEmision.value = null;
+  try {
+    const { data } = await api.get<{ data: Borrador }>(
+      `${base.value}/facturas/borrador`,
+      { params: orden !== null ? { orden } : { venta } },
+    );
+    const b = data.data;
+    limpiarFormulario();
+    receptor.value = {
+      ...receptor.value,
+      nombre: b.receptor.nombre ?? "",
+      email: b.receptor.email ?? "",
+      rfc: b.receptor.rfc ?? "",
+      codigo_postal: b.receptor.codigo_postal ?? "",
+    };
+    if (b.receptor.uso_cfdi) {
+      usoCfdi.value = b.receptor.uso_cfdi;
+    }
+    formaPago.value = b.forma_pago;
+    conceptos.value = b.conceptos.map((c) => ({
+      descripcion: c.descripcion,
+      cantidad: c.cantidad,
+      precio: (c.precio_unitario_minor / 100).toFixed(2),
+      clave_prod_serv: c.clave_prod_serv,
+      clave_unidad: c.clave_unidad,
+    }));
+    ventaLigada.value = {
+      tipo: orden !== null ? "orden" : "venta",
+      id: (orden ?? venta) as string,
+      etiqueta: b.etiqueta,
+      total_minor: b.total_minor,
+      moneda: b.moneda,
+    };
+    await nextTick();
+    formulario.value?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    // Ya facturada, sin pagar o de otra sede: lo dice el API.
+    ventaLigada.value = null;
+    errorEmision.value = mensajeDeError(e);
+  }
+}
+watch(() => [route.query.orden, route.query.venta], cargarBorrador);
+// Factura sin venta: quita la venta de la dirección (y el formulario vuelve a vacío).
+function soltarVenta(): void {
+  const query = { ...route.query };
+  delete query.orden;
+  delete query.venta;
+  void router.replace({ query });
+}
 function fechaCorta(iso: string | null | undefined): string {
   return iso
     ? new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
@@ -217,10 +335,7 @@ const columnas = computed(() => [
 ]);
 
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 
 async function cargar(): Promise<void> {
@@ -282,6 +397,12 @@ async function emitir(): Promise<void> {
       },
       uso_cfdi: usoCfdi.value,
       forma_pago: formaPago.value,
+      ...(ventaLigada.value !== null
+        ? {
+            [ventaLigada.value.tipo === "orden" ? "orden_id" : "venta_id"]:
+              ventaLigada.value.id,
+          }
+        : {}),
       ...(esAnticipo.value
         ? {
             anticipo: true,
@@ -312,17 +433,12 @@ async function emitir(): Promise<void> {
           }),
     });
     mensaje.value = "ok";
-    receptor.value = {
-      nombre: "",
-      rfc: "",
-      email: "",
-      codigo_postal: "",
-      regimen_fiscal: "",
-    };
-    conceptos.value = [conceptoNuevo()];
-    esAnticipo.value = false;
-    importeAnticipo.value = "";
-    anticiposElegidos.value = [];
+    limpiarFormulario();
+    // Ya facturada: la venta sale de la dirección (volver no la factura otra vez).
+    if (ventaLigada.value !== null) {
+      ventaLigada.value = null;
+      soltarVenta();
+    }
     await cargar();
   } catch (e) {
     // El rechazo del proveedor llega como 422 con la factura en error + motivo.
@@ -342,7 +458,10 @@ async function emitir(): Promise<void> {
   }
 }
 
-onMounted(cargar);
+onMounted(async () => {
+  await cargar();
+  await cargarBorrador();
+});
 </script>
 
 <template>
@@ -524,8 +643,31 @@ onMounted(cargar);
         class="mt-6"
         tipo="facturacion"
       />
-      <div v-else-if="puedeEmitir" class="mt-6 tu-card p-6">
+      <div
+        v-else-if="puedeEmitir"
+        ref="formulario"
+        class="mt-6 tu-card p-6 scroll-mt-4"
+      >
         <h2 class="font-medium text-lg">{{ $t("facturas.nueva.titulo") }}</h2>
+
+        <AvisoTono v-if="ventaLigada" class="mt-4" data-prueba="venta-ligada">
+          {{
+            $t("facturarVenta.ligada", {
+              venta: ventaLigada.etiqueta,
+              total: dinero(ventaLigada.total_minor, ventaLigada.moneda),
+            })
+          }}
+          <template #acciones>
+            <button
+              type="button"
+              class="tu-btn tu-btn-contorno tu-btn-chico"
+              data-prueba="soltar-venta"
+              @click="soltarVenta"
+            >
+              {{ $t("facturarVenta.soltar") }}
+            </button>
+          </template>
+        </AvisoTono>
 
         <form class="mt-4 space-y-5" @submit.prevent="emitir">
           <div>
@@ -657,7 +799,8 @@ onMounted(cargar);
             </div>
           </div>
 
-          <div>
+          <!-- Un anticipo no factura la venta (ADR 0179): la del resto, sí. -->
+          <div v-if="!ventaLigada">
             <label class="flex items-start gap-2 text-sm">
               <input
                 v-model="esAnticipo"

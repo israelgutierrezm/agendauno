@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\EstadoFactura;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -104,6 +106,16 @@ class VentaPosTenant extends Model
     public function devoluciones(): HasMany
     {
         return $this->hasMany(DevolucionVentaTenant::class, 'venta_pos_id');
+    }
+
+    /**
+     * Su factura timbrada, si ya se facturó (ADR 0179).
+     *
+     * @return HasOne<FacturaTenant, $this>
+     */
+    public function facturaTimbrada(): HasOne
+    {
+        return $this->hasOne(FacturaTenant::class, 'venta_pos_id')->where('estado', EstadoFactura::Timbrada->value)->latestOfMany();
     }
 
     /**

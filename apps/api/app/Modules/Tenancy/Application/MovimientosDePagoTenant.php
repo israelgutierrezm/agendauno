@@ -707,11 +707,6 @@ class MovimientosDePagoTenant
     }
 
     /**
-     * Cómo se llama una forma de pago en el corte. La tarjeta con la terminal del
-     * negocio (cobros en caja y mostrador) va aparte de la tarjeta en línea (por la
-     * pasarela): la primera se cuadra con el voucher de la terminal; la otra, no.
-     */
-    /**
      * Las partes guardadas de un cobro mixto, en su orden.
      *
      * @param  iterable<ParteCobroTenant>  $partes
@@ -728,6 +723,11 @@ class MovimientosDePagoTenant
         return array_map(static fn (array $p): array => ['metodo' => $p['metodo'], 'monto_minor' => $p['monto_minor']], $lista);
     }
 
+    /**
+     * Cómo se llama una forma de pago en el corte. La tarjeta con la terminal del
+     * negocio (cobros en caja y mostrador) va aparte de la tarjeta en línea (por la
+     * pasarela): la primera se cuadra con el voucher de la terminal; la otra, no.
+     */
     private static function etiquetaMetodo(?string $metodo, ?string $proveedor): string
     {
         $tipo = MetodoPago::tryFrom((string) $metodo);

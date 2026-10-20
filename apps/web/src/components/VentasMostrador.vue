@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import CorregirCobro from "@/components/CorregirCobro.vue";
@@ -10,6 +11,11 @@ import DevolverVenta, {
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import {
+  puedeFacturarVentas,
+  rutaFacturaDeVenta,
+  rutaFacturarVenta,
+} from "@/lib/facturarVenta";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { terminoComprador } from "@/lib/mostrador";
@@ -56,6 +62,9 @@ interface Venta {
   motivo_anulacion?: string | null;
   corregible?: boolean;
   anulable?: boolean;
+  // Su factura, o si ya se puede facturar (ADR 0179).
+  factura?: { id: string; uuid: string | null } | null;
+  facturable?: boolean;
 }
 interface Meta {
   total: number;
@@ -108,6 +117,7 @@ const corrigiendo = ref<string | null>(null);
 // La venta de la que se devuelven productos (ADR 0178).
 const devolviendo = ref<string | null>(null);
 const puedeDevolver = computed(() => sesion.puede("pagos.reembolsar"));
+const puedeFacturar = computed(() => puedeFacturarVentas(sesion));
 async function alDevolver(): Promise<void> {
   devolviendo.value = null;
   await cargar();
@@ -387,6 +397,20 @@ onMounted(cargar);
                 </td>
                 <td v-if="corregir" class="text-right">
                   <span class="inline-flex flex-wrap justify-end gap-3">
+                    <RouterLink
+                      v-if="v.factura"
+                      class="tu-enlace text-sm"
+                      :to="rutaFacturaDeVenta(v.factura.uuid)"
+                      data-prueba="venta-facturada"
+                      >{{ $t("facturarVenta.facturada") }}</RouterLink
+                    >
+                    <RouterLink
+                      v-else-if="puedeFacturar && v.facturable"
+                      class="tu-enlace text-sm"
+                      :to="rutaFacturarVenta({ venta: v.id })"
+                      data-prueba="venta-facturar"
+                      >{{ $t("facturarVenta.facturar") }}</RouterLink
+                    >
                     <button
                       v-if="v.devolvible && puedeDevolver"
                       class="tu-enlace text-sm"

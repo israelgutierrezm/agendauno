@@ -52,6 +52,9 @@ final class CorregirVentaPosTenant
         if ($venta->devoluciones()->exists()) {
             return 'Ya tiene devoluciones: su forma de pago ya no se corrige.';
         }
+        if (FacturasDeVentasTenant::deVenta((int) $venta->getKey()) !== null) {
+            return 'La venta ya está facturada: su forma de pago va en el CFDI.';
+        }
         $horas = $this->parametros->entero('pagos.horas_para_corregir');
         if ($horas > 0 && $venta->created_at !== null && $venta->created_at->lt(now()->subHours($horas))) {
             return "La forma de pago se corrige hasta {$horas} h después de la venta.";
@@ -71,6 +74,9 @@ final class CorregirVentaPosTenant
         }
         if ($venta->devoluciones()->exists()) {
             return 'Ya tiene devoluciones: devuelve lo que queda en lugar de anularla.';
+        }
+        if (FacturasDeVentasTenant::deVenta((int) $venta->getKey()) !== null) {
+            return 'La venta ya está facturada: cancela antes su CFDI.';
         }
         $horas = $this->parametros->entero('pagos.horas_para_anular');
         if ($horas > 0 && $venta->created_at !== null && $venta->created_at->lt(now()->subHours($horas))) {

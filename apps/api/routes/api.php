@@ -1047,6 +1047,8 @@ Route::prefix('v1')->group(function (): void {
             // Facturas (CFDI): emitir/timbrar vía FacturAPI, listar y consultar.
             Route::get('/facturas', [FacturasTenantController::class, 'index'])->middleware('puede:ordenes.ver')->name('facturas.index');
             Route::post('/facturas', [FacturasTenantController::class, 'emitir'])->middleware(['puede:ordenes.gestionar', 'plan:facturacion'])->name('facturas.store');
+            // Lo que se factura de una venta (ADR 0179): conceptos, a quién y forma de pago.
+            Route::get('/facturas/borrador', [FacturasTenantController::class, 'borrador'])->middleware(['puede:ordenes.gestionar', 'plan:facturacion'])->name('facturas.borrador');
             Route::get('/facturas/{factura}', [FacturasTenantController::class, 'show'])->middleware('puede:ordenes.ver')->name('facturas.show');
 
             // Integraciones de bienestar (Wellhub / TotalPass): el propietario conecta

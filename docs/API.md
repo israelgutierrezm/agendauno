@@ -690,6 +690,27 @@ Solo negocios de clases, con `reservas.gestionar`. Con `ya_descontadas` = 1, tam
 - Cada factura trae `anticipo` y `anticipo_aplicado`. `GET /facturas?anticipos_de=<RFC>`
   lista los anticipos timbrados y sin aplicar de ese RFC.
 
+## Facturas: la factura de una venta (ADR 0179)
+
+- `GET /facturas/borrador?orden=<ULID>` o `?venta=<ULID>` (venta del mostrador), con
+  `ordenes.gestionar` y la función `facturacion`. Responde:
+  - `etiqueta`, `total_minor` y `moneda`;
+  - `receptor` (`nombre`, `email`, `rfc`, `codigo_postal`, `uso_cfdi`): la persona y,
+    si ya se le facturó, los datos de su última factura;
+  - `conceptos` (precio sin IVA, con `clave_prod_serv` y `clave_unidad`);
+  - `forma_pago` del SAT.
+  - 422 en `orden_id` o `venta_id` si no está pagada, está anulada o ya está facturada;
+    403 si es de otra sede.
+- `POST /facturas` acepta `orden_id` o `venta_id` (uno u otro; no con `anticipo`).
+  La venta queda ligada y no se factura otra vez (422 en ese campo). Cada factura trae
+  `orden_id` y `venta_id`.
+- `GET /pagos` trae en cada cobro `orden`, `factura` (`{id, uuid}` o `null`) y
+  `facturable`. `GET /pos/ventas` trae `factura` y `facturable`.
+- Facturada, la venta del mostrador ya no se corrige ni se anula
+  (`PAYMENT_NOT_CORRECTABLE` / `PAYMENT_NOT_VOIDABLE`).
+- Alcance: quien está acotado a sedes ve en `GET /facturas` las de las órdenes y ventas
+  del mostrador de sus sedes; `GET /facturas/{id}` de otra sede responde 403.
+
 ## Citas: anticipo para apartar (ADR 0161)
 
 - `PUT /ofertas/{oferta}` (y el alta) aceptan `anticipo_minor` (monto, menor que el

@@ -125,4 +125,47 @@ describe("ventas del mostrador", () => {
     expect(w.find('[data-prueba="corregir-venta"]').exists()).toBe(false);
     expect(w.text()).toContain("1 × Café americano");
   });
+
+  it("cada venta se factura o lleva a su factura (ADR 0179)", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          venta("v1", { facturable: true }),
+          venta("v2", { factura: { id: "f1", uuid: "U-1" } }),
+          venta("v3", { anulada_en: "2026-09-30T19:00:00Z" }),
+        ],
+        meta: { total: 3, page: 1, per_page: 20, ultima_pagina: 1 },
+      },
+    });
+    const w = mount(VentasMostrador, {
+      props: { corregir: true },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          RouterLink: {
+            props: ["to"],
+            template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const filas = w.findAll('[data-prueba="venta"]');
+    const facturar = filas[0]!.get('[data-prueba="venta-facturar"]');
+    expect(facturar.text()).toBe("Facturar");
+    expect(JSON.parse(facturar.attributes("data-to")!)).toEqual({
+      name: "facturas",
+      query: { venta: "v1" },
+    });
+    const facturada = filas[1]!.get('[data-prueba="venta-facturada"]');
+    expect(facturada.text()).toBe("Facturada");
+    expect(JSON.parse(facturada.attributes("data-to")!)).toEqual({
+      name: "facturas",
+      query: { q: "U-1" },
+    });
+    expect(filas[2]!.find('[data-prueba="venta-facturar"]').exists()).toBe(
+      false,
+    );
+  });
 });
