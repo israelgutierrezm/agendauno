@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Tenancy\Application\ConciliarPagosTenant;
+use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
@@ -15,7 +16,8 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * Pregunta a la pasarela por los cobros en línea cuyo aviso no llegó, en cada estudio
  * operativo, y aplica lo que habría aplicado el aviso. También las tarjetas del pago
- * automático autorizadas en Stripe cuyo aviso no llegó (ADR 0076).
+ * automático autorizadas en Stripe cuyo aviso no llegó (ADR 0076). Y reintenta el aviso
+ * al superadmin de las incidencias de cobro cuyo aviso no salió.
  */
 class ConciliarPagos extends Command
 {
@@ -23,9 +25,9 @@ class ConciliarPagos extends Command
 
     protected $description = 'Confirma con la pasarela los cobros en línea cuyo aviso no llegó';
 
-    public function handle(ConciliarPagosTenant $conciliar, ConciliarTarjetasStripe $tarjetas, GestorDeConexionTenant $gestor): int
+    public function handle(ConciliarPagosTenant $conciliar, ConciliarTarjetasStripe $tarjetas, IncidenciasCobroTenant $incidencias, GestorDeConexionTenant $gestor): int
     {
-        $total = ['aprobados' => 0, 'rechazados' => 0, 'en_espera' => 0, 'tarjetas' => 0];
+        $total = ['aprobados' => 0, 'rechazados' => 0, 'en_espera' => 0, 'tarjetas' => 0, 'alertas' => 0];
         $slug = $this->option('estudio');
 
         Estudio::query()
@@ -33,7 +35,7 @@ class ConciliarPagos extends Command
             // registra aunque el negocio esté suspendido.
             ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
             ->when(is_string($slug), fn ($q) => $q->where('slug', $slug))
-            ->chunkById(100, function (Collection $estudios) use (&$total, $conciliar, $tarjetas, $gestor): void {
+            ->chunkById(100, function (Collection $estudios) use (&$total, $conciliar, $tarjetas, $incidencias, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
                     if (! $gestor->baseDeDatosExiste($estudio)) {
@@ -47,10 +49,12 @@ class ConciliarPagos extends Command
                     foreach ($cuenta as $clave => $n) {
                         $total[$clave] += $n;
                     }
+                    // Aparte: si esto falla, la conciliación del negocio ya se hizo.
+                    $total['alertas'] += $gestor->ejecutarAislado($estudio, fn (): int => $incidencias->alertarPendientes(), 0);
                 }
             });
 
-        $this->info("Cobros confirmados: {$total['aprobados']}. Cerrados: {$total['rechazados']}. En espera: {$total['en_espera']}. Tarjetas registradas: {$total['tarjetas']}.");
+        $this->info("Cobros confirmados: {$total['aprobados']}. Cerrados: {$total['rechazados']}. En espera: {$total['en_espera']}. Tarjetas registradas: {$total['tarjetas']}. Avisos al superadmin reintentados: {$total['alertas']}.");
 
         return self::SUCCESS;
     }

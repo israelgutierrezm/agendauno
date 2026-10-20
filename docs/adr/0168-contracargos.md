@@ -26,6 +26,19 @@ responder y cuándo se abrió y se cerró. Lo hace `ContracargosTenant`.
 Cada cambio queda en la bitácora (`pago.contracargo`). El mismo aviso dos veces no
 duplica nada: la devolución es una por disputa.
 
+### Si algo falla a medias (2026-10-20)
+
+- El estado del pago, su incidencia, la devolución y la bitácora se guardan en **una sola
+  transacción**. Si algo falla, no queda nada: el aviso de la pasarela sigue pendiente y
+  su reintento (ADR 0173) lo hace todo de nuevo. Antes, el estado podía quedar guardado
+  sin su incidencia, y el reintento ya no la creaba porque veía el estado.
+- **El aviso al superadmin** sale cuando la incidencia ya quedó guardada (si la
+  transacción se deshace, no hay aviso de algo que no existe). Si no sale, la incidencia
+  queda sin `alertada_en` y `agendauno:conciliar-pagos` lo reintenta cada 5 minutos. Vale
+  para toda incidencia de cobro, no solo los contracargos.
+- **Avisos desordenados**: si el cierre (perdido) llega antes que la apertura, se abre la
+  incidencia con el cierre y la apertura tardía no la reabre ni la duplica.
+
 ### Qué avisa cada pasarela
 
 | Pasarela | Avisos | Cómo se ubica el pago |

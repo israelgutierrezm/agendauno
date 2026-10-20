@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Modules\Platform\Operacion\AlertaPlataforma;
+use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\AuditoriaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -99,6 +103,26 @@ function estadoDelContracargo(string $slug, string $pago): array
     });
 }
 
+/**
+ * Cuántas veces quedó en la bitácora y si el superadmin ya se enteró de la incidencia.
+ *
+ * @return array{bitacora: int, alertadas: int}
+ */
+function rastroDelContracargo(string $slug): array
+{
+    return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $slug)->firstOrFail(), fn (): array => [
+        'bitacora' => AuditoriaTenant::query()->where('accion', 'pago.contracargo')->count(),
+        'alertadas' => IncidenciaCobroTenant::query()->whereNotNull('alertada_en')->count(),
+    ]);
+}
+
+/** La disputa de Stripe sobre el pago de prueba (pi_1). @return array<string, mixed> */
+function disputaDeStripe(): array
+{
+    return ['id' => 'dp_1', 'amount' => 89900, 'currency' => 'mxn', 'reason' => 'fraudulent', 'payment_intent' => 'pi_1',
+        'evidence_details' => ['due_by' => now()->addDays(7)->getTimestamp()]];
+}
+
 it('Stripe: la disputa abre el contracargo en «por conciliar»; perdido, cuenta como devolución una sola vez', function (): void {
     $c = pagoParaContracargo('stripe', ['secret_key' => 'sk_test_x']);
     $url = "/api/v1/webhooks/tenant/{$c['slug']}/stripe";
@@ -167,4 +191,106 @@ it('OpenPay: un contracargo aceptado se pierde y cuenta como devolución', funct
     $estado = estadoDelContracargo($c['slug'], $c['pago']);
     expect($estado['pago']->contracargo_estado)->toBe('perdido')
         ->and($estado['devoluciones'])->toBe(1);
+});
+
+it('si falla a medias, nada queda guardado y el reintento deja incidencia, bitácora y aviso una sola vez', function (): void {
+    // Fallará una vez justo después de guardar el estado del pago, antes de su
+    // incidencia. Se enlaza antes del primer aviso: la ruta conserva su controlador.
+    $fallas = (object) ['quedan' => 0];
+    $this->app->bind(IncidenciasCobroTenant::class, fn ($app) => new class($app->make(AlertasPlataforma::class), $app->make(GestorDeConexionTenant::class), $fallas) extends IncidenciasCobroTenant
+    {
+        public function __construct(AlertasPlataforma $alertas, GestorDeConexionTenant $gestor, private readonly object $fallas)
+        {
+            parent::__construct($alertas, $gestor);
+        }
+
+        public function porPago(string $tipo, PagoTenant $pago, string $detalle, array $datos = []): IncidenciaCobroTenant
+        {
+            if ($this->fallas->quedan-- > 0) {
+                throw new RuntimeException('Se cayó la conexión a media escritura.');
+            }
+
+            return parent::porPago($tipo, $pago, $detalle, $datos);
+        }
+    });
+    $c = pagoParaContracargo('stripe', ['secret_key' => 'sk_test_x']);
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/stripe";
+    $this->postJson($url, ['type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_1', 'payment_status' => 'paid']]])->assertOk();
+
+    $fallas->quedan = 1;
+    $aviso = ['id' => 'evt_disputa', 'type' => 'charge.dispute.created', 'data' => ['object' => disputaDeStripe()]];
+    $this->postJson($url, $aviso)->assertOk();
+    // Se deshizo todo: ni el estado sin su incidencia ni la bitácora a medias.
+    $estado = estadoDelContracargo($c['slug'], $c['pago']);
+    expect($estado['pago']->contracargo_estado)->toBeNull()
+        ->and($estado['incidencias'])->toBe([])
+        ->and(rastroDelContracargo($c['slug']))->toBe(['bitacora' => 0, 'alertadas' => 0])
+        ->and(AlertaPlataforma::query()->where('tipo', 'incidencia_cobro')->count())->toBe(0);
+
+    // La pasarela reenvía el aviso y, además, toca su reintento: todo una sola vez.
+    $this->postJson($url, $aviso)->assertOk();
+    $this->travel(5)->minutes();
+    $this->artisan('agendauno:procesar-avisos-pasarela')->assertSuccessful();
+
+    $estado = estadoDelContracargo($c['slug'], $c['pago']);
+    expect($estado['pago']->contracargo_estado)->toBe('abierto')
+        ->and($estado['incidencias'])->toHaveCount(1)
+        ->and($estado['incidencias'][0]['detalle'])->toContain('Responde en Stripe')
+        ->and(rastroDelContracargo($c['slug']))->toBe(['bitacora' => 1, 'alertadas' => 1])
+        ->and(AlertaPlataforma::query()->where('tipo', 'incidencia_cobro')->where('clave', "{$c['slug']}:contracargo")->value('veces'))->toBe(1);
+});
+
+it('si el aviso al superadmin no sale, la conciliación lo reintenta una sola vez', function (): void {
+    // La base de la plataforma no responderá una vez (se enlaza antes del primer aviso).
+    $alertas = new class(app(GestorDeConexionTenant::class)) extends AlertasPlataforma
+    {
+        public int $caidas = 0;
+
+        public function registrar(string $tipo, string $clave, string $mensaje, ?string $estudio = null): bool
+        {
+            if ($tipo === 'incidencia_cobro' && $this->caidas-- > 0) {
+                return false;
+            }
+
+            return parent::registrar($tipo, $clave, $mensaje, $estudio);
+        }
+    };
+    $this->app->instance(AlertasPlataforma::class, $alertas);
+    $c = pagoParaContracargo('stripe', ['secret_key' => 'sk_test_x']);
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/stripe";
+    $this->postJson($url, ['type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_1', 'payment_status' => 'paid']]])->assertOk();
+
+    $alertas->caidas = 1;
+    $this->postJson($url, ['type' => 'charge.dispute.created', 'data' => ['object' => disputaDeStripe()]])->assertOk();
+    // La incidencia está en «por conciliar», pero el superadmin aún no se enteró.
+    expect(estadoDelContracargo($c['slug'], $c['pago'])['incidencias'])->toHaveCount(1)
+        ->and(rastroDelContracargo($c['slug']))->toBe(['bitacora' => 1, 'alertadas' => 0])
+        ->and(AlertaPlataforma::query()->where('tipo', 'incidencia_cobro')->count())->toBe(0);
+
+    $this->travel(2)->minutes();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
+
+    expect(rastroDelContracargo($c['slug'])['alertadas'])->toBe(1)
+        ->and(AlertaPlataforma::query()->where('tipo', 'incidencia_cobro')->where('clave', "{$c['slug']}:contracargo")->value('veces'))->toBe(1);
+});
+
+it('avisos desordenados: perdido antes que abierto deja el resultado correcto', function (): void {
+    $c = pagoParaContracargo('stripe', ['secret_key' => 'sk_test_x']);
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/stripe";
+    $this->postJson($url, ['type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_1', 'payment_status' => 'paid']]])->assertOk();
+
+    // Llega primero el cierre (perdido) y después, tarde, la apertura.
+    $this->postJson($url, ['type' => 'charge.dispute.closed', 'data' => ['object' => [...disputaDeStripe(), 'status' => 'lost']]])->assertOk();
+    $this->postJson($url, ['type' => 'charge.dispute.created', 'data' => ['object' => disputaDeStripe()]])->assertOk();
+
+    $estado = estadoDelContracargo($c['slug'], $c['pago']);
+    expect($estado['pago']->contracargo_estado)->toBe('perdido')
+        ->and($estado['pago']->estado->value)->toBe('reembolsado')
+        ->and($estado['devoluciones'])->toBe(1)
+        // Una sola incidencia, la del perdido: la apertura tardía no la reabre ni duplica.
+        ->and($estado['incidencias'])->toHaveCount(1)
+        ->and($estado['incidencias'][0]['estado'])->toBe('abierta')
+        ->and($estado['incidencias'][0]['detalle'])->toContain('Se perdió el contracargo')
+        ->and(rastroDelContracargo($c['slug']))->toBe(['bitacora' => 1, 'alertadas' => 1]);
 });

@@ -49,6 +49,7 @@ class IncidenciaCobroTenant extends Model
     protected $fillable = [
         'tipo', 'estado', 'pago_id', 'reembolso_id', 'orden_id', 'detalle', 'datos',
         'resuelta_por', 'resuelta_en', 'resolucion', 'domiciliacion_id', 'referencia_externa',
+        'alertada_en',
     ];
 
     /**
@@ -57,6 +58,8 @@ class IncidenciaCobroTenant extends Model
     protected $casts = [
         'datos' => 'array',
         'resuelta_en' => 'datetime',
+        // Cuándo se enteró el superadmin; null mientras su aviso no sale.
+        'alertada_en' => 'datetime',
     ];
 
     /**

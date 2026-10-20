@@ -9,9 +9,11 @@ use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\AsistenciaTenant as ModeloAsistenciaTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\AsistenciaAunNoAbre;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaNoConfirmada;
@@ -245,8 +247,13 @@ class AsistenciaTenant
      * - `penaliza`: su política cobra las faltas.
      * - `tolerada`: esta falta entra en la tolerancia de su política.
      * - `pierde_credito`: con todo lo anterior, lo pierde.
+     * - `conserva`: sin crédito, lo ya pagado que no se devuelve por no asistir: el
+     *   `anticipo` de una cita (ADR 0161) o el `pago` completo; null si no pagó nada.
+     *   `conserva_minor` y `moneda` dicen cuánto.
      *
-     * @return array{con_credito: bool, penaliza: bool, tolerada: bool, pierde_credito: bool, unidades: int}
+     * La web y la app del equipo lo dicen con las mismas palabras.
+     *
+     * @return array{con_credito: bool, penaliza: bool, tolerada: bool, pierde_credito: bool, unidades: int, conserva: string|null, conserva_minor: int|null, moneda: string|null}
      */
     public function efectoDeInasistencia(ReservaTenant $reserva): array
     {
@@ -254,12 +261,24 @@ class AsistenciaTenant
         $penaliza = (bool) ($reserva->penaliza_no_show ?? true);
         $tolerada = $penaliza && $this->tolerada($reserva);
 
+        $reserva->loadMissing(['orden', 'saldoOrden']);
+        /** @var Collection<int, OrdenTenant> $pagadas */
+        $pagadas = $retencion !== null ? collect() : collect([$reserva->orden, $reserva->saldo_orden_id !== null ? $reserva->saldoOrden : null])
+            ->filter(static fn (?OrdenTenant $orden): bool => $orden?->estado === EstadoOrden::Pagada)
+            ->values();
+        // Con anticipo, si solo pagó el anticipo (el resto sigue por cobrar), eso es lo
+        // que el negocio conserva; si pagó todo, el pago.
+        $soloAnticipo = $reserva->anticipo_minor !== null && $reserva->saldo_orden_id !== null && $pagadas->count() === 1;
+
         return [
             'con_credito' => $retencion !== null,
             'penaliza' => $penaliza,
             'tolerada' => $tolerada,
             'pierde_credito' => $retencion !== null && $penaliza && ! $tolerada,
             'unidades' => (int) ($retencion->unidades ?? 0),
+            'conserva' => $pagadas->isEmpty() ? null : ($soloAnticipo ? 'anticipo' : 'pago'),
+            'conserva_minor' => $pagadas->isEmpty() ? null : (int) $pagadas->sum('total_minor'),
+            'moneda' => $pagadas->first()?->moneda,
         ];
     }
 

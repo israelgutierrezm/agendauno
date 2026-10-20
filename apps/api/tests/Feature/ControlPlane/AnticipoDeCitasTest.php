@@ -127,6 +127,23 @@ it('con anticipo se aparta pagando el anticipo y el resto queda por cobrar al te
         ->assertUnprocessable();
 });
 
+it('si no llega, la confirmación dice que el anticipo no se devuelve', function (): void {
+    $ctx = barberiaConAnticipo(['anticipo_minor' => 10000]);
+    $e = $ctx['e'];
+    $cita = agendarConAnticipo($ctx)->assertCreated()->json('data');
+    $efecto = fn (): array => $this->getJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/inasistencia", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+
+    // Sin pagar aún, no hay nada que conservar.
+    expect($efecto())->toMatchArray(['con_credito' => false, 'conserva' => null, 'conserva_minor' => null]);
+
+    pagarAnticipoEnLinea($e['slug'], $cita['orden_id']);
+    expect($efecto())->toMatchArray([
+        'con_credito' => false, 'pierde_credito' => false,
+        'conserva' => 'anticipo', 'conserva_minor' => 10000, 'moneda' => 'MXN',
+    ]);
+});
+
 it('el anticipo puede ser un porcentaje y el cliente puede elegir pagar todo', function (): void {
     $ctx = barberiaConAnticipo(['anticipo_pct' => 30]);
     $e = $ctx['e'];

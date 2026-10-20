@@ -38,7 +38,12 @@ class AlertasPlataforma
         $this->registradas = new SplObjectStorage;
     }
 
-    public function registrar(string $tipo, string $clave, string $mensaje, ?string $estudio = null): void
+    /**
+     * Registra (o acumula) la alerta. true si quedó guardada; si no se pudo (la base de
+     * la plataforma no responde), lo deja en el registro y responde false para que
+     * quien lo necesite lo reintente.
+     */
+    public function registrar(string $tipo, string $clave, string $mensaje, ?string $estudio = null): bool
     {
         try {
             $ahora = CarbonImmutable::now();
@@ -54,7 +59,7 @@ class AlertasPlataforma
                     'pendiente' => true,
                 ])->save();
 
-                return;
+                return true;
             }
 
             $reavisar = $alerta->notificada_en === null
@@ -66,8 +71,12 @@ class AlertasPlataforma
                 'ultima_en' => $ahora,
                 'pendiente' => $alerta->pendiente || $reavisar,
             ])->save();
+
+            return true;
         } catch (Throwable $e) {
             Log::warning('No se pudo registrar la alerta de plataforma: '.$e->getMessage(), ['tipo' => $tipo, 'clave' => $clave]);
+
+            return false;
         }
     }
 

@@ -25,6 +25,12 @@ use Illuminate\Support\Facades\DB;
  *   cancela solo: la incidencia sigue abierta para que el negocio decida.
  *
  * Idempotente: el mismo aviso dos veces no duplica nada.
+ *
+ * El estado del pago, su incidencia y la bitácora se guardan en una sola transacción:
+ * quedan juntos o no queda nada. Si algo falla a medias, el aviso de la pasarela sigue
+ * pendiente y su reintento (ADR 0173) hace todo de nuevo; nunca queda el estado guardado
+ * sin su incidencia, que un reintento ya no crearía. El aviso al superadmin sale cuando
+ * ya quedó guardado y, si no sale, se reintenta ({@see IncidenciasCobroTenant}).
  */
 class ContracargosTenant
 {
@@ -41,11 +47,11 @@ class ContracargosTenant
 
     public function abierto(PagoTenant $pago, string $referencia, int $montoMinor, ?string $motivo = null, ?CarbonImmutable $venceEn = null): void
     {
-        $abierto = DB::connection('tenant')->transaction(function () use ($pago, $referencia, $montoMinor, $motivo, $venceEn): bool {
+        DB::connection('tenant')->transaction(function () use ($pago, $referencia, $montoMinor, $motivo, $venceEn): void {
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->firstOrFail();
             // Ya cerrado (ganado o perdido) o ya registrado: un aviso tardío no lo reabre.
             if ($bloqueado->contracargo_referencia === $referencia && $bloqueado->contracargo_estado !== null) {
-                return false;
+                return;
             }
             $bloqueado->update([
                 'contracargo_estado' => self::ABIERTO,
@@ -57,29 +63,24 @@ class ContracargosTenant
                 'contracargo_cerrado_en' => null,
             ]);
 
-            return true;
+            $monto = self::dinero((int) $bloqueado->contracargo_monto_minor, (string) $bloqueado->moneda);
+            $plazo = $bloqueado->contracargo_vence_en !== null ? ' antes del '.$bloqueado->contracargo_vence_en->format('Y-m-d') : '';
+            $this->incidencias->porPago(
+                IncidenciaCobroTenant::CONTRACARGO,
+                $bloqueado,
+                "El banco del cliente disputa el pago de {$monto}".($motivo !== null ? " ({$motivo})" : '')
+                    .". Responde en {$this->pasarela($bloqueado)}{$plazo} con lo que pruebe que se dio el servicio.",
+                ['referencia' => $referencia, 'vence_en' => $bloqueado->contracargo_vence_en?->toIso8601String()],
+            );
+            $this->auditoria->registrar(null, 'pago.contracargo', 'pago', (string) $bloqueado->ulid, null, [
+                'estado' => self::ABIERTO,
+                'monto_minor' => (int) $bloqueado->contracargo_monto_minor,
+                'moneda' => $bloqueado->moneda,
+                'motivo' => $motivo,
+                'referencia' => $referencia,
+            ]);
         });
-        if (! $abierto) {
-            return;
-        }
         $pago->refresh();
-
-        $monto = self::dinero((int) $pago->contracargo_monto_minor, (string) $pago->moneda);
-        $plazo = $pago->contracargo_vence_en !== null ? ' antes del '.$pago->contracargo_vence_en->format('Y-m-d') : '';
-        $this->incidencias->porPago(
-            IncidenciaCobroTenant::CONTRACARGO,
-            $pago,
-            "El banco del cliente disputa el pago de {$monto}".($motivo !== null ? " ({$motivo})" : '')
-                .". Responde en {$this->pasarela($pago)}{$plazo} con lo que pruebe que se dio el servicio.",
-            ['referencia' => $referencia, 'vence_en' => $pago->contracargo_vence_en?->toIso8601String()],
-        );
-        $this->auditoria->registrar(null, 'pago.contracargo', 'pago', (string) $pago->ulid, null, [
-            'estado' => self::ABIERTO,
-            'monto_minor' => (int) $pago->contracargo_monto_minor,
-            'moneda' => $pago->moneda,
-            'motivo' => $motivo,
-            'referencia' => $referencia,
-        ]);
     }
 
     /**
@@ -87,12 +88,13 @@ class ContracargosTenant
      */
     public function cerrado(PagoTenant $pago, string $referencia, bool $ganado, int $montoMinor = 0): void
     {
-        $cerrado = DB::connection('tenant')->transaction(function () use ($pago, $referencia, $ganado, $montoMinor): bool {
+        DB::connection('tenant')->transaction(function () use ($pago, $referencia, $ganado, $montoMinor): void {
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->firstOrFail();
             if ($bloqueado->contracargo_referencia === $referencia
                 && in_array($bloqueado->contracargo_estado, [self::GANADO, self::PERDIDO], true)) {
-                return false;
+                return;
             }
+            $antes = $bloqueado->contracargo_estado;
             $monto = $montoMinor > 0 ? $montoMinor : (int) ($bloqueado->contracargo_monto_minor ?? $bloqueado->monto_minor);
             $bloqueado->update([
                 'contracargo_estado' => $ganado ? self::GANADO : self::PERDIDO,
@@ -105,33 +107,29 @@ class ContracargosTenant
                 $this->devolucion($bloqueado, $referencia, $monto);
             }
 
-            return true;
+            $dinero = self::dinero($monto, (string) $bloqueado->moneda);
+            $abiertas = IncidenciaCobroTenant::query()
+                ->where('tipo', IncidenciaCobroTenant::CONTRACARGO)
+                ->where('pago_id', $bloqueado->getKey())
+                ->where('estado', IncidenciaCobroTenant::ABIERTA)
+                ->get();
+            if ($ganado) {
+                $abiertas->each(fn (IncidenciaCobroTenant $i) => $this->incidencias->cerrar($i, "Se ganó el contracargo: el pago de {$dinero} se queda."));
+            } else {
+                // Perdido sin aviso de apertura (llegó desordenado o no llegó): se abre aquí.
+                $detalle = "Se perdió el contracargo: {$this->pasarela($bloqueado)} devolvió {$dinero} al cliente. Decide si cancelas lo que compró.";
+                $abiertas->isEmpty()
+                    ? $this->incidencias->porPago(IncidenciaCobroTenant::CONTRACARGO, $bloqueado, $detalle, ['referencia' => $referencia])
+                    : $abiertas->each(fn (IncidenciaCobroTenant $i) => $i->update(['detalle' => $detalle]));
+            }
+            $this->auditoria->registrar(null, 'pago.contracargo', 'pago', (string) $bloqueado->ulid, ['estado' => $antes], [
+                'estado' => $ganado ? self::GANADO : self::PERDIDO,
+                'monto_minor' => $monto,
+                'moneda' => $bloqueado->moneda,
+                'referencia' => $referencia,
+            ]);
         });
-        if (! $cerrado) {
-            return;
-        }
         $pago->refresh();
-
-        $monto = self::dinero((int) $pago->contracargo_monto_minor, (string) $pago->moneda);
-        $abiertas = IncidenciaCobroTenant::query()
-            ->where('tipo', IncidenciaCobroTenant::CONTRACARGO)
-            ->where('pago_id', $pago->getKey())
-            ->where('estado', IncidenciaCobroTenant::ABIERTA)
-            ->get();
-        if ($ganado) {
-            $abiertas->each(fn (IncidenciaCobroTenant $i) => $this->incidencias->cerrar($i, "Se ganó el contracargo: el pago de {$monto} se queda."));
-        } else {
-            $detalle = "Se perdió el contracargo: {$this->pasarela($pago)} devolvió {$monto} al cliente. Decide si cancelas lo que compró.";
-            $abiertas->isEmpty()
-                ? $this->incidencias->porPago(IncidenciaCobroTenant::CONTRACARGO, $pago, $detalle, ['referencia' => $referencia])
-                : $abiertas->each(fn (IncidenciaCobroTenant $i) => $i->update(['detalle' => $detalle]));
-        }
-        $this->auditoria->registrar(null, 'pago.contracargo', 'pago', (string) $pago->ulid, ['estado' => self::ABIERTO], [
-            'estado' => $ganado ? self::GANADO : self::PERDIDO,
-            'monto_minor' => (int) $pago->contracargo_monto_minor,
-            'moneda' => $pago->moneda,
-            'referencia' => $referencia,
-        ]);
     }
 
     /**

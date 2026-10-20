@@ -245,7 +245,7 @@ onMounted(() => {
       </RouterLink>
 
       <!-- Navegación: grupos con un enlace por área -->
-      <div class="flex-1 overflow-y-auto px-3 py-4">
+      <div class="tu-lateral-desplazable flex-1 overflow-y-auto px-3 py-4">
         <NavLateral
           :compacto="compactoEfectivo"
           @navegar="menuLateral = false"
@@ -560,6 +560,34 @@ onMounted(() => {
 </template>
 
 <style>
+/* La barra de desplazamiento del menú lateral: delgada, sin flechas y del color del
+   texto de la barra de cada tema (no la gris del sistema). Discreta en reposo; se
+   marca un poco más al pasar el cursor o al recorrerlo con el teclado. */
+.tu-lateral-desplazable {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--barra-texto) 22%, transparent)
+    transparent;
+}
+.tu-lateral-desplazable:hover,
+.tu-lateral-desplazable:focus-within {
+  scrollbar-color: color-mix(in srgb, var(--barra-texto) 45%, transparent)
+    transparent;
+}
+/* Safari (sin `scrollbar-color`): lo mismo con las reglas de WebKit. */
+.tu-lateral-desplazable::-webkit-scrollbar {
+  width: 6px;
+}
+.tu-lateral-desplazable::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tu-lateral-desplazable::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--barra-texto) 22%, transparent);
+}
+.tu-lateral-desplazable:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--barra-texto) 45%, transparent);
+}
+
 /* Marco del panel: el color de la barra de su tema envuelve todo (menú lateral y
    encabezado) y el contenido va en una tarjeta redondeada. El menú lateral cambia de
    ancho y la tarjeta se ajusta sola (flex). */
