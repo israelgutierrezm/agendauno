@@ -115,7 +115,10 @@ class VentaPosTenant extends Model
      */
     public function facturaTimbrada(): HasOne
     {
-        return $this->hasOne(FacturaTenant::class, 'venta_pos_id')->where('estado', EstadoFactura::Timbrada->value)->latestOfMany();
+        return $this->hasOne(FacturaTenant::class, 'venta_pos_id')
+            ->where('tipo', FacturaTenant::INGRESO)
+            ->where('estado', EstadoFactura::Timbrada->value)
+            ->latestOfMany();
     }
 
     /**

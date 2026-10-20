@@ -33,7 +33,7 @@ use Illuminate\Validation\ValidationException;
  * de su última factura (RFC, código postal y uso del CFDI), para no volver a pedirlos.
  *
  * @phpstan-type Concepto array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string}
- * @phpstan-type Receptor array{nombre: string|null, email: string|null, rfc: string|null, codigo_postal: string|null, uso_cfdi: string|null}
+ * @phpstan-type Receptor array{nombre: string|null, email: string|null, rfc: string|null, codigo_postal: string|null, uso_cfdi: string|null, regimen_fiscal: string|null}
  */
 class FacturasDeVentasTenant
 {
@@ -45,16 +45,18 @@ class FacturasDeVentasTenant
 
     public function __construct(private readonly ParametrosTenant $parametros) {}
 
-    /** La factura timbrada de la orden, si ya la tiene. */
+    /** La factura timbrada de la orden, si ya la tiene (sus notas de crédito no cuentan). */
     public static function deOrden(int $ordenId): ?FacturaTenant
     {
-        return FacturaTenant::query()->where('orden_id', $ordenId)->where('estado', EstadoFactura::Timbrada->value)->latest('id')->first();
+        return FacturaTenant::query()->where('orden_id', $ordenId)->where('tipo', FacturaTenant::INGRESO)
+            ->where('estado', EstadoFactura::Timbrada->value)->latest('id')->first();
     }
 
     /** La factura timbrada de la venta del mostrador, si ya la tiene. */
     public static function deVenta(int $ventaId): ?FacturaTenant
     {
-        return FacturaTenant::query()->where('venta_pos_id', $ventaId)->where('estado', EstadoFactura::Timbrada->value)->latest('id')->first();
+        return FacturaTenant::query()->where('venta_pos_id', $ventaId)->where('tipo', FacturaTenant::INGRESO)
+            ->where('estado', EstadoFactura::Timbrada->value)->latest('id')->first();
     }
 
     /** Que la orden se pueda facturar: pagada y sin factura timbrada. */
@@ -145,11 +147,12 @@ class FacturasDeVentasTenant
     private function receptor(?PersonaTenant $persona): array
     {
         if (! $persona instanceof PersonaTenant) {
-            return ['nombre' => null, 'email' => null, 'rfc' => null, 'codigo_postal' => null, 'uso_cfdi' => null];
+            return ['nombre' => null, 'email' => null, 'rfc' => null, 'codigo_postal' => null, 'uso_cfdi' => null, 'regimen_fiscal' => null];
         }
         $id = (int) $persona->getKey();
         $ultima = FacturaTenant::query()
             ->where('estado', EstadoFactura::Timbrada->value)
+            ->where('tipo', FacturaTenant::INGRESO)
             ->where('anticipo', false)
             ->where(fn (Builder $q) => $q
                 ->whereIn('orden_id', OrdenTenant::query()->select('id')->where('persona_id', $id))
@@ -163,6 +166,46 @@ class FacturasDeVentasTenant
             'rfc' => $ultima?->receptor_rfc,
             'codigo_postal' => $ultima?->receptor_cp,
             'uso_cfdi' => $ultima?->uso_cfdi,
+            'regimen_fiscal' => $ultima?->receptor_regimen,
+        ];
+    }
+
+    /**
+     * Lo que lleva la sustituta de una factura (ADR 0180): su receptor, su forma de
+     * pago y sus conceptos (sin IVA, como se timbraron), para corregir lo que estaba
+     * mal. Una factura de antes de guardar sus conceptos trae los de su venta, si tiene.
+     *
+     * @return array{etiqueta: string, receptor: Receptor, conceptos: list<Concepto>, forma_pago: string, total_minor: int, moneda: string, anticipo: bool}
+     */
+    public function borradorDeSustituta(FacturaTenant $factura): array
+    {
+        /** @var list<Concepto> $conceptos */
+        $conceptos = array_values(array_filter(
+            (array) ($factura->conceptos ?? []),
+            static fn (mixed $c): bool => is_array($c),
+        ));
+        if ($conceptos === [] && $factura->orden !== null) {
+            $conceptos = $this->borradorDeOrden($factura->orden)['conceptos'];
+        } elseif ($conceptos === [] && $factura->venta !== null) {
+            $conceptos = $this->borradorDeVenta($factura->venta)['conceptos'];
+        }
+
+        return [
+            // Su folio corto: «Sustituyes la factura A6660546».
+            'etiqueta' => mb_strtoupper(mb_substr((string) $factura->uuid, 0, 8)),
+            'receptor' => [
+                'nombre' => $factura->receptor_nombre,
+                'email' => $factura->receptor_email,
+                'rfc' => $factura->receptor_rfc,
+                'codigo_postal' => $factura->receptor_cp,
+                'uso_cfdi' => $factura->uso_cfdi,
+                'regimen_fiscal' => $factura->receptor_regimen,
+            ],
+            'conceptos' => $conceptos,
+            'forma_pago' => $factura->forma_pago ?? '01',
+            'total_minor' => (int) $factura->total_minor,
+            'moneda' => (string) $factura->moneda,
+            'anticipo' => (bool) $factura->anticipo,
         ];
     }
 

@@ -21,6 +21,21 @@ final class CatalogosSat
         'clave_unidad' => 'ACT',
     ];
 
+    /**
+     * El concepto de una nota de crédito (CFDI de egreso, ADR 0180): la clave de
+     * servicios de facturación y la unidad «actividad», como en el anticipo.
+     */
+    public const NOTA_DE_CREDITO = [
+        'clave_prod_serv' => '84111506',
+        'clave_unidad' => 'ACT',
+    ];
+
+    /** El uso del CFDI de una nota de crédito: devoluciones, descuentos o bonificaciones. */
+    public const USO_NOTA_DE_CREDITO = 'G02';
+
+    /** Motivos de cancelación que se piden (el 04 es de la factura global, que no hay). */
+    public const MOTIVOS_CANCELACION = ['01', '02', '03'];
+
     /** La leyenda del CFDI por el resto de una operación con anticipo (remanente). */
     public const LEYENDA_REMANENTE = 'CFDI por remanente de un anticipo';
 

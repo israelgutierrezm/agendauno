@@ -77,6 +77,10 @@ Schedule::command('agendauno:confirmar-cancelaciones')->everyFiveMinutes()->with
 // habría aplicado el aviso. Antes de que venza el apartado de una cita (30 min).
 Schedule::command('agendauno:conciliar-pagos')->everyFiveMinutes()->withoutOverlapping();
 
+// Cancelaciones de facturas (CFDI) que esperan al cliente o al SAT (ADR 0180): el
+// cliente tiene días para responder, así que basta cada media hora.
+Schedule::command('agendauno:conciliar-cancelaciones-cfdi')->everyThirtyMinutes()->withoutOverlapping();
+
 // Renta del SaaS pagada cuyo aviso de Stripe no llegó: se confirma antes de que el
 // negocio se suspenda por renta vencida.
 Schedule::command('agendauno:conciliar-renta')->everyFifteenMinutes()->withoutOverlapping();

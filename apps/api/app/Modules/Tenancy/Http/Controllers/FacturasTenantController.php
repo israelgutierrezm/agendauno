@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
+use App\Modules\Tenancy\Application\CancelarFacturaTenant;
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
 use App\Modules\Tenancy\Application\FacturasDeVentasTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
@@ -18,6 +19,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -37,6 +39,7 @@ class FacturasTenantController
     public function __construct(
         private readonly EmitirFacturaTenant $emisor,
         private readonly FacturasDeVentasTenant $ventas,
+        private readonly CancelarFacturaTenant $cancelar,
     ) {}
 
     /**
@@ -46,9 +49,20 @@ class FacturasTenantController
     public function borrador(Request $request): JsonResponse
     {
         $validado = $request->validate([
-            'orden' => ['nullable', 'string', 'required_without:venta', 'prohibits:venta'],
-            'venta' => ['nullable', 'string'],
+            'orden' => ['nullable', 'string', 'required_without_all:venta,sustituye', 'prohibits:venta,sustituye'],
+            'venta' => ['nullable', 'string', 'prohibits:sustituye'],
+            // La sustituta de una factura con datos mal (ADR 0180).
+            'sustituye' => ['nullable', 'string'],
         ]);
+        if (isset($validado['sustituye'])) {
+            $factura = $this->facturaDeMiSede($request, (string) $validado['sustituye']);
+            $impedimento = $this->cancelar->impedimento($factura);
+            if ($impedimento !== null) {
+                throw ValidationException::withMessages(['sustituye' => [$impedimento]]);
+            }
+
+            return response()->json(['data' => $this->ventas->borradorDeSustituta($factura)]);
+        }
         if (isset($validado['orden'])) {
             $orden = $this->ordenDeMiSede($request, (string) $validado['orden']);
             $this->ventas->exigirOrden($orden);
@@ -106,7 +120,7 @@ class FacturasTenantController
             ->map(static fn ($n): int => (int) $n)->all();
         $pagina = $consulta
             ->when(($filtros['estado'] ?? null) !== null, fn (Builder $q) => $q->where('estado', $filtros['estado']))
-            ->with(['orden', 'venta'])
+            ->with(['orden', 'venta', 'relacionada'])
             ->orderByDesc('id')
             ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
@@ -120,6 +134,7 @@ class FacturasTenantController
                 'conteos' => [
                     'timbrada' => $conteos[EstadoFactura::Timbrada->value] ?? 0,
                     'error' => $conteos[EstadoFactura::Error->value] ?? 0,
+                    'cancelada' => $conteos[EstadoFactura::Cancelada->value] ?? 0,
                 ],
             ],
         ]);
@@ -127,30 +142,61 @@ class FacturasTenantController
 
     public function show(Request $request): JsonResponse
     {
-        $factura = FacturaTenant::query()->where('ulid', (string) $request->route('factura'))->firstOrFail();
-        $orden = $factura->orden_id !== null ? OrdenTenant::query()->find($factura->orden_id) : null;
-        $venta = $factura->venta_pos_id !== null ? VentaPosTenant::query()->find($factura->venta_pos_id) : null;
-        if ($orden instanceof OrdenTenant) {
-            app(AlcancePersonaTenant::class)->exigirOrden($request, $orden);
-        } elseif ($venta instanceof VentaPosTenant) {
-            $this->exigirSedeDeVenta($request, $venta);
-        } else {
-            abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403);
-        }
+        $factura = $this->facturaDeMiSede($request, (string) $request->route('factura'));
 
         return response()->json(['data' => $this->presentar($factura)]);
     }
 
+    /**
+     * Pide cancelar el CFDI (ADR 0180) con el motivo `02` (con errores, sin sustituta)
+     * o `03` (la operación no se llevó a cabo). La del `01` se pide sola al sustituirla.
+     * Si el cliente debe aceptarla, queda en espera.
+     */
+    public function cancelar(Request $request): JsonResponse
+    {
+        $factura = $this->facturaDeMiSede($request, (string) $request->route('factura'));
+        $validado = $request->validate([
+            'motivo' => ['required', 'string', Rule::in(['02', '03'])],
+        ], ['motivo.in' => 'Elige por qué se cancela: con errores (02) o no se llevó a cabo (03).']);
+        $factura = $this->cancelar->solicitar($factura, (string) $validado['motivo'], $this->actor($request));
+
+        return response()->json(['data' => $this->presentar($factura->load(['orden', 'venta', 'relacionada']))]);
+    }
+
+    /**
+     * Una nota de crédito (ADR 0180) de una factura timbrada: lo devuelto, descontado o
+     * bonificado (con IVA), cómo se le devolvió y, si la factura no lo guardó, el
+     * régimen fiscal del cliente.
+     */
+    public function notaDeCredito(Request $request): JsonResponse
+    {
+        $this->exigirFacturacion();
+        $factura = $this->facturaDeMiSede($request, (string) $request->route('factura'));
+        $validado = $request->validate([
+            'monto_minor' => ['required', 'integer', 'min:1'],
+            'descripcion' => ['nullable', 'string', 'max:1000'],
+            'forma_pago' => ['required', 'string', Rule::in(CatalogosSat::FORMAS_PAGO)],
+            'regimen_fiscal' => ['nullable', 'string', 'regex:/^[0-9]{3,4}$/'],
+        ]);
+        $datos = $this->datosFiscales();
+
+        $nota = $this->emisor->emitirNotaDeCredito(
+            $datos,
+            $factura,
+            (int) $validado['monto_minor'],
+            trim((string) ($validado['descripcion'] ?? '')) !== '' ? (string) $validado['descripcion'] : 'Devolución',
+            (string) $validado['forma_pago'],
+            $validado['regimen_fiscal'] ?? null,
+        );
+
+        $estado = $nota->estado === EstadoFactura::Timbrada ? 201 : 422;
+
+        return response()->json(['data' => $this->presentar($nota->load(['orden', 'venta', 'relacionada']))], $estado);
+    }
+
     public function emitir(Request $request): JsonResponse
     {
-        // Sin proveedor real en producción no se factura (ni se simula).
-        if (! ConfiguracionPlataforma::facturacionDisponible()) {
-            throw ValidationException::withMessages(['facturacion' => [FacturacionNoConfigurada::MOTIVO]]);
-        }
-        // Solo en pesos mexicanos y en México (ADR 0099).
-        if (! app(RegionNegocioTenant::class)->factura()) {
-            throw ValidationException::withMessages(['facturacion' => [RegionNegocioTenant::MOTIVO_FACTURACION]]);
-        }
+        $this->exigirFacturacion();
         $validado = $request->validate([
             'receptor.nombre' => ['required', 'string', 'max:255'],
             'receptor.rfc' => ['required', 'string', 'regex:/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i'],
@@ -177,7 +223,13 @@ class FacturasTenantController
             // anticipo no factura la venta: la factura del resto sí.
             'orden_id' => ['nullable', 'string', 'prohibits:venta_id', 'prohibited_if:anticipo,true'],
             'venta_id' => ['nullable', 'string', 'prohibited_if:anticipo,true'],
+            // La factura que sustituye (ADR 0180): la nueva toma su venta y se pide la
+            // cancelación de la vieja con el motivo 01.
+            'sustituye' => ['nullable', 'string', 'prohibits:orden_id,venta_id'],
         ]);
+        $sustituye = isset($validado['sustituye']) ? $this->facturaDeMiSede($request, (string) $validado['sustituye']) : null;
+        // Sustituir también cancela: pide el permiso de devoluciones, como cancelar.
+        abort_if($sustituye !== null && ! $this->actor($request)?->puede('pagos.reembolsar'), 403, 'Para sustituir una factura hace falta poder cancelarla.');
         $orden = isset($validado['orden_id']) ? $this->ordenDeMiSede($request, (string) $validado['orden_id']) : null;
         $venta = isset($validado['venta_id']) ? $this->ventaDeMiSede($request, (string) $validado['venta_id']) : null;
         if ($orden !== null) {
@@ -194,12 +246,7 @@ class FacturasTenantController
             throw ValidationException::withMessages(['uso_cfdi' => ['Ese uso del CFDI es solo para personas físicas y el RFC es de persona moral.']]);
         }
 
-        $datos = DatosFiscalesTenant::query()->first();
-        if (! $datos instanceof DatosFiscalesTenant) {
-            throw ValidationException::withMessages([
-                'datos_fiscales' => ['Carga los datos fiscales del negocio antes de facturar.'],
-            ]);
-        }
+        $datos = $this->datosFiscales();
 
         /** @var list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string}> $items */
         $items = $validado['items'];
@@ -215,11 +262,24 @@ class FacturasTenantController
             array_values($validado['anticipos'] ?? []),
             $orden !== null ? (int) $orden->getKey() : null,
             $venta !== null ? (int) $venta->getKey() : null,
+            $sustituye,
         );
 
-        $estado = $factura->estado === EstadoFactura::Timbrada ? 201 : 422;
+        // Timbrada la sustituta, se pide cancelar la que sustituye (motivo 01). Si el
+        // proveedor no la acepta aún, se dice y se puede volver a pedir desde la lista.
+        $aviso = null;
+        if ($sustituye !== null && $factura->estado === EstadoFactura::Timbrada) {
+            try {
+                $this->cancelar->solicitar($sustituye, '01', $this->actor($request));
+            } catch (ValidationException $e) {
+                $aviso = (string) collect($e->errors())->flatten()->first();
+            }
+        }
 
-        return response()->json(['data' => $this->presentar($factura)], $estado);
+        $estado = $factura->estado === EstadoFactura::Timbrada ? 201 : 422;
+        $datosRespuesta = $this->presentar($factura->load(['orden', 'venta', 'relacionada']));
+
+        return response()->json(['data' => $datosRespuesta] + ($aviso !== null ? ['meta' => ['aviso_cancelacion' => $aviso]] : []), $estado);
     }
 
     /**
@@ -248,7 +308,71 @@ class FacturasTenantController
             // La venta que factura (ADR 0179).
             'orden_id' => $factura->orden?->ulid,
             'venta_id' => $factura->venta?->ulid,
+            // Ingreso o nota de crédito, y con cuál se relaciona (ADR 0180).
+            'tipo' => $factura->tipo === FacturaTenant::EGRESO ? 'nota_de_credito' : 'ingreso',
+            'relacionada' => $factura->relacionada !== null
+                ? ['id' => $factura->relacionada->ulid, 'uuid' => $factura->relacionada->uuid, 'relacion' => $factura->relacion]
+                : null,
+            'forma_pago' => $factura->forma_pago,
+            'regimen_receptor' => $factura->receptor_regimen,
+            'cancelacion' => $factura->cancelacion_estado !== null ? [
+                'estado' => $factura->cancelacion_estado->value,
+                'motivo' => $factura->cancelacion_motivo,
+                'detalle' => $factura->cancelacion_detalle,
+                'solicitada_en' => $factura->cancelacion_solicitada_en?->toIso8601String(),
+            ] : null,
+            'cancelada_en' => $factura->cancelada_en?->toIso8601String(),
+            // Lo que se puede hacer con ella.
+            'cancelable' => $this->cancelar->impedimento($factura) === null,
+            'acreditable_minor' => $factura->estado === EstadoFactura::Timbrada && $factura->tipo === FacturaTenant::INGRESO && ! $factura->anticipo
+                ? $factura->acreditable()
+                : 0,
         ];
+    }
+
+    /** La factura, si quien la pide alcanza su venta (R19); sin venta, es del negocio. */
+    private function facturaDeMiSede(Request $request, string $ulid): FacturaTenant
+    {
+        $factura = FacturaTenant::query()->where('ulid', $ulid)->with(['orden', 'venta', 'relacionada'])->firstOrFail();
+        if ($factura->orden instanceof OrdenTenant) {
+            app(AlcancePersonaTenant::class)->exigirOrden($request, $factura->orden);
+        } elseif ($factura->venta instanceof VentaPosTenant) {
+            $this->exigirSedeDeVenta($request, $factura->venta);
+        } else {
+            abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403);
+        }
+
+        return $factura;
+    }
+
+    /** Sin proveedor real en producción no se factura (ni se simula); solo en México (ADR 0099). */
+    private function exigirFacturacion(): void
+    {
+        if (! ConfiguracionPlataforma::facturacionDisponible()) {
+            throw ValidationException::withMessages(['facturacion' => [FacturacionNoConfigurada::MOTIVO]]);
+        }
+        if (! app(RegionNegocioTenant::class)->factura()) {
+            throw ValidationException::withMessages(['facturacion' => [RegionNegocioTenant::MOTIVO_FACTURACION]]);
+        }
+    }
+
+    private function datosFiscales(): DatosFiscalesTenant
+    {
+        $datos = DatosFiscalesTenant::query()->first();
+        if (! $datos instanceof DatosFiscalesTenant) {
+            throw ValidationException::withMessages([
+                'datos_fiscales' => ['Carga los datos fiscales del negocio antes de facturar.'],
+            ]);
+        }
+
+        return $datos;
+    }
+
+    private function actor(Request $request): ?Usuario
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+
+        return $actor instanceof Usuario ? $actor : null;
     }
 
     /** La orden, si quien la factura alcanza a su cliente y su sede. */

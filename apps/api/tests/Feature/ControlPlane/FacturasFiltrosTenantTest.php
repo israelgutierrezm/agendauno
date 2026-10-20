@@ -38,11 +38,11 @@ it('filtra las facturas por fechas del negocio y dice cuántas hay de cada estad
 
     $this->getJson($url, conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('meta.total', 3)
-        ->assertJsonPath('meta.conteos', ['timbrada' => 2, 'error' => 1]);
+        ->assertJsonPath('meta.conteos', ['timbrada' => 2, 'error' => 1, 'cancelada' => 0]);
     // El 30 de septiembre del negocio incluye la de las 23:30 de la Ciudad de México.
     $this->getJson("{$url}?desde=2026-09-30&hasta=2026-09-30", conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('meta.total', 1)
-        ->assertJsonPath('meta.conteos', ['timbrada' => 1, 'error' => 0]);
+        ->assertJsonPath('meta.conteos', ['timbrada' => 1, 'error' => 0, 'cancelada' => 0]);
     $this->getJson("{$url}?desde=2026-09-01&hasta=2026-10-01&estado=timbrada", conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('meta.total', 2);
     $this->getJson("{$url}?desde=2026-10-02&hasta=2026-10-01", conBearer($e['bearer']))->assertUnprocessable();

@@ -75,9 +75,5 @@ Las ventas del mostrador (ADR 0145) no tenían ningún vínculo con su factura.
 
 - **Lo que hay antes de esta versión:** las facturas siguen sin venta. Ninguna se liga
   hacia atrás, porque el RFC o el monto no bastan para saber de qué venta eran.
-- **Cancelar un CFDI** no existe todavía en AgendaUno, y una factura timbrada sigue
-  timbrada. Para anular una venta facturada, hoy hay que cancelar el CFDI en el portal
-  del proveedor. La venta seguirá bloqueada hasta que exista la cancelación (pendiente).
-- **Devolver o reembolsar** una venta facturada sigue siendo posible, igual que antes
-  con los reembolsos. La nota de crédito (CFDI de egreso) no se emite desde AgendaUno
-  (pendiente).
+- **Cancelar un CFDI** y la **nota de crédito** al devolver o reembolsar una venta
+  facturada se resolvieron en el ADR 0180.

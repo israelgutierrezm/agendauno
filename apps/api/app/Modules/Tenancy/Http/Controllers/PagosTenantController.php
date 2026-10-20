@@ -133,6 +133,7 @@ class PagosTenantController
         $comprobantes = $this->comprobantes($pagos);
         // Las facturas de sus ventas (ADR 0179), en una consulta.
         $facturas = FacturaTenant::query()
+            ->where('tipo', FacturaTenant::INGRESO)
             ->where('estado', EstadoFactura::Timbrada->value)
             ->whereIn('orden_id', $pagos->pluck('orden_id')->filter()->unique()->values())
             ->get(['id', 'ulid', 'uuid', 'orden_id'])

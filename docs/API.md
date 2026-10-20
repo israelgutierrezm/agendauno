@@ -718,6 +718,38 @@ Solo negocios de clases, con `reservas.gestionar`. Con `ya_descontadas` = 1, tam
 - Alcance: quien está acotado a sedes ve en `GET /facturas` las de las órdenes y ventas
   del mostrador de sus sedes; `GET /facturas/{id}` de otra sede responde 403.
 
+## Facturas: cancelar, sustituir y notas de crédito (ADR 0180)
+
+- `POST /facturas/{factura}/cancelar` (`pagos.reembolsar`, función `facturacion`):
+  - `motivo`: `02` (con errores, sin sustituta) o `03` (no se llevó a cabo).
+  - Responde la factura: `estado: cancelada` si el SAT ya la aceptó; si no,
+    `cancelacion.estado: pendiente`.
+  - 422 en `factura` si tiene notas de crédito vigentes, es un anticipo aplicado o su
+    cancelación ya está en espera.
+  - `agendauno:conciliar-cancelaciones-cfdi` (cada 30 min) aplica lo que respondió el
+    SAT: `aceptada`, `rechazada` o `vencida` (con `cancelacion.detalle`).
+- `POST /facturas` acepta `sustituye` (ULID; no con `orden_id` ni `venta_id`, y pide
+  también `pagos.reembolsar`):
+  - la nueva toma la venta de la anterior y se relaciona con ella (`04`);
+  - timbrada, se pide cancelar la anterior con el motivo `01`;
+  - si no se pudo pedir, responde `meta.aviso_cancelacion`.
+  - `GET /facturas/borrador?sustituye=<ULID>` trae lo timbrado: receptor con
+    `regimen_fiscal`, conceptos, `forma_pago` y `anticipo`.
+- `POST /facturas/{factura}/notas-credito` (`pagos.reembolsar`):
+  - `monto_minor` (con IVA), `descripcion` (opcional; «Devolución»), `forma_pago` y
+    `regimen_fiscal` (si la factura no lo guardó).
+  - CFDI de egreso relacionado (`01`) con uso `G02`.
+  - 422 en `monto_minor` si pasa de lo que queda por acreditar; 422 en
+    `regimen_fiscal` si falta.
+- Cada factura trae:
+  - `tipo` (`ingreso` | `nota_de_credito`);
+  - `relacionada` (`{id, uuid, relacion}`);
+  - `forma_pago` y `regimen_receptor`;
+  - `cancelacion` (`{estado, motivo, detalle, solicitada_en}` o null) y
+    `cancelada_en`;
+  - `cancelable` y `acreditable_minor`.
+- `GET /facturas` cuenta también `conteos.cancelada` y filtra `estado=cancelada`.
+
 ## Citas: anticipo para apartar (ADR 0161)
 
 - `PUT /ofertas/{oferta}` (y el alta) aceptan `anticipo_minor` (monto, menor que el

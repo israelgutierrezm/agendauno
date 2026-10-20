@@ -131,7 +131,7 @@ it('una orden se factura una vez: queda ligada y ya no se anula ni se corrige', 
     $this->getJson("{$url}/borrador?orden={$otra['orden']}", conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.receptor', [
-            'nombre' => 'Público en general', 'email' => null, 'rfc' => 'XAXX010101000', 'codigo_postal' => '06700', 'uso_cfdi' => 'S01',
+            'nombre' => 'Público en general', 'email' => null, 'rfc' => 'XAXX010101000', 'codigo_postal' => '06700', 'uso_cfdi' => 'S01', 'regimen_fiscal' => null,
         ]);
 });
 

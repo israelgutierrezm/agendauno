@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
  * determinista sin llamar a FacturAPI. Permite ejercitar todo el pipeline de
  * facturación sin llaves reales.
  */
-class FacturacionFalsa implements ClienteFacturacion
+class FacturacionFalsa implements CancelacionCfdi, ClienteFacturacion
 {
     public function timbrar(string $llaveOrganizacion, array $factura): ResultadoTimbre
     {
@@ -23,5 +23,16 @@ class FacturacionFalsa implements ClienteFacturacion
         return $formato === 'xml'
             ? '<?xml version="1.0"?><cfdi:Comprobante fake="'.$facturaId.'"/>'
             : '%PDF-1.4 fake '.$facturaId;
+    }
+
+    /** El SAT la acepta en el acto (sin cliente que deba aceptarla). */
+    public function cancelar(string $llaveOrganizacion, string $facturaId, string $motivo, ?string $sustituta = null): EstadoCancelacion
+    {
+        return EstadoCancelacion::Aceptada;
+    }
+
+    public function consultarCancelacion(string $llaveOrganizacion, string $facturaId): EstadoCancelacion
+    {
+        return EstadoCancelacion::Aceptada;
     }
 }

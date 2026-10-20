@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Platform\Operacion\LatidoOperacion;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
+use App\Modules\Tenancy\Facturacion\CancelacionCfdi;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\FacturacionFalsa;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
@@ -42,18 +43,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Una sola instancia: recuerda qué excepciones ya registró con su tipo.
         $this->app->singleton(AlertasPlataforma::class);
-        // Proveedor de facturación (CFDI): FacturAPI real si hay llave maestra de
-        // plataforma; si no, el falso en desarrollo y pruebas, y en producción uno que
-        // no timbra (nunca un CFDI simulado a un cliente real).
-        $this->app->bind(ClienteFacturacion::class, function (): ClienteFacturacion {
-            // La llave maestra la resuelve la plataforma (config en BD, con respaldo a env).
-            $llave = ConfiguracionPlataforma::llaveFacturapi();
-            if ($llave !== null) {
-                return new FacturApiHttp((string) config('agendauno.facturapi.base_url'));
-            }
-
-            return $this->app->environment('production') ? new FacturacionNoConfigurada : new FacturacionFalsa;
-        });
+        // Proveedor de facturación (CFDI): el real solo con llave de FacturAPI.
+        $this->app->bind(ClienteFacturacion::class, fn (): ClienteFacturacion => $this->proveedorDeFacturacion());
+        // Cancelar un CFDI (ADR 0180): el mismo proveedor.
+        $this->app->bind(CancelacionCfdi::class, fn (): CancelacionCfdi => $this->proveedorDeFacturacion());
     }
 
     /**
@@ -214,6 +207,21 @@ class AppServiceProvider extends ServiceProvider
     private static function rutaTenant(Request $request): string
     {
         return (string) preg_replace('/^api\.v1\.(app|sub|sub-[a-z]+)\./', '', (string) $request->route()?->getName());
+    }
+
+    /**
+     * Proveedor de facturación (CFDI): FacturAPI real si hay llave maestra de
+     * plataforma; si no, el falso en desarrollo y pruebas, y en producción uno que no
+     * timbra (nunca un CFDI simulado a un cliente real).
+     */
+    private function proveedorDeFacturacion(): CancelacionCfdi&ClienteFacturacion
+    {
+        // La llave maestra la resuelve la plataforma (config en BD, con respaldo a env).
+        if (ConfiguracionPlataforma::llaveFacturapi() !== null) {
+            return new FacturApiHttp((string) config('agendauno.facturapi.base_url'));
+        }
+
+        return $this->app->environment('production') ? new FacturacionNoConfigurada : new FacturacionFalsa;
     }
 
     private static function textoDeRuta(Request $request, string $parametro): string

@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Facturacion\CatalogosSat;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
+use App\Modules\Tenancy\Facturacion\EstadoCancelacion;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
@@ -33,6 +34,11 @@ use Illuminate\Validation\ValidationException;
  * La venta que factura (ADR 0179), si se dice: una orden o una venta del mostrador.
  * Se bloquea y se revalida en la misma transacción, así dos timbrados a la vez no la
  * facturan dos veces.
+ *
+ * Sustituir y notas de crédito (ADR 0180): la sustituta se relaciona con la que
+ * sustituye (`04`) y toma su venta; la nota de crédito (egreso) se relaciona con la
+ * factura que corrige (`01`) y no pasa de lo que queda por acreditar. Se guardan el
+ * régimen del receptor, la forma de pago y los conceptos con que se timbró.
  */
 class EmitirFacturaTenant
 {
@@ -51,6 +57,7 @@ class EmitirFacturaTenant
      * @param  list<string>  $anticipos  ULID de las facturas de anticipo que aplica
      * @param  int|null  $ordenId  la orden que factura
      * @param  int|null  $ventaPosId  la venta del mostrador que factura
+     * @param  FacturaTenant|null  $sustituye  la factura que sustituye (su cancelación se pide aparte)
      */
     public function emitir(
         DatosFiscalesTenant $emisor,
@@ -63,6 +70,7 @@ class EmitirFacturaTenant
         array $anticipos = [],
         ?int $ordenId = null,
         ?int $ventaPosId = null,
+        ?FacturaTenant $sustituye = null,
     ): FacturaTenant {
         if ($anticipo) {
             $items = [['cantidad' => 1, 'precio_unitario_minor' => (int) $items[0]['precio_unitario_minor']] + CatalogosSat::ANTICIPO];
@@ -84,18 +92,30 @@ class EmitirFacturaTenant
         $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
-            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $llave, $cuerpo, $anticipo, $anticipos, $ordenId, $ventaPosId
+            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $formaPago, $items, $llave, $cuerpo, $anticipo, $anticipos, $ordenId, $ventaPosId, $sustituye
         ): FacturaTenant {
+            $relacionados = [];
+            // La que sustituye, bloqueada y revisada: la nueva toma su venta.
+            if ($sustituye instanceof FacturaTenant) {
+                $sustituye = $this->exigirSustituible($sustituye, $anticipo, $anticipos);
+                if (($ordenId !== null && $ordenId !== $sustituye->orden_id) || ($ventaPosId !== null && $ventaPosId !== $sustituye->venta_pos_id)) {
+                    throw ValidationException::withMessages(['sustituye' => ['La sustituta es de la misma venta que la factura que sustituye.']]);
+                }
+                $ordenId = $sustituye->orden_id !== null ? (int) $sustituye->orden_id : null;
+                $ventaPosId = $sustituye->venta_pos_id !== null ? (int) $sustituye->venta_pos_id : null;
+                $relacionados[] = ['relationship' => FacturaTenant::RELACION_SUSTITUCION, 'documents' => [(string) $sustituye->uuid]];
+            }
+            $suya = static fn (?FacturaTenant $f): bool => $f !== null && $f->getKey() !== $sustituye?->getKey();
             // La venta que factura, bloqueada: si otro timbrado ya la facturó, no otra vez.
             if ($ordenId !== null) {
                 OrdenTenant::query()->whereKey($ordenId)->lockForUpdate()->first();
-                if (FacturasDeVentasTenant::deOrden($ordenId) !== null) {
+                if ($suya(FacturasDeVentasTenant::deOrden($ordenId))) {
                     throw ValidationException::withMessages(['orden_id' => ['Esta venta ya está facturada.']]);
                 }
             }
             if ($ventaPosId !== null) {
                 VentaPosTenant::query()->whereKey($ventaPosId)->lockForUpdate()->first();
-                if (FacturasDeVentasTenant::deVenta($ventaPosId) !== null) {
+                if ($suya(FacturasDeVentasTenant::deVenta($ventaPosId))) {
                     throw ValidationException::withMessages(['venta_id' => ['Esta venta ya está facturada.']]);
                 }
             }
@@ -109,12 +129,14 @@ class EmitirFacturaTenant
                 throw ValidationException::withMessages(['anticipos' => ['Algún anticipo ya se aplicó, no está timbrado o es de otro RFC.']]);
             }
             if ($aplicados->isNotEmpty()) {
-                $cuerpo['related_documents'] = [[
+                $relacionados[] = [
                     'relationship' => CatalogosSat::RELACION_ANTICIPO,
                     'documents' => $aplicados->pluck('uuid')->values()->all(),
-                ]];
+                ];
             }
-            $saldo = $this->timbres->apartarParaTimbrar();
+            if ($relacionados !== []) {
+                $cuerpo['related_documents'] = $relacionados;
+            }
             $comun = [
                 'receptor_nombre' => $receptor['nombre'],
                 'receptor_rfc' => mb_strtoupper($receptor['rfc']),
@@ -128,37 +150,168 @@ class EmitirFacturaTenant
                 'anticipo' => $anticipo,
                 'orden_id' => $ordenId,
                 'venta_pos_id' => $ventaPosId,
+                'tipo' => FacturaTenant::INGRESO,
+                'relacionada_id' => $sustituye?->getKey(),
+                'relacion' => $sustituye instanceof FacturaTenant ? FacturaTenant::RELACION_SUSTITUCION : null,
+                'receptor_regimen' => $receptor['regimen_fiscal'] ?? null,
+                'forma_pago' => $formaPago,
+                'conceptos' => $items,
             ];
 
-            try {
-                $resultado = $this->cliente->timbrar($llave, $cuerpo);
-            } catch (TimbradoFallido $e) {
-                return FacturaTenant::query()->create($comun + [
-                    'estado' => EstadoFactura::Error->value,
-                    'motivo_error' => $e->getMessage(),
-                ]);
+            $factura = $this->timbrarYGuardar($llave, $cuerpo, $comun);
+            if ($factura->estado === EstadoFactura::Timbrada) {
+                FacturaTenant::query()->whereKey($aplicados->modelKeys())->update(['anticipo_aplicado_en' => $factura->getKey()]);
             }
-
-            $base = rtrim((string) config('agendauno.facturapi.base_url'), '/');
-            $factura = FacturaTenant::query()->create($comun + [
-                'estado' => EstadoFactura::Timbrada->value,
-                'facturapi_id' => $resultado->facturaId,
-                'uuid' => $resultado->uuid,
-                'pdf_url' => "{$base}/invoices/{$resultado->facturaId}/pdf",
-                'xml_url' => "{$base}/invoices/{$resultado->facturaId}/xml",
-                'timbrada_en' => Carbon::now(),
-            ]);
-            $this->timbres->gastar($saldo, (string) $factura->ulid);
-            FacturaTenant::query()->whereKey($aplicados->modelKeys())->update(['anticipo_aplicado_en' => $factura->getKey()]);
-
-            $this->eventos->registrar('factura.timbrada', 'factura', $factura->ulid, [
-                'factura' => $factura->ulid,
-                'uuid' => $factura->uuid,
-                'total_minor' => $factura->total_minor,
-            ]);
 
             return $factura;
         });
+    }
+
+    /**
+     * Una nota de crédito (CFDI de egreso) por `$montoMinor` (con IVA) de una factura
+     * timbrada: una devolución, un descuento o una bonificación. Al mismo receptor, con
+     * la forma en que se le devolvió el dinero.
+     */
+    public function emitirNotaDeCredito(
+        DatosFiscalesTenant $emisor,
+        FacturaTenant $original,
+        int $montoMinor,
+        string $descripcion,
+        string $formaPago,
+        ?string $regimenReceptor,
+    ): FacturaTenant {
+        $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
+        $subtotal = max(1, (int) round($montoMinor * 10000 / (10000 + $ivaBps)));
+        $impuesto = intdiv($subtotal * $ivaBps, 10000);
+        $total = $subtotal + $impuesto;
+        $items = [['descripcion' => mb_substr($descripcion, 0, 1000), 'cantidad' => 1, 'precio_unitario_minor' => $subtotal] + CatalogosSat::NOTA_DE_CREDITO];
+        $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
+
+        return DB::connection('tenant')->transaction(function () use ($original, $items, $subtotal, $impuesto, $total, $formaPago, $regimenReceptor, $llave, $ivaBps): FacturaTenant {
+            $original = FacturaTenant::query()->whereKey($original->getKey())->lockForUpdate()->firstOrFail();
+            if ($original->estado !== EstadoFactura::Timbrada || $original->tipo !== FacturaTenant::INGRESO) {
+                throw ValidationException::withMessages(['factura' => ['Solo se acredita una factura de venta timbrada.']]);
+            }
+            if ($original->anticipo) {
+                throw ValidationException::withMessages(['factura' => ['Un anticipo se aplica al facturar el resto, no con nota de crédito.']]);
+            }
+            if ($original->cancelacion_estado === EstadoCancelacion::Pendiente) {
+                throw ValidationException::withMessages(['factura' => ['Su cancelación está en espera: no se le hacen notas de crédito.']]);
+            }
+            $regimen = $original->receptor_regimen ?? $regimenReceptor;
+            if ($regimen === null || $regimen === '') {
+                throw ValidationException::withMessages(['regimen_fiscal' => ['Falta el régimen fiscal del cliente: va en la nota de crédito.']]);
+            }
+            $queda = $original->acreditable();
+            if ($total > $queda) {
+                throw ValidationException::withMessages(['monto_minor' => ['Pasa de lo que queda por acreditar de esta factura.']]);
+            }
+
+            $receptor = [
+                'nombre' => $original->receptor_nombre,
+                'rfc' => $original->receptor_rfc,
+                'email' => $original->receptor_email,
+                'codigo_postal' => $original->receptor_cp,
+                'regimen_fiscal' => $regimen,
+            ];
+            $cuerpo = ['type' => FacturaTenant::EGRESO]
+                + $this->armarCuerpo($receptor, $items, CatalogosSat::USO_NOTA_DE_CREDITO, $formaPago, (string) $original->moneda, $ivaBps)
+                + ['related_documents' => [['relationship' => FacturaTenant::RELACION_NOTA_DE_CREDITO, 'documents' => [(string) $original->uuid]]]];
+
+            $nota = $this->timbrarYGuardar($llave, $cuerpo, [
+                'receptor_nombre' => $original->receptor_nombre,
+                'receptor_rfc' => $original->receptor_rfc,
+                'receptor_email' => $original->receptor_email,
+                'uso_cfdi' => CatalogosSat::USO_NOTA_DE_CREDITO,
+                'receptor_cp' => $original->receptor_cp,
+                'moneda' => $original->moneda,
+                'subtotal_minor' => $subtotal,
+                'impuesto_minor' => $impuesto,
+                'total_minor' => $total,
+                'anticipo' => false,
+                // La venta de la factura que corrige: para ver por sede (no la factura).
+                'orden_id' => $original->orden_id,
+                'venta_pos_id' => $original->venta_pos_id,
+                'tipo' => FacturaTenant::EGRESO,
+                'relacionada_id' => $original->getKey(),
+                'relacion' => FacturaTenant::RELACION_NOTA_DE_CREDITO,
+                'receptor_regimen' => $regimen,
+                'forma_pago' => $formaPago,
+                'conceptos' => $items,
+            ]);
+            // El régimen del cliente queda en la factura: la siguiente nota no lo pide.
+            if ($nota->estado === EstadoFactura::Timbrada && $original->receptor_regimen === null) {
+                $original->forceFill(['receptor_regimen' => $regimen])->save();
+            }
+
+            return $nota;
+        });
+    }
+
+    /**
+     * La factura que se sustituye, bloqueada: timbrada, de una venta, sin cancelación
+     * en espera, sin notas de crédito ni anticipos aplicados (el SAT no la cancelaría
+     * con documentos relacionados vigentes), y del mismo tipo (anticipo o no).
+     *
+     * @param  list<string>  $anticipos
+     */
+    private function exigirSustituible(FacturaTenant $factura, bool $anticipo, array $anticipos): FacturaTenant
+    {
+        $factura = FacturaTenant::query()->whereKey($factura->getKey())->lockForUpdate()->firstOrFail();
+        $motivo = match (true) {
+            $factura->estado !== EstadoFactura::Timbrada || $factura->tipo !== FacturaTenant::INGRESO => 'Solo se sustituye una factura de venta timbrada.',
+            $factura->cancelacion_estado === EstadoCancelacion::Pendiente => 'Su cancelación ya está en espera.',
+            $factura->notasDeCredito()->exists() => 'Tiene notas de crédito: cancélalas antes de sustituirla.',
+            FacturaTenant::query()->where('anticipo_aplicado_en', $factura->getKey())->exists() || $anticipos !== [] => 'Aplica anticipos: cancélala y factura de nuevo el resto.',
+            $factura->anticipo && $factura->anticipo_aplicado_en !== null => 'Este anticipo ya se aplicó: no se sustituye.',
+            $factura->anticipo !== $anticipo => $factura->anticipo ? 'La sustituta de un anticipo es otro anticipo.' : 'La sustituta de una venta no es un anticipo.',
+            default => null,
+        };
+        if ($motivo !== null) {
+            throw ValidationException::withMessages(['sustituye' => [$motivo]]);
+        }
+
+        return $factura;
+    }
+
+    /**
+     * Timbra y guarda (dentro de la transacción): con un timbre del negocio, timbrada
+     * con su UUID o con el error del proveedor (y sin gastar el timbre).
+     *
+     * @param  array<string, mixed>  $cuerpo
+     * @param  array<string, mixed>  $comun
+     */
+    private function timbrarYGuardar(string $llave, array $cuerpo, array $comun): FacturaTenant
+    {
+        $saldo = $this->timbres->apartarParaTimbrar();
+        try {
+            $resultado = $this->cliente->timbrar($llave, $cuerpo);
+        } catch (TimbradoFallido $e) {
+            return FacturaTenant::query()->create($comun + [
+                'estado' => EstadoFactura::Error->value,
+                'motivo_error' => $e->getMessage(),
+            ]);
+        }
+
+        $base = rtrim((string) config('agendauno.facturapi.base_url'), '/');
+        $factura = FacturaTenant::query()->create($comun + [
+            'estado' => EstadoFactura::Timbrada->value,
+            'facturapi_id' => $resultado->facturaId,
+            'uuid' => $resultado->uuid,
+            'pdf_url' => "{$base}/invoices/{$resultado->facturaId}/pdf",
+            'xml_url' => "{$base}/invoices/{$resultado->facturaId}/xml",
+            'timbrada_en' => Carbon::now(),
+        ]);
+        $this->timbres->gastar($saldo, (string) $factura->ulid);
+
+        $this->eventos->registrar('factura.timbrada', 'factura', $factura->ulid, [
+            'factura' => $factura->ulid,
+            'uuid' => $factura->uuid,
+            'total_minor' => $factura->total_minor,
+            'tipo' => $factura->tipo,
+        ]);
+
+        return $factura;
     }
 
     /**

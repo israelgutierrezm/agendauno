@@ -6,8 +6,10 @@ import { useRoute, useRouter } from "vue-router";
 
 import AvisoRegion from "@/components/AvisoRegion.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
+import CancelarFactura from "@/components/CancelarFactura.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import NotaDeCredito from "@/components/NotaDeCredito.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
@@ -45,6 +47,18 @@ interface Factura {
   // La venta que factura (ADR 0179).
   orden_id?: string | null;
   venta_id?: string | null;
+  // Cancelar, sustituir y notas de crédito (ADR 0180).
+  tipo?: "ingreso" | "nota_de_credito";
+  relacionada?: { id: string; uuid: string | null; relacion: string } | null;
+  forma_pago?: string | null;
+  regimen_receptor?: string | null;
+  cancelacion?: {
+    estado: "pendiente" | "aceptada" | "rechazada" | "vencida";
+    motivo: string | null;
+    detalle: string | null;
+  } | null;
+  cancelable?: boolean;
+  acreditable_minor?: number;
 }
 
 // Lo que se factura de una venta (ADR 0179): conceptos sin IVA, a quién y la forma.
@@ -56,6 +70,7 @@ interface Borrador {
     rfc: string | null;
     codigo_postal: string | null;
     uso_cfdi: string | null;
+    regimen_fiscal?: string | null;
   };
   conceptos: {
     descripcion: string;
@@ -67,6 +82,8 @@ interface Borrador {
   forma_pago: string;
   total_minor: number;
   moneda: string;
+  // La sustituta de un anticipo es otro anticipo (ADR 0180).
+  anticipo?: boolean;
 }
 
 interface Concepto {
@@ -83,12 +100,34 @@ const router = useRouter();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeEmitir = computed(() => sesion.puede("ordenes.gestionar"));
+// Cancelar, sustituir y notas de crédito: como devolver un cobro (ADR 0180).
+const puedeCancelar = computed(() => sesion.puede("pagos.reembolsar"));
+const cancelando = ref<Factura | null>(null);
+const acreditando = ref<Factura | null>(null);
+// Lo que pasó con una cancelación o una nota de crédito (arriba de la lista).
+const avisoLista = ref<string | null>(null);
+async function alCancelar(f: { estado: string }): Promise<void> {
+  cancelando.value = null;
+  avisoLista.value =
+    f.estado === "cancelada"
+      ? t("cancelarFactura.hecha")
+      : t("cancelarFactura.enEsperaHecha");
+  await cargar();
+}
+async function alAcreditar(): Promise<void> {
+  acreditando.value = null;
+  avisoLista.value = t("cancelarFactura.notaHecha");
+  await cargar();
+}
+function folioCorto(uuid: string | null | undefined): string {
+  return (uuid ?? "").slice(0, 8).toUpperCase();
+}
 
 const facturas = ref<Factura[]>([]);
 // Por páginas (antes, solo las últimas 100), con búsqueda, estado y fechas en el API
 // (y en la dirección, para volver a ellos).
 const buscar = ref("");
-const estado = ref<"" | "timbrada" | "error">("");
+const estado = ref<"" | "timbrada" | "error" | "cancelada">("");
 const desde = ref("");
 const hasta = ref("");
 const pagina = ref(1);
@@ -97,11 +136,11 @@ const meta = ref<{
   page: number;
   per_page: number;
   ultima_pagina: number;
-  conteos?: { timbrada: number; error: number };
+  conteos?: { timbrada: number; error: number; cancelada?: number };
 } | null>(null);
 useFiltrosEnUrl({
   q: buscar,
-  estado: opcionEnUrl(estado, ["", "timbrada", "error"] as const),
+  estado: opcionEnUrl(estado, ["", "timbrada", "error", "cancelada"] as const),
   desde: fechaEnUrl(desde),
   hasta: fechaEnUrl(hasta),
 });
@@ -230,7 +269,7 @@ watch(() => [receptor.value.rfc, esAnticipo.value], buscarAnticipos);
 // La venta que se factura (ADR 0179), si se llegó desde un cobro o el mostrador
 // (`?orden=` o `?venta=`): su borrador llena el formulario y, al timbrar, queda ligada.
 const ventaLigada = ref<{
-  tipo: "orden" | "venta";
+  tipo: "orden" | "venta" | "sustituye";
   id: string;
   etiqueta: string;
   total_minor: number;
@@ -254,9 +293,14 @@ function limpiarFormulario(): void {
   anticiposElegidos.value = [];
 }
 async function cargarBorrador(): Promise<void> {
-  const orden = textoDeConsulta(route.query.orden);
-  const venta = orden === null ? textoDeConsulta(route.query.venta) : null;
-  if (orden === null && venta === null) {
+  // La sustituta de una factura con datos mal (ADR 0180): `?sustituye=`.
+  const sustituye = textoDeConsulta(route.query.sustituye);
+  const orden = sustituye === null ? textoDeConsulta(route.query.orden) : null;
+  const venta =
+    sustituye === null && orden === null
+      ? textoDeConsulta(route.query.venta)
+      : null;
+  if (orden === null && venta === null && sustituye === null) {
     if (ventaLigada.value !== null) {
       ventaLigada.value = null;
       limpiarFormulario();
@@ -270,7 +314,14 @@ async function cargarBorrador(): Promise<void> {
   try {
     const { data } = await api.get<{ data: Borrador }>(
       `${base.value}/facturas/borrador`,
-      { params: orden !== null ? { orden } : { venta } },
+      {
+        params:
+          sustituye !== null
+            ? { sustituye }
+            : orden !== null
+              ? { orden }
+              : { venta },
+      },
     );
     const b = data.data;
     limpiarFormulario();
@@ -280,21 +331,30 @@ async function cargarBorrador(): Promise<void> {
       email: b.receptor.email ?? "",
       rfc: b.receptor.rfc ?? "",
       codigo_postal: b.receptor.codigo_postal ?? "",
+      regimen_fiscal: b.receptor.regimen_fiscal ?? "",
     };
     if (b.receptor.uso_cfdi) {
       usoCfdi.value = b.receptor.uso_cfdi;
     }
     formaPago.value = b.forma_pago;
-    conceptos.value = b.conceptos.map((c) => ({
+    // Sin conceptos guardados (una factura de antes), un renglón para escribirlos.
+    const traidos = b.conceptos.map((c) => ({
       descripcion: c.descripcion,
       cantidad: c.cantidad,
       precio: (c.precio_unitario_minor / 100).toFixed(2),
       clave_prod_serv: c.clave_prod_serv,
       clave_unidad: c.clave_unidad,
     }));
+    conceptos.value = traidos.length > 0 ? traidos : [conceptoNuevo()];
+    // La sustituta de un anticipo es otro anticipo, por el mismo importe.
+    if (b.anticipo === true) {
+      esAnticipo.value = true;
+      importeAnticipo.value = conceptos.value[0]?.precio ?? "";
+    }
     ventaLigada.value = {
-      tipo: orden !== null ? "orden" : "venta",
-      id: (orden ?? venta) as string,
+      tipo:
+        sustituye !== null ? "sustituye" : orden !== null ? "orden" : "venta",
+      id: (sustituye ?? orden ?? venta) as string,
       etiqueta: b.etiqueta,
       total_minor: b.total_minor,
       moneda: b.moneda,
@@ -307,12 +367,16 @@ async function cargarBorrador(): Promise<void> {
     errorEmision.value = mensajeDeError(e);
   }
 }
-watch(() => [route.query.orden, route.query.venta], cargarBorrador);
+watch(
+  () => [route.query.orden, route.query.venta, route.query.sustituye],
+  cargarBorrador,
+);
 // Factura sin venta: quita la venta de la dirección (y el formulario vuelve a vacío).
 function soltarVenta(): void {
   const query = { ...route.query };
   delete query.orden;
   delete query.venta;
+  delete query.sustituye;
   void router.replace({ query });
 }
 function fechaCorta(iso: string | null | undefined): string {
@@ -332,6 +396,7 @@ const columnas = computed(() => [
   },
   { clave: "estado", etiqueta: t("facturas.colEstado") },
   { clave: "uuid", etiqueta: t("facturas.colFolio") },
+  { clave: "acciones", etiqueta: t("cancelarFactura.colAcciones") },
 ]);
 
 function dinero(minor: number, moneda: string): string {
@@ -387,7 +452,9 @@ async function emitir(): Promise<void> {
   errorEmision.value = null;
   mensaje.value = null;
   try {
-    await api.post(`${base.value}/facturas`, {
+    const { data: respuesta } = await api.post<{
+      meta?: { aviso_cancelacion?: string };
+    }>(`${base.value}/facturas`, {
       receptor: {
         nombre: receptor.value.nombre,
         rfc: receptor.value.rfc,
@@ -399,8 +466,11 @@ async function emitir(): Promise<void> {
       forma_pago: formaPago.value,
       ...(ventaLigada.value !== null
         ? {
-            [ventaLigada.value.tipo === "orden" ? "orden_id" : "venta_id"]:
-              ventaLigada.value.id,
+            [ventaLigada.value.tipo === "orden"
+              ? "orden_id"
+              : ventaLigada.value.tipo === "venta"
+                ? "venta_id"
+                : "sustituye"]: ventaLigada.value.id,
           }
         : {}),
       ...(esAnticipo.value
@@ -433,6 +503,10 @@ async function emitir(): Promise<void> {
           }),
     });
     mensaje.value = "ok";
+    const aviso = respuesta?.meta?.aviso_cancelacion;
+    avisoLista.value = aviso
+      ? t("cancelarFactura.avisoCancelacion", { motivo: aviso })
+      : null;
     limpiarFormulario();
     // Ya facturada: la venta sale de la dirección (volver no la factura otra vez).
     if (ventaLigada.value !== null) {
@@ -501,6 +575,14 @@ onMounted(async () => {
     <!-- Si la primera carga falló, el aviso de arriba lo dice (con Reintentar): la
          tabla vacía diría «aún no has emitido facturas». -->
     <template v-else-if="cargadoUnaVez">
+      <AvisoTono
+        v-if="avisoLista"
+        class="mt-4"
+        role="status"
+        data-prueba="aviso-facturas"
+      >
+        {{ avisoLista }}
+      </AvisoTono>
       <div class="fa-filtros mt-6" data-prueba="filtros-facturas">
         <input
           v-model="buscar"
@@ -516,7 +598,7 @@ onMounted(async () => {
           :aria-label="$t('operacion.listadosDos.estadoFactura')"
         >
           <button
-            v-for="e in ['', 'timbrada', 'error'] as const"
+            v-for="e in ['', 'timbrada', 'error', 'cancelada'] as const"
             :key="e"
             type="button"
             :aria-pressed="estado === e"
@@ -528,13 +610,15 @@ onMounted(async () => {
                 ? $t("operacion.listadosDos.todas")
                 : e === "timbrada"
                   ? $t("operacion.listadosDos.timbradas")
-                  : $t("operacion.listadosDos.conError")
+                  : e === "error"
+                    ? $t("operacion.listadosDos.conError")
+                    : $t("cancelarFactura.canceladas")
             }}
             <span
               v-if="e !== '' && meta?.conteos"
               class="ml-1 tabular-nums"
               :style="{ color: 'var(--texto-suave)' }"
-              >{{ meta.conteos[e] }}</span
+              >{{ meta.conteos[e] ?? 0 }}</span
             >
           </button>
         </div>
@@ -583,14 +667,56 @@ onMounted(async () => {
         <template #col-estado="{ valor, fila }">
           <span
             class="tu-badge"
-            :class="valor === 'timbrada' ? 'tu-badge-exito' : 'tu-badge-aviso'"
+            :class="
+              valor === 'timbrada'
+                ? 'tu-badge-exito'
+                : valor === 'error'
+                  ? 'tu-badge-aviso'
+                  : ''
+            "
           >
             {{
               valor === "timbrada"
                 ? $t("facturas.estado.timbrada")
-                : $t("facturas.estado.error")
+                : valor === "error"
+                  ? $t("facturas.estado.error")
+                  : $t("cancelarFactura.cancelada")
             }}
           </span>
+          <!-- Nota de crédito o sustituta: con cuál se relaciona (ADR 0180). -->
+          <span
+            v-if="(fila as Factura).relacionada"
+            class="block text-xs mt-1"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="factura-relacionada"
+            >{{
+              $t(
+                (fila as Factura).tipo === "nota_de_credito"
+                  ? "cancelarFactura.esNota"
+                  : "cancelarFactura.sustituye",
+                { folio: folioCorto((fila as Factura).relacionada?.uuid) },
+              )
+            }}</span
+          >
+          <span
+            v-if="
+              valor === 'timbrada' &&
+              (fila as Factura).cancelacion?.estado === 'pendiente'
+            "
+            class="block text-xs mt-1"
+            :style="{ color: 'var(--aviso)' }"
+            data-prueba="cancelacion-en-espera"
+            >{{ $t("cancelarFactura.enEspera") }}</span
+          >
+          <span
+            v-else-if="
+              valor === 'timbrada' && (fila as Factura).cancelacion?.detalle
+            "
+            class="block text-xs mt-1"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="cancelacion-detalle"
+            >{{ (fila as Factura).cancelacion?.detalle }}</span
+          >
           <span
             v-if="(fila as Factura).anticipo"
             class="block text-xs mt-1"
@@ -602,6 +728,31 @@ onMounted(async () => {
                 : $t("facturas.anticipo.porAplicar")
             }}</span
           >
+        </template>
+        <template #col-acciones="{ fila }">
+          <span
+            v-if="puedeCancelar"
+            class="inline-flex flex-wrap justify-end gap-x-3"
+          >
+            <button
+              v-if="((fila as Factura).acreditable_minor ?? 0) > 0"
+              type="button"
+              class="tu-enlace text-sm"
+              data-prueba="nota-credito"
+              @click="acreditando = fila as Factura"
+            >
+              {{ $t("cancelarFactura.notaDeCredito") }}
+            </button>
+            <button
+              v-if="(fila as Factura).cancelable"
+              type="button"
+              class="tu-enlace text-sm"
+              data-prueba="cancelar-factura"
+              @click="cancelando = fila as Factura"
+            >
+              {{ $t("cancelarFactura.cancelar") }}
+            </button>
+          </span>
         </template>
         <template #col-uuid="{ fila }">
           <div v-if="(fila as Factura).uuid" class="flex items-center gap-2">
@@ -652,10 +803,15 @@ onMounted(async () => {
 
         <AvisoTono v-if="ventaLigada" class="mt-4" data-prueba="venta-ligada">
           {{
-            $t("facturarVenta.ligada", {
-              venta: ventaLigada.etiqueta,
-              total: dinero(ventaLigada.total_minor, ventaLigada.moneda),
-            })
+            ventaLigada.tipo === "sustituye"
+              ? $t("cancelarFactura.sustituyendo", {
+                  factura: ventaLigada.etiqueta,
+                  total: dinero(ventaLigada.total_minor, ventaLigada.moneda),
+                })
+              : $t("facturarVenta.ligada", {
+                  venta: ventaLigada.etiqueta,
+                  total: dinero(ventaLigada.total_minor, ventaLigada.moneda),
+                })
           }}
           <template #acciones>
             <button
@@ -664,7 +820,11 @@ onMounted(async () => {
               data-prueba="soltar-venta"
               @click="soltarVenta"
             >
-              {{ $t("facturarVenta.soltar") }}
+              {{
+                ventaLigada.tipo === "sustituye"
+                  ? $t("cancelarFactura.soltarSustitucion")
+                  : $t("facturarVenta.soltar")
+              }}
             </button>
           </template>
         </AvisoTono>
@@ -838,7 +998,11 @@ onMounted(async () => {
           </div>
 
           <fieldset
-            v-if="!esAnticipo && anticiposDisponibles.length > 0"
+            v-if="
+              !esAnticipo &&
+              ventaLigada?.tipo !== 'sustituye' &&
+              anticiposDisponibles.length > 0
+            "
             data-prueba="anticipos-por-aplicar"
           >
             <legend class="font-semibold text-sm mb-2">
@@ -986,6 +1150,39 @@ onMounted(async () => {
         </form>
       </div>
     </template>
+
+    <CancelarFactura
+      :base="base"
+      :factura="
+        cancelando
+          ? {
+              id: cancelando.id,
+              uuid: cancelando.uuid,
+              receptor: cancelando.receptor,
+              total: dinero(cancelando.total_minor, cancelando.moneda),
+            }
+          : null
+      "
+      @cerrar="cancelando = null"
+      @cancelada="alCancelar"
+    />
+    <NotaDeCredito
+      :base="base"
+      :factura="
+        acreditando
+          ? {
+              id: acreditando.id,
+              receptor: acreditando.receptor,
+              acreditable_minor: acreditando.acreditable_minor ?? 0,
+              forma_pago: acreditando.forma_pago,
+              regimen_receptor: acreditando.regimen_receptor,
+            }
+          : null
+      "
+      :dinero="(m: number) => dinero(m, acreditando?.moneda ?? sesion.moneda)"
+      @cerrar="acreditando = null"
+      @hecha="alAcreditar"
+    />
   </section>
 </template>
 

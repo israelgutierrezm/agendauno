@@ -13,7 +13,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
  * facturar ({@see ConfiguracionPlataforma::facturacionDisponible()});
  * esto es la defensa de fondo.
  */
-class FacturacionNoConfigurada implements ClienteFacturacion
+class FacturacionNoConfigurada implements CancelacionCfdi, ClienteFacturacion
 {
     public const MOTIVO = 'La facturación aún no está disponible en la plataforma.';
 
@@ -23,6 +23,16 @@ class FacturacionNoConfigurada implements ClienteFacturacion
     }
 
     public function descargar(string $llaveOrganizacion, string $facturaId, string $formato): string
+    {
+        throw new TimbradoFallido(self::MOTIVO);
+    }
+
+    public function cancelar(string $llaveOrganizacion, string $facturaId, string $motivo, ?string $sustituta = null): EstadoCancelacion
+    {
+        throw new TimbradoFallido(self::MOTIVO);
+    }
+
+    public function consultarCancelacion(string $llaveOrganizacion, string $facturaId): EstadoCancelacion
     {
         throw new TimbradoFallido(self::MOTIVO);
     }

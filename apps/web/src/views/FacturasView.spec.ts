@@ -380,3 +380,147 @@ describe("facturar una venta (ADR 0179)", () => {
     w.unmount();
   });
 });
+
+describe("cancelar, sustituir y notas de crédito (ADR 0180)", () => {
+  const listaCon = (filas: Record<string, unknown>[]) =>
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/facturas")
+          ? {
+              data: filas,
+              meta: {
+                total: filas.length,
+                page: 1,
+                per_page: 20,
+                ultima_pagina: 1,
+              },
+            }
+          : { data: {} },
+      }),
+    );
+
+  it("cada factura se cancela o se acredita y dice cómo va su cancelación", async () => {
+    listaCon([
+      {
+        ...factura("1", "timbrada"),
+        cancelable: true,
+        acreditable_minor: 11600,
+      },
+      {
+        ...factura("2", "timbrada"),
+        cancelable: false,
+        acreditable_minor: 0,
+        cancelacion: { estado: "pendiente", motivo: "02", detalle: null },
+      },
+      {
+        ...factura("3", "timbrada"),
+        tipo: "nota_de_credito",
+        relacionada: { id: "1", uuid: "uuid-1abcdef", relacion: "01" },
+        cancelable: true,
+        acreditable_minor: 0,
+      },
+    ]);
+    api.post.mockResolvedValue({ data: { data: { estado: "timbrada" } } });
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+
+    expect(w.findAll('[data-prueba="cancelar-factura"]')).toHaveLength(2);
+    expect(w.findAll('[data-prueba="nota-credito"]')).toHaveLength(1);
+    expect(w.get('[data-prueba="cancelacion-en-espera"]').text()).toBe(
+      "Cancelación en espera del cliente",
+    );
+    expect(w.get('[data-prueba="factura-relacionada"]').text()).toBe(
+      "Nota de crédito de UUID-1AB",
+    );
+
+    // Cancelar: se elige el motivo y, si espera al cliente, se dice.
+    await w.findAll('[data-prueba="cancelar-factura"]')[0]!.trigger("click");
+    await w.get('[data-prueba="motivo-03"]').setValue(true);
+    await w.get("#form-cancelar-factura").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/facturas/1/cancelar",
+      { motivo: "03" },
+    );
+    expect(w.get('[data-prueba="aviso-facturas"]').text()).toContain(
+      "queda en espera",
+    );
+    w.unmount();
+  });
+
+  it("la sustituta trae lo timbrado y manda la factura que sustituye", async () => {
+    vi.mocked(confirmar).mockResolvedValue(true);
+    ruta.query = { sustituye: "F1" };
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/facturas/borrador")
+          ? {
+              data: {
+                etiqueta: "UUID-F1",
+                receptor: {
+                  nombre: "Ana López",
+                  email: null,
+                  rfc: "LOAA800101AB1",
+                  codigo_postal: "06700",
+                  uso_cfdi: "S01",
+                  regimen_fiscal: "605",
+                },
+                conceptos: [
+                  {
+                    descripcion: "Pack 8 clases",
+                    cantidad: 1,
+                    precio_unitario_minor: 77500,
+                    clave_prod_serv: "86121600",
+                    clave_unidad: "E48",
+                  },
+                ],
+                forma_pago: "01",
+                total_minor: 89900,
+                moneda: "MXN",
+                anticipo: false,
+              },
+            }
+          : {
+              data: [],
+              meta: { total: 0, page: 1, per_page: 20, ultima_pagina: 1 },
+            },
+      }),
+    );
+    api.post.mockResolvedValue({
+      data: {
+        data: factura("2", "timbrada"),
+        meta: { aviso_cancelacion: "FacturAPI no respondió." },
+      },
+    });
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/facturas/borrador", {
+      params: { sustituye: "F1" },
+    });
+    expect(w.get('[data-prueba="venta-ligada"]').text()).toContain(
+      "Sustituyes la factura UUID-F1",
+    );
+    await w.get("#fa-rfc").setValue("LOAA800101AB2");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    const enviado = api.post.mock.calls[0]![1] as Record<string, unknown>;
+    expect(enviado).toMatchObject({
+      sustituye: "F1",
+      receptor: expect.objectContaining({
+        rfc: "LOAA800101AB2",
+        regimen_fiscal: "605",
+      }),
+    });
+    expect(enviado).not.toHaveProperty("orden_id");
+    // La nueva se timbró pero la anterior no se canceló: se dice.
+    expect(w.get('[data-prueba="aviso-facturas"]').text()).toContain(
+      "FacturAPI no respondió.",
+    );
+    w.unmount();
+  });
+});

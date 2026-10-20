@@ -1050,6 +1050,9 @@ Route::prefix('v1')->group(function (): void {
             // Lo que se factura de una venta (ADR 0179): conceptos, a quién y forma de pago.
             Route::get('/facturas/borrador', [FacturasTenantController::class, 'borrador'])->middleware(['puede:ordenes.gestionar', 'plan:facturacion'])->name('facturas.borrador');
             Route::get('/facturas/{factura}', [FacturasTenantController::class, 'show'])->middleware('puede:ordenes.ver')->name('facturas.show');
+            // Cancelar el CFDI y notas de crédito (ADR 0180): como anular o devolver un cobro.
+            Route::post('/facturas/{factura}/cancelar', [FacturasTenantController::class, 'cancelar'])->middleware(['puede:pagos.reembolsar', 'plan:facturacion'])->name('facturas.cancelar');
+            Route::post('/facturas/{factura}/notas-credito', [FacturasTenantController::class, 'notaDeCredito'])->middleware(['puede:pagos.reembolsar', 'plan:facturacion'])->name('facturas.notas-credito');
 
             // Integraciones de bienestar (Wellhub / TotalPass): el propietario conecta
             // llaves (cifradas); el staff valida check-ins de esos usuarios en clases
