@@ -4,6 +4,9 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import CorregirCobro from "@/components/CorregirCobro.vue";
+import DevolverVenta, {
+  type LineaDevolvible,
+} from "@/components/DevolverVenta.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -41,8 +44,13 @@ interface Venta {
   propina_minor?: number;
   moneda: string;
   metodo_pago: string;
+  // Con varias formas (ADR 0177): cuánto con cada una.
+  partes?: { metodo: string; monto_minor: number }[];
   creado_en: string | null;
-  lineas?: { articulo: string | null; cantidad: number }[];
+  lineas?: LineaDevolvible[];
+  // Devoluciones parciales (ADR 0178): cuánto salió y si aún se puede devolver.
+  devuelto_minor?: number;
+  devolvible?: boolean;
   // Venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
   anulada_en?: string | null;
   motivo_anulacion?: string | null;
@@ -97,6 +105,13 @@ const desde = ref("");
 const hasta = ref("");
 const filtrando = computed(() => desde.value !== "" || hasta.value !== "");
 const corrigiendo = ref<string | null>(null);
+// La venta de la que se devuelven productos (ADR 0178).
+const devolviendo = ref<string | null>(null);
+const puedeDevolver = computed(() => sesion.puede("pagos.reembolsar"));
+async function alDevolver(): Promise<void> {
+  devolviendo.value = null;
+  await cargar();
+}
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -326,7 +341,24 @@ onMounted(cargar);
                     data-prueba="venta-anulada"
                     >{{ $t("corregirCobro.anulada") }}</span
                   >
-                  <template v-else>{{ nombreMetodo(v.metodo_pago) }}</template>
+                  <template v-else>
+                    {{ nombreMetodo(v.metodo_pago) }}
+                    <span
+                      v-if="v.partes && v.partes.length > 1"
+                      class="block text-xs mo-suave"
+                      data-prueba="partes-venta"
+                      >{{
+                        v.partes
+                          .map((p) =>
+                            $t("formasDePago.detalle", {
+                              forma: nombreMetodo(p.metodo),
+                              monto: dinero(p.monto_minor, v.moneda),
+                            }),
+                          )
+                          .join(" · ")
+                      }}</span
+                    >
+                  </template>
                 </td>
                 <td
                   class="text-right font-medium tabular-nums"
@@ -342,18 +374,64 @@ onMounted(cargar);
                       })
                     }}</span
                   >
+                  <span
+                    v-if="(v.devuelto_minor ?? 0) > 0"
+                    class="block text-xs font-normal mo-suave"
+                    data-prueba="devuelto-venta"
+                    >{{
+                      $t("devolverVenta.devuelto", {
+                        monto: dinero(v.devuelto_minor ?? 0, v.moneda),
+                      })
+                    }}</span
+                  >
                 </td>
                 <td v-if="corregir" class="text-right">
-                  <button
-                    v-if="!v.anulada_en && (v.corregible || v.anulable)"
-                    class="tu-enlace text-sm"
-                    type="button"
-                    data-prueba="corregir-venta"
-                    :aria-expanded="corrigiendo === v.id"
-                    @click="corrigiendo = corrigiendo === v.id ? null : v.id"
-                  >
-                    {{ $t("corregirCobro.corregir") }}
-                  </button>
+                  <span class="inline-flex flex-wrap justify-end gap-3">
+                    <button
+                      v-if="v.devolvible && puedeDevolver"
+                      class="tu-enlace text-sm"
+                      type="button"
+                      data-prueba="devolver-venta-abrir"
+                      :aria-expanded="devolviendo === v.id"
+                      @click="
+                        devolviendo = devolviendo === v.id ? null : v.id;
+                        corrigiendo = null;
+                      "
+                    >
+                      {{ $t("devolverVenta.accion") }}
+                    </button>
+                    <button
+                      v-if="!v.anulada_en && (v.corregible || v.anulable)"
+                      class="tu-enlace text-sm"
+                      type="button"
+                      data-prueba="corregir-venta"
+                      :aria-expanded="corrigiendo === v.id"
+                      @click="
+                        corrigiendo = corrigiendo === v.id ? null : v.id;
+                        devolviendo = null;
+                      "
+                    >
+                      {{ $t("corregirCobro.corregir") }}
+                    </button>
+                  </span>
+                </td>
+              </tr>
+              <tr
+                v-if="corregir && devolviendo === v.id && v.lineas"
+                class="mo-correccion"
+              >
+                <td :colspan="columnas">
+                  <DevolverVenta
+                    :base="base"
+                    :venta="{
+                      id: v.id,
+                      moneda: v.moneda,
+                      lineas: v.lineas,
+                      partes: v.partes,
+                    }"
+                    @devuelto="alDevolver"
+                    @cerrar="devolviendo = null"
+                  />
                 </td>
               </tr>
               <tr v-if="corregir && corrigiendo === v.id" class="mo-correccion">

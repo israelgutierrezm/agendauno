@@ -27,7 +27,7 @@ class ReembolsoTenant extends Model
     protected $fillable = [
         'pago_id', 'monto_minor', 'moneda', 'estado', 'proveedor', 'motivo',
         'revirtio_creditos', 'referencia_externa', 'actor_id', 'actor_nombre', 'metadata',
-        'llave', 'motivo_fallo', 'intentos', 'aplicado_en',
+        'llave', 'motivo_fallo', 'intentos', 'aplicado_en', 'metodo',
     ];
 
     /**

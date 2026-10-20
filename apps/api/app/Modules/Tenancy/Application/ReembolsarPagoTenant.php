@@ -20,6 +20,7 @@ use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\Exceptions\DerechoYaUsado;
 use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
+use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\PasarelaReembolsable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
@@ -85,10 +86,11 @@ class ReembolsarPagoTenant
         bool $revertirCreditos = true,
         bool $manual = false,
         ?string $llave = null,
+        ?string $metodo = null,
     ): ReembolsoTenant {
         // 1) Se registra la intención (y en caja o manual, se aplica) antes de hablar
         // con la pasarela: si algo falla después, la devolución queda rastreable.
-        [$reembolso, $nuevo] = DB::connection('tenant')->transaction(function () use ($pago, $montoMinor, $motivo, $actor, $revertirCreditos, $manual, $llave): array {
+        [$reembolso, $nuevo] = DB::connection('tenant')->transaction(function () use ($pago, $montoMinor, $motivo, $actor, $revertirCreditos, $manual, $llave, $metodo): array {
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->firstOrFail();
 
             if ($llave !== null) {
@@ -116,6 +118,10 @@ class ReembolsarPagoTenant
                 throw new PagoNoReembolsable('El monto a reembolsar excede lo disponible.');
             }
 
+            // Un cobro mixto (ADR 0177) se devuelve por una de sus formas, sin pasar de lo
+            // que entró por ella.
+            $salePor = $this->formaDeLaDevolucion($bloqueado, $monto, $metodo);
+
             $esTotal = $monto === $bloqueado->monto_minor && $comprometido === 0;
             $orden = $bloqueado->orden;
 
@@ -136,6 +142,7 @@ class ReembolsarPagoTenant
                 'motivo' => $motivo,
                 'revirtio_creditos' => false,
                 'llave' => $llave,
+                'metodo' => $bloqueado->metodo === MetodoPago::Mixto ? $salePor : null,
                 'actor_id' => $actor?->getKey(),
                 'actor_nombre' => $actor?->name,
                 'metadata' => [
@@ -160,7 +167,7 @@ class ReembolsarPagoTenant
             if ($via !== 'pasarela') {
                 $this->aplicarAprobado($bloqueado, $reembolso, $actor);
             }
-            $this->cajas->asentar($turno, MovimientoCajaTenant::DEVOLUCION, CajasTenant::metodoDelPago($bloqueado), -$monto,
+            $this->cajas->asentar($turno, MovimientoCajaTenant::DEVOLUCION, $salePor, -$monto,
                 ['pago_id' => $bloqueado->getKey(), 'reembolso_id' => $reembolso->getKey()], $actor, $motivo);
 
             return [$reembolso, true];
@@ -173,6 +180,32 @@ class ReembolsarPagoTenant
         }
 
         return $reembolso->refresh();
+    }
+
+    /**
+     * Por qué forma de la caja sale el dinero. Un pago normal, por la suya. Uno mixto,
+     * por la forma elegida, que debe ser una de sus partes y alcanzar con lo que entró
+     * por ella menos lo ya devuelto por ella.
+     */
+    private function formaDeLaDevolucion(PagoTenant $pago, int $monto, ?string $metodo): string
+    {
+        if ($pago->metodo !== MetodoPago::Mixto) {
+            return CajasTenant::metodoDelPago($pago);
+        }
+        $partes = CajasTenant::partesDelPago($pago);
+        $parte = collect($partes)->firstWhere('metodo', $metodo);
+        if ($metodo === null || $parte === null) {
+            throw new PagoNoReembolsable('Se cobró con varias formas de pago: elige por cuál de ellas sale la devolución.');
+        }
+        $devuelto = (int) $pago->reembolsos()
+            ->whereIn('estado', EstadoReembolso::comprometidos())
+            ->where('metodo', $metodo)
+            ->sum('monto_minor');
+        if ($monto > $parte['monto_minor'] - $devuelto) {
+            throw new PagoNoReembolsable('Por esa forma de pago no entró tanto: devuelve hasta lo que se cobró con ella.');
+        }
+
+        return $metodo;
     }
 
     /**

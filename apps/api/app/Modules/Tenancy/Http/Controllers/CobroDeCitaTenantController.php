@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Application\TicketVentaPosTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,7 +52,10 @@ class CobroDeCitaTenantController
             'recibido_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             'enviar_ticket' => ['nullable', 'boolean'],
             'clave_intento' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
+            // Con varias formas de pago (ADR 0177): cuánto con cada una; suman todo.
+            ...PartesCobro::reglas(),
         ]);
+        $partes = PartesCobro::desde($validado['partes'] ?? null);
 
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
@@ -86,6 +90,7 @@ class CobroDeCitaTenantController
             $validado['referencia'] ?? null,
             $clave,
             $actor,
+            partes: $partes,
         );
         try {
             $resumen = $cobrar();
@@ -117,6 +122,7 @@ class CobroDeCitaTenantController
             'cambio_minor' => $resumen['cambio_minor'],
             'moneda' => $resumen['moneda'],
             'metodo' => $resumen['metodo'],
+            'partes' => $resumen['partes'],
             'orden_id' => $resumen['orden']?->ulid,
             // El comprobante de todo cobro (con el servicio) y cómo va su envío por correo:
             // `enviado`, `pendiente` (en la cola), `fallido` (se reenvía aparte) o null si

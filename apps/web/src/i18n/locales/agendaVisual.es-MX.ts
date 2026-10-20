@@ -114,6 +114,8 @@ export default {
       ventanilla: "Ventanilla",
       // Solo para mostrar con qué se pagó.
       spei: "Transferencia",
+      // Con varias formas de pago (ADR 0177).
+      mixto: "Varias formas",
       oxxo: "OXXO",
     },
     confirmarCobro:

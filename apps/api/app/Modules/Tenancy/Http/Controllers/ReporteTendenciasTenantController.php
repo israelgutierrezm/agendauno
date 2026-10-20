@@ -196,7 +196,8 @@ class ReporteTendenciasTenantController
             ->when($sedes !== null, fn ($q) => $q->whereIn('ventas_pos.sucursal_id', $sedes))
             ->whereBetween('ventas_pos.created_at', [$inicio, $fin])
             ->groupBy('lineas_venta_pos.articulo_id')
-            ->selectRaw('lineas_venta_pos.articulo_id as aid, SUM(lineas_venta_pos.subtotal_minor) as vendido, SUM(lineas_venta_pos.cantidad) as unidades')
+            // Sin lo devuelto (ADR 0178): el subtotal es precio × piezas, así que es exacto.
+            ->selectRaw('lineas_venta_pos.articulo_id as aid, SUM(lineas_venta_pos.subtotal_minor * (lineas_venta_pos.cantidad - lineas_venta_pos.cantidad_devuelta) / lineas_venta_pos.cantidad) as vendido, SUM(lineas_venta_pos.cantidad - lineas_venta_pos.cantidad_devuelta) as unidades')
             ->toBase()
             ->get();
         $articulos = ArticuloTenant::query()

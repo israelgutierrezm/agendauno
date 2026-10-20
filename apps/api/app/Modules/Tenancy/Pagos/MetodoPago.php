@@ -15,6 +15,8 @@ enum MetodoPago: string
     case Spei = 'spei';
     case Efectivo = 'efectivo';
     case Ventanilla = 'ventanilla';
+    // Cobro en caja con varias formas (ADR 0177): sus partes dicen cuánto en cada una.
+    case Mixto = 'mixto';
 
     public function etiqueta(): string
     {
@@ -24,6 +26,7 @@ enum MetodoPago: string
             self::Spei => 'Transferencia SPEI',
             self::Efectivo => 'Efectivo',
             self::Ventanilla => 'Ventanilla',
+            self::Mixto => 'Mixto',
         };
     }
 }

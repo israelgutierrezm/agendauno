@@ -87,6 +87,26 @@ class VentaPosTenant extends Model
     }
 
     /**
+     * Sus partes, si se cobró con varias formas (ADR 0177): lo vendido y la propina.
+     *
+     * @return HasMany<ParteCobroTenant, $this>
+     */
+    public function partes(): HasMany
+    {
+        return $this->hasMany(ParteCobroTenant::class, 'venta_pos_id');
+    }
+
+    /**
+     * Sus devoluciones parciales (ADR 0178).
+     *
+     * @return HasMany<DevolucionVentaTenant, $this>
+     */
+    public function devoluciones(): HasMany
+    {
+        return $this->hasMany(DevolucionVentaTenant::class, 'venta_pos_id');
+    }
+
+    /**
      * @return BelongsTo<SucursalTenant, $this>
      */
     public function sucursal(): BelongsTo

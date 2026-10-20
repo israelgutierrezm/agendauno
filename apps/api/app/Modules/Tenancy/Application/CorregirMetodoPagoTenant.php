@@ -51,6 +51,9 @@ class CorregirMetodoPagoTenant
         if ($pago->estado !== EstadoPago::Aprobado) {
             return 'Este cobro ya tiene devoluciones; su forma de pago ya no se corrige.';
         }
+        if ($pago->metodo === MetodoPago::Mixto) {
+            return 'Se cobró con varias formas de pago: anúlalo y cóbralo de nuevo con las formas correctas.';
+        }
         $horas = $this->parametros->entero('pagos.horas_para_corregir');
         if ($horas > 0 && $pago->created_at !== null && $pago->created_at->lt(now()->subHours($horas))) {
             return "La forma de pago se corrige hasta {$horas} h después del cobro.";

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\DevolucionVentaTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\ParteCobroTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
@@ -15,6 +17,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\ConceptoDeCobro;
 use Carbon\CarbonImmutable;
@@ -105,7 +108,12 @@ class MovimientosDePagoTenant
         $truncado = false;
         foreach ([
             'cobro' => fn (): array => $this->cobros($inicio, $fin, $usuarioId, $limite),
-            'devolucion' => fn (): array => $this->devoluciones($inicio, $fin, $usuarioId, $limite),
+            'devolucion' => function () use ($inicio, $fin, $usuarioId, $limite): array {
+                [$deCobros, $cortadoA] = $this->devoluciones($inicio, $fin, $usuarioId, $limite);
+                [$delMostrador, $cortadoB] = $this->devolucionesDelMostrador($inicio, $fin, $usuarioId, $limite);
+
+                return [[...$deCobros, ...$delMostrador], $cortadoA || $cortadoB];
+            },
             'venta' => fn (): array => $this->ventas($inicio, $fin, $usuarioId, $limite),
             'cancelacion' => fn (): array => $this->cancelaciones($inicio, $fin, $usuarioId, $limite),
         ] as $t => $consulta) {
@@ -252,6 +260,16 @@ class MovimientosDePagoTenant
         foreach ($devoluciones as $r) {
             $sumar((string) $r->moneda, $r->fecha, 'devuelto_minor', (int) $r->monto);
         }
+        // Lo devuelto del mostrador (ADR 0178), en su fecha.
+        $delMostrador = DevolucionVentaTenant::query()
+            ->join('ventas_pos', 'ventas_pos.id', '=', 'devoluciones_venta.venta_pos_id')
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('ventas_pos.sucursal_id', $sucursales))
+            ->whereBetween('devoluciones_venta.created_at', [$inicio, $fin])
+            ->toBase()
+            ->get(['ventas_pos.moneda as moneda', 'devoluciones_venta.monto_minor as monto', 'devoluciones_venta.created_at as fecha']);
+        foreach ($delMostrador as $r) {
+            $sumar((string) $r->moneda, $r->fecha, 'devuelto_minor', (int) $r->monto);
+        }
 
         return $por;
     }
@@ -265,7 +283,7 @@ class MovimientosDePagoTenant
             ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
             ->whereBetween('aprobado_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('registrado_por', $usuarioId))
-            ->with(['orden.persona', 'orden.lineas.producto', 'orden.sesion'])
+            ->with(['orden.persona', 'orden.lineas.producto', 'orden.sesion', 'partes'])
             ->orderByDesc('aprobado_en')
             ->orderByDesc('id')
             ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
@@ -282,6 +300,8 @@ class MovimientosDePagoTenant
                 'monto_minor' => $pago->monto_minor,
                 'moneda' => $pago->moneda,
                 'metodo' => $pago->metodo->value ?? $pago->proveedor,
+                // Con varias formas (ADR 0177): cuánto con cada una.
+                'partes' => $pago->metodo === MetodoPago::Mixto ? self::partesGuardadas($pago->partes) : null,
                 'persona' => $pago->orden?->persona?->nombreCompleto(),
                 'concepto' => self::concepto($pago->orden),
                 'quien' => $registro['nombre'] ?? ($pago->domiciliacion_id !== null ? 'Pago automático' : 'En línea'),
@@ -321,7 +341,9 @@ class MovimientosDePagoTenant
                 'tipo' => 'devolucion',
                 'monto_minor' => -$r->monto_minor,
                 'moneda' => $r->moneda,
-                'metodo' => $r->pago->metodo->value ?? $r->pago->proveedor ?? null,
+                'metodo' => $r->metodo !== null
+                    ? (CorregirMetodoPagoTenant::metodoDeCaja($r->metodo)->value ?? $r->metodo)
+                    : ($r->pago->metodo->value ?? $r->pago->proveedor ?? null),
                 'persona' => $r->pago?->orden?->persona?->nombreCompleto(),
                 'concepto' => self::concepto($r->pago?->orden),
                 'quien' => $actor['nombre'] ?? ($r->actor_nombre ?: 'Sistema'),
@@ -332,6 +354,47 @@ class MovimientosDePagoTenant
                 'detalle' => $r->motivo,
             ];
         }, $reembolsos), $cortado];
+    }
+
+    /**
+     * Lo devuelto de ventas del mostrador (ADR 0178): en su fecha y por su forma.
+     *
+     * @return array{0: list<Movimiento>, 1: bool}
+     */
+    private function devolucionesDelMostrador(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
+    {
+        $devoluciones = DevolucionVentaTenant::query()
+            ->whereHas('venta', fn ($q) => $q->when($this->sucursales !== null, fn ($v) => $v->whereIn('sucursal_id', $this->sucursales ?? [])))
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
+            ->with(['venta', 'lineas.linea.articulo'])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
+            ->get();
+        [$devoluciones, $cortado] = self::recortar($devoluciones->all(), $limite);
+        $nombres = $this->nombres(array_map(static fn (DevolucionVentaTenant $d): mixed => $d->usuario_id, $devoluciones));
+
+        return [array_map(function (DevolucionVentaTenant $d) use ($nombres): array {
+            $quien = $d->usuario_id !== null ? $nombres[(int) $d->usuario_id] ?? null : null;
+            $concepto = $d->lineas->map(fn ($l): string => (string) ($l->linea->articulo->nombre ?? ''))->filter()->unique()->implode(', ');
+
+            return [
+                'fecha' => (string) $d->created_at?->toIso8601String(),
+                'tipo' => 'devolucion',
+                'monto_minor' => -$d->monto_minor,
+                'moneda' => (string) $d->venta?->moneda,
+                'metodo' => $d->metodo,
+                'persona' => null,
+                'concepto' => Str::limit($concepto !== '' ? $concepto : 'Devolución del mostrador', 120),
+                'quien' => $quien['nombre'] ?? 'Sistema',
+                'quien_id' => $quien['ulid'] ?? null,
+                'referencia' => (string) $d->ulid,
+                'orden' => null,
+                'pago' => null,
+                'detalle' => $d->motivo,
+            ];
+        }, $devoluciones), $cortado];
     }
 
     /**
@@ -347,7 +410,7 @@ class MovimientosDePagoTenant
             ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
             ->whereBetween('created_at', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
-            ->with('lineas.articulo')
+            ->with(['lineas.articulo', 'partes'])
             ->orderByDesc('id')
             ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
             ->get();
@@ -366,6 +429,7 @@ class MovimientosDePagoTenant
                 'propina_minor' => $v->propina_minor,
                 'moneda' => $v->moneda,
                 'metodo' => $v->metodo_pago,
+                'partes' => $v->metodo_pago === PartesCobro::MIXTO ? self::partesGuardadas($v->partes) : null,
                 'persona' => null,
                 'concepto' => Str::limit($concepto !== '' ? $concepto : 'Venta de mostrador', 120),
                 'quien' => $vendio['nombre'] ?? 'Sistema',
@@ -452,9 +516,26 @@ class MovimientosDePagoTenant
                 ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
                 ->whereBetween('aprobado_en', [$inicio, $fin])
                 ->when($usuarioId !== null, fn ($q) => $q->where('registrado_por', $usuarioId))
+                // Los mixtos van por sus partes (abajo), no como «mixto».
+                ->where(fn ($q) => $q->whereNull('metodo')->orWhere('metodo', '!=', MetodoPago::Mixto->value))
                 ->groupByRaw('moneda, metodo, proveedor, registrado_por, CASE WHEN domiciliacion_id IS NULL THEN 0 ELSE 1 END')
                 ->toBase()
                 ->get();
+            $partes = $this->porSedeDeLaOrden(PagoTenant::query(), 'pagos.orden_id')
+                ->join('partes_cobro', 'partes_cobro.pago_id', '=', 'pagos.id')
+                ->selectRaw('pagos.moneda AS moneda, partes_cobro.metodo AS metodo, pagos.proveedor AS proveedor, pagos.registrado_por AS registrado_por, 0 AS automatico, SUM(partes_cobro.monto_minor) AS total')
+                ->where('pagos.metodo', MetodoPago::Mixto->value)
+                ->whereIn('pagos.estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
+                ->whereBetween('pagos.aprobado_en', [$inicio, $fin])
+                ->when($usuarioId !== null, fn ($q) => $q->where('pagos.registrado_por', $usuarioId))
+                ->groupBy('pagos.moneda', 'partes_cobro.metodo', 'pagos.proveedor', 'pagos.registrado_por')
+                ->toBase()
+                ->get()
+                // La forma de la caja, como la guarda un pago (transferencia → SPEI).
+                ->each(static function (object $f): void {
+                    $f->metodo = CorregirMetodoPagoTenant::metodoDeCaja((string) $f->metodo)->value ?? $f->metodo;
+                });
+            $filas = $filas->concat($partes);
             $nombres = $this->nombres($filas->pluck('registrado_por')->all());
             foreach ($filas as $f) {
                 $quien = $f->registrado_por !== null
@@ -467,11 +548,11 @@ class MovimientosDePagoTenant
         if ($incluye('devolucion')) {
             $filas = $this->porSedeDeLaOrden(ReembolsoTenant::query(), 'pagos.orden_id')
                 ->join('pagos', 'pagos.id', '=', 'reembolsos.pago_id')
-                ->selectRaw('reembolsos.moneda AS moneda, pagos.metodo AS metodo, pagos.proveedor AS proveedor, reembolsos.actor_id AS actor_id, reembolsos.actor_nombre AS actor_nombre, SUM(reembolsos.monto_minor) AS total')
+                ->selectRaw('reembolsos.moneda AS moneda, pagos.metodo AS metodo, reembolsos.metodo AS sale_por, pagos.proveedor AS proveedor, reembolsos.actor_id AS actor_id, reembolsos.actor_nombre AS actor_nombre, SUM(reembolsos.monto_minor) AS total')
                 ->where('reembolsos.estado', EstadoReembolso::Aprobado->value)
                 ->whereBetween('reembolsos.aplicado_en', [$inicio, $fin])
                 ->when($usuarioId !== null, fn ($q) => $q->where('reembolsos.actor_id', $usuarioId))
-                ->groupBy('reembolsos.moneda', 'pagos.metodo', 'pagos.proveedor', 'reembolsos.actor_id', 'reembolsos.actor_nombre')
+                ->groupBy('reembolsos.moneda', 'pagos.metodo', 'reembolsos.metodo', 'pagos.proveedor', 'reembolsos.actor_id', 'reembolsos.actor_nombre')
                 ->toBase()
                 ->get();
             $nombres = $this->nombres($filas->pluck('actor_id')->all());
@@ -479,20 +560,58 @@ class MovimientosDePagoTenant
                 $quien = $f->actor_id !== null
                     ? ($nombres[(int) $f->actor_id]['nombre'] ?? 'Sistema')
                     : ((string) ($f->actor_nombre ?? '') !== '' ? (string) $f->actor_nombre : 'Sistema');
-                $sumar((string) $f->moneda, ($f->metodo ?? null) ?: ($f->proveedor ?? null), -((int) $f->total), $quien, $f->proveedor ?? null);
+                // De un cobro mixto, por la forma por la que salió (ADR 0177).
+                $metodo = $f->sale_por !== null
+                    ? (CorregirMetodoPagoTenant::metodoDeCaja((string) $f->sale_por)->value ?? $f->sale_por)
+                    : (($f->metodo ?? null) ?: ($f->proveedor ?? null));
+                $sumar((string) $f->moneda, $metodo, -((int) $f->total), $quien, $f->proveedor ?? null);
+            }
+        }
+
+        if ($incluye('devolucion')) {
+            // Del mostrador (ADR 0178): por la forma por la que salió.
+            $filas = DevolucionVentaTenant::query()
+                ->join('ventas_pos', 'ventas_pos.id', '=', 'devoluciones_venta.venta_pos_id')
+                ->selectRaw('ventas_pos.moneda AS moneda, devoluciones_venta.metodo AS metodo, devoluciones_venta.usuario_id AS usuario_id, SUM(devoluciones_venta.monto_minor) AS total')
+                ->when($this->sucursales !== null, fn ($q) => $q->whereIn('ventas_pos.sucursal_id', $this->sucursales ?? []))
+                ->whereBetween('devoluciones_venta.created_at', [$inicio, $fin])
+                ->when($usuarioId !== null, fn ($q) => $q->where('devoluciones_venta.usuario_id', $usuarioId))
+                ->groupBy('ventas_pos.moneda', 'devoluciones_venta.metodo', 'devoluciones_venta.usuario_id')
+                ->toBase()
+                ->get();
+            $nombres = $this->nombres($filas->pluck('usuario_id')->all());
+            foreach ($filas as $f) {
+                $quien = $f->usuario_id !== null ? ($nombres[(int) $f->usuario_id]['nombre'] ?? 'Sistema') : 'Sistema';
+                $sumar((string) $f->moneda, (string) $f->metodo, -((int) $f->total), $quien);
             }
         }
 
         if ($incluye('venta')) {
-            $filas = VentaPosTenant::query()
-                ->selectRaw('moneda, metodo_pago, usuario_id, SUM(total_minor) AS total, SUM(propina_minor) AS propinas')
+            $ventas = fn () => VentaPosTenant::query()
                 ->whereNull('anulada_en')
                 ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
                 ->whereBetween('created_at', [$inicio, $fin])
-                ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
+                ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId));
+            $filas = $ventas()
+                ->selectRaw('moneda, metodo_pago, usuario_id, SUM(total_minor) AS total, SUM(propina_minor) AS propinas')
+                ->where('metodo_pago', '!=', PartesCobro::MIXTO)
                 ->groupBy('moneda', 'metodo_pago', 'usuario_id')
                 ->toBase()
                 ->get();
+            // Las mixtas (ADR 0177): lo vendido y la propina repartidos entre sus formas.
+            foreach ($ventas()->where('metodo_pago', PartesCobro::MIXTO)->with('partes')->get() as $mixta) {
+                [$deVenta, $dePropina] = PartesCobro::repartir(self::partesGuardadas($mixta->partes), [(int) $mixta->total_minor, (int) $mixta->propina_minor]);
+                $porForma = [];
+                foreach ([[$deVenta, 'total'], [$dePropina, 'propinas']] as [$tramo, $campo]) {
+                    foreach ($tramo as $parte) {
+                        $porForma[$parte['metodo']] ??= ['total' => 0, 'propinas' => 0];
+                        $porForma[$parte['metodo']][$campo] += $parte['monto_minor'];
+                    }
+                }
+                foreach ($porForma as $metodo => $montos) {
+                    $filas->push((object) ['moneda' => $mixta->moneda, 'metodo_pago' => $metodo, 'usuario_id' => $mixta->usuario_id, 'total' => $montos['total'], 'propinas' => $montos['propinas']]);
+                }
+            }
             $nombres = $this->nombres($filas->pluck('usuario_id')->all());
             foreach ($filas as $f) {
                 $quien = $f->usuario_id !== null ? ($nombres[(int) $f->usuario_id]['nombre'] ?? 'Sistema') : 'Sistema';
@@ -592,6 +711,23 @@ class MovimientosDePagoTenant
      * negocio (cobros en caja y mostrador) va aparte de la tarjeta en línea (por la
      * pasarela): la primera se cuadra con el voucher de la terminal; la otra, no.
      */
+    /**
+     * Las partes guardadas de un cobro mixto, en su orden.
+     *
+     * @param  iterable<ParteCobroTenant>  $partes
+     * @return list<array{metodo: string, monto_minor: int}>
+     */
+    private static function partesGuardadas(iterable $partes): array
+    {
+        $lista = [];
+        foreach ($partes as $parte) {
+            $lista[] = ['orden' => (int) $parte->orden, 'id' => (int) $parte->id, 'metodo' => (string) $parte->metodo, 'monto_minor' => (int) $parte->monto_minor];
+        }
+        usort($lista, static fn (array $a, array $b): int => [$a['orden'], $a['id']] <=> [$b['orden'], $b['id']]);
+
+        return array_map(static fn (array $p): array => ['metodo' => $p['metodo'], 'monto_minor' => $p['monto_minor']], $lista);
+    }
+
     private static function etiquetaMetodo(?string $metodo, ?string $proveedor): string
     {
         $tipo = MetodoPago::tryFrom((string) $metodo);

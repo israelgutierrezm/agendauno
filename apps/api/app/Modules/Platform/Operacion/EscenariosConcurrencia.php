@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\BajasDeGrupoTenant;
 use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CobroDeCitaTenant;
+use App\Modules\Tenancy\Application\DevolverVentaPosTenant;
 use App\Modules\Tenancy\Application\InscribirEnGrupoTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
@@ -31,6 +32,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\InscripcionGrupoTenant;
+use App\Modules\Tenancy\Models\LineaVentaPosTenant;
 use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
@@ -46,6 +48,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\Exceptions\VentaNoDevolvible;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
@@ -84,6 +87,7 @@ class EscenariosConcurrencia
         private readonly InscribirEnGrupoTenant $inscribir,
         private readonly BajasDeGrupoTenant $bajas,
         private readonly CajasTenant $cajas,
+        private readonly DevolverVentaPosTenant $devoluciones,
     ) {}
 
     /**
@@ -370,7 +374,7 @@ class EscenariosConcurrencia
 
         try {
             return ['hecho' => true, 'esperado' => true, 'detalle' => $accion()];
-        } catch (ReservaException|SaldoInsuficiente|InventarioException|ValidationException|CajaCerrada $e) {
+        } catch (ReservaException|SaldoInsuficiente|InventarioException|ValidationException|CajaCerrada|VentaNoDevolvible $e) {
             return ['hecho' => false, 'esperado' => true, 'detalle' => class_basename($e).': '.$e->getMessage()];
         } catch (Throwable $e) {
             return ['hecho' => false, 'esperado' => false, 'detalle' => class_basename($e).': '.Str::limit($e->getMessage(), 300)];
@@ -399,6 +403,7 @@ class EscenariosConcurrencia
             'cobrar-cita' => $this->prepararCobrarCita((int) $paso['reserva'], (string) $paso['clave']),
             'cambiar-grupo' => $this->prepararCambiarGrupo((int) $paso['inscripcion'], (int) $paso['destino'], (string) $paso['desde']),
             'contar-caja' => $this->prepararContarCaja((int) $paso['turno']),
+            'devolver-venta' => $this->prepararDevolverVenta((int) $paso['venta'], (int) $paso['cantidad']),
             'aprovisionar' => $this->prepararAprovisionar((int) $paso['estudio']),
             'migrar' => $this->prepararMigrar((int) $paso['estudio']),
             default => throw new InvalidArgumentException("Paso desconocido: {$paso['accion']}"),
@@ -414,6 +419,36 @@ class EscenariosConcurrencia
         $reserva = ReservaTenant::query()->findOrFail($reservaId);
 
         return fn (): string => (string) $this->cobro->cobrar($reserva, 'efectivo', [], 0, 100000, null, $clave, null)['venta']?->ulid;
+    }
+
+    /** Devolver piezas de una venta del mostrador (ADR 0178): devuelve el monto. */
+    private function prepararDevolverVenta(int $ventaId, int $cantidad): callable
+    {
+        $venta = VentaPosTenant::query()->findOrFail($ventaId);
+        $linea = (string) LineaVentaPosTenant::query()->where('venta_pos_id', $ventaId)->value('ulid');
+        $cajero = Usuario::query()->orderBy('id')->firstOrFail();
+
+        return fn (): string => (string) $this->devoluciones->devolver($venta, [$linea => $cantidad], 'Verificación', null, $cajero)->monto_minor;
+    }
+
+    /**
+     * Una venta del mostrador ya hecha con `$piezas` piezas de un producto nuevo de la
+     * sede (para devolver de ella).
+     *
+     * @return array{venta: int, articulo: int}
+     */
+    public function ventaHecha(int $sucursalId, int $piezas): array
+    {
+        $articulo = $this->articulo($sucursalId, $piezas);
+        $venta = $this->mostrador->vender(SucursalTenant::query()->findOrFail($sucursalId), [['articulo' => $articulo, 'cantidad' => $piezas]], 'efectivo');
+
+        return ['venta' => (int) $venta->getKey(), 'articulo' => (int) $articulo->getKey()];
+    }
+
+    /** Cuántas piezas de la venta ya se devolvieron. */
+    public function piezasDevueltas(int $ventaId): int
+    {
+        return (int) LineaVentaPosTenant::query()->where('venta_pos_id', $ventaId)->sum('cantidad_devuelta');
     }
 
     /** El conteo a ciegas de la caja con el cajón vacío (ADR 0175): devuelve su estado. */

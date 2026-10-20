@@ -2,11 +2,13 @@
 import { computed, ref, watch } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import FormasDePago from "@/components/FormasDePago.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import type { SesionAgenda } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { efectivoDe, partesListas, type ParteCobro } from "@/lib/formasDePago";
 import { aMinor, dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -113,14 +115,25 @@ const propina = computed(() => {
   );
 });
 const total = computed(() => servicio.value + productos.value + propina.value);
+// Con varias formas de pago (ADR 0177): cuánto con cada una; suman todo.
+const dividido = ref(false);
+const partes = ref<ParteCobro[] | null>(null);
+// Lo recibido y el cambio, solo contra lo que se paga en efectivo.
+const enEfectivo = computed(() =>
+  dividido.value
+    ? efectivoDe(partes.value)
+    : metodo.value === "efectivo"
+      ? total.value
+      : 0,
+);
 const recibidoMinor = computed(() =>
   recibido.value.trim() === "" ? null : aMinor(recibido.value, tenant.pais),
 );
 const cambio = computed(() =>
-  recibidoMinor.value === null ? null : recibidoMinor.value - total.value,
+  recibidoMinor.value === null ? null : recibidoMinor.value - enEfectivo.value,
 );
 const falta = computed(() =>
-  metodo.value === "efectivo" && cambio.value !== null && cambio.value < 0
+  enEfectivo.value > 0 && cambio.value !== null && cambio.value < 0
     ? -cambio.value
     : 0,
 );
@@ -147,6 +160,7 @@ const puedeCobrar = computed(
   () =>
     total.value > 0 &&
     falta.value === 0 &&
+    (!dividido.value || partesListas(partes.value, total.value)) &&
     !lineas.value.some(excede) &&
     !editor.guardando.value,
 );
@@ -180,6 +194,7 @@ watch(
     lineas.value = [];
     elegido.value = "";
     metodo.value = "efectivo";
+    dividido.value = false;
     propinaPct.value = 0;
     propinaOtra.value = "";
     recibido.value = "";
@@ -208,13 +223,16 @@ async function cobrar(): Promise<void> {
   const respuesta = await editor.guardar(() =>
     api.post<{ data: Resultado }>(`${props.base}/reservas/${reserva}/cobro`, {
       metodo: metodo.value,
+      ...(dividido.value && partes.value !== null
+        ? { partes: partes.value }
+        : {}),
       items: lineas.value.map((l) => ({
         articulo_id: l.articulo.id,
         cantidad: l.cantidad,
         precio_minor: l.articulo.precio_minor,
       })),
       propina_minor: propina.value,
-      recibido_minor: metodo.value === "efectivo" ? recibidoMinor.value : null,
+      recibido_minor: enEfectivo.value > 0 ? recibidoMinor.value : null,
       enviar_ticket: enviarTicket.value,
       clave_intento: clave,
     }),
@@ -499,7 +517,7 @@ async function cerrar(): Promise<void> {
       <!-- Forma de pago y, en efectivo, lo que entregó -->
       <fieldset>
         <legend class="tu-label">{{ $t("cobroCita.metodo") }}</legend>
-        <div class="tu-segmentado flex-wrap" role="group">
+        <div v-if="!dividido" class="tu-segmentado flex-wrap" role="group">
           <button
             v-for="m in METODOS"
             :key="m"
@@ -510,8 +528,19 @@ async function cerrar(): Promise<void> {
             {{ $t(`agendaVisual.cita.metodos.${m}`) }}
           </button>
         </div>
+        <FormasDePago
+          v-model:dividido="dividido"
+          v-model:partes="partes"
+          class="mt-2"
+          :total="total"
+          :metodos="METODOS"
+          prefijo="agendaVisual.cita.metodos"
+          :inicial="metodo"
+          :moneda="tenant.moneda"
+          :pais="tenant.pais"
+        />
       </fieldset>
-      <div v-if="metodo === 'efectivo'">
+      <div v-if="enEfectivo > 0">
         <label class="tu-label" for="cc-recibido">{{
           $t("cobroCita.recibe")
         }}</label>

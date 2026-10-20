@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -75,11 +76,21 @@ class PuntoDeVentaTenant
      * una cita, con su reserva: así un reintento se reconoce y otra operación con la
      * misma clave es un conflicto (R05).
      *
+     * Con varias formas de pago (`$partes`, ADR 0177) se guarda «mixto»: las partes suman
+     * lo vendido y la propina, y cada forma entra a la caja por separado. `$efectivoMinor`
+     * es lo que se paga en efectivo de todo el cobro (en una cita, también el servicio):
+     * lo recibido se compara con eso, y el cambio sale solo de ahí.
+     *
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras?: list<ExtraArticuloTenant>, precio_minor?: int|null}>  $items
+     * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
      */
-    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0, ?int $reservaId = null, ?string $huella = null): VentaPosTenant
+    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0, ?int $reservaId = null, ?string $huella = null, ?array $partes = null, ?int $efectivoMinor = null): VentaPosTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor, $reservaId, $huella): VentaPosTenant {
+        if ($partes !== null) {
+            $metodo = PartesCobro::MIXTO;
+        }
+
+        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor, $reservaId, $huella, $partes, $efectivoMinor): VentaPosTenant {
             // La caja de la sede (ADR 0175), bloqueada antes que los artículos.
             $turno = $this->cajas->turnoParaMovimiento((int) $sucursal->getKey());
             $moneda = $items !== [] ? $items[0]['articulo']->moneda : ($orden->moneda ?? $this->region->moneda());
@@ -160,15 +171,33 @@ class PuntoDeVentaTenant
                 );
             }
 
-            // En efectivo: lo que entregó alcanza para lo vendido y la propina (el cambio).
-            if ($recibidoMinor !== null && $recibidoMinor < $total + $venta->propina_minor + $venta->servicio_minor) {
+            // Con varias formas, suman lo vendido y la propina (ADR 0177). «Mixto» sin
+            // partes solo vale sin dinero propio (el comprobante de una cita mixta).
+            $propio = $total + (int) $venta->propina_minor;
+            if ($partes !== null) {
+                PartesCobro::exigirTotal($partes, $propio);
+            } elseif ($metodo === PartesCobro::MIXTO && $propio > 0) {
+                throw ValidationException::withMessages(['partes' => ['Indica cuánto se paga con cada forma.']]);
+            }
+            // En efectivo: lo que entregó alcanza para lo que se paga en efectivo (el cambio).
+            $enEfectivo = $efectivoMinor
+                ?? ($partes !== null ? PartesCobro::efectivo($partes) : $total + $venta->propina_minor + $venta->servicio_minor);
+            if ($recibidoMinor !== null && $recibidoMinor < $enEfectivo) {
                 throw ValidationException::withMessages(['recibido_minor' => ['Lo que recibiste no alcanza para cobrar la venta.']]);
             }
-            $venta->update(['total_minor' => $total, 'recibido_minor' => $metodo === 'efectivo' ? $recibidoMinor : null]);
+            $conEfectivo = $metodo === 'efectivo' || ($efectivoMinor ?? ($partes !== null ? PartesCobro::efectivo($partes) : 0)) > 0;
+            $venta->update(['total_minor' => $total, 'recibido_minor' => $conEfectivo ? $recibidoMinor : null]);
             // Lo vendido y la propina (en la caja, aunque no sea ingreso; ADR 0139). El
-            // servicio de una cita entra por su cobro.
-            $this->cajas->asentar($turno, MovimientoCajaTenant::VENTA, CajasTenant::metodo($metodo), $total, ['venta_pos_id' => $venta->getKey()], $actor);
-            $this->cajas->asentar($turno, MovimientoCajaTenant::PROPINA, CajasTenant::metodo($metodo), (int) $venta->propina_minor, ['venta_pos_id' => $venta->getKey()], $actor);
+            // servicio de una cita entra por su cobro. Mixta: cada forma por separado.
+            if ($partes !== null) {
+                PartesCobro::guardar($venta->partes(), $partes);
+                [$deVenta, $dePropina] = PartesCobro::repartir($partes, [$total, (int) $venta->propina_minor]);
+                $this->cajas->asentarPartes($turno, MovimientoCajaTenant::VENTA, $deVenta, 1, ['venta_pos_id' => $venta->getKey()], $actor);
+                $this->cajas->asentarPartes($turno, MovimientoCajaTenant::PROPINA, $dePropina, 1, ['venta_pos_id' => $venta->getKey()], $actor);
+            } else {
+                $this->cajas->asentar($turno, MovimientoCajaTenant::VENTA, CajasTenant::metodo($metodo), $total, ['venta_pos_id' => $venta->getKey()], $actor);
+                $this->cajas->asentar($turno, MovimientoCajaTenant::PROPINA, CajasTenant::metodo($metodo), (int) $venta->propina_minor, ['venta_pos_id' => $venta->getKey()], $actor);
+            }
 
             return $venta->refresh();
         });

@@ -1866,6 +1866,8 @@ export default {
       titulo: "Reembolsar pago",
       reembolsable: "Reembolsable: {monto}",
       monto: "Monto a reembolsar",
+      // Un cobro con varias formas (ADR 0177) se devuelve por una de ellas.
+      salePor: "Se devuelve por",
       motivo: "Motivo",
       motivoPh: "Cancelación, error de cobro…",
       revertir: "Revertir créditos",
@@ -1973,6 +1975,8 @@ export default {
       tarjeta: "Tarjeta (terminal)",
       transferencia: "Transferencia",
       ventanilla: "Ventanilla",
+      // Con varias formas de pago (ADR 0177).
+      mixto: "Varias formas",
     },
     productos: {
       titulo: "Productos",
@@ -2534,6 +2538,8 @@ export default {
       efectivo: "Efectivo",
       tarjeta: "Tarjeta",
       transferencia: "Transferencia",
+      // Con varias formas de pago (ADR 0177).
+      mixto: "Varias formas",
     },
     inventario: {
       nuevo: "Nuevo artículo",

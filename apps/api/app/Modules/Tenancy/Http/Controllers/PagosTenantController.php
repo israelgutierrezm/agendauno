@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AnularCobroTenant;
+use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -17,6 +18,7 @@ use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
+use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -159,6 +161,9 @@ class PagosTenantController
                     'estado' => $pago->estado->value,
                     'proveedor' => $pago->proveedor,
                     'metodo' => $pago->metodo?->value,
+                    // Con varias formas (ADR 0177): cuánto con cada una (su devolución
+                    // elige por cuál sale).
+                    'partes' => $pago->metodo === MetodoPago::Mixto ? CajasTenant::partesDelPago($pago) : null,
                     'reembolsado_minor' => $reembolsado,
                     'reembolsable_minor' => max(0, $pago->monto_minor - $comprometido),
                     'con_reembolsos' => (int) $pago->getAttribute('reembolsos_count') > 0,

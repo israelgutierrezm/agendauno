@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
+use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CompradoresPosTenant;
 use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
+use App\Modules\Tenancy\Application\DevolverVentaPosTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\TicketVentaPosTenant;
+use App\Modules\Tenancy\Models\DevolucionVentaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +44,7 @@ class PuntoDeVentaTenantController
         private readonly CompradoresPosTenant $compradores,
         private readonly TicketVentaPosTenant $tickets,
         private readonly FechasNegocioTenant $fechas,
+        private readonly DevolverVentaPosTenant $devoluciones,
     ) {}
 
     /**
@@ -105,21 +110,27 @@ class PuntoDeVentaTenantController
     }
 
     /**
-     * Cuántas ventas y cuánto se vendió (sin anuladas; las propinas, aparte).
+     * Cuántas ventas y cuánto se vendió (sin anuladas ni lo devuelto; las propinas,
+     * aparte).
      *
      * @param  Builder<VentaPosTenant>  $consulta
-     * @return array{ventas: int, vendido_minor: int, propinas_minor: int}
+     * @return array{ventas: int, vendido_minor: int, propinas_minor: int, devuelto_minor: int}
      */
     private function sumar(Builder $consulta): array
     {
-        $fila = (clone $consulta)->whereNull('anulada_en')
+        $vigentes = (clone $consulta)->whereNull('anulada_en');
+        $fila = (clone $vigentes)
             ->selectRaw('COUNT(*) as ventas, COALESCE(SUM(total_minor), 0) as vendido, COALESCE(SUM(propina_minor), 0) as propinas')
             ->toBase()->first();
+        $devuelto = (int) DevolucionVentaTenant::query()
+            ->whereIn('venta_pos_id', (clone $vigentes)->select('ventas_pos.id'))
+            ->sum('monto_minor');
 
         return [
             'ventas' => (int) ($fila->ventas ?? 0),
-            'vendido_minor' => (int) ($fila->vendido ?? 0),
+            'vendido_minor' => (int) ($fila->vendido ?? 0) - $devuelto,
             'propinas_minor' => (int) ($fila->propinas ?? 0),
+            'devuelto_minor' => $devuelto,
         ];
     }
 
@@ -157,7 +168,10 @@ class PuntoDeVentaTenantController
             'items.*.precio_minor' => ['nullable', 'integer', 'min:0'],
             // La clave del intento de cobro: un reintento devuelve la misma venta.
             'clave_intento' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
+            // Con varias formas de pago (ADR 0177): cuánto con cada una.
+            ...PartesCobro::reglas(),
         ]);
+        $partes = PartesCobro::desde($validado['partes'] ?? null);
 
         // Ya se registró con esta clave (la respuesta se perdió): la misma venta, si es la
         // misma operación; con otra (u otra cita), conflicto (R05).
@@ -168,6 +182,7 @@ class PuntoDeVentaTenantController
                 (string) $i['articulo_id'], (int) $i['cantidad'], array_values((array) ($i['extras'] ?? [])), $i['precio_minor'] ?? null,
             ], array_values($validado['items'])),
             'metodo' => $validado['metodo_pago'] ?? 'efectivo',
+            'partes' => $partes,
             'propina' => (int) ($validado['propina_minor'] ?? 0),
             'recibido' => $validado['recibido_minor'] ?? null,
             'comprador' => $validado['comprador_id'] ?? null,
@@ -210,6 +225,7 @@ class PuntoDeVentaTenantController
                 isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
                 $clave,
                 huella: $huella,
+                partes: $partes,
             );
         } catch (UniqueConstraintViolationException $e) {
             // Dos intentos con la misma clave a la vez: el otro ya la registró.
@@ -272,6 +288,34 @@ class PuntoDeVentaTenantController
      * Anula una venta registrada por error: no cuenta en el corte y lo vendido
      * regresa al inventario (ADR 0089).
      */
+    /**
+     * Devuelve algunos productos de la venta (ADR 0178): las piezas por línea, el
+     * motivo y, si se cobró con varias formas, por cuál sale el dinero.
+     */
+    public function devolver(Request $request): JsonResponse
+    {
+        $venta = $this->ventaDeMiSede($request);
+        $validado = $request->validate([
+            'lineas' => ['required', 'array', 'min:1', 'max:50'],
+            'lineas.*.id' => ['required', 'string'],
+            'lineas.*.cantidad' => ['required', 'integer', 'min:1', 'max:999'],
+            'motivo' => ['required', 'string', 'max:255'],
+            'metodo' => ['nullable', 'string', 'in:'.implode(',', CajasTenant::METODOS)],
+            'idempotency_key' => ['nullable', 'string', 'max:100'],
+        ]);
+        $cantidades = [];
+        foreach ($validado['lineas'] as $linea) {
+            $cantidades[(string) $linea['id']] = ($cantidades[(string) $linea['id']] ?? 0) + (int) $linea['cantidad'];
+        }
+        $llave = $request->header('Idempotency-Key') ?: ($validado['idempotency_key'] ?? null);
+        $this->devoluciones->devolver(
+            $venta, $cantidades, $validado['motivo'], $validado['metodo'] ?? null, $this->actor($request),
+            is_string($llave) && $llave !== '' ? mb_substr($llave, 0, 100) : null,
+        );
+
+        return response()->json(['data' => $this->presentar($venta->refresh()->load(['sucursal', 'lineas.articulo', 'persona']))], 201);
+    }
+
     public function anular(Request $request): JsonResponse
     {
         $venta = $this->ventaDeMiSede($request);
@@ -304,6 +348,9 @@ class PuntoDeVentaTenantController
     private function presentar(VentaPosTenant $venta): array
     {
         $persona = $venta->persona;
+        // Con varias formas (ADR 0177): cuánto con cada una; el cambio, del efectivo.
+        $partes = CajasTenant::partesDelCobro($venta);
+        $mixto = count($partes) > 1;
 
         return [
             'id' => $venta->ulid,
@@ -324,18 +371,27 @@ class PuntoDeVentaTenantController
             'propina_minor' => $venta->propina_minor,
             'cobrado_minor' => $venta->cobradoMinor(),
             'recibido_minor' => $venta->recibido_minor,
-            'cambio_minor' => $venta->recibido_minor !== null ? $venta->recibido_minor - $venta->cobradoMinor() : null,
+            'cambio_minor' => $venta->recibido_minor !== null
+                ? $venta->recibido_minor - ($mixto ? PartesCobro::efectivo($partes) : $venta->cobradoMinor())
+                : null,
             'moneda' => $venta->moneda,
-            'metodo_pago' => $venta->metodo_pago,
+            'metodo_pago' => $mixto ? PartesCobro::MIXTO : $venta->metodo_pago,
+            'partes' => $mixto ? $partes : [],
             'creado_en' => $venta->created_at?->toIso8601String(),
             // Corregir la forma de pago o anularla (ADR 0089).
             'anulada_en' => $venta->anulada_en?->toIso8601String(),
             'motivo_anulacion' => $venta->motivo_anulacion,
             'corregible' => $this->corregir->impedimentoMetodo($venta) === null,
             'anulable' => $this->corregir->impedimentoAnular($venta) === null,
+            // Devoluciones parciales (ADR 0178): cuánto salió y si aún se puede devolver.
+            'devuelto_minor' => (int) $venta->devoluciones()->sum('monto_minor'),
+            'devolvible' => $this->devoluciones->impedimento($venta) === null
+                && $venta->lineas->contains(fn ($l): bool => (int) $l->cantidad > (int) $l->cantidad_devuelta),
             'lineas' => $venta->lineas->map(fn ($l): array => [
+                'id' => $l->ulid,
                 'articulo' => $l->articulo?->nombre,
                 'cantidad' => $l->cantidad,
+                'cantidad_devuelta' => (int) $l->cantidad_devuelta,
                 'subtotal_minor' => $l->subtotal_minor,
                 'extras' => array_map(static fn (array $e): string => (string) $e['nombre'], $l->extras ?? []),
             ])->all(),

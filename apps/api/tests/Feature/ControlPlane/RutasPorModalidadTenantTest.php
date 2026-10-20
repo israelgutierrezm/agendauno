@@ -49,6 +49,10 @@ function rutasExclusivasPorModalidad(): array
         'importaciones.clases.plantilla' => 'clases',
         'importaciones.clases.preview' => 'clases',
         'importaciones.clases.store' => 'clases',
+        // Reservas futuras de clases de otro sistema (ADR 0176).
+        'importaciones.reservas.plantilla' => 'clases',
+        'importaciones.reservas.preview' => 'clases',
+        'importaciones.reservas.store' => 'clases',
         'plantillas-horario.index' => 'clases',
         'plantillas-horario.store' => 'clases',
         'plantillas-horario.eliminar' => 'clases',
@@ -145,6 +149,7 @@ function patronesDeRutasExclusivas(): array
 {
     return [
         '/^importaciones\.clases\./' => 'clases',
+        '/^importaciones\.reservas\./' => 'clases',
         '/^plantillas-horario\./' => 'clases',
         '/^grupos\./' => 'clases',
         '/niveles/' => 'clases',

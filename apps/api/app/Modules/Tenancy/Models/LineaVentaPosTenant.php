@@ -21,7 +21,8 @@ class LineaVentaPosTenant extends Model
     protected $table = 'lineas_venta_pos';
 
     // Los extras que llevó, congelados (nombre y precio de ese día; ADR 0139).
-    protected $fillable = ['venta_pos_id', 'articulo_id', 'cantidad', 'precio_unitario_minor', 'subtotal_minor', 'extras', 'extras_minor'];
+    // Cuántas piezas ya se devolvieron (ADR 0178).
+    protected $fillable = ['venta_pos_id', 'articulo_id', 'cantidad', 'precio_unitario_minor', 'subtotal_minor', 'extras', 'extras_minor', 'cantidad_devuelta'];
 
     /**
      * @var array<string, string>
@@ -32,6 +33,7 @@ class LineaVentaPosTenant extends Model
         'subtotal_minor' => 'integer',
         'extras' => 'array',
         'extras_minor' => 'integer',
+        'cantidad_devuelta' => 'integer',
     ];
 
     /**

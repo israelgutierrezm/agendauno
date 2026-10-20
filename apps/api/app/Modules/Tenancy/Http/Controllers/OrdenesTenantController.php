@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -233,11 +234,14 @@ class OrdenesTenantController
             'referencia' => ['nullable', 'string', 'max:255'],
             // Dónde se cobra (la sucursal de la barra): su caja lo registra (ADR 0175).
             'sucursal_id' => ['nullable', 'string'],
+            // Con varias formas de pago (ADR 0177): cuánto con cada una; suman el total.
+            ...PartesCobro::reglas(),
         ]);
+        $partes = PartesCobro::desde($validado['partes'] ?? null);
 
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
-        $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor, $this->sucursalDeCaja($validado['sucursal_id'] ?? null, $actor));
+        $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor, $this->sucursalDeCaja($validado['sucursal_id'] ?? null, $actor), $partes);
 
         // Cobro en caja: queda quién lo registró (el pago lo guarda; aquí, la bitácora).
         if ($pago !== null) {
@@ -245,7 +249,8 @@ class OrdenesTenantController
                 'orden' => (string) $orden->ulid,
                 'monto_minor' => $pago->monto_minor,
                 'moneda' => $pago->moneda,
-                'metodo' => $validado['metodo'],
+                'metodo' => $partes !== null ? PartesCobro::MIXTO : $validado['metodo'],
+                'partes' => $partes,
                 'referencia' => $validado['referencia'] ?? null,
             ]);
         }

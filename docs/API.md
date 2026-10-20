@@ -427,12 +427,45 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
   - `activa_sin_comprobar`;
   - `comprobada`: hay un pago que aprobó ese proveedor, con `comprobada_en`.
 
+## Cobro mixto (ADR 0177)
+
+- `partes` (opcional): lista de 2 a 4 `{metodo, monto_minor}` con formas de la caja
+  (`efectivo`, `tarjeta`, `transferencia`, `ventanilla`), sin repetir y cada una mayor
+  que cero. Va en:
+  - `POST /pos/ventas`: suman lo vendido y la propina;
+  - `POST /ordenes/{orden}/liquidar`: suman el total;
+  - `POST /reservas/{reserva}/cobro`: suman todo, y se reparten en orden: servicio,
+    productos y propina.
+  - Si no suman, responde 422 (`meta.errors.partes`).
+  - `recibido_minor` se compara con la parte en efectivo; el cambio sale de ahí.
+- El cobro queda como `mixto` (`metodo_pago`, `metodo` del pago) y las respuestas, el
+  ticket y la lista de pagos traen `partes`.
+- El corte (`GET /pagos/movimientos`) cuenta cada parte en su forma.
+- `PUT /pos/ventas/{venta}/metodo` y la corrección de la forma de un pago no aceptan un
+  cobro mixto: se anula y se cobra de nuevo.
+- `POST /pagos/{pago}/reembolsos` de un pago mixto pide `metodo` (la forma por la que
+  sale), sin pasar de lo que entró por ella.
+
+## Devolución parcial en el mostrador (ADR 0178)
+
+- `POST /pos/ventas/{venta}/devoluciones` (`pagos.reembolsar`): `lineas` (lista de
+  `{id, cantidad}` con el ulid de cada línea de la venta), `motivo`, `metodo` (solo si
+  la venta fue mixta: la forma por la que sale) e `Idempotency-Key`.
+  - Responde 201 con la venta.
+  - Responde 422 `SALE_NOT_RETURNABLE` si está anulada, pasó el plazo
+    (`pos.dias_para_devolver`), se piden más piezas de las que quedan o la forma no
+    alcanza.
+- La venta (`GET /pos/ventas` y sus respuestas) suma `devuelto_minor` y `devolvible`;
+  cada línea, `id` y `cantidad_devuelta`. `meta.resumen.vendido_minor` ya no cuenta lo
+  devuelto y trae `devuelto_minor`.
+- Con devoluciones, la venta ya no se anula ni se corrige su forma.
+- El corte lista la devolución como `devolucion`, en su fecha y por su forma.
+
 ## Disponibilidad al mover una cita
 
 - `GET /disponibilidad` (`agenda.ver`, negocios de citas) acepta `excluir_reserva` (el
   ulid de la cita que se mueve): su propio horario no cuenta como ocupado, así se puede
-  mover unos minutos con el mismo profesional. Lo usan la web y la app del equipo al
-  reprogramar.
+  mover unos minutos con el mismo profesional. Lo usa la app del equipo al reprogramar.
 
 ## Importar citas futuras (ADR 0160)
 

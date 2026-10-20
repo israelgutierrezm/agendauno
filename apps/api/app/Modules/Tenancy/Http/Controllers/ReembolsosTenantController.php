@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -50,6 +51,8 @@ class ReembolsosTenantController
             'manual' => ['boolean'],
             // Una por intento desde la pantalla: repetir (doble clic) no devuelve dos veces.
             'idempotency_key' => ['nullable', 'string', 'max:100'],
+            // De un cobro mixto (ADR 0177): por qué forma sale el dinero.
+            'metodo' => ['nullable', 'string', 'in:'.implode(',', CajasTenant::METODOS)],
         ]);
         $llave = $request->header('Idempotency-Key') ?: ($validado['idempotency_key'] ?? null);
 
@@ -61,6 +64,7 @@ class ReembolsosTenantController
         $reembolso = $this->reembolsos->ejecutar(
             $pago, $monto, $validado['motivo'], $actorUsuario, $revertir, (bool) ($validado['manual'] ?? false),
             is_string($llave) && $llave !== '' ? mb_substr($llave, 0, 100) : null,
+            $validado['metodo'] ?? null,
         );
 
         $this->auditoria->registrar(

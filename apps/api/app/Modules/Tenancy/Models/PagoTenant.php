@@ -106,4 +106,14 @@ class PagoTenant extends Model
     {
         return $this->hasMany(ReembolsoTenant::class, 'pago_id');
     }
+
+    /**
+     * Sus partes, si fue un cobro mixto (ADR 0177).
+     *
+     * @return HasMany<ParteCobroTenant, $this>
+     */
+    public function partes(): HasMany
+    {
+        return $this->hasMany(ParteCobroTenant::class, 'pago_id');
+    }
 }

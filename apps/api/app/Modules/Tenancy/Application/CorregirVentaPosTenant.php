@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Pagos\Exceptions\CobroNoAnulable;
 use App\Modules\Tenancy\Pagos\Exceptions\CobroNoCorregible;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -45,6 +46,12 @@ final class CorregirVentaPosTenant
         if ($venta->anulada_en !== null) {
             return 'Esta venta está anulada.';
         }
+        if ($venta->metodo_pago === PartesCobro::MIXTO) {
+            return 'Se cobró con varias formas de pago: anúlala y cóbrala de nuevo con las formas correctas.';
+        }
+        if ($venta->devoluciones()->exists()) {
+            return 'Ya tiene devoluciones: su forma de pago ya no se corrige.';
+        }
         $horas = $this->parametros->entero('pagos.horas_para_corregir');
         if ($horas > 0 && $venta->created_at !== null && $venta->created_at->lt(now()->subHours($horas))) {
             return "La forma de pago se corrige hasta {$horas} h después de la venta.";
@@ -61,6 +68,9 @@ final class CorregirVentaPosTenant
         }
         if ($venta->anulada_en !== null) {
             return 'Esta venta ya está anulada.';
+        }
+        if ($venta->devoluciones()->exists()) {
+            return 'Ya tiene devoluciones: devuelve lo que queda en lugar de anularla.';
         }
         $horas = $this->parametros->entero('pagos.horas_para_anular');
         if ($horas > 0 && $venta->created_at !== null && $venta->created_at->lt(now()->subHours($horas))) {
@@ -111,8 +121,9 @@ final class CorregirVentaPosTenant
             }
             // Sale de la caja abierta de hoy (ADR 0175), bloqueada antes del inventario.
             $turno = $this->cajas->turnoParaMovimiento((int) $bloqueada->sucursal_id);
-            $this->cajas->asentar($turno, MovimientoCajaTenant::ANULACION, CajasTenant::metodo((string) $bloqueada->metodo_pago),
-                -((int) $bloqueada->total_minor + (int) $bloqueada->propina_minor), ['venta_pos_id' => $bloqueada->getKey()], $actor, $motivo);
+            // Sale de cada forma con la que entró (con varias formas, ADR 0177).
+            $this->cajas->asentarPartes($turno, MovimientoCajaTenant::ANULACION, CajasTenant::partesDeVenta($bloqueada), -1,
+                ['venta_pos_id' => $bloqueada->getKey()], $actor, $motivo);
             // Lo vendido regresa al inventario de la sede donde se vendió.
             foreach ($bloqueada->lineas as $linea) {
                 $this->inventario->registrar(

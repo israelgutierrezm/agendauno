@@ -3,8 +3,10 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import FormasDePago from "@/components/FormasDePago.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { partesListas, type ParteCobro } from "@/lib/formasDePago";
 import { useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -44,6 +46,12 @@ const motivo = ref("");
 // «tarjeta»: con la terminal del negocio (no por la pasarela en línea).
 const METODOS = ["efectivo", "tarjeta", "transferencia", "ventanilla"] as const;
 const metodo = ref<(typeof METODOS)[number]>("efectivo");
+// Con varias formas de pago (ADR 0177): cuánto con cada una; suman el total.
+const dividido = ref(false);
+const partes = ref<ParteCobro[] | null>(null);
+const partesOk = computed(
+  () => !dividido.value || partesListas(partes.value, total.value),
+);
 const referencia = ref("");
 const procesando = ref(false);
 const error = ref<string | null>(null);
@@ -53,6 +61,7 @@ watch(
   () => props.orden?.id,
   () => {
     metodo.value = "efectivo";
+    dividido.value = false;
     referencia.value = "";
     error.value = null;
     total.value = props.orden?.total_minor ?? 0;
@@ -114,6 +123,9 @@ async function registrar(): Promise<void> {
     const sede = sucursales.fija.value;
     await api.post(`${props.base}/ordenes/${o.id}/liquidar`, {
       metodo: metodo.value,
+      ...(dividido.value && partes.value !== null
+        ? { partes: partes.value }
+        : {}),
       referencia: referencia.value.trim() || null,
       ...(sede !== null ? { sucursal_id: sede } : {}),
     });
@@ -199,7 +211,7 @@ async function registrar(): Promise<void> {
       </ul>
       <div>
         <p class="tu-label">{{ $t("ventas.vender.metodo") }}</p>
-        <div class="tu-segmentado w-full" role="group">
+        <div v-if="!dividido" class="tu-segmentado w-full" role="group">
           <button
             v-for="m in METODOS"
             :key="m"
@@ -211,6 +223,17 @@ async function registrar(): Promise<void> {
             {{ $t(`ventas.metodos.${m}`) }}
           </button>
         </div>
+        <FormasDePago
+          v-model:dividido="dividido"
+          v-model:partes="partes"
+          class="mt-2"
+          :total="total"
+          :metodos="METODOS"
+          prefijo="ventas.metodos"
+          :inicial="metodo"
+          :moneda="orden.moneda"
+          :pais="sesion.pais"
+        />
       </div>
       <div>
         <label class="tu-label" for="cobro-ref">{{
@@ -238,7 +261,7 @@ async function registrar(): Promise<void> {
         <button
           type="submit"
           class="tu-btn tu-btn-primario"
-          :disabled="procesando"
+          :disabled="procesando || !partesOk"
           data-prueba="confirmar-pago"
         >
           {{ $t("cobranza.pendientes.registrar") }}

@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use App\Modules\Tenancy\Pasarelas\PasarelaCancelable;
 use App\Modules\Tenancy\Pasarelas\PasarelaDomiciliable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
@@ -39,8 +40,9 @@ class CobrarOrdenTenant
     /**
      * @param  Usuario|null  $registradoPor  quién registra el cobro (en caja, o el alumno al pagar en línea)
      * @param  int|null  $sucursalCaja  la sede donde se cobra en el mostrador (su caja; ADR 0175); si no, la de la orden
+     * @param  list<array{metodo: string, monto_minor: int}>|null  $partes  cobro mixto en caja (ADR 0177): suman el total
      */
-    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null, ?Usuario $registradoPor = null, ?int $sucursalCaja = null): PagoTenant
+    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null, ?Usuario $registradoPor = null, ?int $sucursalCaja = null, ?array $partes = null): PagoTenant
     {
         if ($idempotencyKey !== null) {
             $previo = PagoTenant::query()->where('idempotency_key', $idempotencyKey)->first();
@@ -53,7 +55,7 @@ class CobrarOrdenTenant
             throw new PasarelaNoDisponible('La pasarela no está activa en este negocio.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor, $sucursalCaja): PagoTenant {
+        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor, $sucursalCaja, $partes): PagoTenant {
             $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
@@ -70,16 +72,26 @@ class CobrarOrdenTenant
             // su confirmación en vez de cobrar otra vez.
             $this->anularIntentosAbiertos($bloqueada);
 
+            // Con varias formas, solo en caja y sumando el total (ADR 0177).
+            if ($partes !== null) {
+                if ($proveedor !== 'manual') {
+                    throw new OrdenNoLiquidable('El cobro con varias formas de pago es solo en caja.');
+                }
+                PartesCobro::exigirTotal($partes, (int) $bloqueada->total_minor);
+            }
             $pago = PagoTenant::query()->create([
                 'orden_id' => $bloqueada->getKey(),
                 'proveedor' => $proveedor,
-                'metodo' => $metodo?->value,
+                'metodo' => $partes !== null ? MetodoPago::Mixto->value : $metodo?->value,
                 'estado' => EstadoPago::Pendiente->value,
                 'monto_minor' => $bloqueada->total_minor,
                 'moneda' => $bloqueada->moneda,
                 'idempotency_key' => $idempotencyKey,
                 'registrado_por' => $registradoPor?->getKey(),
             ]);
+            if ($partes !== null) {
+                PartesCobro::guardar($pago->partes(), $partes);
+            }
 
             $pago->retorno = $retorno;
             $resultado = $this->registro->resolver($proveedor)->cobrar($pago, $this->registro->llaves($proveedor));
@@ -157,7 +169,8 @@ class CobrarOrdenTenant
                 ? $this->cajas->turnoParaMovimiento($sucursalCaja ?? $orden->sucursal_id)
                 : null;
             $pago->update(['estado' => EstadoPago::Aprobado->value, 'referencia_externa' => $resultado->referencia, 'aprobado_en' => now()]);
-            $this->cajas->asentar($turno, MovimientoCajaTenant::COBRO, CajasTenant::metodoDelPago($pago), $pago->monto_minor, ['pago_id' => $pago->getKey()], $actor);
+            // Una forma o, si fue mixto, un renglón por forma (ADR 0177).
+            $this->cajas->asentarPartes($turno, MovimientoCajaTenant::COBRO, CajasTenant::partesDelPago($pago), 1, ['pago_id' => $pago->getKey()], $actor);
             // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
             $this->fulfillment->cumplir($orden);
         } elseif ($resultado->esPendiente()) {

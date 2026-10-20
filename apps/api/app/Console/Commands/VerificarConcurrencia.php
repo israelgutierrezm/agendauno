@@ -133,6 +133,7 @@ class VerificarConcurrencia extends Command
             $this->caso('Ventas del mostrador a la vez por la última pieza', fn () => $this->ultimaPieza($escenarios, $rondas, $procesos));
             $this->caso('Ventas con los mismos artículos en distinto orden', fn () => $this->mismosArticulos($escenarios, $rondas));
             $this->caso('Ventas del mostrador mientras se cuenta la caja', fn () => $this->ventasYConteoDeCaja($escenarios, $rondas, $procesos));
+            $this->caso('Devoluciones a la vez de la misma venta del mostrador', fn () => $this->devolucionesALaVez($escenarios, $rondas, $procesos));
             $this->caso('Respaldo y restauración de un negocio', fn () => $this->respaldoYRestauracion($gestor));
             $this->caso('Migraciones de varios negocios', fn () => $this->migraciones($gestor, is_string($base)));
         } catch (Throwable $e) {
@@ -532,6 +533,34 @@ class VerificarConcurrencia extends Command
             $this->comprobar($fallas, $hechos === 1, "{$hechos} ventas se llevaron la última pieza");
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).': '.count($res)." ventas por 1 pieza → {$hechos} vendida, quedan {$stock}", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Varias devoluciones a la vez de la misma venta del mostrador (ADR 0178): de 3
+     * piezas, cada una pide 2; solo una cabe. Nunca se devuelve más de lo vendido y el
+     * inventario recupera exactamente lo devuelto.
+     *
+     * @return list<string>
+     */
+    private function devolucionesALaVez(EscenariosConcurrencia $e, int $rondas, int $procesos): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $v = $e->ventaHecha($this->base['sucursal'], 3);
+            $paso = ['accion' => 'devolver-venta', 'venta' => $v['venta'], 'cantidad' => 2];
+            $res = $this->competir(array_fill(0, max(2, $procesos), $paso));
+
+            $hechos = $this->hechos($res);
+            $devueltas = $e->piezasDevueltas($v['venta']);
+            $stock = $e->stock($v['articulo'], $this->base['sucursal']);
+            $this->comprobar($fallas, $hechos === 1, "{$hechos} devoluciones de 2 piezas de una venta de 3");
+            $this->comprobar($fallas, $devueltas === 2, "se devolvieron {$devueltas} piezas");
+            $this->comprobar($fallas, $stock === 2, "el inventario tiene {$stock} piezas y se devolvieron {$devueltas}");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).': '.count($res)." devoluciones de 2 piezas → {$hechos} hecha, {$devueltas} devueltas", $res);
         }
 
         return $fallas;

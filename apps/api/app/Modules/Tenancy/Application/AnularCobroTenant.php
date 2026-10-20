@@ -109,7 +109,8 @@ class AnularCobroTenant
             // Sale de la caja abierta de la sede del cobro, hoy (ADR 0175): lo cerrado no
             // cambia. Bloqueada antes del inventario que regresa.
             $turno = $this->cajas->turnoParaMovimiento($this->cajas->sucursalDelCobro($bloqueado));
-            $this->cajas->asentar($turno, MovimientoCajaTenant::ANULACION, CajasTenant::metodoDelPago($bloqueado), -$bloqueado->monto_minor,
+            // Sale de cada forma con la que entró (con varias formas, ADR 0177).
+            $this->cajas->asentarPartes($turno, MovimientoCajaTenant::ANULACION, CajasTenant::partesDelPago($bloqueado), -1,
                 ['pago_id' => $bloqueado->getKey()], $actor, $motivo);
 
             $this->derechos->retirarTodo(

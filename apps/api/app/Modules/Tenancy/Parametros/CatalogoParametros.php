@@ -156,6 +156,9 @@ final class CatalogoParametros
             new DefinicionParametro('pagos.horas_para_anular', 'Cobros en caja', 'Un cobro se puede anular hasta',
                 'Horas después del cobro. 0 = sin límite.', $e, 24, 0, 720, 'h'),
 
+            // ADR 0178: devolver algunos productos de una venta del mostrador.
+            new DefinicionParametro('pos.dias_para_devolver', 'Devoluciones', 'Un producto vendido en el mostrador se puede devolver hasta',
+                'Días después de la venta. El dinero sale de la caja abierta y las piezas vuelven al inventario. 0 = sin límite.', $e, 30, 0, 365, 'días'),
             new DefinicionParametro('cancelacion.devolver_pago_si_cancela_negocio', 'Devoluciones', 'Si el negocio cancela algo ya pagado en línea, devolver el pago',
                 'Se devuelve solo, por la misma pasarela. Lo pagado en efectivo se devuelve en caja.', $sn, 0),
 

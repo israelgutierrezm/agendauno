@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,8 +30,11 @@ use Illuminate\Validation\ValidationException;
  *   dos veces (va aparte, en `servicio_minor`).
  * - La clave del intento hace idempotente el reintento: lo mismo devuelve el mismo
  *   cobro; la clave con otra cita u otros importes responde 409 (R05).
+ * - Con varias formas de pago (ADR 0177) las partes suman todo y se reparten en orden:
+ *   primero el servicio (su pago), después los productos y la propina (la venta). El
+ *   cambio sale solo de la parte en efectivo.
  *
- * @phpstan-type Resumen array{servicio_minor: int, productos_minor: int, propina_minor: int, total_minor: int, recibido_minor: int|null, cambio_minor: int|null, moneda: string, metodo: string, orden: OrdenTenant|null, venta: VentaPosTenant|null}
+ * @phpstan-type Resumen array{servicio_minor: int, productos_minor: int, propina_minor: int, total_minor: int, recibido_minor: int|null, cambio_minor: int|null, moneda: string, metodo: string, partes: list<array{metodo: string, monto_minor: int}>, orden: OrdenTenant|null, venta: VentaPosTenant|null}
  */
 class CobroDeCitaTenant
 {
@@ -42,11 +46,12 @@ class CobroDeCitaTenant
 
     /**
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras: list<ExtraArticuloTenant>, precio_minor: int|null}>  $items
+     * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
      * @return Resumen
      */
-    public function cobrar(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?string $clave, ?Usuario $actor, ?string $huella = null): array
+    public function cobrar(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?string $clave, ?Usuario $actor, ?string $huella = null, ?array $partes = null): array
     {
-        $huella ??= self::huella($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia);
+        $huella ??= self::huella($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $partes);
         if ($clave !== null) {
             $previa = VentaPosTenant::query()->where('clave_intento', $clave)->first();
             if ($previa instanceof VentaPosTenant) {
@@ -56,7 +61,7 @@ class CobroDeCitaTenant
             }
         }
 
-        $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor, $huella): array {
+        $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor, $huella, $partes): array {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
             // Ya con la cita bajo candado: si el mismo intento llegó dos veces a la vez
             // (doble clic, reintento de red), el segundo encuentra aquí el cobro del
@@ -87,26 +92,48 @@ class CobroDeCitaTenant
                 throw ValidationException::withMessages(['reserva' => ['Esta cita ya está cobrada: agrega un producto o una propina para cobrar algo más.']]);
             }
 
+            // Con varias formas: suman todo y se reparten en orden (servicio, productos y
+            // propina); cada lado guarda lo suyo (ADR 0177).
+            $metodoServicio = $metodo;
+            $metodoVenta = $metodo;
+            $partesServicio = null;
+            $partesVenta = null;
+            $enEfectivo = null;
+            if ($partes !== null) {
+                $productos = array_sum(array_map(static fn (array $i): int => ((int) $i['articulo']->precio_minor
+                    + array_sum(array_map(static fn (ExtraArticuloTenant $e): int => (int) $e->precio_minor, $i['extras']))) * max(1, $i['cantidad']), $items));
+                PartesCobro::exigirTotal($partes, $servicio + $productos + $propinaMinor);
+                [$delServicio, $deProductos, $dePropina] = PartesCobro::repartir($partes, [$servicio, $productos, $propinaMinor]);
+                $deVenta = PartesCobro::juntar([...$deProductos, ...$dePropina]);
+                $metodoServicio = $delServicio === [] ? $metodo : PartesCobro::metodo($delServicio);
+                $partesServicio = count($delServicio) > 1 ? $delServicio : null;
+                $metodoVenta = $deVenta === [] ? PartesCobro::MIXTO : PartesCobro::metodo($deVenta);
+                $partesVenta = count($deVenta) > 1 ? $deVenta : null;
+                $enEfectivo = PartesCobro::efectivo($partes);
+            }
+
             if ($servicio > 0) {
                 // A la caja de la sede de la cita (ADR 0175).
-                $pago = $this->ordenes->liquidar($orden, $metodo, $referencia, $actor, (int) $sucursal->getKey());
+                $pago = $this->ordenes->liquidar($orden, $metodoServicio, $referencia, $actor, (int) $sucursal->getKey(), $partesServicio);
                 if ($pago !== null) {
                     $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
                         'orden' => (string) $orden->ulid,
                         'monto_minor' => $pago->monto_minor,
                         'moneda' => $pago->moneda,
-                        'metodo' => $metodo,
+                        'metodo' => $partesServicio !== null ? PartesCobro::MIXTO : $metodoServicio,
+                        'partes' => $partesServicio,
                         'referencia' => $referencia,
                     ]);
                 }
             }
 
-            // Siempre su venta (aun solo el servicio): lo recibido alcanza para todo (la
-            // venta lo valida con el servicio) y queda el comprobante.
+            // Siempre su venta (aun solo el servicio): lo recibido alcanza para lo que se
+            // paga en efectivo (la venta lo valida con el servicio) y queda el comprobante.
+            $conEfectivo = $partes !== null ? $enEfectivo > 0 : $metodo === 'efectivo';
             $venta = $this->pos->vender(
-                $sucursal, $items, $metodo, $actor, $propinaMinor, $bloqueada->persona,
-                $metodo === 'efectivo' ? $recibidoMinor : null, $clave, $orden, $servicio,
-                (int) $bloqueada->getKey(), $huella,
+                $sucursal, $items, $metodoVenta, $actor, $propinaMinor, $bloqueada->persona,
+                $conEfectivo ? $recibidoMinor : null, $clave, $orden, $servicio,
+                (int) $bloqueada->getKey(), $huella, $partesVenta, $enEfectivo,
             );
 
             return $this->resumenDeVenta($venta);
@@ -120,10 +147,11 @@ class CobroDeCitaTenant
      * extras y el precio mostrado), la propina, lo recibido y la referencia.
      *
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras: list<ExtraArticuloTenant>, precio_minor: int|null}>  $items
+     * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
      */
-    public static function huella(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia): string
+    public static function huella(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?array $partes = null): string
     {
-        return PuntoDeVentaTenant::huella('cita', [
+        $pedido = [
             'reserva' => (string) $reserva->ulid,
             'metodo' => $metodo,
             'items' => array_map(static fn (array $i): array => [
@@ -132,9 +160,15 @@ class CobroDeCitaTenant
                 $i['precio_minor'],
             ], $items),
             'propina' => $propinaMinor,
-            'recibido' => $metodo === 'efectivo' ? $recibidoMinor : null,
+            'recibido' => $metodo === 'efectivo' || ($partes !== null && PartesCobro::efectivo($partes) > 0) ? $recibidoMinor : null,
             'referencia' => $referencia,
-        ]);
+        ];
+        // Sin partes, la huella de siempre (los cobros ya hechos se siguen reconociendo).
+        if ($partes !== null) {
+            $pedido['partes'] = $partes;
+        }
+
+        return PuntoDeVentaTenant::huella('cita', $pedido);
     }
 
     /**
@@ -143,6 +177,10 @@ class CobroDeCitaTenant
     private function resumenDeVenta(VentaPosTenant $venta): array
     {
         $total = $venta->cobradoMinor();
+        // Todas las formas del cobro (el servicio y lo del mostrador): el cambio sale
+        // solo del efectivo (ADR 0177).
+        $partes = CajasTenant::partesDelCobro($venta);
+        $mixto = count($partes) > 1;
 
         return [
             'servicio_minor' => $venta->servicio_minor,
@@ -150,9 +188,10 @@ class CobroDeCitaTenant
             'propina_minor' => $venta->propina_minor,
             'total_minor' => $total,
             'recibido_minor' => $venta->recibido_minor,
-            'cambio_minor' => $venta->recibido_minor !== null ? $venta->recibido_minor - $total : null,
+            'cambio_minor' => $venta->recibido_minor !== null ? $venta->recibido_minor - ($mixto ? PartesCobro::efectivo($partes) : $total) : null,
             'moneda' => (string) $venta->moneda,
-            'metodo' => (string) $venta->metodo_pago,
+            'metodo' => $mixto ? PartesCobro::MIXTO : (string) $venta->metodo_pago,
+            'partes' => $mixto ? $partes : [],
             'orden' => $venta->orden,
             'venta' => $venta,
         ];

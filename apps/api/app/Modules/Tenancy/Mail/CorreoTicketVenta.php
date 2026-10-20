@@ -31,7 +31,7 @@ class CorreoTicketVenta extends Mailable implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    private const METODOS = ['efectivo' => 'Efectivo', 'tarjeta' => 'Tarjeta', 'transferencia' => 'Transferencia'];
+    private const METODOS = ['efectivo' => 'Efectivo', 'tarjeta' => 'Tarjeta', 'transferencia' => 'Transferencia', 'ventanilla' => 'Ventanilla', 'mixto' => 'Varias formas'];
 
     /**
      * @param  array<string, mixed>  $ticket  como lo arma {@see TicketVentaPosTenant::datos()}, más `fecha` y `nombre`
@@ -119,6 +119,11 @@ class CorreoTicketVenta extends Mailable implements ShouldQueue
         $totales .= '<tr><td><strong>Total</strong></td><td style="text-align:right"><strong>'.$dinero((int) $t['cobrado_minor']).'</strong></td></tr>';
         $metodo = self::METODOS[$t['metodo_pago']] ?? ucfirst((string) $t['metodo_pago']);
         $totales .= '<tr><td>Forma de pago</td><td style="text-align:right">'.e($metodo).'</td></tr>';
+        // Con varias formas (ADR 0177): cuánto con cada una.
+        foreach ($t['partes'] ?? [] as $parte) {
+            $forma = self::METODOS[$parte['metodo']] ?? ucfirst((string) $parte['metodo']);
+            $totales .= '<tr><td style="padding-left:12px">'.e($forma).'</td><td style="text-align:right">'.$dinero((int) $parte['monto_minor']).'</td></tr>';
+        }
         if ($t['recibido_minor'] !== null && $t['cambio_minor'] !== null) {
             $totales .= '<tr><td>Recibido</td><td style="text-align:right">'.$dinero((int) $t['recibido_minor']).'</td></tr>'
                 .'<tr><td>Cambio</td><td style="text-align:right">'.$dinero((int) $t['cambio_minor']).'</td></tr>';

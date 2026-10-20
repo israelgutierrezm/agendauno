@@ -981,6 +981,8 @@ Route::prefix('v1')->group(function (): void {
             // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
             Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.metodo');
             Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');
+            // Devolver algunos productos (ADR 0178): sale de la caja abierta y regresa al inventario.
+            Route::post('/pos/ventas/{venta}/devoluciones', [PuntoDeVentaTenantController::class, 'devolver'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.devoluciones');
             // Cierre y arqueo de caja (ADR 0175): abrir con fondo, mover efectivo, contar a
             // ciegas y cerrar (caja.operar); lo esperado, los cierres y su revisión
             // (caja.supervisar).

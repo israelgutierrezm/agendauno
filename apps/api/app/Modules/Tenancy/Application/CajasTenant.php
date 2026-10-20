@@ -13,6 +13,9 @@ use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
@@ -63,6 +66,52 @@ class CajasTenant
     }
 
     /**
+     * Cuánto entró en cada forma con un pago: sus partes si fue mixto (ADR 0177); si no,
+     * todo en su forma.
+     *
+     * @return list<array{metodo: string, monto_minor: int}>
+     */
+    public static function partesDelPago(PagoTenant $pago): array
+    {
+        return $pago->metodo === MetodoPago::Mixto
+            ? PartesCobro::leer($pago->partes())
+            : [['metodo' => self::metodoDelPago($pago), 'monto_minor' => (int) $pago->monto_minor]];
+    }
+
+    /**
+     * Cuánto entró en cada forma con una venta del mostrador (lo vendido y la propina):
+     * sus partes si fue mixta; si no, todo en su forma. Sin dinero propio, nada.
+     *
+     * @return list<array{metodo: string, monto_minor: int}>
+     */
+    public static function partesDeVenta(VentaPosTenant $venta): array
+    {
+        $monto = (int) $venta->total_minor + (int) $venta->propina_minor;
+        if ($venta->metodo_pago === PartesCobro::MIXTO) {
+            return PartesCobro::leer($venta->partes());
+        }
+
+        return $monto > 0 ? [['metodo' => self::metodo($venta->metodo_pago), 'monto_minor' => $monto]] : [];
+    }
+
+    /**
+     * Las formas de todo el cobro de una venta: en una cita, también el pago del
+     * servicio. Sirve para el ticket y el cambio (que sale solo del efectivo).
+     *
+     * @return list<array{metodo: string, monto_minor: int}>
+     */
+    public static function partesDelCobro(VentaPosTenant $venta): array
+    {
+        $delServicio = [];
+        if ($venta->orden_id !== null && (int) $venta->servicio_minor > 0) {
+            $pago = PagoTenant::query()->where('orden_id', $venta->orden_id)->whereNotNull('aprobado_en')->latest('id')->first();
+            $delServicio = $pago instanceof PagoTenant ? self::partesDelPago($pago) : [];
+        }
+
+        return PartesCobro::juntar([...$delServicio, ...self::partesDeVenta($venta)]);
+    }
+
+    /**
      * La caja abierta de la sede, bloqueada, para asentar un movimiento; null si la sede
      * no usa caja. Sin sede (una orden sin sucursal), la única del negocio.
      *
@@ -98,6 +147,19 @@ class CajasTenant
         }
 
         return $turno;
+    }
+
+    /**
+     * Asienta un cobro mixto (ADR 0177): un renglón por forma, con el signo pedido.
+     *
+     * @param  list<array{metodo: string, monto_minor: int}>  $partes
+     * @param  array{pago_id?: int|null, venta_pos_id?: int|null, reembolso_id?: int|null}  $origen
+     */
+    public function asentarPartes(?TurnoCajaTenant $turno, string $tipo, array $partes, int $signo, array $origen = [], ?Usuario $actor = null, ?string $motivo = null): void
+    {
+        foreach ($partes as $parte) {
+            $this->asentar($turno, $tipo, $parte['metodo'], $signo * $parte['monto_minor'], $origen, $actor, $motivo);
+        }
     }
 
     /**

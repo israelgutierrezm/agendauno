@@ -71,6 +71,8 @@ interface Pago {
   estado: string;
   proveedor: string | null;
   metodo: string | null;
+  // Con varias formas (ADR 0177): cuánto con cada una; su devolución elige por cuál.
+  partes?: { metodo: string; monto_minor: number }[] | null;
   reembolsado_minor: number;
   reembolsable_minor: number;
   // Tiene devoluciones (aunque estén en curso o hayan fallado).
@@ -538,9 +540,12 @@ async function alCorregirCobro(): Promise<void> {
   await cargar();
 }
 
+// De un cobro mixto: por qué forma sale la devolución (la primera, por omisión).
+const rMetodo = ref("");
 function abrirReembolso(p: Pago): void {
   reembolsando.value = p;
   rLlave.value = crypto.randomUUID();
+  rMetodo.value = p.partes?.[0]?.metodo ?? "";
   rMonto.value = String(p.reembolsable_minor / 100);
   rMotivo.value = "";
   rRevertir.value = true;
@@ -565,6 +570,7 @@ async function reembolsar(): Promise<void> {
         motivo: rMotivo.value.trim(),
         revertir_creditos: rRevertir.value,
         manual: rManual.value,
+        ...(p.partes && p.partes.length > 1 ? { metodo: rMetodo.value } : {}),
       },
       { headers: { "Idempotency-Key": rLlave.value } },
     );
@@ -1599,6 +1605,36 @@ watch(vista, cargar, { immediate: true });
               class="tu-error-campo"
               >{{ erroresReembolso.motivo }}</span
             >
+          </div>
+          <div
+            v-if="reembolsando.partes && reembolsando.partes.length > 1"
+            class="sm:col-span-2"
+          >
+            <label class="tu-label" for="rfp">{{
+              $t("cobranza.reembolso.salePor")
+            }}</label>
+            <select
+              id="rfp"
+              v-model="rMetodo"
+              class="tu-input"
+              data-prueba="reembolso-forma"
+            >
+              <option
+                v-for="p in reembolsando.partes"
+                :key="p.metodo"
+                :value="p.metodo"
+              >
+                {{
+                  $t("formasDePago.detalle", {
+                    forma: $t(`ventas.metodos.${p.metodo}`),
+                    monto: dinero(p.monto_minor, reembolsando.moneda),
+                  })
+                }}
+              </option>
+            </select>
+            <span v-if="erroresReembolso.metodo" class="tu-error-campo">{{
+              erroresReembolso.metodo
+            }}</span>
           </div>
           <label
             class="flex items-center justify-between gap-3 text-sm sm:col-span-2"

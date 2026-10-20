@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Mail\CorreoTicketVenta;
 use App\Modules\Tenancy\Models\LineaVentaPosTenant;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -35,11 +36,16 @@ class TicketVentaPosTenant
     /**
      * Si se cobró al terminar una cita, el servicio va primero (`servicio`).
      *
-     * @return array{id: string, folio: string, creado_en: string|null, sucursal: string|null, servicio: array{nombre: string|null, monto_minor: int}|null, lineas: list<array{articulo: string|null, cantidad: int, extras: list<string>, subtotal_minor: int}>, total_minor: int, propina_minor: int, cobrado_minor: int, recibido_minor: int|null, cambio_minor: int|null, moneda: string, metodo_pago: string, anulada: bool}
+     * Con varias formas de pago (ADR 0177), `metodo_pago` es «mixto» y `partes` dice
+     * cuánto con cada una; el cambio sale solo del efectivo.
+     *
+     * @return array{id: string, folio: string, creado_en: string|null, sucursal: string|null, servicio: array{nombre: string|null, monto_minor: int}|null, lineas: list<array{articulo: string|null, cantidad: int, extras: list<string>, subtotal_minor: int}>, total_minor: int, propina_minor: int, cobrado_minor: int, recibido_minor: int|null, cambio_minor: int|null, moneda: string, metodo_pago: string, partes: list<array{metodo: string, monto_minor: int}>, anulada: bool}
      */
     public function datos(VentaPosTenant $venta): array
     {
         $venta->loadMissing(['sucursal', 'lineas.articulo', 'orden.sesion.oferta']);
+        $partes = CajasTenant::partesDelCobro($venta);
+        $mixto = count($partes) > 1;
 
         return [
             'id' => (string) $venta->ulid,
@@ -59,9 +65,12 @@ class TicketVentaPosTenant
             'propina_minor' => $venta->propina_minor,
             'cobrado_minor' => $venta->cobradoMinor(),
             'recibido_minor' => $venta->recibido_minor,
-            'cambio_minor' => $venta->recibido_minor !== null ? $venta->recibido_minor - $venta->cobradoMinor() : null,
+            'cambio_minor' => $venta->recibido_minor !== null
+                ? $venta->recibido_minor - ($mixto ? PartesCobro::efectivo($partes) : $venta->cobradoMinor())
+                : null,
             'moneda' => (string) $venta->moneda,
-            'metodo_pago' => (string) $venta->metodo_pago,
+            'metodo_pago' => $mixto ? PartesCobro::MIXTO : (string) $venta->metodo_pago,
+            'partes' => $mixto ? $partes : [],
             'anulada' => $venta->anulada_en !== null,
         ];
     }

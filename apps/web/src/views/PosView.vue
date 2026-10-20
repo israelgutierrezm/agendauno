@@ -7,6 +7,7 @@ import BuscarPersona, {
   type PersonaBuscable,
 } from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import FormasDePago from "@/components/FormasDePago.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -18,6 +19,7 @@ import VentasMostrador, {
 } from "@/components/VentasMostrador.vue";
 import { api, camposConError, codigoDeError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { efectivoDe, partesListas, type ParteCobro } from "@/lib/formasDePago";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoComprador } from "@/lib/mostrador";
 import { useSucursalOperativa, useSucursales } from "@/lib/sucursalOperativa";
@@ -320,21 +322,49 @@ const propinaMinor = computed(() => {
   return Math.round((totalCarrito.value * propinaModo.value) / 100);
 });
 const totalCobrar = computed(() => totalCarrito.value + propinaMinor.value);
+// Con varias formas de pago (ADR 0177): cuánto con cada una; suman el total.
+const dividido = ref(false);
+const partes = ref<ParteCobro[] | null>(null);
+const partesOk = computed(
+  () => !dividido.value || partesListas(partes.value, totalCobrar.value),
+);
+// Lo recibido y el cambio, solo contra lo que se paga en efectivo.
+const enEfectivo = computed(() =>
+  dividido.value
+    ? efectivoDe(partes.value)
+    : metodo.value === "efectivo"
+      ? totalCobrar.value
+      : 0,
+);
 const recibido = ref("");
 const recibidoMinor = computed(() =>
-  metodo.value === "efectivo" && recibido.value !== ""
+  enEfectivo.value > 0 && recibido.value !== ""
     ? Math.round(Number(recibido.value) * 100)
     : null,
 );
 const cambio = computed(() =>
-  recibidoMinor.value === null ? null : recibidoMinor.value - totalCobrar.value,
+  recibidoMinor.value === null ? null : recibidoMinor.value - enEfectivo.value,
 );
 function reiniciarCobro(): void {
   propinaModo.value = "sin";
   propinaOtra.value = "";
   recibido.value = "";
   comprador.value = "";
+  dividido.value = false;
 }
+// Cómo se cobra, en palabras (para confirmar): la forma o cada parte con su monto.
+const formaEnPalabras = computed(() =>
+  dividido.value && partes.value !== null
+    ? partes.value
+        .map((p) =>
+          t("formasDePago.detalle", {
+            forma: t(`pos.metodos.${p.metodo}`),
+            monto: dinero(p.monto_minor),
+          }),
+        )
+        .join(" · ")
+    : t(`pos.metodos.${metodo.value}`),
+);
 // La sede de la venta, siempre a la vista: con «Todas» en la barra se vende en la
 // elegida aquí (la primera al entrar), no en todas.
 const sucursalVenta = computed(
@@ -457,7 +487,7 @@ async function cobrar(): Promise<void> {
     !(await confirmar(
       t("confirmaciones.pos", {
         total: dinero(totalCobrar.value),
-        metodo: t(`pos.metodos.${metodo.value}`),
+        metodo: formaEnPalabras.value,
       }) +
         " " +
         (a
@@ -483,6 +513,9 @@ async function cobrar(): Promise<void> {
       clave_intento: claveIntento,
       sucursal_id: sucursalSel.value,
       metodo_pago: metodo.value,
+      ...(dividido.value && partes.value !== null
+        ? { partes: partes.value }
+        : {}),
       items: carrito.value.map((l) => ({
         articulo_id: l.id,
         cantidad: l.cantidad,
@@ -889,7 +922,7 @@ onMounted(cargar);
             </div>
             <div class="mt-4">
               <p class="tu-label">{{ $t("pos.metodo") }}</p>
-              <div class="tu-segmentado w-full" role="group">
+              <div v-if="!dividido" class="tu-segmentado w-full" role="group">
                 <button
                   v-for="m in METODOS"
                   :key="m"
@@ -901,6 +934,18 @@ onMounted(cargar);
                   {{ $t(`pos.metodos.${m}`) }}
                 </button>
               </div>
+              <FormasDePago
+                v-if="carrito.length > 0"
+                v-model:dividido="dividido"
+                v-model:partes="partes"
+                class="mt-2"
+                :total="totalCobrar"
+                :metodos="METODOS"
+                prefijo="pos.metodos"
+                :inicial="metodo"
+                :moneda="sesion.moneda"
+                :pais="sesion.pais"
+              />
             </div>
             <div v-if="carrito.length > 0" class="mt-4" data-prueba="propina">
               <p class="tu-label">{{ $t("mostradorVisual.propina.titulo") }}</p>
@@ -970,7 +1015,7 @@ onMounted(cargar);
               }}</span>
             </div>
             <div
-              v-if="metodo === 'efectivo' && carrito.length > 0"
+              v-if="enEfectivo > 0 && carrito.length > 0"
               class="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3"
             >
               <label class="block text-sm">
@@ -1016,6 +1061,7 @@ onMounted(cargar);
                 !puedeVender ||
                 cobrando ||
                 carrito.length === 0 ||
+                !partesOk ||
                 (cambio !== null && cambio < 0)
               "
               @click="cobrar"

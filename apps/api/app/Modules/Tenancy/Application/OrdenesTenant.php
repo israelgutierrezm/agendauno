@@ -20,6 +20,7 @@ use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Ordenes\Exceptions\PrimeraVezNoDisponible;
 use App\Modules\Tenancy\Ordenes\Exceptions\ProductoArchivado;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -216,7 +217,10 @@ class OrdenesTenant
      * pagó, no se cobra dos veces). Idempotente: una orden ya pagada no se vuelve a
      * cobrar (devuelve null). La orden cancelada no admite liquidación.
      */
-    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null, ?int $sucursalCaja = null): ?PagoTenant
+    /**
+     * @param  list<array{metodo: string, monto_minor: int}>|null  $partes  con varias formas (ADR 0177): suman el total
+     */
+    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null, ?int $sucursalCaja = null, ?array $partes = null): ?PagoTenant
     {
         $orden->refresh();
         if ($orden->estado === EstadoOrden::Pagada) {
@@ -226,9 +230,9 @@ class OrdenesTenant
             throw new OrdenNoLiquidable('La orden no admite liquidacion.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja): PagoTenant {
-            $pago = $this->cobrar->ejecutar($orden, 'manual', self::metodoDeCaja($metodo), null, null, $actor, $sucursalCaja);
-            $orden->update(['metodo_pago' => $metodo, 'referencia_pago' => $referencia]);
+        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja, $partes): PagoTenant {
+            $pago = $this->cobrar->ejecutar($orden, 'manual', $partes !== null ? MetodoPago::Mixto : self::metodoDeCaja($metodo), null, null, $actor, $sucursalCaja, $partes);
+            $orden->update(['metodo_pago' => $partes !== null ? PartesCobro::MIXTO : $metodo, 'referencia_pago' => $referencia]);
 
             return $pago;
         });
