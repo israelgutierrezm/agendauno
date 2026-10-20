@@ -33,6 +33,8 @@ class PagoRentaController
 
         $validado = $request->validate([
             'proveedor' => ['nullable', Rule::in(['stripe', 'mercadopago', 'openpay'])],
+            // A dónde vuelve tras pagar: Timbres, para una compra de timbres (con su aviso).
+            'retorno' => ['nullable', Rule::in(['/renta', '/renta/timbres'])],
         ]);
 
         $cargo = CargoRenta::query()
@@ -49,6 +51,7 @@ class PagoRentaController
             throw new PasarelaNoDisponible('La plataforma no tiene una pasarela de cobro activa.');
         }
 
+        $cargo->retorno = $validado['retorno'] ?? null;
         $pagado = $this->cobrar->ejecutar($cargo, $proveedor);
 
         return response()->json(['data' => [

@@ -32,6 +32,7 @@ beforeEach(function (): void {
         'modo' => [],          // cs_N => 'setup' | 'payment'
         'cargo' => 'exito',    // exito | fondos | caido
         'cargos' => 0,
+        'busqueda' => null,    // el PaymentIntent que encuentra la búsqueda por metadata
     ];
     $stripe = $this->stripe;
     Http::fake(function (Request $request) use ($stripe) {
@@ -57,6 +58,9 @@ beforeEach(function (): void {
                 'setup_intent' => $modo === 'setup' ? ['id' => 'seti_1', 'payment_method' => $metodo] : null,
                 'payment_intent' => $modo === 'payment' ? ['id' => 'pi_compra', 'setup_future_usage' => 'off_session', 'payment_method' => $metodo] : null,
             ]);
+        }
+        if (str_contains($url, '/payment_intents/search')) {
+            return Http::response(['data' => $stripe->busqueda === null ? [] : [$stripe->busqueda]]);
         }
         if (str_ends_with($url, '/payment_intents')) {
             $stripe->cargos++;
@@ -436,4 +440,27 @@ it('si Stripe cobró pero no respondió a tiempo, su aviso registra el pago y cu
         OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value,
         PagoTenant::query()->where('referencia_externa', 'pi_tardio')->count(),
     ]))->toBe(['pagada', 1]);
+});
+
+it('si un cargo anterior sí se hizo y no quedó registrado, el reintento lo registra en vez de cobrar otra vez', function (): void {
+    $m = alumnoConMembresia();
+    autorizarTarjeta($m);
+    $this->stripe->cargo = 'caido';
+    expect(renovarHoy($m))->toBe('fallido');
+    [$orden, $total] = enEstudioPago($m, fn (): array => [
+        (string) OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('ulid'),
+        (int) OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('total_minor'),
+    ]);
+    // Stripe sí cobró (y su aviso no llegó); su llave pudo ya caducar.
+    $this->stripe->busqueda = ['id' => 'pi_ya_cobrado', 'status' => 'succeeded', 'amount_received' => $total, 'currency' => 'mxn', 'metadata' => ['orden' => $orden]];
+    $this->stripe->cargo = 'exito';
+    $cargos = $this->stripe->cargos;
+
+    renovarHoy($m);
+
+    expect($this->stripe->cargos)->toBe($cargos)
+        ->and(enEstudioPago($m, fn (): array => [
+            OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value,
+            PagoTenant::query()->where('referencia_externa', 'pi_ya_cobrado')->count(),
+        ]))->toBe(['pagada', 1]);
 });

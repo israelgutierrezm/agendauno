@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EliminacionesTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\GestionarPromocionesTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Models\PromocionTenant;
@@ -192,7 +193,7 @@ class PromocionesTenantController
         if ($v['tipo'] === TipoPromocion::Porcentaje->value && (int) $v['valor'] > 10000) {
             throw ValidationException::withMessages(['valor' => ['Un descuento no puede ser mayor a 100 %.']]);
         }
-        if ((bool) ($v['activa'] ?? true) && isset($v['vence_en']) && Carbon::parse((string) $v['vence_en'])->endOfDay()->isPast()) {
+        if ((bool) ($v['activa'] ?? true) && isset($v['vence_en']) && Carbon::parse((string) $v['vence_en'])->toDateString() < app(FechasNegocioTenant::class)->hoy()) {
             throw ValidationException::withMessages(['vence_en' => ['Esa fecha ya pasó: elige una futura o deja la promoción apagada.']]);
         }
 

@@ -109,7 +109,7 @@ it('con tarjeta, el alumno paga en la página de OpenPay y la notificación conf
     Http::assertSent(fn (Request $q): bool => $q->url() === 'https://sandbox-api.openpay.mx/v1/m123/charges'
         && $q['method'] === 'card' && $q['confirm'] === false && $q['order_id'] === $r['pago']
         && $q['amount'] === 899.0 && $q['customer']['email'] === 'vale@correo.mx'
-        && str_contains($q['redirect_url'], '/mi-cuenta?pago=exito')
+        && str_contains($q['redirect_url'], '/mi-cuenta/pagos?pago=exito')
         && $q->hasHeader('X-Forwarded-For')
         && $q->header('Authorization')[0] === 'Basic '.base64_encode('sk_prueba:'));
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -163,11 +164,17 @@ const montoMovimiento = ref("");
 const motivoMovimiento = ref("");
 const guardandoMovimiento = ref(false);
 const errorMovimiento = ref<string | null>(null);
+// Una clave por movimiento: reintentarlo (sin red, tiempo agotado) no lo registra dos veces.
+const claveMovimiento = ref("");
+function nuevaClave(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}
 function abrirMovimiento(tipo: "retiro" | "ingreso"): void {
   movimiento.value = tipo;
   montoMovimiento.value = "";
   motivoMovimiento.value = "";
   errorMovimiento.value = null;
+  claveMovimiento.value = nuevaClave();
 }
 async function registrarMovimiento(): Promise<void> {
   const monto = aMinor(montoMovimiento.value, sesion.pais);
@@ -185,6 +192,7 @@ async function registrarMovimiento(): Promise<void> {
         tipo: movimiento.value,
         monto_minor: monto,
         motivo: motivoMovimiento.value.trim(),
+        clave: claveMovimiento.value,
       },
     );
     turno.value = data.data;
@@ -192,6 +200,14 @@ async function registrarMovimiento(): Promise<void> {
     toast.exito(t("caja.okMovimiento"));
   } catch (e) {
     errorMovimiento.value = mensajeDeError(e);
+    // Si el servidor respondió que no (p. ej. otro monto), el siguiente es otro intento.
+    if (
+      axios.isAxiosError(e) &&
+      e.response !== undefined &&
+      e.response.status < 500
+    ) {
+      claveMovimiento.value = nuevaClave();
+    }
   } finally {
     guardandoMovimiento.value = false;
   }
@@ -221,12 +237,16 @@ async function registrarConteo(): Promise<void> {
   const montos: Record<string, number> = {};
   for (const m of METODOS) {
     const texto = contado.value[m].trim();
-    const minor = texto === "" ? 0 : aMinor(texto, sesion.pais);
+    // Fuera del efectivo el reporte puede salir negativo (una devolución por la terminal
+    // en un día sin ventas con tarjeta).
+    const negativo = m !== "efectivo" && texto.startsWith("-");
+    const minor =
+      texto === "" ? 0 : aMinor(negativo ? texto.slice(1) : texto, sesion.pais);
     if (minor === null) {
       errorConteo.value = `${t(`caja.metodos.${m}`)}: ${t("caja.montoInvalido")}`;
       return;
     }
-    montos[`${m}_minor`] = minor;
+    montos[`${m}_minor`] = negativo ? -minor : minor;
   }
   if (turno.value === null) return;
   if (!(await confirmar(t("caja.confirmarConteo")))) return;

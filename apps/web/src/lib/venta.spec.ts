@@ -13,63 +13,55 @@ const orden = {
   items: [{ producto_id: "pack", cantidad: 1 }],
 };
 
+type Llamada = [string, { liquidar: { clave: string } }];
+function claves(): string[] {
+  return (api.post.mock.calls as Llamada[]).map(
+    ([, cuerpo]) => cuerpo.liquidar.clave,
+  );
+}
+
 describe("vender", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sede.fija.value = null;
   });
 
-  it("cobra en la sucursal de la barra para que su caja lo registre", async () => {
+  it("vende y cobra de una vez, en la caja de la sucursal de la barra", async () => {
     sede.fija.value = "S1";
     api.post.mockResolvedValue({ data: { data: { id: "o1" } } });
-    await crearVenta().vender("/b", orden, "efectivo");
-    expect(api.post).toHaveBeenLastCalledWith("/b/ordenes/o1/liquidar", {
-      metodo: "efectivo",
-      sucursal_id: "S1",
+    expect(await crearVenta().vender("/b", orden, "efectivo")).toBe("o1");
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post).toHaveBeenLastCalledWith("/b/ordenes", {
+      ...orden,
+      liquidar: {
+        metodo: "efectivo",
+        clave: expect.any(String),
+        sucursal_id: "S1",
+      },
     });
   });
 
-  it("si el cobro falla, reintentar cobra la misma orden y no crea otra", async () => {
+  it("si falla, reintentar la misma venta lleva la misma clave (no cobra dos veces)", async () => {
     const venta = crearVenta();
-    api.post.mockImplementation((url: string) =>
-      url.endsWith("/ordenes")
-        ? Promise.resolve({ data: { data: { id: "o1" } } })
-        : Promise.reject(new Error("Sin red")),
-    );
+    api.post.mockRejectedValueOnce(new Error("Sin red"));
     await expect(venta.vender("/b", orden, "efectivo")).rejects.toThrow();
+    api.post.mockResolvedValue({ data: { data: { id: "o1" } } });
+    expect(await venta.vender("/b", orden, "efectivo")).toBe("o1");
+    const [primera, segunda] = claves();
+    expect(primera).toBe(segunda);
 
-    api.post.mockImplementation((url: string) =>
-      url.endsWith("/ordenes")
-        ? Promise.resolve({ data: { data: { id: "o2" } } })
-        : Promise.resolve({ data: {} }),
-    );
-    expect(await venta.vender("/b", orden, "tarjeta")).toBe("o1");
-    expect(
-      api.post.mock.calls.filter(([url]) => url === "/b/ordenes"),
-    ).toHaveLength(1);
-    expect(api.post).toHaveBeenLastCalledWith("/b/ordenes/o1/liquidar", {
-      metodo: "tarjeta",
-    });
-
-    // Cobrada: la siguiente venta es otra orden.
-    expect(await venta.vender("/b", orden, "efectivo")).toBe("o2");
+    // Hecha: la siguiente venta es otra (otra clave).
+    await venta.vender("/b", orden, "efectivo");
+    expect(claves()[2]).not.toBe(primera);
   });
 
-  it("otra venta (otro producto o persona) no reusa la orden pendiente", async () => {
+  it("otra venta (otro producto, persona o forma) lleva otra clave", async () => {
     const venta = crearVenta();
-    api.post.mockImplementation((url: string) =>
-      url.endsWith("/ordenes")
-        ? Promise.resolve({ data: { data: { id: "o1" } } })
-        : Promise.reject(new Error("Sin red")),
-    );
+    api.post.mockRejectedValueOnce(new Error("Sin red"));
     await expect(venta.vender("/b", orden, "efectivo")).rejects.toThrow();
-    api.post.mockImplementation((url: string) =>
-      url.endsWith("/ordenes")
-        ? Promise.resolve({ data: { data: { id: "o3" } } })
-        : Promise.resolve({ data: {} }),
-    );
-    expect(
-      await venta.vender("/b", { ...orden, comprador_id: "p2" }, "efectivo"),
-    ).toBe("o3");
+    api.post.mockResolvedValue({ data: { data: { id: "o3" } } });
+    await venta.vender("/b", { ...orden, comprador_id: "p2" }, "efectivo");
+    const [primera, segunda] = claves();
+    expect(primera).not.toBe(segunda);
   });
 });

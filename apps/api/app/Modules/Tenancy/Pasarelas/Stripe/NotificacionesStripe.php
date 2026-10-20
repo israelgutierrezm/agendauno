@@ -73,7 +73,7 @@ class NotificacionesStripe
         if (in_array($tipo, ['refund.updated', 'refund.failed', 'charge.refund.updated'], true) && is_array($objeto)) {
             $estado = (string) ($objeto['status'] ?? '');
             if (in_array($estado, ['succeeded', 'failed', 'canceled'], true)) {
-                $this->reembolsos->conciliar($referencia, $estado === 'succeeded');
+                $this->reembolsos->conciliar($referencia, $estado === 'succeeded', isset($metadatos['reembolso']) ? (string) $metadatos['reembolso'] : null);
             }
         }
 

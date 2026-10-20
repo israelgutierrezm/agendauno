@@ -423,6 +423,10 @@ export const miCuentaExtra = {
     "Ya iniciaste un pago en línea. Si ya pagaste, espera la confirmación antes de volver a pagar.",
   enProcesoOxxo:
     "Ya pediste tu ficha para pagar en OXXO. Si ya pagaste, la confirmación puede tardar hasta un día.",
+  // Pagar de otra forma con una referencia de OXXO viva: no se puede cancelar.
+  otraFormaConOxxo:
+    "Ya generaste una referencia de OXXO para este pago y no se puede cancelar. Si pagas ahora de otra forma, no pagues esa referencia: se cobraría dos veces. ¿Pagar de todos modos?",
+  pagarDeTodos: "Pagar de todos modos",
   modoPrueba:
     "Este negocio está probando su cobro en línea: por ahora no se cobra de verdad.",
 };
@@ -451,6 +455,11 @@ export const reembolsosPago = {
     "La devolución quedó en proceso: se confirma cuando la pasarela de pago responda.",
   sinConfirmar:
     "La pasarela no respondió. La consultamos de nuevo automáticamente; mientras, aparece en Por conciliar.",
+  hecha: "Se devolvieron {monto}.",
+  rechazada:
+    "La pasarela no hizo la devolución: {motivo}. Si ya devolviste el dinero por otro medio, márcalo abajo.",
+  rechazadaSinMotivo:
+    "La pasarela no hizo la devolución. Si ya devolviste el dinero por otro medio, márcalo abajo.",
 };
 
 // Cobranza: lo del dinero que alguien debe revisar (devoluciones sin confirmar…).
@@ -998,10 +1007,16 @@ export const recuperarContrasena = {
     "Este enlace está incompleto. Pide uno nuevo desde la pantalla de inicio de sesión.",
 };
 
+// Al volver de pagar no se afirma lo que la pasarela aún no confirma: un pago en
+// tienda (OXXO) o en revisión se aprueba después.
 export const pagoEnLinea = {
-  exito: "¡Gracias! Recibimos tu pago. Se confirma en unos segundos.",
+  exito:
+    "¡Gracias! Estamos confirmando tu pago con la pasarela; en unos segundos lo verás aquí.",
+  pendiente:
+    "Tu pago quedó en proceso: se confirma cuando la pasarela lo apruebe (si elegiste pagar en tienda, cuando pagues).",
   cancelado: "El pago no se completó. Puedes intentarlo de nuevo.",
-  citaExito: "¡Listo! Recibimos tu pago. Tu cita se confirma en unos segundos.",
+  citaExito:
+    "¡Gracias! Estamos confirmando tu pago; tu cita se confirma en cuanto la pasarela lo apruebe.",
   rentaExito:
     "¡Gracias! Recibimos el pago de tu renta. Se confirma en unos segundos.",
 };
@@ -1089,7 +1104,7 @@ export const pasarelasEstado = {
   copiada: "Copiada",
   ayudaWebhook: {
     stripe:
-      "Regístrala en Stripe → Desarrolladores → Webhooks con los eventos checkout.session.*, payment_intent.* y refund.*, y pega aquí su clave de firma (webhook_secret).",
+      "Regístrala en Stripe → Desarrolladores → Webhooks con los eventos checkout.session.*, payment_intent.*, refund.* y charge.dispute.* (contracargos), y pega aquí su clave de firma (webhook_secret).",
     mercadopago:
       "Regístrala en Mercado Pago → Tus integraciones → Webhooks con los temas Pagos y Planes y suscripciones, y pega aquí la clave secreta (webhook_secret).",
     openpay:
@@ -1295,7 +1310,9 @@ export const corteCaja = {
   cobrado: "Cobrado",
   devuelto: "Devuelto",
   neto: "Neto",
-  porCobrar: "Por cobrar",
+  // Las compras hechas en el rango que siguen sin pagarse (no es el «Por cobrar» del
+  // Inicio y de Cobranza, que cuenta todo lo que se debe hoy).
+  porCobrar: "Compras del rango sin pagar",
   enMoneda: "En {moneda}",
   truncado:
     "Se muestran los {n} movimientos más recientes; los totales y el CSV incluyen todos los del rango.",

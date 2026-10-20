@@ -434,7 +434,12 @@ export function kpisCitas(
     const pago = pagoCita(s);
     if (e !== "no_asistio" && (pago === "por_pagar" || pago === "por_cobrar")) {
       k.pendientesPago++;
-      k.porCobrarMinor += s.cita?.total_minor ?? s.oferta_precio_clase ?? 0;
+      // Lo que falta (con anticipo ya pagado, solo el resto), no el total.
+      k.porCobrarMinor +=
+        s.cita?.por_cobrar_minor ??
+        s.cita?.total_minor ??
+        s.oferta_precio_clase ??
+        0;
     }
     if (e === "no_asistio") {
       k.noAsistieron++;

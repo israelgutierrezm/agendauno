@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Exceptions\FacturacionSinRespuesta;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\ResultadoTimbre;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
@@ -223,4 +224,43 @@ it('un anticipo de otro RFC no se puede aplicar y la factura de un anticipo llev
     $dos['items'][] = $dos['items'][0];
     test()->postJson("/api/v1/app/{$e['slug']}/facturas", $dos, conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonValidationErrors(['items'], 'meta.errors');
+});
+
+it('si FacturAPI no responde, el reintento lleva la misma llave y registra una sola factura; otra igual después, otra llave', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    cargarDatosFiscales($e);
+    // FacturAPI que no responde la primera vez (pero sí timbra) y, con la misma llave,
+    // devuelve la misma factura.
+    $enviadas = new ArrayObject;
+    app()->instance(ClienteFacturacion::class, new class($enviadas) implements ClienteFacturacion
+    {
+        public function __construct(private ArrayObject $enviadas) {}
+
+        public function timbrar(string $llaveOrganizacion, array $factura): ResultadoTimbre
+        {
+            $this->enviadas->append($factura);
+            if (count($this->enviadas) === 1) {
+                throw new FacturacionSinRespuesta;
+            }
+
+            return new ResultadoTimbre('fac_'.md5((string) $factura['idempotency_key']), 'UUID-'.md5((string) $factura['idempotency_key']));
+        }
+
+        public function descargar(string $llaveOrganizacion, string $facturaId, string $formato): string
+        {
+            return '';
+        }
+    });
+    $url = "/api/v1/app/{$e['slug']}/facturas";
+
+    $this->postJson($url, cfdiValido(), conBearer($e['bearer']))->assertStatus(503)->assertJsonPath('code', 'INVOICING_NO_RESPONSE');
+    $this->getJson($url, conBearer($e['bearer']))->assertOk()->assertJsonCount(0, 'data');
+
+    $this->postJson($url, cfdiValido(), conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.estado', 'timbrada');
+    expect($enviadas[1]['idempotency_key'])->toBe($enviadas[0]['idempotency_key']);
+
+    // Otra factura igual (otra venta del mismo cliente): otra llave, otra factura.
+    $this->postJson($url, cfdiValido(), conBearer($e['bearer']))->assertCreated();
+    expect($enviadas[2]['idempotency_key'])->not->toBe($enviadas[1]['idempotency_key']);
+    $this->getJson($url, conBearer($e['bearer']))->assertOk()->assertJsonCount(2, 'data');
 });

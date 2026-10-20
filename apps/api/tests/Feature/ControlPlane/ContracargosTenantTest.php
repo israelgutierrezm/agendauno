@@ -294,3 +294,48 @@ it('avisos desordenados: perdido antes que abierto deja el resultado correcto', 
         ->and($estado['incidencias'][0]['detalle'])->toContain('Se perdió el contracargo')
         ->and(rastroDelContracargo($c['slug']))->toBe(['bitacora' => 1, 'alertadas' => 1]);
 });
+
+/**
+ * El pago queda como el cobro de un pago automático: aprobado y con la referencia del
+ * cobro de la pasarela (su `external_reference`/`order_id` no es nuestro pago).
+ */
+function comoCobroAutomaticoParaContracargo(string $slug, string $pago, string $referencia): void
+{
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $slug)->firstOrFail(), function () use ($pago, $referencia): void {
+        PagoTenant::query()->where('ulid', $pago)->update(['estado' => 'aprobado', 'aprobado_en' => now(), 'referencia_externa' => $referencia]);
+    });
+}
+
+it('Mercado Pago: el contracargo de un cobro automático se ubica por su cobro', function (): void {
+    $c = pagoParaContracargo('mercadopago', ['access_token' => 'APP_USR-prueba']);
+    comoCobroAutomaticoParaContracargo($c['slug'], $c['pago'], '702');
+    // En un pago automático, la referencia de Mercado Pago es la domiciliación.
+    $this->cobros->mp['702'] = ['id' => 702, 'status' => 'charged_back', 'status_detail' => 'in_process', 'external_reference' => '01JDOMICILIACION0000000000', 'transaction_amount' => 899.0];
+
+    $this->postJson("/api/v1/webhooks/tenant/{$c['slug']}/mercadopago?type=payment&data_id=702")->assertOk();
+
+    expect(estadoDelContracargo($c['slug'], $c['pago'])['pago']->contracargo_estado)->toBe('abierto');
+});
+
+it('OpenPay: el contracargo de un cobro automático (sin order_id) se ubica por su cargo', function (): void {
+    $c = pagoParaContracargo('openpay', ['merchant_id' => 'm1', 'private_key' => 'sk_op', 'public_key' => 'pk_op']);
+    comoCobroAutomaticoParaContracargo($c['slug'], $c['pago'], 'trx2');
+    $this->cobros->op['trx2'] = ['id' => 'trx2', 'status' => 'completed', 'order_id' => null, 'amount' => 899.0, 'customer_id' => 'cus_1'];
+
+    $this->postJson("/api/v1/webhooks/tenant/{$c['slug']}/openpay", ['type' => 'chargeback.created', 'transaction' => ['id' => 'trx2', 'customer_id' => 'cus_1']])->assertOk();
+
+    expect(estadoDelContracargo($c['slug'], $c['pago'])['pago']->contracargo_estado)->toBe('abierto');
+});
+
+it('con un contracargo abierto no se devuelve el pago (si se pierde, el banco ya lo devuelve)', function (): void {
+    $c = pagoParaContracargo('mercadopago', ['access_token' => 'APP_USR-prueba']);
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/mercadopago";
+    $cobro = ['id' => 701, 'status' => 'approved', 'external_reference' => $c['pago'], 'transaction_amount' => 899.0];
+    $this->cobros->mp['701'] = $cobro;
+    $this->postJson("{$url}?type=payment&data_id=701")->assertOk();
+    $this->cobros->mp['701'] = [...$cobro, 'status' => 'charged_back', 'status_detail' => 'in_process'];
+    $this->postJson("{$url}?type=payment&data_id=701")->assertOk();
+
+    $this->postJson("/api/v1/app/{$c['slug']}/pagos/{$c['pago']}/reembolsos", ['motivo' => 'Lo pidió', 'manual' => true], conBearer($c['bearer']))
+        ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_REFUNDABLE');
+});

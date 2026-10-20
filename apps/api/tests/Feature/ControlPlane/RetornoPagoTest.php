@@ -58,8 +58,8 @@ it('regresa del pago al subdominio desde el que se pagó y a url_app si el orige
         ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_retorno_1');
 
     Http::assertSent(fn (PeticionSaliente $r): bool => str_ends_with($r->url(), '/checkout/sessions')
-        && $r['success_url'] === $sitio.'/mi-cuenta?pago=exito'
-        && $r['cancel_url'] === $sitio.'/mi-cuenta?pago=cancelado');
+        && $r['success_url'] === $sitio.'/mi-cuenta/pagos?pago=exito'
+        && $r['cancel_url'] === $sitio.'/mi-cuenta/pagos?pago=cancelado');
 })->with([
     'desde el subdominio del negocio' => [['Origin' => 'https://estudio-a.agendauno.mx'], 'https://estudio-a.agendauno.mx'],
     'sin Origin, por el Referer' => [['Referer' => 'https://estudio-a.agendauno.mx/mi-cuenta?seccion=compras'], 'https://estudio-a.agendauno.mx'],

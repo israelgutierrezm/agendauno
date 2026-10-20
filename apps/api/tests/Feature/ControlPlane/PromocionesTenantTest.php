@@ -94,8 +94,12 @@ it('respeta el tope de usos: al agotarse deja de aplicar', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     crearPromocion($e, ['codigo' => 'UNICO', 'tipo' => 'monto_fijo', 'valor' => 5000, 'usos_maximos' => 1]);
 
-    // Una compra con el código que nadie paga no lo agota.
+    // Una compra por pagar con el código lo aparta: otra a la vez no lo usa de más.
     crearOrdenConPromo($e, 'UNICO')->assertCreated()->assertJsonPath('data.descuento_minor', 5000);
+    crearOrdenConPromo($e, 'UNICO')->assertStatus(422)->assertJsonPath('code', 'PROMO_INVALID');
+
+    // Abandonada (un día después), ya no lo aparta.
+    $this->travel(25)->hours();
     $pagada = (string) crearOrdenConPromo($e, 'UNICO')->assertCreated()->json('data.id');
     // El uso se cuenta al pagarse.
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$pagada}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();

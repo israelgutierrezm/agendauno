@@ -140,7 +140,8 @@ mismo. Así no hay CORS entre subdominios.
    `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`,
    `checkout.session.expired`, `payment_intent.succeeded`,
    `payment_intent.payment_failed` y `payment_intent.canceled` (cobros a la tarjeta
-   domiciliada). Captura las llaves **y el secreto del webhook** (`whsec_…`) en el
+   domiciliada), y `charge.refunded` y `charge.dispute.created` (alertan al superadmin
+   de una devolución o una disputa de la renta o de timbres). Captura las llaves **y el secreto del webhook** (`whsec_…`) en el
    superadmin → Pasarelas. Al pasar de llaves de prueba a live, el superadmin pide el
    secreto nuevo y borra las tarjetas guardadas en modo prueba (no existen en live):
    los dueños las vuelven a guardar en «Mi suscripción».

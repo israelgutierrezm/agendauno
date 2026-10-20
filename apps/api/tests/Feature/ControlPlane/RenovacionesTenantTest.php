@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
@@ -160,4 +161,18 @@ it('una sesión que vence no pierde la deuda ni el seguimiento', function (): vo
         'proxima' => AcuerdoTenant::query()->where('ulid', $m['acuerdo'])->firstOrFail()->proxima_cobro_en?->toDateString(),
     ]);
     expect($estado)->toBe(['deudas' => 1, 'dunning' => 'en_mora', 'proxima' => $m['proxima']]);
+});
+
+it('devolver el cobro de una renovación es solo dinero: no dice que revirtió y la membresía sigue', function (): void {
+    $m = membresiaPorRenovar();
+    renovarConStripe($m);
+    $orden = (string) enEstudioRenovacion($m, fn () => OrdenTenant::query()->where('estado', 'pendiente')->whereNotNull('renueva_acuerdo_id')->value('ulid'));
+    $this->postJson("/api/v1/app/{$m['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($m['bearer']))->assertOk();
+    $pago = (string) enEstudioRenovacion($m, fn () => PagoTenant::query()->where('estado', 'aprobado')
+        ->where('orden_id', OrdenTenant::query()->where('ulid', $orden)->value('id'))->value('ulid'));
+
+    $this->postJson("/api/v1/app/{$m['slug']}/pagos/{$pago}/reembolsos", ['motivo' => 'No vino'], conBearer($m['bearer']))
+        ->assertCreated()->assertJsonPath('data.revirtio_creditos', false);
+
+    expect(enEstudioRenovacion($m, fn () => AcuerdoTenant::query()->where('ulid', $m['acuerdo'])->firstOrFail()->estado->value))->toBe('activo');
 });

@@ -93,20 +93,27 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
   Future<void> marcarNoAsistio(SesionAgenda s) =>
       _accion((r) => r.marcarAsistencia(s.cita!.reservaId, 'ausente'));
 
-  /// Cobra lo que falta de la cita (el saldo, si pagó anticipo) y dice si quedó
-  /// cobrada: con la agenda ya recargada, la cita ya no está por cobrar. Si el
-  /// servidor respondió pero la cita sigue por cobrar, no se anuncia como cobrada.
+  /// Cobra lo que falta de la cita (el anticipo sin pagar y el resto, juntos).
+  /// Cobrada es lo que responde el servidor: si después falla recargar la agenda,
+  /// el cobro ya quedó (no se anuncia como fallido ni se cobra otra vez).
   Future<bool> cobrar(SesionAgenda s, String metodo, {String? clave}) async {
+    final repo = ref.read(agendaRepositoryProvider);
+    if (repo == null) {
+      return false;
+    }
     final intento =
         clave ??
         'app-${s.cita!.reservaId}-${DateTime.now().microsecondsSinceEpoch}';
-    await _accion(
-      (r) => r.cobrarCita(s.cita!.reservaId, metodo, clave: intento),
-    );
-    final recargada = state.value?.sesiones
-        .where((x) => x.id == s.id)
-        .firstOrNull;
-    return recargada == null || !recargada.porCobrar;
+    await repo.cobrarCita(s.cita!.reservaId, metodo, clave: intento);
+    if (ref.mounted) {
+      ref.invalidateSelf();
+      try {
+        await future;
+      } on Object {
+        // La agenda se vuelve a cargar al reintentar; el cobro ya quedó.
+      }
+    }
+    return true;
   }
 
   Future<void> cancelar(SesionAgenda s, {String por = 'negocio'}) =>

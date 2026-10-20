@@ -226,7 +226,8 @@ class ReservasTenant
                 $activa = ReservaTenant::query()
                     ->where('sesion_id', $bloqueada->getKey())
                     ->where('persona_id', $persona->getKey())
-                    ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+                    // También un lugar apartado por pagar: no se reserva dos veces.
+                    ->whereIn('estado', self::ACTIVAS)
                     ->exists();
 
                 if ($activa) {
@@ -351,7 +352,7 @@ class ReservasTenant
         $duplicada = ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->where('persona_id', $persona->getKey())
-            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+            ->whereIn('estado', self::ACTIVAS)
             ->exists();
         $reglas['sin_reserva_previa'] = ! $duplicada;
         if ($duplicada) {
@@ -782,35 +783,51 @@ class ReservasTenant
             return null;
         }
 
-        $siguiente = ReservaTenant::query()
+        // En orden de llegada. A quien hoy no tiene con qué (su plan venció, se usó o se
+        // canceló) se le salta, sin perder su lugar en la lista: la oferta pasa al
+        // siguiente (no se atasca la lista en el primero).
+        $enEspera = ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->where('estado', EstadoReserva::EnEspera->value)
             ->orderBy('id')
             ->lockForUpdate()
-            ->first();
+            ->get();
+
+        $siguiente = null;
+        $derecho = null;
+        $retencion = null;
+        $unidadesReservadas = 0;
+        foreach ($enEspera as $candidata) {
+            // Reserva el costo REAL con el que se creo la reserva (no un valor fijo).
+            $costo = $candidata->costo_unidades ?? self::UNIDADES_POR_SESION;
+            $derecho = null;
+            if ($candidata->derecho_id !== null) {
+                // El plan que hoy la cubre (vigente, activo y con saldo), no el de cuando
+                // se anotó, que pudo vencer, usarse o cancelarse.
+                $derecho = $candidata->persona !== null ? $this->resolver->paraSesion($candidata->persona, $sesion, $costo) : null;
+                if ($derecho === null) {
+                    continue;
+                }
+            }
+            if ($derecho !== null && ! $derecho->ilimitado) {
+                try {
+                    $retencion = $this->creditos->retener($derecho, $costo, 'Oferta de lista de espera');
+                    $unidadesReservadas = $costo;
+                } catch (SaldoInsuficiente) {
+                    continue;
+                }
+            }
+            $siguiente = $candidata;
+            break;
+        }
 
         if ($siguiente === null) {
             return null;
         }
 
-        $derecho = $siguiente->derecho;
-        $retencion = null;
-        $unidadesReservadas = 0;
-        // Reserva el costo REAL con el que se creo la reserva (no un valor fijo).
-        $costo = $siguiente->costo_unidades ?? self::UNIDADES_POR_SESION;
-
-        if ($derecho !== null && ! $derecho->ilimitado) {
-            try {
-                $retencion = $this->creditos->retener($derecho, $costo, 'Oferta de lista de espera');
-                $unidadesReservadas = $costo;
-            } catch (SaldoInsuficiente) {
-                // Sin credito al ofrecer: se queda en espera para intentar luego.
-                return null;
-            }
-        }
-
         $siguiente->update([
             'estado' => EstadoReserva::Ofrecida->value,
+            'derecho_id' => $derecho?->getKey() ?? $siguiente->derecho_id,
             'retencion_id' => $retencion?->getKey(),
             'unidades' => $unidadesReservadas,
             'oferta_expira_en' => now()->addMinutes($this->parametros->entero('reservas.minutos_para_aceptar_lugar')),

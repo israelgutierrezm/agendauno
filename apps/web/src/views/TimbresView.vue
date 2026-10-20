@@ -241,7 +241,10 @@ async function pagarPendiente(): Promise<void> {
   try {
     const { data } = await api.post<{
       data: { estado?: string; checkout?: { tipo?: string; url?: string } };
-    }>(`${base.value}/renta/cargos/${pendiente.id}/pagar`, {});
+    }>(`${base.value}/renta/cargos/${pendiente.id}/pagar`, {
+      // Vuelve aquí, con el aviso de los timbres (no el de la renta).
+      retorno: "/renta/timbres",
+    });
     const checkout = data.data.checkout ?? {};
     if (typeof checkout.url === "string" && checkout.url !== "") {
       window.location.href = checkout.url;

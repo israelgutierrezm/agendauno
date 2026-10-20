@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Support\Facades\File;
 
 /*
@@ -214,4 +216,19 @@ it('pago por asistente: corregir la asistencia después de pagar no cambia el co
     // Si después se corrige (no vino), solo aparece lo que cambió: se reconoció de más.
     $marcar($bea, 'ausente');
     expect($diferencia())->toMatchArray(['reconocido_minor' => 20000, 'hoy_minor' => 10000, 'diferencia_minor' => -10000]);
+});
+
+it('quien se dio de baja sigue en su corte: su línea es suya y no se sugiere pagarle otra vez', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    ['coach' => $coach] = nominaConDosClasesImpartidas($e);
+    // Se le da de baja antes de cerrar el periodo que trabajó.
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), fn () => Usuario::query()->where('ulid', $coach)->firstOrFail()->delete());
+    $url = "/api/v1/app/{$e['slug']}/nomina/cortes";
+
+    $corte = (string) $this->postJson($url, ['desde' => '2026-10-01', 'hasta' => '2026-10-04'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.total_minor', 40000)->json('data.id');
+
+    $detalle = $this->getJson("{$url}/{$corte}", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($detalle['lineas'][0]['usuario_id'])->toBe($coach)
+        ->and($detalle['diferencias'])->toBe([]);
 });

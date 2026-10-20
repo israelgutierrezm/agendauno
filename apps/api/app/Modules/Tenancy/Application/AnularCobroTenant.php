@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\PromocionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -72,6 +73,13 @@ class AnularCobroTenant
         if ($orden->renueva_acuerdo_id !== null) {
             return 'Un cobro de renovación no se anula: su efecto es el ciclo de la membresía. Usa la devolución.';
         }
+        // Un cobro doble: la venta la pagó el otro; anular este le quitaría lo comprado.
+        $otroCobro = PagoTenant::query()->where('orden_id', $orden->getKey())->whereKeyNot($pago->getKey())
+            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
+            ->exists();
+        if ($otroCobro) {
+            return 'Esta venta tiene otro cobro: devuelve este (solo el dinero) en lugar de anularlo.';
+        }
         if (! $completo) {
             return null;
         }
@@ -108,7 +116,7 @@ class AnularCobroTenant
             ];
             // Sale de la caja abierta de la sede del cobro, hoy (ADR 0175): lo cerrado no
             // cambia. Bloqueada antes del inventario que regresa.
-            $turno = $this->cajas->turnoParaMovimiento($this->cajas->sucursalDelCobro($bloqueado));
+            $turno = $this->cajas->turnoParaAjusteDelCobro($bloqueado);
             // Sale de cada forma con la que entró (con varias formas, ADR 0177).
             $this->cajas->asentarPartes($turno, MovimientoCajaTenant::ANULACION, CajasTenant::partesDelPago($bloqueado), -1,
                 ['pago_id' => $bloqueado->getKey()], $actor, $motivo);
@@ -118,6 +126,8 @@ class AnularCobroTenant
                 ContextoMovimiento::para(OrigenMovimiento::Anulacion, 'pago', (string) $bloqueado->ulid, $actor),
                 'Cobro anulado',
                 $actor,
+                // Ya bloqueados: si se usó mientras tanto (una reserva), no se anula.
+                exigirSinUso: true,
             );
             // Los artículos que salieron con el cobro vuelven a su sede (ADR 0166).
             $this->inventario->devolverDeOrden($orden, 'Cobro anulado '.$orden->ulid, $actor);
@@ -128,6 +138,11 @@ class AnularCobroTenant
                 'metodo_pago' => null,
                 'referencia_pago' => null,
             ]);
+            // El uso del código se contó al pagarse: anulado el cobro, se devuelve (si se
+            // cobra otra vez, se vuelve a contar).
+            if ($orden->promocion_id !== null) {
+                PromocionTenant::query()->whereKey($orden->promocion_id)->where('usos', '>', 0)->decrement('usos');
+            }
 
             $orden->loadMissing('persona');
             $this->eventos->registrar('pago.anulado', 'pago', (string) $bloqueado->ulid, [

@@ -210,3 +210,18 @@ it('caja ve la inscripción antes de cobrar y quien puede la exenta al vender', 
     );
     expect($auditoria?->motivo)->toBe('Reingreso pactado');
 });
+
+it('una primera venta devuelta completa no exime de la inscripción a la siguiente', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    inscripcionDe500($e);
+    $plan = planConInscripcion($e);
+    $ana = crearMiembroTenant($e, 'Ana');
+    $orden = ventaConCuotas($e, $ana, $plan);
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden['id']}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    $pago = (string) collect($this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->json('data'))->first()['id'];
+
+    // Se arrepintió: se le devuelve todo y el plan se retira.
+    $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pago}/reembolsos", ['motivo' => 'Se arrepintió'], conBearer($e['bearer']))->assertCreated();
+
+    expect(ventaConCuotas($e, $ana, $plan)['total_minor'])->toBe(150000);
+});

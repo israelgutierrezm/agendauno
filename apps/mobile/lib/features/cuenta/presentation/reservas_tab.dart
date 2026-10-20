@@ -49,6 +49,7 @@ class ReservasTab extends ConsumerWidget {
       if (reserva != null) {
         mostrarDetalleReserva(
           context,
+          ref,
           reserva,
           pagoEnLinea: cuenta.pagoEnLinea,
         );

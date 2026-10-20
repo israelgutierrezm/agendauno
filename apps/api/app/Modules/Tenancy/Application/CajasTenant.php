@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -104,7 +105,15 @@ class CajasTenant
     {
         $delServicio = [];
         if ($venta->orden_id !== null && (int) $venta->servicio_minor > 0) {
-            $pago = PagoTenant::query()->where('orden_id', $venta->orden_id)->whereNotNull('aprobado_en')->latest('id')->first();
+            // El cobro de esa venta: aprobado (no anulado) y hecho a más tardar con ella, no
+            // uno posterior.
+            $pago = PagoTenant::query()
+                ->where('orden_id', $venta->orden_id)
+                ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value])
+                ->whereNotNull('aprobado_en')
+                ->where('created_at', '<=', $venta->created_at)
+                ->latest('id')
+                ->first();
             $delServicio = $pago instanceof PagoTenant ? self::partesDelPago($pago) : [];
         }
 
@@ -187,6 +196,34 @@ class CajasTenant
     }
 
     /**
+     * La caja abierta donde se ajusta un cobro (anularlo o corregir su forma de pago):
+     * solo si ese cobro entró por una caja. Uno que no pasó por caja (p. ej. la sede aún
+     * no la usaba) no se ajusta en la de hoy: su dinero nunca estuvo en ese cajón.
+     */
+    public function turnoParaAjusteDelCobro(PagoTenant $pago): ?TurnoCajaTenant
+    {
+        $entro = MovimientoCajaTenant::query()
+            ->where('pago_id', $pago->getKey())
+            ->where('tipo', MovimientoCajaTenant::COBRO)
+            ->exists();
+
+        return $entro ? $this->turnoParaMovimiento($this->sucursalDelCobro($pago)) : null;
+    }
+
+    /**
+     * Igual, para una venta del mostrador: solo si entró por una caja.
+     */
+    public function turnoParaAjusteDeLaVenta(VentaPosTenant $venta): ?TurnoCajaTenant
+    {
+        $entro = MovimientoCajaTenant::query()
+            ->where('venta_pos_id', $venta->getKey())
+            ->where('tipo', MovimientoCajaTenant::VENTA)
+            ->exists();
+
+        return $entro ? $this->turnoParaMovimiento((int) $venta->sucursal_id) : null;
+    }
+
+    /**
      * La sede de la caja donde entró un cobro (un ajuste posterior va a la caja abierta
      * de esa misma sede); si no entró por una caja, la de su orden.
      */
@@ -228,10 +265,24 @@ class CajasTenant
     }
 
     /** Un retiro o un ingreso de efectivo que no es venta (con su motivo). */
-    public function moverEfectivo(TurnoCajaTenant $turno, string $tipo, int $montoMinor, string $motivo, Usuario $actor): MovimientoCajaTenant
+    /**
+     * @param  string|null  $clave  la del intento: repetirlo (sin red, doble clic) devuelve el mismo movimiento
+     */
+    public function moverEfectivo(TurnoCajaTenant $turno, string $tipo, int $montoMinor, string $motivo, Usuario $actor, ?string $clave = null): MovimientoCajaTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($turno, $tipo, $montoMinor, $motivo, $actor): MovimientoCajaTenant {
+        return DB::connection('tenant')->transaction(function () use ($turno, $tipo, $montoMinor, $motivo, $actor, $clave): MovimientoCajaTenant {
             $bloqueado = TurnoCajaTenant::query()->whereKey($turno->getKey())->lockForUpdate()->firstOrFail();
+            $monto = $tipo === MovimientoCajaTenant::RETIRO ? -abs($montoMinor) : abs($montoMinor);
+            $repetido = $clave !== null
+                ? MovimientoCajaTenant::query()->where('turno_caja_id', $bloqueado->getKey())->where('clave', $clave)->first()
+                : null;
+            if ($repetido instanceof MovimientoCajaTenant) {
+                if ($repetido->tipo !== $tipo || (int) $repetido->monto_minor !== $monto) {
+                    throw new CajaNoOperable('Esa clave ya se usó para otro movimiento: vuelve a intentarlo.');
+                }
+
+                return $repetido;
+            }
             if ($bloqueado->estado !== TurnoCajaTenant::ABIERTA) {
                 throw new CajaNoOperable('Esta caja ya se contó: el efectivo se mueve en la caja abierta.');
             }
@@ -239,9 +290,10 @@ class CajasTenant
                 'turno_caja_id' => $bloqueado->getKey(),
                 'tipo' => $tipo,
                 'metodo' => 'efectivo',
-                'monto_minor' => $tipo === MovimientoCajaTenant::RETIRO ? -abs($montoMinor) : abs($montoMinor),
+                'monto_minor' => $monto,
                 'usuario_id' => $actor->getKey(),
                 'motivo' => mb_substr($motivo, 0, 300),
+                'clave' => $clave,
             ]);
             $this->auditoria->registrar($actor, 'caja.'.$tipo, 'turno_caja', (string) $bloqueado->ulid, null, [
                 'monto_minor' => abs($montoMinor), 'moneda' => $bloqueado->moneda,
@@ -289,7 +341,9 @@ class CajasTenant
 
             $diferencia = 0;
             foreach ($this->esperado($bloqueado) as $metodo => $esperado) {
-                $real = max(0, (int) ($contado[$metodo] ?? 0));
+                // Fuera del efectivo el reporte puede salir negativo (una devolución por la
+                // terminal en un día sin ventas con tarjeta).
+                $real = $metodo === 'efectivo' ? max(0, (int) ($contado[$metodo] ?? 0)) : (int) ($contado[$metodo] ?? 0);
                 $diferencia += abs($real - $esperado);
                 ConteoCajaTenant::query()->create([
                     'turno_caja_id' => $bloqueado->getKey(),

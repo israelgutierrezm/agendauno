@@ -69,6 +69,26 @@ describe("registrar pago con cuotas", () => {
     expect(w.find('[data-prueba="cuotas-orden"]').exists()).toBe(false);
   });
 
+  it("cerrar después de exentar avisa el cambio (quien lo abrió recarga)", async () => {
+    api.post.mockResolvedValueOnce({
+      data: { data: { estado: "pendiente", total_minor: 100000 } },
+    });
+    const w = montar();
+    await w.get('[data-prueba="exentar-cuota"]').trigger("click");
+    await w.get('[data-prueba="motivo-cuota"]').setValue("Reingreso pactado");
+    await w.get('[data-prueba="confirmar-exencion"]').trigger("click");
+    await flushPromises();
+
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Cancelar")!
+      .trigger("click");
+    expect(w.emitted("cerrar")).toBeUndefined();
+    expect(w.emitted("registrado")?.[0]).toEqual([
+      "Se exentó «Inscripción»: la orden queda en $1,000.00.",
+    ]);
+  });
+
   it("sin permiso no se ofrece exentar", () => {
     sesion.puede.mockReturnValue(false);
     const w = montar();

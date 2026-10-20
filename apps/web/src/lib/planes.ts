@@ -1,3 +1,5 @@
+import { dinero as dineroDelPais } from "@/lib/formato";
+
 /**
  * Planes y paquetes (ADR 0050): lo que el negocio vende para reservar. La vigencia
  * se calcula igual que en la API (`VigenciaProducto`), para mostrar "hasta cuándo"
@@ -126,9 +128,11 @@ export function clasesDe(unidades: number | null): number {
   return Math.round((unidades ?? 0) / UNIDADES_POR_CLASE);
 }
 
-export function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+/** Un precio en su moneda, escrito como en el país del negocio (sin país, como en México). */
+export function dinero(
+  minor: number,
+  moneda: string,
+  pais?: string | null,
+): string {
+  return dineroDelPais(minor, moneda, pais);
 }

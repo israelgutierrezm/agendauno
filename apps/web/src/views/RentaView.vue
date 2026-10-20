@@ -116,6 +116,9 @@ interface RespuestaPago {
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+// Pagar con tarjeta guardada, comprar timbres, facturar y cambiar de plan piden
+// gestionar el negocio (el API lo exige); quien solo ve la renta, solo la ve.
+const puedeGestionar = computed(() => sesion.puede("estudio.gestionar"));
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -448,6 +451,7 @@ onMounted(() => {
         class="mt-6"
         :plan="renta.plan"
         :base="base"
+        :puede-gestionar="puedeGestionar"
         :ventas="renta.ventas ?? { correo: null, whatsapp: null }"
         @cambiado="planCambiado"
       />
@@ -673,6 +677,7 @@ onMounted(() => {
         <TarjetaRenta
           v-if="conTarjeta"
           :base="base"
+          :puede-gestionar="puedeGestionar"
           :tarjeta="renta.tarjeta ?? null"
           :posible="renta.domiciliacion_posible ?? false"
           @cambio="cargar"
@@ -680,6 +685,7 @@ onMounted(() => {
         <TimbresRenta
           v-if="conTimbres"
           :base="base"
+          :puede-gestionar="puedeGestionar"
           :pagado="retornoPago === 'exito'"
         />
       </div>
@@ -855,7 +861,7 @@ onMounted(() => {
                   </button>
                   <!-- Pagado sin factura (o con error): emitir/reintentar -->
                   <button
-                    v-else
+                    v-else-if="puedeGestionar"
                     type="button"
                     class="tu-btn tu-btn-fantasma whitespace-nowrap"
                     data-prueba="facturar"

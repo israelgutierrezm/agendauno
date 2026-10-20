@@ -182,3 +182,29 @@ it('el programa y las recompensas dejan registro en la bitácora', function (): 
         ->toContain('Editó la recompensa Clase gratis: cambió los puntos')
         ->toContain('Dejó de ofrecer la recompensa Clase gratis');
 });
+
+it('corregir una asistencia a ausente retira sus puntos, y volver a presente no los da dos veces', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    test()->putJson("/api/v1/app/{$e['slug']}/lealtad/programa", [
+        'activa' => true, 'puntos_por_asistencia' => 10, 'puntos_por_moneda' => 0,
+    ], conBearer($e['bearer']))->assertOk();
+    $semilla = agendaSemilla($e);
+    $vp = venderPackAMiembroTenant($e, 8000, 'Ana');
+    $reserva = (string) test()->postJson("/api/v1/app/{$e['slug']}/sesiones/".crearSesionTenant($e, $semilla).'/reservas', [
+        'persona_id' => $vp['persona'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $marcar = function (string $estado) use ($e, $reserva): void {
+        test()->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => $estado], conBearer($e['bearer']))->assertSuccessful();
+        test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    };
+    $saldo = fn (): int => (int) test()->getJson("/api/v1/app/{$e['slug']}/miembros/{$vp['persona']}/puntos", conBearer($e['bearer']))->json('data.saldo');
+
+    $marcar('presente');
+    expect($saldo())->toBe(10);
+    $marcar('ausente');
+    expect($saldo())->toBe(0);
+    $marcar('presente');
+    expect($saldo())->toBe(10);
+    $marcar('presente');
+    expect($saldo())->toBe(10);
+});

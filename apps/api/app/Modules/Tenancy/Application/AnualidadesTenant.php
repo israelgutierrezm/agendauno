@@ -108,7 +108,9 @@ class AnualidadesTenant
     private function crear(PersonaTenant $persona, int $monto, int $anio): bool
     {
         $referencia = ConceptoCuota::Anualidad->value.':'.$persona->ulid.':'.$anio;
-        if (LineaOrdenTenant::query()->where('referencia', $referencia)->exists()) {
+        // Ya generada, o exentada (su línea se quitó, pero no se vuelve a cobrar).
+        if (LineaOrdenTenant::query()->where('referencia', $referencia)->exists()
+            || DB::connection('tenant')->table('cuotas_exentadas')->where('referencia', $referencia)->exists()) {
             return false;
         }
 

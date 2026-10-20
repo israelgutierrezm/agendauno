@@ -34,8 +34,10 @@ class DunningTenantController
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+        // Quien está acotado a sedes (R19) ve solo la mora de sus clientes.
         $base = ProcesoDunningTenant::query()
-            ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value]);
+            ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
+            ->whereHas('acuerdo', fn ($a) => app(AlcancePersonaTenant::class)->acotada($a, $request));
         $total = (clone $base)->count();
         $buscar = trim((string) ($filtros['q'] ?? ''));
         $pagina = $base

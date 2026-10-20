@@ -77,7 +77,8 @@ describe("PlanCitasRenta", () => {
     expect(precio("premium")).toContain("28");
     expect(precio("pro")).toContain("50");
     // A 20 pesos por dólar.
-    expect(w.get("[data-prueba='nivel-premium']").text()).toContain("$560");
+    // USD 28 × 20 = $560, más 16 % de IVA: el cargo que se emite.
+    expect(w.get("[data-prueba='nivel-premium']").text()).toContain("$650");
     // Individual no sirve con 2 profesionales; el actual no se vuelve a elegir.
     expect(
       w.get("[data-prueba='nivel-individual'] button").attributes("disabled"),

@@ -31,7 +31,8 @@ use Illuminate\Http\Request;
  */
 class MiPagoAutomaticoTenantController
 {
-    private const RETORNO = '/mi-cuenta';
+    // A Pagos: ahí se ve la tarjeta y se recarga lo pendiente al volver.
+    private const RETORNO = '/mi-cuenta/pagos';
 
     public function __construct(
         private readonly PersonaDeUsuarioTenant $personas,

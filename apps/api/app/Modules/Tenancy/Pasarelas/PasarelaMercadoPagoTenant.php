@@ -52,7 +52,8 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultab
             ConceptoDeCobro::de($orden),
             (string) $pago->ulid,
             $this->urlNotificaciones(),
-            ['success' => $retorno['exito'], 'pending' => $retorno['exito'], 'failure' => $retorno['cancelado']],
+            // En tienda o en revisión, el pago no se ha hecho: la web no dice «recibido».
+            ['success' => $retorno['exito'], 'pending' => $retorno['pendiente'], 'failure' => $retorno['cancelado']],
             $orden?->persona?->email,
             Carbon::now()->addDays($this->parametros->entero('cobranza.dias_pagar_en_tienda')),
         );

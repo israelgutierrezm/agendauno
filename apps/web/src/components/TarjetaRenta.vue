@@ -18,11 +18,15 @@ interface Tarjeta {
   vence: string | null;
 }
 
-const props = defineProps<{
-  base: string;
-  tarjeta: Tarjeta | null;
-  posible: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    base: string;
+    tarjeta: Tarjeta | null;
+    posible: boolean;
+    puedeGestionar?: boolean;
+  }>(),
+  { puedeGestionar: true },
+);
 const emit = defineEmits<{ cambio: [] }>();
 
 const { t } = useI18n();
@@ -125,7 +129,7 @@ onMounted(async () => {
     <p v-if="!posible" class="mt-2 text-sm tr-suave">
       {{ $t("suscripcion.tarjeta.noDisponible") }}
     </p>
-    <div v-else class="mt-4 flex gap-2 flex-wrap">
+    <div v-else-if="puedeGestionar" class="mt-4 flex gap-2 flex-wrap">
       <button
         type="button"
         class="tu-btn tu-btn-fantasma"

@@ -56,12 +56,33 @@ final class ReciboRentaPdf
     public static function concepto(CargoRenta $cargo): string
     {
         $marca = self::marca($cargo);
+        $cubre = self::rango($cargo);
+        $cuando = $cubre !== null ? $cubre[0]->toDateString().' al '.$cubre[1]->toDateString() : (string) $cargo->periodo;
 
         return match ($cargo->concepto) {
             'timbres' => "Timbres de facturación {$marca}",
-            'ajuste' => "Cambio de plan {$marca} {$cargo->periodo}",
-            default => "Suscripción {$marca} {$cargo->periodo}",
+            'ajuste' => "Cambio de plan {$marca} {$cuando}",
+            default => "Suscripción {$marca} {$cuando}",
         };
+    }
+
+    /**
+     * Lo que cubre el cargo cuando no es su mes de calendario (un plan anual, un ajuste
+     * por días sueltos); null si cubre el mes de su periodo o no lo dice.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     */
+    private static function rango(CargoRenta $cargo): ?array
+    {
+        if ($cargo->cubre_desde === null || $cargo->cubre_hasta === null) {
+            return null;
+        }
+        $desde = CarbonImmutable::parse($cargo->cubre_desde->toDateString());
+        $hasta = CarbonImmutable::parse($cargo->cubre_hasta->toDateString());
+        $delMes = $desde->format('Y-m') === (string) $cargo->periodo && $desde->day === 1
+            && $hasta->toDateString() === $desde->endOfMonth()->toDateString();
+
+        return $delMes ? null : [$desde, $hasta];
     }
 
     /** La marca del negocio del cargo; sin él, la de la plataforma. */
@@ -81,6 +102,11 @@ final class ReciboRentaPdf
         $fecha = static fn (CarbonImmutable $f): string => $f->setTimezone($zona)->locale('es')->translatedFormat('j \d\e F \d\e Y');
         $inicio = CarbonImmutable::createFromFormat('Y-m-d', $cargo->periodo.'-01', $zona);
         $periodo = $inicio instanceof CarbonImmutable ? $inicio->locale('es')->translatedFormat('F \d\e Y') : (string) $cargo->periodo;
+        $cubre = self::rango($cargo);
+        if ($cubre !== null) {
+            $dia = static fn (CarbonImmutable $f): string => $f->locale('es')->translatedFormat('j \d\e F \d\e Y');
+            $periodo = $dia($cubre[0]).' al '.$dia($cubre[1]);
+        }
         $pagado = $cargo->pagado_en !== null ? $fecha(CarbonImmutable::instance($cargo->pagado_en)) : '—';
         $metodo = (string) ($cargo->metodo_pago ?? '');
 

@@ -308,3 +308,22 @@ it('una tarifa sin techo o con topes desordenados se rechaza', function (): void
 
     $this->getJson('/api/v1/plataforma/tarifas', ['Accept' => 'application/json'])->assertUnauthorized();
 });
+
+it('clases: quien usó el servicio en el mes cuenta aunque al final del mes se archive o deje de ser facturable', function (): void {
+    $e = estudioConSesion('pilates-a', 'dueno@pilates.mx');
+    terminarPrueba($e);
+    $ana = crearMiembroTenant($e, 'Ana');
+    $beto = crearMiembroTenant($e, 'Beto');
+    compraPagadaTenant($e, $ana);
+    compraPagadaTenant($e, $beto);
+    $url = "/api/v1/app/{$e['slug']}/renta/quien-cuenta";
+    expect($this->getJson($url, conBearer($e['bearer']))->assertOk()->json('data.cantidad'))->toBe(2);
+
+    // A fin de mes: Ana deja de ser facturable y Beto se archiva.
+    $this->travelTo('2026-10-31 20:00:00');
+    $this->putJson("/api/v1/app/{$e['slug']}/miembros/{$ana}", ['es_facturable' => false], conBearer($e['bearer']))->assertOk();
+    $this->putJson("/api/v1/app/{$e['slug']}/miembros/{$beto}", ['archivado' => true], conBearer($e['bearer']))->assertOk();
+
+    // Octubre los sigue contando: sí usaron el servicio.
+    expect($this->getJson("{$url}?periodo=2026-10", conBearer($e['bearer']))->assertOk()->json('data.cantidad'))->toBe(2);
+});

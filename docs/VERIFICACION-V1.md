@@ -34,7 +34,7 @@ pasarela: `APP_URL/api/v1/webhooks/tenant/{negocio}/{stripe|mercadopago|openpay}
 
 | Pasarela | Llaves | Webhook |
 |---|---|---|
-| Stripe | `secret_key` (`sk_test_…`) y `webhook_secret` (`whsec_…`) | Dashboard → Developers → Webhooks. Eventos `checkout.session.*`, `payment_intent.*`, `refund.*`. |
+| Stripe | `secret_key` (`sk_test_…`) y `webhook_secret` (`whsec_…`) | Dashboard → Developers → Webhooks. Eventos `checkout.session.*`, `payment_intent.*`, `refund.*` y `charge.dispute.*` (contracargos). |
 | Mercado Pago | `access_token` (`TEST-…`) y `webhook_secret` | Tus integraciones → Webhooks, temas «Pagos» y «Planes y suscripciones». La cuenta vendedora y la compradora de prueba deben ser del mismo país. |
 | OpenPay | `merchant_id`, `private_key`, `public_key`, `webhook_user`, `webhook_password` | Guarda usuario y contraseña **antes** de registrar el webhook en el panel; OpenPay manda un código que aparece en la pantalla de Pasarelas y se captura en su panel para verificarlo. |
 

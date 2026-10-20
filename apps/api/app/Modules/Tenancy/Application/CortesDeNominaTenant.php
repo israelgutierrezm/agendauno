@@ -53,7 +53,7 @@ class CortesDeNominaTenant
             }
 
             $filas = $this->nomina->calcular($desde, $hasta);
-            $ids = Usuario::query()->whereIn('ulid', array_filter(array_column($filas, 'usuario_id')))->pluck('id', 'ulid');
+            $ids = Usuario::withTrashed()->whereIn('ulid', array_filter(array_column($filas, 'usuario_id')))->pluck('id', 'ulid');
             $moneda = $this->region->moneda();
 
             $corte = DB::connection('tenant')->transaction(function () use ($desde, $hasta, $actor, $filas, $ids, $moneda): CorteNominaTenant {
@@ -173,7 +173,7 @@ class CortesDeNominaTenant
     public function diferencias(CorteNominaTenant $corte): array
     {
         $enCorte = [];
-        $usuarios = Usuario::query()->whereIn('id', $corte->lineas()->whereNotNull('usuario_id')->select('usuario_id'))->pluck('ulid', 'id');
+        $usuarios = Usuario::withTrashed()->whereIn('id', $corte->lineas()->whereNotNull('usuario_id')->select('usuario_id'))->pluck('ulid', 'id');
         foreach ($corte->lineas as $linea) {
             /** @var LineaCorteNominaTenant $linea */
             $clave = $linea->usuario_id !== null ? (string) $usuarios->get($linea->usuario_id) : '';
@@ -184,7 +184,7 @@ class CortesDeNominaTenant
         // reconocido. Los demás ajustes (un bono…) van aparte y no cambian lo que falta.
         $ajustes = [];
         $otros = [];
-        $deAjustes = Usuario::query()->whereIn('id', $corte->ajustes()->whereNotNull('usuario_id')->select('usuario_id'))->pluck('ulid', 'id');
+        $deAjustes = Usuario::withTrashed()->whereIn('id', $corte->ajustes()->whereNotNull('usuario_id')->select('usuario_id'))->pluck('ulid', 'id');
         foreach ($corte->ajustes()->get() as $ajuste) {
             $clave = $ajuste->usuario_id !== null ? (string) $deAjustes->get($ajuste->usuario_id) : '';
             if ($ajuste->compensa()) {

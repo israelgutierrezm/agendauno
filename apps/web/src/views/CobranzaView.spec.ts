@@ -130,6 +130,51 @@ describe("cobros: movimientos", () => {
     expect(w.text()).toContain("Ana");
     expect(mocks.post).not.toHaveBeenCalled();
   });
+  it("si la pasarela no hace la devolución, el diálogo sigue abierto con el motivo y otra llave", async () => {
+    mocks.post.mockResolvedValueOnce({
+      data: {
+        data: {
+          estado: "fallido",
+          monto_minor: 10000,
+          moneda: "MXN",
+          motivo_fallo: "Fondos insuficientes en la cuenta",
+        },
+      },
+    });
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Reembolsar")!
+      .trigger("click");
+    const dialogo = w.get('[role="dialog"]');
+    await dialogo.get("#rmt").setValue("Cobro doble");
+    await dialogo.get("#form-reembolso").trigger("submit");
+    await flushPromises();
+
+    expect(w.find('[role="dialog"]').exists()).toBe(true);
+    expect(w.get('[data-prueba="error-reembolso"]').text()).toContain(
+      "Fondos insuficientes en la cuenta",
+    );
+    // El siguiente intento lleva otra llave (la de la fallida ya no sirve).
+    mocks.post.mockResolvedValueOnce({
+      data: {
+        data: { estado: "aprobado", monto_minor: 10000, moneda: "MXN" },
+      },
+    });
+    await w.get("#form-reembolso").trigger("submit");
+    await flushPromises();
+    const llaves = mocks.post.mock.calls.map(
+      ([, , opciones]) =>
+        (opciones as { headers: Record<string, string> }).headers[
+          "Idempotency-Key"
+        ],
+    );
+    expect(llaves[0]).not.toBe(llaves[1]);
+    expect(w.find('[role="dialog"]').exists()).toBe(false);
+  });
   it("el reembolso que no pasa se explica dentro del diálogo, junto a su campo", async () => {
     mocks.post.mockRejectedValueOnce({
       campos: { monto_minor: "El monto excede lo reembolsable." },

@@ -193,8 +193,8 @@ class MedirUsoSaas
     }
 
     /**
-     * Los alumnos que cuentan en el mes. Incluye a quien se dio de baja durante o después
-     * del mes: sí usó el servicio.
+     * Los alumnos que cuentan en el mes. Incluye a quien se dio de baja, se archivó o se
+     * marcó como no facturable durante o después del mes: sí usó el servicio.
      *
      * @return Builder<PersonaTenant>
      */
@@ -203,8 +203,8 @@ class MedirUsoSaas
         return PersonaTenant::withTrashed()
             ->where(fn (Builder $q) => $q->whereNull('deleted_at')->orWhere('deleted_at', '>=', $inicio))
             ->where('tipo', TipoPersonaTenant::Miembro->value)
-            ->where('es_facturable', true)
-            ->where('archivado', false)
+            ->where(fn (Builder $q) => $q->where('es_facturable', true)->orWhere('no_facturable_desde', '>=', $inicio))
+            ->where(fn (Builder $q) => $q->where('archivado', false)->orWhere('archivado_en', '>=', $inicio))
             ->where(function (Builder $q) use ($inicio, $fin): void {
                 $q->whereExists($this->reservoEnElMes($inicio, $fin))
                     ->orWhereExists($this->comproEnElMes($inicio, $fin));

@@ -1105,11 +1105,13 @@ onMounted(cargar);
         }"
       >
         {{
-          retornoPago !== "exito"
-            ? $t("pagoEnLinea.cancelado")
-            : soloPago
-              ? $t("pagoEnLinea.exito")
-              : $t("pagoEnLinea.citaExito")
+          retornoPago === "pendiente"
+            ? $t("pagoEnLinea.pendiente")
+            : retornoPago !== "exito"
+              ? $t("pagoEnLinea.cancelado")
+              : soloPago
+                ? $t("pagoEnLinea.exito")
+                : $t("pagoEnLinea.citaExito")
         }}
       </p>
       <!-- Encabezado con marca del estudio -->

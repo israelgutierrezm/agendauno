@@ -38,7 +38,8 @@ class PlataformaCobrosController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $buscar = trim((string) ($validado['q'] ?? ''));
-        $hoy = Carbon::today();
+        // El día y el mes en la hora de la plataforma, no en UTC.
+        $hoy = Carbon::now((string) config('agendauno.plataforma.zona_horaria', 'America/Mexico_City'))->startOfDay();
 
         // Por moneda (ADR 0107: a México en pesos, al resto en dólares): no se suman
         // pesos con dólares. Arriba, los pesos; las demás monedas, aparte.
@@ -49,11 +50,11 @@ class PlataformaCobrosController
             return [
                 'moneda' => $moneda,
                 'pendiente_minor' => (int) (clone $deMoneda)->sum('monto_minor'),
-                'vencido_minor' => (int) (clone $deMoneda)->whereDate('vence_en', '<', $hoy)->sum('monto_minor'),
+                'vencido_minor' => (int) (clone $deMoneda)->whereDate('vence_en', '<', $hoy->toDateString())->sum('monto_minor'),
                 'cobrado_mes_minor' => (int) CargoRenta::query()
                     ->where('estado', EstadoCargoRenta::Pagado->value)
                     ->where('moneda', $moneda)
-                    ->whereBetween('pagado_en', [$hoy->copy()->startOfMonth(), $hoy->copy()->endOfMonth()])
+                    ->whereBetween('pagado_en', [$hoy->copy()->startOfMonth()->utc(), $hoy->copy()->endOfMonth()->utc()])
                     ->sum('monto_minor'),
             ];
         };
@@ -80,7 +81,7 @@ class PlataformaCobrosController
             ->when(isset($validado['periodo']), fn ($q) => $q->where('periodo', $validado['periodo']))
             ->when($request->boolean('vencidos'), fn ($q) => $q
                 ->where('estado', EstadoCargoRenta::Pendiente->value)
-                ->whereDate('vence_en', '<', $hoy))
+                ->whereDate('vence_en', '<', $hoy->toDateString()))
             ->orderByDesc('periodo')
             ->orderByDesc('id')
             ->paginate((int) ($validado['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($validado['page'] ?? 1));

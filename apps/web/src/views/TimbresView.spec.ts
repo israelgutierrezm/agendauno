@@ -200,7 +200,8 @@ describe("timbres para facturar", () => {
     await flushPromises();
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/renta/cargos/cargo1/pagar",
-      {},
+      // Vuelve a Timbres, no a Renta (con el aviso de la renta).
+      { retorno: "/renta/timbres" },
     );
   });
 

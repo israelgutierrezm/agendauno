@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Platform\Operacion\AlertaPlataforma;
+use App\Modules\Tenancy\Application\ReciboRentaPdf;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
@@ -241,4 +243,89 @@ it('una renta mes vencido por debajo del cargo mínimo queda sin cargo', functio
     emitirCargoDelMesEnCurso();
 
     expect(CargoRenta::query()->sole())->estado->value->toBe('sin_cargo')->monto_minor->toBe(900);
+});
+
+it('extender una prueba que ya terminó regala solo la extensión: los días de en medio se cobran', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->putJson('/api/v1/plataforma/estudios/estudio-a', ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 310000], conPlataforma())->assertOk();
+    Estudio::query()->where('slug', $e['slug'])->update(['trial_termina_en' => '2026-10-05']);
+
+    // El 28 se le regala una semana más.
+    $this->travelTo('2026-10-28 12:00:00');
+    $this->postJson('/api/v1/plataforma/estudios/estudio-a/extender-prueba', ['dias' => 7], conPlataforma())->assertOk();
+
+    emitirCargoDelMesEnCurso();
+
+    // Del 6 al 27 de octubre (22 de 31 días), no el mes entero sin cargo.
+    expect(CargoRenta::query()->sole()->monto_minor)->toBe(220000);
+});
+
+it('los meses cerrados que no se emitieron (p. ej. mientras estuvo suspendido) se emiten al volver', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
+    $this->putJson('/api/v1/plataforma/estudios/estudio-a', ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900], conPlataforma())->assertOk();
+    // Octubre se emitió; noviembre no (el negocio no estaba operativo).
+    emitirCargoDelMesEnCurso();
+
+    $this->travelTo('2027-01-02 12:00:00');
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
+
+    expect(CargoRenta::query()->orderBy('periodo')->pluck('periodo')->all())->toBe(['2026-10', '2026-11', '2026-12']);
+});
+
+it('pagar una compra de timbres desde Timbres vuelve a Timbres, no al aviso de la renta', function (): void {
+    Http::fake([
+        'api.stripe.com/*' => Http::response(['id' => 'cs_timbres_1', 'url' => 'https://checkout.stripe.com/c/pay/cs_timbres_1'], 200),
+    ]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    activarStripePlataforma(['secret_key' => 'sk_test_plat']);
+    $cargo = cargoRentaPendiente($e);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'stripe', 'retorno' => '/renta/timbres'], conBearer($e['bearer']))
+        ->assertCreated();
+    Http::assertSent(fn ($r): bool => str_ends_with((string) $r['success_url'], '/renta/timbres?pago=exito'));
+
+    // A otro lado, no.
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'stripe', 'retorno' => 'https://otro.mx'], conBearer($e['bearer']))
+        ->assertStatus(422);
+});
+
+it('el recibo de una cuota fija fuera de México no inventa IVA, y un plan anual dice lo que cubre', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    $cargo = new CargoRenta(['periodo' => '2026-10', 'concepto' => 'renta', 'monto_minor' => 20000, 'moneda' => 'USD', 'modo_cobro' => 'fijo']);
+
+    $estudio->pais = 'CO';
+    $cargo->setRelation('estudio', $estudio);
+    expect(ReciboRentaPdf::importes($cargo))->toMatchArray(['subtotal_minor' => 20000, 'iva_porcentaje' => 0, 'impuesto_minor' => 0]);
+
+    $estudio->pais = 'MX';
+    expect(ReciboRentaPdf::importes($cargo)['iva_porcentaje'])->toBe(16);
+
+    // Un plan anual: su rango, no solo el mes.
+    $cargo->cubre_desde = '2026-10-15';
+    $cargo->cubre_hasta = '2027-10-14';
+    expect(ReciboRentaPdf::concepto($cargo))->toEndWith('2026-10-15 al 2027-10-14');
+    // Un mes completo: el periodo, como siempre.
+    $cargo->cubre_desde = '2026-10-01';
+    $cargo->cubre_hasta = '2026-10-31';
+    expect(ReciboRentaPdf::concepto($cargo))->toEndWith(' 2026-10');
+});
+
+it('una devolución o una disputa de un cobro de la renta alerta al superadmin', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    activarStripePlataforma(['secret_key' => 'sk_test_plat']);
+    $cargo = cargoRentaPendiente($e);
+    CargoRenta::query()->where('ulid', $cargo)->update(['estado' => 'pagado', 'referencia_pago' => 'pi_renta_1', 'metodo_pago' => 'stripe']);
+
+    $this->postJson('/api/v1/webhooks/plataforma/stripe', [
+        'type' => 'charge.refunded',
+        'data' => ['object' => ['id' => 'ch_1', 'payment_intent' => 'pi_renta_1', 'amount_refunded' => 89900, 'currency' => 'mxn']],
+    ])->assertOk();
+
+    $alerta = AlertaPlataforma::query()->where('tipo', 'renta_devuelta')->sole();
+    expect($alerta->estudio)->toBe($e['slug'])
+        ->and($alerta->mensaje)->toContain('899.00 MXN');
 });

@@ -79,3 +79,60 @@ it('no renueva packs no recurrentes (politica_reset ninguno)', function (): void
         expect($derecho->movimientos()->count())->toBe(1); // solo la concesion inicial
     });
 });
+
+/**
+ * Vende a Ana una membresía mensual (4 clases, calendario) con ese rollover y devuelve
+ * el id de su derecho.
+ *
+ * @param  array{slug: string}  $e
+ */
+function membresiaDeCiclosParaRevisar(array $e, string $persona, PoliticaRollover $rollover): int
+{
+    return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), function () use ($persona, $rollover): int {
+        $membresias = app(MembresiasTenant::class);
+        $producto = $membresias->crearProducto('Mensual', TipoProducto::Membresia, 0, 'MXN', false, null, PoliticaReset::Calendario, 4000, $rollover);
+
+        return (int) $membresias->venderProducto(PersonaTenant::query()->where('ulid', $persona)->firstOrFail(), $producto)->derechos()->firstOrFail()->getKey();
+    });
+}
+
+it('al reactivar una membresía, los ciclos que pasaron sin correr no se conceden', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $derechoId = membresiaDeCiclosParaRevisar($e, crearMiembroTenant($e, 'Ana'), PoliticaRollover::Completo);
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    // Estuvo suspendida desde julio: sus ciclos no corrieron.
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => DerechoTenant::query()->whereKey($derechoId)->update(['ciclo_fin' => '2026-07-31']));
+
+    $this->artisan('agendauno:generar-ciclos')->assertSuccessful();
+
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, function () use ($derechoId): void {
+        $derecho = DerechoTenant::query()->whereKey($derechoId)->firstOrFail();
+        // Lo que tenía (acarreado) más el cupo de octubre; no agosto ni septiembre (la
+        // otra concesión es la de la venta).
+        expect(app(LibroMayorTenant::class)->saldo($derecho))->toBe(8000)
+            ->and($derecho->movimientos()->where('descripcion', 'Concesión de ciclo')->count())->toBe(2)
+            ->and($derecho->ciclo_fin->toDateString())->toBe('2026-10-31');
+    });
+});
+
+it('al cerrar el ciclo no vence lo apartado para una clase que ya empezó en él', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $persona = crearMiembroTenant($e, 'Ana');
+    $derechoId = membresiaDeCiclosParaRevisar($e, $persona, PoliticaRollover::Ninguno);
+    $sesion = crearSesionTenant($e, agendaSemilla($e), null, '2026-10-01 20:00:00');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    // El ciclo cierra el día de la clase; su asistencia aún no se marca.
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => DerechoTenant::query()->whereKey($derechoId)->update(['ciclo_fin' => '2026-10-01']));
+
+    $this->travelTo('2026-10-02 08:00:00');
+    $this->artisan('agendauno:generar-ciclos')->assertSuccessful();
+
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, function () use ($derechoId): void {
+        $derecho = DerechoTenant::query()->whereKey($derechoId)->firstOrFail();
+        // Vencen 3 de 4: la apartada sigue para esa clase; más el cupo nuevo.
+        expect($derecho->movimientos()->where('descripcion', 'Expiracion de ciclo')->sum('unidades'))->toBe(-3000)
+            ->and(app(LibroMayorTenant::class)->saldo($derecho))->toBe(5000)
+            ->and(app(LibroMayorTenant::class)->disponible($derecho))->toBe(4000);
+    });
+});

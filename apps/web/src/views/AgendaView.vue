@@ -3399,7 +3399,7 @@ onMounted(async () => {
                     v-model.number="lugaresModel.precio"
                     type="number"
                     min="0"
-                    step="1"
+                    step="0.01"
                     class="tu-input"
                     :placeholder="$t('agenda.lugares.precioPh')"
                   />

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Facturacion;
 
+use App\Modules\Tenancy\Exceptions\FacturacionSinRespuesta;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -15,14 +17,26 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion
 {
     public function __construct(private readonly string $baseUrl) {}
 
+    /**
+     * Sin respuesta, o con un error del propio FacturAPI (5xx, 429), no se sabe si timbró:
+     * {@see FacturacionSinRespuesta}, para reintentar con la misma `idempotency_key` del
+     * cuerpo. Un rechazo (4xx) es definitivo: {@see TimbradoFallido}.
+     */
     public function timbrar(string $llaveOrganizacion, array $factura): ResultadoTimbre
     {
-        $respuesta = Http::withToken($llaveOrganizacion)
-            ->baseUrl($this->baseUrl)
-            ->acceptJson()
-            ->asJson()
-            ->post('/invoices', $factura);
+        try {
+            $respuesta = Http::withToken($llaveOrganizacion)
+                ->baseUrl($this->baseUrl)
+                ->acceptJson()
+                ->asJson()
+                ->post('/invoices', $factura);
+        } catch (ConnectionException) {
+            throw new FacturacionSinRespuesta;
+        }
 
+        if ($respuesta->serverError() || $respuesta->status() === 429) {
+            throw new FacturacionSinRespuesta;
+        }
         if ($respuesta->failed()) {
             throw new TimbradoFallido((string) ($respuesta->json('message') ?? 'FacturAPI rechazo el timbrado.'));
         }

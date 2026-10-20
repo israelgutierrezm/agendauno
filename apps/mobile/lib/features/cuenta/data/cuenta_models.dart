@@ -890,8 +890,10 @@ class MiCuenta {
     this.pagoEnLinea = false,
     this.pagoEnLineaPrueba = false,
     this.pagoAutomatico = false,
+    this.domiciliarAlPagar = false,
     this.resenasPendientes = const [],
     this.porPagar = const [],
+    this.porPagarSinCargar = false,
     this.portal,
     this.asistencias30Dias = 0,
   });
@@ -908,6 +910,9 @@ class MiCuenta {
   /// Lo que tiene pendiente de pago (p. ej. su renovación).
   final List<OrdenPorPagar> porPagar;
 
+  /// No se pudo cargar lo pendiente: no se sabe si está al corriente.
+  final bool porPagarSinCargar;
+
   /// Clases o citas a las que asistió y aún no califica.
   final List<ResenaPendiente> resenasPendientes;
 
@@ -916,6 +921,10 @@ class MiCuenta {
 
   /// ¿La pasarela admite pago automático (domiciliar sus membresías)?
   final bool pagoAutomatico;
+
+  /// ¿Se domicilia al pagar (la casilla del pago)? Solo con Stripe; con Mercado
+  /// Pago u OpenPay el pago automático se activa aparte.
+  final bool domiciliarAlPagar;
   final List<DerechoMiembro> derechos;
   final List<ReservaMiembro> reservas;
   final List<ClaseMiembro> clases;

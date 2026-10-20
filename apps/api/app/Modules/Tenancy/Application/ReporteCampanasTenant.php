@@ -38,9 +38,10 @@ class ReporteCampanasTenant
     ) {}
 
     /**
+     * @param  list<int>|null  $sedes  las de quien consulta (null: todas)
      * @return array{desde: string, hasta: string, moneda: string, filas: list<array<string, mixed>>}
      */
-    public function calcular(string $desde, string $hasta): array
+    public function calcular(string $desde, string $hasta, ?array $sedes = null): array
     {
         $zona = $this->fechas->zona();
         $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay()->utc();
@@ -55,6 +56,7 @@ class ReporteCampanasTenant
 
         // Solicitudes de sus formularios.
         ProspectoTenant::query()->where('origen', OrigenProspecto::Formulario->value)->whereBetween('created_at', [$inicio, $fin])
+            ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->get(['id', 'contexto_medicion_id'])
             ->each(fn (ProspectoTenant $p) => $sumar($p->contexto_medicion_id, 'solicitudes'));
 
@@ -64,6 +66,7 @@ class ReporteCampanasTenant
         $ordenes = OrdenTenant::query()->whereIn('estado', [EstadoOrden::Pagada->value, EstadoOrden::Cancelada->value])
             ->whereNotNull('pagada_en')->where('total_minor', '>', 0)
             ->whereBetween('pagada_en', [$inicio, $fin])
+            ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->get(['id', 'persona_id', 'contexto_medicion_id', 'total_minor', 'renueva_acuerdo_id', 'pagada_en']);
         $porPersona = $this->contextosPorPersona($ordenes->pluck('persona_id')->filter()->unique()->values()->all());
         $contextoDe = fn (OrdenTenant $o): ?int => $o->contexto_medicion_id ?? ($porPersona[$o->persona_id] ?? null);
@@ -86,6 +89,7 @@ class ReporteCampanasTenant
 
         // Devoluciones aplicadas, por la campaña de su orden.
         ReembolsoTenant::query()->where('estado', EstadoReembolso::Aprobado->value)->whereBetween('aplicado_en', [$inicio, $fin])
+            ->when($sedes !== null, fn ($q) => $q->whereHas('pago.orden', fn ($o) => $o->whereIn('sucursal_id', $sedes)))
             ->with('pago.orden')->get()
             ->each(function (ReembolsoTenant $r) use ($sumar, $porPersona): void {
                 $orden = $r->pago?->orden;
@@ -99,6 +103,7 @@ class ReporteCampanasTenant
         // Primeras reservas confirmadas de cada persona.
         $reservas = ReservaTenant::query()->where('estado', EstadoReserva::Confirmada->value)->whereBetween('created_at', [$inicio, $fin])
             ->whereNotNull('persona_id')
+            ->when($sedes !== null, fn ($q) => $q->whereHas('sesion', fn ($s) => $s->whereIn('sucursal_id', $sedes)))
             ->whereNotExists(fn ($q) => $q->from('reservas as previa')->whereColumn('previa.persona_id', 'reservas.persona_id')
                 ->where('previa.estado', EstadoReserva::Confirmada->value)->whereColumn('previa.id', '<', 'reservas.id'))
             ->get(['id', 'persona_id']);

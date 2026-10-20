@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Pagos\Exceptions\DerechoYaUsado;
 use Illuminate\Support\Collection;
 
 /**
@@ -74,17 +75,35 @@ class DerechosDeOrdenTenant
     }
 
     /**
-     * Lleva a 0 cada derecho de la orden (reverso en el ledger, bajo candado) y cancela
-     * sus acuerdos.
+     * Retira lo que queda de cada derecho de la orden (reverso en el ledger, bajo
+     * candado) y cancela sus acuerdos. Lo apartado para una clase que ya se reservó no
+     * se retira (el saldo nunca queda en negativo).
+     *
+     * Con `$exigirSinUso` (anular un cobro), primero bloquea los derechos y, si alguno
+     * ya se usó (uno que se reservó mientras tanto, p. ej.), no retira nada: lanza
+     * {@see DerechoYaUsado} para que la operación se deshaga.
+     *
+     * Devuelve si alguno ya se había usado (lo revisa con los derechos bloqueados).
      */
-    public function retirarTodo(OrdenTenant $orden, ContextoMovimiento $contexto, string $descripcion, ?Usuario $actor): void
+    public function retirarTodo(OrdenTenant $orden, ContextoMovimiento $contexto, string $descripcion, ?Usuario $actor, bool $exigirSinUso = false): bool
     {
-        foreach ($this->acuerdosDe($orden) as $acuerdo) {
+        $acuerdos = $this->acuerdosDe($orden);
+        $ids = $acuerdos->flatMap(fn (AcuerdoTenant $a) => $a->derechos->modelKeys())->sort()->values()->all();
+        // Bajo candado y en orden de id, y ya bloqueados se revisa el uso.
+        $bloqueados = DerechoTenant::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $huboUso = $bloqueados->contains(fn (DerechoTenant $d): bool => $this->tuvoUso($d));
+        if ($exigirSinUso && $huboUso) {
+            throw new DerechoYaUsado('Los créditos o la membresía de esta venta ya se usaron; usa la devolución.');
+        }
+        foreach ($acuerdos as $acuerdo) {
             foreach ($acuerdo->derechos as $derecho) {
-                $bloqueado = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
-                $saldo = $this->libro->saldo($bloqueado);
-                if ($saldo !== 0) {
-                    $this->libro->registrar($bloqueado, TipoMovimiento::Reverso, -$saldo, $descripcion, $contexto);
+                $bloqueado = $bloqueados->get($derecho->getKey());
+                if (! $bloqueado instanceof DerechoTenant) {
+                    continue;
+                }
+                $retirable = max(0, $this->libro->disponible($bloqueado));
+                if ($retirable !== 0) {
+                    $this->libro->registrar($bloqueado, TipoMovimiento::Reverso, -$retirable, $descripcion, $contexto);
                 }
             }
             $acuerdo->update(['estado' => EstadoAcuerdo::Cancelado->value]);
@@ -92,5 +111,7 @@ class DerechosDeOrdenTenant
             $this->domiciliaciones->desactivar($acuerdo);
             $this->deudas->anular([$acuerdo->getKey()], $actor);
         }
+
+        return $huboUso;
     }
 }

@@ -121,6 +121,24 @@ class ReservaTenant extends Model
     }
 
     /**
+     * Cuánto falta por cobrar de la cita: el anticipo sin pagar y el resto, juntos
+     * (null si no falta nada).
+     */
+    public function porCobrarMinor(): ?int
+    {
+        $suma = 0;
+        $alguna = false;
+        foreach ([$this->orden, $this->saldo_orden_id !== null ? $this->saldoOrden : null] as $orden) {
+            if ($orden instanceof OrdenTenant && $orden->estado === EstadoOrden::Pendiente) {
+                $suma += (int) $orden->total_minor;
+                $alguna = true;
+            }
+        }
+
+        return $alguna ? $suma : null;
+    }
+
+    /**
      * El anticipo ya pagado de una cita que tiene saldo (null si no lleva anticipo o
      * aún no lo paga).
      */

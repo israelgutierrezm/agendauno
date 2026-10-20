@@ -3,11 +3,12 @@ import { useRoute, useRouter } from "vue-router";
 
 /**
  * Resultado con el que el cliente vuelve de la página de pago externa (Stripe
- * Checkout): `?pago=exito` o `?pago=cancelado` (`?tarjeta=…` al autorizar una
+ * Checkout): `?pago=exito`, `?pago=pendiente` (aún sin aprobar: en tienda o en
+ * revisión) o `?pago=cancelado` (`?tarjeta=…` al autorizar una
  * tarjeta para pago automático). Se lee una vez al abrir la pantalla y se quita de
  * la URL para que recargar no repita el aviso.
  */
-export type RetornoPago = "exito" | "cancelado";
+export type RetornoPago = "exito" | "pendiente" | "cancelado";
 
 export function useRetornoPago(
   parametro: "pago" | "tarjeta" = "pago",
@@ -16,7 +17,9 @@ export function useRetornoPago(
   const router = useRouter();
   const pago = route.query[parametro];
   const retorno = ref<RetornoPago | null>(
-    pago === "exito" || pago === "cancelado" ? pago : null,
+    pago === "exito" || pago === "pendiente" || pago === "cancelado"
+      ? pago
+      : null,
   );
 
   if (retorno.value !== null) {

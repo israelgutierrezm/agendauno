@@ -484,6 +484,7 @@ onMounted(async () => {
             :precio-minor="servicio.precio_minor"
             :por-separado-minor="servicio.precio_por_separado_minor"
             :moneda="servicio.moneda"
+            :pais="sesion.pais"
           />
         </div>
         <div v-if="sucursales.length > 1">

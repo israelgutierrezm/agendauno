@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/formato.dart';
 import '../../../core/network/participante_en_uso.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'cuenta_widgets.dart';
@@ -33,14 +34,26 @@ class _HistorialComprasSeccionState
     super.initState();
     _cargar();
     // De otra persona (familias): su propio historial, desde la primera página.
-    ref.listenManual(participanteEnUsoProvider, (_, _) {
-      setState(() {
-        _ordenes.clear();
-        _pagina = 0;
-        _hayMas = true;
-      });
-      _cargar();
+    ref.listenManual(participanteEnUsoProvider, (_, _) => _reiniciar());
+    // Cada vez que la cuenta se recarga (al volver de pagar, al deslizar para
+    // actualizar), lo que se pagó pasa de «Por pagar» al historial.
+    ref.listenManual(cuentaProvider, (antes, ahora) {
+      if (antes?.value != null && ahora.hasValue && !ahora.isLoading) {
+        _reiniciar();
+      }
     });
+  }
+
+  void _reiniciar() {
+    if (_cargando) {
+      return;
+    }
+    setState(() {
+      _ordenes.clear();
+      _pagina = 0;
+      _hayMas = true;
+    });
+    _cargar();
   }
 
   Future<void> _cargar() async {

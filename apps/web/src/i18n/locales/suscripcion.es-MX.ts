@@ -45,13 +45,18 @@ export default {
     cerrar: "Cerrar",
     elegir: "Elegir",
     actual: "Tu plan",
+    // Con un cambio programado para el siguiente periodo: quedarse con el actual.
+    mantener: "Mantener mi plan",
+    confirmarMantener:
+      "¿Mantener tu plan actual? Se cancela el cambio que programaste para el siguiente periodo.",
+    mantenido: "Mantienes tu plan: se canceló el cambio programado.",
     guardando: "Guardando…",
     porMes: "al mes",
     porAno: "al año",
     porProfesional: "Profesionales",
     menos: "Uno menos",
     mas: "Uno más",
-    aproximado: "≈ {monto} al tipo de cambio de hoy",
+    aproximado: "≈ {monto} con IVA, al tipo de cambio de hoy",
     tipoCambio:
       "Precios en dólares. Te cobramos en pesos al tipo de cambio FIX del Banco de México vigente el día en que se emite el cargo (hoy 1 USD = {valor} MXN).",
     enDolares: "Precios en dólares, más impuestos.",

@@ -24,6 +24,8 @@ class OrdenTenant extends Model
     protected $table = 'ordenes';
 
     protected $fillable = [
+        // La de una compra del cliente desde su cuenta (repetirla es la misma orden).
+        'clave',
         'persona_id', 'sucursal_id', 'sesion_id', 'renueva_acuerdo_id', 'estado', 'total_minor', 'descuento_minor', 'promocion_id', 'moneda',
         'metodo_pago', 'referencia_pago', 'pagada_en', 'domiciliar', 'cancelada_en', 'cancelada_por', 'contexto_medicion_id',
         // Renovación: cuándo vence lo que renueva (ADR 0166).

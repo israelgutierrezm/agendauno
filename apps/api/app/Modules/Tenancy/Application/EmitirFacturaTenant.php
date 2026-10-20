@@ -309,13 +309,25 @@ class EmitirFacturaTenant
     private function timbrarYGuardar(string $llave, array $cuerpo, array $comun): FacturaTenant
     {
         $saldo = $this->timbres->apartarParaTimbrar();
+        // La llave de idempotencia de FacturAPI: la huella de lo que se pide y cuántas
+        // facturas iguales ya se timbraron. Si FacturAPI no respondió a tiempo (y esta
+        // transacción se deshizo), el reintento lleva la misma llave y recibe la misma
+        // factura; una igual después de cancelar la anterior es otra llave.
+        $huella = sha1((string) json_encode($cuerpo));
+        $previas = FacturaTenant::query()->where('huella', $huella)->whereNotNull('facturapi_id')->count();
+        $comun['huella'] = $huella;
         try {
-            $resultado = $this->cliente->timbrar($llave, $cuerpo);
+            $resultado = $this->cliente->timbrar($llave, $cuerpo + ['idempotency_key' => $huella.'-'.$previas]);
         } catch (TimbradoFallido $e) {
             return FacturaTenant::query()->create($comun + [
                 'estado' => EstadoFactura::Error->value,
                 'motivo_error' => $e->getMessage(),
             ]);
+        }
+        // Ya registrada (dos solicitudes iguales a la vez recibieron la misma): esa.
+        $registrada = FacturaTenant::query()->where('facturapi_id', $resultado->facturaId)->first();
+        if ($registrada instanceof FacturaTenant) {
+            return $registrada;
         }
 
         $base = rtrim((string) config('agendauno.facturapi.base_url'), '/');

@@ -150,7 +150,8 @@ class PuntoDeVentaTenantController
     {
         $validado = $request->validate([
             'sucursal_id' => ['required', 'string'],
-            'metodo_pago' => ['nullable', 'string', 'max:40'],
+            // Una forma que la caja y el corte conocen (no texto libre).
+            'metodo_pago' => ['nullable', 'string', Rule::in([...CajasTenant::METODOS, PartesCobro::MIXTO])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.articulo_id' => ['required', 'string'],
             'items.*.cantidad' => ['required', 'integer', 'min:1'],

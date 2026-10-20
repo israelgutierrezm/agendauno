@@ -255,7 +255,9 @@ class InicioTab extends ConsumerWidget {
               icono: Icons.payments_outlined,
               titulo: 'Pagos',
               tono: TonosAcceso.pagos,
-              valor: pagar > 0
+              valor: cuenta.porPagarSinCargar
+                  ? 'Sin cargar'
+                  : pagar > 0
                   ? (pagar == 1 ? '1 por pagar' : '$pagar por pagar')
                   : 'Al corriente',
               atencion: pagar > 0,

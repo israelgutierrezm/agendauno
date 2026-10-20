@@ -39,6 +39,13 @@ class AcumularPuntos
         if (! in_array($evento->tipo, ['asistencia.marcada', 'orden.pagada'], true)) {
             return;
         }
+        // Asistencia corregida (ya no presente): se retiran los puntos que dio, aunque el
+        // programa ya no esté activo (se dieron cuando lo estaba).
+        if ($evento->tipo === 'asistencia.marcada' && ($evento->payload['estado'] ?? null) !== 'presente') {
+            $this->retirarAsistencia($evento);
+
+            return;
+        }
 
         $programa = ProgramaLealtadTenant::query()->first();
         if (! $programa instanceof ProgramaLealtadTenant || ! $programa->activa || ! $this->funciones->tieneElNegocioActual('lealtad')) {
@@ -55,7 +62,10 @@ class AcumularPuntos
         }
 
         if ($evento->tipo === 'asistencia.marcada') {
-            if (($payload['estado'] ?? null) !== 'presente') {
+            // Una vez por reserva: marcarla presente otra vez (tras corregirla) no premia
+            // dos veces.
+            $reservaUlid = $this->comoTexto($payload['reserva_id'] ?? null);
+            if ($reservaUlid !== null && $this->puntos->vigentesDeAsistencia($reservaUlid) > 0) {
                 return;
             }
             $this->puntos->acumularPorEvento(
@@ -81,6 +91,18 @@ class AcumularPuntos
             $personaId, $puntos, OrigenPuntos::Compra, $evento->eventoUlid,
             'Puntos por compra', 'orden', $ordenUlid,
         );
+    }
+
+    private function retirarAsistencia(EventoDeDominioTenant $evento): void
+    {
+        $ulid = $evento->payload['persona_id'] ?? null;
+        $reservaUlid = $this->comoTexto($evento->payload['reserva_id'] ?? null);
+        $personaId = is_string($ulid) && $ulid !== ''
+            ? (int) PersonaTenant::query()->where('ulid', $ulid)->value('id')
+            : 0;
+        if ($personaId > 0 && $reservaUlid !== null && $this->puntos->vigentesDeAsistencia($reservaUlid) > 0) {
+            $this->puntos->retirarDeAsistencia($personaId, $reservaUlid, $evento->eventoUlid);
+        }
     }
 
     private function retirar(EventoDeDominioTenant $evento): void

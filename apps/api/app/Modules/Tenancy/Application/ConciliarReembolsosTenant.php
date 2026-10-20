@@ -19,6 +19,10 @@ use Illuminate\Support\Carbon;
  * Solo dentro de la ventana en que la pasarela recuerda la llave (Stripe, 24 h) y en
  * pasarelas que la respetan; pasado eso, o en las que no (OpenPay), queda "por
  * conciliar" para que alguien la revise en el panel de la pasarela y la marque.
+ *
+ * Las pendientes (la pasarela la recibió y la confirma después) se esperan a su aviso;
+ * si no llega en {@see self::HORAS_PENDIENTE} horas, también quedan por conciliar: si
+ * no, el monto seguiría apartado sin que nadie pudiera cerrarla.
  * Debe correr con la conexión del estudio activa.
  */
 class ConciliarReembolsosTenant
@@ -32,6 +36,11 @@ class ConciliarReembolsosTenant
      * Minutos antes de dar por "a medias" una solicitada (que aún no se pidió).
      */
     private const MINUTOS_A_MEDIAS = 2;
+
+    /**
+     * Horas que se espera el aviso de una devolución pendiente.
+     */
+    private const HORAS_PENDIENTE = 48;
 
     public function __construct(
         private readonly ReembolsarPagoTenant $reembolsos,
@@ -47,10 +56,27 @@ class ConciliarReembolsosTenant
                 ->where('estado', EstadoReembolso::Incierto->value)
                 ->orWhere(fn ($q2) => $q2
                     ->where('estado', EstadoReembolso::Solicitado->value)
-                    ->where('created_at', '<', Carbon::now()->subMinutes(self::MINUTOS_A_MEDIAS))))
+                    ->where('created_at', '<', Carbon::now()->subMinutes(self::MINUTOS_A_MEDIAS)))
+                ->orWhere(fn ($q3) => $q3
+                    ->where('estado', EstadoReembolso::Pendiente->value)
+                    ->where('updated_at', '<', Carbon::now()->subHours(self::HORAS_PENDIENTE))
+                    ->whereNotIn('id', IncidenciaCobroTenant::query()
+                        ->select('reembolso_id')
+                        ->whereNotNull('reembolso_id')
+                        ->where('estado', IncidenciaCobroTenant::ABIERTA))))
             ->orderBy('id')
             ->get()
             ->each(function (ReembolsoTenant $reembolso) use (&$aclaradas): void {
+                if ($reembolso->estado === EstadoReembolso::Pendiente) {
+                    $this->incidencias->porReembolso(
+                        IncidenciaCobroTenant::REEMBOLSO_INCIERTO,
+                        $reembolso,
+                        'La pasarela no ha confirmado la devolución. Revisa en su panel si se hizo y márcala aquí.',
+                    );
+
+                    return;
+                }
+
                 $vigente = $reembolso->created_at !== null
                     && $reembolso->created_at->greaterThan(Carbon::now()->subHours(self::HORAS_REINTENTO));
 

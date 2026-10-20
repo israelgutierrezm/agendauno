@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Pasarelas\PasarelaStripePlataforma;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
+use App\Support\ReporteDeErrores;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Confirma un cargo de renta pendiente a partir de la referencia del intento (la que
@@ -22,6 +27,9 @@ class ConfirmarCargoRenta
         private readonly SuspensionPorRenta $suspension,
         private readonly AcreditarTimbresPagados $timbres,
         private readonly DomiciliacionRenta $domiciliacion,
+        private readonly AlertasPlataforma $alertas,
+        private readonly RegistroDePasarelasPlataforma $registro,
+        private readonly PasarelaStripePlataforma $stripe,
     ) {}
 
     /**
@@ -35,7 +43,8 @@ class ConfirmarCargoRenta
             return;
         }
 
-        $pagado = DB::transaction(function () use ($referencia, $proveedor, $cargoUlid, $montoMinor): ?CargoRenta {
+        $abierta = null;
+        $pagado = DB::transaction(function () use ($referencia, $proveedor, $cargoUlid, $montoMinor, &$abierta): ?CargoRenta {
             $cargo = CargoRenta::query()
                 ->where('referencia_pago', $referencia)
                 ->lockForUpdate()
@@ -52,10 +61,16 @@ class ConfirmarCargoRenta
                 }
                 if ($cargo instanceof CargoRenta && $cargo->estado !== EstadoCargoRenta::Pendiente
                     && (string) $cargo->referencia_pago !== $referencia) {
-                    // Otro pago del mismo cargo: se revisa a mano (p. ej. para devolverlo).
+                    // Otro pago del mismo cargo: se cobró dos veces y hay que devolverlo.
                     Log::warning('Pago de renta de un cargo que ya no está pendiente.', [
                         'cargo' => $cargo->ulid, 'referencia' => $referencia, 'estado' => $cargo->estado->value,
                     ]);
+                    $this->alertas->registrar(
+                        'renta_cobrada_dos_veces',
+                        $cargo->ulid.':'.$referencia,
+                        "La renta {$cargo->periodo} se cobró dos veces (ya estaba {$cargo->estado->value}; el otro cobro es {$referencia}). Devuélvelo desde el panel de {$proveedor}.",
+                        $cargo->estudio?->slug,
+                    );
                 }
             }
 
@@ -63,6 +78,11 @@ class ConfirmarCargoRenta
                 return null;
             }
 
+            // Se pagó con otro intento: la sesión que seguía abierta se vence después.
+            $previa = (string) $cargo->referencia_pago;
+            if ($previa !== '' && $previa !== $referencia && str_starts_with($previa, 'cs_')) {
+                $abierta = $previa;
+            }
             $cargo->update([
                 'estado' => EstadoCargoRenta::Pagado->value,
                 'pagado_en' => Carbon::now(),
@@ -72,6 +92,15 @@ class ConfirmarCargoRenta
 
             return $cargo;
         });
+
+        if ($abierta !== null) {
+            try {
+                $this->stripe->cancelarIntento($abierta, $this->registro->llaves('stripe'));
+            } catch (Throwable $e) {
+                // Si no se vence y se paga, su aviso alerta del cobro doble.
+                ReporteDeErrores::reportarAtrapado($e);
+            }
+        }
 
         $this->suspension->reactivarSiPago($pagado?->estudio);
         // Una compra de timbres: se suman al saldo del negocio.

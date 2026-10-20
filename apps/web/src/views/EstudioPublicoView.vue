@@ -1526,6 +1526,7 @@ onBeforeUnmount(() => {
                       :precio-minor="x.precio_minor"
                       :por-separado-minor="x.precio_por_separado_minor"
                       :moneda="x.moneda"
+                      :pais="escaparate?.estudio.pais"
                     />
                   </div>
                   <div class="flex items-center gap-3">

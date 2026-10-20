@@ -28,8 +28,18 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
   /// una cita (lo dicen las capacidades de la sesión).
   bool get _conClases => ref.read(sesionProvider)?.capacidades.clases ?? true;
 
-  Future<void> reservar(String sesionId, {bool esperar = false, int? lugar}) =>
-      _hacer((repo) => repo.reservar(sesionId, esperar: esperar, lugar: lugar));
+  /// Reserva y dice en qué quedó (apartada por pagar, con su orden).
+  Future<({String estado, String? ordenId})> reservar(
+    String sesionId, {
+    bool esperar = false,
+    int? lugar,
+  }) async {
+    ({String estado, String? ordenId}) resultado = (estado: '', ordenId: null);
+    await _hacer((repo) async {
+      resultado = await repo.reservar(sesionId, esperar: esperar, lugar: lugar);
+    });
+    return resultado;
+  }
 
   Future<void> cancelar(String reservaId) =>
       _hacer((repo) => repo.cancelar(reservaId));
@@ -59,11 +69,17 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
   ) => _hacer((repo) => repo.calificar(reservaId, calificacion, comentario));
 
   /// Compra un plan: la orden aparece en "Por pagar" al recargar.
-  Future<void> comprar(String productoId, {bool aceptaCondiciones = false}) =>
-      _hacer(
-        (repo) =>
-            repo.comprar(productoId, aceptaCondiciones: aceptaCondiciones),
-      );
+  Future<void> comprar(
+    String productoId, {
+    bool aceptaCondiciones = false,
+    String? clave,
+  }) => _hacer(
+    (repo) => repo.comprar(
+      productoId,
+      aceptaCondiciones: aceptaCondiciones,
+      clave: clave,
+    ),
+  );
 
   /// Tras agendar una cita (la agenda el formulario de citas).
   Future<void> recargar() => _hacer((_) async {});

@@ -232,7 +232,9 @@ class BajaDeMembresiaTenant
 
     private function cancelarReservasPosteriores(AcuerdoTenant $acuerdo, string $efectiva, ?Usuario $actor): void
     {
-        $derechos = DerechoTenant::query()->where('acuerdo_id', $acuerdo->getKey())->pluck('id')->all();
+        $base = DerechoTenant::query()->where('acuerdo_id', $acuerdo->getKey())->pluck('id')->all();
+        // También las de sus clases extra, que se van con su paquete.
+        $derechos = [...$base, ...DerechoTenant::query()->whereIn('extra_de_id', $base)->pluck('id')->all()];
         $limite = CarbonImmutable::parse($efectiva, $this->fechas->zona())->endOfDay()->utc();
 
         ReservaTenant::query()

@@ -6,6 +6,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import FormasDePago from "@/components/FormasDePago.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { partesListas, type ParteCobro } from "@/lib/formasDePago";
 import { useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -42,6 +43,8 @@ const puedeExentar = computed(() => sesion.puede("cuotas.exentar"));
 const total = ref(0);
 const cuotas = ref<CuotaPorCobrar[]>([]);
 const exentando = ref<string | null>(null);
+// Lo que se exentó con el diálogo abierto (para avisar al cerrar).
+const exentadas = ref<string[]>([]);
 const motivo = ref("");
 // «tarjeta»: con la terminal del negocio (no por la pasarela en línea).
 const METODOS = ["efectivo", "tarjeta", "transferencia", "ventanilla"] as const;
@@ -68,9 +71,26 @@ watch(
     cuotas.value = [...(props.orden?.cuotas ?? [])];
     exentando.value = null;
     motivo.value = "";
+    exentadas.value = [];
   },
   { immediate: true },
 );
+
+// Exentar ya cambió la orden: al cerrar sin cobrar, se avisa como un cambio y quien
+// abrió el cobro recarga (si no, mostraría el total anterior).
+function cerrar(): void {
+  if (exentadas.value.length > 0 && props.orden) {
+    emit(
+      "registrado",
+      t("cobranza.pendientes.exentada", {
+        cuota: exentadas.value.join("», «"),
+        total: dinero(total.value, props.orden.moneda),
+      }),
+    );
+    return;
+  }
+  emit("cerrar");
+}
 
 // Exentar una cuota (B04): sale de la orden y queda en la bitácora con el motivo.
 async function exentar(c: CuotaPorCobrar): Promise<void> {
@@ -88,6 +108,7 @@ async function exentar(c: CuotaPorCobrar): Promise<void> {
     });
     cuotas.value = cuotas.value.filter((x) => x.id !== c.id);
     total.value = data.data.total_minor;
+    exentadas.value.push(c.nombre);
     exentando.value = null;
     motivo.value = "";
     // Si era lo único, ya no hay nada que cobrar.
@@ -105,10 +126,7 @@ async function exentar(c: CuotaPorCobrar): Promise<void> {
 }
 
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 
 async function registrar(): Promise<void> {
@@ -150,7 +168,7 @@ async function registrar(): Promise<void> {
     :titulo="$t('cobranza.pendientes.registrarTitulo')"
     tam="md"
     :ocupado="procesando || exentando !== null"
-    @cerrar="emit('cerrar')"
+    @cerrar="cerrar"
   >
     <form v-if="orden" class="space-y-4" @submit.prevent="registrar">
       <p class="text-sm">
@@ -254,7 +272,7 @@ async function registrar(): Promise<void> {
           type="button"
           class="tu-btn tu-btn-fantasma"
           :disabled="procesando"
-          @click="emit('cerrar')"
+          @click="cerrar"
         >
           {{ $t("comun.cancelar") }}
         </button>

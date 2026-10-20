@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
@@ -53,7 +54,8 @@ class PromocionTenant extends Model
         if (! $this->activa) {
             return false;
         }
-        if ($this->vence_en !== null && $this->vence_en->endOfDay()->isPast()) {
+        // Vale todo su último día en la zona del negocio (no hasta las 18:00 de UTC).
+        if ($this->vence_en !== null && $this->vence_en->toDateString() < app(FechasNegocioTenant::class)->hoy()) {
             return false;
         }
         if ($this->usos_maximos !== null && $this->usos >= $this->usos_maximos) {

@@ -1814,6 +1814,7 @@ export default {
       exentar: "Exentar",
       exentadaTodo:
         "Se exentó «{cuota}»: ya no hay nada por cobrar en esa orden.",
+      exentada: "Se exentó «{cuota}»: la orden queda en {total}.",
       referencia: "Referencia (opcional)",
       registrado: "Pago de {nombre} registrado: {monto}.",
     },
@@ -1871,7 +1872,8 @@ export default {
       motivo: "Motivo",
       motivoPh: "Cancelación, error de cobro…",
       revertir: "Revertir créditos",
-      revertirAyuda: "Quita los créditos otorgados por esta compra.",
+      revertirAyuda:
+        "Quita los créditos otorgados por esta compra. Si la pagó otro cobro o es una renovación, se devuelve solo el dinero: para quitarle el periodo, pausa o da de baja la membresía.",
       confirmar: "Reembolsar",
       procesando: "Reembolsando…",
     },

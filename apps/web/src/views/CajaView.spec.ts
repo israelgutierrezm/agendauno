@@ -266,4 +266,32 @@ describe("caja de la sucursal", () => {
       "Revisada por Dueña",
     );
   });
+
+  it("reintentar un retiro que no tuvo respuesta lleva la misma clave (no lo registra dos veces)", async () => {
+    mocks.get.mockResolvedValueOnce({
+      data: { data: { usa_caja: true, turno: TURNO } },
+    });
+    mocks.post
+      .mockRejectedValueOnce(new Error("Sin red"))
+      .mockResolvedValueOnce({ data: { data: TURNO } });
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="retiro"]').trigger("click");
+    await w.get('[data-prueba="monto-movimiento"]').setValue("200");
+    await w
+      .get('[data-prueba="motivo-movimiento"]')
+      .setValue("Pago a proveedor");
+    await w.get("#caja-movimiento").trigger("submit");
+    await flushPromises();
+    await w.get("#caja-movimiento").trigger("submit");
+    await flushPromises();
+
+    const claves = mocks.post.mock.calls.map(
+      ([, cuerpo]) => (cuerpo as { clave: string }).clave,
+    );
+    expect(claves).toHaveLength(2);
+    expect(claves[0]).toBe(claves[1]);
+    expect(claves[0]).not.toBe("");
+  });
 });

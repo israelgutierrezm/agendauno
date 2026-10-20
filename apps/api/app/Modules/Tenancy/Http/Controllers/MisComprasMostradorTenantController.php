@@ -37,8 +37,10 @@ class MisComprasMostradorTenantController
             return response()->json(['data' => [], 'meta' => ['total' => 0, 'page' => 1, 'per_page' => $porPagina, 'ultima_pagina' => 1]]);
         }
 
+        // Solo lo del mostrador: el cobro de una cita ya está en su historial de pagos.
         $pagina = VentaPosTenant::query()
             ->where('persona_id', $persona->getKey())
+            ->delMostrador()
             ->with(['sucursal', 'lineas.articulo'])
             ->orderByDesc('id')
             ->paginate($porPagina, ['*'], 'page', (int) ($filtros['page'] ?? 1));

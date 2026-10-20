@@ -11,8 +11,11 @@ use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\MontoDecimal;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Support\ReporteDeErrores;
+use Throwable;
 
 /**
  * Notificaciones de Mercado Pago (webhook por negocio). La notificación solo dice
@@ -39,7 +42,7 @@ class NotificacionesMercadoPago
         $api = new ClienteMercadoPago($token);
 
         match ($tipo) {
-            'payment' => $this->pago($api->pago($id)),
+            'payment' => $this->pago($api, $api->pago($id)),
             // La suscripción (pago automático) se autorizó, pausó o canceló.
             'subscription_preapproval', 'preapproval' => $this->suscripcion($id),
             // Mercado Pago cobró (o intentó cobrar) una cuota de la suscripción.
@@ -65,22 +68,17 @@ class NotificacionesMercadoPago
     }
 
     /**
-     * Un cobro de Checkout Pro cambió: se aplica a nuestro pago (su
-     * `external_reference`).
+     * Un cobro cambió: se aplica a nuestro pago ({@see self::pagoDelCobro()}).
      *
      * @param  array<string, mixed>  $cobro
      */
-    private function pago(array $cobro): void
+    private function pago(ClienteMercadoPago $api, array $cobro): void
     {
-        $pago = PagoTenant::query()
-            ->where('ulid', (string) ($cobro['external_reference'] ?? ''))
-            ->where('proveedor', 'mercadopago')
-            ->first();
+        $cobroId = (string) ($cobro['id'] ?? '');
+        $pago = $this->pagoDelCobro($cobro, $cobroId);
         if (! $pago instanceof PagoTenant) {
             return;
         }
-
-        $cobroId = (string) ($cobro['id'] ?? '');
         // Contracargo (ADR 0168): en proceso (abierto), «settled» (perdido: el dinero
         // se devolvió al cliente) o «reimbursed» (ganado: el dinero volvió al negocio).
         if ((string) ($cobro['status'] ?? '') === 'charged_back' && $cobroId !== '') {
@@ -94,7 +92,7 @@ class NotificacionesMercadoPago
             return;
         }
         match ((string) ($cobro['status'] ?? '')) {
-            'approved' => $this->confirmar->aprobar($pago, $cobroId),
+            'approved' => $this->aprobado($api, $pago, $cobro, $cobroId),
             // El cobro existe pero falta (p. ej. el ticket de OXXO): la referencia pasa a
             // ser ese cobro, para poder cancelarlo o devolverlo.
             'pending', 'in_process', 'authorized' => $this->referir($pago, $cobroId),
@@ -126,9 +124,95 @@ class NotificacionesMercadoPago
         $pagos = $api->contracargo($id)['payments'] ?? [];
         foreach (is_array($pagos) ? $pagos : [] as $cobroId) {
             if (is_scalar($cobroId) && (string) $cobroId !== '') {
-                $this->pago($api->pago((string) $cobroId));
+                $this->pago($api, $api->pago((string) $cobroId));
             }
         }
+    }
+
+    /**
+     * El pago al que toca el cobro: el que ya lo tiene como referencia (un cobro doble
+     * ya registrado, o la cuota de un pago automático, cuya `external_reference` es la
+     * domiciliación) o, si no, el intento de Checkout Pro de su `external_reference`.
+     *
+     * @param  array<string, mixed>  $cobro
+     */
+    private function pagoDelCobro(array $cobro, string $cobroId): ?PagoTenant
+    {
+        $porCobro = $cobroId === '' ? null : PagoTenant::query()
+            ->where('proveedor', 'mercadopago')
+            ->where('referencia_externa', $cobroId)
+            ->first();
+
+        return $porCobro ?? PagoTenant::query()
+            ->where('ulid', (string) ($cobro['external_reference'] ?? ''))
+            ->where('proveedor', 'mercadopago')
+            ->first();
+    }
+
+    /**
+     * Un cobro aprobado. Si el intento ya quedó pagado con OTRO cobro de la misma
+     * preferencia (p. ej. pagó con tarjeta y después también el ticket de OXXO), este se
+     * registra aparte: es dinero cobrado de más, por devolver. Si con este se pagó, los
+     * demás cobros por pagar de la preferencia se cancelan.
+     *
+     * @param  array<string, mixed>  $cobro
+     */
+    private function aprobado(ClienteMercadoPago $api, PagoTenant $pago, array $cobro, string $cobroId): void
+    {
+        if ($cobroId !== '' && (string) $pago->referencia_externa !== $cobroId
+            && ! in_array($pago->estado, [EstadoPago::Pendiente, EstadoPago::Rechazado], true)) {
+            $monto = MontoDecimal::aCentavos((float) ($cobro['transaction_amount'] ?? 0));
+            $this->confirmar->otroCobro(
+                $pago,
+                $cobroId,
+                $monto > 0 ? $monto : (int) $pago->monto_minor,
+                (string) ($cobro['currency_id'] ?? $pago->moneda),
+                self::metodoDe($cobro, $pago),
+            );
+
+            return;
+        }
+
+        $this->confirmar->aprobar($pago, $cobroId);
+        if ((string) ($cobro['external_reference'] ?? '') === (string) $pago->ulid) {
+            $this->cancelarOtrosCobros($api, $pago->refresh(), $cobroId);
+        }
+    }
+
+    /**
+     * Pagado con este cobro: los demás de la misma preferencia que sigan por pagar (el
+     * ticket de OXXO) se cancelan, para que no se cobre dos veces. Si no se puede, el que
+     * llegue a pagarse se registra como cobro doble.
+     */
+    private function cancelarOtrosCobros(ClienteMercadoPago $api, PagoTenant $pago, string $cobroId): void
+    {
+        if ($pago->estado !== EstadoPago::Aprobado || (string) $pago->referencia_externa !== $cobroId) {
+            return;
+        }
+
+        try {
+            foreach ($api->pagosDeReferencia((string) $pago->ulid) as $otro) {
+                $otroId = (string) ($otro['id'] ?? '');
+                if ($otroId !== '' && $otroId !== $cobroId && in_array((string) ($otro['status'] ?? ''), ['pending', 'in_process'], true)) {
+                    $api->cancelarPago($otroId);
+                }
+            }
+        } catch (Throwable $e) {
+            ReporteDeErrores::reportarAtrapado($e);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $cobro
+     */
+    private static function metodoDe(array $cobro, PagoTenant $pago): MetodoPago
+    {
+        return match ((string) ($cobro['payment_type_id'] ?? '')) {
+            'credit_card', 'debit_card', 'prepaid_card' => MetodoPago::Tarjeta,
+            'ticket', 'atm' => MetodoPago::Oxxo,
+            'bank_transfer' => MetodoPago::Spei,
+            default => $pago->metodo instanceof MetodoPago ? $pago->metodo : MetodoPago::Tarjeta,
+        };
     }
 
     private function referir(PagoTenant $pago, string $cobroId): void

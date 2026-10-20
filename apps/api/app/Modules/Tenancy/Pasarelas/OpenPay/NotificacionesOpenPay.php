@@ -62,22 +62,12 @@ class NotificacionesOpenPay
             return;
         }
 
-        // Cargo de una suscripción (pago automático): se concilian los del cliente de
-        // OpenPay de esa membresía.
-        $suscripcion = $this->domiciliacionDelCliente((string) ($transaccion['customer_id'] ?? ''));
-        if ($tipo === 'subscription.charge.failed' || ($suscripcion instanceof DomiciliacionTenant && ($transaccion['order_id'] ?? null) === null)) {
-            if ($suscripcion instanceof DomiciliacionTenant) {
-                $this->suscripciones->actualizar($suscripcion);
-            }
-
-            return;
-        }
-
-        // Contracargo (ADR 0168): se relee el cargo en OpenPay para ubicar su pago.
+        // Contracargo (ADR 0168): se relee el cargo en OpenPay para ubicar su pago. Va
+        // antes que la suscripción: también llegan de los cobros automáticos.
         if (in_array($tipo, ['chargeback.created', 'chargeback.accepted', 'chargeback.rejected'], true)) {
             $modo = ConfiguracionPasarelaTenant::query()->where('proveedor', 'openpay')->value('modo');
             $cargo = (new ClienteOpenPay($llaves['merchant_id'], $llaves['private_key'], $modo !== 'live'))->cargo($id);
-            $pago = PagoTenant::query()->where('ulid', (string) ($cargo['order_id'] ?? ''))->where('proveedor', 'openpay')->first();
+            $pago = $this->pagoDelCargo($id, $cargo);
             if ($pago instanceof PagoTenant) {
                 $monto = MontoDecimal::aCentavos((float) ($cargo['amount'] ?? 0));
                 match ($tipo) {
@@ -87,6 +77,17 @@ class NotificacionesOpenPay
                     'chargeback.rejected' => $this->contracargos->cerrado($pago, $id, true, $monto),
                     default => $this->contracargos->abierto($pago, $id, $monto, 'Contracargo en OpenPay'),
                 };
+            }
+
+            return;
+        }
+
+        // Cargo de una suscripción (pago automático): se concilian los del cliente de
+        // OpenPay de esa membresía.
+        $suscripcion = $this->domiciliacionDelCliente((string) ($transaccion['customer_id'] ?? ''));
+        if ($tipo === 'subscription.charge.failed' || ($suscripcion instanceof DomiciliacionTenant && ($transaccion['order_id'] ?? null) === null)) {
+            if ($suscripcion instanceof DomiciliacionTenant) {
+                $this->suscripciones->actualizar($suscripcion);
             }
 
             return;
@@ -112,6 +113,18 @@ class NotificacionesOpenPay
             'failed', 'cancelled' => $this->confirmar->rechazarPorReferencia($id),
             default => null,
         };
+    }
+
+    /**
+     * El pago del cargo: el que ya lo tiene como referencia (también el cobro de un pago
+     * automático, que no tiene `order_id`) o el intento de su `order_id`.
+     *
+     * @param  array<string, mixed>  $cargo
+     */
+    private function pagoDelCargo(string $id, array $cargo): ?PagoTenant
+    {
+        return PagoTenant::query()->where('proveedor', 'openpay')->where('referencia_externa', $id)->first()
+            ?? PagoTenant::query()->where('ulid', (string) ($cargo['order_id'] ?? ''))->where('proveedor', 'openpay')->first();
     }
 
     private function domiciliacionDelCliente(string $cliente): ?DomiciliacionTenant

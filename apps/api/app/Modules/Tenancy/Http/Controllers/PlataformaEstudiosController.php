@@ -240,8 +240,9 @@ class PlataformaEstudiosController
     }
 
     /**
-     * Extiende la prueba gratis N días (desde hoy si ya había terminado). Los meses
-     * cubiertos por la prueba no generan cargo de renta.
+     * Extiende la prueba gratis N días (desde hoy si ya había terminado). Los días
+     * cubiertos por la prueba no generan cargo de renta; si ya había terminado, los que
+     * corrieron entre su fin y hoy sí (se guarda ese hueco).
      */
     public function extenderPrueba(Request $request, string $estudio): JsonResponse
     {
@@ -251,12 +252,16 @@ class PlataformaEstudiosController
             throw ValidationException::withMessages(['estado' => ['Reactiva el negocio antes de extender su prueba.']]);
         }
 
-        $base = $modelo->trial_termina_en !== null && ! $modelo->trial_termina_en->isPast()
-            ? Carbon::parse($modelo->trial_termina_en->toDateString())
-            : Carbon::today();
+        $vigente = $modelo->trial_termina_en !== null && ! $modelo->trial_termina_en->isPast();
+        $base = $vigente ? Carbon::parse($modelo->trial_termina_en->toDateString()) : Carbon::today();
+        // Ya había terminado: lo que corrió desde su fin hasta hoy se cobra.
+        $hueco = ! $vigente && $modelo->trial_termina_en !== null
+            ? ['prueba_termino_antes' => $modelo->trial_termina_en->toDateString(), 'prueba_extendida_desde' => $base->toDateString()]
+            : [];
 
         $modelo->update([
-            'trial_termina_en' => $base->addDays((int) $validado['dias'])->toDateString(),
+            ...$hueco,
+            'trial_termina_en' => $base->copy()->addDays((int) $validado['dias'])->toDateString(),
             'estado' => EstadoEstudio::Trialing->value,
             'estado_facturacion' => EstadoFacturacion::Trial->value,
         ]);

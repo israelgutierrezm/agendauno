@@ -10,8 +10,10 @@ use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Pasarelas\PasarelaStripePlataforma;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
+use App\Support\ReporteDeErrores;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Cobra un cargo de renta del SaaS (plataforma -> dueño) con la pasarela de LA
@@ -28,6 +30,7 @@ class CobrarCargoRenta
         private readonly SuspensionPorRenta $suspension,
         private readonly ConciliarCargosRenta $conciliar,
         private readonly AcreditarTimbresPagados $timbres,
+        private readonly ConfirmarCargoRenta $confirmar,
     ) {}
 
     public function ejecutar(CargoRenta $cargo, string $proveedor): CargoRenta
@@ -41,6 +44,21 @@ class CobrarCargoRenta
         if ($cargo->estado === EstadoCargoRenta::Pendiente && $cargo->metodo_pago === 'stripe'
             && (string) $cargo->referencia_pago !== '' && $this->conciliar->conciliar($cargo)) {
             return $cargo->refresh();
+        }
+
+        // Un cobro a la tarjeta domiciliada que quedó sin respuesta pudo hacerse: se busca
+        // en Stripe antes de abrir otro pago (si no, se cobraría dos veces).
+        if ($proveedor === 'stripe' && $cargo->estado === EstadoCargoRenta::Pendiente && (string) $cargo->referencia_pago === '') {
+            $previo = $this->cobroDomiciliadoSinRegistrar($cargo);
+            if (($previo['status'] ?? '') === 'succeeded') {
+                $this->confirmar->porReferencia($previo['id'], 'stripe', (string) $cargo->ulid, $cargo->monto_minor);
+                if ($cargo->refresh()->estado === EstadoCargoRenta::Pagado) {
+                    return $cargo;
+                }
+            }
+            if (in_array($previo['status'] ?? '', ['processing', 'requires_capture'], true)) {
+                throw new CargoRentaNoPagable('Ya hay un pago en proceso para esta renta; espera su confirmación.');
+            }
         }
 
         $cobrado = DB::transaction(function () use ($cargo, $proveedor): CargoRenta {
@@ -88,5 +106,27 @@ class CobrarCargoRenta
         }
 
         return $cobrado;
+    }
+
+    /**
+     * El cobro a la tarjeta domiciliada del cargo en Stripe, si el negocio tiene tarjeta
+     * domiciliada. Si Stripe no responde, se sigue (no se impide pagar).
+     *
+     * @return array{id: string, status: string}|null
+     */
+    private function cobroDomiciliadoSinRegistrar(CargoRenta $cargo): ?array
+    {
+        $cargo->loadMissing('estudio');
+        if ((string) $cargo->estudio?->domiciliacion_metodo === '') {
+            return null;
+        }
+
+        try {
+            return $this->stripe->cobroDomiciliadoDe($cargo, $this->registro->llaves('stripe'));
+        } catch (Throwable $e) {
+            ReporteDeErrores::reportarAtrapado($e);
+
+            return null;
+        }
     }
 }

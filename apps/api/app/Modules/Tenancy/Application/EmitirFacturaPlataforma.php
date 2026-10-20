@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use App\Modules\Tenancy\ModoCobroSaas;
 use Illuminate\Support\Carbon;
@@ -60,6 +61,13 @@ class EmitirFacturaPlataforma
         $cuerpo = $this->armarCuerpo($cargo, $receptor, $iva);
 
         return DB::transaction(function () use ($cargo, $receptor, $subtotal, $impuesto, $total, $llave, $cuerpo): FacturaPlataforma {
+            // El cargo bloqueado y su factura vuelta a leer: dos solicitudes a la vez (un
+            // doble clic, un reintento) no timbran dos CFDI por el mismo pago.
+            CargoRenta::query()->whereKey($cargo->getKey())->lockForUpdate()->first();
+            $previa = FacturaPlataforma::query()->where('cargo_renta_id', $cargo->getKey())->first();
+            if ($previa instanceof FacturaPlataforma && $previa->estado === EstadoFactura::Timbrada) {
+                return $previa;
+            }
             $comun = [
                 'estudio_id' => $cargo->estudio_id,
                 'receptor_nombre' => $receptor['nombre'],
@@ -75,7 +83,11 @@ class EmitirFacturaPlataforma
             ];
 
             try {
-                $resultado = $this->cliente->timbrar($llave, $cuerpo);
+                // La misma llave por cargo y lo que se pide: si FacturAPI no respondió a
+                // tiempo, el reintento recibe la misma factura en lugar de otra.
+                $resultado = $this->cliente->timbrar($llave, $cuerpo + [
+                    'idempotency_key' => 'renta-'.$cargo->ulid.'-'.substr(sha1((string) json_encode($cuerpo)), 0, 16),
+                ]);
             } catch (TimbradoFallido $e) {
                 return FacturaPlataforma::query()->updateOrCreate(
                     ['cargo_renta_id' => $cargo->getKey()],
@@ -143,7 +155,8 @@ class EmitirFacturaPlataforma
     {
         $porcentaje = is_array($cargo->desglose) ? ($cargo->desglose['iva_porcentaje'] ?? null) : null;
         if ($cargo->modo_cobro === ModoCobroSaas::Fijo || ! is_numeric($porcentaje)) {
-            return self::IVA_POR_OMISION;
+            // La cuota fija de un negocio fuera de México se cobra sin IVA (exportación).
+            return $cargo->estudio instanceof Estudio && ! $cargo->estudio->enMexico() ? 0 : self::IVA_POR_OMISION;
         }
 
         return max(0, min(100, (int) $porcentaje));

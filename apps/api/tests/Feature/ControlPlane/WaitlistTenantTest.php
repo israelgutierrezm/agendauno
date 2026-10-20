@@ -70,6 +70,27 @@ it('al expirar la oferta, se marca expirada y el cupo se re-ofrece al siguiente'
     expect($estados)->not->toHaveKey('Beto');
 });
 
+it('si quien sigue ya no tiene con qué, el lugar pasa al siguiente y él conserva su turno', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $sesion = crearSesionTenant($e, $semilla, capacidad: 1);
+    $otra = crearSesionTenant($e, $semilla, capacidad: 5, cuando: '2026-10-02 08:00:00');
+    $a = venderPackAMiembroTenant($e, 8000, 'Ana');
+    // Beto tiene un solo crédito.
+    $b = venderPackAMiembroTenant($e, 1000, 'Beto');
+    $c = venderPackAMiembroTenant($e, 8000, 'Ceci');
+    $url = "/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas";
+    $reservaA = (string) $this->postJson($url, ['persona_id' => $a['persona']], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $this->postJson($url, ['persona_id' => $b['persona'], 'esperar' => true], conBearer($e['bearer']))->assertCreated();
+    $this->postJson($url, ['persona_id' => $c['persona'], 'esperar' => true], conBearer($e['bearer']))->assertCreated();
+    // Beto usa su crédito en otra clase mientras espera.
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$otra}/reservas", ['persona_id' => $b['persona']], conBearer($e['bearer']))->assertCreated();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reservaA}/cancelar", [], conBearer($e['bearer']))->assertOk();
+
+    expect(estadosRoster($e, $sesion))->toMatchArray(['Beto' => 'en_espera', 'Ceci' => 'ofrecida']);
+});
+
 it('aceptar una oferta ya vencida se rechaza (OFFER_NOT_AVAILABLE)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $d = sesionLlenaConEspera($e);

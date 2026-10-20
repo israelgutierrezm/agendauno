@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
@@ -573,7 +574,14 @@ async function reembolsar(): Promise<void> {
   errorReembolso.value = null;
   erroresReembolso.value = {};
   try {
-    const { data } = await api.post<{ data: { estado: string } }>(
+    const { data } = await api.post<{
+      data: {
+        estado: string;
+        monto_minor: number;
+        moneda: string;
+        motivo_fallo: string | null;
+      };
+    }>(
       `${base.value}/pagos/${p.id}/reembolsos`,
       {
         monto_minor: Math.round(Number(rMonto.value) * 100),
@@ -584,16 +592,36 @@ async function reembolsar(): Promise<void> {
       },
       { headers: { "Idempotency-Key": rLlave.value } },
     );
+    // La pasarela no la hizo: el diálogo sigue abierto con el motivo, y el siguiente
+    // intento (p. ej. «ya lo devolví por otro medio») lleva otra llave.
+    if (data.data.estado === "fallido") {
+      rLlave.value = crypto.randomUUID();
+      errorReembolso.value = data.data.motivo_fallo
+        ? t("reembolsosPago.rechazada", { motivo: data.data.motivo_fallo })
+        : t("reembolsosPago.rechazadaSinMotivo");
+      return;
+    }
     avisoReembolso.value =
       data.data.estado === "pendiente"
         ? t("reembolsosPago.enProceso")
         : data.data.estado === "incierto"
           ? t("reembolsosPago.sinConfirmar")
-          : null;
+          : t("reembolsosPago.hecha", {
+              monto: dinero(data.data.monto_minor, data.data.moneda),
+            });
     porConciliar.value?.cargar();
     reembolsando.value = null;
     await cargar();
   } catch (e) {
+    // Rechazada por el servidor (un 4xx con su motivo): el reintento lleva otra llave.
+    // Sin respuesta (red), la misma: el servidor pudo haberla hecho.
+    if (
+      axios.isAxiosError(e) &&
+      e.response !== undefined &&
+      e.response.status < 500
+    ) {
+      rLlave.value = crypto.randomUUID();
+    }
     erroresReembolso.value = erroresPorCampo(e);
     errorReembolso.value =
       Object.keys(erroresReembolso.value).length > 0
@@ -1224,8 +1252,12 @@ watch(vista, cargar, { immediate: true });
                         data-prueba="pago-facturar"
                         >{{ $t("facturarVenta.facturar") }}</RouterLink
                       >
+                      <!-- Solo a quien puede hacer algo: corregir o anular. -->
                       <button
-                        v-if="p.corregible || p.anulable"
+                        v-if="
+                          (p.corregible && sesion.puede('ordenes.gestionar')) ||
+                          (p.anulable && puedeReembolsar)
+                        "
                         class="tu-enlace text-sm"
                         type="button"
                         :aria-expanded="corrigiendo === p.id"

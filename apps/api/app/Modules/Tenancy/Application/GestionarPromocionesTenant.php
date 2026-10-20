@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PromocionTenant;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\PromocionInvalida;
 
 /**
@@ -81,12 +83,28 @@ class GestionarPromocionesTenant
         if (! $promocion->vigente()) {
             throw new PromocionInvalida('La promoción no está vigente.');
         }
+        // Con tope de usos, también cuentan las compras con el código aún por pagar de
+        // las últimas horas: si no, varias órdenes a la vez lo usarían de más al pagarse.
+        // Una compra abandonada deja de apartarlo pasado ese tiempo.
+        if ($promocion->usos_maximos !== null) {
+            $apartados = OrdenTenant::query()
+                ->where('promocion_id', $promocion->getKey())
+                ->where('estado', EstadoOrden::Pendiente->value)
+                ->where('created_at', '>=', now()->subHours(self::HORAS_APARTADO))
+                ->count();
+            if ((int) $promocion->usos + $apartados >= (int) $promocion->usos_maximos) {
+                throw new PromocionInvalida('La promoción ya no tiene usos disponibles.');
+            }
+        }
         if ($promocion->monto_minimo_minor !== null && $subtotal < $promocion->monto_minimo_minor) {
             throw new PromocionInvalida('La compra no alcanza el mínimo para esta promoción.');
         }
 
         return $promocion;
     }
+
+    /** Cuánto tiempo aparta un uso una compra por pagar con el código. */
+    private const HORAS_APARTADO = 24;
 
     private function normalizar(string $codigo): string
     {

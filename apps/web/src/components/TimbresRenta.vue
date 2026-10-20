@@ -23,7 +23,10 @@ interface Timbres {
   resumen?: { usados_mes: number };
 }
 
-const props = defineProps<{ base: string; pagado?: boolean }>();
+const props = withDefaults(
+  defineProps<{ base: string; pagado?: boolean; puedeGestionar?: boolean }>(),
+  { pagado: false, puedeGestionar: true },
+);
 const toast = useToastStore();
 
 const timbres = ref<Timbres | null>(null);
@@ -60,7 +63,11 @@ async function comprar(): Promise<void> {
   try {
     const { data } = await api.post<{
       data: { checkout?: { url?: string } };
-    }>(`${props.base}/timbres/comprar`, { cantidad: paquete.value });
+    }>(`${props.base}/timbres/comprar`, {
+      cantidad: paquete.value,
+      // Vuelve a Timbres, con su aviso (no el de la renta).
+      retorno: "/renta/timbres",
+    });
     const url = data.data.checkout?.url;
     if (typeof url === "string" && url !== "") {
       window.location.href = url;
@@ -156,6 +163,7 @@ defineExpose({ cargar });
           </select>
         </label>
         <button
+          v-if="puedeGestionar"
           type="button"
           class="tu-btn tu-btn-fantasma"
           :disabled="comprando || paquete === null"

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
+import { dinero } from "@/lib/formato";
+
 /**
  * Qué incluye un servicio tipo paquete y, si sale más barato, cuánto costaría por
  * separado (ADR 0063). En un servicio simple no muestra nada.
@@ -10,6 +12,8 @@ const props = defineProps<{
   precioMinor?: number | null;
   porSeparadoMinor?: number | null;
   moneda?: string | null;
+  /** El país del negocio: cómo se escriben sus precios. */
+  pais?: string | null;
 }>();
 
 const lista = computed(() => props.incluye ?? []);
@@ -18,10 +22,7 @@ const porSeparado = computed(() =>
   props.porSeparadoMinor != null &&
   props.precioMinor != null &&
   props.porSeparadoMinor > props.precioMinor
-    ? new Intl.NumberFormat("es-MX", {
-        style: "currency",
-        currency: props.moneda ?? "MXN",
-      }).format(props.porSeparadoMinor / 100)
+    ? dinero(props.porSeparadoMinor, props.moneda ?? "MXN", props.pais)
     : null,
 );
 </script>

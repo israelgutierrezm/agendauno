@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\CupoLleno;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
 use App\Modules\Tenancy\Reservas\Exceptions\SinDerechoDisponible;
 use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
+use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +99,7 @@ class ImportarReservasTenant
                     $this->validar($datos);
                     $persona = PersonaTenant::query()
                         ->whereRaw('lower(email) = ?', [mb_strtolower($datos['email'])])
+                        ->where('tipo', TipoPersonaTenant::Miembro->value)
                         ->where('archivado', false)
                         ->first() ?? $this->error('email', 'No hay un alumno con ese correo: impórtalo primero.');
                     $sucursal = $this->sucursal($sucursales, $datos['sucursal'], $actor);
@@ -318,7 +320,7 @@ class ImportarReservasTenant
             || ReservaTenant::query()
                 ->where('sesion_id', $sesion->getKey())
                 ->where('persona_id', $persona->getKey())
-                ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+                ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value])
                 ->exists();
     }
 

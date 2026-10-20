@@ -138,18 +138,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
       final cobrada = await ref
           .read(agendaProvider.notifier)
           .cobrar(s, _metodo, clave: _claveCobro);
+      // El servidor respondió: el siguiente cobro (otra cosa) lleva otra clave.
+      _claveCobro = null;
       if (cobrada) {
-        _claveCobro = null;
+        mensajero.showSnackBar(const SnackBar(content: Text('Cita cobrada.')));
       }
-      mensajero.showSnackBar(
-        SnackBar(
-          content: Text(
-            cobrada
-                ? 'Cita cobrada.'
-                : 'El cobro no quedó registrado: la cita sigue por cobrar.',
-          ),
-        ),
-      );
     } on DioException catch (e) {
       mensajero.showSnackBar(
         SnackBar(

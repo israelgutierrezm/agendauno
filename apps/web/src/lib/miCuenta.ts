@@ -220,6 +220,8 @@ const pagoEnLinea = ref(false);
 // La pasarela del negocio está en pruebas: no se cobra de verdad (M07).
 const pagoEnLineaPrueba = ref(false);
 const pagoAutomatico = ref(false);
+// La casilla «cobrar automáticamente» al pagar (solo con Stripe).
+const domiciliarAlPagar = ref(false);
 const cargando = ref(false);
 const cargado = ref(false);
 const error = ref<string | null>(null);
@@ -247,6 +249,7 @@ export function reiniciarMiCuenta(): void {
   pagoEnLinea.value = false;
   pagoEnLineaPrueba.value = false;
   pagoAutomatico.value = false;
+  domiciliarAlPagar.value = false;
   cargando.value = false;
   cargado.value = false;
   error.value = null;
@@ -324,6 +327,7 @@ export function useMiCuenta() {
             pago_en_linea?: boolean;
             pago_en_linea_prueba?: boolean;
             pago_automatico?: boolean;
+            domiciliar_al_pagar?: boolean;
           };
         }>(`${base.value}/mi/perfil`),
         // Las próximas clases (para el Inicio) no tumban la cuenta si fallan: el
@@ -346,6 +350,7 @@ export function useMiCuenta() {
       pagoEnLinea.value = p.data.data.pago_en_linea === true;
       pagoEnLineaPrueba.value = p.data.data.pago_en_linea_prueba === true;
       pagoAutomatico.value = p.data.data.pago_automatico === true;
+      domiciliarAlPagar.value = p.data.data.domiciliar_al_pagar === true;
       clases.value = a.data.data;
       waivers.value = w.data.data;
       productos.value = pr.data.data;
@@ -423,6 +428,7 @@ export function useMiCuenta() {
     pagoEnLinea,
     pagoEnLineaPrueba,
     pagoAutomatico,
+    domiciliarAlPagar,
     cargado,
     cargando,
     error,

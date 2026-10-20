@@ -34,8 +34,11 @@ class CalcularRentabilidadTenant
         // Una sola moneda: la del negocio (ADR 0099).
         $moneda = app(ParametrosTenant::class)->moneda();
 
+        // Hasta el inicio del día siguiente, sin incluirlo: una sesión a medianoche no
+        // cuenta en dos periodos.
         $sesiones = SesionTenant::query()
-            ->whereBetween('inicia_en', [$inicio, $fin])
+            ->where('inicia_en', '>=', $inicio)
+            ->where('inicia_en', '<', $fin)
             ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
             ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
             ->with('oferta')

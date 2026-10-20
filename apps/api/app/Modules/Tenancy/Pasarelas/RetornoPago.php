@@ -10,8 +10,9 @@ use Illuminate\Http\Request;
 
 /**
  * URLs de regreso a la web tras pagar en una página externa: la pantalla de origen
- * con `?pago=exito` o `?pago=cancelado`, para que avise cómo quedó el pago. Al
- * autorizar una tarjeta para pagos automáticos el parámetro es `tarjeta`.
+ * con `?pago=exito`, `?pago=pendiente` (la pasarela aún no lo aprueba: OXXO, revisión)
+ * o `?pago=cancelado`, para que avise cómo quedó el pago. Al autorizar una tarjeta
+ * para pagos automáticos el parámetro es `tarjeta`.
  *
  * Se vuelve al mismo sitio desde el que se inició el pago ({@see origen}): quien entró
  * por el subdominio de su negocio (`{slug}.dominio`, el del enlace y el QR) tiene ahí
@@ -20,7 +21,7 @@ use Illuminate\Http\Request;
 final class RetornoPago
 {
     /**
-     * @return array{exito: string, cancelado: string}
+     * @return array{exito: string, pendiente: string, cancelado: string}
      */
     public static function urls(?string $retorno, string $parametro = 'pago'): array
     {
@@ -30,6 +31,7 @@ final class RetornoPago
 
         return [
             'exito' => $base.$union.$parametro.'=exito',
+            'pendiente' => $base.$union.$parametro.'=pendiente',
             'cancelado' => $base.$union.$parametro.'=cancelado',
         ];
     }

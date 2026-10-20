@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Listeners;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
@@ -44,16 +45,21 @@ class DevolverPagoAlCancelarNegocio
             return;
         }
 
-        $reserva = ReservaTenant::query()->where('ulid', $evento->agregadoId)->with('orden')->first();
-        if (! $reserva instanceof ReservaTenant
-            || $reserva->cancelada_por !== QuienCancela::Negocio->value
-            || $reserva->orden === null
-            || $reserva->orden->estado !== EstadoOrden::Pagada) {
+        $reserva = ReservaTenant::query()->where('ulid', $evento->agregadoId)->first();
+        if (! $reserva instanceof ReservaTenant || $reserva->cancelada_por !== QuienCancela::Negocio->value) {
+            return;
+        }
+        // Lo pagado de la cita: su orden (o el anticipo) y, si la tiene, la del resto.
+        $ordenes = OrdenTenant::query()
+            ->whereKey(array_values(array_filter([$reserva->orden_id, $reserva->saldo_orden_id])))
+            ->where('estado', EstadoOrden::Pagada->value)
+            ->pluck('id');
+        if ($ordenes->isEmpty()) {
             return;
         }
 
         $pagos = PagoTenant::query()
-            ->where('orden_id', $reserva->orden->getKey())
+            ->whereIn('orden_id', $ordenes)
             ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
             ->whereIn('proveedor', ProveedorPasarela::enLinea())
             ->get();
@@ -63,7 +69,8 @@ class DevolverPagoAlCancelarNegocio
                     $pago,
                     null,
                     'El negocio canceló la reserva.',
-                    llave: 'cancelacion-negocio:'.$reserva->ulid,
+                    // Una por pago: el anticipo y el resto son devoluciones distintas.
+                    llave: 'cancelacion-negocio:'.$reserva->ulid.':'.$pago->ulid,
                 );
             } catch (PagoNoReembolsable) {
                 // Ya devuelto, o la pasarela no devuelve en línea: lo resuelve el negocio.

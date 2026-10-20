@@ -20,7 +20,9 @@ use App\Modules\Tenancy\Pasarelas\PasarelaCancelable;
 use App\Modules\Tenancy\Pasarelas\PasarelaDomiciliable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\Pasarelas\ResultadoPago;
+use App\Support\ReporteDeErrores;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Cobra una orden tenant-local con la pasarela del estudio. El cobro en linea es
@@ -44,19 +46,31 @@ class CobrarOrdenTenant
      */
     public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null, ?Usuario $registradoPor = null, ?int $sucursalCaja = null, ?array $partes = null): PagoTenant
     {
-        if ($idempotencyKey !== null) {
-            $previo = PagoTenant::query()->where('idempotency_key', $idempotencyKey)->first();
-            if ($previo instanceof PagoTenant) {
-                return $previo;
+        $repetido = function () use ($orden, $proveedor, $idempotencyKey): ?PagoTenant {
+            $previo = $idempotencyKey !== null ? PagoTenant::query()->where('idempotency_key', $idempotencyKey)->first() : null;
+            // La misma llave es el mismo cobro: de esta orden y por la misma pasarela.
+            if ($previo instanceof PagoTenant && ((int) $previo->orden_id !== (int) $orden->getKey() || $previo->proveedor !== $proveedor)) {
+                throw new OrdenNoLiquidable('Esa llave ya se usó para otro cobro: vuelve a intentarlo.');
             }
+
+            return $previo;
+        };
+        $previo = $repetido();
+        if ($previo instanceof PagoTenant) {
+            return $previo;
         }
 
         if (! $this->registro->activa($proveedor)) {
             throw new PasarelaNoDisponible('La pasarela no está activa en este negocio.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor, $sucursalCaja, $partes): PagoTenant {
+        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor, $sucursalCaja, $partes, $repetido): PagoTenant {
             $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
+            // Ya bloqueada, otra vez: dos peticiones a la vez con la misma llave.
+            $previo = $repetido();
+            if ($previo instanceof PagoTenant) {
+                return $previo;
+            }
 
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
                 throw new OrdenNoLiquidable('La orden no admite cobro.');
@@ -120,6 +134,26 @@ class CobrarOrdenTenant
         $pasarela = $this->registro->resolver($proveedor);
         if (! $pasarela instanceof PasarelaDomiciliable) {
             throw new PasarelaNoDisponible('La pasarela no admite pagos automáticos.');
+        }
+
+        // Un cargo anterior de esta orden que sí se hizo pero no quedó registrado (la
+        // pasarela no respondió y su aviso no llegó; su llave pudo ya caducar): se registra
+        // en lugar de cobrar otra vez. Si la pasarela no responde, se sigue.
+        try {
+            $previo = $pasarela->cargoDeOrden($orden, $this->registro->llaves($proveedor));
+        } catch (Throwable $e) {
+            ReporteDeErrores::reportarAtrapado($e);
+            $previo = null;
+        }
+        if (($previo['status'] ?? '') === 'succeeded') {
+            app(ConfirmarPagoTenant::class)->porCargoDomiciliado($previo['id'], (string) $orden->ulid, (string) $domiciliacion->ulid, $previo['monto_minor'], $previo['moneda']);
+            $registrado = PagoTenant::query()->where('referencia_externa', $previo['id'])->first();
+            if ($registrado instanceof PagoTenant) {
+                return $registrado;
+            }
+        }
+        if (in_array($previo['status'] ?? '', ['processing', 'requires_capture'], true)) {
+            throw new CobroNoConcluyente('El cargo anterior de esta renovación sigue en proceso.');
         }
 
         return DB::connection('tenant')->transaction(function () use ($orden, $domiciliacion, $proveedor, $pasarela): PagoTenant {

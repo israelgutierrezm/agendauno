@@ -46,7 +46,7 @@ class CortesNominaTenantController
     {
         $corte = $this->corte($request);
         $corte->loadSum('ajustes', 'monto_minor');
-        $usuarios = Usuario::query()
+        $usuarios = Usuario::withTrashed()
             ->whereIn('id', $corte->lineas->pluck('usuario_id')->merge($corte->ajustes->pluck('usuario_id'))->filter())
             ->pluck('ulid', 'id');
 
@@ -114,7 +114,7 @@ class CortesNominaTenantController
             // Corrige una diferencia del cálculo (R09): se resta de lo que falta.
             'compensa_diferencia' => ['sometimes', 'boolean'],
         ]);
-        $persona = Usuario::query()->where('ulid', $validado['usuario_id'])->firstOrFail();
+        $persona = Usuario::withTrashed()->where('ulid', $validado['usuario_id'])->firstOrFail();
         $ajuste = $this->cortes->ajustar(
             $this->corte($request), $persona, (int) $validado['monto_minor'], trim($validado['motivo']), $this->actor($request),
             (bool) ($validado['compensa_diferencia'] ?? false),

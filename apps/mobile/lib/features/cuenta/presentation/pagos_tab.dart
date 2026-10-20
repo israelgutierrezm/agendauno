@@ -39,14 +39,21 @@ class PagosTab extends ConsumerWidget {
                 style: TextStyle(color: context.colores.aviso),
               ),
             ),
-          if (cuenta.porPagar.isEmpty)
+          if (cuenta.porPagarSinCargar)
+            const TextoVacio(
+              'No se pudo cargar lo que tienes por pagar. Desliza para '
+              'reintentar.',
+            )
+          else if (cuenta.porPagar.isEmpty)
             const TextoVacio('Estás al corriente.')
           else
             for (final o in cuenta.porPagar)
               PorPagarTile(
                 o,
+                // Cada orden con su estado (la casilla no pasa de una a otra).
+                key: ValueKey(o.id),
                 pagoEnLinea: cuenta.pagoEnLinea,
-                pagoAutomatico: cuenta.pagoAutomatico && !esCitas,
+                pagoAutomatico: cuenta.domiciliarAlPagar && !esCitas,
               ),
           // Comprar un plan (en citas, un bono): crea la orden y queda en "Por pagar".
           const ComprarPlanesSeccion(),

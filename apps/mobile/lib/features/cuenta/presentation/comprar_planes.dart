@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,6 +24,10 @@ class ComprarPlanesSeccion extends ConsumerStatefulWidget {
 
 class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
   String? _comprando;
+
+  /// El intento de compra en curso: reintentar el mismo plan (el negocio tardó en
+  /// responder) lleva la misma clave y no crea otra orden.
+  ({String producto, String clave})? _intento;
 
   Future<void> _comprar(ProductoComprable p) async {
     // Permanencia (B04): se leen y se aceptan las condiciones antes de comprar.
@@ -48,12 +54,28 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
         return;
       }
     }
+    if (_intento?.producto != p.id) {
+      _intento = (
+        producto: p.id,
+        clave:
+            '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}',
+      );
+    }
+    final clave = _intento!.clave;
     setState(() => _comprando = p.id);
     await hacerConAviso(
       context,
-      () => ref
-          .read(cuentaProvider.notifier)
-          .comprar(p.id, aceptaCondiciones: condiciones != null),
+      () async {
+        await ref
+            .read(cuentaProvider.notifier)
+            .comprar(
+              p.id,
+              aceptaCondiciones: condiciones != null,
+              clave: clave,
+            );
+        // Hecha: la siguiente compra es otra.
+        _intento = null;
+      },
       // En citas se compran bonos (ADR 0130).
       exito:
           'Compra creada. Págala en "Por pagar" para activar '

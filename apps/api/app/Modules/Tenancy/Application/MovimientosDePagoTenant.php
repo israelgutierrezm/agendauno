@@ -730,7 +730,9 @@ class MovimientosDePagoTenant
      */
     private static function etiquetaMetodo(?string $metodo, ?string $proveedor): string
     {
-        $tipo = MetodoPago::tryFrom((string) $metodo);
+        // Como la caja: «transferencia» (mostrador, citas) es la SPEI de los cobros y
+        // «manual» es la terminal. Si no, el corte las parte en dos renglones.
+        $tipo = MetodoPago::tryFrom((string) $metodo) ?? CorregirMetodoPagoTenant::metodoDeCaja((string) $metodo);
         if ($tipo === MetodoPago::Tarjeta) {
             return in_array((string) $proveedor, ProveedorPasarela::enLinea(), true) ? 'Tarjeta en línea' : 'Tarjeta (terminal)';
         }

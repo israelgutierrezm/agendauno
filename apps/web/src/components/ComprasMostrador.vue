@@ -23,6 +23,7 @@ interface Ticket {
     extras: string[];
   }[];
   propina_minor: number;
+  total_minor: number;
   cobrado_minor: number;
   moneda: string;
   anulada: boolean;
@@ -152,7 +153,7 @@ onMounted(() => void cargar());
           <span
             class="font-medium tabular-nums"
             :class="{ 'line-through': t.anulada }"
-            >{{ dinero(t.cobrado_minor, t.moneda) }}</span
+            >{{ dinero(t.total_minor + t.propina_minor, t.moneda) }}</span
           >
           <span
             v-if="t.anulada"

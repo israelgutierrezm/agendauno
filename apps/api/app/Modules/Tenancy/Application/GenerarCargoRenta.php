@@ -45,6 +45,46 @@ class GenerarCargoRenta
     ) {}
 
     /**
+     * Los meses cerrados que faltan por emitir: desde el siguiente al último cargo del
+     * negocio (o desde su alta) hasta el mes anterior, a lo más los últimos
+     * {@see self::MESES_ATRAS}. Un negocio que estuvo suspendido no emitió los suyos: al
+     * volver se emiten (sí usó el servicio esos meses).
+     *
+     * @return list<string>
+     */
+    public function periodosPorEmitir(Estudio $estudio): array
+    {
+        $zona = self::zona($estudio);
+        $ultimo = CarbonImmutable::now($zona)->subMonthNoOverflow()->startOfMonth();
+        $desde = $ultimo->subMonthsNoOverflow(self::MESES_ATRAS - 1);
+        $alta = $estudio->created_at !== null ? CarbonImmutable::parse($estudio->created_at)->setTimezone($zona)->startOfMonth() : $desde;
+        if ($alta->greaterThan($desde)) {
+            $desde = $alta;
+        }
+        $previo = CargoRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('clave', 'periodo')
+            ->max('periodo');
+        if (is_string($previo) && $previo !== '') {
+            $siguiente = CarbonImmutable::createFromFormat('Y-m-d', $previo.'-01', $zona)?->startOfMonth()->addMonthNoOverflow();
+            if ($siguiente !== null && $siguiente->greaterThan($desde)) {
+                $desde = $siguiente;
+            }
+        }
+
+        $periodos = [];
+        for ($mes = $desde; $mes->lessThanOrEqualTo($ultimo); $mes = $mes->addMonthNoOverflow()) {
+            $periodos[] = $mes->format('Y-m');
+        }
+
+        // El mes anterior siempre se revisa (si ya está emitido, no se toca).
+        return $periodos === [] ? [$ultimo->format('Y-m')] : $periodos;
+    }
+
+    /** Hasta cuántos meses cerrados atrás se emiten los que falten. */
+    private const MESES_ATRAS = 3;
+
+    /**
      * ¿Ese periodo se cobra por adelantado con el plan de citas (y no mes vencido)?
      * Sí, si al cierre del periodo ya regía la tarifa de citas por niveles.
      */
@@ -178,16 +218,20 @@ class GenerarCargoRenta
             return [$dias, $dias];
         }
 
-        // Se cobra desde el día siguiente al fin de la prueba.
-        $desde = CarbonImmutable::parse($estudio->trial_termina_en->toDateString())->addDay()->startOfDay();
-        if ($desde->greaterThan($fin)) {
-            return [0, $dias];
-        }
-        if ($desde->lessThanOrEqualTo($inicio)) {
-            return [$dias, $dias];
+        // Se cobra desde el día siguiente al fin de la prueba, y también el hueco entre
+        // una prueba que terminó y su extensión (excluidos ambos extremos).
+        $tras = $estudio->trial_termina_en->toDateString();
+        $huecoDesde = $estudio->prueba_termino_antes?->toDateString();
+        $huecoHasta = $estudio->prueba_extendida_desde?->toDateString();
+        $cobrables = 0;
+        for ($dia = $inicio; $dia->lessThanOrEqualTo($fin); $dia = $dia->addDay()) {
+            $fecha = $dia->toDateString();
+            if ($fecha > $tras || ($huecoDesde !== null && $huecoHasta !== null && $fecha > $huecoDesde && $fecha < $huecoHasta)) {
+                $cobrables++;
+            }
         }
 
-        return [(int) $desde->diffInDays($fin) + 1, $dias];
+        return [$cobrables, $dias];
     }
 
     private static function zona(Estudio $estudio): string

@@ -70,8 +70,9 @@ class CajasTenantController
             'tipo' => ['required', Rule::in([MovimientoCajaTenant::RETIRO, MovimientoCajaTenant::INGRESO])],
             'monto_minor' => ['required', 'integer', 'min:1', 'max:1000000000'],
             'motivo' => ['required', 'string', 'min:3', 'max:300'],
+            'clave' => ['nullable', 'string', 'max:64'],
         ]);
-        $this->cajas->moverEfectivo($turno, (string) $validado['tipo'], (int) $validado['monto_minor'], (string) $validado['motivo'], $actor);
+        $this->cajas->moverEfectivo($turno, (string) $validado['tipo'], (int) $validado['monto_minor'], (string) $validado['motivo'], $actor, $validado['clave'] ?? null);
 
         return response()->json(['data' => $this->presentar($turno->refresh(), $actor->puede('caja.supervisar'), true)], 201);
     }
@@ -83,7 +84,7 @@ class CajasTenantController
         $turno = $this->turno($request, $actor);
         $reglas = [];
         foreach (CajasTenant::METODOS as $metodo) {
-            $reglas["{$metodo}_minor"] = ['nullable', 'integer', 'min:0', 'max:1000000000'];
+            $reglas["{$metodo}_minor"] = ['nullable', 'integer', $metodo === 'efectivo' ? 'min:0' : 'min:-1000000000', 'max:1000000000'];
         }
         $validado = $request->validate($reglas);
         $contado = [];

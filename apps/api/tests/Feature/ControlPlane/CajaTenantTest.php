@@ -200,3 +200,47 @@ it('lo cerrado no cambia: anular, corregir y devolver después entran en la caja
         ->and($abierta['esperado'])->toBe(['efectivo' => 200000 - 56000 - 89900 + 89900 - 30000, 'tarjeta' => 56000, 'transferencia' => 0, 'ventanilla' => 0])
         ->and(collect($abierta['movimientos'])->pluck('tipo')->all())->toBe(['correccion', 'correccion', 'anulacion', 'cobro', 'devolucion']);
 });
+
+it('anular o corregir un cobro que no pasó por caja no descuadra la caja de hoy', function (): void {
+    $c = mostradorConCaja();
+    $this->putJson("{$c['base']}/parametros", ['valores' => ['pagos.permitir_anular_cobro' => 1]], conBearer($c['e']['bearer']))->assertOk();
+    // Antes de estrenar la caja: un paquete y una venta en efectivo.
+    $pago = packCobradoEnCaja($c, 'efectivo');
+    $otro = packCobradoEnCaja($c, 'efectivo', 'Beto');
+    $venta = ventaDePomadas($c, $c['recepcion'], 1);
+
+    abrirCaja($c, $c['recepcion'], 50000);
+    $this->postJson("{$c['base']}/pagos/{$pago}/anular", ['motivo' => 'Se registró dos veces'], conBearer($c['e']['bearer']))->assertOk();
+    $this->putJson("{$c['base']}/pagos/{$otro}/metodo", ['metodo' => 'tarjeta', 'motivo' => 'Fue con tarjeta'], conBearer($c['e']['bearer']))->assertOk();
+    $this->putJson("{$c['base']}/pos/ventas/{$venta}/metodo", ['metodo' => 'tarjeta', 'motivo' => 'Fue con tarjeta'], conBearer($c['e']['bearer']))->assertOk();
+
+    // Su dinero nunca estuvo en este cajón: la caja sigue con su fondo.
+    $abierta = cajaActual($c, $c['e']['bearer'])['turno'];
+    expect($abierta['esperado'])->toBe(['efectivo' => 50000, 'tarjeta' => 0, 'transferencia' => 0, 'ventanilla' => 0])
+        ->and($abierta['movimientos'])->toBe([]);
+});
+
+it('repetir un retiro con su clave no lo registra dos veces; la misma clave con otro monto, no', function (): void {
+    $c = mostradorConCaja();
+    $turno = abrirCaja($c, $c['recepcion'], 50000);
+    $url = "{$c['base']}/caja/turnos/{$turno}/movimientos";
+    $retiro = fn (int $monto) => $this->postJson($url, ['tipo' => 'retiro', 'monto_minor' => $monto, 'motivo' => 'Pago a proveedor', 'clave' => 'ret-1'], conBearer($c['recepcion']));
+
+    $retiro(20000)->assertCreated();
+    $retiro(20000)->assertCreated();
+    $retiro(30000)->assertStatus(422);
+
+    $abierta = cajaActual($c, $c['e']['bearer'])['turno'];
+    expect($abierta['esperado']['efectivo'])->toBe(30000)
+        ->and($abierta['movimientos'])->toHaveCount(1);
+});
+
+it('fuera del efectivo, el conteo admite un monto negativo (una devolución por la terminal)', function (): void {
+    $c = mostradorConCaja();
+    $turno = abrirCaja($c, $c['recepcion'], 0);
+    $url = "{$c['base']}/caja/turnos/{$turno}/conteo";
+
+    $this->postJson($url, ['efectivo_minor' => -100], conBearer($c['recepcion']))->assertStatus(422);
+    $this->postJson($url, ['efectivo_minor' => 0, 'tarjeta_minor' => -89900], conBearer($c['recepcion']))
+        ->assertOk()->assertJsonPath('data.cuadra', false);
+});

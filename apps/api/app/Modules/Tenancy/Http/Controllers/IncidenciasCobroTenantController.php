@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\FulfillmentTenant;
 use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -43,12 +44,18 @@ class IncidenciasCobroTenantController
     {
         $validado = $request->validate(['estado' => ['nullable', Rule::in([IncidenciaCobroTenant::ABIERTA, IncidenciaCobroTenant::RESUELTA])]]);
 
+        // Quien está acotado a sedes (R19) ve solo las de sus sedes; las que no son de
+        // ninguna venta (del negocio), no.
+        $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
         $incidencias = IncidenciaCobroTenant::query()
             ->where('estado', $validado['estado'] ?? IncidenciaCobroTenant::ABIERTA)
             ->with(['pago.orden.persona', 'reembolso', 'resolvio', 'domiciliacion.persona'])
             ->orderByDesc('id')
             ->limit(self::LIMITE)
-            ->get();
+            ->get()
+            ->filter(fn (IncidenciaCobroTenant $i): bool => $sedes === null
+                || in_array((int) (self::ordenDe($i)->sucursal_id ?? 0), $sedes, true))
+            ->values();
 
         return response()->json([
             'data' => $incidencias->map(fn (IncidenciaCobroTenant $i): array => $this->presentar($i))->all(),
@@ -58,10 +65,14 @@ class IncidenciasCobroTenantController
     public function resolver(Request $request, ReembolsarPagoTenant $reembolsos, IncidenciasCobroTenant $incidencias, RegistrarAuditoria $auditoria, FulfillmentTenant $fulfillment): JsonResponse
     {
         $incidencia = IncidenciaCobroTenant::query()->where('ulid', (string) $request->route('incidencia'))->firstOrFail();
-        // Un cobro de otra sede no se resuelve (ni se devuelve) desde aquí (R19).
-        $ordenIncidencia = $incidencia->orden_id !== null ? OrdenTenant::query()->find($incidencia->orden_id) : null;
+        // Un cobro de otra sede no se resuelve (ni se devuelve) desde aquí (R19): la
+        // venta de la incidencia, la de su pago o la de su devolución. Sin venta, solo
+        // quien ve todo el negocio.
+        $ordenIncidencia = self::ordenDe($incidencia);
         if ($ordenIncidencia instanceof OrdenTenant) {
             app(AlcancePersonaTenant::class)->exigirOrden($request, $ordenIncidencia);
+        } else {
+            abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403);
         }
         $validado = $request->validate([
             'resolucion' => ['required', 'string', 'max:500'],
@@ -95,7 +106,14 @@ class IncidenciasCobroTenantController
             // Si cobró de más, solo el excedente (lo debido ya pagó la renovación).
             $excedente = $incidencia->datos['excedente_minor'] ?? null;
             // La llave de la incidencia: repetir no devuelve dos veces.
-            $reembolsos->ejecutar($pago, is_int($excedente) ? $excedente : null, 'Devolución: '.$validado['resolucion'], $actor, false, false, 'incidencia_'.$incidencia->ulid);
+            $devolucion = $reembolsos->ejecutar($pago, is_int($excedente) ? $excedente : null, 'Devolución: '.$validado['resolucion'], $actor, false, false, 'incidencia_'.$incidencia->ulid);
+            // Si la pasarela no la hizo, la incidencia sigue abierta: el cobro de más
+            // sigue sin devolver.
+            if ($devolucion->estado === EstadoReembolso::Fallido) {
+                throw ValidationException::withMessages(['accion' => [
+                    'La pasarela no hizo la devolución'.($devolucion->motivo_fallo ? ': '.$devolucion->motivo_fallo : '').'. La incidencia sigue abierta.',
+                ]]);
+            }
         }
         if (($validado['accion'] ?? null) === 'aplicar') {
             // «Dar por pagada»: el cobro paga la renovación aunque el importe sea otro. Bajo
@@ -122,6 +140,14 @@ class IncidenciasCobroTenantController
         ], (string) $validado['resolucion']);
 
         return response()->json(['data' => $this->presentar($incidencia->refresh()->load(['pago.orden.persona', 'reembolso', 'resolvio', 'domiciliacion.persona']))]);
+    }
+
+    /** La venta de la incidencia: la suya, la de su pago o la de su devolución. */
+    private static function ordenDe(IncidenciaCobroTenant $incidencia): ?OrdenTenant
+    {
+        $ordenId = $incidencia->orden_id ?? $incidencia->pago->orden_id ?? $incidencia->reembolso->pago->orden_id ?? null;
+
+        return $ordenId !== null ? OrdenTenant::query()->find($ordenId) : null;
     }
 
     /**

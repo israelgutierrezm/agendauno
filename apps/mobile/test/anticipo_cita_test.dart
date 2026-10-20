@@ -106,7 +106,7 @@ const _sesion = Sesion(
 Future<void> _montar(
   WidgetTester tester,
   _Api api,
-  void Function(BuildContext context) abrir,
+  void Function(BuildContext context, WidgetRef ref) abrir,
 ) async {
   tester.view.physicalSize = const Size(390, 1800);
   tester.view.devicePixelRatio = 1;
@@ -122,9 +122,9 @@ Future<void> _montar(
       ],
       child: MaterialApp(
         home: Scaffold(
-          body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () => abrir(context),
+          body: Consumer(
+            builder: (context, ref, _) => TextButton(
+              onPressed: () => abrir(context, ref),
               child: const Text('Abrir'),
             ),
           ),
@@ -139,7 +139,7 @@ Future<void> _montar(
 Future<void> _abrirAgendar(WidgetTester tester, _Api api) => _montar(
   tester,
   api,
-  (context) => showModalBottomSheet<void>(
+  (context, _) => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     builder: (_) => const AgendarCitaSheet(),
@@ -383,8 +383,8 @@ void main() {
       },
     });
 
-    await _montar(tester, _Api(), (context) {
-      mostrarDetalleReserva(context, reserva);
+    await _montar(tester, _Api(), (context, ref) {
+      mostrarDetalleReserva(context, ref, reserva);
     });
 
     expect(
@@ -404,8 +404,8 @@ void main() {
       'cita': {'reserva_id': 'r2', 'estado': 'confirmada'},
     });
 
-    await _montar(tester, _Api(), (context) {
-      mostrarDetalleReserva(context, reserva);
+    await _montar(tester, _Api(), (context, ref) {
+      mostrarDetalleReserva(context, ref, reserva);
     });
 
     expect(find.byKey(const Key('anticipo-pagado')), findsNothing);

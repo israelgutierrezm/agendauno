@@ -134,3 +134,23 @@ it('al pausar el paquete, sus clases extra se recorren igual', function (): void
     // Cinco días en pausa (14 al 18): ambos vencen cinco días después.
     expect(array_column(derechosDe($e, $ana), 'valido_hasta'))->toBe(['2026-11-05', '2026-11-05']);
 });
+
+it('con el paquete en pausa, sus clases extra tampoco se reservan', function (): void {
+    $this->travelTo('2026-10-14 12:00:00');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $paquete = productoDeClases($e, [
+        'nombre' => '4 clases', 'tipo' => 'paquete', 'creditos_incluidos' => 4000,
+        'vigencia_tipo' => 'meses', 'vigencia_cantidad' => 1, 'ofertas' => [$semilla['oferta']],
+    ]);
+    $extra = productoDeClases($e, ['nombre' => 'Clase extra', 'tipo' => 'add_on', 'creditos_incluidos' => 1000]);
+    $ana = crearMiembroTenant($e, 'Ana');
+    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))
+        ->assertCreated()->json('data.acuerdo');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
+    $sesion = crearSesionTenant($e, $semilla, null, '2026-10-16 08:00:00');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/pausar", ['hasta' => '2026-10-20'], conBearer($e['bearer']))->assertOk();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $ana], conBearer($e['bearer']))->assertStatus(422);
+});

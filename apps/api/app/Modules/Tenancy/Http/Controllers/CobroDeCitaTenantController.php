@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\CobroDeCitaTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
-use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\TicketVentaPosTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Pagos\PartesCobro;
+use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,14 +58,15 @@ class CobroDeCitaTenantController
 
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
-        // Alcance: quien imparte, solo lo de sus clientes; el staff acotado, de sus sedes.
+        // Alcance por la cita, no por la ficha del cliente (que puede no tener sede, si
+        // agendó en la página): el staff acotado, las de sus sedes; quien imparte, las
+        // suyas (ADR 0095, R19).
         $persona = $reserva->persona;
-        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
-        $sucursalId = $reserva->sesion?->sucursal_id;
+        $sesion = $reserva->sesion;
         abort_unless(
-            $actor === null || app(ResolverAccesoTenant::class)->permiteSucursal($actor, $sucursalId !== null ? (int) $sucursalId : null),
+            $sesion !== null && app(AccesoSesionTenant::class)->puedeOperar($sesion, $actor),
             403,
-            'No puedes cobrar en una sucursal que no te corresponde.',
+            'No puedes cobrar esta cita: es de otra sucursal o de otro profesional.',
         );
 
         // Vender productos pide el mostrador (su permiso y su función del plan).

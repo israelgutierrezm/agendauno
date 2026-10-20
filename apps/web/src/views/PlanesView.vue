@@ -417,7 +417,7 @@ onMounted(cargar);
                   <template v-else>{{ aplicaA(p) }}</template>
                 </td>
                 <td class="text-right font-medium tabular-nums">
-                  {{ dinero(p.precio_minor, p.moneda) }}
+                  {{ dinero(p.precio_minor, p.moneda, sesion.pais) }}
                 </td>
                 <td>
                   <span

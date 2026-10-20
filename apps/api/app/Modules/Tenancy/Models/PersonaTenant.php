@@ -94,6 +94,8 @@ class PersonaTenant extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'archivado_en' => 'datetime',
+        'no_facturable_desde' => 'datetime',
         'recibe_promociones' => 'boolean',
         'tipo' => TipoPersonaTenant::class,
         'activo' => 'boolean',
@@ -103,6 +105,23 @@ class PersonaTenant extends Model
         'fecha_nacimiento' => 'date',
         'genero' => GeneroPersona::class,
     ];
+
+    /**
+     * Desde cuándo está archivada o no es facturable (la medición del mes los cuenta si
+     * el cambio fue dentro del mes). Solo al cambiar una ficha: quien nace así (una
+     * cortesía) nunca contó.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (PersonaTenant $persona): void {
+            if ($persona->isDirty('archivado')) {
+                $persona->archivado_en = $persona->archivado ? now() : null;
+            }
+            if ($persona->isDirty('es_facturable')) {
+                $persona->no_facturable_desde = $persona->es_facturable === false ? now() : null;
+            }
+        });
+    }
 
     /**
      * Sucursal de casa (home) de la persona. R18.

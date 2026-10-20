@@ -336,7 +336,8 @@ ninguna asignada, ninguna, ADR 0098).
     completos anteriores), `alcanza_meses` (`null` sin uso con qué estimar) y `por_mes`
     (12 meses en la zona del negocio: `mes`, `usados`, `comprados`);
   - `compra_pendiente`: la compra empezada y sin pagar (`id`, `cantidad`, `monto_minor`,
-    `moneda`, `emitido_en`), que se paga con `POST /renta/cargos/{id}/pagar`.
+    `moneda`, `emitido_en`), que se paga con `POST /renta/cargos/{id}/pagar` (con
+    `retorno: "/renta/timbres"` vuelve a Timbres).
 - `GET /timbres/movimientos` filtra por `tipo` (`consumo`, `compra`, `ajuste`), `desde` y
   `hasta` (días del negocio) y `q` (cliente, RFC o folio fiscal de la factura), pagina
   con `page` y `per_page` (hasta 100) y exporta con `?formato=csv`. Cada fila trae:
@@ -1396,10 +1397,12 @@ en el negocio.
   `diferencia_minor`, y en `movimientos` solo sus retiros e ingresos (conteo a ciegas).
 - `POST /caja/turnos` {`sucursal_id`, `fondo_minor`, `nota`}: abre (409
   `CASH_REGISTER_ALREADY_OPEN` si la sede ya tiene una sin cerrar).
-- `POST /caja/turnos/{t}/movimientos` {`tipo`: retiro|ingreso, `monto_minor`, `motivo`}.
+- `POST /caja/turnos/{t}/movimientos` {`tipo`: retiro|ingreso, `monto_minor`, `motivo`,
+  `clave`}: con la misma `clave` devuelve el mismo movimiento (con otro monto, 422).
 - `POST /caja/turnos/{t}/conteo` {`efectivo_minor`, `tarjeta_minor`,
-  `transferencia_minor`, `ventanilla_minor`}: una sola vez. Devuelve `cuadra`; si no
-  cuadra, el turno queda `contada` con sus `conteos`.
+  `transferencia_minor`, `ventanilla_minor`}: una sola vez. Fuera del efectivo admite
+  montos negativos (una devolución por la terminal). Devuelve `cuadra`; si no cuadra, el
+  turno queda `contada` con sus `conteos`.
 - `POST /caja/turnos/{t}/cierre` {`motivo`}: cierra la contada; queda
   `requiere_revision`.
 - `GET /caja/turnos` (`caja.supervisar`; `sucursal_id`, `desde`, `hasta`,
@@ -1408,7 +1411,10 @@ en el negocio.
 - En una sede que usa caja, los cobros en caja, las ventas, las devoluciones en caja, las
   anulaciones y los cambios de forma de pago responden 422 `CASH_REGISTER_CLOSED` sin una
   caja abierta. `POST /ordenes/{o}/liquidar` y `/cobrar` aceptan `sucursal_id` (dónde se
-  cobra).
+  cobra). Anular o corregir un cobro que no entró por una caja no mueve la caja de hoy.
+- `POST /ordenes` acepta `liquidar` {`metodo`, `clave`, `sucursal_id`}: vende y cobra en
+  caja en una transacción (si el cobro no pasa, no queda la orden). Repetir la misma
+  `clave` devuelve la venta ya hecha (409 si el comprador es otro) (ADR 0181).
 
 ### Contracargos (ADR 0168)
 

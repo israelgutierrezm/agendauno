@@ -29,6 +29,8 @@ class FacturaTenant extends Model
         'anticipo', 'anticipo_aplicado_en',
         // Cancelar, sustituir y notas de crédito (ADR 0180).
         'tipo', 'relacionada_id', 'relacion', 'receptor_regimen', 'forma_pago', 'conceptos',
+        // La huella del CFDI pedido: arma la llave de idempotencia de FacturAPI.
+        'huella',
         'cancelacion_estado', 'cancelacion_motivo', 'cancelacion_detalle', 'cancelacion_solicitada_en', 'cancelada_en',
     ];
 

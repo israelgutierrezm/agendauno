@@ -11,7 +11,6 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Exceptions\TipoCambioNoDisponible;
 use App\Modules\Tenancy\Models\Estudio;
-use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Throwable;
@@ -52,14 +51,16 @@ class GenerarCargosRenta extends Command
                         if (! $gestor->baseDeDatosExiste($estudio)) {
                             continue;
                         }
-                        $periodo = $pedido !== ''
-                            ? $pedido
-                            : CarbonImmutable::now((string) ($estudio->zona_horaria ?: 'UTC'))->subMonthNoOverflow()->format('Y-m');
-                        if (! $generar->cerrado($estudio, $periodo)) {
-                            $abiertos++;
-                        } elseif (! $generar->porAdelantado($estudio, $periodo)) {
-                            $generar->paraEstudio($estudio, $periodo);
-                            $emitidos++;
+                        // Sin periodo pedido: el mes anterior y los cerrados que hayan
+                        // faltado (p. ej. mientras estuvo suspendido).
+                        $periodos = $pedido !== '' ? [$pedido] : $generar->periodosPorEmitir($estudio);
+                        foreach ($periodos as $periodo) {
+                            if (! $generar->cerrado($estudio, $periodo)) {
+                                $abiertos++;
+                            } elseif (! $generar->porAdelantado($estudio, $periodo)) {
+                                $generar->paraEstudio($estudio, $periodo);
+                                $emitidos++;
+                            }
                         }
 
                         if ($planes->aplica($estudio)) {

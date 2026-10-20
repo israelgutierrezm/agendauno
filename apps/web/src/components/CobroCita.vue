@@ -156,9 +156,21 @@ const disponibles = computed(() =>
       !lineas.value.some((l) => l.articulo.id === a.id),
   ),
 );
+// Un monto escrito que no se entiende no se toma como cero: se avisa y no se cobra.
+const propinaIlegible = computed(
+  () =>
+    propinaPct.value === "otra" &&
+    propinaOtra.value.trim() !== "" &&
+    aMinor(propinaOtra.value, tenant.pais) === null,
+);
+const recibidoIlegible = computed(
+  () => recibido.value.trim() !== "" && recibidoMinor.value === null,
+);
 const puedeCobrar = computed(
   () =>
     total.value > 0 &&
+    !propinaIlegible.value &&
+    !recibidoIlegible.value &&
     falta.value === 0 &&
     (!dividido.value || partesListas(partes.value, total.value)) &&
     !lineas.value.some(excede) &&
@@ -512,6 +524,13 @@ async function cerrar(): Promise<void> {
         >
           {{ editor.errores.value.propina_minor }}
         </p>
+        <p
+          v-else-if="propinaIlegible"
+          class="tu-error-campo"
+          data-prueba="propina-ilegible"
+        >
+          {{ $t("cobroCita.montoIlegible") }}
+        </p>
       </fieldset>
 
       <!-- Forma de pago y, en efectivo, lo que entregó -->
@@ -558,6 +577,13 @@ async function cerrar(): Promise<void> {
           class="tu-error-campo"
         >
           {{ editor.errores.value.recibido_minor }}
+        </p>
+        <p
+          v-else-if="recibidoIlegible"
+          class="tu-error-campo"
+          data-prueba="recibido-ilegible"
+        >
+          {{ $t("cobroCita.montoIlegible") }}
         </p>
         <p
           v-else-if="falta > 0"

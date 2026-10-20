@@ -8,16 +8,17 @@ export interface OrdenNueva {
 }
 
 /**
- * Vender cobra en dos pasos: crear la orden y liquidarla. Si el cobro falla (p. ej.
- * sin red), la orden queda pendiente; al reintentar la MISMA venta se cobra esa orden
- * y no se crea otra (no quedan órdenes repetidas en «Por cobrar»).
+ * Vender cobra de una vez: el API crea la orden y la cobra en caja en una sola
+ * transacción. Si el cobro no pasa (p. ej. la caja está cerrada), no queda ninguna
+ * orden por cobrar. Cada intento lleva su clave: repetir la MISMA venta (sin red, doble
+ * clic) devuelve la venta que ya se hizo, no cobra otra.
  *
  * Se cobra en la sucursal de la barra (la fija): su caja lo registra (ADR 0175).
  */
 export function crearVenta(): {
   vender: (base: string, orden: OrdenNueva, metodo: string) => Promise<string>;
 } {
-  let sinCobrar: { clave: string; id: string } | null = null;
+  let intento: { venta: string; clave: string } | null = null;
   const sucursales = useSucursales();
 
   async function vender(
@@ -25,23 +26,24 @@ export function crearVenta(): {
     orden: OrdenNueva,
     metodo: string,
   ): Promise<string> {
-    const clave = JSON.stringify([base, orden]);
-    let id = sinCobrar?.clave === clave ? sinCobrar.id : null;
-    if (id === null) {
-      const { data } = await api.post<{ data: { id: string } }>(
-        `${base}/ordenes`,
-        orden,
-      );
-      id = data.data.id;
-      sinCobrar = { clave, id };
+    const venta = JSON.stringify([base, orden, metodo]);
+    if (intento?.venta !== venta) {
+      intento = { venta, clave: crypto.randomUUID().replace(/-/g, "") };
     }
     const sede = sucursales.fija.value;
-    await api.post(`${base}/ordenes/${id}/liquidar`, {
-      metodo,
-      ...(sede !== null ? { sucursal_id: sede } : {}),
-    });
-    sinCobrar = null;
-    return id;
+    const { data } = await api.post<{ data: { id: string } }>(
+      `${base}/ordenes`,
+      {
+        ...orden,
+        liquidar: {
+          metodo,
+          clave: intento.clave,
+          ...(sede !== null ? { sucursal_id: sede } : {}),
+        },
+      },
+    );
+    intento = null;
+    return data.data.id;
   }
 
   return { vender };

@@ -86,7 +86,7 @@ class PagosTenantController
         $actor = $request->attributes->get('usuario_tenant');
         $sedes = $actor instanceof Usuario ? $this->acceso->sucursalesPermitidas($actor) : null;
         $q = trim((string) ($filtros['q'] ?? ''));
-        $encontrados = fn (): Builder => PagoTenant::query()
+        $enAlcance = fn (): Builder => PagoTenant::query()
             ->when($sedes !== null, fn ($c) => $c->whereHas('orden', fn ($o) => $o->whereIn('sucursal_id', $sedes)))
             ->whereIn('estado', [
                 EstadoPago::Aprobado->value,
@@ -96,9 +96,11 @@ class PagosTenantController
             ->when($q !== '', fn ($c) => $c->whereHas('orden.persona', fn ($p) => $p->where(fn ($w) => $w
                 ->where('nombre', 'like', "%{$q}%")
                 ->orWhere('primer_apellido', 'like', "%{$q}%")
-                ->orWhere('segundo_apellido', 'like', "%{$q}%"))))
-            ->when($desde !== null, fn ($c) => $c->where('created_at', '>=', $this->fechas->inicioDelDia((string) $desde)))
-            ->when($hasta !== null, fn ($c) => $c->where('created_at', '<=', $this->fechas->finDelDia((string) $hasta)));
+                ->orWhere('segundo_apellido', 'like', "%{$q}%"))));
+        // Por el día en que se cobró (como el corte), no el día en que se inició el pago.
+        $encontrados = fn (): Builder => $enAlcance()
+            ->when($desde !== null, fn ($c) => $c->whereRaw('COALESCE(aprobado_en, created_at) >= ?', [$this->fechas->inicioDelDia((string) $desde)]))
+            ->when($hasta !== null, fn ($c) => $c->whereRaw('COALESCE(aprobado_en, created_at) <= ?', [$this->fechas->finDelDia((string) $hasta)]));
 
         $estado = $filtros['estado'] ?? null;
         if (($filtros['formato'] ?? 'json') === 'csv') {
@@ -139,13 +141,16 @@ class PagosTenantController
             ->get(['id', 'ulid', 'uuid', 'orden_id'])
             ->keyBy('orden_id');
 
-        $aprobados = $encontrados()->where('estado', EstadoPago::Aprobado->value);
+        // Como el corte: lo cobrado incluye lo que después se devolvió (la devolución
+        // cuenta aparte, el día en que se hizo).
         $resumen = [
-            'cobros' => (clone $aprobados)->count(),
-            'cobrado' => $this->porMoneda((clone $aprobados)->toBase()),
+            'cobros' => $encontrados()->count(),
+            'cobrado' => $this->porMoneda($encontrados()->toBase()),
             'reembolsado' => $this->porMoneda(ReembolsoTenant::query()
                 ->where('estado', EstadoReembolso::Aprobado->value)
-                ->whereIn('pago_id', $encontrados()->select('id'))
+                ->whereIn('pago_id', $enAlcance()->select('id'))
+                ->when($desde !== null, fn ($c) => $c->where('aplicado_en', '>=', $this->fechas->inicioDelDia((string) $desde)))
+                ->when($hasta !== null, fn ($c) => $c->where('aplicado_en', '<=', $this->fechas->finDelDia((string) $hasta)))
                 ->toBase()),
             'sin_aprobar' => $encontrados()->where('estado', '!=', EstadoPago::Aprobado->value)->count(),
         ];
@@ -294,8 +299,11 @@ class PagosTenantController
         $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->with('orden')->firstOrFail();
         $actor = $request->attributes->get('usuario_tenant');
         $sucursal = $pago->orden?->sucursal_id;
+        // También la sede de la caja donde entró el cobro: ahí cae el ajuste.
+        $deLaCaja = app(CajasTenant::class)->sucursalDelCobro($pago);
         abort_unless(
-            ! $actor instanceof Usuario || $acceso->permiteSucursal($actor, $sucursal !== null ? (int) $sucursal : null),
+            ! $actor instanceof Usuario || ($acceso->permiteSucursal($actor, $sucursal !== null ? (int) $sucursal : null)
+                && $acceso->permiteSucursal($actor, $deLaCaja)),
             403,
         );
 

@@ -81,7 +81,7 @@ it('el alumno paga en línea; el webhook confirma, otorga créditos y ya puede r
         ->assertCreated()
         ->assertJsonPath('data.estado', 'pendiente')
         ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_alumno_1');
-    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], '/mi-cuenta?pago=exito'));
+    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], '/mi-cuenta/pagos?pago=exito'));
 
     // Antes de reservar no hay derecho.
     $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($a['bearer']))

@@ -336,10 +336,10 @@ class _AgendaCitas extends ConsumerWidget {
           ].contains(s.estadoCita),
         )
         .length;
-    // Lo que se cobra es el total de cada cita, fijo desde que se agendó.
+    // Lo que falta de cada cita (con anticipo ya pagado, solo el resto), no su total.
     final porCobrar = citas
         .where((s) => s.porCobrar)
-        .fold<int>(0, (a, s) => a + (s.montoMinor ?? 0));
+        .fold<int>(0, (a, s) => a + (s.porCobrarMinor ?? s.montoMinor ?? 0));
     // Los precios son de la moneda del negocio (una sola, ADR 0099).
     final moneda = ref.watch(sesionProvider)?.moneda ?? 'MXN';
 

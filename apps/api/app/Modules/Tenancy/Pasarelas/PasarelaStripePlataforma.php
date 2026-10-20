@@ -96,6 +96,21 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
             return true;
         }
 
-        return (new ClienteStripe($secretKey))->expirarSesion($referencia) !== 'complete';
+        // Solo vencida: si sigue abierta (no se pudo vencer), se podría pagar dos veces.
+        return (new ClienteStripe($secretKey))->expirarSesion($referencia) === 'expired';
+    }
+
+    /**
+     * El cobro a la tarjeta domiciliada de un cargo que quedó sin respuesta (Stripe pudo
+     * haberlo hecho): el último PaymentIntent con su `metadata.cargo_renta`, o null.
+     *
+     * @param  array<string, string>  $llaves
+     * @return array{id: string, status: string, monto_minor: int, moneda: string}|null
+     */
+    public function cobroDomiciliadoDe(CargoRenta $cargo, array $llaves): ?array
+    {
+        $secretKey = $llaves['secret_key'] ?? '';
+
+        return $secretKey === '' ? null : (new ClienteStripe($secretKey))->intentConMetadata('cargo_renta', (string) $cargo->ulid);
     }
 }

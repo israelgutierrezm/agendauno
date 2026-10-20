@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,8 +9,20 @@ import 'package:agendauno/features/cuenta/presentation/comprar_planes.dart';
 /// Comprar un plan desde la app: qué se ofrece, cómo se describe y que comprar crea
 /// la orden (que luego se paga en "Por pagar").
 
+/// Lo que piden las compras (compartido: la cuenta se vuelve a crear en cada lectura).
+class _Registro {
+  final claves = <String?>[];
+
+  /// Cuántas compras fallan sin respuesta antes de responder.
+  var sinRespuesta = 0;
+}
+
 class _CuentaFalsa extends CuentaController {
+  _CuentaFalsa([_Registro? registro]) : registro = registro ?? _Registro();
+
+  final _Registro registro;
   final compras = <String>[];
+  List<String?> get claves => registro.claves;
 
   @override
   Future<MiCuenta> build() async =>
@@ -19,8 +32,18 @@ class _CuentaFalsa extends CuentaController {
   Future<void> comprar(
     String productoId, {
     bool aceptaCondiciones = false,
-  }) async =>
-      compras.add(aceptaCondiciones ? '$productoId+condiciones' : productoId);
+    String? clave,
+  }) async {
+    claves.add(clave);
+    if (registro.sinRespuesta > 0) {
+      registro.sinRespuesta--;
+      throw DioException(
+        requestOptions: RequestOptions(path: '/mi/ordenes'),
+        type: DioExceptionType.receiveTimeout,
+      );
+    }
+    compras.add(aceptaCondiciones ? '$productoId+condiciones' : productoId);
+  }
 }
 
 ProductoComprable producto(Map<String, dynamic> extra) =>
@@ -137,6 +160,37 @@ void main() {
     expect(cuenta.compras, ['p1']);
     expect(find.textContaining('Págala en "Por pagar"'), findsOneWidget);
   });
+
+  testWidgets(
+    'reintentar una compra que no tuvo respuesta lleva la misma clave; la siguiente, otra',
+    (tester) async {
+      final registro = _Registro()..sinRespuesta = 1;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            cuentaProvider.overrideWith(() => _CuentaFalsa(registro)),
+            productosProvider.overrideWith((ref) async => [producto({})]),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: ComprarPlanesSeccion()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.widgetWithText(FilledButton, 'Comprar'));
+        await tester.pumpAndSettle();
+      }
+
+      expect(registro.claves, hasLength(3));
+      expect(registro.claves[0], isNotNull);
+      expect(registro.claves[1], registro.claves[0]);
+      expect(registro.claves[2], isNot(registro.claves[1]));
+    },
+  );
 
   testWidgets('con permanencia, se aceptan las condiciones antes de comprar', (
     tester,

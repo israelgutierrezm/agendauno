@@ -161,7 +161,12 @@ class CargarSaldosAperturaTenant
      */
     private function cargar(array $datos, int $fila, string $corte, string $evidencia, ?Usuario $actor): void
     {
-        $persona = PersonaTenant::query()->whereRaw('lower(email) = ?', [mb_strtolower((string) $datos['email'])])->firstOrFail();
+        // La misma ficha que encontró el análisis: la del alumno, no otra con el mismo
+        // correo (p. ej. alguien del equipo).
+        $persona = PersonaTenant::query()
+            ->whereRaw('lower(email) = ?', [mb_strtolower((string) $datos['email'])])
+            ->where('tipo', TipoPersonaTenant::Miembro->value)
+            ->firstOrFail();
         $producto = ProductoTenant::query()->get()
             ->first(static fn (ProductoTenant $p): bool => self::clave((string) $p->nombre) === self::clave((string) $datos['plan']));
         if (! $producto instanceof ProductoTenant) {

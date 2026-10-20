@@ -75,6 +75,18 @@ class DomiciliacionesTenant
     }
 
     /**
+     * ¿Se puede domiciliar al pagar (la casilla «cobrar automáticamente» del pago)?
+     * Solo con una pasarela que guarda la tarjeta en el cobro (Stripe); con
+     * suscripciones (Mercado Pago, OpenPay) el pago automático se activa aparte.
+     */
+    public function alPagar(): bool
+    {
+        $proveedor = $this->registro->enLinea();
+
+        return $proveedor !== null && $this->registro->resolver($proveedor) instanceof PasarelaDomiciliable;
+    }
+
+    /**
      * La tarjeta que comparten los pagos automáticos de la persona, si la pasarela
      * del negocio funciona así (Stripe). Con suscripciones cada membresía tiene la
      * suya.

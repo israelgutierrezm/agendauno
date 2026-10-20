@@ -572,7 +572,8 @@ class AgendaTenantController
                 'total_minor' => $titular->totalCitaMinor(),
                 // Con anticipo (ADR 0161): lo ya pagado al apartar y lo que falta.
                 'anticipo_minor' => $titular->anticipoPagadoMinor(),
-                'por_cobrar_minor' => $titular->ordenPorCobrar()?->total_minor,
+                // Lo que falta: el anticipo sin pagar y el resto juntos (se cobran juntos).
+                'por_cobrar_minor' => $titular->porCobrarMinor(),
                 'moneda' => $titular->orden?->moneda,
                 // Con qué se pagó y si esa forma se puede corregir (ADR 0086).
                 'pago' => $this->pagoDeCita($titular),

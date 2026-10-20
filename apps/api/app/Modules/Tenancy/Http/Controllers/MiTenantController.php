@@ -262,6 +262,10 @@ class MiTenantController
             // citas no: no hay nada que se renueve (ADR 0130).
             'pago_automatico' => $this->domiciliaciones->proveedor() !== null
                 && ! app(MembresiasPorModalidadTenant::class)->enCitas(),
+            // Domiciliar al pagar (la casilla del pago): solo si la pasarela lo hace en
+            // el mismo cobro (Stripe); con Mercado Pago u OpenPay se activa aparte.
+            'domiciliar_al_pagar' => $this->domiciliaciones->alPagar()
+                && ! app(MembresiasPorModalidadTenant::class)->enCitas(),
             'derechos' => $derechos,
             'reservas' => $reservas,
             // Qué partes de su cuenta le sirven y su asistencia reciente (ADR 0091).
@@ -923,7 +927,10 @@ class MiTenantController
             // queda por pagar (en el negocio o en línea, con su orden).
             'anticipo_minor' => $reserva->anticipoPagadoMinor(),
             'saldo_minor' => $reserva->saldoOrden?->estado === EstadoOrden::Pendiente ? $reserva->saldoOrden->total_minor : null,
-            'saldo_orden_id' => $reserva->saldoOrden?->estado === EstadoOrden::Pendiente ? $reserva->saldoOrden->ulid : null,
+            // Se paga después del anticipo: mientras no esté pagado, no se ofrece.
+            'saldo_orden_id' => $reserva->saldoOrden?->estado === EstadoOrden::Pendiente && $reserva->orden?->estado === EstadoOrden::Pagada
+                ? $reserva->saldoOrden->ulid
+                : null,
             // Lo que pidió que supieran al agendar y, si es para otra persona, quién asiste.
             'nota' => $reserva->nota_cliente,
             'asiste' => $reserva->asiste,
@@ -1037,9 +1044,13 @@ class MiTenantController
             ->with(['lineas.producto', 'lineas.beneficiario', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal'])
             ->orderByDesc('id')
             ->get();
+        // El resto de una cita no se ofrece mientras su anticipo no esté pagado: pagarlo
+        // antes no aparta la cita (ADR 0161).
+        $restosEnEspera = self::restosConAnticipoSinPagar($ordenes->modelKeys());
 
         return response()->json([
-            'data' => $ordenes->map(fn (OrdenTenant $o): array => $this->presentarOrden($o))->all(),
+            'data' => $ordenes->reject(fn (OrdenTenant $o): bool => in_array((int) $o->getKey(), $restosEnEspera, true))
+                ->map(fn (OrdenTenant $o): array => $this->presentarOrden($o))->values()->all(),
         ]);
     }
 
@@ -1059,6 +1070,8 @@ class MiTenantController
             'codigo_promo' => ['nullable', 'string', 'max:64'],
             // Acepta las condiciones de un plan con permanencia (B04).
             'acepta_condiciones' => ['sometimes', 'boolean'],
+            // La del intento: repetir la compra (sin respuesta, doble toque) es la misma.
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
             // De dónde llegó (ADR 0142): se guarda con la orden.
             ...Atribucion::reglas(),
             ...IdentificadoresNavegador::reglas(),
@@ -1088,6 +1101,7 @@ class MiTenantController
             aceptacion: ($validado['acepta_condiciones'] ?? false) === true
                 ? ['via' => 'cliente', 'usuario' => $actor instanceof Usuario ? $actor : null, 'ip' => $request->ip()]
                 : null,
+            clave: $validado['idempotency_key'] ?? null,
         );
 
         $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $titular, $validado['medicion'] ?? null, $request->ip(), $request->userAgent());
@@ -1111,9 +1125,17 @@ class MiTenantController
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
         abort_unless($this->ordenesDe($request, $persona)->whereKey($orden->getKey())->exists(), 403, 'Esta orden no es tuya.');
 
+        // El resto de una cita se paga después del anticipo: con el anticipo se aparta.
+        if (self::restosConAnticipoSinPagar([(int) $orden->getKey()]) !== []) {
+            throw ValidationException::withMessages([
+                'orden' => ['Primero paga el anticipo: con él se aparta tu cita; el resto se paga después.'],
+            ]);
+        }
+
         $validado = $request->validate([
             'proveedor' => ['nullable', 'string'],
-            'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
+            // En línea solo se paga con tarjeta, OXXO o SPEI (no en efectivo ni mixto).
+            'metodo' => ['nullable', Rule::in([MetodoPago::Tarjeta->value, MetodoPago::Oxxo->value, MetodoPago::Spei->value])],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
             'domiciliar' => ['sometimes', 'boolean'],
         ]);
@@ -1138,7 +1160,7 @@ class MiTenantController
         // y la pasarela la guarda a su nombre (ADR 0129).
         $domiciliar = $request->boolean('domiciliar');
         // En citas no hay nada que se renueve (ADR 0130).
-        if ($domiciliar && ($this->domiciliaciones->proveedor() !== $validado['proveedor'] || ! self::seRenueva($orden)
+        if ($domiciliar && ($this->domiciliaciones->proveedor() !== $validado['proveedor'] || ! $this->domiciliaciones->alPagar() || ! self::seRenueva($orden)
             || app(MembresiasPorModalidadTenant::class)->enCitas())) {
             throw ValidationException::withMessages([
                 'domiciliar' => ['Esta compra no admite pago automático.'],
@@ -1153,7 +1175,7 @@ class MiTenantController
 
         // El propio alumno paga en línea: queda como quien registró el cobro.
         $alumno = $request->attributes->get('usuario_tenant');
-        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/mi-cuenta', $alumno instanceof Usuario ? $alumno : null);
+        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/mi-cuenta/pagos', $alumno instanceof Usuario ? $alumno : null);
 
         return response()->json(['data' => [
             'pago' => $pago->ulid,
@@ -1254,5 +1276,25 @@ class MiTenantController
         abort_unless($estudio instanceof Estudio, 404);
 
         return $estudio;
+    }
+
+    /**
+     * De esas órdenes, las del resto de una cita cuyo anticipo aún no se paga.
+     *
+     * @param  list<int>  $ordenes
+     * @return list<int>
+     */
+    private static function restosConAnticipoSinPagar(array $ordenes): array
+    {
+        if ($ordenes === []) {
+            return [];
+        }
+
+        return ReservaTenant::query()
+            ->whereIn('saldo_orden_id', $ordenes)
+            ->whereHas('orden', fn ($q) => $q->where('estado', '!=', EstadoOrden::Pagada->value))
+            ->pluck('saldo_orden_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
     }
 }

@@ -79,6 +79,40 @@ class PuntosTenant
     }
 
     /**
+     * Puntos que una asistencia (reserva) dejó vigentes: lo acumulado menos lo retirado.
+     */
+    public function vigentesDeAsistencia(string $reservaUlid): int
+    {
+        return (int) MovimientoPuntosTenant::query()
+            ->where('origen', OrigenPuntos::Asistencia->value)
+            ->where('referencia_tipo', 'asistencia')
+            ->where('referencia_id', $reservaUlid)
+            ->sum('puntos');
+    }
+
+    /**
+     * Retira los puntos de una asistencia que se corrigió (ya no fue presente).
+     * Idempotente por `evento_ulid`; el saldo nunca queda en negativo.
+     */
+    public function retirarDeAsistencia(int $personaId, string $reservaUlid, string $eventoUlid): void
+    {
+        DB::connection('tenant')->transaction(function () use ($personaId, $reservaUlid, $eventoUlid): void {
+            PersonaTenant::query()->whereKey($personaId)->lockForUpdate()->firstOrFail();
+            if (MovimientoPuntosTenant::query()->where('evento_ulid', $eventoUlid)->exists()) {
+                return;
+            }
+            $retirar = min($this->vigentesDeAsistencia($reservaUlid), $this->libro->saldo($personaId));
+            if ($retirar <= 0) {
+                return;
+            }
+            $this->libro->registrar(
+                $personaId, TipoMovimientoPuntos::Reverso, OrigenPuntos::Asistencia, -$retirar,
+                'Asistencia corregida', 'asistencia', $reservaUlid, null, null, $eventoUlid,
+            );
+        });
+    }
+
+    /**
      * Retira los puntos que dio una compra cuyo cobro se anuló (ADR 0087). Idempotente
      * por `evento_ulid`. Si la persona ya gastó parte, retira solo lo que tiene: el
      * saldo nunca queda en negativo.

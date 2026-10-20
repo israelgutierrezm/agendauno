@@ -77,17 +77,21 @@ class CobroDeCitaTenant
             if ($sucursal === null) {
                 throw ValidationException::withMessages(['reserva' => ['Esta cita no tiene sucursal: no se puede cobrar aquí.']]);
             }
-            $orden = $bloqueada->orden_id !== null
-                ? OrdenTenant::query()->whereKey($bloqueada->orden_id)->lockForUpdate()->first()
-                : null;
-            // Con anticipo ya pagado (ADR 0161), lo que falta es el saldo.
-            if ($orden !== null && $orden->estado === EstadoOrden::Pagada && $bloqueada->saldo_orden_id !== null) {
-                $orden = OrdenTenant::query()->whereKey($bloqueada->saldo_orden_id)->lockForUpdate()->first() ?? $orden;
-            }
-            if ($orden !== null && $orden->estado === EstadoOrden::Cancelada) {
+            // Su orden (o la del anticipo, ADR 0161) y la del resto, bloqueadas por id.
+            $ordenes = OrdenTenant::query()
+                ->whereKey(array_values(array_filter([$bloqueada->orden_id, $bloqueada->saldo_orden_id])))
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $principal = $bloqueada->orden_id !== null ? $ordenes->get($bloqueada->orden_id) : null;
+            $resto = $bloqueada->saldo_orden_id !== null ? $ordenes->get($bloqueada->saldo_orden_id) : null;
+            if ($principal?->estado === EstadoOrden::Cancelada || ($principal?->estado === EstadoOrden::Pagada && $resto?->estado === EstadoOrden::Cancelada)) {
                 throw ValidationException::withMessages(['reserva' => ['El cobro de esta cita se canceló: no se puede cobrar.']]);
             }
-            $servicio = $orden !== null && $orden->estado === EstadoOrden::Pendiente ? $orden->total_minor : 0;
+            // Lo que falta: el anticipo sin pagar y el resto se cobran juntos.
+            $aCobrar = collect([$principal, $resto])
+                ->filter(static fn (?OrdenTenant $o): bool => $o?->estado === EstadoOrden::Pendiente)
+                ->values();
+            $orden = $aCobrar->first() ?? $resto ?? $principal;
+            $servicio = (int) $aCobrar->sum('total_minor');
             if ($servicio === 0 && $items === [] && $propinaMinor <= 0) {
                 throw ValidationException::withMessages(['reserva' => ['Esta cita ya está cobrada: agrega un producto o una propina para cobrar algo más.']]);
             }
@@ -113,17 +117,26 @@ class CobroDeCitaTenant
             }
 
             if ($servicio > 0) {
-                // A la caja de la sede de la cita (ADR 0175).
-                $pago = $this->ordenes->liquidar($orden, $metodoServicio, $referencia, $actor, (int) $sucursal->getKey(), $partesServicio);
-                if ($pago !== null) {
-                    $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
-                        'orden' => (string) $orden->ulid,
-                        'monto_minor' => $pago->monto_minor,
-                        'moneda' => $pago->moneda,
-                        'metodo' => $partesServicio !== null ? PartesCobro::MIXTO : $metodoServicio,
-                        'partes' => $partesServicio,
-                        'referencia' => $referencia,
-                    ]);
+                // Con anticipo y resto, cada orden con lo suyo de las formas (en orden).
+                $porOrden = $partesServicio !== null
+                    ? PartesCobro::repartir($partesServicio, $aCobrar->map(static fn (OrdenTenant $o): int => (int) $o->total_minor)->all())
+                    : null;
+                foreach ($aCobrar as $i => $porCobrar) {
+                    $suyas = $porOrden[$i] ?? null;
+                    $metodoDeEsta = $suyas !== null && $suyas !== [] ? PartesCobro::metodo($suyas) : $metodoServicio;
+                    $partesDeEsta = $suyas !== null && count($suyas) > 1 ? $suyas : null;
+                    // A la caja de la sede de la cita (ADR 0175).
+                    $pago = $this->ordenes->liquidar($porCobrar, $metodoDeEsta, $referencia, $actor, (int) $sucursal->getKey(), $partesDeEsta);
+                    if ($pago !== null) {
+                        $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
+                            'orden' => (string) $porCobrar->ulid,
+                            'monto_minor' => $pago->monto_minor,
+                            'moneda' => $pago->moneda,
+                            'metodo' => $partesDeEsta !== null ? PartesCobro::MIXTO : $metodoDeEsta,
+                            'partes' => $partesDeEsta,
+                            'referencia' => $referencia,
+                        ]);
+                    }
                 }
             }
 

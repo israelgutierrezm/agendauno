@@ -78,6 +78,26 @@ it('se cobra al cumplir el año de su alta, una sola vez, y no antes', function 
     expect(anualidadesPorCobrar($e))->toBe(['Ana' => 80000]);
 });
 
+it('una anualidad exentada no se vuelve a generar ese año', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    anualidadConfigurada($e);
+    altaConAnualidad($e, 'Ana');
+    $this->travelTo('2027-10-03 12:00:00');
+    $this->artisan('agendauno:generar-cuotas')->assertSuccessful();
+    $orden = collect($this->getJson("/api/v1/app/{$e['slug']}/cobranza/pendientes", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->first(fn (array $o): bool => collect($o['cuotas'])->contains('concepto', 'anualidad'));
+    $linea = collect($orden['cuotas'])->firstWhere('concepto', 'anualidad')['id'];
+
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden['id']}/lineas/{$linea}/exentar", ['motivo' => 'Cortesía'], conBearer($e['bearer']))
+        ->assertOk();
+    expect(anualidadesPorCobrar($e))->toBe([]);
+
+    // Al día siguiente (sigue dentro de la ventana), no se vuelve a generar.
+    $this->travelTo('2027-10-04 12:00:00');
+    $this->artisan('agendauno:generar-cuotas')->assertSuccessful();
+    expect(anualidadesPorCobrar($e))->toBe([]);
+});
+
 it('quien entró un 29 de febrero la paga el 28 en los años que no son bisiestos', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     anualidadConfigurada($e);

@@ -178,8 +178,14 @@ const activa = computed(
     estado.value !== "completada" &&
     estado.value !== "no_asistio",
 );
+// Cobrar: también ya atendida (se cobra al terminar), como la cuenta Recepción; no
+// cancelada ni sin asistencia (eso se resuelve con «no vino»).
 const sePuedeCobrar = computed(
-  () => activa.value && porCobrar.value && props.puedeCobrar,
+  () =>
+    estado.value !== "cancelada" &&
+    estado.value !== "no_asistio" &&
+    porCobrar.value &&
+    props.puedeCobrar,
 );
 // Reprogramar o cancelar: aún sin asistencia marcada.
 const sePuedeMover = computed(

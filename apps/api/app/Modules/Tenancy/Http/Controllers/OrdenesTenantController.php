@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -20,9 +21,11 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\PartesCobro;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -133,6 +136,14 @@ class OrdenesTenantController
             'motivo_exencion' => ['nullable', 'required_if:exentar_inscripcion,true', 'string', 'max:300'],
             // El cliente aceptó las condiciones de un plan con permanencia (B04).
             'acepta_condiciones' => ['sometimes', 'boolean'],
+            // Venderla y cobrarla en caja de una vez: si el cobro no pasa (la caja está
+            // cerrada, p. ej.), no queda la orden pendiente.
+            'liquidar' => ['sometimes', 'array'],
+            'liquidar.metodo' => ['required_with:liquidar', Rule::in(self::METODOS)],
+            'liquidar.referencia' => ['nullable', 'string', 'max:255'],
+            'liquidar.sucursal_id' => ['nullable', 'string'],
+            // El intento: repetirlo (sin red, doble clic) devuelve la misma venta.
+            'liquidar.clave' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
 
         $comprador = PersonaTenant::query()->where('ulid', $validado['comprador_id'])->firstOrFail();
@@ -166,16 +177,37 @@ class OrdenesTenantController
         $exentar = (bool) ($validado['exentar_inscripcion'] ?? false);
         abort_if($exentar && ! ($actor instanceof Usuario && $actor->puede('cuotas.exentar')), 403, 'No puedes exentar la inscripción.');
 
-        $orden = $this->ordenes->crear(
-            $comprador,
-            $items,
-            $validado['codigo_promo'] ?? null,
-            $sucursalId,
-            exencionInscripcion: $exentar ? ['actor' => $actor, 'motivo' => trim((string) ($validado['motivo_exencion'] ?? ''))] : null,
-            aceptacion: ($validado['acepta_condiciones'] ?? false) === true
-                ? ['via' => 'negocio', 'usuario' => $actor, 'ip' => $request->ip()]
-                : null,
-        );
+        $liquidar = $validado['liquidar'] ?? null;
+        $cajaDe = $liquidar !== null ? $this->sucursalDeCaja($liquidar['sucursal_id'] ?? null, $actor) : null;
+        $llave = isset($liquidar['clave']) ? 'venta:'.$liquidar['clave'] : null;
+        if ($llave !== null) {
+            $previo = PagoTenant::query()->where('idempotency_key', $llave)->with('orden')->first();
+            if ($previo instanceof PagoTenant && $previo->orden instanceof OrdenTenant) {
+                abort_unless((int) $previo->orden->persona_id === (int) $comprador->getKey(), 409, 'Ese intento ya se usó en otra venta.');
+
+                return response()->json(['data' => $this->presentar($previo->orden)], 201);
+            }
+        }
+        $vender = function () use ($comprador, $items, $validado, $sucursalId, $exentar, $actor, $request, $liquidar, $cajaDe, $llave): OrdenTenant {
+            $orden = $this->ordenes->crear(
+                $comprador,
+                $items,
+                $validado['codigo_promo'] ?? null,
+                $sucursalId,
+                exencionInscripcion: $exentar ? ['actor' => $actor, 'motivo' => trim((string) ($validado['motivo_exencion'] ?? ''))] : null,
+                aceptacion: ($validado['acepta_condiciones'] ?? false) === true
+                    ? ['via' => 'negocio', 'usuario' => $actor, 'ip' => $request->ip()]
+                    : null,
+            );
+            if ($liquidar !== null) {
+                $pago = $this->ordenes->liquidar($orden, (string) $liquidar['metodo'], $liquidar['referencia'] ?? null, $actor, $cajaDe, null, $llave);
+                $this->registrarCobro($pago, $orden, $actor, (string) $liquidar['metodo'], null, $liquidar['referencia'] ?? null);
+            }
+
+            return $orden;
+        };
+        // Con el cobro, en una transacción: si no se cobra, no se vende.
+        $orden = $liquidar !== null ? DB::connection('tenant')->transaction($vender) : $vender();
 
         return response()->json(['data' => $this->presentar($orden->refresh())], 201);
     }
@@ -195,7 +227,11 @@ class OrdenesTenantController
 
         $validado = $request->validate([
             'proveedor' => ['required', 'string'],
-            'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
+            // Una forma real: «mixto» va con sus partes al liquidar (ADR 0177), y en
+            // línea solo se paga con tarjeta, OXXO o SPEI (lo demás no entraría al corte).
+            'metodo' => ['nullable', Rule::in(in_array($request->input('proveedor'), ProveedorPasarela::enLinea(), true)
+                ? [MetodoPago::Tarjeta->value, MetodoPago::Oxxo->value, MetodoPago::Spei->value]
+                : [MetodoPago::Efectivo->value, MetodoPago::Ventanilla->value, MetodoPago::Tarjeta->value, MetodoPago::Spei->value])],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
             'sucursal_id' => ['nullable', 'string'],
         ]);
@@ -243,19 +279,29 @@ class OrdenesTenantController
         $actor = $actor instanceof Usuario ? $actor : null;
         $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor, $this->sucursalDeCaja($validado['sucursal_id'] ?? null, $actor), $partes);
 
-        // Cobro en caja: queda quién lo registró (el pago lo guarda; aquí, la bitácora).
-        if ($pago !== null) {
-            $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
-                'orden' => (string) $orden->ulid,
-                'monto_minor' => $pago->monto_minor,
-                'moneda' => $pago->moneda,
-                'metodo' => $partes !== null ? PartesCobro::MIXTO : $validado['metodo'],
-                'partes' => $partes,
-                'referencia' => $validado['referencia'] ?? null,
-            ]);
-        }
+        $this->registrarCobro($pago, $orden, $actor, $validado['metodo'], $partes, $validado['referencia'] ?? null);
 
         return response()->json(['data' => $this->presentar($orden->refresh())]);
+    }
+
+    /**
+     * Cobro en caja: queda quién lo registró (el pago lo guarda; aquí, la bitácora).
+     *
+     * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
+     */
+    private function registrarCobro(?PagoTenant $pago, OrdenTenant $orden, ?Usuario $actor, string $metodo, ?array $partes, ?string $referencia): void
+    {
+        if ($pago === null) {
+            return;
+        }
+        $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
+            'orden' => (string) $orden->ulid,
+            'monto_minor' => $pago->monto_minor,
+            'moneda' => $pago->moneda,
+            'metodo' => $partes !== null ? PartesCobro::MIXTO : $metodo,
+            'partes' => $partes,
+            'referencia' => $referencia,
+        ]);
     }
 
     /** La sede donde se cobra en el mostrador, si es una de quien cobra (su caja; ADR 0175). */

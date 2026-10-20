@@ -135,6 +135,24 @@ describe("cobrar en caja", () => {
 });
 
 describe("asistencia", () => {
+  it("ya atendida y terminada, se sigue cobrando; sin asistencia, no", () => {
+    const atendida = cita({ asistencia: "presente", por_cobrar: true });
+    (atendida as { inicia_en: string }).inicia_en = "2020-01-01T10:00:00Z";
+    (atendida as { termina_en: string }).termina_en = "2020-01-01T10:30:00Z";
+    expect(
+      montar(atendida)
+        .findAll("button")
+        .some((b) => b.text() === "Registrar pago"),
+    ).toBe(true);
+
+    const noVino = cita({ asistencia: "ausente", por_cobrar: true });
+    expect(
+      montar(noVino)
+        .findAll("button")
+        .some((b) => b.text() === "Registrar pago"),
+    ).toBe(false);
+  });
+
   it("«No asistió» se confirma como acción delicada", async () => {
     mocks.confirmar.mockResolvedValue(true);
     const w = montar(cita({ por_cobrar: false }));

@@ -185,9 +185,13 @@ Future<bool> confirmarCancelacion(
   try {
     efecto = await repo.efectoDeCancelar(reservaId);
   } on DioException {
+    // Sin la vista previa no se sabe si pierde lo pagado: se advierte.
     efecto = const EfectoCancelacion(
       cancelable: true,
-      mensaje: '¿Cancelar esta reserva?',
+      mensaje:
+          'No pudimos revisar qué pasa si cancelas ahora: según la política del '
+          'negocio, podrías perder el crédito o lo que pagaste. ¿Cancelar de '
+          'todos modos?',
     );
   }
   if (!context.mounted) {

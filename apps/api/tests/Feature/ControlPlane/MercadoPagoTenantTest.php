@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\PagoTenant;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -110,7 +112,7 @@ it('el alumno paga en la página de Mercado Pago y la notificación firmada conf
         && $q['external_reference'] === $r['pago']
         && $q['items'][0]['unit_price'] === 899.0 && $q['items'][0]['currency_id'] === 'MXN'
         && str_ends_with($q['notification_url'], '/webhooks/tenant/estudio-a/mercadopago')
-        && str_contains($q['back_urls']['success'], '/mi-cuenta?pago=exito')
+        && str_contains($q['back_urls']['success'], '/mi-cuenta/pagos?pago=exito')
         && $q->header('Authorization')[0] === 'Bearer APP_USR-prueba');
 
     // Mercado Pago avisa del cobro aprobado; el estado se lee de su API.
@@ -178,4 +180,31 @@ it('la devolución desde cobranza se pide a Mercado Pago con llave de idempotenc
 
     Http::assertSent(fn (Request $q): bool => str_ends_with($q->url(), '/v1/payments/555/refunds')
         && $q['amount'] === 899.0 && $q->hasHeader('X-Idempotency-Key'));
+});
+
+it('pagado con tarjeta, el ticket de OXXO de la misma preferencia se cancela; si aun así se paga, queda como cobro doble', function (): void {
+    $c = compraConMercadoPago();
+    $pago = (string) $this->postJson("/api/v1/app/{$c['slug']}/mi/ordenes/{$c['orden']}/cobrar", [], conBearer($c['alumno']))->json('data.pago');
+
+    // Sacó un ticket de OXXO y después pagó con tarjeta en la misma página.
+    $this->mp->cobros['700'] = ['id' => 700, 'status' => 'pending', 'external_reference' => $pago];
+    notificarMercadoPago($c, '700')->assertOk();
+    $this->mp->cobros['701'] = ['id' => 701, 'status' => 'approved', 'external_reference' => $pago, 'transaction_amount' => 899, 'currency_id' => 'MXN', 'payment_type_id' => 'credit_card'];
+    notificarMercadoPago($c, '701')->assertOk();
+    expect(estadoOrden($c))->toBe('pagada');
+    Http::assertSent(fn (Request $q): bool => $q->method() === 'PUT' && str_ends_with($q->url(), '/v1/payments/700') && $q['status'] === 'cancelled');
+
+    // La cancelación no alcanzó y el ticket se pagó: ese dinero queda registrado, una vez.
+    $this->mp->cobros['700'] = ['id' => 700, 'status' => 'approved', 'external_reference' => $pago, 'transaction_amount' => 899, 'currency_id' => 'MXN', 'payment_type_id' => 'ticket'];
+    notificarMercadoPago($c, '700')->assertOk();
+    notificarMercadoPago($c, '700')->assertOk();
+
+    $incidencias = $this->getJson("/api/v1/app/{$c['slug']}/incidencias-cobro", conBearer($c['bearer']))->assertOk()->json('data');
+    expect($incidencias)->toHaveCount(1)
+        ->and($incidencias[0]['tipo'])->toBe('pago_duplicado')
+        ->and($incidencias[0]['monto_minor'])->toBe(89900)
+        ->and($incidencias[0]['pago'])->not->toBe($pago);
+    $aprobados = app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $c['slug'])->sole(), fn (): array => PagoTenant::query()
+        ->where('estado', 'aprobado')->orderBy('id')->pluck('referencia_externa')->all());
+    expect($aprobados)->toBe(['701', '700']);
 });

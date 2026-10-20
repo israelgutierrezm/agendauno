@@ -149,6 +149,13 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConsultable, P
         return ['tipo' => 'redirect', 'url' => $sesion['url'], 'referencia' => $sesion['id']];
     }
 
+    public function cargoDeOrden(OrdenTenant $orden, array $llaves): ?array
+    {
+        $secretKey = $llaves['secret_key'] ?? '';
+
+        return $secretKey === '' ? null : (new ClienteStripe($secretKey))->intentConMetadata('orden', (string) $orden->ulid);
+    }
+
     public function cobrarDomiciliado(PagoTenant $pago, DomiciliacionTenant $domiciliacion, string $idempotencia, array $llaves): ResultadoPago
     {
         $api = self::api($llaves);

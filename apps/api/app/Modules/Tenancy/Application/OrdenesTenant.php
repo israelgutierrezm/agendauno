@@ -60,8 +60,14 @@ class OrdenesTenant
      * @param  array{actor: Usuario|null, motivo: string}|null  $exencionInscripcion
      * @param  array{via: string, usuario: Usuario|null, ip: string|null}|null  $aceptacion
      */
-    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false, ?array $exencionInscripcion = null, ?array $aceptacion = null): OrdenTenant
+    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false, ?array $exencionInscripcion = null, ?array $aceptacion = null, ?string $clave = null): OrdenTenant
     {
+        // La misma compra repetida (sin respuesta, doble toque) es la misma orden.
+        $repetida = $clave !== null ? OrdenTenant::query()->where('persona_id', $comprador->getKey())->where('clave', $clave)->first() : null;
+        if ($repetida instanceof OrdenTenant) {
+            return $repetida;
+        }
+
         $moneda = $items[0]['producto']->moneda; // Una sola moneda por orden.
         // Clases de prueba por persona en esta orden (B03): una sola, aunque vengan en
         // varias líneas (ADR 0137).
@@ -97,7 +103,15 @@ class OrdenesTenant
             }
         }
 
-        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId, $renovacion, $exencionInscripcion, $aceptacion): OrdenTenant {
+        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId, $renovacion, $exencionInscripcion, $aceptacion, $clave): OrdenTenant {
+            if ($clave !== null) {
+                // Dos a la vez con la misma clave: la segunda espera y devuelve la primera.
+                PersonaTenant::query()->whereKey($comprador->getKey())->lockForUpdate()->first();
+                $repetida = OrdenTenant::query()->where('persona_id', $comprador->getKey())->where('clave', $clave)->first();
+                if ($repetida instanceof OrdenTenant) {
+                    return $repetida;
+                }
+            }
             $subtotal = 0;
 
             $orden = OrdenTenant::query()->create([
@@ -107,6 +121,7 @@ class OrdenesTenant
                 'estado' => EstadoOrden::Pendiente->value,
                 'total_minor' => 0,
                 'moneda' => $moneda,
+                'clave' => $clave,
             ]);
 
             foreach ($items as $item) {
@@ -220,7 +235,7 @@ class OrdenesTenant
     /**
      * @param  list<array{metodo: string, monto_minor: int}>|null  $partes  con varias formas (ADR 0177): suman el total
      */
-    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null, ?int $sucursalCaja = null, ?array $partes = null): ?PagoTenant
+    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null, ?int $sucursalCaja = null, ?array $partes = null, ?string $idempotencyKey = null): ?PagoTenant
     {
         $orden->refresh();
         if ($orden->estado === EstadoOrden::Pagada) {
@@ -230,8 +245,8 @@ class OrdenesTenant
             throw new OrdenNoLiquidable('La orden no admite liquidacion.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja, $partes): PagoTenant {
-            $pago = $this->cobrar->ejecutar($orden, 'manual', $partes !== null ? MetodoPago::Mixto : self::metodoDeCaja($metodo), null, null, $actor, $sucursalCaja, $partes);
+        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja, $partes, $idempotencyKey): PagoTenant {
+            $pago = $this->cobrar->ejecutar($orden, 'manual', $partes !== null ? MetodoPago::Mixto : self::metodoDeCaja($metodo), $idempotencyKey, null, $actor, $sucursalCaja, $partes);
             $orden->update(['metodo_pago' => $partes !== null ? PartesCobro::MIXTO : $metodo, 'referencia_pago' => $referencia]);
 
             return $pago;

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\ReembolsoTenant;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -175,4 +177,71 @@ it('dos devoluciones del 50 % dejan los créditos en 0, no en 25 %', function ()
     $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pago}/reembolsos", ['monto_minor' => 44950, 'motivo' => 'Otra mitad'], conBearer($e['bearer']))
         ->assertCreated();
     expect(saldoDeAna($e, $persona))->toBe(0);
+});
+
+it('una devolución pendiente sin aviso de Stripe queda por conciliar a las 48 h y se cierra a mano', function (): void {
+    stripeConDevolucion('pending');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $p = packPagadoConStripe($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$p['pago']}/reembolsos", ['motivo' => 'Se mudó'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'pendiente');
+
+    // Antes de las 48 h se espera el aviso.
+    $this->travel(47)->hours();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
+    expect($this->getJson("/api/v1/app/{$e['slug']}/incidencias-cobro", conBearer($e['bearer']))->json('data'))->toBe([]);
+
+    $this->travel(2)->hours();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
+    $incidencias = $this->getJson("/api/v1/app/{$e['slug']}/incidencias-cobro", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($incidencias)->toHaveCount(1)
+        ->and($incidencias[0]['tipo'])->toBe('reembolso_incierto')
+        ->and($incidencias[0]['reembolso']['estado'])->toBe('pendiente');
+
+    // Se revisó en Stripe: sí se hizo. Se aplican sus efectos.
+    $this->postJson("/api/v1/app/{$e['slug']}/incidencias-cobro/{$incidencias[0]['id']}/resolver", [
+        'resolucion' => 'Hecha en Stripe', 'reembolso' => 'aprobado',
+    ], conBearer($e['bearer']))->assertOk();
+    expect(saldoDeAna($e, $p['persona']))->toBe(0);
+});
+
+it('el aviso que llega antes de guardar la referencia encuentra la devolución por su llave', function (): void {
+    stripeConDevolucion('pending');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $p = packPagadoConStripe($e);
+    $devolucion = (string) $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$p['pago']}/reembolsos", ['motivo' => 'Se mudó'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    // Como si el aviso llegara antes de que se guardara la respuesta de Stripe.
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->sole(), function () use ($devolucion): void {
+        ReembolsoTenant::query()->where('ulid', $devolucion)->update(['referencia_externa' => null]);
+    });
+
+    $this->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
+        'type' => 'refund.updated', 'data' => ['object' => ['id' => 're_1', 'status' => 'succeeded', 'metadata' => ['reembolso' => 'reembolso_'.$devolucion]]],
+    ])->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/pagos/{$p['pago']}/reembolsos", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.0.estado', 'aprobado')->assertJsonPath('data.0.referencia_externa', 're_1');
+    expect(saldoDeAna($e, $p['persona']))->toBe(0);
+});
+
+it('si Stripe avisa que una devolución ya hecha falló, no se deshace sola: queda por conciliar', function (): void {
+    stripeConDevolucion('succeeded');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $p = packPagadoConStripe($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$p['pago']}/reembolsos", ['motivo' => 'Se mudó'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'aprobado');
+
+    $this->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
+        'type' => 'refund.failed', 'data' => ['object' => ['id' => 're_1', 'status' => 'failed']],
+    ])->assertOk();
+
+    $incidencias = $this->getJson("/api/v1/app/{$e['slug']}/incidencias-cobro", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($incidencias)->toHaveCount(1)
+        ->and($incidencias[0]['tipo'])->toBe('reembolso_incierto')
+        ->and($incidencias[0]['detalle'])->toContain('falló después de confirmarla');
+    $this->getJson("/api/v1/app/{$e['slug']}/pagos/{$p['pago']}/reembolsos", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.0.estado', 'aprobado');
+    expect(saldoDeAna($e, $p['persona']))->toBe(0);
 });

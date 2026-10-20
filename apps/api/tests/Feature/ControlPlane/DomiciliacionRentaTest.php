@@ -157,6 +157,8 @@ it('si la tarjeta pide autenticación ya no se reintenta: el dueño paga a mano'
             'error' => ['code' => 'authentication_required', 'payment_intent' => ['id' => 'pi_3ds']],
         ], 402),
         'api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_manual', 'url' => 'https://checkout.stripe.com/c/pay/cs_manual']),
+        // Antes de abrir el pago se busca si el cobro automático se hizo: no.
+        'api.stripe.com/v1/payment_intents/search*' => Http::response(['data' => []]),
     ]);
 
     $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
@@ -274,4 +276,22 @@ it('si Stripe cobró pero el cargo no guardó la referencia, el aviso lo confirm
     $this->travel(1)->hours();
     $aviso($cargo->monto_minor);
     expect($cargo->refresh()->pagado_en?->toIso8601String())->toBe($pagadoEn);
+});
+
+it('si el cobro a la tarjeta quedó sin respuesta pero Stripe sí cobró, pagar en línea lo confirma en vez de cobrar otra vez', function (): void {
+    ['e' => $e, 'cargo' => $cargo] = rentaConTarjeta();
+    Http::fake([
+        'api.stripe.com/v1/payment_intents/search*' => Http::response(['data' => [['id' => 'pi_sin_respuesta', 'status' => 'succeeded']]]),
+        'api.stripe.com/v1/payment_intents' => Http::response([], 500),
+        'api.stripe.com/v1/checkout/sessions' => Http::response(['id' => 'cs_doble', 'url' => 'https://checkout.stripe.com/c/pay/cs_doble']),
+    ]);
+    // El cobro automático no obtuvo respuesta: el cargo sigue pendiente.
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    expect($cargo->refresh()->estado->value)->toBe('pendiente');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo->ulid}/pagar", ['proveedor' => 'stripe'], conBearer($e['bearer']))
+        ->assertSuccessful();
+
+    expect($cargo->refresh())->estado->value->toBe('pagado')->referencia_pago->toBe('pi_sin_respuesta');
+    Http::assertNotSent(fn (PeticionHttp $r): bool => str_ends_with($r->url(), '/checkout/sessions'));
 });

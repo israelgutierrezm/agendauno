@@ -10,7 +10,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
-import { aMinor, dinero as dineroDelPais } from "@/lib/formato";
+import { aMinor, aTexto, dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -270,7 +270,7 @@ function usarDiferencia(d: Detalle["diferencias"][number]): void {
   ajuste.value = {
     usuario_id: d.usuario_id ?? "",
     sentido: d.diferencia_minor >= 0 ? "favor" : "contra",
-    monto: String(Math.abs(d.diferencia_minor) / 100),
+    monto: aTexto(Math.abs(d.diferencia_minor), sesion.pais),
     motivo: ajuste.value.motivo,
     compensa: true,
   };

@@ -305,6 +305,34 @@ class ClienteStripe
     }
 
     /**
+     * El último PaymentIntent con esa metadata (búsqueda de Stripe; puede tardar hasta
+     * un minuto en ver uno nuevo), o null si no hay.
+     *
+     * @return array{id: string, status: string, monto_minor: int, moneda: string}|null
+     */
+    public function intentConMetadata(string $clave, string $valor): ?array
+    {
+        /** @var array{data?: list<array{id?: string, status?: string, amount?: int, amount_received?: int, currency?: string}>} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/payment_intents/search', [
+                'query' => "metadata['".$clave."']:'".str_replace("'", '', $valor)."'",
+                'limit' => 1,
+            ])
+            ->throw()
+            ->json();
+        $intent = $json['data'][0] ?? null;
+
+        return is_array($intent) && ($intent['id'] ?? '') !== ''
+            ? [
+                'id' => (string) $intent['id'],
+                'status' => (string) ($intent['status'] ?? ''),
+                'monto_minor' => (int) ($intent['amount_received'] ?? $intent['amount'] ?? 0),
+                'moneda' => strtoupper((string) ($intent['currency'] ?? '')),
+            ]
+            : null;
+    }
+
+    /**
      * Estado de un PaymentIntent (`succeeded`, `processing`, `requires_action`,
      * `requires_payment_method`, `canceled`…).
      */

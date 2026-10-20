@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Pasarelas;
 
 use App\Modules\Tenancy\Exceptions\CobroNoConcluyente;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 
@@ -36,6 +37,15 @@ interface PasarelaDomiciliable
      * @throws CobroNoConcluyente si la pasarela no respondió
      */
     public function cobrarDomiciliado(PagoTenant $pago, DomiciliacionTenant $domiciliacion, string $idempotencia, array $llaves): ResultadoPago;
+
+    /**
+     * El último cargo automático de la orden en la pasarela (pudo hacerse sin quedar
+     * registrado: no respondió y su aviso no llegó), o null.
+     *
+     * @param  array<string, string>  $llaves
+     * @return array{id: string, status: string, monto_minor: int, moneda: string}|null
+     */
+    public function cargoDeOrden(OrdenTenant $orden, array $llaves): ?array;
 
     /**
      * La tarjeta (su referencia en la pasarela) ya no se usará para cobrar: se

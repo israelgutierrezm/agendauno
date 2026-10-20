@@ -20,11 +20,15 @@ import {
  * por adelantado. Muestra el plan y, al cambiarlo, los tres niveles con su precio
  * en dólares (y lo aproximado en pesos al tipo de cambio de hoy).
  */
-const props = defineProps<{
-  plan: PlanCitas;
-  base: string;
-  ventas: { correo: string | null; whatsapp: string | null };
-}>();
+const props = withDefaults(
+  defineProps<{
+    plan: PlanCitas;
+    base: string;
+    ventas: { correo: string | null; whatsapp: string | null };
+    puedeGestionar?: boolean;
+  }>(),
+  { puedeGestionar: true },
+);
 const emit = defineEmits<{ cambiado: [mensaje: string] }>();
 
 const { t } = useI18n();
@@ -85,7 +89,9 @@ function aproximado(minor: number): string | null {
   if (props.plan.moneda_cobro !== "MXN" || tipo === null) {
     return null;
   }
-  return pesos(Math.round(minor * Number(tipo.valor)));
+  // Con el IVA, como el cargo que se emite.
+  const iva = props.plan.iva_porcentaje ?? 0;
+  return pesos(Math.round((minor * Number(tipo.valor) * (100 + iva)) / 100));
 }
 function esActual(nivel: NivelPlan): boolean {
   return (
@@ -140,6 +146,33 @@ function confirmacion(nivel: NivelPlan): string {
   return siguiente > actual
     ? t("suscripcion.plan.confirmarSubir", { plan: nuevo })
     : t("suscripcion.plan.confirmarSiguiente", { plan: nuevo });
+}
+
+// Quedarse con el plan actual cancela el cambio programado (el servidor deja el
+// siguiente vacío al elegir el mismo plan).
+async function mantener(): Promise<void> {
+  if (
+    !(await confirmar(t("suscripcion.plan.confirmarMantener"), {
+      aceptar: t("suscripcion.plan.mantener"),
+    }))
+  ) {
+    return;
+  }
+  guardando.value = props.plan.nivel;
+  error.value = null;
+  try {
+    await api.put(`${props.base}/renta/plan`, {
+      nivel: props.plan.nivel,
+      profesionales: props.plan.profesionales,
+      periodicidad: props.plan.periodicidad,
+    });
+    abierto.value = false;
+    emit("cambiado", t("suscripcion.plan.mantenido"));
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    guardando.value = null;
+  }
 }
 
 async function elegir(nivel: NivelPlan): Promise<void> {
@@ -377,19 +410,24 @@ const enlaceWhatsApp = computed(() =>
             }}
           </p>
           <button
+            v-if="puedeGestionar"
             type="button"
             class="tu-btn mt-4 w-full"
             :class="esActual(nivel) ? 'tu-btn-fantasma' : 'tu-btn-primario'"
             :disabled="
-              esActual(nivel) || !disponible(nivel) || guardando !== null
+              (esActual(nivel) && !plan.siguiente) ||
+              !disponible(nivel) ||
+              guardando !== null
             "
-            @click="elegir(nivel)"
+            @click="esActual(nivel) ? mantener() : elegir(nivel)"
           >
             {{
               guardando === nivel
                 ? $t("suscripcion.plan.guardando")
                 : esActual(nivel)
-                  ? $t("suscripcion.plan.actual")
+                  ? plan.siguiente
+                    ? $t("suscripcion.plan.mantener")
+                    : $t("suscripcion.plan.actual")
                   : $t("suscripcion.plan.elegir")
             }}
           </button>

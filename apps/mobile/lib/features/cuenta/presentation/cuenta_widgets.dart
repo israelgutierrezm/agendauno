@@ -248,7 +248,8 @@ class _PorPagarTileState extends ConsumerState<PorPagarTile> {
       ref,
       widget.o.id,
       metodo: metodo,
-      domiciliar: _domiciliar,
+      // Solo si se puede domiciliar al pagar y la orden se renueva.
+      domiciliar: widget.pagoAutomatico && widget.o.recurrente && _domiciliar,
     );
     if (mounted) {
       setState(() => _pagando = false);
@@ -339,14 +340,21 @@ class _PorPagarTileState extends ConsumerState<PorPagarTile> {
 /// cambiar horario o cancelar.
 Future<void> mostrarDetalleReserva(
   BuildContext context,
+  WidgetRef ref,
   ReservaMiembro r, {
   bool pagoEnLinea = false,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  showDragHandle: true,
-  builder: (_) => _DetalleReserva(r, pagoEnLinea: pagoEnLinea),
-);
+}) async {
+  // «Pagar» cierra la hoja con su orden y el pago se abre desde aquí.
+  final aPagar = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _DetalleReserva(r, pagoEnLinea: pagoEnLinea),
+  );
+  if (aPagar != null && context.mounted) {
+    await pagarEnLinea(context, ref, aPagar);
+  }
+}
 
 class _DetalleReserva extends ConsumerWidget {
   const _DetalleReserva(this.r, {this.pagoEnLinea = false});
@@ -380,6 +388,15 @@ class _DetalleReserva extends ConsumerWidget {
     final anticipo = r.cita?.textoAnticipo(
       ref.watch(sesionProvider)?.moneda ?? 'MXN',
     );
+    // Cuánto paga al tocar «Pagar»: la orden de la reserva entre las por pagar.
+    final porPagar = _sePagaAqui
+        ? ref
+              .watch(cuentaProvider)
+              .value
+              ?.porPagar
+              .where((o) => o.id == r.ordenId)
+              .firstOrNull
+        : null;
     // Al terminar una acción, se cierra la hoja (la cuenta ya se recargó).
     Future<void> y(Future<void> Function() accion, String exito) async {
       final nav = Navigator.of(context);
@@ -480,8 +497,16 @@ class _DetalleReserva extends ConsumerWidget {
               children: [
                 if (_sePagaAqui)
                   FilledButton(
-                    onPressed: () => pagarEnLinea(context, ref, r.ordenId!),
-                    child: const Text('Pagar'),
+                    key: const Key('pagar-reserva'),
+                    // Cierra la hoja con la orden a pagar ([mostrarDetalleReserva]
+                    // abre el pago): un segundo toque no abre otro y al volver no
+                    // queda la reserva vieja.
+                    onPressed: () => Navigator.pop(context, r.ordenId),
+                    child: Text(
+                      porPagar == null
+                          ? 'Pagar'
+                          : 'Pagar ${Formato.dinero(porPagar.totalMinor, porPagar.moneda)}',
+                    ),
                   ),
                 if (r.ofrecida)
                   FilledButton(
@@ -576,14 +601,27 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
       final nav = Navigator.of(context);
       final messenger = ScaffoldMessenger.of(context);
       try {
-        await notifier.reservar(c.id, esperar: esperar, lugar: _lugar);
+        final r = await notifier.reservar(
+          c.id,
+          esperar: esperar,
+          lugar: _lugar,
+        );
+        // Una clase de pago queda apartada: se paga para confirmar el lugar.
+        final porPagar = r.estado == 'pendiente_pago' && r.ordenId != null;
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              esperar ? 'Te anotamos en la lista de espera.' : 'Reservado.',
+              esperar
+                  ? 'Te anotamos en la lista de espera.'
+                  : porPagar
+                  ? 'Apartado: págalo para confirmar tu lugar.'
+                  : 'Reservado.',
             ),
           ),
         );
+        if (porPagar && context.mounted) {
+          await pagarEnLinea(context, ref, r.ordenId!);
+        }
         if (nav.mounted) {
           nav.pop();
         }

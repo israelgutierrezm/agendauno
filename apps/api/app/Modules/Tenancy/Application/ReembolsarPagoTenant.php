@@ -96,12 +96,31 @@ class ReembolsarPagoTenant
             if ($llave !== null) {
                 $repetido = $bloqueado->reembolsos()->where('llave', $llave)->first();
                 if ($repetido instanceof ReembolsoTenant) {
+                    // La misma llave es la misma devolución: si lo pedido es otra cosa
+                    // (monto, «ya lo devolví», forma, revertir) o la anterior falló, no se
+                    // responde como hecha: se pide otra vez, con otra llave.
+                    $igual = ($montoMinor === null || $montoMinor === (int) $repetido->monto_minor)
+                        && $manual === (($repetido->metadata['via'] ?? null) === 'manual')
+                        && $revertirCreditos === (bool) ($repetido->metadata['revertir_pedido'] ?? $repetido->metadata['revertir_creditos'] ?? true)
+                        && ($metodo === null || $repetido->metodo === null || $metodo === $repetido->metodo);
+                    if (! $igual) {
+                        throw new PagoNoReembolsable('Esa llave ya se usó para otra devolución: vuelve a intentarlo.');
+                    }
+                    if ($repetido->estado === EstadoReembolso::Fallido) {
+                        throw new PagoNoReembolsable('Esa devolución falló'.($repetido->motivo_fallo ? ': '.$repetido->motivo_fallo : '').'. Vuelve a intentarlo.');
+                    }
+
                     return [$repetido, false];
                 }
             }
 
             if (! in_array($bloqueado->estado, [EstadoPago::Aprobado, EstadoPago::ParcialmenteReembolsado], true)) {
                 throw new PagoNoReembolsable('Solo se puede reembolsar un pago aprobado.');
+            }
+            // Con un contracargo abierto, si se pierde el banco ya le devuelve el dinero al
+            // cliente: devolverlo también sería pagarlo dos veces.
+            if ($bloqueado->contracargo_estado === ContracargosTenant::ABIERTO) {
+                throw new PagoNoReembolsable('Este pago tiene un contracargo abierto: espera a que se resuelva. Si se pierde, el banco le devuelve el dinero al cliente.');
             }
 
             // Lo aprobado y lo que está en curso: no se puede devolver de más.
@@ -124,6 +143,16 @@ class ReembolsarPagoTenant
 
             $esTotal = $monto === $bloqueado->monto_minor && $comprometido === 0;
             $orden = $bloqueado->orden;
+            $pedido = $revertirCreditos;
+            // Solo dinero: en un cobro doble la venta la pagó otro cobro (la venta, sus
+            // derechos y su inventario siguen); en una renovación, el periodo ya corre y
+            // no se quita solo (para eso se pausa o se da de baja la membresía).
+            if ($orden !== null && ($orden->renueva_acuerdo_id !== null
+                || PagoTenant::query()->where('orden_id', $orden->getKey())->whereKeyNot($bloqueado->getKey())
+                    ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
+                    ->exists())) {
+                $revertirCreditos = false;
+            }
 
             // Devolución total: se rechaza si algún derecho de la orden ya tuvo uso
             // (antes de tocar la pasarela: no se devuelve dinero si luego no podríamos
@@ -150,6 +179,7 @@ class ReembolsarPagoTenant
                     'total' => $esTotal,
                     'via' => $via,
                     'revertir_creditos' => $revertirCreditos,
+                    'revertir_pedido' => $pedido,
                 ],
             ]);
 
@@ -258,15 +288,32 @@ class ReembolsarPagoTenant
      * Resultado de una devolución en línea que llega después (webhook de la
      * pasarela): la aprueba (y aplica sus efectos) o la marca fallida. Idempotente.
      */
-    public function conciliar(string $referencia, bool $exitosa): ?ReembolsoTenant
+    public function conciliar(string $referencia, bool $exitosa, ?string $llave = null): ?ReembolsoTenant
     {
         if ($referencia === '') {
             return null;
         }
 
-        $reembolso = ReembolsoTenant::query()->where('referencia_externa', $referencia)->first();
+        // Por su referencia o, si el aviso llegó antes de guardarla, por la llave con que
+        // se pidió (Stripe la devuelve en la metadata: `reembolso_<ulid>`).
+        $reembolso = ReembolsoTenant::query()->where('referencia_externa', $referencia)->first()
+            ?? ($llave !== null && str_starts_with($llave, 'reembolso_')
+                ? ReembolsoTenant::query()->where('ulid', substr($llave, strlen('reembolso_')))->first()
+                : null);
         if (! $reembolso instanceof ReembolsoTenant) {
             return null;
+        }
+
+        // Falló después de confirmarse (Stripe lo permite): no se deshace nada solo, pero
+        // el cliente no recibió su dinero y alguien tiene que resolverlo.
+        if (! $exitosa && $reembolso->estado === EstadoReembolso::Aprobado) {
+            $this->incidencias->porReembolso(
+                IncidenciaCobroTenant::REEMBOLSO_INCIERTO,
+                $reembolso,
+                'La pasarela avisó que la devolución falló después de confirmarla: el cliente no recibió su dinero. Devuélvelo por otro medio y anota aquí qué hiciste.',
+            );
+
+            return $reembolso;
         }
 
         $this->resolver($reembolso, $exitosa ? EstadoReembolso::Aprobado : EstadoReembolso::Fallido, $referencia, null, null);
@@ -351,17 +398,23 @@ class ReembolsarPagoTenant
         $revertir = (bool) ($metadata['revertir_creditos'] ?? true);
         $esTotal = (bool) ($metadata['total'] ?? false);
         $orden = $pago->orden;
+        $acumulado = (int) $pago->reembolsos()->where('estado', EstadoReembolso::Aprobado->value)->sum('monto_minor');
+
+        // Devuelto todo en partes, y con lo que se compró sin usar: es una devolución
+        // total (se retira el plan y se cancela la venta), no un saldo que nunca se acaba.
+        if (! $esTotal && $revertir && $orden !== null && $acumulado >= $pago->monto_minor && ! $this->derechos->algunoUsado($orden)) {
+            $esTotal = true;
+        }
 
         if ($revertir && $orden !== null) {
             if ($esTotal) {
-                $this->revertirTotal($orden, $pago, $actor);
+                $this->revertirTotal($orden, $pago, $reembolso, $actor);
             } else {
                 $this->revertirProporcional($orden, $pago, $actor);
             }
             $reembolso->update(['revirtio_creditos' => true]);
         }
 
-        $acumulado = (int) $pago->reembolsos()->where('estado', EstadoReembolso::Aprobado->value)->sum('monto_minor');
         $pago->update([
             'estado' => $acumulado >= $pago->monto_minor
                 ? EstadoPago::Reembolsado->value
@@ -426,9 +479,20 @@ class ReembolsarPagoTenant
     /**
      * Revierte a 0 el saldo de cada derecho intacto de la orden y cancela sus acuerdos.
      */
-    private function revertirTotal(OrdenTenant $orden, PagoTenant $pago, ?Usuario $actor): void
+    private function revertirTotal(OrdenTenant $orden, PagoTenant $pago, ReembolsoTenant $reembolso, ?Usuario $actor): void
     {
-        $this->derechos->retirarTodo($orden, $this->contexto($pago, $actor), 'Reembolso total del pago', $actor);
+        $huboUso = $this->derechos->retirarTodo($orden, $this->contexto($pago, $actor), 'Reembolso total del pago', $actor);
+
+        // Una devolución en línea se confirma después: si mientras tanto el plan se usó,
+        // el dinero ya salió. Se retira lo libre, lo apartado se respeta y alguien lo
+        // revisa con el cliente.
+        if ($huboUso) {
+            $this->incidencias->porReembolso(
+                IncidenciaCobroTenant::REEMBOLSO_INCIERTO,
+                $reembolso,
+                'La devolución se confirmó cuando el plan ya se había usado: se retiró lo que quedaba libre y se respetó lo ya reservado. Revisa con el cliente lo que usó.',
+            );
+        }
     }
 
     /**
@@ -443,7 +507,13 @@ class ReembolsarPagoTenant
         if ($total <= 0) {
             return;
         }
-        $devuelto = min($total, (int) $pago->reembolsos()->where('estado', EstadoReembolso::Aprobado->value)->sum('monto_minor'));
+        // Solo cuentan las devoluciones que revirtieron: una compensación (solo dinero) o
+        // un contracargo no hacen que la siguiente revierta de más.
+        $devuelto = min($total, (int) $pago->reembolsos()
+            ->where('estado', EstadoReembolso::Aprobado->value)
+            ->get()
+            ->filter(fn (ReembolsoTenant $r): bool => (bool) ($r->metadata['revertir_creditos'] ?? false))
+            ->sum('monto_minor'));
 
         foreach ($this->derechos->acuerdosDe($orden) as $acuerdo) {
             foreach ($acuerdo->derechos as $derecho) {

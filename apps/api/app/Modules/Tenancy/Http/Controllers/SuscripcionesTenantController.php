@@ -52,9 +52,10 @@ class SuscripcionesTenantController
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
-        $base = AcuerdoTenant::query()
+        // Quien está acotado a sedes (R19) ve solo las de sus clientes.
+        $base = app(AlcancePersonaTenant::class)->acotada(AcuerdoTenant::query()
             ->whereNotNull('proxima_cobro_en')
-            ->where('estado', '!=', EstadoAcuerdo::Cancelado->value);
+            ->where('estado', '!=', EstadoAcuerdo::Cancelado->value), $request);
         $resumen = [
             'total' => (clone $base)->count(),
             'automaticos' => (clone $base)->whereHas('domiciliacion')->count(),

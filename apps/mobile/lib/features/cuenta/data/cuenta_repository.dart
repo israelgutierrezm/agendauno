@@ -67,6 +67,7 @@ class CuentaRepository {
               .toList()
         : <ClaseMiembro>[];
 
+    final porPagar = await _porPagar();
     return MiCuenta(
       derechos: derechos,
       reservas: reservas,
@@ -75,8 +76,10 @@ class CuentaRepository {
       pagoEnLinea: (data['pago_en_linea'] ?? false) as bool,
       pagoEnLineaPrueba: (data['pago_en_linea_prueba'] ?? false) as bool,
       pagoAutomatico: (data['pago_automatico'] ?? false) as bool,
+      domiciliarAlPagar: (data['domiciliar_al_pagar'] ?? false) as bool,
       resenasPendientes: await _resenasPendientes(),
-      porPagar: await _porPagar(),
+      porPagar: porPagar ?? const [],
+      porPagarSinCargar: porPagar == null,
       portal: PortalCliente.desdeJson(data['portal']),
       asistencias30Dias: (data['asistencias_30_dias'] as num? ?? 0).toInt(),
     );
@@ -93,16 +96,22 @@ class CuentaRepository {
 
   /// Compra un plan: crea la orden pendiente (se activa al pagarla).
   /// Con permanencia (B04), aceptando sus condiciones.
-  Future<void> comprar(String productoId, {bool aceptaCondiciones = false}) =>
-      _dio.post<Map<String, dynamic>>(
-        '$_base/mi/ordenes',
-        data: {
-          'items': [
-            {'producto_id': productoId, 'cantidad': 1},
-          ],
-          if (aceptaCondiciones) 'acepta_condiciones': true,
-        },
-      );
+  /// [clave]: la del intento; repetirla (sin respuesta, doble toque) devuelve la
+  /// misma compra en vez de crear otra.
+  Future<void> comprar(
+    String productoId, {
+    bool aceptaCondiciones = false,
+    String? clave,
+  }) => _dio.post<Map<String, dynamic>>(
+    '$_base/mi/ordenes',
+    data: {
+      'items': [
+        {'producto_id': productoId, 'cantidad': 1},
+      ],
+      if (aceptaCondiciones) 'acepta_condiciones': true,
+      'idempotency_key': ?clave,
+    },
+  );
 
   /// Las clases del periodo que ve el calendario (fechas locales, fin incluido)
   /// y, si eligió una, de esa sucursal.
@@ -138,8 +147,8 @@ class CuentaRepository {
   }
 
   /// Todo lo que debe (completo, aparte del historial: un adeudo antiguo no se
-  /// pierde); si falla, simplemente no se muestra.
-  Future<List<OrdenPorPagar>> _porPagar() async {
+  /// pierde); si falla, null: no se sabe (no se dice «al corriente»).
+  Future<List<OrdenPorPagar>?> _porPagar() async {
     try {
       final res = await _dio.get<Map<String, dynamic>>(
         '$_base/mi/ordenes/pendientes',
@@ -150,7 +159,7 @@ class CuentaRepository {
         desfaseMin: _desfaseMin,
       );
     } on DioException {
-      return const [];
+      return null;
     }
   }
 
@@ -428,12 +437,23 @@ class CuentaRepository {
   }
 
   /// Reserva un lugar, o se anota en la lista de espera si la clase está llena.
-  /// Con lugar numerado si lo eligió (B06); el servidor lo valida.
-  Future<void> reservar(String sesionId, {bool esperar = false, int? lugar}) =>
-      _dio.post<Map<String, dynamic>>(
-        '$_base/mi/reservas',
-        data: {'sesion_id': sesionId, 'esperar': esperar, 'lugar': ?lugar},
-      );
+  /// Con lugar numerado si lo eligió (B06); el servidor lo valida. Dice en qué
+  /// quedó: una clase de pago queda apartada (`pendiente_pago`) con su orden.
+  Future<({String estado, String? ordenId})> reservar(
+    String sesionId, {
+    bool esperar = false,
+    int? lugar,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/reservas',
+      data: {'sesion_id': sesionId, 'esperar': esperar, 'lugar': ?lugar},
+    );
+    final datos = (res.data?['data'] as Map<String, dynamic>?) ?? const {};
+    return (
+      estado: (datos['estado'] ?? '') as String,
+      ordenId: datos['orden_id'] as String?,
+    );
+  }
 
   Future<void> cancelar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/mi/reservas/$reservaId/cancelar');

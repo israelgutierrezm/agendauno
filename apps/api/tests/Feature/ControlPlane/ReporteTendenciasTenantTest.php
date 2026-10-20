@@ -96,3 +96,21 @@ it('la tendencia exige facturacion.ver (recepción no entra)', function (): void
     $this->getJson("/api/v1/app/{$e['slug']}/reportes/tendencias?desde={$hoy}&hasta={$hoy}", conBearer($recep))
         ->assertForbidden();
 });
+
+it('el desglose por producto suma lo vendido: los descuentos van en su renglón', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $pack = crearPackTenant($e, 8000);
+    $this->postJson("/api/v1/app/{$e['slug']}/promociones", ['codigo' => 'MITAD', 'tipo' => 'porcentaje', 'valor' => 5000], conBearer($e['bearer']))->assertCreated();
+    $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
+        'comprador_id' => crearMiembroTenant($e, 'Ana'), 'items' => [['producto_id' => $pack, 'cantidad' => 1]], 'codigo_promo' => 'MITAD',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    crearOrdenPagada($e, $pack, 'Beto');
+
+    $hoy = CarbonImmutable::now()->toDateString();
+    $data = $this->getJson("/api/v1/app/{$e['slug']}/reportes/tendencias?desde={$hoy}&hasta={$hoy}&agrupacion=dia", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+
+    expect(collect($data['por_producto'])->sum('ventas_minor'))->toBe($data['totales']['ventas_minor'])
+        ->and(collect($data['por_producto'])->firstWhere('producto', 'Descuentos')['ventas_minor'])->toBe(-44950);
+});

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ReporteCampanasTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class ReporteCampanasTenantController
         $desde = $validado['desde'] ?? CarbonImmutable::parse($hasta)->subDays(29)->toDateString();
         abort_if(CarbonImmutable::parse($desde)->diffInDays(CarbonImmutable::parse($hasta)) > 366, 422, 'El periodo puede ser de hasta un año.');
 
-        return response()->json(['data' => $reporte->calcular($desde, $hasta)]);
+        // Quien está acotado a sedes (R19) ve solo lo de sus sedes.
+        return response()->json(['data' => $reporte->calcular($desde, $hasta, app(ResolverAccesoTenant::class)->deLaSolicitud($request))]);
     }
 }

@@ -425,7 +425,11 @@ onMounted(cargar);
                       {{ $t("devolverVenta.accion") }}
                     </button>
                     <button
-                      v-if="!v.anulada_en && (v.corregible || v.anulable)"
+                      v-if="
+                        !v.anulada_en &&
+                        ((v.corregible && sesion.puede('pos.vender')) ||
+                          (v.anulable && puedeDevolver))
+                      "
                       class="tu-enlace text-sm"
                       type="button"
                       data-prueba="corregir-venta"

@@ -67,6 +67,7 @@ class ResolverDerechoTenant
                 $consulta->where('persona_id', $persona->getKey())
                     ->where('estado', EstadoAcuerdo::Activo->value);
             })
+            ->where(fn (Builder $q) => self::conPaqueteActivo($q))
             ->with('ofertas:id')
             ->get()
             ->filter(fn (DerechoTenant $derecho): bool => $this->vigente($derecho, $sesion->inicia_en) && $this->cubre($derecho, $sesion))
@@ -96,6 +97,7 @@ class ResolverDerechoTenant
                 $consulta->where('persona_id', $persona->getKey())
                     ->where('estado', EstadoAcuerdo::Activo->value);
             })
+            ->where(fn (Builder $q) => self::conPaqueteActivo($q))
             ->with('ofertas:id')
             ->get()
             ->filter(fn (DerechoTenant $d): bool => $this->vigente($d, $ahora)
@@ -294,5 +296,17 @@ class ResolverDerechoTenant
     private function vigente(DerechoTenant $derecho, CarbonInterface $momento): bool
     {
         return $this->fechas->cubre($derecho->valido_desde, $derecho->valido_hasta, $momento);
+    }
+
+    /**
+     * Las clases extra solo valen con su paquete activo: con el paquete pausado,
+     * suspendido o dado de baja, tampoco se reservan.
+     */
+    private static function conPaqueteActivo(Builder $consulta): void
+    {
+        $consulta->whereNull('extra_de_id')
+            ->orWhereIn('extra_de_id', DerechoTenant::query()
+                ->select('id')
+                ->whereHas('acuerdo', fn (Builder $a) => $a->where('estado', EstadoAcuerdo::Activo->value)));
     }
 }

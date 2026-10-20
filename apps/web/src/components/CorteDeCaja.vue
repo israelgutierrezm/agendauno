@@ -133,10 +133,14 @@ function parametros(): Record<string, string | undefined> {
   };
 }
 
+// Cada carga lleva su número: la respuesta de un rango anterior que llegue tarde no
+// pisa la del rango que se está viendo.
+let peticion = 0;
 async function cargar(): Promise<void> {
   if (desde.value === "" || hasta.value === "") {
     return;
   }
+  const esta = ++peticion;
   cargando.value = true;
   error.value = null;
   errorCarga.value = null;
@@ -147,6 +151,9 @@ async function cargar(): Promise<void> {
       totales_por_moneda?: Totales[];
       meta?: { truncado?: boolean; limite?: number };
     }>(`${base.value}/pagos/movimientos`, { params: parametros() });
+    if (esta !== peticion) {
+      return;
+    }
     movimientos.value = data.data;
     totalesPorMoneda.value = data.totales_por_moneda ?? [data.totales];
     truncado.value = data.meta?.truncado ? (data.meta.limite ?? null) : null;
@@ -163,13 +170,18 @@ async function cargar(): Promise<void> {
       }));
     }
   } catch (e) {
+    if (esta !== peticion) {
+      return;
+    }
     // Sin totales de otro rango a la vista.
     movimientos.value = [];
     totalesPorMoneda.value = [];
     truncado.value = null;
     errorCarga.value = mensajeDeError(e);
   } finally {
-    cargando.value = false;
+    if (esta === peticion) {
+      cargando.value = false;
+    }
   }
 }
 

@@ -219,4 +219,20 @@ void main() {
     // Era la última página.
     expect(find.text('Ver más'), findsNothing);
   });
+
+  testWidgets(
+    'al recargarse la cuenta (p. ej. al volver de pagar), el historial se vuelve a leer',
+    (tester) async {
+      final repo = await _montar(tester, const HistorialComprasSeccion());
+      expect(repo.paginas, [1]);
+
+      ProviderScope.containerOf(
+        tester.element(find.byType(HistorialComprasSeccion)),
+      ).invalidate(cuentaProvider);
+      await tester.pumpAndSettle();
+
+      expect(repo.paginas, [1, 1]);
+      expect(find.text('Pack 8 clases'), findsOneWidget);
+    },
+  );
 }

@@ -51,8 +51,12 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
         });
       }
     } on DioException {
+      // El código anterior ya venció: no se deja en pantalla (recepción lo rechazaría).
       if (mounted) {
-        setState(() => _error = 'No se pudo generar tu pase.');
+        setState(() {
+          _codigo = null;
+          _error = 'No se pudo generar tu pase.';
+        });
       }
     }
   }
@@ -86,9 +90,14 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
                   semanticsLabel: 'Código QR de tu pase de entrada',
                 ),
               )
-            else if (_error != null)
-              Text(_error!, style: TextStyle(color: context.colores.error))
-            else
+            else if (_error != null) ...[
+              Text(_error!, style: TextStyle(color: context.colores.error)),
+              TextButton(
+                key: const Key('pase-reintentar'),
+                onPressed: _cargar,
+                child: const Text('Reintentar'),
+              ),
+            ] else
               const SizedBox(
                 height: 240,
                 child: Center(child: CircularProgressIndicator()),

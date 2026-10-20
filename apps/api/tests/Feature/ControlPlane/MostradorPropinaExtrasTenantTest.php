@@ -99,3 +99,19 @@ it('la propina va aparte; en efectivo, lo recibido da el cambio', function (): v
         ->and($corte['totales']['propinas_por_metodo'])->toBe(['Efectivo' => 1000])
         ->and(collect($corte['data'])->firstWhere('tipo', 'venta')['propina_minor'])->toBe(1000);
 });
+
+it('en el corte, la transferencia del mostrador y la de los cobros van en un solo renglón, como en la caja', function (): void {
+    $c = cafeteriaMostrador();
+    $this->postJson("{$c['base']}/pos/ventas", [
+        'sucursal_id' => $c['sede'], 'metodo_pago' => 'transferencia',
+        'items' => [['articulo_id' => $c['proteina'], 'cantidad' => 1]], 'propina_minor' => 1000,
+    ], conBearer($c['e']['bearer']))->assertCreated();
+    $orden = (string) $this->postJson("{$c['base']}/ordenes", [
+        'comprador_id' => crearMiembroTenant($c['e'], 'Ana'), 'items' => [['producto_id' => crearPackTenant($c['e']), 'cantidad' => 1]],
+    ], conBearer($c['e']['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("{$c['base']}/ordenes/{$orden}/liquidar", ['metodo' => 'transferencia'], conBearer($c['e']['bearer']))->assertOk();
+
+    $totales = $this->getJson("{$c['base']}/pagos/movimientos", conBearer($c['e']['bearer']))->assertOk()->json('totales');
+    expect($totales['por_metodo'])->toBe(['Transferencia SPEI' => 6000 + 89900])
+        ->and($totales['propinas_por_metodo'])->toBe(['Transferencia SPEI' => 1000]);
+});

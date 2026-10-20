@@ -114,14 +114,29 @@ describe("vender un plan", () => {
     await w.get("form").trigger("submit");
     await flushPromises();
 
+    // Se vende y se cobra de una vez (si el cobro no pasa, no queda la orden).
     expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/ordenes", {
       comprador_id: "m1",
       items: [{ producto_id: "p1", cantidad: 1 }],
       codigo_promo: undefined,
+      liquidar: { metodo: "transferencia", clave: expect.any(String) },
     });
+  });
+
+  it("un código escrito pero no aplicado no se manda: se cobra lo que se confirmó", async () => {
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    await w.findAll('[data-prueba="plan"]')[0]!.trigger("click");
+    const buscador = w.findComponent(BuscarPersona);
+    buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+    buscador.vm.$emit("update:modelValue", "m1");
+    await w.get("#vpromo").setValue("VERANO20");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
     expect(mocks.post).toHaveBeenCalledWith(
-      "/api/v1/app/demo/ordenes/o9/liquidar",
-      { metodo: "transferencia" },
+      "/api/v1/app/demo/ordenes",
+      expect.objectContaining({ codigo_promo: undefined }),
     );
   });
 
@@ -175,6 +190,7 @@ describe("vender un plan", () => {
       codigo_promo: undefined,
       exentar_inscripcion: true,
       motivo_exencion: "Reingreso pactado",
+      liquidar: { metodo: "efectivo", clave: expect.any(String) },
     });
   });
 

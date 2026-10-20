@@ -38,4 +38,6 @@ export default {
     "El cobro quedó registrado, pero no se pudo mandar el ticket por correo.",
   reenviarTicket: "Reenviar ticket",
   listo: "Listo",
+  // Un monto que no se pudo leer (p. ej. con la coma o el punto de otro país).
+  montoIlegible: "No entendimos este monto: escríbelo solo con números.",
 };

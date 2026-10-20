@@ -47,6 +47,18 @@ class ExentarCuotaTenant
                 'monto_minor' => $bloqueada->subtotal_minor,
                 'total_minor' => $orden->total_minor,
             ];
+            // Una cuota generada (la anualidad de un año) no se vuelve a generar: queda su
+            // referencia aunque la línea se quite.
+            if ($bloqueada->referencia !== null) {
+                DB::connection('tenant')->table('cuotas_exentadas')->insertOrIgnore([
+                    'referencia' => $bloqueada->referencia,
+                    'orden_id' => $orden->getKey(),
+                    'motivo' => mb_substr($motivo, 0, 500),
+                    'actor_id' => $actor?->getKey(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
             $bloqueada->delete();
             $cambios = ['total_minor' => max(0, $orden->total_minor - $bloqueada->subtotal_minor)];
             // Si era lo único que tenía, ya no hay nada que cobrar.

@@ -11,6 +11,7 @@ import HistorialCompras from "@/components/HistorialCompras.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { participanteEnUso } from "@/lib/participanteEnUso";
 import { listaDeNombres, textoCobertura } from "@/lib/cobertura";
 import {
@@ -37,7 +38,7 @@ const cuenta = useMiCuenta();
 const retornoPago = useRetornoPago();
 const corte = ref<InstanceType<typeof CortePlanes> | null>(null);
 const historial = ref<InstanceType<typeof HistorialCompras> | null>(null);
-if (retornoPago.value === "exito") {
+if (retornoPago.value === "exito" || retornoPago.value === "pendiente") {
   // El webhook de la pasarela confirma el pago en segundos.
   window.setTimeout(() => {
     void cuenta.cargar(true);
@@ -80,8 +81,12 @@ const domiciliar = ref<Record<string, boolean>>({});
 const porPersonaACargo = participanteEnUso() !== null;
 
 // Las clases extra se suman a un paquete: solo se ofrecen a quien tiene uno.
+// Las clases extra se suman a un paquete vigente (o agotado); no a uno vencido, en
+// pausa o por empezar: el API lo rechazaría.
 const tienePaquete = computed(() =>
-  cuenta.derechos.value.some((d) => !d.ilimitado),
+  cuenta.derechos.value.some(
+    (d) => !d.ilimitado && (d.estado === "vigente" || d.estado === "agotado"),
+  ),
 );
 // La clase de prueba solo la ve quien todavía puede comprarla (nunca vino; B03). El
 // destacado del negocio va primero.
@@ -129,6 +134,18 @@ async function pagar(
   ordenId: string,
   metodo: "tarjeta" | "oxxo" = "tarjeta",
 ): Promise<void> {
+  // Con una referencia de OXXO viva, pagar otra vez puede cobrar dos veces.
+  const enProceso = cuenta.porPagar.value.find(
+    (o) => o.id === ordenId,
+  )?.pago_en_proceso;
+  if (
+    enProceso?.metodo === "oxxo" &&
+    !(await confirmar(t("miCuentaExtra.otraFormaConOxxo"), {
+      aceptar: t("miCuentaExtra.pagarDeTodos"),
+    }))
+  ) {
+    return;
+  }
   pagando.value = ordenId;
   errorPago.value = null;
   mensaje.value = null;
@@ -138,11 +155,19 @@ async function pagar(
       data: { checkout?: ({ tipo?: string; url?: string } & Voucher) | null };
     }>(`${cuenta.base.value}/mi/ordenes/${ordenId}/cobrar`, {
       metodo,
-      domiciliar: metodo === "tarjeta" && domiciliar.value[ordenId] === true,
+      // Solo si se puede domiciliar al pagar y la orden se renueva.
+      domiciliar:
+        metodo === "tarjeta" &&
+        cuenta.domiciliarAlPagar.value &&
+        cuenta.porPagar.value.find((o) => o.id === ordenId)?.recurrente ===
+          true &&
+        domiciliar.value[ordenId] === true,
     });
     const checkout = data.data.checkout ?? {};
     if (checkout.tipo === "voucher") {
       voucher.value = checkout;
+      // Ya hay un pago en proceso: se ve en la lista (y no invita a pagar dos veces).
+      void cuenta.cargar(true);
       return;
     }
     if (checkout.tipo === "redirect" && checkout.url) {
@@ -150,6 +175,7 @@ async function pagar(
       return;
     }
     mensaje.value = "pago";
+    void cuenta.cargar(true);
   } catch (e) {
     errorPago.value = { id: ordenId, mensaje: mensajeDeError(e) };
   } finally {
@@ -408,7 +434,7 @@ onMounted(() => void cuenta.asegurar());
                   {{ $t("pagoTienda.pagarOxxo") }}
                 </button>
                 <label
-                  v-if="cuenta.pagoAutomatico.value && o.recurrente"
+                  v-if="cuenta.domiciliarAlPagar.value && o.recurrente"
                   class="flex items-center gap-1.5 text-xs"
                   :style="{ color: 'var(--texto-suave)' }"
                 >

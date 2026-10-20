@@ -368,8 +368,10 @@ class ResumenDelDiaTenant
     {
         return [
             ...$this->porCobrar->resumen($permitidas),
+            // De las sedes que ve (y la elegida en la barra), como el resto del Inicio.
             'en_mora' => ProcesoDunningTenant::query()
                 ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
+                ->when($permitidas !== null, fn ($q) => $q->whereHas('acuerdo.persona', fn ($p) => $p->whereIn('sucursal_id', $permitidas)))
                 ->count(),
         ];
     }

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Application\ConfirmarCargoRenta;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
+use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
 use Illuminate\Http\JsonResponse;
@@ -105,6 +107,24 @@ class WebhookPlataformaController
             $error = is_array($objeto['last_payment_error'] ?? null) ? $objeto['last_payment_error'] : [];
             $codigo = $error['decline_code'] ?? $error['code'] ?? null;
             $this->confirmar->intentoTerminado($referencia, is_string($codigo) && $codigo !== '' ? $codigo : null);
+        }
+
+        // Una devolución o una disputa de un cobro de la plataforma (renta o timbres): el
+        // cargo no se toca solo; el superadmin lo revisa.
+        if (in_array($tipo, ['charge.refunded', 'charge.dispute.created'], true) && is_array($objeto)) {
+            $intent = (string) ($objeto['payment_intent'] ?? '');
+            $cargo = $intent !== '' ? CargoRenta::query()->where('referencia_pago', $intent)->first() : null;
+            $monto = (int) ($objeto['amount_refunded'] ?? $objeto['amount'] ?? 0);
+            $dinero = number_format($monto / 100, 2, '.', ',').' '.strtoupper((string) ($objeto['currency'] ?? ''));
+            app(AlertasPlataforma::class)->registrar(
+                $tipo === 'charge.refunded' ? 'renta_devuelta' : 'renta_en_disputa',
+                $intent !== '' ? $intent : $referencia,
+                ($tipo === 'charge.refunded' ? 'Stripe registró una devolución' : 'El banco disputó un cobro')
+                    ." de la plataforma ({$dinero}, {$intent})"
+                    .($cargo instanceof CargoRenta ? " del cargo {$cargo->periodo} ({$cargo->concepto})" : '')
+                    .'. Revisa la renta o los timbres de ese negocio.',
+                $cargo?->estudio?->slug,
+            );
         }
 
         return response()->json(['data' => ['ok' => true]]);

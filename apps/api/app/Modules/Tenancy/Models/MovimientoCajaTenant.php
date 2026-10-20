@@ -48,7 +48,7 @@ class MovimientoCajaTenant extends Model
     protected $table = 'movimientos_caja';
 
     protected $fillable = [
-        'turno_caja_id', 'tipo', 'metodo', 'monto_minor', 'pago_id', 'venta_pos_id', 'reembolso_id', 'usuario_id', 'motivo',
+        'turno_caja_id', 'tipo', 'metodo', 'monto_minor', 'pago_id', 'venta_pos_id', 'reembolso_id', 'usuario_id', 'motivo', 'clave',
     ];
 
     /**

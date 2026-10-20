@@ -85,6 +85,11 @@ class CuotasTenant
     {
         $acuerdos = AcuerdoTenant::query()
             ->where('persona_id', $persona->getKey())
+            // Un plan deshecho (su cobro se anuló o se devolvió completo) nunca contó: su
+            // venta no quedó pagada.
+            ->where(fn (Builder $q) => $q->where('estado', '!=', EstadoAcuerdo::Cancelado->value)
+                ->orWhereNull('linea_orden_id')
+                ->orWhereHas('lineaOrden.orden', fn (Builder $o) => $o->where('estado', EstadoOrden::Pagada->value)))
             ->with('derechos')
             ->get();
         if ($acuerdos->isEmpty()) {

@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Cuotas\ConceptoCuota;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\LineaVentaPosTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Support\Csv;
@@ -162,10 +163,11 @@ class ReporteTendenciasTenantController
     }
 
     /**
-     * Lo vendido por producto (subtotal de línea) en la moneda del negocio: compras
-     * no canceladas, por la fecha de la compra, de las sedes que ve quien consulta. Suma
-     * también los artículos del mostrador (ventas no anuladas), como el total «Vendido»
-     * (ADR 0166).
+     * Lo vendido por producto en la moneda del negocio, de modo que sume el total
+     * «Vendido»: compras no canceladas por la fecha de la compra (sus líneas; las de una
+     * cita o clase suelta, que no tienen líneas, por su servicio; los descuentos, en un
+     * renglón negativo) y los artículos del mostrador (ventas no anuladas). Lo devuelto
+     * va en «Devuelto», como en el total (ADR 0166, 0181).
      *
      * @param  list<int>|null  $sedes
      * @return list<array{producto: string, ventas_minor: int, unidades: int}>
@@ -197,12 +199,30 @@ class ReporteTendenciasTenantController
             ->whereBetween('ventas_pos.created_at', [$inicio, $fin])
             ->groupBy('lineas_venta_pos.articulo_id')
             // Sin lo devuelto (ADR 0178): el subtotal es precio × piezas, así que es exacto.
-            ->selectRaw('lineas_venta_pos.articulo_id as aid, SUM(lineas_venta_pos.subtotal_minor * (lineas_venta_pos.cantidad - lineas_venta_pos.cantidad_devuelta) / lineas_venta_pos.cantidad) as vendido, SUM(lineas_venta_pos.cantidad - lineas_venta_pos.cantidad_devuelta) as unidades')
+            ->selectRaw('lineas_venta_pos.articulo_id as aid, SUM(lineas_venta_pos.subtotal_minor) as vendido, SUM(lineas_venta_pos.cantidad) as unidades')
             ->toBase()
             ->get();
         $articulos = ArticuloTenant::query()
             ->whereIn('id', $mostrador->pluck('aid')->filter()->all())
             ->pluck('nombre', 'id');
+
+        $compras = fn () => OrdenTenant::query()
+            ->where('ordenes.estado', '!=', EstadoOrden::Cancelada->value)
+            ->where('ordenes.moneda', $moneda)
+            ->when($sedes !== null, fn ($q) => $q->whereIn('ordenes.sucursal_id', $sedes))
+            ->whereBetween('ordenes.created_at', [$inicio, $fin]);
+        // Citas y clases sueltas (sin líneas): por su servicio.
+        $sinLineas = $compras()
+            ->whereNotExists(fn ($q) => $q->from('lineas_orden')->whereColumn('lineas_orden.orden_id', 'ordenes.id'))
+            ->leftJoin('sesiones', 'sesiones.id', '=', 'ordenes.sesion_id')
+            ->leftJoin('ofertas', 'ofertas.id', '=', 'sesiones.oferta_id')
+            ->groupBy('ofertas.nombre')
+            ->selectRaw('ofertas.nombre as nombre, SUM(ordenes.total_minor) as vendido, COUNT(*) as unidades')
+            ->toBase()
+            ->get();
+        $descuentos = (int) $compras()
+            ->whereExists(fn ($q) => $q->from('lineas_orden')->whereColumn('lineas_orden.orden_id', 'ordenes.id'))
+            ->sum('ordenes.descuento_minor');
 
         return $filas
             ->map(static fn (object $f): array => [
@@ -218,6 +238,12 @@ class ReporteTendenciasTenantController
                 'ventas_minor' => (int) $f->vendido,
                 'unidades' => (int) $f->unidades,
             ]))
+            ->concat($sinLineas->map(static fn (object $f): array => [
+                'producto' => (string) ($f->nombre ?? 'Otros cobros'),
+                'ventas_minor' => (int) $f->vendido,
+                'unidades' => (int) $f->unidades,
+            ]))
+            ->concat($descuentos > 0 ? [['producto' => 'Descuentos', 'ventas_minor' => -$descuentos, 'unidades' => 0]] : [])
             ->sortByDesc('ventas_minor')
             ->values()
             ->all();

@@ -100,7 +100,7 @@ final class CorregirVentaPosTenant
             }
             // En la caja abierta de hoy (ADR 0175): sale de una forma de pago y entra en otra.
             if (CajasTenant::metodo($antes) !== CajasTenant::metodo($metodo)) {
-                $turno = $this->cajas->turnoParaMovimiento((int) $bloqueada->sucursal_id);
+                $turno = $this->cajas->turnoParaAjusteDeLaVenta($bloqueada);
                 $monto = (int) $bloqueada->total_minor + (int) $bloqueada->propina_minor;
                 $origen = ['venta_pos_id' => $bloqueada->getKey()];
                 $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, CajasTenant::metodo($antes), -$monto, $origen, $actor, $motivo);
@@ -126,7 +126,7 @@ final class CorregirVentaPosTenant
                 throw new CobroNoAnulable($impedimento);
             }
             // Sale de la caja abierta de hoy (ADR 0175), bloqueada antes del inventario.
-            $turno = $this->cajas->turnoParaMovimiento((int) $bloqueada->sucursal_id);
+            $turno = $this->cajas->turnoParaAjusteDeLaVenta($bloqueada);
             // Sale de cada forma con la que entró (con varias formas, ADR 0177).
             $this->cajas->asentarPartes($turno, MovimientoCajaTenant::ANULACION, CajasTenant::partesDeVenta($bloqueada), -1,
                 ['venta_pos_id' => $bloqueada->getKey()], $actor, $motivo);

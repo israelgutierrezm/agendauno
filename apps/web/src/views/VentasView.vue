@@ -259,8 +259,9 @@ async function vender(): Promise<void> {
       {
         comprador_id: venta.value.compradorId,
         items: [{ producto_id: venta.value.productoId, cantidad: 1 }],
+        // Solo el código ya aplicado: lo que se confirmó es lo que se cobra.
         codigo_promo:
-          venta.value.codigoPromo.trim() !== ""
+          promoPreview.value !== null && venta.value.codigoPromo.trim() !== ""
             ? venta.value.codigoPromo
             : undefined,
         ...(inscripcion.value > 0 && exentarInscripcion.value
