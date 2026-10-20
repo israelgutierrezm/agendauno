@@ -144,6 +144,48 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
     return repo == null ? const [] : repo.historial(s.cita!.reservaId);
   }
 
+  /// Agenda una cita a un cliente (recepción, teléfono, mostrador), como en la web.
+  /// La agenda pasa al día y al profesional de la cita, ya recargada, para verla.
+  /// Devuelve la cita creada (null sin sesión).
+  Future<SesionAgenda?> agendarCita(NuevaCita cita) async {
+    final repo = ref.read(agendaRepositoryProvider);
+    if (repo == null) {
+      return null;
+    }
+    final creada = await repo.agendarCita(cita);
+    if (!ref.mounted) {
+      return creada; // Se salió o cambió la sesión mientras tanto.
+    }
+    ref
+        .read(profesionalAgendaProvider.notifier)
+        .elegir(creada.instructorId ?? cita.instructorId);
+    final dia = creada.iniciaLocal;
+    ref
+        .read(fechaAgendaProvider.notifier)
+        .elegir(DateTime(dia.year, dia.month, dia.day));
+    ref.invalidateSelf();
+    await future;
+    return creada;
+  }
+
+  /// Mueve la cita a otra hora de su sucursal (y, si se quiere, con otro
+  /// profesional). El servidor revalida que esté libre; la agenda se recarga.
+  Future<CitaMovida?> reprogramar(
+    SesionAgenda s, {
+    required DateTime inicia,
+    String? instructorId,
+  }) async {
+    CitaMovida? movida;
+    await _accion(
+      (r) async => movida = await r.reprogramarCita(
+        s.cita!.reservaId,
+        inicia: inicia,
+        instructorId: instructorId,
+      ),
+    );
+    return movida;
+  }
+
   Future<void> _accion(Future<void> Function(AgendaRepository repo) fn) async {
     final repo = ref.read(agendaRepositoryProvider);
     if (repo == null) {

@@ -13,6 +13,7 @@ import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import 'abrir_sesion.dart';
+import 'nueva_cita_sheet.dart';
 
 const _diasCortos = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const _meses = [
@@ -67,9 +68,38 @@ class AgendaScreen extends ConsumerWidget {
     final horaSucursal = etiquetaHoraSucursal(
       estado.value?.sesiones ?? const [],
     );
+    // Citas: el negocio agenda al cliente (quien gestiona reservas, como en la web).
+    final agenda = estado.value;
+    final puedeAgendar =
+        (sesion?.esCitas ?? false) &&
+        (sesion?.puede('reservas.gestionar') ?? false) &&
+        (agenda?.profesionales.isNotEmpty ?? false);
+    final elegido = ref.watch(profesionalAgendaProvider);
 
     return Scaffold(
       backgroundColor: context.colores.fondo,
+      floatingActionButton: !puedeAgendar
+          ? null
+          : FloatingActionButton.extended(
+              key: const Key('nueva-cita'),
+              icon: const Icon(Icons.add),
+              label: const Text('Nueva cita'),
+              onPressed: () => mostrarNuevaCita(
+                context,
+                profesionales: agenda!.profesionales,
+                dia: dia,
+                // Lo que se está viendo: ese profesional y su sucursal.
+                profesionalId: profesionalEnVista(
+                  agenda,
+                  acotado: sesion?.esInstructorAcotado ?? false,
+                  elegido: elegido,
+                ),
+                sucursalId: agenda.sesiones
+                    .map((s) => s.sucursalId)
+                    .nonNulls
+                    .firstOrNull,
+              ),
+            ),
       appBar: AppBar(
         backgroundColor: context.colores.fondo,
         titleSpacing: 20,
@@ -256,6 +286,21 @@ class _TiraSemana extends ConsumerWidget {
 
 // ------------------------------------------------------------------ CITAS
 
+/// El profesional cuyo día se ve en la agenda de citas (null sin equipo). Quien
+/// imparte solo recibe sus citas: se le abre su día, sin elegir a otros. Al resto,
+/// el que eligió o el primer profesional con citas ese día (no uno vacío por orden).
+String? profesionalEnVista(
+  AgendaDia agenda, {
+  required bool acotado,
+  String? elegido,
+}) {
+  final id =
+      (acotado ? null : elegido) ?? agenda.sesiones.firstOrNull?.instructorId;
+  return agenda.profesionales.any((p) => p.id == id)
+      ? id
+      : agenda.profesionales.firstOrNull?.id;
+}
+
 class _AgendaCitas extends ConsumerWidget {
   const _AgendaCitas({
     required this.agenda,
@@ -272,19 +317,13 @@ class _AgendaCitas extends ConsumerWidget {
     if (agenda.profesionales.isEmpty) {
       return const _Vacio('Aún no hay profesionales en el equipo.');
     }
-    // Quien imparte solo recibe sus citas: se le abre su día, sin elegir a otros.
-    // Al resto, el primer profesional con citas ese día (no uno vacío por orden).
     final acotado = ref.watch(sesionProvider)?.esInstructorAcotado ?? false;
-    final conCitas = agenda.sesiones.firstOrNull?.instructorId;
-    final elegido =
-        (acotado ? null : ref.watch(profesionalAgendaProvider)) ??
-        conCitas ??
-        agenda.profesionales.first.id;
-    final indice = math.max(
-      0,
-      agenda.profesionales.indexWhere((p) => p.id == elegido),
+    final elegido = profesionalEnVista(
+      agenda,
+      acotado: acotado,
+      elegido: ref.watch(profesionalAgendaProvider),
     );
-    final pro = agenda.profesionales[indice];
+    final pro = agenda.profesionales.firstWhere((p) => p.id == elegido);
     final citas = agenda.sesiones
         .where((s) => s.instructorId == pro.id)
         .toList();
@@ -483,7 +522,8 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
           ? const _Vacio('Sin citas este día.')
           : SingleChildScrollView(
               controller: _scroll,
-              padding: const EdgeInsets.only(top: 10, bottom: 24),
+              // Abajo, espacio para «Nueva cita»: no tapa la última cita del día.
+              padding: const EdgeInsets.only(top: 10, bottom: 96),
               child: SizedBox(
                 height: alto,
                 child: Stack(

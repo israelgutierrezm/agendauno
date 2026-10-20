@@ -160,6 +160,123 @@ class AgendaRepository {
         .map((e) => HechoCita.desdeJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  // ----------------------------- agendar y reprogramar (igual que la web)
+
+  /// Los servicios que se ofrecen (sin los archivados), para agendar una cita.
+  Future<List<ServicioCita>> serviciosParaCita() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/ofertas');
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => ServicioCita.desdeJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Las sucursales del negocio (dónde será la cita).
+  Future<List<SucursalAgenda>> sucursales() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/sucursales');
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => SucursalAgenda.desdeJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Los huecos libres de un profesional en una sucursal ese día (su horario de
+  /// atención menos lo ocupado, con la duración y los márgenes del servicio). Cada
+  /// uno trae su hora en la sucursal (`inicia_local`).
+  Future<List<HorarioCita>> horariosLibres({
+    required String instructorId,
+    required String sucursalId,
+    required DateTime fecha,
+    String? ofertaId,
+    int? duracionMinutos,
+    String? excluirReserva,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/disponibilidad',
+      queryParameters: {
+        'instructor_id': instructorId,
+        'sucursal_id': sucursalId,
+        'fecha': ymd(fecha),
+        'oferta_id': ?ofertaId,
+        'duracion_minutos': ?duracionMinutos,
+        // Al mover una cita, su propio horario no cuenta como ocupado.
+        'excluir_reserva': ?excluirReserva,
+      },
+    );
+    return HorarioCita.deLista(
+      (res.data?['data'] as Map<String, dynamic>?)?['slots'],
+    );
+  }
+
+  /// Busca clientes en el servidor por nombre, correo o celular (los primeros 8),
+  /// como el buscador de la web.
+  Future<List<ClienteAgenda>> buscarClientes(String texto) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/miembros',
+      queryParameters: {
+        'tipo': 'miembro',
+        'q': texto,
+        'page': 1,
+        'per_page': 8,
+      },
+    );
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => ClienteAgenda.desdeJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Da de alta a un cliente al vuelo (alta rápida al agendar): su nombre y, si se
+  /// tienen, su celular y su correo, en la sucursal de la cita.
+  Future<ClienteAgenda> crearCliente({
+    required String nombre,
+    String? celular,
+    String? email,
+    String? sucursalId,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/miembros',
+      data: {
+        'nombre': nombre,
+        'celular': celular,
+        'email': ?email,
+        'tipo': 'miembro',
+        'sucursal_id': sucursalId,
+      },
+    );
+    return ClienteAgenda.desdeJson(
+      (res.data?['data'] as Map<String, dynamic>?) ?? const {},
+    );
+  }
+
+  /// El negocio agenda una cita a un cliente: queda confirmada y, si el servicio es
+  /// de pago, se cobra en caja. Devuelve la cita como la muestra la agenda.
+  Future<SesionAgenda> agendarCita(NuevaCita cita) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/agenda/citas',
+      data: cita.aJson(),
+    );
+    return SesionAgenda.desdeJson(
+      (res.data?['data'] as Map<String, dynamic>?) ?? const {},
+    );
+  }
+
+  /// Mueve una cita a otra hora (de la sucursal) y, si se quiere, con otro
+  /// profesional. El servidor revalida que esté libre; si no, no cambia nada.
+  Future<CitaMovida> reprogramarCita(
+    String reservaId, {
+    required DateTime inicia,
+    String? instructorId,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/reservas/$reservaId/reprogramar',
+      data: {
+        'inicia_en_local': horaLocalParaApi(inicia),
+        'instructor_id': ?instructorId,
+      },
+    );
+    return CitaMovida.desdeJson(
+      (res.data?['data'] as Map<String, dynamic>?) ?? const {},
+    );
+  }
 }
 
 /// Repositorio ligado a la sesión activa (null si no hay sesión).

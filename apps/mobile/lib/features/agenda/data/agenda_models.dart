@@ -199,6 +199,7 @@ class SesionAgenda {
     required this.instructorId,
     required this.sala,
     this.sucursal,
+    this.sucursalId,
     required this.iniciaEn,
     required this.terminaEn,
     required this.iniciaLocal,
@@ -224,6 +225,10 @@ class SesionAgenda {
   final String? instructorId;
   final String? sala;
   final String? sucursal;
+
+  /// La sucursal de la sesión (su ULID): con ella se buscan los horarios libres al
+  /// reprogramar una cita.
+  final String? sucursalId;
 
   /// El instante en que empieza y termina (en la zona del teléfono): para ordenar y
   /// comparar con «ahora» (si ya empezó, la ventana de asistencia). No se muestra.
@@ -371,6 +376,7 @@ class SesionAgenda {
       instructorId: json['instructor_id'] as String?,
       sala: json['sala'] as String?,
       sucursal: json['sucursal'] as String?,
+      sucursalId: json['sucursal_id'] as String?,
       iniciaEn: inicia,
       terminaEn: termina,
       iniciaLocal: pared(paredInicio, inicia),
@@ -463,6 +469,158 @@ class Profesional {
   factory Profesional.desdeJson(Map<String, dynamic> json) => Profesional(
     id: json['id'] as String,
     nombre: (json['nombre'] ?? '') as String,
+  );
+}
+
+// ------------------------------------- agendar y reprogramar desde el equipo
+
+/// Un servicio del catálogo para agendar una cita (GET /ofertas, solo los que se
+/// ofrecen): lo que dura y cómo se habilita (se cobra en caja o usa un crédito).
+class ServicioCita {
+  const ServicioCita({
+    required this.id,
+    required this.nombre,
+    this.precioMinor,
+    this.politicaReserva = 'entitlement',
+    this.duracionMinutos,
+  });
+
+  final String id;
+  final String nombre;
+  final int? precioMinor;
+
+  /// `pago` (se cobra en caja) o `entitlement` (usa un crédito de su plan).
+  final String politicaReserva;
+
+  /// La que fija el servicio (null: se elige al agendar).
+  final int? duracionMinutos;
+
+  bool get seCobraEnCaja => politicaReserva == 'pago';
+
+  /// "Corte · 30 min · $150.00", como en el selector de la web.
+  String etiqueta(String moneda) => [
+    nombre,
+    if (duracionMinutos != null) '$duracionMinutos min',
+    if (seCobraEnCaja && (precioMinor ?? 0) > 0)
+      Formato.dinero(precioMinor!, moneda),
+  ].join(' · ');
+
+  /// Lo que pasa al agendarla (los mismos textos que la web).
+  String aviso(String moneda) => seCobraEnCaja
+      ? 'Queda confirmada y se cobra en caja: '
+            '${Formato.dinero(precioMinor ?? 0, moneda)}.'
+      : 'Queda confirmada y usa un crédito de su membresía.';
+
+  factory ServicioCita.desdeJson(Map<String, dynamic> j) => ServicioCita(
+    id: j['id'] as String,
+    nombre: (j['nombre'] ?? '') as String,
+    precioMinor: (j['precio_clase_minor'] as num?)?.toInt(),
+    politicaReserva: (j['politica_reserva'] ?? 'entitlement') as String,
+    duracionMinutos: switch ((j['duracion_minutos'] as num?)?.toInt()) {
+      final int m when m > 0 => m,
+      _ => null,
+    },
+  );
+}
+
+/// Una sucursal del negocio (GET /sucursales): dónde será la cita.
+class SucursalAgenda {
+  const SucursalAgenda({required this.id, required this.nombre});
+
+  final String id;
+  final String nombre;
+
+  factory SucursalAgenda.desdeJson(Map<String, dynamic> j) => SucursalAgenda(
+    id: j['id'] as String,
+    nombre: (j['nombre'] ?? '') as String,
+  );
+}
+
+/// Un cliente del negocio para agendarle (GET /miembros?q=…, o el que se acaba de
+/// dar de alta): su nombre y algo para distinguirlo (su correo o su celular).
+class ClienteAgenda {
+  const ClienteAgenda({required this.id, required this.nombre, this.detalle});
+
+  final String id;
+  final String nombre;
+  final String? detalle;
+
+  factory ClienteAgenda.desdeJson(Map<String, dynamic> j) {
+    String? texto(Object? v) =>
+        v is String && v.trim().isNotEmpty ? v.trim() : null;
+    return ClienteAgenda(
+      id: j['id'] as String,
+      nombre: texto(j['nombre_completo']) ?? texto(j['nombre']) ?? '—',
+      detalle: texto(j['email']) ?? texto(j['celular']),
+    );
+  }
+}
+
+/// Lo que se manda para agendar una cita a un cliente (POST /agenda/citas), igual
+/// que la web: la hora es la de la sucursal, sin zona (`inicia_en_local`).
+class NuevaCita {
+  const NuevaCita({
+    required this.personaId,
+    required this.ofertaId,
+    required this.sucursalId,
+    required this.instructorId,
+    required this.inicia,
+    required this.duracionMinutos,
+  });
+
+  final String personaId;
+  final String ofertaId;
+  final String sucursalId;
+  final String instructorId;
+
+  /// La hora de pared de la sucursal (ver [horaLocalParaApi]).
+  final DateTime inicia;
+  final int duracionMinutos;
+
+  Map<String, dynamic> aJson() => {
+    'persona_id': personaId,
+    'oferta_id': ofertaId,
+    'sucursal_id': sucursalId,
+    'instructor_id': instructorId,
+    'inicia_en_local': horaLocalParaApi(inicia),
+    'duracion_minutos': duracionMinutos,
+  };
+}
+
+/// Una hora de pared de la sucursal como la pide el API en `inicia_en_local`
+/// ("AAAA-MM-DD HH:MM:00", sin zona): el servidor la lee en la zona de la sucursal.
+String horaLocalParaApi(DateTime pared) =>
+    '${Formato.iso(pared)} ${Formato.hora(pared)}:00';
+
+/// La hora de pared de la sucursal de un horario libre (su `inicia_local`, sin
+/// zona), o null si no vino. Se guarda en UTC solo para que el horario de verano
+/// del teléfono no la mueva: sus campos son el día y la hora en la sucursal.
+DateTime? paredDeHorario(String? iniciaLocal) {
+  final m = iniciaLocal == null
+      ? null
+      : RegExp(
+          r'^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})',
+        ).firstMatch(iniciaLocal.trim());
+  if (m == null) {
+    return null;
+  }
+  int n(int i) => int.parse(m.group(i)!);
+  return DateTime.utc(n(1), n(2), n(3), n(4), n(5));
+}
+
+/// Lo que respondió el servidor al mover una cita (POST /reservas/{id}/reprogramar):
+/// el horario de antes y el nuevo (instantes).
+class CitaMovida {
+  const CitaMovida({this.antes, this.ahora, this.sesionId});
+
+  final DateTime? antes;
+  final DateTime? ahora;
+  final String? sesionId;
+
+  factory CitaMovida.desdeJson(Map<String, dynamic> j) => CitaMovida(
+    antes: DateTime.tryParse((j['antes'] ?? '') as String),
+    ahora: DateTime.tryParse((j['ahora'] ?? '') as String),
+    sesionId: j['sesion_id'] as String?,
   );
 }
 

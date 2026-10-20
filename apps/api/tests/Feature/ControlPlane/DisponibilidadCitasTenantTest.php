@@ -116,3 +116,30 @@ it('un día cerrado del negocio no ofrece huecos de cita', function (): void {
 
     expect(slotsDisponibles($e, $coachId, $sede['sucursal'], $fecha))->toBe([]);
 });
+
+it('al mover una cita, su propio horario no cuenta como ocupado', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
+    $coachId = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
+        ->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
+
+    $fecha = '2026-10-05';
+    fijarHorarioAtencion($e, $coachId, $sede['sucursal'], (int) CarbonImmutable::parse($fecha)->isoWeekday());
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
+        'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 15000, 'duracion_minutos' => 60,
+    ], conBearer($e['bearer']))->assertOk();
+    $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/agenda/citas", [
+        'persona_id' => crearMiembroTenant($e), 'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'],
+        'instructor_id' => $coachId, 'inicia_en_local' => "{$fecha} 10:00:00", 'duracion_minutos' => 60,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.cita.reserva_id');
+    expect($reserva)->not->toBe('');
+
+    $inicios = fn (array $slots): array => array_map(static fn (array $s): string => (string) $s['inicia_local'], $slots);
+    expect($inicios(slotsDisponibles($e, $coachId, $sede['sucursal'], $fecha)))->not->toContain("{$fecha} 10:00");
+
+    $moviendo = $this->getJson("/api/v1/app/{$e['slug']}/disponibilidad?instructor_id={$coachId}&sucursal_id={$sede['sucursal']}&fecha={$fecha}&duracion_minutos=60&excluir_reserva={$reserva}", conBearer($e['bearer']))
+        ->assertOk()->json('data.slots');
+    expect($moviendo)->toHaveCount(3);
+});

@@ -10,11 +10,13 @@ import '../../auth/application/sesion_controller.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import 'agenda_screen.dart';
+import 'reprogramar_cita_sheet.dart';
 
 /// Abre la hoja de una cita: quién, qué, a qué hora y cómo va (su atención y su
 /// pago, como los calcula el servidor), lo que el cliente pidió, su contacto y su
 /// historial, con las acciones de recepción (llegó, no asistió, cobrar en caja,
-/// cancelar). Lo que mueve dinero o créditos se confirma antes, como en la web.
+/// reprogramar, cancelar). Lo que mueve dinero o créditos se confirma antes, como
+/// en la web.
 Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) =>
     showModalBottomSheet<void>(
       context: context,
@@ -237,6 +239,17 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
       'Cita cancelada; el horario quedó libre.',
       cerrar: true,
     );
+  }
+
+  /// Mover la cita a otra hora (y, si se quiere, con otro profesional). Si se movió,
+  /// la hoja se cierra: la cita pudo irse a otro día.
+  Future<void> _reprogramar(SesionAgenda s) async {
+    final navegador = Navigator.of(context);
+    final equipo = ref.read(agendaProvider).value?.profesionales ?? const [];
+    final movida = await mostrarReprogramarCita(context, s, equipo);
+    if (movida && mounted) {
+      navegador.pop();
+    }
   }
 
   @override
@@ -494,13 +507,32 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                       ),
                   ],
                 ),
+              // Mover o cancelar: con el mismo permiso y antes de marcar asistencia.
               if (cancelable)
-                TextButton(
-                  onPressed: _ocupado ? null : () => _cancelar(s),
-                  style: TextButton.styleFrom(
-                    foregroundColor: context.colores.error,
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          key: const Key('reprogramar'),
+                          icon: const Icon(Icons.event_repeat, size: 18),
+                          label: const Text('Reprogramar'),
+                          onPressed: _ocupado ? null : () => _reprogramar(s),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: _ocupado ? null : () => _cancelar(s),
+                          style: TextButton.styleFrom(
+                            foregroundColor: context.colores.error,
+                          ),
+                          child: const Text('Cancelar cita'),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: const Text('Cancelar cita'),
                 ),
             ],
             if (verHistorial) _HistorialCita(sesion: s, moneda: moneda),

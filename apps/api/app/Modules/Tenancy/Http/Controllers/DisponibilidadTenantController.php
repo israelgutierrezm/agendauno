@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -105,10 +106,15 @@ class DisponibilidadTenantController
             'oferta_id' => ['nullable', 'string'],
             'duracion_minutos' => ['required_without:oferta_id', 'nullable', 'integer', 'min:5', 'max:1440'],
             'paso_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
+            // Al mover una cita: su propio horario no cuenta como ocupado.
+            'excluir_reserva' => ['nullable', 'string'],
         ]);
 
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+        $excluir = ($validado['excluir_reserva'] ?? '') !== ''
+            ? ReservaTenant::query()->where('ulid', $validado['excluir_reserva'])->value('sesion_id')
+            : null;
 
         $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::paraAgendar($validado['oferta_id']) : null;
         [$duracion, $margenes] = $this->disponibilidad->duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
@@ -121,6 +127,7 @@ class DisponibilidadTenantController
             isset($validado['paso_minutos']) ? (int) $validado['paso_minutos'] : null,
             $margenes,
             $oferta,
+            $excluir !== null ? (int) $excluir : null,
         );
 
         return response()->json(['data' => ['fecha' => $validado['fecha'], 'slots' => $slots]]);

@@ -94,7 +94,7 @@ function disponibleDeImportacion(string $slug, string $derecho): int
  *
  * @return array{reservas: array<string, string>, avisos_pendientes: int, sin_avisos: bool}
  */
-function reservasImportadas(string $slug): array
+function reservasDeClasesImportadas(string $slug): array
 {
     return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $slug)->firstOrFail(), function (): array {
         $reservas = ReservaTenant::query()->with('persona')->orderBy('id')->get();
@@ -120,10 +120,10 @@ it('importa confirmadas y la lista de espera en su orden, aparta el crédito y n
     expect($previa['ok'])->toBeTrue()
         ->and($previa['resumen'])->toMatchArray(['total' => 3, 'validas' => 3, 'pendientes' => 0, 'invalidas' => 0, 'en_espera' => 1, 'creditos_reintegrados' => 0])
         // La vista previa no guarda nada.
-        ->and(reservasImportadas($e['slug'])['reservas'])->toBe([]);
+        ->and(reservasDeClasesImportadas($e['slug'])['reservas'])->toBe([]);
     importarReservasCsv($e, $filas, parcial: false)['importacion']->assertCreated()->assertJsonPath('data.importadas', 3);
 
-    expect(reservasImportadas($e['slug']))->toBe([
+    expect(reservasDeClasesImportadas($e['slug']))->toBe([
         'reservas' => ['ana@correo.mx' => 'confirmada', 'beto@correo.mx' => 'confirmada', 'caro@correo.mx' => 'en_espera'],
         'avisos_pendientes' => 0,
         'sin_avisos' => true,
@@ -134,7 +134,7 @@ it('importa confirmadas y la lista de espera en su orden, aparta el crédito y n
 
     $otra = importarReservasCsv($e, $filas, parcial: false);
     expect($otra['previa']['resumen'])->toMatchArray(['validas' => 0, 'existentes' => 3]);
-    expect(reservasImportadas($e['slug'])['reservas'])->toHaveCount(3)
+    expect(reservasDeClasesImportadas($e['slug'])['reservas'])->toHaveCount(3)
         ->and(disponibleDeImportacion($e['slug'], $e['derechos']['ana']))->toBe(7000);
 
     // Cada carga queda en la bitácora con su resumen (también la que no agregó nada).
@@ -162,7 +162,7 @@ it('si los saldos ya descontaron las reservas, el crédito se reintegra como ape
     // El saldo de cada uno queda igual que antes: lo reintegrado se aparta para la clase.
     expect(disponibleDeImportacion($e2['slug'], $e2['derechos']['ana']))->toBe(1000)
         ->and(disponibleDeImportacion($e2['slug'], $e2['derechos']['beto']))->toBe(0)
-        ->and(reservasImportadas($e2['slug'])['reservas'])->toBe(['ana@correo.mx' => 'confirmada', 'beto@correo.mx' => 'confirmada']);
+        ->and(reservasDeClasesImportadas($e2['slug'])['reservas'])->toBe(['ana@correo.mx' => 'confirmada', 'beto@correo.mx' => 'confirmada']);
     $apertura = app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e2['slug'])->firstOrFail(), fn (): int => MovimientoCreditoTenant::query()
         ->where('origen', OrigenMovimiento::Apertura->value)->count());
     expect($apertura)->toBe(2);
@@ -194,11 +194,11 @@ it('lo que no se puede queda pendiente o inválido con su motivo; sin «por part
         ->and($porFila[7]['errores'][0])->toContain('No hay una clase «Yoga»')
         ->and($porFila[8]['errores'][0])->toContain('antes del corte');
     $r['importacion']->assertUnprocessable();
-    expect(reservasImportadas($e['slug'])['reservas'])->toBe([]);
+    expect(reservasDeClasesImportadas($e['slug'])['reservas'])->toBe([]);
 
     $parcial = importarReservasCsv($e, $filas, parcial: true, corte: '2026-10-03');
     $parcial['importacion']->assertCreated()->assertJsonPath('data.importadas', 2);
-    expect(reservasImportadas($e['slug'])['reservas'])->toBe(['ana@correo.mx' => 'confirmada', 'beto@correo.mx' => 'confirmada']);
+    expect(reservasDeClasesImportadas($e['slug'])['reservas'])->toBe(['ana@correo.mx' => 'confirmada', 'beto@correo.mx' => 'confirmada']);
 });
 
 it('la confirmación vale solo para el archivo revisado', function (): void {
@@ -209,5 +209,5 @@ it('la confirmación vale solo para el archivo revisado', function (): void {
     $this->post("/api/v1/app/{$e['slug']}/importaciones/reservas", [
         'corte' => '2026-10-01', 'ya_descontadas' => '0', 'archivo' => $otro, 'confirmacion' => $r['previa']['confirmacion'],
     ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonPath('meta.errors.archivo.0', 'Vuelve a revisar el archivo: la confirmación expiró o cambió el contenido.');
-    expect(reservasImportadas($e['slug'])['reservas'])->toBe([]);
+    expect(reservasDeClasesImportadas($e['slug'])['reservas'])->toBe([]);
 });

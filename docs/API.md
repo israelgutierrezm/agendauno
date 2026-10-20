@@ -427,6 +427,13 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
   - `activa_sin_comprobar`;
   - `comprobada`: hay un pago que aprobó ese proveedor, con `comprobada_en`.
 
+## Disponibilidad al mover una cita
+
+- `GET /disponibilidad` (`agenda.ver`, negocios de citas) acepta `excluir_reserva` (el
+  ulid de la cita que se mueve): su propio horario no cuenta como ocupado, así se puede
+  mover unos minutos con el mismo profesional. Lo usan la web y la app del equipo al
+  reprogramar.
+
 ## Importar citas futuras (ADR 0160)
 
 Solo negocios de citas, con `agenda.gestionar` y `reservas.gestionar`.
