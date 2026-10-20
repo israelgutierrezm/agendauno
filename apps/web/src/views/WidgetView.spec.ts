@@ -5,9 +5,10 @@ import { i18n } from "@/i18n";
 import WidgetView from "./WidgetView.vue";
 
 /*
-| Un widget en la web del negocio (ADR 0141): los planes con su botón para comprar,
-| que pide sus datos ahí mismo (el formulario de captación de siempre); y fuera de las
-| webs registradas, no se muestra.
+| Un widget en la web del negocio (ADR 0141): los planes con su botón «Me interesa»,
+| que pide sus datos ahí mismo (el formulario de captación de siempre; no se compra
+| ahí); quien ya es cliente entra sin perder lo que eligió; y fuera de las webs
+| registradas, no se muestra.
 */
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
@@ -33,7 +34,7 @@ const WIDGET = {
   modalidad: "clases",
 };
 const PLAN = {
-  id: "p1",
+  id: "01JABCDEFGHJKMNPQRSTVWXYZ0",
   nombre: "Paquete 8 clases",
   tipo: "paquete",
   precio_minor: 140000,
@@ -78,19 +79,58 @@ beforeEach(() => {
 });
 
 describe("widget de planes", () => {
-  it("muestra los planes y al comprar pide sus datos ahí mismo", async () => {
+  it("muestra los planes y «Me interesa» pide sus datos ahí mismo", async () => {
     const w = montar();
     await flushPromises();
 
     const planes = w.get('[data-prueba="widget-planes"]');
     expect(planes.text()).toContain("Paquete 8 clases");
     expect(planes.text()).toContain("$1,400.00");
+    // El botón dice lo que hace: no compra, deja sus datos.
+    expect(w.get('[data-prueba="lo-quiero"]').text()).toBe("Me interesa");
+    expect(planes.text()).not.toContain("Comprar");
     await w.get('[data-prueba="lo-quiero"]').trigger("click");
-    expect(w.get('[data-prueba="formulario"]').text()).toBe("p1");
+    expect(w.get('[data-prueba="formulario"]').text()).toBe(PLAN.id);
     expect(w.text()).toContain("Déjanos tus datos para Paquete 8 clases");
     // Con el color del negocio.
     expect(w.get('[data-prueba="widget"]').attributes("style")).toContain(
       "--acento: #e0457b",
+    );
+  });
+
+  it("quien ya es cliente entra sin perder el plan que eligió", async () => {
+    const w = montar();
+    await flushPromises();
+    const entrar = () =>
+      new URL(
+        w.get('[data-prueba="widget-entrar"]').attributes("href")!,
+        "https://x.test",
+      );
+    expect(entrar().searchParams.get("volver")).toBeNull();
+
+    await w.get('[data-prueba="lo-quiero"]').trigger("click");
+    expect(entrar().searchParams.get("estudio")).toBe("demo");
+    expect(entrar().searchParams.get("volver")).toBe(
+      `/mi-cuenta?plan=${PLAN.id}`,
+    );
+  });
+
+  it("sin formulario de captación, lleva a la página del negocio", async () => {
+    api.get.mockImplementation((url: string) =>
+      url.endsWith("/captacion")
+        ? Promise.reject(new Error("404"))
+        : Promise.resolve({
+            data: {
+              data: url.endsWith("/widgets/w1")
+                ? WIDGET
+                : { productos: [PLAN], estudio: { perfil_config: {} } },
+            },
+          }),
+    );
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="lo-quiero"]').text()).toBe(
+      "Ver en la página del negocio",
     );
   });
 

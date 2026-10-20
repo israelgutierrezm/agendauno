@@ -921,8 +921,19 @@ async function agendar(): Promise<void> {
     }
   } catch (e) {
     error.value = mensajeDeError(e);
+    return;
   } finally {
     agendando.value = false;
+  }
+  // «Agendar y pagar» hace las dos cosas: apartada la cita, pasa directo al pago en
+  // línea. Si el pago no arranca, queda apartada con «Pagar ahora» para reintentar.
+  if (
+    requierePago.value &&
+    pagoEnLinea.value &&
+    apartada.value &&
+    resultado.value?.orden_id
+  ) {
+    await pagar(resultado.value.orden_id);
   }
 }
 
@@ -2420,7 +2431,7 @@ onMounted(cargar);
                   {{
                     agendando
                       ? $t("reservar.agendando")
-                      : requierePago
+                      : requierePago && pagoEnLinea
                         ? $t("reservar.agendarYPagar")
                         : $t("perfilPublico.agendar.agendar")
                   }}

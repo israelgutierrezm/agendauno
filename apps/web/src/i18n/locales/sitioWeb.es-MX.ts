@@ -392,7 +392,8 @@ export default {
       "Lo que se muestra sale de tu negocio: aquí decides qué se ve en tu sitio (lo que ocultes sigue a la venta y se agenda igual); cada cosa se edita en su lugar, así tu página y tu agenda dicen lo mismo. Se publica con tus demás cambios.",
     visitante: "Qué puede hacer quien visita tu página",
     agendar: "Agendar en línea",
-    agendarClases: "Reservar sus clases en línea",
+    // Quien visita ve las clases y pide lugar; reservar es de quien ya es cliente.
+    agendarClases: "Ver tus clases y pedir lugar en línea",
     agendarCitas: "Agendar su cita en línea",
     dejarDatos: "Dejar sus datos para que lo contactes",
     activo: "Activo",

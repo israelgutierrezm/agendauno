@@ -105,7 +105,7 @@ describe("página pública del estudio", () => {
 
     await w
       .findAll("button")
-      .find((b) => b.text() === "Reservar primera clase")!
+      .find((b) => b.text() === "Pedir mi primera clase")!
       .trigger("click");
     const acceso = w.get('[data-prueba="pedir-acceso"]');
     expect(acceso.text()).toContain("Pide tu acceso");
@@ -153,7 +153,7 @@ describe("página pública del estudio", () => {
     const w = montar();
     await flushPromises();
     expect(w.text()).not.toContain("Agendar una cita");
-    expect(w.text()).toContain("Reservar primera clase");
+    expect(w.text()).toContain("Pedir mi primera clase");
 
     const citas = escaparate({ promedio: null, total: 0, recientes: [] });
     Object.assign(citas.data.data.estudio, {
@@ -164,7 +164,7 @@ describe("página pública del estudio", () => {
     const conCitas = montar();
     await flushPromises();
     expect(conCitas.text()).toContain("Agendar una cita");
-    expect(conCitas.text()).not.toContain("Reservar primera clase");
+    expect(conCitas.text()).not.toContain("Pedir mi primera clase");
   });
 
   it("muestra el giro como insignia, salvo los generales del registro", async () => {

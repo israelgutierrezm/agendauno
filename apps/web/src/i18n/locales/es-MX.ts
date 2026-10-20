@@ -1207,7 +1207,8 @@ export default {
     cargando: "Cargando el negocio…",
     noDisponible: "Este negocio no está disponible por ahora.",
     volverDirectorio: "← Volver a negocios",
-    reservar: "Reservar primera clase",
+    // Abre «Pide tu acceso» (registro cerrado, ADR 0093): no reserva todavía.
+    reservar: "Pedir mi primera clase",
     agendarCita: "Agendar una cita",
     agendaEnLinea: "Agenda en línea",
     avisoPrivacidad: "Aviso de privacidad",
@@ -1219,7 +1220,7 @@ export default {
     agendaPaso3: "Elige horario",
     pedirAcceso: "Pedir acceso",
     // Pedir lugar en una clase concreta: llega a Prospectos con esa clase (ADR 0117).
-    pedirLugar: "Quiero este lugar",
+    pedirLugar: "Pedir este lugar",
     // Registro cerrado (ADR 0093): el negocio da de alta a sus clientes.
     acceso: {
       titulo: "Pide tu acceso",
@@ -1267,7 +1268,8 @@ export default {
       paraActividad: "Para {actividad}",
       vence: "Si lo pagas hoy, se puede usar hasta el {fecha}",
       renueva: "Se renueva cada mes mientras la pagues",
-      loQuiero: "Lo quiero",
+      // Deja sus datos para ese plan (Prospectos); no lo compra aquí.
+      loQuiero: "Me interesa",
       permanencia:
         "Permanencia mínima de 1 mes | Permanencia mínima de {n} meses",
       grupos: {

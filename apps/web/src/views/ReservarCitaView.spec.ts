@@ -587,16 +587,21 @@ describe("agenda pública por pasos", () => {
   });
 
   it("pide el correo y confirma con el resumen de dónde es la cita (pago obligatorio: queda apartada)", async () => {
-    mocks.post.mockResolvedValue({
-      data: {
-        data: {
-          estado: "pendiente_pago",
-          orden_id: "orden",
-          total_minor: 20000,
-          moneda: "MXN",
-        },
-      },
-    });
+    // El pago no arranca: la cita queda apartada con «Pagar ahora» para reintentar.
+    mocks.post.mockImplementation((url: string) =>
+      url.endsWith("/citas/pagar")
+        ? Promise.reject(new Error("pasarela"))
+        : Promise.resolve({
+            data: {
+              data: {
+                estado: "pendiente_pago",
+                orden_id: "orden",
+                total_minor: 20000,
+                moneda: "MXN",
+              },
+            },
+          }),
+    );
     const vista = montar();
     await flushPromises();
     await vista.get('input[value="centro"]').setValue();
@@ -619,8 +624,17 @@ describe("agenda pública por pasos", () => {
     expect(boton.attributes("disabled")).toBeDefined();
 
     await agendarComo(vista);
+    await flushPromises();
+    // «Agendar y pagar» pasó directo al pago, sin otro clic.
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/citas/pagar", {
+      orden_id: "orden",
+      metodo: "tarjeta",
+    });
     expect(vista.get("h2.text-success").text()).toBe(es.reservar.listoTitulo);
     expect(vista.get('[role="status"]').text()).toContain(es.reservar.apartado);
+    expect(
+      vista.findAll("button").some((b) => b.text().startsWith("Pagar ahora")),
+    ).toBe(true);
     expect(vista.get('[data-prueba="donde-listo"]').text()).toContain(
       "Av. Juárez 10, Centro",
     );
@@ -672,17 +686,22 @@ describe("agenda pública por pasos", () => {
       anticipo_minor: 5000,
     } as (typeof op.data.data.servicios)[number];
     api(op);
-    mocks.post.mockResolvedValue({
-      data: {
-        data: {
-          estado: "pendiente_pago",
-          orden_id: "orden",
-          total_minor: 5000,
-          saldo_minor: 15000,
-          moneda: "MXN",
-        },
-      },
-    });
+    // Al agendar pasa directo al pago; aquí no arranca y la cita queda apartada.
+    mocks.post.mockImplementation((url: string) =>
+      url.endsWith("/citas/pagar")
+        ? Promise.reject(new Error("pasarela"))
+        : Promise.resolve({
+            data: {
+              data: {
+                estado: "pendiente_pago",
+                orden_id: "orden",
+                total_minor: 5000,
+                saldo_minor: 15000,
+                moneda: "MXN",
+              },
+            },
+          }),
+    );
     const vista = montar();
     await flushPromises();
     await hastaHorario(vista);
@@ -698,7 +717,7 @@ describe("agenda pública por pasos", () => {
     expect(eleccion.text()).toContain("Pagar todo ahora: $200");
     expect(marcado(vista, '[data-prueba="pagar-anticipo"]')).toBe(true);
     await agendarComo(vista);
-    expect(mocks.post).toHaveBeenLastCalledWith(
+    expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/citas",
       expect.objectContaining({ pagar: "anticipo" }),
     );
@@ -714,7 +733,7 @@ describe("agenda pública por pasos", () => {
     await continuar(vista);
     await vista.get('[data-prueba="pagar-todo"]').setValue();
     await agendarComo(vista);
-    expect(mocks.post).toHaveBeenLastCalledWith(
+    expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/citas",
       expect.objectContaining({ pagar: "todo" }),
     );

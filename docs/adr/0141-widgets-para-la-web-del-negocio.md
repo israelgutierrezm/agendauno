@@ -59,3 +59,22 @@ calendario ya era así.
   dos.
 - Pendiente si se pide: una lista de próximas clases compacta y un botón suelto de
   «Agendar» para negocios de citas.
+
+## Cada botón dice lo que hace (2026-10-20)
+
+Antes de V1, ningún botón público promete algo que no hace:
+
+| Antes | Ahora | Qué hace |
+|---|---|---|
+| Widget de planes «Comprar» | «Me interesa» (sin captación: «Ver en la página del negocio») | Deja sus datos para ese plan (Prospectos) |
+| «Reservar primera clase» | «Pedir mi primera clase» | Abre «Pide tu acceso» |
+| «Quiero este lugar» | «Pedir este lugar» | Deja sus datos para esa clase |
+| «Lo quiero» (planes de la página) | «Me interesa» | Deja sus datos para ese plan |
+| «Reserva tu clase» (página de enlaces) | «Ver clases y horarios» | Lleva a la página del negocio |
+| «Agendar y pagar» | Igual | Aparta la cita y pasa directo al pago; si no arranca, queda «Pagar ahora» |
+
+- El enlace «¿Ya tienes cuenta? Entra…» del widget también se ve con el formulario
+  abierto y lleva la clase o el plan elegidos en el regreso (ADR 0142). Antes solo se
+  veía sin nada elegido, así que nunca llevaba el interés.
+- Que el widget termine en una reserva o una compra (no solo en un prospecto) queda para
+  V1.1, junto con la inscripción inmediata.

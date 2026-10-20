@@ -312,7 +312,8 @@ export default {
     cargando: "Cargando…",
     noDisponible: "Este negocio no está disponible por ahora.",
     agendar: "Agenda tu cita",
-    reservarClase: "Reserva tu clase",
+    // Lleva a la página del negocio, con sus clases y horarios.
+    reservarClase: "Ver clases y horarios",
     horario: "Horario de clases",
     precios: "Planes y precios",
     conocer: "Conoce más de nosotros",

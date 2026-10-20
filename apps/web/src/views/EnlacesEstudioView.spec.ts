@@ -121,7 +121,7 @@ describe("página de enlaces del negocio", () => {
       .findAll("a")
       .map((a) => a.text());
     expect(botones.slice(0, 3)).toEqual([
-      "Reserva tu clase",
+      "Ver clases y horarios",
       "Horario de clases",
       "Planes y precios",
     ]);
@@ -142,6 +142,6 @@ describe("página de enlaces del negocio", () => {
       .findAll("a")
       .map((a) => a.text());
     expect(botones[0]).toBe("Agenda tu cita");
-    expect(botones).not.toContain("Reserva tu clase");
+    expect(botones).not.toContain("Ver clases y horarios");
   });
 });

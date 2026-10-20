@@ -274,24 +274,30 @@ onBeforeUnmount(() => observador?.disconnect());
                 :plan="p"
                 :terminos="terminos"
                 :varias-sedes="variasSedes"
-                :boton="t('captacion.widgets.publico.comprar')"
+                :boton="
+                  formulario
+                    ? t('captacion.widgets.publico.meInteresa')
+                    : t('captacion.widgets.publico.verEnPagina')
+                "
                 @elegir="elegirPlan(p)"
               />
             </li>
           </ul>
         </template>
-        <p class="mt-4 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ t("captacion.widgets.publico.yaCuenta") }}
-          <a
-            class="tu-enlace"
-            :href="enlaceEntrar"
-            target="_blank"
-            rel="noopener"
-            data-prueba="widget-entrar"
-            >{{ t("captacion.widgets.publico.entrar") }}</a
-          >
-        </p>
       </template>
+      <!-- Quien ya es cliente entra y sigue con lo que eligió (ADR 0142): también
+           desde el formulario, con la clase o el plan en el regreso. -->
+      <p class="mt-4 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ t("captacion.widgets.publico.yaCuenta") }}
+        <a
+          class="tu-enlace"
+          :href="enlaceEntrar"
+          target="_blank"
+          rel="noopener"
+          data-prueba="widget-entrar"
+          >{{ t("captacion.widgets.publico.entrar") }}</a
+        >
+      </p>
     </template>
     <!-- La leyenda fija de la plataforma, también dentro de otra web (ADR 0167). -->
     <p class="mt-4 text-center">

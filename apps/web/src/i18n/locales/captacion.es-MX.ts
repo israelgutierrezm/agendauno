@@ -6,7 +6,7 @@ export default {
     nav: "Integrar en mi web",
     titulo: "Integrar en mi web",
     descripcion:
-      "Muestra tu calendario de clases o tus planes dentro de tu propia web. Cada quien reserva, pide lugar o compra desde ahí.",
+      "Muestra tu calendario de clases o tus planes dentro de tu propia web. Quien visita te deja sus datos para pedir un lugar o un plan; quien ya es cliente entra a su cuenta para reservar o comprar.",
     nuevo: "Nuevo widget",
     vacio: "Aún no tienes widgets. Crea uno y copia su código en tu web.",
     tipos: {
@@ -60,7 +60,10 @@ export default {
       noDisponible: "Este widget no está disponible.",
       noAutorizado:
         "Este widget no está autorizado para mostrarse en esta web.",
-      comprar: "Comprar",
+      // Con captación, deja sus datos para ese plan (no lo compra ahí); sin ella,
+      // lo lleva a la página del negocio.
+      meInteresa: "Me interesa",
+      verEnPagina: "Ver en la página del negocio",
       volver: "← Volver",
       pidiendo: "Déjanos tus datos para {etiqueta}",
       yaCuenta: "¿Ya tienes cuenta?",
