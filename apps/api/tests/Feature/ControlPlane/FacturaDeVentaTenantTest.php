@@ -218,3 +218,31 @@ it('quien está acotado a una sede ve y factura solo las ventas de su sede', fun
     expect(collect($this->getJson($url, conBearer($recep))->assertOk()->json('data'))->pluck('id')->all())->toBe([$facturaA]);
     expect($this->getJson($url, conBearer($e['bearer']))->assertOk()->json('data'))->toHaveCount(2);
 });
+
+it('lo devuelto en el mostrador no se factura; devuelto todo, ya no es facturable', function (): void {
+    $e = estudioConSesion('factura-devuelta', 'a@factura-devuelta.mx');
+    cargarDatosFiscales($e);
+    $sede = agendaSemilla($e);
+    $base = "/api/v1/app/{$e['slug']}";
+    test()->postJson("{$base}/caja/turnos", ['sucursal_id' => $sede['sucursal'], 'fondo_minor' => 0], conBearer($e['bearer']))->assertCreated();
+    $venta = pomadasVendidasParaFacturar($e, $sede['sucursal']);
+    $linea = (string) collect($this->getJson("{$base}/pos/ventas", conBearer($e['bearer']))->json('data'))->firstWhere('id', $venta)['lineas'][0]['id'];
+    $devolver = fn (string $llave) => $this->withHeader('Idempotency-Key', $llave)->postJson("{$base}/pos/ventas/{$venta}/devoluciones", [
+        'lineas' => [['id' => $linea, 'cantidad' => 1]], 'motivo' => 'Venía abierta',
+    ], conBearer($e['bearer']))->assertCreated();
+
+    // Devuelta una de dos pomadas: se factura una, por $280.
+    $devolver('dev-1');
+    $this->getJson("{$base}/facturas/borrador?venta={$venta}", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.total_minor', 28000)
+        ->assertJsonPath('data.conceptos.0.cantidad', 1)
+        ->assertJsonPath('data.conceptos.0.precio_unitario_minor', 24138);
+
+    // Devuelta la otra: ya no hay nada que facturar.
+    $devolver('dev-2');
+    $this->getJson("{$base}/facturas/borrador?venta={$venta}", conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonPath('meta.errors.venta_id.0', 'Se devolvió todo lo vendido: no queda nada que facturar.');
+    expect(collect($this->getJson("{$base}/pos/ventas", conBearer($e['bearer']))->json('data'))->firstWhere('id', $venta)['facturable'])
+        ->toBeFalse();
+});

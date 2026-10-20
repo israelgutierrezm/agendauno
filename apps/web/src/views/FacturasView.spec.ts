@@ -138,6 +138,10 @@ describe("facturas: búsqueda, filtros y páginas", () => {
     await w.get("#fa-cp").setValue("06700");
     await w.get("#fa-desc-0").setValue("Clase de yoga");
     await w.get("#fa-precio-0").setValue("100");
+    // El precio va antes de IVA: se ve el total que se timbra.
+    expect(w.get('[data-prueba="totales-factura"]').text()).toBe(
+      "Subtotal $100.00 · IVA 16 % $16.00 · Total $116.00",
+    );
     await w.get("form").trigger("submit");
     await flushPromises();
 

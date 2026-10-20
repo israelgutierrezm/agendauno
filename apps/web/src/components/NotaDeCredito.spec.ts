@@ -92,4 +92,20 @@ describe("nota de crédito", () => {
     expect(w.text()).toContain("Pasa de lo que queda por acreditar.");
     expect(w.emitted("hecha")).toBeUndefined();
   });
+
+  it("un error que no es de un campo del diálogo también se muestra", async () => {
+    api.post.mockRejectedValue({
+      campos: { factura: "Su cancelación está en espera." },
+    });
+    const w = mount(NotaDeCredito, {
+      props: { base: "/api/v1/app/demo", factura: null, dinero },
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await w.setProps({ factura: { ...factura, regimen_receptor: "616" } });
+    await w.get("#form-nota-credito").trigger("submit");
+    await flushPromises();
+    expect(w.get('[data-prueba="error-nota"]').text()).toBe(
+      "Su cancelación está en espera.",
+    );
+  });
 });

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CompradoresPosTenant;
 use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
 use App\Modules\Tenancy\Application\DevolverVentaPosTenant;
+use App\Modules\Tenancy\Application\FacturasDeVentasTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -389,7 +390,8 @@ class PuntoDeVentaTenantController
             'factura' => $venta->facturaTimbrada !== null
                 ? ['id' => $venta->facturaTimbrada->ulid, 'uuid' => $venta->facturaTimbrada->uuid]
                 : null,
-            'facturable' => $venta->facturaTimbrada === null && $venta->anulada_en === null && (int) $venta->total_minor > 0,
+            'facturable' => $venta->facturaTimbrada === null && $venta->anulada_en === null && (int) $venta->total_minor > 0
+                && FacturasDeVentasTenant::quedaPorFacturar($venta),
             'devolvible' => $this->devoluciones->impedimento($venta) === null
                 && $venta->lineas->contains(fn ($l): bool => (int) $l->cantidad > (int) $l->cantidad_devuelta),
             'lineas' => $venta->lineas->map(fn ($l): array => [

@@ -78,6 +78,8 @@ const pideRegimen = computed(
   () => props.factura !== null && !props.factura.regimen_receptor,
 );
 const montoMinor = computed(() => Math.round(Number(monto.value) * 100));
+// Los campos que el diálogo muestra junto a su error.
+const CAMPOS = ["monto_minor", "regimen_fiscal"];
 
 async function timbrar(): Promise<void> {
   if (!props.factura) {
@@ -114,10 +116,20 @@ async function timbrar(): Promise<void> {
       axios.isAxiosError(e) && e.response?.data?.data?.estado === "error"
         ? (e.response.data.data.motivo_error as string | null)
         : null;
-    errores.value = rechazo === null ? erroresPorCampo(e) : {};
+    const porCampo = rechazo === null ? erroresPorCampo(e) : {};
+    // Junto a su campo, lo que es de un campo del diálogo; lo demás (la factura, la
+    // facturación, los datos fiscales), arriba.
+    errores.value = Object.fromEntries(
+      Object.entries(porCampo).filter(([c]) => CAMPOS.includes(c)),
+    );
+    const otros = Object.entries(porCampo).filter(([c]) => !CAMPOS.includes(c));
     error.value =
       rechazo ??
-      (Object.keys(errores.value).length > 0 ? null : mensajeDeError(e));
+      (otros.length > 0
+        ? otros.map(([, m]) => m).join(" ")
+        : Object.keys(errores.value).length > 0
+          ? null
+          : mensajeDeError(e));
   } finally {
     timbrando.value = false;
   }

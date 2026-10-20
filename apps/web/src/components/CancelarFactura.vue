@@ -18,7 +18,15 @@ export interface FacturaACancelar {
   total: string;
 }
 
-const props = defineProps<{ base: string; factura: FacturaACancelar | null }>();
+const props = withDefaults(
+  defineProps<{
+    base: string;
+    factura: FacturaACancelar | null;
+    // Sustituir es emitir otra: solo a quien puede emitir.
+    puedeSustituir?: boolean;
+  }>(),
+  { puedeSustituir: true },
+);
 const emit = defineEmits<{
   cerrar: [];
   cancelada: [factura: { estado: string }];
@@ -106,7 +114,7 @@ async function pedir(): Promise<void> {
             </span>
           </label>
         </fieldset>
-        <p class="text-sm">
+        <p v-if="puedeSustituir" class="text-sm">
           {{ $t("cancelarFactura.sustituirPregunta") }}
           <RouterLink
             class="tu-enlace"

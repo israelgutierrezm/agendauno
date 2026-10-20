@@ -137,6 +137,7 @@ const meta = ref<{
   per_page: number;
   ultima_pagina: number;
   conteos?: { timbrada: number; error: number; cancelada?: number };
+  iva_porcentaje?: number;
 } | null>(null);
 useFiltrosEnUrl({
   q: buscar,
@@ -291,6 +292,8 @@ function limpiarFormulario(): void {
   esAnticipo.value = false;
   importeAnticipo.value = "";
   anticiposElegidos.value = [];
+  usoCfdi.value = "G03";
+  formaPago.value = "01";
 }
 async function cargarBorrador(): Promise<void> {
   // La sustituta de una factura con datos mal (ADR 0180): `?sustituye=`.
@@ -429,6 +432,31 @@ async function cargar(): Promise<void> {
   }
 }
 
+// El total antes de timbrar, como lo calcula el CFDI: los precios van sin IVA y el
+// IVA de cada concepto se redondea al centavo.
+const ivaNegocio = computed(() => meta.value?.iva_porcentaje ?? 16);
+const totales = computed(() => {
+  const lineas = esAnticipo.value
+    ? [{ cantidad: 1, precio: importeAnticipo.value }]
+    : conceptos.value;
+  let subtotal = 0;
+  let impuesto = 0;
+  for (const c of lineas) {
+    const importe =
+      Number(c.cantidad || 0) * Math.round(Number(c.precio || 0) * 100);
+    subtotal += importe;
+    impuesto += Math.floor((importe * ivaNegocio.value * 100 + 5000) / 10000);
+  }
+  return { subtotal, impuesto, total: subtotal + impuesto };
+});
+// Con una venta, el total debe ser el suyo (unos centavos de redondeo, a lo más).
+const totalDistinto = computed(
+  () =>
+    ventaLigada.value !== null &&
+    ventaLigada.value.tipo !== "sustituye" &&
+    Math.abs(totales.value.total - ventaLigada.value.total_minor) > 2,
+);
+
 function agregarConcepto(): void {
   conceptos.value.push(conceptoNuevo());
 }
@@ -442,7 +470,10 @@ async function emitir(): Promise<void> {
   // Un CFDI timbrado no se edita: se confirma antes de timbrar.
   if (
     !(await confirmar(
-      t("confirmaciones.factura", { rfc: receptor.value.rfc }),
+      t("confirmaciones.factura", {
+        rfc: receptor.value.rfc,
+        total: dinero(totales.value.total, sesion.moneda),
+      }),
       { aceptar: t("confirmaciones.timbrar") },
     ))
   ) {
@@ -1124,6 +1155,30 @@ onMounted(async () => {
             </button>
           </div>
 
+          <!-- El total que se timbra (precios sin IVA, como el CFDI). -->
+          <p class="text-sm tabular-nums" data-prueba="totales-factura">
+            {{
+              $t("cancelarFactura.totales", {
+                subtotal: dinero(totales.subtotal, sesion.moneda),
+                iva: ivaNegocio,
+                impuesto: dinero(totales.impuesto, sesion.moneda),
+                total: dinero(totales.total, sesion.moneda),
+              })
+            }}
+          </p>
+          <AvisoTono
+            v-if="totalDistinto && ventaLigada"
+            tono="aviso"
+            data-prueba="total-distinto"
+          >
+            {{
+              $t("cancelarFactura.totalDistinto", {
+                total: dinero(totales.total, sesion.moneda),
+                venta: dinero(ventaLigada.total_minor, ventaLigada.moneda),
+              })
+            }}
+          </AvisoTono>
+
           <AvisoTono v-if="mensaje" tono="exito">
             {{ $t("facturas.nueva.timbrada") }}
           </AvisoTono>
@@ -1153,6 +1208,7 @@ onMounted(async () => {
 
     <CancelarFactura
       :base="base"
+      :puede-sustituir="puedeEmitir"
       :factura="
         cancelando
           ? {

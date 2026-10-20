@@ -6,7 +6,7 @@ export default {
   cobrar: "Sí, cobrar",
   pos: "¿Cobrar {total} en {metodo}? La venta se registra y se descuenta del inventario.",
   factura:
-    "¿Timbrar la factura para {rfc}? Un CFDI timbrado no se edita; solo se cancela ante el SAT.",
+    "¿Timbrar la factura por {total} para {rfc}? Un CFDI timbrado no se edita; solo se cancela ante el SAT.",
   facturaRenta:
     "¿Timbrar la factura de este cargo? Un CFDI timbrado no se edita; solo se cancela ante el SAT.",
   timbrar: "Timbrar",

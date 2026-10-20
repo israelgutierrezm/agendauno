@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Facturacion\CatalogosSat;
+use App\Modules\Tenancy\Facturacion\EstadoCancelacion;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
@@ -131,6 +132,8 @@ class FacturasTenantController
                 'page' => $pagina->currentPage(),
                 'per_page' => $pagina->perPage(),
                 'ultima_pagina' => $pagina->lastPage(),
+                // La tasa del negocio: la pantalla muestra el total antes de timbrar.
+                'iva_porcentaje' => app(ParametrosTenant::class)->entero('facturacion.iva_porcentaje'),
                 'conteos' => [
                     'timbrada' => $conteos[EstadoFactura::Timbrada->value] ?? 0,
                     'error' => $conteos[EstadoFactura::Error->value] ?? 0,
@@ -324,7 +327,9 @@ class FacturasTenantController
             'cancelada_en' => $factura->cancelada_en?->toIso8601String(),
             // Lo que se puede hacer con ella.
             'cancelable' => $this->cancelar->impedimento($factura) === null,
+            // Con la cancelación en espera no se le hacen notas de crédito.
             'acreditable_minor' => $factura->estado === EstadoFactura::Timbrada && $factura->tipo === FacturaTenant::INGRESO && ! $factura->anticipo
+                && $factura->cancelacion_estado !== EstadoCancelacion::Pendiente
                 ? $factura->acreditable()
                 : 0,
         ];

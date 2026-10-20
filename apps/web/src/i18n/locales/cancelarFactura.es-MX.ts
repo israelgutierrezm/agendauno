@@ -45,6 +45,10 @@ export default {
   timbrar: "Timbrar la nota",
   timbrando: "Timbrando…",
   notaHecha: "La nota de crédito quedó timbrada.",
+  // El total antes de timbrar (los precios van sin IVA, como en el CFDI).
+  totales: "Subtotal {subtotal} · IVA {iva} % {impuesto} · Total {total}",
+  totalDistinto:
+    "El total ({total}) no coincide con el de la venta ({venta}): revisa los precios, que van antes de IVA.",
   // Sustituir (en el formulario de factura).
   sustituyendo:
     "Sustituyes la factura {factura} · {total}. Al timbrar, se pide cancelar la anterior con el motivo 01.",

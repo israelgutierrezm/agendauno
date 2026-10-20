@@ -85,7 +85,7 @@ class EmitirFacturaTenant
             $items,
         ));
         $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
-        $impuesto = intdiv($subtotal * $ivaBps, 10000);
+        $impuesto = self::ivaDe($items, $ivaBps);
         $total = $subtotal + $impuesto;
 
         $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
@@ -181,8 +181,13 @@ class EmitirFacturaTenant
         ?string $regimenReceptor,
     ): FacturaTenant {
         $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
-        $subtotal = max(1, (int) round($montoMinor * 10000 / (10000 + $ivaBps)));
-        $impuesto = intdiv($subtotal * $ivaBps, 10000);
+        // El importe sin IVA más grande cuyo total (con el IVA redondeado, como el CFDI)
+        // no pasa del monto: así una nota por el total acredita el total.
+        $subtotal = intdiv($montoMinor * 10000, 10000 + $ivaBps) + 1;
+        while ($subtotal > 1 && $subtotal + self::ivaDeImporte($subtotal, $ivaBps) > $montoMinor) {
+            $subtotal--;
+        }
+        $impuesto = self::ivaDeImporte($subtotal, $ivaBps);
         $total = $subtotal + $impuesto;
         $items = [['descripcion' => mb_substr($descripcion, 0, 1000), 'cantidad' => 1, 'precio_unitario_minor' => $subtotal] + CatalogosSat::NOTA_DE_CREDITO];
         $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
@@ -246,6 +251,26 @@ class EmitirFacturaTenant
 
             return $nota;
         });
+    }
+
+    /**
+     * El IVA como lo calcula el CFDI: el de cada concepto, redondeado al centavo, y su
+     * suma (no el del subtotal truncado, que podía diferir por un centavo).
+     *
+     * @param  list<array{cantidad: int, precio_unitario_minor: int}>  $items
+     */
+    private static function ivaDe(array $items, int $ivaBps): int
+    {
+        return array_sum(array_map(
+            static fn (array $i): int => self::ivaDeImporte($i['cantidad'] * $i['precio_unitario_minor'], $ivaBps),
+            $items,
+        ));
+    }
+
+    /** El IVA de un importe, redondeado al centavo (la mitad hacia arriba). */
+    private static function ivaDeImporte(int $importe, int $ivaBps): int
+    {
+        return intdiv($importe * $ivaBps + 5000, 10000);
     }
 
     /**

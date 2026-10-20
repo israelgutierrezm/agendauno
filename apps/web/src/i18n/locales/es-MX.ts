@@ -2290,7 +2290,7 @@ export default {
       conceptos: "Conceptos",
       descripcion: "Descripción",
       cantidad: "Cantidad",
-      precio: "Precio unitario",
+      precio: "Precio unitario (antes de IVA)",
       claveProdServ: "Clave prod/serv (SAT)",
       agregarConcepto: "Agregar concepto",
       quitar: "Quitar",

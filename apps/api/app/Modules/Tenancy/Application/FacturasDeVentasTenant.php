@@ -70,7 +70,10 @@ class FacturasDeVentasTenant
         }
     }
 
-    /** Que la venta del mostrador se pueda facturar: vigente, con productos y sin factura. */
+    /**
+     * Que la venta del mostrador se pueda facturar: vigente, con productos que no se
+     * devolvieron y sin factura.
+     */
     public function exigirVenta(VentaPosTenant $venta): void
     {
         if ($venta->anulada_en !== null) {
@@ -78,6 +81,9 @@ class FacturasDeVentasTenant
         }
         if ((int) $venta->total_minor <= 0) {
             throw ValidationException::withMessages(['venta_id' => ['Esta venta no tiene productos que facturar.']]);
+        }
+        if (! self::quedaPorFacturar($venta)) {
+            throw ValidationException::withMessages(['venta_id' => ['Se devolvió todo lo vendido: no queda nada que facturar.']]);
         }
         if (self::deVenta((int) $venta->getKey()) !== null) {
             throw ValidationException::withMessages(['venta_id' => ['Esta venta ya está facturada.']]);
@@ -121,21 +127,36 @@ class FacturasDeVentasTenant
     public function borradorDeVenta(VentaPosTenant $venta): array
     {
         $venta->loadMissing(['lineas.articulo', 'persona']);
-        $conceptos = array_values($venta->lineas->map(function (LineaVentaPosTenant $l): array {
+        // Lo devuelto no se factura (ADR 0178): por pieza, lo que se cobró por ella, como
+        // al devolver.
+        $lineas = $venta->lineas->filter(static fn (LineaVentaPosTenant $l): bool => self::piezasQueQuedan($l) > 0);
+        $conceptos = array_values($lineas->map(function (LineaVentaPosTenant $l): array {
             $extras = array_map(static fn (array $e): string => (string) $e['nombre'], $l->extras ?? []);
             $nombre = (string) ($l->articulo->nombre ?? 'Producto').($extras !== [] ? ' con '.implode(', ', $extras) : '');
 
-            return $this->concepto($nombre, (int) $l->cantidad, intdiv((int) $l->subtotal_minor, max(1, (int) $l->cantidad)), self::ARTICULO);
+            return $this->concepto($nombre, self::piezasQueQuedan($l), intdiv((int) $l->subtotal_minor, max(1, (int) $l->cantidad)), self::ARTICULO);
         })->all());
+        $devuelto = (int) $venta->devoluciones()->sum('monto_minor');
 
         return [
             'etiqueta' => 'Venta '.TicketVentaPosTenant::folio($venta),
             'receptor' => $this->receptor($venta->persona),
             'conceptos' => $conceptos,
             'forma_pago' => self::formaDeLasPartes(CajasTenant::partesDeVenta($venta)),
-            'total_minor' => (int) $venta->total_minor,
+            'total_minor' => max(0, (int) $venta->total_minor - $devuelto),
             'moneda' => (string) $venta->moneda,
         ];
+    }
+
+    /** ¿Le queda algo sin devolver? Lo que se devolvió completo no se factura. */
+    public static function quedaPorFacturar(VentaPosTenant $venta): bool
+    {
+        return $venta->lineas->contains(static fn (LineaVentaPosTenant $l): bool => self::piezasQueQuedan($l) > 0);
+    }
+
+    private static function piezasQueQuedan(LineaVentaPosTenant $linea): int
+    {
+        return max(0, (int) $linea->cantidad - (int) $linea->cantidad_devuelta);
     }
 
     /**

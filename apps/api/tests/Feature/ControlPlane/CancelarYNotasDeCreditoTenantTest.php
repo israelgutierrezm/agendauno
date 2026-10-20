@@ -260,6 +260,36 @@ it('la nota de crédito se relaciona (01), no pasa de lo facturado y mientras ex
         ->assertOk()->assertJsonPath('data.estado', 'cancelada');
 });
 
+it('una nota por el total acredita el total (el IVA se redondea como en el CFDI)', function (): void {
+    $e = estudioConSesion('nota-exacta', 'a@nota-exacta.mx');
+    cargarDatosFiscales($e);
+    proveedorCfdiQueAnota();
+    $url = "/api/v1/app/{$e['slug']}/facturas";
+    // $100.04 + IVA: 16.0064 se redondea a 16.01 (como el CFDI), total $116.05.
+    $factura = (string) $this->postJson($url, [
+        'receptor' => ['nombre' => 'Cliente Final', 'rfc' => 'XAXX010101000', 'codigo_postal' => '06700', 'regimen_fiscal' => '616'],
+        'uso_cfdi' => 'S01',
+        'items' => [['descripcion' => 'Clase', 'cantidad' => 1, 'precio_unitario_minor' => 10004, 'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48']],
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.impuesto_minor', 1601)->assertJsonPath('data.total_minor', 11605)->json('data.id');
+
+    $this->postJson("{$url}/{$factura}/notas-credito", ['monto_minor' => 11605, 'forma_pago' => '01'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.total_minor', 11605);
+    $this->getJson("{$url}/{$factura}", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.acreditable_minor', 0);
+});
+
+it('con la cancelación en espera no se ofrecen notas de crédito', function (): void {
+    $e = estudioConSesion('nota-espera', 'a@nota-espera.mx');
+    cargarDatosFiscales($e);
+    proveedorCfdiQueAnota([EstadoCancelacion::Pendiente]);
+    $v = paqueteFacturadoParaCancelar($e);
+    $url = "/api/v1/app/{$e['slug']}/facturas/{$v['factura']}";
+
+    $this->postJson("{$url}/cancelar", ['motivo' => '02'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.acreditable_minor', 0);
+    $this->postJson("{$url}/notas-credito", ['monto_minor' => 1000, 'forma_pago' => '01'], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonPath('meta.errors.factura.0', 'Su cancelación está en espera: no se le hacen notas de crédito.');
+});
+
 it('un anticipo aplicado no se cancela; cancelar el resto lo deja por aplicar', function (): void {
     $e = estudioConSesion('anticipo-cancela', 'a@anticipo-cancela.mx');
     cargarDatosFiscales($e);
