@@ -225,12 +225,14 @@ class AgendaRepository {
   }
 
   /// Da de alta a un cliente al vuelo (alta rápida al agendar): su nombre y, si se
-  /// tienen, su celular y su correo, en la sucursal de la cita.
+  /// tienen, su celular y su correo, en la sucursal de la cita. `aceptaWhatsApp`:
+  /// el cliente aceptó los avisos por WhatsApp (solo con celular, como en la web).
   Future<ClienteAgenda> crearCliente({
     required String nombre,
     String? celular,
     String? email,
     String? sucursalId,
+    bool aceptaWhatsApp = false,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/miembros',
@@ -238,6 +240,7 @@ class AgendaRepository {
         'nombre': nombre,
         'celular': celular,
         'email': ?email,
+        if (aceptaWhatsApp) 'acepta_whatsapp': true,
         'tipo': 'miembro',
         'sucursal_id': sucursalId,
       },

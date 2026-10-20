@@ -168,12 +168,14 @@ class _Repo extends AgendaRepository {
     String? celular,
     String? email,
     String? sucursalId,
+    bool aceptaWhatsApp = false,
   }) async {
     altas.add({
       'nombre': nombre,
       'celular': celular,
       'email': email,
       'sucursal_id': sucursalId,
+      if (aceptaWhatsApp) 'acepta_whatsapp': true,
     });
     final id = 'nuevo-${altas.length}';
     _nombres[id] = nombre;
@@ -228,6 +230,7 @@ Sesion _sesion({
   String rol = 'recepcionista',
   List<String> permisos = _permisosRecepcion,
   Modalidad modalidad = Modalidad.citas,
+  bool whatsappClientes = false,
 }) => Sesion(
   slug: 'demo',
   bearer: 't',
@@ -235,6 +238,7 @@ Sesion _sesion({
   rol: rol,
   permisos: permisos,
   modalidad: modalidad,
+  whatsappClientes: whatsappClientes,
   terminologia: const Terminologia(
     sesion: 'Cita',
     miembro: 'Cliente',
@@ -283,6 +287,27 @@ Finder _fila(String cual) => find.descendant(
 );
 
 void main() {
+  test(
+    'la sesión sabe si el negocio manda avisos por WhatsApp y lo guarda',
+    () {
+      final sesion = Sesion.desdeJson(
+        'demo',
+        'token',
+        {'nombre': 'Recepción', 'rol': 'recepcionista'},
+        {'whatsapp_clientes': true},
+      );
+      expect(sesion.whatsappClientes, isTrue);
+      expect(Sesion.desdeAlmacen(sesion.aJson())?.whatsappClientes, isTrue);
+      // Un API anterior no lo manda: no se pregunta.
+      expect(
+        Sesion.desdeJson('demo', 'token', {
+          'rol': 'recepcionista',
+        }).whatsappClientes,
+        isFalse,
+      );
+    },
+  );
+
   group('agendar desde la app del equipo', () {
     testWidgets(
       'busca al cliente, elige un hueco, confirma todo y la agenda se recarga',
@@ -371,6 +396,9 @@ void main() {
         find.byKey(const Key('nuevo-celular')),
         '55 1111 2222',
       );
+      await tester.pump();
+      // El negocio no manda avisos por WhatsApp: no se pregunta.
+      expect(find.byKey(const Key('acepta-whatsapp')), findsNothing);
       await _tocar(tester, find.byKey(const Key('hora-10:00')));
       await _tocar(tester, find.byKey(const Key('agendar-cita')));
 
@@ -391,6 +419,31 @@ void main() {
         repo.agendadas.single['inicia_en_local'],
         '${_ymd(_hoy)} 10:00:00',
       );
+    });
+
+    testWidgets('con avisos por WhatsApp, el alta pregunta si los acepta', (
+      tester,
+    ) async {
+      final repo = _Repo();
+      await _abrirAgenda(tester, repo, sesion: _sesion(whatsappClientes: true));
+      await _tocar(tester, find.byKey(const Key('nueva-cita')));
+      await _buscarCliente(tester, 'Pedro Páramo');
+      await _tocar(tester, find.byKey(const Key('cliente-nuevo')));
+
+      // Sin celular no hay a dónde mandarlos.
+      expect(find.byKey(const Key('acepta-whatsapp')), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('nuevo-celular')),
+        '55 1111 2222',
+      );
+      await tester.pump();
+      await _tocar(tester, find.byKey(const Key('acepta-whatsapp')));
+      await _tocar(tester, find.byKey(const Key('hora-10:00')));
+      await _tocar(tester, find.byKey(const Key('agendar-cita')));
+      await _tocar(tester, find.widgetWithText(FilledButton, 'Agendar'));
+
+      expect(repo.altas.single['acepta_whatsapp'], true);
+      expect(repo.agendadas.single['persona_id'], 'nuevo-1');
     });
 
     testWidgets(
@@ -674,6 +727,7 @@ void main() {
         nombre: 'Pedro Páramo',
         celular: '55 1111 2222',
         sucursalId: 's1',
+        aceptaWhatsApp: true,
       );
       await repo.crearCliente(
         nombre: 'Susana San Juan',
@@ -697,6 +751,7 @@ void main() {
       expect(api.pedidos[1].data, {
         'nombre': 'Pedro Páramo',
         'celular': '55 1111 2222',
+        'acepta_whatsapp': true,
         'tipo': 'miembro',
         'sucursal_id': 's1',
       });

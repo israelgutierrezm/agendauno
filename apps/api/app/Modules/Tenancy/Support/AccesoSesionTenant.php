@@ -26,27 +26,37 @@ class AccesoSesionTenant
 
     public function puedeOperar(SesionTenant $sesion, ?Usuario $usuario): bool
     {
+        return $this->puedeOperarEn((int) $sesion->sucursal_id, $sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, $usuario);
+    }
+
+    /**
+     * ¿Puede operar lo que se da en esa sucursal con ese profesional? Lo mismo que una
+     * sesión que aún no existe: agendar una cita o pasarla a otro profesional. Quien
+     * imparte agenda solo para sí (salvo un rol del equipo en esa sede).
+     */
+    public function puedeOperarEn(int $sucursalId, ?int $instructorId, ?Usuario $usuario): bool
+    {
         if (! $usuario instanceof Usuario) {
             return false;
         }
 
         if (! $this->esInstructorAcotado($usuario)) {
             // El equipo acotado por sucursal (R19) solo opera las sesiones de sus sedes.
-            return $this->acceso->permiteSucursal($usuario, (int) $sesion->sucursal_id);
+            return $this->acceso->permiteSucursal($usuario, $sucursalId);
         }
 
-        if ($sesion->instructor_id !== null && (int) $sesion->instructor_id === (int) $usuario->getKey()) {
+        if ($instructorId !== null && $instructorId === (int) $usuario->getKey()) {
             return true;
         }
 
         // Scope por sucursal (R19): un rol DEL EQUIPO asignado en la sucursal de la sesion
         // (p. ej. recepción de esa sede) amplía su alcance más allá de sus propias
         // sesiones. Estar asignado como quien imparte solo dice dónde trabaja (ADR 0098).
-        $rol = $this->acceso->rolAsignado($usuario, (int) $sesion->sucursal_id);
+        $rol = $this->acceso->rolAsignado($usuario, $sucursalId);
 
         return $rol !== null
             && $this->roles->tieneFaceta([$rol], 'equipo')
-            && $this->acceso->rolAsignadoPermite($usuario, 'asistencia.marcar', (int) $sesion->sucursal_id);
+            && $this->acceso->rolAsignadoPermite($usuario, 'asistencia.marcar', $sucursalId);
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -110,9 +111,18 @@ class OrganizacionesTenantController
         return response()->json(['data' => $this->presentarSucursal($sucursal)]);
     }
 
-    public function sucursales(): JsonResponse
+    /**
+     * Las sucursales del negocio. Quien está acotado a algunas (R19) ve solo esas: son
+     * las que le tocan para vender, agendar o filtrar; sin ninguna asignada, ninguna
+     * (ADR 0098).
+     */
+    public function sucursales(Request $request): JsonResponse
     {
-        $sucursales = SucursalTenant::query()->orderBy('nombre')->get();
+        $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
+        $sucursales = SucursalTenant::query()
+            ->when($sedes !== null, fn ($q) => $q->whereIn('id', $sedes))
+            ->orderBy('nombre')
+            ->get();
 
         return response()->json([
             'data' => $sucursales->map(fn (SucursalTenant $sucursal): array => $this->presentarSucursal($sucursal))->all(),

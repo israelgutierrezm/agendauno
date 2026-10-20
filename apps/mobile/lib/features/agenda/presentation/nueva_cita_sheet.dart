@@ -92,6 +92,10 @@ class _NuevaCitaSheetState extends ConsumerState<NuevaCitaSheet> {
   final _buscar = TextEditingController();
   final _nombre = TextEditingController();
   final _celular = TextEditingController();
+
+  /// Aceptó los avisos por WhatsApp (ADR 0069): solo si el negocio los manda y hay
+  /// celular.
+  bool _aceptaWhatsApp = false;
   final _correo = TextEditingController();
   Timer? _espera;
   List<ClienteAgenda> _resultados = const [];
@@ -289,6 +293,12 @@ class _NuevaCitaSheetState extends ConsumerState<NuevaCitaSheet> {
     _error = null;
   });
 
+  /// Como en la web: se pregunta por WhatsApp si el negocio manda avisos por ahí y
+  /// el cliente dejó celular.
+  bool get _ofrecerWhatsApp =>
+      (ref.read(sesionProvider)?.whatsappClientes ?? false) &&
+      _celular.text.trim().isNotEmpty;
+
   /// Alta rápida: lo escrito en el buscador pasa a su campo (nombre, celular o
   /// correo) para no escribirlo dos veces.
   void _abrirNuevo() {
@@ -415,6 +425,7 @@ class _NuevaCitaSheetState extends ConsumerState<NuevaCitaSheet> {
           celular: celular.isEmpty ? null : celular,
           email: correo.isEmpty ? null : correo,
           sucursalId: sucursal.id,
+          aceptaWhatsApp: _ofrecerWhatsApp && _aceptaWhatsApp,
         );
         // Ya existe: si la cita no se puede agendar (el hueco se ocupó), al
         // reintentar se usa este cliente y no se crea otro igual.
@@ -746,7 +757,19 @@ class _NuevaCitaSheetState extends ConsumerState<NuevaCitaSheet> {
                     : Paises.ayudaCelular(pais: sesion.pais, lada: sesion.lada),
                 helperMaxLines: 2,
               ),
+              onChanged: (_) => setState(() {}),
             ),
+            if (_ofrecerWhatsApp)
+              CheckboxListTile(
+                key: const Key('acepta-whatsapp'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _aceptaWhatsApp,
+                onChanged: _guardando
+                    ? null
+                    : (v) => setState(() => _aceptaWhatsApp = v ?? false),
+                title: const Text('Acepta recibir avisos por WhatsApp'),
+              ),
             TextField(
               key: const Key('nuevo-correo'),
               controller: _correo,

@@ -208,6 +208,7 @@ class Sesion {
     this.funcionesSin = const [],
     this.estadoNegocio,
     this.modulos = const [],
+    this.whatsappClientes = false,
   });
 
   final String slug;
@@ -265,6 +266,10 @@ class Sesion {
   final List<String> modulos;
 
   bool tieneModulo(String modulo) => modulos.contains(modulo);
+
+  /// ¿El negocio manda avisos por WhatsApp a sus clientes (ADR 0069)? Solo entonces
+  /// el alta de un cliente le pregunta si los acepta.
+  final bool whatsappClientes;
 
   /// Estado del negocio en la plataforma (`estudio.estado`: trialing, active,
   /// suspended…; null si el API no lo mandó).
@@ -376,6 +381,7 @@ class Sesion {
     'funciones_sin': funcionesSin,
     'estado_negocio': estadoNegocio,
     'modulos': modulos,
+    'whatsapp_clientes': whatsappClientes,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -425,6 +431,7 @@ class Sesion {
       funcionesSin: _textos(datos['funciones_sin']),
       estadoNegocio: datos['estado_negocio'] as String?,
       modulos: _textos(datos['modulos']),
+      whatsappClientes: (datos['whatsapp_clientes'] ?? false) as bool,
     );
   }
 
@@ -478,6 +485,7 @@ class Sesion {
       funcionesSin: _textos(plan?['sin']),
       estadoNegocio: estudio?['estado'] as String?,
       modulos: _textos(estudio?['modulos']),
+      whatsappClientes: (estudio?['whatsapp_clientes'] ?? false) as bool,
     );
   }
 
@@ -548,6 +556,8 @@ class Sesion {
     funcionesSin: funcionesSin,
     estadoNegocio: estadoNegocio,
     modulos: modulos,
+    whatsappClientes:
+        (estudio?['whatsapp_clientes'] ?? whatsappClientes) as bool,
   );
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.

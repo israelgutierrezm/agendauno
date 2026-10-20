@@ -302,6 +302,13 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
 | `GET /mi/reservas/{reserva}/reprogramar` | `?fecha=AAAA-MM-DD` → `zona_horaria`, `slots[]` (`inicia`, `termina`, `inicia_local`) | `sesiones[]` (`id`, `inicia_en`, `inicia_local`, `zona_horaria`) | siempre `{puede, motivo, tipo, restantes, hasta}` |
 | `POST /mi/reservas/{reserva}/reprogramar` | `inicia_en_local` (obligatorio) | `sesion_id` (obligatorio) | `{tipo, reserva, sesion_id, antes, ahora, restantes}` |
 
+Quien imparte (un rol de esa faceta sin rol del equipo, ADR 0095) agenda y pasa citas
+solo a su propia agenda: `POST /agenda/citas` con otro `instructor_id` responde 403
+(«Solo puedes agendar citas contigo.») y reprogramar a otro `instructor_id`, 403. Con
+un rol del equipo en esa sede, como en el resto de la agenda, opera la de todos. Y
+`GET /sucursales` lista solo las sedes de quien está acotado a algunas (R19; sin
+ninguna asignada, ninguna, ADR 0098).
+
 ### Reservas en una cita y eventos
 
 - `POST /sesiones/{sesion}/reservas` y su `/preview` son del núcleo (sin modalidad),

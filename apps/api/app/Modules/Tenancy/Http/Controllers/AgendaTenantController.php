@@ -166,6 +166,13 @@ class AgendaTenantController
                 403,
                 'No puedes agendar en una sucursal que no te corresponde.',
             );
+            // Quien imparte agenda solo para sí, salvo un rol del equipo en esa sede
+            // (ADR 0095): no llena la agenda de otro profesional.
+            abort_unless(
+                $this->acceso->puedeOperarEn((int) $sucursal->getKey(), (int) $instructor->getKey(), $usuario),
+                403,
+                'Solo puedes agendar citas contigo.',
+            );
         }
 
         // La que mande la pantalla, la del servicio o la que fijó el negocio para citas.

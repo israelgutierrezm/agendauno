@@ -48,7 +48,9 @@ class ReprogramarTenantController
                 'sesion_id.prohibited' => 'Una cita se cambia de horario, no a otra sesión.',
             ]);
             $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sesion->zona_horaria)->utc();
-            $movida = $this->reprogramar->moverCita($reserva, $inicia, $this->instructor($validado['instructor_id'] ?? null), $actor);
+            $instructor = $this->instructor($validado['instructor_id'] ?? null);
+            $this->exigirProfesional($request, $sesion, $instructor);
+            $movida = $this->reprogramar->moverCita($reserva, $inicia, $instructor, $actor);
         } else {
             $validado = $request->validate([
                 'sesion_id' => ['required', 'string'],
@@ -92,7 +94,9 @@ class ReprogramarTenantController
         $antes = $sesion->inicia_en->toIso8601String();
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sesion->zona_horaria)->utc();
 
-        $movida = $this->reprogramar->moverClase($sesion, $inicia, $this->instructor($validado['instructor_id'] ?? null), $this->actor($request));
+        $instructor = $this->instructor($validado['instructor_id'] ?? null);
+        $this->exigirProfesional($request, $sesion, $instructor);
+        $movida = $this->reprogramar->moverClase($sesion, $inicia, $instructor, $this->actor($request));
 
         return response()->json(['data' => [
             'tipo' => $movida->tipo->value,
@@ -115,6 +119,19 @@ class ReprogramarTenantController
     private function exigirSesion(Request $request, ?SesionTenant $sesion): void
     {
         abort_unless($sesion !== null && app(AccesoSesionTenant::class)->puedeOperar($sesion, $this->actor($request)), 403);
+    }
+
+    /** A otro profesional, solo si también puede operar lo suyo (ADR 0095). */
+    private function exigirProfesional(Request $request, SesionTenant $sesion, ?int $instructor): void
+    {
+        if ($instructor === null) {
+            return;
+        }
+        abort_unless(
+            app(AccesoSesionTenant::class)->puedeOperarEn((int) $sesion->sucursal_id, $instructor, $this->actor($request)),
+            403,
+            'Solo puedes pasarla a tu propia agenda.',
+        );
     }
 
     private function actor(Request $request): ?Usuario
