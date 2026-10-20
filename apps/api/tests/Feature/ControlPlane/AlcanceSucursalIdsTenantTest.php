@@ -32,7 +32,7 @@ afterEach(function (): void {
 function clienteConPaqueteEnSede(array $e, string $nombre, string $sucursal, string $producto): array
 {
     $persona = crearMiembroEnSucursal($e, $nombre, $sucursal);
-    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
 

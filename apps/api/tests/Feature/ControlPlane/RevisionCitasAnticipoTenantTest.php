@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -168,4 +169,67 @@ it('cobrar se autoriza por la cita: su sede y su profesional, no la ficha del cl
     $this->postJson("/api/v1/app/{$slug}/reservas/{$reserva}/cobro", ['metodo' => 'efectivo'], conBearer($otro))->assertForbidden();
     $this->postJson("/api/v1/app/{$slug}/reservas/{$reserva}/cobro", ['metodo' => 'efectivo'], conBearer($recep))
         ->assertCreated()->assertJsonPath('data.servicio_minor', 25000);
+});
+
+/**
+ * Pagados en línea el anticipo ($100) y el resto ($150) de la cita; devuelve el id de la
+ * reserva.
+ *
+ * @param  array{e: array{slug: string, bearer: string}, ana: string, cita: array<string, mixed>}  $ctx
+ */
+function citaPagadaCompletaParaRevisar(array $ctx): string
+{
+    $slug = $ctx['e']['slug'];
+    test()->postJson("/api/v1/app/{$slug}/mi/ordenes/{$ctx['cita']['orden_id']}/cobrar", [], conBearer($ctx['ana']))->assertCreated();
+    stripeCompletaSesion($slug, 'cs_1');
+    $resto = (string) collect(test()->getJson("/api/v1/app/{$slug}/mi/perfil", conBearer($ctx['ana']))->json('data.reservas'))
+        ->firstWhere('id', $ctx['cita']['id'])['cita']['saldo_orden_id'];
+    test()->postJson("/api/v1/app/{$slug}/mi/ordenes/{$resto}/cobrar", [], conBearer($ctx['ana']))->assertCreated();
+    stripeCompletaSesion($slug, 'cs_2');
+
+    return (string) $ctx['cita']['id'];
+}
+
+/** @return list<int> los montos que se pidió devolver a Stripe, de menor a mayor */
+function devolucionesDeStripeParaRevisar(): array
+{
+    return Http::recorded(fn (Request $r): bool => str_ends_with($r->url(), '/refunds'))
+        ->map(fn (array $par): int => (int) $par[0]['amount'])->sort()->values()->all();
+}
+
+it('si cancela tarde, el negocio se queda solo con el anticipo y le devuelve el resto', function (): void {
+    $ctx = citaConAnticipoParaRevisar();
+    $slug = $ctx['e']['slug'];
+    $this->putJson("/api/v1/app/{$slug}/parametros", ['valores' => ['cancelacion.cliente_cancela_tarde' => 1]], conBearer($ctx['e']['bearer']))->assertOk();
+    $reserva = citaPagadaCompletaParaRevisar($ctx);
+
+    // Una hora antes de la cita.
+    $this->travelTo(CarbonImmutable::parse("{$ctx['dia']} 09:00:00", 'America/Mexico_City'));
+    $this->getJson("/api/v1/app/{$slug}/mi/reservas/{$reserva}/cancelacion", conBearer($ctx['ana']))->assertOk()
+        ->assertJsonPath('data.mensaje', fn (string $m): bool => str_contains($m, 'el anticipo no se devuelve') && str_contains($m, '$150.00'));
+    $this->postJson("/api/v1/app/{$slug}/mi/reservas/{$reserva}/cancelar", [], conBearer($ctx['ana']))->assertOk();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    expect(devolucionesDeStripeParaRevisar())->toBe([15000]);
+});
+
+it('si no llega, el negocio se queda solo con el anticipo y le devuelve el resto', function (): void {
+    $ctx = citaConAnticipoParaRevisar();
+    $slug = $ctx['e']['slug'];
+    citaPagadaCompletaParaRevisar($ctx);
+    $reserva = (string) citaEnAgendaParaRevisar($ctx)['reserva_id'];
+
+    // Pasada la cita, la recepción ve qué pasa antes de marcarla.
+    $this->travelTo(CarbonImmutable::parse("{$ctx['dia']} 11:00:00", 'America/Mexico_City'));
+    $this->getJson("/api/v1/app/{$slug}/reservas/{$reserva}/inasistencia", conBearer($ctx['e']['bearer']))->assertOk()
+        ->assertJsonPath('data.conserva', 'anticipo')
+        ->assertJsonPath('data.conserva_minor', 10000)
+        ->assertJsonPath('data.devuelve_minor', 15000)
+        ->assertJsonPath('data.devuelve_en_linea_minor', 15000);
+    $this->postJson("/api/v1/app/{$slug}/reservas/{$reserva}/asistencia", ['estado' => 'ausente'], conBearer($ctx['e']['bearer']))->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    expect(devolucionesDeStripeParaRevisar())->toBe([15000]);
 });

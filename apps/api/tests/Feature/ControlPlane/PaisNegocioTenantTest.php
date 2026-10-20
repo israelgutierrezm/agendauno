@@ -230,7 +230,7 @@ it('el aviso por WhatsApp va con la lada del país del negocio, no la de México
     $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$clienta}/resumen", conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.whatsapp.con_celular', true);
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $clienta, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $clienta, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
         ->assertCreated();
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $clienta], conBearer($e['bearer']))
         ->assertCreated();

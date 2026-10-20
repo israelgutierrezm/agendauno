@@ -29,7 +29,7 @@ class CatalogoDePermisosTenant
                 'sucursales.ver', 'sucursales.gestionar',
                 'agenda.ver', 'agenda.gestionar', 'agenda.eliminar',
                 'productos.ver', 'productos.gestionar', 'productos.eliminar',
-                'membresias.gestionar', 'creditos.gestionar', 'derechos.ver',
+                'membresias.gestionar', 'membresias.cortesia', 'creditos.gestionar', 'derechos.ver',
                 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar', 'checkins.excepcion',
                 'ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar',
                 'presupuestos.ver', 'presupuestos.gestionar',
@@ -90,7 +90,8 @@ class CatalogoDePermisosTenant
             // (ADR 0167): prepararlo va aparte de publicarlo.
             'captacion' => ['prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar', 'sitio.editar', 'sitio.publicar'],
             'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
-            'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
+            // Dar un plan sin cobrarlo (cortesía) va aparte de venderlo (ADR 0181).
+            'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'membresias.cortesia', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             // Exentar una cuota (inscripción, anualidad, penalización; B04) va aparte.
             // La caja (ADR 0175): operarla va aparte de supervisarla (ver lo esperado y revisar).
             'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar', 'facturacion.ver', 'presupuestos.ver', 'presupuestos.gestionar', 'caja.operar', 'caja.supervisar'],
@@ -163,6 +164,7 @@ class CatalogoDePermisosTenant
             'catalogo.gestionar' => ['catalogo.ver', 'agenda.ver'],
             'productos.gestionar' => ['productos.ver', 'catalogo.ver', 'sucursales.ver'],
             'productos.eliminar' => ['productos.gestionar', 'productos.ver', 'catalogo.ver', 'sucursales.ver'],
+            'membresias.cortesia' => ['membresias.gestionar', 'productos.ver', 'miembros.ver', 'derechos.ver'],
             'promociones.eliminar' => ['promociones.gestionar'],
             'ordenes.gestionar' => ['ordenes.ver', 'productos.ver', 'miembros.ver', 'derechos.ver'],
             'pagos.reembolsar' => ['ordenes.ver'],

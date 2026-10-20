@@ -870,7 +870,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/miembros/{persona}/participantes', [FamiliasTenantController::class, 'vincular'])->middleware(['puede:miembros.gestionar', 'modulo:familias'])->name('miembros.participantes.store');
             Route::post('/tutelas/{tutela}/autorizar', [FamiliasTenantController::class, 'autorizarEnMostrador'])->middleware(['puede:miembros.gestionar', 'modulo:familias'])->name('tutelas.autorizar');
             Route::post('/tutelas/{tutela}/retirar', [FamiliasTenantController::class, 'retirar'])->middleware(['puede:miembros.gestionar', 'modulo:familias'])->name('tutelas.retirar');
-            Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware(['puede:membresias.gestionar', 'plan:paquetes'])->name('acuerdos.store');
+            Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware(['puede:membresias.cortesia', 'plan:paquetes'])->name('acuerdos.store');
             // Dunning (R10): morosidad de la membresia ante fallo de cobro.
             Route::get('/dunning', [DunningTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('dunning.index');
             // Lo que ya se debe (compras sin pagar y citas pasadas sin pagar), como en el Inicio.

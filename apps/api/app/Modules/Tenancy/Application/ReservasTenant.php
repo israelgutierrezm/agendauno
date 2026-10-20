@@ -554,8 +554,8 @@ class ReservasTenant
                 $credito = EmitirReservaCanceladaTenant::creditoCobrado((int) ($bloqueada->horas_limite ?? $horasLimite));
             }
 
-            // El anticipo (ADR 0161): si cancela a tiempo se le devuelve (lo hace
-            // DevolverAnticipoAlCancelarATiempo); si cancela tarde, el negocio lo conserva.
+            // El anticipo (ADR 0161, 0181): si cancela a tiempo se le devuelve; si cancela
+            // tarde, el negocio conserva solo el anticipo (lo hace DevolverPagoDeCitaConAnticipo).
             if ($efecto->anticipo === EfectoCancelacion::COBRA) {
                 $credito = self::anticipoConservado($bloqueada, (int) ($bloqueada->horas_limite ?? $horasLimite));
             } elseif ($efecto->anticipo === EfectoCancelacion::DEVUELVE && $this->pagadoEnLinea($bloqueada)) {
@@ -681,13 +681,27 @@ class ReservasTenant
         }
 
         return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, false, $limite,
-            "Se cancela con menos de {$horas} h de anticipación: el {$que} no se devuelve.", anticipo: EfectoCancelacion::COBRA);
+            "Se cancela con menos de {$horas} h de anticipación: el anticipo no se devuelve".self::loDeMas($reserva, 'pagaste', 'se te devuelve'), anticipo: EfectoCancelacion::COBRA);
     }
 
     /** La frase del aviso al cliente cuando el negocio conserva su anticipo. */
     private static function anticipoConservado(ReservaTenant $reserva, int $horas): string
     {
-        return "Como cancelaste con menos de {$horas} h de anticipación, tu ".($reserva->saldo_orden_id !== null ? 'anticipo' : 'pago').' no se devuelve.';
+        return "Como cancelaste con menos de {$horas} h de anticipación, tu anticipo no se devuelve".self::loDeMas($reserva, 'pagaste', 'se te devuelve');
+    }
+
+    /**
+     * El final de la frase: el negocio conserva solo el anticipo (ADR 0181); lo demás
+     * que ya pagó se devuelve.
+     */
+    private static function loDeMas(ReservaTenant $reserva, string $pago, string $devuelve): string
+    {
+        $deMas = app(AnticipoDeCitaTenant::class)->pagadoDeMas($reserva)['de_mas_minor'];
+        if ($deMas <= 0) {
+            return '.';
+        }
+
+        return "; lo demás que {$pago} (".DatosDeOrden::dinero($deMas, (string) ($reserva->orden->moneda ?? 'MXN')).") {$devuelve}.";
     }
 
     /** ¿Lo pagado para confirmar la reserva se pagó en línea (y se puede devolver solo)? */

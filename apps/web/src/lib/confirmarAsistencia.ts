@@ -22,6 +22,9 @@ export interface EfectoInasistencia {
    */
   conserva?: "anticipo" | "pago" | null;
   conserva_minor?: number | null;
+  /** Con anticipo: lo demás que pagó, y cuánto de eso se le devuelve solo en línea. */
+  devuelve_minor?: number;
+  devuelve_en_linea_minor?: number;
   moneda?: string | null;
 }
 
@@ -51,9 +54,27 @@ export function textoInasistencia(
   if (!e.con_credito) {
     if (e.conserva && e.conserva_minor && e.moneda) {
       const monto = dinero(e.conserva_minor, e.moneda);
-      return e.conserva === "anticipo"
-        ? t("confirmaciones.asistencia.efecto.conservaAnticipo", { monto })
-        : t("confirmaciones.asistencia.efecto.conservaPago", { monto });
+      if (e.conserva !== "anticipo") {
+        return t("confirmaciones.asistencia.efecto.conservaPago", { monto });
+      }
+      // Solo el anticipo (ADR 0181): lo demás que pagó se le devuelve.
+      const enLinea = e.devuelve_en_linea_minor ?? 0;
+      const enCaja = (e.devuelve_minor ?? 0) - enLinea;
+      return [
+        t("confirmaciones.asistencia.efecto.conservaAnticipo", { monto }),
+        enLinea > 0
+          ? t("confirmaciones.asistencia.efecto.devuelveEnLinea", {
+              monto: dinero(enLinea, e.moneda),
+            })
+          : null,
+        enCaja > 0
+          ? t("confirmaciones.asistencia.efecto.devuelveEnCaja", {
+              monto: dinero(enCaja, e.moneda),
+            })
+          : null,
+      ]
+        .filter((x): x is string => x !== null)
+        .join(" ");
     }
     return t("confirmaciones.asistencia.efecto.sinCredito");
   }

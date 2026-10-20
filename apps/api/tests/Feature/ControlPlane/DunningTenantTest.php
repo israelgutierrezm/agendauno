@@ -26,7 +26,7 @@ function venderAcuerdoTenant(array $e, string $nombre = 'Ana'): array
     $persona = crearMiembroTenant($e, $nombre);
     $producto = crearPackTenant($e, 8000);
 
-    $venta = test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $venta = test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated();
 
@@ -67,7 +67,7 @@ it('en gracia el socio puede reservar; tras vencer la gracia queda suspendido y 
 
     $persona = crearMiembroTenant($e, 'Ana');
     $producto = crearPackTenant($e, 8000);
-    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 
@@ -100,7 +100,7 @@ it('regularizar reactiva un acuerdo suspendido (vuelve a poder reservar)', funct
 
     $persona = crearMiembroTenant($e, 'Ana');
     $producto = crearPackTenant($e, 8000);
-    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 

@@ -51,7 +51,7 @@ class ComprarTimbres
             'periodo' => $hoy->format('Y-m'),
             'clave' => 'timbres:'.Str::lower((string) Str::ulid()),
             'concepto' => 'timbres',
-            'modo_cobro' => $estudio->modo_cobro->value,
+            'modo_cobro' => app(CondicionesDeCobroSaas::class)->al($estudio)['modo_cobro']->value,
             'metrica' => 'timbres',
             'alumnos_activos' => $cantidad,
             'desglose' => [

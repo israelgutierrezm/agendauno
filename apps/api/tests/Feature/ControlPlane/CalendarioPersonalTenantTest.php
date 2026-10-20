@@ -31,7 +31,7 @@ it('el alumno se suscribe a su calendario y ve sus reservas', function (): void 
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $vale = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
     $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, now()->addDays(2)->format('Y-m-d').' 10:00:00');
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
 
@@ -77,7 +77,7 @@ it('agregar a mi calendario: el alumno descarga su reserva sola, no la de otro',
     $reservas = [];
     foreach (['Vale', 'Beto'] as $nombre) {
         $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q={$nombre}", conBearer($e['bearer']))->json('data.0.id');
-        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
+        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
         $reservas[$nombre] = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))
             ->assertCreated()->json('data.id');
     }

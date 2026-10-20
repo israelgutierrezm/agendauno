@@ -44,7 +44,7 @@ it('el resumen marca adeudo cuando hay morosidad (dunning)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $persona = crearMiembroTenant($e, 'Deudor');
     $producto = crearPackTenant($e);
-    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 

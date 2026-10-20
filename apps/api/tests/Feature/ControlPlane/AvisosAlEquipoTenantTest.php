@@ -95,7 +95,7 @@ it('una solicitud de baja de datos le llega a quien puede atenderla', function (
 it('una reseña nueva le llega al equipo con la calificación', function (): void {
     $e = negocioConEquipo();
     $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2026-09-29 10:00:00');
     $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');

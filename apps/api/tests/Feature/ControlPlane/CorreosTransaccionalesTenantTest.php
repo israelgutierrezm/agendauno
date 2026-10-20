@@ -50,7 +50,7 @@ it('confirma la reserva por correo a nombre del negocio', function (): void {
     Mail::fake();
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $persona = clienteConCorreo($e);
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
         ->assertCreated();
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2026-10-01 08:00:00');
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))
@@ -81,7 +81,7 @@ it('quien queda en lista de espera recibe la confirmación hasta que acepta su l
     $ana = clienteConCorreo($e, 'Ana', 'ana@correo.mx');
     $bea = clienteConCorreo($e);
     foreach ([$ana, $bea] as $persona) {
-        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
+        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
     }
     $reservaAna = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $ana], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');

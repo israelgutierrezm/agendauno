@@ -44,7 +44,7 @@ function membresiaConPermanencia(array $e, int $meses = 6, array $baja = ['baja_
  */
 function contratarConPermanencia(array $e, string $persona, string $plan): string
 {
-    return (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    return (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $plan, 'acepta_condiciones' => true,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 }
@@ -54,7 +54,7 @@ it('sin aceptar las condiciones no se compra; aceptadas, quedan con la compra y 
     $plan = membresiaConPermanencia($e);
     $ana = crearMiembroTenant($e, 'Ana');
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $plan], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $plan], conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonPath('code', 'TERMS_NOT_ACCEPTED');
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes", ['comprador_id' => $ana, 'items' => [['producto_id' => $plan, 'cantidad' => 1]]], conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonPath('code', 'TERMS_NOT_ACCEPTED');
@@ -183,7 +183,7 @@ it('en mora la baja es hoy y la mensualidad vencida se cobra aparte; un paquete 
         ->and($pendientes->first()['cuotas'][0])->toMatchArray(['concepto' => 'adeudo_mensualidad', 'monto_minor' => 120000]);
 
     $paquete = crearPackTenant($e);
-    $delPaquete = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))
+    $delPaquete = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))
         ->assertCreated()->json('data.acuerdo');
     $this->getJson("/api/v1/app/{$e['slug']}/acuerdos/{$delPaquete}/baja", conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonPath('code', 'MEMBERSHIP_CANCEL_NOT_ALLOWED');

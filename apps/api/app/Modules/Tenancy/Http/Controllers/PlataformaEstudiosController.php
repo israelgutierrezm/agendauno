@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Acceso\BitacoraPlataforma;
 use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
+use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
@@ -46,7 +47,7 @@ class PlataformaEstudiosController
 
     private const CARGOS = 12;
 
-    public function show(string $estudio, ClienteWhatsApp $whatsapp, CambiarModalidadEstudio $cambioModalidad, PlanCitasSaas $planes, GestorDeConexionTenant $gestor): JsonResponse
+    public function show(string $estudio, ClienteWhatsApp $whatsapp, CambiarModalidadEstudio $cambioModalidad, PlanCitasSaas $planes, GestorDeConexionTenant $gestor, CondicionesDeCobroSaas $condiciones): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
         // Quién la suspendió por última vez, cuándo y por qué (ADR 0132).
@@ -113,6 +114,9 @@ class PlataformaEstudiosController
             'whatsapp_clientes' => self::whatsappClientes($modelo, $whatsapp),
             // Módulos que se encienden por negocio (ADR 0123).
             'modulos' => self::catalogoModulos($modelo),
+            // Lo pactado con fecha de vigencia (ADR 0181): desde qué mes rige lo de hoy,
+            // el primer mes que todavía se puede cambiar y el cambio ya programado.
+            'cobro' => self::cobroPactado($modelo, $condiciones),
             // Su plan de citas (ADR 0107), para verlo y cambiarlo desde soporte.
             'plan_citas' => $planes->aplica($modelo) && $gestor->baseDeDatosExiste($modelo) ? $planes->resumen($modelo) : null,
             'uso' => $uso,
@@ -423,6 +427,25 @@ class PlataformaEstudiosController
         Log::info('plataforma.estudio.terminologia', ['estudio' => $modelo->slug, ...$cambio]);
 
         return response()->json(['data' => $terminologia->paraEditar($modelo->refresh())]);
+    }
+
+    /**
+     * @return array{desde: string|null, primer_periodo_abierto: string, proximo: array{desde: string|null, modo_cobro: string, cuota_fija_minor: int, cuota_fija_moneda: string}|null}
+     */
+    public static function cobroPactado(Estudio $estudio, CondicionesDeCobroSaas $condiciones): array
+    {
+        $proximo = $condiciones->proximo($estudio);
+
+        return [
+            'desde' => $condiciones->al($estudio)['desde'],
+            'primer_periodo_abierto' => $condiciones->primerPeriodoAbierto($estudio),
+            'proximo' => $proximo === null ? null : [
+                'desde' => $proximo['desde'],
+                'modo_cobro' => $proximo['modo_cobro']->value,
+                'cuota_fija_minor' => $proximo['cuota_fija_minor'],
+                'cuota_fija_moneda' => $proximo['cuota_fija_moneda'],
+            ],
+        ];
     }
 
     /**

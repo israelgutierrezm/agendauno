@@ -74,7 +74,7 @@ it('renovaciones y morosos van por páginas y sus indicadores cuentan todo', fun
     $producto = crearPackTenant($e, 8000);
     $acuerdos = [];
     foreach (['Ana', 'Beto', 'Caro'] as $nombre) {
-        $acuerdos[$nombre] = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+        $acuerdos[$nombre] = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
             'persona_id' => crearMiembroTenant($e, $nombre), 'producto_id' => $producto,
         ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
     }

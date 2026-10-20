@@ -67,7 +67,7 @@ function alumnaConApp(): array
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $alumna = alumnoConSesion($e);
     $persona = (string) test()->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
         ->assertCreated();
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2026-10-01 08:00:00');
 
@@ -97,7 +97,7 @@ it('la app registra el teléfono y la confirmación de su reserva le llega por p
 
     // Otra alumna sin la app no recibe push.
     $otra = crearMiembroTenant($m, 'Caro');
-    $this->postJson("/api/v1/app/{$m['slug']}/acuerdos", ['persona_id' => $otra, 'producto_id' => crearPackTenant($m)], conBearer($m['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$m['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $otra, 'producto_id' => crearPackTenant($m)], conBearer($m['bearer']))->assertCreated();
 
     foreach ([$m['persona'], $otra] as $persona) {
         $this->postJson("/api/v1/app/{$m['slug']}/sesiones/{$m['sesion']}/reservas", ['persona_id' => $persona], conBearer($m['bearer']))->assertCreated();

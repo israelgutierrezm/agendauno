@@ -122,7 +122,7 @@ it('saldos de apertura: plan y créditos al corte, con evidencia, sin venta ni p
     ], conBearer($e['bearer']))->assertCreated();
     // Caro ya compró el pack aquí: cargarle otro saldo de ese plan es un conflicto.
     $caro = (string) enNegocioMigracion(fn () => PersonaTenant::query()->where('email', 'caro@correo.mx')->value('ulid'));
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $caro, 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $caro, 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
 
     $csv = "email,plan,creditos,vence\n"
         ."ana@correo.mx,pack 8 CLASES,4.5,2026-10-20\n"        // válida (el nombre se compara sin mayúsculas)

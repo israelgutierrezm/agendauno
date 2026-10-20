@@ -28,7 +28,7 @@ function alumnaConPlanDeClases(array $e, string $producto): array
     $persona = (string) test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Valeria', 'email' => 'valeria@correo.mx', 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
 
@@ -116,7 +116,7 @@ it('una membresía en pausa se ve en pausa en el perfil', function (): void {
     $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Ana', 'email' => 'ana.pausa@correo.mx', 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $mensualidad,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
     $this->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/pausar", ['hasta' => '2026-10-09'], conBearer($e['bearer']))->assertOk();

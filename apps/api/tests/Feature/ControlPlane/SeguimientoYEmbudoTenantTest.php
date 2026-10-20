@@ -145,7 +145,7 @@ it('el embudo cuenta las renovaciones que tocaban en el periodo, aunque su orden
         'nombre' => 'Mensualidad', 'tipo' => 'membresia', 'precio_minor' => 120000, 'moneda' => 'MXN',
         'ilimitado' => true, 'politica_reset' => 'aniversario',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
     // El aviso de renovación abre hoy (1 de octubre) la orden de lo que vence el 1 de noviembre.
     app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-a')->firstOrFail(),
         fn () => app(DeudaDeRenovacionTenant::class)->de(AcuerdoTenant::query()->firstOrFail()));

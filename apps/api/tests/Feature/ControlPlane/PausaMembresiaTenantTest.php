@@ -38,7 +38,7 @@ function membresiaParaPausar(): array
         'nombre' => 'Mensualidad', 'tipo' => 'membresia', 'precio_minor' => 129900, 'moneda' => 'MXN',
         'ilimitado' => true, 'politica_reset' => 'calendario',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 

@@ -57,7 +57,7 @@ it('con clase próxima, el pronóstico para esa hora en su sucursal', function (
     ])]);
     $d = alumnaConSucursalUbicada();
     $e = $d['e'];
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $d['persona'], 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $d['persona'], 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $sesion = crearSesionTenant($e, $d['semilla'], 10, '2026-10-01 08:00:00');
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $d['persona']], conBearer($e['bearer']))->assertCreated();
 

@@ -249,11 +249,14 @@ class AsistenciaTenant
      * - `pierde_credito`: con todo lo anterior, lo pierde.
      * - `conserva`: sin crédito, lo ya pagado que no se devuelve por no asistir: el
      *   `anticipo` de una cita (ADR 0161) o el `pago` completo; null si no pagó nada.
-     *   `conserva_minor` y `moneda` dicen cuánto.
+     *   `conserva_minor` y `moneda` dicen cuánto. Con anticipo el negocio conserva solo
+     *   el anticipo (ADR 0181): `devuelve_minor` es lo demás que pagó, y
+     *   `devuelve_en_linea_minor` cuánto de eso se le devuelve solo por la pasarela (el
+     *   resto, en caja).
      *
      * La web y la app del equipo lo dicen con las mismas palabras.
      *
-     * @return array{con_credito: bool, penaliza: bool, tolerada: bool, pierde_credito: bool, unidades: int, conserva: string|null, conserva_minor: int|null, moneda: string|null}
+     * @return array{con_credito: bool, penaliza: bool, tolerada: bool, pierde_credito: bool, unidades: int, conserva: string|null, conserva_minor: int|null, moneda: string|null, devuelve_minor: int, devuelve_en_linea_minor: int}
      */
     public function efectoDeInasistencia(ReservaTenant $reserva): array
     {
@@ -266,9 +269,11 @@ class AsistenciaTenant
         $pagadas = $retencion !== null ? collect() : collect([$reserva->orden, $reserva->saldo_orden_id !== null ? $reserva->saldoOrden : null])
             ->filter(static fn (?OrdenTenant $orden): bool => $orden?->estado === EstadoOrden::Pagada)
             ->values();
-        // Con anticipo, si solo pagó el anticipo (el resto sigue por cobrar), eso es lo
-        // que el negocio conserva; si pagó todo, el pago.
-        $soloAnticipo = $reserva->anticipo_minor !== null && $reserva->saldo_orden_id !== null && $pagadas->count() === 1;
+        // Con anticipo, el negocio conserva solo el anticipo; lo demás que pagó se le
+        // devuelve (ADR 0181).
+        $deMas = $reserva->anticipo_minor !== null && $pagadas->isNotEmpty()
+            ? app(AnticipoDeCitaTenant::class)->pagadoDeMas($reserva)
+            : null;
 
         return [
             'con_credito' => $retencion !== null,
@@ -276,9 +281,11 @@ class AsistenciaTenant
             'tolerada' => $tolerada,
             'pierde_credito' => $retencion !== null && $penaliza && ! $tolerada,
             'unidades' => (int) ($retencion->unidades ?? 0),
-            'conserva' => $pagadas->isEmpty() ? null : ($soloAnticipo ? 'anticipo' : 'pago'),
-            'conserva_minor' => $pagadas->isEmpty() ? null : (int) $pagadas->sum('total_minor'),
+            'conserva' => $pagadas->isEmpty() ? null : ($deMas !== null ? 'anticipo' : 'pago'),
+            'conserva_minor' => $pagadas->isEmpty() ? null : ($deMas['anticipo_minor'] ?? (int) $pagadas->sum('total_minor')),
             'moneda' => $pagadas->first()?->moneda,
+            'devuelve_minor' => $deMas['de_mas_minor'] ?? 0,
+            'devuelve_en_linea_minor' => $deMas['en_linea_minor'] ?? 0,
         ];
     }
 

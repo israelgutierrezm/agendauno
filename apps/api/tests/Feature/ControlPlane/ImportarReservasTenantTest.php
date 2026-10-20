@@ -52,7 +52,7 @@ function estudioParaImportarReservas(array $conPaquete, int $creditos = 8000): a
             'nombre' => ucfirst($nombre), 'email' => "{$nombre}@correo.mx",
         ], conBearer($e['bearer']))->assertCreated()->json('data.id');
         if (in_array($nombre, $conPaquete, true)) {
-            $derechos[$nombre] = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+            $derechos[$nombre] = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
                 'persona_id' => $persona, 'producto_id' => $paquete,
             ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
         }

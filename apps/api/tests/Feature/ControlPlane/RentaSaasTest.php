@@ -329,3 +329,33 @@ it('una devolución o una disputa de un cobro de la renta alerta al superadmin',
     expect($alerta->estudio)->toBe($e['slug'])
         ->and($alerta->mensaje)->toContain('899.00 MXN');
 });
+
+it('lo pactado rige desde el mes que dice el superadmin: cada mes se cobra con lo que regía a su cierre', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
+
+    // Octubre sigue por uso; la cuota fija rige desde noviembre (ADR 0181).
+    $this->putJson('/api/v1/plataforma/estudios/estudio-a', [
+        'modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900, 'vigente_desde' => '2026-11',
+    ], conPlataforma())->assertOk()
+        ->assertJsonPath('data.modo_cobro', 'activos')
+        ->assertJsonPath('data.cobro.proximo.desde', '2026-11')
+        ->assertJsonPath('data.cobro.proximo.cuota_fija_minor', 149900);
+
+    emitirCargoDelMesEnCurso();
+    emitirCargoDelMesEnCurso();
+
+    $cargos = CargoRenta::query()->orderBy('periodo')->get();
+    expect($cargos->pluck('periodo')->all())->toBe(['2026-10', '2026-11'])
+        ->and($cargos[0]->modo_cobro->value)->toBe('activos')
+        ->and($cargos[1]->modo_cobro->value)->toBe('fijo')
+        ->and($cargos[1]->monto_minor)->toBe(149900)
+        // La renta diaria deja en el negocio lo que rige hoy.
+        ->and(Estudio::query()->where('slug', 'estudio-a')->firstOrFail()->modo_cobro->value)->toBe('fijo');
+
+    // Un mes ya cobrado no cambia.
+    $this->putJson('/api/v1/plataforma/estudios/estudio-a', [
+        'modo_cobro' => 'activos', 'cuota_fija_minor' => 0, 'vigente_desde' => '2026-11',
+    ], conPlataforma())->assertUnprocessable()->assertJsonValidationErrors(['vigente_desde'], 'meta.errors');
+});

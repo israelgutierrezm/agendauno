@@ -35,15 +35,15 @@
       },
       {
         "hasta": 500,
-        "monto_minor": 16400
+        "monto_minor": 14900
       },
       {
         "hasta": 1000,
-        "monto_minor": 29700
+        "monto_minor": 19900
       },
       {
         "hasta": null,
-        "monto_minor": 29700
+        "monto_minor": 19900
       }
     ]
   },

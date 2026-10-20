@@ -9,8 +9,10 @@ Revisiones anteriores: 26 de septiembre y 7 de octubre de 2026 (landing por moda
   pesos al tipo de cambio FIX del Banco de México del día del cobro, más IVA; fuera de
   México, en dólares. Así se compara con AgendaPro y ReservaClase (más bajo).
 - **Clases con cupo** (estudios y academias): una banda mensual según alumnos activos,
-  mes vencido. ReservaClase Premium −15 %, redondeado hacia abajo. Todas las
-  herramientas de clases desde el primer plan.
+  mes vencido. ReservaClase Premium −15 %, redondeado hacia abajo, hasta 300 alumnos;
+  arriba, un techo para competir con los planes de precio fijo: 301–500 a USD 149 y
+  501–1,000 a USD 199 (versión del 2026-10-20). Todas las herramientas de clases desde
+  el primer plan.
 - **Citas 1 a 1**: tres planes por profesionales contratados, por adelantado, mensual
   o anual (el anual cuesta 10 meses: 2 de cortesía). Individual (1 profesional),
   Premium y Pro (de 2 a 20; AgendaPro Básico y Premium −15 %, redondeado hacia abajo).

@@ -250,7 +250,7 @@ it('si un consumidor del outbox falla y el evento se reintenta, no se repiten av
     $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Ana', 'email' => 'ana@correo.mx', 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2030-01-07 08:00:00');
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
 

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
+use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoEstudio;
@@ -20,6 +21,7 @@ use App\Modules\Tenancy\ModoCobroSaas;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use App\Modules\Tenancy\ProductoComercial;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -114,10 +116,13 @@ class PlataformaController
 
     /**
      * Ajusta la facturación SaaS de un estudio: modo de cobro (por uso según su
-     * modalidad, o cuota fija pactada) y estado de facturación. Solo el admin de la
-     * plataforma. Los precios por uso viven en las tarifas versionadas.
+     * modalidad, o cuota fija pactada) desde un mes, y estado de facturación. Solo el
+     * admin de la plataforma. Los precios por uso viven en las tarifas versionadas.
+     *
+     * `vigente_desde` (AAAA-MM; por omisión el primer mes sin cobrar): cada mes se cobra
+     * con lo que regía a su cierre (ADR 0181).
      */
-    public function actualizarEstudio(Request $request, string $estudio): JsonResponse
+    public function actualizarEstudio(Request $request, string $estudio, CondicionesDeCobroSaas $condiciones): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
 
@@ -126,15 +131,25 @@ class PlataformaController
             'cuota_fija_minor' => ['required', 'integer', 'min:0'],
             // La cuota pactada puede ser en dólares (en México se cobra en pesos, ADR 0107).
             'cuota_fija_moneda' => ['nullable', Rule::in(['MXN', 'USD'])],
+            'vigente_desde' => ['nullable', 'date_format:Y-m'],
             'estado_facturacion' => ['nullable', Rule::enum(EstadoFacturacion::class)],
         ]);
 
-        $modelo->update([
-            'modo_cobro' => $validado['modo_cobro'],
-            'cuota_fija_minor' => (int) $validado['cuota_fija_minor'],
-            'cuota_fija_moneda' => $validado['cuota_fija_moneda'] ?? $modelo->cuota_fija_moneda,
-            'estado_facturacion' => $validado['estado_facturacion'] ?? $modelo->estado_facturacion->value,
-        ]);
+        try {
+            $condiciones->pactar(
+                $modelo,
+                ModoCobroSaas::from((string) $validado['modo_cobro']),
+                (int) $validado['cuota_fija_minor'],
+                (string) ($validado['cuota_fija_moneda'] ?? $modelo->cuota_fija_moneda ?: 'MXN'),
+                $validado['vigente_desde'] ?? null,
+            );
+        } catch (DomainException $e) {
+            throw ValidationException::withMessages(['vigente_desde' => $e->getMessage()]);
+        }
+        $modelo->refresh();
+        if (isset($validado['estado_facturacion'])) {
+            $modelo->update(['estado_facturacion' => $validado['estado_facturacion']]);
+        }
 
         return response()->json(['data' => [
             'slug' => $modelo->slug,
@@ -142,6 +157,7 @@ class PlataformaController
             'cuota_fija_minor' => $modelo->cuota_fija_minor,
             'cuota_fija_moneda' => $modelo->cuota_fija_moneda,
             'estado_facturacion' => $modelo->estado_facturacion->value,
+            'cobro' => PlataformaEstudiosController::cobroPactado($modelo, $condiciones),
         ]]);
     }
 

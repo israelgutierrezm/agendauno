@@ -228,7 +228,7 @@ it('ya con cuenta ve lo que le interesó para continuar, hasta que lo reserva o 
         ->and($interes['plan'])->toMatchArray(['id' => $pack, 'nombre' => 'Pack 8 clases']);
 
     // Comprado el plan, ya no se le recuerda; reservada la clase, tampoco: nada.
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $convertido['persona']['id'], 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $convertido['persona']['id'], 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
     expect($this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->json('data'))->toMatchArray(['plan' => null])
         ->and($this->getJson("/api/v1/app/{$e['slug']}/mi/interes", conBearer($bearer))->json('data.clase.id'))->toBe($sesion);
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $convertido['persona']['id']], conBearer($e['bearer']))->assertCreated();

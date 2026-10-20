@@ -171,7 +171,7 @@ function venderPackTenant(array $e, int $creditos = 8000): string
     $persona = crearMiembroTenant($e);
     $producto = crearPackTenant($e, $creditos);
 
-    return (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    return (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
 }
@@ -186,7 +186,7 @@ function venderPackAMiembroTenant(array $e, int $creditos = 8000, string $nombre
 {
     $persona = crearMiembroTenant($e, $nombre);
     $producto = crearPackTenant($e, $creditos);
-    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
 

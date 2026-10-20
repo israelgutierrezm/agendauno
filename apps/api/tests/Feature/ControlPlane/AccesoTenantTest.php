@@ -50,7 +50,7 @@ it('concede acceso abierto por membresia ilimitada sin reserva (ACCESS_OPEN)', f
     $producto = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
         'nombre' => 'Ilimitada', 'tipo' => 'membresia', 'precio_minor' => 99900, 'moneda' => 'MXN', 'ilimitado' => true,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))
         ->assertCreated();
 
     $acceso = $this->postJson("/api/v1/app/{$e['slug']}/accesos", [

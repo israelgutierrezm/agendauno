@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
@@ -34,7 +35,7 @@ class GenerarCargosRenta extends Command
 
     protected $description = 'Emite los cargos de renta del SaaS de los meses ya cerrados y de los planes por adelantado';
 
-    public function handle(GenerarCargoRenta $generar, PlanCitasSaas $planes, GestorDeConexionTenant $gestor, AlertasPlataforma $alertas): int
+    public function handle(GenerarCargoRenta $generar, PlanCitasSaas $planes, GestorDeConexionTenant $gestor, AlertasPlataforma $alertas, CondicionesDeCobroSaas $condiciones): int
     {
         $pedido = (string) ($this->option('periodo') ?? '');
         $emitidos = 0;
@@ -44,10 +45,12 @@ class GenerarCargosRenta extends Command
 
         Estudio::query()
             ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
-            ->chunkById(100, function (Collection $estudios) use (&$emitidos, &$abiertos, &$sinTipoCambio, &$fallidos, $generar, $planes, $gestor, $alertas, $pedido): void {
+            ->chunkById(100, function (Collection $estudios) use (&$emitidos, &$abiertos, &$sinTipoCambio, &$fallidos, $generar, $planes, $gestor, $alertas, $condiciones, $pedido): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
                     try {
+                        // Lo pactado para este mes, si cambió (ADR 0181).
+                        $condiciones->sincronizar($estudio);
                         if (! $gestor->baseDeDatosExiste($estudio)) {
                             continue;
                         }

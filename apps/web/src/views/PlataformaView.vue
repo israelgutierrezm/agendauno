@@ -126,6 +126,17 @@ interface FichaApi extends Omit<Estudio, "uso"> {
   modulos?: ModuloDelNegocio[];
   uso: { periodo: string; metrica: string; cantidad: number }[];
   cargos: Cargo[];
+  // Lo pactado con fecha de vigencia (ADR 0181).
+  cobro?: {
+    desde: string | null;
+    primer_periodo_abierto: string;
+    proximo: {
+      desde: string | null;
+      modo_cobro: string;
+      cuota_fija_minor: number;
+      cuota_fija_moneda: string;
+    } | null;
+  };
   // Su plan de citas (ADR 0107): se ve y se cambia desde aquí.
   plan_citas?: PlanCitas | null;
   // Últimos avisos de la plataforma al dueño (ADR 0071).
@@ -338,6 +349,8 @@ const edit = ref({
   cuota: "0",
   moneda: "MXN",
   estado_facturacion: "",
+  // Desde qué mes rige (AAAA-MM; ADR 0181): por omisión, el primero sin cobrar.
+  desde: "",
 });
 const diasPrueba = ref(15);
 // Por qué se suspende (opcional): se escribe en la ficha, junto a las acciones.
@@ -360,6 +373,7 @@ async function abrirFicha(e: Pick<Estudio, "slug">): Promise<void> {
       cuota: String(data.data.cuota_fija_minor / 100),
       moneda: data.data.cuota_fija_moneda ?? "MXN",
       estado_facturacion: data.data.estado_facturacion,
+      desde: data.data.cobro?.primer_periodo_abierto ?? "",
     };
   } catch (err) {
     toast.error(mensajeDeError(err));
@@ -433,6 +447,7 @@ function guardarCobro(): void {
           // Sin cuota fija, la que ya tenía se conserva aunque el campo quedara vacío.
           cuota_fija_minor: cuota ?? f.cuota_fija_minor,
           cuota_fija_moneda: edit.value.moneda,
+          vigente_desde: edit.value.desde || undefined,
           estado_facturacion: edit.value.estado_facturacion,
         },
         encabezados(),
@@ -2479,7 +2494,45 @@ function borrar(): void {
                   </select>
                 </div>
               </template>
+              <div>
+                <label class="tu-label" for="cvd">{{
+                  $t("plataformaAdmin.ficha.vigenteDesde")
+                }}</label>
+                <input
+                  id="cvd"
+                  v-model="edit.desde"
+                  type="month"
+                  class="tu-input"
+                  :min="ficha.cobro?.primer_periodo_abierto"
+                  aria-describedby="cvd-ayuda"
+                />
+              </div>
             </div>
+            <p
+              id="cvd-ayuda"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("plataformaAdmin.ficha.vigenteDesdeAyuda") }}
+            </p>
+            <p
+              v-if="ficha.cobro?.proximo"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{
+                $t("plataformaAdmin.ficha.cobroProximo", {
+                  mes: periodo(ficha.cobro.proximo.desde ?? ""),
+                  cobro:
+                    ficha.cobro.proximo.modo_cobro === "fijo"
+                      ? dinero(
+                          ficha.cobro.proximo.cuota_fija_minor,
+                          ficha.cobro.proximo.cuota_fija_moneda,
+                        )
+                      : $t("plataformaAdmin.ficha.porUso"),
+                })
+              }}
+            </p>
             <button
               class="tu-btn tu-btn-primario text-sm"
               type="submit"

@@ -744,6 +744,8 @@ class EfectoInasistencia {
     this.conserva,
     this.conservaMinor,
     this.moneda,
+    this.devuelveMinor = 0,
+    this.devuelveEnLineaMinor = 0,
   });
 
   final bool conCredito;
@@ -759,6 +761,11 @@ class EfectoInasistencia {
   final int? conservaMinor;
   final String? moneda;
 
+  /// Con anticipo (ADR 0181): lo demás que pagó, y cuánto de eso se le devuelve
+  /// solo en línea (lo otro, en caja).
+  final int devuelveMinor;
+  final int devuelveEnLineaMinor;
+
   factory EfectoInasistencia.desdeJson(Map<String, dynamic> j) =>
       EfectoInasistencia(
         conCredito: (j['con_credito'] ?? false) as bool,
@@ -768,6 +775,9 @@ class EfectoInasistencia {
         conserva: j['conserva'] as String?,
         conservaMinor: (j['conserva_minor'] as num?)?.toInt(),
         moneda: j['moneda'] as String?,
+        devuelveMinor: (j['devuelve_minor'] as num?)?.toInt() ?? 0,
+        devuelveEnLineaMinor:
+            (j['devuelve_en_linea_minor'] as num?)?.toInt() ?? 0,
       );
 
   /// El efecto en una frase, con las mismas palabras que la web
@@ -777,9 +787,17 @@ class EfectoInasistencia {
       final monto = conservaMinor ?? 0;
       if (conserva != null && monto > 0 && moneda != null) {
         final dinero = Formato.dinero(monto, moneda!);
-        return conserva == 'anticipo'
-            ? 'El anticipo de $dinero no se devuelve: el negocio lo conserva.'
-            : 'Ya pagó $dinero: no se devuelve por no asistir.';
+        if (conserva != 'anticipo') {
+          return 'Ya pagó $dinero: no se devuelve por no asistir.';
+        }
+        final enCaja = devuelveMinor - devuelveEnLineaMinor;
+        return [
+          'El anticipo de $dinero no se devuelve: el negocio lo conserva.',
+          if (devuelveEnLineaMinor > 0)
+            'Lo demás que pagó en línea (${Formato.dinero(devuelveEnLineaMinor, moneda!)}) se le devuelve solo.',
+          if (enCaja > 0)
+            'Devuélvele en caja ${Formato.dinero(enCaja, moneda!)} que pagó de más.',
+        ].join(' ');
       }
       return 'No usó créditos en esta reserva: su saldo no cambia.';
     }

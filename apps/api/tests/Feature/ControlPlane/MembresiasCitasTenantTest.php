@@ -50,7 +50,7 @@ function membresiaVendidaEnClases(array $e): array
         'ilimitado' => true, 'politica_reset' => 'calendario',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
     $ana = crearMiembroTenant($e, 'Ana');
-    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $ana, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 
@@ -119,7 +119,7 @@ it('al pasar a citas, sus membresías ya no se venden y las vendidas terminan en
     expect($estado)->toBe(['archivado' => true, 'proxima' => null, 'baja' => '2026-10-31', 'estado' => 'activo', 'vale_hasta' => '2026-10-31']);
 
     // Ya no se vende ni se ofrece.
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => crearMiembroTenant($e, 'Luis'), 'producto_id' => $m['producto']], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => crearMiembroTenant($e, 'Luis'), 'producto_id' => $m['producto']], conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'MEMBERSHIP_NOT_AVAILABLE');
 });
 

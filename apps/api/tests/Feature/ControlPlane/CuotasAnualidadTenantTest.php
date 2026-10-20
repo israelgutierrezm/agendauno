@@ -42,7 +42,7 @@ function altaConAnualidad(array $e, string $nombre, bool $cobra = true): string
         'nombre' => 'Mensualidad '.$nombre, 'tipo' => 'membresia', 'precio_minor' => 120000, 'moneda' => 'MXN',
         'ilimitado' => true, 'politica_reset' => 'aniversario', 'cobra_anualidad' => $cobra,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
 
     return $persona;
 }

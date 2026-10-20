@@ -29,7 +29,7 @@ it('el corte muestra lo incluido, las extras y cada clase en que se usó', funct
     $producto = fn (array $datos): string => (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", array_merge([
         'precio_minor' => 60000, 'moneda' => 'MXN', 'ilimitado' => false,
     ], $datos), conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $vender = fn (string $p) => $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $p], conBearer($e['bearer']))->assertCreated();
+    $vender = fn (string $p) => $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $p], conBearer($e['bearer']))->assertCreated();
 
     $vender($producto([
         'nombre' => '3 clases', 'tipo' => 'paquete', 'creditos_incluidos' => 3000,

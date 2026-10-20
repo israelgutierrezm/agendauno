@@ -32,7 +32,7 @@ it('el corte trae las clases más recientes de cada plan y las demás por págin
         'nombre' => '20 clases', 'tipo' => 'paquete', 'creditos_incluidos' => 20000, 'precio_minor' => 200000,
         'moneda' => 'MXN', 'ilimitado' => false, 'vigencia_tipo' => 'meses', 'vigencia_cantidad' => 3,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
     foreach (range(2, 15) as $dia) {
         $sesion = crearSesionTenant($e, $semilla, 10, sprintf('2026-10-%02d 19:00:00', $dia));
         $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
@@ -81,7 +81,7 @@ it('el perfil del alumno trae sus próximas clases y lo vigente, no todo su hist
     // Cinco paquetes ya vencidos y uno vigente.
     foreach (['2026-06-01', '2026-07-01', '2026-08-01', '2026-09-01', '2026-09-10', '2026-10-01'] as $fecha) {
         $this->travelTo("{$fecha} 12:00:00");
-        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $mensual], conBearer($e['bearer']))->assertCreated();
+        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $mensual], conBearer($e['bearer']))->assertCreated();
     }
     $pasada = crearSesionTenant($e, $semilla, 10, '2026-10-02 19:00:00');
     $proxima = crearSesionTenant($e, $semilla, 10, '2026-10-20 19:00:00');

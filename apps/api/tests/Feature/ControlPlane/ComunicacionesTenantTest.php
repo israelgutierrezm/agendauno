@@ -79,7 +79,7 @@ it('una plantilla de email genera y envia un correo al destinatario', function (
         'nombre' => 'Bea', 'email' => 'bea@correo.mx', 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
     $producto = crearPackTenant($e, 8000);
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
     $semilla = agendaSemilla($e);
     $sesion = crearSesionTenant($e, $semilla, 5);
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();

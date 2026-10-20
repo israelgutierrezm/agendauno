@@ -31,7 +31,7 @@ function alumnaQueTomaClase(array $e): array
 {
     $vale = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
     $persona = (string) test()->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, now('America/Mexico_City')->addDay()->format('Y-m-d').' 10:00:00');
     $reserva = (string) test()->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');

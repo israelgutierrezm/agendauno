@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AvisoRentaTenant;
+use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
@@ -19,7 +20,6 @@ use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use App\Modules\Tenancy\Models\TarifaSaas;
-use App\Modules\Tenancy\ModoCobroSaas;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,19 +39,21 @@ class FacturacionController
         private readonly PlanCitasSaas $planes,
         private readonly TiposDeCambio $tipos,
         private readonly RegistroDePasarelasPlataforma $pasarelas,
+        private readonly CondicionesDeCobroSaas $condiciones,
     ) {}
 
     public function show(Request $request): JsonResponse
     {
         $estudio = $this->estudio($request);
+        $pactado = $this->condiciones->al($estudio);
 
         return response()->json(['data' => [
             'plan' => $estudio->plan,
             'estado_facturacion' => $estudio->estado_facturacion->value,
             'trial_termina_en' => $estudio->trial_termina_en?->toDateString(),
             'modalidad' => $estudio->modalidad()->value,
-            'modo_cobro' => $estudio->modo_cobro->value,
-            'cuota_fija_minor' => $estudio->cuota_fija_minor,
+            'modo_cobro' => $pactado['modo_cobro']->value,
+            'cuota_fija_minor' => $pactado['cuota_fija_minor'],
             'moneda' => $estudio->moneda,
             'uso' => $this->estimacion($estudio),
         ]]);
@@ -80,13 +82,22 @@ class FacturacionController
             ->keyBy('cargo_renta_id');
 
         $porPlan = $this->planes->aplica($estudio);
+        $pactado = $this->condiciones->al($estudio);
+        $proximo = $this->condiciones->proximo($estudio);
 
         return response()->json(['data' => [
             'modalidad' => $estudio->modalidad()->value,
-            'modo_cobro' => $estudio->modo_cobro->value,
+            'modo_cobro' => $pactado['modo_cobro']->value,
             'moneda' => $estudio->moneda,
-            'cuota_fija_minor' => $estudio->cuota_fija_minor,
-            'cuota_fija_moneda' => $estudio->cuota_fija_moneda,
+            'cuota_fija_minor' => $pactado['cuota_fija_minor'],
+            'cuota_fija_moneda' => $pactado['cuota_fija_moneda'],
+            // Lo ya pactado para un mes siguiente (ADR 0181), o null.
+            'cobro_proximo' => $proximo === null ? null : [
+                'desde' => $proximo['desde'],
+                'modo_cobro' => $proximo['modo_cobro']->value,
+                'cuota_fija_minor' => $proximo['cuota_fija_minor'],
+                'cuota_fija_moneda' => $proximo['cuota_fija_moneda'],
+            ],
             'trial_termina_en' => $estudio->trial_termina_en?->toDateString(),
             // Cómo se cobra: por plan contratado, por adelantado (citas), o por uso, mes vencido.
             'cobro' => $porPlan ? 'plan' : 'uso',
@@ -263,7 +274,7 @@ class FacturacionController
      */
     private function tarifa(Estudio $estudio): ?array
     {
-        if ($estudio->modo_cobro === ModoCobroSaas::Fijo) {
+        if ($this->condiciones->esFijo($estudio)) {
             return null;
         }
         $vigente = TarifaSaas::vigente($estudio->modalidad());

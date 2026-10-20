@@ -35,7 +35,7 @@ it('un plan que empieza el 31 renueva sin desbordar febrero y vuelve al 31', fun
         'ilimitado' => false, 'creditos_incluidos' => 8000,
         'politica_reset' => 'aniversario', 'unidades_por_ciclo' => 8000, 'politica_rollover' => 'ninguno',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $derecho = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $derecho = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto, 'fecha_inicio' => '2027-01-31',
     ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
 
@@ -71,7 +71,7 @@ it('una pausa corre el ancla junto con las fechas', function (): void {
         'nombre' => 'Mensual', 'tipo' => 'membresia', 'precio_minor' => 99900, 'moneda' => 'MXN',
         'ilimitado' => true, 'politica_reset' => 'aniversario', 'politica_rollover' => 'ninguno',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto, 'fecha_inicio' => '2026-10-01',
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 
@@ -97,7 +97,7 @@ it('un plan de calendario cobra el 1 aunque haya empezado otro día', function (
         'nombre' => 'Mensualidad', 'tipo' => 'membresia', 'precio_minor' => 99900, 'moneda' => 'MXN',
         'ilimitado' => true, 'politica_reset' => 'calendario', 'politica_rollover' => 'ninguno',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
 

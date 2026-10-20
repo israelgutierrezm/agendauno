@@ -118,7 +118,7 @@ it('los recordatorios salen a las horas del negocio y el segundo se puede apagar
         'recordatorios.primero_horas' => 48, 'recordatorios.segundo_horas' => 0,
     ]], conBearer($e['bearer']))->assertOk();
     $persona = crearMiembroTenant($e, 'Ana');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     // Clase el 4 a las 10:00 CDMX (16:00 UTC).
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2030-01-04 10:00:00');
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
@@ -141,7 +141,7 @@ it('un negocio sin política de cancelación usa la que fija la plataforma', fun
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Ana', 'email' => 'ana@correo.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $bearerAna = personalConSesion($e['slug'], $e['bearer'], 'ana@correo.mx', 'miembro');
     $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/".crearSesionTenant($e, agendaSemilla($e), 5, '2030-01-02 10:00:00').'/reservas', [
         'persona_id' => $persona,

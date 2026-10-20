@@ -66,7 +66,7 @@ it('un paquete de ciertas clases no sirve para las demás', function (): void {
     expect($datos['ofertas'])->toBe([['id' => $semilla['oferta'], 'nombre' => 'Nivel 1']]);
 
     $ana = crearMiembroTenant($e, 'Ana');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $producto], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $producto], conBearer($e['bearer']))
         ->assertCreated();
 
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$nivel1}/reservas", ['persona_id' => $ana], conBearer($e['bearer']))
@@ -82,7 +82,7 @@ it('sin clases elegidas sirve para todas; editar el plan no cambia lo ya vendido
     $producto = paqueteParaClases($e, []);
 
     $ana = crearMiembroTenant($e, 'Ana');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $producto], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $producto], conBearer($e['bearer']))
         ->assertCreated();
 
     // Después, el plan se limita a Nivel 1: a Ana le sigue sirviendo para Nivel 4.
@@ -93,7 +93,7 @@ it('sin clases elegidas sirve para todas; editar el plan no cambia lo ya vendido
 
     // Quien compra ahora, ya no.
     $beto = crearMiembroTenant($e, 'Beto');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $beto, 'producto_id' => $producto], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $beto, 'producto_id' => $producto], conBearer($e['bearer']))
         ->assertCreated();
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$nivel4['sesion']}/reservas", ['persona_id' => $beto], conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'ENTITLEMENT_REQUIRED');

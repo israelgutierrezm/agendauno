@@ -33,7 +33,7 @@ afterEach(function (): void {
 function alumnaParaFaltar(array $e): array
 {
     $persona = crearMiembroTenant($e, 'Ana');
-    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e, 8000)], conBearer($e['bearer']))
+    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e, 8000)], conBearer($e['bearer']))
         ->assertCreated()->json('data.derecho.id');
 
     return ['persona' => $persona, 'derecho' => $derecho];

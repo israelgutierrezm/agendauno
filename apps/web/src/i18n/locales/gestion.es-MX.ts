@@ -863,6 +863,12 @@ export const plataformaAdmin = {
     sinMotivo: "Sin motivo",
     guardado: "Cobro actualizado.",
     cuotaRequerida: "Escribe la cuota fija (0 o más).",
+    // Lo pactado con fecha de vigencia (ADR 0181).
+    vigenteDesde: "Rige desde",
+    vigenteDesdeAyuda:
+      "Cada mes se cobra con lo que regía a su cierre. Los meses ya cobrados no cambian.",
+    cobroProximo: "Programado: desde {mes}, {cobro}.",
+    porUso: "por uso",
     abrirPagina: "Ver su página",
     whatsappClientes: "WhatsApp con sus clientes",
     whatsappActivo: "Activo",

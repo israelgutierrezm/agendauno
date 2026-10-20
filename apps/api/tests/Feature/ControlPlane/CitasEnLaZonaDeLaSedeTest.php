@@ -97,7 +97,7 @@ it('da las otras fechas de la clase con la hora de la sede', function (): void {
     $this->putJson("/api/v1/app/{$e['slug']}/sucursales/{$sede['sucursal']}", ['zona_horaria' => 'America/Cancun'], conBearer($e['bearer']))
         ->assertOk();
     $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Ana', 'email' => 'ana@cancun.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $bearer = personalConSesion($e['slug'], $e['bearer'], 'ana@cancun.mx', 'miembro');
     $lunes = crearSesionTenant($e, $sede, 5, '2026-10-05 08:00:00');
     $miercoles = crearSesionTenant($e, $sede, 5, '2026-10-07 08:00:00');

@@ -42,6 +42,7 @@ class GenerarCargoRenta
         private readonly MonedaDeCobroSaas $moneda,
         private readonly PlanCitasSaas $planes,
         private readonly ParametrosTenant $parametros,
+        private readonly CondicionesDeCobroSaas $condiciones,
     ) {}
 
     /**
@@ -134,7 +135,8 @@ class GenerarCargoRenta
             [
                 'concepto' => 'renta',
                 ...$final['columnas'],
-                'modo_cobro' => $estudio->modo_cobro->value,
+                // Lo pactado que regía en ese mes (ADR 0181).
+                'modo_cobro' => $this->condiciones->en($estudio, $periodo)['modo_cobro']->value,
                 'metrica' => $medicion->metrica,
                 'alumnos_activos' => $medicion->cantidad,
                 'medicion_id' => $medicion->getKey(),
@@ -163,10 +165,12 @@ class GenerarCargoRenta
      */
     public function cotizar(Estudio $estudio, string $metrica, int $cantidad, array $detalle, string $periodo, ?CarbonImmutable $tarifaAl = null): array
     {
-        if ($estudio->modo_cobro === ModoCobroSaas::Fijo) {
-            $desglose = $this->calcular->fija((int) $estudio->cuota_fija_minor);
+        // Lo pactado que regía en ese mes: cuota fija o por uso (ADR 0181).
+        $pactado = $this->condiciones->en($estudio, $periodo);
+        if ($pactado['modo_cobro'] === ModoCobroSaas::Fijo) {
+            $desglose = $this->calcular->fija($pactado['cuota_fija_minor']);
             $version = null;
-            $monedaTarifa = (string) ($estudio->cuota_fija_moneda ?: 'MXN');
+            $monedaTarifa = $pactado['cuota_fija_moneda'];
         } else {
             $modalidad = $metrica === ModalidadServicio::Citas->metrica() ? ModalidadServicio::Citas : ModalidadServicio::Clases;
             $tarifa = TarifaSaas::vigenteEn($modalidad, $tarifaAl ?? CarbonImmutable::now());

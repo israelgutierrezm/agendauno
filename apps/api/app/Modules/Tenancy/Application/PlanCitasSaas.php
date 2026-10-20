@@ -52,6 +52,7 @@ class PlanCitasSaas
         private readonly TiposDeCambio $tipos,
         private readonly GestorDeConexionTenant $gestor,
         private readonly ParametrosTenant $parametros,
+        private readonly CondicionesDeCobroSaas $condiciones,
     ) {}
 
     /** Días para pagar un cargo del plan (parámetro de la plataforma). */
@@ -75,7 +76,7 @@ class PlanCitasSaas
     public function aplica(Estudio $estudio, ?CarbonInterface $al = null): bool
     {
         return $estudio->modalidad() === ModalidadServicio::Citas
-            && $estudio->modo_cobro !== ModoCobroSaas::Fijo
+            && ! $this->condiciones->esFijo($estudio, $al)
             && $this->tarifa($al) !== null;
     }
 

@@ -160,10 +160,10 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.text()).not.toMatch(/talleres|reservas grupales/i);
     vista.unmount();
   });
-  it("el respaldo coincide con lo publicado (ReservaClase y AgendaPro −15 %, redondeados hacia abajo)", () => {
+  it("el respaldo coincide con lo publicado (ReservaClase y AgendaPro −15 %, redondeados hacia abajo; techo de clases arriba de 300)", () => {
     const { clases, citas } = PRECIOS_POR_OMISION;
     expect(rangosClases(clases.bandas).map((b) => b.subtotal)).toEqual([
-      2100, 3000, 3900, 4800, 6800, 8400, 11100, 16400, 29700,
+      2100, 3000, 3900, 4800, 6800, 8400, 11100, 14900, 19900,
     ]);
     expect(rangosClases(clases.bandas)[1]!.capacidad).toBe(
       "41–60 alumnos activos",

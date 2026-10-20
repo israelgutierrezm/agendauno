@@ -36,7 +36,7 @@ function reservaConCorreo(string $reservadaEn): array
     $persona = (string) test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Bea', 'email' => 'bea@correo.mx', 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => crearPackTenant($e, 8000),
     ], conBearer($e['bearer']))->assertCreated();
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2026-10-01 08:00:00');

@@ -35,7 +35,7 @@ it('el calendario, sus reservas, sus movimientos y su historial traen la hora de
     $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Luz', 'email' => 'luz@correo.mx', 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $derecho = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $derecho = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => crearPackTenant($e, 8000),
     ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
     $luz = personalConSesion($e['slug'], $e['bearer'], 'luz@correo.mx', 'miembro');

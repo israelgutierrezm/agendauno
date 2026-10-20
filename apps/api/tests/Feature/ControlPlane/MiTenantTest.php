@@ -29,7 +29,7 @@ function miembroConAcceso(array $e, string $email = 'ana@correo.mx'): array
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
 
     $pack = crearPackTenant($e, 8000);
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $pack,
     ], conBearer($e['bearer']))->assertCreated();
 

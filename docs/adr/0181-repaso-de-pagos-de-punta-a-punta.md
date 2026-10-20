@@ -143,6 +143,26 @@ El cobro de una cita se autoriza por la cita (su sede y su profesional).
   `no_facturable_desde`); de plataforma `2026_10_20_000100_hueco_de_prueba`.
 - La web y la app mandan claves por intento al vender, al mover efectivo y al comprar un
   plan.
-- Quedan pendientes de decisión: qué se queda el negocio si cancelan tarde o no llegan a
-  una cita con anticipo; `POST /acuerdos` entrega planes sin orden; versionar la cuota fija
-  de la renta.
+- Las decisiones que quedaban pendientes las tomó el dueño (ver abajo).
+
+## Decisiones del dueño (2026-10-20)
+
+- **Cita con anticipo que se cancela tarde o no se atiende: solo el anticipo.** El negocio
+  conserva el anticipo; lo demás que el cliente ya pagó se le devuelve. Lo pagado en línea
+  se devuelve solo, por la misma pasarela (`DevolverPagoDeCitaConAnticipo`, que reemplaza a
+  `DevolverAnticipoAlCancelarATiempo`, con llaves `cancelacion-tardia:` e `inasistencia:`
+  por reserva y pago); lo pagado en caja lo devuelve el negocio, y la vista previa de la
+  inasistencia lo dice (`devuelve_minor`, `devuelve_en_linea_minor`). Cancelar a tiempo
+  sigue devolviendo todo.
+- **Cortesías con permiso y motivo.** `POST /acuerdos` da un plan sin cobrarlo: pide el
+  permiso nuevo `membresias.cortesia` (el propietario y el administrador lo traen;
+  recepción no) y un `motivo`, que queda en la bitácora como `membresia.cortesia`.
+- **Lo pactado con cada negocio, con fecha de vigencia.** El superadmin dice desde qué mes
+  rige el cobro por uso o una cuota fija (`vigente_desde`, AAAA-MM; por omisión, el primer
+  mes sin cobrar). Cada mes se cobra con lo que regía a su cierre (`condiciones_cobro_saas`,
+  migración `2026_10_20_000300`); un mes ya cobrado no cambia (422) y se pacta a lo más 12
+  meses adelante. Las columnas de `estudios` quedan con lo que rige hoy: se actualizan al
+  pactar y cada día con la renta.
+- **Techo de la tarifa de clases.** Versión nueva de la tarifa (migración
+  `2026_10_20_000200_techo_de_clases`): 301–500 alumnos activos a USD 149 y 501–1,000 a
+  USD 199; las demás bandas, las versiones anteriores y los cargos ya emitidos no cambian.

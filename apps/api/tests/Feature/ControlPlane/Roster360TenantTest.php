@@ -18,7 +18,7 @@ it('el roster expone adeudo, documentos pendientes y persona_id por asistente', 
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $persona = crearMiembroTenant($e, 'Ana');
     $pack = crearPackTenant($e, 8000);
-    $venta = $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $venta = $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $pack,
     ], conBearer($e['bearer']))->assertCreated()->json('data');
 

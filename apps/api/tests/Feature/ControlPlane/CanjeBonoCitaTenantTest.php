@@ -49,7 +49,7 @@ it('el masaje con bono aparece solo en la cuenta de quien tiene el bono, y la ci
         'ilimitado' => false, 'creditos_incluidos' => 5000, 'ofertas' => [$masaje],
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
     $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/mi/formularios", conBearer($ana['bearer']))->json('data.persona_id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $bono], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $bono], conBearer($e['bearer']))->assertCreated();
 
     $servicio = collect($opciones())->firstWhere('nombre', 'Masaje relajante');
     expect($servicio)->not->toBeNull()

@@ -254,6 +254,8 @@ class MembresiasTenantController
             'producto_id' => ['required', 'string'],
             'fecha_inicio' => ['nullable', 'date'],
             'acepta_condiciones' => ['sometimes', 'boolean'],
+            // Una cortesía (sin cobro) siempre dice por qué (ADR 0181).
+            'motivo' => ['required', 'string', 'min:3', 'max:300'],
         ]);
 
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
@@ -276,6 +278,8 @@ class MembresiasTenantController
             condiciones: $aceptada ? CondicionesDePlan::aceptadas($producto, 'negocio', $actor, $request->ip()) : null,
         );
         $derecho = $acuerdo->derechos()->firstOrFail();
+        app(RegistrarAuditoria::class)->registrar($actor, 'membresia.cortesia', 'acuerdo', (string) $acuerdo->ulid,
+            null, ['persona' => $persona->ulid, 'producto' => $producto->nombre], trim((string) $validado['motivo']));
 
         return response()->json([
             'data' => [

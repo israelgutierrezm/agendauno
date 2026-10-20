@@ -164,7 +164,10 @@ export default {
         gestionar: "Crear y editar planes y paquetes",
         eliminar: "Archivar planes y paquetes",
       },
-      membresias: { gestionar: "Vender y administrar membresías" },
+      membresias: {
+        gestionar: "Vender y administrar membresías",
+        cortesia: "Dar planes de cortesía (sin cobro)",
+      },
       creditos: { gestionar: "Ajustar créditos" },
       promociones: {
         gestionar: "Crear promociones",

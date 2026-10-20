@@ -116,7 +116,7 @@ it('en una clase grupal no se avisa al instructor por cada reserva', function ()
     ], conBearer($ctx['e']['bearer']))->assertCreated()->json('data.id');
     $this->putJson("/api/v1/app/{$ctx['e']['slug']}/ofertas/{$ctx['sede']['oferta']}", ['lugares' => 12, 'politica_reserva' => 'entitlement'], conBearer($ctx['e']['bearer']))
         ->assertOk();
-    $this->postJson("/api/v1/app/{$ctx['e']['slug']}/acuerdos", ['persona_id' => $ctx['cliente'], 'producto_id' => crearPackTenant($ctx['e'])], conBearer($ctx['e']['bearer']))
+    $this->postJson("/api/v1/app/{$ctx['e']['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ctx['cliente'], 'producto_id' => crearPackTenant($ctx['e'])], conBearer($ctx['e']['bearer']))
         ->assertCreated();
 
     $this->postJson("/api/v1/app/{$ctx['e']['slug']}/sesiones/{$clase}/reservas", ['persona_id' => $ctx['cliente']], conBearer($ctx['e']['bearer']))

@@ -36,7 +36,7 @@ it('conserva las sucursales compradas y comparte el saldo entre ellas sin inclui
     $polanco = $this->postJson("/api/v1/app/{$e['slug']}/organizaciones/{$org}/sucursales", ['nombre' => 'Polanco'], conBearer($e['bearer']))->assertCreated()->json('data.id');
     $producto = crearProductoTenant($e, ['sucursal_ids' => [$semilla['sucursal'], $polanco]]);
     $persona = crearMiembroTenant($e, 'Ana');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
     $futura = $this->postJson("/api/v1/app/{$e['slug']}/organizaciones/{$org}/sucursales", ['nombre' => 'Nueva'], conBearer($e['bearer']))->assertCreated()->json('data.id');
 
     $this->putJson("/api/v1/app/{$e['slug']}/productos/{$producto}", ['sucursal_ids' => null], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.todas_sucursales', true);
@@ -53,7 +53,7 @@ it('conserva las sucursales compradas y comparte el saldo entre ellas sin inclui
     $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/derechos", conBearer($e['bearer']))
         ->assertJsonPath('data.0.disponible', 6000);
     $nuevaPersona = crearMiembroTenant($e, 'Beto');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $nuevaPersona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $nuevaPersona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$noCubierta}/reservas", ['persona_id' => $nuevaPersona], conBearer($e['bearer']))->assertCreated();
 });
 
@@ -86,7 +86,7 @@ it('la vigencia del producto fija el vencimiento del derecho al venderse', funct
     $persona = crearMiembroTenant($e, 'Ana');
     $producto = crearProductoTenant($e, ['vigencia_tipo' => 'dias', 'vigencia_cantidad' => 30]);
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated();
 
@@ -102,7 +102,7 @@ it('vigencia por meses a la misma fecha o hasta fin de mes', function (string $t
     $persona = crearMiembroTenant($e, 'Ana');
     $producto = crearProductoTenant($e, ['vigencia_tipo' => $tipo, 'vigencia_cantidad' => $cantidad]);
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated();
 
@@ -138,7 +138,7 @@ it('una clase suelta es siempre de una clase', function (): void {
     ], conBearer($e['bearer']))->assertCreated()->json('data');
     expect($producto['ilimitado'])->toBeFalse()->and($producto['creditos_incluidos'])->toBe(1000);
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto['id'],
     ], conBearer($e['bearer']))->assertCreated();
     $ficha = $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/ficha", conBearer($e['bearer']))->assertOk()->json('data');

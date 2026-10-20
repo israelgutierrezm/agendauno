@@ -33,7 +33,7 @@ function porVencerEnSucursal(array $e, string $nombre, string $sucursalUlid, int
         'nombre' => 'Pack', 'tipo' => 'paquete', 'precio_minor' => 89900, 'moneda' => 'MXN',
         'ilimitado' => false, 'creditos_incluidos' => 8000, 'vigencia_tipo' => 'dias', 'vigencia_cantidad' => $dias,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))->assertCreated();
 }

@@ -35,7 +35,7 @@ function alumnaConAccesoLibre(array $e): array
     $producto = (string) test()->postJson("/api/v1/app/{$e['slug']}/productos", [
         'nombre' => 'Ilimitada', 'tipo' => 'membresia', 'precio_minor' => 99900, 'moneda' => 'MXN', 'ilimitado' => true,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))
         ->assertCreated();
 
     return ['bearer' => $alumna['bearer'], 'persona' => $persona];

@@ -41,7 +41,7 @@ function planLocalDeRoma(): array
     $ana = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
     $persona = (string) app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-a')->firstOrFail(),
         fn () => PersonaTenant::query()->where('email', 'ana@correo.mx')->value('ulid'));
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
 
     return ['e' => $e, 'ana' => $ana, 'persona' => $persona, 'oferta' => $semilla['oferta'], 'roma' => $semilla['sucursal'], 'polanco' => $polanco];
 }

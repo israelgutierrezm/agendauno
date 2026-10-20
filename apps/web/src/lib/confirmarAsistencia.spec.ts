@@ -82,4 +82,23 @@ describe("efecto de una falta", () => {
       ),
     ).toBe("Ya pagó $250.00: no se devuelve por no asistir.");
   });
+
+  it("con anticipo, lo demás que pagó se devuelve: en línea solo y lo de caja, a mano", () => {
+    expect(
+      textoInasistencia(
+        t,
+        efecto({
+          con_credito: false,
+          pierde_credito: false,
+          conserva: "anticipo",
+          conserva_minor: 10000,
+          moneda: "MXN",
+          devuelve_minor: 15000,
+          devuelve_en_linea_minor: 5000,
+        }),
+      ),
+    ).toBe(
+      "El anticipo de $100.00 no se devuelve: el negocio lo conserva. Lo demás que pagó en línea ($50.00) se le devuelve solo. Devuélvele en caja $100.00 que pagó de más.",
+    );
+  });
 });

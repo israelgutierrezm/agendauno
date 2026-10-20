@@ -36,7 +36,7 @@ function alumnaConCreditos(array $e, string $email = 'ana@correo.mx'): array
     $persona = (string) test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Ana', 'email' => $email, 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $derecho = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => crearPackTenant($e, 8000),
     ], conBearer($e['bearer']))->assertCreated()->json('data.derecho.id');
 

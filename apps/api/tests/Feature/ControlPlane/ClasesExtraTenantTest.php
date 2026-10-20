@@ -51,7 +51,7 @@ it('sin paquete vigente no se venden clases extra', function (): void {
     $extra = productoDeClases($e, ['nombre' => '2 clases extra', 'tipo' => 'add_on', 'creditos_incluidos' => 2000]);
     $ana = crearMiembroTenant($e, 'Ana');
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'BASE_PACKAGE_REQUIRED');
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
         'comprador_id' => $ana, 'items' => [['producto_id' => $extra, 'cantidad' => 1]],
@@ -69,9 +69,9 @@ it('se suman al paquete vigente, vencen con él y se gastan después de él', fu
     $extra = productoDeClases($e, ['nombre' => 'Clase extra', 'tipo' => 'add_on', 'creditos_incluidos' => 1000, 'precio_minor' => 15000]);
     $ana = crearMiembroTenant($e, 'Ana');
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))->assertCreated();
     $this->travelTo('2026-10-20 12:00:00');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
 
     [$base, $extras] = derechosDe($e, $ana);
     // Vence con el paquete (14 oct + 1 mes), no a partir de su propia compra.
@@ -97,8 +97,8 @@ it('sirven para las mismas clases que el paquete', function (): void {
     ]);
     $extra = productoDeClases($e, ['nombre' => 'Clase extra', 'tipo' => 'add_on', 'creditos_incluidos' => 1000]);
     $ana = crearMiembroTenant($e, 'Ana');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))->assertCreated();
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
 
     // Otra clase (otra actividad): ni el paquete ni su extra la cubren.
     $programa = (string) $this->postJson("/api/v1/app/{$e['slug']}/programas", ['nombre' => 'Aéreo'], conBearer($e['bearer']))->json('data.id');
@@ -121,9 +121,9 @@ it('al pausar el paquete, sus clases extra se recorren igual', function (): void
     ]);
     $extra = productoDeClases($e, ['nombre' => 'Clase extra', 'tipo' => 'add_on', 'creditos_incluidos' => 1000]);
     $ana = crearMiembroTenant($e, 'Ana');
-    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))
+    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))
         ->assertCreated()->json('data.acuerdo');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
     expect(array_column(derechosDe($e, $ana), 'valido_hasta'))->toBe(['2026-10-31', '2026-10-31']);
 
     $this->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/pausar", ['hasta' => '2026-10-18'], conBearer($e['bearer']))->assertOk();
@@ -145,9 +145,9 @@ it('con el paquete en pausa, sus clases extra tampoco se reservan', function ():
     ]);
     $extra = productoDeClases($e, ['nombre' => 'Clase extra', 'tipo' => 'add_on', 'creditos_incluidos' => 1000]);
     $ana = crearMiembroTenant($e, 'Ana');
-    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))
+    $acuerdo = (string) $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $paquete], conBearer($e['bearer']))
         ->assertCreated()->json('data.acuerdo');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => $extra], conBearer($e['bearer']))->assertCreated();
     $sesion = crearSesionTenant($e, $semilla, null, '2026-10-16 08:00:00');
 
     $this->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/pausar", ['hasta' => '2026-10-20'], conBearer($e['bearer']))->assertOk();

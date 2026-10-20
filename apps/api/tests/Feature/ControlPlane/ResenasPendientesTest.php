@@ -24,7 +24,7 @@ it('filtra por fechas y pagina las clases por calificar', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $vale = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
     $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $semilla = agendaSemilla($e);
 
     // Tres clases en días seguidos (2, 3 y 4 de octubre), a las que asistió.

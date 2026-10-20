@@ -34,7 +34,7 @@ function mensualidadVendidaConAnualidad(array $e, string $nombre, bool $cobra): 
         'nombre' => 'Mensualidad '.$nombre, 'tipo' => 'membresia', 'precio_minor' => 120000, 'moneda' => 'MXN',
         'ilimitado' => true, 'politica_reset' => 'aniversario', 'cobra_anualidad' => $cobra,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => $plan], conBearer($e['bearer']))->assertCreated();
 
     return $plan;
 }
@@ -75,7 +75,7 @@ it('una orden que se paga después concede el plan como se compró, aunque se ed
         ->and($derecho['valido_hasta'])->toBeNull();
 
     // Una compra nueva ya concede el plan editado.
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => crearMiembroTenant($e, 'Bea'), 'producto_id' => $pack], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => crearMiembroTenant($e, 'Bea'), 'producto_id' => $pack], conBearer($e['bearer']))
         ->assertCreated();
 });
 

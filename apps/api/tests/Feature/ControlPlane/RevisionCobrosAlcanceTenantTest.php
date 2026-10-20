@@ -205,7 +205,7 @@ it('quien está acotado a una sede ve solo las renovaciones y la mora de sus cli
         'nombre' => 'Mensualidad', 'tipo' => 'membresia', 'precio_minor' => 129900, 'moneda' => 'MXN', 'ilimitado' => true, 'politica_reset' => 'calendario',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
     foreach ([['Ana', $sedeA], ['Beto', $sedeB]] as [$nombre, $sede]) {
-        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
             'persona_id' => crearMiembroEnSucursal($e, $nombre, $sede), 'producto_id' => $producto,
         ], conBearer($e['bearer']))->assertCreated();
     }

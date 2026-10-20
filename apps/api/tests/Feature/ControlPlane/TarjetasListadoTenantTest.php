@@ -107,7 +107,7 @@ it('con dos planes vigentes, el resumen trae los dos y suma su saldo', function 
     $mensual = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
         'nombre' => 'Paquete 4 clases', 'tipo' => 'paquete', 'precio_minor' => 60000, 'moneda' => 'MXN', 'creditos_incluidos' => 4000,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana['persona'], 'producto_id' => $mensual], conBearer($e['bearer']))
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana['persona'], 'producto_id' => $mensual], conBearer($e['bearer']))
         ->assertCreated();
 
     $membresia = collect($this->getJson("/api/v1/app/{$e['slug']}/miembros?page=1&resumen=1", conBearer($e['bearer']))->assertOk()->json('data'))

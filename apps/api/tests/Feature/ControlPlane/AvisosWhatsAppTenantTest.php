@@ -148,7 +148,7 @@ function negocioConAlumnas(): array
     $vale = (string) test()->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
     $caro = crearMiembroTenant($e, 'Caro');
     foreach ([$vale => '55 1234 5678', $caro => '55 8765 4321'] as $persona => $celular) {
-        test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
+        test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))
             ->assertCreated();
         enNegocioWhatsApp($e, fn () => PersonaTenant::query()->where('ulid', $persona)->update(['celular' => $celular]));
     }

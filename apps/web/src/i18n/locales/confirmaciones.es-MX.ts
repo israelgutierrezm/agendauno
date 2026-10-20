@@ -66,6 +66,9 @@ export default {
       conservaAnticipo:
         "El anticipo de {monto} no se devuelve: el negocio lo conserva.",
       conservaPago: "Ya pagó {monto}: no se devuelve por no asistir.",
+      devuelveEnLinea:
+        "Lo demás que pagó en línea ({monto}) se le devuelve solo.",
+      devuelveEnCaja: "Devuélvele en caja {monto} que pagó de más.",
     },
     correccion:
       "{persona} está marcado como «{antes}». ¿Cambiarlo a «{ahora}»? Si aplica, el crédito se ajusta en su saldo.",

@@ -117,6 +117,12 @@ Cada negocio es solo de clases o solo de citas, y la modalidad está guardada
   tiene sesiones o reservas, y 422 `VALIDATION_FAILED` si el giro es de la otra
   modalidad. Sin giro, conserva el suyo si encaja o toma `general` (clases) o
   `general_citas` (citas). Queda en la bitácora del negocio (`estudio.modalidad`).
+- **Lo pactado, con fecha de vigencia (ADR 0181).** `PUT /plataforma/estudios/{slug}`
+  (`modo_cobro`, `cuota_fija_minor`, `cuota_fija_moneda`, `vigente_desde` AAAA-MM,
+  `estado_facturacion`) pacta desde ese mes (por omisión, el primero sin cobrar) y
+  responde con lo que rige hoy y `cobro` (`desde`, `primer_periodo_abierto`, `proximo`);
+  la ficha (`GET`) trae el mismo `cobro`. Un mes ya cobrado responde 422 en
+  `vigente_desde`. `GET /renta` del dueño suma `cobro_proximo`.
 - **Escaparate.** `GET /escaparate` suma `estudio.modalidad` y `estudio.capacidades`;
   `estudio.tiene_citas` sale de la modalidad (no de las ofertas) y
   `servicios[].agendable` solo es `true` en un negocio de citas (una clase de pago
@@ -1415,6 +1421,10 @@ en el negocio.
 - `POST /ordenes` acepta `liquidar` {`metodo`, `clave`, `sucursal_id`}: vende y cobra en
   caja en una transacción (si el cobro no pasa, no queda la orden). Repetir la misma
   `clave` devuelve la venta ya hecha (409 si el comprador es otro) (ADR 0181).
+- `POST /acuerdos` {`persona_id`, `producto_id`, `fecha_inicio`, `motivo`} da un plan sin
+  cobrarlo (cortesía): pide el permiso `membresias.cortesia` y un `motivo` (3–300), que
+  queda en la bitácora como `membresia.cortesia` (ADR 0181). Vender se hace con
+  `POST /ordenes`.
 
 ### Contracargos (ADR 0168)
 

@@ -159,7 +159,7 @@ it('la lista para empezar se comprueba con los datos y en orden; activar una pas
     // ...la de un cliente desde su cuenta, sí.
     $luz = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Luz', 'email' => 'luz@correo.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $luz, 'producto_id' => crearPackTenant($e, 8000)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $luz, 'producto_id' => crearPackTenant($e, 8000)], conBearer($e['bearer']))->assertCreated();
     $cuenta = personalConSesion($e['slug'], $e['bearer'], 'luz@correo.mx', 'miembro');
     $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($cuenta))->assertCreated();
     expect($comprobado()['prueba'])->toBeTrue();

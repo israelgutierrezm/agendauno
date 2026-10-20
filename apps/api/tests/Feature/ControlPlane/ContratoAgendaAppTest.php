@@ -92,7 +92,7 @@ function contratoAgendaMiembro(array $e, string $email = 'ana@correo.mx'): array
     $persona = (string) test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Ana', 'email' => $email, 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => crearPackTenant($e),
     ], conBearer($e['bearer']))->assertCreated();
 

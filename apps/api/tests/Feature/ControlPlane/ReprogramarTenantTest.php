@@ -169,7 +169,7 @@ it('una clase completa cambia de horario y cada alumno recibe el aviso; lo ocurr
     $sesion = crearSesionTenant($e, $sede, 5, '2030-01-07 08:00:00');
     foreach (['Bea' => 'bea@correo.mx', 'Caro' => 'caro@correo.mx'] as $nombre => $email) {
         $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => $nombre, 'email' => $email, 'tipo' => 'miembro'], conBearer($e['bearer']))->json('data.id');
-        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
         $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
     }
 

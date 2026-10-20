@@ -19,7 +19,7 @@ it('vende un pack y concede sus creditos en el ledger (saldo derivado)', functio
     $persona = crearMiembroTenant($e);
     $producto = crearPackTenant($e, 8000);
 
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($e['bearer']))
         ->assertCreated()
@@ -104,8 +104,31 @@ it('un instructor ve derechos solo de sus clientes y no vende ni mueve el ledger
     $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/derechos", conBearer($coach))->assertForbidden();
 
     // Vender o mover el ledger: prohibido.
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba',
         'persona_id' => $persona, 'producto_id' => $producto,
     ], conBearer($coach))->assertStatus(403);
     $this->postJson("/api/v1/app/{$e['slug']}/derechos/{$derecho}/consumos", ['unidades' => 1000], conBearer($coach))->assertStatus(403);
+});
+
+it('dar un plan de cortesía pide su propio permiso y un motivo, y queda en la bitácora', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $persona = crearMiembroTenant($e);
+    $producto = crearPackTenant($e, 8000);
+    $app = "/api/v1/app/{$e['slug']}";
+
+    // Recepción vende y cobra, pero regalar un plan no le toca (ADR 0181).
+    $recep = conBearer(personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista'));
+    $this->postJson("{$app}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto, 'motivo' => 'Le caigo bien'], $recep)
+        ->assertForbidden();
+
+    $this->postJson("{$app}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['motivo'], 'meta.errors');
+
+    $acuerdo = (string) $this->postJson("{$app}/acuerdos", [
+        'persona_id' => $persona, 'producto_id' => $producto, 'motivo' => 'Compensación por la clase cancelada',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.acuerdo');
+
+    $asiento = $this->getJson("{$app}/auditorias?accion=membresia.cortesia", conBearer($e['bearer']))->assertOk()->json('data.0');
+    expect($asiento['entidad_id'])->toBe($acuerdo)
+        ->and($asiento['motivo'])->toBe('Compensación por la clase cancelada');
 });

@@ -158,7 +158,7 @@ it('cambiar los días: quita las fechas que ya no van, crea las de los días nue
     $e = $c['e'];
     // Ana reserva el lunes 21.
     $ana = crearMiembroTenant($e, 'Ana');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $ana, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $lunes21 = collect($this->getJson("/api/v1/app/{$e['slug']}/sesiones?desde=2030-01-21&hasta=2030-01-21", conBearer($e['bearer']))->json('data'))
         ->first(fn (array $s): bool => str_starts_with($s['inicia_en'], '2030-01-21'));
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$lunes21['id']}/reservas", ['persona_id' => $ana], conBearer($e['bearer']))->assertCreated();

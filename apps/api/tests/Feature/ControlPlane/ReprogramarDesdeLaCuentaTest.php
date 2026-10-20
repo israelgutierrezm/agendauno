@@ -121,14 +121,14 @@ it('un alumno cambia su clase a otra fecha de la misma clase que tenga lugar', f
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sede = agendaSemilla($e);
     $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Ana', 'email' => 'ana@correo.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $bearer = personalConSesion($e['slug'], $e['bearer'], 'ana@correo.mx', 'miembro');
     $lunes = crearSesionTenant($e, $sede, 5, '2030-01-07 08:00:00');
     $martes = crearSesionTenant($e, $sede, 1, '2030-01-08 08:00:00');
     $miercoles = crearSesionTenant($e, $sede, 5, '2030-01-09 08:00:00');
     // El martes ya está lleno.
     $otra = crearMiembroTenant($e, 'Beto');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $otra, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $otra, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$martes}/reservas", ['persona_id' => $otra], conBearer($e['bearer']))->assertCreated();
     $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $lunes], conBearer($bearer))->assertCreated()->json('data.id');
 
@@ -144,7 +144,7 @@ it('al cambiar su clase, el alumno no se adelanta a la apertura de reservas', fu
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sede = agendaSemilla($e);
     $persona = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Ana', 'email' => 'ana@correo.mx', 'tipo' => 'miembro'], conBearer($e['bearer']))->json('data.id');
-    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e)], conBearer($e['bearer']))->assertCreated();
     $bearer = personalConSesion($e['slug'], $e['bearer'], 'ana@correo.mx', 'miembro');
     $manana = crearSesionTenant($e, $sede, 5, '2030-01-02 08:00:00');
     $lejana = crearSesionTenant($e, $sede, 5, '2030-01-20 08:00:00');

@@ -34,7 +34,7 @@ function alumnaConDatos(array $e): array
     $alumna = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
     $persona = (string) test()->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => crearPackTenant($e, 8000)], conBearer($e['bearer']))
+    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['motivo' => 'Cortesía de prueba', 'persona_id' => $persona, 'producto_id' => crearPackTenant($e, 8000)], conBearer($e['bearer']))
         ->assertCreated();
 
     return ['bearer' => $alumna['bearer'], 'persona' => $persona];
