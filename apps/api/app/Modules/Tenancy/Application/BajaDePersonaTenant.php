@@ -4,15 +4,23 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Medicion\EstadoEnvioMedicion;
+use App\Modules\Tenancy\Medicion\IdentificadoresNavegador;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\ContextoMedicionTenant;
 use App\Modules\Tenancy\Models\ConversacionTenant;
 use App\Modules\Tenancy\Models\Documento;
+use App\Modules\Tenancy\Models\EnvioMedicionTenant;
+use App\Modules\Tenancy\Models\EventoProspectoTenant;
 use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\NotaPersonaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\PresupuestoTenant;
+use App\Modules\Tenancy\Models\ProspectoTenant;
+use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\RespuestaFormulario;
 use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
@@ -128,6 +136,7 @@ class BajaDePersonaTenant
             ConversacionTenant::query()->whereKey($conversaciones)->delete();
             NotaPersonaTenant::query()->where('persona_id', $persona->getKey())->delete();
             AceptacionWaiverTenant::query()->where('persona_id', $persona->getKey())->update(['ip' => null]);
+            $this->borrarRastros($persona);
 
             $usuario = $persona->usuario_id !== null ? Usuario::query()->find($persona->usuario_id) : null;
             if ($usuario instanceof Usuario) {
@@ -167,6 +176,10 @@ class BajaDePersonaTenant
                 'es_facturable' => false,
                 'recibe_promociones' => false,
                 'whatsapp_aceptado_en' => null,
+                'fecha_nacimiento' => null,
+                'genero' => null,
+                'como_nos_conocio' => null,
+                'referencia_externa' => null,
                 'usuario_id' => null,
                 'eliminado_por' => $actor?->getKey(),
             ])->save();
@@ -189,6 +202,41 @@ class BajaDePersonaTenant
         }
 
         return $solicitud->refresh();
+    }
+
+    /**
+     * Lo que quedaba de la persona fuera de su ficha: su solicitud de informes (el
+     * prospecto sigue contando en el embudo, sin sus datos), el contacto de sus
+     * presupuestos, el texto de sus reseñas (la calificación se queda en los promedios)
+     * y los identificadores de su navegador; las conversiones que aún no salían ya no se
+     * mandan.
+     */
+    private function borrarRastros(PersonaTenant $persona): void
+    {
+        $id = $persona->getKey();
+        $prospectos = ProspectoTenant::query()->where('persona_id', $id)->pluck('id')->all();
+        ProspectoTenant::query()->whereKey($prospectos)->update([
+            'nombre' => self::NOMBRE_ANONIMO,
+            'email' => null,
+            'telefono' => null,
+            'respuestas' => null,
+            'comentario_cierre' => null,
+        ]);
+        EventoProspectoTenant::query()->whereIn('prospecto_id', $prospectos)->update(['detalle' => null]);
+        PresupuestoTenant::query()->where('persona_id', $id)->update([
+            'nombre_contacto' => null,
+            'email_contacto' => null,
+            'celular_contacto' => null,
+        ]);
+        ResenaTenant::query()->where('persona_id', $id)->update(['comentario' => null, 'visible' => false]);
+
+        $contextos = ContextoMedicionTenant::query()->where('persona_id', $id)->pluck('id')->all();
+        $sinIdentificadores = array_fill_keys(array_diff(IdentificadoresNavegador::COLUMNAS, ['analitica', 'publicidad']), null);
+        ContextoMedicionTenant::query()->whereKey($contextos)->update($sinIdentificadores);
+        EnvioMedicionTenant::query()
+            ->where(fn ($q) => $q->where('persona_id', $id)->orWhereIn('contexto_medicion_id', $contextos))
+            ->whereIn('estado', [EstadoEnvioMedicion::Pendiente->value, EstadoEnvioMedicion::Error->value])
+            ->update(['estado' => EstadoEnvioMedicion::Omitido->value, 'motivo' => 'baja_de_datos', 'proximo_intento_en' => null]);
     }
 
     private function exigirPendiente(SolicitudPrivacidadTenant $solicitud): void

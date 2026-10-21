@@ -93,6 +93,16 @@ negocio (ADR 0190) y la bandeja después.
       antes de que el mensaje quede guardado. El pie sale como otro mensaje.
   - **Baja de datos (ARCO):** al atenderla se borran las conversaciones ligadas a su
     ficha, con sus archivos. Una conversación sin ligar no se puede saber de quién es.
+  - **Acceso y portabilidad (ARCO):** `POST /mi/datos` incluye esas conversaciones con
+    sus mensajes. De paso, la descarga incluye lo demás que quedaba fuera (niveles,
+    grupos, invitados, reseñas, compras del mostrador, apartados, presupuestos,
+    puntos y canjes, su solicitud de informes, seguimientos y los identificadores de su
+    navegador guardados para medir campañas). La baja vacía también la fecha de
+    nacimiento, el género, «cómo nos conoció», el identificador del sistema anterior,
+    los datos de su prospecto, el contacto de sus presupuestos, el texto de sus
+    reseñas (la calificación sigue en los promedios) y los identificadores de su
+    navegador; sus conversiones pendientes ya no se mandan (`omitido`,
+    `baja_de_datos`).
 - **Plantillas fuera de las 24 horas (WhatsApp)**:
   - El panel lee las plantillas aprobadas de la cuenta de WhatsApp del negocio
     (`message_templates`), guardadas 10 minutos. Solo ofrece las que puede llenar: de

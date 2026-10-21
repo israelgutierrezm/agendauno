@@ -43,6 +43,8 @@ class RegistrarEstudio
         'agendauno', 'turnouno', 'clases', 'citas', 'registro', 'entrar', 'negocios',
         // El superadmin vive en /plataforma (ADR 0126).
         'plataforma',
+        // El destino del CNAME de los dominios propios (ADR 0189).
+        'sitios',
         // Que nadie registre un subdominio que parezca de la plataforma (p. ej.
         // pagos.agendauno.mx) para suplantarla.
         'login', 'auth', 'cuenta', 'cuentas', 'pagos', 'pago', 'cobros', 'facturacion', 'billing',
