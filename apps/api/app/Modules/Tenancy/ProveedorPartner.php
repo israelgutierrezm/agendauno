@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy;
 
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
+
 /**
  * Plataformas de bienestar corporativo con las que un estudio puede integrarse
  * para aceptar check-ins de sus usuarios (la plataforma cubre la clase).
@@ -74,10 +76,19 @@ enum ProveedorPartner: string
     public function credencialesObligatorias(): array
     {
         return match ($this) {
-            self::Wellhub => [['api_key', 'gym_id']],
+            // Con el token de AgendaUno como sistema integrado, basta su Gym ID.
+            self::Wellhub => trim((string) config('agendauno.integraciones.wellhub_api_token')) !== ''
+                ? [['api_key', 'gym_id'], ['gym_id']]
+                : [['api_key', 'gym_id']],
             self::TotalPass => [['api_key', 'codigo_gimnasio'], ['place_api_key']],
             self::Fitpass => [],
         };
+    }
+
+    /** ¿Se ofrece en ese país? (los decide el superadmin, ADR 0202) */
+    public function disponibleEn(string $pais): bool
+    {
+        return in_array(strtoupper($pais), ConfiguracionPlataforma::paisesBienestar()[$this->value] ?? [], true);
     }
 
     /** ¿Valida las visitas con su API? Fitpass, no: las valida recepción (ADR 0197). */

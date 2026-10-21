@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Models\HorarioPlataformaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -211,10 +212,14 @@ class CambiarSerieTenant
             || $db->table('checkins')->where('sesion_id', $id)->exists()
             || $db->table('accesos')->where('sesion_id', $id)->exists()
             || $db->table('asignaciones_sesion')->where('sesion_id', $id)->exists()
-            || $db->table('ordenes')->where('sesion_id', $id)->exists();
+            || $db->table('ordenes')->where('sesion_id', $id)->exists()
+            || $db->table('lugares_plataforma')->where('sesion_id', $id)->exists()
+            || $db->table('horarios_plataforma')->where('sesion_id', $id)->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)->exists();
         if ($usada) {
             $sesion->save();
             $this->reservas->cancelarSesion($sesion, $actor);
+            // Publicada en Wellhub o TotalPass: se retira ya (la plataforma avisa).
+            app(PublicarEnPlataformasTenant::class)->alCambiarSesion($sesion->refresh());
         } else {
             $sesion->delete();
         }

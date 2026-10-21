@@ -245,6 +245,47 @@ interface InvitadoLista {
   estado: "reservado" | "asistio" | "no_asistio";
 }
 const invitados = ref<InvitadoLista[]>([]);
+// Quien reservó desde la app de Wellhub, TotalPass o Fitpass (ADR 0202): visitantes de
+// la plataforma, no clientes; TotalPass valida la llegada sola en su app.
+interface LugarPlataformaLista {
+  id: string;
+  proveedor: "wellhub" | "totalpass" | "fitpass";
+  nombre: string | null;
+  estado: "reservado" | "asistio" | "no_asistio";
+  puede_marcar: boolean;
+}
+const plataforma = ref<LugarPlataformaLista[]>([]);
+async function llegoDePlataforma(l: LugarPlataformaLista): Promise<void> {
+  ocupado.value = true;
+  try {
+    await api.post(`${base.value}/lugares-plataforma/${l.id}/llego`, {});
+    l.estado = "asistio";
+    l.puede_marcar = false;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    ocupado.value = false;
+  }
+}
+async function cancelarDePlataforma(l: LugarPlataformaLista): Promise<void> {
+  if (
+    !(await confirmar(t("paseLista.plataforma.cancelarConfirmar"), {
+      peligro: true,
+      aceptar: t("paseLista.plataforma.cancelar"),
+    }))
+  ) {
+    return;
+  }
+  ocupado.value = true;
+  try {
+    await api.post(`${base.value}/lugares-plataforma/${l.id}/cancelar`, {});
+    plataforma.value = plataforma.value.filter((p) => p.id !== l.id);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    ocupado.value = false;
+  }
+}
 // Lo que los clientes apartaron para la clase (ADR 0194), por persona, para cobrarlo
 // en el mostrador de la sede.
 interface ApartadoLista {
@@ -321,10 +362,12 @@ async function cargar(silencioso = false): Promise<void> {
         empezo?: boolean;
         sesion?: ClaseLista;
         invitados?: InvitadoLista[];
+        plataforma?: LugarPlataformaLista[];
       };
     }>(`${base.value}/sesiones/${props.id}/reservas`);
     lista.value = data.data;
     invitados.value = data.meta?.invitados ?? [];
+    plataforma.value = data.meta?.plataforma ?? [];
     void cargarApartados();
     desde.value = data.meta?.asistencia_desde ?? null;
     empezo.value = data.meta?.empezo ?? false;
@@ -821,6 +864,63 @@ watch(
                 @click="marcarInvitado(i, false)"
               >
                 {{ $t("paseLista.acciones.noVino") }}
+              </button>
+            </template>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Reservas desde la app de una plataforma (ADR 0202) -->
+      <section
+        v-if="plataforma.length > 0"
+        class="pl-espera tu-card"
+        data-prueba="plataforma-clase"
+      >
+        <header>
+          <div>
+            <h2>
+              {{ $t("paseLista.plataforma.titulo") }}
+              <span class="tabular-nums">{{ plataforma.length }}</span>
+            </h2>
+            <p>{{ $t("paseLista.plataforma.ayuda") }}</p>
+          </div>
+        </header>
+        <ul>
+          <li v-for="l in plataforma" :key="l.id">
+            <AvatarIniciales :nombre="l.nombre ?? ''" tam="sm" />
+            <span class="min-w-0 flex-1 truncate">
+              {{ l.nombre ?? $t("paseLista.plataforma.sinNombre") }}
+              <span class="text-xs" :style="{ color: 'var(--texto-suave)' }"
+                >·
+                {{
+                  $t(`paseLista.plataforma.proveedores.${l.proveedor}`)
+                }}</span
+              >
+            </span>
+            <span class="text-xs">{{
+              $t(`paseLista.invitados.estados.${l.estado}`)
+            }}</span>
+            <template v-if="puedeMarcar && l.estado === 'reservado'">
+              <button
+                v-if="l.puede_marcar"
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="ocupado"
+                @click="llegoDePlataforma(l)"
+              >
+                {{ $t("paseLista.acciones.llego") }}
+              </button>
+              <span v-else class="tu-hint">{{
+                $t("paseLista.plataforma.enSuApp")
+              }}</span>
+              <button
+                v-if="sesion.puede('reservas.gestionar')"
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="ocupado"
+                @click="cancelarDePlataforma(l)"
+              >
+                {{ $t("paseLista.plataforma.cancelar") }}
               </button>
             </template>
           </li>

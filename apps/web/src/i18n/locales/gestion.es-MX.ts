@@ -938,6 +938,13 @@ export const plataformaAdmin = {
     webhook_user: "Usuario del webhook",
     webhook_password: "Contraseña del webhook",
   },
+  paisesBienestar: {
+    titulo: "Wellhub y TotalPass por país",
+    ayuda:
+      "Códigos de dos letras separados por comas (MX, CO…). Solo los negocios de esos países pueden conectarlas. Fitpass solo opera en México.",
+    guardar: "Guardar países",
+    guardado: "Países guardados.",
+  },
   correoAlertas: {
     titulo: "Correo del superadministrador",
     ayuda:

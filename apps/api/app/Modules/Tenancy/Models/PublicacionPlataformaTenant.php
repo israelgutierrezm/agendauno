@@ -29,13 +29,14 @@ class PublicacionPlataformaTenant extends Model
 
     protected $table = 'publicaciones_plataforma';
 
-    protected $fillable = ['proveedor', 'oferta_id', 'producto_externo', 'clase_externa', 'activa', 'error'];
+    protected $fillable = ['proveedor', 'oferta_id', 'producto_externo', 'clase_externa', 'activa', 'error', 'oculta_en'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
         'activa' => 'boolean',
+        'oculta_en' => 'datetime',
     ];
 
     /**

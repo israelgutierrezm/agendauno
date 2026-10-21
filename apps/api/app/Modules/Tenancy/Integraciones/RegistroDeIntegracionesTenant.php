@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Integraciones;
 
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
+use App\Modules\Tenancy\ProveedorPartner;
 
 /**
  * Resuelve el validador de una plataforma de bienestar y lee su configuracion
@@ -30,10 +31,10 @@ class RegistroDeIntegracionesTenant
         };
     }
 
-    /** Activa en el negocio y el negocio está en México (donde operan). */
+    /** Activa en el negocio y la plataforma opera en su país. */
     public function activa(string $proveedor): bool
     {
-        return $this->region->enMexico() && IntegracionTenant::query()
+        return (ProveedorPartner::tryFrom($proveedor)?->disponibleEn($this->region->pais()) ?? false) && IntegracionTenant::query()
             ->where('proveedor', $proveedor)
             ->where('activa', true)
             ->exists();

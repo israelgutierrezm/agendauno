@@ -66,6 +66,22 @@ export default {
       no_asistio: "No vino",
     },
   },
+  // Quien reservó desde la app de Wellhub, TotalPass o Fitpass (ADR 0202).
+  plataforma: {
+    titulo: "Reservas de plataformas",
+    ayuda:
+      "Reservaron desde la app de su plataforma: ocupan lugar y no son clientes del negocio.",
+    sinNombre: "Visitante",
+    enSuApp: "Hace check-in en su app",
+    cancelar: "Cancelar reserva",
+    cancelarConfirmar:
+      "La plataforma le avisará que su reserva se canceló y el lugar queda libre.",
+    proveedores: {
+      wellhub: "Wellhub",
+      totalpass: "TotalPass",
+      fitpass: "Fitpass",
+    },
+  },
   // Quien llegó sin reservar.
   agregar: {
     boton: "Agregar alumno",

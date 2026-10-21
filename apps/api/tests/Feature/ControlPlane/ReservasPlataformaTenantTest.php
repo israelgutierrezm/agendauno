@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
@@ -44,7 +45,9 @@ function wellhubDeReservasSimulado(int $reservas = 204): void
             str_contains($url, '/setup/v1/gyms/445566/products') => Http::response(['gym_id' => 445566, 'products' => [
                 ['product_id' => 987, 'name' => 'Clases ilimitadas', 'virtual' => false],
             ]]),
+            $r->method() === 'GET' && str_ends_with($url, '/v1/systems/gyms/445566/webhooks') => Http::response(['webhooks' => $GLOBALS['wh_avisos'] ?? []]),
             str_contains($url, '/v1/systems/gyms/445566/webhooks') => Http::response(null, 204),
+            $r->method() === 'PUT' && str_ends_with($url, '/booking/v1/gyms/445566/classes/77') => Http::response(null, 204),
             str_contains($url, '/booking/v2/gyms/445566/bookings/') => Http::response(null, $reservas),
             $r->method() === 'POST' && str_ends_with($url, '/booking/v1/gyms/445566/classes') => Http::response(['classes' => [['id' => 77, 'name' => 'Pole', 'reference' => 'x']]], 201),
             $r->method() === 'POST' && str_ends_with($url, '/classes/77/slots') => Http::response(['metadata' => ['total' => 1, 'errors' => 0], 'results' => [['id' => 5001]]], 201),
@@ -151,7 +154,7 @@ it('publica en Wellhub las clases elegidas, con la hora del negocio y sus lugare
     publicarEnWellhub($e, $semilla);
 
     // Se registró con Wellhub la dirección de sus avisos (check-in y reservas) con su llave.
-    Http::assertSent(fn (Request $r): bool => str_ends_with($r->url(), '/v1/systems/gyms/445566/webhooks')
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'POST' && str_ends_with($r->url(), '/v1/systems/gyms/445566/webhooks')
         && collect($r['webhooks'])->pluck('event')->contains('booking-requested')
         && collect($r['webhooks'])->every(fn (array $w): bool => $w['secret'] === SECRETO_RESERVAS_WELLHUB));
     // La clase, con su producto y la oferta como referencia.
@@ -313,7 +316,9 @@ it('si no se le puede contestar a Wellhub a tiempo, la reserva se libera', funct
     $this->travelTo(now()->addMinutes(16));
     $this->artisan('agendauno:procesar-plataformas')->assertSuccessful();
     expect($estado())->toBe('fallido')
-        ->and(lugaresDeWellhub($e)[0])->toMatchArray(['estado' => 'rechazado', 'motivo' => 'SIN_RESPUESTA']);
+        ->and(lugaresDeWellhub($e)[0])->toMatchArray(['estado' => 'rechazado', 'motivo' => 'SIN_RESPUESTA'])
+        // Lo último que se le dice a Wellhub: fue un error técnico.
+        ->and(collect(respuestasAWellhub('BK_1'))->last())->toMatchArray(['status' => 'REJECTED', 'reason_category' => 'TECHNICAL_ERROR']);
 });
 
 it('la llave de avisos que genera el negocio al encender las reservas es otra configuración (R13)', function (): void {
@@ -368,4 +373,118 @@ it('solo publica con la integración conectada y un producto por clase', functio
     $this->putJson("/api/v1/app/{$e['slug']}/integraciones/totalpass/reservas", [
         'activas' => true, 'sucursal_id' => $semilla['sucursal'], 'clases' => [],
     ], conBearer($e['bearer']))->assertUnprocessable();
+});
+
+it('recepción ve quién reservó desde Wellhub: marca que llegó (con su Wellhub ID guardado) o cancela la reserva', function (): void {
+    $e = estudioConSesion('fluo-rs', 'f@correo.mx');
+    $semilla = agendaSemilla($e);
+    $sesion = crearSesionTenant($e, $semilla, 5, '2026-10-01 07:00:00');
+    wellhubDeReservasSimulado();
+    $url = publicarEnWellhub($e, $semilla);
+    avisoDeReservaWellhub($url, 'booking-requested', 'BK_A')->assertOk();
+    avisoDeReservaWellhub($url, 'booking-requested', 'BK_B', ['unique_token' => '9876543210987', 'name' => 'Beto Ruiz'])->assertOk();
+
+    $lista = $this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", conBearer($e['bearer']))->assertOk()->json('meta.plataforma');
+    expect(collect($lista)->pluck('nombre')->all())->toBe(['Ana Pérez', 'Beto Ruiz'])
+        ->and($lista[0])->toMatchArray(['proveedor' => 'wellhub', 'estado' => 'reservado', 'puede_marcar' => true]);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/lugares-plataforma/{$lista[0]['id']}/cancelar", ['motivo' => 'Se suspendió la clase.'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.estado', 'cancelado');
+    expect(collect(respuestasAWellhub('BK_A'))->last())->toBe(['status' => 'CANCELLED_BY_GYM', 'reason' => 'Se suspendió la clase.']);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/lugares-plataforma/{$lista[1]['id']}/llego", [], conBearer($e['bearer']))->assertCreated()
+        ->assertJsonPath('data.estado', 'validado');
+    Http::assertSent(fn (Request $r): bool => str_ends_with($r->url(), '/access/v1/validate') && $r['gympass_id'] === '9876543210987');
+    expect(collect(lugaresDeWellhub($e))->pluck('estado')->all())->toBe(['cancelado', 'asistio']);
+});
+
+it('una cancelación que llega antes que su solicitud no aparta lugar', function (): void {
+    $e = estudioConSesion('fluo-rs', 'f@correo.mx');
+    $semilla = agendaSemilla($e);
+    crearSesionTenant($e, $semilla, 3, '2026-10-02 08:00:00');
+    wellhubDeReservasSimulado();
+    $url = publicarEnWellhub($e, $semilla);
+
+    avisoDeReservaWellhub($url, 'booking-canceled', 'BK_9')->assertOk();
+    avisoDeReservaWellhub($url, 'booking-requested', 'BK_9')->assertOk();
+
+    expect(lugaresDeWellhub($e))->toBe([])->and(respuestasAWellhub('BK_9'))->toBe([]);
+});
+
+it('una reserva directa le manda a Wellhub los lugares de la clase al momento', function (): void {
+    $e = estudioConSesion('fluo-rs', 'f@correo.mx');
+    $semilla = agendaSemilla($e);
+    $sesion = crearSesionTenant($e, $semilla, 3, '2026-10-02 08:00:00');
+    wellhubDeReservasSimulado();
+    publicarEnWellhub($e, $semilla);
+    $this->artisan('agendauno:sincronizar-plataformas')->assertSuccessful();
+    $vp = venderPackAMiembroTenant($e, 8000);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    // Sin esperar la vuelta de cada cinco minutos: uno de tres ya no es para Wellhub.
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'PATCH' && str_ends_with($r->url(), '/classes/77/slots/5001')
+        && $r['total_capacity'] === 3 && $r['total_booked'] === 1);
+});
+
+it('la clase que se deja de publicar se oculta en Wellhub (no se borra)', function (): void {
+    $e = estudioConSesion('fluo-rs', 'f@correo.mx');
+    $semilla = agendaSemilla($e);
+    crearSesionTenant($e, $semilla, 3, '2026-10-02 08:00:00');
+    wellhubDeReservasSimulado();
+    publicarEnWellhub($e, $semilla);
+    $this->artisan('agendauno:sincronizar-plataformas')->assertSuccessful();
+
+    $this->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub/reservas", [
+        'activas' => true, 'sucursal_id' => $semilla['sucursal'],
+        'clases' => [['oferta_id' => $semilla['oferta'], 'publicada' => false]],
+    ], conBearer($e['bearer']))->assertOk();
+    $this->artisan('agendauno:sincronizar-plataformas')->assertSuccessful();
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'PUT' && str_ends_with($r->url(), '/booking/v1/gyms/445566/classes/77')
+        && $r['visible'] === false && $r['bookable'] === false);
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'DELETE' && str_ends_with($r->url(), '/classes/77/slots/5001'));
+});
+
+it('con el token de AgendaUno como sistema integrado, basta el Gym ID del negocio', function (): void {
+    config(['agendauno.integraciones.wellhub_api_token' => 'tok_de_agendauno']);
+    $e = estudioConSesion('fluo-rs', 'f@correo.mx');
+    $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2026-10-01 06:30:00');
+    wellhubDeReservasSimulado();
+
+    $this->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub", ['activa' => true, 'credenciales' => ['gym_id' => '445566']], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.activa', true);
+    $this->postJson("/api/v1/app/{$e['slug']}/checkins", ['proveedor' => 'wellhub', 'sesion_id' => $sesion, 'codigo' => '1234567890123'], conBearer($e['bearer']))
+        ->assertCreated();
+    Http::assertSent(fn (Request $r): bool => str_ends_with($r->url(), '/access/v1/validate') && $r->hasHeader('Authorization', 'Bearer tok_de_agendauno'));
+});
+
+it('al activarla registra sus avisos con Wellhub y cambia los que el gimnasio ya tenía', function (): void {
+    config(['app.url' => 'https://api.agendauno.test']);
+    $GLOBALS['wh_avisos'] = [['event' => 'checkin', 'url' => 'https://otro-sistema.example/avisos', 'secret' => 'viejo']];
+    $e = estudioConSesion('fluo-rs', 'f@correo.mx');
+    wellhubDeReservasSimulado();
+
+    $url = (string) $this->putJson("/api/v1/app/{$e['slug']}/integraciones/wellhub", [
+        'activa' => true, 'credenciales' => ['api_key' => 'wh_token', 'gym_id' => '445566'],
+    ], conBearer($e['bearer']))->assertOk()->json('data.automatico.aviso_url');
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'PUT' && str_ends_with($r->url(), '/v1/systems/gyms/445566/webhooks/checkin')
+        && $r['webhook']['url'] === $url);
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'POST' && str_ends_with($r->url(), '/v1/systems/gyms/445566/webhooks')
+        && collect($r['webhooks'])->pluck('event')->sort()->values()->all() === ['booking-canceled', 'booking-late-canceled', 'booking-requested', 'checkin-booking-occurred']);
+    unset($GLOBALS['wh_avisos']);
+});
+
+it('Wellhub y TotalPass se ofrecen en los países que decide el superadmin', function (): void {
+    $e = estudioConSesion('fluo-rs', 'f@correo.mx');
+    Estudio::query()->where('slug', $e['slug'])->update(['pais' => 'CO']);
+
+    $this->getJson("/api/v1/app/{$e['slug']}/integraciones", conBearer($e['bearer']))->assertStatus(422);
+
+    ConfiguracionPlataforma::establecer('paises_bienestar', (string) json_encode(['wellhub' => ['MX', 'CO'], 'totalpass' => ['MX']]));
+    expect(collect($this->getJson("/api/v1/app/{$e['slug']}/integraciones", conBearer($e['bearer']))->assertOk()->json('data'))->pluck('proveedor')->all())
+        ->toBe(['wellhub']);
+    $this->putJson("/api/v1/app/{$e['slug']}/integraciones/totalpass", ['activa' => false], conBearer($e['bearer']))->assertStatus(422);
 });

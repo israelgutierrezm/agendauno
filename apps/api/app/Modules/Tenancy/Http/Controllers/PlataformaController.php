@@ -361,6 +361,10 @@ class PlataformaController
             'banxico_token' => ['nullable', 'string', 'max:255'],
             'timbres_paquetes' => ['nullable', 'array', 'min:1', 'max:10'],
             'timbres_paquetes.*' => ['integer', 'distinct', 'min:1', 'max:100000'],
+            // En qué países se ofrecen Wellhub y TotalPass (ADR 0202).
+            'paises_bienestar' => ['sometimes', 'array:wellhub,totalpass'],
+            'paises_bienestar.*' => ['array', 'max:30'],
+            'paises_bienestar.*.*' => ['string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
         ]);
 
         foreach (['facturapi_llave', 'correo_alertas', 'ventas_correo', 'ventas_correo_turnouno', 'banxico_token'] as $clave) {
@@ -370,6 +374,13 @@ class PlataformaController
         }
         if ($request->exists('ventas_whatsapp')) {
             ConfiguracionPlataforma::establecer('ventas_whatsapp', preg_replace('/\D/', '', (string) ($validado['ventas_whatsapp'] ?? '')) ?: null);
+        }
+        if ($request->exists('paises_bienestar')) {
+            $actuales = ConfiguracionPlataforma::paisesBienestar();
+            ConfiguracionPlataforma::establecer('paises_bienestar', (string) json_encode([
+                'wellhub' => array_map('strtoupper', $validado['paises_bienestar']['wellhub'] ?? $actuales['wellhub']),
+                'totalpass' => array_map('strtoupper', $validado['paises_bienestar']['totalpass'] ?? $actuales['totalpass']),
+            ]));
         }
         if ($request->exists('timbres_paquetes')) {
             $paquetes = $validado['timbres_paquetes'] ?? null;
@@ -395,6 +406,7 @@ class PlataformaController
             'ventas_whatsapp' => ConfiguracionPlataforma::ventasWhatsApp(),
             'banxico_configurado' => ConfiguracionPlataforma::tokenBanxico() !== null,
             'timbres_paquetes' => ConfiguracionPlataforma::paquetesTimbres(),
+            'paises_bienestar' => ConfiguracionPlataforma::paisesBienestar(),
         ];
     }
 

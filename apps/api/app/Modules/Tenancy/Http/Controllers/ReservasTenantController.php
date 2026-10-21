@@ -91,6 +91,8 @@ class ReservasTenantController
                 'sesion' => $this->resumenDeSesion($sesion),
                 // Los invitados de los clientes (ADR 0182): ocupan lugar, no son clientes.
                 'invitados' => InvitadosTenantController::deLaSesion($sesion),
+                // Quien reservó desde la app de Wellhub, TotalPass o Fitpass (ADR 0202).
+                'plataforma' => LugaresPlataformaTenantController::deLaSesion($sesion),
             ],
         ]);
     }

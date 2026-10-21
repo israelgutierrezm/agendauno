@@ -42,6 +42,14 @@ interface PublicadorPlataforma
     public function prepararClase(PublicacionPlataformaTenant $publicacion, array $credenciales): ?string;
 
     /**
+     * Muestra u oculta en la plataforma la clase de una publicación (Wellhub no borra
+     * clases: las oculta con sus horarios). Null si quedó o no aplica; si no, por qué.
+     *
+     * @param  array<string, string>  $credenciales
+     */
+    public function visibilidadDeClase(PublicacionPlataformaTenant $publicacion, array $credenciales, bool $visible): ?string;
+
+    /**
      * Cambia el producto o plan de una clase ya publicada. Null si quedó; si no, por qué.
      *
      * @param  array<string, string>  $credenciales

@@ -683,6 +683,8 @@ const facturapiConfigurada = ref(false);
 const llaveInput = ref("");
 // A dónde llegan las alertas y las rentas vencidas (ADR 0072).
 const correoAlertas = ref("");
+// En qué países se ofrecen Wellhub y TotalPass (ADR 0202): códigos de dos letras.
+const paisesBienestar = ref({ wellhub: "MX", totalpass: "MX" });
 // Documentos legales: el borrador (texto y responsable) y lo publicado. Guardar no
 // cambia lo que ven los usuarios; publicar crea la versión siguiente.
 interface Publicado {
@@ -715,7 +717,11 @@ const guardando = ref<string | null>(null);
 async function cargarConfiguracion(): Promise<void> {
   const [cfg, pas, leg] = await Promise.all([
     cliente.get<{
-      data: { facturapi_configurada: boolean; correo_alertas?: string | null };
+      data: {
+        facturapi_configurada: boolean;
+        correo_alertas?: string | null;
+        paises_bienestar?: { wellhub: string[]; totalpass: string[] };
+      };
     }>("/api/v1/plataforma/configuracion", encabezados()),
     cliente.get<{ data: Pasarela[] }>(
       "/api/v1/plataforma/pasarelas",
@@ -740,6 +746,13 @@ async function cargarConfiguracion(): Promise<void> {
   ]);
   facturapiConfigurada.value = cfg.data.data.facturapi_configurada;
   correoAlertas.value = cfg.data.data.correo_alertas ?? "";
+  const paises = cfg.data.data.paises_bienestar;
+  if (paises) {
+    paisesBienestar.value = {
+      wellhub: paises.wellhub.join(", "),
+      totalpass: paises.totalpass.join(", "),
+    };
+  }
   pasarelas.value = pas.data.data;
   legales.value = {
     aviso_privacidad: leg.data.data.aviso_privacidad ?? "",
@@ -813,6 +826,41 @@ async function guardarCorreoAlertas(): Promise<void> {
     );
     correoAlertas.value = data.data.correo_alertas ?? "";
     toast.exito(t("plataformaAdmin.correoAlertas.guardado"));
+  } catch (err) {
+    toast.error(mensajeDeError(err));
+  } finally {
+    guardando.value = null;
+  }
+}
+
+/** «MX, co» → ["MX", "CO"]. */
+function codigosDePais(texto: string): string[] {
+  return texto
+    .split(/[\s,]+/)
+    .map((c) => c.trim().toUpperCase())
+    .filter((c) => /^[A-Z]{2}$/.test(c));
+}
+
+async function guardarPaisesBienestar(): Promise<void> {
+  guardando.value = "paises";
+  try {
+    const { data } = await cliente.put<{
+      data: { paises_bienestar: { wellhub: string[]; totalpass: string[] } };
+    }>(
+      "/api/v1/plataforma/configuracion",
+      {
+        paises_bienestar: {
+          wellhub: codigosDePais(paisesBienestar.value.wellhub),
+          totalpass: codigosDePais(paisesBienestar.value.totalpass),
+        },
+      },
+      encabezados(),
+    );
+    paisesBienestar.value = {
+      wellhub: data.data.paises_bienestar.wellhub.join(", "),
+      totalpass: data.data.paises_bienestar.totalpass.join(", "),
+    };
+    toast.exito(t("plataformaAdmin.paisesBienestar.guardado"));
   } catch (err) {
     toast.error(mensajeDeError(err));
   } finally {
@@ -1858,6 +1906,51 @@ function borrar(): void {
               :disabled="guardando === 'correo'"
             >
               {{ $t("plataformaAdmin.correoAlertas.guardar") }}
+            </button>
+          </div>
+        </form>
+
+        <!-- Países donde se ofrecen Wellhub y TotalPass (ADR 0202). -->
+        <form
+          class="tu-card p-5"
+          data-prueba="paises-bienestar"
+          @submit.prevent="guardarPaisesBienestar"
+        >
+          <h2 class="font-medium text-lg">
+            {{ $t("plataformaAdmin.paisesBienestar.titulo") }}
+          </h2>
+          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("plataformaAdmin.paisesBienestar.ayuda") }}
+          </p>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="tu-label" for="paises-wellhub">Wellhub</label>
+              <input
+                id="paises-wellhub"
+                v-model="paisesBienestar.wellhub"
+                class="tu-input"
+                autocomplete="off"
+                placeholder="MX, CO"
+              />
+            </div>
+            <div>
+              <label class="tu-label" for="paises-totalpass">TotalPass</label>
+              <input
+                id="paises-totalpass"
+                v-model="paisesBienestar.totalpass"
+                class="tu-input"
+                autocomplete="off"
+                placeholder="MX"
+              />
+            </div>
+          </div>
+          <div class="mt-3 flex justify-end">
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="guardando === 'paises'"
+            >
+              {{ $t("plataformaAdmin.paisesBienestar.guardar") }}
             </button>
           </div>
         </form>

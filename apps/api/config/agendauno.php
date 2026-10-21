@@ -333,6 +333,9 @@ return [
         // sede (`place_api_key`) dan una sesión de 24 h. La dirección de confirmación del
         // check-in de producción falta confirmarla con TotalPass (documentan la de pruebas).
         'totalpass_partner_api_key' => env('TOTALPASS_PARTNER_API_KEY'),
+        // El token de AgendaUno como sistema integrado de Wellhub: el negocio solo da su
+        // Gym ID (si no captura un token propio).
+        'wellhub_api_token' => env('WELLHUB_API_TOKEN', ''),
         'totalpass_gym_url' => env('TOTALPASS_GYM_API_URL', 'https://gym-service-api.totalpass.com'),
         'totalpass_admin_url' => env('TOTALPASS_ADMIN_URL', 'https://admin.totalpass.com'),
         // Reservas desde la app (ADR 0149). La Booking API de Wellhub usa la misma dirección

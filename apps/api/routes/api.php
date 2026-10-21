@@ -76,6 +76,7 @@ use App\Modules\Tenancy\Http\Controllers\KioscosTenantController;
 use App\Modules\Tenancy\Http\Controllers\LealtadTenantController;
 use App\Modules\Tenancy\Http\Controllers\LegalesPublicoController;
 use App\Modules\Tenancy\Http\Controllers\LlavesApiTenantController;
+use App\Modules\Tenancy\Http\Controllers\LugaresPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\MarcaEstudioController;
 use App\Modules\Tenancy\Http\Controllers\MedicionNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\MedicionPlataformaController;
@@ -205,7 +206,7 @@ Route::prefix('v1')->group(function (): void {
     // SaaS (plataforma -> dueño) -> pagado. Sin sesion; idempotente.
     // Avisos de Wellhub y TotalPass de cada negocio (check-in automático, ADR 0148).
     Route::post('/webhooks/bienestar/{estudio}/{proveedor}/{token}', WebhookBienestarController::class)
-        ->middleware(['throttle:600,1,bienestar-webhook', 'estudio.resolver'])->name('api.v1.webhooks.bienestar');
+        ->middleware(['throttle:bienestar-webhook', 'estudio.resolver'])->name('api.v1.webhooks.bienestar');
     Route::post('/webhooks/plataforma/{proveedor}', WebhookPlataformaController::class)
         ->middleware('throttle:600,1,plataforma-webhook')->name('api.v1.webhooks.plataforma');
     // Estados de entrega de WhatsApp (Meta): verificación (GET) y avisos (POST), ADR 0074.
@@ -1269,6 +1270,9 @@ Route::prefix('v1')->group(function (): void {
 
             // Check-ins de Wellhub / TotalPass en las clases.
             Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('checkins.store');
+            // Las reservas desde la app de una plataforma en la lista de la clase (ADR 0202).
+            Route::post('/lugares-plataforma/{lugar}/llego', [LugaresPlataformaTenantController::class, 'llego'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('lugares-plataforma.llego');
+            Route::post('/lugares-plataforma/{lugar}/cancelar', [LugaresPlataformaTenantController::class, 'cancelar'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('lugares-plataforma.cancelar');
             Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('sesiones.checkins.index');
             // La que la plataforma no pudo verificar, como excepción con evidencia (M10).
             Route::post('/checkins/{checkin}/excepcion', [CheckinsTenantController::class, 'excepcion'])->middleware(['puede:checkins.excepcion', 'modalidad:clases'])->name('checkins.excepcion');

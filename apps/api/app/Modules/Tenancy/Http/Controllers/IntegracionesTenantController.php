@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\IntegracionSoloMexico;
 use App\Modules\Tenancy\Integraciones\ClienteTotalPass;
+use App\Modules\Tenancy\Integraciones\PublicadorWellhub;
 use App\Modules\Tenancy\Models\CheckinTenant;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
@@ -45,32 +46,38 @@ class IntegracionesTenantController
         private readonly RegionNegocioTenant $region,
         private readonly RegistrarAuditoria $auditoria,
         private readonly ClienteTotalPass $totalpass,
+        private readonly PublicadorWellhub $wellhub,
     ) {}
 
     public function index(): JsonResponse
     {
-        $this->exigirMexico();
+        $disponibles = array_values(array_filter(ProveedorPartner::cases(), fn (ProveedorPartner $p): bool => $p->disponibleEn($this->region->pais())));
+        if ($disponibles === []) {
+            throw new IntegracionSoloMexico('Wellhub, TotalPass y Fitpass aún no se ofrecen en el país de tu negocio.');
+        }
         $configs = IntegracionTenant::query()->get()->keyBy('proveedor');
 
         $data = array_map(fn (ProveedorPartner $proveedor): array => $this->presentar(
             $proveedor,
             $configs->get($proveedor->value),
-        ), ProveedorPartner::cases());
+        ), $disponibles);
 
         return response()->json(['data' => $data]);
     }
 
     public function upsert(Request $request): JsonResponse
     {
-        $this->exigirMexico();
         $proveedor = ProveedorPartner::tryFrom((string) $request->route('proveedor'));
         abort_if($proveedor === null, 404);
+        $this->exigirDisponible($proveedor);
 
         $validado = $request->validate([
             'activa' => ['required', 'boolean'],
             // Solo las credenciales que pide este proveedor.
             'credenciales' => ['nullable', 'array:'.implode(',', $proveedor->credenciales())],
             'credenciales.*' => ['nullable', 'string', 'max:500'],
+            // Wellhub acepta llaves de firma de hasta 100 caracteres.
+            'credenciales.webhook_secret' => ['nullable', 'string', 'max:100'],
         ]);
 
         $config = IntegracionTenant::query()->firstOrNew(['proveedor' => $proveedor->value]);
@@ -124,6 +131,14 @@ class IntegracionesTenantController
             ) ? now() : null;
         }
         $config->save();
+
+        // Wellhub: un negocio que solo valida visitas (sin publicar clases) también recibe
+        // los avisos de check-in; se registran al activarla (o con otras llaves). Solo con
+        // la dirección pública (HTTPS) de la plataforma.
+        if ($proveedor === ProveedorPartner::Wellhub && $config->activa && str_starts_with((string) config('app.url'), 'https://')
+            && ($config->webhook_registrado_en === null || array_intersect($cambiadas, ['api_key', 'gym_id']) !== [])) {
+            $this->wellhub->registrarAvisos($config, self::urlDeAvisos($proveedor, (string) $config->token_webhook));
+        }
 
         if ($antes['activa'] !== $config->activa || $cambiadas !== []) {
             $usuario = $request->attributes->get('usuario_tenant');
@@ -254,10 +269,10 @@ class IntegracionesTenantController
         throw ValidationException::withMessages($errores);
     }
 
-    private function exigirMexico(): void
+    private function exigirDisponible(ProveedorPartner $proveedor): void
     {
-        if (! $this->region->enMexico()) {
-            throw new IntegracionSoloMexico('Wellhub y TotalPass solo están disponibles para negocios en México.');
+        if (! $proveedor->disponibleEn($this->region->pais())) {
+            throw new IntegracionSoloMexico($proveedor->nombre().' aún no se ofrece en el país de tu negocio.');
         }
     }
 }

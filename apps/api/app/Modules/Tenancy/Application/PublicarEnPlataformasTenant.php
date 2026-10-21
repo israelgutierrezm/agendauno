@@ -87,6 +87,7 @@ class PublicarEnPlataformasTenant
         }
         $credenciales = $integracion->llaves();
         $listas = $this->publicaciones($integracion, $publicador, $credenciales);
+        $this->ocultarLasQueYaNo($integracion, $publicador, $credenciales);
 
         $ahora = now();
         $hasta = $ahora->copy()->addDays($this->parametros->entero('plataformas.dias_publicados'));
@@ -150,6 +151,97 @@ class PublicarEnPlataformasTenant
     }
 
     /**
+     * Algo cambió en una sesión (una reserva, una cancelación, se canceló o se movió):
+     * cada plataforma donde está publicada la recibe al momento, sin esperar la vuelta de
+     * cada cinco minutos. La cancelada o borrada se retira.
+     */
+    public function alCambiarSesion(SesionTenant $sesion): void
+    {
+        HorarioPlataformaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)
+            ->whereNotNull('id_externo')
+            ->with(['sesion', 'publicacion'])
+            ->get()
+            ->each(function (HorarioPlataformaTenant $publicado) use ($sesion): void {
+                $proveedor = ProveedorPartner::tryFrom($publicado->proveedor);
+                $publicador = $proveedor !== null ? $this->publicador($proveedor) : null;
+                $integracion = IntegracionTenant::query()->where('proveedor', $publicado->proveedor)->first();
+                if ($proveedor === null || ! $publicador instanceof PublicadorPlataforma || ! $integracion instanceof IntegracionTenant) {
+                    return;
+                }
+                if (! $sesion->exists || $sesion->estado !== EstadoSesionTenant::Programada || ! $this->publica($integracion)) {
+                    $this->retirar($publicador, $publicado, $integracion->llaves());
+
+                    return;
+                }
+                $this->sincronizarSesion($sesion, $proveedor);
+            });
+    }
+
+    /**
+     * Retira todo lo publicado del negocio y oculta sus clases (el negocio se dio de baja
+     * de la plataforma): ya no se reserva nada suyo. Cuántos horarios retiró.
+     */
+    public function retirarTodo(): int
+    {
+        $retirados = 0;
+        HorarioPlataformaTenant::query()
+            ->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)
+            ->whereNotNull('id_externo')
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
+            ->with(['sesion', 'publicacion'])
+            ->limit(self::LOTE)
+            ->get()
+            ->each(function (HorarioPlataformaTenant $publicado) use (&$retirados): void {
+                $proveedor = ProveedorPartner::tryFrom($publicado->proveedor);
+                $publicador = $proveedor !== null ? $this->publicador($proveedor) : null;
+                $integracion = IntegracionTenant::query()->where('proveedor', $publicado->proveedor)->first();
+                if ($publicador instanceof PublicadorPlataforma && $integracion instanceof IntegracionTenant) {
+                    $retirados += $this->retirar($publicador, $publicado, $integracion->llaves());
+                }
+            });
+        IntegracionTenant::query()->get()->each(function (IntegracionTenant $integracion): void {
+            $proveedor = ProveedorPartner::tryFrom($integracion->proveedor);
+            $publicador = $proveedor !== null ? $this->publicador($proveedor) : null;
+            if (! $publicador instanceof PublicadorPlataforma) {
+                return;
+            }
+            PublicacionPlataformaTenant::query()->where('proveedor', $integracion->proveedor)->whereNull('oculta_en')->get()
+                ->each(function (PublicacionPlataformaTenant $publicacion) use ($publicador, $integracion): void {
+                    if ($publicador->visibilidadDeClase($publicacion, $integracion->llaves(), false) === null) {
+                        $publicacion->forceFill(['oculta_en' => now()])->save();
+                    }
+                });
+        });
+
+        return $retirados;
+    }
+
+    /**
+     * Las clases que se dejaron de publicar se ocultan en la plataforma (Wellhub no las
+     * borra); la que se vuelve a publicar se muestra en {@see publicaciones()}.
+     *
+     * @param  array<string, string>  $credenciales
+     */
+    private function ocultarLasQueYaNo(IntegracionTenant $integracion, PublicadorPlataforma $publicador, array $credenciales): void
+    {
+        $publica = $this->publica($integracion);
+        PublicacionPlataformaTenant::query()
+            ->where('proveedor', $integracion->proveedor)
+            ->whereNull('oculta_en')
+            ->whereNotNull('clase_externa')
+            ->where(fn ($q) => $publica ? $q->where('activa', false) : $q)
+            ->with('oferta.actividad')
+            ->get()
+            ->each(function (PublicacionPlataformaTenant $publicacion) use ($publicador, $credenciales): void {
+                if ($publicador->visibilidadDeClase($publicacion, $credenciales, false) === null) {
+                    $publicacion->forceFill(['oculta_en' => now()])->save();
+                }
+            });
+    }
+
+    /**
      * Vuelve a mandar los lugares de una clase ya publicada (después de una reserva o
      * cancelación de la plataforma, o de un cambio en la clase).
      */
@@ -206,9 +298,9 @@ class PublicarEnPlataformasTenant
     /** ¿La integración publica sus clases? */
     public function publica(IntegracionTenant $integracion): bool
     {
-        // Wellhub y TotalPass solo operan en México: fuera, lo publicado se retira.
+        // Fuera de los países donde opera la plataforma, lo publicado se retira.
         return $integracion->activa && $integracion->reservas_activas && $integracion->sucursal_id !== null
-            && $this->region->enMexico();
+            && (ProveedorPartner::tryFrom($integracion->proveedor)?->disponibleEn($this->region->pais()) ?? false);
     }
 
     /**
@@ -231,6 +323,10 @@ class PublicarEnPlataformasTenant
             ->each(function (PublicacionPlataformaTenant $publicacion) use ($publicador, $credenciales, &$listas): void {
                 if ($publicacion->oferta === null) {
                     return;
+                }
+                // Se había ocultado al dejar de publicarla: se muestra de nuevo.
+                if ($publicacion->oculta_en !== null && $publicador->visibilidadDeClase($publicacion, $credenciales, true) === null) {
+                    $publicacion->forceFill(['oculta_en' => null])->save();
                 }
                 $error = $publicador->prepararClase($publicacion, $credenciales);
                 $publicacion->error = $error !== null ? Str::limit($error, 290) : null;

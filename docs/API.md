@@ -963,6 +963,18 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
   y en el uso del canal de su plataforma.
 - `GET /sesiones/{sesion}/checkins` suma `visitante_id` y `origen` (`manual` o
   `automatico`).
+- `GET /sesiones/{sesion}/reservas` suma `meta.plataforma`: quien reservó desde la app de
+  Wellhub, TotalPass o Fitpass (`id`, `proveedor`, `nombre`, `estado`, `puede_marcar`;
+  ADR 0202).
+- `POST /lugares-plataforma/{lugar}/llego` (`checkins.registrar`): marca que llegó quien
+  reservó desde la plataforma (Wellhub se valida con su Wellhub ID guardado; TotalPass
+  responde 422: se valida sola en su app). `POST /lugares-plataforma/{lugar}/cancelar
+  {motivo?}` (`reservas.gestionar`): el negocio cancela esa reserva y la plataforma le
+  avisa a la persona.
+- `GET /integraciones` solo lista las plataformas que se ofrecen en el país del negocio
+  (`paises_bienestar` del superadmin, México por omisión); `llaves_alternativas` son
+  otros grupos de llaves que bastan para activarla (TotalPass: `place_api_key`; Wellhub,
+  con el token de sistema de AgendaUno: `gym_id`).
 - `GET` y `PUT /integraciones/{proveedor}` suman `automatico`: `aviso_url` (la dirección
   de avisos del negocio), `listo` y `registrado_en`. Las credenciales suman
   `webhook_secret` (Wellhub) y `place_api_key` (TotalPass). Con `place_api_key`,

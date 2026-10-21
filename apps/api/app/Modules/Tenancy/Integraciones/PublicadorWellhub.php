@@ -25,9 +25,17 @@ use Illuminate\Support\Str;
  *   minutos antes de empezar).
  * - Cancelar sin costo: hasta las horas de la política del negocio, con el tope de 24
  *   horas de Wellhub.
+ * - Clase en línea (ADR 0184): con un producto virtual de Wellhub y su enlace al aceptar
+ *   la reserva; el producto y la clase tienen que coincidir.
+ * - Wellhub acepta horarios de hasta 200 minutos: uno más largo no se publica (se dice
+ *   por qué en vez de recortarlo).
+ * - Una clase no se borra en Wellhub: al dejar de publicarla se oculta.
  */
 class PublicadorWellhub implements PublicadorPlataforma
 {
+    /** Lo más largo que acepta Wellhub en un horario. */
+    private const MAXIMO_MINUTOS = 200;
+
     public function __construct(
         private readonly ClienteWellhubReservas $cliente,
         private readonly ParametrosTenant $parametros,
@@ -82,6 +90,10 @@ class PublicadorWellhub implements PublicadorPlataforma
         if ((string) $publicacion->producto_externo === '') {
             return 'Elige el producto de Wellhub con que se ofrece la clase.';
         }
+        $error = $this->productoAdecuado($publicacion, $credenciales);
+        if ($error !== null) {
+            return $error;
+        }
         [$nombre, $descripcion, $referencia] = self::clase($publicacion);
         $resultado = $this->cliente->crearClase($credenciales, $nombre, $descripcion, (string) $publicacion->producto_externo, $referencia);
         if (! $resultado->ok || $resultado->id === null) {
@@ -93,10 +105,53 @@ class PublicadorWellhub implements PublicadorPlataforma
         return null;
     }
 
+    public function visibilidadDeClase(PublicacionPlataformaTenant $publicacion, array $credenciales, bool $visible): ?string
+    {
+        if ($publicacion->clase_externa === null || $publicacion->clase_externa === '') {
+            return null;
+        }
+        [$nombre, $descripcion, $referencia] = self::clase($publicacion);
+        $resultado = $this->cliente->actualizarClase($credenciales, (string) $publicacion->clase_externa, $nombre, $descripcion, (string) $publicacion->producto_externo, $referencia, $visible);
+
+        return $resultado->ok ? null : ($resultado->error ?? 'Wellhub no cambió la clase.');
+    }
+
+    /**
+     * Un producto virtual de Wellhub es para una clase en línea y al revés (Wellhub
+     * rechaza el horario si no coinciden). Si Wellhub no contesta, se intenta igual.
+     *
+     * @param  array<string, string>  $credenciales
+     */
+    private function productoAdecuado(PublicacionPlataformaTenant $publicacion, array $credenciales): ?string
+    {
+        $producto = collect($this->cliente->productos($credenciales) ?? [])->firstWhere('id', (string) $publicacion->producto_externo);
+        if (! is_array($producto)) {
+            return null;
+        }
+        $enLinea = self::enLinea($publicacion);
+        if ($producto['virtual'] && ! $enLinea) {
+            return 'Ese producto de Wellhub es para clases en línea: elige uno presencial o pon el enlace de la clase en línea.';
+        }
+        if (! $producto['virtual'] && $enLinea) {
+            return 'La clase es en línea: elige un producto virtual de Wellhub.';
+        }
+
+        return null;
+    }
+
+    private static function enLinea(PublicacionPlataformaTenant $publicacion): bool
+    {
+        return trim((string) $publicacion->oferta?->enlace_en_linea) !== '';
+    }
+
     public function cambiarProducto(PublicacionPlataformaTenant $publicacion, array $credenciales): ?string
     {
         if ($publicacion->clase_externa === null || $publicacion->clase_externa === '') {
             return null;
+        }
+        $error = $this->productoAdecuado($publicacion, $credenciales);
+        if ($error !== null) {
+            return $error;
         }
         [$nombre, $descripcion, $referencia] = self::clase($publicacion);
         $resultado = $this->cliente->actualizarClase(
@@ -118,9 +173,9 @@ class PublicadorWellhub implements PublicadorPlataforma
         $horario = [
             'occur_date' => $inicio->toIso8601String(),
             'status' => 1,
-            'length_in_minutes' => max(1, min(200, (int) $sesion->inicia_en->diffInMinutes($sesion->termina_en))),
+            'length_in_minutes' => max(1, (int) $sesion->inicia_en->diffInMinutes($sesion->termina_en)),
             'product_id' => (int) $publicacion->producto_externo,
-            'virtual' => false,
+            'virtual' => self::enLinea($publicacion),
         ];
         $sala = trim((string) $sesion->recurso?->nombre);
         if (mb_strlen($sala) >= 2) {
@@ -174,6 +229,9 @@ class PublicadorWellhub implements PublicadorPlataforma
 
     public function crear(PublicacionPlataformaTenant $publicacion, array $horario, LugaresDeHorario $lugares, array $credenciales): ResultadoPlataforma
     {
+        if (($horario['length_in_minutes'] ?? 0) > self::MAXIMO_MINUTOS) {
+            return ResultadoPlataforma::rechazado('Wellhub acepta clases de hasta 200 minutos: esta no se publica.');
+        }
         [$capacidad, $reservados] = $this->numeros($lugares);
 
         return $this->cliente->crearHorario($credenciales, (string) $publicacion->clase_externa, [
@@ -185,6 +243,9 @@ class PublicadorWellhub implements PublicadorPlataforma
 
     public function actualizar(HorarioPlataformaTenant $publicado, PublicacionPlataformaTenant $publicacion, array $horario, LugaresDeHorario $lugares, array $credenciales): ResultadoPlataforma
     {
+        if (($horario['length_in_minutes'] ?? 0) > self::MAXIMO_MINUTOS) {
+            return ResultadoPlataforma::rechazado('Wellhub acepta clases de hasta 200 minutos: esta no se publica.');
+        }
         [$capacidad, $reservados] = $this->numeros($lugares);
 
         return $this->cliente->actualizarHorario($credenciales, (string) $publicacion->clase_externa, (string) $publicado->id_externo, [

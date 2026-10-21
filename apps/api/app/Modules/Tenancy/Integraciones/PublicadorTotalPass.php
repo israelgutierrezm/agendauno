@@ -73,6 +73,12 @@ class PublicadorTotalPass implements PublicadorPlataforma
         return (string) $publicacion->producto_externo === '' ? 'Elige el plan de TotalPass con que se ofrece la clase.' : null;
     }
 
+    public function visibilidadDeClase(PublicacionPlataformaTenant $publicacion, array $credenciales, bool $visible): ?string
+    {
+        // En TotalPass no hay clase aparte: lo que deja de publicarse se retira.
+        return null;
+    }
+
     public function cambiarProducto(PublicacionPlataformaTenant $publicacion, array $credenciales): ?string
     {
         // El plan va en cada ocurrencia: la sincronización las vuelve a publicar.

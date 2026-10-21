@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Facturacion\FacturacionFalsa;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Facturacion\FacturApiHttp;
 use App\Modules\Tenancy\Listeners\AcumularPuntos;
+use App\Modules\Tenancy\Listeners\AvisarCambiosAPlataformas;
 use App\Modules\Tenancy\Listeners\DevolverPagoAlCancelarNegocio;
 use App\Modules\Tenancy\Listeners\DevolverPagoDeCitaConAnticipo;
 use App\Modules\Tenancy\Listeners\EjecutarAutomatizaciones;
@@ -91,6 +92,11 @@ class AppServiceProvider extends ServiceProvider
         // Rutas tenant AUTENTICADAS (sesión o llave de API): por usuario o llave de cada
         // negocio, para frenar abuso/enumeración sin castigar a todo el estudio ni a
         // quienes comparten la red (wifi del estudio, datos móviles).
+        // Los avisos de Wellhub y TotalPass llegan de sus servidores (las mismas IP para
+        // todos los negocios): el límite es de cada negocio, no compartido (ADR 0202).
+        RateLimiter::for('bienestar-webhook', fn (Request $request): Limit => Limit::perMinute(600)
+            ->by('bienestar:'.(string) $request->route('estudio')));
+
         RateLimiter::for('tenant', fn (Request $request): Limit => Limit::perMinute(120)
             ->by(self::quienEnElNegocio($request)));
 
@@ -170,6 +176,8 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(EventoDeDominioTenant::class, DevolverPagoDeCitaConAnticipo::class);
         // GA4 y Meta del negocio (ADR 0143): anota sus conversiones; se mandan aparte.
         Event::listen(EventoDeDominioTenant::class, RegistrarConversionesMedicion::class);
+        // Wellhub y TotalPass ven al momento los lugares de sus clases (ADR 0202).
+        Event::listen(EventoDeDominioTenant::class, AvisarCambiosAPlataformas::class);
     }
 
     /**

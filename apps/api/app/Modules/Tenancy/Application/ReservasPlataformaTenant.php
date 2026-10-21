@@ -215,8 +215,15 @@ class ReservasPlataformaTenant
             'email' => Arr::get($datos, 'event_data.user.email'),
         ], null);
 
+        if ($this->yaCancelada(ProveedorPartner::Wellhub, $numero)) {
+            $evento->terminar(EventoPlataformaTenant::PROCESADO, 'La reserva ya se había cancelado en Wellhub.');
+
+            return;
+        }
         [$lugar, $motivo] = $this->decidir(ProveedorPartner::Wellhub, $publicado, $visitante, self::referencia(ProveedorPartner::Wellhub, $numero));
-        $respuesta = $this->wellhub->responderReserva($credenciales, $numero, $motivo, $motivo !== null ? (self::MOTIVOS[$motivo] ?? null) : null);
+        // Una clase en línea manda su enlace al aceptarla.
+        $enlace = $motivo === null ? self::enlaceEnLinea($lugar) : null;
+        $respuesta = $this->wellhub->responderReserva($credenciales, $numero, $motivo, $motivo !== null ? (self::MOTIVOS[$motivo] ?? null) : null, $enlace);
 
         $this->asentar($evento, ProveedorPartner::Wellhub, $lugar, $motivo, $respuesta, $solicitada->addMinutes(self::MINUTOS_WELLHUB));
     }
@@ -246,6 +253,11 @@ class ReservasPlataformaTenant
         // Sus avisos no van firmados: la reserva tiene que existir en TotalPass, seguir
         // activa y ser de una clase publicada aquí; la clase y la persona se toman de lo
         // que dice TotalPass, no del aviso (una vez decidida, su lugar ya lo dice).
+        if ($this->yaCancelada(ProveedorPartner::TotalPass, $slot)) {
+            $evento->terminar(EventoPlataformaTenant::PROCESADO, 'La reserva ya se había cancelado en TotalPass.');
+
+            return;
+        }
         $lugar = LugarPlataformaTenant::query()->where('referencia_externa', $referencia)->first();
         if ($lugar instanceof LugarPlataformaTenant) {
             $publicado = HorarioPlataformaTenant::query()->where('proveedor', ProveedorPartner::TotalPass->value)->where('sesion_id', $lugar->sesion_id)->first();
@@ -365,6 +377,15 @@ class ReservasPlataformaTenant
         // No se le pudo contestar a tiempo. TotalPass no dice qué hace con ella: se le
         // pregunta; si la dejó viva, el lugar sigue. Si no (o Wellhub, que la rechaza
         // sola), el lugar se libera.
+        if ($proveedor === ProveedorPartner::Wellhub && $lugar instanceof LugarPlataformaTenant && $lugar->estado === LugarPlataformaTenant::RESERVADO) {
+            // Lo último que se intenta: que Wellhub sepa que fue un error técnico.
+            $this->wellhub->responderReserva(
+                $this->registro->credenciales(ProveedorPartner::Wellhub->value),
+                substr((string) $lugar->referencia_externa, strlen(self::referencia(ProveedorPartner::Wellhub, ''))),
+                'TECHNICAL_ERROR',
+                'No pudimos confirmar tu reserva a tiempo. Intenta de nuevo.',
+            );
+        }
         if ($lugar instanceof LugarPlataformaTenant && $lugar->estado === LugarPlataformaTenant::RESERVADO && ! $this->sigueEnTotalPass($proveedor, $lugar)) {
             $lugar->fill(['estado' => LugarPlataformaTenant::RECHAZADO, 'motivo' => 'SIN_RESPUESTA'])->save();
             $this->ofrecerLiberado($lugar);
@@ -436,7 +457,9 @@ class ReservasPlataformaTenant
     {
         $lugar = LugarPlataformaTenant::query()->where('referencia_externa', self::referencia($proveedor, $numero))->first();
         if (! $lugar instanceof LugarPlataformaTenant) {
-            $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'No se encontró la reserva.');
+            // Llegó antes que su solicitud (los avisos pueden llegar fuera de orden): queda
+            // anotada y la solicitud, cuando llegue, ya no aparta lugar.
+            $evento->terminar(EventoPlataformaTenant::PROCESADO, 'Se canceló antes de llegar su solicitud.');
 
             return;
         }
@@ -446,6 +469,54 @@ class ReservasPlataformaTenant
             $this->alCambiar($lugar);
         }
         $evento->terminar(EventoPlataformaTenant::PROCESADO, $estado === LugarPlataformaTenant::CANCELADO_TARDE ? 'Reserva cancelada tarde.' : 'Reserva cancelada.');
+    }
+
+    /**
+     * El negocio cancela una reserva hecha desde la app de la plataforma (la clase se
+     * cambió, la persona avisó por otro medio…): la plataforma le avisa a la persona, el
+     * lugar se libera y se ofrece a la lista de espera. Null si quedó; si no, por qué.
+     */
+    public function cancelarPorElNegocio(LugarPlataformaTenant $lugar, string $motivo): ?string
+    {
+        if ($lugar->origen !== LugarPlataformaTenant::ORIGEN_RESERVA || $lugar->estado !== LugarPlataformaTenant::RESERVADO) {
+            return 'Solo se cancela una reserva vigente hecha desde la app de la plataforma.';
+        }
+        $proveedor = ProveedorPartner::tryFrom($lugar->proveedor);
+        $numero = $proveedor !== null ? substr((string) $lugar->referencia_externa, strlen(self::referencia($proveedor, ''))) : '';
+        $resultado = match ($proveedor) {
+            ProveedorPartner::Wellhub => $this->wellhub->cancelarReserva($this->registro->credenciales($proveedor->value), $numero, $motivo),
+            ProveedorPartner::TotalPass => $this->totalpass->cancelarReserva($this->registro->credenciales($proveedor->value)['place_api_key'] ?? '', $numero),
+            // Fitpass no tiene API: se cancela en su panel (ADR 0197).
+            default => ResultadoPlataforma::hecho(),
+        };
+        if (! $resultado->ok) {
+            return $resultado->error ?? 'La plataforma no canceló la reserva.';
+        }
+        $lugar->fill(['estado' => LugarPlataformaTenant::CANCELADO, 'motivo' => 'CANCELADA_POR_NEGOCIO'])->save();
+        $this->ofrecerLiberado($lugar);
+        $this->alCambiar($lugar);
+
+        return null;
+    }
+
+    /** ¿Ya llegó el aviso de que esa reserva se canceló? (antes que su solicitud) */
+    private function yaCancelada(ProveedorPartner $proveedor, string $numero): bool
+    {
+        return EventoPlataformaTenant::query()
+            ->where('proveedor', $proveedor->value)
+            ->whereIn('clave', [
+                'reserva:'.$numero.':'.AvisosPlataformaTenant::RESERVA_CANCELADA,
+                'reserva:'.$numero.':'.AvisosPlataformaTenant::RESERVA_CANCELADA_TARDE,
+            ])
+            ->exists();
+    }
+
+    /** El enlace de una clase en línea, para la reserva aceptada (ADR 0184). */
+    private static function enlaceEnLinea(?LugarPlataformaTenant $lugar): ?string
+    {
+        $enlace = trim((string) $lugar?->sesion?->oferta?->enlace_en_linea);
+
+        return $enlace !== '' ? $enlace : null;
     }
 
     /** ¿TotalPass dejó viva la reserva que no se le pudo confirmar a tiempo? */

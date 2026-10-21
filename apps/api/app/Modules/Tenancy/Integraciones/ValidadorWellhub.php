@@ -38,7 +38,7 @@ class ValidadorWellhub implements ValidadorPartner
 
     public function validar(string $codigo, array $credenciales): ResultadoCheckin
     {
-        $token = $credenciales['api_key'] ?? '';
+        $token = ClienteWellhubReservas::token($credenciales);
         $gimnasio = $credenciales['gym_id'] ?? '';
         if ($token === '' || $gimnasio === '') {
             return ResultadoCheckin::invalido('Faltan el token y el Gym ID de Wellhub en la integración.');

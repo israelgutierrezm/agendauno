@@ -225,4 +225,61 @@ describe("pase de lista en su propia pantalla", () => {
     await flushPromises();
     expect(w.get('[data-prueba="estado-lista"]').exists()).toBe(true);
   });
+
+  it("muestra quién reservó desde una plataforma: Wellhub se marca, TotalPass llega sola y se puede cancelar", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-09T16:05:00Z"));
+    permisos.add("reservas.gestionar");
+    api.get.mockResolvedValue({
+      data: {
+        data: [],
+        meta: {
+          ...meta(true),
+          plataforma: [
+            {
+              id: "l1",
+              proveedor: "wellhub",
+              nombre: "Beto Ruiz",
+              estado: "reservado",
+              puede_marcar: true,
+            },
+            {
+              id: "l2",
+              proveedor: "totalpass",
+              nombre: "Luis Mora",
+              estado: "reservado",
+              puede_marcar: false,
+            },
+          ],
+        },
+      },
+    });
+    api.post.mockResolvedValue({ data: {} });
+    const w = montar();
+    await flushPromises();
+
+    const seccion = w.get('[data-prueba="plataforma-clase"]');
+    expect(seccion.text()).toContain("Beto Ruiz");
+    expect(seccion.text()).toContain("Hace check-in en su app");
+    await seccion
+      .findAll("button")
+      .find((b) => b.text() === "Llegó")!
+      .trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/lugares-plataforma/l1/llego",
+      {},
+    );
+
+    await w
+      .get('[data-prueba="plataforma-clase"]')
+      .findAll("button")
+      .find((b) => b.text() === "Cancelar reserva")!
+      .trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/lugares-plataforma/l2/cancelar",
+      {},
+    );
+  });
 });

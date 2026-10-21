@@ -80,6 +80,33 @@ class ConfiguracionPlataforma extends Model
     }
 
     /**
+     * En qué países se ofrece cada plataforma de bienestar (ADR 0202): los decide el
+     * superadmin; México por omisión. Fitpass solo opera en México.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function paisesBienestar(): array
+    {
+        $guardados = [];
+        try {
+            $guardados = json_decode((string) static::obtener('paises_bienestar'), true);
+        } catch (Throwable) {
+            // Tabla ausente: los de omisión.
+        }
+        $paises = [];
+        foreach (['wellhub', 'totalpass'] as $proveedor) {
+            $lista = is_array($guardados) && is_array($guardados[$proveedor] ?? null) ? $guardados[$proveedor] : ['MX'];
+            $paises[$proveedor] = array_values(array_unique(array_filter(array_map(
+                static fn ($p): string => strtoupper(trim((string) $p)),
+                $lista,
+            ), static fn (string $p): bool => preg_match('/^[A-Z]{2}$/', $p) === 1)));
+        }
+        $paises['fitpass'] = ['MX'];
+
+        return $paises;
+    }
+
+    /**
      * Correo del superadministrador: ahí llegan las alertas de la operación y las
      * rentas vencidas. El que capturó en su panel tiene prioridad; si no, el de
      * ALERTAS_CORREO. Tolera que la tabla aún no exista.

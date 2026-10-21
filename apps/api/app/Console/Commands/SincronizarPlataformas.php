@@ -54,6 +54,25 @@ class SincronizarPlataformas extends Command
                     }, 0);
                 }
             });
+        // Un negocio dado de baja ya no se reserva desde ninguna plataforma (ADR 0202).
+        Estudio::query()
+            ->where('estado', EstadoEstudio::Cancelled->value)
+            ->chunkById(100, function (Collection $estudios) use (&$cambios, $publicar, $gestor): void {
+                /** @var Collection<int, Estudio> $estudios */
+                foreach ($estudios as $estudio) {
+                    if (! $gestor->baseDeDatosExiste($estudio)) {
+                        continue;
+                    }
+                    $cambios += $gestor->ejecutarAislado($estudio, function () use ($publicar): int {
+                        if (! Schema::connection('tenant')->hasTable('horarios_plataforma')
+                            || ! HorarioPlataformaTenant::query()->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)->exists()) {
+                            return 0;
+                        }
+
+                        return $publicar->retirarTodo();
+                    }, 0);
+                }
+            });
         $this->info("Horarios publicados o actualizados: {$cambios}.");
 
         return self::SUCCESS;

@@ -66,6 +66,50 @@ Huecos completados:
   y el código del gimnasio siguen siendo para validar el token a mano.
 - Si su sesión (JWT) vence antes de tiempo, se pide otra.
 
+## Wellhub
+
+- **Lugares al momento.** Wellhub pide actualizar los lugares en cada reserva, sea suya o
+  no. Una reserva directa, una cancelación, una sesión cancelada o reprogramada de una
+  clase publicada manda sus lugares en segundos (listener del outbox y un trabajo único
+  por sesión que agrupa lo que pasa en 15 segundos), sin esperar la vuelta de cada cinco
+  minutos. Lo mismo vale para TotalPass.
+- **Borrar una fecha de una serie** que está publicada o tuvo lugares de plataforma ya no
+  la borra (dejaba su horario huérfano y reservable en Wellhub): se cancela y se retira.
+- **Negocio dado de baja:** se retira todo lo publicado y se ocultan sus clases.
+- **El negocio cancela una reserva** desde la lista de la clase
+  (`POST /lugares-plataforma/{lugar}/cancelar`, con `reservas.gestionar`): Wellhub con
+  `CANCELLED_BY_GYM`, TotalPass con `DELETE /partner/slot/{id}`. El lugar se libera y se
+  ofrece a la lista de espera.
+- **Recepción ve quién reservó** desde la app de la plataforma en la lista de la clase
+  (`meta.plataforma`) y marca que llegó (`POST /lugares-plataforma/{lugar}/llego`): con
+  Wellhub se valida con su Wellhub ID ya guardado, sin teclear sus 13 dígitos; TotalPass
+  valida la llegada sola en su app.
+- **Avisos fuera de orden:** una cancelación que llega antes que su solicitud queda
+  anotada y la solicitud ya no aparta lugar.
+- **Al rendirse** con una reserva que no se pudo contestar a tiempo, se le dice a Wellhub
+  `REJECTED` con `TECHNICAL_ERROR` (su categoría para fallas técnicas).
+- **Avisos registrados al activarla** (no solo al publicar clases: un negocio que solo
+  valida visitas también recibe el `checkin`), solo con la dirección HTTPS de la
+  plataforma. Los que el gimnasio ya tenía (de otro sistema) se cambian con
+  `PUT /webhooks/{evento}` en lugar de crearse otra vez. La llave de firma: hasta 100
+  caracteres, como pide Wellhub.
+- **Clases:** no se duplican (antes de crearla se busca la suya por referencia); al dejar
+  de publicarla se oculta (`visible: false`, Wellhub no borra clases) y al volver se
+  muestra. Una clase en línea (ADR 0184) va con producto virtual y su enlace al aceptar
+  la reserva; si el producto y la clase no coinciden, se dice antes de publicar. Un
+  horario de más de 200 minutos no se publica (antes se recortaba sin avisar).
+- **Token de AgendaUno como sistema integrado** (`WELLHUB_API_TOKEN`): con él, el negocio
+  solo da su Gym ID.
+- **Límite de avisos por negocio:** los avisos llegan de las mismas IP de Wellhub para
+  todos; el límite de 600 por minuto ahora es de cada negocio.
+- La búsqueda de un horario que Wellhub ya tenía usa un minuto de margen.
+
+## Países
+
+Wellhub opera en varios países: dónde se ofrecen Wellhub y TotalPass lo decide el
+superadmin (`paises_bienestar` en su configuración, México por omisión). Fitpass sigue
+solo en México. Un negocio de otro país no las ve, no las configura y no publica.
+
 ## Wellhub y TotalPass: reintentos
 
 Cuando la plataforma no responde, el aviso se reintenta mientras ella espere (15 minutos

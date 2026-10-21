@@ -287,11 +287,11 @@ class ReservasPlataformaTenantController
 
     private function proveedor(Request $request): ProveedorPartner
     {
-        if (! $this->region->enMexico()) {
-            throw new IntegracionSoloMexico('Wellhub y TotalPass solo están disponibles para negocios en México.');
-        }
         $proveedor = ProveedorPartner::tryFrom((string) $request->route('proveedor'));
         abort_if($proveedor === null, 404);
+        if (! $proveedor->disponibleEn($this->region->pais())) {
+            throw new IntegracionSoloMexico($proveedor->nombre().' aún no se ofrece en el país de tu negocio.');
+        }
 
         return $proveedor;
     }
