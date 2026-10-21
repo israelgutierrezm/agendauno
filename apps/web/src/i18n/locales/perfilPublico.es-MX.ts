@@ -109,6 +109,10 @@ export default {
     requisitosPh: "Ninguno: empezamos desde cero.",
     queLlevar: "Qué llevar",
     queLlevarPh: "Ropa cómoda y una botella de agua.",
+    // Clase en línea (ADR 0184).
+    enlace: "Enlace de la clase en línea (opcional)",
+    enlaceAyuda:
+      "Zoom, Meet o el que uses. Solo lo ve quien reservó la clase, en su cuenta y en la app.",
   },
   // Cómo conoció el cliente al negocio (se guarda en su ficha).
   origenes: {

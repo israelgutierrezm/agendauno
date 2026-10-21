@@ -4,17 +4,41 @@
 | cada pregunta en un `<details>` (se abre sin JavaScript). Los textos llegan ya
 | traducidos; lo que va debajo (p. ej. la nota de México, `landing.soloMexico`) entra
 | por el slot. Las tarjetas toman `--sobre-banda` (como `marketing/landing.css`).
+| Con `estructurado`, las mismas preguntas van como datos estructurados (FAQPage) para
+| los buscadores: solo lo que se ve en la página (comparativo del 2026-10-20).
 */
+import { computed, h } from "vue";
+
 export interface PreguntaFrecuente {
   clave: string;
   pregunta: string;
   respuesta: string;
 }
 
-defineProps<{
+const props = defineProps<{
   titulo: string;
   preguntas: readonly PreguntaFrecuente[];
+  estructurado?: boolean;
 }>();
+
+const jsonLd = computed(() =>
+  JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: props.preguntas.map((p) => ({
+      "@type": "Question",
+      name: p.pregunta,
+      acceptedAnswer: { "@type": "Answer", text: p.respuesta },
+    })),
+  }).replace(/</g, "\\u003c"),
+);
+// El `<script type="application/ld+json">` (solo datos, no se ejecuta).
+const DatosEstructurados = () =>
+  h("script", {
+    type: "application/ld+json",
+    "data-prueba": "faq-ld",
+    innerHTML: jsonLd.value,
+  });
 </script>
 
 <template>
@@ -49,6 +73,7 @@ defineProps<{
       </details>
     </div>
     <slot />
+    <DatosEstructurados v-if="estructurado && preguntas.length > 0" />
   </div>
 </template>
 

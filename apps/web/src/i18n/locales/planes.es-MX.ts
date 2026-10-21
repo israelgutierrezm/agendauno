@@ -17,6 +17,25 @@ export default {
     clasesServiciosClases: "Clases",
   },
   titulo: "Planes y paquetes",
+  // Planes «socio» (ADR 0182): se congelan en cada venta.
+  socio: {
+    titulo: "Reglas de reserva",
+    ayuda:
+      "Opcional. Lo que pongas aquí se congela en cada venta: cambiarlo después no afecta lo ya vendido.",
+    topeDia: "Máximo de reservas por día",
+    topeSemana: "Máximo de reservas por semana",
+    sinTope: "Sin tope",
+    anticipado: "Reserva antes que los demás (horas)",
+    sinAnticipado: "Igual que todos",
+    invitados: "Invitados al mes",
+    sinInvitados: "Sin invitados",
+  },
+  // Avisos de coherencia del catálogo (antes de abrir).
+  coherencia: {
+    titulo: "Revisa tu catálogo",
+    ayuda:
+      "No impide vender: son detalles que tus clientes notan al comparar planes.",
+  },
   subtitulo:
     "Lo que tus alumnos compran para reservar: cuántas clases incluye, cuánto dura y para qué clases sirve.",
   nuevo: "Nuevo plan",

@@ -10,8 +10,11 @@ import {
   type NivelCitas,
   desdeCitas,
   dolares,
+  fechaDelTipo,
   maxAlumnos,
   pesos,
+  pesosConIva,
+  pesosRedondos,
   rangosClases,
   tablaCitas,
 } from "@/marketing/precios";
@@ -72,6 +75,19 @@ const nombreMoneda = computed(
   () => NOMBRE_MONEDA[moneda.value] ?? moneda.value,
 );
 const iva = computed(() => precios.datos[modo.value].iva_porcentaje ?? 16);
+// El equivalente en pesos con IVA para México, al último FIX conocido (si la tarifa
+// es en dólares y hay uno): los competidores publican en pesos.
+const tipoCambio = computed(() =>
+  moneda.value === "USD" ? (precios.datos.tipo_cambio ?? null) : null,
+);
+function enPesos(importe: number): string | null {
+  return tipoCambio.value && importe > 0
+    ? pesosRedondos(pesosConIva(importe, iva.value, tipoCambio.value))
+    : null;
+}
+const fechaTipoCambio = computed(() =>
+  tipoCambio.value ? fechaDelTipo(tipoCambio.value.fecha) : null,
+);
 // Desde cuándo rige la tarifa que se ve: la misma fecha que muestra la contratación.
 const vigenteDesde = computed(() => {
   const fecha = precios.datos[modo.value].vigente_desde;
@@ -290,6 +306,13 @@ function elegirModo(valor: Modo) {
             · {{ tarjeta.nota }}</template
           >
         </p>
+        <p
+          v-if="enPesos(tarjeta.importe)"
+          class="precio-pesos"
+          data-prueba="precio-pesos"
+        >
+          Unos {{ enPesos(tarjeta.importe) }} MXN con IVA en México
+        </p>
         <ul v-if="modo === 'citas'">
           <li
             v-for="beneficio in tarjeta.funciones.slice(0, 4)"
@@ -384,13 +407,22 @@ function elegirModo(valor: Modo) {
       </ul>
     </section>
 
-    <CalculadoraRenta :modo="modo" :precios="precios.datos" :anual="anual" />
+    <CalculadoraRenta
+      :modo="modo"
+      :precios="precios.datos"
+      :anual="anual"
+      :registro-abierto="registroAbierto"
+    />
 
     <p class="precios-aclaracion">
       Precios en {{ nombreMoneda }}, más impuestos.
       <template v-if="moneda !== 'MXN'">
         En México se cobran en pesos al tipo de cambio FIX del Banco de México
-        vigente el día en que se emite el cargo, más IVA.
+        vigente el día en que se emite el cargo, más IVA.<template
+          v-if="fechaTipoCambio"
+        >
+          Los montos en pesos usan el FIX del {{ fechaTipoCambio }}.</template
+        >
       </template>
       <template v-if="modo === 'clases'">
         Todas las herramientas para clases, desde el primer plan; la tarifa
@@ -789,6 +821,10 @@ summary:focus-visible {
 }
 .precio-impuestos {
   margin-top: 0.25rem;
+}
+.precio-pesos {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
 }
 .precio-tarjeta ul {
   display: grid;

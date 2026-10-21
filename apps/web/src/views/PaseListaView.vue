@@ -237,6 +237,29 @@ function conBotones(r: ReservaLista): boolean {
   );
 }
 
+// Invitados de los clientes (ADR 0182): ocupan lugar; se marca si llegaron.
+interface InvitadoLista {
+  id: string;
+  nombre: string;
+  anfitrion: string | null;
+  estado: "reservado" | "asistio" | "no_asistio";
+}
+const invitados = ref<InvitadoLista[]>([]);
+async function marcarInvitado(
+  i: InvitadoLista,
+  asistio: boolean,
+): Promise<void> {
+  ocupado.value = true;
+  try {
+    await api.put(`${base.value}/invitados/${i.id}/asistencia`, { asistio });
+    i.estado = asistio ? "asistio" : "no_asistio";
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    ocupado.value = false;
+  }
+}
+
 async function cargar(silencioso = false): Promise<void> {
   if (!silencioso) {
     cargando.value = true;
@@ -249,9 +272,11 @@ async function cargar(silencioso = false): Promise<void> {
         asistencia_desde?: string;
         empezo?: boolean;
         sesion?: ClaseLista;
+        invitados?: InvitadoLista[];
       };
     }>(`${base.value}/sesiones/${props.id}/reservas`);
     lista.value = data.data;
+    invitados.value = data.meta?.invitados ?? [];
     desde.value = data.meta?.asistencia_desde ?? null;
     empezo.value = data.meta?.empezo ?? false;
     clase.value = data.meta?.sesion ?? null;
@@ -697,6 +722,61 @@ watch(
                 })
         }}
       </p>
+
+      <!-- Invitados de los clientes (ADR 0182): no son clientes, ocupan lugar -->
+      <section
+        v-if="invitados.length > 0"
+        class="pl-espera tu-card"
+        data-prueba="invitados-clase"
+      >
+        <header>
+          <div>
+            <h2>
+              {{ $t("paseLista.invitados.titulo") }}
+              <span class="tabular-nums">{{ invitados.length }}</span>
+            </h2>
+            <p>{{ $t("paseLista.invitados.ayuda") }}</p>
+          </div>
+        </header>
+        <ul>
+          <li v-for="i in invitados" :key="i.id">
+            <AvatarIniciales :nombre="i.nombre" tam="sm" />
+            <span class="min-w-0 flex-1 truncate">
+              {{ i.nombre }}
+              <span
+                v-if="i.anfitrion"
+                class="text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >·
+                {{
+                  $t("paseLista.invitados.de", { nombre: i.anfitrion })
+                }}</span
+              >
+            </span>
+            <span class="text-xs">{{
+              $t(`paseLista.invitados.estados.${i.estado}`)
+            }}</span>
+            <template v-if="puedeMarcar">
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="ocupado || i.estado === 'asistio'"
+                @click="marcarInvitado(i, true)"
+              >
+                {{ $t("paseLista.acciones.llego") }}
+              </button>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="ocupado || i.estado === 'no_asistio'"
+                @click="marcarInvitado(i, false)"
+              >
+                {{ $t("paseLista.acciones.noVino") }}
+              </button>
+            </template>
+          </li>
+        </ul>
+      </section>
 
       <!-- Lista de espera: en su orden; al liberarse un lugar se ofrece así -->
       <section v-if="enEspera.length > 0" class="pl-espera tu-card">

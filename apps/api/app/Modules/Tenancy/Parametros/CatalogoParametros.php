@@ -77,6 +77,10 @@ final class CatalogoParametros
             new DefinicionParametro('plataformas.lugares_sin_tope', 'Wellhub y TotalPass', 'Lugares en clases sin cupo',
                 'Cuántos lugares se ofrecen en la app de Wellhub o TotalPass cuando la clase no tiene cupo.', $e, 20, 1, 500, 'lugares', modalidad: 'clases'),
 
+            // Tope de mensajes de WhatsApp del negocio (ADR 0186).
+            new DefinicionParametro('whatsapp.tope_mensual', 'WhatsApp', 'Máximo de mensajes de WhatsApp al mes',
+                'Al llegar, los avisos por WhatsApp de ese mes ya no salen (sí por correo y en la app). 0 = sin tope. Solo cuenta si la plataforma cobra los mensajes.', $e, 0, 0, 100000, 'mensajes'),
+
             // Asistencia (ADR 0101).
             new DefinicionParametro('asistencia.minutos_antes', 'Asistencia', 'Se puede pasar lista desde',
                 'Minutos antes de que empiece la clase o cita. Antes no se registra la asistencia.', $e, 30, 0, 240, 'min'),
@@ -242,6 +246,20 @@ final class CatalogoParametros
                 'Días después de emitido el cargo, si la tarjeta lo rechazó. 0 = no se reintenta.', $e, 3, 0, 30, 'días', porNegocio: false),
             new DefinicionParametro('renta.reintento_2_dias', 'Renta', 'Segundo reintento del cobro automático',
                 'Días después de emitido el cargo. 0 = no hay segundo reintento.', $e, 7, 0, 60, 'días', porNegocio: false),
+            // Servicios con precio publicado (ADR 0188).
+            new DefinicionParametro('servicios.arranque_centavos', 'Renta', 'Arranque acompañado',
+                'Pago único, en centavos de peso sin IVA: clases, paquetes, horario, pasarela y sitio con plantilla. Gratis con el plan anual.', $e, 390000, 0, 10000000, '¢', porNegocio: false),
+            new DefinicionParametro('servicios.arranque_migracion_centavos', 'Renta', 'Arranque con migración',
+                'Pago único, en centavos de peso sin IVA: el arranque y la migración de clientes con sus saldos y membresías.', $e, 490000, 0, 10000000, '¢', porNegocio: false),
+            new DefinicionParametro('servicios.app_marca_alta_centavos', 'Renta', 'App con la marca del negocio: alta',
+                'Pago único, en centavos de peso sin IVA.', $e, 490000, 0, 10000000, '¢', porNegocio: false),
+            new DefinicionParametro('servicios.app_marca_mensual_centavos', 'Renta', 'App con la marca del negocio: mensualidad',
+                'Cada mes con el complemento encendido, en centavos de peso sin IVA; se cobra aparte de la renta.', $e, 99000, 0, 10000000, '¢', porNegocio: false),
+            // WhatsApp por mensaje (ADR 0186).
+            new DefinicionParametro('whatsapp.cobro_por_mensaje', 'Renta', 'Los negocios pagan sus mensajes de WhatsApp',
+                'Encendido, cada aviso por WhatsApp gasta un mensaje del saldo que el negocio compra en paquetes. Apagado, la plataforma los paga.', $sn, 0, porNegocio: false),
+            new DefinicionParametro('whatsapp.precio_mensaje_centavos', 'Renta', 'Precio de cada mensaje de WhatsApp',
+                'En centavos de peso, sin IVA: la tarifa de Meta por mensaje de utilidad más el margen de la plataforma.', $e, 45, 1, 10000, '¢', porNegocio: false),
             new DefinicionParametro('timbres.precio_centavos', 'Renta', 'Precio de cada timbre para facturar',
                 'En centavos de peso, sin IVA. Los paquetes que se venden se fijan en Configuración → Datos comerciales.', $e, 180, 1, 10000, '¢', porNegocio: false),
             new DefinicionParametro('renta.tipo_cambio_dias_vigencia', 'Renta', 'Antigüedad máxima del tipo de cambio',

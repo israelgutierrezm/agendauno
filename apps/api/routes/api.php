@@ -28,6 +28,7 @@ use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CobroDeCitaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ComplementosNegocioController;
+use App\Modules\Tenancy\Http\Controllers\ConciliacionPlataformasTenantController;
 use App\Modules\Tenancy\Http\Controllers\CortesNominaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CuotasTenantController;
@@ -62,6 +63,8 @@ use App\Modules\Tenancy\Http\Controllers\IntegracionApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\InteresadosController;
 use App\Modules\Tenancy\Http\Controllers\InventarioTenantController;
+use App\Modules\Tenancy\Http\Controllers\InvitadosTenantController;
+use App\Modules\Tenancy\Http\Controllers\KioscosTenantController;
 use App\Modules\Tenancy\Http\Controllers\LealtadTenantController;
 use App\Modules\Tenancy\Http\Controllers\LegalesPublicoController;
 use App\Modules\Tenancy\Http\Controllers\LlavesApiTenantController;
@@ -83,6 +86,7 @@ use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisParticipantesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MovimientosPagoTenantController;
+use App\Modules\Tenancy\Http\Controllers\NivelesMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\NotasPersonaTenantController;
 use App\Modules\Tenancy\Http\Controllers\OnboardingController;
 use App\Modules\Tenancy\Http\Controllers\OrdenesTenantController;
@@ -148,6 +152,7 @@ use App\Modules\Tenancy\Http\Controllers\TimbresTenantController;
 use App\Modules\Tenancy\Http\Controllers\TipoCambioPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\TiposDocumentoController;
 use App\Modules\Tenancy\Http\Controllers\UsuariosTenantController;
+use App\Modules\Tenancy\Http\Controllers\VideosTenantController;
 use App\Modules\Tenancy\Http\Controllers\VisitantesPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookBienestarController;
@@ -155,6 +160,7 @@ use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookWhatsAppController;
+use App\Modules\Tenancy\Http\Controllers\WhatsAppSaldoTenantController;
 use App\Modules\Tenancy\Http\Controllers\WidgetsTenantController;
 use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Support\Facades\Route;
@@ -332,6 +338,11 @@ Route::prefix('v1')->group(function (): void {
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
+        // Kiosco de llegada (ADR 0183): la tableta de recepción, con su propia llave.
+        Route::middleware(['kiosco', 'throttle:negocio-publico'])->prefix('kiosco')->name('kiosco.')->group(function (): void {
+            Route::get('/', [KioscosTenantController::class, 'mostrar'])->name('mostrar');
+            Route::post('/llegadas', [KioscosTenantController::class, 'llegada'])->name('llegadas');
+        });
         // GA4 de su página (ADR 0143) y las preferencias de quien la visita.
         Route::get('/medicion', [MedicionNegocioTenantController::class, 'publico'])->middleware('throttle:negocio-publico')->name('medicion.publico');
         Route::post('/medicion/consentimiento', [MedicionNegocioTenantController::class, 'consentimiento'])->middleware('throttle:negocio-publico')->name('medicion.consentimiento');
@@ -404,6 +415,12 @@ Route::prefix('v1')->group(function (): void {
             // Lugares numerados (B06): cuáles están libres y elegir o cambiar el suyo.
             Route::get('/mi/sesiones/{sesion}/lugares', [MiTenantController::class, 'lugares'])->middleware('modalidad:clases')->name('mi.sesiones.lugares');
             Route::put('/mi/reservas/{reserva}/lugar', [MiTenantController::class, 'elegirLugar'])->middleware('modalidad:clases')->name('mi.reservas.lugar');
+            // Biblioteca de videos de sus planes (ADR 0184).
+            Route::get('/mi/videos', [VideosTenantController::class, 'mios'])->middleware('modalidad:clases')->name('mi.videos.index');
+            // Pases de invitado de su plan (ADR 0182).
+            Route::get('/mi/invitados', [InvitadosTenantController::class, 'mios'])->middleware('modalidad:clases')->name('mi.invitados.index');
+            Route::post('/mi/sesiones/{sesion}/invitados', [InvitadosTenantController::class, 'invitar'])->middleware(['modalidad:clases', 'throttle:20,1'])->name('mi.invitados.store');
+            Route::delete('/mi/invitados/{invitado}', [InvitadosTenantController::class, 'cancelarMio'])->middleware('modalidad:clases')->name('mi.invitados.destroy');
             // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.
             Route::get('/mi/citas/opciones', [MiTenantController::class, 'opcionesCita'])->middleware('modalidad:citas')->name('mi.citas.opciones');
             Route::get('/mi/citas/disponibilidad', [MiTenantController::class, 'disponibilidadCita'])->middleware('modalidad:citas')->name('mi.citas.disponibilidad');
@@ -506,6 +523,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/solicitudes-privacidad/{solicitud}/atender', [SolicitudesPrivacidadTenantController::class, 'atender'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.atender');
             Route::post('/solicitudes-privacidad/{solicitud}/rechazar', [SolicitudesPrivacidadTenantController::class, 'rechazar'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.rechazar');
             // Padrón facturable (P0): base de la renta SaaS; `?formato=csv` para exportar. Ruta literal antes de {persona}.
+            // El nivel del cliente en cada actividad (ADR 0187).
+            Route::get('/miembros/{persona}/niveles', [NivelesMiembroTenantController::class, 'index'])->middleware(['puede:miembros.ver', 'modalidad:clases'])->name('miembros.niveles.index');
+            Route::put('/miembros/{persona}/niveles', [NivelesMiembroTenantController::class, 'asignar'])->middleware(['puede:miembros.gestionar', 'modalidad:clases'])->name('miembros.niveles.update');
             Route::get('/miembros/padron', [MiembrosTenantController::class, 'padron'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('miembros.padron');
             // Números del directorio de clientes. Ruta literal antes de {persona}.
             Route::get('/miembros/resumen', ResumenClientesTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
@@ -612,6 +632,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
             // Complementos que se piden a la plataforma (p. ej. Familias; ADR 0140).
             Route::get('/renta/complementos', [ComplementosNegocioController::class, 'index'])->middleware('puede:facturacion.ver')->name('renta.complementos');
+            // Referidos entre negocios (ADR 0188).
+            Route::get('/renta/referidos', [FacturacionController::class, 'referidos'])->middleware('puede:facturacion.ver')->name('renta.referidos');
             Route::post('/renta/complementos/{modulo}/solicitud', [ComplementosNegocioController::class, 'solicitar'])->middleware(['puede:estudio.gestionar', 'throttle:login'])->name('renta.complementos.solicitar');
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente
             // + checkout; el webhook de la plataforma confirma). El dueño paga su suscripcion.
@@ -626,6 +648,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/timbres', [TimbresTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('timbres.index');
             Route::get('/timbres/movimientos', [TimbresTenantController::class, 'movimientos'])->middleware('puede:facturacion.ver')->name('timbres.movimientos');
             Route::post('/timbres/comprar', [TimbresTenantController::class, 'comprar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('timbres.comprar');
+            // WhatsApp por mensaje (ADR 0186): plantillas, precio, saldo y paquetes.
+            Route::get('/whatsapp/saldo', [WhatsAppSaldoTenantController::class, 'mostrar'])->middleware('puede:facturacion.ver')->name('whatsapp.saldo');
+            Route::post('/whatsapp/comprar', [WhatsAppSaldoTenantController::class, 'comprar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('whatsapp.comprar');
             // Factura (CFDI) de la renta del SaaS: emite el CFDI de un cargo pagado y
             // entrega el PDF/XML (AgendaUno emisor, el estudio receptor).
             Route::post('/renta/cargos/{cargo}/factura', [FacturaRentaController::class, 'emitir'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.factura');
@@ -714,6 +739,11 @@ Route::prefix('v1')->group(function (): void {
             // Servicios o clases en una línea (nombre, duración y precio o cupo).
             Route::post('/ofertas/rapidas', [CatalogoTenantController::class, 'altaRapida'])->middleware('puede:catalogo.gestionar')->name('ofertas.rapidas');
             Route::put('/ofertas/{oferta}', [CatalogoTenantController::class, 'actualizarOferta'])->middleware('puede:catalogo.gestionar')->name('ofertas.update');
+            // Biblioteca de videos (ADR 0184).
+            Route::get('/videos', [VideosTenantController::class, 'index'])->middleware(['puede:catalogo.ver', 'modalidad:clases'])->name('videos.index');
+            Route::post('/videos', [VideosTenantController::class, 'store'])->middleware(['puede:catalogo.gestionar', 'modalidad:clases'])->name('videos.store');
+            Route::put('/videos/{video}', [VideosTenantController::class, 'update'])->middleware(['puede:catalogo.gestionar', 'modalidad:clases'])->name('videos.update');
+            Route::delete('/videos/{video}', [VideosTenantController::class, 'destroy'])->middleware(['puede:catalogo.gestionar', 'modalidad:clases'])->name('videos.destroy');
             // Retirarlo del catálogo y volver a ofrecerlo, con su historial (ADR 0154).
             Route::post('/ofertas/{oferta}/archivar', [CatalogoTenantController::class, 'archivar'])->middleware('puede:catalogo.gestionar')->name('ofertas.archivar');
             Route::post('/ofertas/{oferta}/restaurar', [CatalogoTenantController::class, 'restaurar'])->middleware('puede:catalogo.gestionar')->name('ofertas.restaurar');
@@ -750,6 +780,11 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/visitantes-plataforma/{visitante}', [VisitantesPlataformaTenantController::class, 'show'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.show');
             Route::get('/visitantes-plataforma/{visitante}/visitas', [VisitantesPlataformaTenantController::class, 'visitas'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.visitas');
             Route::get('/visitantes-plataforma/{visitante}/reservas', [VisitantesPlataformaTenantController::class, 'reservas'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('visitantes-plataforma.reservas');
+            // Conciliación de lo que pagan Wellhub y TotalPass (ADR 0185).
+            Route::get('/plataformas/tarifas', [ConciliacionPlataformasTenantController::class, 'tarifas'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('plataformas.tarifas.index');
+            Route::post('/plataformas/tarifas', [ConciliacionPlataformasTenantController::class, 'pactarTarifa'])->middleware(['puede:estudio.gestionar', 'modalidad:clases'])->name('plataformas.tarifas.store');
+            Route::get('/plataformas/conciliacion', [ConciliacionPlataformasTenantController::class, 'resumen'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('plataformas.conciliacion.show');
+            Route::post('/plataformas/conciliacion', [ConciliacionPlataformasTenantController::class, 'importar'])->middleware(['puede:estudio.gestionar', 'modalidad:clases', 'throttle:20,1'])->name('plataformas.conciliacion.store');
             Route::get('/reportes/equipo', ReporteEquipoTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.equipo');
             // Analitica de demanda (R31): mapa dia x hora + por actividad (ocupacion y espera).
             Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.demanda');
@@ -854,6 +889,7 @@ Route::prefix('v1')->group(function (): void {
             // derecho (entitlement) + ledger de creditos. El saldo se deriva del
             // ledger. La venta y las mutaciones del ledger son concurrency-safe.
             Route::get('/productos', [MembresiasTenantController::class, 'productos'])->middleware('puede:productos.ver')->name('productos.index');
+            Route::get('/productos/coherencia', [MembresiasTenantController::class, 'coherencia'])->middleware('puede:productos.ver')->name('productos.coherencia');
             Route::post('/productos', [MembresiasTenantController::class, 'crearProducto'])->middleware(['puede:productos.gestionar', 'plan:paquetes'])->name('productos.store');
             // Editor completo de membresías (Etapa 2): editar plantilla / archivar-reactivar.
             Route::put('/productos/{producto}', [MembresiasTenantController::class, 'actualizarProducto'])->middleware('puede:productos.gestionar')->name('productos.update');
@@ -925,6 +961,9 @@ Route::prefix('v1')->group(function (): void {
             // Transferir/regalar el lugar a otra persona (R9).
             Route::post('/reservas/{reserva}/transferir', [ReservasTenantController::class, 'transferir'])->middleware('puede:reservas.gestionar')->name('reservas.transferir');
             Route::post('/reservas/{reserva}/asistencia', [AsistenciaTenantController::class, 'marcar'])->middleware('puede:asistencia.marcar')->name('reservas.asistencia.store');
+            // Invitados de los clientes en la lista de la clase (ADR 0182).
+            Route::put('/invitados/{invitado}/asistencia', [InvitadosTenantController::class, 'asistencia'])->middleware(['puede:asistencia.marcar', 'modalidad:clases'])->name('invitados.asistencia');
+            Route::delete('/invitados/{invitado}', [InvitadosTenantController::class, 'cancelar'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('invitados.destroy');
             // Qué pasa con su crédito si no vino, para decirlo antes de marcarlo.
             Route::get('/reservas/{reserva}/inasistencia', [AsistenciaTenantController::class, 'efectoDeInasistencia'])->middleware('puede:asistencia.marcar')->name('reservas.inasistencia');
             // Terminar de pasar lista: quien no tiene registro «no se presentó» (ADR 0101).
@@ -1123,6 +1162,10 @@ Route::prefix('v1')->group(function (): void {
             // Control de acceso (R12): la puerta registra un intento y el motor decide
             // (reserva vigente u OPEN_ACCESS por membresia ilimitada); deja bitacora.
             Route::post('/accesos', [AccesosTenantController::class, 'registrar'])->middleware('puede:checkins.registrar')->name('accesos.store');
+            // Tabletas de llegada (ADR 0183): las activa y da de baja quien administra el negocio.
+            Route::get('/kioscos', [KioscosTenantController::class, 'index'])->middleware('puede:estudio.gestionar')->name('kioscos.index');
+            Route::post('/kioscos', [KioscosTenantController::class, 'store'])->middleware('puede:estudio.gestionar')->name('kioscos.store');
+            Route::delete('/kioscos/{kiosco}', [KioscosTenantController::class, 'destroy'])->middleware('puede:estudio.gestionar')->name('kioscos.destroy');
             Route::get('/accesos', [AccesosTenantController::class, 'index'])->middleware('puede:checkins.registrar')->name('accesos.index');
         });
 

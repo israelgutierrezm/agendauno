@@ -86,7 +86,7 @@ class EmitirFacturaPlataforma
                 // La misma llave por cargo y lo que se pide: si FacturAPI no respondió a
                 // tiempo, el reintento recibe la misma factura en lugar de otra.
                 $resultado = $this->cliente->timbrar($llave, $cuerpo + [
-                    'idempotency_key' => 'renta-'.$cargo->ulid.'-'.substr(sha1((string) json_encode($cuerpo)), 0, 16),
+                    'idempotency_key' => 'renta-'.$cargo->ulid.'-'.substr(hash('sha256', (string) json_encode($cuerpo)), 0, 16),
                 ]);
             } catch (TimbradoFallido $e) {
                 return FacturaPlataforma::query()->updateOrCreate(

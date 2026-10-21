@@ -9,6 +9,7 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
 import DarDeBajaMembresia from "@/components/DarDeBajaMembresia.vue";
 import FamiliaMiembro from "@/components/FamiliaMiembro.vue";
+import NivelesMiembro from "@/components/NivelesMiembro.vue";
 import ExpedientePersona from "@/components/ExpedientePersona.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
@@ -1289,6 +1290,15 @@ const regreso = useRegreso({
                     }}
                   </button>
                 </template>
+              </section>
+
+              <!-- Su nivel en cada actividad (ADR 0187); solo si hay niveles. -->
+              <section
+                v-if="!sesion.esCitas"
+                class="px-5 py-5 border-t max-lg:order-2 empty:hidden"
+                :style="{ borderColor: 'var(--borde)' }"
+              >
+                <NivelesMiembro :persona-id="personaId" />
               </section>
 
               <!-- Historial de reservas -->

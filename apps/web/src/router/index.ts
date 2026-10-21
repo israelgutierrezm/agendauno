@@ -128,6 +128,12 @@ const router = createRouter({
       props: { vistaPrevia: true },
     },
     {
+      // Kiosco de llegada (ADR 0183): la tableta de recepción del negocio.
+      path: "/estudio/:slug/kiosco",
+      name: "kiosco",
+      component: () => import("@/views/KioscoView.vue"),
+    },
+    {
       // Agendar cita (público, guest): elegir servicio → persona → hueco → pagar.
       path: "/agendar/:slug",
       name: "agendar-cita",
@@ -448,6 +454,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Biblioteca de videos (ADR 0184).
+      path: "/videos",
+      name: "videos",
+      component: () => import("@/views/VideosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/recepcion",
       name: "recepcion",
       component: () => import("@/views/FrontDeskView.vue"),
@@ -577,6 +590,13 @@ const router = createRouter({
       path: "/mi-cuenta/pagos",
       name: "mis-pagos",
       component: () => import("@/views/MisPagosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // Videos del negocio para el cliente (ADR 0184).
+      path: "/mi-cuenta/videos",
+      name: "mis-videos",
+      component: () => import("@/views/MisVideosView.vue"),
       meta: { requiereSesion: true },
     },
     {

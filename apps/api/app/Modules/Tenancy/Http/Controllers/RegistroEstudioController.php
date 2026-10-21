@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\AtribucionPlataforma;
 use App\Modules\Tenancy\Application\ConversionesPlataforma;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\ReferidosSaas;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\Application\VerificacionWhatsAppDueno;
 use App\Modules\Tenancy\Application\VerificarRecaptcha;
@@ -113,6 +114,8 @@ class RegistroEstudioController
 
         $this->legales->registrarAceptacion($estudio, (string) $estudio->contacto_email, $request->ip(), $request->userAgent());
         $atribucion->registrar($estudio, $request->validated('atribucion'), $request->validated('medicion'), $request->ip(), $request->userAgent());
+        // Llegó invitado por otro negocio (ADR 0188).
+        app(ReferidosSaas::class)->vincular($estudio, $request->validated('referido'));
         if ($verificacion !== null) {
             $this->whatsapp->usar($verificacion);
             $estudio->forceFill([

@@ -1426,6 +1426,54 @@ en el negocio.
   queda en la bitácora como `membresia.cortesia` (ADR 0181). Vender se hace con
   `POST /ordenes`.
 
+### Planes «socio» y catálogo (ADR 0182)
+
+- `POST/PUT /productos` aceptan `max_reservas_dia`, `max_reservas_semana`,
+  `acceso_anticipado_horas` e `invitados_por_mes` (null = sin la regla); la venta los
+  congela en el derecho. Responden `meta.avisos` (`codigo`, `producto_id`, `mensaje`) con
+  los avisos de coherencia del plan; `GET /productos/coherencia` trae los del catálogo.
+- Reservar con un plan en su tope del día o la semana responde 422
+  `BOOKING_LIMIT_REACHED`; `antes-de-reservar` lo dice con `motivo = tope` y trae
+  `pases_invitado`.
+- Invitados: `GET /mi/invitados` (`pases` del mes y `proximos`), `POST
+  /mi/sesiones/{sesion}/invitados` {`nombre`} (422 `GUEST_PASS_NOT_AVAILABLE`, 409
+  `CAPACITY_FULL`), `DELETE /mi/invitados/{invitado}`. El equipo: `PUT
+  /invitados/{invitado}/asistencia` {`asistio`} (`asistencia.marcar`) y `DELETE
+  /invitados/{invitado}` (`reservas.gestionar`); `GET /sesiones/{sesion}/reservas` suma
+  `meta.invitados`.
+- `GET /precios` suma `tipo_cambio` (`diezmilesimas`, `fecha`) o null.
+
+### Kiosco, clases en línea, conciliación, WhatsApp, niveles y referidos (ADR 0183–0188)
+
+- **Kiosco de llegada (0183).** `GET/POST /kioscos` y `DELETE /kioscos/{kiosco}`
+  (`estudio.gestionar`); el alta responde la `llave` una sola vez. La tableta, con
+  `X-Kiosco`: `GET /kiosco` (negocio y sede) y `POST /kiosco/llegadas` {`codigo`} →
+  `resultado` (`llegada`, `ya_registrada`, `temprano`, `sin_clase`, `bienvenida`,
+  `pase_invalido`), `nombre` (el primero), `clase` (`nombre`, `hora`, `lugar`) y
+  `mensaje`.
+- **Clases en línea y videos (0184).** `PUT /ofertas/{oferta}` acepta `enlace_en_linea`
+  (https); `GET /mi/perfil` lo da en `reservas[]` solo con la reserva confirmada.
+  `GET/POST /videos`, `PUT/DELETE /videos/{video}` (`titulo`, `url` https, `descripcion`,
+  `categoria`, `duracion_minutos`, `publicado`, `orden`, `planes`); `GET /mi/videos`
+  (`disponible` y `url` solo si su plan lo incluye).
+- **Conciliación de plataformas (0185).** `GET/POST /plataformas/tarifas` {`proveedor`,
+  `monto_minor`, `vigente_desde`}; `GET /plataformas/conciliacion?proveedor=&periodo=` y
+  `POST /plataformas/conciliacion` (multipart: `proveedor`, `periodo`, `archivo` CSV) →
+  `esperado_minor`, `recibido_minor`, `diferencia_minor`, `visitas_sin_pago`,
+  `pagos_sin_visita`, `montos_distintos`.
+- **WhatsApp por mensaje (0186).** `GET /whatsapp/saldo` (`activo`, `cobra`,
+  `precio_minor`, `disponibles`, `usados_mes`, `tope_mensual`, `paquetes`, `plantillas`,
+  `movimientos`); `POST /whatsapp/comprar` {`cantidad`} → `checkout`. Sin saldo o en el
+  tope, el aviso se descarta con el motivo.
+- **Niveles y práctica libre (0187).** `PUT /ofertas/{oferta}` acepta `nivel_id` (de su
+  actividad) y `practica_libre`; responde `nivel`, `niveles_actividad` y
+  `practica_libre`. `GET/PUT /miembros/{persona}/niveles` {`actividad_id`, `nivel_id`}.
+  Reservar desde la cuenta sin el nivel: 422 `LEVEL_REQUIRED`.
+- **Servicios y referidos (0188).** `GET /renta/complementos` suma los servicios
+  (`tipo` = `servicio`) y el `precio` de cada uno; `GET /renta/referidos` (`codigo`,
+  `invitados`, `beneficios`). `POST /registro` acepta `referido`. `GET /mi/perfil` suma
+  `resumen_asistencia` (`clases_mes`, `racha_semanas`, `total`).
+
 ### Contracargos (ADR 0168)
 
 - Los webhooks de pasarela atienden contracargos:

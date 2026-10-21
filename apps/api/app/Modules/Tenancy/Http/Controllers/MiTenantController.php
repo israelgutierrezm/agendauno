@@ -21,6 +21,7 @@ use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
+use App\Modules\Tenancy\Application\NivelesPersonaTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
@@ -271,6 +272,8 @@ class MiTenantController
             // Qué partes de su cuenta le sirven y su asistencia reciente (ADR 0091).
             'portal' => $this->portal->capacidades($this->estudioDe($request), $persona),
             'asistencias_30_dias' => $this->portal->asistencias($persona),
+            // Su resumen: clases del mes, semanas seguidas y total (comparativo, ADR 0182).
+            'resumen_asistencia' => $this->portal->resumen($persona, (string) ($this->estudioDe($request)->zona_horaria ?: 'UTC')),
             // La global o, si el negocio no configuró una, la de la plataforma (M05).
             'politica_cancelacion' => $politica instanceof PoliticaCancelacionTenant ? [
                 'horas_limite' => $politica->horas_limite,
@@ -457,7 +460,9 @@ class MiTenantController
             throw new SesionNoReservable('Esta cita es privada.');
         }
         // Cuándo abre y cierra la reserva de la clase para el cliente (lo decide el negocio).
-        app(VentanaDeReservaTenant::class)->exigirParaClase($sesion);
+        app(VentanaDeReservaTenant::class)->exigirParaClase($sesion, $persona);
+        // La clase pide un nivel (ADR 0187): desde su cuenta, solo con ese nivel o más.
+        app(NivelesPersonaTenant::class)->exigir($persona, $sesion);
 
         // Cómo se habilita la reserva de la clase: si es de pago por clase, se crea una
         // reserva pendiente (retiene el cupo) + una orden por la sesión, y el miembro
@@ -858,6 +863,8 @@ class MiTenantController
             'cancelacion' => $this->cancelacionDeReserva($reserva),
             // Para llegar preparado (ADR 0118).
             'que_llevar' => $reserva->sesion?->oferta?->que_llevar,
+            // Clase en línea (ADR 0184): el enlace, solo con la reserva confirmada.
+            'enlace_en_linea' => $reserva->estado === EstadoReserva::Confirmada ? $reserva->sesion?->oferta?->enlace_en_linea : null,
             // Su lugar numerado y cuántos tiene la clase (0 = no numera; B06).
             'lugar' => $reserva->lugar === null ? null : (int) $reserva->lugar,
             'lugares' => (int) ($reserva->sesion?->oferta->lugares ?? 0),

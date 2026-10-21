@@ -1067,6 +1067,15 @@ onMounted(() => void cuenta.asegurar());
             </li>
           </ul>
           <a
+            v-if="abierto.reserva.enlace_en_linea"
+            :href="abierto.reserva.enlace_en_linea"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="tu-btn tu-btn-primario inline-block text-sm"
+            data-prueba="entrar-en-linea"
+            >{{ $t("portal.miReserva.entrarEnLinea") }}</a
+          >
+          <a
             v-if="abierto.reserva.mapa_url"
             :href="abierto.reserva.mapa_url"
             target="_blank"

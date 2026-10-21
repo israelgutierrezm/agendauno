@@ -21,6 +21,7 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     esCitas: false,
+    puede: () => true,
     zonaHoraria: "America/Mexico_City",
     estudio: { bienestar_posible: true },
   }),

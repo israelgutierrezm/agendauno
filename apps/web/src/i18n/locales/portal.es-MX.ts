@@ -82,6 +82,8 @@ export default {
       asistencia: "Mi asistencia",
       asistenciaValor:
         "Sin clases en 30 días | 1 clase en 30 días | {n} clases en 30 días",
+      clasesMes: "Sin clases este mes | 1 clase este mes | {n} clases este mes",
+      racha: "{n} semanas seguidas",
     },
   },
   reservas: {
@@ -130,6 +132,17 @@ export default {
     verPlanes: "Ver planes",
   },
   // Antes de reservar una clase (M05): lo que va a pasar, dicho por el servidor.
+  // Pases de invitado del plan (ADR 0182).
+  invitados: {
+    invitar:
+      "Invitar a alguien (te queda {n} pase este mes) | Invitar a alguien (te quedan {n} pases este mes)",
+    nombre: "Nombre de tu invitado",
+    apartar: "Apartar su lugar",
+    nombreRequerido: "Escribe el nombre de tu invitado.",
+    listo:
+      "Apartamos un lugar para {nombre}. Si no puede venir, cancélalo antes de la clase y recuperas tu pase.",
+    ayuda: "Ocupa un lugar en la clase y usa uno de los pases de tu plan.",
+  },
   antesDeReservar: {
     calculando: "Revisando tu plan…",
     plan: "Tu plan",
@@ -190,6 +203,8 @@ export default {
   },
   // Su reserva, después de reservar (C05) y en su detalle.
   miReserva: {
+    // Clase en línea (ADR 0184).
+    entrarEnLinea: "Entrar a la clase en línea",
     lista: "Listo: tu clase está reservada.",
     enEspera: "Estás en la lista de espera. Te avisamos si se libera un lugar.",
     conPlan: "Con {plan}",

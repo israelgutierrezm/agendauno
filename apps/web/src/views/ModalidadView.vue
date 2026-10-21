@@ -4,6 +4,7 @@ import { computed, onMounted, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import ArranqueYReferidos from "@/components/ArranqueYReferidos.vue";
 import AyudaParaEmpezar from "@/components/AyudaParaEmpezar.vue";
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
 import CasosPiloto from "@/components/CasosPiloto.vue";
@@ -17,6 +18,8 @@ import NegociosAnimados from "@/components/NegociosAnimados.vue";
 import PreciosLanding from "@/components/PreciosLanding.vue";
 import PreguntasFrecuentes from "@/components/PreguntasFrecuentes.vue";
 import ProductoDemo from "@/components/ProductoDemo.vue";
+import ReemplazaHerramientas from "@/components/ReemplazaHerramientas.vue";
+import ResultadosLanding from "@/components/ResultadosLanding.vue";
 import RecorridoDemo from "@/components/RecorridoDemo.vue";
 import SellosConfianza from "@/components/SellosConfianza.vue";
 import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
@@ -350,6 +353,9 @@ function medirOtra(): void {
         <p class="mt-3 text-lg max-w-2xl reveal" :style="SUAVE">
           {{ t(k("seccion.subtitulo")) }}
         </p>
+        <!-- Por resultados: atraer, convertir, retener y operar (comparativo). -->
+        <ResultadosLanding :modo="modo" class="mt-10 reveal" />
+        <p class="tu-nota-mexico mt-3">{{ t("landing.soloMexico") }}</p>
         <FuncionesLanding :modo="modo" />
       </div>
     </section>
@@ -539,6 +545,23 @@ function medirOtra(): void {
         </div>
         <!-- Cada tarjeta ya lleva su «Probar» y «Sin tarjeta»: sin repetirlo aquí. -->
         <PreciosLanding :modo="modo" />
+        <!-- Lo que reemplaza con un solo pago y lo que nadie más da (comparativo). -->
+        <h3 class="mt-14 text-xl font-semibold reveal">
+          {{ t("landing.porQue.titulo") }}
+        </h3>
+        <p class="mt-2 max-w-3xl reveal" :style="SUAVE">
+          {{ t("landing.porQue.subtitulo") }}
+        </p>
+        <ReemplazaHerramientas :modo="modo" class="mt-6 reveal" />
+        <!-- Lo que se cobra aparte, con precio publicado, y los referidos (ADR 0188);
+             con el registro cerrado no se ofrece. -->
+        <template v-if="registroAbierto">
+          <h3 class="mt-14 text-xl font-semibold reveal">
+            {{ t("landing.porQue.aparte") }}
+          </h3>
+          <ArranqueYReferidos :modo="modo" class="mt-5 reveal" />
+        </template>
+        <p class="tu-nota-mexico mt-3">{{ t("landing.soloMexico") }}</p>
       </div>
     </section>
 
@@ -615,6 +638,7 @@ function medirOtra(): void {
         <PreguntasFrecuentes
           :titulo="t('landing.modalidad.faqTitulo')"
           :preguntas="preguntas"
+          estructurado
         >
           <p v-if="notas.preguntas" class="tu-nota-mexico">
             {{ t("landing.soloMexico") }}

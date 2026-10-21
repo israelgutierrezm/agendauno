@@ -176,6 +176,12 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         "créditos",
         "vigencia",
       ]),
+      o("videos", "videos", "configNegocio.opciones.videos", [
+        "video",
+        "en línea",
+        "biblioteca",
+        "contenido",
+      ]),
       o("recursos", "recursos", "configNegocio.opciones.recursos", [
         "sala",
         "salón",

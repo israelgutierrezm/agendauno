@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import ConciliacionPlataformas from "@/components/ConciliacionPlataformas.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import LogoPlataforma from "@/components/LogoPlataforma.vue";
@@ -763,6 +764,8 @@ onMounted(() => {
         </div>
       </div>
     </PanelLateral>
+    <!-- Conciliación de pagos (ADR 0185) -->
+    <ConciliacionPlataformas />
   </section>
 </template>
 

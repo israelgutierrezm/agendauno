@@ -12,10 +12,32 @@ import CalculadoraRenta from "./CalculadoraRenta.vue";
 function montar(modo: "clases" | "citas", anual = false) {
   return mount(CalculadoraRenta, {
     props: { modo, precios: PRECIOS_POR_OMISION, anual },
+    global: { stubs: { RouterLink: true } },
   });
 }
 
 describe("calculadora de la mensualidad", () => {
+  it("con el último FIX publicado, el equivalente en pesos con IVA", () => {
+    const w = mount(CalculadoraRenta, {
+      global: { stubs: { RouterLink: true } },
+      props: {
+        modo: "clases",
+        precios: {
+          ...PRECIOS_POR_OMISION,
+          tipo_cambio: { diezmilesimas: 185000, fecha: "2026-10-19" },
+        },
+      },
+    });
+    // 45 alumnos: USD 30 + IVA = 34.80 × 18.50 = $643.80 → unos $644.
+    expect(w.get('[data-prueba="calculadora-pesos"]').text()).toContain(
+      "unos $644 MXN al mes con IVA, al tipo de cambio FIX del 19 de octubre de 2026 (18.5000 pesos por dólar)",
+    );
+    // Sin tipo de cambio no se inventa uno.
+    expect(
+      montar("clases").find('[data-prueba="calculadora-pesos"]').exists(),
+    ).toBe(false);
+  });
+
   it("clases: una banda para todo el mes, con el IVA de México aparte", async () => {
     const w = montar("clases");
     // 45 por omisión: banda de 41 a 60.

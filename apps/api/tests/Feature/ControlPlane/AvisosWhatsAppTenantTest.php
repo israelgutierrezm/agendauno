@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\MensajesWhatsAppTenant;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -629,4 +630,45 @@ it('sin celular no se marca que el cliente pidió los avisos por WhatsApp', func
     // Con su celular en la misma edición, sí.
     $this->putJson("/api/v1/app/{$m['slug']}/miembros/{$m['caro']}", ['celular' => '55 8765 4321', 'acepta_whatsapp' => true], conBearer($m['bearer']))
         ->assertOk()->assertJsonPath('data.acepta_whatsapp', true);
+});
+
+it('con cobro por mensaje, cada aviso gasta un mensaje del saldo; sin saldo o en el tope, no sale', function (): void {
+    $m = negocioConAlumnas();
+    encenderWhatsApp();
+    avisoPorWhatsApp($m);
+    $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['whatsapp.cobro_por_mensaje' => 1]], conPlataforma())->assertOk();
+    $this->putJson("/api/v1/app/{$m['slug']}/mi/privacidad", ['acepta_whatsapp' => true], conBearer($m['alumna']))->assertOk();
+    $app = "/api/v1/app/{$m['slug']}";
+    $reservar = function (string $sesion) use ($m, $app): void {
+        $this->postJson("{$app}/sesiones/{$sesion}/reservas", ['persona_id' => $m['vale']], conBearer($m['bearer']))->assertCreated();
+        $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+        $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+    };
+
+    // El negocio ve sus plantillas, el precio por mensaje y su saldo.
+    $saldo = $this->getJson("{$app}/whatsapp/saldo", conBearer($m['bearer']))->assertOk();
+    expect($saldo->json('data'))->toMatchArray(['activo' => true, 'cobra' => true, 'disponibles' => 0, 'precio_minor' => 45])
+        ->and(collect($saldo->json('data.plantillas'))->firstWhere('evento', 'reserva.confirmada')['activo'])->toBeTrue();
+
+    // Sin saldo, el aviso no sale.
+    $reservar($m['sesion']);
+    expect(avisosWhatsApp($m)[0]->estado->value)->toBe('descartado')
+        ->and(avisosWhatsApp($m)[0]->ultimo_error)->toContain('Sin saldo de WhatsApp')
+        ->and($this->meta->envios)->toHaveCount(0);
+
+    // Con un paquete acreditado (una sola vez por compra), sale y gasta uno.
+    enNegocioWhatsApp($m, fn () => app(MensajesWhatsAppTenant::class)->acreditar(100, 'cargo:prueba', 'Paquete de 100 mensajes de WhatsApp'));
+    enNegocioWhatsApp($m, fn () => app(MensajesWhatsAppTenant::class)->acreditar(100, 'cargo:prueba', 'Repetido'));
+    $semilla = agendaSemilla($m);
+    $reservar(crearSesionTenant($m, $semilla, 5, '2026-10-02 08:00:00'));
+    expect($this->meta->envios)->toHaveCount(1);
+    $this->getJson("{$app}/whatsapp/saldo", conBearer($m['bearer']))->assertOk()
+        ->assertJsonPath('data.disponibles', 99)
+        ->assertJsonPath('data.usados_mes', 1);
+
+    // El negocio pone un tope de 1 al mes: el siguiente ya no sale.
+    $this->putJson("{$app}/parametros", ['valores' => ['whatsapp.tope_mensual' => 1]], conBearer($m['bearer']))->assertOk();
+    $reservar(crearSesionTenant($m, $semilla, 5, '2026-10-03 08:00:00'));
+    expect($this->meta->envios)->toHaveCount(1)
+        ->and(collect(avisosWhatsApp($m))->last()->ultimo_error)->toContain('tope de 1');
 });

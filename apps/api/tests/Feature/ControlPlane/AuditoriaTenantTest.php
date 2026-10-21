@@ -26,7 +26,8 @@ it('un top-up de creditos queda registrado en la bitacora (actor, entidad, antes
     $this->postJson("/api/v1/app/{$e['slug']}/derechos/{$vp['derecho']}/topups", ['unidades' => 2000, 'descripcion' => 'Cortesia'], conBearer($e['bearer']))
         ->assertCreated();
 
-    $bitacora = $this->getJson("/api/v1/app/{$e['slug']}/auditorias", conBearer($e['bearer']))->assertOk()->json('data');
+    // El plan se dio como cortesía (ADR 0181): también queda su asiento.
+    $bitacora = $this->getJson("/api/v1/app/{$e['slug']}/auditorias?accion=credito.top_up", conBearer($e['bearer']))->assertOk()->json('data');
 
     expect($bitacora)->toHaveCount(1);
     expect($bitacora[0]['accion'])->toBe('credito.top_up');
@@ -52,7 +53,7 @@ it('la bitacora es tenant-local: un estudio no ve la auditoria de otro', functio
     $vp = venderPackAMiembroTenant($a, 8000);
     $this->postJson("/api/v1/app/{$a['slug']}/derechos/{$vp['derecho']}/topups", ['unidades' => 1000], conBearer($a['bearer']))->assertCreated();
 
-    // El estudio A tiene 1 asiento; el B, ninguno (bases separadas).
-    $this->getJson("/api/v1/app/{$a['slug']}/auditorias", conBearer($a['bearer']))->assertOk()->assertJsonCount(1, 'data');
+    // El estudio A tiene sus 2 asientos (la cortesía y el top-up); el B, ninguno (bases separadas).
+    $this->getJson("/api/v1/app/{$a['slug']}/auditorias", conBearer($a['bearer']))->assertOk()->assertJsonCount(2, 'data');
     $this->getJson("/api/v1/app/{$b['slug']}/auditorias", conBearer($b['bearer']))->assertOk()->assertJsonCount(0, 'data');
 });

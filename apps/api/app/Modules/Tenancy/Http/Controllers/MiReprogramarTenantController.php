@@ -158,7 +158,7 @@ class MiReprogramarTenantController
             $destino = SesionTenant::query()->where('ulid', (string) $validado['sesion_id'])->firstOrFail();
             // Como al reservar desde la cuenta: dentro de la apertura y el cierre de
             // reservas del negocio (no se adelanta a quienes aún no pueden reservar).
-            app(VentanaDeReservaTenant::class)->exigirParaClase($destino);
+            app(VentanaDeReservaTenant::class)->exigirParaClase($destino, $reserva->persona);
             $movida = $this->reprogramar->moverAClase($reserva, $destino, $actor);
         }
         $movida->forceFill(['reprogramaciones_cliente' => (int) $movida->reprogramaciones_cliente + 1])->save();

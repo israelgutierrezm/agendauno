@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Application\ComplementosRentaSaas;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
@@ -35,7 +36,7 @@ class GenerarCargosRenta extends Command
 
     protected $description = 'Emite los cargos de renta del SaaS de los meses ya cerrados y de los planes por adelantado';
 
-    public function handle(GenerarCargoRenta $generar, PlanCitasSaas $planes, GestorDeConexionTenant $gestor, AlertasPlataforma $alertas, CondicionesDeCobroSaas $condiciones): int
+    public function handle(GenerarCargoRenta $generar, PlanCitasSaas $planes, GestorDeConexionTenant $gestor, AlertasPlataforma $alertas, CondicionesDeCobroSaas $condiciones, ComplementosRentaSaas $complementos): int
     {
         $pedido = (string) ($this->option('periodo') ?? '');
         $emitidos = 0;
@@ -45,7 +46,7 @@ class GenerarCargosRenta extends Command
 
         Estudio::query()
             ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
-            ->chunkById(100, function (Collection $estudios) use (&$emitidos, &$abiertos, &$sinTipoCambio, &$fallidos, $generar, $planes, $gestor, $alertas, $condiciones, $pedido): void {
+            ->chunkById(100, function (Collection $estudios) use (&$emitidos, &$abiertos, &$sinTipoCambio, &$fallidos, $generar, $planes, $gestor, $alertas, $condiciones, $complementos, $pedido): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
                     try {
@@ -60,8 +61,15 @@ class GenerarCargosRenta extends Command
                         foreach ($periodos as $periodo) {
                             if (! $generar->cerrado($estudio, $periodo)) {
                                 $abiertos++;
-                            } elseif (! $generar->porAdelantado($estudio, $periodo)) {
+
+                                continue;
+                            }
+                            if (! $generar->porAdelantado($estudio, $periodo)) {
                                 $generar->paraEstudio($estudio, $periodo);
+                                $emitidos++;
+                            }
+                            // La app con su marca, aparte de la renta (ADR 0188).
+                            if ($complementos->emitirMensualidades($estudio, $periodo)?->wasRecentlyCreated === true) {
                                 $emitidos++;
                             }
                         }

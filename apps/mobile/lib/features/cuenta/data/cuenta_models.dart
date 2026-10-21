@@ -278,11 +278,15 @@ class ReservaMiembro {
     this.ocupacion,
     this.cita,
     this.lugar,
+    this.enlaceEnLinea,
   });
 
   final String id;
   final String estado;
   final String? sesionId;
+
+  /// Clase en línea (ADR 0184): el enlace, solo con la reserva confirmada.
+  final String? enlaceEnLinea;
 
   /// Su lugar numerado, si la clase los numera y lo eligió (B06).
   final int? lugar;
@@ -353,6 +357,7 @@ class ReservaMiembro {
       asiste: j['asiste'] as String?,
       mapaUrl: j['mapa_url'] as String?,
       lugar: (j['lugar'] as num?)?.toInt(),
+      enlaceEnLinea: j['enlace_en_linea'] as String?,
       clase: tipo == TipoSesion.clase && j['clase'] is Map<String, dynamic>
           ? BloqueClase.desdeJson(j['clase'])
           : null,
@@ -896,6 +901,8 @@ class MiCuenta {
     this.porPagarSinCargar = false,
     this.portal,
     this.asistencias30Dias = 0,
+    this.clasesMes,
+    this.rachaSemanas = 0,
   });
 
   /// La pasarela del negocio está en pruebas: por ahora no se cobra de verdad (M07).
@@ -906,6 +913,11 @@ class MiCuenta {
 
   /// A cuántas clases o citas llegó en los últimos 30 días.
   final int asistencias30Dias;
+
+  /// Su resumen (ADR 0182): clases a las que vino este mes (null si el API no lo
+  /// manda) y cuántas semanas seguidas lleva viniendo.
+  final int? clasesMes;
+  final int rachaSemanas;
 
   /// Lo que tiene pendiente de pago (p. ej. su renovación).
   final List<OrdenPorPagar> porPagar;
@@ -1441,6 +1453,7 @@ class AntesDeReservar {
     this.queLlevar,
     this.lugaresTotal = 0,
     this.lugaresOcupados = const [],
+    this.pasesInvitado = 0,
   });
 
   factory AntesDeReservar.desdeJson(Map<String, dynamic> j) {
@@ -1484,8 +1497,12 @@ class AntesDeReservar {
                 .map((n) => n.toInt())
                 .toList()
           : const [],
+      pasesInvitado: (j['pases_invitado'] as num? ?? 0).toInt(),
     );
   }
+
+  /// Pases de invitado que le quedan para esa clase (ADR 0182).
+  final int pasesInvitado;
 
   /// Lugares numerados de la clase (0 = no numera) y los ya tomados, sin decir por
   /// quién (B06).

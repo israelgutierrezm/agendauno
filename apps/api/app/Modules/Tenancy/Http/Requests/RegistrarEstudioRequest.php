@@ -83,6 +83,8 @@ class RegistrarEstudioRequest extends FormRequest
             // campo trampa (honeypot) que debe llegar vacío; si un bot lo llena, falla.
             'recaptcha_token' => ['nullable', 'string'],
             'sitio_web' => ['prohibited'],
+            // El código de quien lo invitó (referidos, ADR 0188).
+            'referido' => ['nullable', 'string', 'max:16'],
             // De dónde llegó quien registra (ADR 0142).
             ...Atribucion::reglas(),
             // Sus preferencias de medición y los identificadores que permitió (ADR 0143).

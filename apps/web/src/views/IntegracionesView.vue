@@ -7,6 +7,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
+import KioscosNegocio from "@/components/KioscosNegocio.vue";
 import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -82,7 +83,7 @@ interface Entrega {
   entregado_en: string | null;
 }
 // Medición: su GA4 y su Meta (ADR 0143).
-type Pestana = "bienestar" | "llaves" | "webhooks" | "medicion";
+type Pestana = "bienestar" | "llaves" | "webhooks" | "medicion" | "kiosco";
 
 // Lo secreto se captura como contraseña; los códigos (Gym ID, gimnasio, plan), no.
 const SECRETAS = new Set(["api_key", "webhook_secret", "place_api_key"]);
@@ -522,6 +523,15 @@ onMounted(cargar);
         @click="pestana = 'medicion'"
       >
         {{ $t("medicion.negocio.pestana") }}
+      </button>
+      <button
+        v-if="sesion.puede('estudio.gestionar')"
+        type="button"
+        :aria-pressed="pestana === 'kiosco'"
+        data-prueba="pestana-kiosco"
+        @click="pestana = 'kiosco'"
+      >
+        {{ $t("kiosco.panel.titulo") }}
       </button>
     </div>
 
@@ -1099,6 +1109,8 @@ onMounted(cargar);
 
     <!-- GA4 y Meta del negocio (ADR 0143) -->
     <MedicionNegocio v-if="!cargando && pestana === 'medicion'" class="mt-5" />
+    <!-- Kiosco de llegada (ADR 0183) -->
+    <KioscosNegocio v-if="!cargando && pestana === 'kiosco'" class="mt-5" />
   </section>
 </template>
 

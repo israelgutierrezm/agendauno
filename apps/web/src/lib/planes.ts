@@ -38,6 +38,11 @@ export interface Plan {
   descripcion?: string | null;
   destacado?: boolean;
   primera_vez?: boolean;
+  // Planes «socio» (ADR 0182): topes, acceso anticipado e invitados al mes.
+  max_reservas_dia?: number | null;
+  max_reservas_semana?: number | null;
+  acceso_anticipado_horas?: number | null;
+  invitados_por_mes?: number | null;
   // Cuotas del negocio (B04).
   cobra_inscripcion?: boolean;
   cobra_anualidad?: boolean;

@@ -15,11 +15,14 @@ enum ModuloNegocio: string
 {
     // Un alumno con cuenta gestiona a personas a su cargo (B05).
     case Familias = 'familias';
+    // La app en las tiendas con la marca del negocio (ADR 0188): alta y mensualidad.
+    case AppConMarca = 'app_marca';
 
     public function etiqueta(): string
     {
         return match ($this) {
             self::Familias => 'Familias y responsables',
+            self::AppConMarca => 'App en tiendas con tu marca',
         };
     }
 
@@ -27,6 +30,7 @@ enum ModuloNegocio: string
     {
         return match ($this) {
             self::Familias => 'Un alumno con cuenta reserva, compra y ve los documentos de personas a su cargo (sus hijos, por ejemplo), con su autorización.',
+            self::AppConMarca => 'Tu propia app en Google Play y App Store, con tu nombre, tu logo y tus colores. La app AgendaUno y tu app web siguen incluidas.',
         };
     }
 }

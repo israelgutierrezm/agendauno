@@ -138,4 +138,14 @@ class SesionTenant extends Model
     {
         return $this->hasMany(ReservaTenant::class, 'sesion_id');
     }
+
+    /**
+     * Invitados de los clientes (ADR 0182).
+     *
+     * @return HasMany<InvitadoSesionTenant, $this>
+     */
+    public function invitados(): HasMany
+    {
+        return $this->hasMany(InvitadoSesionTenant::class, 'sesion_id');
+    }
 }

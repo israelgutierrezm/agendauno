@@ -63,12 +63,19 @@ class AntesDeReservarTenant
             'requisitos' => $sesion->oferta?->requisitos,
             'que_llevar' => $sesion->oferta?->que_llevar,
             'cancelacion' => $this->cancelacion($sesion),
+            // Pases de invitado que le quedan para esa clase (ADR 0182).
+            'pases_invitado' => app(InvitadosTenant::class)->quedanPara($persona, $sesion),
         ];
 
         try {
-            $this->ventana->exigirParaClase($sesion);
+            $this->ventana->exigirParaClase($sesion, $persona);
         } catch (FueraDeVentana $e) {
             return [...$base, ...$this->noDisponible('BOOKING_NOT_OPEN', 'fuera_de_ventana', $e->getMessage())];
+        }
+        // La clase pide un nivel que aún no tiene (ADR 0187).
+        $nivel = app(NivelesPersonaTenant::class)->motivo($persona, $sesion);
+        if ($nivel !== null) {
+            return [...$base, ...$this->noDisponible('LEVEL_REQUIRED', 'nivel', $nivel)];
         }
 
         if ($sesion->oferta?->politica_reserva === PoliticaReservaTenant::Pago) {
@@ -144,6 +151,8 @@ class AntesDeReservarTenant
         return match ($codigo) {
             'ALREADY_BOOKED' => ['ya_reservada', 'ver_reserva'],
             'CAPACITY_FULL' => ['llena', 'otras_clases'],
+            // Llegó al tope de reservas de su plan (ADR 0182).
+            'BOOKING_LIMIT_REACHED' => ['tope', 'otras_clases'],
             'ENTITLEMENT_REQUIRED' => $this->sinPlan($sesion, $persona),
             default => ['no_reservable', null],
         };

@@ -61,6 +61,7 @@ final class ReciboRentaPdf
 
         return match ($cargo->concepto) {
             'timbres' => "Timbres de facturación {$marca}",
+            'whatsapp' => "Mensajes de WhatsApp {$marca}",
             'ajuste' => "Cambio de plan {$marca} {$cuando}",
             default => "Suscripción {$marca} {$cuando}",
         };

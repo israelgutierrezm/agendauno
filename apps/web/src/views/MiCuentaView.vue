@@ -202,7 +202,26 @@ const TONO = {
   expediente: "rosa",
   perfil: "azul",
   asistencia: "morado",
+  videos: "cielo",
 };
+// Videos del negocio (ADR 0184): la tarjeta sale solo si publicó alguno.
+const videosDisponibles = ref<number | null>(null);
+async function cargarVideos(): Promise<void> {
+  if (sesion.esCitas === true) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: { disponible?: boolean }[] }>(
+      `/api/v1/app/${sesion.slug}/mi/videos`,
+    );
+    videosDisponibles.value =
+      data.data.length > 0
+        ? data.data.filter((v) => v.disponible).length
+        : null;
+  } catch {
+    videosDisponibles.value = null;
+  }
+}
 // Su imagen, si se agregó.
 const IMAGEN: Record<string, string> = {
   reservar: "acceso-reservar",
@@ -325,10 +344,25 @@ const accesos = computed<Acceso[]>(() => {
     : {
         clave: "asistencia",
         titulo: t("portal.inicio.tarjetas.asistencia"),
-        valor: t(
-          "portal.inicio.tarjetas.asistenciaValor",
-          cuenta.asistencias.value,
-        ),
+        // Con su resumen: clases del mes y semanas seguidas (si lleva más de una).
+        valor: cuenta.resumenAsistencia.value
+          ? [
+              t(
+                "portal.inicio.tarjetas.clasesMes",
+                cuenta.resumenAsistencia.value.clases_mes,
+              ),
+              cuenta.resumenAsistencia.value.racha_semanas > 1
+                ? t("portal.inicio.tarjetas.racha", {
+                    n: cuenta.resumenAsistencia.value.racha_semanas,
+                  })
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : t(
+              "portal.inicio.tarjetas.asistenciaValor",
+              cuenta.asistencias.value,
+            ),
         icono: "hecho",
         tono: TONO.asistencia,
         ruta: "mis-reservas",
@@ -370,9 +404,35 @@ const accesos = computed<Acceso[]>(() => {
     ruta: "mi-perfil",
   };
 
+  const videos: Acceso | null =
+    videosDisponibles.value === null
+      ? null
+      : {
+          clave: "videos",
+          titulo: t("videos.mios.titulo"),
+          valor: t(
+            "videos.mios.disponibles",
+            { n: videosDisponibles.value },
+            videosDisponibles.value,
+          ),
+          icono: "cuadricula",
+          tono: TONO.videos,
+          ruta: "mis-videos",
+        };
+
   const orden = citas
     ? [reservas, reservar, pagos, plan, expediente, pase, perfil]
-    : [reservar, reservas, plan, asistencia, pagos, pase, expediente, perfil];
+    : [
+        reservar,
+        reservas,
+        plan,
+        asistencia,
+        pagos,
+        videos,
+        pase,
+        expediente,
+        perfil,
+      ];
   return orden.filter((a): a is Acceso => a !== null);
 });
 
@@ -384,6 +444,7 @@ onMounted(() => {
   void cuenta.asegurar();
   void cargarClima();
   void cargarInteres();
+  void cargarVideos();
 });
 </script>
 

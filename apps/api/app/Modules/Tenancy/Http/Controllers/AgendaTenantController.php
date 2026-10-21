@@ -110,7 +110,9 @@ class AgendaTenantController
         // El tipo sale de la modalidad del negocio, nunca de la pantalla (ADR 0104); una
         // cita es de una sola persona.
         $tipo = $this->modalidad->tipoSesion();
-        $capacidad = $tipo === TipoSesionTenant::Cita ? 1 : ($validado['capacidad'] ?? $oferta->capacidad);
+        // Una práctica libre (ADR 0187) toma su cupo del equipo del espacio.
+        $capacidad = $tipo === TipoSesionTenant::Cita ? 1 : ($validado['capacidad']
+            ?? ($oferta->practica_libre && $recurso?->capacidad !== null ? (int) $recurso->capacidad : $oferta->capacidad));
 
         // Se revalida al GUARDAR, bajo candado del profesional y del recurso: dos
         // solicitudes simultáneas no pueden encimarse.

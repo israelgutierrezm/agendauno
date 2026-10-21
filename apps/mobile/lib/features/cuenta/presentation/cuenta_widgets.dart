@@ -429,6 +429,19 @@ class _DetalleReserva extends ConsumerWidget {
               ].whereType<String>().join(' · '),
               style: TextStyle(color: context.colores.textoSuave),
             ),
+            // Clase en línea (ADR 0184): solo https.
+            if (r.enlaceEnLinea != null &&
+                r.enlaceEnLinea!.startsWith('https://'))
+              TextButton.icon(
+                key: const Key('entrar-en-linea'),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                icon: const Icon(Icons.videocam_outlined, size: 18),
+                label: const Text('Entrar a la clase en línea'),
+                onPressed: () => launchUrl(
+                  Uri.parse(r.enlaceEnLinea!),
+                  mode: LaunchMode.externalApplication,
+                ),
+              ),
             // Dónde es (M06): cómo llegar a la sede, en clases y en citas.
             if (r.mapaUrl != null)
               TextButton.icon(
@@ -582,6 +595,35 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
   int? _lugar;
 
   ClaseMiembro get c => widget.c;
+
+  /// Pase de invitado (ADR 0182): aparta un lugar para alguien que no es cliente.
+  Future<void> _invitar(int pases) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(cuentaProvider.notifier);
+    final nombre = await showDialog<String>(
+      context: context,
+      builder: (context) => const _NombreInvitado(),
+    );
+    if (nombre == null || nombre.trim().length < 2) {
+      return;
+    }
+    try {
+      await notifier.invitar(c.id, nombre.trim());
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Apartamos un lugar para ${nombre.trim()}. Si no puede venir, '
+            'cancélalo antes de la clase y recuperas tu pase.',
+          ),
+        ),
+      );
+    } on DioException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(mensajeDeError(e))));
+    }
+    if (mounted) {
+      ref.invalidate(antesDeReservarProvider(c.id));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -745,6 +787,18 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                 ),
               ),
             ],
+            if (antes != null && antes.pasesInvitado > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: TextButton(
+                  onPressed: () => _invitar(antes.pasesInvitado),
+                  child: Text(
+                    antes.pasesInvitado == 1
+                        ? 'Invitar a alguien (te queda 1 pase este mes)'
+                        : 'Invitar a alguien (te quedan ${antes.pasesInvitado} pases este mes)',
+                  ),
+                ),
+              ),
             const SizedBox(height: 16),
             if (antes != null && !antes.puedeReservar)
               const SizedBox.shrink()
@@ -780,6 +834,56 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
       ),
     );
   }
+}
+
+/// El nombre del invitado (ADR 0182).
+class _NombreInvitado extends StatefulWidget {
+  const _NombreInvitado();
+
+  @override
+  State<_NombreInvitado> createState() => _NombreInvitadoState();
+}
+
+class _NombreInvitadoState extends State<_NombreInvitado> {
+  final _nombre = TextEditingController();
+
+  @override
+  void dispose() {
+    _nombre.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Invitar a alguien'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _nombre,
+          autofocus: true,
+          maxLength: 120,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Nombre de tu invitado'),
+        ),
+        Text(
+          'Ocupa un lugar en la clase y usa uno de los pases de tu plan.',
+          style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.of(context).pop(_nombre.text),
+        child: const Text('Apartar su lugar'),
+      ),
+    ],
+  );
 }
 
 /// Calificar una clase o cita a la que asistió: 1 a 5 y un comentario opcional.

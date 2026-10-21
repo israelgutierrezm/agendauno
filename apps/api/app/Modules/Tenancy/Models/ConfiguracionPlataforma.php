@@ -149,6 +149,27 @@ class ConfiguracionPlataforma extends Model
     /** Paquetes de timbres que se venden por omisión (ADR 0107). */
     public const PAQUETES_TIMBRES = [50, 100, 200, 350, 500];
 
+    /** Paquetes de mensajes de WhatsApp a la venta (ADR 0186). */
+    public const PAQUETES_WHATSAPP = [100, 500, 1000, 2500];
+
+    /**
+     * Los paquetes de mensajes de WhatsApp que se venden (los del superadmin o, sin
+     * ellos, los de siempre).
+     *
+     * @return list<int>
+     */
+    public static function paquetesWhatsApp(): array
+    {
+        $guardados = json_decode((string) (self::leer('whatsapp_paquetes') ?? ''), true);
+        if (! is_array($guardados)) {
+            return self::PAQUETES_WHATSAPP;
+        }
+        $paquetes = array_values(array_unique(array_filter(array_map('intval', $guardados), static fn (int $n): bool => $n > 0)));
+        sort($paquetes);
+
+        return $paquetes !== [] ? $paquetes : self::PAQUETES_WHATSAPP;
+    }
+
     /**
      * Paquetes de timbres que se venden (cuántos timbres trae cada uno): los que fijó el
      * superadmin o los de siempre.

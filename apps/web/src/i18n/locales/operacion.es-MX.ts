@@ -560,6 +560,34 @@ export default {
   // Seguimiento útil en Tareas (plan de mejoras M09).
   // Wellhub y TotalPass (ADR 0148): sus visitantes en Reportes y el check-in automático.
   plataformas: {
+    // Conciliación de pagos de Wellhub y TotalPass (ADR 0185).
+    conciliacion: {
+      titulo: "Conciliar pagos",
+      ayuda:
+        "Compara lo que te pagó la plataforma con tus visitas validadas del mes. Descarga el reporte de pagos de su portal (guárdalo como CSV) e impórtalo aquí.",
+      plataforma: "Plataforma",
+      mes: "Mes",
+      visitas: "Visitas validadas",
+      esperado: "Esperado",
+      recibido: "Recibido",
+      diferencia: "Diferencia",
+      sinImportar: "Sin importar",
+      sinTarifa:
+        "{n} visitas sin tarifa: captura cuánto te pagan por visita para calcular lo esperado.",
+      tarifa: "Lo que te pagan por visita",
+      tarifaAyuda: "Rige desde el mes elegido.",
+      guardarTarifa: "Guardar tarifa",
+      tarifaGuardada: "Tarifa guardada.",
+      archivo: "Reporte de pagos (CSV)",
+      archivoAyuda:
+        "Con columnas de fecha, monto y, si las trae, la referencia del check-in.",
+      importar: "Importar y conciliar",
+      importado: "Reporte importado.",
+      visitasSinPago: "Visitas sin pago ({n})",
+      pagosSinVisita: "Pagos sin visita ({n})",
+      montosDistintos: "Montos distintos ({n})",
+      enLugarDe: " en lugar de {monto}",
+    },
     tab: "Plataformas",
     titulo: "Wellhub y TotalPass",
     subtitulo:

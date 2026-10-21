@@ -112,7 +112,7 @@ class EmbudoPlataforma
         $pagaron = CargoRenta::query()
             ->whereIn('estudio_id', $cohorte->modelKeys())
             ->where('estado', EstadoCargoRenta::Pagado->value)
-            ->where('concepto', '!=', 'timbres')
+            ->whereNotIn('concepto', ['timbres', 'whatsapp'])
             ->where('monto_minor', '>', 0)
             ->distinct()
             ->pluck('estudio_id')

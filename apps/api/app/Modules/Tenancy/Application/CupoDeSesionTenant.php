@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Models\InvitadoSesionTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -26,6 +27,8 @@ use Illuminate\Database\Eloquent\Builder;
  * - También quienes vienen por Wellhub o TotalPass (ADR 0148): sus lugares de plataforma
  *   reservados o con asistencia ocupan cupo sin ser reservas; cuentan en el canal de su
  *   plataforma.
+ * - Y los invitados de los clientes (pases de invitado, ADR 0182): ocupan lugar a nombre
+ *   de quien invita, en el canal directo.
  * - Cada regla de capacidad por canal (R20) aparta sus cupos sin usar para su canal hasta
  *   `liberar_horas_antes` del inicio; para los demás canales esos lugares no están.
  * - Sin capacidad, la clase no tiene tope (`null`).
@@ -49,16 +52,22 @@ class CupoDeSesionTenant
     /** Atributo de {@see conteos()} con los lugares que ocupan las plataformas (ADR 0148). */
     public const ATRIBUTO_PLATAFORMA = 'ocupados_plataforma';
 
+    /** Atributo de {@see conteos()} con los lugares que ocupan los invitados (ADR 0182). */
+    public const ATRIBUTO_INVITADOS = 'ocupados_invitados';
+
     /**
      * Los conteos de una lista de sesiones (para `withCount` o `loadCount`): cuántas
      * reservas ocupan lugar, cuántos lugares ocupan las plataformas y cuántas esperan.
      * Lo ocupado en total lo da {@see ocupadosCargados()}.
      *
-     * @return array<string, Closure(Builder<ReservaTenant>|Builder<LugarPlataformaTenant>): void>
+     * @return array<string, Closure(Builder<ReservaTenant>|Builder<LugarPlataformaTenant>|Builder<InvitadoSesionTenant>): void>
      */
     public static function conteos(): array
     {
         return [
+            'invitados as '.self::ATRIBUTO_INVITADOS => static function (Builder $q): void {
+                $q->whereIn('estado', InvitadoSesionTenant::OCUPAN_LUGAR);
+            },
             'reservas as ocupados' => static function (Builder $q): void {
                 $q->whereIn('estado', self::OCUPAN_LUGAR);
             },
@@ -84,8 +93,20 @@ class CupoDeSesionTenant
         $plataforma = array_key_exists(self::ATRIBUTO_PLATAFORMA, $atributos)
             ? (int) $atributos[self::ATRIBUTO_PLATAFORMA]
             : self::ocupadosDePlataforma($sesion);
+        $invitados = array_key_exists(self::ATRIBUTO_INVITADOS, $atributos)
+            ? (int) $atributos[self::ATRIBUTO_INVITADOS]
+            : self::ocupadosDeInvitados($sesion);
 
-        return (int) $atributos['ocupados'] + $plataforma;
+        return (int) $atributos['ocupados'] + $plataforma + $invitados;
+    }
+
+    /** Lugares que ocupan los invitados de los clientes en la sesión (ADR 0182). */
+    public static function ocupadosDeInvitados(SesionTenant $sesion): int
+    {
+        return InvitadoSesionTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->whereIn('estado', InvitadoSesionTenant::OCUPAN_LUGAR)
+            ->count();
     }
 
     /** Lugares que ocupan Wellhub y TotalPass en la sesión. */
@@ -122,7 +143,7 @@ class CupoDeSesionTenant
         return ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->whereIn('estado', self::OCUPAN_LUGAR)
-            ->count() + self::ocupadosDePlataforma($sesion);
+            ->count() + self::ocupadosDePlataforma($sesion) + self::ocupadosDeInvitados($sesion);
     }
 
     /**

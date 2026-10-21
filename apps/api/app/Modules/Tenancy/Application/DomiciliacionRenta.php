@@ -273,7 +273,7 @@ class DomiciliacionRenta
             ->where('monto_minor', '>', 0)
             ->whereNull('referencia_pago')
             // Una compra de timbres se paga al comprarla, no a la tarjeta.
-            ->where(fn ($q) => $q->whereNull('concepto')->orWhere('concepto', '!=', 'timbres'))
+            ->where(fn ($q) => $q->whereNull('concepto')->orWhereNotIn('concepto', ['timbres', 'whatsapp']))
             ->where(fn ($q) => $q->whereNull('error_cobro')->orWhere('error_cobro', '!=', 'authentication_required'))
             ->where(fn ($q) => $q->where(fn ($q) => $q->where('intentos_automaticos', 0)->whereNull('proximo_intento_en'))
                 ->orWhere('proximo_intento_en', '<=', $ahora))

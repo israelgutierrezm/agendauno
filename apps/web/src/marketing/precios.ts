@@ -51,6 +51,26 @@ export interface PreciosPublicos {
    * el de un producto: mientras, su landing junta interesados (prelanzamiento).
    */
   registro: { agendauno: boolean; turnouno: boolean };
+  /**
+   * El último tipo de cambio FIX conocido (pesos por dólar, en diezmilésimas), para
+   * mostrar el equivalente en pesos con IVA en México. Null sin uno.
+   */
+  tipo_cambio?: TipoCambio | null;
+  /** Lo que se cobra aparte, con precio publicado (ADR 0188), en centavos de peso. */
+  servicios?: {
+    arranque_minor: number;
+    arranque_migracion_minor: number;
+    app_marca_alta_minor: number;
+    app_marca_mensual_minor: number;
+    moneda: string;
+  };
+  referidos?: { meses_gratis: number };
+}
+
+export interface TipoCambio {
+  diezmilesimas: number;
+  /** AAAA-MM-DD */
+  fecha: string;
 }
 
 /** Lo publicado al pre-generar, si se pidió (en la aplicación y en las pruebas, no). */
@@ -81,6 +101,7 @@ export const PRECIOS_POR_OMISION: PreciosPublicos = (() => {
         ventas: { ...base.ventas, ...publicados.ventas },
         timbres: { ...base.timbres, ...publicados.timbres },
         registro: { ...base.registro, ...publicados.registro },
+        tipo_cambio: publicados.tipo_cambio ?? null,
       };
 })();
 
@@ -150,6 +171,38 @@ export function dolares(centavos: number): string {
     minimumFractionDigits: centavos % 100 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(centavos / 100);
+}
+
+/**
+ * Un importe en dólares (centavos) en pesos con IVA (centavos), al tipo de cambio dado:
+ * lo que se pagaría en México (el cargo usa el FIX del día en que se emite).
+ */
+export function pesosConIva(
+  centavosUsd: number,
+  ivaPorcentaje: number,
+  tipo: TipoCambio,
+): number {
+  const conIva = centavosUsd + Math.round((centavosUsd * ivaPorcentaje) / 100);
+  return Math.round((conIva * tipo.diezmilesimas) / 10000);
+}
+
+/** «$1,234» (pesos, redondeado a pesos enteros: es un equivalente, no el cargo). */
+export function pesosRedondos(centavos: number): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(Math.round(centavos / 100));
+}
+
+/** «20 de octubre de 2026» (sin moverlo de zona). */
+export function fechaDelTipo(fecha: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${fecha.slice(0, 10)}T12:00:00Z`));
 }
 
 /** «$90» (pesos). */

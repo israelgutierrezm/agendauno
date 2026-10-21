@@ -48,6 +48,8 @@ interface Antes {
   };
   // Si la clase numera lugares (B06): cuántos y cuáles están tomados.
   lugares?: { total: number; ocupados: number[] } | null;
+  // Pases de invitado que le quedan para esa clase (ADR 0182).
+  pases_invitado?: number;
 }
 
 const props = defineProps<{
@@ -90,6 +92,33 @@ async function cargar(): Promise<void> {
 }
 watch(() => props.sesionId, cargar);
 onMounted(cargar);
+
+// Pase de invitado (ADR 0182): aparta un lugar para alguien que no es cliente.
+const invitado = ref("");
+const invitando = ref(false);
+const invitadoListo = ref<string | null>(null);
+const errorInvitado = ref<string | null>(null);
+async function invitar(): Promise<void> {
+  const nombre = invitado.value.trim();
+  if (nombre.length < 2 || invitando.value) {
+    errorInvitado.value = t("portal.invitados.nombreRequerido");
+    return;
+  }
+  invitando.value = true;
+  errorInvitado.value = null;
+  try {
+    await api.post(`${props.base}/mi/sesiones/${props.sesionId}/invitados`, {
+      nombre,
+    });
+    invitadoListo.value = nombre;
+    invitado.value = "";
+    await cargar();
+  } catch (e) {
+    errorInvitado.value = mensajeDeError(e);
+  } finally {
+    invitando.value = false;
+  }
+}
 
 const creditos = (unidades: number) =>
   t(
@@ -245,6 +274,60 @@ const motivo = computed(() => {
         />
       </div>
 
+      <p
+        v-if="invitadoListo"
+        class="ar-motivo"
+        role="status"
+        data-prueba="invitado-listo"
+      >
+        {{ $t("portal.invitados.listo", { nombre: invitadoListo }) }}
+      </p>
+      <details
+        v-if="(antes.pases_invitado ?? 0) > 0"
+        class="ar-invitar"
+        data-prueba="invitar"
+      >
+        <summary>
+          {{
+            $t(
+              "portal.invitados.invitar",
+              { n: antes.pases_invitado },
+              antes.pases_invitado ?? 0,
+            )
+          }}
+        </summary>
+        <form
+          class="mt-2 flex flex-wrap items-end gap-2"
+          @submit.prevent="invitar"
+        >
+          <label class="min-w-0 flex-1">
+            <span class="tu-label">{{ $t("portal.invitados.nombre") }}</span>
+            <input
+              v-model="invitado"
+              class="tu-input"
+              autocomplete="off"
+              maxlength="120"
+              data-prueba="invitado-nombre"
+              :aria-invalid="errorInvitado ? 'true' : undefined"
+            />
+          </label>
+          <button
+            type="submit"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="invitando"
+            data-prueba="invitar-confirmar"
+          >
+            {{ $t("portal.invitados.apartar") }}
+          </button>
+        </form>
+        <p v-if="errorInvitado" class="tu-error-campo" role="alert">
+          {{ errorInvitado }}
+        </p>
+        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("portal.invitados.ayuda") }}
+        </p>
+      </details>
+
       <div class="flex flex-wrap gap-2">
         <button
           v-if="antes.resultado !== 'no_disponible'"
@@ -308,6 +391,10 @@ const motivo = computed(() => {
   .ar-datos dd {
     margin-bottom: 0.4rem;
   }
+}
+.ar-invitar summary {
+  cursor: pointer;
+  color: var(--primario);
 }
 .ar-motivo {
   padding: 0.6rem 0.75rem;

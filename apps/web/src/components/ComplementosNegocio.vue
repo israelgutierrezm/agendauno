@@ -15,10 +15,19 @@ import { useToastStore } from "@/stores/toast";
  */
 interface Complemento {
   clave: string;
+  /** Un módulo que se enciende, o un servicio de pago único (ADR 0188). */
+  tipo?: "modulo" | "servicio";
   nombre: string;
   descripcion: string;
   activo: boolean;
   solicitado_en: string | null;
+  // Con precio publicado (en pesos, sin IVA); null, incluido (ADR 0188).
+  precio?: {
+    alta_minor: number;
+    mensual_minor: number | null;
+    moneda: string;
+    gratis: boolean;
+  } | null;
 }
 
 const { t } = useI18n();
@@ -57,6 +66,28 @@ async function pedir(c: Complemento): Promise<void> {
   } finally {
     pidiendo.value = null;
   }
+}
+
+function precio(c: Complemento): string | null {
+  const p = c.precio;
+  if (!p) {
+    return null;
+  }
+  const fmt = (minor: number) =>
+    new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: p.moneda,
+      maximumFractionDigits: 0,
+    }).format(minor / 100);
+  if (p.gratis) {
+    return t("suscripcion.complementos.gratisConAnual");
+  }
+  return p.mensual_minor
+    ? t("suscripcion.complementos.precioMensual", {
+        alta: fmt(p.alta_minor),
+        mensual: fmt(p.mensual_minor),
+      })
+    : t("suscripcion.complementos.precioUnico", { precio: fmt(p.alta_minor) });
 }
 
 function fecha(iso: string): string {
@@ -112,6 +143,13 @@ onMounted(cargar);
         </div>
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ conTerminosActuales(c.descripcion) }}
+        </p>
+        <p
+          v-if="precio(c)"
+          class="text-sm font-medium"
+          data-prueba="precio-complemento"
+        >
+          {{ precio(c) }}
         </p>
         <button
           v-if="!c.activo && puedePedir"

@@ -33,6 +33,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaYaAtendida;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\Reservas\Exceptions\SinDerechoDisponible;
+use App\Modules\Tenancy\Reservas\Exceptions\TopeDeReservas;
 use App\Modules\Tenancy\Reservas\Exceptions\TransferenciaInvalida;
 use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
 use App\Modules\Tenancy\Reservas\QuienCancela;
@@ -239,7 +240,19 @@ class ReservasTenant
                 $derecho = $this->resolver->paraSesion($persona, $bloqueada, $costo);
 
                 if ($derecho === null) {
-                    throw new SinDerechoDisponible($this->resolver->motivoSinDerecho($persona, $bloqueada, $costo));
+                    $tope = $this->resolver->topeAlcanzado($persona, $bloqueada);
+                    throw $tope !== null
+                        ? new TopeDeReservas($tope)
+                        : new SinDerechoDisponible($this->resolver->motivoSinDerecho($persona, $bloqueada, $costo));
+                }
+                // El tope del plan (ADR 0182), otra vez con su derecho bloqueado: dos
+                // reservas al mismo tiempo no pasan las dos.
+                if (TopesDeReservaTenant::tieneTope($derecho)) {
+                    $derecho = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
+                    $tope = app(TopesDeReservaTenant::class)->alcanzado($derecho, $bloqueada);
+                    if ($tope !== null) {
+                        throw new TopeDeReservas($tope);
+                    }
                 }
 
                 // Congela (snapshot) la politica de cancelacion/no-show vigente: cancelar
@@ -375,6 +388,11 @@ class ReservasTenant
         $derecho = $this->resolver->paraSesion($persona, $sesion, $costo);
         $reglas['derecho_disponible'] = $derecho !== null;
         if ($derecho === null) {
+            $tope = $this->resolver->topeAlcanzado($persona, $sesion);
+            if ($tope !== null) {
+                return DecisionReserva::rechazar('BOOKING_LIMIT_REACHED', $tope, $reglas);
+            }
+
             return DecisionReserva::rechazar('ENTITLEMENT_REQUIRED', $this->resolver->motivoSinDerecho($persona, $sesion, $costo), $reglas);
         }
 
@@ -409,6 +427,7 @@ class ReservasTenant
     {
         return match ($codigo) {
             'BOOKING_NOT_OPEN' => new FueraDeVentana($mensaje),
+            'BOOKING_LIMIT_REACHED' => new TopeDeReservas($mensaje),
             'ALREADY_BOOKED' => new YaReservado($mensaje),
             'ENTITLEMENT_REQUIRED' => new SinDerechoDisponible($mensaje),
             'CAPACITY_FULL' => new CupoLleno($mensaje),

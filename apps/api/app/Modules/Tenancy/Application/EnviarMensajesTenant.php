@@ -43,6 +43,7 @@ class EnviarMensajesTenant
         private readonly EntregarPushTenant $push,
         private readonly AlertasPlataforma $alertas,
         private readonly ClienteWhatsApp $whatsapp,
+        private readonly MensajesWhatsAppTenant $saldoWhatsApp,
     ) {}
 
     public function ejecutar(): int
@@ -78,10 +79,21 @@ class EnviarMensajesTenant
 
                     return;
                 }
+                // Sin saldo o en el tope del mes, el aviso no sale (ADR 0186).
+                if ($mensaje->canal === CanalComunicacion::WhatsApp && ($motivo = $this->saldoWhatsApp->motivoParaNoEnviar()) !== null) {
+                    $mensaje->estado = EstadoMensaje::Descartado;
+                    $mensaje->ultimo_error = $motivo;
+                    $mensaje->save();
+
+                    return;
+                }
                 $mensaje->intentos++;
 
                 try {
                     $this->entregar($mensaje);
+                    if ($mensaje->canal === CanalComunicacion::WhatsApp) {
+                        $this->saldoWhatsApp->gastar('mensaje:'.$mensaje->getKey());
+                    }
                     $mensaje->estado = EstadoMensaje::Enviado;
                     $mensaje->enviado_en = Carbon::now();
                     $mensaje->ultimo_error = null;

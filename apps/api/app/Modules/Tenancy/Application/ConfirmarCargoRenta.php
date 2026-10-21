@@ -26,6 +26,7 @@ class ConfirmarCargoRenta
     public function __construct(
         private readonly SuspensionPorRenta $suspension,
         private readonly AcreditarTimbresPagados $timbres,
+        private readonly AcreditarMensajesWhatsAppPagados $whatsapp,
         private readonly DomiciliacionRenta $domiciliacion,
         private readonly AlertasPlataforma $alertas,
         private readonly RegistroDePasarelasPlataforma $registro,
@@ -103,8 +104,11 @@ class ConfirmarCargoRenta
         }
 
         $this->suspension->reactivarSiPago($pagado?->estudio);
-        // Una compra de timbres: se suman al saldo del negocio.
+        // Una compra de timbres o de mensajes: se suman al saldo del negocio.
         $this->timbres->aplicar($pagado);
+        $this->whatsapp->aplicar($pagado);
+        // El primer mes pagado de un negocio invitado: un mes gratis para los dos (ADR 0188).
+        app(ReferidosSaas::class)->alPagar($pagado);
     }
 
     /**
@@ -128,7 +132,7 @@ class ConfirmarCargoRenta
                 ->lockForUpdate()
                 ->get();
             foreach ($cargos as $cargo) {
-                if ($cargo->concepto === 'timbres') {
+                if (in_array($cargo->concepto, ['timbres', 'whatsapp'], true)) {
                     $cargo->update(['estado' => EstadoCargoRenta::Cancelado->value]);
 
                     continue;

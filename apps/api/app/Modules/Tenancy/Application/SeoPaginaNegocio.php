@@ -37,6 +37,7 @@ final class SeoPaginaNegocio
         'hyrox' => 'ExerciseGym',
         'pilates' => 'SportsActivityLocation',
         'pole' => 'SportsActivityLocation',
+        'cycling' => 'ExerciseGym',
         'yoga' => 'SportsActivityLocation',
         'danza' => 'SportsActivityLocation',
         'natacion' => 'SportsActivityLocation',

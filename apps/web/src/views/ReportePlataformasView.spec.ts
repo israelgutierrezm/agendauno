@@ -67,6 +67,8 @@ function montar() {
     global: {
       plugins: [i18n],
       stubs: {
+        // La conciliación tiene su propia prueba.
+        ConciliacionPlataformas: true,
         PanelLateral: {
           props: ["abierto", "titulo"],
           template:

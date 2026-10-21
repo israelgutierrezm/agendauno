@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularRentaSaas;
+use App\Modules\Tenancy\Application\ComplementosRentaSaas;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\MonedaDeCobroSaas;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\TimbresTenant;
+use App\Modules\Tenancy\Application\TiposDeCambio;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\TarifaSaas;
@@ -24,8 +26,10 @@ use Illuminate\Http\JsonResponse;
  */
 class PreciosPublicosController
 {
-    public function __invoke(TimbresTenant $timbres, ParametrosTenant $parametros): JsonResponse
+    public function __invoke(TimbresTenant $timbres, ParametrosTenant $parametros, TiposDeCambio $tipos): JsonResponse
     {
+        $tipo = $tipos->ultimo();
+
         $tarifaClases = TarifaSaas::vigente(ModalidadServicio::Clases);
         $tarifaCitas = TarifaSaas::vigente(ModalidadServicio::Citas);
         $clases = $tarifaClases->definicion ?? [];
@@ -66,6 +70,12 @@ class PreciosPublicosController
             'registro' => collect(ProductoComercial::cases())
                 ->mapWithKeys(fn (ProductoComercial $p): array => [$p->value => $parametros->siNo('registro.abierto_'.$p->value)])
                 ->all(),
+            // El último FIX conocido, para mostrar en México el equivalente en pesos con
+            // IVA (el cargo usa el del día en que se emite).
+            'tipo_cambio' => $tipo === null ? null : ['diezmilesimas' => $tipo['diezmilesimas'], 'fecha' => $tipo['fecha']],
+            // Lo que se cobra aparte, con precio publicado, y los referidos (ADR 0188).
+            'servicios' => app(ComplementosRentaSaas::class)->precios(),
+            'referidos' => ['meses_gratis' => 1],
         ]]);
     }
 }

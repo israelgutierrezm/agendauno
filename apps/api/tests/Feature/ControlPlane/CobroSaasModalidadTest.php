@@ -67,9 +67,9 @@ it('clases: cobra la banda de alumnos activos del mes con IVA', function (): voi
 
     expect($cargo['metrica'])->toBe('alumnos_activos')
         ->and($cargo['cantidad'])->toBe(3)
-        // La versión 3 es la de dólares (2026_10_08_000200_tarifas_en_usd): hasta 40
-        // alumnos, 21 USD = 420 pesos.
-        ->and($cargo['tarifa_version'])->toBe(3)
+        // La versión 4 es la del techo (2026_10_20_000200_techo_de_clases), en dólares:
+        // hasta 40 alumnos, 21 USD = 420 pesos.
+        ->and($cargo['tarifa_version'])->toBe(4)
         ->and($cargo['desglose']['subtotal_minor'])->toBe(42000)
         ->and($cargo['desglose']['iva_minor'])->toBe(6720)
         ->and($cargo['monto_minor'])->toBe(48720)
@@ -272,8 +272,9 @@ it('el superadmin publica una versión nueva de la tarifa y los cargos la usan',
 
     $this->getJson('/api/v1/plataforma/tarifas', conPlataforma())
         ->assertOk()
-        // La 1 es la inicial; la 2, la de los rangos de alumnos; la 3, la de dólares.
-        ->assertJsonPath('data.clases.vigente.version', 3)
+        // La 1 es la inicial; la 2, la de los rangos de alumnos; la 3, la de dólares; la
+        // 4, la del techo para estudios grandes.
+        ->assertJsonPath('data.clases.vigente.version', 4)
         ->assertJsonPath('data.clases.vigente.definicion.moneda', 'USD')
         ->assertJsonPath('data.clases.vigente.definicion.bandas.0.hasta', 40)
         ->assertJsonPath('data.citas.vigente.definicion.niveles.individual.1', 900);
@@ -282,12 +283,12 @@ it('el superadmin publica una versión nueva de la tarifa y los cargos la usan',
     $this->postJson('/api/v1/plataforma/tarifas/clases', [
         'moneda' => 'MXN', 'dias_prueba' => 30, 'iva_porcentaje' => 16,
         'bandas' => [['hasta' => 50, 'monto_minor' => 29900], ['hasta' => null, 'monto_minor' => 99900]],
-    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 4);
+    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 5);
 
     emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
-    expect($cargo['tarifa_version'])->toBe(4)
+    expect($cargo['tarifa_version'])->toBe(5)
         ->and($cargo['desglose']['subtotal_minor'])->toBe(29900)
         ->and($cargo['tipo_cambio'])->toBeNull();
 });

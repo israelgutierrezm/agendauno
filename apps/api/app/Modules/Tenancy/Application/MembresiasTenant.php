@@ -223,6 +223,11 @@ class MembresiasTenant
                 'ciclo_fin' => $cicloFin,
                 'valido_desde' => $inicio,
                 'valido_hasta' => $validoHasta,
+                // Topes, acceso anticipado e invitados (ADR 0182), congelados al venderlo.
+                'max_reservas_dia' => $producto->max_reservas_dia,
+                'max_reservas_semana' => $producto->max_reservas_semana,
+                'acceso_anticipado_horas' => $producto->acceso_anticipado_horas,
+                'invitados_por_mes' => $producto->invitados_por_mes,
             ]);
             // A qué clases aplica, copiado: editar el plan después no cambia lo vendido.
             $derecho->ofertas()->sync($producto->relationLoaded('ofertas')

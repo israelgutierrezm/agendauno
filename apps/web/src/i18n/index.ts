@@ -100,6 +100,14 @@ import detalleClase from "./locales/detalleClase.es-MX";
 // Medición con GA4 y Meta (ADR 0142 y 0143).
 import medicion from "./locales/medicion.es-MX";
 import paseLista from "./locales/paseLista.es-MX";
+// Kiosco de llegada (ADR 0183).
+import kiosco from "./locales/kiosco.es-MX";
+// Videos y clases en línea (ADR 0184).
+import videos from "./locales/videos.es-MX";
+// WhatsApp por mensaje (ADR 0186).
+import whatsappRenta from "./locales/whatsappRenta.es-MX";
+// Niveles por actividad y práctica libre (ADR 0187).
+import nivelesMiembro from "./locales/nivelesMiembro.es-MX";
 import listadosVisual from "./locales/listadosVisual.es-MX";
 import sucursalOperativa from "./locales/sucursalOperativa.es-MX";
 import {
@@ -217,6 +225,10 @@ const mensajesBase = {
   modalidadNegocio,
   detalleClase,
   paseLista,
+  kiosco,
+  videos,
+  whatsappRenta,
+  nivelesMiembro,
   listadosVisual,
   sucursalOperativa,
   inventarioVisual,

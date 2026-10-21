@@ -244,11 +244,22 @@ class InicioTab extends ConsumerWidget {
                     icono: Icons.task_alt,
                     titulo: 'Mi asistencia',
                     tono: TonosAcceso.reservas,
-                    valor: switch (cuenta.asistencias30Dias) {
-                      0 => 'Sin $clases en 30 días',
-                      1 => '1 $clase en 30 días',
-                      final n => '$n $clases en 30 días',
-                    },
+                    // Con su resumen: este mes y las semanas seguidas.
+                    valor: cuenta.clasesMes != null
+                        ? [
+                            switch (cuenta.clasesMes!) {
+                              0 => 'Sin $clases este mes',
+                              1 => '1 $clase este mes',
+                              final n => '$n $clases este mes',
+                            },
+                            if (cuenta.rachaSemanas > 1)
+                              '${cuenta.rachaSemanas} semanas seguidas',
+                          ].join(' · ')
+                        : switch (cuenta.asistencias30Dias) {
+                            0 => 'Sin $clases en 30 días',
+                            1 => '1 $clase en 30 días',
+                            final n => '$n $clases en 30 días',
+                          },
                     onTap: () => onIr(PestanaCuenta.reservas),
                   ),
             pagos: TarjetaAcceso(

@@ -89,6 +89,8 @@ class ReservasTenantController
                 'asistencia_desde' => $sesion->inicia_en->copy()->subMinutes(app(ParametrosTenant::class)->entero('asistencia.minutos_antes'))->toIso8601String(),
                 'empezo' => $sesion->inicia_en->lessThanOrEqualTo(now()),
                 'sesion' => $this->resumenDeSesion($sesion),
+                // Los invitados de los clientes (ADR 0182): ocupan lugar, no son clientes.
+                'invitados' => InvitadosTenantController::deLaSesion($sesion),
             ],
         ]);
     }

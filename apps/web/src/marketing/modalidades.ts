@@ -66,6 +66,7 @@ export const PERFILES_POR_MODO: Record<Modo, readonly string[]> = {
   clases: [
     "pilates",
     "pole",
+    "cycling",
     "yoga",
     "danza",
     "gimnasio",
@@ -344,6 +345,11 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
       "migracion",
       "preparacion",
       "pagos",
+      // Objeciones de quien compara proveedores (comparativo del 2026-10-20).
+      "permanencia",
+      "comisiones",
+      "datos",
+      "facturacion",
       "soporte",
       "modalidad",
       "precio",

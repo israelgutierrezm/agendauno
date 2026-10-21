@@ -49,13 +49,16 @@ function cargoDeDiciembre(): ?CargoRenta
         ->first();
 }
 
-/** Publica la versión 4 (la 1 es la inicial; la 2, la de los rangos de alumnos; la 3, la de dólares). */
+/**
+ * Publica la versión 5 (la 1 es la inicial; la 2, la de los rangos de alumnos; la 3, la
+ * de dólares; la 4, la del techo para estudios grandes).
+ */
 function publicarTarifaNueva(): void
 {
     test()->postJson('/api/v1/plataforma/tarifas/clases', [
         'dias_prueba' => 30, 'iva_porcentaje' => 16,
         'bandas' => [['hasta' => 50, 'monto_minor' => 29900], ['hasta' => null, 'monto_minor' => 99900]],
-    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 4);
+    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 5);
 }
 
 it('no emite el cargo de un mes que aún no cierra en la zona del negocio', function (): void {
@@ -102,6 +105,6 @@ it('se cobra con la tarifa vigente en el mes, no con una publicada después', fu
 
     $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
 
-    // La vigente en diciembre (la de dólares), no la del 2 de enero.
-    expect(cargoDeDiciembre()?->tarifa_version)->toBe(3);
+    // La vigente en diciembre (la del techo, en dólares), no la del 2 de enero.
+    expect(cargoDeDiciembre()?->tarifa_version)->toBe(4);
 });

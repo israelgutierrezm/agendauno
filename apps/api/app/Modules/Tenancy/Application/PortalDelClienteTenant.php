@@ -64,4 +64,41 @@ class PortalDelClienteTenant
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>=', CarbonImmutable::now()->subDays(self::DIAS_ASISTENCIA)))
             ->count();
     }
+
+    /**
+     * Su resumen (comparativo del 2026-10-20): clases a las que vino este mes, cuántas
+     * semanas seguidas lleva viniendo (de lunes a domingo, contando la actual si ya
+     * vino) y cuántas lleva en total. En la zona del negocio.
+     *
+     * @return array{clases_mes: int, racha_semanas: int, total: int}
+     */
+    public function resumen(PersonaTenant $persona, string $zona): array
+    {
+        $fechas = ReservaTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->whereHas('asistencia', fn ($q) => $q->where('estado', EstadoAsistencia::Presente->value))
+            ->with('sesion:id,inicia_en')
+            ->get(['id', 'sesion_id'])
+            ->map(static fn (ReservaTenant $r): ?CarbonImmutable => $r->sesion === null ? null : CarbonImmutable::instance($r->sesion->inicia_en)->setTimezone($zona))
+            ->filter();
+        $ahora = CarbonImmutable::now($zona);
+        $semanas = $fechas->map(static fn (CarbonImmutable $f): string => $f->startOfWeek(CarbonImmutable::MONDAY)->toDateString())->unique()->flip();
+
+        // La racha: desde esta semana (si ya vino) o la anterior, hacia atrás.
+        $semana = $ahora->startOfWeek(CarbonImmutable::MONDAY);
+        if (! $semanas->has($semana->toDateString())) {
+            $semana = $semana->subWeek();
+        }
+        $racha = 0;
+        while ($semanas->has($semana->toDateString())) {
+            $racha++;
+            $semana = $semana->subWeek();
+        }
+
+        return [
+            'clases_mes' => $fechas->filter(static fn (CarbonImmutable $f): bool => $f->format('Y-m') === $ahora->format('Y-m') && $f->lessThanOrEqualTo($ahora))->count(),
+            'racha_semanas' => $racha,
+            'total' => $fechas->count(),
+        ];
+    }
 }

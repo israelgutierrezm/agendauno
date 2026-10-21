@@ -282,6 +282,16 @@ function canalTexto(canal: string): string {
 // Canales que ofrece el servidor: push solo si la plataforma tiene FCM configurado.
 const canalesDifusion = ref<Canal[]>(["interno", "email"]);
 const canalesAuto = ref<Canal[]>(["interno", "email"]);
+// Para filtrar lo enviado: solo los canales que el negocio tiene (WhatsApp, si la
+// plataforma lo activó para él).
+const canalesDeSalida = computed<Canal[]>(() =>
+  (["email", "whatsapp", "push", "interno"] as Canal[]).filter(
+    (c) =>
+      canalesAuto.value.includes(c) ||
+      canalesDifusion.value.includes(c) ||
+      (c === "whatsapp" && sesion.estudio?.whatsapp_clientes === true),
+  ),
+);
 
 function fecha(iso: string | null): string {
   if (iso === null) {
@@ -1335,11 +1345,7 @@ onMounted(cargar);
           data-prueba="salida-canal"
         >
           <option value="">{{ $t("operacion.salida.todosLosCanales") }}</option>
-          <option
-            v-for="c in ['email', 'whatsapp', 'push', 'interno']"
-            :key="c"
-            :value="c"
-          >
+          <option v-for="c in canalesDeSalida" :key="c" :value="c">
             {{ canalTexto(c) }}
           </option>
         </select>

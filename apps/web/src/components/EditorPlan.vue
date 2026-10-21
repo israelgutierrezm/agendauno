@@ -33,7 +33,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  */
 const props = defineProps<{ plan: Plan | null }>();
 const emit = defineEmits<{
-  guardado: [nombre: string];
+  // Con los avisos de coherencia del plan guardado (no impiden guardarlo).
+  guardado: [nombre: string, avisos: string[]];
   cerrar: [];
   // Para su contenedor: no cerrarse a medio guardar ni descartar sin preguntar.
   estado: [e: EstadoEditor];
@@ -100,7 +101,19 @@ const form = reactive({
     p?.penalizacion_minor != null ? String(p.penalizacion_minor / 100) : "",
   // Con «meses restantes», qué parte de lo que falte (p. ej. 50 %).
   porcentaje: String(p?.penalizacion_porcentaje ?? 100),
+  // Planes «socio» (ADR 0182); vacío = sin la regla.
+  topeDia: p?.max_reservas_dia ? String(p.max_reservas_dia) : "",
+  topeSemana: p?.max_reservas_semana ? String(p.max_reservas_semana) : "",
+  anticipado: p?.acceso_anticipado_horas
+    ? String(p.acceso_anticipado_horas)
+    : "",
+  invitados: p?.invitados_por_mes ? String(p.invitados_por_mes) : "",
 });
+/** Un número entero positivo, o null si está vacío (sin la regla). */
+function entero(v: string): number | null {
+  const n = numero(v);
+  return n === null || n <= 0 ? null : Math.round(n);
+}
 const guardando = ref(false);
 const error = ref<string | null>(null);
 // El error de cada campo, junto a él (y el resumen arriba del botón).
@@ -366,6 +379,14 @@ async function guardar(): Promise<void> {
     descripcion: form.descripcion.trim() || null,
     destacado: form.destacado,
     primera_vez: admitePrimeraVez.value && form.primeraVez,
+    ...(esCitas.value || esExtra.value
+      ? {}
+      : {
+          max_reservas_dia: entero(form.topeDia),
+          max_reservas_semana: entero(form.topeSemana),
+          acceso_anticipado_horas: entero(form.anticipado),
+          invitados_por_mes: entero(form.invitados),
+        }),
     ...(esCitas.value
       ? {}
       : {
@@ -388,16 +409,19 @@ async function guardar(): Promise<void> {
       : {}),
   };
   try {
-    if (p) {
-      await api.put(`${base.value}/productos/${p.id}`, {
-        ...carga,
-        archivado: form.archivado,
-      });
-    } else {
-      await api.post(`${base.value}/productos`, carga);
-    }
+    type Respuesta = { meta?: { avisos?: { mensaje: string }[] } };
+    const { data } = p
+      ? await api.put<Respuesta>(`${base.value}/productos/${p.id}`, {
+          ...carga,
+          archivado: form.archivado,
+        })
+      : await api.post<Respuesta>(`${base.value}/productos`, carga);
     foto.fijar();
-    emit("guardado", form.nombre.trim());
+    emit(
+      "guardado",
+      form.nombre.trim(),
+      (data?.meta?.avisos ?? []).map((a) => a.mensaje),
+    );
   } catch (e) {
     // Lo capturado se queda: solo se corrige lo marcado.
     errores.value = erroresPorCampo(e);
@@ -772,6 +796,66 @@ onMounted(async () => {
           >
         </span>
       </label>
+    </fieldset>
+
+    <!-- Planes «socio» (ADR 0182): topes, acceso anticipado e invitados. -->
+    <fieldset
+      v-if="!esCitas && !esExtra"
+      class="space-y-3"
+      data-prueba="reglas-socio"
+    >
+      <legend class="tu-label">{{ $t("planes.socio.titulo") }}</legend>
+      <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("planes.socio.ayuda") }}
+      </p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label>
+          <span class="tu-label">{{ $t("planes.socio.topeDia") }}</span>
+          <input
+            v-model="form.topeDia"
+            class="tu-input"
+            type="number"
+            min="1"
+            max="20"
+            :placeholder="$t('planes.socio.sinTope')"
+            data-prueba="tope-dia"
+          />
+        </label>
+        <label>
+          <span class="tu-label">{{ $t("planes.socio.topeSemana") }}</span>
+          <input
+            v-model="form.topeSemana"
+            class="tu-input"
+            type="number"
+            min="1"
+            max="100"
+            :placeholder="$t('planes.socio.sinTope')"
+          />
+        </label>
+        <label>
+          <span class="tu-label">{{ $t("planes.socio.anticipado") }}</span>
+          <input
+            v-model="form.anticipado"
+            class="tu-input"
+            type="number"
+            min="1"
+            max="720"
+            :placeholder="$t('planes.socio.sinAnticipado')"
+          />
+        </label>
+        <label>
+          <span class="tu-label">{{ $t("planes.socio.invitados") }}</span>
+          <input
+            v-model="form.invitados"
+            class="tu-input"
+            type="number"
+            min="1"
+            max="20"
+            :placeholder="$t('planes.socio.sinInvitados')"
+            data-prueba="invitados-mes"
+          />
+        </label>
+      </div>
     </fieldset>
 
     <!-- Permanencia (B04): solo en membresías. -->

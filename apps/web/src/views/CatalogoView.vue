@@ -62,6 +62,12 @@ interface Oferta {
   para_principiantes?: boolean;
   requisitos?: string | null;
   que_llevar?: string | null;
+  // Clase en línea (ADR 0184): el enlace que ve solo quien la reservó.
+  enlace_en_linea?: string | null;
+  // Nivel que pide, los de su actividad y si es práctica libre (ADR 0187).
+  nivel?: { id: string; nombre: string } | null;
+  niveles_actividad?: { id: string; nombre: string }[];
+  practica_libre?: boolean;
   // Retirado del catálogo: ya no se agenda ni se vende; su historial sigue (ADR 0154).
   archivado?: boolean;
 }
@@ -187,6 +193,9 @@ const form = ref<{
   principiantes: boolean;
   requisitos: string;
   queLlevar: string;
+  enlace: string;
+  nivel: string;
+  practicaLibre: boolean;
   regreso: string;
   anticipoTipo: TipoAnticipo;
   anticipo: string;
@@ -205,6 +214,9 @@ const form = ref<{
   principiantes: false,
   requisitos: "",
   queLlevar: "",
+  enlace: "",
+  nivel: "",
+  practicaLibre: false,
   regreso: "",
   anticipoTipo: "ninguno",
   anticipo: "",
@@ -354,6 +366,9 @@ function configurar(o: Oferta): void {
     principiantes: o.para_principiantes ?? false,
     requisitos: o.requisitos ?? "",
     queLlevar: o.que_llevar ?? "",
+    enlace: o.enlace_en_linea ?? "",
+    nivel: o.nivel?.id ?? "",
+    practicaLibre: o.practica_libre ?? false,
     regreso: o.regreso_dias ? String(o.regreso_dias) : "",
     anticipoTipo:
       o.anticipo_minor != null
@@ -595,6 +610,15 @@ async function guardar(o: Oferta): Promise<void> {
         : { para_principiantes: form.value.principiantes }),
       requisitos: form.value.requisitos.trim() || null,
       que_llevar: form.value.queLlevar.trim() || null,
+      ...(esCitas.value
+        ? {}
+        : {
+            enlace_en_linea: form.value.enlace.trim() || null,
+            practica_libre: form.value.practicaLibre,
+            ...(o.niveles_actividad?.length
+              ? { nivel_id: form.value.nivel || null }
+              : {}),
+          }),
       // Citas: con esto, retención encuentra a quien ya debería haber regresado; y
       // el anticipo para apartar en línea (uno u otro; ninguno lo quita).
       ...(esCitas.value
@@ -1013,6 +1037,42 @@ onMounted(cargar);
           maxlength="600"
           :placeholder="$t('perfilPublico.catalogo.descripcionPh')"
         />
+        <!-- Práctica libre y nivel que pide (ADR 0187). -->
+        <label
+          v-if="!esCitas"
+          class="mb-3 flex items-start gap-2 text-sm"
+          data-prueba="practica-libre"
+        >
+          <input v-model="form.practicaLibre" type="checkbox" class="mt-1" />
+          <span>
+            {{ $t("nivelesMiembro.clase.practicaLibre") }}
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t("nivelesMiembro.clase.practicaLibreAyuda") }}</span
+            >
+          </span>
+        </label>
+        <div
+          v-if="!esCitas && o.niveles_actividad?.length"
+          class="mb-3"
+          data-prueba="nivel-clase"
+        >
+          <label class="tu-label" :for="`c-nivel-${o.id}`">{{
+            $t("nivelesMiembro.clase.nivel")
+          }}</label>
+          <select :id="`c-nivel-${o.id}`" v-model="form.nivel" class="tu-input">
+            <option value="">
+              {{ $t("nivelesMiembro.clase.cualquiera") }}
+            </option>
+            <option v-for="n in o.niveles_actividad" :key="n.id" :value="n.id">
+              {{ n.nombre }}
+            </option>
+          </select>
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("nivelesMiembro.clase.nivelAyuda") }}
+          </p>
+        </div>
         <!-- Para quien llega por primera vez (C03). -->
         <label
           v-if="!esCitas"
@@ -1053,6 +1113,28 @@ onMounted(cargar);
               maxlength="300"
               :placeholder="$t('perfilPublico.catalogo.queLlevarPh')"
             />
+          </div>
+          <div v-if="!esCitas" class="sm:col-span-2">
+            <label class="tu-label" :for="`c-enlace-${o.id}`">{{
+              $t("perfilPublico.catalogo.enlace")
+            }}</label>
+            <input
+              :id="`c-enlace-${o.id}`"
+              v-model="form.enlace"
+              class="tu-input"
+              type="url"
+              inputmode="url"
+              maxlength="500"
+              placeholder="https://"
+              :aria-describedby="`c-enlace-ayuda-${o.id}`"
+            />
+            <p
+              :id="`c-enlace-ayuda-${o.id}`"
+              class="mt-1 text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("perfilPublico.catalogo.enlaceAyuda") }}
+            </p>
           </div>
         </div>
         <label class="tu-label">{{ $t("catalogo.politica.etiqueta") }}</label>

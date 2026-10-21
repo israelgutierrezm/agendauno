@@ -82,7 +82,7 @@ class AvisosDuenos
         // Renta lista para pagar (una compra de timbres se paga al comprarla).
         CargoRenta::query()->with('estudio')
             ->where('estado', EstadoCargoRenta::Pendiente->value)
-            ->where(fn ($q) => $q->whereNull('concepto')->orWhere('concepto', '!=', 'timbres'))
+            ->where(fn ($q) => $q->whereNull('concepto')->orWhereNotIn('concepto', ['timbres', 'whatsapp']))
             ->where('emitido_en', '>=', now()->subDays(self::DIAS_RENTA_EMITIDA))
             ->each(function (CargoRenta $cargo) use (&$nuevos): void {
                 $nuevos += $this->avisarCargo($cargo, 'renta_emitida');

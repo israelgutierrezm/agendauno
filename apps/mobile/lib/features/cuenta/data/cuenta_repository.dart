@@ -82,6 +82,12 @@ class CuentaRepository {
       porPagarSinCargar: porPagar == null,
       portal: PortalCliente.desdeJson(data['portal']),
       asistencias30Dias: (data['asistencias_30_dias'] as num? ?? 0).toInt(),
+      clasesMes: (data['resumen_asistencia'] is Map<String, dynamic>)
+          ? ((data['resumen_asistencia']['clases_mes'] as num?) ?? 0).toInt()
+          : null,
+      rachaSemanas: (data['resumen_asistencia'] is Map<String, dynamic>)
+          ? ((data['resumen_asistencia']['racha_semanas'] as num?) ?? 0).toInt()
+          : 0,
     );
   }
 
@@ -457,6 +463,13 @@ class CuentaRepository {
 
   Future<void> cancelar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/mi/reservas/$reservaId/cancelar');
+
+  /// Aparta un lugar para un invitado con un pase de su plan (ADR 0182).
+  Future<void> invitar(String sesionId, String nombre) =>
+      _dio.post<Map<String, dynamic>>(
+        '$_base/mi/sesiones/$sesionId/invitados',
+        data: {'nombre': nombre},
+      );
 
   /// A qué puede cambiar su reserva (cita: horarios libres de ese día).
   Future<OpcionesReprogramar> opcionesReprogramar(

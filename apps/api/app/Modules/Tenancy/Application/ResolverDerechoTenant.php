@@ -30,7 +30,10 @@ class ResolverDerechoTenant
 
     public function paraSesion(PersonaTenant $persona, SesionTenant $sesion, int $unidades): ?DerechoTenant
     {
-        $derechos = $this->candidatos($persona, $sesion);
+        // Un plan que llegó a su tope del día o de la semana no se usa (ADR 0182).
+        $derechos = $this->candidatos($persona, $sesion)
+            ->filter(fn (DerechoTenant $derecho): bool => app(TopesDeReservaTenant::class)->alcanzado($derecho, $sesion) === null)
+            ->values();
 
         $limitado = $derechos->first(
             fn (DerechoTenant $derecho): bool => ! $derecho->ilimitado && $this->libro->disponible($derecho) >= $unidades,
@@ -52,6 +55,60 @@ class ResolverDerechoTenant
     public function paraReintegro(PersonaTenant $persona, SesionTenant $sesion): ?DerechoTenant
     {
         return $this->candidatos($persona, $sesion)->first(fn (DerechoTenant $derecho): bool => ! $derecho->ilimitado);
+    }
+
+    /**
+     * Si la persona tiene planes que cubren la clase pero todos llegaron a su tope del
+     * día o de la semana, por qué (ADR 0182); null si no es eso.
+     */
+    public function topeAlcanzado(PersonaTenant $persona, SesionTenant $sesion): ?string
+    {
+        $candidatos = $this->candidatos($persona, $sesion);
+        $motivo = null;
+        foreach ($candidatos as $derecho) {
+            $tope = app(TopesDeReservaTenant::class)->alcanzado($derecho, $sesion);
+            if ($tope === null) {
+                return null;
+            }
+            $motivo ??= $tope;
+        }
+
+        return $motivo;
+    }
+
+    /**
+     * Cuántas horas antes que los demás puede reservar la persona esa clase: el mayor
+     * acceso anticipado de sus planes que la cubren (ADR 0182).
+     */
+    public function horasDeAccesoAnticipado(PersonaTenant $persona, SesionTenant $sesion): int
+    {
+        return (int) $this->candidatos($persona, $sesion)->max(static fn (DerechoTenant $d): int => (int) ($d->acceso_anticipado_horas ?? 0));
+    }
+
+    /**
+     * Los planes activos de la persona que cubren la sesión (para los pases de
+     * invitado, ADR 0182).
+     *
+     * @return Collection<int, DerechoTenant>
+     */
+    public function candidatosPara(PersonaTenant $persona, SesionTenant $sesion): Collection
+    {
+        return $this->candidatos($persona, $sesion);
+    }
+
+    /**
+     * Los planes activos y vigentes hoy de la persona, sin mirar una clase.
+     *
+     * @return Collection<int, DerechoTenant>
+     */
+    public function vigentesDe(PersonaTenant $persona): Collection
+    {
+        return DerechoTenant::query()
+            ->whereHas('acuerdo', fn (Builder $consulta) => $consulta->where('persona_id', $persona->getKey())->where('estado', EstadoAcuerdo::Activo->value))
+            ->where(fn (Builder $q) => self::conPaqueteActivo($q))
+            ->get()
+            ->filter(fn (DerechoTenant $derecho): bool => $this->vigente($derecho, now()))
+            ->values();
     }
 
     /**

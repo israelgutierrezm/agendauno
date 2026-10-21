@@ -18,6 +18,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * aqui: se deriva del ledger (`movimientos`). Puede ser ilimitado.
  *
  * @property list<int>|null $sucursales_ids sedes donde vale (null = todas, ADR 0017)
+ * @property int|null $max_reservas_dia tope de reservas por día, congelado al venderlo (ADR 0182)
+ * @property int|null $max_reservas_semana tope de reservas por semana (ADR 0182)
+ * @property int|null $acceso_anticipado_horas reserva esas horas antes que los demás (ADR 0182)
+ * @property int|null $invitados_por_mes pases de invitado al mes (ADR 0182)
  */
 class DerechoTenant extends Model
 {
@@ -32,6 +36,7 @@ class DerechoTenant extends Model
         'acuerdo_id', 'extra_de_id', 'ambito', 'actividad_id', 'sucursal_id', 'sucursales_ids', 'ilimitado',
         'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
         'ciclo_inicio', 'ciclo_fin', 'valido_desde', 'valido_hasta',
+        'max_reservas_dia', 'max_reservas_semana', 'acceso_anticipado_horas', 'invitados_por_mes',
     ];
 
     /**
@@ -44,6 +49,10 @@ class DerechoTenant extends Model
         'politica_rollover' => PoliticaRollover::class,
         'unidades_por_ciclo' => 'integer',
         'rollover_max' => 'integer',
+        'max_reservas_dia' => 'integer',
+        'max_reservas_semana' => 'integer',
+        'acceso_anticipado_horas' => 'integer',
+        'invitados_por_mes' => 'integer',
         'ciclo_inicio' => 'date',
         'ciclo_fin' => 'date',
         'valido_desde' => 'date',

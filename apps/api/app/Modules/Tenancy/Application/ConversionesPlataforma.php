@@ -101,10 +101,10 @@ class ConversionesPlataforma
         }
 
         $pagados = CargoRenta::query()->from('cargos_renta as c')->select('c.*')
-            ->where('c.estado', EstadoCargoRenta::Pagado->value)->where('c.concepto', '!=', 'timbres')
+            ->where('c.estado', EstadoCargoRenta::Pagado->value)->whereNotIn('c.concepto', ['timbres', 'whatsapp'])
             ->where('c.monto_minor', '>', 0)->whereNotNull('c.pagado_en')->where('c.pagado_en', '>=', $desde)
             ->whereNotExists(fn ($q) => $q->from('cargos_renta as previo')->whereColumn('previo.estudio_id', 'c.estudio_id')
-                ->where('previo.estado', EstadoCargoRenta::Pagado->value)->where('previo.concepto', '!=', 'timbres')
+                ->where('previo.estado', EstadoCargoRenta::Pagado->value)->whereNotIn('previo.concepto', ['timbres', 'whatsapp'])
                 ->where('previo.monto_minor', '>', 0)->whereColumn('previo.pagado_en', '<', 'c.pagado_en'))
             ->get();
         foreach ($pagados as $cargo) {

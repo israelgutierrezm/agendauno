@@ -6,6 +6,7 @@ use App\Http\Middleware\CorrelationId;
 use App\Http\Middleware\RespuestaPrivadaSinCache;
 use App\Modules\Platform\Operacion\ErroresPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AlcanceLlaveApi;
+use App\Modules\Tenancy\Http\Middleware\AutenticarKiosco;
 use App\Modules\Tenancy\Http\Middleware\AutenticarLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AutenticarTenant;
@@ -55,6 +56,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'puede' => PermisoTenant::class,
             // Integracion de terceros por llave de API con scopes (R40).
             'estudio.llave' => AutenticarLlaveApi::class,
+            // La tableta de llegada, con su llave (ADR 0183).
+            'kiosco' => AutenticarKiosco::class,
             'alcance' => AlcanceLlaveApi::class,
             // Operador de plataforma (PlatformAdmin): token global.
             'plataforma.auth' => AutenticarPlataforma::class,

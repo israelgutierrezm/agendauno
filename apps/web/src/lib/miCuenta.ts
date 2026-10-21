@@ -63,6 +63,8 @@ export interface Reserva {
     penaliza_tarde: boolean;
   } | null;
   que_llevar?: string | null;
+  // Clase en línea (ADR 0184): el enlace, solo con la reserva confirmada.
+  enlace_en_linea?: string | null;
   // Su lugar numerado y cuántos tiene la clase (0 = no numera; B06).
   lugar?: number | null;
   lugares?: number;
@@ -216,6 +218,12 @@ const formularios = ref<FormularioPersona[]>([]);
 const personaId = ref<string | null>(null);
 const portal = ref<PortalCuenta | null>(null);
 const asistencias = ref(0);
+export interface ResumenAsistencia {
+  clases_mes: number;
+  racha_semanas: number;
+  total: number;
+}
+const resumenAsistencia = ref<ResumenAsistencia | null>(null);
 const pagoEnLinea = ref(false);
 // La pasarela del negocio está en pruebas: no se cobra de verdad (M07).
 const pagoEnLineaPrueba = ref(false);
@@ -324,6 +332,8 @@ export function useMiCuenta() {
             politica_cancelacion: Politica | null;
             portal?: PortalCuenta;
             asistencias_30_dias?: number;
+            // Su resumen: clases del mes, semanas seguidas y total (ADR 0182).
+            resumen_asistencia?: ResumenAsistencia;
             pago_en_linea?: boolean;
             pago_en_linea_prueba?: boolean;
             pago_automatico?: boolean;
@@ -347,6 +357,7 @@ export function useMiCuenta() {
       politica.value = p.data.data.politica_cancelacion;
       portal.value = p.data.data.portal ?? null;
       asistencias.value = p.data.data.asistencias_30_dias ?? 0;
+      resumenAsistencia.value = p.data.data.resumen_asistencia ?? null;
       pagoEnLinea.value = p.data.data.pago_en_linea === true;
       pagoEnLineaPrueba.value = p.data.data.pago_en_linea_prueba === true;
       pagoAutomatico.value = p.data.data.pago_automatico === true;
@@ -425,6 +436,7 @@ export function useMiCuenta() {
     personaId,
     portal,
     asistencias,
+    resumenAsistencia,
     pagoEnLinea,
     pagoEnLineaPrueba,
     pagoAutomatico,

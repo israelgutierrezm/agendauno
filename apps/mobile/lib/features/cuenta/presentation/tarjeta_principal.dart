@@ -18,6 +18,7 @@ String fotoNegocio(String? perfil) {
     'yoga': 'yoga-v1.jpg',
     'danza': 'danza-v1.jpg',
     'gimnasio': 'gimnasio-v1.jpg',
+    'cycling': 'gimnasio-v1.jpg',
     'crossfit': 'crossfit-v1.webp',
     'hyrox': 'crossfit-hyrox-v1.webp',
     'natacion': 'natacion-v1.jpg',

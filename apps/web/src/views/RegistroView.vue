@@ -43,6 +43,11 @@ const props = withDefaults(
 );
 
 const router = useRouter();
+/** El código de quien lo invitó (`?ref=`), en mayúsculas; null sin uno válido. */
+function codigoReferido(): string | null {
+  const ref = new URLSearchParams(window.location.search).get("ref") ?? "";
+  return /^[A-Za-z0-9]{4,16}$/.test(ref) ? ref.toUpperCase() : null;
+}
 const { t } = useI18n();
 
 // Cada dominio registra negocios de su producto (ADR 0108): AgendaUno los de clases y
@@ -468,6 +473,8 @@ async function enviar(): Promise<void> {
             ? verificacion.value
             : undefined,
         acepta_terminos: aceptaTerminos.value,
+        // Llegó invitado por otro negocio (?ref=CODIGO; ADR 0188).
+        referido: codigoReferido() ?? undefined,
         aviso_version: legales.value.versiones?.aviso_privacidad?.version,
         terminos_version: legales.value.versiones?.terminos?.version,
         ...medicion,

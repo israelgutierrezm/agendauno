@@ -54,6 +54,18 @@ export default {
   espera: {
     ayuda: "Si se libera un lugar, se ofrece en este orden.",
   },
+  // Invitados de los clientes con su pase del plan (ADR 0182).
+  invitados: {
+    titulo: "Invitados",
+    ayuda:
+      "Vienen con el pase de invitado de un cliente: ocupan lugar y no son clientes.",
+    de: "invitado de {nombre}",
+    estados: {
+      reservado: "Por marcar",
+      asistio: "Llegó",
+      no_asistio: "No vino",
+    },
+  },
   // Quien llegó sin reservar.
   agregar: {
     boton: "Agregar alumno",

@@ -130,7 +130,7 @@ class GenerarCargoRenta
         $finDelMes = CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->endOfMonth()->startOfDay() ?? $hoy;
         $vence = ($finDelMes->greaterThan($hoy) ? $finDelMes : $hoy)->addDays(max(1, $this->parametros->entero('renta.dias_para_pagar')));
 
-        return CargoRenta::query()->firstOrCreate(
+        $cargo = CargoRenta::query()->firstOrCreate(
             ['estudio_id' => $estudio->getKey(), 'periodo' => $periodo, 'clave' => 'periodo'],
             [
                 'concepto' => 'renta',
@@ -152,6 +152,12 @@ class GenerarCargoRenta
                 'emitido_en' => now(),
             ],
         );
+        // Un mes gratis por referidos (ADR 0188): este cargo queda sin cargo.
+        if ($cargo->wasRecentlyCreated) {
+            app(ReferidosSaas::class)->aplicarAlCargo($cargo);
+        }
+
+        return $cargo;
     }
 
     /**

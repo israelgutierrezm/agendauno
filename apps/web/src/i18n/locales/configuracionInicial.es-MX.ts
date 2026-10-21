@@ -92,6 +92,8 @@ export default {
     incluir: "Ofrecer",
     clases: "Clases",
     vigencia: {
+      muestra:
+        "Clase muestra: solo para quien viene por primera vez, vale 14 días",
       suelta: "Una clase, vale 30 días",
       paquete: "Vale un mes",
       mensualidad: "Clases ilimitadas durante un mes",

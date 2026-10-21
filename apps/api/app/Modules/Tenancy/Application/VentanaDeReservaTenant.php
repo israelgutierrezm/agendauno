@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Reservas\Exceptions\FueraDeVentana;
 use Carbon\CarbonImmutable;
@@ -16,22 +17,30 @@ use Carbon\CarbonImmutable;
  * - Citas: con `citas.minutos_anticipacion_minima` de anticipación y hasta
  *   `citas.dias_maximos_adelante` días adelante.
  *
- * Solo aplica al cliente: el negocio reserva y agenda cuando lo necesita.
+ * Solo aplica al cliente: el negocio reserva y agenda cuando lo necesita. Un plan con
+ * acceso anticipado (ADR 0182) le abre las clases esas horas antes que a los demás.
  */
 class VentanaDeReservaTenant
 {
     public function __construct(private readonly ParametrosTenant $parametros) {}
 
-    /** Lanza FueraDeVentana si el cliente aún no puede, o ya no puede, reservar la clase. */
-    public function exigirParaClase(SesionTenant $sesion): void
+    /**
+     * Lanza FueraDeVentana si el cliente aún no puede, o ya no puede, reservar la clase.
+     * Con la persona, cuenta el acceso anticipado de sus planes.
+     */
+    public function exigirParaClase(SesionTenant $sesion, ?PersonaTenant $persona = null): void
     {
         $inicia = CarbonImmutable::instance($sesion->inicia_en);
         $ahora = CarbonImmutable::now();
 
         $dias = $this->parametros->entero('reservas.dias_apertura');
         if ($dias > 0 && $ahora->lessThan($inicia->subDays($dias))) {
-            $abre = $inicia->subDays($dias)->setTimezone($this->zona($sesion));
-            throw new FueraDeVentana('Las reservas de esta clase abren el '.$abre->format('d/m/Y').' a las '.$abre->format('H:i').'.');
+            $antes = $persona !== null ? app(ResolverDerechoTenant::class)->horasDeAccesoAnticipado($persona, $sesion) : 0;
+            $abre = $inicia->subDays($dias)->subHours($antes);
+            if ($ahora->lessThan($abre)) {
+                $local = $abre->setTimezone($this->zona($sesion));
+                throw new FueraDeVentana('Las reservas de esta clase abren '.($antes > 0 ? 'para ti ' : '').'el '.$local->format('d/m/Y').' a las '.$local->format('H:i').'.');
+            }
         }
 
         $minutos = $this->parametros->entero('reservas.minutos_cierre');

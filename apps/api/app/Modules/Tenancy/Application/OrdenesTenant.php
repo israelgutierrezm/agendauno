@@ -83,11 +83,12 @@ class OrdenesTenant
             // Clase de prueba (B03): una sola, para quien nunca vino.
             if (! $renovacion && $item['producto']->primera_vez) {
                 $quien = $item['beneficiario'] ?? $comprador;
-                $clave = (int) $quien->getKey();
-                if (max(1, $item['cantidad']) > 1 || isset($pruebas[$clave]) || ! app(PrimeraVezTenant::class)->elegible($quien)) {
+                // No es la clave de reintento de la orden (`$clave`): no se pisa.
+                $quienId = (int) $quien->getKey();
+                if (max(1, $item['cantidad']) > 1 || isset($pruebas[$quienId]) || ! app(PrimeraVezTenant::class)->elegible($quien)) {
                     throw new PrimeraVezNoDisponible(PrimeraVezTenant::MENSAJE);
                 }
-                $pruebas[$clave] = true;
+                $pruebas[$quienId] = true;
             }
             if ($item['producto']->moneda !== $moneda) {
                 throw new MonedaMixta('Una orden no puede mezclar monedas.');

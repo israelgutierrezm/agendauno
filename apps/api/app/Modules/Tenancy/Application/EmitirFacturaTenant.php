@@ -313,7 +313,8 @@ class EmitirFacturaTenant
         // facturas iguales ya se timbraron. Si FacturAPI no respondió a tiempo (y esta
         // transacción se deshizo), el reintento lleva la misma llave y recibe la misma
         // factura; una igual después de cancelar la anterior es otra llave.
-        $huella = sha1((string) json_encode($cuerpo));
+        // SHA-256 recortado a la columna (40): sha1 no se usa (preset de seguridad).
+        $huella = substr(hash('sha256', (string) json_encode($cuerpo)), 0, 40);
         $previas = FacturaTenant::query()->where('huella', $huella)->whereNotNull('facturapi_id')->count();
         $comun['huella'] = $huella;
         try {

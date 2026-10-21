@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Application\MonedaDeCobroSaas;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
+use App\Modules\Tenancy\Application\ReferidosSaas;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\TiposDeCambio;
 use App\Modules\Tenancy\ModalidadServicio;
@@ -350,5 +351,18 @@ class FacturacionController
         abort_unless($estudio instanceof Estudio, 404);
 
         return $estudio;
+    }
+
+    /** Referidos (ADR 0188): su código, su enlace, a quiénes invitó y sus meses gratis. */
+    public function referidos(Request $request, ReferidosSaas $referidos): JsonResponse
+    {
+        $estudio = $this->estudio($request);
+        $codigo = $referidos->codigo($estudio);
+
+        return response()->json(['data' => [
+            'codigo' => $codigo,
+            'invitados' => Estudio::query()->where('referido_por_id', $estudio->getKey())->count(),
+            'beneficios' => $referidos->beneficios($estudio),
+        ]]);
     }
 }

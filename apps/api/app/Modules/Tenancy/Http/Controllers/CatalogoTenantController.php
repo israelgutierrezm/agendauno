@@ -11,6 +11,7 @@ use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\NivelTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
@@ -170,6 +171,8 @@ class CatalogoTenantController
             // Anticipo para apartar en línea (citas, ADR 0161): un monto o un porcentaje.
             'anticipo_minor' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::MAX_PRECIO_MINOR, 'prohibits:anticipo_pct'],
             'anticipo_pct' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:99'],
+            // Clase en línea (ADR 0184): el enlace que ve solo quien la reservó.
+            'enlace_en_linea' => ['sometimes', 'nullable', 'string', 'max:500', 'url:https'],
         ], [
             'modalidad.in' => $esCitas
                 ? 'En un negocio de citas cada servicio es individual.'
@@ -198,6 +201,7 @@ class CatalogoTenantController
                 : ($esCitas ? 30 : null),
             'preparacion_min' => (int) ($validado['preparacion_min'] ?? 0),
             'limpieza_min' => (int) ($validado['limpieza_min'] ?? 0),
+            'enlace_en_linea' => self::enlace($validado['enlace_en_linea'] ?? null),
             ...($anticipo ?? []),
         ]);
 
@@ -241,6 +245,11 @@ class CatalogoTenantController
             // Anticipo para apartar en línea (citas, ADR 0161): un monto o un porcentaje.
             'anticipo_minor' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::MAX_PRECIO_MINOR, 'prohibits:anticipo_pct'],
             'anticipo_pct' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:99'],
+            // Clase en línea (ADR 0184).
+            'enlace_en_linea' => ['sometimes', 'nullable', 'string', 'max:500', 'url:https'],
+            // Nivel que pide la clase y práctica libre (ADR 0187).
+            'nivel_id' => ['sometimes', 'nullable', 'string'],
+            'practica_libre' => ['sometimes', 'boolean'],
         ]);
 
         // Primero se valida todo; después se guarda todo junto (ver abajo).
@@ -261,6 +270,19 @@ class CatalogoTenantController
             if ($request->has($campo)) {
                 $cambios[$campo] = $this->descripcion($validado[$campo] ?? null);
             }
+        }
+        if ($request->has('enlace_en_linea')) {
+            $cambios['enlace_en_linea'] = self::enlace($validado['enlace_en_linea'] ?? null);
+        }
+        if ($request->has('practica_libre')) {
+            $cambios['practica_libre'] = (bool) $validado['practica_libre'];
+        }
+        if ($request->has('nivel_id')) {
+            $nivel = ($validado['nivel_id'] ?? '') !== '' ? NivelTenant::query()->where('ulid', (string) $validado['nivel_id'])->first() : null;
+            if (($validado['nivel_id'] ?? '') !== '' && (! $nivel instanceof NivelTenant || (int) $nivel->actividad_id !== (int) $oferta->actividad_id)) {
+                throw ValidationException::withMessages(['nivel_id' => ['Ese nivel no es de la actividad de esta clase.']]);
+            }
+            $cambios['nivel_id'] = $nivel?->getKey();
         }
         $recursos = null;
         if (array_key_exists('recursos', $validado)) {
@@ -412,7 +434,7 @@ class CatalogoTenantController
     public function ofertas(Request $request): JsonResponse
     {
         $ofertas = OfertaTenant::query()
-            ->with(['actividad', 'recursos', 'incluidas'])
+            ->with(['actividad.niveles', 'recursos', 'incluidas'])
             ->when(! $request->boolean('archivados'), fn ($q) => $q->vigentes())
             ->orderBy('nombre')
             ->get();
@@ -485,6 +507,11 @@ class CatalogoTenantController
             'para_principiantes' => $oferta->para_principiantes,
             'requisitos' => $oferta->requisitos,
             'que_llevar' => $oferta->que_llevar,
+            'enlace_en_linea' => $oferta->enlace_en_linea,
+            // El nivel que pide y si es práctica libre (ADR 0187).
+            'nivel' => $oferta->nivel_id === null ? null : (($n = NivelTenant::query()->find((int) $oferta->nivel_id)) === null ? null : ['id' => $n->ulid, 'nombre' => $n->nombre]),
+            'practica_libre' => (bool) $oferta->practica_libre,
+            'niveles_actividad' => $oferta->actividad?->niveles->sortBy('orden')->map(static fn (NivelTenant $n): array => ['id' => $n->ulid, 'nombre' => $n->nombre])->values()->all() ?? [],
             'modalidad' => $oferta->modalidad->value,
             'capacidad' => $oferta->capacidad,
             'lugares' => $oferta->lugares,
@@ -536,5 +563,13 @@ class CatalogoTenantController
         if ((int) ($precioMinor ?? 0) <= 0) {
             throw ValidationException::withMessages(['precio_clase_minor' => ['Un servicio que se paga al reservar necesita un precio mayor a 0.']]);
         }
+    }
+
+    /** El enlace de la clase en línea, sin espacios; vacío, ninguno. */
+    private static function enlace(mixed $valor): ?string
+    {
+        $texto = is_string($valor) ? trim($valor) : '';
+
+        return $texto === '' ? null : $texto;
     }
 }

@@ -36,7 +36,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en', 'regreso_dias', 'anticipo_minor', 'anticipo_pct'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en', 'regreso_dias', 'anticipo_minor', 'anticipo_pct', 'enlace_en_linea', 'nivel_id', 'practica_libre'];
 
     /**
      * @var array<string, string>
@@ -45,6 +45,7 @@ class OfertaTenant extends Model
         'modalidad' => ModalidadOfertaTenant::class,
         'capacidad' => 'integer',
         'lugares' => 'integer',
+        'practica_libre' => 'boolean',
         'precio_clase_minor' => 'integer',
         'politica_reserva' => PoliticaReservaTenant::class,
         'duracion_minutos' => 'integer',

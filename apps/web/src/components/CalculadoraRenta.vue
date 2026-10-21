@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { RouterLink } from "vue-router";
 
 import type { Modo } from "@/marketing/modalidades";
 import {
   type NivelCitas,
   type PreciosPublicos,
   dolares,
+  fechaDelTipo,
   maxAlumnos,
+  pesosConIva,
+  pesosRedondos,
   tablaCitas,
 } from "@/marketing/precios";
 
@@ -16,14 +20,16 @@ import {
 | calcula sea la que verá al contratar.
 | - Clases: los alumnos activos del mes eligen una sola banda para todo el mes.
 | - Citas: plan y profesionales, al mes o al año (por adelantado).
-| Muestra el IVA de México aparte y cómo se convierte a pesos, sin inventar un tipo de
-| cambio.
+| Muestra el IVA de México aparte y, con el último FIX publicado, el equivalente en
+| pesos con IVA (sin él, cómo se convierte, sin inventar un tipo de cambio).
 */
 const props = defineProps<{
   modo: Modo;
   precios: PreciosPublicos;
   /** Al año (citas); lo comparte con la tabla. */
   anual?: boolean;
+  /** Con el registro cerrado no se ofrece empezar (prelanzamiento, ADR 0108). */
+  registroAbierto?: boolean;
 }>();
 
 const alumnos = ref(45);
@@ -111,6 +117,20 @@ const conIva = computed(() => {
   const impuesto = Math.round((importe * iva.value) / 100);
   return { impuesto, total: importe + impuesto };
 });
+
+// En pesos con IVA al último FIX conocido (si la tarifa es en dólares y hay uno).
+const enPesos = computed(() => {
+  const importe = resultado.value.importe;
+  const tipo = props.precios.tipo_cambio;
+  if (importe === null || importe === 0 || moneda.value !== "USD" || !tipo) {
+    return null;
+  }
+  return {
+    total: pesosRedondos(pesosConIva(importe, iva.value, tipo)),
+    fecha: fechaDelTipo(tipo.fecha),
+    tipo: (tipo.diezmilesimas / 10000).toFixed(4),
+  };
+});
 </script>
 
 <template>
@@ -167,6 +187,15 @@ const conIva = computed(() => {
       </p>
       <p class="calculadora-detalle">{{ resultado.detalle }}</p>
       <p
+        v-if="enPesos"
+        class="calculadora-pesos"
+        data-prueba="calculadora-pesos"
+      >
+        En México, unos <strong>{{ enPesos.total }}</strong> MXN
+        {{ resultado.periodo }} con IVA, al tipo de cambio FIX del
+        {{ enPesos.fecha }} ({{ enPesos.tipo }} pesos por dólar).
+      </p>
+      <p
         v-if="conIva"
         class="calculadora-detalle"
         data-prueba="calculadora-iva"
@@ -179,6 +208,14 @@ const conIva = computed(() => {
           vigente el día en que se emite el cargo</template
         >. Fuera de México, sin IVA.
       </p>
+      <!-- El siguiente paso, desde la cifra (comparativo del 2026-10-20). -->
+      <RouterLink
+        v-if="registroAbierto !== false"
+        class="tu-btn tu-btn-primario calculadora-cta"
+        :to="{ name: 'registro', query: { modo } }"
+        data-prueba="calculadora-cta"
+        >Empezar con esta cifra</RouterLink
+      >
     </div>
   </section>
 </template>
@@ -190,6 +227,14 @@ const conIva = computed(() => {
   border: 1px solid var(--borde);
   border-radius: 16px;
   background: var(--superficie);
+}
+.calculadora-cta {
+  margin-top: 0.85rem;
+  display: inline-block;
+}
+.calculadora-pesos {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
 }
 .calculadora h3 {
   font-weight: 600;

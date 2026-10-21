@@ -15,6 +15,23 @@ export default {
     pedirOtraVez: "Volver a pedirlo",
     pedido:
       "Listo: le avisamos al equipo de AgendaUno para activar {nombre}. Te contactaremos.",
+    // Con precio publicado (ADR 0188).
+    precioUnico: "{precio} + IVA, un solo pago",
+    precioMensual: "{alta} + IVA de alta y {mensual} + IVA al mes",
+    gratisConAnual: "Sin costo con tu plan anual",
+  },
+  // Referidos entre negocios (ADR 0188).
+  referidos: {
+    titulo: "Invita a otro negocio",
+    ayuda:
+      "Cuando el negocio que invitas pague su primer mes, los dos reciben un mes gratis. Sin dinero en efectivo.",
+    codigo: "Tu código",
+    copiar: "Copiar enlace",
+    copiado: "Enlace copiado.",
+    invitados:
+      "Sin negocios invitados todavía | 1 negocio invitado | {n} negocios invitados",
+    pendiente: "Pendiente",
+    aplicado: "Aplicado",
   },
   niveles: {
     individual: "Individual",

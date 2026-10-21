@@ -192,8 +192,25 @@ const indicadores = computed<Indicador[]>(() => {
 });
 
 const truncado = ref<number | null>(null);
+// Avisos de coherencia del catálogo (precios por clase que suben, «ilimitado» con
+// tope, reglas apagadas): no impiden vender.
+const avisos = ref<{ codigo: string; producto_id: string; mensaje: string }[]>(
+  [],
+);
+async function cargarAvisos(): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: typeof avisos.value }>(
+      `${base.value}/productos/coherencia`,
+    );
+    avisos.value = data.data;
+  } catch {
+    // Son una ayuda: si no llegan, la lista sigue igual.
+    avisos.value = [];
+  }
+}
 async function cargar(): Promise<void> {
   error.value = null;
+  void cargarAvisos();
   try {
     const { data } = await api.get<{
       data: Plan[];
@@ -217,9 +234,15 @@ function abrir(p: Plan | null): void {
 const editorPlan = useContenedorEditor(abierto);
 const editorCuotas = useContenedorEditor(cuotasAbiertas);
 const toast = useToastStore();
-async function guardado(nombre: string): Promise<void> {
+async function guardado(
+  nombre: string,
+  avisosDelPlan: string[] = [],
+): Promise<void> {
   editorPlan.cerrado();
   toast.exito(t("planes.editor.guardadoNombre", { nombre }));
+  for (const aviso of avisosDelPlan) {
+    toast.aviso(aviso);
+  }
   await cargar();
 }
 function cuotasGuardadas(): void {
@@ -289,6 +312,20 @@ onMounted(cargar);
         data-prueba="planes-truncado"
       >
         {{ $t("planesVisual.truncado", { n: truncado }) }}
+      </AvisoTono>
+      <AvisoTono
+        v-if="avisos.length > 0"
+        tono="aviso"
+        class="mt-4"
+        data-prueba="planes-coherencia"
+      >
+        <p class="font-medium">{{ $t("planes.coherencia.titulo") }}</p>
+        <ul class="mt-1 list-disc space-y-1 pl-5">
+          <li v-for="a in avisos" :key="`${a.codigo}-${a.producto_id}`">
+            {{ a.mensaje }}
+          </li>
+        </ul>
+        <p class="mt-1 text-xs">{{ $t("planes.coherencia.ayuda") }}</p>
       </AvisoTono>
 
       <div class="tu-card mt-5">

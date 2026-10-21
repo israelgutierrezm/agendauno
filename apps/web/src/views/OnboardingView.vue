@@ -47,13 +47,18 @@ interface Sugerencias {
     precio_minor: number;
   }[];
   clases: { nombre: string; duracion_minutos: number; capacidad: number }[];
+  // El catálogo de arranque del giro: clase muestra (para quien viene por primera
+  // vez), clase suelta, paquetes y mensualidad.
   planes: {
     clave: string;
+    tipo?: TipoPlanSugerido;
     nombre: string;
     precio_minor: number;
     clases: number | null;
+    primera_vez?: boolean;
   }[];
 }
+type TipoPlanSugerido = "muestra" | "suelta" | "paquete" | "mensualidad";
 interface Oferta {
   id: string;
   nombre: string;
@@ -173,6 +178,7 @@ const horario = ref<
 const planes = ref<
   {
     clave: string;
+    tipo: TipoPlanSugerido;
     incluir: boolean;
     nombre: string;
     precio: string;
@@ -340,6 +346,7 @@ function sugerir(s: Sugerencias): void {
   }
   planes.value = s.planes.map((p) => ({
     clave: p.clave,
+    tipo: p.tipo ?? (p.clave as TipoPlanSugerido),
     incluir: productos.value.length === 0,
     nombre: p.nombre,
     precio: aTexto(p.precio_minor, sesion.pais),
@@ -598,32 +605,43 @@ async function guardarPlanes(): Promise<void> {
       moneda: sesion.moneda,
     };
     const datos =
-      p.clave === "suelta"
+      p.tipo === "muestra"
         ? {
+            // Solo la compra, una vez, quien nunca vino (validado en el servidor).
             ...comun,
             tipo: "sesion_individual",
             ilimitado: false,
             creditos_incluidos: 1000,
             vigencia_tipo: "dias",
-            vigencia_cantidad: 30,
+            vigencia_cantidad: 14,
+            primera_vez: true,
           }
-        : p.clave === "paquete"
+        : p.tipo === "suelta"
           ? {
               ...comun,
-              tipo: "paquete",
+              tipo: "sesion_individual",
               ilimitado: false,
-              creditos_incluidos: Number(p.clases) * 1000,
-              vigencia_tipo: "meses",
-              vigencia_cantidad: 1,
+              creditos_incluidos: 1000,
+              vigencia_tipo: "dias",
+              vigencia_cantidad: 30,
             }
-          : {
-              ...comun,
-              tipo: "membresia",
-              ilimitado: true,
-              creditos_incluidos: null,
-              vigencia_tipo: "meses",
-              vigencia_cantidad: 1,
-            };
+          : p.tipo === "paquete"
+            ? {
+                ...comun,
+                tipo: "paquete",
+                ilimitado: false,
+                creditos_incluidos: Number(p.clases) * 1000,
+                vigencia_tipo: "meses",
+                vigencia_cantidad: 1,
+              }
+            : {
+                ...comun,
+                tipo: "membresia",
+                ilimitado: true,
+                creditos_incluidos: null,
+                vigencia_tipo: "meses",
+                vigencia_cantidad: 1,
+              };
     const { data } = await api.post<{
       data: { id: string; nombre: string; precio_minor: number };
     }>(`${base.value}/productos`, datos);
@@ -1371,7 +1389,7 @@ onMounted(cargar);
               </label>
               <label class="block min-w-0 flex-1">
                 <span class="tu-label">{{
-                  $t(`configuracionInicial.planes.vigencia.${p.clave}`)
+                  $t(`configuracionInicial.planes.vigencia.${p.tipo}`)
                 }}</span>
                 <input
                   v-model="p.nombre"
@@ -1379,7 +1397,7 @@ onMounted(cargar);
                   :aria-label="$t('configuracionInicial.catalogo.nombre')"
                 />
               </label>
-              <label v-if="p.clave === 'paquete'" class="block w-24">
+              <label v-if="p.tipo === 'paquete'" class="block w-24">
                 <span class="tu-label">{{
                   $t("configuracionInicial.planes.clases")
                 }}</span>

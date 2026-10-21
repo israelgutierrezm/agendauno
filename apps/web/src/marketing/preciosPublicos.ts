@@ -25,6 +25,9 @@ export function aplicarPreciosPublicos(datos: Partial<PreciosPublicos>): void {
     ventas: { ...base.ventas, ...datos.ventas },
     timbres: { ...base.timbres, ...datos.timbres },
     registro: { ...base.registro, ...datos.registro },
+    tipo_cambio: datos.tipo_cambio ?? base.tipo_cambio ?? null,
+    servicios: datos.servicios ?? base.servicios,
+    referidos: datos.referidos ?? base.referidos,
   };
   preciosPublicos.cargados = true;
 }

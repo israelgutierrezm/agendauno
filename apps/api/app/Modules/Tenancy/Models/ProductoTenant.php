@@ -30,6 +30,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property BajaAnticipada|null $baja_anticipada qué paga si da de baja antes (B04)
  * @property int|null $penalizacion_minor la penalización fija, si es por monto (B04)
  * @property int|null $penalizacion_porcentaje con «meses restantes», qué parte de lo que falte (1–100; ADR 0137)
+ * @property int|null $max_reservas_dia tope de reservas por día (ADR 0182)
+ * @property int|null $max_reservas_semana tope de reservas por semana (ADR 0182)
+ * @property int|null $acceso_anticipado_horas reserva esas horas antes de que abran para todos (ADR 0182)
+ * @property int|null $invitados_por_mes pases de invitado al mes (ADR 0182)
  */
 class ProductoTenant extends Model
 {
@@ -52,6 +56,8 @@ class ProductoTenant extends Model
         'permanencia_meses', 'baja_anticipada', 'penalizacion_minor',
         // Con «meses restantes», qué porcentaje de lo que falte (ADR 0137).
         'penalizacion_porcentaje',
+        // Planes «socio» (ADR 0182).
+        'max_reservas_dia', 'max_reservas_semana', 'acceso_anticipado_horas', 'invitados_por_mes',
     ];
 
     /**
@@ -73,6 +79,10 @@ class ProductoTenant extends Model
         'permanencia_meses' => 'integer',
         'baja_anticipada' => BajaAnticipada::class,
         'penalizacion_minor' => 'integer',
+        'max_reservas_dia' => 'integer',
+        'max_reservas_semana' => 'integer',
+        'acceso_anticipado_horas' => 'integer',
+        'invitados_por_mes' => 'integer',
         'penalizacion_porcentaje' => 'integer',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,

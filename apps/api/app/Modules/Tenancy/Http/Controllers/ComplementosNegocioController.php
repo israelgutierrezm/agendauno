@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Operacion\AlertaPlataforma;
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Application\ComplementosRentaSaas;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ModuloNegocio;
@@ -24,21 +25,37 @@ class ComplementosNegocioController
 {
     public const TIPO_ALERTA = 'modulo_solicitado';
 
-    public function __construct(private readonly AlertasPlataforma $alertas) {}
+    /** Servicios de pago único que se piden igual (ADR 0188). */
+    private const SERVICIOS = [
+        'arranque' => ['Arranque acompañado', 'Te dejamos listo: clases, paquetes, horario, pasarela de pago y tu sitio con plantilla.'],
+        'arranque_migracion' => ['Arranque con migración', 'El arranque acompañado y la migración de tus clientes con sus saldos y membresías (hasta 2,000).'],
+    ];
+
+    public function __construct(
+        private readonly AlertasPlataforma $alertas,
+        private readonly ComplementosRentaSaas $complementos,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
         $estudio = $this->estudio($request);
 
         return response()->json([
-            'data' => array_map(fn (ModuloNegocio $m): array => $this->presentar($estudio, $m), ModuloNegocio::cases()),
+            'data' => [
+                ...array_map(fn (ModuloNegocio $m): array => $this->presentar($estudio, $m), ModuloNegocio::cases()),
+                ...array_map(fn (string $clave): array => $this->presentarServicio($estudio, $clave), array_keys(self::SERVICIOS)),
+            ],
         ]);
     }
 
     public function solicitar(Request $request): JsonResponse
     {
         $estudio = $this->estudio($request);
-        $elegido = ModuloNegocio::tryFrom((string) $request->route('modulo')) ?? abort(404);
+        $clave = (string) $request->route('modulo');
+        if (isset(self::SERVICIOS[$clave])) {
+            return $this->solicitarServicio($request, $estudio, $clave);
+        }
+        $elegido = ModuloNegocio::tryFrom($clave) ?? abort(404);
         if ($estudio->moduloHabilitado($elegido)) {
             throw ValidationException::withMessages(['modulo' => ['Ya lo tienes activo.']]);
         }
@@ -66,13 +83,62 @@ class ComplementosNegocioController
             ->where('clave', self::clave($estudio, $modulo))
             ->first();
 
+        $precios = $this->complementos->precios();
+
         return [
             'clave' => $modulo->value,
+            'tipo' => 'modulo',
             'nombre' => $modulo->etiqueta(),
             'descripcion' => $modulo->descripcion(),
             'activo' => $activo,
             'solicitado_en' => $solicitud?->ultima_en?->toIso8601String(),
+            // Con precio publicado (ADR 0188); sin él, incluido.
+            'precio' => $modulo === ModuloNegocio::AppConMarca ? [
+                'alta_minor' => $precios['app_marca_alta_minor'],
+                'mensual_minor' => $precios['app_marca_mensual_minor'],
+                'moneda' => $precios['moneda'],
+                'gratis' => false,
+            ] : null,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarServicio(Estudio $estudio, string $clave): array
+    {
+        $precios = $this->complementos->precios();
+        $solicitud = AlertaPlataforma::query()->where('tipo', self::TIPO_ALERTA)->where('clave', "servicio:{$estudio->slug}:{$clave}")->first();
+
+        return [
+            'clave' => $clave,
+            'tipo' => 'servicio',
+            'nombre' => self::SERVICIOS[$clave][0],
+            'descripcion' => self::SERVICIOS[$clave][1],
+            'activo' => false,
+            'solicitado_en' => $solicitud?->ultima_en?->toIso8601String(),
+            'precio' => [
+                'alta_minor' => $clave === 'arranque' ? $precios['arranque_minor'] : $precios['arranque_migracion_minor'],
+                'mensual_minor' => null,
+                'moneda' => $precios['moneda'],
+                'gratis' => $this->complementos->arranqueGratis($estudio),
+            ],
+        ];
+    }
+
+    private function solicitarServicio(Request $request, Estudio $estudio, string $clave): JsonResponse
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        $quien = $usuario instanceof Usuario ? " (lo pidió {$usuario->name})" : '';
+        $gratis = $this->complementos->arranqueGratis($estudio) ? ' Tiene plan anual: va sin costo.' : '';
+        $this->alertas->registrar(
+            self::TIPO_ALERTA,
+            "servicio:{$estudio->slug}:{$clave}",
+            "{$estudio->nombre} pide «".self::SERVICIOS[$clave][0]."»{$quien}.{$gratis} Contáctalo para agendar.",
+            $estudio->slug,
+        );
+
+        return response()->json(['data' => $this->presentarServicio($estudio, $clave)], 201);
     }
 
     private static function clave(Estudio $estudio, ModuloNegocio $modulo): string

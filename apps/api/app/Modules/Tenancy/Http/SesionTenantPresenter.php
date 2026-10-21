@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http;
 
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
+use App\Modules\Tenancy\Models\InvitadoSesionTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -35,7 +36,7 @@ class SesionTenantPresenter
      * Los conteos que usan `clase` y `ocupacion` (para `withCount` o `loadCount`): los de
      * la regla única de cupo.
      *
-     * @return array<string, Closure(Builder<ReservaTenant>|Builder<LugarPlataformaTenant>): void>
+     * @return array<string, Closure(Builder<ReservaTenant>|Builder<LugarPlataformaTenant>|Builder<InvitadoSesionTenant>): void>
      */
     public static function conteos(): array
     {

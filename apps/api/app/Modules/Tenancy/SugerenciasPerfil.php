@@ -12,7 +12,7 @@ namespace App\Modules\Tenancy;
  *
  * @phpstan-type Servicio array{nombre: string, duracion_minutos: int, precio_minor: int}
  * @phpstan-type Clase array{nombre: string, duracion_minutos: int, capacidad: int}
- * @phpstan-type Plan array{clave: string, nombre: string, precio_minor: int, clases: int|null}
+ * @phpstan-type Plan array{clave: string, tipo: string, nombre: string, precio_minor: int, clases: int|null, primera_vez: bool}
  */
 final class SugerenciasPerfil
 {
@@ -24,13 +24,50 @@ final class SugerenciasPerfil
         return [
             'servicios' => self::servicios($perfil),
             'clases' => self::clases($perfil),
-            // Los planes de un negocio de clases (clase suelta, paquete y mensualidad).
-            'planes' => [
-                ['clave' => 'suelta', 'nombre' => 'Clase suelta', 'precio_minor' => 20000, 'clases' => 1],
-                ['clave' => 'paquete', 'nombre' => 'Paquete 8 clases', 'precio_minor' => 120000, 'clases' => 8],
-                ['clave' => 'mensualidad', 'nombre' => 'Mensualidad ilimitada', 'precio_minor' => 150000, 'clases' => null],
-            ],
+            'planes' => self::planes($perfil),
         ];
+    }
+
+    /**
+     * El catálogo de arranque de un negocio de clases (comparativo del 2026-10-20): la
+     * clase muestra para quien viene por primera vez, la clase suelta, los paquetes
+     * típicos del giro (más grandes, más baratos por clase) y la mensualidad. Precios de
+     * referencia de estudios reales en México; el dueño los ajusta.
+     *
+     * @return list<Plan>
+     */
+    private static function planes(PerfilNegocio $perfil): array
+    {
+        $muestra = static fn (string $nombre, int $pesos): array => ['clave' => 'muestra', 'tipo' => 'muestra', 'nombre' => $nombre, 'precio_minor' => $pesos * 100, 'clases' => 1, 'primera_vez' => true];
+        $suelta = static fn (int $pesos): array => ['clave' => 'suelta', 'tipo' => 'suelta', 'nombre' => 'Clase suelta', 'precio_minor' => $pesos * 100, 'clases' => 1, 'primera_vez' => false];
+        // El primer paquete conserva la clave `paquete`; los demás, `paquete_{n}`.
+        $paquetes = static fn (array $porClases): array => array_map(
+            static fn (int $clases, int $pesos, int $i): array => [
+                'clave' => $i === 0 ? 'paquete' : "paquete_{$clases}",
+                'tipo' => 'paquete',
+                'nombre' => "Paquete {$clases} clases",
+                'precio_minor' => $pesos * 100,
+                'clases' => $clases,
+                'primera_vez' => false,
+            ],
+            array_keys($porClases),
+            array_values($porClases),
+            array_keys(array_values($porClases)),
+        );
+        $mensual = static fn (int $pesos, string $nombre = 'Mensualidad ilimitada'): array => ['clave' => 'mensualidad', 'tipo' => 'mensualidad', 'nombre' => $nombre, 'precio_minor' => $pesos * 100, 'clases' => null, 'primera_vez' => false];
+
+        return match ($perfil) {
+            PerfilNegocio::Pole => [$muestra('Clase muestra', 200), $suelta(280), ...$paquetes([4 => 900, 8 => 1600, 12 => 2200]), $mensual(2600)],
+            PerfilNegocio::Pilates => [$muestra('Clase muestra', 150), $suelta(350), ...$paquetes([5 => 1500, 10 => 2800, 20 => 5000]), $mensual(4000)],
+            PerfilNegocio::Cycling => [$muestra('Primera rodada', 120), $suelta(250), ...$paquetes([5 => 1100, 10 => 2000, 20 => 3600]), $mensual(2900)],
+            PerfilNegocio::Yoga => [$muestra('Clase muestra', 100), $suelta(200), ...$paquetes([8 => 1200, 12 => 1600]), $mensual(1500)],
+            PerfilNegocio::Danza => [$muestra('Clase muestra', 100), $suelta(180), ...$paquetes([8 => 1100]), $mensual(1300, 'Mensualidad')],
+            PerfilNegocio::Natacion => [$muestra('Clase muestra', 150), $suelta(250), ...$paquetes([8 => 1600]), $mensual(1800, 'Mensualidad')],
+            PerfilNegocio::Gimnasio => [$muestra('Pase de un día', 150), ...$paquetes([10 => 1100]), $mensual(900, 'Mensualidad')],
+            PerfilNegocio::Crossfit => [$muestra('Clase de prueba', 200), $suelta(250), ...$paquetes([12 => 2000]), $mensual(2200)],
+            PerfilNegocio::Hyrox => [$muestra('Pase de un día', 400), ...$paquetes([8 => 2000, 16 => 3400]), $mensual(2800)],
+            default => [$muestra('Clase muestra', 150), $suelta(200), ...$paquetes([8 => 1200]), $mensual(1500)],
+        };
     }
 
     /**
@@ -61,6 +98,7 @@ final class SugerenciasPerfil
         return match ($perfil) {
             PerfilNegocio::Pole => [$c('Pole Nivel 1', 60, 8), $c('Pole Nivel 2', 60, 8), $c('Flexibilidad', 60, 10)],
             PerfilNegocio::Pilates => [$c('Pilates Mat', 50, 12), $c('Pilates Reformer', 50, 6)],
+            PerfilNegocio::Cycling => [$c('Indoor cycling', 45, 20), $c('Cycling + fuerza', 50, 16)],
             PerfilNegocio::Yoga => [$c('Hatha Yoga', 60, 15), $c('Vinyasa', 60, 15)],
             PerfilNegocio::Danza => [$c('Ballet infantil', 60, 12), $c('Jazz', 60, 15)],
             PerfilNegocio::Natacion => [$c('Natación niños', 45, 6), $c('Natación adultos', 45, 8)],

@@ -12,7 +12,7 @@ import AntesDeReservar from "./AntesDeReservar.vue";
 | se puede intentar igual.
 */
 
-const api = vi.hoisted(() => ({ get: vi.fn() }));
+const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Sin conexión" }));
 vi.mock("vue-router", () => ({
   RouterLink: {
@@ -99,6 +99,32 @@ describe("antes de reservar", () => {
 
     await w.get('[data-prueba="confirmar-reserva"]').trigger("click");
     expect(w.emitted("confirmar")?.[0]).toEqual([false, null]);
+  });
+
+  it("con pases de invitado del plan, aparta un lugar para alguien", async () => {
+    api.get
+      .mockResolvedValueOnce(antes({ pases_invitado: 1 }))
+      .mockResolvedValueOnce(antes({ pases_invitado: 0 }));
+    api.post.mockResolvedValueOnce({ data: { data: { id: "i1" } } });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="invitar"] summary').text()).toBe(
+      "Invitar a alguien (te queda 1 pase este mes)",
+    );
+    await w.get('[data-prueba="invitado-nombre"]').setValue("Mar Pérez");
+    await w.get('[data-prueba="invitar"] form').trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/mi/sesiones/s1/invitados",
+      { nombre: "Mar Pérez" },
+    );
+    expect(w.get('[data-prueba="invitado-listo"]').text()).toContain(
+      "Apartamos un lugar para Mar Pérez.",
+    );
+    // Ya sin pases: ya no se ofrece.
+    expect(w.find('[data-prueba="invitar"]').exists()).toBe(false);
   });
 
   it("sin plan vigente dice el motivo y lleva a revisar su plan, sin botón de reservar", async () => {

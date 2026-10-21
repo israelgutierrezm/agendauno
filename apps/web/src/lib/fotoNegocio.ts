@@ -13,6 +13,8 @@ const FOTOS: Record<string, string> = {
   yoga: "yoga-v1.jpg",
   danza: "danza-v1.jpg",
   gimnasio: "gimnasio-v1.jpg",
+  // Sin foto propia todavía: la del gimnasio.
+  cycling: "gimnasio-v1.jpg",
   crossfit: "crossfit-v1.webp",
   hyrox: "crossfit-hyrox-v1.webp",
   natacion: "natacion-v1.jpg",

@@ -19,6 +19,7 @@ enum PerfilNegocio: string
     case Hyrox = 'hyrox';
     case Pilates = 'pilates';
     case Pole = 'pole';
+    case Cycling = 'cycling';
     case Natacion = 'natacion';
     case Danza = 'danza';
     case Yoga = 'yoga';
@@ -50,6 +51,10 @@ enum PerfilNegocio: string
             self::Pole => [
                 'terminologia' => ['sesion' => 'Clase', 'miembro' => 'Alumna', 'instructor' => 'Coach'],
                 'flags' => ['grupos' => false, 'niveles' => true, 'acceso_abierto' => false],
+            ],
+            self::Cycling => [
+                'terminologia' => ['sesion' => 'Clase', 'miembro' => 'Alumno', 'instructor' => 'Coach'],
+                'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
             ],
             self::Pilates, self::Yoga => [
                 'terminologia' => ['sesion' => 'Sesión', 'miembro' => 'Alumno', 'instructor' => 'Instructor'],

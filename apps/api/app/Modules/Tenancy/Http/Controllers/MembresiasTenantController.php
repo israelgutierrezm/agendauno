@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
+use App\Modules\Tenancy\Application\CoherenciaCatalogoTenant;
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
@@ -103,6 +104,7 @@ class MembresiasTenantController
             'cobra_inscripcion' => ['sometimes', 'boolean'],
             'cobra_anualidad' => ['sometimes', 'boolean'],
             ...self::reglasPermanencia(),
+            ...self::reglasSocio(),
         ]);
         // Un negocio de citas vende bonos de sesiones, no membresías (ADR 0130).
         $this->modalidades->exigirAtributos($validado);
@@ -134,9 +136,11 @@ class MembresiasTenantController
             'cobra_inscripcion' => (bool) ($validado['cobra_inscripcion'] ?? false),
             'cobra_anualidad' => (bool) ($validado['cobra_anualidad'] ?? false),
             ...self::permanencia($validado),
+            ...array_map(static fn (mixed $v): ?int => $v === null ? null : (int) $v, array_intersect_key($validado, array_flip(self::REGLAS_SOCIO))),
         ]);
 
-        return response()->json(['data' => $this->presentarProducto($producto)], 201);
+        // Avisos de coherencia del catálogo (no bloquean).
+        return response()->json(['data' => $this->presentarProducto($producto), 'meta' => ['avisos' => app(CoherenciaCatalogoTenant::class)->revisar($producto)]], 201);
     }
 
     /**
@@ -175,6 +179,7 @@ class MembresiasTenantController
             'cobra_inscripcion' => ['sometimes', 'boolean'],
             'cobra_anualidad' => ['sometimes', 'boolean'],
             ...self::reglasPermanencia(),
+            ...self::reglasSocio(),
         ]);
 
         self::exigirCuotasConMonto($validado);
@@ -184,7 +189,7 @@ class MembresiasTenantController
         abort_if($archiva && ! ($actor instanceof Usuario && $actor->puede('productos.eliminar')), 403);
 
         $atributos = [];
-        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado', 'destacado', 'primera_vez', 'cobra_inscripcion', 'cobra_anualidad'] as $campo) {
+        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado', 'destacado', 'primera_vez', 'cobra_inscripcion', 'cobra_anualidad', ...self::REGLAS_SOCIO] as $campo) {
             if ($request->has($campo)) {
                 $atributos[$campo] = $validado[$campo] ?? null;
             }
@@ -244,7 +249,13 @@ class MembresiasTenantController
             $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado', 'actividad_id', 'sucursal_id', 'sucursales_ids']),
         );
 
-        return response()->json(['data' => $this->presentarProducto($producto)]);
+        return response()->json(['data' => $this->presentarProducto($producto), 'meta' => ['avisos' => app(CoherenciaCatalogoTenant::class)->revisar($producto)]]);
+    }
+
+    /** Los avisos de coherencia de todo el catálogo a la venta. */
+    public function coherencia(CoherenciaCatalogoTenant $coherencia): JsonResponse
+    {
+        return response()->json(['data' => $coherencia->revisar()]);
     }
 
     public function vender(Request $request): JsonResponse
@@ -409,6 +420,11 @@ class MembresiasTenantController
             'descripcion' => $producto->descripcion,
             'destacado' => $producto->destacado,
             'primera_vez' => $producto->primera_vez,
+            // Planes «socio» (ADR 0182).
+            'max_reservas_dia' => $producto->max_reservas_dia,
+            'max_reservas_semana' => $producto->max_reservas_semana,
+            'acceso_anticipado_horas' => $producto->acceso_anticipado_horas,
+            'invitados_por_mes' => $producto->invitados_por_mes,
             'cobra_inscripcion' => $producto->cobra_inscripcion,
             'cobra_anualidad' => $producto->cobra_anualidad,
             // Permanencia (B04) y las condiciones que se aceptan al comprarlo.
@@ -479,6 +495,24 @@ class MembresiasTenantController
             'ilimitado' => $derecho->ilimitado,
             'saldo' => $derecho->ilimitado ? null : $this->libro->saldo($derecho),
             'disponible' => $derecho->ilimitado ? null : $this->libro->disponible($derecho),
+        ];
+    }
+
+    /** Topes, acceso anticipado e invitados de un plan (ADR 0182). */
+    private const REGLAS_SOCIO = ['max_reservas_dia', 'max_reservas_semana', 'acceso_anticipado_horas', 'invitados_por_mes'];
+
+    /**
+     * Vacío o null: sin la regla.
+     *
+     * @return array<string, list<string>>
+     */
+    private static function reglasSocio(): array
+    {
+        return [
+            'max_reservas_dia' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20'],
+            'max_reservas_semana' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
+            'acceso_anticipado_horas' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:720'],
+            'invitados_por_mes' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:20'],
         ];
     }
 

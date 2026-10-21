@@ -232,6 +232,7 @@ export default {
       fiscales: "Datos fiscales",
       terminologia: "Terminología",
       planes: "Planes y paquetes",
+      videos: "Videos para tus clientes",
       planesCitas: "Bonos",
       recursos: "Espacios y recursos",
       politicas: "Políticas de reserva y cancelación",
@@ -540,6 +541,22 @@ export default {
           aSinWhatsapp:
             "Nosotros. Escríbenos a {correo}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
         },
+        permanencia: {
+          q: "¿Hay plazo forzoso o contrato anual?",
+          a: "No. Pagas cada mes por los alumnos activos que tuviste y puedes dejar de usarlo cuando quieras. No hay costo de instalación: te das de alta tú mismo.",
+        },
+        comisiones: {
+          q: "¿Cobran comisión por mis ventas o pagos en línea?",
+          a: "No. AgendaUno no cobra comisión por tus ventas ni por tus pagos en línea, en ningún plan. La pasarela que conectes (Stripe, Mercado Pago u OpenPay) cobra su propia comisión, directo en tu cuenta.",
+        },
+        datos: {
+          q: "¿Qué pasa con mis datos si me voy?",
+          a: "Son tuyos. Descargas a tus alumnos en un archivo cuando quieras, desde Miembros. No usamos tus datos para nada que no sea darte el servicio.",
+        },
+        facturacion: {
+          q: "¿Puedo facturar a mis alumnos?",
+          a: "Sí, en México: emites el CFDI de cada venta desde el sistema, lo cancelas o lo sustituyes y haces notas de crédito. Cada factura usa un timbre de tus paquetes.",
+        },
         pagos: {
           q: "¿Mis alumnos pueden pagar en línea?",
           a: "Sí, si conectas tu propia pasarela (Stripe, Mercado Pago u OpenPay, en México): tus alumnos compran y pagan su plan desde su cuenta y el dinero llega a tu cuenta de la pasarela. También registras en recepción los pagos en efectivo o por transferencia.",
@@ -844,6 +861,14 @@ export default {
         citas: "Probar con citas",
       },
     },
+    // Lo que reemplaza y lo que nadie más da (comparativo del 2026-10-20).
+    porQue: {
+      etiqueta: "Por qué AgendaUno",
+      titulo: "Un solo sistema en lugar de seis.",
+      subtitulo:
+        "Lo que hoy resuelves con hojas de cálculo, mensajes a mano y servicios por separado, en un solo lugar y con un solo pago al mes.",
+      aparte: "Si quieres más ayuda",
+    },
     heroEscritura: {
       prefijo: "Una agenda para",
       pausar: "Pausar texto animado",
@@ -1047,6 +1072,7 @@ export default {
       salud: "Consultorio, nutrición o profesional de la salud",
       pilates: "Estudio de Pilates",
       pole: "Estudio de Pole dance",
+      cycling: "Estudio de cycling",
       yoga: "Estudio de Yoga",
       danza: "Escuela de danza",
       gimnasio: "Gimnasio",

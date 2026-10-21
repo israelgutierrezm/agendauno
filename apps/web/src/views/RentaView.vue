@@ -13,6 +13,8 @@ import PlanCitasRenta from "@/components/PlanCitasRenta.vue";
 import QuienCuentaRenta from "@/components/QuienCuentaRenta.vue";
 import TarjetaRenta from "@/components/TarjetaRenta.vue";
 import TimbresRenta from "@/components/TimbresRenta.vue";
+import WhatsAppRenta from "@/components/WhatsAppRenta.vue";
+import ReferidosRenta from "@/components/ReferidosRenta.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useRetornoPago } from "@/lib/retornoPago";
@@ -689,6 +691,16 @@ onMounted(() => {
           :pagado="retornoPago === 'exito'"
         />
       </div>
+
+      <!-- Mensajes de WhatsApp (ADR 0186): solo si está activo en el negocio. -->
+      <WhatsAppRenta
+        v-if="sesion.estudio?.whatsapp_clientes === true"
+        :base="base"
+        :puede-gestionar="puedeGestionar"
+      />
+
+      <!-- Referidos entre negocios (ADR 0188). -->
+      <ReferidosRenta :base="base" />
 
       <!-- Historial de cargos -->
       <!-- Complementos que se piden (ADR 0140): p. ej. Familias. -->
