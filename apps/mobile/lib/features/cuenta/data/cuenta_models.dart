@@ -1739,3 +1739,59 @@ class PaginaHistorial {
     );
   }
 }
+
+/// Un producto que el negocio ofrece al reservar (ADR 0194): se recoge y se paga en
+/// el mostrador el día de la clase.
+class ArticuloAlReservar {
+  const ArticuloAlReservar({
+    required this.id,
+    required this.nombre,
+    required this.precioMinor,
+    required this.moneda,
+    required this.disponibles,
+  });
+
+  final String id;
+  final String nombre;
+  final int precioMinor;
+  final String moneda;
+  final int disponibles;
+
+  factory ArticuloAlReservar.desdeJson(Map<String, dynamic> j) =>
+      ArticuloAlReservar(
+        id: j['id'] as String,
+        nombre: j['nombre'] as String? ?? '—',
+        precioMinor: (j['precio_minor'] as num? ?? 0).toInt(),
+        moneda: j['moneda'] as String? ?? 'MXN',
+        disponibles: (j['disponibles'] as num? ?? 0).toInt(),
+      );
+}
+
+/// Lo que ya apartó para esa clase.
+class ApartadoDeClase {
+  const ApartadoDeClase({
+    required this.id,
+    required this.nombre,
+    required this.cantidad,
+    required this.totalMinor,
+    required this.moneda,
+  });
+
+  final String id;
+  final String nombre;
+  final int cantidad;
+  final int totalMinor;
+  final String moneda;
+
+  factory ApartadoDeClase.desdeJson(Map<String, dynamic> j) => ApartadoDeClase(
+    id: j['id'] as String,
+    nombre:
+        ((j['articulo'] ?? const <String, dynamic>{})
+                as Map<String, dynamic>)['nombre']
+            as String? ??
+        '—',
+    cantidad: (j['cantidad'] as num? ?? 1).toInt(),
+    totalMinor: (j['total_minor'] as num? ?? 0).toInt(),
+    moneda: j['moneda'] as String? ?? 'MXN',
+  );
+}

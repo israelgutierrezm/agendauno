@@ -432,6 +432,55 @@ class CuentaRepository {
         '';
   }
 
+  /// Lo que se ofrece para recoger en esa clase y lo que ya apartó (ADR 0194).
+  Future<
+    ({List<ArticuloAlReservar> articulos, List<ApartadoDeClase> apartados})
+  >
+  articulosDeClase(String sesionId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/sesiones/$sesionId/articulos',
+    );
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    return (
+      articulos: ((data['articulos'] ?? []) as List)
+          .map((e) => ArticuloAlReservar.desdeJson(e as Map<String, dynamic>))
+          .toList(),
+      apartados: ((data['apartados'] ?? []) as List)
+          .map((e) => ApartadoDeClase.desdeJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// Aparta un producto para recogerlo en la clase (se paga en el mostrador).
+  Future<void> apartarArticulo(String sesionId, String articuloId) async {
+    await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/sesiones/$sesionId/articulos',
+      data: {'articulo_id': articuloId, 'cantidad': 1},
+    );
+  }
+
+  /// Quita lo apartado antes de la clase.
+  Future<void> quitarApartado(String apartadoId) async {
+    await _dio.delete<void>('$_base/mi/apartados/$apartadoId');
+  }
+
+  /// Si su pase puede ir a la cartera del teléfono (ADR 0195): Apple y Google.
+  Future<({bool apple, bool google})> walletDisponible() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/pase/wallet');
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    return (apple: data['apple'] == true, google: data['google'] == true);
+  }
+
+  /// El enlace «Guardar en Google Wallet» de su pase (un JWT firmado).
+  Future<String> urlGoogleWallet() async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/pase/wallet/google',
+    );
+    return ((res.data?['data'] ?? {}) as Map<String, dynamic>)['url']
+            as String? ??
+        '';
+  }
+
   /// Lo que pasará si reserva esa clase (M05); no aparta nada.
   Future<AntesDeReservar> antesDeReservar(String sesionId) async {
     final res = await _dio.get<Map<String, dynamic>>(

@@ -13,6 +13,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
+import 'apartados_clase.dart';
 import 'cuenta_screen.dart';
 import 'reprogramar_sheet.dart';
 
@@ -493,6 +494,13 @@ class _DetalleReserva extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(anticipo),
               ),
+            // Productos para recoger en la clase (ADR 0194), antes de que empiece.
+            if (!r.esCita &&
+                r.estado == 'confirmada' &&
+                r.sesionId != null &&
+                inicio != null &&
+                inicio.isAfter(DateTime.now()))
+              ApartadosClase(sesionId: r.sesionId!),
             const SizedBox(height: 16),
             if (inicio != null &&
                 (r.estado == 'confirmada' || r.estado == 'pendiente_pago'))

@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/tema_agendauno.dart';
 import '../data/cuenta_repository.dart';
@@ -23,12 +25,59 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
   String? _codigo;
   String? _error;
   Timer? _temporizador;
+  bool _googleWallet = false;
+  bool _abriendoWallet = false;
 
   @override
   void initState() {
     super.initState();
     _cargar();
     _temporizador = Timer.periodic(_renovar, (_) => _cargar());
+    _revisarWallet();
+  }
+
+  Future<void> _revisarWallet() async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    if (repo == null || defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+    try {
+      final disponible = await repo.walletDisponible();
+      if (mounted) {
+        setState(() => _googleWallet = disponible.google);
+      }
+    } on DioException {
+      // Sin cartera: el QR de siempre sigue sirviendo.
+    }
+  }
+
+  Future<void> _guardarEnGoogleWallet() async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    if (repo == null) {
+      return;
+    }
+    setState(() => _abriendoWallet = true);
+    try {
+      final url = await repo.urlGoogleWallet();
+      final abierto =
+          url.isNotEmpty &&
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      if (!abierto && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir Google Wallet.')),
+        );
+      }
+    } on DioException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo preparar tu pase.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _abriendoWallet = false);
+      }
+    }
   }
 
   @override
@@ -102,6 +151,20 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
                 height: 240,
                 child: Center(child: CircularProgressIndicator()),
               ),
+            if (_googleWallet) ...[
+              const SizedBox(height: 16),
+              OutlinedButton(
+                key: const Key('pase-google-wallet'),
+                onPressed: _abriendoWallet ? null : _guardarEnGoogleWallet,
+                child: const Text('Guardar en Google Wallet'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'El pase de la cartera no cambia cada minuto como este QR.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: context.colores.textoSuave),
+              ),
+            ],
           ],
         ),
       ),
