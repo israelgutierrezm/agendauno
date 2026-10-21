@@ -131,6 +131,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Páginas públicas de AgendaUno sin negocio (registro, directorio, legales).
         RateLimiter::for('publico', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
+        // El servicio web de Apple Wallet: muchos teléfonos detrás de una IP de Apple no,
+        // pero sí varias peticiones seguidas de un teléfono al registrar sus pases.
+        RateLimiter::for('wallet', fn (Request $request): Limit => Limit::perMinute(120)->by((string) $request->ip()));
 
         // Superadmin: va antes de validar su token (para frenar a quien lo adivina).
         RateLimiter::for('plataforma', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));

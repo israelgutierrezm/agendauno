@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\PaseWallet;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Support\ZipSinCompresion;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 
 /**
@@ -21,10 +23,105 @@ use RuntimeException;
  *
  * Las credenciales son de la plataforma (config `agendauno.wallet`); sin ellas la
  * cartera no se ofrece. Sin validar con certificados reales.
+ *
+ * El pase muestra su plan, hasta cuándo vale y su saldo, y se actualiza solo: Apple
+ * Wallet lo pide a su servicio web (`webServiceURL`) cuando se le avisa que cambió, y el
+ * objeto de Google Wallet se actualiza por su API ({@see ActualizarPasesWallet}).
  */
 class PasesWalletTenant
 {
-    public function __construct(private readonly PaseAccesoTenant $pases) {}
+    public function __construct(
+        private readonly PaseAccesoTenant $pases,
+        private readonly ResumenMembresiasTenant $membresias,
+    ) {}
+
+    /** El número de serie del pase: el negocio y la persona (no cambia con el slug). */
+    public static function serie(Estudio $estudio, PersonaTenant $persona): string
+    {
+        return $estudio->ulid.'-'.$persona->ulid;
+    }
+
+    /** El token con el que Apple Wallet se identifica ante el servicio web del pase. */
+    public static function tokenApple(string $serie): string
+    {
+        return hash_hmac('sha256', 'wallet-apple:'.$serie, (string) config('app.key'));
+    }
+
+    /** El identificador del objeto del pase en Google Wallet. */
+    public static function objetoGoogle(Estudio $estudio, PersonaTenant $persona): string
+    {
+        return (string) config('agendauno.wallet.google.issuer_id').'.'.$estudio->ulid.'_'.$persona->ulid;
+    }
+
+    /**
+     * Lo que muestra el pase: nombre, negocio, colores, su plan, hasta cuándo vale, su
+     * saldo y el código. Su huella dice si cambió.
+     *
+     * @return array{nombre: string, negocio: string, color: string, plan: string, vence: string|null, saldo: string|null, codigo: string}
+     */
+    public function contenido(Estudio $estudio, PersonaTenant $persona): array
+    {
+        $resumen = $this->membresias->deVarias([(int) $persona->getKey()])[(int) $persona->getKey()];
+        $plan = match ($resumen['estado']) {
+            'sin', 'vencida' => 'Sin plan vigente',
+            'pausada' => ($resumen['plan'] ?? 'Plan').' (en pausa)',
+            default => (string) ($resumen['plan'] ?? 'Plan vigente'),
+        };
+        $vigente = ! in_array($resumen['estado'], ['sin', 'vencida'], true);
+        $vence = $vigente && $resumen['valido_hasta'] !== null
+            ? Carbon::parse($resumen['valido_hasta'])->locale('es')->translatedFormat('j M Y')
+            : null;
+        $saldo = match (true) {
+            ! $vigente => null,
+            $resumen['ilimitado'] => 'Ilimitado',
+            default => self::unidades($resumen['saldo_unidades']),
+        };
+
+        return [
+            'nombre' => $persona->nombreCompleto(),
+            'negocio' => (string) $estudio->nombre,
+            'color' => (string) ($estudio->color_marca ?? ''),
+            'plan' => $plan,
+            'vence' => $vence,
+            'saldo' => $saldo,
+            'codigo' => $this->pases->codigoDeWallet($persona),
+        ];
+    }
+
+    /**
+     * La huella de lo que muestra el pase.
+     *
+     * @param  array<string, string|null>  $contenido
+     */
+    public static function huella(array $contenido): string
+    {
+        return hash('sha256', (string) json_encode($contenido, JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Anota que la persona guardó (o va a guardar) su pase en una cartera, con la
+     * huella de lo que muestra, para avisar cuando cambie.
+     */
+    public function registrar(Estudio $estudio, PersonaTenant $persona, bool $google = false): PaseWallet
+    {
+        $huella = self::huella($this->contenido($estudio, $persona));
+        $pase = PaseWallet::query()->firstOrNew(['estudio_id' => $estudio->getKey(), 'persona_ulid' => $persona->ulid]);
+        $pase->serie = self::serie($estudio, $persona);
+        if ($pase->huella !== $huella) {
+            $pase->huella = $huella;
+            $pase->cambio_en = now();
+        }
+        $pase->en_google = $pase->en_google || $google;
+        $pase->save();
+
+        return $pase;
+    }
+
+    /** Créditos en unidades (1000 = 1) como se leen: «8» o «7.5». */
+    private static function unidades(int $unidades): string
+    {
+        return rtrim(rtrim(number_format($unidades / 1000, 3, '.', ''), '0'), '.');
+    }
 
     public function appleDisponible(): bool
     {
@@ -48,14 +145,19 @@ class PasesWalletTenant
             throw new RuntimeException('Apple Wallet no está configurado en la plataforma.');
         }
         $c = (array) config('agendauno.wallet.apple');
-        $codigo = $this->pases->codigoDeWallet($persona);
+        $contenido = $this->contenido($estudio, $persona);
+        $codigo = $contenido['codigo'];
         [$fondo, $texto] = self::colores($estudio);
+        $serie = self::serie($estudio, $persona);
 
         $pase = [
             'formatVersion' => 1,
             'passTypeIdentifier' => (string) $c['pass_type_id'],
-            'serialNumber' => $estudio->slug.'-'.$persona->ulid,
+            'serialNumber' => $serie,
             'teamIdentifier' => (string) $c['team_id'],
+            // Su servicio web: Apple Wallet pide aquí el pase cuando se le avisa que cambió.
+            'webServiceURL' => rtrim((string) config('app.url'), '/').'/api/v1/wallet/apple',
+            'authenticationToken' => self::tokenApple($serie),
             'organizationName' => (string) $estudio->nombre,
             'description' => 'Pase de entrada de '.$estudio->nombre,
             'logoText' => (string) $estudio->nombre,
@@ -64,7 +166,13 @@ class PasesWalletTenant
             'labelColor' => $texto,
             'generic' => [
                 'primaryFields' => [['key' => 'nombre', 'label' => 'NOMBRE', 'value' => $persona->nombreCompleto()]],
-                'secondaryFields' => [['key' => 'negocio', 'label' => 'NEGOCIO', 'value' => (string) $estudio->nombre]],
+                'secondaryFields' => [
+                    ['key' => 'plan', 'label' => 'PLAN', 'value' => $contenido['plan'], 'changeMessage' => 'Tu plan: %@'],
+                ],
+                'auxiliaryFields' => array_values(array_filter([
+                    $contenido['vence'] !== null ? ['key' => 'vence', 'label' => 'VALE HASTA', 'value' => $contenido['vence']] : null,
+                    $contenido['saldo'] !== null ? ['key' => 'saldo', 'label' => 'SALDO', 'value' => $contenido['saldo'], 'changeMessage' => 'Tu saldo: %@'] : null,
+                ])),
                 'backFields' => [['key' => 'uso', 'label' => 'CÓMO SE USA', 'value' => 'Muestra el código en recepción o en el kiosco al llegar. Si pierdes tu teléfono, renueva el pase desde tu cuenta.']],
             ],
             'barcodes' => [['format' => 'PKBarcodeFormatQR', 'message' => $codigo, 'messageEncoding' => 'iso-8859-1']],
@@ -92,8 +200,6 @@ class PasesWalletTenant
         /** @var array{client_email?: string, private_key?: string} $cuenta */
         $cuenta = (array) json_decode((string) file_get_contents((string) $c['cuenta_servicio']), true);
         $emisor = (string) $c['issuer_id'];
-        $codigo = $this->pases->codigoDeWallet($persona);
-        [$fondo] = self::colores($estudio, hexadecimal: true);
         $clase = $emisor.'.agendauno_pase_entrada';
 
         $reclamos = [
@@ -104,20 +210,39 @@ class PasesWalletTenant
             'origins' => [],
             'payload' => [
                 'genericClasses' => [['id' => $clase]],
-                'genericObjects' => [[
-                    'id' => $emisor.'.'.preg_replace('/[^A-Za-z0-9_\-]/', '_', $estudio->slug.'_'.$persona->ulid),
-                    'classId' => $clase,
-                    'state' => 'ACTIVE',
-                    'cardTitle' => ['defaultValue' => ['language' => 'es-MX', 'value' => (string) $estudio->nombre]],
-                    'subheader' => ['defaultValue' => ['language' => 'es-MX', 'value' => 'Pase de entrada']],
-                    'header' => ['defaultValue' => ['language' => 'es-MX', 'value' => $persona->nombreCompleto()]],
-                    'hexBackgroundColor' => $fondo,
-                    'barcode' => ['type' => 'QR_CODE', 'value' => $codigo],
-                ]],
+                'genericObjects' => [$this->objetoDeGoogle($estudio, $persona, $clase)],
             ],
         ];
 
         return 'https://pay.google.com/gp/v/save/'.self::jwt($reclamos, (string) ($cuenta['private_key'] ?? ''));
+    }
+
+    /**
+     * El objeto del pase en Google Wallet, con lo que muestra (también para actualizarlo).
+     *
+     * @return array<string, mixed>
+     */
+    public function objetoDeGoogle(Estudio $estudio, PersonaTenant $persona, ?string $clase = null): array
+    {
+        $contenido = $this->contenido($estudio, $persona);
+        [$fondo] = self::colores($estudio, hexadecimal: true);
+        $texto = static fn (string $v): array => ['defaultValue' => ['language' => 'es-MX', 'value' => $v]];
+
+        return [
+            'id' => self::objetoGoogle($estudio, $persona),
+            'classId' => $clase ?? (string) config('agendauno.wallet.google.issuer_id').'.agendauno_pase_entrada',
+            'state' => 'ACTIVE',
+            'cardTitle' => $texto((string) $estudio->nombre),
+            'subheader' => $texto('Pase de entrada'),
+            'header' => $texto($persona->nombreCompleto()),
+            'hexBackgroundColor' => $fondo,
+            'textModulesData' => array_values(array_filter([
+                ['id' => 'plan', 'header' => 'Plan', 'body' => $contenido['plan']],
+                $contenido['vence'] !== null ? ['id' => 'vence', 'header' => 'Vale hasta', 'body' => $contenido['vence']] : null,
+                $contenido['saldo'] !== null ? ['id' => 'saldo', 'header' => 'Saldo', 'body' => $contenido['saldo']] : null,
+            ])),
+            'barcode' => ['type' => 'QR_CODE', 'value' => $contenido['codigo']],
+        ];
     }
 
     /**

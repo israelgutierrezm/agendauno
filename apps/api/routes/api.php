@@ -173,6 +173,7 @@ use App\Modules\Tenancy\Http\Controllers\VueltaCalendarioController;
 use App\Modules\Tenancy\Http\Controllers\VueltaInstagramController;
 use App\Modules\Tenancy\Http\Controllers\VueltaMessengerController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
+use App\Modules\Tenancy\Http\Controllers\WalletAppleServicioController;
 use App\Modules\Tenancy\Http\Controllers\WebhookBienestarController;
 use App\Modules\Tenancy\Http\Controllers\WebhookCalendariosController;
 use App\Modules\Tenancy\Http\Controllers\WebhookInstagramController;
@@ -260,6 +261,15 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/demos', [DemosController::class, 'horarios'])->middleware('throttle:publico')->name('api.v1.demos.horarios');
     Route::post('/demos', [DemosController::class, 'agendar'])->middleware('throttle:login')->name('api.v1.demos.agendar');
     Route::post('/demos/{demo}/cancelar', [DemosController::class, 'cancelar'])->middleware('throttle:login')->name('api.v1.demos.cancelar');
+    // Servicio web de los pases de Apple Wallet (ADR 0195): el teléfono registra el pase,
+    // pregunta qué cambió y pide el pase nuevo (con el token del pase, sin sesión).
+    Route::prefix('/wallet/apple/v1')->middleware('throttle:wallet')->group(function (): void {
+        Route::post('/devices/{dispositivo}/registrations/{tipo}/{serie}', [WalletAppleServicioController::class, 'registrar'])->name('api.v1.wallet.apple.registrar');
+        Route::delete('/devices/{dispositivo}/registrations/{tipo}/{serie}', [WalletAppleServicioController::class, 'quitar'])->name('api.v1.wallet.apple.quitar');
+        Route::get('/devices/{dispositivo}/registrations/{tipo}', [WalletAppleServicioController::class, 'cambiados'])->name('api.v1.wallet.apple.cambiados');
+        Route::get('/passes/{tipo}/{serie}', [WalletAppleServicioController::class, 'pase'])->name('api.v1.wallet.apple.pase');
+        Route::post('/log', [WalletAppleServicioController::class, 'bitacora'])->name('api.v1.wallet.apple.bitacora');
+    });
     Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:publico')->name('api.v1.registro.slug');
     // WhatsApp del dueño (ADR 0070): verificar su número con un código al registrarse.
     Route::get('/registro/whatsapp', [RegistroWhatsAppController::class, 'disponible'])->middleware('throttle:publico')->name('api.v1.registro.whatsapp');

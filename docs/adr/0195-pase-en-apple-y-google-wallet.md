@@ -39,9 +39,33 @@ un servicio de actualización por pase, que Apple y Google piden aparte.
 
 - El código de la cartera no caduca: una captura de pantalla sirve hasta que se renueve
   o el negocio lo apague. Por eso es opcional por negocio.
-- Sin servicio de actualización: si cambia el color o el nombre del negocio, el pase ya
-  agregado no cambia hasta que se vuelva a agregar.
-- En la app móvil aún no hay botón (agregar a Apple Wallet desde la app pide un plugin
-  nuevo). Se hace desde la cuenta en la web.
+- Al principio el pase guardado no se actualizaba; ahora sí: ver «Se actualiza solo».
+- La app móvil ya ofrece «Agregar a Apple Wallet» en iPhone (PassKit por un canal nativo,
+  sin plugin) y Google Wallet en Android.
 - Sin validar con certificados reales de Apple ni con una cuenta de Google Wallet:
   probado con certificados y llaves de prueba hechos en la prueba.
+
+## Se actualiza solo (2026-10-21)
+
+Pedido del dueño: los pases ya guardados se actualizan solos cuando cambia el plan o el
+saldo.
+
+- **El pase muestra** su plan (o «Sin plan vigente», o «en pausa»), hasta cuándo vale y
+  su saldo (o «Ilimitado»), además del nombre, el negocio y el código.
+- **Se anota al bajarlo**: el pase (por persona y negocio) va en la base de la plataforma
+  (`pases_wallet`), con la huella de lo que muestra. El número de serie es el negocio y
+  la persona por su identificador público (`{negocio}-{persona}`), así no cambia con el
+  slug; el objeto de Google, `{emisor}.{negocio}_{persona}`.
+- **Apple**: el pase lleva `webServiceURL` (`/api/v1/wallet/apple`) y un
+  `authenticationToken` propio de su serie (HMAC con la llave de la app). El teléfono
+  registra su token de avisos (`dispositivos_pase_wallet`), pregunta qué cambió y pide el
+  pase nuevo, como lo pide Apple.
+- **Cada 10 minutos** (`agendauno:actualizar-pases-wallet`) se revisa, negocio por
+  negocio, la huella de cada pase guardado. Si cambió: un aviso vacío por APNs (HTTP/2,
+  con el certificado del tipo de pase) a cada teléfono, y un `PATCH` al objeto en Google
+  Wallet (token de la cuenta de servicio, guardado 50 minutos). Un teléfono que Apple ya
+  no reconoce (410) se olvida; un objeto que nunca se guardó en Google (404) no es error.
+- Renovar el pase cambia su código: el pase guardado recibe el nuevo.
+- Sin validar con certificados ni cuentas reales (APNs y Google simulados en la prueba).
+- Migración de la plataforma `2026_10_21_000409_pases_wallet`; `WALLET_APPLE_APNS_URL`
+  (producción de APNs por omisión).

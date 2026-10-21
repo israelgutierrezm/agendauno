@@ -41,8 +41,11 @@ class PaseWalletTenantController
     {
         $persona = $this->personaDe($request);
         abort_unless($this->pases->walletPermitido() && $this->wallet->appleDisponible(), 404);
+        $estudio = $this->estudio($request);
+        // Se anota para avisarle a su teléfono cuando cambie su plan o su saldo.
+        $this->wallet->registrar($estudio, $persona);
 
-        return response($this->wallet->apple($this->estudio($request), $persona), 200, [
+        return response($this->wallet->apple($estudio, $persona), 200, [
             'Content-Type' => 'application/vnd.apple.pkpass',
             'Content-Disposition' => 'attachment; filename="pase.pkpass"',
             'Cache-Control' => 'no-store',
@@ -53,8 +56,10 @@ class PaseWalletTenantController
     {
         $persona = $this->personaDe($request);
         abort_unless($this->pases->walletPermitido() && $this->wallet->googleDisponible(), 404);
+        $estudio = $this->estudio($request);
+        $this->wallet->registrar($estudio, $persona, google: true);
 
-        return response()->json(['data' => ['url' => $this->wallet->google($this->estudio($request), $persona)]]);
+        return response()->json(['data' => ['url' => $this->wallet->google($estudio, $persona)]]);
     }
 
     /** Lo renueva: los pases que ya estaban en la cartera dejan de servir. */

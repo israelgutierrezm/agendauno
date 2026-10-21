@@ -97,6 +97,9 @@ Schedule::command('agendauno:conciliar-renta')->everyFifteenMinutes()->withoutOv
 Schedule::command('agendauno:dominios-propios')->everyTenMinutes()->withoutOverlapping();
 // Recordatorios de las demos agendadas en la landing: un día y una hora antes (ADR 0193).
 Schedule::command('agendauno:recordar-demos')->everyFiveMinutes()->withoutOverlapping();
+// Los pases de la cartera que cambiaron (plan, vigencia, saldo): se avisa a Apple Wallet
+// y se actualiza Google Wallet (ADR 0195).
+Schedule::command('agendauno:actualizar-pases-wallet')->everyTenMinutes()->withoutOverlapping();
 
 // Plantillas de WhatsApp de los negocios (ADR 0190): cómo van en Meta.
 Schedule::command('agendauno:revisar-plantillas-whatsapp')->everyFifteenMinutes()->withoutOverlapping();

@@ -81,6 +81,9 @@ return [
             'certificado' => env('WALLET_APPLE_CERTIFICADO', ''),
             'clave' => env('WALLET_APPLE_CLAVE', ''),
             'wwdr' => env('WALLET_APPLE_WWDR', ''),
+            // APNs: a dónde se avisa que un pase cambió (el de pruebas de Apple no aplica a
+            // los pases: siempre producción).
+            'apns_url' => env('WALLET_APPLE_APNS_URL', 'https://api.push.apple.com'),
         ],
         'google' => [
             'issuer_id' => env('WALLET_GOOGLE_ISSUER_ID', ''),

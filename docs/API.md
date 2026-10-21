@@ -1686,6 +1686,18 @@ en el negocio.
 - `GET /mi/pase/wallet/apple` devuelve el `.pkpass` (`application/vnd.apple.pkpass`).
 - `GET /mi/pase/wallet/google` devuelve {`url`}, el enlace «Guardar en Google Wallet».
 - `POST /mi/pase/wallet/renovar` crea otro código; el anterior deja de servir.
+- El pase muestra su plan, hasta cuándo vale y su saldo, y se actualiza solo
+  (`agendauno:actualizar-pases-wallet`, cada 10 minutos): se avisa por APNs a los
+  teléfonos con el pase en Apple Wallet y se actualiza su objeto en Google Wallet.
+- Servicio web de Apple Wallet (sin sesión; `Authorization: ApplePass {token del pase}`),
+  bajo `/api/v1/wallet/apple/v1`:
+  - `POST|DELETE /devices/{dispositivo}/registrations/{tipo}/{serie}` {`pushToken`}
+    registra o quita el teléfono (201 nuevo, 200 ya estaba; 401 con otro token);
+  - `GET /devices/{dispositivo}/registrations/{tipo}?passesUpdatedSince=` devuelve
+    {`serialNumbers`, `lastUpdated`} o 204 si nada cambió;
+  - `GET /passes/{tipo}/{serie}` devuelve el pase como está ahora (304 con
+    `If-Modified-Since` si no cambió);
+  - `POST /log` recibe lo que reporta el teléfono.
 - El código de la cartera es `AU2.{persona}.{token}`; `POST /accesos` lo acepta como el
   QR (`ACCESS_PASS_INVALID` si se renovó o el negocio lo apagó).
 
