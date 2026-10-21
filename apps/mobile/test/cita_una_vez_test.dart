@@ -89,6 +89,20 @@ void main() {
     expect(_clave(api.pedidos[2]), isNot(_clave(api.pedidos[0])));
   });
 
+  test('cliente: reintentar la misma clase manda la misma clave', () async {
+    final api = _ApiSinRedUnaVez();
+    final repo = CuentaRepository(Dio()..httpClientAdapter = api, 'demo');
+
+    await expectLater(repo.reservar('s1'), throwsA(isA<DioException>()));
+    await repo.reservar('s1');
+    // Ya respondió: la siguiente es otra reserva.
+    await repo.reservar('s1');
+
+    expect(_clave(api.pedidos[0]), isNotNull);
+    expect(_clave(api.pedidos[1]), _clave(api.pedidos[0]));
+    expect(_clave(api.pedidos[2]), isNot(_clave(api.pedidos[0])));
+  });
+
   test('equipo: reintentar la misma cita manda la misma clave', () async {
     final api = _ApiSinRedUnaVez();
     final repo = AgendaRepository(Dio()..httpClientAdapter = api, 'demo');

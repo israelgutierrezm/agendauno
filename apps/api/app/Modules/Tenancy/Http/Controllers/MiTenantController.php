@@ -450,7 +450,10 @@ class MiTenantController
             'esperar' => ['boolean'],
             // El lugar numerado que eligió (B06); el motor lo valida bajo el candado.
             'lugar' => ['nullable', 'integer', 'min:1'],
+            // La del intento (ADR 0201): repetirlo devuelve la reserva ya hecha.
+            'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
+        $clave = $validado['idempotency_key'] ?? null;
 
         $sesion = SesionTenant::query()->where('ulid', $validado['sesion_id'])->with('oferta')->firstOrFail();
 
@@ -458,6 +461,11 @@ class MiTenantController
         // su titular: nadie más puede reservarla ni esperar su lugar (ADR 0104).
         if (! $this->modalidad->esClases() || $sesion->esCita()) {
             throw new SesionNoReservable('Esta cita es privada.');
+        }
+        // Un reintento de lo que ya se hizo: lo mismo, aunque la ventana ya cerrara.
+        $previa = $this->reservas->previaDeLaClave($clave, $sesion, $persona);
+        if ($previa !== null) {
+            return response()->json(['data' => $this->presentarReserva($previa->load(['sesion.oferta', 'orden', 'saldoOrden']))]);
         }
         // Cuándo abre y cierra la reserva de la clase para el cliente (lo decide el negocio).
         app(VentanaDeReservaTenant::class)->exigirParaClase($sesion, $persona);
@@ -476,15 +484,16 @@ class MiTenantController
                 $monto,
                 app(ParametrosTenant::class)->monedaDe($sesion->sucursal),
                 (int) $sesion->sucursal_id,
+                clave: $clave,
             );
 
-            return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden', 'saldoOrden']))], 201);
+            return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden', 'saldoOrden']))], $reserva->wasRecentlyCreated ? 201 : 200);
         }
 
         $reserva = $this->reservas->crear(
             $sesion,
             $persona,
-            null,
+            $clave,
             (bool) ($validado['esperar'] ?? false),
             null,
             CanalReserva::Directo->value,
@@ -493,7 +502,7 @@ class MiTenantController
         // La reserva de un cliente de verdad: la prueba del recorrido (ADR 0166).
         app(PuestaEnMarchaTenant::class)->anotarPrueba($request->attributes->get('estudio'));
 
-        return response()->json(['data' => $this->presentarReserva($reserva->load('sesion.oferta'))], 201);
+        return response()->json(['data' => $this->presentarReserva($reserva->load('sesion.oferta'))], $reserva->wasRecentlyCreated ? 201 : 200);
     }
 
     /**

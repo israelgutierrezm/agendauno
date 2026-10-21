@@ -64,6 +64,27 @@ it('el miembro reserva una sesion y aparece en su perfil', function (): void {
         ->assertJsonPath('data.derechos.0.disponible', 7000);
 });
 
+it('reservar otra vez con la misma clave devuelve la reserva ya hecha (ADR 0201)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $m = miembroConAcceso($e);
+    $semilla = agendaSemilla($e);
+    $sesion = crearSesionTenant($e, $semilla);
+    $otra = crearSesionTenant($e, $semilla, null, '2026-10-02 08:00:00');
+    $reservar = fn (string $s, string $clave) => test()->postJson("/api/v1/app/{$e['slug']}/mi/reservas", [
+        'sesion_id' => $s, 'idempotency_key' => $clave,
+    ], conBearer($m['bearer']));
+
+    $primera = (string) $reservar($sesion, 'intento1')->assertCreated()->json('data.id');
+    // Se perdió la respuesta y la app lo manda otra vez: la misma, sin error.
+    $reservar($sesion, 'intento1')->assertOk()->assertJsonPath('data.id', $primera);
+    // La misma clave para otra clase no es un reintento.
+    $reservar($otra, 'intento1')->assertStatus(422);
+
+    test()->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($m['bearer']))
+        ->assertOk()->assertJsonCount(1, 'data.reservas')
+        ->assertJsonPath('data.derechos.0.disponible', 7000);
+});
+
 it('el miembro cancela su propia reserva', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $m = miembroConAcceso($e);

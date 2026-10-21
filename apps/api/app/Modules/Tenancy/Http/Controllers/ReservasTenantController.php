@@ -219,7 +219,8 @@ class ReservasTenantController
             isset($validado['lugar']) ? (int) $validado['lugar'] : null,
         );
 
-        return response()->json(['data' => $this->presentar($reserva)], 201);
+        // Un reintento con la misma clave devuelve la reserva ya hecha (ADR 0201).
+        return response()->json(['data' => $this->presentar($reserva)], $reserva->wasRecentlyCreated ? 201 : 200);
     }
 
     /**

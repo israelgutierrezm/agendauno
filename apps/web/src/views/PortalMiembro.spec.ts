@@ -640,6 +640,8 @@ describe("portal del alumno", () => {
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/mi/reservas", {
       sesion_id: "s2",
       esperar: true,
+      // La clave del intento (ADR 0201).
+      idempotency_key: expect.stringMatching(/^[a-f0-9]{32}$/),
     });
     // Lo que quedó, de la reserva real: en espera, sin consumo.
     expect(w.get('[data-prueba="reserva-confirmada"]').text()).toBe(
@@ -966,6 +968,7 @@ describe("portal del alumno", () => {
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/mi/ordenes", {
       items: [{ producto_id: "p9", cantidad: 1 }],
       acepta_condiciones: true,
+      idempotency_key: expect.stringMatching(/^[a-f0-9]{32}$/),
     });
     w.unmount();
   });

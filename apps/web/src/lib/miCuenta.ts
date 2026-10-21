@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { camposDeMedicion } from "@/lib/etiquetas";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { intentoUnico } from "@/lib/intento";
 import { participanteEnUso } from "@/lib/participanteEnUso";
 import type { FormularioPersona } from "@/lib/formularios";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -387,6 +388,11 @@ export function useMiCuenta() {
     await cargar(cargado.value && identidadCargada === identidad());
   }
 
+  // Reservar otra vez lo mismo (se perdió la respuesta) devuelve la reserva ya
+  // hecha, no un error (ADR 0201).
+  const intentoReserva = intentoUnico();
+  const intentoCompra = intentoUnico();
+
   async function accion(fn: () => Promise<unknown>): Promise<boolean> {
     accionando.value = true;
     error.value = null;
@@ -453,13 +459,18 @@ export function useMiCuenta() {
     cargarFormularios,
     // Con lugar numerado si lo eligió (B06); el servidor lo valida.
     reservar: (c: Clase, esperar: boolean, lugar: number | null = null) =>
-      accion(() =>
-        api.post(`${base.value}/mi/reservas`, {
+      accion(async () => {
+        const pedido = {
           sesion_id: c.id,
           esperar,
           ...(lugar !== null ? { lugar } : {}),
-        }),
-      ),
+        };
+        await api.post(`${base.value}/mi/reservas`, {
+          ...pedido,
+          idempotency_key: intentoReserva.clave(pedido),
+        });
+        intentoReserva.listo();
+      }),
     cancelar: (r: Reserva) =>
       accion(() => api.post(`${base.value}/mi/reservas/${r.id}/cancelar`, {})),
     aceptar: (r: Reserva) =>
@@ -468,16 +479,22 @@ export function useMiCuenta() {
       accion(() => api.post(`${base.value}/mi/waivers/${w.id}/aceptar`, {})),
     // Con permanencia (B04), aceptando sus condiciones.
     comprar: (p: Producto, aceptaCondiciones = false) =>
-      accion(async () =>
-        api.post(`${base.value}/mi/ordenes`, {
+      accion(async () => {
+        const pedido = {
           items: [{ producto_id: p.id, cantidad: 1 }],
           ...(aceptaCondiciones ? { acepta_condiciones: true } : {}),
+        };
+        await api.post(`${base.value}/mi/ordenes`, {
+          ...pedido,
+          // Comprar otra vez lo mismo (se perdió la respuesta) no crea otra orden.
+          idempotency_key: intentoCompra.clave(pedido),
           // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
           ...(await camposDeMedicion(
             `negocio:${(sesion.slug ?? "").toLowerCase()}`,
           )),
-        }),
-      ),
+        });
+        intentoCompra.listo();
+      }),
   };
 }
 

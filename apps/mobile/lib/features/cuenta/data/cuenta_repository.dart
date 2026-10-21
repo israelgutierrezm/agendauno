@@ -25,6 +25,7 @@ class CuentaRepository {
   /// Una cita por intento: reintentar la misma no agenda otra; con «cualquier
   /// profesional» podía quedar una segunda con otra persona (ADR 0201).
   final _intentoCita = IntentoUnico();
+  final _intentoReserva = IntentoUnico();
 
   /// Moneda del negocio: la de los precios y adeudos que no traen la suya.
   final String _moneda;
@@ -504,10 +505,14 @@ class CuentaRepository {
     bool esperar = false,
     int? lugar,
   }) async {
+    final pedido = {'sesion_id': sesionId, 'esperar': esperar, 'lugar': ?lugar};
+    // Otro toque o una respuesta perdida: el servidor devuelve la misma reserva
+    // (ADR 0201).
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/reservas',
-      data: {'sesion_id': sesionId, 'esperar': esperar, 'lugar': ?lugar},
+      data: {...pedido, 'idempotency_key': _intentoReserva.clave(pedido)},
     );
+    _intentoReserva.listo();
     final datos = (res.data?['data'] as Map<String, dynamic>?) ?? const {};
     return (
       estado: (datos['estado'] ?? '') as String,

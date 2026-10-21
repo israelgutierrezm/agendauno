@@ -330,6 +330,9 @@ ninguna asignada, ninguna, ADR 0098).
   Un reintento con la misma clave, misma persona, servicio, sede, hora y, si se
   eligió, profesional devuelve la cita ya agendada con 200 (la nueva responde 201).
   La misma clave con otra cosa responde 422 `SESSION_NOT_BOOKABLE`.
+- `POST /mi/reservas` y `POST /sesiones/{sesion}/reservas` (clases) siguen la misma
+  regla: con la misma clave, la misma persona y la misma sesión devuelven la reserva ya
+  hecha con 200; con otra persona u otra sesión, 422 `SESSION_NOT_BOOKABLE`.
 - Los eventos `reserva.*` y `asistencia.marcada` (mensajes automáticos y webhooks)
   llevan los datos de su sesión: `sesion_id`, `tipo` (`clase` | `cita`), `inicia_en`,
   `actividad`, `fecha`, `hora`, `sucursal` y `con`. Es aditivo: `reserva.creada`

@@ -94,9 +94,19 @@ class ReservasTenant
      * eligió pagar todo: una sola orden, pero la cita guarda el anticipo que pedía el
      * servicio (si cancela a tiempo, lo pagado se le devuelve).
      */
-    public function reservarConPago(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null, string $canal = 'directo', ?int $anticipoMinor = null, bool $completo = false): ReservaTenant
+    public function reservarConPago(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null, string $canal = 'directo', ?int $anticipoMinor = null, bool $completo = false, ?string $clave = null): ReservaTenant
     {
-        return $this->reservarConOrden($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, EstadoReserva::PendientePago, $anticipoMinor, $completo);
+        $previa = $this->previaDeLaClave($clave, $sesion, $persona);
+        if ($previa !== null) {
+            return $previa;
+        }
+
+        try {
+            return $this->reservarConOrden($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, EstadoReserva::PendientePago, $anticipoMinor, $completo, $clave);
+        } catch (QueryException $e) {
+            // Otra solicitud con la misma clave la creó al mismo tiempo (índice único).
+            return $this->previaDeLaClave($clave, $sesion, $persona) ?? throw $e;
+        }
     }
 
     /**
@@ -115,9 +125,9 @@ class ReservasTenant
      * Reserva ligada a una orden por la sesión: `PendientePago` (retiene el cupo hasta
      * pagar en línea o expirar) o `Confirmada` (el negocio cobra en caja).
      */
-    private function reservarConOrden(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId, string $canal, EstadoReserva $estado, ?int $anticipoMinor = null, bool $completo = false): ReservaTenant
+    private function reservarConOrden(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId, string $canal, EstadoReserva $estado, ?int $anticipoMinor = null, bool $completo = false, ?string $clave = null): ReservaTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, $estado, $anticipoMinor, $completo): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, $estado, $anticipoMinor, $completo, $clave): ReservaTenant {
             $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
@@ -165,6 +175,7 @@ class ReservasTenant
                 'horas_limite' => $politica->horasLimite,
                 'penaliza_tarde' => $politica->penalizaTarde,
                 'penaliza_no_show' => $politica->penalizaNoShow,
+                'idempotency_key' => $clave !== '' ? $clave : null,
             ]);
 
             $this->emitirCreada($reserva, $bloqueada, $persona);
@@ -202,11 +213,9 @@ class ReservasTenant
         $costo = $unidades ?? self::UNIDADES_POR_SESION;
 
         // Reintento idempotente: la misma clave devuelve la reserva ya creada.
-        if ($idempotencyKey !== null) {
-            $previa = ReservaTenant::query()->where('idempotency_key', $idempotencyKey)->first();
-            if ($previa !== null) {
-                return $previa;
-            }
+        $previa = $this->previaDeLaClave($idempotencyKey, $sesion, $persona);
+        if ($previa !== null) {
+            return $previa;
         }
 
         // Pre-check con el motor: decision estructurada + fail-fast. Traduce el codigo
@@ -329,15 +338,30 @@ class ReservasTenant
         } catch (QueryException $e) {
             // Carrera de idempotencia: otra peticion concurrente ya creo la reserva
             // con la misma clave (viola el unique). Se devuelve la existente, no un 500.
-            if ($idempotencyKey !== null) {
-                $previa = ReservaTenant::query()->where('idempotency_key', $idempotencyKey)->first();
-                if ($previa !== null) {
-                    return $previa;
-                }
-            }
-
-            throw $e;
+            return $this->previaDeLaClave($idempotencyKey, $sesion, $persona) ?? throw $e;
         }
+    }
+
+    /**
+     * La reserva que ya hizo esta misma solicitud (ADR 0201): la misma clave para la
+     * misma persona y la misma sesión es un reintento (se perdió la respuesta, doble
+     * toque) y devuelve lo hecho; usada para otra persona u otra sesión, se rechaza en
+     * lugar de devolver la reserva de alguien más.
+     */
+    public function previaDeLaClave(?string $clave, SesionTenant $sesion, PersonaTenant $persona): ?ReservaTenant
+    {
+        if ($clave === null || $clave === '') {
+            return null;
+        }
+        $previa = ReservaTenant::query()->where('idempotency_key', $clave)->first();
+        if (! $previa instanceof ReservaTenant) {
+            return null;
+        }
+        if ((int) $previa->persona_id !== (int) $persona->getKey() || (int) $previa->sesion_id !== (int) $sesion->getKey()) {
+            throw new SesionNoReservable('Esta solicitud ya se usó para otra reserva. Vuelve a elegir la clase.');
+        }
+
+        return $previa;
     }
 
     /**

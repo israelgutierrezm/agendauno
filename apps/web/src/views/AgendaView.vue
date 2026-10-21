@@ -46,6 +46,7 @@ import {
 } from "@/lib/agenda";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { intentoUnico } from "@/lib/intento";
 import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { hoyComoFecha, hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
@@ -1475,6 +1476,8 @@ async function refrescarTras(sesionId: string): Promise<void> {
   }
 }
 
+const intentoReserva = intentoUnico();
+
 async function reservar(id: string): Promise<void> {
   if (reservarModel.value.miembroId === "") {
     return;
@@ -1482,12 +1485,18 @@ async function reservar(id: string): Promise<void> {
   accionando.value = true;
   error.value = null;
   try {
-    await api.post(`${base.value}/sesiones/${id}/reservas`, {
+    const pedido = {
       persona_id: reservarModel.value.miembroId,
       esperar: reservarModel.value.esperar,
       canal: reservarModel.value.canal,
       lugar: reservarModel.value.lugar,
+    };
+    await api.post(`${base.value}/sesiones/${id}/reservas`, {
+      ...pedido,
+      // Otro clic o una respuesta perdida no la reserva dos veces (ADR 0201).
+      idempotency_key: intentoReserva.clave({ sesion: id, ...pedido }),
     });
+    intentoReserva.listo();
     reservarModel.value.miembroId = "";
     reservarModel.value.lugar = null;
     await refrescarTras(id);

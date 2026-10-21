@@ -45,3 +45,18 @@ cita su `clave_intento` (`POST /reservas/{reserva}/cobro`).
 - Un cliente con una versión anterior (sin clave) funciona igual que antes.
 - La clave no protege dos solicitudes distintas: dos citas a dos horas son dos citas.
   Lo que las limita sigue siendo `citas.maximo_por_pagar` (ADR 0065).
+
+## Ajuste (2026-10-21): también las reservas de clase
+
+- `POST /mi/reservas` (el alumno reserva una clase, con su plan o pagándola) acepta la
+  misma `idempotency_key`. Antes, un reintento respondía «Ya existe una reserva para esta
+  sesión» aunque la reserva sí se hubiera hecho. Ahora devuelve la reserva con 200,
+  también si la ventana para reservar cerró entre los dos intentos.
+- `ReservasTenant::previaDeLaClave` aplica la misma regla que las citas: la clave solo es
+  un reintento si la persona y la sesión coinciden. Si no, 422 («Esta solicitud ya se usó
+  para otra reserva»). Antes, `POST /sesiones/{sesion}/reservas` devolvía la reserva de
+  quien hubiera usado esa clave primero.
+- `POST /sesiones/{sesion}/reservas` (el equipo) responde 200 al reintento, no 201.
+- La web manda la clave al reservar desde la cuenta, al agregar a alguien a la clase y al
+  reservar desde la agenda, y al comprar un plan desde la cuenta. La app la manda al
+  reservar desde la cuenta.

@@ -152,11 +152,37 @@ it('la misma idempotency_key devuelve la reserva ya creada', function (): void {
 
     $segunda = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", [
         'persona_id' => $vp['persona'], 'idempotency_key' => 'abc-123',
-    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    ], conBearer($e['bearer']))->assertOk()->json('data.id');
 
     expect($segunda)->toBe($primera);
     // Un solo hold pese a dos POST: disponible baja una sola vez.
     expect(saldoDerecho($e, $vp['persona'])['disponible'])->toBe(7000);
+});
+
+it('la clave de una reserva no devuelve la de otra persona ni la de otra sesión', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $ana = venderPackAMiembroTenant($e, 8000, 'Ana');
+    $beto = venderPackAMiembroTenant($e, 8000, 'Beto');
+    $sesion = crearSesionTenant($e, $semilla);
+    $otra = crearSesionTenant($e, $semilla, null, '2026-10-02 08:00:00');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", [
+        'persona_id' => $ana['persona'], 'idempotency_key' => 'abc-123',
+    ], conBearer($e['bearer']))->assertCreated();
+
+    // Con la misma clave para Beto no se le entrega la reserva de Ana.
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", [
+        'persona_id' => $beto['persona'], 'idempotency_key' => 'abc-123',
+    ], conBearer($e['bearer']))->assertStatus(422)
+        ->assertJsonPath('message', 'Esta solicitud ya se usó para otra reserva. Vuelve a elegir la clase.')
+        ->assertJsonMissingPath('data');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$otra}/reservas", [
+        'persona_id' => $ana['persona'], 'idempotency_key' => 'abc-123',
+    ], conBearer($e['bearer']))->assertStatus(422);
+
+    expect(saldoDerecho($e, $beto['persona'])['disponible'])->toBe(8000)
+        ->and(saldoDerecho($e, $ana['persona'])['disponible'])->toBe(7000);
 });
 
 it('las reservas son tenant-local: un estudio no puede resolver la sesion de otro', function (): void {

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { intentoUnico } from "@/lib/intento";
 
 /**
  * Agregar a alguien a la clase en el momento (llegó sin reservar): se busca y se
@@ -24,6 +25,9 @@ const nombre = ref("");
 const guardando = ref(false);
 const error = ref<string | null>(null);
 
+// Otro clic o una respuesta perdida no la agrega dos veces (ADR 0201).
+const intento = intentoUnico();
+
 function elegir(p: { nombre: string }): void {
   nombre.value = p.nombre;
 }
@@ -36,10 +40,17 @@ async function agregar(): Promise<void> {
   error.value = null;
   try {
     // Sin lugar, a la lista de espera (esperar=true) en vez de fallar.
-    await api.post(`${props.base}/sesiones/${props.sesionId}/reservas`, {
+    const pedido = {
+      sesion: props.sesionId,
       persona_id: personaId.value,
       esperar: props.llena,
+    };
+    await api.post(`${props.base}/sesiones/${props.sesionId}/reservas`, {
+      persona_id: pedido.persona_id,
+      esperar: pedido.esperar,
+      idempotency_key: intento.clave(pedido),
     });
+    intento.listo();
     emit("agregado", nombre.value, props.llena);
     personaId.value = "";
     nombre.value = "";
