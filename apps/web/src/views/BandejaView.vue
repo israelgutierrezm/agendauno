@@ -49,6 +49,8 @@ interface Conversacion {
   ultimo_mensaje_en: string | null;
   puede_contestar: boolean;
   contestar_hasta: string | null;
+  // Instagram o Messenger después de 24 horas (etiqueta HUMAN_AGENT).
+  como_agente?: boolean;
 }
 interface Mensaje {
   id: string;
@@ -883,9 +885,14 @@ onBeforeUnmount(() => {
           />
           <div class="bm-fila">
             <span class="tu-hint">{{
-              $t("bandejaMensajes.contestarHasta", {
-                hora: hora(seleccion.contestar_hasta, true),
-              })
+              $t(
+                seleccion.como_agente
+                  ? "bandejaMensajes.comoAgente"
+                  : "bandejaMensajes.contestarHasta",
+                {
+                  hora: hora(seleccion.contestar_hasta, true),
+                },
+              )
             }}</span>
             <input
               ref="elegirArchivo"

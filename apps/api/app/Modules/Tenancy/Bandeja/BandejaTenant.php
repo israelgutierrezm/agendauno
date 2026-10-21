@@ -364,14 +364,15 @@ class BandejaTenant
             throw ValidationException::withMessages(['texto' => ['Ese canal ya no está conectado: conéctalo de nuevo en la bandeja.']]);
         }
         if (! $conversacion->puedeContestar()) {
-            throw ValidationException::withMessages(['texto' => ['Pasaron más de 24 horas desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.']]);
+            throw ValidationException::withMessages(['texto' => [self::ventanaCerrada($conversacion)]]);
         }
+        $agente = $conversacion->comoAgenteHumano();
 
         try {
             $id = match ($canal->canal) {
                 CanalMensajeria::WHATSAPP => $this->meta->enviarWhatsApp($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $texto),
-                CanalMensajeria::MESSENGER => $this->meta->enviarMessenger($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $texto),
-                default => $this->meta->enviarInstagram($canal->token, $conversacion->contacto_id, $texto),
+                CanalMensajeria::MESSENGER => $this->meta->enviarMessenger($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $texto, $agente),
+                default => $this->meta->enviarInstagram($canal->token, $conversacion->contacto_id, $texto, $agente),
             };
         } catch (RequestException $e) {
             report($e);
@@ -408,8 +409,9 @@ class BandejaTenant
             throw ValidationException::withMessages(['archivo' => ['Ese canal ya no está conectado: conéctalo de nuevo en la bandeja.']]);
         }
         if (! $conversacion->puedeContestar()) {
-            throw ValidationException::withMessages(['archivo' => ['Pasaron más de 24 horas desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.']]);
+            throw ValidationException::withMessages(['archivo' => [self::ventanaCerrada($conversacion)]]);
         }
+        $agente = $conversacion->comoAgenteHumano();
         $mime = (string) $archivo->getMimeType();
         $tipo = str_starts_with($mime, 'image/') ? 'image' : 'document';
         if ($canal->canal === CanalMensajeria::INSTAGRAM && $tipo !== 'image') {
@@ -440,9 +442,9 @@ class BandejaTenant
                 $medio = $this->meta->subirWhatsApp($canal->token, $canal->cuenta_id, $contenido, $mime, $nombre);
                 $id = $this->meta->enviarArchivoWhatsApp($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $tipo, $medio, $pie, $nombre);
             } elseif ($canal->canal === CanalMensajeria::MESSENGER) {
-                $id = $this->meta->enviarAdjuntoMessenger($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $tipo === 'image' ? 'image' : 'file', $this->urlPublicaDeArchivo($estudio, $ruta));
+                $id = $this->meta->enviarAdjuntoMessenger($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $tipo === 'image' ? 'image' : 'file', $this->urlPublicaDeArchivo($estudio, $ruta), $agente);
             } else {
-                $id = $this->meta->enviarImagenInstagram($canal->token, $conversacion->contacto_id, $this->urlPublicaDeArchivo($estudio, $ruta));
+                $id = $this->meta->enviarImagenInstagram($canal->token, $conversacion->contacto_id, $this->urlPublicaDeArchivo($estudio, $ruta), $agente);
             }
         } catch (RequestException $e) {
             DiscosDeArchivos::privado()->delete($ruta);
@@ -616,6 +618,16 @@ class BandejaTenant
      * Instagram (no pide sesión: la firma vence en minutos). Apunta al archivo, no al
      * mensaje: Meta puede pedirlo antes de que el mensaje quede guardado.
      */
+    /** Por qué ya no se le puede contestar con texto libre. */
+    private static function ventanaCerrada(ConversacionTenant $conversacion): string
+    {
+        $plazo = $conversacion->canal !== CanalMensajeria::WHATSAPP && (bool) config('agendauno.bandeja.agente_humano')
+            ? '7 días'
+            : '24 horas';
+
+        return "Pasaron más de {$plazo} desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.";
+    }
+
     private function urlPublicaDeArchivo(Estudio $estudio, string $ruta): string
     {
         return URL::temporarySignedRoute('api.v1.bandeja.archivo', CarbonImmutable::now()->addMinutes(self::MINUTOS_ARCHIVO_PUBLICO), [

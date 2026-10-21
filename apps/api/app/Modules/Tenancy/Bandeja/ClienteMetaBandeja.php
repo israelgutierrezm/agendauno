@@ -161,11 +161,12 @@ class ClienteMetaBandeja
      * Manda una imagen por Instagram: Meta la toma de `$url` (una dirección firmada y
      * temporal de la plataforma). Devuelve el id del mensaje.
      */
-    public function enviarImagenInstagram(string $token, string $para, string $url): string
+    public function enviarImagenInstagram(string $token, string $para, string $url, bool $agenteHumano = false): string
     {
         return (string) $this->api($token)->post($this->instagram('me/messages'), [
             'recipient' => ['id' => $para],
             'message' => ['attachment' => ['type' => 'image', 'payload' => ['url' => $url]]],
+            ...self::etiqueta($agenteHumano),
         ])->throw()->json('message_id');
     }
 
@@ -279,12 +280,24 @@ class ClienteMetaBandeja
     }
 
     /** Manda texto (dentro de las 24 horas); devuelve el id del mensaje. */
-    public function enviarInstagram(string $token, string $para, string $texto): string
+    public function enviarInstagram(string $token, string $para, string $texto, bool $agenteHumano = false): string
     {
         return (string) $this->api($token)->post($this->instagram('me/messages'), [
             'recipient' => ['id' => $para],
             'message' => ['text' => $texto],
+            ...self::etiqueta($agenteHumano),
         ])->throw()->json('message_id');
+    }
+
+    /**
+     * Fuera de las 24 horas, Instagram y Messenger aceptan la respuesta de una persona
+     * con la etiqueta HUMAN_AGENT (hasta 7 días).
+     *
+     * @return array<string, string>
+     */
+    private static function etiqueta(bool $agenteHumano): array
+    {
+        return $agenteHumano ? ['messaging_type' => 'MESSAGE_TAG', 'tag' => 'HUMAN_AGENT'] : [];
     }
 
     /** El nombre de quien escribe por Instagram, si Meta lo da. */
@@ -358,13 +371,14 @@ class ClienteMetaBandeja
         $this->api($token)->delete($this->graph($paginaId.'/subscribed_apps'));
     }
 
-    /** Manda texto por Messenger (dentro de las 24 horas); devuelve el id del mensaje. */
-    public function enviarMessenger(string $token, string $paginaId, string $para, string $texto): string
+    /** Manda texto por Messenger; devuelve el id del mensaje. */
+    public function enviarMessenger(string $token, string $paginaId, string $para, string $texto, bool $agenteHumano = false): string
     {
         return (string) $this->api($token)->post($this->graph($paginaId.'/messages'), [
             'recipient' => ['id' => $para],
             'messaging_type' => 'RESPONSE',
             'message' => ['text' => $texto],
+            ...self::etiqueta($agenteHumano),
         ])->throw()->json('message_id');
     }
 
@@ -372,12 +386,13 @@ class ClienteMetaBandeja
      * Manda una imagen o un archivo por Messenger: Meta lo toma de `$url` (firmada y
      * temporal). Devuelve el id del mensaje.
      */
-    public function enviarAdjuntoMessenger(string $token, string $paginaId, string $para, string $tipo, string $url): string
+    public function enviarAdjuntoMessenger(string $token, string $paginaId, string $para, string $tipo, string $url, bool $agenteHumano = false): string
     {
         return (string) $this->api($token)->post($this->graph($paginaId.'/messages'), [
             'recipient' => ['id' => $para],
             'messaging_type' => 'RESPONSE',
             'message' => ['attachment' => ['type' => $tipo, 'payload' => ['url' => $url, 'is_reusable' => false]]],
+            ...self::etiqueta($agenteHumano),
         ])->throw()->json('message_id');
     }
 

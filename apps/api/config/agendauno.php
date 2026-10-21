@@ -119,6 +119,10 @@ return [
         // Messenger usa la misma app de Meta, con su inicio de sesión de Facebook: se
         // enciende cuando Meta aprueba sus permisos de páginas (pages_messaging…).
         'messenger' => (bool) env('BANDEJA_MESSENGER', false),
+        // Contestar por Instagram y Messenger hasta 7 días después de su último mensaje
+        // con la etiqueta HUMAN_AGENT: se enciende cuando Meta aprueba el permiso «Human
+        // Agent» de la app (WhatsApp no la tiene: fuera de las 24 horas, plantillas).
+        'agente_humano' => (bool) env('BANDEJA_AGENTE_HUMANO', false),
     ],
 
     /*

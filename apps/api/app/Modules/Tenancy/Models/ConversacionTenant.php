@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -37,6 +38,12 @@ class ConversacionTenant extends Model
     /** Las horas en que Meta deja contestar con texto libre tras el último mensaje suyo. */
     public const HORAS_PARA_CONTESTAR = 24;
 
+    /**
+     * Instagram y Messenger: con la etiqueta HUMAN_AGENT, alguien del equipo puede
+     * contestar hasta 7 días después (si Meta aprobó ese permiso a la app).
+     */
+    public const HORAS_AGENTE_HUMANO = 168;
+
     protected $connection = 'tenant';
 
     protected $table = 'conversaciones';
@@ -55,8 +62,31 @@ class ConversacionTenant extends Model
     /** ¿Aún se le puede contestar con texto libre? */
     public function puedeContestar(): bool
     {
+        return $this->contestarHasta()?->isFuture() === true;
+    }
+
+    /** Hasta cuándo se le puede contestar con texto libre. */
+    public function contestarHasta(): ?CarbonInterface
+    {
+        return $this->ultimo_entrante_en?->copy()->addHours($this->horasParaContestar());
+    }
+
+    /**
+     * Pasaron las 24 horas: lo que se le mande ahora sale con la etiqueta HUMAN_AGENT
+     * (solo Instagram y Messenger, con el permiso encendido).
+     */
+    public function comoAgenteHumano(): bool
+    {
         return $this->ultimo_entrante_en !== null
-            && $this->ultimo_entrante_en->copy()->addHours(self::HORAS_PARA_CONTESTAR)->isFuture();
+            && ! $this->ultimo_entrante_en->copy()->addHours(self::HORAS_PARA_CONTESTAR)->isFuture()
+            && $this->puedeContestar();
+    }
+
+    private function horasParaContestar(): int
+    {
+        $conAgente = $this->canal !== CanalMensajeria::WHATSAPP && (bool) config('agendauno.bandeja.agente_humano');
+
+        return $conAgente ? self::HORAS_AGENTE_HUMANO : self::HORAS_PARA_CONTESTAR;
     }
 
     /**

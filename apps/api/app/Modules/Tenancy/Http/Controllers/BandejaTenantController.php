@@ -236,7 +236,9 @@ class BandejaTenantController
             'ultimo_texto' => $c->ultimo_texto,
             'ultimo_mensaje_en' => $c->ultimo_mensaje_en?->toIso8601String(),
             'puede_contestar' => $c->puedeContestar(),
-            'contestar_hasta' => $c->ultimo_entrante_en?->copy()->addHours(ConversacionTenant::HORAS_PARA_CONTESTAR)->toIso8601String(),
+            'contestar_hasta' => $c->contestarHasta()?->toIso8601String(),
+            // Pasaron las 24 horas: contesta una persona del equipo (HUMAN_AGENT).
+            'como_agente' => $c->comoAgenteHumano(),
         ];
     }
 

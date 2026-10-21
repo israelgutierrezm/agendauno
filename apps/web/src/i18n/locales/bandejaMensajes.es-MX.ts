@@ -50,6 +50,8 @@ export default {
   enviar: "Enviar",
   enviando: "Enviando…",
   contestarHasta: "Puedes contestar hasta las {hora}.",
+  comoAgente:
+    "Pasaron 24 horas: contestas como persona del equipo, hasta las {hora}. Meta no permite promociones aquí.",
   fueraDePlazo:
     "Pasaron más de 24 horas desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.",
   plantillas: {

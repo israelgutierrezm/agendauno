@@ -595,6 +595,37 @@ it('conecta la página de Facebook, recibe por Messenger y contesta con texto y 
     Http::assertSent(fn (PeticionHttp $p): bool => $p->method() === 'DELETE' && str_contains($p->url(), '/44556677/subscribed_apps'));
 });
 
+it('fuera de las 24 horas, Messenger se contesta como persona del equipo hasta 7 días (HUMAN_AGENT)', function (): void {
+    config(['agendauno.bandeja.messenger' => true]);
+    unset($GLOBALS['paginas_facebook']);
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    conectarMessengerDeBandeja($e)->assertCreated();
+    $instante = now()->getTimestampMs();
+    avisoDeBandeja('/api/v1/webhooks/messenger', ['object' => 'page', 'entry' => [['id' => '44556677', 'time' => $instante, 'messaging' => [
+        ['sender' => ['id' => '9988'], 'recipient' => ['id' => '44556677'], 'timestamp' => $instante, 'message' => ['mid' => 'mid.entrada', 'text' => '¿Hay lugar el sábado?']],
+    ]]]])->assertOk();
+    $conversacion = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones?canal=messenger", conBearer($e['bearer']))->json('data.0.id');
+    $contestar = fn () => $this->postJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$conversacion}/mensajes", ['texto' => 'Perdón la demora: sí hay.'], conBearer($e['bearer']));
+
+    // A las 30 horas, sin el permiso de Meta, no se puede.
+    $this->travel(30)->hours();
+    $contestar()->assertUnprocessable()->assertJsonPath('meta.errors.texto.0', 'Pasaron más de 24 horas desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.');
+
+    // Con el permiso, sale con la etiqueta.
+    config(['agendauno.bandeja.agente_humano' => true]);
+    $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones?canal=messenger", conBearer($e['bearer']))
+        ->assertJsonPath('data.0.puede_contestar', true)->assertJsonPath('data.0.como_agente', true);
+    $contestar()->assertCreated();
+    Http::assertSent(fn (PeticionHttp $p): bool => str_ends_with($p->url(), '/44556677/messages')
+        && $p['messaging_type'] === 'MESSAGE_TAG' && $p['tag'] === 'HUMAN_AGENT');
+
+    // Pasados los 7 días, ya no.
+    $this->travel(7)->days();
+    $contestar()->assertUnprocessable()->assertJsonPath('meta.errors.texto.0', 'Pasaron más de 7 días desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.');
+});
+
 it('con varias páginas se elige una; la de otro negocio no, ni la selección de otro', function (): void {
     config(['agendauno.bandeja.messenger' => true]);
     $GLOBALS['paginas_facebook'] = [

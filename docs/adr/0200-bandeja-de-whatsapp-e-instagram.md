@@ -138,3 +138,14 @@ negocio (ADR 0190) y la bandeja después.
   - **Encendido:** apagado hasta que Meta apruebe los permisos de páginas de la app
     (`BANDEJA_MESSENGER=true`).
 - Sin validar con Meta: todo lo de este ajuste se probó con respuestas simuladas.
+
+## Ajuste (2026-10-21): contestar hasta 7 días por Instagram y Messenger
+
+- Con `BANDEJA_AGENTE_HUMANO=true` (cuando Meta aprueba el permiso «Human Agent» de la
+  app), una conversación de Instagram o Messenger se puede contestar hasta 7 días
+  después del último mensaje de la persona. Pasadas las 24 horas, cada texto o archivo
+  sale con `messaging_type: MESSAGE_TAG` y `tag: HUMAN_AGENT`, y el panel avisa que se
+  contesta como persona del equipo y que no van promociones (`como_agente`).
+- WhatsApp no tiene esa etiqueta: fuera de las 24 horas sigue con plantillas.
+- Apagado por omisión. El formato de la etiqueta en la API de Instagram no se probó
+  con Meta; está documentado para Messenger.
