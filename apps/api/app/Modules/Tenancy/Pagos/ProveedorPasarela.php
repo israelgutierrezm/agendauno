@@ -47,7 +47,8 @@ enum ProveedorPasarela: string
      */
     public static function implementadasPlataforma(): array
     {
-        return [self::Stripe->value];
+        // La renta también con Mercado Pago y OpenPay (ADR 0192).
+        return [self::Stripe->value, self::MercadoPago->value, self::OpenPay->value];
     }
 
     /**

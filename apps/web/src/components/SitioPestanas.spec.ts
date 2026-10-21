@@ -36,6 +36,7 @@ const global = {
       template: '<a :data-ruta="to.name"><slot /></a>',
     },
     SeoPaginaSitio: true,
+    DominioPropioSitio: { template: '<div data-prueba="dominio-propio" />' },
     EnlaceEstudio: true,
     IntegrarWebView: true,
   },
@@ -178,7 +179,7 @@ describe("dominio y SEO", () => {
     expect(w.get("fieldset").attributes("disabled")).toBeDefined();
   });
 
-  it("cerrarla se confirma; el dominio propio es Plus y aún no está", async () => {
+  it("cerrarla se confirma; el dominio propio va en su tarjeta", async () => {
     confirmar.mockResolvedValueOnce(false);
     const w = mount(SitioDominio, {
       props: { ...props, conPlus: false },
@@ -190,9 +191,6 @@ describe("dominio y SEO", () => {
     await flushPromises();
     expect(confirmar).toHaveBeenCalled();
     expect(api.put).not.toHaveBeenCalled();
-    expect(w.get('[data-prueba="dominio-propio"]').text()).toContain("Plus");
-    expect(w.get('[data-prueba="dominio-propio"]').text()).toContain(
-      "Aún no está disponible",
-    );
+    expect(w.find('[data-prueba="dominio-propio"]').exists()).toBe(true);
   });
 });

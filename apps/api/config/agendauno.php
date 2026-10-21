@@ -50,6 +50,24 @@ return [
     ],
 
     /*
+    | Dominio propio de cada negocio (ADR 0189). El negocio apunta su dominio con un
+    | CNAME a `sitios.{dominio de su producto}` (o `destino`, si se fija) o, en la raíz
+    | de su dominio, con registros A a `ips`; y prueba que es suyo con un TXT en
+    | `_agendauno.{su dominio}`. `archivo_traefik`: donde se escribe la configuración
+    | dinámica de Traefik con los dominios activos (vacío: no se escribe); sus
+    | certificados los pide `certresolver` por HTTP-01 (el de DNS-01 de Cloudflare no
+    | sirve para dominios ajenos).
+    */
+    'dominios_propios' => [
+        'destino' => env('DOMINIOS_PROPIOS_DESTINO', ''),
+        'ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('DOMINIOS_PROPIOS_IPS', ''))))),
+        'archivo_traefik' => env('DOMINIOS_PROPIOS_TRAEFIK', ''),
+        'certresolver' => env('DOMINIOS_PROPIOS_CERTRESOLVER', 'letsencrypt'),
+        'entrada_traefik' => env('TRAEFIK_ENTRADA', 'websecure'),
+        'servicio_traefik' => env('DOMINIOS_PROPIOS_SERVICIO', 'agendauno-web@docker'),
+    ],
+
+    /*
     | App móvil (ADR 0104). `version_minima`: la versión más antigua de la app que aún
     | se acepta; viaja en /yo y una instalada más vieja pide actualizarse. Se sube
     | cuando cambia un contrato que las versiones anteriores no entienden.
@@ -129,6 +147,8 @@ return [
     'ventas' => [
         'correo' => env('VENTAS_CORREO', 'ventas@agendauno.mx'),
         'whatsapp' => env('VENTAS_WHATSAPP'),
+        // La zona de los horarios de las demos (ADR 0193).
+        'zona' => env('VENTAS_ZONA', 'America/Mexico_City'),
     ],
 
     /*

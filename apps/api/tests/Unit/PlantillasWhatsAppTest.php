@@ -34,11 +34,15 @@ it('los avisos a los dueños también son válidos para Meta', function (): void
             ->and($meta)->not->toMatch('/\}\}[\s.]*$/')
             ->and($todos[1])->toBe(array_values(array_unique($todos[1])));
     }
-    // El código es de autenticación; los avisos, de utilidad.
+    // La de la demo agendada (ADR 0193), igual.
+    $demo = PlantillasWhatsApp::demoAgendada();
+    expect($demo['nombre'])->toMatch('/^agendauno_[a-z0-9_]+$/')
+        ->and(PlantillasWhatsApp::textoParaMeta($demo['texto']))->not->toMatch('/^\s*\{\{/')->not->toMatch('/\}\}[\s.]*$/');
+    // El código es de autenticación; los avisos y la demo, de utilidad.
     $categorias = array_column(PlantillasWhatsApp::paraDuenos(), 'categoria');
     expect($categorias[0])->toBe('AUTHENTICATION')
         ->and(array_unique(array_slice($categorias, 1)))->toBe(['UTILITY'])
-        ->and(count($categorias))->toBe(1 + count(PlantillasWhatsApp::tiposDeDuenos()));
+        ->and(count($categorias))->toBe(1 + count(PlantillasWhatsApp::tiposDeDuenos()) + 1);
 });
 
 it('los valores van en orden, sin saltos de línea y nunca vacíos', function (): void {

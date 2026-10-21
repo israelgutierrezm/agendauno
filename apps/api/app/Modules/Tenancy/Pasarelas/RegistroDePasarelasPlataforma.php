@@ -11,8 +11,8 @@ use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 /**
  * Resuelve la pasarela de LA PLATAFORMA por proveedor y lee su configuracion (activa
  * + llaves) desde el control plane. Sirve para cobrar la renta del SaaS al dueño.
- * El dueño siempre paga en línea; hoy solo con Stripe (activa y con llave secreta).
- * OpenPay y Mercado Pago aún no tienen integración completa: no se pueden usar.
+ * El dueño siempre paga en línea: con Stripe, Mercado Pago u OpenPay (ADR 0192), las
+ * que estén activas y con sus llaves. La domiciliación sigue solo con Stripe.
  * Espejo, a nivel plataforma, de {@see RegistroDePasarelasTenant}.
  */
 class RegistroDePasarelasPlataforma
@@ -22,14 +22,48 @@ class RegistroDePasarelasPlataforma
      */
     private const PRIORIDAD = ['stripe', 'mercadopago', 'openpay'];
 
-    public function __construct(private readonly PasarelaStripePlataforma $stripe) {}
+    /** Las llaves sin las que cada una no cobra. */
+    private const LLAVES = [
+        'stripe' => ['secret_key'],
+        'mercadopago' => ['access_token'],
+        'openpay' => ['merchant_id', 'private_key'],
+    ];
+
+    public function __construct(
+        private readonly PasarelaStripePlataforma $stripe,
+        private readonly PasarelaMercadoPagoPlataforma $mercadoPago,
+        private readonly PasarelaOpenPayPlataforma $openPay,
+    ) {}
 
     public function resolver(string $proveedor): PasarelaPlataforma
     {
         return match ($proveedor) {
             'stripe' => $this->stripe,
+            'mercadopago' => $this->mercadoPago,
+            'openpay' => $this->openPay,
             default => throw new PasarelaNoDisponible('Esa pasarela aún no está disponible.'),
         };
+    }
+
+    /**
+     * Las llaves que le faltan para cobrar.
+     *
+     * @param  array<string, string>  $llaves
+     * @return list<string>
+     */
+    public static function llavesFaltantes(string $proveedor, array $llaves): array
+    {
+        return array_values(array_filter(self::LLAVES[$proveedor] ?? [], static fn (string $l): bool => trim($llaves[$l] ?? '') === ''));
+    }
+
+    /**
+     * Las que pueden cobrar ahora, en orden de preferencia.
+     *
+     * @return list<string>
+     */
+    public function activas(): array
+    {
+        return array_values(array_filter(self::PRIORIDAD, fn (string $p): bool => $this->activa($p)));
     }
 
     /**
@@ -47,7 +81,7 @@ class RegistroDePasarelasPlataforma
             ->first();
 
         return $config instanceof ConfiguracionPasarelaPlataforma
-            && ($proveedor !== 'stripe' || ($config->llaves()['secret_key'] ?? '') !== '');
+            && self::llavesFaltantes($proveedor, $config->llaves()) === [];
     }
 
     /**

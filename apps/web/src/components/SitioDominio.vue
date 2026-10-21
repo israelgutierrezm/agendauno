@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import DominioPropioSitio from "@/components/DominioPropioSitio.vue";
 import SeoPaginaSitio from "@/components/SeoPaginaSitio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -12,7 +13,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * «Dominio y SEO» del sitio (ADR 0167): su dirección pública, cómo se publica la
  * página (en el directorio, solo con el enlace o cerrada), lo que ven buscadores y
- * redes de Inicio y el dominio propio (Plus, aún no disponible).
+ * redes de Inicio y el dominio propio (Plus, ADR 0189).
  *
  * Abrir o cerrar la página se aplica al momento (no es parte del borrador); el SEO sí
  * es del borrador y se publica con el sitio.
@@ -205,24 +206,7 @@ async function copiar(): Promise<void> {
       </p>
     </div>
 
-    <!-- Dominio propio: Plus, aún no disponible -->
-    <div class="tu-card p-5" data-prueba="dominio-propio">
-      <div class="flex flex-wrap items-center gap-2">
-        <h2 class="text-lg font-medium">
-          {{ $t("sitioWeb.dominio.propio") }}
-        </h2>
-        <span class="tu-badge">{{ $t("sitioWeb.plus.etiqueta") }}</span>
-      </div>
-      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("sitioWeb.dominio.propioAyuda") }}
-      </p>
-      <p class="mt-2 text-sm">
-        {{
-          conPlus
-            ? $t("sitioWeb.dominio.propioPronto")
-            : $t("sitioWeb.dominio.propioPlus")
-        }}
-      </p>
-    </div>
+    <!-- Dominio propio (Plus, ADR 0189) -->
+    <DominioPropioSitio :puede-publicar="puedePublicar" />
   </div>
 </template>

@@ -325,6 +325,8 @@ class AuthTenantController
             // Su moneda y su zona horaria (ADR 0099); con pesos mexicanos cobra en
             // línea y (en México) factura.
             'moneda' => app(ParametrosTenant::class)->moneda(),
+            // Precio por forma de pago (ADR 0191): el descuento al cobrar de contado en caja.
+            'descuento_contado_pct' => app(ParametrosTenant::class)->entero('ventas.descuento_contado_pct'),
             'zona_horaria' => app(FechasNegocioTenant::class)->zona(),
             // Su desfase de hoy con UTC (minutos): la app sabe qué día es en el negocio
             // antes de cargar su agenda, sin un paquete de zonas (ADR 0166).

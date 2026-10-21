@@ -458,8 +458,35 @@ export default {
     propio: "Dominio propio",
     propioAyuda:
       "Tu página en tu dirección (p. ej. www.tunegocio.com) en lugar de la de la plataforma.",
-    propioPronto: "Aún no está disponible.",
     propioPlus:
-      "Será del sitio avanzado (Plus), desde el plan Premium. Aún no está disponible.",
+      "Es del sitio avanzado (Plus), desde el plan Premium. Con él, tu página abre en tu propio dominio.",
+    propioCampo: "Tu dominio",
+    conectar: "Conectar",
+    revisar: "Revisar ahora",
+    quitar: "Quitar dominio",
+    quitarConfirmar:
+      "Tu página dejará de abrir en {dominio} y seguirá en la dirección de la plataforma.",
+    estado: {
+      activo: "Activo",
+      pendiente: "Pendiente",
+      sin_plan: "Sin el plan",
+    },
+    activoAyuda: "Tu página ya abre en",
+    sinPlanAyuda:
+      "Tu dominio está listo, pero se sirve con el sitio avanzado (Plus) de tu plan.",
+    problema: {
+      sin_txt: "Aún no vemos el registro TXT.",
+      txt_distinto:
+        "El registro TXT tiene otro valor: cópialo de nuevo, tal cual.",
+      no_apunta:
+        "El dominio ya es tuyo; falta que apunte aquí con el CNAME (o los registros A).",
+    },
+    registrosAyuda:
+      "Crea estos registros en el panel de tu proveedor de dominio (donde lo compraste):",
+    tipo: "Tipo",
+    nombre: "Nombre",
+    valor: "Valor",
+    tardaAyuda:
+      "Pueden tardar unas horas en verse. Lo revisamos solos cada 10 minutos; cuando quede activo, tu página abre ahí con candado (https).",
   },
 };

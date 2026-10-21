@@ -240,7 +240,8 @@ it('apagado, el negocio no ve WhatsApp; encendido, solo enciende avisos con el t
         ->assertUnprocessable()->assertJsonValidationErrors(['clave'], 'meta.errors');
     $this->putJson($url, ['clave' => 'reserva.confirmada', 'canal' => 'whatsapp', 'destinatario' => 'profesional'], conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonValidationErrors(['canal'], 'meta.errors');
-    // Los envíos masivos no van por WhatsApp.
+    // Sin la cuenta de WhatsApp Business de la plataforma, las campañas no van por
+    // WhatsApp (ADR 0190).
     expect($this->getJson("/api/v1/app/{$e['slug']}/comunicaciones/segmentos", conBearer($e['bearer']))->json('canales'))
         ->not->toContain('whatsapp');
 

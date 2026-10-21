@@ -33,15 +33,56 @@ const RESERVADOS = new Set([
   "pruebas",
 ]);
 
+// El dominio propio con que se abrió la página (ADR 0189), si la API dijo de qué
+// negocio es (`lib/dominioPropio`, antes de la primera ruta). Ahí hace las veces del
+// subdominio.
+let dominioPropio: { host: string; slug: string } | null = null;
+
+export function fijarDominioPropio(
+  valor: { host: string; slug: string } | null,
+): void {
+  dominioPropio =
+    valor === null
+      ? null
+      : { host: valor.host.toLowerCase(), slug: valor.slug };
+}
+
+/** El dominio propio en que está la página, o null. */
+export function dominioPropioActual(): { host: string; slug: string } | null {
+  return dominioPropio;
+}
+
+/**
+ * ¿Un host que no es de la plataforma (ni de desarrollo)? Ahí puede estar el dominio
+ * propio de un negocio (ADR 0189). Ni localhost, ni una IP, ni un dominio de producto
+ * o sus subdominios.
+ */
+export function esHostAjeno(host: string = window.location.hostname): boolean {
+  const h = host.toLowerCase();
+  if (h === "" || h.startsWith("[") || h.includes(":")) {
+    return false;
+  }
+  if (h === "localhost" || h.endsWith(".localhost") || /^[\d.]+$/.test(h)) {
+    return false;
+  }
+  return !PRODUCTOS_LISTA.some((id) => {
+    const dominio = PRODUCTOS[id].dominio;
+    return h === dominio || h.endsWith(`.${dominio}`);
+  });
+}
+
 /**
  * Slug del estudio derivado del subdominio (`{slug}.agendauno.mx` en prod o
- * `{slug}.localhost` en dev), o `null` si estamos en el dominio raíz o en un
- * subdominio reservado. Solo un nivel de subdominio (sin puntos internos).
+ * `{slug}.localhost` en dev) o de su dominio propio, o `null` si estamos en el dominio
+ * raíz o en un subdominio reservado. Solo un nivel de subdominio (sin puntos internos).
  */
 export function slugDeSubdominio(
   host: string = window.location.hostname,
 ): string | null {
   const h = host.toLowerCase().split(":")[0];
+  if (dominioPropio !== null && h === dominioPropio.host) {
+    return dominioPropio.slug;
+  }
 
   const sufijos = [
     ".localhost",
@@ -88,6 +129,10 @@ export function urlPublicaEstudio(
   slug: string,
   producto: Producto = productoActual(),
 ): string {
+  // En su dominio propio, ese es su dirección (ADR 0189).
+  if (dominioPropio !== null && dominioPropio.slug === slug) {
+    return dominioPropio.host;
+  }
   return `${slug}.${PRODUCTOS[producto].dominio}`;
 }
 

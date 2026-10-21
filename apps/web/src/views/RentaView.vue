@@ -106,6 +106,8 @@ interface Renta {
     vence: string | null;
   } | null;
   domiciliacion_posible?: boolean;
+  /** Con qué se puede pagar la renta (ADR 0192): Stripe, Mercado Pago u OpenPay. */
+  pasarelas?: string[];
   /** ¿Puede recibir la factura de la renta? Si no, se le da un recibo sin valor fiscal. */
   factura_renta_posible?: boolean;
   actual: Uso;
@@ -129,6 +131,12 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 
 const pagando = ref<string | null>(null);
+// Con más de una pasarela activa, el dueño elige con cuál paga (ADR 0192).
+const pasarelasRenta = computed(() => renta.value?.pasarelas ?? []);
+const pasarelaElegida = ref<string | null>(null);
+const pasarela = computed(
+  () => pasarelaElegida.value ?? pasarelasRenta.value[0] ?? null,
+);
 const facturando = ref<string | null>(null);
 
 // Quién cuenta en el cobro del mes: en un diálogo con tabla (cientos de alumnos).
@@ -287,7 +295,9 @@ async function pagar(cargo: Cargo): Promise<void> {
   try {
     const { data } = await api.post<{ data: RespuestaPago }>(
       `${base.value}/renta/cargos/${cargo.id}/pagar`,
-      {},
+      pasarelasRenta.value.length > 1 && pasarela.value !== null
+        ? { proveedor: pasarela.value }
+        : {},
     );
     const checkout = data.data.checkout ?? {};
     // Pasarelas de redirección (p. ej. Mercado Pago): se envía al checkout externo.
@@ -707,6 +717,28 @@ onMounted(() => {
       <ComplementosNegocio />
 
       <h2 class="mt-8 font-medium text-lg">{{ $t("renta.historial") }}</h2>
+      <!-- Con qué se paga, si la plataforma tiene más de una pasarela (ADR 0192). -->
+      <div
+        v-if="
+          pasarelasRenta.length > 1 &&
+          renta.cargos.some((c) => c.estado === 'pendiente')
+        "
+        class="mt-3 flex flex-wrap items-center gap-2"
+        data-prueba="pasarela-renta"
+      >
+        <span class="text-sm">{{ $t("renta.pagarCon") }}</span>
+        <div class="tu-segmentado" role="group">
+          <button
+            v-for="p in pasarelasRenta"
+            :key="p"
+            type="button"
+            :aria-pressed="pasarela === p"
+            @click="pasarelaElegida = p"
+          >
+            {{ $t(`renta.pasarelas.${p}`) }}
+          </button>
+        </div>
+      </div>
       <EstadoVacio
         v-if="renta.cargos.length === 0"
         class="tu-card mt-3"

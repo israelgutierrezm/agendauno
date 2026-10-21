@@ -55,6 +55,16 @@ const partes = ref<ParteCobro[] | null>(null);
 const partesOk = computed(
   () => !dividido.value || partesListas(partes.value, total.value),
 );
+// Precio por forma de pago (ADR 0191): todo en efectivo o todo por transferencia
+// baja el porcentaje del negocio; con tarjeta o dividido, no. El servidor lo aplica.
+const pctContado = computed(() => sesion.estudio?.descuento_contado_pct ?? 0);
+const totalACobrar = computed(() =>
+  pctContado.value > 0 &&
+  !dividido.value &&
+  (metodo.value === "efectivo" || metodo.value === "transferencia")
+    ? total.value - Math.floor((total.value * pctContado.value) / 100)
+    : total.value,
+);
 const referencia = ref("");
 const procesando = ref(false);
 const error = ref<string | null>(null);
@@ -151,7 +161,7 @@ async function registrar(): Promise<void> {
       "registrado",
       t("cobranza.pendientes.registrado", {
         nombre: o.persona ?? "—",
-        monto: dinero(total.value, o.moneda),
+        monto: dinero(totalACobrar.value, o.moneda),
       }),
     );
   } catch (e) {
@@ -177,8 +187,30 @@ async function registrar(): Promise<void> {
         </span>
         {{ orden.concepto ?? "—" }}
       </p>
-      <p class="text-2xl font-semibold tabular-nums">
-        {{ dinero(total, orden.moneda) }}
+      <p class="text-2xl font-semibold tabular-nums" data-prueba="total-cobro">
+        {{ dinero(totalACobrar, orden.moneda) }}
+      </p>
+      <p
+        v-if="totalACobrar !== total"
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+        data-prueba="descuento-contado"
+      >
+        {{
+          $t("cobranza.pendientes.descuentoContado", {
+            pct: pctContado,
+            antes: dinero(total, orden.moneda),
+          })
+        }}
+      </p>
+      <p
+        v-else-if="pctContado > 0"
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{
+          $t("cobranza.pendientes.descuentoContadoAyuda", { pct: pctContado })
+        }}
       </p>
       <ul
         v-if="cuotas.length > 0"

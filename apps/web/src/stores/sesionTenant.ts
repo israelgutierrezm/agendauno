@@ -113,6 +113,8 @@ export interface EstudioSesion {
   con_equipo?: boolean;
   // El negocio manda avisos por WhatsApp a sus clientes (ADR 0069).
   whatsapp_clientes?: boolean;
+  // Precio por forma de pago (ADR 0191): % de descuento al cobrar de contado en caja.
+  descuento_contado_pct?: number;
   // Los módulos que el superadmin encendió en el negocio (ADR 0123): solo estos se
   // muestran; el servidor niega los demás.
   modulos?: string[];

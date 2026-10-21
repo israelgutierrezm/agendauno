@@ -13,10 +13,10 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * La renta pagada cuyo aviso de Stripe no llegó: se pregunta a Stripe por los cargos
- * pendientes con un intento en curso y se aplica lo que habría aplicado el aviso
- * (pagado, o el intento ya no se puede pagar). Sin esto, un negocio que pagó podría
- * suspenderse por renta vencida.
+ * La renta pagada cuyo aviso no llegó: se pregunta a la pasarela (Stripe, Mercado Pago u
+ * OpenPay, ADR 0192) por los cargos pendientes con un intento en curso y se aplica lo
+ * que habría aplicado el aviso (pagado, o el intento ya no se puede pagar). Sin esto,
+ * un negocio que pagó podría suspenderse por renta vencida.
  */
 class ConciliarCargosRenta
 {
@@ -27,6 +27,7 @@ class ConciliarCargosRenta
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly PasarelaStripePlataforma $stripe,
         private readonly ConfirmarCargoRenta $confirmar,
+        private readonly AvisosRentaPlataforma $avisos,
     ) {}
 
     /**
@@ -34,13 +35,14 @@ class ConciliarCargosRenta
      */
     public function ejecutar(): int
     {
-        if (! $this->registro->activa('stripe')) {
+        $activas = $this->registro->activas();
+        if ($activas === []) {
             return 0;
         }
 
         return CargoRenta::query()
             ->where('estado', EstadoCargoRenta::Pendiente->value)
-            ->where('metodo_pago', 'stripe')
+            ->whereIn('metodo_pago', $activas)
             ->whereNotNull('referencia_pago')
             ->where('updated_at', '<=', Carbon::now()->subMinutes(self::MINUTOS_DE_GRACIA))
             ->orderBy('id')
@@ -54,6 +56,9 @@ class ConciliarCargosRenta
      */
     public function conciliar(CargoRenta $cargo): bool
     {
+        if (in_array($cargo->metodo_pago, ['mercadopago', 'openpay'], true)) {
+            return $this->avisos->conciliar($cargo);
+        }
         $referencia = (string) $cargo->referencia_pago;
         try {
             $estado = $this->stripe->estadoIntento($referencia, $this->registro->llaves('stripe'));

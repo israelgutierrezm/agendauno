@@ -79,8 +79,10 @@ class EnviarMensajesTenant
 
                     return;
                 }
-                // Sin saldo o en el tope del mes, el aviso no sale (ADR 0186).
-                if ($mensaje->canal === CanalComunicacion::WhatsApp && ($motivo = $this->saldoWhatsApp->motivoParaNoEnviar()) !== null) {
+                // Sin saldo o en el tope del mes, el aviso no sale (ADR 0186). Uno de
+                // marketing gasta más de un mensaje (ADR 0190).
+                $unidades = max(1, (int) ($mensaje->parametros['unidades'] ?? 1));
+                if ($mensaje->canal === CanalComunicacion::WhatsApp && ($motivo = $this->saldoWhatsApp->motivoParaNoEnviar($unidades)) !== null) {
                     $mensaje->estado = EstadoMensaje::Descartado;
                     $mensaje->ultimo_error = $motivo;
                     $mensaje->save();
@@ -92,7 +94,7 @@ class EnviarMensajesTenant
                 try {
                     $this->entregar($mensaje);
                     if ($mensaje->canal === CanalComunicacion::WhatsApp) {
-                        $this->saldoWhatsApp->gastar('mensaje:'.$mensaje->getKey());
+                        $this->saldoWhatsApp->gastar('mensaje:'.$mensaje->getKey(), $unidades);
                     }
                     $mensaje->estado = EstadoMensaje::Enviado;
                     $mensaje->enviado_en = Carbon::now();

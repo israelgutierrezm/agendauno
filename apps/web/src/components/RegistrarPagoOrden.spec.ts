@@ -12,7 +12,10 @@ import RegistrarPagoOrden from "./RegistrarPagoOrden.vue";
 
 const api = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
-const sesion = vi.hoisted(() => ({ puede: vi.fn(() => true) }));
+const sesion = vi.hoisted(() => ({
+  puede: vi.fn(() => true),
+  estudio: null as { descuento_contado_pct: number } | null,
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));
@@ -43,6 +46,7 @@ function montar(o = orden) {
 beforeEach(() => {
   api.post.mockReset();
   sesion.puede.mockReturnValue(true);
+  sesion.estudio = null;
 });
 
 describe("registrar pago con cuotas", () => {
@@ -94,5 +98,25 @@ describe("registrar pago con cuotas", () => {
     const w = montar();
     expect(w.text()).toContain("Inscripción");
     expect(w.find('[data-prueba="exentar-cuota"]').exists()).toBe(false);
+  });
+});
+
+// Precio por forma de pago (ADR 0191): el descuento de contado se ve antes de cobrar.
+describe("registrar pago de contado", () => {
+  it("en efectivo o transferencia muestra el precio de contado; con tarjeta, el de siempre", async () => {
+    sesion.estudio = { descuento_contado_pct: 10 };
+    const w = montar({ ...orden, cuotas: [] });
+
+    expect(w.get('[data-prueba="total-cobro"]').text()).toBe("$1,350.00");
+    expect(w.get('[data-prueba="descuento-contado"]').text()).toContain(
+      "$1,500.00",
+    );
+
+    const tarjeta = w
+      .findAll("button")
+      .find((b) => b.text().startsWith("Tarjeta"));
+    await tarjeta?.trigger("click");
+    expect(w.get('[data-prueba="total-cobro"]').text()).toBe("$1,500.00");
+    expect(w.find('[data-prueba="descuento-contado"]').exists()).toBe(false);
   });
 });

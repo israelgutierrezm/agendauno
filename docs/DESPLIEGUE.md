@@ -103,6 +103,48 @@ mismo. Así no hay CORS entre subdominios.
 
    Con Traefik 2, las reglas cambian: `HostRegexp(`{sub:[a-z0-9-]+}.DOMINIO`)` y el
    middleware `ipwhitelist`; ajústalas en los dos archivos.
+
+   #### Dominios propios (ADR 0189)
+
+   Un negocio con el sitio avanzado (Plus) conecta su dominio en Sitio web › Dominio:
+   prueba que es suyo con un TXT en `_agendauno.{su dominio}` y lo apunta con un CNAME
+   a `sitios.{dominio de su producto}` (o, en la raíz de su dominio, con registros A a
+   `DOMINIOS_PROPIOS_IPS`). nginx ya atiende cualquier host con la aplicación y la API
+   resuelve el negocio por el host; lo que falta es el certificado de cada dominio,
+   que **no** puede salir del resolvedor por DNS-01 de Cloudflare (el dominio no es
+   nuestro). Para encenderlo (requiere autorización: cambia el Traefik compartido):
+
+   1. DNS: `sitios.agendauno.mx` y `sitios.turnouno.mx` como registro A a la IP del
+      servidor, **sin el proxy de Cloudflare** (nube gris): el reto HTTP-01 y las
+      visitas a los dominios de los negocios llegan directo al servidor.
+   2. Traefik: un resolvedor por HTTP-01 y el proveedor `file` vigilando un directorio:
+
+      ```yaml
+      certificatesResolvers:
+        letsencrypt:
+          acme:
+            email: operacion@DOMINIO
+            storage: /letsencrypt/acme-http.json
+            httpChallenge:
+              entryPoint: web
+      providers:
+        file:
+          directory: /etc/traefik/dinamico
+          watch: true
+      ```
+
+      con `/srv/traefik/dinamico/agendauno` del servidor montado dentro de
+      `/etc/traefik/dinamico`.
+   3. `docker-compose.dominios-propios.yml` en `COMPOSE_FILE`, `DOMINIOS_PROPIOS_DIR`
+      en `web.env` y `DOMINIOS_PROPIOS_TRAEFIK=/var/www/traefik-dinamico/dominios-propios.yml`
+      en `api.env` (ver el archivo). `chown 82:82` al directorio.
+   4. `php artisan agendauno:dominios-propios` escribe el archivo con los dominios que
+      se sirven (el programador lo repite cada 10 minutos).
+
+   Con `docker-compose.cloudflare.yml` (Traefik solo deja entrar a Cloudflare) los
+   dominios de los negocios no llegan: se necesitaría Cloudflare for SaaS (nombres de
+   host personalizados), que es otra decisión. **Sin validar en producción**: el flujo
+   está probado con DNS simulado, no con un dominio y un certificado reales.
 5. **Correo**: cuenta SMTP (Resend, Postmark, Amazon SES, Brevo…) con el dominio del
    remitente verificado (SPF y DKIM).
 6. **Facturación (opcional)**: llave de FacturAPI (`FACTURAPI_LLAVE` o en la

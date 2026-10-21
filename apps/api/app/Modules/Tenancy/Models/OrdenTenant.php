@@ -32,6 +32,8 @@ class OrdenTenant extends Model
         'renueva_vence_el',
         // Lo pagado en otro sistema antes de importarla (R14): no es ingreso de aquí.
         'pagado_fuera_minor',
+        // El descuento por pagar de contado en caja (ADR 0191), aparte del de promoción.
+        'descuento_contado_minor',
     ];
 
     /**
@@ -44,6 +46,7 @@ class OrdenTenant extends Model
         'pagada_en' => 'datetime',
         'renueva_vence_el' => 'date',
         'pagado_fuera_minor' => 'integer',
+        'descuento_contado_minor' => 'integer',
         'domiciliar' => 'boolean',
         'cancelada_en' => 'datetime',
     ];

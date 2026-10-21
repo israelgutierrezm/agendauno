@@ -35,6 +35,8 @@ interface Config {
   duenos: boolean;
   conectado: boolean;
   phone_number_id: string;
+  // La cuenta de WhatsApp Business (ADR 0190).
+  waba_id?: string;
   token_configurado: boolean;
   // En cuántos negocios está activado (ADR 0083).
   negocios_habilitados?: number;
@@ -64,6 +66,7 @@ const borrador = ref({
   duenos: false,
   negocios: false,
   phone_number_id: "",
+  waba_id: "",
   token: "",
   app_secret: "",
 });
@@ -86,6 +89,7 @@ function aplicar(c: Config): void {
     duenos: c.duenos,
     negocios: c.negocios,
     phone_number_id: c.phone_number_id,
+    waba_id: c.waba_id ?? "",
     token: "",
     app_secret: "",
   };
@@ -112,6 +116,7 @@ async function guardar(): Promise<void> {
         duenos: borrador.value.duenos,
         negocios: borrador.value.negocios,
         phone_number_id: borrador.value.phone_number_id.trim(),
+        waba_id: borrador.value.waba_id.trim(),
         token: borrador.value.token.trim() || null,
         app_secret: borrador.value.app_secret.trim() || null,
       },
@@ -183,6 +188,22 @@ onMounted(cargar);
             inputmode="numeric"
             autocomplete="off"
           />
+        </div>
+        <div>
+          <label class="tu-label" for="wa-cuenta">{{
+            $t("plataformaAdmin.whatsapp.cuenta")
+          }}</label>
+          <input
+            id="wa-cuenta"
+            v-model="borrador.waba_id"
+            class="tu-input"
+            inputmode="numeric"
+            autocomplete="off"
+            data-prueba="wa-cuenta"
+          />
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("plataformaAdmin.whatsapp.cuentaAyuda") }}
+          </p>
         </div>
         <div>
           <label class="tu-label" for="wa-token">{{

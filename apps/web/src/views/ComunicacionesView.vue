@@ -10,6 +10,9 @@ import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import PlantillasWhatsAppNegocio, {
+  type PlantillaWhatsApp,
+} from "@/components/PlantillasWhatsAppNegocio.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -57,6 +60,10 @@ interface Alcance {
   sin_consentimiento: number;
   sin_email: number;
   sin_app: number;
+  // Por WhatsApp (ADR 0190): sin aceptarlo o sin celular, y lo que gasta.
+  sin_whatsapp?: number;
+  mensajes?: number;
+  costo_minor?: number | null;
 }
 
 type Canal = "interno" | "email" | "push" | "whatsapp";
@@ -87,7 +94,7 @@ interface Mensaje {
   leido_en?: string | null;
   ultimo_error?: string | null;
 }
-type Pestana = "difusion" | "automaticos" | "salida";
+type Pestana = "difusion" | "automaticos" | "whatsapp" | "salida";
 
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
@@ -170,7 +177,33 @@ const form = ref({
   canal: "interno" as Canal,
   asunto: "",
   cuerpo: "",
+  // Por WhatsApp: la plantilla aprobada del negocio (ADR 0190).
+  plantilla_whatsapp: "",
 });
+
+// Las plantillas de WhatsApp aprobadas, para campañas por WhatsApp.
+const plantillasWhatsApp = ref<PlantillaWhatsApp[]>([]);
+const esCampanaWhatsApp = computed(() => form.value.canal === "whatsapp");
+const plantillaElegida = computed(() =>
+  plantillasWhatsApp.value.find((p) => p.id === form.value.plantilla_whatsapp),
+);
+async function cargarPlantillasWhatsApp(): Promise<void> {
+  if (!canalesDifusion.value.includes("whatsapp")) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: PlantillaWhatsApp[] }>(
+      `${base.value}/comunicaciones/whatsapp/plantillas`,
+    );
+    plantillasWhatsApp.value = data.data.filter((p) => p.estado === "aprobada");
+  } catch {
+    plantillasWhatsApp.value = [];
+  }
+}
+const dineroMxn = (minor: number): string =>
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
+    minor / 100,
+  );
 
 const segmentoSel = computed(() =>
   segmentos.value.find((s) => s.clave === form.value.segmento),
@@ -201,6 +234,13 @@ const excluidos = computed(() => {
     a.sin_app > 0
       ? t("operacion.comunicacion.sinApp", { n: a.sin_app }, a.sin_app)
       : null,
+    (a.sin_whatsapp ?? 0) > 0
+      ? t(
+          "comunicacionPantalla.whatsapp.sinWhatsApp",
+          { n: a.sin_whatsapp },
+          a.sin_whatsapp ?? 0,
+        )
+      : null,
   ].filter(Boolean);
   return partes.length > 0 ? partes.join(" · ") : null;
 });
@@ -214,7 +254,15 @@ async function abrirRevision(): Promise<void> {
   try {
     const { data } = await api.get<{ data: Alcance }>(
       `${base.value}/comunicaciones/alcance`,
-      { params: { segmento: form.value.segmento, canal: form.value.canal } },
+      {
+        params: {
+          segmento: form.value.segmento,
+          canal: form.value.canal,
+          ...(esCampanaWhatsApp.value
+            ? { plantilla_whatsapp: form.value.plantilla_whatsapp }
+            : {}),
+        },
+      },
     );
     alcance.value = data.data;
   } catch {
@@ -234,9 +282,38 @@ function conEjemplo(texto: string): string {
 const puedeEnviar = computed(
   () =>
     form.value.segmento !== "" &&
-    form.value.asunto.trim() !== "" &&
-    form.value.cuerpo.trim() !== "",
+    (esCampanaWhatsApp.value
+      ? plantillaElegida.value !== undefined
+      : form.value.asunto.trim() !== "" && form.value.cuerpo.trim() !== ""),
 );
+// Lo que se verá en la revisión: el texto escrito o el de la plantilla.
+const vistaAsunto = computed(() =>
+  esCampanaWhatsApp.value
+    ? (plantillaElegida.value?.titulo ?? "")
+    : conEjemplo(form.value.asunto),
+);
+const vistaCuerpo = computed(() =>
+  esCampanaWhatsApp.value
+    ? (plantillaElegida.value?.cuerpo ?? "")
+        .replace(/\{\{\s*persona_nombre\s*\}\}/g, "Ana")
+        .replace(/\{\{\s*negocio\s*\}\}/g, sesion.estudio?.nombre ?? "")
+    : conEjemplo(form.value.cuerpo),
+);
+// Por WhatsApp, lo que gasta del saldo (y cuánto cuesta, si la plataforma lo cobra).
+const gastoWhatsApp = computed(() => {
+  const a = alcance.value;
+  if (!esCampanaWhatsApp.value || a?.mensajes === undefined) {
+    return null;
+  }
+  return a.costo_minor === null || a.costo_minor === undefined
+    ? t("comunicacionPantalla.whatsapp.gastoSinCosto", {
+        mensajes: a.mensajes,
+      })
+    : t("comunicacionPantalla.whatsapp.gasto", {
+        mensajes: a.mensajes,
+        costo: dineroMxn(a.costo_minor),
+      });
+});
 
 // Ayuda de marcadores: se arma en el script para no meter `{{ }}` en el template
 // (Vue lo interpretaría como interpolación anidada). El backend reemplaza estos
@@ -321,6 +398,7 @@ async function cargar(): Promise<void> {
     ]);
     segmentos.value = seg.data.data;
     canalesDifusion.value = seg.data.canales ?? ["interno", "email"];
+    await cargarPlantillasWhatsApp();
     // Desde Renovaciones › Para recuperar: «Escribirles» llega con su grupo elegido.
     const pedido = ruta?.query.segmento;
     if (
@@ -348,12 +426,24 @@ async function enviar(): Promise<void> {
   try {
     const { data } = await api.post<{ data: Difusion }>(
       `${base.value}/comunicaciones/difusiones`,
-      { ...form.value },
+      esCampanaWhatsApp.value
+        ? {
+            segmento: form.value.segmento,
+            canal: form.value.canal,
+            plantilla_whatsapp: form.value.plantilla_whatsapp,
+          }
+        : {
+            segmento: form.value.segmento,
+            canal: form.value.canal,
+            asunto: form.value.asunto,
+            cuerpo: form.value.cuerpo,
+          },
     );
     exito.value = data.data.total;
     revisando.value = false;
     form.value.asunto = "";
     form.value.cuerpo = "";
+    form.value.plantilla_whatsapp = "";
     await cargar();
   } catch (e) {
     errorEnvio.value = mensajeDeError(e);
@@ -768,6 +858,8 @@ async function irPestana(p: Pestana): Promise<void> {
   try {
     if (p === "automaticos") {
       await abrirAutomaticos();
+    } else if (p === "difusion") {
+      await cargarPlantillasWhatsApp();
     } else if (p === "salida") {
       await cargarSalida();
     }
@@ -809,6 +901,15 @@ onMounted(cargar);
         @click="irPestana('automaticos')"
       >
         {{ $t("comunicacionPantalla.pestanas.automaticos.titulo") }}
+      </button>
+      <button
+        v-if="puedeAutomaticos && canalesDifusion.includes('whatsapp')"
+        type="button"
+        :aria-pressed="pestana === 'whatsapp'"
+        data-prueba="pestana-whatsapp"
+        @click="irPestana('whatsapp')"
+      >
+        {{ $t("comunicacionPantalla.pestanas.whatsapp.titulo") }}
       </button>
       <button
         v-if="puedeSalida"
@@ -915,32 +1016,69 @@ onMounted(cargar);
           </div>
         </div>
 
-        <label class="block mt-5 text-sm font-semibold" for="com-asunto">{{
-          $t("comunicaciones.asuntoLabel")
-        }}</label>
-        <input
-          id="com-asunto"
-          v-model="form.asunto"
-          type="text"
-          maxlength="255"
-          class="tu-input mt-1 w-full"
-          :placeholder="$t('comunicaciones.asuntoPh')"
-        />
+        <!-- Por WhatsApp va una plantilla aprobada del negocio (ADR 0190). -->
+        <template v-if="esCampanaWhatsApp">
+          <label class="block mt-5 text-sm font-semibold" for="com-plantilla">{{
+            $t("comunicacionPantalla.whatsapp.plantilla")
+          }}</label>
+          <select
+            v-if="plantillasWhatsApp.length > 0"
+            id="com-plantilla"
+            v-model="form.plantilla_whatsapp"
+            class="tu-input mt-1 w-full"
+            data-prueba="plantilla-campana"
+          >
+            <option value="" disabled>
+              {{ $t("comunicacionPantalla.whatsapp.elegir") }}
+            </option>
+            <option v-for="p in plantillasWhatsApp" :key="p.id" :value="p.id">
+              {{ p.titulo }}
+            </option>
+          </select>
+          <p
+            v-else
+            class="mt-1 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="sin-plantillas-aprobadas"
+          >
+            {{ $t("comunicacionPantalla.whatsapp.sinAprobadas") }}
+          </p>
+          <p
+            v-if="plantillaElegida"
+            class="mt-2 text-sm whitespace-pre-line"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ vistaCuerpo }}
+          </p>
+        </template>
+        <template v-else>
+          <label class="block mt-5 text-sm font-semibold" for="com-asunto">{{
+            $t("comunicaciones.asuntoLabel")
+          }}</label>
+          <input
+            id="com-asunto"
+            v-model="form.asunto"
+            type="text"
+            maxlength="255"
+            class="tu-input mt-1 w-full"
+            :placeholder="$t('comunicaciones.asuntoPh')"
+          />
 
-        <label class="block mt-4 text-sm font-semibold" for="com-cuerpo">{{
-          $t("comunicaciones.cuerpoLabel")
-        }}</label>
-        <textarea
-          id="com-cuerpo"
-          v-model="form.cuerpo"
-          rows="4"
-          maxlength="5000"
-          class="tu-input mt-1 w-full"
-          :placeholder="$t('comunicaciones.cuerpoPh')"
-        ></textarea>
-        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ marcadoresTexto }}
-        </p>
+          <label class="block mt-4 text-sm font-semibold" for="com-cuerpo">{{
+            $t("comunicaciones.cuerpoLabel")
+          }}</label>
+          <textarea
+            id="com-cuerpo"
+            v-model="form.cuerpo"
+            rows="4"
+            maxlength="5000"
+            class="tu-input mt-1 w-full"
+            :placeholder="$t('comunicaciones.cuerpoPh')"
+          ></textarea>
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ marcadoresTexto }}
+          </p>
+        </template>
 
         <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
           <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
@@ -999,11 +1137,18 @@ onMounted(cargar);
           class="mt-1 rounded-xl border p-4"
           :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
         >
-          <p class="font-semibold">{{ conEjemplo(form.asunto) }}</p>
+          <p class="font-semibold">{{ vistaAsunto }}</p>
           <p class="mt-2 whitespace-pre-line text-sm">
-            {{ conEjemplo(form.cuerpo) }}
+            {{ vistaCuerpo }}
           </p>
         </div>
+        <p
+          v-if="gastoWhatsApp"
+          class="mt-3 text-sm"
+          data-prueba="gasto-whatsapp"
+        >
+          {{ gastoWhatsApp }}
+        </p>
         <AvisoTono v-if="destinatarios === 0" tono="aviso" class="mt-4">
           {{ $t("operacion.comunicacion.sinDestinatarios") }}
         </AvisoTono>
@@ -1198,6 +1343,12 @@ onMounted(cargar);
         @ir="irPaginaDifusiones"
       />
     </template>
+
+    <!-- Plantillas de WhatsApp del negocio (ADR 0190) -->
+    <PlantillasWhatsAppNegocio
+      v-if="pestana === 'whatsapp'"
+      @cambio="cargarPlantillasWhatsApp"
+    />
 
     <!-- Mensajes automáticos -->
     <div v-if="pestana === 'automaticos'" class="mt-5 tu-card p-5">

@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * evento via plantilla) hacia una persona/destinatario por un canal, con su ciclo de
  * vida (encolado → enviado/fallido). `canal=interno` es la bandeja in-app de la persona.
  *
- * @property array{plantilla?: string, valores?: list<string>}|null $parametros
+ * @property array{plantilla?: string, valores?: list<string>, unidades?: int}|null $parametros
  */
 class MensajeTenant extends Model
 {

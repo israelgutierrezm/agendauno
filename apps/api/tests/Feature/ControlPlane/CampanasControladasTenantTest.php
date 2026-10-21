@@ -140,7 +140,7 @@ it('antes de enviar dice a cuántos llega y quién queda fuera; después, cuánt
 
     // Por correo llega solo a Ana: Beto no tiene correo y Carla no quiere promociones.
     $this->getJson("/api/v1/app/{$e['slug']}/comunicaciones/alcance?segmento=todos&canal=email", conBearer($e['bearer']))
-        ->assertOk()->assertExactJson(['data' => ['elegibles' => 1, 'sin_consentimiento' => 1, 'sin_email' => 1, 'sin_app' => 0]]);
+        ->assertOk()->assertExactJson(['data' => ['elegibles' => 1, 'sin_consentimiento' => 1, 'sin_email' => 1, 'sin_app' => 0, 'sin_whatsapp' => 0]]);
     $difusion = (string) $this->postJson("/api/v1/app/{$e['slug']}/comunicaciones/difusiones", [
         'segmento' => 'todos', 'canal' => 'email', 'asunto' => 'Promo', 'cuerpo' => 'Dos clases gratis.',
     ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.total', 1)->json('data.id');

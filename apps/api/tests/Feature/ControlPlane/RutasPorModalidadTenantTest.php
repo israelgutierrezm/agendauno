@@ -99,6 +99,24 @@ function rutasExclusivasPorModalidad(): array
         // Lugares numerados desde la cuenta (B06).
         'mi.sesiones.lugares' => 'clases',
         'mi.reservas.lugar' => 'clases',
+        // Invitados de los planes socio (ADR 0182), videos (ADR 0184), conciliación de
+        // Wellhub y TotalPass (ADR 0185) y niveles de cada alumno (ADR 0187).
+        'mi.invitados.index' => 'clases',
+        'mi.invitados.store' => 'clases',
+        'mi.invitados.destroy' => 'clases',
+        'invitados.asistencia' => 'clases',
+        'invitados.destroy' => 'clases',
+        'mi.videos.index' => 'clases',
+        'videos.index' => 'clases',
+        'videos.store' => 'clases',
+        'videos.update' => 'clases',
+        'videos.destroy' => 'clases',
+        'plataformas.tarifas.index' => 'clases',
+        'plataformas.tarifas.store' => 'clases',
+        'plataformas.conciliacion.show' => 'clases',
+        'plataformas.conciliacion.store' => 'clases',
+        'miembros.niveles.index' => 'clases',
+        'miembros.niveles.update' => 'clases',
         // Citas: horarios de atención y disponibilidad del equipo, agendar desde el
         // panel, desde la cuenta y sin cuenta, y el historial de una cita.
         'horarios-atencion.index' => 'citas',

@@ -85,6 +85,13 @@ Schedule::command('agendauno:conciliar-cancelaciones-cfdi')->everyThirtyMinutes(
 // negocio se suspenda por renta vencida.
 Schedule::command('agendauno:conciliar-renta')->everyFifteenMinutes()->withoutOverlapping();
 
+// Dominios propios de los negocios (ADR 0189): revisa su DNS y deja al día los que
+// Traefik sirve con su certificado.
+Schedule::command('agendauno:dominios-propios')->everyTenMinutes()->withoutOverlapping();
+
+// Plantillas de WhatsApp de los negocios (ADR 0190): cómo van en Meta.
+Schedule::command('agendauno:revisar-plantillas-whatsapp')->everyFifteenMinutes()->withoutOverlapping();
+
 // Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2), a
 // las 00:45 de CDMX (ya empezó el día del cobro en el negocio). Una vez al día: es la
 // cadencia de los reintentos.

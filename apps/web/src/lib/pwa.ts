@@ -1,7 +1,7 @@
 import { reactive } from "vue";
 
 import { productoActual } from "@/lib/producto";
-import { enSubdominioDeEstudio } from "@/lib/tenant";
+import { dominioPropioActual, enSubdominioDeEstudio } from "@/lib/tenant";
 
 /**
  * La app instalable (PWA) de cada negocio (ADR 0110). Solo en el subdominio del
@@ -66,7 +66,15 @@ export function instalarPwa(): void {
     return;
   }
   instalado = true;
-  enHead("link", { rel: "manifest", href: "/api/v1/pwa/manifest.webmanifest" });
+  // En su dominio propio (ADR 0189) no hay rutas por subdominio: va con su slug.
+  const propio = dominioPropioActual();
+  enHead("link", {
+    rel: "manifest",
+    href:
+      propio === null
+        ? "/api/v1/pwa/manifest.webmanifest"
+        : `/api/v1/app/${encodeURIComponent(propio.slug)}/pwa/manifest.webmanifest`,
+  });
   enHead("meta", { name: "mobile-web-app-capable", content: "yes" });
   enHead("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
   enHead("meta", {

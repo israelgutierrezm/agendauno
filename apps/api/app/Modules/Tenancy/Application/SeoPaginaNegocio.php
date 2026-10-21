@@ -72,9 +72,10 @@ final class SeoPaginaNegocio
     }
 
     /**
-     * El negocio de un subdominio de un producto, abierto o no. False si el host no es
-     * un subdominio de ningún producto (otro host: no es asunto de esta página); null si
-     * lo es, pero de ningún negocio de ese producto.
+     * El negocio de un subdominio de un producto, abierto o no, o el de un dominio propio
+     * que se sirve (ADR 0189). False si el host no es de ningún negocio (otro host: no
+     * es asunto de esta página); null si es un subdominio de un producto, pero de ningún
+     * negocio de ese producto.
      */
     private function delSubdominio(string $host): Estudio|false|null
     {
@@ -89,7 +90,7 @@ final class SeoPaginaNegocio
             return $estudio instanceof Estudio && $estudio->producto() === $producto ? $estudio : null;
         }
 
-        return false;
+        return app(DominiosPropios::class)->estudioDelHost($host) ?? false;
     }
 
     /**
@@ -444,10 +445,15 @@ final class SeoPaginaNegocio
             : $robots;
     }
 
-    /** `https://{slug}.{dominio de su producto}`, sin diagonal final. */
+    /**
+     * `https://{slug}.{dominio de su producto}`, sin diagonal final; o su dominio propio
+     * si se sirve con él (ADR 0189): ahí apuntan la canónica y el sitemap.
+     */
     public function urlBase(Estudio $estudio): string
     {
-        return "https://{$estudio->slug}.{$estudio->producto()->dominio()}";
+        $propio = app(DominiosPropios::class)->servidoDe($estudio);
+
+        return $propio !== null ? "https://{$propio}" : "https://{$estudio->slug}.{$estudio->producto()->dominio()}";
     }
 
     /** Una imagen guardada como ruta del sitio (`/storage/...`) se vuelve absoluta. */

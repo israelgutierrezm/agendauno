@@ -1,0 +1,23 @@
+# Dominios propios de los negocios (ADR 0189). La API (al conectar, revisar o quitar un
+# dominio) y el programador (agendauno:dominios-propios, cada 10 minutos) escriben la
+# configuración dinámica de Traefik, un router por dominio que se sirve, en un
+# directorio del servidor que el Traefik vigila (proveedor `file`). Traefik pide el
+# certificado de cada uno por HTTP-01.
+#
+# Se agrega en web.env, después de docker-compose.traefik.yml:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.traefik.yml:docker-compose.dominios-propios.yml
+#   DOMINIOS_PROPIOS_DIR=/srv/traefik/dinamico/agendauno   # el mismo que monta Traefik
+# y en api.env:
+#   DOMINIOS_PROPIOS_TRAEFIK=/var/www/traefik-dinamico/dominios-propios.yml
+#
+# El directorio debe poder escribirlo www-data del contenedor (uid 82 en Alpine):
+#   chown 82:82 /srv/traefik/dinamico/agendauno
+# Ver docs/DESPLIEGUE.md → «Dominios propios».
+
+services:
+  api:
+    volumes:
+      - ${DOMINIOS_PROPIOS_DIR:?Falta DOMINIOS_PROPIOS_DIR en web.env}:/var/www/traefik-dinamico
+  scheduler:
+    volumes:
+      - ${DOMINIOS_PROPIOS_DIR:?Falta DOMINIOS_PROPIOS_DIR en web.env}:/var/www/traefik-dinamico

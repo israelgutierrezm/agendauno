@@ -150,6 +150,9 @@ final class CatalogoParametros
 
             // Devoluciones (ADR 0046).
             // Cobros en caja (ADR 0086): corregir la forma de pago de un cobro.
+            // Precio por forma de pago (ADR 0191).
+            new DefinicionParametro('ventas.descuento_contado_pct', 'Cobros en caja', 'Descuento por pagar de contado',
+                'Porcentaje que se descuenta al cobrar en caja todo en efectivo o todo por transferencia. 0 = el mismo precio con cualquier forma de pago. No aplica a pagos en línea ni con varias formas.', $e, 0, 0, 30, '%'),
             new DefinicionParametro('pagos.permitir_corregir_metodo', 'Cobros en caja', 'Permitir corregir la forma de pago de un cobro',
                 'Si se registró en efectivo y era transferencia (o al revés), se corrige sin cambiar el monto. Queda en la bitácora. No aplica a pagos en línea ni a ventas ya facturadas.', $sn, 1),
             new DefinicionParametro('pagos.horas_para_corregir', 'Cobros en caja', 'La forma de pago se puede corregir hasta',
@@ -260,10 +263,31 @@ final class CatalogoParametros
                 'Encendido, cada aviso por WhatsApp gasta un mensaje del saldo que el negocio compra en paquetes. Apagado, la plataforma los paga.', $sn, 0, porNegocio: false),
             new DefinicionParametro('whatsapp.precio_mensaje_centavos', 'Renta', 'Precio de cada mensaje de WhatsApp',
                 'En centavos de peso, sin IVA: la tarifa de Meta por mensaje de utilidad más el margen de la plataforma.', $e, 45, 1, 10000, '¢', porNegocio: false),
+            // Las plantillas de marketing de cada negocio cuestan más en Meta (ADR 0190).
+            new DefinicionParametro('whatsapp.mensajes_por_marketing', 'Renta', 'Mensajes del saldo que gasta uno de marketing',
+                'Meta cobra los de marketing varias veces más caros que los de utilidad: cada uno gasta estos mensajes del saldo del negocio.', $e, 5, 1, 20, 'mensajes', porNegocio: false),
             new DefinicionParametro('timbres.precio_centavos', 'Renta', 'Precio de cada timbre para facturar',
                 'En centavos de peso, sin IVA. Los paquetes que se venden se fijan en Configuración → Datos comerciales.', $e, 180, 1, 10000, '¢', porNegocio: false),
             new DefinicionParametro('renta.tipo_cambio_dias_vigencia', 'Renta', 'Antigüedad máxima del tipo de cambio',
                 'Para cobrar en pesos la renta en dólares. Uno más viejo ya no se usa: el cargo espera y se te avisa.', $e, 7, 1, 60, 'días', porNegocio: false),
+
+            // La demo de 15 minutos que se agenda desde la landing (ADR 0193).
+            new DefinicionParametro('demos.activas', 'Demos', 'Agendar demos desde la landing',
+                'Encendido, la landing ofrece agendar una demo en los horarios de abajo (hora del centro de México).', $sn, 0, porNegocio: false),
+            new DefinicionParametro('demos.minutos', 'Demos', 'Duración de cada demo',
+                'También es cada cuánto empieza una.', $e, 15, 10, 60, 'min', porNegocio: false),
+            new DefinicionParametro('demos.hora_inicio', 'Demos', 'Primera hora para una demo',
+                'De lunes a viernes (y sábado, si se enciende abajo).', $e, 10, 0, 23, 'h', porNegocio: false),
+            new DefinicionParametro('demos.hora_fin', 'Demos', 'Las demos terminan a más tardar a las',
+                'La última empieza para terminar a esta hora.', $e, 18, 1, 24, 'h', porNegocio: false),
+            new DefinicionParametro('demos.sabados', 'Demos', 'También los sábados',
+                'Con el mismo horario.', $sn, 0, porNegocio: false),
+            new DefinicionParametro('demos.dias_adelante', 'Demos', 'Días hacia adelante que se ofrecen',
+                'Cuántos días se pueden elegir, desde hoy.', $e, 10, 1, 30, 'días', porNegocio: false),
+            new DefinicionParametro('demos.horas_anticipacion', 'Demos', 'Anticipación mínima',
+                'Horas antes de que empiece, para que alguien la tome.', $e, 3, 0, 72, 'h', porNegocio: false),
+            new DefinicionParametro('demos.por_horario', 'Demos', 'Demos a la misma hora',
+                'Cuántas personas atienden demos: ese número de demos cabe en cada horario.', $e, 1, 1, 10, 'demos', porNegocio: false),
 
             // Avisos a los dueños (ADR 0071, solo la plataforma).
             new DefinicionParametro('duenos.dias_aviso_prueba', 'Dueños', 'Días antes del fin de la prueba para avisar al dueño',

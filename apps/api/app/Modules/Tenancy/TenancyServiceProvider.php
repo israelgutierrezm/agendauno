@@ -8,6 +8,8 @@ use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Application\VerificadorGoogle;
 use App\Modules\Tenancy\Application\VerificadorGoogleTokeninfo;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Integraciones\ConsultaDns;
+use App\Modules\Tenancy\Integraciones\ConsultaDnsSistema;
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
 use App\Modules\Tenancy\Integraciones\ResolvedorDnsSistema;
 use App\Modules\Tenancy\Models\Estudio;
@@ -34,6 +36,7 @@ class TenancyServiceProvider extends ServiceProvider
         // pruebas por un doble que devuelve una identidad conocida.
         $this->app->bind(VerificadorGoogle::class, VerificadorGoogleTokeninfo::class);
         $this->app->bind(ResolvedorDns::class, ResolvedorDnsSistema::class);
+        $this->app->bind(ConsultaDns::class, ConsultaDnsSistema::class);
     }
 
     public function boot(): void

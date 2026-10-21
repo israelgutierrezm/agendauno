@@ -10,6 +10,7 @@ import { alPerderSesion } from "./lib/api";
 import { instalarGuardaDeArrastre } from "./lib/archivos";
 import { instalarReporteDeErrores } from "./lib/errores";
 import { instalarRecargaPorVersion } from "./lib/recargaPorVersion";
+import { resolverDominioPropio } from "./lib/dominioPropio";
 import { productoActual } from "./lib/producto";
 import { instalarPwa } from "./lib/pwa";
 import { enSubdominioDeEstudio } from "./lib/tenant";
@@ -23,7 +24,9 @@ aplicarMarca(productoActual());
 instalarPwa();
 
 const pinia = createPinia();
-const app = createApp(App).use(pinia).use(i18n).use(router);
+// El router va después: en el dominio propio de un negocio, su primera ruta ya sabe de
+// qué negocio es (abajo).
+const app = createApp(App).use(pinia).use(i18n);
 // Los errores que nadie atrapa llegan al monitoreo de la plataforma (ADR 0080).
 instalarReporteDeErrores(app, {
   ruta: () => router.currentRoute.value.path,
@@ -60,11 +63,19 @@ alPerderSesion(() => {
   });
 });
 
-// Conservar el HTML comercial visible mientras se resuelve la primera ruta. Si la
-// primera navegación falla (y no se pudo recargar), se monta igual: mejor la app
-// con su aviso que la página en blanco.
-void router
-  .isReady()
+// En el dominio propio de un negocio (ADR 0189), de qué negocio es, con su marca y su
+// app instalable; luego la primera ruta. Conservar el HTML comercial visible mientras
+// se resuelve. Si la primera navegación falla (y no se pudo recargar), se monta igual:
+// mejor la app con su aviso que la página en blanco.
+void resolverDominioPropio()
+  .then((propio) => {
+    if (propio) {
+      aplicarMarca(productoActual());
+      instalarPwa();
+    }
+    app.use(router);
+    return router.isReady();
+  })
   .catch(() => undefined)
   .then(() => {
     app.mount("#app");

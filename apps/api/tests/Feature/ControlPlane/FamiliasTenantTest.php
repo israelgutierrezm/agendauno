@@ -241,7 +241,8 @@ it('el módulo está apagado por omisión y solo el superadministrador lo encien
     $this->getJson("/api/v1/app/{$e['slug']}/mi/participantes", conBearer($mama['bearer']))->assertForbidden();
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estudio.modulos', []);
     $modulos = $this->getJson("/api/v1/plataforma/estudios/{$e['slug']}", conPlataforma())->assertOk()->json('data.modulos');
-    expect($modulos)->toHaveCount(1)
+    // Familias y la app con la marca del negocio (ADR 0188), apagados.
+    expect($modulos)->toHaveCount(2)
         ->and($modulos[0])->toMatchArray(['clave' => 'familias', 'habilitado' => false]);
 
     // El negocio no puede encenderlo por su cuenta.

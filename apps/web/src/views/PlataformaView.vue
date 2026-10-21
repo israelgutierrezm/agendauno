@@ -9,6 +9,7 @@ import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
 import EquipoPlataforma from "@/components/EquipoPlataforma.vue";
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
 import InteresadosPlataforma from "@/components/InteresadosPlataforma.vue";
+import DemosPlataforma from "@/components/DemosPlataforma.vue";
 import ModalidadPlataforma from "@/components/ModalidadPlataforma.vue";
 import OperacionPlataforma from "@/components/OperacionPlataforma.vue";
 import PaisPlataforma from "@/components/PaisPlataforma.vue";
@@ -1717,6 +1718,13 @@ function borrar(): void {
       <InteresadosPlataforma
         v-if="pestana === 'interesados'"
         class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
+      <!-- Las demos agendadas desde la landing (ADR 0193) -->
+      <DemosPlataforma
+        v-if="pestana === 'interesados'"
+        class="mt-8"
         :api-url="apiUrl"
         :token="token"
       />

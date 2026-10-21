@@ -243,11 +243,15 @@ class PlataformaController
             }
             $config->credenciales = array_merge($config->llaves(), $nuevas);
         }
-        // Sin su llave secreta Stripe no cobra la renta: no se activa sin ella.
-        if ($config->activa && $proveedor === 'stripe' && trim($config->llaves()['secret_key'] ?? '') === '') {
+        // Sin sus llaves no cobra la renta: no se activa sin ellas (ADR 0192).
+        $faltantes = RegistroDePasarelasPlataforma::llavesFaltantes($proveedor, $config->llaves());
+        if ($config->activa && $faltantes !== []) {
             throw ValidationException::withMessages([
                 'activa' => ['Para activarla captura sus llaves.'],
-                'credenciales.secret_key' => ['Captúrala para activar la pasarela.'],
+                ...array_combine(
+                    array_map(static fn (string $l): string => "credenciales.{$l}", $faltantes),
+                    array_fill(0, count($faltantes), ['Captúrala para activar la pasarela.']),
+                ),
             ]);
         }
 

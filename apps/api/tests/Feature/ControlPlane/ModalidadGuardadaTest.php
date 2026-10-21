@@ -75,7 +75,7 @@ it('la configuración inicial dice qué giros puede elegir el negocio: solo los 
     $this->getJson("/api/v1/app/{$citas['slug']}/onboarding", conBearer($citas['bearer']))
         ->assertOk()->assertJsonPath('data.perfiles', ['barberia', 'estetica', 'salon', 'spa', 'salud', 'general_citas']);
     $this->getJson("/api/v1/app/{$clases['slug']}/onboarding", conBearer($clases['bearer']))
-        ->assertOk()->assertJsonPath('data.perfiles', ['general', 'gimnasio', 'crossfit', 'hyrox', 'pilates', 'pole', 'natacion', 'danza', 'yoga', 'academia']);
+        ->assertOk()->assertJsonPath('data.perfiles', ['general', 'gimnasio', 'crossfit', 'hyrox', 'pilates', 'pole', 'cycling', 'natacion', 'danza', 'yoga', 'academia']);
 });
 
 it('«otro negocio de citas» registra un negocio de citas que solo cambia a giros de citas', function (): void {

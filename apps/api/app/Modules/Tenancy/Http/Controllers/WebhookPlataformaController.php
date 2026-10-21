@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Application\AvisosRentaPlataforma;
 use App\Modules\Tenancy\Application\ConfirmarCargoRenta;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Pasarelas\MercadoPago\VerificarFirmaMercadoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +18,9 @@ use Illuminate\Http\Request;
 /**
  * Webhook publico de la pasarela de LA PLATAFORMA: `/webhooks/plataforma/{proveedor}`.
  * Confirma el cargo de renta pendiente correspondiente -> `pagado`. Idempotente. Para
- * Stripe verifica la firma con la `webhook_secret` global cuando esta configurada.
+ * Stripe verifica la firma con la `webhook_secret` global cuando esta configurada; Mercado
+ * Pago, su firma `x-signature`; OpenPay, su usuario y contraseña (HTTP Basic). De estas
+ * dos, el cobro se relee en su API antes de confirmar (ADR 0192).
  * Espejo, a nivel plataforma, de {@see WebhookTenantController}.
  */
 class WebhookPlataformaController
@@ -25,6 +29,7 @@ class WebhookPlataformaController
         private readonly ConfirmarCargoRenta $confirmar,
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly DomiciliacionRenta $domiciliacion,
+        private readonly AvisosRentaPlataforma $avisos,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -33,6 +38,12 @@ class WebhookPlataformaController
 
         if ($proveedor === 'stripe') {
             return $this->stripe($request);
+        }
+        if ($proveedor === 'mercadopago') {
+            return $this->mercadoPago($request);
+        }
+        if ($proveedor === 'openpay') {
+            return $this->openPay($request);
         }
 
         // Otros proveedores aun no tienen verificacion de firma dedicada. En PRODUCCION
@@ -46,6 +57,58 @@ class WebhookPlataformaController
         if ($referencia !== '') {
             $this->confirmar->porReferencia($referencia, $proveedor);
         }
+
+        return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * Mercado Pago: `?data.id=…&type=…` (PHP lo entrega como `data_id`) firmado en
+     * `x-signature` con el secreto de la plataforma.
+     */
+    private function mercadoPago(Request $request): JsonResponse
+    {
+        $secreto = $this->registro->llaves('mercadopago')['webhook_secret'] ?? '';
+        $dataId = (string) $request->query('data_id', '');
+        if ($secreto === '') {
+            if (! app()->environment(['local', 'testing'])) {
+                abort(400, 'Webhook sin secreto configurado.');
+            }
+        } elseif (! VerificarFirmaMercadoPago::valida($dataId, $request->header('x-request-id'), $request->header('x-signature'), $secreto)) {
+            abort(401, 'Firma inválida.');
+        }
+
+        $tipo = (string) ($request->query('type') ?? $request->json('type') ?? $request->query('topic') ?? '');
+        $id = $dataId !== '' ? $dataId : (string) ($request->json('data.id') ?? $request->query('id') ?? '');
+        $this->avisos->mercadoPago($tipo, $id);
+
+        return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * OpenPay: HTTP Basic con el usuario y la contraseña que guardó la plataforma. La
+     * verificación del webhook (`verification`) solo se contesta.
+     */
+    private function openPay(Request $request): JsonResponse
+    {
+        $llaves = $this->registro->llaves('openpay');
+        $usuario = $llaves['webhook_user'] ?? '';
+        $clave = $llaves['webhook_password'] ?? '';
+        if ($usuario === '' || $clave === '') {
+            if (! app()->environment(['local', 'testing'])) {
+                abort(400, 'Webhook sin usuario y contraseña configurados.');
+            }
+        } else {
+            $encabezado = (string) $request->header('Authorization', '');
+            $decodificado = str_starts_with($encabezado, 'Basic ') ? (string) base64_decode(substr($encabezado, 6), true) : '';
+            [$recibidoUsuario, $recibidaClave] = array_pad(explode(':', $decodificado, 2), 2, '');
+            if (! hash_equals($usuario, $recibidoUsuario) || ! hash_equals($clave, $recibidaClave)) {
+                abort(401, 'Credenciales inválidas.');
+            }
+        }
+
+        /** @var array<string, mixed> $evento */
+        $evento = $request->json()->all();
+        $this->avisos->openPay($evento);
 
         return response()->json(['data' => ['ok' => true]]);
     }

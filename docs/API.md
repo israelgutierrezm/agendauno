@@ -1509,6 +1509,98 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
+### Demo agendable en la landing (ADR 0193)
+
+- `GET /api/v1/demos` (público) devuelve `activas`, `minutos`, `zona`, `whatsapp` (si se
+  puede confirmar por WhatsApp) y `dias`: [{`fecha`, `horas`: ["10:00", …]}], solo los
+  horarios libres.
+- `POST /api/v1/demos` {`producto`, `fecha`, `hora`, `nombre`, `negocio`, `giro`?,
+  `correo`, `telefono`, `acepta_whatsapp`?, `acepta_aviso`, `aviso_version`?,
+  `recaptcha_token`?} responde 201 {`id`, `inicia_en`, `whatsapp`}.
+  - 422 en `meta.errors.hora` si el horario ya no está libre;
+  - 422 en `telefono` si no tiene 10 dígitos;
+  - `sitio_web` es un campo trampa y debe llegar vacío.
+- `POST /api/v1/demos/{id}/cancelar` {`token`} la cancela (404 con otro token).
+- Superadmin:
+  - `GET /plataforma/demos`, las próximas primero;
+  - `PUT /plataforma/demos/{id}` {`estado`: `atendida`, `no_asistio` o `cancelada`}.
+
+### Renta con Mercado Pago y OpenPay (ADR 0192)
+
+- `GET /renta` suma `pasarelas`: las de la plataforma que pueden cobrar la renta, en
+  orden (`stripe`, `mercadopago`, `openpay`). `POST /renta/cargos/{cargo}/pagar` acepta
+  `proveedor` con cualquiera de ellas; sin él, la primera.
+- Mercado Pago abre una preferencia (redirect) con el cargo como `external_reference`.
+  OpenPay abre un cargo con tarjeta en su página (redirect).
+- Avisos de la plataforma:
+  - `POST /webhooks/plataforma/mercadopago` (`?type=payment&data.id=…`), firmado con su
+    `webhook_secret`;
+  - `POST /webhooks/plataforma/openpay`, con HTTP Basic (`webhook_user`,
+    `webhook_password`).
+  - El cobro se relee en la API antes de dar la renta por pagada.
+- Superadmin: `PUT /plataforma/pasarelas/{mercadopago|openpay}` exige sus llaves para
+  activarla (`access_token`; `merchant_id` y `private_key`).
+
+### Precio por forma de pago (ADR 0191)
+
+- Parámetro del negocio `ventas.descuento_contado_pct` (0 a 30). `GET /yo` lo trae en
+  `estudio.descuento_contado_pct`.
+- `POST /ordenes/{orden}/liquidar` con `metodo` `efectivo` o `transferencia` y sin
+  `partes` baja ese porcentaje del total, una vez. La orden lo devuelve en
+  `descuento_contado_minor`, que también suma a `descuento_minor`. Con tarjeta, en
+  ventanilla, con varias formas de pago o en línea, no hay descuento.
+
+### Plantillas de WhatsApp del negocio (ADR 0190)
+
+- `GET /comunicaciones/whatsapp/plantillas` (`comunicaciones.ver`) devuelve:
+  - en `data`, sus plantillas sin archivar: `id`, `titulo`, `categoria` (`utilidad`,
+    `marketing`), `cuerpo`, `pie`, `estado` (`borrador`, `en_revision`, `aprobada`,
+    `rechazada`, `pausada`), `motivo`, `editable`, `enviada_en`, `revisada_en`;
+  - en `meta`: `disponible`, `marcadores`, `max_cuerpo`, `cobra` y `categorias`
+    [{`clave`, `mensajes`, `precio_minor`}].
+- Con `comunicaciones.gestionar` y el plan de mensajes:
+  - `POST /comunicaciones/whatsapp/plantillas` {`titulo`, `categoria`, `cuerpo`,
+    `pie`?} la crea en borrador;
+  - `PUT /comunicaciones/whatsapp/plantillas/{id}` la cambia, solo en borrador o
+    rechazada (422 en `meta.errors.estado`);
+  - `POST /comunicaciones/whatsapp/plantillas/{id}/enviar` la manda a Meta;
+  - `POST /comunicaciones/whatsapp/plantillas/{id}/revisar` pregunta a Meta cómo va.
+  - El texto usa `{{persona_nombre}}` y `{{negocio}}` (obligatorio); ninguno abre ni
+    cierra el texto y ninguno se repite (422 en `meta.errors.cuerpo`).
+- `DELETE /comunicaciones/whatsapp/plantillas/{id}` (`comunicaciones.eliminar`) la
+  archiva y la borra de Meta.
+- Campañas por WhatsApp:
+  - `GET /comunicaciones/segmentos` incluye `whatsapp` en `canales` cuando el negocio
+    puede usarlas.
+  - `POST /comunicaciones/difusiones` con `canal=whatsapp` lleva `plantilla_whatsapp`
+    (id de una aprobada) en lugar de `asunto` y `cuerpo`.
+  - `GET /comunicaciones/alcance` suma `sin_whatsapp` y, con `plantilla_whatsapp`,
+    `mensajes` y `costo_minor` (null si la plataforma no los cobra).
+- Superadmin: `PUT /plataforma/whatsapp` acepta `waba_id`, la cuenta de WhatsApp
+  Business de la plataforma, y `GET` lo devuelve.
+
+### Dominio propio del sitio (ADR 0189)
+
+- `GET /sitio/dominio` (`sitio.editar`) devuelve:
+  - `con_plan`: si tiene `sitio_avanzado`;
+  - `destino`: el CNAME, `sitios.{dominio de su producto}`;
+  - `dominio`: null, o {`dominio`, `estado` (`activo`, `pendiente`, `sin_plan`),
+    `problema` (`sin_txt`, `txt_distinto`, `no_apunta`, null), `propiedad_verificada`,
+    `revisado_en`, `registros`: [{`tipo`, `nombre`, `valor`}]}.
+- Con `sitio.publicar`:
+  - `PUT /sitio/dominio` {`dominio`} lo conecta o lo cambia. Exige `sitio_avanzado`
+    (403 `PLAN_FEATURE_NOT_INCLUDED`). Responde 422 en `meta.errors.dominio` si no es
+    un dominio de internet, es de la plataforma o ya es de otro negocio.
+  - `POST /sitio/dominio/revisar` revisa su DNS ahora (10 por minuto).
+  - `DELETE /sitio/dominio` lo quita.
+- Los registros son un TXT en `_agendauno.{dominio}` (`agendauno-verificacion={token}`)
+  y un CNAME al destino. En la raíz de su dominio, si la plataforma fijó
+  `DOMINIOS_PROPIOS_IPS`, van registros A.
+- `GET /api/v1/dominio-propio` (sin sesión) responde {`slug`, `producto`} del negocio
+  del host con que se pidió, o 404 si ese dominio no se sirve.
+- `agendauno:dominios-propios` (cada 10 min) revisa los pendientes y los activos y
+  escribe la configuración de Traefik (`DOMINIOS_PROPIOS_TRAEFIK`).
+
 ### Bloques propios del sitio (ADR 0146)
 
 - En `secciones[]` caben, además, bloques propios con `tipo` = `texto_imagen`,

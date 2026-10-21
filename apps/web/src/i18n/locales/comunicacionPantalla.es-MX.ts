@@ -16,6 +16,11 @@ export default {
       ayuda:
         "Plantillas que se envían solas cuando pasa algo en el negocio: una reserva, un pago, un recordatorio. Aquí eliges a quién le llega cada aviso, por qué canal y con qué texto.",
     },
+    whatsapp: {
+      titulo: "Plantillas de WhatsApp",
+      ayuda:
+        "Tus propios textos para campañas por WhatsApp. Meta los revisa antes de que se puedan usar.",
+    },
     salida: {
       titulo: "Bandeja de salida",
       ayuda:
@@ -23,6 +28,17 @@ export default {
     },
   },
   // Las reglas de Tareas no envían mensajes: crean tareas para el equipo.
+  // Campañas por WhatsApp con una plantilla aprobada (ADR 0190).
+  whatsapp: {
+    plantilla: "Plantilla de WhatsApp",
+    elegir: "Elige una plantilla aprobada",
+    sinAprobadas:
+      "Aún no tienes plantillas aprobadas por Meta. Escríbelas en la pestaña Plantillas de WhatsApp.",
+    sinWhatsApp:
+      "{n} no aceptó tus avisos por WhatsApp o no tiene celular | {n} no aceptaron tus avisos por WhatsApp o no tienen celular",
+    gasto: "Gasta {mensajes} mensajes de tu saldo de WhatsApp ({costo} + IVA).",
+    gastoSinCosto: "Gasta {mensajes} mensajes de tu saldo de WhatsApp.",
+  },
   reglasTareas:
     "¿Quieres que se cree una tarea para el equipo cuando pase algo? Eso se configura en Tareas › Automatización.",
   irATareas: "Ir a Tareas",

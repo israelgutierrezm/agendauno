@@ -38,6 +38,7 @@ class OrdenesTenant
         private readonly MembresiasTenant $membresias,
         private readonly CuotasTenant $cuotas,
         private readonly MembresiasPorModalidadTenant $modalidades,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -247,11 +248,62 @@ class OrdenesTenant
         }
 
         return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja, $partes, $idempotencyKey): PagoTenant {
+            $this->aplicarDescuentoContado($orden, $metodo, $partes);
             $pago = $this->cobrar->ejecutar($orden, 'manual', $partes !== null ? MetodoPago::Mixto : self::metodoDeCaja($metodo), $idempotencyKey, null, $actor, $sucursalCaja, $partes);
             $orden->update(['metodo_pago' => $partes !== null ? PartesCobro::MIXTO : $metodo, 'referencia_pago' => $referencia]);
 
             return $pago;
         });
+    }
+
+    /** Las formas de pago de contado: con ellas aplica el descuento del negocio (ADR 0191). */
+    public const METODOS_CONTADO = ['efectivo', 'transferencia'];
+
+    /**
+     * Lo que se cobraría de contado: el total menos el descuento del negocio, o null si
+     * no hay descuento (0 %, ya aplicado o nada que descontar).
+     */
+    public function totalDeContado(OrdenTenant $orden): ?int
+    {
+        $descuento = $this->descuentoDeContado($orden);
+
+        return $descuento > 0 ? (int) $orden->total_minor - $descuento : null;
+    }
+
+    /**
+     * Precio por forma de pago (ADR 0191): cobrada en caja toda en efectivo o toda por
+     * transferencia, la orden baja el porcentaje que fijó el negocio. Una vez: queda en
+     * `descuento_contado_minor` y suma al descuento de la orden. Con varias formas de
+     * pago no aplica (lo que se divide ya sumaba el total).
+     *
+     * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
+     */
+    private function aplicarDescuentoContado(OrdenTenant $orden, string $metodo, ?array $partes): void
+    {
+        if ($partes !== null || ! in_array($metodo, self::METODOS_CONTADO, true)) {
+            return;
+        }
+        $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
+        $descuento = $this->descuentoDeContado($bloqueada);
+        if ($descuento <= 0) {
+            return;
+        }
+        $bloqueada->update([
+            'total_minor' => (int) $bloqueada->total_minor - $descuento,
+            'descuento_minor' => (int) $bloqueada->descuento_minor + $descuento,
+            'descuento_contado_minor' => $descuento,
+        ]);
+        $orden->setRawAttributes($bloqueada->getAttributes(), true);
+    }
+
+    private function descuentoDeContado(OrdenTenant $orden): int
+    {
+        $porcentaje = $this->parametros->entero('ventas.descuento_contado_pct');
+        if ($porcentaje <= 0 || (int) $orden->descuento_contado_minor > 0 || (int) $orden->total_minor <= 0) {
+            return 0;
+        }
+
+        return intdiv((int) $orden->total_minor * min(30, $porcentaje), 100);
     }
 
     private static function metodoDeCaja(string $metodo): ?MetodoPago

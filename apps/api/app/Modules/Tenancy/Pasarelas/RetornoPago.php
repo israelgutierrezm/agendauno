@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Application\DominiosPropios;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Http\Request;
@@ -77,8 +78,10 @@ final class RetornoPago
         foreach (ProductoComercial::cases() as $producto) {
             $hostsWeb[] = strtolower((string) parse_url($producto->urlWeb(), PHP_URL_HOST));
         }
+        // También el dominio propio de un negocio (ADR 0189): su sesión vive ahí.
         $esNuestro = in_array($host, array_filter($hostsWeb), true)
-            || ProductoComercial::delHost($host) !== null;
+            || ProductoComercial::delHost($host) !== null
+            || app(DominiosPropios::class)->estudioDelHost($host) !== null;
         if (! $esNuestro) {
             return null;
         }

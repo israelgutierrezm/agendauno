@@ -6,12 +6,15 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\DifundirComunicacionTenant;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
+use App\Modules\Tenancy\Application\PlantillasWhatsAppNegocio;
 use App\Modules\Tenancy\Application\ResolverSegmentoTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Models\DifusionTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\PlantillaWhatsAppNegocio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -29,7 +32,9 @@ class DifusionesTenantController
 {
     private const LIMITE = 100;
 
-    public function segmentos(ResolverSegmentoTenant $resolver): JsonResponse
+    public function __construct(private readonly PlantillasWhatsAppNegocio $plantillas) {}
+
+    public function segmentos(Request $request, ResolverSegmentoTenant $resolver): JsonResponse
     {
         $conteos = $resolver->conteos();
 
@@ -41,8 +46,9 @@ class DifusionesTenantController
                 'descripcion' => $s->descripcion(),
                 'total' => $conteos[$s->value] ?? 0,
             ], array_filter(SegmentoComunicacion::cases(), static fn (SegmentoComunicacion $s): bool => array_key_exists($s->value, $conteos)))),
-            // Push solo aparece si la plataforma tiene FCM configurado.
-            'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::paraDifusiones()),
+            // Push solo aparece si la plataforma tiene FCM configurado; WhatsApp, si el
+            // negocio puede usar sus plantillas (ADR 0190).
+            'canales' => $this->canales($request),
         ]);
     }
 
@@ -54,10 +60,15 @@ class DifusionesTenantController
     {
         $validado = $request->validate([
             'segmento' => ['required', Rule::enum(SegmentoComunicacion::class)],
-            'canal' => ['required', Rule::in(array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::paraDifusiones()))],
+            'canal' => ['required', Rule::in($this->canales($request))],
+            'plantilla_whatsapp' => ['nullable', 'string', 'max:40'],
         ]);
+        $canal = CanalComunicacion::from($validado['canal']);
+        $plantilla = $canal === CanalComunicacion::WhatsApp && isset($validado['plantilla_whatsapp'])
+            ? $this->plantillaAprobada($request, (string) $validado['plantilla_whatsapp'])
+            : null;
 
-        return response()->json(['data' => $difundir->alcance(SegmentoComunicacion::from($validado['segmento']), CanalComunicacion::from($validado['canal']))]);
+        return response()->json(['data' => $difundir->alcance(SegmentoComunicacion::from($validado['segmento']), $canal, $plantilla)]);
     }
 
     public function index(Request $request): JsonResponse
@@ -92,17 +103,24 @@ class DifusionesTenantController
     {
         $validado = $request->validate([
             'segmento' => ['required', Rule::enum(SegmentoComunicacion::class)],
-            'canal' => ['required', Rule::in(array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::paraDifusiones()))],
-            'asunto' => ['required', 'string', 'max:255'],
-            'cuerpo' => ['required', 'string', 'max:5000'],
+            'canal' => ['required', Rule::in($this->canales($request))],
+            // Por WhatsApp el texto es el de la plantilla aprobada (ADR 0190).
+            'plantilla_whatsapp' => ['required_if:canal,whatsapp', 'nullable', 'string', 'max:40'],
+            'asunto' => ['exclude_if:canal,whatsapp', 'required', 'string', 'max:255'],
+            'cuerpo' => ['exclude_if:canal,whatsapp', 'required', 'string', 'max:5000'],
         ]);
 
         $segmento = SegmentoComunicacion::from($validado['segmento']);
         $canal = CanalComunicacion::from($validado['canal']);
+        $plantilla = $canal === CanalComunicacion::WhatsApp ? $this->plantillaAprobada($request, (string) $validado['plantilla_whatsapp']) : null;
+        if ($plantilla instanceof PlantillaWhatsAppNegocio) {
+            $validado['asunto'] = $plantilla->titulo;
+            $validado['cuerpo'] = $plantilla->cuerpo;
+        }
         $huella = DifundirComunicacionTenant::huella($segmento, $canal, $validado['asunto'], $validado['cuerpo']);
         // La misma campaña no se manda dos veces el mismo día (B08). Con el candado, dos
         // envíos a la vez (un doble clic, un reintento) no pasan los dos la revisión.
-        $difusion = Cache::lock('difusion:'.$huella, 30)->block(10, function () use ($huella, $difundir, $segmento, $canal, $validado): DifusionTenant {
+        $difusion = Cache::lock('difusion:'.$huella, 30)->block(10, function () use ($huella, $difundir, $segmento, $canal, $validado, $plantilla): DifusionTenant {
             $repetida = DifusionTenant::query()
                 ->where('huella', $huella)
                 ->where('estado', '!=', DifusionTenant::CANCELADA)
@@ -112,7 +130,7 @@ class DifusionesTenantController
                 throw ValidationException::withMessages(['cuerpo' => ['Ya mandaste esta misma difusión en las últimas 24 horas.']]);
             }
 
-            return $difundir->ejecutar($segmento, $canal, $validado['asunto'], $validado['cuerpo']);
+            return $difundir->ejecutar($segmento, $canal, $validado['asunto'], $validado['cuerpo'], $plantilla);
         });
 
         return response()->json(['data' => $this->presentar($difusion)], 201);
@@ -154,6 +172,34 @@ class DifusionesTenantController
         });
 
         return response()->json(['data' => $this->presentar($difusion->refresh())]);
+    }
+
+    /**
+     * Los canales de una campaña: los de siempre y WhatsApp si el negocio puede usar sus
+     * plantillas.
+     *
+     * @return list<string>
+     */
+    private function canales(Request $request): array
+    {
+        $canales = array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::paraDifusiones());
+        $estudio = $request->attributes->get('estudio');
+        if ($estudio instanceof Estudio && $this->plantillas->disponible($estudio)) {
+            $canales[] = CanalComunicacion::WhatsApp->value;
+        }
+
+        return $canales;
+    }
+
+    private function plantillaAprobada(Request $request, string $ulid): PlantillaWhatsAppNegocio
+    {
+        $estudio = $request->attributes->get('estudio');
+        $plantilla = $estudio instanceof Estudio ? $this->plantillas->aprobada($estudio, $ulid) : null;
+        if (! $plantilla instanceof PlantillaWhatsAppNegocio) {
+            throw ValidationException::withMessages(['plantilla_whatsapp' => ['Elige una plantilla de WhatsApp aprobada.']]);
+        }
+
+        return $plantilla;
     }
 
     private function difusion(Request $request): DifusionTenant

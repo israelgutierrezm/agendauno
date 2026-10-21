@@ -106,6 +106,8 @@ import kiosco from "./locales/kiosco.es-MX";
 import videos from "./locales/videos.es-MX";
 // WhatsApp por mensaje (ADR 0186).
 import whatsappRenta from "./locales/whatsappRenta.es-MX";
+import plantillasWhatsApp from "./locales/plantillasWhatsApp.es-MX";
+import demoAgendable, { demosPlataforma } from "./locales/demoAgendable.es-MX";
 // Niveles por actividad y práctica libre (ADR 0187).
 import nivelesMiembro from "./locales/nivelesMiembro.es-MX";
 import listadosVisual from "./locales/listadosVisual.es-MX";
@@ -228,6 +230,9 @@ const mensajesBase = {
   kiosco,
   videos,
   whatsappRenta,
+  plantillasWhatsApp,
+  demoAgendable,
+  demosPlataforma,
   nivelesMiembro,
   listadosVisual,
   sucursalOperativa,

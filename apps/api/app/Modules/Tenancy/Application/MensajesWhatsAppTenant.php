@@ -45,6 +45,15 @@ class MensajesWhatsAppTenant
     }
 
     /**
+     * Cuántos mensajes del saldo gasta uno de esa categoría (ADR 0190): utilidad, uno;
+     * marketing, los que fija la plataforma.
+     */
+    public function unidadesPor(string $categoria): int
+    {
+        return $categoria === 'marketing' ? max(1, $this->parametros->entero('whatsapp.mensajes_por_marketing')) : 1;
+    }
+
+    /**
      * Los paquetes a la venta con su precio (sin IVA, en pesos).
      *
      * @return list<array{cantidad: int, precio_minor: int}>
@@ -78,8 +87,8 @@ class MensajesWhatsAppTenant
             ->sum('cantidad'));
     }
 
-    /** Por qué un aviso no puede salir ahora (null si puede). */
-    public function motivoParaNoEnviar(): ?string
+    /** Por qué un aviso (que gasta `$unidades` mensajes) no puede salir ahora; null si puede. */
+    public function motivoParaNoEnviar(int $unidades = 1): ?string
     {
         if (! $this->cobra()) {
             return null;
@@ -88,25 +97,25 @@ class MensajesWhatsAppTenant
         if ($tope > 0 && $this->usadosEsteMes() >= $tope) {
             return "Llegaste al tope de {$tope} mensajes de WhatsApp de este mes.";
         }
-        if ($this->disponibles() < 1) {
+        if ($this->disponibles() < max(1, $unidades)) {
             return 'Sin saldo de WhatsApp: compra un paquete de mensajes en Mi suscripción.';
         }
 
         return null;
     }
 
-    /** Gasta el mensaje de un aviso enviado (una vez por aviso). */
-    public function gastar(string $referencia): void
+    /** Gasta los mensajes de un aviso enviado (una vez por aviso). */
+    public function gastar(string $referencia, int $unidades = 1): void
     {
         if (! $this->cobra()) {
             return;
         }
-        DB::connection('tenant')->transaction(function () use ($referencia): void {
+        DB::connection('tenant')->transaction(function () use ($referencia, $unidades): void {
             $saldo = $this->bloquear();
             if (MovimientoWhatsAppTenant::query()->where('tipo', 'consumo')->where('referencia', $referencia)->exists()) {
                 return;
             }
-            $this->mover($saldo, 'consumo', -1, $referencia, null);
+            $this->mover($saldo, 'consumo', -max(1, $unidades), $referencia, null);
         });
     }
 

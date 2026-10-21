@@ -124,6 +124,7 @@ describe("WhatsApp de la plataforma", () => {
         duenos: true,
         negocios: false,
         phone_number_id: "109876543210",
+        waba_id: "",
         token: "EAAG-token",
         app_secret: null,
       },

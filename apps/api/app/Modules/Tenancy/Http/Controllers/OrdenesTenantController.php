@@ -301,6 +301,8 @@ class OrdenesTenantController
             'metodo' => $partes !== null ? PartesCobro::MIXTO : $metodo,
             'partes' => $partes,
             'referencia' => $referencia,
+            // El descuento por pagar de contado, si se aplicó (ADR 0191).
+            'descuento_contado_minor' => (int) $orden->descuento_contado_minor,
         ]);
     }
 
@@ -331,6 +333,7 @@ class OrdenesTenantController
             'estado' => $orden->estado->value,
             'total_minor' => $orden->total_minor,
             'descuento_minor' => (int) ($orden->descuento_minor ?? 0),
+            'descuento_contado_minor' => (int) ($orden->descuento_contado_minor ?? 0),
             'moneda' => $orden->moneda,
             'metodo_pago' => $orden->metodo_pago,
             'referencia_pago' => $orden->referencia_pago,

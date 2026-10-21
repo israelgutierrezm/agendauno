@@ -8,6 +8,8 @@ use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Exceptions\CargoRentaNoPagable;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Pasarelas\PasarelaMercadoPagoPlataforma;
+use App\Modules\Tenancy\Pasarelas\PasarelaOpenPayPlataforma;
 use App\Modules\Tenancy\Pasarelas\PasarelaStripePlataforma;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use App\Support\ReporteDeErrores;
@@ -31,6 +33,8 @@ class CobrarCargoRenta
         private readonly ConciliarCargosRenta $conciliar,
         private readonly AcreditarTimbresPagados $timbres,
         private readonly ConfirmarCargoRenta $confirmar,
+        private readonly PasarelaMercadoPagoPlataforma $mercadoPago,
+        private readonly PasarelaOpenPayPlataforma $openPay,
     ) {}
 
     public function ejecutar(CargoRenta $cargo, string $proveedor): CargoRenta
@@ -41,7 +45,7 @@ class CobrarCargoRenta
 
         // Un intento anterior ya pagado cuyo aviso no llegó: se confirma y no se cobra
         // de nuevo.
-        if ($cargo->estado === EstadoCargoRenta::Pendiente && $cargo->metodo_pago === 'stripe'
+        if ($cargo->estado === EstadoCargoRenta::Pendiente && in_array($cargo->metodo_pago, ['stripe', 'mercadopago', 'openpay'], true)
             && (string) $cargo->referencia_pago !== '' && $this->conciliar->conciliar($cargo)) {
             return $cargo->refresh();
         }
@@ -73,8 +77,7 @@ class CobrarCargoRenta
             // Reintento: el intento anterior (sesión abierta) se vence antes de abrir
             // otro; si ya se pagó, se espera su confirmación en vez de cobrar de nuevo.
             $anterior = (string) $bloqueado->referencia_pago;
-            if ($anterior !== '' && $bloqueado->metodo_pago === 'stripe'
-                && ! $this->stripe->cancelarIntento($anterior, $this->registro->llaves('stripe'))) {
+            if ($anterior !== '' && ! $this->cerrarAnterior($bloqueado, $anterior)) {
                 throw new CargoRentaNoPagable('Ya hay un pago en proceso para esta renta; espera su confirmación.');
             }
 
@@ -106,6 +109,21 @@ class CobrarCargoRenta
         }
 
         return $cobrado;
+    }
+
+    /**
+     * Cierra el intento anterior, de la pasarela con que se abrió, antes de abrir otro.
+     * False si ya se pagó o se está cobrando (ADR 0192).
+     */
+    private function cerrarAnterior(CargoRenta $cargo, string $anterior): bool
+    {
+        return match ($cargo->metodo_pago) {
+            'stripe' => $this->stripe->cancelarIntento($anterior, $this->registro->llaves('stripe')),
+            'mercadopago' => $this->mercadoPago->cancelarIntento($cargo, $this->registro->llaves('mercadopago')),
+            // La página de pago de OpenPay no se cierra: solo se espera si ya se cobró.
+            'openpay' => ! in_array($this->openPay->cargo($anterior, $this->registro->llaves('openpay'))['estado'], ['completed', 'in_progress'], true),
+            default => true,
+        };
     }
 
     /**

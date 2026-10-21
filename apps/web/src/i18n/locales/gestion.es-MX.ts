@@ -950,6 +950,10 @@ export const plataformaAdmin = {
     encendido: "Encendido",
     apagado: "Apagado",
     numero: "Identificador del número (Phone number ID)",
+    // Con ella se mandan a aprobar las plantillas de los negocios (ADR 0190).
+    cuenta: "Cuenta de WhatsApp Business (WABA ID)",
+    cuentaAyuda:
+      "Opcional. Con ella cada negocio escribe sus propias plantillas para campañas y la plataforma las manda a aprobar a Meta.",
     token: "Token de acceso",
     tokenGuardado: "Guardado; escribe uno nuevo para reemplazarlo",
     tokenAyuda:

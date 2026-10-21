@@ -543,7 +543,7 @@ export default {
         },
         permanencia: {
           q: "¿Hay plazo forzoso o contrato anual?",
-          a: "No. Pagas cada mes por los alumnos activos que tuviste y puedes dejar de usarlo cuando quieras. No hay costo de instalación: te das de alta tú mismo.",
+          a: "No. Pagas cada mes por los alumnos activos que tuviste y puedes dejar de usarlo cuando quieras. No hay costo de instalación.",
         },
         comisiones: {
           q: "¿Cobran comisión por mis ventas o pagos en línea?",
@@ -1836,6 +1836,10 @@ export default {
       comprada: "Comprada el {fecha}",
       registrar: "Registrar pago",
       registrarTitulo: "Registrar pago",
+      // Precio por forma de pago (ADR 0191).
+      descuentoContado: "De contado: {pct} % menos (antes {antes}).",
+      descuentoContadoAyuda:
+        "Todo en efectivo o todo por transferencia tiene {pct} % de descuento.",
       // Exentar una cuota por cobrar (B04).
       exentar: "Exentar",
       exentadaTodo:
@@ -2682,6 +2686,13 @@ export default {
     suspendidoAyuda:
       "Mientras tanto nadie puede agendar ni entrar al panel. Paga la renta pendiente aquí abajo y se reactiva solo en unos minutos; tu información está a salvo.",
     historial: "Historial de cargos",
+    // Con qué se paga la renta (ADR 0192).
+    pagarCon: "Pagar con",
+    pasarelas: {
+      stripe: "Tarjeta",
+      mercadopago: "Mercado Pago",
+      openpay: "OpenPay",
+    },
     sinCargos: "Aún no hay cargos generados.",
     colPeriodo: "Periodo",
     colMonto: "Monto",

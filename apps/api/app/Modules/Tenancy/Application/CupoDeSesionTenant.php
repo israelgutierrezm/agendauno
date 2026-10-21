@@ -103,6 +103,11 @@ class CupoDeSesionTenant
     /** Lugares que ocupan los invitados de los clientes en la sesión (ADR 0182). */
     public static function ocupadosDeInvitados(SesionTenant $sesion): int
     {
+        // Una sesión que aún no se guarda no tiene invitados.
+        if ($sesion->getKey() === null) {
+            return 0;
+        }
+
         return InvitadoSesionTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->whereIn('estado', InvitadoSesionTenant::OCUPAN_LUGAR)
@@ -112,6 +117,10 @@ class CupoDeSesionTenant
     /** Lugares que ocupan Wellhub y TotalPass en la sesión. */
     public static function ocupadosDePlataforma(SesionTenant $sesion): int
     {
+        if ($sesion->getKey() === null) {
+            return 0;
+        }
+
         return LugarPlataformaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->whereIn('estado', LugarPlataformaTenant::OCUPAN_LUGAR)

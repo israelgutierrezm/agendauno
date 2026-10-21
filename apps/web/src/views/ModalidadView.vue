@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 
 import ArranqueYReferidos from "@/components/ArranqueYReferidos.vue";
 import AyudaParaEmpezar from "@/components/AyudaParaEmpezar.vue";
+import DemoAgendable from "@/components/DemoAgendable.vue";
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
 import CasosPiloto from "@/components/CasosPiloto.vue";
 import FondoHero from "@/components/FondoHero.vue";
@@ -674,6 +675,11 @@ function medirOtra(): void {
         >
           {{ textoRegistro }}
         </RouterLink>
+        <!-- La demo de 15 minutos, si la plataforma agenda demos (ADR 0193). -->
+        <DemoAgendable
+          :producto="productoDeModalidad(modo)"
+          class="mt-10 mx-auto max-w-2xl"
+        />
         <!-- Enlace discreto a la otra modalidad: cada negocio es de una sola. -->
         <p class="tu-modalidad-otra">
           {{ t(k("final.otra")) }}

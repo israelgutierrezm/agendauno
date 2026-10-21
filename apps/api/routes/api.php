@@ -33,10 +33,12 @@ use App\Modules\Tenancy\Http\Controllers\CortesNominaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CuotasTenantController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
+use App\Modules\Tenancy\Http\Controllers\DemosController;
 use App\Modules\Tenancy\Http\Controllers\DifusionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DirectorioController;
 use App\Modules\Tenancy\Http\Controllers\DisponibilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\DocumentosController;
+use App\Modules\Tenancy\Http\Controllers\DominioPropioController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
 use App\Modules\Tenancy\Http\Controllers\EmbudoPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\EquipoPlataformaController;
@@ -102,6 +104,7 @@ use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlanRentaController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
+use App\Modules\Tenancy\Http\Controllers\PlantillasWhatsAppNegocioController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaCobrosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaErroresController;
@@ -201,6 +204,11 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
     // Interesados de un producto que aún no abre registros (ADR 0108): la landing de TurnoUno.
     Route::post('/interesados', [InteresadosController::class, 'store'])->middleware('throttle:login')->name('api.v1.interesados');
+    // La demo de 15 minutos desde la landing (ADR 0193): sus horarios, agendarla y
+    // cancelarla con el enlace de su correo.
+    Route::get('/demos', [DemosController::class, 'horarios'])->middleware('throttle:publico')->name('api.v1.demos.horarios');
+    Route::post('/demos', [DemosController::class, 'agendar'])->middleware('throttle:login')->name('api.v1.demos.agendar');
+    Route::post('/demos/{demo}/cancelar', [DemosController::class, 'cancelar'])->middleware('throttle:login')->name('api.v1.demos.cancelar');
     Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:publico')->name('api.v1.registro.slug');
     // WhatsApp del dueño (ADR 0070): verificar su número con un código al registrarse.
     Route::get('/registro/whatsapp', [RegistroWhatsAppController::class, 'disponible'])->middleware('throttle:publico')->name('api.v1.registro.whatsapp');
@@ -231,6 +239,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/pagina-negocio/sitemap.xml', [PaginaNegocioSeoController::class, 'sitemap'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.sitemap');
     Route::get('/pagina-negocio/negocios.xml', [PaginaNegocioSeoController::class, 'negocios'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.negocios');
     Route::get('/pagina-negocio/robots.txt', [PaginaNegocioSeoController::class, 'robots'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.robots');
+    // De qué negocio es el dominio propio con que se abrió la página (ADR 0189).
+    Route::get('/dominio-propio', [DominioPropioController::class, 'resolver'])->middleware('throttle:publico')->name('api.v1.dominio-propio');
 
     // Entrar al superadmin (ADR 0126): correo, contraseña y token; luego el código por correo.
     Route::post('/plataforma/entrar', [AccesoPlataformaController::class, 'entrar'])->middleware('throttle:plataforma-acceso')->name('api.v1.plataforma.entrar');
@@ -270,6 +280,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
         // Quienes esperan el lanzamiento de un producto (ADR 0108).
         Route::get('/interesados', [InteresadosController::class, 'index'])->name('interesados');
+        // Las demos agendadas desde la landing (ADR 0193).
+        Route::get('/demos', [DemosController::class, 'index'])->name('demos');
+        Route::put('/demos/{demo}', [DemosController::class, 'actualizar'])->name('demos.actualizar');
         // Embudo de la plataforma: de la landing al primer pago (C08).
         Route::get('/embudo', [EmbudoPlataformaController::class, 'reporte'])->name('embudo');
         // GA4 y Meta del SaaS, por producto (ADR 0143): destinos, envíos y prueba.
@@ -685,6 +698,12 @@ Route::prefix('v1')->group(function (): void {
             // Sitio del negocio (ADR 0114): borrador, vista previa y publicar. Prepararlo
             // (`sitio.editar`) va aparte de publicarlo y de lo que va en vivo (`sitio.publicar`, ADR 0167).
             Route::get('/sitio', [SitioWebController::class, 'mostrar'])->middleware('puede:sitio.editar')->name('sitio.show');
+            // Su dominio propio (ADR 0189): verlo lo ve quien edita; conectarlo, revisarlo
+            // y quitarlo cambia dónde vive la página (quien publica).
+            Route::get('/sitio/dominio', [DominioPropioController::class, 'mostrar'])->middleware('puede:sitio.editar')->name('sitio.dominio.show');
+            Route::put('/sitio/dominio', [DominioPropioController::class, 'conectar'])->middleware('puede:sitio.publicar')->name('sitio.dominio.conectar');
+            Route::post('/sitio/dominio/revisar', [DominioPropioController::class, 'revisar'])->middleware(['puede:sitio.publicar', 'throttle:10,1,dominio-propio'])->name('sitio.dominio.revisar');
+            Route::delete('/sitio/dominio', [DominioPropioController::class, 'quitar'])->middleware('puede:sitio.publicar')->name('sitio.dominio.quitar');
             Route::put('/sitio', [SitioWebController::class, 'guardar'])->middleware('puede:sitio.editar')->name('sitio.guardar');
             Route::post('/sitio/publicar', [SitioWebController::class, 'publicar'])->middleware('puede:sitio.publicar')->name('sitio.publicar');
             Route::post('/sitio/descartar', [SitioWebController::class, 'descartar'])->middleware('puede:sitio.editar')->name('sitio.descartar');
@@ -1133,6 +1152,13 @@ Route::prefix('v1')->group(function (): void {
             // Antes de enviar: a cuántos llega y quién queda fuera (ADR 0166).
             Route::get('/comunicaciones/alcance', [DifusionesTenantController::class, 'alcance'])->middleware('puede:comunicaciones.gestionar')->name('comunicaciones.alcance');
             Route::get('/comunicaciones/segmentos', [DifusionesTenantController::class, 'segmentos'])->middleware('puede:comunicaciones.ver')->name('difusiones.segmentos');
+            // Sus plantillas de WhatsApp para campañas (ADR 0190): las aprueba Meta.
+            Route::get('/comunicaciones/whatsapp/plantillas', [PlantillasWhatsAppNegocioController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('whatsapp.plantillas.index');
+            Route::post('/comunicaciones/whatsapp/plantillas', [PlantillasWhatsAppNegocioController::class, 'store'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes'])->name('whatsapp.plantillas.store');
+            Route::put('/comunicaciones/whatsapp/plantillas/{plantilla}', [PlantillasWhatsAppNegocioController::class, 'update'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes'])->name('whatsapp.plantillas.update');
+            Route::post('/comunicaciones/whatsapp/plantillas/{plantilla}/enviar', [PlantillasWhatsAppNegocioController::class, 'enviar'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes', 'throttle:10,1,plantillas-whatsapp'])->name('whatsapp.plantillas.enviar');
+            Route::post('/comunicaciones/whatsapp/plantillas/{plantilla}/revisar', [PlantillasWhatsAppNegocioController::class, 'revisar'])->middleware(['puede:comunicaciones.gestionar', 'throttle:10,1,plantillas-whatsapp'])->name('whatsapp.plantillas.revisar');
+            Route::delete('/comunicaciones/whatsapp/plantillas/{plantilla}', [PlantillasWhatsAppNegocioController::class, 'destroy'])->middleware('puede:comunicaciones.eliminar')->name('whatsapp.plantillas.destroy');
             Route::get('/comunicaciones/difusiones', [DifusionesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('difusiones.index');
             Route::post('/comunicaciones/difusiones', [DifusionesTenantController::class, 'difundir'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes'])->name('difusiones.store');
             // Pausar, reanudar o cancelar una campaña sin tocar los avisos de operación (B08).

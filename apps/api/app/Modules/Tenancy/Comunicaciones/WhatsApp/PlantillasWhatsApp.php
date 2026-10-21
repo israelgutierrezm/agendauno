@@ -71,6 +71,19 @@ final class PlantillasWhatsApp
     ];
 
     /**
+     * La demo agendada desde la landing (ADR 0193), a quien la pidió y aceptó que se le
+     * confirmara por WhatsApp. Marcadores: {{nombre}}, {{marca}}, {{fecha}}, {{hora}} y
+     * {{enlace}} (para cancelarla).
+     *
+     * @var array{nombre: string, titulo: string, texto: string}
+     */
+    private const DEMO = [
+        'nombre' => 'agendauno_demo_agendada',
+        'titulo' => 'Demo agendada',
+        'texto' => 'Hola {{nombre}}, tu demo de {{marca}} quedó para el {{fecha}} a las {{hora}} (hora del centro de México). Ese día te llamamos a este número. Si no puedes, cancélala aquí: {{enlace}} Gracias por tu interés.',
+    ];
+
+    /**
      * @var array<string, array{nombre: string, titulo: string, texto: string}>
      */
     private const CATALOGO = [
@@ -244,6 +257,14 @@ final class PlantillasWhatsApp
     }
 
     /**
+     * @return array{nombre: string, titulo: string, texto: string}
+     */
+    public static function demoAgendada(): array
+    {
+        return self::DEMO;
+    }
+
+    /**
      * El aviso de la plataforma a un dueño de ese tipo (ADR 0071): nombre en Meta,
      * asunto del correo y texto (el mismo por correo y por WhatsApp).
      *
@@ -280,7 +301,7 @@ final class PlantillasWhatsApp
             'idioma' => ClienteWhatsApp::IDIOMA,
             'categoria' => 'AUTHENTICATION',
         ]];
-        foreach (self::DUENOS as $tipo => $plantilla) {
+        foreach ([...self::DUENOS, 'demo_agendada' => self::DEMO] as $tipo => $plantilla) {
             $lista[] = [
                 'evento' => $tipo,
                 'nombre' => $plantilla['nombre'],

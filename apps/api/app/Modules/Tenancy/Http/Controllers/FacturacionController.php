@@ -108,6 +108,8 @@ class FacturacionController
             // Domiciliación: la tarjeta con que se cobra sola (ADR 0107).
             'tarjeta' => DomiciliacionRenta::tarjeta($estudio),
             'domiciliacion_posible' => $this->pasarelas->activa('stripe'),
+            // Con qué puede pagar la renta (ADR 0192).
+            'pasarelas' => $this->pasarelas->activas(),
             // ¿Puede recibir la factura (CFDI) de la renta? Si no, se ofrece el recibo sin valor fiscal.
             'factura_renta_posible' => $this->facturaRentaPosible(),
             'actual' => $this->estimacion($estudio),

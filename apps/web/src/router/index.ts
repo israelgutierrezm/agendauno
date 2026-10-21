@@ -65,6 +65,12 @@ const router = createRouter({
       component: () => import("@/views/AvisoPrivacidadView.vue"),
     },
     {
+      // Cancelar la demo agendada desde el enlace del correo (ADR 0193).
+      path: "/demo/cancelar",
+      name: "demo-cancelar",
+      component: () => import("@/views/DemoCancelarView.vue"),
+    },
+    {
       path: "/terminos",
       name: "terminos",
       component: () => import("@/views/TerminosView.vue"),

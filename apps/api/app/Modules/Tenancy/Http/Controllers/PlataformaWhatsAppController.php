@@ -36,6 +36,9 @@ class PlataformaWhatsAppController
             'negocios' => ['required', 'boolean'],
             'duenos' => ['required', 'boolean'],
             'phone_number_id' => ['nullable', 'string', 'max:40', 'regex:/^[0-9]*$/'],
+            // La cuenta de WhatsApp Business: con ella se mandan a aprobar las plantillas
+            // de los negocios (ADR 0190).
+            'waba_id' => ['nullable', 'string', 'max:40', 'regex:/^[0-9]*$/'],
             // Vacío conserva el que ya estaba.
             'token' => ['nullable', 'string', 'max:1000'],
             // App Secret de la app de Meta: firma los avisos de estado (ADR 0074).
@@ -50,7 +53,7 @@ class PlataformaWhatsAppController
             throw ValidationException::withMessages(['phone_number_id' => ['Para encenderlo carga el identificador del número y el token.']]);
         }
 
-        $this->whatsapp->guardar((bool) $validado['negocios'], (bool) $validado['duenos'], $numero, $token, $validado['app_secret'] ?? null);
+        $this->whatsapp->guardar((bool) $validado['negocios'], (bool) $validado['duenos'], $numero, $token, $validado['app_secret'] ?? null, $request->has('waba_id') ? (string) ($validado['waba_id'] ?? '') : null);
 
         return response()->json(['data' => $this->presentar()]);
     }

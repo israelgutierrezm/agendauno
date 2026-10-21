@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Comunicaciones\WhatsApp;
 
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -29,6 +30,9 @@ use Throwable;
  * Los mensajes son plantillas aprobadas por Meta ({@see PlantillasWhatsApp}). La
  * configuración vive cifrada en el control plane (`configuracion_plataforma`): los
  * dos interruptores, el identificador del número y el token (nunca se devuelve).
+ *
+ * Con el identificador de la cuenta de WhatsApp Business (`waba_id`), la plataforma
+ * además manda a aprobar las plantillas que escribe cada negocio (ADR 0190).
  */
 class ClienteWhatsApp
 {
@@ -64,6 +68,17 @@ class ClienteWhatsApp
     }
 
     /**
+     * ¿Puede mandar a aprobar plantillas? Con la cuenta de WhatsApp Business y el token
+     * (ADR 0190).
+     */
+    public function gestionaPlantillas(): bool
+    {
+        $config = $this->config();
+
+        return $config['waba_id'] !== '' && $config['token'] !== '';
+    }
+
+    /**
      * ¿La plataforma verifica y avisa a los dueños por WhatsApp?
      */
     public function activoParaDuenos(): bool
@@ -76,7 +91,7 @@ class ClienteWhatsApp
      * estados (ADR 0074): la dirección y el token de verificación que se cargan en
      * Meta.
      *
-     * @return array{negocios: bool, duenos: bool, conectado: bool, phone_number_id: string, token_configurado: bool, webhook: array{url: string, token_verificacion: string, app_secret_configurado: bool}}
+     * @return array{negocios: bool, duenos: bool, conectado: bool, phone_number_id: string, waba_id: string, token_configurado: bool, webhook: array{url: string, token_verificacion: string, app_secret_configurado: bool}}
      */
     public function paraEditar(): array
     {
@@ -87,6 +102,7 @@ class ClienteWhatsApp
             'duenos' => $config['duenos'],
             'conectado' => $this->conectado(),
             'phone_number_id' => $config['phone_number_id'],
+            'waba_id' => $config['waba_id'],
             'token_configurado' => $config['token'] !== '',
             'webhook' => [
                 'url' => route('api.v1.webhooks.whatsapp'),
@@ -100,7 +116,7 @@ class ClienteWhatsApp
      * Guarda la configuración. Un token o App Secret vacío conserva el que ya
      * estaba. El token de verificación del webhook se genera una vez.
      */
-    public function guardar(bool $negocios, bool $duenos, string $phoneNumberId, #[\SensitiveParameter] ?string $token, #[\SensitiveParameter] ?string $appSecret = null): void
+    public function guardar(bool $negocios, bool $duenos, string $phoneNumberId, #[\SensitiveParameter] ?string $token, #[\SensitiveParameter] ?string $appSecret = null, ?string $wabaId = null): void
     {
         $actual = $this->config();
         $conservar = static fn (?string $nuevo, string $anterior): string => is_string($nuevo) && trim($nuevo) !== '' ? trim($nuevo) : $anterior;
@@ -109,6 +125,8 @@ class ClienteWhatsApp
             'negocios' => $negocios,
             'duenos' => $duenos,
             'phone_number_id' => trim($phoneNumberId),
+            // Sin valor, el que ya estaba (las pantallas viejas no lo mandan).
+            'waba_id' => $wabaId !== null ? trim($wabaId) : $actual['waba_id'],
             'token' => $conservar($token, $actual['token']),
             'app_secret' => $conservar($appSecret, $actual['app_secret']),
             'verify_token' => $actual['verify_token'] !== '' ? $actual['verify_token'] : Str::random(40),
@@ -157,6 +175,76 @@ class ClienteWhatsApp
         ]];
 
         return $this->enviar($telefono, $plantilla, $idioma, $componentes);
+    }
+
+    /**
+     * Manda a aprobar una plantilla en la cuenta de WhatsApp Business de la plataforma
+     * (ADR 0190), en español de México. El cuerpo ya lleva {{1}}, {{2}}, … y `ejemplos`
+     * un valor de muestra para cada uno, como pide Meta. Devuelve el id de Meta.
+     *
+     * @param  list<string>  $ejemplos
+     */
+    public function crearPlantilla(string $nombre, string $categoria, string $cuerpo, array $ejemplos, ?string $pie): string
+    {
+        $componentes = [[
+            'type' => 'BODY',
+            'text' => $cuerpo,
+            ...($ejemplos === [] ? [] : ['example' => ['body_text' => [$ejemplos]]]),
+        ]];
+        if ($pie !== null && trim($pie) !== '') {
+            $componentes[] = ['type' => 'FOOTER', 'text' => trim($pie)];
+        }
+
+        $respuesta = $this->cuenta()->post('message_templates', [
+            'name' => $nombre,
+            'language' => self::IDIOMA,
+            'category' => $categoria === 'marketing' ? 'MARKETING' : 'UTILITY',
+            'components' => $componentes,
+        ]);
+        if (! $respuesta->successful()) {
+            throw new RuntimeException(self::error($respuesta));
+        }
+        $id = $respuesta->json('id');
+
+        return is_scalar($id) ? (string) $id : '';
+    }
+
+    /**
+     * El estado de una plantilla en Meta (`APPROVED`, `PENDING`, `REJECTED`, `PAUSED`,
+     * `DISABLED`…) y, si la rechazó, por qué. Null si Meta no la tiene.
+     *
+     * @return array{estado: string, motivo: string|null}|null
+     */
+    public function estadoPlantilla(string $nombre): ?array
+    {
+        $respuesta = $this->cuenta()->get('message_templates', [
+            'name' => $nombre,
+            'fields' => 'name,status,rejected_reason',
+        ]);
+        if (! $respuesta->successful()) {
+            throw new RuntimeException(self::error($respuesta));
+        }
+        foreach ((array) $respuesta->json('data', []) as $plantilla) {
+            if (is_array($plantilla) && ($plantilla['name'] ?? null) === $nombre) {
+                $motivo = $plantilla['rejected_reason'] ?? null;
+
+                return [
+                    'estado' => strtoupper((string) ($plantilla['status'] ?? '')),
+                    'motivo' => is_string($motivo) && $motivo !== '' && $motivo !== 'NONE' ? $motivo : null,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /** La borra de Meta (al archivarla). Si ya no existe, no pasa nada. */
+    public function eliminarPlantilla(string $nombre): void
+    {
+        $respuesta = $this->cuenta()->delete('message_templates?name='.rawurlencode($nombre));
+        if (! $respuesta->successful() && $respuesta->status() !== 404) {
+            throw new RuntimeException(self::error($respuesta));
+        }
     }
 
     /**
@@ -230,6 +318,20 @@ class ClienteWhatsApp
         return is_string($wamid) && $wamid !== '' ? $wamid : null;
     }
 
+    /** La cuenta de WhatsApp Business de la plataforma, para sus plantillas. */
+    private function cuenta(): PendingRequest
+    {
+        if (! $this->gestionaPlantillas()) {
+            throw new RuntimeException('Falta la cuenta de WhatsApp Business de la plataforma.');
+        }
+        $config = $this->config();
+        $version = (string) config('agendauno.whatsapp.version', 'v23.0');
+
+        return Http::withToken($config['token'])
+            ->timeout(15)
+            ->baseUrl('https://graph.facebook.com/'.$version.'/'.rawurlencode($config['waba_id']).'/');
+    }
+
     private function url(string $phoneNumberId): string
     {
         $version = (string) config('agendauno.whatsapp.version', 'v23.0');
@@ -255,7 +357,7 @@ class ClienteWhatsApp
      * Se lee cada vez (sin memoria): un proceso largo (cola, relay) ve al momento
      * que el superadministrador lo apagó.
      *
-     * @return array{negocios: bool, duenos: bool, phone_number_id: string, token: string, app_secret: string, verify_token: string}
+     * @return array{negocios: bool, duenos: bool, phone_number_id: string, waba_id: string, token: string, app_secret: string, verify_token: string}
      */
     private function config(): array
     {
@@ -272,6 +374,7 @@ class ClienteWhatsApp
             'negocios' => (bool) ($datos['negocios'] ?? $datos['encendido'] ?? false),
             'duenos' => (bool) ($datos['duenos'] ?? false),
             'phone_number_id' => is_string($datos['phone_number_id'] ?? null) ? $datos['phone_number_id'] : '',
+            'waba_id' => is_string($datos['waba_id'] ?? null) ? $datos['waba_id'] : '',
             'token' => is_string($datos['token'] ?? null) ? $datos['token'] : '',
             'app_secret' => is_string($datos['app_secret'] ?? null) ? $datos['app_secret'] : '',
             'verify_token' => is_string($datos['verify_token'] ?? null) ? $datos['verify_token'] : '',
