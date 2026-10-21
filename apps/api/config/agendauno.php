@@ -89,6 +89,18 @@ return [
     ],
 
     /*
+    | El asistente sobre los datos del negocio (ADR 0196): Claude por la API de Anthropic.
+    | La llave es de la plataforma; sin ella no se ofrece. Lo enciende el superadmin
+    | (parámetro `asistente.activo`).
+    */
+    'asistente' => [
+        'llave' => env('ASISTENTE_ANTHROPIC_KEY', ''),
+        'modelo' => env('ASISTENTE_MODELO', 'claude-sonnet-5-5'),
+        'url' => env('ASISTENTE_URL', 'https://api.anthropic.com/v1/messages'),
+        'timeout' => (int) env('ASISTENTE_TIMEOUT', 60),
+    ],
+
+    /*
     | App móvil (ADR 0104). `version_minima`: la versión más antigua de la app que aún
     | se acepta; viaja en /yo y una instalada más vieja pide actualizarse. Se sube
     | cuando cambia un contrato que las versiones anteriores no entienden.

@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Http\Controllers\AparienciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ApartadosTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsignacionesPersonalTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsistenciaTenantController;
+use App\Modules\Tenancy\Http\Controllers\AsistenteTenantController;
 use App\Modules\Tenancy\Http\Controllers\AuditoriaController;
 use App\Modules\Tenancy\Http\Controllers\AuthTenantController;
 use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
@@ -800,6 +801,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/reportes/sucursales', ReporteSucursalesTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.sucursales');
             // Reporte de negocio (R29): metricas del periodo (ingresos, ocupacion, no-show, ARPU).
             Route::get('/reportes/negocio', ReporteNegocioTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.negocio');
+            // El asistente sobre los datos del negocio (ADR 0196).
+            Route::get('/asistente', [AsistenteTenantController::class, 'mostrar'])->name('asistente.show');
+            Route::post('/asistente', [AsistenteTenantController::class, 'preguntar'])->middleware(['puede:facturacion.ver', 'throttle:20,1,asistente'])->name('asistente.preguntar');
+            Route::post('/asistente/acciones', [AsistenteTenantController::class, 'aplicar'])->middleware(['puede:facturacion.ver', 'throttle:20,1,asistente'])->name('asistente.aplicar');
             // Reporte de rentabilidad por clase (R30): ingreso vs costo de instructor por oferta.
             Route::get('/reportes/rentabilidad', ReporteRentabilidadTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.rentabilidad');
             // Agenda del equipo (ADR 0081): ocupación, asistencia, valor, pago y margen por profesional.

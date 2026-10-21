@@ -345,6 +345,13 @@ const router = createRouter({
       component: () => import("@/views/ReportesView.vue"),
       meta: { requiereSesion: true },
     },
+    // El asistente sobre los datos del negocio (ADR 0196).
+    {
+      path: "/reportes/asistente",
+      name: "asistente-ia",
+      component: () => import("@/views/AsistenteView.vue"),
+      meta: { requiereSesion: true },
+    },
     // Visitantes de Wellhub y TotalPass (ADR 0148), aparte de los alumnos.
     {
       path: "/reportes/plataformas",

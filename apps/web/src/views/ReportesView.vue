@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EmbudoNegocio, { type Embudo } from "@/components/EmbudoNegocio.vue";
@@ -12,6 +12,7 @@ import MapaDemanda from "@/components/MapaDemanda.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
+import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio, inicioDeMesEnNegocio } from "@/lib/hoyNegocio";
@@ -631,7 +632,26 @@ watch(soloRendimiento, (rendimiento) => {
   void cargar();
 });
 
-onMounted(cargar);
+// El asistente sobre los datos del negocio (ADR 0196): si se ofrece, a la mano.
+const asistenteDisponible = ref(false);
+async function revisarAsistente(): Promise<void> {
+  if (!puedeEntrar("asistente-ia", sesion)) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: { disponible: boolean } }>(
+      `/api/v1/app/${sesion.slug}/asistente`,
+    );
+    asistenteDisponible.value = data.data.disponible;
+  } catch {
+    asistenteDisponible.value = false;
+  }
+}
+
+onMounted(() => {
+  void cargar();
+  void revisarAsistente();
+});
 </script>
 
 <template>
@@ -643,7 +663,16 @@ onMounted(cargar);
           : $t('reportes.titulo')
       "
       icono="reportes"
-    />
+    >
+      <template v-if="asistenteDisponible && !soloRendimiento" #acciones>
+        <RouterLink
+          :to="{ name: 'asistente-ia' }"
+          class="tu-btn tu-btn-contorno"
+          data-prueba="ir-asistente"
+          >{{ $t("asistenteIA.boton") }}</RouterLink
+        >
+      </template>
+    </EncabezadoSeccion>
 
     <div v-if="!soloRendimiento" class="tu-pestanas mt-6" role="group">
       <button

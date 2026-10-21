@@ -1509,6 +1509,19 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
+### Asistente sobre los datos del negocio (ADR 0196)
+
+- `GET /asistente` devuelve {`disponible`}.
+- `POST /asistente` (`facturacion.ver`) {`mensajes`: [{`rol`: `usuario`|`asistente`,
+  `texto`}] (hasta 20)} devuelve {`respuesta`, `propuestas`: [{`tipo`
+  (`generar_agenda`|`campana`), `resumen`, `datos`, `token`}]}.
+  - 403 si no está disponible;
+  - 429 al llegar al tope del día;
+  - 502 si el modelo no responde.
+- `POST /asistente/acciones` (`facturacion.ver`) {`token`} aplica una propuesta de quien
+  la pidió, en su negocio y vigente (30 min). Devuelve {`tipo`, `resultado`}: `creadas`
+  y `omitidas`, o `enviados`. Responde 422 si no es suya o venció.
+
 ### Pase en Apple Wallet y Google Wallet (ADR 0195)
 
 - `GET /mi/pase/wallet` devuelve {`apple`, `google`}: las que se ofrecen (la plataforma

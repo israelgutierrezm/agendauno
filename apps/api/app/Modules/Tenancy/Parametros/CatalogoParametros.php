@@ -274,6 +274,12 @@ final class CatalogoParametros
             new DefinicionParametro('renta.tipo_cambio_dias_vigencia', 'Renta', 'Antigüedad máxima del tipo de cambio',
                 'Para cobrar en pesos la renta en dólares. Uno más viejo ya no se usa: el cargo espera y se te avisa.', $e, 7, 1, 60, 'días', porNegocio: false),
 
+            // El asistente sobre los datos del negocio (ADR 0196).
+            new DefinicionParametro('asistente.activo', 'Asistente', 'Asistente con IA para los negocios',
+                'Encendido (y con la llave de la API), los negocios con reportes avanzados le preguntan a un asistente por sus cifras. Cada pregunta cuesta.', $sn, 0, porNegocio: false),
+            new DefinicionParametro('asistente.preguntas_por_dia', 'Asistente', 'Preguntas al asistente por día',
+                'Por negocio. 0 = sin asistente.', $e, 40, 0, 500, 'preguntas'),
+
             // La demo de 15 minutos que se agenda desde la landing (ADR 0193).
             new DefinicionParametro('demos.activas', 'Demos', 'Agendar demos desde la landing',
                 'Encendido, la landing ofrece agendar una demo en los horarios de abajo (hora del centro de México).', $sn, 0, porNegocio: false),

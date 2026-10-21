@@ -93,6 +93,8 @@ export const POLITICAS: Record<string, Politica> = {
   lealtad: { permiso: "lealtad.ver", funcion: "lealtad" },
   resenas: { permiso: "miembros.ver" },
   reportes: { permiso: "facturacion.ver" },
+  // El asistente sobre los datos del negocio (ADR 0196).
+  "asistente-ia": { permiso: "facturacion.ver", funcion: "reportes_avanzados" },
   // Visitantes de Wellhub y TotalPass (ADR 0148): solo negocios de clases.
   "reportes-plataformas": { permiso: "facturacion.ver", modalidad: "clases" },
 
