@@ -167,6 +167,7 @@ use App\Modules\Tenancy\Http\Controllers\VideosTenantController;
 use App\Modules\Tenancy\Http\Controllers\VisitantesPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\VueltaCalendarioController;
 use App\Modules\Tenancy\Http\Controllers\VueltaInstagramController;
+use App\Modules\Tenancy\Http\Controllers\VueltaMessengerController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookBienestarController;
 use App\Modules\Tenancy\Http\Controllers\WebhookInstagramController;
@@ -216,6 +217,11 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:60,1,instagram-webhook-verificar')->name('api.v1.webhooks.instagram.verificar');
     Route::post('/webhooks/instagram', [WebhookInstagramController::class, 'recibir'])
         ->middleware('throttle:600,1,instagram-webhook')->name('api.v1.webhooks.instagram');
+    // Mensajes de Messenger (páginas de Facebook) de la bandeja de cada negocio (ADR 0200).
+    Route::get('/webhooks/messenger', [WebhookInstagramController::class, 'verificar'])
+        ->middleware('throttle:60,1,messenger-webhook-verificar')->name('api.v1.webhooks.messenger.verificar');
+    Route::post('/webhooks/messenger', [WebhookInstagramController::class, 'recibirMessenger'])
+        ->middleware('throttle:600,1,messenger-webhook')->name('api.v1.webhooks.messenger');
 
     // La vuelta de Google o Microsoft al conectar el calendario de quien atiende (ADR 0199):
     // una sola para todos los negocios; lleva el código a la web, que lo confirma con su sesión.
@@ -224,6 +230,9 @@ Route::prefix('v1')->group(function (): void {
     // La vuelta de Instagram al conectar la cuenta de la bandeja (ADR 0200).
     Route::get('/bandeja/instagram/vuelta', VueltaInstagramController::class)
         ->middleware('throttle:30,1,instagram-vuelta')->name('api.v1.bandeja.instagram.vuelta');
+    // La vuelta de Facebook al conectar la página de Messenger de la bandeja (ADR 0200).
+    Route::get('/bandeja/messenger/vuelta', VueltaMessengerController::class)
+        ->middleware('throttle:30,1,messenger-vuelta')->name('api.v1.bandeja.messenger.vuelta');
     // La imagen que el equipo manda por Instagram: Meta la toma de aquí (firmada, vence en minutos).
     Route::get('/bandeja/archivos/{estudio}/{archivo}', ArchivoBandejaPublicoController::class)
         ->middleware(['signed', 'throttle:120,1,bandeja-archivo'])->name('api.v1.bandeja.archivo');
@@ -1192,7 +1201,10 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/bandeja/canales/whatsapp', [CanalesMensajeriaTenantController::class, 'conectarWhatsApp'])->middleware(['puede:integraciones.configurar', 'plan:mensajes', 'throttle:login'])->name('bandeja.canales.whatsapp');
             Route::post('/bandeja/canales/instagram/conectar', [CanalesMensajeriaTenantController::class, 'conectarInstagram'])->middleware(['puede:integraciones.configurar', 'plan:mensajes'])->name('bandeja.canales.instagram.conectar');
             Route::post('/bandeja/canales/instagram/confirmar', [CanalesMensajeriaTenantController::class, 'confirmarInstagram'])->middleware(['puede:integraciones.configurar', 'plan:mensajes', 'throttle:login'])->name('bandeja.canales.instagram.confirmar');
-            Route::delete('/bandeja/canales/{canal}', [CanalesMensajeriaTenantController::class, 'desconectar'])->whereIn('canal', ['whatsapp', 'instagram'])->middleware('puede:integraciones.configurar')->name('bandeja.canales.desconectar');
+            Route::post('/bandeja/canales/messenger/conectar', [CanalesMensajeriaTenantController::class, 'conectarMessenger'])->middleware(['puede:integraciones.configurar', 'plan:mensajes'])->name('bandeja.canales.messenger');
+            Route::post('/bandeja/canales/messenger/confirmar', [CanalesMensajeriaTenantController::class, 'confirmarMessenger'])->middleware(['puede:integraciones.configurar', 'plan:mensajes', 'throttle:login'])->name('bandeja.canales.messenger.confirmar');
+            Route::post('/bandeja/canales/messenger/pagina', [CanalesMensajeriaTenantController::class, 'elegirPaginaMessenger'])->middleware(['puede:integraciones.configurar', 'plan:mensajes', 'throttle:20,1,messenger-pagina'])->name('bandeja.canales.messenger.pagina');
+            Route::delete('/bandeja/canales/{canal}', [CanalesMensajeriaTenantController::class, 'desconectar'])->whereIn('canal', ['whatsapp', 'instagram', 'messenger'])->middleware('puede:integraciones.configurar')->name('bandeja.canales.desconectar');
             Route::get('/webhooks-salientes', [WebhooksSalientesTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.index');
             // GA4 y Meta del negocio (ADR 0143): sus destinos, sus envíos y la prueba.
             Route::get('/medicion/destinos', [MedicionNegocioTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('medicion.destinos.index');

@@ -36,7 +36,7 @@ import { useToastStore } from "@/stores/toast";
  * vincula con la ficha de un cliente. Quien configura las integraciones conecta aquí
  * el número de WhatsApp y la cuenta de Instagram. Se refresca sola cada 20 segundos.
  */
-type Canal = "whatsapp" | "instagram";
+type Canal = "whatsapp" | "instagram" | "messenger";
 interface Conversacion {
   id: string;
   canal: Canal;
@@ -77,6 +77,12 @@ interface Canales {
     conexion: ConexionCanal | null;
   };
   instagram: { disponible: boolean; conexion: ConexionCanal | null };
+  messenger?: { disponible: boolean; conexion: ConexionCanal | null };
+}
+interface PaginaFacebook {
+  id: string;
+  nombre: string;
+  ocupada: boolean;
 }
 
 const REFRESCO_MS = 20000;
@@ -385,28 +391,86 @@ async function desconectar(conexion: ConexionCanal): Promise<void> {
   }
 }
 
-/** La vuelta de Instagram: confirma el código con la sesión y lo quita de la URL. */
-async function procesarVuelta(): Promise<void> {
-  const consulta = ruta?.query ?? {};
-  const instagram =
-    typeof consulta.instagram === "string" ? consulta.instagram : null;
-  if (instagram === null) {
+async function conectarMessenger(): Promise<void> {
+  conectando.value = "messenger";
+  try {
+    const { data } = await api.post<{ data: { url: string } }>(
+      `${base.value}/bandeja/canales/messenger/conectar`,
+    );
+    window.location.assign(data.data.url);
+  } catch (err) {
+    toast.error(mensajeDeError(err, t("bandejaMensajes.canales.error")));
+    conectando.value = null;
+  }
+}
+
+function conectar(clave: Canal): void {
+  if (clave === "whatsapp") {
+    void conectarWhatsApp();
+  } else if (clave === "instagram") {
+    void conectarInstagram();
+  } else {
+    void conectarMessenger();
+  }
+}
+
+// Con varias páginas de Facebook, quien conecta elige una (unos minutos).
+const eleccionPagina = ref<{
+  seleccion: string;
+  paginas: PaginaFacebook[];
+} | null>(null);
+const paginaElegida = ref("");
+async function elegirPagina(): Promise<void> {
+  const eleccion = eleccionPagina.value;
+  if (eleccion === null || paginaElegida.value === "") {
     return;
   }
+  conectando.value = "messenger";
+  try {
+    await api.post(`${base.value}/bandeja/canales/messenger/pagina`, {
+      seleccion: eleccion.seleccion,
+      pagina_id: paginaElegida.value,
+    });
+    eleccionPagina.value = null;
+    toast.exito(t("bandejaMensajes.canales.messengerListo"));
+    await cargarCanales();
+  } catch (err) {
+    toast.error(mensajeDeError(err, t("bandejaMensajes.canales.error")));
+  } finally {
+    conectando.value = null;
+  }
+}
+
+/**
+ * La vuelta de Instagram o de Facebook (Messenger): confirma el código con la sesión y
+ * lo quita de la URL. Con varias páginas de Facebook, pide elegir una.
+ */
+async function procesarVuelta(): Promise<void> {
+  const consulta = ruta?.query ?? {};
+  const clave: "instagram" | "messenger" | null =
+    typeof consulta.instagram === "string"
+      ? "instagram"
+      : typeof consulta.messenger === "string"
+        ? "messenger"
+        : null;
+  if (clave === null) {
+    return;
+  }
+  const resultado = consulta[clave];
   const { codigo, estado: estadoOauth } = consulta;
   const resto = { ...consulta };
-  delete resto.instagram;
+  delete resto[clave];
   delete resto.codigo;
   delete resto.estado;
   void router?.replace({ query: resto });
   if (
-    instagram !== "conectar" ||
+    resultado !== "conectar" ||
     typeof codigo !== "string" ||
     typeof estadoOauth !== "string"
   ) {
     toast.error(
       t(
-        instagram === "cancelado"
+        resultado === "cancelado"
           ? "bandejaMensajes.canales.cancelado"
           : "bandejaMensajes.canales.error",
       ),
@@ -414,11 +478,28 @@ async function procesarVuelta(): Promise<void> {
     return;
   }
   try {
-    await api.post(`${base.value}/bandeja/canales/instagram/confirmar`, {
+    const respuesta = await api.post<{
+      data: { seleccion?: string; paginas?: PaginaFacebook[] };
+    }>(`${base.value}/bandeja/canales/${clave}/confirmar`, {
       codigo,
       estado: estadoOauth,
     });
-    toast.exito(t("bandejaMensajes.canales.instagramListo"));
+    const datos = respuesta.data.data;
+    if (clave === "messenger" && datos.seleccion && datos.paginas) {
+      eleccionPagina.value = {
+        seleccion: datos.seleccion,
+        paginas: datos.paginas,
+      };
+      paginaElegida.value = "";
+      return;
+    }
+    toast.exito(
+      t(
+        clave === "instagram"
+          ? "bandejaMensajes.canales.instagramListo"
+          : "bandejaMensajes.canales.messengerListo",
+      ),
+    );
     await cargarCanales();
   } catch (err) {
     toast.error(mensajeDeError(err, t("bandejaMensajes.canales.error")));
@@ -429,10 +510,10 @@ const filasCanales = computed(() => {
   if (canales.value === null) {
     return [];
   }
-  return (["whatsapp", "instagram"] as const).map((clave) => ({
+  return (["whatsapp", "instagram", "messenger"] as const).map((clave) => ({
     clave,
-    disponible: canales.value![clave].disponible,
-    conexion: canales.value![clave].conexion,
+    disponible: canales.value![clave]?.disponible ?? false,
+    conexion: canales.value![clave]?.conexion ?? null,
   }));
 });
 
@@ -506,11 +587,7 @@ onBeforeUnmount(() => {
               type="button"
               class="tu-btn tu-btn-fantasma text-sm"
               :disabled="conectando !== null"
-              @click="
-                fila.clave === 'whatsapp'
-                  ? conectarWhatsApp()
-                  : conectarInstagram()
-              "
+              @click="conectar(fila.clave)"
             >
               {{
                 conectando === fila.clave
@@ -529,6 +606,39 @@ onBeforeUnmount(() => {
           </span>
         </li>
       </ul>
+      <form
+        v-if="eleccionPagina"
+        class="bm-elegir-pagina"
+        data-prueba="elegir-pagina"
+        @submit.prevent="elegirPagina"
+      >
+        <label class="tu-label" for="bm-pagina">{{
+          $t("bandejaMensajes.canales.elegirPagina")
+        }}</label>
+        <select id="bm-pagina" v-model="paginaElegida" class="tu-input">
+          <option
+            v-for="p in eleccionPagina.paginas"
+            :key="p.id"
+            :value="p.id"
+            :disabled="p.ocupada"
+          >
+            {{
+              p.ocupada
+                ? $t("bandejaMensajes.canales.paginaOcupada", {
+                    nombre: p.nombre,
+                  })
+                : p.nombre
+            }}
+          </option>
+        </select>
+        <button
+          type="submit"
+          class="tu-btn tu-btn-primario text-sm"
+          :disabled="paginaElegida === '' || conectando !== null"
+        >
+          {{ $t("bandejaMensajes.canales.elegir") }}
+        </button>
+      </form>
     </section>
 
     <div class="bm-cuerpo" :class="{ 'bm-con-detalle': seleccion !== null }">
@@ -561,6 +671,9 @@ onBeforeUnmount(() => {
             </option>
             <option value="instagram">
               {{ $t("bandejaMensajes.canal.instagram") }}
+            </option>
+            <option value="messenger">
+              {{ $t("bandejaMensajes.canal.messenger") }}
             </option>
           </select>
           <input
@@ -757,7 +870,13 @@ onBeforeUnmount(() => {
             v-model="texto"
             class="tu-input"
             rows="2"
-            :maxlength="seleccion.canal === 'instagram' ? 1000 : 4096"
+            :maxlength="
+              seleccion.canal === 'instagram'
+                ? 1000
+                : seleccion.canal === 'messenger'
+                  ? 2000
+                  : 4096
+            "
             :placeholder="$t('bandejaMensajes.escribir')"
             :aria-label="$t('bandejaMensajes.escribir')"
             @keydown.enter.exact.prevent="enviar"
@@ -1022,7 +1141,8 @@ onBeforeUnmount(() => {
   font-size: 0.75rem;
 }
 .bm-redactar,
-.bm-fuera {
+.bm-fuera,
+.bm-elegir-pagina {
   display: grid;
   gap: 0.5rem;
 }

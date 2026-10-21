@@ -62,7 +62,10 @@ class BandejaTenant
     private const MINUTOS_ARCHIVO_PUBLICO = 15;
 
     /** Cómo se llama cada canal en un aviso al equipo. */
-    private const NOMBRES = [CanalMensajeria::WHATSAPP => 'WhatsApp', CanalMensajeria::INSTAGRAM => 'Instagram'];
+    private const NOMBRES = [CanalMensajeria::WHATSAPP => 'WhatsApp', CanalMensajeria::INSTAGRAM => 'Instagram', CanalMensajeria::MESSENGER => 'Messenger'];
+
+    /** Minutos para elegir la página después de entrar con Facebook. */
+    private const MINUTOS_ELEGIR_PAGINA = 10;
 
     public function __construct(
         private readonly ClienteMetaBandeja $meta,
@@ -141,14 +144,94 @@ class BandejaTenant
         ]);
     }
 
+    public function vueltaMessenger(): string
+    {
+        return rtrim((string) config('app.url'), '/').'/api/v1/bandeja/messenger/vuelta';
+    }
+
+    /** El inicio de sesión de Facebook para elegir la página (mismo estado que Instagram). */
+    public function urlMessenger(Estudio $estudio, Usuario $usuario): string
+    {
+        $estado = Crypt::encryptString((string) json_encode([
+            'e' => (string) $estudio->slug,
+            'u' => (string) $usuario->ulid,
+            'v' => CarbonImmutable::now()->addMinutes(self::VIGENCIA_ESTADO_MIN)->getTimestamp(),
+        ]));
+
+        return $this->meta->urlAutorizacionMessenger($estado, $this->vueltaMessenger());
+    }
+
+    /**
+     * Las páginas de quien entró con Facebook. Sus llaves quedan unos minutos, cifradas
+     * y ligadas a este negocio, bajo `seleccion`: el panel elige una sin volver a pedir
+     * permiso (el código de Facebook sirve una sola vez).
+     *
+     * @return array{seleccion: string, paginas: list<array{id: string, nombre: string, ocupada: bool}>}
+     */
+    public function paginasMessenger(Estudio $estudio, string $codigo): array
+    {
+        $paginas = $this->meta->paginasMessenger($codigo, $this->vueltaMessenger());
+        $seleccion = Str::random(40);
+        Cache::put('bandeja:messenger:'.$seleccion, Crypt::encryptString((string) json_encode([
+            'estudio' => (int) $estudio->getKey(),
+            'paginas' => $paginas,
+        ])), now()->addMinutes(self::MINUTOS_ELEGIR_PAGINA));
+
+        return [
+            'seleccion' => $seleccion,
+            'paginas' => array_map(fn (array $p): array => [
+                'id' => $p['id'],
+                'nombre' => $p['nombre'],
+                // Conectada a otro negocio: no se puede elegir.
+                'ocupada' => CanalMensajeria::query()->where('canal', CanalMensajeria::MESSENGER)->where('cuenta_id', $p['id'])->where('estudio_id', '!=', $estudio->getKey())->exists(),
+            ], $paginas),
+        ];
+    }
+
+    /** Conecta la página elegida: se suscribe a sus mensajes y guarda su llave. */
+    public function conectarMessenger(Estudio $estudio, string $seleccion, string $paginaId): CanalMensajeria
+    {
+        $guardado = Cache::get('bandeja:messenger:'.$seleccion);
+        $datos = null;
+        if (is_string($guardado)) {
+            try {
+                $datos = json_decode(Crypt::decryptString($guardado), true);
+            } catch (DecryptException) {
+                $datos = null;
+            }
+        }
+        if (! is_array($datos) || (int) ($datos['estudio'] ?? 0) !== (int) $estudio->getKey()) {
+            throw ValidationException::withMessages(['pagina_id' => ['Se venció el tiempo para elegir la página: vuelve a conectar.']]);
+        }
+        $pagina = collect((array) ($datos['paginas'] ?? []))->first(fn (mixed $p): bool => is_array($p) && ($p['id'] ?? null) === $paginaId);
+        if (! is_array($pagina)) {
+            throw ValidationException::withMessages(['pagina_id' => ['Esa página no es de las que elegiste en Facebook.']]);
+        }
+        $this->exigirLibre(CanalMensajeria::MESSENGER, $paginaId, $estudio);
+        $this->meta->suscribirPagina((string) $pagina['token'], $paginaId);
+        Cache::forget('bandeja:messenger:'.$seleccion);
+
+        return $this->guardarCanal($estudio, CanalMensajeria::MESSENGER, [
+            'cuenta_id' => $paginaId,
+            'waba_id' => null,
+            'nombre' => (string) $pagina['nombre'],
+            'token' => (string) $pagina['token'],
+            'token_vence_en' => null,
+            'pin' => null,
+        ]);
+    }
+
     public function desconectar(CanalMensajeria $canal): void
     {
-        if ($canal->canal === CanalMensajeria::WHATSAPP && $canal->waba_id !== null) {
-            try {
+        try {
+            if ($canal->canal === CanalMensajeria::WHATSAPP && $canal->waba_id !== null) {
                 $this->meta->desconectarWhatsApp($canal->token, $canal->waba_id);
-            } catch (Throwable $e) {
-                report($e);
             }
+            if ($canal->canal === CanalMensajeria::MESSENGER) {
+                $this->meta->desconectarMessenger($canal->token, $canal->cuenta_id);
+            }
+        } catch (Throwable $e) {
+            report($e);
         }
         $canal->delete();
     }
@@ -210,6 +293,25 @@ class BandejaTenant
      */
     public function procesarInstagram(array $aviso): int
     {
+        return $this->procesarMensajeria(CanalMensajeria::INSTAGRAM, $aviso);
+    }
+
+    /**
+     * Lo que llegó a una página de Facebook de la bandeja (Messenger): el mismo formato
+     * que Instagram.
+     *
+     * @param  array<string, mixed>  $aviso
+     */
+    public function procesarMessenger(array $aviso): int
+    {
+        return $this->procesarMensajeria(CanalMensajeria::MESSENGER, $aviso);
+    }
+
+    /**
+     * @param  array<string, mixed>  $aviso
+     */
+    private function procesarMensajeria(string $tipo, array $aviso): int
+    {
         $procesados = 0;
         foreach ((array) ($aviso['entry'] ?? []) as $entrada) {
             if (! is_array($entrada)) {
@@ -217,11 +319,11 @@ class BandejaTenant
             }
             $cuenta = (string) ($entrada['id'] ?? '');
             $canal = $cuenta === '' ? null : CanalMensajeria::query()
-                ->where('canal', CanalMensajeria::INSTAGRAM)->where('cuenta_id', $cuenta)->with('estudio')->first();
+                ->where('canal', $tipo)->where('cuenta_id', $cuenta)->with('estudio')->first();
             if ($canal === null || $canal->estudio === null) {
                 continue;
             }
-            $procesados += (int) $this->gestor->ejecutarEn($canal->estudio, function () use ($entrada, $cuenta, $canal): int {
+            $procesados += (int) $this->gestor->ejecutarEn($canal->estudio, function () use ($entrada, $cuenta, $canal, $tipo): int {
                 $n = 0;
                 foreach ((array) ($entrada['messaging'] ?? []) as $evento) {
                     $mensaje = is_array($evento) && is_array($evento['message'] ?? null) ? $evento['message'] : null;
@@ -235,11 +337,14 @@ class BandejaTenant
                         continue;
                     }
                     $texto = is_string($mensaje['text'] ?? null) ? $mensaje['text'] : null;
-                    [$tipo, $adjunto] = self::adjuntoDeMeta($mensaje, $texto);
+                    [$tipoMensaje, $adjunto] = self::adjuntoDeMeta($mensaje, $texto);
                     $cuando = CarbonImmutable::createFromTimestampMs((int) ($evento['timestamp'] ?? now()->getTimestampMs()));
+                    $nombre = $tipo === CanalMensajeria::MESSENGER
+                        ? fn (): ?string => $this->meta->nombreEnMessenger($canal->token, $contacto)
+                        : fn (): ?string => $this->meta->nombreEnInstagram($canal->token, $contacto);
                     $n += $deNegocio
-                        ? (int) $this->registrarSaliente(CanalMensajeria::INSTAGRAM, $contacto, $id, $tipo, $texto, $cuando, $adjunto)
-                        : (int) $this->registrarEntrante(CanalMensajeria::INSTAGRAM, $contacto, fn (): ?string => $this->meta->nombreEnInstagram($canal->token, $contacto), $id, $tipo, $texto, $cuando, $adjunto);
+                        ? (int) $this->registrarSaliente($tipo, $contacto, $id, $tipoMensaje, $texto, $cuando, $adjunto)
+                        : (int) $this->registrarEntrante($tipo, $contacto, $nombre, $id, $tipoMensaje, $texto, $cuando, $adjunto);
                 }
 
                 return $n;
@@ -263,9 +368,11 @@ class BandejaTenant
         }
 
         try {
-            $id = $canal->canal === CanalMensajeria::WHATSAPP
-                ? $this->meta->enviarWhatsApp($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $texto)
-                : $this->meta->enviarInstagram($canal->token, $conversacion->contacto_id, $texto);
+            $id = match ($canal->canal) {
+                CanalMensajeria::WHATSAPP => $this->meta->enviarWhatsApp($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $texto),
+                CanalMensajeria::MESSENGER => $this->meta->enviarMessenger($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $texto),
+                default => $this->meta->enviarInstagram($canal->token, $conversacion->contacto_id, $texto),
+            };
         } catch (RequestException $e) {
             report($e);
             throw ValidationException::withMessages(['texto' => ['Meta no aceptó el mensaje: '.Str::limit((string) ($e->response->json('error.message') ?? 'inténtalo de nuevo.'), 160)]]);
@@ -308,8 +415,9 @@ class BandejaTenant
         if ($canal->canal === CanalMensajeria::INSTAGRAM && $tipo !== 'image') {
             throw ValidationException::withMessages(['archivo' => ['Por Instagram solo se mandan imágenes.']]);
         }
-        // Una imagen de Instagram no lleva pie: el texto sale aparte, después.
-        $pieAparte = $canal->canal === CanalMensajeria::INSTAGRAM ? $pie : null;
+        // Una imagen de Instagram o un adjunto de Messenger no lleva pie: el texto sale
+        // aparte, después.
+        $pieAparte = $canal->canal !== CanalMensajeria::WHATSAPP ? $pie : null;
         $pie = $pieAparte !== null ? null : $pie;
         $contenido = (string) $archivo->get();
         $nombre = Str::limit($archivo->getClientOriginalName() ?: 'archivo', 200, '');
@@ -331,6 +439,8 @@ class BandejaTenant
             if ($canal->canal === CanalMensajeria::WHATSAPP) {
                 $medio = $this->meta->subirWhatsApp($canal->token, $canal->cuenta_id, $contenido, $mime, $nombre);
                 $id = $this->meta->enviarArchivoWhatsApp($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $tipo, $medio, $pie, $nombre);
+            } elseif ($canal->canal === CanalMensajeria::MESSENGER) {
+                $id = $this->meta->enviarAdjuntoMessenger($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $tipo === 'image' ? 'image' : 'file', $this->urlPublicaDeArchivo($estudio, $ruta));
             } else {
                 $id = $this->meta->enviarImagenInstagram($canal->token, $conversacion->contacto_id, $this->urlPublicaDeArchivo($estudio, $ruta));
             }

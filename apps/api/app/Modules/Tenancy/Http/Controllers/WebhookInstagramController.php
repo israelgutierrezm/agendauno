@@ -11,9 +11,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * Webhook público de Instagram para la bandeja (ADR 0200): `/webhooks/instagram`.
- * GET: Meta lo verifica con nuestro token. POST: los mensajes de las cuentas conectadas,
- * con la firma de la app; sin secreto con qué revisarla, solo en local y pruebas.
+ * Webhooks públicos de Instagram y Messenger para la bandeja (ADR 0200):
+ * `/webhooks/instagram` y `/webhooks/messenger`. GET: Meta los verifica con nuestro
+ * token. POST: los mensajes de las cuentas o páginas conectadas, con la firma de la
+ * app; sin secreto con qué revisarla, solo en local y pruebas.
  */
 class WebhookInstagramController
 {
@@ -34,13 +35,28 @@ class WebhookInstagramController
 
     public function recibir(Request $request): JsonResponse
     {
-        $firma = $this->meta->firmaValida($request->getContent(), $request->header('X-Hub-Signature-256'), 'instagram');
-        if ($firma === false || ($firma === null && ! app()->environment(['local', 'testing']))) {
-            abort(403, 'Firma inválida.');
-        }
+        $this->exigirFirma($request, 'instagram');
         /** @var array<string, mixed> $aviso */
         $aviso = $request->json()->all();
 
         return response()->json(['data' => ['ok' => true, 'procesados' => $this->bandeja->procesarInstagram($aviso)]]);
+    }
+
+    /** Messenger (`/webhooks/messenger`): el mismo formato, firmado por la app de Meta. */
+    public function recibirMessenger(Request $request): JsonResponse
+    {
+        $this->exigirFirma($request, 'messenger');
+        /** @var array<string, mixed> $aviso */
+        $aviso = $request->json()->all();
+
+        return response()->json(['data' => ['ok' => true, 'procesados' => $this->bandeja->procesarMessenger($aviso)]]);
+    }
+
+    private function exigirFirma(Request $request, string $canal): void
+    {
+        $firma = $this->meta->firmaValida($request->getContent(), $request->header('X-Hub-Signature-256'), $canal);
+        if ($firma === false || ($firma === null && ! app()->environment(['local', 'testing']))) {
+            abort(403, 'Firma inválida.');
+        }
     }
 }

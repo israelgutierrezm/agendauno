@@ -10,18 +10,18 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * La imagen que el equipo manda por Instagram (ADR 0200): Meta la toma de una
- * dirección de la plataforma, firmada y que vence en minutos (middleware `signed`).
- * Solo imágenes guardadas por la bandeja de ese negocio; nada más se sirve por aquí.
+ * La imagen que el equipo manda por Instagram, o la imagen o el PDF por Messenger
+ * (ADR 0200): Meta los toma de una dirección de la plataforma, firmada y que vence en
+ * minutos (middleware `signed`). Solo lo guardado por la bandeja de ese negocio.
  */
 class ArchivoBandejaPublicoController
 {
-    private const TIPOS = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
+    private const TIPOS = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
 
     public function __invoke(Request $request): Response
     {
         $archivo = (string) $request->route('archivo');
-        abort_unless(preg_match('/^[A-Za-z0-9]{40}\.(jpg|png|webp)$/', $archivo) === 1, 404);
+        abort_unless(preg_match('/^[A-Za-z0-9]{40}\.(jpg|png|webp|pdf)$/', $archivo) === 1, 404);
         $estudio = Estudio::query()->where('slug', (string) $request->route('estudio'))->firstOrFail();
         $ruta = 'bandeja/'.$estudio->getKey().'/'.$archivo;
         abort_unless(DiscosDeArchivos::privado()->exists($ruta), 404);

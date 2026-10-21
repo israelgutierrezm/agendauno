@@ -62,6 +62,13 @@ function fingirMetaBandeja(array &$llamadas): void
             str_ends_with($url, 'graph.instagram.com/v23.0/me') => Http::response(['user_id' => '1789', 'username' => 'estudio.cal']),
             str_ends_with($url, 'graph.instagram.com/v23.0/me/messages') => Http::response(['recipient_id' => '555', 'message_id' => 'm_salida'.(++$enviados)]),
             str_ends_with($url, 'graph.instagram.com/v23.0/555') => Http::response(['name' => 'Ana Instagram']),
+            // Messenger: las páginas de quien entra con Facebook, el nombre de quien escribe
+            // y lo que se manda desde la página.
+            str_ends_with($url, 'graph.facebook.com/v23.0/me/accounts') => Http::response(['data' => $GLOBALS['paginas_facebook'] ?? [
+                ['id' => '44556677', 'name' => 'Estudio Cal', 'access_token' => 'llave-pagina'],
+            ]]),
+            str_ends_with($url, 'graph.facebook.com/v23.0/9988') => Http::response(['first_name' => 'Pedro', 'last_name' => 'Páez']),
+            (bool) preg_match('#graph\.facebook\.com/v23\.0/(44556677|11223344)/messages$#', $url) => Http::response(['recipient_id' => '9988', 'message_id' => 'mid.salida'.(++$enviados)]),
             // Archivos (medios de WhatsApp y adjuntos de Instagram).
             str_ends_with($url, 'graph.facebook.com/v23.0/media-foto') => Http::response(['url' => 'https://lookaside.fbsbx.com/wa/media-foto', 'mime_type' => 'image/jpeg', 'file_size' => 10]),
             str_ends_with($url, 'graph.facebook.com/v23.0/media-html') => Http::response(['url' => 'https://lookaside.fbsbx.com/wa/media-html', 'mime_type' => 'text/html', 'file_size' => 25]),
@@ -522,4 +529,111 @@ it('pasadas las 24 horas se contesta por WhatsApp con una plantilla aprobada del
         ->and($mensaje['texto'])->toBe("Estudio Cal\n\nHola Lucía, ¿seguimos con tu cita del martes?\n\nContesta para hablar con nosotros");
     Http::assertSent(fn (PeticionHttp $p): bool => str_ends_with($p->url(), '/7654321/messages') && ($p['type'] ?? null) === 'template'
         && $p['template'] === ['name' => 'recordatorio_cita', 'language' => ['code' => 'es_MX'], 'components' => [['type' => 'body', 'parameters' => [['type' => 'text', 'text' => 'Lucía'], ['type' => 'text', 'text' => 'martes']]]]]);
+});
+
+/**
+ * Entra con Facebook y confirma desde la web: devuelve la respuesta de confirmar.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function conectarMessengerDeBandeja(array $e): TestResponse
+{
+    $url = (string) test()->postJson("/api/v1/app/{$e['slug']}/bandeja/canales/messenger/conectar", [], conBearer($e['bearer']))->assertOk()->json('data.url');
+    parse_str((string) parse_url($url, PHP_URL_QUERY), $consulta);
+    $destino = (string) test()->get('/api/v1/bandeja/messenger/vuelta?'.http_build_query(['code' => 'codigo-fb', 'state' => $consulta['state']]))
+        ->assertRedirect()->headers->get('Location');
+    parse_str((string) parse_url($destino, PHP_URL_QUERY), $web);
+    expect($web['messenger'])->toBe('conectar');
+
+    return test()->postJson("/api/v1/app/{$e['slug']}/bandeja/canales/messenger/confirmar", ['codigo' => $web['codigo'], 'estado' => $web['estado']], conBearer($e['bearer']));
+}
+
+// Facebook Messenger: la página del negocio, con el inicio de sesión de Facebook.
+it('conecta la página de Facebook, recibe por Messenger y contesta con texto y archivos', function (): void {
+    Storage::fake('local');
+    config(['agendauno.bandeja.messenger' => true]);
+    unset($GLOBALS['paginas_facebook']);
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+
+    $canales = $this->getJson("/api/v1/app/{$e['slug']}/bandeja/canales", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($canales['messenger'])->toBe(['disponible' => true, 'conexion' => null]);
+    $url = (string) $this->postJson("/api/v1/app/{$e['slug']}/bandeja/canales/messenger/conectar", [], conBearer($e['bearer']))->json('data.url');
+    expect($url)->toStartWith('https://www.facebook.com/v23.0/dialog/oauth?')->toContain('pages_messaging');
+
+    // Con una sola página, se conecta sin preguntar.
+    $canal = conectarMessengerDeBandeja($e)->assertCreated()->json('data');
+    expect($canal)->toMatchArray(['canal' => 'messenger', 'nombre' => 'Estudio Cal', 'estado' => 'activo'])->and($canal)->not->toHaveKey('token');
+    Http::assertSent(fn (PeticionHttp $p): bool => str_contains($p->url(), '/44556677/subscribed_apps') && $p->hasHeader('Authorization', 'Bearer llave-pagina'));
+
+    $instante = now()->getTimestampMs();
+    avisoDeBandeja('/api/v1/webhooks/messenger', ['object' => 'page', 'entry' => [['id' => '44556677', 'time' => $instante, 'messaging' => [
+        ['sender' => ['id' => '9988'], 'recipient' => ['id' => '44556677'], 'timestamp' => $instante, 'message' => ['mid' => 'mid.entrada', 'text' => '¿Hay lugar el sábado?']],
+    ]]]])->assertOk()->assertJsonPath('data.procesados', 1);
+    // Sin la firma de la app, se rechaza.
+    avisoDeBandeja('/api/v1/webhooks/messenger', ['object' => 'page', 'entry' => []], 'otro-secreto')->assertForbidden();
+
+    $conversacion = $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones?canal=messenger", conBearer($e['bearer']))->json('data.0');
+    expect($conversacion)->toMatchArray(['canal' => 'messenger', 'contacto' => 'Pedro Páez', 'telefono' => null, 'puede_contestar' => true]);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$conversacion['id']}/mensajes", ['texto' => 'Sí, a las 10.'], conBearer($e['bearer']))->assertCreated();
+    Http::assertSent(fn (PeticionHttp $p): bool => str_ends_with($p->url(), 'graph.facebook.com/v23.0/44556677/messages')
+        && $p->hasHeader('Authorization', 'Bearer llave-pagina') && $p['recipient'] === ['id' => '9988']
+        && $p['messaging_type'] === 'RESPONSE' && $p['message'] === ['text' => 'Sí, a las 10.']);
+
+    // Un PDF sale como archivo que Meta toma de la dirección firmada.
+    $this->post("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$conversacion['id']}/archivos", ['archivo' => UploadedFile::fake()->createWithContent('temario.pdf', "%PDF-1.4\n%%EOF")], [...conBearer($e['bearer']), 'Accept' => 'application/json'])
+        ->assertCreated();
+    $envio = collect($llamadas)->first(fn (array $l): bool => str_ends_with($l['url'], '/44556677/messages') && isset($l['cuerpo']['message']['attachment']));
+    expect($envio['cuerpo']['message']['attachment']['type'])->toBe('file')
+        ->and((string) $envio['cuerpo']['message']['attachment']['payload']['url'])->toContain('/api/v1/bandeja/archivos/');
+    $archivo = (string) $envio['cuerpo']['message']['attachment']['payload']['url'];
+    $this->get((string) parse_url($archivo, PHP_URL_PATH).'?'.parse_url($archivo, PHP_URL_QUERY))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+
+    $this->deleteJson("/api/v1/app/{$e['slug']}/bandeja/canales/messenger", [], conBearer($e['bearer']))->assertNoContent();
+    Http::assertSent(fn (PeticionHttp $p): bool => $p->method() === 'DELETE' && str_contains($p->url(), '/44556677/subscribed_apps'));
+});
+
+it('con varias páginas se elige una; la de otro negocio no, ni la selección de otro', function (): void {
+    config(['agendauno.bandeja.messenger' => true]);
+    $GLOBALS['paginas_facebook'] = [
+        ['id' => '44556677', 'name' => 'Estudio Cal', 'access_token' => 'llave-pagina'],
+        ['id' => '11223344', 'name' => 'Estudio Cal Sur', 'access_token' => 'llave-sur'],
+    ];
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $otro = estudioConSesion('otro-bandeja', 'otro-bandeja@correo.mx');
+    CanalMensajeria::query()->create([
+        'estudio_id' => Estudio::query()->where('slug', $otro['slug'])->value('id'), 'canal' => 'messenger', 'cuenta_id' => '44556677',
+        'nombre' => 'Estudio Cal', 'token' => 'llave-otra', 'estado' => 'activo',
+    ]);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+
+    $eleccion = conectarMessengerDeBandeja($e)->assertOk()->json('data');
+    expect($eleccion['paginas'])->toBe([
+        ['id' => '44556677', 'nombre' => 'Estudio Cal', 'ocupada' => true],
+        ['id' => '11223344', 'nombre' => 'Estudio Cal Sur', 'ocupada' => false],
+    ]);
+    $ruta = "/api/v1/app/{$e['slug']}/bandeja/canales/messenger/pagina";
+    $this->postJson($ruta, ['seleccion' => $eleccion['seleccion'], 'pagina_id' => '44556677'], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['canal'], 'meta.errors');
+    // La selección es de este negocio: otro no la usa.
+    $this->postJson("/api/v1/app/{$otro['slug']}/bandeja/canales/messenger/pagina", ['seleccion' => $eleccion['seleccion'], 'pagina_id' => '11223344'], conBearer($otro['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['pagina_id'], 'meta.errors');
+    $this->postJson($ruta, ['seleccion' => $eleccion['seleccion'], 'pagina_id' => '11223344'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.nombre', 'Estudio Cal Sur');
+    // Ya se usó: no sirve otra vez.
+    $this->postJson($ruta, ['seleccion' => $eleccion['seleccion'], 'pagina_id' => '11223344'], conBearer($e['bearer']))->assertUnprocessable();
+    unset($GLOBALS['paginas_facebook']);
+});
+
+it('sin encender Messenger en la plataforma no se ofrece', function (): void {
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/bandeja/canales", conBearer($e['bearer']))->assertJsonPath('data.messenger.disponible', false);
+    $this->postJson("/api/v1/app/{$e['slug']}/bandeja/canales/messenger/conectar", [], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['canal'], 'meta.errors');
 });

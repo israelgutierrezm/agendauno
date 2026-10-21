@@ -1,15 +1,15 @@
-// La bandeja de WhatsApp e Instagram (ADR 0200).
+// La bandeja de WhatsApp, Instagram y Messenger (ADR 0200).
 export default {
   titulo: "Mensajes",
   subtitulo:
-    "Lo que te escriben por WhatsApp e Instagram, en un solo lugar. Contesta desde aquí en las 24 horas que da Meta.",
+    "Lo que te escriben por WhatsApp, Instagram y Messenger, en un solo lugar. Contesta desde aquí en las 24 horas que da Meta.",
   abiertas: "Abiertas",
   archivadas: "Archivadas",
   todos: "Todos los canales",
   buscar: "Buscar por nombre o número",
   vacio: "Aún no hay mensajes",
   vacioTexto:
-    "Cuando alguien escriba a tu WhatsApp o Instagram conectados, aparece aquí.",
+    "Cuando alguien escriba a tu WhatsApp, Instagram o página de Facebook conectados, aparece aquí.",
   vacioArchivadas: "No hay conversaciones archivadas",
   elegir: "Elige una conversación para leerla.",
   sinNombre: "Sin nombre",
@@ -17,6 +17,7 @@ export default {
   canal: {
     whatsapp: "WhatsApp",
     instagram: "Instagram",
+    messenger: "Messenger",
   },
   tipos: {
     image: "Imagen",
@@ -85,7 +86,7 @@ export default {
   canales: {
     titulo: "Canales conectados",
     ayuda:
-      "Conecta el número de WhatsApp Business y la cuenta profesional de Instagram de tu negocio. Los mensajes llegan aquí y se contestan desde ese número o esa cuenta.",
+      "Conecta el número de WhatsApp Business, la cuenta profesional de Instagram y la página de Facebook de tu negocio. Los mensajes llegan aquí y se contestan desde ese número, esa cuenta o esa página.",
     noDisponible: "Aún no disponible en la plataforma.",
     conectar: "Conectar",
     conectando: "Conectando…",
@@ -96,6 +97,10 @@ export default {
     reconectar: "Vuelve a conectar",
     whatsappListo: "Listo: tu WhatsApp quedó conectado.",
     instagramListo: "Listo: tu Instagram quedó conectado.",
+    messengerListo: "Listo: tu página de Facebook quedó conectada.",
+    elegirPagina: "¿Qué página de Facebook conectas?",
+    paginaOcupada: "{nombre} (ya está en otro negocio)",
+    elegir: "Conectar esta página",
     cancelado: "No se terminó de conectar.",
     error: "No se pudo conectar: vuelve a intentarlo.",
     desconectado: "Canal desconectado.",

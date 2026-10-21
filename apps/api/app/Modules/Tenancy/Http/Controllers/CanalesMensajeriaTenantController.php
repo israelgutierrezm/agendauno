@@ -19,8 +19,9 @@ use RuntimeException;
 /**
  * Los canales de la bandeja (ADR 0200), con `integraciones.configurar`: conectar el
  * número de WhatsApp (el registro insertado de Meta corre en la web y aquí llega su
- * código) o la cuenta de Instagram (su inicio de sesión; la vuelta regresa a la web y
- * la web confirma con la sesión), y desconectarlos.
+ * código), la cuenta de Instagram o la página de Facebook para Messenger (su inicio de
+ * sesión; la vuelta regresa a la web y la web confirma con la sesión), y
+ * desconectarlos.
  */
 class CanalesMensajeriaTenantController
 {
@@ -35,6 +36,7 @@ class CanalesMensajeriaTenantController
         $estudio = $this->estudio($request);
         $whatsapp = $this->bandeja->canal($estudio, CanalMensajeria::WHATSAPP);
         $instagram = $this->bandeja->canal($estudio, CanalMensajeria::INSTAGRAM);
+        $messenger = $this->bandeja->canal($estudio, CanalMensajeria::MESSENGER);
 
         return response()->json(['data' => [
             'whatsapp' => [
@@ -45,6 +47,10 @@ class CanalesMensajeriaTenantController
             'instagram' => [
                 'disponible' => $this->meta->instagramConfigurado(),
                 'conexion' => $instagram === null ? null : $this->presentar($instagram),
+            ],
+            'messenger' => [
+                'disponible' => $this->meta->messengerConfigurado(),
+                'conexion' => $messenger === null ? null : $this->presentar($messenger),
             ],
         ]]);
     }
@@ -93,6 +99,70 @@ class CanalesMensajeriaTenantController
         } catch (RequestException|RuntimeException $e) {
             report($e);
             throw ValidationException::withMessages(['codigo' => ['Instagram no terminó de conectar la cuenta: vuelve a intentarlo.']]);
+        }
+        $this->registrar($request, 'bandeja.canal_conectado', $canal);
+
+        return response()->json(['data' => $this->presentar($canal)], 201);
+    }
+
+    public function conectarMessenger(Request $request): JsonResponse
+    {
+        $this->exigir($this->meta->messengerConfigurado(), 'Messenger');
+
+        return response()->json(['data' => ['url' => $this->bandeja->urlMessenger($this->estudio($request), $this->usuario($request))]]);
+    }
+
+    /**
+     * La vuelta de Facebook: con una sola página se conecta; con varias, devuelve las
+     * páginas para elegir (`paginas`, `seleccion`).
+     */
+    public function confirmarMessenger(Request $request): JsonResponse
+    {
+        $this->exigir($this->meta->messengerConfigurado(), 'Messenger');
+        $validado = $request->validate([
+            'codigo' => ['required', 'string', 'max:2048'],
+            'estado' => ['required', 'string', 'max:4096'],
+        ]);
+        $estudio = $this->estudio($request);
+        $estado = $this->bandeja->leerEstado((string) $validado['estado']);
+        if ($estado === null || $estado['estudio'] !== (string) $estudio->slug || $estado['usuario'] !== (string) $this->usuario($request)->ulid) {
+            throw ValidationException::withMessages(['codigo' => ['El enlace venció o no es de tu cuenta: vuelve a conectar.']]);
+        }
+        try {
+            $paginas = $this->bandeja->paginasMessenger($estudio, (string) $validado['codigo']);
+        } catch (RequestException|RuntimeException $e) {
+            report($e);
+            throw ValidationException::withMessages(['codigo' => ['Facebook no terminó de conectar: vuelve a intentarlo.']]);
+        }
+        if ($paginas['paginas'] === []) {
+            throw ValidationException::withMessages(['codigo' => ['Tu cuenta de Facebook no administra ninguna página: crea la de tu negocio o pide que te den acceso.']]);
+        }
+        $libres = array_values(array_filter($paginas['paginas'], static fn (array $p): bool => ! $p['ocupada']));
+        if (count($paginas['paginas']) === 1 && count($libres) === 1) {
+            return $this->conectarPagina($request, $estudio, $paginas['seleccion'], $libres[0]['id']);
+        }
+
+        return response()->json(['data' => $paginas]);
+    }
+
+    public function elegirPaginaMessenger(Request $request): JsonResponse
+    {
+        $this->exigir($this->meta->messengerConfigurado(), 'Messenger');
+        $validado = $request->validate([
+            'seleccion' => ['required', 'string', 'size:40'],
+            'pagina_id' => ['required', 'string', 'regex:/^\d{5,30}$/'],
+        ]);
+
+        return $this->conectarPagina($request, $this->estudio($request), (string) $validado['seleccion'], (string) $validado['pagina_id']);
+    }
+
+    private function conectarPagina(Request $request, Estudio $estudio, string $seleccion, string $paginaId): JsonResponse
+    {
+        try {
+            $canal = $this->bandeja->conectarMessenger($estudio, $seleccion, $paginaId);
+        } catch (RequestException $e) {
+            report($e);
+            throw ValidationException::withMessages(['pagina_id' => ['Facebook no dejó recibir los mensajes de esa página: vuelve a intentarlo.']]);
         }
         $this->registrar($request, 'bandeja.canal_conectado', $canal);
 

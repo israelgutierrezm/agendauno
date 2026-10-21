@@ -10,7 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * El número de WhatsApp o la cuenta de Instagram de un negocio para su bandeja (control
+ * El número de WhatsApp, la cuenta de Instagram o la página de Facebook (Messenger) de
+ * un negocio para su bandeja (control
  * plane, ADR 0200). Meta avisa a una sola URL de la plataforma: `cuenta_id` dice de qué
  * negocio es cada mensaje. La llave y el PIN del número van cifrados.
  *
@@ -35,7 +36,10 @@ class CanalMensajeria extends Model
 
     public const INSTAGRAM = 'instagram';
 
-    public const CANALES = [self::WHATSAPP, self::INSTAGRAM];
+    /** La página de Facebook del negocio (`cuenta_id` es el id de la página). */
+    public const MESSENGER = 'messenger';
+
+    public const CANALES = [self::WHATSAPP, self::INSTAGRAM, self::MESSENGER];
 
     protected $table = 'canales_mensajeria';
 

@@ -62,7 +62,7 @@ negocio (ADR 0190) y la bandeja después.
   - ~~mandar y ver archivos~~ (hecho, ver el ajuste);
   - ~~contestar fuera de las 24 horas con plantillas del número del negocio~~ (hecho,
     ver el ajuste);
-  - Facebook Messenger.
+  - ~~Facebook Messenger~~ (hecho, ver el ajuste).
 - Sin validar con Meta: probado con respuestas simuladas.
 
 ## Ajuste (2026-10-21)
@@ -104,3 +104,27 @@ negocio (ADR 0190) y la bandeja después.
     como le llegó. El panel avisa que Meta cobra el mensaje a la cuenta de WhatsApp
     del negocio, según su categoría.
   - Instagram no tiene plantillas: ahí se espera a que vuelva a escribir.
+- **Facebook Messenger**:
+  - **Conexión:**
+    - La página de Facebook del negocio se conecta con el inicio de sesión de Facebook
+      de la misma app de Meta. Pide `pages_show_list`, `pages_manage_metadata` y
+      `pages_messaging`, nada más.
+    - Del código sale una llave larga de quien conecta. De ella salen las llaves de
+      sus páginas, que no vencen.
+    - Con una sola página se conecta. Con varias, el panel pide elegir una.
+      - Sus llaves esperan 10 minutos, cifradas y ligadas al negocio, bajo una
+        `seleccion` de un solo uso.
+      - Una página conectada a otro negocio aparece pero no se elige.
+    - Al conectar, la app se suscribe a `messages` y `message_echoes` de la página.
+    - Al desconectar, se da de baja de la página.
+  - **Recibir y contestar:**
+    - Avisos en `/webhooks/messenger`, firmados con la app de Meta y con el mismo
+      token de verificación. Tienen el mismo formato que Instagram y comparten su
+      código.
+    - El nombre de quien escribe se lee de su perfil.
+    - Se contesta en 24 horas con `messaging_type: RESPONSE`, hasta 2,000
+      caracteres.
+    - Una imagen o un PDF se mandan por la dirección firmada; el pie sale aparte.
+  - **Encendido:** apagado hasta que Meta apruebe los permisos de páginas de la app
+    (`BANDEJA_MESSENGER=true`).
+- Sin validar con Meta: todo lo de este ajuste se probó con respuestas simuladas.

@@ -21,7 +21,7 @@ use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * La bandeja de WhatsApp e Instagram (ADR 0200): las conversaciones del negocio, leerlas,
+ * La bandeja de WhatsApp, Instagram y Messenger (ADR 0200): las conversaciones del negocio, leerlas,
  * contestarlas (en las 24 horas que deja Meta), archivarlas y vincularlas con la ficha
  * de un cliente. Con `mensajes.atender`.
  */
@@ -103,8 +103,12 @@ class BandejaTenantController
     {
         $conversacion = $this->conversacion($request);
         $validado = $request->validate([
-            // Instagram acepta hasta 1,000 caracteres; WhatsApp, 4,096.
-            'texto' => ['required', 'string', 'max:'.($conversacion->canal === CanalMensajeria::INSTAGRAM ? 1000 : 4096)],
+            // Instagram acepta hasta 1,000 caracteres; Messenger, 2,000; WhatsApp, 4,096.
+            'texto' => ['required', 'string', 'max:'.match ($conversacion->canal) {
+                CanalMensajeria::INSTAGRAM => 1000,
+                CanalMensajeria::MESSENGER => 2000,
+                default => 4096,
+            }],
         ]);
         $usuario = $request->attributes->get('usuario_tenant');
         abort_unless($usuario instanceof Usuario, 401);

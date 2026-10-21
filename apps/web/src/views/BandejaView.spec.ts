@@ -309,6 +309,51 @@ describe("bandeja de WhatsApp e Instagram", () => {
     );
   });
 
+  it("a la vuelta de Facebook, con varias páginas, pide elegir una y la conecta", async () => {
+    permisos.lista = ["mensajes.atender", "integraciones.configurar"];
+    api.post.mockImplementation(async (url: string) =>
+      url.endsWith("/messenger/confirmar")
+        ? {
+            data: {
+              data: {
+                seleccion: "s".repeat(40),
+                paginas: [
+                  { id: "111", nombre: "Estudio Cal", ocupada: true },
+                  { id: "222", nombre: "Estudio Cal Sur", ocupada: false },
+                ],
+              },
+            },
+          }
+        : { data: { data: {} } },
+    );
+    const { w, router } = await montar(
+      "/bandeja?messenger=conectar&codigo=xyz&estado=st",
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/bandeja/canales/messenger/confirmar",
+      { codigo: "xyz", estado: "st" },
+    );
+    expect(router.currentRoute.value.query).toEqual({});
+
+    const eleccion = w.get('[data-prueba="elegir-pagina"]');
+    const opciones = eleccion.findAll("option");
+    // La de otro negocio no se puede elegir.
+    expect(opciones[0].attributes("disabled")).toBeDefined();
+    expect(opciones[0].text()).toContain("ya está en otro negocio");
+    await eleccion.get("select").setValue("222");
+    await eleccion.trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/bandeja/canales/messenger/pagina",
+      { seleccion: "s".repeat(40), pagina_id: "222" },
+    );
+    expect(toast.exito).toHaveBeenCalledWith(
+      bandejaMensajes.canales.messengerListo,
+    );
+    expect(w.find('[data-prueba="elegir-pagina"]').exists()).toBe(false);
+  });
+
   it("archivar la saca de las abiertas", async () => {
     api.put.mockResolvedValue({
       data: { data: { ...conversacion, estado: "archivada" } },

@@ -116,6 +116,9 @@ return [
         'instagram_app_secret' => env('BANDEJA_INSTAGRAM_APP_SECRET', ''),
         'verify_token' => env('BANDEJA_VERIFY_TOKEN', ''),
         'version' => env('BANDEJA_GRAPH_VERSION', 'v23.0'),
+        // Messenger usa la misma app de Meta, con su inicio de sesión de Facebook: se
+        // enciende cuando Meta aprueba sus permisos de páginas (pages_messaging…).
+        'messenger' => (bool) env('BANDEJA_MESSENGER', false),
     ],
 
     /*

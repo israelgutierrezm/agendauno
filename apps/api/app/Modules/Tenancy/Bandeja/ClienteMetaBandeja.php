@@ -17,10 +17,15 @@ use RuntimeException;
  *   app de la plataforma, que se suscribe a su cuenta y registra el número.
  * - Instagram: «Instagram API con inicio de sesión de Instagram». Se pide solo leer el
  *   perfil y manejar los mensajes; la llave larga dura 60 días y se renueva.
+ * - Messenger: la página de Facebook del negocio, con el inicio de sesión de Facebook
+ *   de la misma app. La llave de la página sale de una llave larga y no vence.
  */
 class ClienteMetaBandeja
 {
     private const ALCANCES_INSTAGRAM = 'instagram_business_basic,instagram_business_manage_messages';
+
+    /** Ver sus páginas, suscribirse a una y manejar sus mensajes; nada más. */
+    private const ALCANCES_MESSENGER = 'pages_show_list,pages_manage_metadata,pages_messaging';
 
     public function whatsappConfigurado(): bool
     {
@@ -292,6 +297,100 @@ class ClienteMetaBandeja
         $nombre = $json->json('name') ?: ($json->json('username') !== null ? '@'.$json->json('username') : null);
 
         return is_string($nombre) && $nombre !== '' ? $nombre : null;
+    }
+
+    public function messengerConfigurado(): bool
+    {
+        return (bool) config('agendauno.bandeja.messenger', false) && $this->c('meta_app_id') !== '' && $this->c('meta_app_secret') !== '';
+    }
+
+    /** El inicio de sesión de Facebook para elegir la página: solo sus mensajes. */
+    public function urlAutorizacionMessenger(string $estado, string $vuelta): string
+    {
+        return 'https://www.facebook.com/'.$this->version().'/dialog/oauth?'.http_build_query([
+            'client_id' => $this->c('meta_app_id'),
+            'redirect_uri' => $vuelta,
+            'response_type' => 'code',
+            'scope' => self::ALCANCES_MESSENGER,
+            'state' => $estado,
+        ]);
+    }
+
+    /**
+     * Canjea el código por la llave larga de quien conectó y lee sus páginas, cada una
+     * con su llave (que no vence si sale de una llave larga).
+     *
+     * @return list<array{id: string, nombre: string, token: string}>
+     */
+    public function paginasMessenger(string $codigo, string $vuelta): array
+    {
+        $corta = (string) Http::timeout(15)->get($this->graph('oauth/access_token'), [
+            'client_id' => $this->c('meta_app_id'),
+            'client_secret' => $this->c('meta_app_secret'),
+            'redirect_uri' => $vuelta,
+            'code' => $codigo,
+        ])->throw()->json('access_token');
+        if ($corta === '') {
+            throw new RuntimeException('Facebook no dio la llave.');
+        }
+        $larga = (string) Http::timeout(15)->get($this->graph('oauth/access_token'), [
+            'grant_type' => 'fb_exchange_token',
+            'client_id' => $this->c('meta_app_id'),
+            'client_secret' => $this->c('meta_app_secret'),
+            'fb_exchange_token' => $corta,
+        ])->throw()->json('access_token');
+        $paginas = (array) $this->api($larga !== '' ? $larga : $corta)
+            ->get($this->graph('me/accounts'), ['fields' => 'id,name,access_token', 'limit' => 100])->throw()->json('data');
+
+        return array_values(array_filter(array_map(static fn (mixed $p): ?array => is_array($p) && is_string($p['id'] ?? null) && is_string($p['access_token'] ?? null)
+            ? ['id' => $p['id'], 'nombre' => (string) ($p['name'] ?? $p['id']), 'token' => $p['access_token']]
+            : null, $paginas)));
+    }
+
+    /** Recibe los mensajes de la página (y lo que el negocio contesta desde Facebook). */
+    public function suscribirPagina(string $token, string $paginaId): void
+    {
+        $this->api($token)->post($this->graph($paginaId.'/subscribed_apps').'?subscribed_fields=messages,message_echoes')->throw();
+    }
+
+    public function desconectarMessenger(string $token, string $paginaId): void
+    {
+        $this->api($token)->delete($this->graph($paginaId.'/subscribed_apps'));
+    }
+
+    /** Manda texto por Messenger (dentro de las 24 horas); devuelve el id del mensaje. */
+    public function enviarMessenger(string $token, string $paginaId, string $para, string $texto): string
+    {
+        return (string) $this->api($token)->post($this->graph($paginaId.'/messages'), [
+            'recipient' => ['id' => $para],
+            'messaging_type' => 'RESPONSE',
+            'message' => ['text' => $texto],
+        ])->throw()->json('message_id');
+    }
+
+    /**
+     * Manda una imagen o un archivo por Messenger: Meta lo toma de `$url` (firmada y
+     * temporal). Devuelve el id del mensaje.
+     */
+    public function enviarAdjuntoMessenger(string $token, string $paginaId, string $para, string $tipo, string $url): string
+    {
+        return (string) $this->api($token)->post($this->graph($paginaId.'/messages'), [
+            'recipient' => ['id' => $para],
+            'messaging_type' => 'RESPONSE',
+            'message' => ['attachment' => ['type' => $tipo, 'payload' => ['url' => $url, 'is_reusable' => false]]],
+        ])->throw()->json('message_id');
+    }
+
+    /** El nombre de quien escribe por Messenger, si Meta lo da. */
+    public function nombreEnMessenger(string $token, string $quien): ?string
+    {
+        $json = $this->api($token)->get($this->graph($quien), ['fields' => 'first_name,last_name']);
+        if (! $json->successful()) {
+            return null;
+        }
+        $nombre = trim(((string) $json->json('first_name')).' '.((string) $json->json('last_name')));
+
+        return $nombre !== '' ? $nombre : null;
     }
 
     /**

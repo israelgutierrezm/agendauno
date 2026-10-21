@@ -1516,11 +1516,12 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
-### Bandeja de WhatsApp e Instagram (ADR 0200)
+### Bandeja de WhatsApp, Instagram y Messenger (ADR 0200)
 
 - Atender (`mensajes.atender`, función `mensajes`):
   - `GET /bandeja/resumen` devuelve {`sin_leer`, `canales`}.
-  - `GET /bandeja/conversaciones` (`estado` `abierta`|`archivada`, `canal`, `q`,
+  - `GET /bandeja/conversaciones` (`estado` `abierta`|`archivada`, `canal`
+    `whatsapp`|`instagram`|`messenger`, `q`,
     `page`) devuelve [{`id`, `canal`, `contacto`, `telefono` (solo WhatsApp),
     `persona` {`id`, `nombre`}|null, `estado`, `no_leidos`, `ultimo_texto`,
     `ultimo_mensaje_en`, `puede_contestar`, `contestar_hasta`}] por páginas.
@@ -1553,9 +1554,19 @@ en el negocio.
     (`GET /api/v1/bandeja/instagram/vuelta`) regresa a
     `{web}/bandeja?instagram=conectar&codigo=…&estado=…`.
   - `POST /bandeja/canales/instagram/confirmar` {`codigo`, `estado`} (201).
-  - `DELETE /bandeja/canales/{whatsapp|instagram}` (204).
-- Webhooks: `/webhooks/whatsapp` (el de siempre; devuelve también `bandeja`) y
-  `GET`/`POST /webhooks/instagram`.
+  - Messenger (con `BANDEJA_MESSENGER`): `POST /bandeja/canales/messenger/conectar`
+    devuelve {`url`} (inicio de sesión de Facebook). La vuelta
+    (`GET /api/v1/bandeja/messenger/vuelta`) regresa a
+    `{web}/bandeja?messenger=conectar&codigo=…&estado=…`.
+    - `POST /bandeja/canales/messenger/confirmar` {`codigo`, `estado`}: con una sola
+      página, la conecta (201). Con varias, devuelve {`seleccion`, `paginas`
+      [{`id`, `nombre`, `ocupada`}]} (200).
+    - `POST /bandeja/canales/messenger/pagina` {`seleccion`, `pagina_id`} conecta la
+      elegida (201). La selección vale 10 minutos, una vez y solo en ese negocio.
+  - `DELETE /bandeja/canales/{whatsapp|instagram|messenger}` (204).
+- Webhooks: `/webhooks/whatsapp` (el de siempre; devuelve también `bandeja`),
+  `GET`/`POST /webhooks/instagram` y `GET`/`POST /webhooks/messenger` (`object: page`,
+  firmado con la app de Meta).
 - `GET /api/v1/bandeja/archivos/{negocio}/{archivo}`, firmada y vigente 15 minutos: de
   ahí toma Meta la imagen que se manda por Instagram.
 - `agendauno:renovar-instagram` (diario).
