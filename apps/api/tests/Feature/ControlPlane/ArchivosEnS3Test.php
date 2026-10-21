@@ -80,9 +80,11 @@ it('en S3, las imágenes y los documentos van a su bucket y nada queda en el ser
     expect($nosotros['foto_url'])->toBe($subido['foto']);
     $this->get("/api/v1/app/{$e['slug']}/documentos/{$subido['documento']}", conBearer($e['bearer']))->assertOk();
 
-    // La app instalable usa el logo desde el bucket.
+    // La app instalable hace sus íconos con el logo del bucket.
     $icono = $this->get('http://fluo-s3.agendauno.mx/api/v1/pwa/manifest.webmanifest')->assertOk()->json('icons.0');
-    expect($icono)->toMatchArray(['src' => $estudio->logo_url, 'sizes' => '300x300', 'type' => 'image/png']);
+    expect($icono)->toMatchArray(['sizes' => '192x192', 'type' => 'image/png']);
+    $png = $this->get('http://fluo-s3.agendauno.mx'.$icono['src'])->assertOk()->getContent();
+    expect(getimagesizefromstring((string) $png)[0])->toBe(192);
 });
 
 it('mover-archivos lleva lo del servidor a S3 y cambia las URL; repetirlo no copia de nuevo', function (): void {

@@ -36,11 +36,18 @@ negocios ni aparentar reservas sin conexión.
   del negocio y en el inicio del cliente: con el aviso del navegador (Android, Chrome,
   Edge) o, en iPhone, cómo «Agregar a inicio». «Ahora no» se recuerda.
 
+## Íconos cuadrados del logo (2026-10-21)
+
+- La imagen del API trae GD. Con logo, el manifiesto ofrece sus íconos cuadrados,
+  generados del logo en el servidor (`/api/v1/pwa/icono-{192|512|512-maskable}.png`):
+  el logo completo, centrado y sin deformar (uno ancho no se corta); el «maskable», sobre
+  fondo blanco y dentro de su zona segura.
+- La dirección lleva la versión del logo (`?v=`): otro logo, otra dirección. Se genera
+  una vez por logo y se guarda en caché.
+- Sin GD, el logo tal cual, como antes.
+
 ## Pendiente
 
-- Los íconos del logo se usan tal cual subió el negocio (sin recortar a cuadrado): la
-  imagen de la API no tiene GD. Si se agrega (cambio de imagen), el manifiesto puede
-  servir el logo en 192 y 512 cuadrados.
 - TurnoUno aún no tiene logotipo: su ícono de respaldo es provisional (su inicial).
 - Notificaciones push web: no implementadas (la app oficial sí las tiene); requieren
   llaves VAPID y un servicio de envío.

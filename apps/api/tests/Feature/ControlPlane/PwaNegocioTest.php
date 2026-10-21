@@ -68,13 +68,46 @@ it('una barbería usa su logo, su color y los íconos de TurnoUno, en su dominio
 
     expect($manifiesto['theme_color'])->toBe('#b03a2e')
         ->and($manifiesto['description'])->toContain('citas')
-        ->and($manifiesto['icons'][0])->toMatchArray(['sizes' => '300x300', 'type' => 'image/png', 'purpose' => 'any'])
-        ->and($manifiesto['icons'][0]['src'])->toStartWith('/storage/')
-        ->and($manifiesto['icons'][1]['src'])->toBe('/assets/pwa/turnouno-192.png');
+        ->and(collect($manifiesto['icons'])->map(fn (array $i): string => $i['sizes'].' '.$i['purpose'])->all())
+        ->toBe(['192x192 any', '512x512 any', '512x512 maskable'])
+        ->and($manifiesto['icons'][0]['src'])->toStartWith('/api/v1/pwa/icono-192.png?v=');
 
     // En el dominio del otro producto no existe.
     $this->get('http://barberia-norte.agendauno.mx/api/v1/pwa/manifest.webmanifest')->assertNotFound();
     // Mandar el perfil sin el color no lo borra.
     $this->putJson("http://localhost/api/v1/app/{$e['slug']}/perfil-publico", ['descripcion' => 'Cortes clásicos'], conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.color_marca', '#b03a2e');
+});
+
+it('los íconos cuadrados se generan del logo, sin deformarlo, y cambian con él', function (): void {
+    $e = estudioConSesion('fluo-iconos', 'f@correo.mx');
+    // Un logo ancho (300×100) no se corta: queda centrado dentro del cuadrado.
+    $this->postJson("/api/v1/app/{$e['slug']}/marca/logo", [
+        'logo' => UploadedFile::fake()->image('logo.png', 300, 100),
+    ], conBearer($e['bearer']))->assertOk();
+
+    $iconos = $this->get('http://fluo-iconos.agendauno.mx/api/v1/pwa/manifest.webmanifest')->assertOk()->json('icons');
+    expect($iconos)->toHaveCount(3);
+
+    foreach (['192' => 192, '512' => 512, '512-maskable' => 512] as $tam => $lado) {
+        $src = collect($iconos)->first(fn (array $i): bool => str_starts_with($i['src'], "/api/v1/pwa/icono-{$tam}.png"))['src'];
+        $png = $this->get("http://fluo-iconos.agendauno.mx{$src}")->assertOk()->assertHeader('Content-Type', 'image/png')->getContent();
+        $medidas = getimagesizefromstring((string) $png);
+        expect([$medidas[0], $medidas[1]])->toBe([$lado, $lado]);
+    }
+    // El «maskable» va sobre fondo (el teléfono lo recorta); el logo, dentro de su zona segura.
+    $maskable = imagecreatefromstring((string) $this->get('http://fluo-iconos.agendauno.mx/api/v1/pwa/icono-512-maskable.png')->getContent());
+    expect(imagecolorsforindex($maskable, imagecolorat($maskable, 5, 5)))->toMatchArray(['red' => 255, 'green' => 255, 'blue' => 255, 'alpha' => 0]);
+
+    // Otro logo, otra versión en la dirección.
+    $this->postJson("/api/v1/app/{$e['slug']}/marca/logo", [
+        'logo' => UploadedFile::fake()->image('otro.png', 200, 200),
+    ], conBearer($e['bearer']))->assertOk();
+    $nuevos = $this->get('http://fluo-iconos.agendauno.mx/api/v1/pwa/manifest.webmanifest')->json('icons');
+    expect($nuevos[0]['src'])->not->toBe($iconos[0]['src']);
+
+    // Sin logo no hay íconos propios; un tamaño que no existe, tampoco.
+    $sinLogo = estudioConSesion('fluo-sin-logo', 's@correo.mx');
+    $this->get("http://{$sinLogo['slug']}.agendauno.mx/api/v1/pwa/icono-192.png")->assertNotFound();
+    $this->get('http://fluo-iconos.agendauno.mx/api/v1/pwa/icono-64.png')->assertNotFound();
 });

@@ -36,10 +36,10 @@ implementado** · **Requiere autorización**.
 | Publicar y volver por componente | Implementado, pendiente de despliegue | `./actualizar.sh --solo …`, `./volver.sh --solo …`, versión por componente |
 | PWA por negocio (AgendaUno y TurnoUno) | Implementado, pendiente de despliegue | ADR 0110: manifiesto dinámico en el subdominio, service worker que no guarda la API, invitación a instalar; probado en unidades y contra el API local |
 | Color de marca del negocio | Implementado y probado | Configuración → Perfil público; barra de la app instalada |
-| Íconos cuadrados del logo (192/512) | Preparado para futuro | Requiere GD en la imagen del API (cambio de imagen) |
+| Íconos cuadrados del logo (192/512) | Implementado y probado | ADR 0110: generados del logo con GD (sin cortarlo), con su versión en la dirección |
 | Notificaciones push web | No implementado | La app oficial sí tiene push (FCM) |
 | Constructor del sitio (plantillas, secciones, textos, fotos, banners, vista previa, publicar) | Implementado y probado | ADR 0114: Configuración → Sitio web; borrador y versiones en la base del negocio; probado en pruebas y en el navegador contra la API local (pendiente de despliegue) |
-| Dominios propios de los negocios | Preparado para futuro | Diseño documentado arriba (verificación por DNS, certificados, SEO); no habilitado |
+| Dominios propios de los negocios | Implementado y probado | ADR 0189: verificación por DNS, certificados por HTTP-01 en Traefik y canonical; probado con DNS simulado, sin validar en producción (encenderlo requiere autorización, docs/DESPLIEGUE.md) |
 | App oficial AgendaUno (Android) | Implementado y probado | ADR 0111: sabor `agendauno`, `com.agendauno.app`; APK compilado y revisado |
 | App oficial TurnoUno (Android) | Implementado y probado | Sabor `turnouno`, `com.turnouno.app`, API `turnouno.mx`; APK compilado y revisado; ícono provisional |
 | Apps oficiales en iOS | Preparado para futuro | Producto en Dart listo; esquemas de Xcode en una Mac (docs/MOBILE.md) |
@@ -59,13 +59,13 @@ implementado** · **Requiere autorización**.
 | Autorregistro de clientes en los sitios | Requiere autorización | Se mantiene cerrado (ADR 0093, reafirmado 2026-10-10) |
 | Cambios en producción | Requiere autorización | |
 
-## Dominios propios de los negocios (diseño; no habilitado)
+## Dominios propios de los negocios (ADR 0189)
 
-Hoy cada negocio vive en el subdominio de su producto (`fluo.agendauno.mx`,
-`barberia.turnouno.mx`). La arquitectura admite después un dominio propio
-(`reservas.estudiopilates.mx`) sin otro proyecto ni otra instalación. **No está
-habilitado**: ningún host fuera de los dominios de los productos resuelve un negocio.
-Cuando se implemente:
+Cada negocio vive en el subdominio de su producto (`fluo.agendauno.mx`,
+`barberia.turnouno.mx`) y puede sumar un dominio propio (`reservas.estudiopilates.mx`)
+sin otro proyecto ni otra instalación. Está implementado (ADR 0189) y probado con DNS
+simulado; encenderlo en producción toca el Traefik compartido y requiere autorización
+(docs/DESPLIEGUE.md → «Dominios propios»). El diseño original, que la ADR 0189 precisa:
 
 1. **Verificación de propiedad.** El dueño escribe el dominio en Configuración → Sitio;
    la plataforma guarda un token y le pide dos registros: `TXT

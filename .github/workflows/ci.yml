@@ -97,7 +97,7 @@ jobs:
         with:
           php-version: '8.3'
           # pdo_sqlite: las BD por tenant (data plane) usan SQLite en test/CI.
-          extensions: pdo_mysql, pdo_sqlite, sqlite3, bcmath, intl, mbstring, zip
+          extensions: pdo_mysql, pdo_sqlite, sqlite3, bcmath, intl, mbstring, zip, gd
           coverage: none
           tools: composer:v2
 

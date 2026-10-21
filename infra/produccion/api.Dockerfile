@@ -11,10 +11,12 @@ FROM php:8.3-fpm-alpine AS base
 # mariadb-connector-c trae el plugin caching_sha2_password, con el que entra el
 # usuario normal de MySQL 8.4 (el cliente de MariaDB no lo incluye).
 # su-exec: el worker y el scheduler corren como www-data. zip: leer los reportes de
-# pagos en Excel (.xlsx) de las plataformas (ADR 0202).
-RUN apk add --no-cache mysql-client mariadb-connector-c su-exec libzip \
-    && apk add --no-cache --virtual .deps-compilar libzip-dev \
-    && docker-php-ext-install -j"$(nproc)" pdo_mysql pcntl opcache zip \
+# pagos en Excel (.xlsx) de las plataformas (ADR 0202). gd: los íconos cuadrados de la
+# app instalable, hechos del logo del negocio (PNG, JPEG y WebP; ADR 0110).
+RUN apk add --no-cache mysql-client mariadb-connector-c su-exec libzip libpng libjpeg-turbo libwebp \
+    && apk add --no-cache --virtual .deps-compilar libzip-dev libpng-dev libjpeg-turbo-dev libwebp-dev \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql pcntl opcache zip gd \
     && apk del .deps-compilar
 
 COPY infra/produccion/php.ini /usr/local/etc/php/conf.d/zz-agendauno.ini
