@@ -1,12 +1,17 @@
 /**
- * Widgets para la web del negocio (ADR 0141): su calendario de clases o sus planes,
- * dentro de su propio sitio, con un iframe que avisa su altura (como el formulario de
- * captación embebido, ADR 0117).
+ * Widgets para la web del negocio (ADR 0141): su calendario de clases, sus servicios
+ * para agendar (citas) o sus planes, dentro de su propio sitio, con un iframe que avisa
+ * su altura (como el formulario de captación embebido, ADR 0117).
  */
 import { productoDelHost } from "@/lib/producto";
 import { urlCanonicaEstudio } from "@/lib/tenant";
 
-export type TipoWidget = "calendario" | "planes";
+export type TipoWidget = "calendario" | "agendar" | "planes";
+
+/** Los widgets de cada modalidad: clases (calendario) o citas (agendar), y planes. */
+export function tiposDeWidget(esCitas: boolean): TipoWidget[] {
+  return esCitas ? ["agendar", "planes"] : ["calendario", "planes"];
+}
 export type TemaWidget = "claro" | "oscuro" | "auto";
 
 export interface Widget {

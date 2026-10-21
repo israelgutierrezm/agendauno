@@ -92,6 +92,10 @@ class WidgetsTenantController
         if ($validado['tipo'] === 'calendario' && $estudio instanceof Estudio && $estudio->modalidad() !== ModalidadServicio::Clases) {
             throw ValidationException::withMessages(['tipo' => ['El calendario es de clases: tu negocio agenda citas.']]);
         }
+        // Agendar cita: sus servicios, que abren la página para agendar (y pagar) sin cuenta.
+        if ($validado['tipo'] === 'agendar' && $estudio instanceof Estudio && $estudio->modalidad() !== ModalidadServicio::Citas) {
+            throw ValidationException::withMessages(['tipo' => ['Agendar cita es de negocios de citas: el tuyo es de clases.']]);
+        }
         $sucursal = $validado['filtros']['sucursal'] ?? null;
         if ($sucursal !== null && ! SucursalTenant::query()->where('ulid', $sucursal)->exists()) {
             throw ValidationException::withMessages(['filtros.sucursal' => ['Esa sucursal no existe.']]);

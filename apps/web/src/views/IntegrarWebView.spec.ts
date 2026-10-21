@@ -119,17 +119,24 @@ describe("integrar en mi web", () => {
     expect(codigo).toContain("/w/demo/w1");
   });
 
-  it("en citas solo hay planes: el calendario no se ofrece", async () => {
+  it("en citas se ofrece agendar cita y planes, no el calendario", async () => {
     sesion.esCitas = true;
     const w = montar();
     await flushPromises();
 
     await w.get('[data-prueba="nuevo-widget"]').trigger("click");
-    const calendario = w
-      .findAll('[data-prueba="editor-widget"] button')
-      .find((b) => b.text() === "Calendario de clases")!;
-    expect(calendario.attributes("disabled")).toBeDefined();
-    expect(w.text()).toContain("El calendario es para negocios de clases.");
+    const tipos = w
+      .get('[data-prueba="editor-widget"] .tu-segmentado')
+      .findAll("button")
+      .map((b) => b.text());
+    expect(tipos).toEqual(["Agendar cita", "Planes"]);
+    // Agendar cita, de entrada.
+    const agendar = w
+      .get('[data-prueba="editor-widget"] .tu-segmentado')
+      .findAll("button")
+      .find((b) => b.text() === "Agendar cita")!;
+    expect(agendar.attributes("aria-pressed")).toBe("true");
+    expect(w.text()).toContain("agenda (y paga, si lo pides) sin cuenta");
   });
 
   it("con la página del negocio oculta avisa que los widgets no se muestran", async () => {

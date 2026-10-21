@@ -5,9 +5,10 @@ import { i18n } from "@/i18n";
 import WidgetView from "./WidgetView.vue";
 
 /*
-| Un widget en la web del negocio (ADR 0141): los planes con su botón «Me interesa»,
-| que pide sus datos ahí mismo (el formulario de captación de siempre; no se compra
-| ahí); quien ya es cliente entra sin perder lo que eligió; y fuera de las webs
+| Un widget en la web del negocio (ADR 0141): termina en la reserva o la compra. En los
+| planes, «Lo quiero»: quien ya es cliente lo compra con su cuenta (otra pestaña, con el
+| plan elegido) y quien no, deja sus datos ahí mismo; en citas, cada servicio abre la
+| página para agendar con el servicio y la sede ya elegidos; fuera de las webs
 | registradas, no se muestra.
 */
 
@@ -79,17 +80,25 @@ beforeEach(() => {
 });
 
 describe("widget de planes", () => {
-  it("muestra los planes y «Me interesa» pide sus datos ahí mismo", async () => {
+  it("«Lo quiero»: el cliente lo compra con su cuenta y quien no, deja sus datos", async () => {
     const w = montar();
     await flushPromises();
 
     const planes = w.get('[data-prueba="widget-planes"]');
     expect(planes.text()).toContain("Paquete 8 clases");
     expect(planes.text()).toContain("$1,400.00");
-    // El botón dice lo que hace: no compra, deja sus datos.
-    expect(w.get('[data-prueba="lo-quiero"]').text()).toBe("Me interesa");
-    expect(planes.text()).not.toContain("Comprar");
+    expect(w.get('[data-prueba="lo-quiero"]').text()).toBe("Lo quiero");
     await w.get('[data-prueba="lo-quiero"]').trigger("click");
+    // Ya cliente: comprar con su cuenta, en otra pestaña y con el plan elegido.
+    const comprar = w.get('[data-prueba="widget-reservar-cuenta"]');
+    expect(comprar.text()).toBe("Ya soy cliente: comprar");
+    expect(comprar.attributes("target")).toBe("_blank");
+    expect(
+      new URL(comprar.attributes("href")!, "https://x.test").searchParams.get(
+        "volver",
+      ),
+    ).toBe(`/mi-cuenta?plan=${PLAN.id}`);
+    // Aún no cliente: sus datos para ese plan.
     expect(w.get('[data-prueba="formulario"]').text()).toBe(PLAN.id);
     expect(w.text()).toContain("Déjanos tus datos para Paquete 8 clases");
     // Con el color del negocio.
@@ -115,7 +124,7 @@ describe("widget de planes", () => {
     );
   });
 
-  it("sin formulario de captación, lleva a la página del negocio", async () => {
+  it("sin formulario de captación, va directo a comprar con su cuenta", async () => {
     api.get.mockImplementation((url: string) =>
       url.endsWith("/captacion")
         ? Promise.reject(new Error("404"))
@@ -127,11 +136,61 @@ describe("widget de planes", () => {
             },
           }),
     );
+    const abrir = vi.spyOn(window, "open").mockReturnValue(null);
     const w = montar();
     await flushPromises();
-    expect(w.get('[data-prueba="lo-quiero"]').text()).toBe(
-      "Ver en la página del negocio",
+    await w.get('[data-prueba="lo-quiero"]').trigger("click");
+    expect(abrir).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `volver=${encodeURIComponent(`/mi-cuenta?plan=${PLAN.id}`)}`,
+      ),
+      "_blank",
+      "noopener",
     );
+    abrir.mockRestore();
+  });
+
+  it("en citas, cada servicio abre la página para agendar con el servicio y la sede", async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/widgets/w1")
+            ? {
+                ...WIDGET,
+                tipo: "agendar",
+                modalidad: "citas",
+                filtros: { sucursal: "S1", actividad: null },
+              }
+            : url.endsWith("/citas/opciones")
+              ? {
+                  servicios: [
+                    {
+                      id: "O1",
+                      nombre: "Corte clásico",
+                      precio_minor: 25000,
+                      moneda: "MXN",
+                      duracion_minutos: 30,
+                      anticipo_minor: 10000,
+                    },
+                  ],
+                }
+              : { id: "f1" },
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    const servicios = w.get('[data-prueba="widget-servicios"]');
+    expect(servicios.text()).toContain("Corte clásico");
+    expect(servicios.text()).toContain("30 min");
+    expect(servicios.text()).toContain("$250.00");
+    expect(servicios.text()).toContain("Apartas con $100.00");
+    const agendar = w.get('[data-prueba="widget-agendar"]');
+    expect(agendar.attributes("href")).toBe(
+      "/agendar/demo?servicio=O1&sucursal=S1",
+    );
+    expect(agendar.attributes("target")).toBe("_blank");
   });
 
   it("en una web que no registró, no se muestra", async () => {

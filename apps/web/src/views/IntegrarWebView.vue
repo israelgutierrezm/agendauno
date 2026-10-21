@@ -13,6 +13,7 @@ import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
 import {
   rutaWidget,
+  tiposDeWidget,
   urlWidget,
   type TemaWidget,
   type TipoWidget,
@@ -132,7 +133,7 @@ async function nuevo(): Promise<void> {
   if (!(await puedeCambiar())) return;
   editando.value = null;
   Object.assign(form, {
-    tipo: sesion.esCitas ? "planes" : "calendario",
+    tipo: sesion.esCitas ? "agendar" : "calendario",
     nombre: "",
     sucursal: "",
     actividad: "",
@@ -407,23 +408,18 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           <legend class="tu-label">{{ $t("captacion.widgets.titulo") }}</legend>
           <div class="tu-segmentado w-full" role="group">
             <button
-              v-for="tipo in ['calendario', 'planes'] as const"
+              v-for="tipo in tiposDeWidget(sesion.esCitas === true)"
               :key="tipo"
               type="button"
               class="flex-1"
               :aria-pressed="form.tipo === tipo"
-              :disabled="tipo === 'calendario' && sesion.esCitas"
               @click="form.tipo = tipo"
             >
               {{ $t(`captacion.widgets.tipos.${tipo}`) }}
             </button>
           </div>
           <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{
-              sesion.esCitas
-                ? $t("captacion.widgets.soloClases")
-                : $t(`captacion.widgets.tiposAyuda.${form.tipo}`)
-            }}
+            {{ $t(`captacion.widgets.tiposAyuda.${form.tipo}`) }}
           </p>
         </fieldset>
         <label class="block">

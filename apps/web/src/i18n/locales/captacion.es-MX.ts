@@ -6,19 +6,22 @@ export default {
     nav: "Integrar en mi web",
     titulo: "Integrar en mi web",
     descripcion:
-      "Muestra tu calendario de clases o tus planes dentro de tu propia web. Quien visita te deja sus datos para pedir un lugar o un plan; quien ya es cliente entra a su cuenta para reservar o comprar.",
+      "Muestra tu calendario de clases, tus servicios para agendar o tus planes dentro de tu propia web. En citas, quien visita agenda y paga ahí mismo, sin cuenta; quien ya es cliente reserva o compra con su cuenta, y quien aún no lo es te deja sus datos.",
     nuevo: "Nuevo widget",
     vacio: "Aún no tienes widgets. Crea uno y copia su código en tu web.",
     tipos: {
       calendario: "Calendario de clases",
+      agendar: "Agendar cita",
       planes: "Planes",
     },
     tiposAyuda: {
       calendario:
-        "Fecha, actividad, instructor y lugares libres, con filtros por sucursal y actividad.",
-      planes: "Precio, vigencia, lo que incluye y sus restricciones.",
+        "Fecha, actividad, instructor y lugares libres, con filtros por sucursal y actividad. El cliente reserva con su cuenta.",
+      agendar:
+        "Tus servicios con su precio y duración: quien visita elige uno y agenda (y paga, si lo pides) sin cuenta.",
+      planes:
+        "Precio, vigencia, lo que incluye y sus restricciones. El cliente lo compra con su cuenta.",
     },
-    soloClases: "El calendario es para negocios de clases.",
     nombre: "Nombre (solo para ti)",
     filtros: "Filtros iniciales",
     sucursal: "Sucursal",
@@ -64,6 +67,14 @@ export default {
       // lo lleva a la página del negocio.
       meInteresa: "Me interesa",
       verEnPagina: "Ver en la página del negocio",
+      loQuiero: "Lo quiero",
+      reservarConCuenta: "Ya soy cliente: reservar",
+      comprarConCuenta: "Ya soy cliente: comprar",
+      agendar: "Agendar",
+      minutos: "{n} min",
+      anticipo: "Apartas con {monto}",
+      sinServicios: "Aún no hay servicios para agendar en línea.",
+      errorServicios: "No se pudieron cargar los servicios.",
       volver: "← Volver",
       pidiendo: "Déjanos tus datos para {etiqueta}",
       yaCuenta: "¿Ya tienes cuenta?",

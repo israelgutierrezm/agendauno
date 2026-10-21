@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property int $id
  * @property string $ulid
- * @property string $tipo calendario | planes
+ * @property string $tipo calendario (clases) | agendar (citas) | planes
  * @property string $nombre
  * @property array{sucursal?: string|null, actividad?: string|null}|null $filtros ulids
  * @property string $tema claro | oscuro | auto
@@ -26,7 +26,7 @@ class WidgetTenant extends Model
 {
     use HasPublicId;
 
-    public const TIPOS = ['calendario', 'planes'];
+    public const TIPOS = ['calendario', 'agendar', 'planes'];
 
     public const TEMAS = ['claro', 'oscuro', 'auto'];
 

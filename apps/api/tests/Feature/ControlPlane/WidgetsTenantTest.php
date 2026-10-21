@@ -57,7 +57,7 @@ it('se arma un calendario con sus filtros, tema, acento y webs; la web lo muestr
     $this->deleteJson("{$base}/captacion/widgets/{$planes}", [], conBearer($e['bearer']))->assertNoContent();
 });
 
-it('rechaza un acento, una web o una sucursal que no sirven, y el calendario en citas', function (): void {
+it('rechaza un acento, una web o una sucursal que no sirven, el calendario en citas y agendar en clases', function (): void {
     $e = estudioConSesion('estudio-widget', 'dueno@widget.mx');
     $base = "/api/v1/app/{$e['slug']}";
     $mal = fn (array $datos, string $campo) => $this->postJson("{$base}/captacion/widgets", ['tipo' => 'planes', 'nombre' => 'W', ...$datos], conBearer($e['bearer']))
@@ -67,10 +67,16 @@ it('rechaza un acento, una web o una sucursal que no sirven, y el calendario en 
     $mal(['dominios' => ['no es una web']], 'dominios.0');
     $mal(['filtros' => ['sucursal' => '01JZZZZZZZZZZZZZZZZZZZZZZZ']], 'filtros.sucursal');
 
+    $mal(['tipo' => 'agendar'], 'tipo');
+
     pasarNegocioACitas($e);
     $this->postJson("{$base}/captacion/widgets", ['tipo' => 'calendario', 'nombre' => 'Agenda'], conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonValidationErrors(['tipo'], 'meta.errors');
     $this->postJson("{$base}/captacion/widgets", ['tipo' => 'planes', 'nombre' => 'Bonos'], conBearer($e['bearer']))->assertCreated();
+    // En citas, sus servicios para agendar en su web.
+    $agendar = (string) $this->postJson("{$base}/captacion/widgets", ['tipo' => 'agendar', 'nombre' => 'Agenda en mi web'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.tipo', 'agendar')->json('data.id');
+    $this->getJson("{$base}/widgets/{$agendar}")->assertOk()->assertJsonPath('data.tipo', 'agendar')->assertJsonPath('data.modalidad', 'citas');
 });
 
 it('quien no gestiona prospectos no los arma', function (): void {

@@ -78,3 +78,20 @@ Antes de V1, ningún botón público promete algo que no hace:
   veía sin nada elegido, así que nunca llevaba el interés.
 - Que el widget termine en una reserva o una compra (no solo en un prospecto) queda para
   V1.1, junto con la inscripción inmediata.
+
+## Termina en la reserva o la compra (2026-10-21)
+
+Pedido del dueño: el widget termina en la reserva o la compra, no solo en un prospecto.
+Con el registro cerrado (ADR 0093) y sin poder pagar dentro de un iframe (las pasarelas
+no se dejan embeber), se resuelve así:
+
+- **Agendar cita** (tipo `agendar`, solo negocios de citas; el calendario sigue siendo
+  solo de clases): sus servicios con precio, duración y anticipo. Cada uno abre en otra
+  pestaña la página para agendar del negocio con el servicio y la sede ya elegidos
+  (`/agendar/{negocio}?servicio=&sucursal=`): quien visita agenda y paga ahí, sin cuenta.
+- **Calendario y planes**: el botón es «Lo quiero». Quien ya es cliente reserva o compra
+  con su cuenta («Ya soy cliente: reservar / comprar», otra pestaña con la clase o el
+  plan elegidos, ADR 0142); quien aún no lo es deja sus datos ahí mismo. Sin formulario
+  de captación, va directo a su cuenta.
+- En Captación → «Integrar en mi web», los tipos son los de la modalidad: clases
+  (calendario, planes) o citas (agendar cita, planes).
