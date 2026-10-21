@@ -94,5 +94,6 @@ export default {
       convertido: "Prospecto que pasó a ser alumno",
       sin_atender: "Prospecto sin atender",
     },
+    bandeja: { mensaje_recibido: "Mensaje nuevo en la bandeja" },
   },
 };

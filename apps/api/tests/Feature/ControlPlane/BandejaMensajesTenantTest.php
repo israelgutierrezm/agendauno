@@ -33,6 +33,7 @@ beforeEach(function (): void {
 afterEach(function (): void {
     app(GestorDeConexionTenant::class)->desconectar();
     File::deleteDirectory(storage_path('tenants'));
+    File::deleteDirectory(storage_path('framework/testing/fcm'));
 });
 
 /**
@@ -59,6 +60,9 @@ function fingirMetaBandeja(array &$llamadas): void
             str_ends_with($url, 'graph.instagram.com/v23.0/me') => Http::response(['user_id' => '1789', 'username' => 'estudio.cal']),
             str_ends_with($url, 'graph.instagram.com/v23.0/me/messages') => Http::response(['recipient_id' => '555', 'message_id' => 'm_salida']),
             str_ends_with($url, 'graph.instagram.com/v23.0/555') => Http::response(['name' => 'Ana Instagram']),
+            // Los avisos push al equipo (FCM).
+            str_contains($url, 'oauth2.googleapis.com/token') => Http::response(['access_token' => 'ya29.prueba', 'expires_in' => 3599]),
+            str_contains($url, 'fcm.googleapis.com') => Http::response(['name' => 'projects/agendauno-prueba/messages/1']),
             default => Http::response(['error' => ['message' => 'no esperado: '.$url]], 500),
         };
     });
@@ -277,4 +281,47 @@ it('sin la app de Meta configurada no se ofrece', function (): void {
     $this->postJson("/api/v1/app/{$e['slug']}/bandeja/canales/instagram/conectar", [], conBearer($e['bearer']))->assertUnprocessable();
     $this->get('/api/v1/webhooks/instagram?hub.mode=subscribe&hub.verify_token=verificar-bandeja&hub.challenge=reto')->assertOk()->assertSee('reto');
     $this->get('/api/v1/webhooks/instagram?hub.mode=subscribe&hub.verify_token=otro&hub.challenge=reto')->assertForbidden();
+});
+
+/**
+ * Los avisos push que salieron (relay del outbox y envío de mensajes).
+ *
+ * @param  list<array{metodo: string, url: string, cuerpo: array<mixed>}>  $llamadas
+ * @return list<array<string, mixed>>
+ */
+function pushesDeBandeja(array &$llamadas): array
+{
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+
+    return collect($llamadas)->filter(fn (array $l): bool => str_contains($l['url'], 'fcm.googleapis.com'))
+        ->map(fn (array $l): array => (array) $l['cuerpo']['message'])->values()->all();
+}
+
+// ADR 0200 (ajuste del 2026-10-21): quien atiende la bandeja se entera en su teléfono.
+it('avisa por push a quien atiende la bandeja con el primer mensaje sin leer, sin su número ni lo que escribió', function (): void {
+    cuentaDeServicioFcmDePrueba();
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/dispositivos", ['token' => 'token-duena', 'plataforma' => 'ios'], conBearer($e['bearer']))->assertCreated();
+    // Quien imparte no atiende la bandeja: no le llega.
+    $coach = personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/dispositivos", ['token' => 'token-coach', 'plataforma' => 'android'], conBearer($coach))->assertCreated();
+    conectarWhatsAppDeBandeja($e);
+
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.p1', 'Hola, ¿cuánto cuesta?'))->assertOk();
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.p2', '¿Sigues ahí?'))->assertOk();
+
+    $avisos = pushesDeBandeja($llamadas);
+    expect($avisos)->toHaveCount(1)
+        ->and($avisos[0]['token'])->toBe('token-duena')
+        ->and($avisos[0]['notification'])->toBe(['title' => 'Mensaje nuevo por WhatsApp', 'body' => 'Lucía te escribió. Contéstale en Mensajes.']);
+    expect((string) json_encode($avisos))->not->toContain('5511112222')->not->toContain('cuánto cuesta');
+
+    // Leída la conversación, el siguiente mensaje vuelve a avisar.
+    $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones", conBearer($e['bearer']))->json('data.0.id');
+    $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}", conBearer($e['bearer']))->assertOk();
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.p3', 'Gracias'))->assertOk();
+    expect(pushesDeBandeja($llamadas))->toHaveCount(2);
 });

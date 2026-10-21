@@ -53,6 +53,8 @@ class EventoDeDominioTenant
         'prospecto.creado',
         'prospecto.convertido',
         'prospecto.sin_atender',
+        // Alguien escribió a la bandeja (ADR 0200): una vez hasta que se lea.
+        'bandeja.mensaje_recibido',
     ];
 
     /**

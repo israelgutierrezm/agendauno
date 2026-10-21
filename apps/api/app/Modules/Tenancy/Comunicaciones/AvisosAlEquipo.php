@@ -32,6 +32,8 @@ final class AvisosAlEquipo
         'prospecto.creado' => 'prospectos.ver',
         // Nadie lo atendió a tiempo: a quien puede reasignarlo (ADR 0138).
         'prospecto.sin_atender' => 'prospectos.gestionar',
+        // Le escribieron al negocio por WhatsApp, Instagram o Messenger (ADR 0200).
+        'bandeja.mensaje_recibido' => 'mensajes.atender',
     ];
 
     /**

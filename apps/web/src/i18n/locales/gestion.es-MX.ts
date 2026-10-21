@@ -154,6 +154,7 @@ export const conexiones = {
         convertido: "Prospecto convertido en cliente",
         sin_atender: "Prospecto sin atender",
       },
+      bandeja: { mensaje_recibido: "Mensaje nuevo en la bandeja" },
     },
   },
 };

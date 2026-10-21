@@ -58,8 +58,19 @@ negocio (ADR 0190) y la bandeja después.
   para los negocios.
 - La CSP permite los marcos de facebook.com que usa el registro insertado.
 - Pendiente:
-  - avisos push al equipo cuando llega un mensaje;
+  - ~~avisos push al equipo cuando llega un mensaje~~ (hecho, ver el ajuste);
   - mandar y ver archivos;
   - contestar fuera de las 24 horas con plantillas del número del negocio;
   - Facebook Messenger.
 - Sin validar con Meta: probado con respuestas simuladas.
+
+## Ajuste (2026-10-21)
+
+- **Aviso push al equipo**: el evento `bandeja.mensaje_recibido` le llega a quien tiene
+  `mensajes.atender` (`AvisosAlEquipo`) con la plantilla push de fábrica, que llega
+  activa: «Mensaje nuevo por WhatsApp», «Lucía te escribió. Contéstale en Mensajes.».
+  - Sale una vez por conversación, con el primer mensaje sin leer; una ráfaga no
+    manda un aviso por mensaje. Leída la conversación, el siguiente vuelve a avisar.
+  - Dice el canal y el nombre con que escribió (o «Alguien»), nunca su número ni lo
+    que escribió.
+  - Se puede apagar o cambiar en Comunicación → Automáticos.

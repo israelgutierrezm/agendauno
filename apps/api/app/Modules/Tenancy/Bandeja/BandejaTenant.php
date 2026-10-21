@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Bandeja;
 
+use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CanalMensajeria;
 use App\Modules\Tenancy\Models\ConversacionTenant;
@@ -41,9 +42,13 @@ class BandejaTenant
 
     private const VIGENCIA_ESTADO_MIN = 15;
 
+    /** Cómo se llama cada canal en un aviso al equipo. */
+    private const NOMBRES = [CanalMensajeria::WHATSAPP => 'WhatsApp', CanalMensajeria::INSTAGRAM => 'Instagram'];
+
     public function __construct(
         private readonly ClienteMetaBandeja $meta,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly RegistrarEventoTenant $eventos,
     ) {}
 
     public function canal(Estudio $estudio, string $canal): ?CanalMensajeria
@@ -341,6 +346,15 @@ class BandejaTenant
                     'enviado_en' => $cuando,
                 ]);
                 $fila = ConversacionTenant::query()->whereKey($conversacion->getKey())->lockForUpdate()->firstOrFail();
+                // Aviso al equipo (push) solo con el primer mensaje sin leer: una ráfaga
+                // no manda uno por mensaje. Con quién escribió, sin su número ni su texto.
+                if ((int) $fila->no_leidos === 0) {
+                    $this->eventos->registrar('bandeja.mensaje_recibido', 'conversacion', (string) $fila->ulid, [
+                        'conversacion_id' => (string) $fila->ulid,
+                        'canal' => self::NOMBRES[$fila->canal] ?? $fila->canal,
+                        'contacto' => $fila->contacto_nombre !== null && $fila->contacto_nombre !== '' ? $fila->contacto_nombre : 'Alguien',
+                    ]);
+                }
                 $fila->forceFill([
                     'estado' => ConversacionTenant::ABIERTA,
                     'no_leidos' => $fila->no_leidos + 1,
