@@ -277,7 +277,7 @@ class OrdenesTenantController
 
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
-        $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor, $this->sucursalDeCaja($validado['sucursal_id'] ?? null, $actor), $partes);
+        $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor, $this->sucursalDeCaja($validado['sucursal_id'] ?? null, $actor), $partes, conDescuentoContado: true);
 
         $this->registrarCobro($pago, $orden, $actor, $validado['metodo'], $partes, $validado['referencia'] ?? null);
 

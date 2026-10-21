@@ -36,3 +36,14 @@ transferencia, porque la terminal cobra comisión. El comparativo lo dejó como 
 - Se redondea a favor del cliente: el descuento se trunca a centavos.
 - El descuento se calcula sobre todo lo que lleva la orden, cuotas incluidas. Si un
   negocio quiere precios distintos por producto, hace falta otra regla.
+
+## Ajuste (2026-10-21)
+
+- El descuento se aplicaba también al cobrar una cita (`POST /reservas/{r}/cobro`) y
+  en «vender y cobrar» (`POST /ordenes` con `liquidar`). Ninguna de esas pantallas lo
+  mostraba, así que el ticket, el cambio y la caja no cuadraban. Ahora solo lo aplica
+  `POST /ordenes/{orden}/liquidar` (`liquidar(..., conDescuentoContado: true)`).
+- Anular un cobro de contado devuelve la orden a su precio y quita el descuento. Si se
+  cobra otra vez de contado, se vuelve a descontar.
+- Corregir un cobro de contado a una forma que no es de contado (tarjeta, ventanilla)
+  se rechaza: cambiaría el precio. Se anula y se cobra de nuevo.

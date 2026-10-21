@@ -164,3 +164,78 @@ it('una orden se liquida en caja con varias formas que suman su total', function
     expect(esperadoEnCajaMixta($c))->toMatchArray(['efectivo' => 40000, 'transferencia' => 49900]);
     expect(corteMixto($c)['por_metodo'])->toBe(['Efectivo' => 40000, 'Transferencia SPEI' => 49900]);
 });
+
+/**
+ * Agenda una cita mañana a las 11:00 en la barbería con caja.
+ *
+ * @param  array{e: array{slug: string, bearer: string}, base: string, sede: array{oferta: string, sucursal: string}, pro: string}  $c
+ * @return array<string, mixed>
+ */
+function citaEnCajaMixta(array $c, string $nombre = 'Ana', string $hora = '11:00:00'): array
+{
+    return (array) test()->postJson("{$c['base']}/agenda/citas", [
+        'persona_id' => crearMiembroTenant($c['e'], $nombre), 'oferta_id' => $c['sede']['oferta'],
+        'sucursal_id' => $c['sede']['sucursal'], 'instructor_id' => $c['pro'],
+        'inicia_en_local' => now('America/Mexico_City')->addDay()->format('Y-m-d').' '.$hora,
+    ], conBearer($c['e']['bearer']))->assertCreated()->json('data.cita');
+}
+
+it('la cita cobrada en efectivo no lleva el descuento de contado: ticket, pago y caja dicen lo mismo', function (): void {
+    $c = barberiaConCajaMixta();
+    $this->putJson("{$c['base']}/parametros", ['valores' => ['ventas.descuento_contado_pct' => 10]], conBearer($c['e']['bearer']))->assertOk();
+    $cita = citaEnCajaMixta($c);
+
+    $datos = $this->postJson("{$c['base']}/reservas/{$cita['reserva_id']}/cobro", [
+        'metodo' => 'efectivo', 'recibido_minor' => 25000, 'clave_intento' => 'contado-1',
+    ], conBearer($c['e']['bearer']))->assertCreated()->json('data');
+    $pago = $this->getJson("{$c['base']}/pagos", conBearer($c['e']['bearer']))->json('data.0');
+    expect($datos['total_minor'])->toBe(25000)
+        ->and($datos['cambio_minor'])->toBe(0)
+        ->and($pago['monto_minor'])->toBe(25000)
+        ->and(esperadoEnCajaMixta($c)['efectivo'])->toBe(25000);
+});
+
+it('anular o corregir la venta de una cita con solo propina también la ajusta en la caja', function (): void {
+    $c = barberiaConCajaMixta();
+    $this->putJson("{$c['base']}/parametros", ['valores' => ['pagos.permitir_anular_cobro' => 1]], conBearer($c['e']['bearer']))->assertOk();
+    $cobrar = function (string $clave, string $hora) use ($c): string {
+        $cita = citaEnCajaMixta($c, 'Cliente '.$clave, $hora);
+
+        return (string) $this->postJson("{$c['base']}/reservas/{$cita['reserva_id']}/cobro", [
+            'metodo' => 'efectivo', 'propina_minor' => 3000, 'recibido_minor' => 28000, 'clave_intento' => $clave,
+        ], conBearer($c['e']['bearer']))->assertCreated()->json('data.venta_id');
+    };
+
+    // Servicio $250 + propina $30 en efectivo; anular la venta saca la propina.
+    $venta = $cobrar('propina-1', '11:00:00');
+    expect(esperadoEnCajaMixta($c)['efectivo'])->toBe(28000);
+    $this->postJson("{$c['base']}/pos/ventas/{$venta}/anular", ['motivo' => 'Error'], conBearer($c['e']['bearer']))->assertOk();
+    expect(esperadoEnCajaMixta($c)['efectivo'])->toBe(25000);
+
+    // Corregir la forma de otra: la propina pasa del efectivo a la tarjeta.
+    $otra = $cobrar('propina-2', '12:00:00');
+    $this->putJson("{$c['base']}/pos/ventas/{$otra}/metodo", ['metodo' => 'tarjeta', 'motivo' => 'Pagó con tarjeta'], conBearer($c['e']['bearer']))->assertOk();
+    expect(esperadoEnCajaMixta($c))->toMatchArray(['efectivo' => 50000, 'tarjeta' => 3000]);
+});
+
+it('de la venta de una cita se devuelve por la forma con que se cobraron los productos', function (): void {
+    $c = barberiaConCajaMixta();
+    $cita = citaEnCajaMixta($c, 'Israel');
+    // Corte $250 + 2 ceras $100 + propina $30 = $380: efectivo $200 y tarjeta $180.
+    // Lo de la venta (ceras y propina) queda todo con tarjeta.
+    $venta = (string) $this->postJson("{$c['base']}/reservas/{$cita['reserva_id']}/cobro", [
+        'metodo' => 'efectivo', 'items' => [['articulo_id' => $c['cera'], 'cantidad' => 2]], 'propina_minor' => 3000,
+        'recibido_minor' => 20000, 'clave_intento' => 'cita-devolver-1',
+        'partes' => [['metodo' => 'efectivo', 'monto_minor' => 20000], ['metodo' => 'tarjeta', 'monto_minor' => 18000]],
+    ], conBearer($c['e']['bearer']))->assertCreated()->json('data.venta_id');
+
+    $lista = collect($this->getJson("{$c['base']}/pos/ventas", conBearer($c['e']['bearer']))->json('data'))->firstWhere('id', $venta);
+    expect($lista['partes_devolucion'])->toBe([['metodo' => 'tarjeta', 'monto_minor' => 10000]]);
+    $devolver = fn (array $extra) => $this->postJson("{$c['base']}/pos/ventas/{$venta}/devoluciones", [
+        'lineas' => [['id' => $lista['lineas'][0]['id'], 'cantidad' => 1]], 'motivo' => 'No la quiso', ...$extra,
+    ], conBearer($c['e']['bearer']));
+    // Por efectivo no entró nada de los productos: no sale por ahí en silencio.
+    $devolver(['metodo' => 'efectivo'])->assertUnprocessable();
+    $devolver([])->assertCreated()->assertJsonPath('devolucion.partes', [['metodo' => 'tarjeta', 'monto_minor' => 5000]]);
+    expect(esperadoEnCajaMixta($c))->toMatchArray(['efectivo' => 20000, 'tarjeta' => 18000 - 5000]);
+});

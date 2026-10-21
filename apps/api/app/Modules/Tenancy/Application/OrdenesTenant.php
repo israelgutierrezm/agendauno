@@ -236,8 +236,11 @@ class OrdenesTenant
      */
     /**
      * @param  list<array{metodo: string, monto_minor: int}>|null  $partes  con varias formas (ADR 0177): suman el total
+     * @param  bool  $conDescuentoContado  solo el cobro en caja de una orden (`POST /ordenes/{orden}/liquidar`,
+     *                                     ADR 0191), donde la pantalla lo muestra antes de cobrar. El cobro de una
+     *                                     cita y «vender y cobrar» cobran el precio que muestran.
      */
-    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null, ?int $sucursalCaja = null, ?array $partes = null, ?string $idempotencyKey = null): ?PagoTenant
+    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null, ?int $sucursalCaja = null, ?array $partes = null, ?string $idempotencyKey = null, bool $conDescuentoContado = false): ?PagoTenant
     {
         $orden->refresh();
         if ($orden->estado === EstadoOrden::Pagada) {
@@ -247,8 +250,10 @@ class OrdenesTenant
             throw new OrdenNoLiquidable('La orden no admite liquidacion.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja, $partes, $idempotencyKey): PagoTenant {
-            $this->aplicarDescuentoContado($orden, $metodo, $partes);
+        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor, $sucursalCaja, $partes, $idempotencyKey, $conDescuentoContado): PagoTenant {
+            if ($conDescuentoContado) {
+                $this->aplicarDescuentoContado($orden, $metodo, $partes);
+            }
             $pago = $this->cobrar->ejecutar($orden, 'manual', $partes !== null ? MetodoPago::Mixto : self::metodoDeCaja($metodo), $idempotencyKey, null, $actor, $sucursalCaja, $partes);
             $orden->update(['metodo_pago' => $partes !== null ? PartesCobro::MIXTO : $metodo, 'referencia_pago' => $referencia]);
 

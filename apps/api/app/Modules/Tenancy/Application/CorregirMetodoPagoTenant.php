@@ -83,6 +83,10 @@ class CorregirMetodoPagoTenant
             if ($antes === $metodo) {
                 return $bloqueado;
             }
+            // Con precio de contado (ADR 0191), pasarlo a la terminal cambiaría el precio.
+            if ((int) $orden->descuento_contado_minor > 0 && ! in_array($metodo, OrdenesTenant::METODOS_CONTADO, true)) {
+                throw new CobroNoCorregible('Se cobró con el precio de contado: anúlalo y cóbralo de nuevo con la otra forma de pago.');
+            }
 
             // En la caja abierta de hoy (ADR 0175): sale de una forma de pago y entra en otra.
             $anterior = CajasTenant::metodoDelPago($bloqueado);

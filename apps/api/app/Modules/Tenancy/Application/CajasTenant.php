@@ -211,13 +211,15 @@ class CajasTenant
     }
 
     /**
-     * Igual, para una venta del mostrador: solo si entró por una caja.
+     * Igual, para una venta del mostrador: solo si entró por una caja. La de una cita
+     * con solo propina no tiene renglón de venta (el servicio entra por su cobro): la
+     * propina basta para saber que pasó por la caja.
      */
     public function turnoParaAjusteDeLaVenta(VentaPosTenant $venta): ?TurnoCajaTenant
     {
         $entro = MovimientoCajaTenant::query()
             ->where('venta_pos_id', $venta->getKey())
-            ->where('tipo', MovimientoCajaTenant::VENTA)
+            ->whereIn('tipo', [MovimientoCajaTenant::VENTA, MovimientoCajaTenant::PROPINA])
             ->exists();
 
         return $entro ? $this->turnoParaMovimiento((int) $venta->sucursal_id) : null;

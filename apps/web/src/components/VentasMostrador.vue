@@ -52,6 +52,8 @@ interface Venta {
   metodo_pago: string;
   // Con varias formas (ADR 0177): cuánto con cada una.
   partes?: { metodo: string; monto_minor: number }[];
+  // Por qué formas entró lo vendido (sin servicio ni propina): de ahí sale una devolución.
+  partes_devolucion?: { metodo: string; monto_minor: number }[];
   creado_en: string | null;
   lineas?: LineaDevolvible[];
   // Devoluciones parciales (ADR 0178): cuánto salió y si aún se puede devolver.
@@ -455,7 +457,8 @@ onMounted(cargar);
                       id: v.id,
                       moneda: v.moneda,
                       lineas: v.lineas,
-                      partes: v.partes,
+                      // De lo vendido, no del servicio de una cita (ADR 0178).
+                      partes: v.partes_devolucion ?? v.partes,
                     }"
                     @devuelto="alDevolver"
                     @cerrar="devolviendo = null"

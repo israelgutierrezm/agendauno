@@ -29,6 +29,11 @@ afterEach(function (): void {
  */
 function indicesDemasiadoLargos(string $conexion): array
 {
+    // En MySQL (el CI) la propia migración ya falla con un nombre así.
+    if (DB::connection($conexion)->getDriverName() !== 'sqlite') {
+        return [];
+    }
+
     return DB::connection($conexion)->table('sqlite_master')
         ->where('type', 'index')
         ->whereNotLike('name', 'sqlite_autoindex%')

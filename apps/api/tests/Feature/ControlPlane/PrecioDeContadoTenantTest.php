@@ -83,3 +83,41 @@ it('de contado en caja baja el porcentaje del negocio, una vez; con tarjeta o di
     ], conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('data.total_minor', 89900);
 });
+
+it('anular un cobro de contado devuelve la orden a su precio; pasarlo a tarjeta pide anularlo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['ventas.descuento_contado_pct' => 10, 'pagos.permitir_anular_cobro' => 1]], conBearer($e['bearer']))->assertOk();
+    $orden = ordenParaContado($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.total_minor', 80910);
+    $pago = (string) $this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->json('data.0.id');
+
+    // A tarjeta cambiaría el precio: se pide anularlo y cobrarlo de nuevo.
+    $this->putJson("/api/v1/app/{$e['slug']}/pagos/{$pago}/metodo", ['metodo' => 'tarjeta', 'motivo' => 'Se equivocó'], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonPath('message', 'Se cobró con el precio de contado: anúlalo y cóbralo de nuevo con la otra forma de pago.');
+    // Entre formas de contado sí se corrige.
+    $this->putJson("/api/v1/app/{$e['slug']}/pagos/{$pago}/metodo", ['metodo' => 'transferencia', 'motivo' => 'Fue transferencia'], conBearer($e['bearer']))->assertOk();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pago}/anular", ['motivo' => 'Era tarjeta'], conBearer($e['bearer']))->assertOk();
+    $this->getJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.total_minor', 89900)
+        ->assertJsonPath('data.descuento_contado_minor', 0);
+    // Con tarjeta, el precio de lista.
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'tarjeta'], conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.total_minor', 89900)
+        ->assertJsonPath('data.descuento_contado_minor', 0);
+});
+
+it('vender y cobrar en un paso cobra el precio que muestra, sin el descuento de contado', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['ventas.descuento_contado_pct' => 10]], conBearer($e['bearer']))->assertOk();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
+        'comprador_id' => crearMiembroTenant($e, 'Ana'),
+        'items' => [['producto_id' => crearPackTenant($e), 'cantidad' => 1]],
+        'liquidar' => ['metodo' => 'efectivo'],
+    ], conBearer($e['bearer']))->assertCreated()
+        ->assertJsonPath('data.total_minor', 89900)
+        ->assertJsonPath('data.descuento_contado_minor', 0);
+    expect($this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->json('data.0.monto_minor'))->toBe(89900);
+});

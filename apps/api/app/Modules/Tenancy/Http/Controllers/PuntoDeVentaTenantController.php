@@ -407,6 +407,9 @@ class PuntoDeVentaTenantController
             'anulable' => $this->corregir->impedimentoAnular($venta) === null,
             // Devoluciones parciales (ADR 0178): cuánto salió y si aún se puede devolver.
             'devuelto_minor' => (int) $venta->devoluciones()->sum('monto_minor'),
+            // Por qué formas entró lo vendido (sin el servicio de una cita ni la propina):
+            // de ahí sale una devolución.
+            'partes_devolucion' => PartesCobro::repartir(CajasTenant::partesDeVenta($venta), [(int) $venta->total_minor, (int) $venta->propina_minor])[0],
             // Su factura, si ya se facturó (ADR 0179).
             'factura' => $venta->facturaTimbrada !== null
                 ? ['id' => $venta->facturaTimbrada->ulid, 'uuid' => $venta->facturaTimbrada->uuid]

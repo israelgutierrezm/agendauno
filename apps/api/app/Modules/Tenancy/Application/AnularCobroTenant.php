@@ -132,11 +132,17 @@ class AnularCobroTenant
             // Los artículos que salieron con el cobro vuelven a su sede (ADR 0166).
             $this->inventario->devolverDeOrden($orden, 'Cobro anulado '.$orden->ulid, $actor);
             $bloqueado->update(['estado' => EstadoPago::Anulado->value]);
+            // El precio de contado (ADR 0191) era de ese cobro: la orden vuelve a su precio
+            // y, si se cobra otra vez de contado, se vuelve a descontar.
+            $contado = (int) $orden->descuento_contado_minor;
             $orden->update([
                 'estado' => EstadoOrden::Pendiente->value,
                 'pagada_en' => null,
                 'metodo_pago' => null,
                 'referencia_pago' => null,
+                'total_minor' => (int) $orden->total_minor + $contado,
+                'descuento_minor' => max(0, (int) $orden->descuento_minor - $contado),
+                'descuento_contado_minor' => 0,
             ]);
             // El uso del código se contó al pagarse: anulado el cobro, se devuelve (si se
             // cobra otra vez, se vuelve a contar).

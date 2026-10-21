@@ -165,7 +165,14 @@ class DevolverVentaPosTenant
     private function formasDeSalida(VentaPosTenant $venta, int $monto, ?string $metodo): array
     {
         if ($venta->metodo_pago !== PartesCobro::MIXTO) {
-            return [['metodo' => CajasTenant::metodo($venta->metodo_pago), 'monto_minor' => $monto]];
+            $suya = CajasTenant::metodo($venta->metodo_pago);
+            // Una forma que no es la de lo vendido (p. ej. la que solo pagó el servicio de
+            // una cita) no se acepta en silencio: el dinero saldría por otra.
+            if ($metodo !== null && CajasTenant::metodo($metodo) !== $suya) {
+                throw new VentaNoDevolvible('Los productos de esta venta se cobraron con otra forma de pago: la devolución sale por ahí.');
+            }
+
+            return [['metodo' => $suya, 'monto_minor' => $monto]];
         }
         [$deVenta] = PartesCobro::repartir(CajasTenant::partesDeVenta($venta), [(int) $venta->total_minor, (int) $venta->propina_minor]);
         if ($metodo === null || collect($deVenta)->firstWhere('metodo', $metodo) === null) {
