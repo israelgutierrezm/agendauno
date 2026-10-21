@@ -190,9 +190,9 @@ it('TotalPass: con la llave de la sede registra su aviso y confirma cada check-i
     Http::fake([
         '*/partner/auth' => Http::response(['token' => 'jwt-de-la-sede'], 201),
         '*/partner/webhook/create' => Http::response(['status' => 'success', 'code' => 201], 201),
-        // Un check-in vencido no se confirma.
+        // Un check-in vencido no se confirma (el motivo viene en `errors[0].source`).
         '*/api/v1/webhook_confirmations/*' => fn (Request $r) => str_ends_with($r->url(), 'tok_vencido')
-            ? Http::response(['errors' => [['label' => 'check_in_expired_alert']]], 422)
+            ? Http::response(['errors' => [['status' => '422', 'title' => 'Validation Error', 'source' => ['message' => 'Tempo de check-in expirado!', 'label' => 'check_in_expired_alert']]]], 422)
             : Http::response('1', 200),
     ]);
 
@@ -205,27 +205,38 @@ it('TotalPass: con la llave de la sede registra su aviso y confirma cada check-i
     Http::assertSent(fn (Request $r): bool => str_ends_with($r->url(), '/partner/webhook/create')
         && $r['webhook_url'] === $url && $r['webhook_type'] === 'CHECKIN' && $r->hasHeader('Authorization', 'Bearer jwt-de-la-sede'));
 
+    // Como en su documentación: `type`, y un token en base64 que termina en «==».
+    $token = 'TXIefq1R0-w59n6XLaMhR425lS0olXdTSnQ0qJUNZpnF2GGyUWcjrw==';
     $this->postJson($url, [
-        'event' => 'CHECK_IN_CREATED',
+        'type' => 'CHECK_IN_CREATED',
         'check_in' => ['started_at' => now()->toIso8601String(), 'expires_at' => now()->addMinutes(30)->toIso8601String(), 'plan_code' => 'TP3'],
+        'place' => ['place' => '5e701467-4d80-40a4-b78a-00490a6feb9b', 'name' => 'Fluo', 'code' => 'G1'],
         'user' => ['name' => 'Luis Gómez', 'email' => 'luis@correo.mx', 'phone' => '5511112222', 'code' => 'TP-00042'],
         // La confirmación se arma con el host de TotalPass, no con el que venga aquí.
-        'endpoint' => 'https://otro-sitio.example/api/v1/webhook_confirmations/tok_abc123',
+        'endpoint' => 'https://otro-sitio.example/api/v1/webhook_confirmations/'.$token,
     ])->assertOk();
 
-    Http::assertSent(fn (Request $r): bool => $r->url() === 'https://admin.totalpass.com/api/v1/webhook_confirmations/tok_abc123');
+    Http::assertSent(fn (Request $r): bool => $r->url() === 'https://admin.totalpass.com/api/v1/webhook_confirmations/'.$token);
     Http::assertNotSent(fn (Request $r): bool => str_contains($r->url(), 'otro-sitio.example'));
     $visitas = $this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/checkins", conBearer($e['bearer']))->json('data');
     expect($visitas)->toHaveCount(1)
         ->and($visitas[0]['estado'])->toBe('validado')
         ->and($visitas[0]['usuario'])->toBe('Luis Gómez');
 
-    // Un check-in vencido no se registra.
-    $this->postJson($url, ['event' => 'CHECK_IN_CREATED', 'user' => ['code' => 'TP-7'], 'endpoint' => 'https://x/api/v1/webhook_confirmations/tok_vencido'])->assertOk();
+    // Un check-in vencido no se registra, ni sus datos.
+    $this->postJson($url, ['event' => 'CHECK_IN_CREATED', 'user' => ['code' => 'TP-7', 'name' => 'Otro Nombre'], 'endpoint' => 'https://x/api/v1/webhook_confirmations/tok_vencido'])->assertOk();
     $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
     $resultado = app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => EventoPlataformaTenant::query()->latest('id')->first());
     expect($resultado?->estado)->toBe('descartado')
-        ->and((string) $resultado?->resultado)->toContain('venció');
+        ->and((string) $resultado?->resultado)->toContain('venció')
+        ->and(collect($this->getJson("/api/v1/app/{$e['slug']}/visitantes-plataforma?proveedor=totalpass", conBearer($e['bearer']))->json('data'))->pluck('id_externo')->all())
+        ->toBe(['TP-00042']);
+
+    // El aviso de otro gimnasio de TotalPass no se atiende.
+    $this->postJson($url, ['type' => 'CHECK_IN_CREATED', 'place' => ['code' => 'OTRO'], 'user' => ['code' => 'TP-9'], 'endpoint' => 'https://x/api/v1/webhook_confirmations/tok_otro'])->assertOk();
+    $otro = app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => EventoPlataformaTenant::query()->latest('id')->first());
+    expect([$otro?->estado, $otro?->resultado])->toBe(['descartado', 'El aviso es de otro gimnasio de TotalPass.']);
+    Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), 'tok_otro'));
 });
 
 it('los visitantes se ven en Reportes, aparte de los alumnos; si el negocio lo registra, se dice que ya es alumno', function (): void {

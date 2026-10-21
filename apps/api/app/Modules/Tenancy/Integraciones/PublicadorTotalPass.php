@@ -20,8 +20,12 @@ use Illuminate\Support\Str;
  * ocurrencia.
  *
  * - Lugares: TotalPass muestra los que se le dan para sus usuarios (`slots`) menos los
- *   que ya reservaron. Se le da lo que aún puede tomar más lo que ya ocupan sus
- *   visitantes (nunca menos de lo reservado).
+ *   que ya reservaron en su app. Se le da lo que aún puede tomar más sus reservas vivas
+ *   (nunca menos de lo reservado allá).
+ * - Ventana: abre los días por adelantado del negocio antes de la clase y cierra con el
+ *   cierre de reservas; TotalPass no acepta fechas pasadas, así que al mandarla lo que
+ *   ya pasó se cuenta desde ahora. Lo que se compara para saber si cambió es la ventana
+ *   del negocio, no la hora en que se mandó.
  * - Horas en la zona de la Ciudad de México (`es-MX`), en su formato («03:00 PM»).
  * - La fecha, la hora y el plan no se cambian en una ocurrencia: si cambian, se retira y
  *   se publica de nuevo. El instructor, la duración y la ventana sí se cambian en su lugar.
@@ -30,6 +34,9 @@ class PublicadorTotalPass implements PublicadorPlataforma
 {
     /** La zona de `es-MX` en TotalPass. */
     private const ZONA = 'America/Mexico_City';
+
+    /** Sus fechas con hora: «2026-10-02 07:59 AM». */
+    private const FORMATO = 'Y-m-d h:i A';
 
     public function __construct(
         private readonly ClienteTotalPassReservas $cliente,
@@ -54,6 +61,13 @@ class PublicadorTotalPass implements PublicadorPlataforma
         return null;
     }
 
+    public function dejarDeRecibir(IntegracionTenant $integracion): void
+    {
+        $this->cliente->quitarAvisos($integracion->llaves()['place_api_key'] ?? '');
+        $integracion->reservas_registradas_en = null;
+        $integracion->save();
+    }
+
     public function prepararClase(PublicacionPlataformaTenant $publicacion, array $credenciales): ?string
     {
         return (string) $publicacion->producto_externo === '' ? 'Elige el plan de TotalPass con que se ofrece la clase.' : null;
@@ -75,6 +89,7 @@ class PublicadorTotalPass implements PublicadorPlataforma
         $dias = $this->parametros->entero('reservas.dias_apertura');
         $cierre = max(1, $this->parametros->entero('reservas.minutos_cierre'));
         $horas = max(0, $this->politicas->paraSesion($sesion)->horasLimite);
+        $formato = self::FORMATO;
 
         return [
             'title' => Str::limit($titulo !== '' ? $titulo : 'Clase', 120, ''),
@@ -88,12 +103,42 @@ class PublicadorTotalPass implements PublicadorPlataforma
             'status' => 'ACTIVE',
             'externalReference' => (string) $sesion->getAttribute('ulid'),
             'bookingWindow' => [
-                // «En cuanto se programa» (0 días) es lo más que deja abrir el negocio.
-                'minTimeToBook' => $inicio->subDays($dias > 0 ? $dias : 60)->format('Y-m-d h:i A'),
-                'maxTimeToBook' => $inicio->subMinutes($cierre)->format('Y-m-d h:i A'),
+                // «En cuanto se programa» (0 días): abre desde que se publica.
+                'minTimeToBook' => $dias > 0 ? $inicio->subDays($dias)->format($formato) : null,
+                'maxTimeToBook' => $inicio->subMinutes($cierre)->format($formato),
             ],
-            'maxTimeToCancel' => $inicio->subHours($horas)->format('Y-m-d h:i A'),
+            'maxTimeToCancel' => $inicio->subHours($horas)->format($formato),
         ];
+    }
+
+    /**
+     * Lo que se manda: la ventana sin fechas pasadas (TotalPass las rechaza). Si las
+     * reservas ya cerraron, no se manda ventana (TotalPass conserva la que tenía).
+     *
+     * @param  array<string, mixed>  $horario
+     * @return array<string, mixed>
+     */
+    private static function paraMandar(array $horario): array
+    {
+        $ahora = CarbonImmutable::now(self::ZONA)->addMinute()->startOfMinute();
+        $leer = static fn (mixed $valor): ?CarbonImmutable => is_string($valor) && $valor !== ''
+            ? CarbonImmutable::createFromFormat(self::FORMATO, $valor, self::ZONA) ?: null
+            : null;
+        $ventana = (array) ($horario['bookingWindow'] ?? []);
+        $abre = $leer($ventana['minTimeToBook'] ?? null);
+        $cierra = $leer($ventana['maxTimeToBook'] ?? null);
+        $abre = $abre === null || $abre->lessThan($ahora) ? $ahora : $abre;
+        if ($cierra === null || ! $abre->lessThan($cierra)) {
+            unset($horario['bookingWindow']);
+        } else {
+            $horario['bookingWindow'] = ['minTimeToBook' => $abre->format(self::FORMATO), 'maxTimeToBook' => $cierra->format(self::FORMATO)];
+        }
+        $cancelar = $leer($horario['maxTimeToCancel'] ?? null);
+        if ($cancelar !== null && $cancelar->lessThan($ahora)) {
+            $horario['maxTimeToCancel'] = $ahora->format(self::FORMATO);
+        }
+
+        return $horario;
     }
 
     /** Lo que no se cambia en una ocurrencia: su fecha, su hora y su plan. */
@@ -110,7 +155,7 @@ class PublicadorTotalPass implements PublicadorPlataforma
     public function crear(PublicacionPlataformaTenant $publicacion, array $horario, LugaresDeHorario $lugares, array $credenciales): ResultadoPlataforma
     {
         return $this->cliente->crearOcurrencia($credenciales['place_api_key'] ?? '', [
-            ...$horario,
+            ...self::paraMandar($horario),
             'slots' => $this->numeros($lugares)[0],
         ]);
     }
@@ -127,8 +172,8 @@ class PublicadorTotalPass implements PublicadorPlataforma
 
             return $this->crear($publicacion, $horario, $lugares, $credenciales);
         }
-        $cambio = $this->cliente->actualizarOcurrencia($llave, (string) $publicado->id_externo, array_intersect_key($horario, array_flip([
-            'title', 'responsible', 'duration', 'description', 'externalReference', 'bookingWindow',
+        $cambio = $this->cliente->actualizarOcurrencia($llave, (string) $publicado->id_externo, array_intersect_key(self::paraMandar($horario), array_flip([
+            'title', 'responsible', 'duration', 'description', 'externalReference', 'bookingWindow', 'maxTimeToCancel',
         ])));
         if (! $cambio->ok) {
             return $cambio;

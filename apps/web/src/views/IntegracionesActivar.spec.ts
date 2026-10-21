@@ -105,6 +105,23 @@ describe("integraciones: activar solo con sus llaves", () => {
     w.unmount();
   });
 
+  it("con un grupo de llaves que también basta (TotalPass: la de su sede) se puede encender", async () => {
+    responder({
+      ...WELLHUB,
+      proveedor: "totalpass",
+      llaves: ["api_key", "codigo_gimnasio", "codigo_plan", "place_api_key"],
+      llaves_obligatorias: ["api_key", "codigo_gimnasio"],
+      llaves_alternativas: [["place_api_key"]],
+    } as typeof WELLHUB);
+    const w = await montar();
+    const interruptor = w.get('[data-prueba="activa-totalpass"]');
+    expect(interruptor.attributes("disabled")).toBeDefined();
+
+    await w.get("#totalpass-place_api_key").setValue("llave-de-la-sede");
+    expect(interruptor.attributes("disabled")).toBeUndefined();
+    w.unmount();
+  });
+
   it("marca las llaves que la API rechazó", async () => {
     api.put.mockRejectedValue(new Error("422"));
     campos.lista = ["activa", "credenciales.gym_id"];

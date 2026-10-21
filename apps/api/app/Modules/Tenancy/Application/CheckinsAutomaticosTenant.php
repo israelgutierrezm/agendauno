@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -44,9 +45,6 @@ use Illuminate\Support\Str;
  */
 class CheckinsAutomaticosTenant
 {
-    /** Intentos de validar un aviso antes de darlo por no verificable. */
-    private const MAX_INTENTOS = AvisosPlataformaTenant::MAX_INTENTOS;
-
     /** Cuánto dura el check-in en la app de Wellhub. */
     private const MINUTOS_WELLHUB = 20;
 
@@ -113,6 +111,15 @@ class CheckinsAutomaticosTenant
     private function totalPass(EventoPlataformaTenant $evento): void
     {
         $datos = $evento->payload;
+        $credenciales = $this->registro->credenciales(ProveedorPartner::TotalPass->value);
+        // Sus avisos no van firmados: el de otro gimnasio no se atiende.
+        $gimnasio = trim((string) Arr::get($datos, 'place.code', ''));
+        $propio = trim((string) ($credenciales['codigo_gimnasio'] ?? ''));
+        if ($gimnasio !== '' && $propio !== '' && strcasecmp($gimnasio, $propio) !== 0) {
+            $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'El aviso es de otro gimnasio de TotalPass.');
+
+            return;
+        }
         $token = (string) self::tokenTotalPass($datos);
         $cuando = self::momento(Arr::get($datos, 'check_in.started_at'), $evento);
         $vence = Arr::get($datos, 'check_in.expires_at');
@@ -122,15 +129,16 @@ class CheckinsAutomaticosTenant
 
         $usuario = (array) Arr::get($datos, 'user', []);
         $codigo = trim((string) ($usuario['code'] ?? ''));
-        $visitante = $codigo === '' ? null : $this->visitantes->registrar(ProveedorPartner::TotalPass->value, $codigo, [
+        // Sus datos se guardan solo si TotalPass confirma el check-in (o si al final no se
+        // pudo verificar): un aviso falso no cambia el nombre de nadie.
+        $visitante = $codigo === '' ? null : fn (): VisitantePlataformaTenant => $this->visitantes->registrar(ProveedorPartner::TotalPass->value, $codigo, [
             'nombre' => $usuario['name'] ?? trim(($usuario['first_name'] ?? '').' '.($usuario['last_name'] ?? '')),
             'email' => $usuario['email'] ?? null,
             'telefono' => $usuario['phone'] ?? ($usuario['phone_number'] ?? null),
             'producto' => Arr::get($datos, 'check_in.plan_code'),
         ], $cuando);
 
-        $llave = $this->registro->credenciales(ProveedorPartner::TotalPass->value)['place_api_key'] ?? '';
-        $resultado = $this->totalpass->confirmar($llave, $token, 'totalpass:checkin:'.substr(hash('sha256', $token), 0, 40));
+        $resultado = $this->totalpass->confirmar($credenciales['place_api_key'] ?? '', $token, 'totalpass:checkin:'.substr(hash('sha256', $token), 0, 40));
         $this->asentar($evento, ProveedorPartner::TotalPass, $resultado, $visitante, $cuando, $limite);
     }
 
@@ -143,19 +151,17 @@ class CheckinsAutomaticosTenant
         EventoPlataformaTenant $evento,
         ProveedorPartner $proveedor,
         ResultadoCheckin $resultado,
-        ?VisitantePlataformaTenant $visitante,
+        VisitantePlataformaTenant|Closure|null $visitante,
         CarbonImmutable $cuando,
         CarbonInterface $limite,
         ?SesionTenant $sesion = null,
     ): void {
+        $quien = fn (): ?VisitantePlataformaTenant => $visitante instanceof Closure ? $visitante() : $visitante;
         if ($resultado->valido) {
+            $visitante = $quien();
             $previo = CheckinTenant::query()->where('referencia_externa', $resultado->referencia)->first();
             if ($previo instanceof CheckinTenant) {
-                // Recepción ya la registró a mano: es la misma visita.
-                if ($previo->visitante_id === null && $visitante instanceof VisitantePlataformaTenant) {
-                    $previo->visitante_id = (int) $visitante->getKey();
-                    $previo->save();
-                }
+                $this->completarPrevia($previo, $visitante, $sesion);
             } else {
                 $this->registrarVisita($proveedor, CheckinTenant::VALIDADO, $resultado->referencia, $visitante, $cuando, null, $sesion);
             }
@@ -170,14 +176,16 @@ class CheckinsAutomaticosTenant
             return;
         }
 
+        // Se reintenta mientras el check-in siga vigente, cada vez más espaciado
+        // ({@see AvisosPlataformaTenant::procesarPendientes}).
         $evento->intentos++;
         $evento->resultado = Str::limit((string) $resultado->motivo, 290);
-        if ($evento->intentos < self::MAX_INTENTOS && now()->lessThan($limite)) {
+        if ($evento->intentos < AvisosPlataformaTenant::TOPE_REINTENTOS && now()->lessThan($limite)) {
             $evento->save();
 
             return;
         }
-        $this->registrarVisita($proveedor, CheckinTenant::NO_VERIFICABLE, null, $visitante, $cuando, $resultado->motivo, $sesion);
+        $this->registrarVisita($proveedor, CheckinTenant::NO_VERIFICABLE, null, $quien(), $cuando, $resultado->motivo, $sesion);
         $this->alertas->registrar(
             'bienestar_no_verificable',
             ($this->gestor->actual()->slug ?? '').':'.$proveedor->value,
@@ -210,9 +218,33 @@ class CheckinsAutomaticosTenant
             ]);
         } catch (UniqueConstraintViolationException) {
             // Recepción la registró a mano en este momento: es la misma visita.
+            $previa = CheckinTenant::query()->where('referencia_externa', $referencia)->first();
+            if ($previa instanceof CheckinTenant) {
+                $this->completarPrevia($previa, $visitante, $sesion);
+            }
+
             return;
         }
         $this->lugares->ocuparPorVisita($checkin);
+    }
+
+    /**
+     * La misma visita que ya estaba (recepción la registró a mano, o Wellhub avisó del
+     * check-in y además del check-in a su reserva): se le pone quién fue y, si no tenía,
+     * su clase, y ocupa su lugar (el de su reserva, si reservó).
+     */
+    private function completarPrevia(CheckinTenant $previa, ?VisitantePlataformaTenant $visitante, ?SesionTenant $sesion): void
+    {
+        if ($previa->visitante_id === null && $visitante instanceof VisitantePlataformaTenant) {
+            $previa->visitante_id = (int) $visitante->getKey();
+        }
+        if ($previa->sesion_id === null && $sesion instanceof SesionTenant) {
+            $previa->sesion_id = (int) $sesion->getKey();
+        }
+        if ($previa->isDirty()) {
+            $previa->save();
+            $this->lugares->ocuparPorVisita($previa);
+        }
     }
 
     /**
@@ -225,8 +257,9 @@ class CheckinsAutomaticosTenant
     {
         foreach (['endpoint', 'confirmation_url', 'check_in.endpoint', 'check_in.confirmation_url'] as $campo) {
             $url = Arr::get($datos, $campo);
-            if (is_string($url) && preg_match('#webhook_confirmations/([A-Za-z0-9_\-]+)#', $url, $m) === 1) {
-                return $m[1];
+            // Todo el último tramo: el token es base64 y puede terminar en «==».
+            if (is_string($url) && preg_match('#webhook_confirmations/([^/?\#\s]+)#', $url, $m) === 1) {
+                return rawurldecode($m[1]);
             }
         }
         $suelto = Arr::get($datos, 'token');

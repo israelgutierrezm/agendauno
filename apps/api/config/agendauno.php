@@ -324,7 +324,8 @@ return [
     */
     'integraciones' => [
         'wellhub_url' => env('WELLHUB_API_URL', 'https://api.partners.gympass.com'),
-        'totalpass_url' => env('TOTALPASS_API_URL', 'https://api.totalpass.com'),
+        // Con la versión: en pruebas, https://staging.totalpass.com/api/v1.
+        'totalpass_url' => env('TOTALPASS_API_URL', 'https://api.totalpass.com/service/v1'),
         // Check-in automático (ADR 0148). Wellhub firma sus avisos con la llave secreta
         // que entrega a AgendaUno como sistema integrado (un negocio puede tener la suya).
         'wellhub_webhook_secret' => env('WELLHUB_WEBHOOK_SECRET'),

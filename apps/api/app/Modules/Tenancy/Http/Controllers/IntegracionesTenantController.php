@@ -99,10 +99,15 @@ class IntegracionesTenantController
             $this->exigirLlaves($proveedor, $config);
         }
 
-        // Otro gimnasio u otro token de Wellhub: sus avisos de reserva se vuelven a
-        // registrar al guardar la publicación (ADR 0149).
-        if ($proveedor === ProveedorPartner::Wellhub && array_intersect($cambiadas, ['api_key', 'gym_id']) !== []) {
+        // Otro gimnasio, otro token de Wellhub u otra sede de TotalPass: sus avisos de
+        // reserva se vuelven a registrar al guardar la publicación (ADR 0149).
+        if (array_intersect($cambiadas, ['api_key', 'gym_id', 'place_api_key']) !== []) {
             $config->reservas_registradas_en = null;
+        }
+        // Apagada: TotalPass deja de avisar de los check-in de la sede.
+        if ($proveedor === ProveedorPartner::TotalPass && $antes['activa'] && ! $config->activa && $config->webhook_registrado_en !== null) {
+            $this->totalpass->quitarAviso($config->llaves()['place_api_key'] ?? '');
+            $config->webhook_registrado_en = null;
         }
         // La dirección de sus avisos (check-in automático), una vez por integración.
         if ((string) $config->token_webhook === '') {
@@ -170,7 +175,9 @@ class IntegracionesTenantController
             'llaves' => $proveedor->credenciales(),
             'llaves_configuradas' => array_keys($llaves),
             // Sin estas no se puede activar.
-            'llaves_obligatorias' => $proveedor->credencialesObligatorias(),
+            'llaves_obligatorias' => $proveedor->credencialesObligatorias()[0] ?? [],
+            // Otro grupo que también basta (TotalPass: solo la llave de la sede).
+            'llaves_alternativas' => array_slice($proveedor->credencialesObligatorias(), 1),
             'automatico' => [
                 'aviso_url' => $token !== '' ? self::urlDeAvisos($proveedor, $token) : null,
                 'listo' => match ($proveedor) {
@@ -228,13 +235,16 @@ class IntegracionesTenantController
     private function exigirLlaves(ProveedorPartner $proveedor, IntegracionTenant $config): void
     {
         $llaves = $config->llaves();
-        $faltan = array_values(array_filter(
-            $proveedor->credencialesObligatorias(),
+        $grupos = $proveedor->credencialesObligatorias();
+        $faltantes = array_map(fn (array $grupo): array => array_values(array_filter(
+            $grupo,
             static fn (string $nombre): bool => trim($llaves[$nombre] ?? '') === '',
-        ));
-        if ($faltan === []) {
+        )), $grupos);
+        if ($grupos === [] || in_array([], $faltantes, true)) {
             return;
         }
+        // Las del primer grupo (el de siempre) son las que se piden.
+        $faltan = $faltantes[0];
 
         $errores = ['activa' => ["Para activar {$proveedor->nombre()} captura sus llaves."]];
         foreach ($faltan as $nombre) {

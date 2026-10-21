@@ -346,7 +346,9 @@ class PublicarEnPlataformasTenant
     }
 
     /**
-     * Cuántos lugares ocupan ya los visitantes de esa plataforma en cada sesión.
+     * Cuántas reservas vivas de su app tiene esa plataforma en cada sesión (las que ella
+     * ya descuenta de los lugares que se le dan). Una visita sin reserva no cuenta: ya
+     * ocupa uno de los lugares libres.
      *
      * @param  list<int>  $sesiones
      * @return array<int, int>
@@ -356,6 +358,7 @@ class PublicarEnPlataformasTenant
         return LugarPlataformaTenant::query()
             ->whereIn('sesion_id', $sesiones)
             ->where('proveedor', $proveedor->value)
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
             ->whereIn('estado', LugarPlataformaTenant::OCUPAN_LUGAR)
             ->selectRaw('sesion_id, COUNT(*) as total')
             ->groupBy('sesion_id')

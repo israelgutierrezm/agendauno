@@ -40,6 +40,13 @@ class AvisosPlataformaTenant
     /** Intentos ante un error inesperado antes de darlo por fallido. */
     public const MAX_INTENTOS = 5;
 
+    /**
+     * Cuando la plataforma no responde, se reintenta mientras ella espere (su plazo:
+     * 15 minutos una reserva de Wellhub, 5 una de TotalPass, lo que dure el check-in),
+     * cada vez más espaciado (1, 2, 3… hasta 10 minutos entre intentos), con este tope.
+     */
+    public const TOPE_REINTENTOS = 40;
+
     /** Los avisos de reserva de Wellhub y su tipo aquí. */
     private const RESERVAS_WELLHUB = [
         'booking-requested' => self::RESERVA_SOLICITADA,
@@ -100,6 +107,7 @@ class AvisosPlataformaTenant
             ->orderBy('id')
             ->limit(200)
             ->get()
+            ->filter(fn (EventoPlataformaTenant $evento): bool => self::toca($evento))
             ->each(function (EventoPlataformaTenant $evento) use (&$terminados): void {
                 $this->procesar($evento);
                 if ($evento->estado !== EventoPlataformaTenant::PENDIENTE) {
@@ -108,6 +116,16 @@ class AvisosPlataformaTenant
             });
 
         return $terminados;
+    }
+
+    /** ¿Ya le toca otro intento? Tras cada falla se espera un minuto más (hasta 10). */
+    private static function toca(EventoPlataformaTenant $evento): bool
+    {
+        if ($evento->intentos === 0 || $evento->updated_at === null) {
+            return true;
+        }
+
+        return $evento->updated_at->copy()->addMinutes(min(10, $evento->intentos) - 1)->lessThanOrEqualTo(now());
     }
 
     public function procesar(EventoPlataformaTenant $evento): void

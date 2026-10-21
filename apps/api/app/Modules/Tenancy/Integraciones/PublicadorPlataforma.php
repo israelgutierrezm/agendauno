@@ -28,6 +28,12 @@ interface PublicadorPlataforma
     public function registrarAvisos(IntegracionTenant $integracion, string $url): ?string;
 
     /**
+     * Deja de publicar sus clases: la plataforma deja de mandar avisos de reserva (si se
+     * puede quitar la dirección) y la próxima vez se vuelven a registrar.
+     */
+    public function dejarDeRecibir(IntegracionTenant $integracion): void;
+
+    /**
      * Deja lista la clase de la publicación en la plataforma (Wellhub la crea una vez).
      * Null si quedó; si no, por qué.
      *

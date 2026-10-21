@@ -43,6 +43,12 @@ class PublicadorWellhub implements PublicadorPlataforma
      * Con su Integration Setup API: la dirección de avisos (check-in y reservas) con la
      * llave con que Wellhub los firma. Si el negocio no capturó una, se genera la suya.
      */
+    public function dejarDeRecibir(IntegracionTenant $integracion): void
+    {
+        // Wellhub sigue avisando (su dirección es también la del check-in): con las
+        // reservas apagadas, sus avisos de reserva se rechazan con la clase retirada.
+    }
+
     public function registrarAvisos(IntegracionTenant $integracion, string $url): ?string
     {
         $llaves = $integracion->llaves();

@@ -65,15 +65,17 @@ enum ProveedorPartner: string
 
     /**
      * Sin estas no valida un solo check-in: no se puede activar la integración sin
-     * ellas. Wellhub, su token y su Gym ID; TotalPass, su llave y el código del gimnasio.
+     * ellas. Wellhub, su token y su Gym ID; TotalPass, su llave y el código del gimnasio
+     * (validar el token a mano) o la llave de su sede (check-in automático y reservas).
+     * Cada grupo basta.
      *
-     * @return list<string>
+     * @return list<list<string>>
      */
     public function credencialesObligatorias(): array
     {
         return match ($this) {
-            self::Wellhub => ['api_key', 'gym_id'],
-            self::TotalPass => ['api_key', 'codigo_gimnasio'],
+            self::Wellhub => [['api_key', 'gym_id']],
+            self::TotalPass => [['api_key', 'codigo_gimnasio'], ['place_api_key']],
             self::Fitpass => [],
         };
     }

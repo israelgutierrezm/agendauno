@@ -43,6 +43,8 @@ interface Integracion {
   llaves_configuradas: string[];
   // Sin estas no se puede activar.
   llaves_obligatorias?: string[];
+  // Otros grupos de llaves que también bastan para activar.
+  llaves_alternativas?: string[][];
   // La conexión por lo que de verdad pasó (como las pasarelas): sin llaves, con
   // llaves y apagada, activa sin comprobar o comprobada (la plataforma ya respondió).
   estado_conexion?: EstadoConexion;
@@ -137,11 +139,14 @@ const llavesConError = reactive<Record<string, string[]>>({});
  */
 function faltanLlaves(i: Integracion): string[] {
   const escritas = edicion[i.proveedor]?.llaves ?? {};
-  return (i.llaves_obligatorias ?? []).filter(
-    (llave) =>
-      !i.llaves_configuradas.includes(llave) &&
-      (escritas[llave] ?? "").trim() === "",
+  const falta = (llave: string): boolean =>
+    !i.llaves_configuradas.includes(llave) &&
+    (escritas[llave] ?? "").trim() === "";
+  // Con un grupo completo basta (TotalPass: la llave de su sede sola).
+  const alternativa = (i.llaves_alternativas ?? []).some(
+    (grupo) => grupo.length > 0 && !grupo.some(falta),
   );
+  return alternativa ? [] : (i.llaves_obligatorias ?? []).filter(falta);
 }
 
 // La conexión, con punto y texto: verde comprobada, ámbar activa sin comprobar.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Integraciones;
 
+use Carbon\CarbonInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -93,22 +94,75 @@ class ClienteTotalPassReservas
             ->put($this->url('/partner/event-occurrence/'.rawurlencode($uuid)), $ocurrencia)));
     }
 
-    /** Los lugares para usuarios de TotalPass (no puede bajar de los ya reservados). */
+    /**
+     * Los lugares para usuarios de TotalPass. No pueden bajar de los ya reservados allá
+     * (422): entonces se dejan en los que tiene reservados.
+     */
     public function actualizarLugares(string $placeApiKey, string $uuid, int $lugares): ResultadoPlataforma
     {
-        return $this->resultado($this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http
-            ->put($this->url('/partner/event-occurrence/'.rawurlencode($uuid).'/slot'), ['slots' => $lugares])));
+        $mandar = fn (int $slots): Response|string|null => $this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http
+            ->put($this->url('/partner/event-occurrence/'.rawurlencode($uuid).'/slot'), ['slots' => $slots]));
+        $respuesta = $mandar($lugares);
+        if ($respuesta instanceof Response && $respuesta->status() === 422) {
+            $enUso = $this->lugaresEnUso($placeApiKey, $uuid);
+            if ($enUso !== null && $enUso > $lugares) {
+                $respuesta = $mandar($enUso);
+            }
+        }
+
+        return $this->resultado($respuesta);
     }
 
-    /** Retira la ocurrencia. Si ya no existe, ya está retirada. */
+    /** Cuántos lugares tiene ya reservados TotalPass en la ocurrencia; null si no se sabe. */
+    public function lugaresEnUso(string $placeApiKey, string $uuid): ?int
+    {
+        $respuesta = $this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http
+            ->get($this->url('/partner/events/'.rawurlencode($uuid))));
+        if (! $respuesta instanceof Response || ! $respuesta->successful()) {
+            return null;
+        }
+        $enUso = $respuesta->json('slotsInUse') ?? $respuesta->json('slotCount');
+
+        return is_numeric($enUso) ? (int) $enUso : null;
+    }
+
+    /**
+     * Retira la ocurrencia: primero la deja inactiva (TotalPass borra sus reservas y la
+     * quita de su app) y luego la borra. Si ya no existe, ya está retirada.
+     */
     public function retirarOcurrencia(string $placeApiKey, string $uuid): ResultadoPlataforma
     {
+        $inactiva = $this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http
+            ->post($this->url('/partner/event-occurrence/status'), ['occurrencesToUpdate' => [['occurrenceUuid' => $uuid, 'status' => 'INACTIVE']]]));
+        if (! $inactiva instanceof Response || (! $inactiva->successful() && $inactiva->status() !== 404 && $inactiva->status() !== 400)) {
+            return $this->resultado($inactiva);
+        }
         $respuesta = $this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http
             ->delete($this->url('/partner/event-occurrence/'.rawurlencode($uuid))));
 
         return $respuesta instanceof Response && $respuesta->status() === 404
             ? ResultadoPlataforma::hecho()
             : $this->resultado($respuesta);
+    }
+
+    /**
+     * Las reservas de la sede con clase entre dos fechas (TotalPass da hasta 30 días por
+     * consulta); null sin respuesta.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    public function reservas(string $placeApiKey, CarbonInterface $desde, CarbonInterface $hasta): ?array
+    {
+        $respuesta = $this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http->get($this->url('/partner/slot'), [
+            'slotDateFrom' => $desde->copy()->utc()->format('Y-m-d\TH:i:s.v\Z'),
+            'slotDateTo' => $hasta->copy()->utc()->format('Y-m-d\TH:i:s.v\Z'),
+        ]));
+        if (! $respuesta instanceof Response || ! $respuesta->successful()) {
+            return null;
+        }
+        $datos = $respuesta->json();
+
+        return is_array($datos) && array_is_list($datos) ? array_values(array_filter($datos, 'is_array')) : [];
     }
 
     /**
@@ -162,7 +216,8 @@ class ClienteTotalPassReservas
 
     /**
      * Registra la dirección de los avisos de reserva de la sede y enciende la
-     * confirmación de cada reserva (así se rechaza la que ya no cabe).
+     * confirmación de cada reserva (así se rechaza la que ya no cabe). La sede tiene una
+     * sola dirección: se comprueba que quedó la nuestra.
      */
     public function registrarAvisos(string $placeApiKey, string $url): ResultadoPlataforma
     {
@@ -171,9 +226,29 @@ class ClienteTotalPassReservas
         if (! $aviso->ok) {
             return $aviso;
         }
+        $registrada = $this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http->get($this->url('/partner/webhook')));
+        if ($registrada instanceof Response && $registrada->successful()
+            && is_string($registrada->json('placeWebhookUrl')) && $registrada->json('placeWebhookUrl') !== $url) {
+            return ResultadoPlataforma::rechazado('TotalPass no guardó la dirección de avisos de AgendaUno para tu sede.');
+        }
 
         return $this->resultado($this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http
             ->put($this->url('/partner/places/update-configs'), ['hasSlotConfirmation' => true])));
+    }
+
+    /**
+     * Deja de recibir los avisos de reserva de la sede y apaga la confirmación (al dejar
+     * de publicar sus clases o apagar la integración).
+     */
+    public function quitarAvisos(string $placeApiKey): ResultadoPlataforma
+    {
+        $aviso = $this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http->delete($this->url('/partner/webhook')));
+        if (! $aviso instanceof Response || (! $aviso->successful() && $aviso->status() !== 404)) {
+            return $this->resultado($aviso);
+        }
+
+        return $this->resultado($this->llamar($placeApiKey, fn (PendingRequest $http): Response => $http
+            ->put($this->url('/partner/places/update-configs'), ['hasSlotConfirmation' => false])));
     }
 
     /** El JWT de la sede para la Booking API; null sin llaves o si TotalPass no lo da. */

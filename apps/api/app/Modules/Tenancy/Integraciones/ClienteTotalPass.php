@@ -31,6 +31,9 @@ class ClienteTotalPass
         'check_in_not_available' => 'El check-in ya no está disponible en TotalPass.',
     ];
 
+    /** Un token de confirmación: base64 seguro para URL, con relleno «=». */
+    public const TOKEN = '/^[A-Za-z0-9_\-=+.~]{6,300}$/';
+
     /** Si AgendaUno ya tiene su llave de integrador de TotalPass. */
     public function disponible(): bool
     {
@@ -67,7 +70,10 @@ class ClienteTotalPass
         return $token;
     }
 
-    /** Registra la dirección donde TotalPass avisa de cada check-in de la sede. */
+    /**
+     * Registra la dirección donde TotalPass avisa de cada check-in de la sede. Si la
+     * sede ya tenía una (de otro sistema o de antes), se cambia por la nuestra.
+     */
     public function registrarAviso(string $placeApiKey, string $url): bool
     {
         $token = $this->sesion($placeApiKey);
@@ -75,11 +81,36 @@ class ClienteTotalPass
             return false;
         }
         try {
-            return Http::withToken($token)->acceptJson()->asJson()->timeout(10)
-                ->post($this->gym('/partner/webhook/create'), [
-                    'webhook_url' => $url,
-                    'webhook_type' => 'CHECKIN',
-                ])->successful();
+            $http = Http::withToken($token)->acceptJson()->asJson()->timeout(10);
+            $registrados = $http->get($this->gym('/partner/webhook/get'));
+            $actual = collect((array) ($registrados->successful() ? $registrados->json('webhooks', []) : []))
+                ->first(fn ($aviso): bool => is_array($aviso) && ($aviso['webhook_type'] ?? null) === 'CHECKIN');
+            if (is_array($actual) && ($actual['webhook_url'] ?? null) === $url) {
+                return true;
+            }
+            $cuerpo = ['webhook_url' => $url, 'webhook_type' => 'CHECKIN'];
+            $respuesta = is_array($actual)
+                ? $http->put($this->gym('/partner/webhook/update'), $cuerpo)
+                : $http->post($this->gym('/partner/webhook/create'), $cuerpo);
+            $this->olvidarSiVencio($respuesta, $placeApiKey);
+
+            return $respuesta->successful();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /** Deja de recibir los avisos de check-in de la sede (al apagar la integración). */
+    public function quitarAviso(string $placeApiKey): bool
+    {
+        $token = $this->sesion($placeApiKey);
+        if ($token === null) {
+            return false;
+        }
+        try {
+            $respuesta = Http::withToken($token)->acceptJson()->timeout(10)->delete($this->gym('/partner/webhook/delete/CHECKIN'));
+
+            return $respuesta->successful() || $respuesta->status() === 404;
         } catch (Throwable) {
             return false;
         }
@@ -91,7 +122,8 @@ class ClienteTotalPass
      */
     public function confirmar(string $placeApiKey, string $token, string $referencia): ResultadoCheckin
     {
-        if (preg_match('/^[A-Za-z0-9_\-]{6,200}$/', $token) !== 1) {
+        // El token viene en base64 (puede terminar en «=»).
+        if (preg_match(self::TOKEN, $token) !== 1) {
             return ResultadoCheckin::invalido('El aviso de TotalPass no trae un token de confirmación válido.');
         }
         $sesion = $this->sesion($placeApiKey);
@@ -109,6 +141,8 @@ class ClienteTotalPass
             return ResultadoCheckin::valido($referencia);
         }
         if (in_array($respuesta->status(), [401, 403], true)) {
+            $this->olvidarSiVencio($respuesta, $placeApiKey);
+
             return ResultadoCheckin::noVerificable('TotalPass no aceptó la sesión de la integración: revisa la llave de tu sede.');
         }
         if ($respuesta->status() === 429 || $respuesta->serverError()) {
@@ -121,13 +155,32 @@ class ClienteTotalPass
         return ResultadoCheckin::invalido(self::MOTIVOS[self::etiqueta($respuesta)] ?? 'TotalPass no validó la visita.');
     }
 
+    /**
+     * El `label` de un error de TotalPass. Viene en `errors[0].source` (un objeto al
+     * confirmar un check-in, una lista al validar un token) o suelto.
+     */
+    public static function etiqueta(Response $respuesta): string
+    {
+        foreach (['errors.0.source.label', 'errors.0.source.0.label', 'errors.0.label', 'label'] as $ruta) {
+            $valor = $respuesta->json($ruta);
+            if (is_string($valor) && $valor !== '') {
+                return $valor;
+            }
+        }
+
+        return '';
+    }
+
+    /** La sesión pudo vencer antes de tiempo: la siguiente vez se pide otra. */
+    private function olvidarSiVencio(Response $respuesta, string $placeApiKey): void
+    {
+        if ($respuesta->status() === 401) {
+            Cache::forget('totalpass:sesion:'.hash('sha256', $placeApiKey));
+        }
+    }
+
     private function gym(string $ruta): string
     {
         return rtrim((string) config('agendauno.integraciones.totalpass_gym_url'), '/').$ruta;
-    }
-
-    private static function etiqueta(Response $respuesta): string
-    {
-        return (string) ($respuesta->json('errors.0.label') ?? $respuesta->json('label') ?? '');
     }
 }

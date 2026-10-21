@@ -196,6 +196,31 @@ it('valida el token de TotalPass con su API de uso', function (): void {
         ->assertStatus(422)->assertJsonPath('message', 'Ese token ya se usó en otro gimnasio.');
 });
 
+it('TotalPass a mano: también con la CURP o el código de la persona, y dice por qué no', function (): void {
+    Http::fake([
+        // Como en su documentación: el motivo viene en `errors[0].source[0].label`.
+        'staging.totalpass.com/api/v1/track_usages' => Http::sequence()
+            ->push(null, 204)
+            ->push(null, 204)
+            ->push(['errors' => [['status' => '422', 'title' => 'Validation Error', 'source' => [['label' => 'inactive_employee', 'message' => 'Inativo']]]]], 422),
+    ]);
+    // El sandbox de TotalPass trae la versión en su base.
+    config(['agendauno.integraciones.totalpass_url' => 'https://staging.totalpass.com/api/v1']);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    test()->putJson("/api/v1/app/{$e['slug']}/integraciones/totalpass", [
+        'activa' => true, 'credenciales' => ['api_key' => 'tp_llave', 'codigo_gimnasio' => 'GYM-9'],
+    ], conBearer($e['bearer']))->assertOk();
+    $sesion = sesionDemo($e);
+
+    registrarVisita($e, $sesion, 'totalpass', 'JUMM941106HSRNGR09')->assertCreated();
+    registrarVisita($e, $sesion, 'totalpass', 'aa1122aa')->assertCreated();
+    Http::assertSent(fn (Request $r): bool => $r['data']['attributes']['type'] === 'curp' && $r['data']['attributes']['identifier'] === 'JUMM941106HSRNGR09');
+    Http::assertSent(fn (Request $r): bool => $r['data']['attributes']['type'] === 'code' && $r['data']['attributes']['identifier'] === 'AA1122AA');
+
+    registrarVisita($e, $sesion, 'totalpass', 'K2A5X6')
+        ->assertStatus(422)->assertJsonPath('message', 'La cuenta de TotalPass de esta persona no está activa.');
+});
+
 it('rechaza check-in si la integracion no esta activa (INTEGRATION_UNAVAILABLE)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sesion = sesionDemo($e);

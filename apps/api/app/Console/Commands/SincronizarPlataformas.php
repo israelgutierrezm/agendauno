@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Mantiene al día las clases publicadas en Wellhub y TotalPass de cada negocio (ADR
  * 0149): publica las nuevas, manda los lugares que cambiaron, retira lo que ya no se
- * publica y deja como «no asistió» las reservas de la plataforma de clases que ya
- * terminaron sin check-in. Como los avisos, sigue en un negocio suspendido: sus clases
+ * publica, deja como «no asistió» las reservas de la plataforma de clases que ya
+ * terminaron sin check-in y concilia las reservas de TotalPass con las que él tiene. Como los avisos, sigue en un negocio suspendido: sus clases
  * siguen en pie.
  */
 class SincronizarPlataformas extends Command
@@ -47,6 +47,8 @@ class SincronizarPlataformas extends Command
                             return 0;
                         }
                         $reservas->cerrarTerminadas();
+                        // TotalPass no firma sus avisos ni dice si reintenta: se concilia.
+                        $reservas->conciliarTotalPass();
 
                         return $publicar->sincronizar();
                     }, 0);

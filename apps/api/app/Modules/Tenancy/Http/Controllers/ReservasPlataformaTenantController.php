@@ -133,6 +133,7 @@ class ReservasPlataformaTenantController
         }
 
         $antes = ['activas' => $integracion->reservas_activas, 'sucursal_id' => $integracion->sucursal_id];
+        $seApaga = $integracion->reservas_activas && ! (bool) $validado['activas'];
         DB::connection('tenant')->transaction(function () use ($integracion, $validado, $sucursal, $cambios): void {
             $integracion->reservas_activas = (bool) $validado['activas'];
             $integracion->sucursal_id = $sucursal?->getKey() !== null ? (int) $sucursal->getKey() : $integracion->sucursal_id;
@@ -142,7 +143,10 @@ class ReservasPlataformaTenantController
             }
         });
 
-        // Al encenderlo, la plataforma necesita la dirección de sus avisos de reserva.
+        // Al apagarlo deja de avisar; al encenderlo necesita la dirección de sus avisos.
+        if ($seApaga) {
+            $publicador->dejarDeRecibir($integracion);
+        }
         $errorAvisos = null;
         if ($integracion->reservas_activas && $integracion->reservas_registradas_en === null) {
             $errorAvisos = $publicador->registrarAvisos(

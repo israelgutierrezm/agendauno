@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\Integraciones\ResultadoPlataforma;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\HorarioPlataformaTenant;
+use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
@@ -118,6 +119,86 @@ class ReservasPlataformaTenant
     }
 
     /**
+     * Concilia las reservas de TotalPass de las clases publicadas que aún no empiezan
+     * (sus avisos no van firmados ni dicen si reintentan): una reserva viva cuyo aviso
+     * se perdió entra como si hubiera llegado, y un lugar cuya reserva TotalPass ya no
+     * tiene viva (cancelada sin aviso) se libera. Cuántos lugares cambió.
+     */
+    public function conciliarTotalPass(): int
+    {
+        $integracion = IntegracionTenant::query()->where('proveedor', ProveedorPartner::TotalPass->value)->first();
+        if (! $integracion instanceof IntegracionTenant || ! $integracion->reservas_activas || ! $this->registro->activa(ProveedorPartner::TotalPass->value)) {
+            return 0;
+        }
+        $publicados = HorarioPlataformaTenant::query()
+            ->where('proveedor', ProveedorPartner::TotalPass->value)
+            ->where('estado', HorarioPlataformaTenant::PUBLICADO)
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
+            ->with('sesion')
+            ->get();
+        if ($publicados->isEmpty()) {
+            return 0;
+        }
+        $llave = $integracion->llaves()['place_api_key'] ?? '';
+        $ultima = $publicados->max(fn (HorarioPlataformaTenant $h): int => (int) $h->sesion?->inicia_en->getTimestamp());
+        // TotalPass da hasta 30 días por consulta.
+        $hasta = CarbonImmutable::createFromTimestamp(min((int) $ultima, now()->addDays(29)->getTimestamp()))->addMinute();
+        $lista = $this->totalpass->reservas($llave, CarbonImmutable::now()->startOfDay(), $hasta);
+        if ($lista === null) {
+            return 0;
+        }
+
+        $vistas = [];
+        foreach ($lista as $reserva) {
+            $slot = (string) ($reserva['_id'] ?? $reserva['id'] ?? '');
+            if ($slot === '' || preg_match('/^[A-Za-z0-9_\-]{1,80}$/', $slot) !== 1) {
+                continue;
+            }
+            $vistas[$slot] = $reserva;
+            $publicado = self::viva($reserva) ? $this->horarioDeTotalPass(self::clasesDe($reserva)) : null;
+            if ($publicado === null || LugarPlataformaTenant::query()->where('referencia_externa', self::referencia(ProveedorPartner::TotalPass, $slot))->exists()) {
+                continue;
+            }
+            // Se perdió su aviso: entra como si hubiera llegado (una sola vez).
+            EventoPlataformaTenant::query()->firstOrCreate(
+                ['proveedor' => ProveedorPartner::TotalPass->value, 'clave' => 'reserva:'.$slot.':'.AvisosPlataformaTenant::RESERVA_SOLICITADA],
+                [
+                    'tipo' => AvisosPlataformaTenant::RESERVA_SOLICITADA,
+                    'payload' => [
+                        'event' => ['id' => (string) ($publicado->evento_externo ?? '')],
+                        'slot' => ['id' => $slot, 'status' => (string) ($reserva['status'] ?? 'active')],
+                        'user' => (array) ($reserva['user'] ?? []),
+                        'conciliada' => true,
+                    ],
+                    'estado' => EventoPlataformaTenant::PENDIENTE,
+                    'recibido_en' => now(),
+                ],
+            );
+        }
+
+        $cambios = 0;
+        LugarPlataformaTenant::query()
+            ->where('proveedor', ProveedorPartner::TotalPass->value)
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->where('estado', LugarPlataformaTenant::RESERVADO)
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
+            ->get()
+            ->each(function (LugarPlataformaTenant $lugar) use ($vistas, $llave, &$cambios): void {
+                $slot = substr((string) $lugar->referencia_externa, strlen(self::referencia(ProveedorPartner::TotalPass, '')));
+                $reserva = $vistas[$slot] ?? $this->totalpass->reserva($llave, $slot);
+                if ($reserva === null || (is_array($reserva) && self::viva($reserva))) {
+                    return;
+                }
+                $lugar->fill(['estado' => LugarPlataformaTenant::CANCELADO, 'motivo' => 'CANCELADA_EN_TOTALPASS'])->save();
+                $this->ofrecerLiberado($lugar);
+                $this->alCambiar($lugar);
+                $cambios++;
+            });
+
+        return $cambios;
+    }
+
+    /**
      * @param  array<string, string>  $credenciales
      */
     private function solicitudWellhub(EventoPlataformaTenant $evento, string $numero, array $credenciales): void
@@ -160,37 +241,39 @@ class ReservasPlataformaTenant
         $referencia = self::referencia(ProveedorPartner::TotalPass, $slot);
         $limite = CarbonImmutable::instance($evento->recibido_en)->addMinutes(self::MINUTOS_TOTALPASS);
         $claseDelAviso = (string) Arr::get($datos, 'event.id', '');
+        $usuario = (array) Arr::get($datos, 'user', []);
 
-        // Sus avisos no van firmados: la reserva tiene que existir en TotalPass y ser de
-        // esa clase (una vez decidida, su lugar ya lo dice).
-        if (! LugarPlataformaTenant::query()->where('referencia_externa', $referencia)->exists()) {
+        // Sus avisos no van firmados: la reserva tiene que existir en TotalPass, seguir
+        // activa y ser de una clase publicada aquí; la clase y la persona se toman de lo
+        // que dice TotalPass, no del aviso (una vez decidida, su lugar ya lo dice).
+        $lugar = LugarPlataformaTenant::query()->where('referencia_externa', $referencia)->first();
+        if ($lugar instanceof LugarPlataformaTenant) {
+            $publicado = HorarioPlataformaTenant::query()->where('proveedor', ProveedorPartner::TotalPass->value)->where('sesion_id', $lugar->sesion_id)->first();
+        } else {
             $reserva = $this->totalpass->reserva($llave, $slot);
             if ($reserva === null) {
                 $this->asentar($evento, ProveedorPartner::TotalPass, null, null, ResultadoPlataforma::sinRespuesta('No se pudo comprobar la reserva con TotalPass.'), $limite);
 
                 return;
             }
-            $claseDeTotalPass = $reserva === false ? '' : (string) (Arr::get($reserva, 'eventId') ?? Arr::get($reserva, 'event.id') ?? '');
-            if ($claseDeTotalPass === '' || $claseDeTotalPass !== $claseDelAviso) {
-                $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'TotalPass no tiene esa reserva en esa clase.');
+            $publicado = $reserva === false || ! self::viva($reserva) ? null : $this->horarioDeTotalPass(self::clasesDe($reserva));
+            $delAviso = $publicado === null ? [] : array_filter([(string) $publicado->evento_externo, (string) $publicado->id_externo, ...self::clasesDe((array) $reserva)]);
+            if ($publicado === null || ($claseDelAviso !== '' && ! in_array($claseDelAviso, $delAviso, true))) {
+                $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'TotalPass no tiene esa reserva activa en una clase publicada aquí.');
 
                 return;
             }
+            $usuario = array_merge($usuario, array_filter((array) Arr::get((array) $reserva, 'user', []), static fn ($v): bool => is_scalar($v) && $v !== ''));
         }
-
-        $publicado = HorarioPlataformaTenant::query()
-            ->where('proveedor', ProveedorPartner::TotalPass->value)
-            ->where('evento_externo', $claseDelAviso)
-            ->first();
-        $usuario = (array) Arr::get($datos, 'user', []);
         $codigo = trim((string) ($usuario['code'] ?? ''));
-        // Su documento de identidad no se guarda: no hace falta para la clase.
-        $visitante = $codigo === '' ? null : $this->visitantes->registrar(ProveedorPartner::TotalPass->value, $codigo, [
+        // Su documento de identidad no se guarda: no hace falta para la clase. Ya
+        // decidida, sigue siendo quien era (un aviso repetido no cambia sus datos).
+        $visitante = $lugar instanceof LugarPlataformaTenant ? $lugar->visitante : ($codigo === '' ? null : $this->visitantes->registrar(ProveedorPartner::TotalPass->value, $codigo, [
             'nombre' => $usuario['name'] ?? null,
             'email' => $usuario['email'] ?? null,
             'telefono' => $usuario['phone'] ?? null,
             'producto' => Arr::get($datos, 'event.plan_code'),
-        ], null);
+        ], null));
 
         [$lugar, $motivo] = $this->decidir(ProveedorPartner::TotalPass, $publicado, $visitante, $referencia);
         $respuesta = $this->totalpass->responderReserva($llave, $slot, $motivo !== null ? (self::MOTIVOS_TOTALPASS[$motivo] ?? 'denied_by_gym') : null);
@@ -201,6 +284,55 @@ class ReservasPlataformaTenant
         }
 
         $this->asentar($evento, ProveedorPartner::TotalPass, $lugar, $motivo, $respuesta, $limite);
+    }
+
+    /**
+     * Los identificadores de clase de una reserva de TotalPass (su evento y su
+     * ocurrencia, según venga).
+     *
+     * @param  array<string, mixed>  $reserva
+     * @return list<string>
+     */
+    private static function clasesDe(array $reserva): array
+    {
+        $ids = [];
+        foreach (['eventId', 'event.id', 'eventOccurrenceUuid', 'event.occurrenceUuid', 'occurrenceUuid'] as $campo) {
+            $valor = Arr::get($reserva, $campo);
+            if (is_int($valor) || (is_string($valor) && $valor !== '')) {
+                $ids[] = (string) $valor;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * ¿La reserva sigue viva en TotalPass? (no cancelada, rechazada ni vencida).
+     *
+     * @param  array<string, mixed>  $reserva
+     */
+    private static function viva(array $reserva): bool
+    {
+        $estado = strtolower((string) ($reserva['status'] ?? $reserva['state'] ?? 'active'));
+
+        return ! str_contains($estado, 'cancel') && ! in_array($estado, ['denied', 'expired', 'deleted', 'removed', 'rejected'], true);
+    }
+
+    /**
+     * El horario publicado aquí de una de esas clases de TotalPass.
+     *
+     * @param  list<string>  $clases
+     */
+    private function horarioDeTotalPass(array $clases): ?HorarioPlataformaTenant
+    {
+        if ($clases === []) {
+            return null;
+        }
+
+        return HorarioPlataformaTenant::query()
+            ->where('proveedor', ProveedorPartner::TotalPass->value)
+            ->where(fn ($q) => $q->whereIn('evento_externo', $clases)->orWhereIn('id_externo', $clases))
+            ->first();
     }
 
     /**
@@ -224,14 +356,16 @@ class ReservasPlataformaTenant
         }
 
         $evento->intentos++;
-        if ($respuesta->reintentar && $evento->intentos < AvisosPlataformaTenant::MAX_INTENTOS && now()->lessThan($limite)) {
+        if ($respuesta->reintentar && $evento->intentos < AvisosPlataformaTenant::TOPE_REINTENTOS && now()->lessThan($limite)) {
             $evento->resultado = (string) $respuesta->error;
             $evento->save();
 
             return;
         }
-        // No se le pudo contestar: la plataforma la rechaza sola y el lugar se libera.
-        if ($lugar instanceof LugarPlataformaTenant && $lugar->estado === LugarPlataformaTenant::RESERVADO) {
+        // No se le pudo contestar a tiempo. TotalPass no dice qué hace con ella: se le
+        // pregunta; si la dejó viva, el lugar sigue. Si no (o Wellhub, que la rechaza
+        // sola), el lugar se libera.
+        if ($lugar instanceof LugarPlataformaTenant && $lugar->estado === LugarPlataformaTenant::RESERVADO && ! $this->sigueEnTotalPass($proveedor, $lugar)) {
             $lugar->fill(['estado' => LugarPlataformaTenant::RECHAZADO, 'motivo' => 'SIN_RESPUESTA'])->save();
             $this->ofrecerLiberado($lugar);
             $this->alCambiar($lugar);
@@ -312,6 +446,18 @@ class ReservasPlataformaTenant
             $this->alCambiar($lugar);
         }
         $evento->terminar(EventoPlataformaTenant::PROCESADO, $estado === LugarPlataformaTenant::CANCELADO_TARDE ? 'Reserva cancelada tarde.' : 'Reserva cancelada.');
+    }
+
+    /** ¿TotalPass dejó viva la reserva que no se le pudo confirmar a tiempo? */
+    private function sigueEnTotalPass(ProveedorPartner $proveedor, LugarPlataformaTenant $lugar): bool
+    {
+        if ($proveedor !== ProveedorPartner::TotalPass) {
+            return false;
+        }
+        $slot = substr((string) $lugar->referencia_externa, strlen(self::referencia(ProveedorPartner::TotalPass, '')));
+        $reserva = $this->totalpass->reserva($this->registro->credenciales(ProveedorPartner::TotalPass->value)['place_api_key'] ?? '', $slot);
+
+        return is_array($reserva) && self::viva($reserva);
     }
 
     /** El lugar que dejó la plataforma se ofrece a la lista de espera, en su orden. */
