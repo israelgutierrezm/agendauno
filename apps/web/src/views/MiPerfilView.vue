@@ -8,6 +8,7 @@ import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import ComprasMostrador from "@/components/ComprasMostrador.vue";
 import ConectarCalendarios from "@/components/ConectarCalendarios.vue";
+import DatosFacturacionCliente from "@/components/DatosFacturacionCliente.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import FondoDecorado from "@/components/FondoDecorado.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -44,6 +45,12 @@ const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const usuario = computed(() => sesion.usuario);
 const mostrarPrivacidad = computed(() => esMiembro(usuario.value));
+// El negocio factura a sus clientes (México, con la facturación de la plataforma).
+const facturaPosible = computed(
+  () =>
+    sesion.estudio?.factura_posible === true &&
+    sesion.estudio?.facturacion_disponible !== false,
+);
 // Quien da clases o atiende aparece en el equipo de la página del negocio: ahí se ve
 // su semblanza (C03).
 const apareceEnEquipo = computed(
@@ -965,6 +972,29 @@ const aparienciaAbierta = ref(false);
             integrado
           />
         </div>
+      </section>
+
+      <!-- Sus datos para facturar (clientes, en negocios que facturan). -->
+      <section
+        v-if="mostrarPrivacidad && facturaPosible"
+        id="mp-facturar"
+        class="tu-card mp-bloque"
+        aria-labelledby="mp-facturar-titulo"
+      >
+        <header class="mp-cabecera">
+          <span class="mp-icono" aria-hidden="true"
+            ><IconoNav nombre="ventas" :tam="22"
+          /></span>
+          <div>
+            <h2 id="mp-facturar-titulo" class="mp-seccion">
+              {{ $t("datosFacturacion.titulo") }}
+            </h2>
+          </div>
+        </header>
+        <DatosFacturacionCliente
+          :url="`/api/v1/app/${sesion.slug}/mi/datos-fiscales`"
+          propios
+        />
       </section>
 
       <!-- Lo que compró en el mostrador (ADR 0145); el alumno lo ve en Pagos. -->

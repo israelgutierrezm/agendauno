@@ -42,6 +42,25 @@ final class CatalogosSat
     /** Tipo de relación del CFDI por remanente con el de su anticipo. */
     public const RELACION_ANTICIPO = '07';
 
+    /**
+     * El concepto del CFDI de egreso que aplica un anticipo a la factura de la operación
+     * (Anexo 20, apéndice de anticipos: «aplicación de anticipo»).
+     */
+    public const APLICACION_ANTICIPO = [
+        'descripcion' => 'Aplicación de anticipo',
+        'clave_prod_serv' => '84111506',
+        'clave_unidad' => 'ACT',
+    ];
+
+    /** La forma de pago del CFDI de egreso que aplica un anticipo. */
+    public const FORMA_APLICACION_ANTICIPO = '30';
+
+    /** c_RegimenFiscal. */
+    public const REGIMENES = [
+        '601', '603', '605', '606', '607', '608', '610', '611', '612', '614', '615', '616',
+        '620', '621', '622', '623', '624', '625', '626',
+    ];
+
     /** c_UsoCFDI; los de personas físicas solamente, aparte. */
     public const USOS_CFDI = [
         'G01', 'G02', 'G03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'I07', 'I08',

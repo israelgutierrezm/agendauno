@@ -33,4 +33,33 @@ más simple para un negocio pequeño y gasta un timbre menos.
 - `GET /facturas?anticipos_de=<RFC>` lista los anticipos timbrados y sin aplicar de
   ese RFC. La web los ofrece al capturar el RFC.
 - Fuera de alcance: el camino con CFDI de egreso y facturar en automático desde las
-  órdenes de una cita.
+  órdenes de una cita. Resuelto después: ver «Facturas automáticas de citas».
+
+## Facturas automáticas de citas (2026-10-21)
+
+Pedido del dueño: facturar los anticipos y las citas sin capturarlos a mano, con su CFDI
+de egreso al aplicar el anticipo.
+
+- **Datos para facturar del cliente** (`datos_fiscales_personas`, migración de negocio
+  000195): los guarda el cliente en su cuenta (web y app) o el negocio en su ficha. Al
+  facturar a mano, el borrador los toma.
+- **El negocio la enciende** (`facturacion.automatica_citas`, apagada por omisión) y el
+  cliente la pide (`factura_automatica`). Solo negocios de citas que facturan con la
+  plataforma (México, con su función de facturación y sus datos fiscales).
+- **Al pagarse la orden de una cita** (evento `orden.pagada`):
+  - **el anticipo**: su CFDI de anticipo (como arriba), ligado a la orden del anticipo;
+    así no se factura dos veces;
+  - **el resto**: aquí sí el camino de tres comprobantes del Anexo 20. La factura de la
+    operación completa (el servicio por su precio, sin la leyenda del remanente),
+    relacionada `07` con el anticipo y con la forma de pago del resto; y el **CFDI de
+    egreso** que aplica el anticipo: «Aplicación de anticipo» (`84111506`/`ACT`) por el
+    importe del anticipo, forma de pago `30`, uso `G02`, relacionado `07` con la factura
+    de la operación. Timbrado el egreso, el anticipo queda aplicado;
+  - **una cita pagada completa**: su factura con los conceptos del borrador.
+  - El remanente (dos comprobantes) sigue siendo el camino al facturar a mano.
+- **Reintentos**: `agendauno:facturar-citas` (cada hora) factura lo que no se timbró
+  (hasta tres errores por orden, de los últimos siete días) y aplica los anticipos cuyo
+  egreso falló.
+- El egreso cuenta como lo acreditado de la factura de la operación: una nota de crédito
+  posterior solo puede acreditar lo demás.
+- Sin validar con el SAT ni con FacturAPI reales: probado con el proveedor simulado.

@@ -58,6 +58,9 @@ class EmitirFacturaTenant
      * @param  int|null  $ordenId  la orden que factura
      * @param  int|null  $ventaPosId  la venta del mostrador que factura
      * @param  FacturaTenant|null  $sustituye  la factura que sustituye (su cancelación se pide aparte)
+     * @param  bool  $conEgreso  la factura de la operación completa: los anticipos se
+     *                           aplican después con un CFDI de egreso ({@see aplicarAnticipo})
+     *                           y no con la leyenda del remanente
      */
     public function emitir(
         DatosFiscalesTenant $emisor,
@@ -71,10 +74,11 @@ class EmitirFacturaTenant
         ?int $ordenId = null,
         ?int $ventaPosId = null,
         ?FacturaTenant $sustituye = null,
+        bool $conEgreso = false,
     ): FacturaTenant {
         if ($anticipo) {
             $items = [['cantidad' => 1, 'precio_unitario_minor' => (int) $items[0]['precio_unitario_minor']] + CatalogosSat::ANTICIPO];
-        } elseif ($anticipos !== []) {
+        } elseif ($anticipos !== [] && ! $conEgreso) {
             $items = array_map(static fn (array $i): array => [
                 ...$i,
                 'descripcion' => mb_substr($i['descripcion'].' - '.CatalogosSat::LEYENDA_REMANENTE, 0, 1000),
@@ -92,7 +96,7 @@ class EmitirFacturaTenant
         $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
-            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $formaPago, $items, $llave, $cuerpo, $anticipo, $anticipos, $ordenId, $ventaPosId, $sustituye
+            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $formaPago, $items, $llave, $cuerpo, $anticipo, $anticipos, $ordenId, $ventaPosId, $sustituye, $conEgreso
         ): FacturaTenant {
             $relacionados = [];
             // La que sustituye, bloqueada y revisada: la nueva toma su venta.
@@ -170,11 +174,75 @@ class EmitirFacturaTenant
             ];
 
             $factura = $this->timbrarYGuardar($llave, $cuerpo, $comun);
-            if ($factura->estado === EstadoFactura::Timbrada) {
+            // Con egreso, el anticipo queda aplicado al timbrarse su egreso.
+            if ($factura->estado === EstadoFactura::Timbrada && ! $conEgreso) {
                 FacturaTenant::query()->whereKey($aplicados->modelKeys())->update(['anticipo_aplicado_en' => $factura->getKey()]);
             }
 
             return $factura;
+        });
+    }
+
+    /**
+     * El CFDI de egreso que aplica un anticipo a la factura de la operación completa
+     * (Anexo 20, apéndice de anticipos): por el importe del anticipo, con la forma de
+     * pago 30 (aplicación de anticipos) y relacionado (07) con la factura de la
+     * operación. Timbrado, el anticipo queda aplicado. Un anticipo se aplica una vez.
+     */
+    public function aplicarAnticipo(DatosFiscalesTenant $emisor, FacturaTenant $operacion, FacturaTenant $anticipo): FacturaTenant
+    {
+        $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
+        $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
+
+        return DB::connection('tenant')->transaction(function () use ($operacion, $anticipo, $ivaBps, $llave): FacturaTenant {
+            $anticipo = FacturaTenant::query()->whereKey($anticipo->getKey())->lockForUpdate()->firstOrFail();
+            $operacion = FacturaTenant::query()->whereKey($operacion->getKey())->lockForUpdate()->firstOrFail();
+            if (! $anticipo->anticipo || $anticipo->estado !== EstadoFactura::Timbrada || $anticipo->anticipo_aplicado_en !== null) {
+                throw ValidationException::withMessages(['anticipos' => ['Este anticipo ya se aplicó o no está timbrado.']]);
+            }
+            if ($operacion->estado !== EstadoFactura::Timbrada || $operacion->tipo !== FacturaTenant::INGRESO || $operacion->receptor_rfc !== $anticipo->receptor_rfc) {
+                throw ValidationException::withMessages(['factura' => ['El anticipo se aplica a una factura de venta timbrada del mismo RFC.']]);
+            }
+            $subtotal = (int) $anticipo->subtotal_minor;
+            $items = [['cantidad' => 1, 'precio_unitario_minor' => $subtotal] + CatalogosSat::APLICACION_ANTICIPO];
+            $impuesto = self::ivaDeImporte($subtotal, $ivaBps);
+            $regimen = $operacion->receptor_regimen ?? $anticipo->receptor_regimen;
+            $receptor = [
+                'nombre' => $operacion->receptor_nombre,
+                'rfc' => $operacion->receptor_rfc,
+                'email' => $operacion->receptor_email,
+                'codigo_postal' => $operacion->receptor_cp,
+                'regimen_fiscal' => $regimen,
+            ];
+            $cuerpo = ['type' => FacturaTenant::EGRESO]
+                + $this->armarCuerpo($receptor, $items, CatalogosSat::USO_NOTA_DE_CREDITO, CatalogosSat::FORMA_APLICACION_ANTICIPO, (string) $operacion->moneda, $ivaBps)
+                + ['related_documents' => [['relationship' => CatalogosSat::RELACION_ANTICIPO, 'documents' => [(string) $operacion->uuid]]]];
+
+            $egreso = $this->timbrarYGuardar($llave, $cuerpo, [
+                'receptor_nombre' => $operacion->receptor_nombre,
+                'receptor_rfc' => $operacion->receptor_rfc,
+                'receptor_email' => $operacion->receptor_email,
+                'uso_cfdi' => CatalogosSat::USO_NOTA_DE_CREDITO,
+                'receptor_cp' => $operacion->receptor_cp,
+                'moneda' => $operacion->moneda,
+                'subtotal_minor' => $subtotal,
+                'impuesto_minor' => $impuesto,
+                'total_minor' => $subtotal + $impuesto,
+                'anticipo' => false,
+                'orden_id' => $operacion->orden_id,
+                'venta_pos_id' => $operacion->venta_pos_id,
+                'tipo' => FacturaTenant::EGRESO,
+                'relacionada_id' => $operacion->getKey(),
+                'relacion' => CatalogosSat::RELACION_ANTICIPO,
+                'receptor_regimen' => $regimen,
+                'forma_pago' => CatalogosSat::FORMA_APLICACION_ANTICIPO,
+                'conceptos' => $items,
+            ]);
+            if ($egreso->estado === EstadoFactura::Timbrada) {
+                $anticipo->forceFill(['anticipo_aplicado_en' => $operacion->getKey()])->save();
+            }
+
+            return $egreso;
         });
     }
 

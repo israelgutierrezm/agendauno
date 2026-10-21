@@ -38,6 +38,7 @@ use App\Modules\Tenancy\Http\Controllers\ConciliacionPlataformasTenantController
 use App\Modules\Tenancy\Http\Controllers\CortesNominaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CuotasTenantController;
+use App\Modules\Tenancy\Http\Controllers\DatosFiscalesClienteController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DemosController;
 use App\Modules\Tenancy\Http\Controllers\DifusionesTenantController;
@@ -570,6 +571,10 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/mi/reservas/{reserva}/resena', [ResenasTenantController::class, 'calificar'])->name('mi.reservas.resena');
             // Mis documentos: los que pide el negocio, subir el propio y descargarlo.
             Route::get('/mi/documentos', [MisDocumentosTenantController::class, 'index'])->name('mi.documentos.index');
+            // Mis datos para facturar (y la factura automática de mis citas).
+            Route::get('/mi/datos-fiscales', [DatosFiscalesClienteController::class, 'mios'])->name('mi.datos-fiscales.show');
+            Route::put('/mi/datos-fiscales', [DatosFiscalesClienteController::class, 'guardarMios'])->middleware('throttle:10,1,datos-fiscales')->name('mi.datos-fiscales.update');
+            Route::delete('/mi/datos-fiscales', [DatosFiscalesClienteController::class, 'borrarMios'])->name('mi.datos-fiscales.destroy');
             Route::post('/mi/documentos', [MisDocumentosTenantController::class, 'subir'])->name('mi.documentos.subir');
             Route::get('/mi/documentos/{documento}', [MisDocumentosTenantController::class, 'ver'])->name('mi.documentos.ver');
             // Familias (B05, ADR 0123): las personas a cargo de la cuenta y su autorización.
@@ -642,6 +647,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/miembros/exportar', [MiembrosTenantController::class, 'exportar'])->middleware('puede:miembros.gestionar')->name('miembros.exportar');
             // Notas internas del equipo sobre un cliente.
             Route::get('/miembros/{persona}/notas', [NotasPersonaTenantController::class, 'index'])->middleware('puede:miembros.ver')->name('miembros.notas.index');
+            // Sus datos para facturarle (y si pidió factura automática de sus citas).
+            Route::get('/miembros/{persona}/datos-fiscales', [DatosFiscalesClienteController::class, 'ficha'])->middleware('puede:ordenes.ver')->name('miembros.datos-fiscales.show');
+            Route::put('/miembros/{persona}/datos-fiscales', [DatosFiscalesClienteController::class, 'guardarFicha'])->middleware('puede:ordenes.gestionar')->name('miembros.datos-fiscales.update');
             Route::post('/miembros/{persona}/notas', [NotasPersonaTenantController::class, 'crear'])->middleware('puede:miembros.gestionar')->name('miembros.notas.store');
             Route::delete('/miembros/{persona}/notas/{nota}', [NotasPersonaTenantController::class, 'eliminar'])->middleware('puede:miembros.gestionar')->name('miembros.notas.destroy');
             Route::post('/miembros', [MiembrosTenantController::class, 'store'])->middleware('puede:miembros.gestionar')->name('miembros.store');

@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Listeners\DevolverPagoAlCancelarNegocio;
 use App\Modules\Tenancy\Listeners\DevolverPagoDeCitaConAnticipo;
 use App\Modules\Tenancy\Listeners\EjecutarAutomatizaciones;
 use App\Modules\Tenancy\Listeners\EnviarWebhooksSalientes;
+use App\Modules\Tenancy\Listeners\FacturarCitaAlPagarse;
 use App\Modules\Tenancy\Listeners\GenerarComunicaciones;
 use App\Modules\Tenancy\Listeners\RegistrarConversionesMedicion;
 use App\Modules\Tenancy\Listeners\ReservarInscritosEnFechasNuevas;
@@ -177,6 +178,8 @@ class AppServiceProvider extends ServiceProvider
         // Cita con anticipo (ADR 0161, 0181): si el cliente cancela a tiempo se le devuelve
         // todo; si cancela tarde o no llega, lo que pagó de más sobre el anticipo.
         Event::listen(EventoDeDominioTenant::class, DevolverPagoDeCitaConAnticipo::class);
+        // La factura automática de una cita al pagarse, si su cliente la pidió.
+        Event::listen(EventoDeDominioTenant::class, FacturarCitaAlPagarse::class);
         // GA4 y Meta del negocio (ADR 0143): anota sus conversiones; se mandan aparte.
         Event::listen(EventoDeDominioTenant::class, RegistrarConversionesMedicion::class);
         // Wellhub y TotalPass ven al momento los lugares de sus clases (ADR 0202).

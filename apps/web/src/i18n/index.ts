@@ -101,6 +101,7 @@ import detalleClase from "./locales/detalleClase.es-MX";
 import medicion from "./locales/medicion.es-MX";
 import paseLista from "./locales/paseLista.es-MX";
 import fitpass from "./locales/fitpass.es-MX";
+import datosFacturacion from "./locales/datosFacturacion.es-MX";
 // Kiosco de llegada (ADR 0183).
 import kiosco from "./locales/kiosco.es-MX";
 // Videos y clases en línea (ADR 0184).
@@ -235,6 +236,7 @@ const mensajesBase = {
   detalleClase,
   paseLista,
   fitpass,
+  datosFacturacion,
   kiosco,
   videos,
   whatsappRenta,

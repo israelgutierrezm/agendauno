@@ -147,6 +147,8 @@ final class CatalogoParametros
             // Facturación (ADR 0047).
             new DefinicionParametro('facturacion.iva_porcentaje', 'Facturación', 'Tasa de IVA de las facturas',
                 '8 % solo si el negocio aplica el estímulo de la región fronteriza.', $e, 16, 8, 16, '%', opciones: [16, 8]),
+            new DefinicionParametro('facturacion.automatica_citas', 'Facturación', 'Facturar las citas en automático',
+                'A los clientes que guardaron sus datos fiscales y pidieron factura automática: el anticipo al pagarlo y la cita al pagar el resto, con el CFDI de egreso que aplica el anticipo. Solo negocios de citas.', $sn, 0),
 
             // Devoluciones (ADR 0046).
             // Cobros en caja (ADR 0086): corregir la forma de pago de un cobro.

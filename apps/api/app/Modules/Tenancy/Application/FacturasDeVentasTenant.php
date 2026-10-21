@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Models\DatosFiscalesPersonaTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\LineaVentaPosTenant;
@@ -205,6 +206,12 @@ class FacturasDeVentasTenant
             return ['nombre' => null, 'email' => null, 'rfc' => null, 'codigo_postal' => null, 'uso_cfdi' => null, 'regimen_fiscal' => null];
         }
         $id = (int) $persona->getKey();
+        // Los que guardó (él en su cuenta o el negocio en su ficha), antes que los de su
+        // última factura.
+        $guardados = DatosFiscalesPersonaTenant::query()->where('persona_id', $id)->first();
+        if ($guardados instanceof DatosFiscalesPersonaTenant) {
+            return $guardados->receptor() + ['uso_cfdi' => $guardados->uso_cfdi];
+        }
         $ultima = FacturaTenant::query()
             ->where('estado', EstadoFactura::Timbrada->value)
             ->where('tipo', FacturaTenant::INGRESO)

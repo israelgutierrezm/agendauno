@@ -100,6 +100,8 @@ Schedule::command('agendauno:recordar-demos')->everyFiveMinutes()->withoutOverla
 // Los pases de la cartera que cambiaron (plan, vigencia, saldo): se avisa a Apple Wallet
 // y se actualiza Google Wallet (ADR 0195).
 Schedule::command('agendauno:actualizar-pases-wallet')->everyTenMinutes()->withoutOverlapping();
+// Facturas automáticas de citas que no se timbraron y anticipos por aplicar.
+Schedule::command('agendauno:facturar-citas')->hourlyAt(35)->withoutOverlapping();
 
 // Plantillas de WhatsApp de los negocios (ADR 0190): cómo van en Meta.
 Schedule::command('agendauno:revisar-plantillas-whatsapp')->everyFifteenMinutes()->withoutOverlapping();

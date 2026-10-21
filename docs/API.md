@@ -714,6 +714,27 @@ Solo negocios de clases, con `reservas.gestionar`. Con `ya_descontadas` = 1, tam
 - Cada factura trae `anticipo` y `anticipo_aplicado`. `GET /facturas?anticipos_de=<RFC>`
   lista los anticipos timbrados y sin aplicar de ese RFC.
 
+## Facturas automáticas de citas y datos para facturar
+
+- **Datos para facturar del cliente**: `GET|PUT /mi/datos-fiscales` (su cuenta) y `GET`
+  (`ordenes.ver`) / `PUT` (`ordenes.gestionar`) `/miembros/{persona}/datos-fiscales` (su
+  ficha); `DELETE /mi/datos-fiscales` (204). Campos: `rfc`, `nombre`, `codigo_postal`,
+  `regimen_fiscal` (c_RegimenFiscal), `uso_cfdi` (c_UsoCFDI; uno de personas físicas con
+  un RFC de 12, 422 en `uso_cfdi`), `email` y `factura_automatica`. La respuesta es
+  {`data` (o `null`), `meta.automatica_disponible`}. El borrador de una factura
+  (`/facturas/borrador`) toma estos datos antes que los de su última factura.
+- **Factura automática** (parámetro `facturacion.automatica_citas`, solo negocios de
+  citas que facturan): al pagarse la orden de una cita (`orden.pagada`) de un cliente con
+  `factura_automatica`:
+  - el anticipo (ADR 0161): su CFDI de anticipo, ligado a la orden del anticipo;
+  - el resto, con el anticipo facturado: la factura de la operación completa
+    relacionada (`07`) con el anticipo, y el CFDI de egreso que lo aplica (forma de
+    pago `30`, uso `G02`, «Aplicación de anticipo», relacionado `07` con ella);
+  - una cita pagada completa (o el resto sin anticipo facturado): su factura, con los
+    conceptos del borrador.
+- `agendauno:facturar-citas` (cada hora) reintenta lo que no se timbró (hasta 3 errores
+  por orden, de los últimos 7 días) y aplica los anticipos cuyo egreso falló.
+
 ## Facturas: la factura de una venta (ADR 0179)
 
 - `GET /facturas/borrador?orden=<ULID>` o `?venta=<ULID>` (venta del mostrador), con
@@ -1140,7 +1161,8 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
 
 - `GET/POST /captacion/widgets` y `PUT/DELETE /captacion/widgets/{widget}`
   (`prospectos.ver` y `prospectos.gestionar`). Campos:
-  - `tipo`: `calendario` (solo clases) o `planes`;
+  - `tipo`: `calendario` (solo clases), `agendar` (solo citas: sus servicios abren la
+    página para agendar con el servicio y la sede elegidos) o `planes`;
   - `nombre`;
   - `filtros` (`sucursal` y `actividad`, ulids);
   - `tema`: `claro`, `oscuro` o `auto`;

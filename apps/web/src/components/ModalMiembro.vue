@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
+import DatosFacturacionCliente from "@/components/DatosFacturacionCliente.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import MenuFlotante from "@/components/MenuFlotante.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -1211,6 +1212,21 @@ function colorAlerta(codigo: string): string {
             data-prueba="compras-en-ficha"
             >{{ $t("detalleMiembro.verTodoEnFicha") }} →</RouterLink
           >
+        </section>
+        <!-- Sus datos para facturarle (y si pidió la factura automática). -->
+        <section
+          v-if="
+            persona &&
+            sesion.puede('ordenes.ver') &&
+            sesion.estudio?.factura_posible === true
+          "
+        >
+          <h3 class="dm-titulo">{{ $t("datosFacturacion.titulo") }}</h3>
+          <DatosFacturacionCliente
+            :key="persona.id"
+            class="mt-2"
+            :url="`/api/v1/app/${sesion.slug}/miembros/${persona.id}/datos-fiscales`"
+          />
         </section>
       </div>
 
