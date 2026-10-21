@@ -10,11 +10,12 @@ import 'compras_mostrador.dart';
 import 'corte_planes_card.dart';
 import 'cuenta_widgets.dart';
 import 'historial_compras.dart';
+import 'mis_presupuestos.dart';
 import 'pago_automatico_screen.dart';
 
-/// Pagos del portal: lo que tiene por pagar, comprar un plan, el corte de sus
-/// planes, el pago automático si el negocio lo ofrece, su historial de pagos y lo
-/// que compró en el mostrador.
+/// Pagos del portal: sus presupuestos (en citas), lo que tiene por pagar, comprar
+/// un plan, el corte de sus planes, el pago automático si el negocio lo ofrece, su
+/// historial de pagos y lo que compró en el mostrador.
 class PagosTab extends ConsumerWidget {
   const PagosTab({super.key, required this.cuenta});
 
@@ -29,6 +30,8 @@ class PagosTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
         children: [
+          // Los presupuestos que le mandó el negocio; sin ninguno, no aparece.
+          if (esCitas) const MisPresupuestosSeccion(),
           const TituloSeccion('Por pagar'),
           // La pasarela del negocio está en pruebas (M07).
           if (cuenta.pagoEnLinea && cuenta.pagoEnLineaPrueba)

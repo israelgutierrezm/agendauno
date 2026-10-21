@@ -13,6 +13,7 @@ import 'corte_planes.dart';
 import 'cuenta_models.dart';
 import 'formularios.dart';
 import 'lugares_clase.dart';
+import 'presupuestos.dart';
 import 'videos.dart';
 
 /// Acceso a los datos del autoservicio del miembro (`/app/{slug}/mi/*`), sobre el
@@ -400,6 +401,64 @@ class CuentaRepository {
       ultimaPagina: (meta['ultima_pagina'] as num? ?? pagina).toInt(),
     );
   }
+
+  /// Los presupuestos que le mandó el negocio (solo citas; los 50 más recientes).
+  Future<List<PresupuestoCliente>> presupuestos() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/presupuestos');
+    return ((res.data?['data'] ?? []) as List)
+        .whereType<Map<String, dynamic>>()
+        .map((p) => PresupuestoCliente.desdeJson(p, moneda: _moneda))
+        .toList();
+  }
+
+  /// Un presupuesto suyo, como está ahora (p. ej. tras cambiarlo el negocio).
+  Future<PresupuestoCliente> presupuesto(String id) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/presupuestos/$id',
+    );
+    return _presupuesto(res.data);
+  }
+
+  /// Lo acepta tal como lo vio ([revision]): se vuelve su cobro con el negocio. Si
+  /// el negocio lo cambió mientras tanto, el servidor responde 409.
+  Future<PresupuestoCliente> aceptarPresupuesto(String id, int revision) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/presupuestos/$id/aceptar',
+      data: {'revision': revision},
+    );
+    return _presupuesto(res.data);
+  }
+
+  /// Lo rechaza, con su motivo si quiso darlo.
+  Future<PresupuestoCliente> rechazarPresupuesto(
+    String id, {
+    String? motivo,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/presupuestos/$id/rechazar',
+      data: {'motivo': motivo},
+    );
+    return _presupuesto(res.data);
+  }
+
+  /// Inicia el pago en línea del cobro de un presupuesto aceptado (la página de la
+  /// pasarela del negocio).
+  Future<CheckoutPago> pagarPresupuesto(PresupuestoCliente p) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/presupuestos/${p.id}/pagar',
+      data: {'idempotency_key': p.clavePago},
+    );
+    return CheckoutPago.desdeJson(
+      ((res.data?['data'] ?? {}) as Map<String, dynamic>)['checkout'],
+    );
+  }
+
+  PresupuestoCliente _presupuesto(Map<String, dynamic>? respuesta) =>
+      PresupuestoCliente.desdeJson(
+        (respuesta?['data'] ?? const <String, dynamic>{})
+            as Map<String, dynamic>,
+        moneda: _moneda,
+      );
 
   /// La biblioteca de videos del negocio (ADR 0184, solo en clases): todos los
   /// publicados, con el enlace solo de los que incluye su plan.

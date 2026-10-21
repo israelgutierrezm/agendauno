@@ -209,6 +209,7 @@ class Sesion {
     this.estadoNegocio,
     this.modulos = const [],
     this.whatsappClientes = false,
+    this.accesoAbierto = false,
   });
 
   final String slug;
@@ -270,6 +271,10 @@ class Sesion {
   /// ¿El negocio manda avisos por WhatsApp a sus clientes (ADR 0069)? Solo entonces
   /// el alta de un cliente le pregunta si los acepta.
   final bool whatsappClientes;
+
+  /// ¿El negocio controla la entrada (acceso libre: gimnasio, CrossFit; ADR 0105)?
+  /// Solo ahí el cliente tiene pase QR y recepción lo escanea (como en la web).
+  final bool accesoAbierto;
 
   /// Estado del negocio en la plataforma (`estudio.estado`: trialing, active,
   /// suspended…; null si el API no lo mandó).
@@ -382,6 +387,7 @@ class Sesion {
     'estado_negocio': estadoNegocio,
     'modulos': modulos,
     'whatsapp_clientes': whatsappClientes,
+    'acceso_abierto': accesoAbierto,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -432,6 +438,7 @@ class Sesion {
       estadoNegocio: datos['estado_negocio'] as String?,
       modulos: _textos(datos['modulos']),
       whatsappClientes: (datos['whatsapp_clientes'] ?? false) as bool,
+      accesoAbierto: (datos['acceso_abierto'] ?? false) as bool,
     );
   }
 
@@ -486,6 +493,8 @@ class Sesion {
       estadoNegocio: estudio?['estado'] as String?,
       modulos: _textos(estudio?['modulos']),
       whatsappClientes: (estudio?['whatsapp_clientes'] ?? false) as bool,
+      // Las banderas de su perfil (`perfil_config.flags`), como la web.
+      accesoAbierto: (config?['flags'] as Map?)?['acceso_abierto'] == true,
     );
   }
 
@@ -558,6 +567,7 @@ class Sesion {
     modulos: modulos,
     whatsappClientes:
         (estudio?['whatsapp_clientes'] ?? whatsappClientes) as bool,
+    accesoAbierto: accesoAbierto,
   );
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.

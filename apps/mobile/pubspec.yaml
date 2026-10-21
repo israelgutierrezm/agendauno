@@ -43,6 +43,8 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
   google_sign_in: ^7.2.0
+  # Escanear el pase QR de los clientes en la app del equipo.
+  mobile_scanner: ^7.4.2
 
 dev_dependencies:
   flutter_test:

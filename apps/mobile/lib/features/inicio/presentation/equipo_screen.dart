@@ -5,6 +5,8 @@ import '../../../core/aviso_sin_sucursal.dart';
 import '../../../core/error_de_carga.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../acceso/data/accesos_repository.dart';
+import '../../acceso/presentation/escaner_pase_screen.dart';
 import '../../agenda/presentation/agenda_screen.dart';
 import '../../bandeja/presentation/bandeja_screen.dart';
 import '../../auth/application/sesion_controller.dart';
@@ -298,6 +300,21 @@ class _InicioNegocio extends ConsumerWidget {
                     atencion: (agenda?.sinMarcar ?? 0) > 0,
                     tono: TonosAcceso.creditos,
                     onTap: () => onIr(PestanaEquipo.agenda),
+                  ),
+                // La entrada con el pase QR del cliente (negocios que controlan la
+                // entrada, como la recepción de la web).
+                if (puedeEscanearPase(sesion))
+                  TarjetaAcceso(
+                    key: const Key('escanear-pase'),
+                    icono: Icons.qr_code_scanner,
+                    titulo: 'Escanear pase',
+                    valor: 'Registra la entrada con su QR',
+                    tono: TonosAcceso.pase,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const EscanerPaseScreen(),
+                      ),
+                    ),
                   ),
                 TarjetaAcceso(
                   icono: Icons.person_outline,

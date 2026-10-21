@@ -18,8 +18,15 @@ import 'elegir_profesional.dart';
 /// se paga para reservar, la cita queda apartada hasta pagarla; si pide anticipo,
 /// elige pagar solo el anticipo o todo (ADR 0161). Los servicios de su bono
 /// aparecen «Con tu bono» y no se pagan (ADR 0091).
+///
+/// Con [servicioId] (y [sucursalId]) llega con ese servicio (y esa sede) ya
+/// elegidos, p. ej. desde un presupuesto aceptado; si el negocio ya no lo ofrece en
+/// línea, se elige como siempre.
 class AgendarCitaSheet extends ConsumerStatefulWidget {
-  const AgendarCitaSheet({super.key});
+  const AgendarCitaSheet({super.key, this.servicioId, this.sucursalId});
+
+  final String? servicioId;
+  final String? sucursalId;
 
   @override
   ConsumerState<AgendarCitaSheet> createState() => _AgendarCitaSheetState();
@@ -107,9 +114,14 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     }
     setState(() {
       _opciones = opciones;
+      _servicio = opciones.servicios
+          .where((s) => s.id == widget.servicioId)
+          .firstOrNull;
       _sede = opciones.sucursales.length == 1
           ? opciones.sucursales.first
-          : null;
+          : opciones.sucursales
+                .where((s) => s.id == widget.sucursalId)
+                .firstOrNull;
       _profesional = null;
       _ajustarProfesional();
       _ofrecerWhatsapp = ofrecerWhatsapp;
