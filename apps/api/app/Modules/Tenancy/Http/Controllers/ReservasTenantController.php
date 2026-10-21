@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
+use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -19,6 +20,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\ProveedorPartner;
 use App\Modules\Tenancy\Reservas\CanalReserva;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\QuienCancela;
@@ -93,6 +95,8 @@ class ReservasTenantController
                 'invitados' => InvitadosTenantController::deLaSesion($sesion),
                 // Quien reservó desde la app de Wellhub, TotalPass o Fitpass (ADR 0202).
                 'plataforma' => LugaresPlataformaTenantController::deLaSesion($sesion),
+                // Con Fitpass activo, recepción captura aquí sus reservas (sin API).
+                'fitpass' => app(RegistroDeIntegracionesTenant::class)->activa(ProveedorPartner::Fitpass->value),
             ],
         ]);
     }

@@ -25,7 +25,7 @@ class TarifaPlataformaTenant extends Model
 
     protected $table = 'tarifas_plataforma';
 
-    protected $fillable = ['proveedor', 'monto_minor', 'moneda', 'vigente_desde'];
+    protected $fillable = ['proveedor', 'monto_minor', 'moneda', 'vigente_desde', 'paga_inasistencias'];
 
     /**
      * @var array<string, string>
@@ -33,5 +33,6 @@ class TarifaPlataformaTenant extends Model
     protected $casts = [
         'monto_minor' => 'integer',
         'vigente_desde' => 'date',
+        'paga_inasistencias' => 'boolean',
     ];
 }

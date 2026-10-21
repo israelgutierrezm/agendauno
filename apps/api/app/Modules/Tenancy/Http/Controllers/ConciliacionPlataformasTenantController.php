@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Models\TarifaPlataformaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
+use App\Support\LectorXlsx;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,7 @@ class ConciliacionPlataformasTenantController
                 'monto_minor' => $t->monto_minor,
                 'moneda' => $t->moneda,
                 'vigente_desde' => $t->vigente_desde->toDateString(),
+                'paga_inasistencias' => $t->paga_inasistencias,
             ])->values()->all()]);
     }
 
@@ -45,8 +47,10 @@ class ConciliacionPlataformasTenantController
             'proveedor' => ['required', Rule::enum(ProveedorPartner::class)],
             'monto_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
             'vigente_desde' => ['required', 'date_format:Y-m-d'],
+            // Su contrato: también paga las reservas que no se cancelaron a tiempo.
+            'paga_inasistencias' => ['sometimes', 'boolean'],
         ]);
-        $tarifa = $this->conciliacion->pactarTarifa((string) $validado['proveedor'], (int) $validado['monto_minor'], (string) $validado['vigente_desde']);
+        $tarifa = $this->conciliacion->pactarTarifa((string) $validado['proveedor'], (int) $validado['monto_minor'], (string) $validado['vigente_desde'], (bool) ($validado['paga_inasistencias'] ?? false));
         $actor = $request->attributes->get('usuario_tenant');
         $this->auditoria->registrar($actor instanceof Usuario ? $actor : null, 'plataforma.tarifa', 'tarifa_plataforma', (string) $tarifa->ulid,
             null, ['proveedor' => $tarifa->proveedor, 'monto_minor' => $tarifa->monto_minor, 'vigente_desde' => $tarifa->vigente_desde->toDateString()]);
@@ -64,13 +68,13 @@ class ConciliacionPlataformasTenantController
         return response()->json(['data' => $this->conciliacion->resumen((string) $validado['proveedor'], (string) $validado['periodo'])]);
     }
 
-    /** Importa el reporte de pagos del mes (CSV) y responde la conciliación. */
+    /** Importa el reporte de pagos del mes (CSV o Excel) y responde la conciliación. */
     public function importar(Request $request): JsonResponse
     {
         $validado = $request->validate([
             'proveedor' => ['required', Rule::enum(ProveedorPartner::class)],
             'periodo' => ['required', 'date_format:Y-m'],
-            'archivo' => ['required', 'file', 'max:5120', 'mimetypes:text/plain,text/csv,application/csv,application/vnd.ms-excel'],
+            'archivo' => ['required', 'file', 'max:5120', 'mimetypes:text/plain,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip'],
         ]);
         $archivo = $validado['archivo'];
         abort_unless($archivo instanceof UploadedFile, 422);
@@ -78,10 +82,16 @@ class ConciliacionPlataformasTenantController
         $actor = $actor instanceof Usuario ? $actor : null;
 
         try {
+            // El del portal de Wellhub es un Excel; los demás, un CSV.
+            $excel = str_ends_with(mb_strtolower($archivo->getClientOriginalName()), '.xlsx')
+                || in_array($archivo->getMimeType(), ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'], true);
+            $tabla = $excel
+                ? LectorXlsx::filas((string) $archivo->getRealPath(), 20001)
+                : ConciliacionPlataformasTenant::tablaDeCsv((string) file_get_contents((string) $archivo->getRealPath()));
             $conciliacion = $this->conciliacion->importar(
                 (string) $validado['proveedor'],
                 (string) $validado['periodo'],
-                (string) file_get_contents($archivo->getRealPath()),
+                $tabla,
                 $archivo->getClientOriginalName(),
                 $actor,
             );

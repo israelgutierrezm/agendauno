@@ -84,6 +84,15 @@ function rutasExclusivasPorModalidad(): array
         // Reservas desde la app de Wellhub y TotalPass (ADR 0149).
         'integraciones.reservas.show' => 'clases',
         'integraciones.reservas.guardar' => 'clases',
+        // Fitpass sin API y las reservas de plataformas en la lista de la clase (ADR 0202).
+        'integraciones.fitpass.clases' => 'clases',
+        'integraciones.fitpass.clases.guardar' => 'clases',
+        'integraciones.fitpass.horarios' => 'clases',
+        'integraciones.fitpass.por-marcar' => 'clases',
+        'lugares-plataforma.cancelar' => 'clases',
+        'lugares-plataforma.llego' => 'clases',
+        'lugares-plataforma.marcado' => 'clases',
+        'sesiones.lugares-plataforma.apartar' => 'clases',
         // Visitantes de Wellhub y TotalPass (ADR 0148).
         'reportes.plataformas' => 'clases',
         'visitantes-plataforma.index' => 'clases',

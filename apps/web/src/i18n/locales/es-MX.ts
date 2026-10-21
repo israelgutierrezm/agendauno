@@ -3199,6 +3199,7 @@ export default {
       wellhub: "Wellhub",
       totalpass: "TotalPass",
       classpass: "ClassPass",
+      fitpass: "Fitpass",
       otro: "Otro",
     },
     cuposCanal: {
@@ -3465,6 +3466,9 @@ export default {
     titulo: "Check-ins de bienestar",
     proveedor: "Plataforma",
     codigo: "Código del usuario",
+    reservacionFitpass: "ID de la reservación (Fitpass Admin)",
+    identificacionRevisada:
+      "Revisé su identificación oficial (lo pide Fitpass)",
     registrar: "Registrar check-in",
     registrando: "Validando…",
     vacio: "Sin check-ins de bienestar.",

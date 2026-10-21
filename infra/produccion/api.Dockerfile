@@ -10,9 +10,12 @@ FROM php:8.3-fpm-alpine AS base
 # opcache. Redis va por predis (PHP puro). mysql-client: respaldos con mysqldump;
 # mariadb-connector-c trae el plugin caching_sha2_password, con el que entra el
 # usuario normal de MySQL 8.4 (el cliente de MariaDB no lo incluye).
-# su-exec: el worker y el scheduler corren como www-data.
-RUN apk add --no-cache mysql-client mariadb-connector-c su-exec \
-    && docker-php-ext-install -j"$(nproc)" pdo_mysql pcntl opcache
+# su-exec: el worker y el scheduler corren como www-data. zip: leer los reportes de
+# pagos en Excel (.xlsx) de las plataformas (ADR 0202).
+RUN apk add --no-cache mysql-client mariadb-connector-c su-exec libzip \
+    && apk add --no-cache --virtual .deps-compilar libzip-dev \
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql pcntl opcache zip \
+    && apk del .deps-compilar
 
 COPY infra/produccion/php.ini /usr/local/etc/php/conf.d/zz-agendauno.ini
 # Pool propio de PHP-FPM (el de la imagen solo tiene 5 procesos); se lee después de

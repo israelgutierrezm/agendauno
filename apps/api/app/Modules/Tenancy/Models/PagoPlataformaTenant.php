@@ -26,7 +26,7 @@ class PagoPlataformaTenant extends Model
 
     protected $table = 'pagos_plataforma';
 
-    protected $fillable = ['conciliacion_id', 'fecha', 'referencia', 'monto_minor', 'checkin_id'];
+    protected $fillable = ['conciliacion_id', 'fecha', 'referencia', 'monto_minor', 'checkin_id', 'lugar_id'];
 
     /**
      * @var array<string, string>

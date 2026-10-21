@@ -37,6 +37,10 @@ class CheckinsTenantController
             'proveedor' => ['required', Rule::in(ProveedorPartner::valores())],
             'sesion_id' => ['required', 'string'],
             'codigo' => ['required', 'string', 'max:255'],
+            // Fitpass pide revisar la identificación oficial de quien llega (ADR 0202).
+            'identificacion_revisada' => ['exclude_unless:proveedor,fitpass', 'accepted'],
+        ], [
+            'identificacion_revisada.accepted' => 'Revisa su identificación oficial antes de registrar la visita (lo pide Fitpass).',
         ]);
 
         $sesion = SesionTenant::query()->where('ulid', $validado['sesion_id'])->firstOrFail();

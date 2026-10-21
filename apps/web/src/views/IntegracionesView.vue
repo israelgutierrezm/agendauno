@@ -13,6 +13,7 @@ import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import ReservasBienestar from "@/components/ReservasBienestar.vue";
+import FitpassOperacion from "@/components/FitpassOperacion.vue";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
@@ -671,7 +672,12 @@ onMounted(cargar);
           }}
         </button>
         <!-- Reservas desde la app de la plataforma (ADR 0149). -->
-        <ReservasBienestar v-if="i.activa" :proveedor="i.proveedor" />
+        <ReservasBienestar
+          v-if="i.activa && i.proveedor !== 'fitpass'"
+          :proveedor="i.proveedor"
+        />
+        <!-- Fitpass sin API: horarios para capturar y asistencia por marcar (ADR 0202). -->
+        <FitpassOperacion v-if="i.activa && i.proveedor === 'fitpass'" />
       </div>
     </div>
 

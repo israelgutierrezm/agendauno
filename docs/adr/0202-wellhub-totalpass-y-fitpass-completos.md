@@ -104,6 +104,47 @@ Huecos completados:
   todos; el límite de 600 por minuto ahora es de cada negocio.
 - La búsqueda de un horario que Wellhub ya tenía usa un minuto de margen.
 
+## Fitpass (sin API)
+
+Fitpass no publica una API. Su integración con software de reservas es privada (Fitune
+la tiene por acuerdo con Fitpass). Lo que se puede hacer sin ella:
+
+- **Lugares apartados:** `fitpass` es un canal de reserva más; con su regla de cupo por
+  canal, el negocio aparta los «lugares exclusivos» que da a Fitpass y nadie más los toma.
+- **Reservas capturadas por recepción** desde Fitpass Admin
+  (`POST /sesiones/{sesion}/lugares-plataforma`): con su ID de reservación, su nombre y su
+  correo (se puede pegar la tabla). Cada una ocupa su lugar de lo que Fitpass puede tomar;
+  la que no cabe se dice por qué. La misma reservación otra vez es la misma.
+- **Llegada:** «Llegó» en la lista de la clase o el check-in a mano con el ID de la
+  reservación; las dos piden confirmar que se revisó su identificación oficial (lo piden
+  los términos de Fitpass). La visita es la de su reserva: no ocupa otro lugar. La
+  palabra «folio» se cambió por «ID de la reservación»: no hay folio documentado.
+- **Por marcar en Fitpass Admin:** Fitpass acepta cambios de asistencia hasta 48 horas
+  después de la clase y de eso depende su pago. `GET /integraciones/fitpass/por-marcar`
+  lista quién llegó y quién no de las últimas 48 horas, y `POST
+  /lugares-plataforma/{lugar}/marcado` lo da por marcado.
+- **Horarios para capturar:** el negocio marca qué clases ofrece en Fitpass y el nombre de
+  su disciplina allá (`PUT /integraciones/fitpass/clases`); `GET
+  /integraciones/fitpass/horarios` da los de los próximos días con los lugares para
+  Fitpass y las canceladas (para quitarlas allá). La web los descarga en CSV.
+- Las reservas de Fitpass sin llegada quedan «no asistió» al terminar la clase, aunque el
+  negocio no publique en otra plataforma.
+- **Con un acuerdo con Fitpass** (el negocio lo pide a Fitpass, como Fitune) se agregaría
+  su API: publicar horarios, recibir reservas y mandar la asistencia.
+
+## Conciliación (Wellhub, TotalPass y Fitpass)
+
+- **Excel:** el reporte del portal de Wellhub es un `.xlsx`. Se lee sin dependencias (un
+  `.xlsx` es un zip con XML; la imagen del API suma la extensión `zip`), con las fechas de
+  Excel (su número de serie).
+- **Por persona:** si el reporte trae quién fue (su Wellhub ID, su código o su correo),
+  cada pago se empareja con la visita de esa persona ese día; antes solo por el día, y con
+  dos visitas el mismo día un pago podía quedar con la visita de otra persona.
+- **Inasistencias que se pagan:** si el contrato del negocio con la plataforma dice que
+  también paga las reservas que no se cancelaron a tiempo (Fitune lo describe así para
+  Fitpass), la tarifa lo marca (`paga_inasistencias`) y esas reservas se esperan y se
+  concilian como las visitas.
+
 ## Países
 
 Wellhub opera en varios países: dónde se ofrecen Wellhub y TotalPass lo decide el
@@ -120,6 +161,8 @@ espaciado (1, 2, 3… hasta 10 minutos), en lugar de rendirse a los cinco intent
 
 - La validación con las APIs reales sigue pendiente: hacen falta las credenciales de
   socio de cada plataforma y su ambiente de prueba.
+- Fitpass: confirmar con un studio Fitpass real cómo se identifica la reserva en
+  recepción, si su reporte de pagos trae el ID o el correo, y si paga las inasistencias.
 - Queda por confirmar con TotalPass: el host de su admin en producción, los estados de
   una reserva, qué pasa si no se confirma en 5 minutos y si `event.id` del aviso es el
   evento o la ocurrencia.

@@ -568,7 +568,7 @@ export default {
     conciliacion: {
       titulo: "Conciliar pagos",
       ayuda:
-        "Compara lo que te pagó la plataforma con tus visitas validadas del mes. Descarga el reporte de pagos de su portal (guárdalo como CSV) e impórtalo aquí.",
+        "Compara lo que te pagó la plataforma con tus visitas validadas del mes. Descarga el reporte de pagos de su portal (CSV o Excel) e impórtalo aquí.",
       plataforma: "Plataforma",
       mes: "Mes",
       visitas: "Visitas validadas",
@@ -580,11 +580,14 @@ export default {
         "{n} visitas sin tarifa: captura cuánto te pagan por visita para calcular lo esperado.",
       tarifa: "Lo que te pagan por visita",
       tarifaAyuda: "Rige desde el mes elegido.",
+      pagaInasistencias:
+        "Según mi contrato, también paga las reservas que no se cancelaron a tiempo (no llegó o canceló tarde)",
+      inasistenciasSinPago: "Reservas que no llegaron, sin pago ({n})",
       guardarTarifa: "Guardar tarifa",
       tarifaGuardada: "Tarifa guardada.",
-      archivo: "Reporte de pagos (CSV)",
+      archivo: "Reporte de pagos (CSV o Excel)",
       archivoAyuda:
-        "Con columnas de fecha, monto y, si las trae, la referencia del check-in.",
+        "Con columnas de fecha y monto y, si las trae, la referencia del check-in y quién fue (su Wellhub ID, su código o su correo).",
       importar: "Importar y conciliar",
       importado: "Reporte importado.",
       visitasSinPago: "Visitas sin pago ({n})",

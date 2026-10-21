@@ -37,7 +37,14 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeExcepcion = computed(() => sesion.puede("checkins.excepcion"));
 
 const checkins = ref<Checkin[]>([]);
-const modelo = ref({ proveedor: "wellhub", codigo: "" });
+const modelo = ref({
+  proveedor: "wellhub",
+  codigo: "",
+  identificacionRevisada: false,
+});
+// Fitpass no tiene API: se registra el ID de la reservación de Fitpass Admin y se
+// revisa la identificación oficial de quien llega (lo piden sus términos, ADR 0202).
+const esFitpass = computed(() => modelo.value.proveedor === "fitpass");
 const registrando = ref(false);
 const ok = ref(false);
 const aviso = ref<string | null>(null);
@@ -74,8 +81,12 @@ async function registrar(): Promise<void> {
       proveedor: modelo.value.proveedor,
       sesion_id: props.sesionId,
       codigo: modelo.value.codigo,
+      ...(esFitpass.value
+        ? { identificacion_revisada: modelo.value.identificacionRevisada }
+        : {}),
     });
     modelo.value.codigo = "";
+    modelo.value.identificacionRevisada = false;
     ok.value = true;
   } catch (e) {
     // El proveedor no respondió: no se registra como aprobada, queda sin verificar.
@@ -130,7 +141,11 @@ watch(
   () => props.sesionId,
   () => {
     checkins.value = [];
-    modelo.value = { proveedor: "wellhub", codigo: "" };
+    modelo.value = {
+      proveedor: "wellhub",
+      codigo: "",
+      identificacionRevisada: false,
+    };
     ok.value = false;
     aviso.value = null;
     error.value = null;
@@ -167,7 +182,9 @@ watch(
         </select>
       </div>
       <div class="flex-1 min-w-[150px]">
-        <label class="tu-label" for="cc">{{ $t("checkins.codigo") }}</label>
+        <label class="tu-label" for="cc">{{
+          esFitpass ? $t("checkins.reservacionFitpass") : $t("checkins.codigo")
+        }}</label>
         <input
           id="cc"
           v-model="modelo.codigo"
@@ -176,10 +193,22 @@ watch(
           required
         />
       </div>
+      <label
+        v-if="esFitpass"
+        class="flex items-center gap-2 text-sm w-full"
+        data-prueba="identificacion-revisada"
+      >
+        <input v-model="modelo.identificacionRevisada" type="checkbox" />
+        {{ $t("checkins.identificacionRevisada") }}
+      </label>
       <button
         class="tu-btn tu-btn-primario"
         type="submit"
-        :disabled="registrando || modelo.codigo === ''"
+        :disabled="
+          registrando ||
+          modelo.codigo === '' ||
+          (esFitpass && !modelo.identificacionRevisada)
+        "
       >
         {{
           registrando ? $t("checkins.registrando") : $t("checkins.registrar")

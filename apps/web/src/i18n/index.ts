@@ -100,6 +100,7 @@ import detalleClase from "./locales/detalleClase.es-MX";
 // Medición con GA4 y Meta (ADR 0142 y 0143).
 import medicion from "./locales/medicion.es-MX";
 import paseLista from "./locales/paseLista.es-MX";
+import fitpass from "./locales/fitpass.es-MX";
 // Kiosco de llegada (ADR 0183).
 import kiosco from "./locales/kiosco.es-MX";
 // Videos y clases en línea (ADR 0184).
@@ -233,6 +234,7 @@ const mensajesBase = {
   modalidadNegocio,
   detalleClase,
   paseLista,
+  fitpass,
   kiosco,
   videos,
   whatsappRenta,

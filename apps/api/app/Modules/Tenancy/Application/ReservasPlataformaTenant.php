@@ -17,6 +17,8 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
 use Carbon\CarbonImmutable;
+use DomainException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -497,6 +499,80 @@ class ReservasPlataformaTenant
         $this->alCambiar($lugar);
 
         return null;
+    }
+
+    /**
+     * Una reserva de Fitpass que recepción captura desde Fitpass Admin (sin API, ADR
+     * 0202): con el ID de la reservación, ocupa su lugar en la clase (de lo que Fitpass
+     * puede tomar, con su regla de cupo por canal) a nombre de su visitante. La misma
+     * reservación otra vez es la misma.
+     *
+     * @throws DomainException si no cabe o el ID no sirve
+     */
+    public function apartarFitpass(SesionTenant $sesion, string $id, string $nombre, ?string $correo): LugarPlataformaTenant
+    {
+        $id = strtoupper(trim((string) preg_replace('/\s+/', '', $id)));
+        if ($id === '' || strlen($id) > 64 || preg_match('/^[A-Z0-9_\-]+$/', $id) !== 1) {
+            throw new DomainException('El ID de la reservación de Fitpass solo lleva letras, números y guiones.');
+        }
+        $referencia = self::referencia(ProveedorPartner::Fitpass, $id);
+        $existente = LugarPlataformaTenant::query()->where('referencia_externa', $referencia)->first();
+        if ($existente instanceof LugarPlataformaTenant) {
+            if ((int) $existente->sesion_id !== (int) $sesion->getKey()) {
+                throw new DomainException("La reservación {$id} de Fitpass ya está en otra clase.");
+            }
+
+            return $existente;
+        }
+        $correo = $correo !== null && trim($correo) !== '' ? mb_strtolower(trim($correo)) : null;
+        $visitante = $this->visitantes->registrar(ProveedorPartner::Fitpass->value, $correo ?? 'reserva-'.$id, [
+            'nombre' => trim($nombre) !== '' ? trim($nombre) : null,
+            'email' => $correo,
+        ], null);
+
+        $lugar = DB::connection('tenant')->transaction(function () use ($sesion, $referencia, $visitante): LugarPlataformaTenant {
+            $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
+            if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
+                throw new DomainException('La clase no está programada: no admite reservas.');
+            }
+            if (! $this->hayLugar($bloqueada, ProveedorPartner::Fitpass)) {
+                throw new DomainException('La clase ya no tiene lugar para Fitpass.');
+            }
+
+            return LugarPlataformaTenant::query()->create([
+                'sesion_id' => $bloqueada->getKey(),
+                'proveedor' => ProveedorPartner::Fitpass->value,
+                'visitante_id' => $visitante->getKey(),
+                'origen' => LugarPlataformaTenant::ORIGEN_RESERVA,
+                'estado' => LugarPlataformaTenant::RESERVADO,
+                'referencia_externa' => $referencia,
+            ]);
+        });
+        // Wellhub y TotalPass ven al momento que ese lugar ya no está.
+        $this->publicar->alCambiarSesion($sesion);
+
+        return $lugar;
+    }
+
+    /**
+     * Las reservas de una plataforma sin API cuya asistencia falta marcar en su panel:
+     * de clases que ya terminaron en las últimas 48 horas (Fitpass acepta cambios hasta
+     * entonces y de eso depende su pago). Las más viejas primero.
+     *
+     * @return Collection<int, LugarPlataformaTenant>
+     */
+    public function porMarcarEnPlataforma(ProveedorPartner $proveedor): Collection
+    {
+        return LugarPlataformaTenant::query()
+            ->where('proveedor', $proveedor->value)
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->whereIn('estado', [LugarPlataformaTenant::ASISTIO, LugarPlataformaTenant::NO_ASISTIO])
+            ->whereNull('marcado_en_plataforma_en')
+            ->whereHas('sesion', fn ($q) => $q->where('termina_en', '<=', now())->where('inicia_en', '>=', now()->subHours(48)))
+            ->with(['sesion.oferta', 'visitante'])
+            ->get()
+            ->sortBy(fn (LugarPlataformaTenant $l): int => (int) $l->sesion?->inicia_en->getTimestamp())
+            ->values();
     }
 
     /** ¿Ya llegó el aviso de que esa reserva se canceló? (antes que su solicitud) */

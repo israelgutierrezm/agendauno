@@ -11,6 +11,7 @@ use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\HorarioPlataformaTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
+use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -41,9 +42,11 @@ class SincronizarPlataformas extends Command
                     }
                     $cambios += $gestor->ejecutarAislado($estudio, function () use ($publicar, $reservas): int {
                         // Sin la migración aún, o sin nada que publicar ni publicado, no hace nada.
+                        // (Las reservas de Fitpass se capturan a mano: también cuentan.)
                         if (! Schema::connection('tenant')->hasTable('horarios_plataforma')
                             || (! IntegracionTenant::query()->where('reservas_activas', true)->exists()
-                                && ! HorarioPlataformaTenant::query()->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)->exists())) {
+                                && ! HorarioPlataformaTenant::query()->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)->exists()
+                                && ! LugarPlataformaTenant::query()->where('estado', LugarPlataformaTenant::RESERVADO)->exists())) {
                             return 0;
                         }
                         $reservas->cerrarTerminadas();

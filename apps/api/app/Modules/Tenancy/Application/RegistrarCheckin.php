@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Exceptions\CheckinNoVerificable;
 use App\Modules\Tenancy\Exceptions\IntegracionNoDisponible;
 use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\Models\CheckinTenant;
+use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
@@ -61,6 +62,13 @@ class RegistrarCheckin
         $visitante = $proveedor === ProveedorPartner::Wellhub->value && $resultado->usuario !== null
             ? $this->visitantes->registrar($proveedor, $resultado->usuario, [], now())
             : null;
+        // Fitpass: el ID de una reserva que recepción capturó es esa persona y su lugar.
+        if ($proveedor === ProveedorPartner::Fitpass->value) {
+            $visitante = LugarPlataformaTenant::query()
+                ->where('sesion_id', $sesion->getKey())
+                ->where('referencia_externa', ReservasPlataformaTenant::referencia(ProveedorPartner::Fitpass, $resultado->referencia))
+                ->first()?->visitante;
+        }
 
         // La misma visita intentada antes en esta sesión (sin verificar o como excepción).
         $pendiente = CheckinTenant::query()

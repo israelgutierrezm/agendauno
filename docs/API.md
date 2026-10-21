@@ -971,6 +971,18 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
   responde 422: se valida sola en su app). `POST /lugares-plataforma/{lugar}/cancelar
   {motivo?}` (`reservas.gestionar`): el negocio cancela esa reserva y la plataforma le
   avisa a la persona.
+- Fitpass sin API (ADR 0202): `POST /sesiones/{sesion}/lugares-plataforma {reservas:
+  [{id, nombre?, correo?}]}` (`reservas.gestionar`) captura sus reservas de Fitpass Admin
+  y responde por cada una su `lugar` o su `error`; `GET` y `PUT
+  /integraciones/fitpass/clases {clases: [{oferta_id, ofrecida, disciplina}]}`;
+  `GET /integraciones/fitpass/horarios?dias=7` (`agenda.ver`); `GET
+  /integraciones/fitpass/por-marcar` y `POST /lugares-plataforma/{lugar}/marcado`
+  (`checkins.registrar`). `POST /checkins` y `POST /lugares-plataforma/{lugar}/llego` de
+  Fitpass piden `identificacion_revisada: true`. `meta.fitpass` en la lista de la clase
+  dice si Fitpass está activo.
+- `POST /plataformas/tarifas` acepta `paga_inasistencias`; `POST
+  /plataformas/conciliacion` acepta `.xlsx` y una columna de quién fue (Wellhub ID,
+  código o correo); el resumen suma `inasistencias` e `inasistencias_sin_pago`.
 - `GET /integraciones` solo lista las plataformas que se ofrecen en el país del negocio
   (`paises_bienestar` del superadmin, México por omisión); `llaves_alternativas` son
   otros grupos de llaves que bastan para activarla (TotalPass: `place_api_key`; Wellhub,

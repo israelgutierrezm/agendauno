@@ -255,10 +255,67 @@ interface LugarPlataformaLista {
   puede_marcar: boolean;
 }
 const plataforma = ref<LugarPlataformaLista[]>([]);
+// Fitpass no tiene API: recepción captura aquí sus reservas desde Fitpass Admin.
+const fitpassActivo = ref(false);
+const capturandoFitpass = ref(false);
+const textoFitpass = ref("");
+const erroresFitpass = ref<string[]>([]);
+/**
+ * Un renglón por reserva: «ID, nombre, correo» (también separados por tabulador o
+ * punto y coma, como al copiar la tabla de Fitpass Admin).
+ */
+function reservasFitpass(): { id: string; nombre: string; correo?: string }[] {
+  return textoFitpass.value
+    .split(/\r?\n/)
+    .map((linea) => linea.split(/[\t;,]/).map((c) => c.trim()))
+    .filter((partes) => (partes[0] ?? "") !== "")
+    .map(([id = "", nombre = "", correo = ""]) => ({
+      id,
+      nombre,
+      ...(correo.includes("@") ? { correo } : {}),
+    }));
+}
+async function capturarFitpass(): Promise<void> {
+  const reservas = reservasFitpass();
+  if (reservas.length === 0) {
+    return;
+  }
+  ocupado.value = true;
+  erroresFitpass.value = [];
+  try {
+    const { data } = await api.post<{
+      data: { id: string; error: string | null }[];
+    }>(`${base.value}/sesiones/${props.id}/lugares-plataforma`, { reservas });
+    erroresFitpass.value = data.data
+      .filter((r) => r.error !== null)
+      .map((r) => `${r.id}: ${r.error}`);
+    if (erroresFitpass.value.length === 0) {
+      textoFitpass.value = "";
+      capturandoFitpass.value = false;
+    }
+    await cargar(true);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    ocupado.value = false;
+  }
+}
 async function llegoDePlataforma(l: LugarPlataformaLista): Promise<void> {
+  // Fitpass pide revisar la identificación oficial de quien llega.
+  if (
+    l.proveedor === "fitpass" &&
+    !(await confirmar(t("paseLista.plataforma.identificacion"), {
+      aceptar: t("paseLista.plataforma.identificacionSi"),
+    }))
+  ) {
+    return;
+  }
   ocupado.value = true;
   try {
-    await api.post(`${base.value}/lugares-plataforma/${l.id}/llego`, {});
+    await api.post(
+      `${base.value}/lugares-plataforma/${l.id}/llego`,
+      l.proveedor === "fitpass" ? { identificacion_revisada: true } : {},
+    );
     l.estado = "asistio";
     l.puede_marcar = false;
   } catch (e) {
@@ -363,11 +420,13 @@ async function cargar(silencioso = false): Promise<void> {
         sesion?: ClaseLista;
         invitados?: InvitadoLista[];
         plataforma?: LugarPlataformaLista[];
+        fitpass?: boolean;
       };
     }>(`${base.value}/sesiones/${props.id}/reservas`);
     lista.value = data.data;
     invitados.value = data.meta?.invitados ?? [];
     plataforma.value = data.meta?.plataforma ?? [];
+    fitpassActivo.value = data.meta?.fitpass ?? false;
     void cargarApartados();
     desde.value = data.meta?.asistencia_desde ?? null;
     empezo.value = data.meta?.empezo ?? false;
@@ -872,7 +931,10 @@ watch(
 
       <!-- Reservas desde la app de una plataforma (ADR 0202) -->
       <section
-        v-if="plataforma.length > 0"
+        v-if="
+          plataforma.length > 0 ||
+          (fitpassActivo && sesion.puede('reservas.gestionar'))
+        "
         class="pl-espera tu-card"
         data-prueba="plataforma-clase"
       >
@@ -884,7 +946,50 @@ watch(
             </h2>
             <p>{{ $t("paseLista.plataforma.ayuda") }}</p>
           </div>
+          <button
+            v-if="fitpassActivo && sesion.puede('reservas.gestionar')"
+            type="button"
+            class="tu-btn tu-btn-fantasma text-sm"
+            data-prueba="capturar-fitpass"
+            @click="capturandoFitpass = !capturandoFitpass"
+          >
+            {{ $t("paseLista.plataforma.capturarFitpass") }}
+          </button>
         </header>
+        <form
+          v-if="capturandoFitpass"
+          class="mb-3 space-y-2"
+          @submit.prevent="capturarFitpass"
+        >
+          <label class="tu-label" for="reservas-fitpass">{{
+            $t("paseLista.plataforma.reservasFitpass")
+          }}</label>
+          <textarea
+            id="reservas-fitpass"
+            v-model="textoFitpass"
+            class="tu-input"
+            rows="3"
+            :placeholder="$t('paseLista.plataforma.reservasFitpassEjemplo')"
+          />
+          <p class="tu-hint">
+            {{ $t("paseLista.plataforma.reservasFitpassAyuda") }}
+          </p>
+          <ul
+            v-if="erroresFitpass.length > 0"
+            class="text-sm"
+            :style="{ color: 'var(--peligro)' }"
+            role="alert"
+          >
+            <li v-for="e in erroresFitpass" :key="e">{{ e }}</li>
+          </ul>
+          <button
+            type="submit"
+            class="tu-btn tu-btn-primario text-sm"
+            :disabled="ocupado || textoFitpass.trim() === ''"
+          >
+            {{ $t("paseLista.plataforma.guardarFitpass") }}
+          </button>
+        </form>
         <ul>
           <li v-for="l in plataforma" :key="l.id">
             <AvatarIniciales :nombre="l.nombre ?? ''" tam="sm" />

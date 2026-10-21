@@ -74,6 +74,16 @@ export default {
     sinNombre: "Visitante",
     enSuApp: "Hace check-in en su app",
     cancelar: "Cancelar reserva",
+    capturarFitpass: "Capturar reservas de Fitpass",
+    reservasFitpass: "Reservas de Fitpass Admin",
+    // «@» se escribe así en vue-i18n.
+    reservasFitpassEjemplo: "48211, Ana Ruiz, ana{'@'}correo.mx",
+    reservasFitpassAyuda:
+      "Una por renglón: el ID de la reservación, el nombre y, si lo tienes, el correo. Puedes pegar la tabla de Fitpass Admin.",
+    guardarFitpass: "Guardar reservas",
+    identificacion:
+      "Fitpass pide revisar la identificación oficial de quien llega. ¿Ya la revisaste?",
+    identificacionSi: "Sí, la revisé",
     cancelarConfirmar:
       "La plataforma le avisará que su reserva se canceló y el lugar queda libre.",
     proveedores: {

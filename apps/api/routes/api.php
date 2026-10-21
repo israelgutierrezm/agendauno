@@ -57,6 +57,7 @@ use App\Modules\Tenancy\Http\Controllers\FacturaRentaController;
 use App\Modules\Tenancy\Http\Controllers\FacturasTenantController;
 use App\Modules\Tenancy\Http\Controllers\FamiliasTenantController;
 use App\Modules\Tenancy\Http\Controllers\FichaMiembroTenantController;
+use App\Modules\Tenancy\Http\Controllers\FitpassTenantController;
 use App\Modules\Tenancy\Http\Controllers\FormulariosCaptacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\FormulariosController;
 use App\Modules\Tenancy\Http\Controllers\FrontDeskTenantController;
@@ -1192,6 +1193,12 @@ Route::prefix('v1')->group(function (): void {
             // Reservas desde la app de Wellhub y TotalPass (ADR 0149).
             Route::get('/integraciones/{proveedor}/reservas', [ReservasPlataformaTenantController::class, 'show'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.reservas.show');
             Route::put('/integraciones/{proveedor}/reservas', [ReservasPlataformaTenantController::class, 'guardar'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.reservas.guardar');
+            // Fitpass sin API (ADR 0202): qué clases se ofrecen allá, sus horarios para
+            // capturarlos en Fitpass Admin y lo que falta marcar en su panel.
+            Route::get('/integraciones/fitpass/clases', [FitpassTenantController::class, 'clases'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.fitpass.clases');
+            Route::put('/integraciones/fitpass/clases', [FitpassTenantController::class, 'guardarClases'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.fitpass.clases.guardar');
+            Route::get('/integraciones/fitpass/horarios', [FitpassTenantController::class, 'horarios'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('integraciones.fitpass.horarios');
+            Route::get('/integraciones/fitpass/por-marcar', [LugaresPlataformaTenantController::class, 'porMarcar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('integraciones.fitpass.por-marcar');
 
             // Webhooks salientes (R40): endpoints firmados que consumen el outbox. El
             // secreto se devuelve solo al crear. Configuracion solo del propietario.
@@ -1273,6 +1280,8 @@ Route::prefix('v1')->group(function (): void {
             // Las reservas desde la app de una plataforma en la lista de la clase (ADR 0202).
             Route::post('/lugares-plataforma/{lugar}/llego', [LugaresPlataformaTenantController::class, 'llego'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('lugares-plataforma.llego');
             Route::post('/lugares-plataforma/{lugar}/cancelar', [LugaresPlataformaTenantController::class, 'cancelar'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('lugares-plataforma.cancelar');
+            Route::post('/lugares-plataforma/{lugar}/marcado', [LugaresPlataformaTenantController::class, 'marcado'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('lugares-plataforma.marcado');
+            Route::post('/sesiones/{sesion}/lugares-plataforma', [LugaresPlataformaTenantController::class, 'apartar'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('sesiones.lugares-plataforma.apartar');
             Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('sesiones.checkins.index');
             // La que la plataforma no pudo verificar, como excepción con evidencia (M10).
             Route::post('/checkins/{checkin}/excepcion', [CheckinsTenantController::class, 'excepcion'])->middleware(['puede:checkins.excepcion', 'modalidad:clases'])->name('checkins.excepcion');

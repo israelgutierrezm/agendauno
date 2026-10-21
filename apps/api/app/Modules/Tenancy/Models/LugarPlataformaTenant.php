@@ -59,6 +59,14 @@ class LugarPlataformaTenant extends Model
 
     protected $fillable = [
         'sesion_id', 'proveedor', 'visitante_id', 'origen', 'estado', 'referencia_externa', 'checkin_id', 'motivo',
+        'marcado_en_plataforma_en',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'marcado_en_plataforma_en' => 'datetime',
     ];
 
     /**

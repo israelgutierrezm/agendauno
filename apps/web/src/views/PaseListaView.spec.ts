@@ -282,4 +282,38 @@ describe("pase de lista en su propia pantalla", () => {
       {},
     );
   });
+
+  it("con Fitpass activo, recepción pega las reservas de Fitpass Admin", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-09T15:00:00Z"));
+    permisos.add("reservas.gestionar");
+    api.get.mockResolvedValue({
+      data: {
+        data: [],
+        meta: { ...meta(false), plataforma: [], fitpass: true },
+      },
+    });
+    api.post.mockResolvedValue({
+      data: { data: [{ id: "48211", error: null }] },
+    });
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="capturar-fitpass"]').trigger("click");
+    await w
+      .get("#reservas-fitpass")
+      .setValue("48211\tAna Ruiz\tana@correo.mx\n48212, Beto Paz");
+    await w.get('[data-prueba="plataforma-clase"] form').trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/sesiones/s1/lugares-plataforma",
+      {
+        reservas: [
+          { id: "48211", nombre: "Ana Ruiz", correo: "ana@correo.mx" },
+          { id: "48212", nombre: "Beto Paz" },
+        ],
+      },
+    );
+  });
 });

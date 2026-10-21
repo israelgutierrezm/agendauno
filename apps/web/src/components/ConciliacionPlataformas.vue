@@ -8,13 +8,22 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Conciliación de pagos de Wellhub y TotalPass (ADR 0185). Ninguna publica sus pagos
- * por API: el negocio captura cuánto le pagan por visita e importa el reporte de pagos
- * del mes (CSV, del portal de la plataforma). Se compara con sus visitas validadas.
+ * Conciliación de pagos de Wellhub, TotalPass y Fitpass (ADR 0185 y 0202). Ninguna
+ * publica sus pagos por API: el negocio captura cuánto le pagan por visita (y si su
+ * contrato paga también las reservas que no se cancelaron a tiempo) e importa el
+ * reporte del mes de su portal (CSV o Excel). Se compara con sus visitas validadas.
  */
 interface Resumen {
   moneda: string;
   visitas: number;
+  // Reservas que no se cancelaron a tiempo y que la plataforma paga (su contrato).
+  inasistencias?: number;
+  inasistencias_sin_pago?: {
+    id: string;
+    fecha: string;
+    clase: string | null;
+    estado: string;
+  }[];
   visitas_sin_tarifa: number;
   esperado_minor: number;
   recibido_minor: number;
@@ -60,6 +69,7 @@ const resumen = ref<Resumen | null>(null);
 const error = ref<string | null>(null);
 const ocupado = ref(false);
 const tarifa = ref("");
+const pagaInasistencias = ref(false);
 const archivo = ref<File | null>(null);
 const errorArchivo = ref<string | null>(null);
 
@@ -89,6 +99,7 @@ async function guardarTarifa(): Promise<void> {
       proveedor: proveedor.value,
       monto_minor: Math.round(monto * 100),
       vigente_desde: `${periodo.value}-01`,
+      paga_inasistencias: pagaInasistencias.value,
     });
     toast.exito(t("operacion.plataformas.conciliacion.tarifaGuardada"));
     tarifa.value = "";
@@ -229,6 +240,15 @@ onMounted(cargar);
             data-prueba="tarifa-visita"
           />
         </label>
+        <label class="flex items-start gap-2 text-sm">
+          <input
+            v-model="pagaInasistencias"
+            type="checkbox"
+            class="mt-1"
+            data-prueba="paga-inasistencias"
+          />
+          {{ $t("operacion.plataformas.conciliacion.pagaInasistencias") }}
+        </label>
         <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("operacion.plataformas.conciliacion.tarifaAyuda") }}
         </p>
@@ -247,7 +267,7 @@ onMounted(cargar);
           }}</span>
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             class="tu-input"
             data-prueba="archivo-pagos"
             @change="elegirArchivo"
@@ -271,6 +291,23 @@ onMounted(cargar);
     </div>
 
     <template v-if="resumen?.importado">
+      <details
+        v-if="(resumen.inasistencias_sin_pago ?? []).length > 0"
+        class="mt-4"
+      >
+        <summary class="cursor-pointer text-sm font-medium">
+          {{
+            $t("operacion.plataformas.conciliacion.inasistenciasSinPago", {
+              n: (resumen.inasistencias_sin_pago ?? []).length,
+            })
+          }}
+        </summary>
+        <ul class="mt-2 space-y-1 text-sm">
+          <li v-for="v in resumen.inasistencias_sin_pago" :key="v.id">
+            {{ v.fecha }} · {{ v.clase ?? "—" }}
+          </li>
+        </ul>
+      </details>
       <details v-if="resumen.visitas_sin_pago.length > 0" class="mt-4">
         <summary class="cursor-pointer text-sm font-medium">
           {{

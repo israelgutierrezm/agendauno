@@ -168,6 +168,7 @@ const CANALES = [
   "directo",
   "wellhub",
   "totalpass",
+  "fitpass",
   "classpass",
   "otro",
 ] as const;

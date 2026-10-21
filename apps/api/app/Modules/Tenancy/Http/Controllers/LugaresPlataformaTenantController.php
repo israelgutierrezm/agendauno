@@ -7,11 +7,13 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\RegistrarCheckin;
 use App\Modules\Tenancy\Application\ReservasPlataformaTenant;
+use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +31,7 @@ class LugaresPlataformaTenantController
         private readonly RegistrarCheckin $checkins,
         private readonly AccesoSesionTenant $acceso,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly RegistroDeIntegracionesTenant $registro,
     ) {}
 
     /**
@@ -59,6 +62,12 @@ class LugaresPlataformaTenantController
     {
         $lugar = $this->lugar($request);
         $usuario = $this->usuario($request);
+        // Fitpass pide que recepción revise la identificación oficial de quien llega.
+        if ($lugar->proveedor === ProveedorPartner::Fitpass->value) {
+            $request->validate(['identificacion_revisada' => ['accepted']], [
+                'identificacion_revisada.accepted' => 'Revisa su identificación oficial antes de marcar que llegó (lo pide Fitpass).',
+            ]);
+        }
         if ($lugar->estado !== LugarPlataformaTenant::RESERVADO) {
             throw ValidationException::withMessages(['lugar' => ['Esa reserva ya no está pendiente de llegada.']]);
         }
@@ -84,6 +93,69 @@ class LugaresPlataformaTenantController
         $this->auditoria->registrar($this->usuario($request), 'plataforma.reserva_cancelada', 'lugar_plataforma', (string) $lugar->ulid, null, ['proveedor' => $lugar->proveedor, 'motivo' => $motivo]);
 
         return response()->json(['data' => ['id' => $lugar->ulid, 'estado' => $lugar->estado]]);
+    }
+
+    /**
+     * Recepción captura las reservas de Fitpass de una clase (las ve en Fitpass Admin:
+     * no tiene API). Cada una con su ID de reservación, su nombre y, si lo tiene, su
+     * correo; dice cuáles quedaron y por qué no las demás.
+     */
+    public function apartar(Request $request): JsonResponse
+    {
+        $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        abort_unless($this->acceso->puedeOperar($sesion, $this->usuario($request)), 403);
+        if (! $this->registro->activa(ProveedorPartner::Fitpass->value)) {
+            throw ValidationException::withMessages(['reservas' => ['Activa Fitpass en Integraciones para capturar sus reservas.']]);
+        }
+        $validado = $request->validate([
+            'reservas' => ['required', 'array', 'min:1', 'max:50'],
+            'reservas.*.id' => ['required', 'string', 'max:64'],
+            'reservas.*.nombre' => ['nullable', 'string', 'max:120'],
+            'reservas.*.correo' => ['nullable', 'email', 'max:160'],
+        ]);
+        $resultados = [];
+        foreach ($validado['reservas'] as $reserva) {
+            try {
+                $lugar = $this->reservas->apartarFitpass($sesion, (string) $reserva['id'], (string) ($reserva['nombre'] ?? ''), $reserva['correo'] ?? null);
+                $resultados[] = ['id' => (string) $reserva['id'], 'lugar' => $lugar->ulid, 'error' => null];
+            } catch (DomainException $e) {
+                $resultados[] = ['id' => (string) $reserva['id'], 'lugar' => null, 'error' => $e->getMessage()];
+            }
+        }
+        $this->auditoria->registrar($this->usuario($request), 'plataforma.reservas_capturadas', 'sesion', (string) $sesion->ulid, null, [
+            'proveedor' => ProveedorPartner::Fitpass->value,
+            'capturadas' => count(array_filter($resultados, static fn (array $r): bool => $r['error'] === null)),
+        ]);
+
+        return response()->json(['data' => $resultados], 201);
+    }
+
+    /**
+     * Lo que falta marcar en el panel de Fitpass: asistencias e inasistencias de las
+     * últimas 48 horas (después Fitpass ya no acepta cambios y de eso depende su pago).
+     */
+    public function porMarcar(): JsonResponse
+    {
+        return response()->json(['data' => $this->reservas->porMarcarEnPlataforma(ProveedorPartner::Fitpass)
+            ->map(static fn (LugarPlataformaTenant $l): array => [
+                'id' => $l->ulid,
+                'reservacion' => substr((string) $l->referencia_externa, strlen(ReservasPlataformaTenant::referencia(ProveedorPartner::Fitpass, ''))),
+                'nombre' => $l->visitante->nombre ?? null,
+                'clase' => $l->sesion?->oferta?->nombre,
+                'inicia_en' => $l->sesion?->inicia_en->toIso8601String(),
+                'asistio' => $l->estado === LugarPlataformaTenant::ASISTIO,
+                // Hasta cuándo Fitpass acepta cambios.
+                'marcar_antes_de' => $l->sesion?->inicia_en->copy()->addHours(48)->toIso8601String(),
+            ])->values()->all()]);
+    }
+
+    /** Ya se marcó en el panel de la plataforma. */
+    public function marcado(Request $request): JsonResponse
+    {
+        $lugar = $this->lugar($request);
+        $lugar->forceFill(['marcado_en_plataforma_en' => now()])->save();
+
+        return response()->json(['data' => ['id' => $lugar->ulid, 'marcado_en' => $lugar->marcado_en_plataforma_en?->toIso8601String()]]);
     }
 
     private function lugar(Request $request): LugarPlataformaTenant

@@ -14,6 +14,8 @@ enum CanalReserva: string
     case Directo = 'directo';
     case Wellhub = 'wellhub';
     case TotalPass = 'totalpass';
+    // Fitpass aparta lugares en las clases que ofrece (ADR 0202).
+    case Fitpass = 'fitpass';
     case ClassPass = 'classpass';
     case Otro = 'otro';
 }
