@@ -19,9 +19,8 @@ vi.mock("@/lib/confirmar", () => ({ confirmar }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ pais: "MX" }),
 }));
-vi.mock("@/stores/toast", () => ({
-  useToastStore: () => ({ exito: vi.fn() }),
-}));
+const toast = vi.hoisted(() => ({ exito: vi.fn() }));
+vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
 
 const LINEA = {
   id: "l1",
@@ -82,5 +81,49 @@ describe("devolver productos", () => {
     await flushPromises();
 
     expect(api.post.mock.calls[0]![1]).toMatchObject({ metodo: "tarjeta" });
+  });
+
+  it("el aviso dice lo que salió según el servidor y por qué formas", async () => {
+    // El servidor confirma $280: $200 en efectivo y $80 con tarjeta.
+    api.post.mockResolvedValue({
+      data: {
+        data: {},
+        devolucion: {
+          monto_minor: 28000,
+          partes: [
+            { metodo: "efectivo", monto_minor: 20000 },
+            { metodo: "tarjeta", monto_minor: 8000 },
+          ],
+        },
+      },
+    });
+    const w = montar([
+      { metodo: "efectivo", monto_minor: 20000 },
+      { metodo: "tarjeta", monto_minor: 36000 },
+    ]);
+    expect(w.text()).toContain("lo demás sale por las otras formas");
+    await w.get('[data-prueba="piezas-l1"]').setValue(1);
+    await w.get('[data-prueba="motivo-devolucion"]').setValue("No le quedó");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    const aviso = toast.exito.mock.calls[0]![0] as string;
+    expect(aviso).toContain("$280.00");
+    expect(aviso).toContain("$200.00");
+    expect(aviso).toContain("$80.00");
+  });
+
+  it("si el servidor dice otro importe (llave repetida), avisa ese y no el calculado", async () => {
+    api.post.mockResolvedValue({
+      data: { data: {}, devolucion: { monto_minor: 28000, partes: [] } },
+    });
+    const w = montar();
+    await w.get('[data-prueba="piezas-l1"]').setValue(2);
+    await w.get('[data-prueba="motivo-devolucion"]').setValue("Venía abierta");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(toast.exito.mock.calls[0]![0]).toContain("$280.00");
+    expect(toast.exito.mock.calls[0]![0]).not.toContain("$560.00");
   });
 });

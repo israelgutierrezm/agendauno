@@ -22,14 +22,17 @@ use Illuminate\Support\Facades\DB;
  * - **Cuánto:** cada pieza vale lo que se cobró por ella ese día (su precio con
  *   extras). La propina no se devuelve aquí; se devuelve anulando la venta completa
  *   mientras no tenga devoluciones.
- * - **Por qué forma:** la de la venta. Si fue mixta (ADR 0177), una de sus formas, sin
- *   pasar de lo que entró por ella para lo vendido menos lo ya devuelto por ella.
+ * - **Por qué forma:** la de la venta. Si fue mixta (ADR 0177), primero la elegida y, si
+ *   por ella no alcanza, el resto por las otras formas de la venta. Ninguna pasa de lo
+ *   que entró por ella para lo vendido menos lo ya devuelto por ella; el reparto queda
+ *   en la devolución y cada parte sale de la caja por su forma.
  * - **Caja:** sale de la caja abierta de la sede en ese momento (ADR 0175); lo cerrado
  *   no cambia.
  * - **Inventario:** las piezas vuelven a la sede donde se vendieron.
  * - **Concurrencia:** se bloquea la venta, después la caja y al final los artículos
  *   (por id), como al vender. Dos devoluciones a la vez no devuelven de más.
- * - **Idempotente:** con la misma llave, la misma devolución.
+ * - **Idempotente:** con la misma llave y las mismas piezas, la misma devolución. La
+ *   misma llave con otras piezas se rechaza: no se informa un importe que no salió.
  */
 class DevolverVentaPosTenant
 {
@@ -67,6 +70,10 @@ class DevolverVentaPosTenant
             if ($llave !== null) {
                 $repetida = DevolucionVentaTenant::query()->where('venta_pos_id', $bloqueada->getKey())->where('llave', $llave)->first();
                 if ($repetida instanceof DevolucionVentaTenant) {
+                    if (! $this->mismasPiezas($repetida, $cantidades)) {
+                        throw new VentaNoDevolvible('Ese intento ya registró una devolución con otras piezas: vuelve a abrir la venta para ver lo que quedó.');
+                    }
+
                     return $repetida;
                 }
             }
@@ -96,7 +103,8 @@ class DevolverVentaPosTenant
             if ($regresan === []) {
                 throw new VentaNoDevolvible('Elige qué artículos regresan.');
             }
-            $salePor = $this->formaDeSalida($bloqueada, $monto, $metodo);
+            $partes = $this->formasDeSalida($bloqueada, $monto, $metodo);
+            $salePor = count($partes) === 1 ? $partes[0]['metodo'] : PartesCobro::MIXTO;
 
             // Sale de la caja abierta de la sede, bloqueada antes de los artículos.
             $turno = $this->cajas->turnoParaMovimiento((int) $bloqueada->sucursal_id);
@@ -107,8 +115,11 @@ class DevolverVentaPosTenant
                 'motivo' => mb_substr($motivo, 0, 255),
                 'usuario_id' => $actor?->getKey(),
                 'llave' => $llave,
+                'partes' => $partes,
             ]);
-            $this->cajas->asentar($turno, MovimientoCajaTenant::DEVOLUCION, $salePor, -$monto, ['venta_pos_id' => $bloqueada->getKey()], $actor, $motivo);
+            foreach ($partes as $parte) {
+                $this->cajas->asentar($turno, MovimientoCajaTenant::DEVOLUCION, $parte['metodo'], -$parte['monto_minor'], ['venta_pos_id' => $bloqueada->getKey()], $actor, $motivo);
+            }
 
             // Las piezas vuelven al inventario de la sede, con los artículos bloqueados en
             // el mismo orden que al vender (por id).
@@ -136,6 +147,7 @@ class DevolverVentaPosTenant
                 'monto_minor' => $monto,
                 'moneda' => $bloqueada->moneda,
                 'metodo' => $salePor,
+                'partes' => $partes,
                 'piezas' => array_sum(array_map(static fn (array $r): int => $r[1], $regresan)),
             ], $motivo);
 
@@ -144,24 +156,68 @@ class DevolverVentaPosTenant
     }
 
     /**
-     * Por qué forma sale el dinero: la de la venta. De una venta mixta, la elegida; no
-     * puede pasar de lo que entró por ella para lo vendido menos lo ya devuelto por ella.
+     * Por qué formas sale el dinero. De una venta con una sola forma, esa. De una mixta,
+     * primero la elegida y el resto por las demás en el orden en que se cobró; ninguna
+     * pasa de lo que entró por ella para lo vendido menos lo ya devuelto por ella.
+     *
+     * @return list<array{metodo: string, monto_minor: int}>
      */
-    private function formaDeSalida(VentaPosTenant $venta, int $monto, ?string $metodo): string
+    private function formasDeSalida(VentaPosTenant $venta, int $monto, ?string $metodo): array
     {
         if ($venta->metodo_pago !== PartesCobro::MIXTO) {
-            return CajasTenant::metodo($venta->metodo_pago);
+            return [['metodo' => CajasTenant::metodo($venta->metodo_pago), 'monto_minor' => $monto]];
         }
         [$deVenta] = PartesCobro::repartir(CajasTenant::partesDeVenta($venta), [(int) $venta->total_minor, (int) $venta->propina_minor]);
-        $parte = collect($deVenta)->firstWhere('metodo', $metodo);
-        if ($metodo === null || $parte === null) {
+        if ($metodo === null || collect($deVenta)->firstWhere('metodo', $metodo) === null) {
             throw new VentaNoDevolvible('Se cobró con varias formas de pago: elige por cuál de ellas sale la devolución.');
         }
-        $devuelto = (int) DevolucionVentaTenant::query()->where('venta_pos_id', $venta->getKey())->where('metodo', $metodo)->sum('monto_minor');
-        if ($monto > $parte['monto_minor'] - $devuelto) {
-            throw new VentaNoDevolvible('Por esa forma de pago no entró tanto: elige otra o devuelve menos.');
+
+        // Lo que aún puede salir por cada forma.
+        $disponible = [];
+        foreach ($deVenta as $parte) {
+            $disponible[$parte['metodo']] = ($disponible[$parte['metodo']] ?? 0) + $parte['monto_minor'];
+        }
+        foreach (DevolucionVentaTenant::query()->where('venta_pos_id', $venta->getKey())->get() as $previa) {
+            foreach ($previa->partesDeSalida() as $parte) {
+                if (isset($disponible[$parte['metodo']])) {
+                    $disponible[$parte['metodo']] -= $parte['monto_minor'];
+                }
+            }
         }
 
-        return $metodo;
+        $orden = [$metodo, ...array_values(array_filter(array_keys($disponible), static fn (string $m): bool => $m !== $metodo))];
+        $falta = $monto;
+        $partes = [];
+        foreach ($orden as $forma) {
+            $toma = min($falta, max(0, $disponible[$forma]));
+            if ($toma > 0) {
+                $partes[] = ['metodo' => $forma, 'monto_minor' => $toma];
+                $falta -= $toma;
+            }
+        }
+        if ($falta > 0) {
+            throw new VentaNoDevolvible('Por las formas de pago de esta venta ya no queda tanto por devolver.');
+        }
+
+        return $partes;
+    }
+
+    /**
+     * ¿La devolución ya registrada es de las mismas piezas que se piden?
+     *
+     * @param  array<string, int>  $cantidades
+     */
+    private function mismasPiezas(DevolucionVentaTenant $devolucion, array $cantidades): bool
+    {
+        $registradas = [];
+        foreach ($devolucion->lineas()->with('linea')->get() as $linea) {
+            $ulid = (string) $linea->linea?->ulid;
+            $registradas[$ulid] = ($registradas[$ulid] ?? 0) + (int) $linea->cantidad;
+        }
+        $pedidas = array_map('intval', $cantidades);
+        ksort($registradas);
+        ksort($pedidas);
+
+        return $registradas === $pedidas;
     }
 }

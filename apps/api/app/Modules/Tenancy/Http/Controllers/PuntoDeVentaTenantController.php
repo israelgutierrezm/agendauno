@@ -321,12 +321,21 @@ class PuntoDeVentaTenantController
             $cantidades[(string) $linea['id']] = ($cantidades[(string) $linea['id']] ?? 0) + (int) $linea['cantidad'];
         }
         $llave = $request->header('Idempotency-Key') ?: ($validado['idempotency_key'] ?? null);
-        $this->devoluciones->devolver(
+        $devolucion = $this->devoluciones->devolver(
             $venta, $cantidades, $validado['motivo'], $validado['metodo'] ?? null, $this->actor($request),
             is_string($llave) && $llave !== '' ? mb_substr($llave, 0, 100) : null,
         );
 
-        return response()->json(['data' => $this->presentar($venta->refresh()->load(['sucursal', 'lineas.articulo', 'persona']))], 201);
+        return response()->json([
+            'data' => $this->presentar($venta->refresh()->load(['sucursal', 'lineas.articulo', 'persona'])),
+            // Lo que salió de verdad (con una llave repetida, la devolución de ese intento).
+            'devolucion' => [
+                'id' => $devolucion->ulid,
+                'monto_minor' => $devolucion->monto_minor,
+                'metodo' => $devolucion->metodo,
+                'partes' => $devolucion->partesDeSalida(),
+            ],
+        ], 201);
     }
 
     public function anular(Request $request): JsonResponse

@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $motivo
  * @property int|null $usuario_id
  * @property string|null $llave
+ * @property array<int, mixed>|null $partes  [{metodo, monto_minor}]; se lee con {@see partesDeSalida()}
  */
 class DevolucionVentaTenant extends Model
 {
@@ -29,14 +30,33 @@ class DevolucionVentaTenant extends Model
 
     protected $table = 'devoluciones_venta';
 
-    protected $fillable = ['venta_pos_id', 'monto_minor', 'metodo', 'motivo', 'usuario_id', 'llave'];
+    protected $fillable = ['venta_pos_id', 'monto_minor', 'metodo', 'motivo', 'usuario_id', 'llave', 'partes'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
         'monto_minor' => 'integer',
+        'partes' => 'array',
     ];
+
+    /**
+     * Por qué formas salió el dinero. Las anteriores al reparto salieron completas por
+     * su `metodo`.
+     *
+     * @return list<array{metodo: string, monto_minor: int}>
+     */
+    public function partesDeSalida(): array
+    {
+        $partes = [];
+        foreach (is_array($this->partes) ? $this->partes : [] as $parte) {
+            if (is_array($parte) && is_string($parte['metodo'] ?? null)) {
+                $partes[] = ['metodo' => $parte['metodo'], 'monto_minor' => (int) ($parte['monto_minor'] ?? 0)];
+            }
+        }
+
+        return $partes !== [] ? $partes : [['metodo' => (string) $this->metodo, 'monto_minor' => (int) $this->monto_minor]];
+    }
 
     /**
      * @return BelongsTo<VentaPosTenant, $this>

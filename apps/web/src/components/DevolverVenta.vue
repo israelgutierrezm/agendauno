@@ -82,7 +82,12 @@ async function devolver(): Promise<void> {
   enviando.value = true;
   error.value = null;
   try {
-    await api.post(
+    const { data } = await api.post<{
+      devolucion?: {
+        monto_minor: number;
+        partes: { metodo: string; monto_minor: number }[];
+      };
+    }>(
       `${props.base}/pos/ventas/${props.venta.id}/devoluciones`,
       {
         lineas: props.venta.lineas
@@ -93,7 +98,22 @@ async function devolver(): Promise<void> {
       },
       { headers: { "Idempotency-Key": llave } },
     );
-    toast.exito(t("devolverVenta.ok", { monto: dinero(total.value) }));
+    // Lo que salió de verdad según el servidor (con una llave repetida, lo de ese intento).
+    const salio = data.devolucion?.monto_minor ?? total.value;
+    const partes = data.devolucion?.partes ?? [];
+    toast.exito(
+      partes.length > 1
+        ? t("devolverVenta.okPartes", {
+            monto: dinero(salio),
+            partes: partes
+              .map(
+                (p) =>
+                  `${t(`pos.metodos.${p.metodo}`)} ${dinero(p.monto_minor)}`,
+              )
+              .join(", "),
+          })
+        : t("devolverVenta.ok", { monto: dinero(salio) }),
+    );
     emit("devuelto");
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -151,6 +171,7 @@ async function devolver(): Promise<void> {
         id="dv-forma"
         v-model="metodo"
         class="tu-input"
+        aria-describedby="dv-forma-ayuda"
         data-prueba="forma-devolucion"
       >
         <option v-for="p in venta.partes" :key="p.metodo" :value="p.metodo">
@@ -162,6 +183,9 @@ async function devolver(): Promise<void> {
           }}
         </option>
       </select>
+      <p id="dv-forma-ayuda" class="tu-hint">
+        {{ $t("devolverVenta.salePorAyuda") }}
+      </p>
     </div>
     <div>
       <label class="tu-label" for="dv-motivo"

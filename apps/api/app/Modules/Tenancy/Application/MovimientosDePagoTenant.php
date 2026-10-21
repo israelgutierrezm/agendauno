@@ -385,6 +385,8 @@ class MovimientosDePagoTenant
                 'monto_minor' => -$d->monto_minor,
                 'moneda' => (string) $d->venta?->moneda,
                 'metodo' => $d->metodo,
+                // Si salió por varias formas (ADR 0178): cuánto por cada una.
+                'partes' => $d->metodo === PartesCobro::MIXTO ? $d->partesDeSalida() : null,
                 'persona' => null,
                 'concepto' => Str::limit($concepto !== '' ? $concepto : 'Devolución del mostrador', 120),
                 'quien' => $quien['nombre'] ?? 'Sistema',
@@ -569,16 +571,24 @@ class MovimientosDePagoTenant
         }
 
         if ($incluye('devolucion')) {
-            // Del mostrador (ADR 0178): por la forma por la que salió.
-            $filas = DevolucionVentaTenant::query()
+            // Del mostrador (ADR 0178): por la forma por la que salió; las que salieron por
+            // varias formas, por sus partes.
+            $delMostrador = fn () => DevolucionVentaTenant::query()
                 ->join('ventas_pos', 'ventas_pos.id', '=', 'devoluciones_venta.venta_pos_id')
-                ->selectRaw('ventas_pos.moneda AS moneda, devoluciones_venta.metodo AS metodo, devoluciones_venta.usuario_id AS usuario_id, SUM(devoluciones_venta.monto_minor) AS total')
                 ->when($this->sucursales !== null, fn ($q) => $q->whereIn('ventas_pos.sucursal_id', $this->sucursales ?? []))
                 ->whereBetween('devoluciones_venta.created_at', [$inicio, $fin])
-                ->when($usuarioId !== null, fn ($q) => $q->where('devoluciones_venta.usuario_id', $usuarioId))
+                ->when($usuarioId !== null, fn ($q) => $q->where('devoluciones_venta.usuario_id', $usuarioId));
+            $filas = $delMostrador()
+                ->selectRaw('ventas_pos.moneda AS moneda, devoluciones_venta.metodo AS metodo, devoluciones_venta.usuario_id AS usuario_id, SUM(devoluciones_venta.monto_minor) AS total')
+                ->where('devoluciones_venta.metodo', '!=', PartesCobro::MIXTO)
                 ->groupBy('ventas_pos.moneda', 'devoluciones_venta.metodo', 'devoluciones_venta.usuario_id')
                 ->toBase()
                 ->get();
+            foreach ($delMostrador()->where('devoluciones_venta.metodo', PartesCobro::MIXTO)->select('devoluciones_venta.*', 'ventas_pos.moneda AS moneda_venta')->get() as $repartida) {
+                foreach ($repartida->partesDeSalida() as $parte) {
+                    $filas->push((object) ['moneda' => $repartida->getAttribute('moneda_venta'), 'metodo' => $parte['metodo'], 'usuario_id' => $repartida->usuario_id, 'total' => $parte['monto_minor']]);
+                }
+            }
             $nombres = $this->nombres($filas->pluck('usuario_id')->all());
             foreach ($filas as $f) {
                 $quien = $f->usuario_id !== null ? ($nombres[(int) $f->usuario_id]['nombre'] ?? 'Sistema') : 'Sistema';

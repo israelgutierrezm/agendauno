@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\File;
 | Cada pieza vale lo que se cobró por ella; el dinero sale de la caja abierta por la
 | forma de la venta (de una mixta, la elegida y sin pasar de lo que entró por ella); las
 | piezas vuelven al inventario; no se devuelve más de lo vendido ni dos veces con la
-| misma llave; con devoluciones la venta ya no se anula ni se corrige.
+| misma llave (y la misma llave con otras piezas se rechaza); con devoluciones la venta
+| ya no se anula ni se corrige. De una mixta, si por la forma elegida no alcanza, el
+| resto sale por las otras.
 */
 
 beforeEach(function (): void {
@@ -103,7 +105,7 @@ it('devuelve algunas piezas: sale de la caja, vuelven al inventario y cuenta en 
     expect(existenciasAlDevolver($c))->toBe(10);
 });
 
-it('de una venta con varias formas se elige por cuál sale, sin pasar de lo que entró por ella', function (): void {
+it('de una venta con varias formas sale primero por la elegida y lo que falte por las otras', function (): void {
     $c = tiendaParaDevolver();
     // 2 pomadas ($560): $200 en efectivo y $360 con tarjeta.
     $venta = ventaParaDevolver($c, 2, ['partes' => [['metodo' => 'efectivo', 'monto_minor' => 20000], ['metodo' => 'tarjeta', 'monto_minor' => 36000]]]);
@@ -112,10 +114,39 @@ it('de una venta con varias formas se elige por cuál sale, sin pasar de lo que 
     ], conBearer($c['e']['bearer']));
 
     $devolver([])->assertUnprocessable()->assertJsonPath('code', 'SALE_NOT_RETURNABLE');
-    // Por efectivo entraron $200: una pieza ($280) no cabe.
-    $devolver(['metodo' => 'efectivo'])->assertUnprocessable();
-    $devolver(['metodo' => 'tarjeta'])->assertCreated();
-    expect(esperadoAlDevolver($c))->toMatchArray(['efectivo' => 20000, 'tarjeta' => 36000 - 28000]);
+    // Por efectivo entraron $200: la pieza ($280) sale $200 en efectivo y $80 con tarjeta.
+    $devolver(['metodo' => 'efectivo'])->assertCreated()
+        ->assertJsonPath('devolucion.monto_minor', 28000)
+        ->assertJsonPath('devolucion.metodo', 'mixto')
+        ->assertJsonPath('devolucion.partes', [['metodo' => 'efectivo', 'monto_minor' => 20000], ['metodo' => 'tarjeta', 'monto_minor' => 8000]]);
+    expect(esperadoAlDevolver($c))->toMatchArray(['efectivo' => 0, 'tarjeta' => 36000 - 8000]);
+    // La otra pieza: ya no queda efectivo, sale toda con tarjeta.
+    $devolver(['metodo' => 'efectivo'])->assertCreated()
+        ->assertJsonPath('devolucion.partes', [['metodo' => 'tarjeta', 'monto_minor' => 28000]]);
+    expect(esperadoAlDevolver($c))->toMatchArray(['efectivo' => 0, 'tarjeta' => 0]);
+
+    // El corte cuenta cada parte en su forma.
+    $corte = $this->getJson("{$c['base']}/pagos/movimientos", conBearer($c['e']['bearer']))->assertOk()->json();
+    expect(collect($corte['totales']['por_metodo'])->sortKeys()->all())->toBe(['Efectivo' => 0, 'Tarjeta (terminal)' => 0])
+        ->and($corte['totales']['devuelto_minor'])->toBe(56000);
+    $repartida = collect($corte['data'])->where('tipo', 'devolucion')->firstWhere('metodo', 'mixto');
+    expect($repartida['partes'])->toBe([['metodo' => 'efectivo', 'monto_minor' => 20000], ['metodo' => 'tarjeta', 'monto_minor' => 8000]]);
+});
+
+it('la misma llave con otras piezas se rechaza en lugar de dar por hecha otra devolución', function (): void {
+    $c = tiendaParaDevolver();
+    $venta = ventaParaDevolver($c, 3);
+    $devolver = fn (int $piezas) => $this->withHeader('Idempotency-Key', 'intento-1')->postJson("{$c['base']}/pos/ventas/{$venta['id']}/devoluciones", [
+        'lineas' => [['id' => $venta['lineas'][0]['id'], 'cantidad' => $piezas]], 'motivo' => 'Cambio de opinión',
+    ], conBearer($c['e']['bearer']));
+
+    $devolver(1)->assertCreated()->assertJsonPath('devolucion.monto_minor', 28000);
+    // Reintento idéntico: la misma devolución y el mismo importe.
+    $devolver(1)->assertCreated()->assertJsonPath('devolucion.monto_minor', 28000)->assertJsonPath('data.devuelto_minor', 28000);
+    // Mismo intento con otra cantidad: no se informa $560 cuando salieron $280.
+    $devolver(2)->assertUnprocessable()->assertJsonPath('code', 'SALE_NOT_RETURNABLE');
+    expect(esperadoAlDevolver($c)['efectivo'])->toBe(84000 - 28000)
+        ->and(existenciasAlDevolver($c))->toBe(8);
 });
 
 it('pasado el plazo del negocio ya no se devuelve', function (): void {

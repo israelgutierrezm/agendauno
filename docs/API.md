@@ -464,16 +464,19 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
 
 - `POST /pos/ventas/{venta}/devoluciones` (`pagos.reembolsar`): `lineas` (lista de
   `{id, cantidad}` con el ulid de cada línea de la venta), `motivo`, `metodo` (solo si
-  la venta fue mixta: la forma por la que sale) e `Idempotency-Key`.
-  - Responde 201 con la venta.
+  la venta fue mixta: la forma por la que sale primero; si por ella no alcanza, lo
+  demás sale por las otras formas de la venta) e `Idempotency-Key`.
+  - Responde 201 con la venta y `devolucion` {`id`, `monto_minor`, `metodo` (`mixto` si
+    salió por varias), `partes` [{`metodo`, `monto_minor`}]}: lo que salió de verdad.
   - Responde 422 `SALE_NOT_RETURNABLE` si está anulada, pasó el plazo
-    (`pos.dias_para_devolver`), se piden más piezas de las que quedan o la forma no
-    alcanza.
+    (`pos.dias_para_devolver`), se piden más piezas de las que quedan, entre todas sus
+    formas ya no queda tanto o la `Idempotency-Key` ya se usó con otras piezas.
 - La venta (`GET /pos/ventas` y sus respuestas) suma `devuelto_minor` y `devolvible`;
   cada línea, `id` y `cantidad_devuelta`. `meta.resumen.vendido_minor` ya no cuenta lo
   devuelto y trae `devuelto_minor`.
 - Con devoluciones, la venta ya no se anula ni se corrige su forma.
-- El corte lista la devolución como `devolucion`, en su fecha y por su forma.
+- El corte lista la devolución como `devolucion`, en su fecha y por su forma; la que
+  salió por varias formas trae `partes` y cuenta en cada forma por su parte.
 
 ## Disponibilidad al mover una cita
 

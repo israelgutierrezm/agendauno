@@ -58,3 +58,20 @@ que queda. Así no se devuelve dos veces el mismo dinero.
   en la bitácora.
 - No se emite un CFDI de egreso por la devolución; el negocio lo hace en su sistema de
   facturación si la venta estaba facturada.
+
+## Ajuste (2026-10-21)
+
+- **Venta mixta:** antes, la devolución salía por una sola forma y con tope de lo que
+  entró por ella. Una pieza que costó más que cada parte (p. ej. $280 pagados con $200
+  en efectivo y $360 con tarjeta) no se podía devolver por ninguna.
+  - Ahora sale primero por la forma elegida y, si por ella no alcanza, lo demás sale
+    por las otras formas de la venta, en el orden en que se cobró.
+  - Ninguna forma pasa de lo que entró por ella menos lo ya devuelto por ella.
+  - El reparto queda en `devoluciones_venta.partes`. `metodo` es `mixto` si salió por
+    varias formas.
+  - Cada parte sale de la caja por su forma, y el corte la cuenta en esa forma.
+- **Llave repetida:** con las mismas piezas devuelve la misma devolución. Con otras
+  piezas se rechaza (422): antes se devolvía la del primer intento y la pantalla
+  anunciaba el importe del segundo.
+  - La respuesta trae `devolucion` con lo que salió de verdad, y la web avisa ese
+    importe.
