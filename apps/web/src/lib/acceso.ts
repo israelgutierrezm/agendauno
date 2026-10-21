@@ -89,6 +89,8 @@ export const POLITICAS: Record<string, Politica> = {
   presupuestos: { permiso: "presupuestos.ver", modalidad: "citas" },
   "presupuesto-impreso": { permiso: "presupuestos.ver", modalidad: "citas" },
   comunicaciones: { permiso: "comunicaciones.gestionar", funcion: "mensajes" },
+  // La bandeja de WhatsApp e Instagram (ADR 0200).
+  bandeja: { permiso: "mensajes.atender", funcion: "mensajes" },
   promociones: { permiso: "promociones.gestionar", funcion: "promociones" },
   lealtad: { permiso: "lealtad.ver", funcion: "lealtad" },
   resenas: { permiso: "miembros.ver" },

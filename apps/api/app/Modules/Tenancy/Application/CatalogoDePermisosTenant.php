@@ -42,6 +42,7 @@ class CatalogoDePermisosTenant
                 'prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar',
                 'sitio.editar', 'sitio.publicar',
                 'caja.operar', 'caja.supervisar',
+                'mensajes.atender',
             ],
             'recepcionista' => [
                 'miembros.gestionar', 'miembros.ver', 'documentos.subir', 'formularios.responder',
@@ -60,6 +61,8 @@ class CatalogoDePermisosTenant
                 'caja.operar',
                 // Atiende a quien pregunta; darle acceso (invitar) lo decide quien puede invitar.
                 'prospectos.ver', 'prospectos.gestionar',
+                // Contesta los mensajes de WhatsApp e Instagram (ADR 0200).
+                'mensajes.atender',
             ],
             'instructor' => [
                 'miembros.ver', 'documentos.subir', 'formularios.responder', 'catalogo.ver',
@@ -89,7 +92,8 @@ class CatalogoDePermisosTenant
             // Quien todavía no es cliente (ADR 0117), aparte de Miembros, y el sitio web
             // (ADR 0167): prepararlo va aparte de publicarlo.
             'captacion' => ['prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar', 'sitio.editar', 'sitio.publicar'],
-            'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
+            // Leer y contestar la bandeja de WhatsApp e Instagram (ADR 0200).
+            'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar', 'mensajes.atender'],
             // Dar un plan sin cobrarlo (cortesía) va aparte de venderlo (ADR 0181).
             'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'membresias.cortesia', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             // Exentar una cuota (inscripción, anualidad, penalización; B04) va aparte.
@@ -191,6 +195,8 @@ class CatalogoDePermisosTenant
             // Dar acceso crea o reactiva la ficha y envía la invitación.
             'prospectos.convertir' => ['prospectos.gestionar', 'prospectos.ver', 'miembros.gestionar', 'miembros.ver', 'usuarios.invitar'],
             'tareas.gestionar' => ['tareas.ver'],
+            // Vincular una conversación con su ficha busca entre los clientes.
+            'mensajes.atender' => ['miembros.ver'],
             'tareas.equipo' => ['tareas.ver', 'tareas.gestionar'],
         ];
     }

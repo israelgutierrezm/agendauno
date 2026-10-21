@@ -135,6 +135,10 @@ export default {
         eliminar: "Dar de baja alumnos",
       },
       derechos: { ver: "Ver paquetes y créditos de cada alumno" },
+      // La bandeja de WhatsApp e Instagram (ADR 0200).
+      mensajes: {
+        atender: "Leer y contestar los mensajes de WhatsApp e Instagram",
+      },
       prospectos: {
         ver: "Ver prospectos",
         gestionar: "Atender prospectos y editar los formularios de captación",

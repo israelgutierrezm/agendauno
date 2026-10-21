@@ -1509,6 +1509,34 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
+### Bandeja de WhatsApp e Instagram (ADR 0200)
+
+- Atender (`mensajes.atender`, función `mensajes`):
+  - `GET /bandeja/resumen` devuelve {`sin_leer`, `canales`}.
+  - `GET /bandeja/conversaciones` (`estado` `abierta`|`archivada`, `canal`, `q`,
+    `page`) devuelve [{`id`, `canal`, `contacto`, `telefono` (solo WhatsApp),
+    `persona` {`id`, `nombre`}|null, `estado`, `no_leidos`, `ultimo_texto`,
+    `ultimo_mensaje_en`, `puede_contestar`, `contestar_hasta`}] por páginas.
+  - `GET /bandeja/conversaciones/{id}` suma `mensajes` [{`id`, `direccion`
+    (`entrante`|`saliente`), `tipo`, `texto`, `estado`, `enviado_en`, `enviado_por`}] y
+    la deja leída.
+  - `POST /bandeja/conversaciones/{id}/mensajes` {`texto`} contesta (201). Responde
+    422 fuera de las 24 horas o sin el canal conectado.
+  - `PUT /bandeja/conversaciones/{id}` {`estado`?, `persona_id`?|null}.
+- Canales (`integraciones.configurar`):
+  - `GET /bandeja/canales` devuelve, por canal, {`disponible`, `conexion`} y, en
+    WhatsApp, `registro` {`app_id`, `config_id`, `version`} para el registro insertado.
+  - `POST /bandeja/canales/whatsapp` {`codigo`, `waba_id`, `phone_number_id`} (201).
+    Responde 422 si el número ya está en otro negocio.
+  - `POST /bandeja/canales/instagram/conectar` devuelve {`url`}. La vuelta
+    (`GET /api/v1/bandeja/instagram/vuelta`) regresa a
+    `{web}/bandeja?instagram=conectar&codigo=…&estado=…`.
+  - `POST /bandeja/canales/instagram/confirmar` {`codigo`, `estado`} (201).
+  - `DELETE /bandeja/canales/{whatsapp|instagram}` (204).
+- Webhooks: `/webhooks/whatsapp` (el de siempre; devuelve también `bandeja`) y
+  `GET`/`POST /webhooks/instagram`.
+- `agendauno:renovar-instagram` (diario).
+
 ### Google Calendar y Outlook (ADR 0199)
 
 - `GET /yo/calendarios` devuelve {`disponible` (quien atiende y la plataforma tiene

@@ -493,6 +493,13 @@ const CAPTACION: GrupoMenu = {
   etiqueta: "nav.grupos.captacion",
   areas: [
     {
+      // La bandeja de WhatsApp e Instagram (ADR 0200): quien escribe, cliente o no.
+      clave: "mensajes",
+      etiqueta: "nav.areas.mensajes",
+      icono: "mensaje",
+      vistas: [v("bandeja", "bandeja", "nav.areas.mensajes")],
+    },
+    {
       // Quien todavía no es cliente (ADR 0117): aparte de Miembros.
       clave: "prospectos",
       etiqueta: "nav.vistas.prospectos",

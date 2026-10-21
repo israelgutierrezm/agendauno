@@ -397,6 +397,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // La bandeja de WhatsApp e Instagram (ADR 0200).
+      path: "/bandeja",
+      name: "bandeja",
+      component: () => import("@/views/BandejaView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Captación (ADR 0117): quien todavía no es cliente, aparte de Miembros.
       path: "/prospectos",
       name: "prospectos",

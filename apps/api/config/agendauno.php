@@ -101,6 +101,24 @@ return [
     ],
 
     /*
+    | La bandeja de WhatsApp e Instagram de cada negocio (ADR 0200). WhatsApp: la app de
+    | Meta de la plataforma como Tech Provider y la configuración de su registro
+    | insertado (`whatsapp_config_id`). Instagram: el id y el secreto de Instagram de la
+    | misma app (inicio de sesión de Instagram), con la vuelta
+    | `{APP_URL}/api/v1/bandeja/instagram/vuelta`. Los avisos llegan a
+    | `/api/v1/webhooks/whatsapp` y `/api/v1/webhooks/instagram` (`verify_token`).
+    */
+    'bandeja' => [
+        'meta_app_id' => env('BANDEJA_META_APP_ID', ''),
+        'meta_app_secret' => env('BANDEJA_META_APP_SECRET', ''),
+        'whatsapp_config_id' => env('BANDEJA_WHATSAPP_CONFIG_ID', ''),
+        'instagram_app_id' => env('BANDEJA_INSTAGRAM_APP_ID', ''),
+        'instagram_app_secret' => env('BANDEJA_INSTAGRAM_APP_SECRET', ''),
+        'verify_token' => env('BANDEJA_VERIFY_TOKEN', ''),
+        'version' => env('BANDEJA_GRAPH_VERSION', 'v23.0'),
+    ],
+
+    /*
     | Google Calendar y Outlook en las dos direcciones (ADR 0199): los clientes OAuth son de
     | la plataforma (uno de Google Cloud y uno de Microsoft Entra), con la vuelta
     | `{APP_URL}/api/v1/calendarios/{google|microsoft}/vuelta`. Sin ellos no se ofrece.

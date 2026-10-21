@@ -18,11 +18,13 @@ use App\Modules\Tenancy\Http\Controllers\AvisoPrivacidadNegocioController;
 use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BajaPromocionesController;
 use App\Modules\Tenancy\Http\Controllers\BajasMembresiaTenantController;
+use App\Modules\Tenancy\Http\Controllers\BandejaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CajasTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioPublicoController;
 use App\Modules\Tenancy\Http\Controllers\CalendariosExternosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
+use App\Modules\Tenancy\Http\Controllers\CanalesMensajeriaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
 use App\Modules\Tenancy\Http\Controllers\CaptacionPublicaController;
 use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
@@ -163,8 +165,10 @@ use App\Modules\Tenancy\Http\Controllers\UsuariosTenantController;
 use App\Modules\Tenancy\Http\Controllers\VideosTenantController;
 use App\Modules\Tenancy\Http\Controllers\VisitantesPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\VueltaCalendarioController;
+use App\Modules\Tenancy\Http\Controllers\VueltaInstagramController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookBienestarController;
+use App\Modules\Tenancy\Http\Controllers\WebhookInstagramController;
 use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookTenantController;
@@ -206,11 +210,19 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:60,1,whatsapp-webhook-verificar')->name('api.v1.webhooks.whatsapp.verificar');
     Route::post('/webhooks/whatsapp', [WebhookWhatsAppController::class, 'recibir'])
         ->middleware('throttle:600,1,whatsapp-webhook')->name('api.v1.webhooks.whatsapp');
+    // Mensajes de Instagram de la bandeja de cada negocio (ADR 0200).
+    Route::get('/webhooks/instagram', [WebhookInstagramController::class, 'verificar'])
+        ->middleware('throttle:60,1,instagram-webhook-verificar')->name('api.v1.webhooks.instagram.verificar');
+    Route::post('/webhooks/instagram', [WebhookInstagramController::class, 'recibir'])
+        ->middleware('throttle:600,1,instagram-webhook')->name('api.v1.webhooks.instagram');
 
     // La vuelta de Google o Microsoft al conectar el calendario de quien atiende (ADR 0199):
     // una sola para todos los negocios; lleva el código a la web, que lo confirma con su sesión.
     Route::get('/calendarios/{proveedor}/vuelta', VueltaCalendarioController::class)
         ->whereIn('proveedor', ['google', 'microsoft'])->middleware('throttle:30,1,calendario-vuelta')->name('api.v1.calendarios.vuelta');
+    // La vuelta de Instagram al conectar la cuenta de la bandeja (ADR 0200).
+    Route::get('/bandeja/instagram/vuelta', VueltaInstagramController::class)
+        ->middleware('throttle:30,1,instagram-vuelta')->name('api.v1.bandeja.instagram.vuelta');
 
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
     // Interesados de un producto que aún no abre registros (ADR 0108): la landing de TurnoUno.
@@ -1162,6 +1174,17 @@ Route::prefix('v1')->group(function (): void {
 
             // Webhooks salientes (R40): endpoints firmados que consumen el outbox. El
             // secreto se devuelve solo al crear. Configuracion solo del propietario.
+            // La bandeja de WhatsApp e Instagram (ADR 0200).
+            Route::get('/bandeja/resumen', [BandejaTenantController::class, 'resumen'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.resumen');
+            Route::get('/bandeja/conversaciones', [BandejaTenantController::class, 'index'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.index');
+            Route::get('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'show'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.show');
+            Route::post('/bandeja/conversaciones/{conversacion}/mensajes', [BandejaTenantController::class, 'enviar'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:60,1,bandeja-enviar'])->name('bandeja.enviar');
+            Route::put('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'actualizar'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.actualizar');
+            Route::get('/bandeja/canales', [CanalesMensajeriaTenantController::class, 'index'])->middleware(['puede:integraciones.configurar', 'plan:mensajes'])->name('bandeja.canales');
+            Route::post('/bandeja/canales/whatsapp', [CanalesMensajeriaTenantController::class, 'conectarWhatsApp'])->middleware(['puede:integraciones.configurar', 'plan:mensajes', 'throttle:login'])->name('bandeja.canales.whatsapp');
+            Route::post('/bandeja/canales/instagram/conectar', [CanalesMensajeriaTenantController::class, 'conectarInstagram'])->middleware(['puede:integraciones.configurar', 'plan:mensajes'])->name('bandeja.canales.instagram.conectar');
+            Route::post('/bandeja/canales/instagram/confirmar', [CanalesMensajeriaTenantController::class, 'confirmarInstagram'])->middleware(['puede:integraciones.configurar', 'plan:mensajes', 'throttle:login'])->name('bandeja.canales.instagram.confirmar');
+            Route::delete('/bandeja/canales/{canal}', [CanalesMensajeriaTenantController::class, 'desconectar'])->whereIn('canal', ['whatsapp', 'instagram'])->middleware('puede:integraciones.configurar')->name('bandeja.canales.desconectar');
             Route::get('/webhooks-salientes', [WebhooksSalientesTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.index');
             // GA4 y Meta del negocio (ADR 0143): sus destinos, sus envíos y la prueba.
             Route::get('/medicion/destinos', [MedicionNegocioTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('medicion.destinos.index');

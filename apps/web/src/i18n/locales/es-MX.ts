@@ -158,6 +158,8 @@ export default {
       // Captación (ADR 0167): su sitio web y sus campañas.
       sitio: "Sitio web",
       campanas: "Campañas",
+      // La bandeja de WhatsApp e Instagram (ADR 0200).
+      mensajes: "Mensajes",
     },
     vistas: {
       resumen: "Resumen",

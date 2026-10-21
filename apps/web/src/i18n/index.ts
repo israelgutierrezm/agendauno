@@ -110,6 +110,7 @@ import plantillasWhatsApp from "./locales/plantillasWhatsApp.es-MX";
 import apartados from "./locales/apartados.es-MX";
 import paseWallet from "./locales/paseWallet.es-MX";
 import calendariosExternos from "./locales/calendariosExternos.es-MX";
+import bandejaMensajes from "./locales/bandejaMensajes.es-MX";
 import asistenteIA from "./locales/asistenteIA.es-MX";
 import reservaGoogle from "./locales/reservaGoogle.es-MX";
 import demoAgendable, { demosPlataforma } from "./locales/demoAgendable.es-MX";
@@ -239,6 +240,7 @@ const mensajesBase = {
   apartados,
   paseWallet,
   calendariosExternos,
+  bandejaMensajes,
   asistenteIA,
   reservaGoogle,
   demoAgendable,
