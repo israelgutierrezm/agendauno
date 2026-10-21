@@ -166,3 +166,18 @@ El cobro de una cita se autoriza por la cita (su sede y su profesional).
 - **Techo de la tarifa de clases.** Versión nueva de la tarifa (migración
   `2026_10_20_000200_techo_de_clases`): 301–500 alumnos activos a USD 149 y 501–1,000 a
   USD 199; las demás bandas, las versiones anteriores y los cargos ya emitidos no cambian.
+
+## Ajuste (2026-10-21): la devolución también bloquea primero la orden
+
+El caso nuevo de `agendauno:verificar-concurrencia`, «Anular, corregir y devolver el
+mismo cobro a la vez», falló en su primera corrida en MySQL. Revisando el código se
+encontró un candado muerto posible:
+
+- La devolución (`ReembolsarPagoTenant::ejecutar` y `resolver`) bloqueaba el pago y,
+  al ser total, terminaba actualizando la orden.
+- La anulación bloquea la orden y luego el pago.
+- Cada una esperaba a la otra, y MySQL cortaba una.
+
+Ahora la devolución bloquea la orden del pago y luego el pago, igual que cobrar,
+confirmar, anular y corregir. La regla queda así para todo lo que toca un cobro:
+**primero la orden, después el pago**.

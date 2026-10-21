@@ -910,8 +910,23 @@ class VerificarConcurrencia extends Command
         }
         foreach (array_unique($fallas) as $f) {
             $this->line("  <fg=red>FALLA</> {$f}");
+            // En GitHub Actions, también como anotación: se lee sin abrir el registro.
+            if (getenv('GITHUB_ACTIONS') === 'true') {
+                $this->line('::error title='.self::paraAnotacion('Concurrencia: '.$nombre, true).'::'.self::paraAnotacion($f));
+            }
         }
         $this->fallas++;
+    }
+
+    /**
+     * Texto para una anotación de GitHub (`::error title=…::mensaje`): sin saltos y con
+     * `%` escapado; el título además escapa `:` y `,`.
+     */
+    private static function paraAnotacion(string $texto, bool $titulo = false): string
+    {
+        $texto = str_replace(['%', "\r", "\n"], ['%25', '%0D', '%0A'], $texto);
+
+        return $titulo ? str_replace([':', ','], ['%3A', '%2C'], $texto) : $texto;
     }
 
     /**

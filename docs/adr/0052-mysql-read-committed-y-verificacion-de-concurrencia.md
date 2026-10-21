@@ -105,3 +105,9 @@ prueba directa (SQLite no reproduce candados ni carreras):
 
 `EscenariosConcurrenciaTest` corre cada paso nuevo, solo, en SQLite. Así un paso que
 no se prepara bien falla en la suite y no hasta la verificación en MySQL.
+
+En su primera corrida en el CI falló la verificación. Revisando el código se
+encontró un candado muerto posible entre una devolución y una anulación del mismo
+cobro, y se corrigió (ADR 0181, ajuste). Desde entonces,
+en GitHub Actions cada falla sale también como anotación (`::error`): se lee qué caso
+falló sin abrir el registro del trabajo.

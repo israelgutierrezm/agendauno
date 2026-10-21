@@ -53,7 +53,8 @@ use Throwable;
  * proporcional de los derechos intactos, calculada sobre lo ACUMULADO: dos
  * devoluciones del 50 % dejan 0 créditos, no 25 %.
  *
- * Serializa con `lockForUpdate` sobre el pago (y sobre cada derecho al revertir).
+ * Serializa con `lockForUpdate` sobre su orden y el pago, en ese orden (y sobre cada
+ * derecho al revertir).
  */
 class ReembolsarPagoTenant
 {
@@ -91,7 +92,7 @@ class ReembolsarPagoTenant
         // 1) Se registra la intención (y en caja o manual, se aplica) antes de hablar
         // con la pasarela: si algo falla después, la devolución queda rastreable.
         [$reembolso, $nuevo] = DB::connection('tenant')->transaction(function () use ($pago, $montoMinor, $motivo, $actor, $revertirCreditos, $manual, $llave, $metodo): array {
-            $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->firstOrFail();
+            $bloqueado = $this->bloquearOrdenYPago((int) $pago->getKey());
 
             if ($llave !== null) {
                 $repetido = $bloqueado->reembolsos()->where('llave', $llave)->first();
@@ -239,6 +240,22 @@ class ReembolsarPagoTenant
     }
 
     /**
+     * Bloquea la orden del pago y luego el pago, en ese orden, como cobrar, confirmar,
+     * anular y corregir (ADR 0181). Una devolución total termina cancelando la orden: si
+     * bloqueara primero el pago, se trabaría con una anulación del mismo cobro (que tiene
+     * la orden y espera el pago) y MySQL cortaría una de las dos.
+     */
+    private function bloquearOrdenYPago(int $pagoId): PagoTenant
+    {
+        $ordenId = PagoTenant::query()->whereKey($pagoId)->value('orden_id');
+        if ($ordenId !== null) {
+            OrdenTenant::query()->whereKey($ordenId)->lockForUpdate()->first();
+        }
+
+        return PagoTenant::query()->whereKey($pagoId)->lockForUpdate()->firstOrFail();
+    }
+
+    /**
      * Pide (o vuelve a pedir, con la MISMA llave) la devolución a la pasarela y aplica
      * el resultado. Si la pasarela dijo que no, queda fallida y se avisa con su motivo;
      * si no respondió, queda incierta (pudo haber devuelto) para confirmarla después.
@@ -336,7 +353,7 @@ class ReembolsarPagoTenant
     public function resolver(ReembolsoTenant $reembolso, EstadoReembolso $estado, ?string $referencia, ?string $motivo, ?Usuario $actor): void
     {
         DB::connection('tenant')->transaction(function () use ($reembolso, $estado, $referencia, $motivo, $actor): void {
-            $pago = PagoTenant::query()->whereKey($reembolso->pago_id)->lockForUpdate()->firstOrFail();
+            $pago = $this->bloquearOrdenYPago((int) $reembolso->pago_id);
             $bloqueado = ReembolsoTenant::query()->whereKey($reembolso->getKey())->lockForUpdate()->firstOrFail();
             if ($bloqueado->estado->esFinal()) {
                 return;
