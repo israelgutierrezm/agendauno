@@ -189,3 +189,26 @@ it('se envía y se acepta la versión que se revisó: si alguien la cambió desp
     Mail::assertQueued(CorreoPresupuesto::class);
     $this->postJson("{$url}/aceptar", ['revision' => 2], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estado', 'aceptado');
 });
+
+it('la factura de un presupuesto con impuestos desglosados va en un concepto, sin la línea de impuestos como producto', function (): void {
+    $e = estudioConSesion('barberia-p', 'b@correo.mx', 'barberia');
+    cargarDatosFiscales($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/presupuestos/configuracion", [
+        'impuestos' => 'desglosados', 'tasa_impuesto_bp' => 1600, 'vigencia_dias' => 10,
+    ], conBearer($e['bearer']))->assertOk();
+    $cliente = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Lalo', 'email' => 'lalo@correo.mx'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $id = (string) $this->postJson("/api/v1/app/{$e['slug']}/presupuestos", [
+        'persona_id' => $cliente,
+        'lineas' => [['tipo' => 'libre', 'descripcion' => 'Tratamiento facial', 'cantidad' => 1, 'precio_unitario_minor' => 100000]],
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.total_minor', 116000)->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/presupuestos/{$id}/aceptar", [], conBearer($e['bearer']))->assertOk();
+    $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/presupuestos/{$id}/convertir", [], conBearer($e['bearer']))->assertCreated()->json('data.orden');
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'tarjeta'], conBearer($e['bearer']))->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/facturas/borrador?orden={$orden}", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.total_minor', 116000)
+        ->assertJsonPath('data.conceptos', [[
+            'descripcion' => 'Tratamiento facial', 'cantidad' => 1, 'precio_unitario_minor' => 100000,
+            'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48',
+        ]]);
+});

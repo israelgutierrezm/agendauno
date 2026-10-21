@@ -72,13 +72,13 @@ class CorregirMetodoPagoTenant
     public function corregir(PagoTenant $pago, string $metodo, ?Usuario $actor, ?string $motivo = null): PagoTenant
     {
         return DB::connection('tenant')->transaction(function () use ($pago, $metodo, $actor, $motivo): PagoTenant {
+            // Primero la orden y luego el pago, como al cobrar y al confirmar (ADR 0181).
+            $orden = OrdenTenant::query()->whereKey($pago->orden_id)->lockForUpdate()->firstOrFail();
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->firstOrFail();
             $motivoNo = $this->impedimento($bloqueado);
             if ($motivoNo !== null) {
                 throw new CobroNoCorregible($motivoNo);
             }
-
-            $orden = OrdenTenant::query()->whereKey($bloqueado->orden_id)->lockForUpdate()->firstOrFail();
             $antes = (string) ($orden->metodo_pago ?? $bloqueado->metodo->value ?? 'manual');
             if ($antes === $metodo) {
                 return $bloqueado;

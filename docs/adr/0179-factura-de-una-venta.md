@@ -77,3 +77,15 @@ Las ventas del mostrador (ADR 0145) no tenían ningún vínculo con su factura.
   hacia atrás, porque el RFC o el monto no bastan para saber de qué venta eran.
 - **Cancelar un CFDI** y la **nota de crédito** al devolver o reembolsar una venta
   facturada se resolvieron en el ADR 0180.
+
+## Ajuste (2026-10-21)
+
+- **Factura de una orden:** es por lo cobrado menos lo devuelto (devoluciones
+  aprobadas), igual que la del mostrador ya excluía lo devuelto.
+  - Si queda menos que el total, va un solo concepto con ese importe.
+  - Devuelto todo, ya no se factura.
+- **Al timbrar:** con la orden o la venta bloqueadas, se vuelve a revisar que la venta
+  no esté anulada, que quede algo por facturar y que lo cobrado no se haya devuelto
+  completo.
+- **Presupuesto con impuestos desglosados** (ADR 0127): va en un solo concepto con el
+  total. La línea «Impuestos» de la orden no es un producto con IVA encima.

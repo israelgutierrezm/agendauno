@@ -11,11 +11,16 @@ use App\Modules\Tenancy\Models\LineaVentaPosTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\PresupuestoTenant;
+use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\PartesCobro;
 use App\Modules\Tenancy\Pasarelas\ConceptoDeCobro;
+use App\Modules\Tenancy\Presupuestos\ModoImpuestos;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 
@@ -65,6 +70,9 @@ class FacturasDeVentasTenant
         if ($orden->estado !== EstadoOrden::Pagada) {
             throw ValidationException::withMessages(['orden_id' => ['Solo se factura una venta pagada.']]);
         }
+        if (self::cobradoNeto($orden) <= 0) {
+            throw ValidationException::withMessages(['orden_id' => ['Se devolvió todo lo cobrado: no queda nada que facturar.']]);
+        }
         if (self::deOrden((int) $orden->getKey()) !== null) {
             throw ValidationException::withMessages(['orden_id' => ['Esta venta ya está facturada.']]);
         }
@@ -100,12 +108,20 @@ class FacturasDeVentasTenant
     {
         $orden->loadMissing(['lineas.producto', 'persona', 'sesion.oferta']);
         $lineas = $orden->lineas;
-        $suman = (int) $lineas->sum('subtotal_minor') === (int) $orden->total_minor;
-        $conceptos = $lineas->isNotEmpty() && $suman
+        // Lo que de verdad se quedó el negocio: lo cobrado menos lo devuelto.
+        $total = min((int) $orden->total_minor, self::cobradoNeto($orden));
+        // Un presupuesto con impuestos desglosados trae el impuesto como una línea más
+        // (ADR 0127): no es un concepto con IVA encima. Va un solo concepto con el total.
+        $desglosado = PresupuestoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->where('impuestos', ModoImpuestos::Desglosados->value)
+            ->exists();
+        $suman = (int) $lineas->sum('subtotal_minor') === $total;
+        $conceptos = $lineas->isNotEmpty() && $suman && ! $desglosado
             ? array_values($lineas->map(fn (LineaOrdenTenant $l): array => $this->concepto(
                 $l->nombre(), (int) $l->cantidad, (int) $l->precio_unitario_minor, self::SERVICIO,
             ))->all())
-            : [$this->concepto($this->nombreDeOrden($orden), 1, (int) $orden->total_minor, self::SERVICIO)];
+            : [$this->concepto($this->nombreDeOrden($orden, sinImpuestos: $desglosado), 1, $total, self::SERVICIO)];
         $pago = PagoTenant::query()->where('orden_id', $orden->getKey())->whereNotNull('aprobado_en')->latest('id')->first();
 
         return [
@@ -113,9 +129,27 @@ class FacturasDeVentasTenant
             'receptor' => $this->receptor($orden->persona),
             'conceptos' => $conceptos,
             'forma_pago' => $pago instanceof PagoTenant ? self::formaDelPago($pago) : '01',
-            'total_minor' => (int) $orden->total_minor,
+            'total_minor' => $total,
             'moneda' => (string) $orden->moneda,
         ];
+    }
+
+    /**
+     * Lo cobrado de una orden menos lo devuelto (devoluciones aprobadas): lo que se
+     * puede facturar.
+     */
+    public static function cobradoNeto(OrdenTenant $orden): int
+    {
+        $pagos = PagoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value])
+            ->get(['id', 'monto_minor']);
+        $devuelto = (int) ReembolsoTenant::query()
+            ->whereIn('pago_id', $pagos->modelKeys())
+            ->where('estado', EstadoReembolso::Aprobado->value)
+            ->sum('monto_minor');
+
+        return max(0, (int) $pagos->sum('monto_minor') - $devuelto);
     }
 
     /**
@@ -248,9 +282,15 @@ class FacturasDeVentasTenant
         ];
     }
 
-    private function nombreDeOrden(OrdenTenant $orden): string
+    private function nombreDeOrden(OrdenTenant $orden, bool $sinImpuestos = false): string
     {
-        $nombres = $orden->lineas->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->unique()->implode(', ');
+        // La línea de impuestos de un presupuesto desglosado no es lo que se vendió.
+        $lineas = $sinImpuestos
+            ? $orden->lineas->reject(static fn (LineaOrdenTenant $l): bool => $l->getAttribute('producto_comercial_id') === null
+                && $l->getAttribute('articulo_id') === null
+                && str_starts_with((string) $l->getAttribute('descripcion'), 'Impuestos ('))
+            : $orden->lineas;
+        $nombres = $lineas->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->unique()->implode(', ');
         if ($nombres !== '') {
             return mb_substr($nombres, 0, 255);
         }

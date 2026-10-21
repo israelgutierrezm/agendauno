@@ -79,3 +79,9 @@ La revisión dejó cinco puntos que no caben en un ADR propio cada uno:
 - Un cobro de pasarela de una clase de prueba repetida ya no da una segunda; deja una
   incidencia que alguien debe resolver.
 - Las métricas de activación cuentan negocios, no cuentas.
+
+## Ajuste (2026-10-21)
+
+- Si una orden con un plan y una clase de prueba ya usada se paga, se concede el plan.
+  La incidencia «por conciliar» propone devolver solo lo de la clase de prueba
+  (`excedente_minor`, con su parte del descuento), no todo el pago.

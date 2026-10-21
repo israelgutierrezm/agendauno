@@ -74,3 +74,9 @@ precio del presupuesto.
 - Cambiar los impuestos del negocio no altera los presupuestos ya hechos.
 - Fuera de alcance por ahora: aceptación en línea por el cliente, agendar desde el
   presupuesto y la app móvil (la pantalla es de la web del negocio).
+
+## Ajuste (2026-10-21)
+
+- Al facturar la orden de un presupuesto con impuestos desglosados, la línea
+  «Impuestos (16 %)» no se trata como un concepto: va un solo concepto con el total.
+  Ver ADR 0179.

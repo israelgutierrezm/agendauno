@@ -81,3 +81,9 @@ El dueño decidió (2026-10-18):
 - Facturar el anticipo y el resto se resuelve en el ADR 0163 (CFDI por remanente).
 - La app móvil ofrece la misma elección (anticipo o todo) y muestra el anticipo pagado
   y lo que falta mientras falte.
+
+## Ajuste (2026-10-21)
+
+- Si en caja se cobran juntos el anticipo y el resto con varias formas de pago, el
+  ticket y el cambio toman los pagos de las dos órdenes de la cita. Antes solo
+  contaban el del anticipo, y el cambio salía mal.

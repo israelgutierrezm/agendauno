@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Exceptions\CajaYaAbierta;
 use App\Modules\Tenancy\Models\ConteoCajaTenant;
 use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -105,16 +106,35 @@ class CajasTenant
     {
         $delServicio = [];
         if ($venta->orden_id !== null && (int) $venta->servicio_minor > 0) {
-            // El cobro de esa venta: aprobado (no anulado) y hecho a más tardar con ella, no
-            // uno posterior.
-            $pago = PagoTenant::query()
-                ->where('orden_id', $venta->orden_id)
-                ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value])
-                ->whereNotNull('aprobado_en')
-                ->where('created_at', '<=', $venta->created_at)
-                ->latest('id')
-                ->first();
-            $delServicio = $pago instanceof PagoTenant ? self::partesDelPago($pago) : [];
+            // Las órdenes del servicio: la de la venta y, en una cita con anticipo cobrada
+            // junto con su resto (ADR 0161), la otra de la reserva.
+            $ordenes = [(int) $venta->orden_id];
+            if ($venta->reserva_id !== null) {
+                $reserva = ReservaTenant::query()->whereKey($venta->reserva_id)->first(['orden_id', 'saldo_orden_id']);
+                foreach ([$reserva?->orden_id, $reserva?->saldo_orden_id] as $otra) {
+                    if ($otra !== null && ! in_array((int) $otra, $ordenes, true)) {
+                        $ordenes[] = (int) $otra;
+                    }
+                }
+            }
+            // El cobro de cada una: aprobado (no anulado) y hecho a más tardar con la venta;
+            // solo los que suman lo que se cobró del servicio con ella (un anticipo pagado
+            // antes en línea no es de este cobro).
+            $suma = 0;
+            foreach ($ordenes as $ordenId) {
+                $pago = PagoTenant::query()
+                    ->where('orden_id', $ordenId)
+                    ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value])
+                    ->whereNotNull('aprobado_en')
+                    ->where('created_at', '<=', $venta->created_at)
+                    ->latest('id')
+                    ->first();
+                if (! $pago instanceof PagoTenant || $suma + (int) $pago->monto_minor > (int) $venta->servicio_minor) {
+                    continue;
+                }
+                $suma += (int) $pago->monto_minor;
+                $delServicio = [...$delServicio, ...self::partesDelPago($pago)];
+            }
         }
 
         return PartesCobro::juntar([...$delServicio, ...self::partesDeVenta($venta)]);

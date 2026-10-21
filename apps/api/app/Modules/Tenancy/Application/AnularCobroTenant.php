@@ -100,8 +100,10 @@ class AnularCobroTenant
     public function anular(PagoTenant $pago, ?Usuario $actor, string $motivo): PagoTenant
     {
         return DB::connection('tenant')->transaction(function () use ($pago, $actor, $motivo): PagoTenant {
+            // Primero la orden y luego el pago, como al cobrar y al confirmar (ADR 0181):
+            // en otro orden, dos operaciones a la vez pueden trabarse.
+            $orden = OrdenTenant::query()->whereKey($pago->orden_id)->lockForUpdate()->firstOrFail();
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->firstOrFail();
-            $orden = OrdenTenant::query()->whereKey($bloqueado->orden_id)->lockForUpdate()->firstOrFail();
             $bloqueado->setRelation('orden', $orden);
 
             $motivoNo = $this->impedimento($bloqueado);

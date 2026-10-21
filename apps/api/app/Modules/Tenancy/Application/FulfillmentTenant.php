@@ -80,15 +80,24 @@ class FulfillmentTenant
 
         $orden->loadMissing(['lineas.producto', 'lineas.beneficiario', 'persona']);
         $repetidas = $this->pruebasRepetidas($orden);
+        // Los artículos cobrados, bloqueados de una vez y por id, en el mismo orden que una
+        // venta del mostrador (si no, dos cobros a la vez pueden trabarse).
+        $articulos = $orden->sucursal_id !== null
+            ? $orden->lineas->map(static fn ($l) => $l->getAttribute('articulo_id'))->filter()->map(static fn ($id): int => (int) $id)->unique()->sort()->values()->all()
+            : [];
+        if ($articulos !== []) {
+            ArticuloTenant::query()->whereKey($articulos)->orderBy('id')->lockForUpdate()->get();
+        }
+        $sinConceder = 0;
+        $repetidaDe = null;
 
         foreach ($orden->lineas as $linea) {
             // Un artículo cobrado (de un presupuesto; ADR 0127) sale del inventario de la
             // sede de la orden.
             $articuloId = $linea->getAttribute('articulo_id');
             if ($articuloId !== null && $orden->sucursal_id !== null) {
-                // Ya se pagó: no se rechaza, pero se bloquea el artículo para que una
-                // venta del mostrador a la vez vea la existencia que queda.
-                ArticuloTenant::query()->whereKey((int) $articuloId)->lockForUpdate()->first();
+                // Ya se pagó: no se rechaza (el artículo ya está bloqueado arriba, para que
+                // una venta del mostrador a la vez vea la existencia que queda).
                 $this->inventario->registrar((int) $articuloId, (int) $orden->sucursal_id, -max(1, (int) $linea->cantidad), TipoMovimientoInventario::Salida, 'Cobro '.$orden->ulid);
 
                 continue;
@@ -104,7 +113,8 @@ class FulfillmentTenant
             // La clase de prueba (B03) una sola vez, aunque otra orden pagada a la vez ya
             // se la haya dado: esta no se concede y el pago queda para devolverlo.
             if (isset($repetidas[$linea->getKey()])) {
-                $this->pruebaRepetida($orden, $beneficiario);
+                $sinConceder += (int) $linea->subtotal_minor;
+                $repetidaDe ??= $beneficiario;
 
                 continue;
             }
@@ -115,6 +125,9 @@ class FulfillmentTenant
                 $acuerdo = $this->membresias->venderProducto($beneficiario, $producto, extraAunSinPaquete: true, condiciones: $linea->condiciones);
                 $acuerdo->update(['linea_orden_id' => $linea->getKey()]);
             }
+        }
+        if ($repetidaDe instanceof PersonaTenant) {
+            $this->pruebaRepetida($orden, $repetidaDe, $sinConceder);
         }
     }
 
@@ -149,7 +162,7 @@ class FulfillmentTenant
      * Se pagó una clase de prueba que la persona ya usó: queda «por conciliar» para
      * devolver el pago (o venderle otro plan).
      */
-    private function pruebaRepetida(OrdenTenant $orden, PersonaTenant $persona): void
+    private function pruebaRepetida(OrdenTenant $orden, PersonaTenant $persona, int $sinConceder): void
     {
         $pago = PagoTenant::query()
             ->where('orden_id', $orden->getKey())
@@ -159,10 +172,16 @@ class FulfillmentTenant
         if (! $pago instanceof PagoTenant) {
             return;
         }
+        // Lo que no se concedió, con la parte del descuento de la orden que le toca: si se
+        // devuelve, es solo eso (lo demás de la orden sí se entregó).
+        $subtotal = (int) $orden->lineas->sum('subtotal_minor');
+        $excedente = $subtotal > 0 ? intdiv($sinConceder * (int) $orden->total_minor, $subtotal) : (int) $pago->monto_minor;
+        $excedente = min($excedente, (int) $pago->monto_minor);
         app(IncidenciasCobroTenant::class)->porPago(
             IncidenciaCobroTenant::PRIMERA_VEZ_REPETIDA,
             $pago,
-            "{$persona->nombreCompleto()} ya había usado su clase de prueba: no se concedió otra. Devuelve el pago o véndele otro plan.",
+            "{$persona->nombreCompleto()} ya había usado su clase de prueba: no se concedió otra. Devuelve lo de la clase de prueba o véndele otro plan.",
+            $excedente < (int) $pago->monto_minor ? ['excedente_minor' => $excedente] : [],
         );
     }
 

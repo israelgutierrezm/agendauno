@@ -108,15 +108,26 @@ class EmitirFacturaTenant
             $suya = static fn (?FacturaTenant $f): bool => $f !== null && $f->getKey() !== $sustituye?->getKey();
             // La venta que factura, bloqueada: si otro timbrado ya la facturó, no otra vez.
             if ($ordenId !== null) {
-                OrdenTenant::query()->whereKey($ordenId)->lockForUpdate()->first();
+                $orden = OrdenTenant::query()->whereKey($ordenId)->lockForUpdate()->first();
                 if ($suya(FacturasDeVentasTenant::deOrden($ordenId))) {
                     throw ValidationException::withMessages(['orden_id' => ['Esta venta ya está facturada.']]);
                 }
+                // Con lo devuelto mientras tanto, no se timbra de más.
+                if ($orden instanceof OrdenTenant && FacturasDeVentasTenant::cobradoNeto($orden) <= 0) {
+                    throw ValidationException::withMessages(['orden_id' => ['Se devolvió todo lo cobrado: no queda nada que facturar.']]);
+                }
             }
             if ($ventaPosId !== null) {
-                VentaPosTenant::query()->whereKey($ventaPosId)->lockForUpdate()->first();
+                $venta = VentaPosTenant::query()->whereKey($ventaPosId)->lockForUpdate()->first();
                 if ($suya(FacturasDeVentasTenant::deVenta($ventaPosId))) {
                     throw ValidationException::withMessages(['venta_id' => ['Esta venta ya está facturada.']]);
+                }
+                // Anulada o devuelta mientras tanto: ya no se timbra.
+                if ($venta instanceof VentaPosTenant && $venta->anulada_en !== null) {
+                    throw ValidationException::withMessages(['venta_id' => ['Esta venta está anulada.']]);
+                }
+                if ($venta instanceof VentaPosTenant && ! FacturasDeVentasTenant::quedaPorFacturar($venta)) {
+                    throw ValidationException::withMessages(['venta_id' => ['Se devolvió todo lo vendido: no queda nada que facturar.']]);
                 }
             }
             // Los anticipos que aplica: suyos (mismo RFC), timbrados y aún sin aplicar.

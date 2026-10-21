@@ -246,3 +246,18 @@ it('lo devuelto en el mostrador no se factura; devuelto todo, ya no es facturabl
     expect(collect($this->getJson("{$base}/pos/ventas", conBearer($e['bearer']))->json('data'))->firstWhere('id', $venta)['facturable'])
         ->toBeFalse();
 });
+
+it('la factura de una orden es por lo cobrado menos lo devuelto; devuelto todo, ya no se factura', function (): void {
+    $e = estudioConSesion('factura-orden', 'a@factura-orden.mx');
+    cargarDatosFiscales($e);
+    $v = paqueteCobradoParaFacturar($e);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$v['pago']}/reembolsos", ['motivo' => 'Ajuste', 'monto_minor' => 40000], conBearer($e['bearer']))->assertCreated();
+    $this->getJson("/api/v1/app/{$e['slug']}/facturas/borrador?orden={$v['orden']}", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.total_minor', 49900)
+        ->assertJsonPath('data.conceptos.0.cantidad', 1)
+        ->assertJsonPath('data.conceptos.0.precio_unitario_minor', 43017);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$v['pago']}/reembolsos", ['motivo' => 'Todo', 'monto_minor' => 49900], conBearer($e['bearer']))->assertCreated();
+    $this->getJson("/api/v1/app/{$e['slug']}/facturas/borrador?orden={$v['orden']}", conBearer($e['bearer']))->assertUnprocessable();
+});

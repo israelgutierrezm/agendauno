@@ -167,3 +167,32 @@ it('una clase dice si es para principiantes, qué saber y qué llevar; el instru
     ]);
     expect(collect($escaparate['instructores'])->firstWhere('nombre', 'Diana')['semblanza'] ?? null)->toBe('Instructora de pole desde 2015.');
 });
+
+it('si una orden con un plan y una clase de prueba ya usada se paga, se devuelve solo la prueba', function (): void {
+    $e = estudioConSesion('estudio-planes', 'planes@correo.mx');
+    $prueba = clasePruebaPlanes($e);
+    $pack = crearPackTenant($e);
+    $otra = alumnoConSesion($e, 'Otra', 'otra@correo.mx');
+    $primera = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($otra['bearer']))
+        ->assertCreated()->json('data.id');
+    $segunda = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [
+        ['producto_id' => $pack, 'cantidad' => 1], ['producto_id' => $prueba, 'cantidad' => 1],
+    ]], conBearer($otra['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$primera}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    // La segunda (plan $899 + prueba $150) la cobra la pasarela después.
+    enNegocioPlanesPublico(function () use ($segunda): void {
+        $orden = OrdenTenant::query()->where('ulid', $segunda)->firstOrFail();
+        $pago = PagoTenant::query()->create([
+            'orden_id' => $orden->getKey(), 'proveedor' => 'stripe', 'metodo' => 'tarjeta',
+            'estado' => 'pendiente', 'monto_minor' => (int) $orden->total_minor, 'moneda' => 'MXN', 'referencia_externa' => 'cs_plan_y_prueba',
+        ]);
+        app(ConfirmarPagoTenant::class)->aprobar($pago, 'cs_plan_y_prueba');
+    });
+
+    // El plan se le dio; la prueba no, y lo que se devolvería es solo la prueba.
+    expect(planesDeCorreoPlanesPublico('otra@correo.mx'))->toBe(2);
+    $incidencias = $this->getJson("/api/v1/app/{$e['slug']}/incidencias-cobro", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($incidencias)->toHaveCount(1)
+        ->and($incidencias[0]['tipo'])->toBe('primera_vez_repetida')
+        ->and($incidencias[0]['excedente_minor'])->toBe(15000);
+});

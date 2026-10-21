@@ -233,3 +233,20 @@ it('si no llega, el negocio se queda solo con el anticipo y le devuelve el resto
 
     expect(devolucionesDeStripeParaRevisar())->toBe([15000]);
 });
+
+it('en caja, anticipo y resto juntos con varias formas: el ticket trae las dos y el cambio sale del efectivo', function (): void {
+    $ctx = citaConAnticipoParaRevisar();
+    $slug = $ctx['e']['slug'];
+    $reserva = (string) citaEnAgendaParaRevisar($ctx)['reserva_id'];
+
+    // Anticipo $100 + resto $150 = $250: tarjeta $100 y efectivo $150; entrega $200.
+    $datos = $this->postJson("/api/v1/app/{$slug}/reservas/{$reserva}/cobro", [
+        'metodo' => 'efectivo', 'recibido_minor' => 20000, 'clave_intento' => 'anticipo-mixto-1',
+        'partes' => [['metodo' => 'tarjeta', 'monto_minor' => 10000], ['metodo' => 'efectivo', 'monto_minor' => 15000]],
+    ], conBearer($ctx['e']['bearer']))->assertCreated()->json('data');
+
+    expect($datos['servicio_minor'])->toBe(25000)
+        ->and($datos['metodo'])->toBe('mixto')
+        ->and($datos['cambio_minor'])->toBe(5000)
+        ->and(collect($datos['partes'])->pluck('monto_minor', 'metodo')->sortKeys()->all())->toBe(['efectivo' => 15000, 'tarjeta' => 10000]);
+});
