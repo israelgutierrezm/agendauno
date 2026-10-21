@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\CalendarioExternoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoCalendarioExternoTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request as PeticionHttp;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -38,10 +39,10 @@ afterEach(function (): void {
  * @param  list<array{metodo: string, url: string, cuerpo: array<mixed>}>  $llamadas
  * @param  list<array{start: string, end: string}>  $ocupado
  */
-function fingirGoogleCalendario(array &$llamadas, array &$ocupado): void
+function fingirGoogleCalendario(array &$llamadas, array &$ocupado, ?string &$falla = null): void
 {
     $siguiente = 0;
-    Http::fake(function (PeticionHttp $peticion) use (&$llamadas, &$ocupado, &$siguiente) {
+    Http::fake(function (PeticionHttp $peticion) use (&$llamadas, &$ocupado, &$siguiente, &$falla) {
         $llamadas[] = ['metodo' => $peticion->method(), 'url' => $peticion->url(), 'cuerpo' => $peticion->data()];
         $url = $peticion->url();
         if (str_contains($url, 'oauth2.googleapis.com/token')) {
@@ -50,7 +51,12 @@ function fingirGoogleCalendario(array &$llamadas, array &$ocupado): void
             return Http::response(['access_token' => 'acceso-g', 'refresh_token' => 'refresco-g', 'expires_in' => 3600, 'id_token' => "x.{$carga}.y"]);
         }
         if (str_ends_with($url, '/freeBusy')) {
-            return Http::response(['calendars' => ['primary' => ['busy' => $ocupado]]]);
+            return match ($falla) {
+                // Google contesta 200 con el error dentro y sin nada ocupado.
+                'errores' => Http::response(['calendars' => ['primary' => ['busy' => [], 'errors' => [['domain' => 'global', 'reason' => 'backendError']]]]]),
+                'servidor' => Http::response(['error' => ['code' => 500]], 500),
+                default => Http::response(['calendars' => ['primary' => ['busy' => $ocupado]]]),
+            };
         }
         if (str_ends_with($url, '/calendar/v3/calendars') && $peticion->method() === 'POST') {
             return Http::response(['id' => 'cal-negocio']);
@@ -270,4 +276,73 @@ it('desconectar quita el calendario de su cuenta y los bloqueos que trajo', func
             ->and(BloqueoAgendaTenant::withTrashed()->count())->toBe(0);
     });
     $this->getJson("/api/v1/app/{$slug}/yo/calendarios", conBearer($n['coach']))->assertOk()->assertJsonPath('data.proveedores.0.conexion', null);
+});
+
+it('si Google no da lo ocupado completo, los bloqueos se quedan como estaban', function (string $falla): void {
+    $llamadas = [];
+    $ocupado = [['start' => now()->addDays(3)->setTime(15, 0)->utc()->toIso8601ZuluString(), 'end' => now()->addDays(3)->setTime(16, 0)->utc()->toIso8601ZuluString()]];
+    $error = null;
+    fingirGoogleCalendario($llamadas, $ocupado, $error);
+    $n = negocioConCoachYClase();
+    $slug = $n['e']['slug'];
+    conectarCalendarioDeCoach($n, 'google');
+
+    // Google falla: lo que ya estaba ocupado sigue bloqueado y la conexión lo dice.
+    $error = $falla;
+    $conexion = $this->postJson("/api/v1/app/{$slug}/yo/calendarios/google/sincronizar", [], conBearer($n['coach']))->assertOk()->json('data');
+    expect($conexion['estado'])->toBe('activo')->and($conexion['ultimo_error'])->not->toBeNull();
+    $bloqueos = $this->getJson("/api/v1/app/{$slug}/bloqueos", conBearer($n['e']['bearer']))->json('data');
+    expect($bloqueos)->toHaveCount(1)->and($bloqueos[0]['origen'])->toBe('google');
+
+    // Cuando vuelve a contestar bien, la siguiente pasada lo pone al día.
+    $error = null;
+    $ocupado = [];
+    $this->postJson("/api/v1/app/{$slug}/yo/calendarios/google/sincronizar", [], conBearer($n['coach']))->assertOk()->assertJsonPath('data.ultimo_error', null);
+    expect($this->getJson("/api/v1/app/{$slug}/bloqueos", conBearer($n['e']['bearer']))->json('data'))->toBe([]);
+})->with(['error dentro de un 200' => 'errores', 'error del servidor' => 'servidor']);
+
+it('de Outlook se leen todas las páginas, y una lectura a medias no libera horarios', function (): void {
+    $paginaAjena = false;
+    Http::fake(function (PeticionHttp $peticion) use (&$paginaAjena) {
+        $url = $peticion->url();
+        if (str_contains($url, 'login.microsoftonline.com/common/oauth2/v2.0/token')) {
+            return Http::response(['access_token' => 'acceso-ms', 'refresh_token' => 'refresco-ms', 'expires_in' => 3600]);
+        }
+        if (str_ends_with($url, '/v1.0/me')) {
+            return Http::response(['mail' => 'coach@outlook.com']);
+        }
+        if (str_ends_with($url, '/me/calendars') && $peticion->method() === 'POST') {
+            return Http::response(['id' => 'cal-ms']);
+        }
+        if (str_contains($url, '/me/calendars/cal-ms/events')) {
+            return Http::response(['id' => 'ev-ms']);
+        }
+        $evento = fn (int $dias): array => ['showAs' => 'busy', 'start' => ['dateTime' => now()->addDays($dias)->setTime(12, 0)->utc()->format('Y-m-d\TH:i:s')], 'end' => ['dateTime' => now()->addDays($dias)->setTime(13, 0)->utc()->format('Y-m-d\TH:i:s')]];
+        if (str_contains($url, '/me/calendar/calendarView') && str_contains($url, 'skiptoken=pagina2')) {
+            return Http::response(['value' => [$evento(6)]]);
+        }
+        if (str_contains($url, '/me/calendar/calendarView')) {
+            $siguiente = $paginaAjena ? 'https://otro.example.com/pagina2' : 'https://graph.microsoft.com/v1.0/me/calendar/calendarView?$skiptoken=pagina2';
+
+            return Http::response(['value' => [$evento(5), ['showAs' => 'busy', 'isCancelled' => true, 'start' => ['dateTime' => '2026-10-09T10:00:00'], 'end' => ['dateTime' => '2026-10-09T11:00:00']]], '@odata.nextLink' => $siguiente]);
+        }
+
+        return Http::response(['error' => 'no esperado: '.$url], 500);
+    });
+    $n = negocioConCoachYClase();
+    $slug = $n['e']['slug'];
+
+    conectarCalendarioDeCoach($n, 'microsoft');
+    // Los dos eventos (uno en cada página) bloquean; el cancelado no.
+    $desde = fn (): array => collect($this->getJson("/api/v1/app/{$slug}/bloqueos", conBearer($n['e']['bearer']))->json('data'))
+        ->map(fn (array $b): int => CarbonImmutable::parse($b['desde'])->getTimestamp())->sort()->values()->all();
+    $esperado = [now()->addDays(5)->setTime(12, 0)->getTimestamp(), now()->addDays(6)->setTime(12, 0)->getTimestamp()];
+    expect($desde())->toBe($esperado);
+
+    // Una página siguiente que no es de Graph: no se sigue y nada se libera.
+    $paginaAjena = true;
+    $this->postJson("/api/v1/app/{$slug}/yo/calendarios/microsoft/sincronizar", [], conBearer($n['coach']))->assertOk()
+        ->assertJsonPath('data.estado', 'activo');
+    expect($desde())->toBe($esperado);
+    Http::assertNotSent(fn (PeticionHttp $p): bool => str_contains($p->url(), 'otro.example.com'));
 });

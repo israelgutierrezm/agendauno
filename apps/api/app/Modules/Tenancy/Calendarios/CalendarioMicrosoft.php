@@ -20,6 +20,11 @@ class CalendarioMicrosoft implements ProveedorCalendario
 
     private const ALCANCES = 'offline_access openid email User.Read Calendars.ReadWrite';
 
+    /** Eventos por página al leer lo ocupado, y páginas como máximo por pasada. */
+    private const POR_PAGINA = 250;
+
+    private const MAX_PAGINAS = 40;
+
     public function configurado(): bool
     {
         return (string) config('agendauno.calendarios.microsoft.client_id') !== '' && (string) config('agendauno.calendarios.microsoft.client_secret') !== '';
@@ -104,26 +109,48 @@ class CalendarioMicrosoft implements ProveedorCalendario
         }
     }
 
+    /**
+     * Graph pagina el calendario (`@odata.nextLink`): se leen todas las páginas. Si no se
+     * pudo leer completo (más páginas de las previstas o un evento sin horas), se lanza
+     * en lugar de devolver lo leído: lo que faltara quedaría como libre.
+     */
     public function ocupado(string $acceso, CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
-        $json = $this->api($acceso)
-            ->withHeaders(['Prefer' => 'outlook.timezone="UTC"'])
-            ->get(self::API.'/me/calendar/calendarView', [
-                'startDateTime' => $desde->utc()->toIso8601ZuluString(),
-                'endDateTime' => $hasta->utc()->toIso8601ZuluString(),
-                '$select' => 'start,end,showAs',
-                '$top' => 500,
-            ])->throw()->json();
-
         $ocupado = [];
-        foreach ((array) ($json['value'] ?? []) as $evento) {
-            if (! is_array($evento) || ($evento['showAs'] ?? 'busy') === 'free') {
-                continue;
+        $siguiente = self::API.'/me/calendar/calendarView?'.http_build_query([
+            'startDateTime' => $desde->utc()->toIso8601ZuluString(),
+            'endDateTime' => $hasta->utc()->toIso8601ZuluString(),
+            '$select' => 'start,end,showAs,isCancelled',
+            '$top' => self::POR_PAGINA,
+        ]);
+        for ($pagina = 0; $siguiente !== null; $pagina++) {
+            if ($pagina >= self::MAX_PAGINAS) {
+                throw new RuntimeException('Outlook dio más eventos de los que se pueden leer en una pasada.');
             }
-            $ocupado[] = [
-                'desde' => CarbonImmutable::parse((string) ($evento['start']['dateTime'] ?? ''), 'UTC'),
-                'hasta' => CarbonImmutable::parse((string) ($evento['end']['dateTime'] ?? ''), 'UTC'),
-            ];
+            $json = $this->api($acceso)->withHeaders(['Prefer' => 'outlook.timezone="UTC"'])->get($siguiente)->throw()->json();
+            if (! is_array($json) || ! is_array($json['value'] ?? null)) {
+                throw new RuntimeException('Outlook no dio los eventos del calendario.');
+            }
+            foreach ($json['value'] as $evento) {
+                if (! is_array($evento)) {
+                    throw new RuntimeException('Outlook dio un evento incompleto.');
+                }
+                if (($evento['showAs'] ?? 'busy') === 'free' || ($evento['isCancelled'] ?? false) === true) {
+                    continue;
+                }
+                $inicio = $evento['start']['dateTime'] ?? null;
+                $fin = $evento['end']['dateTime'] ?? null;
+                if (! is_string($inicio) || ! is_string($fin) || $inicio === '' || $fin === '') {
+                    throw new RuntimeException('Outlook dio un evento sin horas.');
+                }
+                $ocupado[] = ['desde' => CarbonImmutable::parse($inicio, 'UTC'), 'hasta' => CarbonImmutable::parse($fin, 'UTC')];
+            }
+            $proxima = $json['@odata.nextLink'] ?? null;
+            if ($proxima !== null && (! is_string($proxima) || ! str_starts_with($proxima, self::API.'/'))) {
+                // Solo se sigue a Graph (la llave no sale a otro lado), y no se deja a medias.
+                throw new RuntimeException('Outlook dio una página siguiente que no es de Graph.');
+            }
+            $siguiente = $proxima;
         }
 
         return $ocupado;

@@ -110,11 +110,19 @@ class CalendarioGoogle implements ProveedorCalendario
             'items' => [['id' => 'primary']],
         ])->throw()->json();
 
+        // Google puede contestar 200 con `errors` (p. ej. backendError) y `busy` vacío: eso
+        // no es «libre». Sin una respuesta completa no se toca nada (se lanza).
+        $primario = is_array($json) ? ($json['calendars']['primary'] ?? null) : null;
+        if (! is_array($primario) || ! empty($primario['errors']) || ! is_array($primario['busy'] ?? null)) {
+            throw new RuntimeException('Google no dio lo ocupado del calendario: '.self::motivo($primario));
+        }
+
         $ocupado = [];
-        foreach ((array) ($json['calendars']['primary']['busy'] ?? []) as $rango) {
-            if (is_array($rango) && isset($rango['start'], $rango['end'])) {
-                $ocupado[] = ['desde' => CarbonImmutable::parse((string) $rango['start'])->utc(), 'hasta' => CarbonImmutable::parse((string) $rango['end'])->utc()];
+        foreach ($primario['busy'] as $rango) {
+            if (! is_array($rango) || ! is_string($rango['start'] ?? null) || ! is_string($rango['end'] ?? null)) {
+                throw new RuntimeException('Google dio un horario ocupado incompleto.');
             }
+            $ocupado[] = ['desde' => CarbonImmutable::parse($rango['start'])->utc(), 'hasta' => CarbonImmutable::parse($rango['end'])->utc()];
         }
 
         return $ocupado;
@@ -136,6 +144,15 @@ class CalendarioGoogle implements ProveedorCalendario
     private function api(string $acceso): PendingRequest
     {
         return Http::withToken($acceso)->acceptJson()->timeout(15);
+    }
+
+    /** Lo que dijo Google del error del calendario, para la conexión. */
+    private static function motivo(mixed $primario): string
+    {
+        $errores = is_array($primario) && is_array($primario['errors'] ?? null) ? $primario['errors'] : [];
+        $razon = is_array($errores[0] ?? null) ? ($errores[0]['reason'] ?? null) : null;
+
+        return is_string($razon) ? $razon : 'respuesta incompleta';
     }
 
     /** El correo del id_token (solo para mostrar qué cuenta se conectó). */
