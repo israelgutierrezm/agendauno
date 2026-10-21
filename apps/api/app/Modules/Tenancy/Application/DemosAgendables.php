@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Mail\CorreoDemoAgendada;
 use App\Modules\Tenancy\Models\DemoAgendada;
+use App\Modules\Tenancy\ProductoComercial;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * La demo de 15 minutos que se agenda desde la landing (ADR 0193).
@@ -18,6 +22,7 @@ use Illuminate\Validation\ValidationException;
  * - Cada demo ocupa un lugar de su horario (`ranura`, único): dos personas no toman el
  *   mismo aunque agenden a la vez. Cancelarla lo libera.
  * - Apagadas (`demos.activas`), la landing no las ofrece y no se agenda.
+ * - Se le recuerda por correo un día y una hora antes a quien la pidió.
  */
 class DemosAgendables
 {
@@ -139,5 +144,71 @@ class DemosAgendables
     public function cuando(DemoAgendada $demo): CarbonImmutable
     {
         return CarbonImmutable::parse($demo->inicia_en)->setTimezone($this->zona());
+    }
+
+    /** «jueves 1 de octubre a las 10:00», en la zona de ventas. */
+    public function textoCuando(DemoAgendada $demo): string
+    {
+        $cuando = $this->cuando($demo);
+
+        return $cuando->locale('es')->translatedFormat('l j \d\e F').' a las '.$cuando->format('H:i');
+    }
+
+    /** El enlace con el que quien la pidió la cancela. */
+    public function enlaceCancelar(DemoAgendada $demo): string
+    {
+        return ProductoComercial::from($demo->producto)->urlWeb().'/demo/cancelar?demo='.$demo->ulid.'&token='.$demo->token;
+    }
+
+    /**
+     * Manda los recordatorios que tocan: el de un día antes, a quien la agendó con más
+     * de un día (y mientras falte más de una hora), y el de una hora antes, a quien la
+     * agendó con más de una hora. Cada uno se toma una sola vez. Devuelve cuántos mandó.
+     */
+    public function recordar(): int
+    {
+        $ahora = now();
+        $mandados = 0;
+        DemoAgendada::query()
+            ->where('estado', 'agendada')
+            ->whereBetween('inicia_en', [$ahora, $ahora->copy()->addDay()])
+            ->where(fn ($q) => $q->whereNull('recordatorio_dia_en')->orWhereNull('recordatorio_hora_en'))
+            ->orderBy('inicia_en')
+            ->get()
+            ->each(function (DemoAgendada $demo) use ($ahora, &$mandados): void {
+                $inicio = CarbonImmutable::parse($demo->inicia_en);
+                $agendada = CarbonImmutable::parse($demo->created_at);
+                $cual = match (true) {
+                    $demo->recordatorio_hora_en === null && $inicio->lessThanOrEqualTo($ahora->copy()->addHour())
+                        && $agendada->lessThanOrEqualTo($inicio->subHour()) => 'hora',
+                    $demo->recordatorio_dia_en === null && $inicio->greaterThan($ahora->copy()->addHour())
+                        && $agendada->lessThanOrEqualTo($inicio->subDay()) => 'dia',
+                    default => null,
+                };
+                if ($cual === null) {
+                    return;
+                }
+                // Se toma una sola vez, aunque otro proceso revise a la vez.
+                $tomado = DemoAgendada::query()->whereKey($demo->getKey())->where('estado', 'agendada')
+                    ->whereNull("recordatorio_{$cual}_en")->update(["recordatorio_{$cual}_en" => now()]);
+                if ($tomado !== 1) {
+                    return;
+                }
+                try {
+                    Mail::to($demo->correo)->send(new CorreoDemoAgendada(
+                        ProductoComercial::from($demo->producto),
+                        $this->textoCuando($demo),
+                        (string) $this->minutos(),
+                        $this->enlaceCancelar($demo),
+                        null,
+                        $cual,
+                    ));
+                    $mandados++;
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            });
+
+        return $mandados;
     }
 }

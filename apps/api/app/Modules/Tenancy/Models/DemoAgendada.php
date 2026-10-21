@@ -26,6 +26,9 @@ use Illuminate\Support\Carbon;
  * @property string $token
  * @property int|null $aviso_version
  * @property Carbon|null $acepto_aviso_en
+ * @property Carbon|null $recordatorio_dia_en
+ * @property Carbon|null $recordatorio_hora_en
+ * @property Carbon $created_at
  */
 class DemoAgendada extends Model
 {
@@ -44,5 +47,7 @@ class DemoAgendada extends Model
         'inicia_en' => 'datetime',
         'acepta_whatsapp' => 'boolean',
         'acepto_aviso_en' => 'datetime',
+        'recordatorio_dia_en' => 'datetime',
+        'recordatorio_hora_en' => 'datetime',
     ];
 }

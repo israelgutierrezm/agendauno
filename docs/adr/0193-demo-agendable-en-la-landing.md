@@ -42,3 +42,11 @@ de interesados.
 - Mientras la plantilla de WhatsApp no esté aprobada en Meta, la confirmación por
   WhatsApp falla en silencio (se reporta) y queda la del correo.
 - No hay recordatorio automático antes de la demo: ventas la ve en su lista.
+
+## Recordatorios (2026-10-21)
+
+- A quien la pidió se le recuerda por correo un día antes (si la agendó con más de un
+  día) y una hora antes (si la agendó con más de una hora), con el enlace para
+  cancelarla. Los manda `agendauno:recordar-demos` cada cinco minutos.
+- Cada recordatorio se toma una sola vez (`recordatorio_dia_en`, `recordatorio_hora_en`),
+  aunque dos procesos revisen a la vez. Una demo cancelada no se recuerda.

@@ -95,6 +95,8 @@ Schedule::command('agendauno:conciliar-renta')->everyFifteenMinutes()->withoutOv
 // Dominios propios de los negocios (ADR 0189): revisa su DNS y deja al día los que
 // Traefik sirve con su certificado.
 Schedule::command('agendauno:dominios-propios')->everyTenMinutes()->withoutOverlapping();
+// Recordatorios de las demos agendadas en la landing: un día y una hora antes (ADR 0193).
+Schedule::command('agendauno:recordar-demos')->everyFiveMinutes()->withoutOverlapping();
 
 // Plantillas de WhatsApp de los negocios (ADR 0190): cómo van en Meta.
 Schedule::command('agendauno:revisar-plantillas-whatsapp')->everyFifteenMinutes()->withoutOverlapping();

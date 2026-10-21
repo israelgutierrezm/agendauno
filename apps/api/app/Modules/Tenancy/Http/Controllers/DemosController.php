@@ -175,8 +175,8 @@ class DemosController
     {
         $producto = ProductoComercial::from($demo->producto);
         $cuando = $this->demos->cuando($demo);
-        $texto = $cuando->locale('es')->translatedFormat('l j \d\e F').' a las '.$cuando->format('H:i');
-        $cancelar = $producto->urlWeb().'/demo/cancelar?demo='.$demo->ulid.'&token='.$demo->token;
+        $texto = $this->demos->textoCuando($demo);
+        $cancelar = $this->demos->enlaceCancelar($demo);
         $minutos = (string) $this->demos->minutos();
         try {
             Mail::to($demo->correo)->send(new CorreoDemoAgendada($producto, $texto, $minutos, $cancelar));

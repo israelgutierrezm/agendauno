@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Mail\CorreoDemoAgendada;
 use App\Modules\Tenancy\Models\DemoAgendada;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -140,4 +141,56 @@ it('si lo pide y la plataforma habla con los dueños por WhatsApp, se le confirm
         ->and($envios[0]['to'])->toBe('525512345678')
         ->and($envios[0]['template']['name'])->toBe('agendauno_demo_agendada')
         ->and($envios[0]['template']['components'][0]['parameters'][0]['text'])->toBe('Ana');
+});
+
+it('recuerda la demo por correo un día y una hora antes, una sola vez', function (): void {
+    demosEncendidas();
+    // Agendada el jueves a las 06:00 para el viernes a las 10:00 (28 horas antes).
+    $this->postJson('/api/v1/demos', datosDeDemo(['fecha' => '2026-10-02', 'hora' => '10:00']))->assertCreated();
+    // Y otra para hoy a las 10:00: con menos de un día, solo la de una hora antes.
+    $this->postJson('/api/v1/demos', datosDeDemo(['correo' => 'luis@barberia.mx']))->assertCreated();
+    $recordatorios = function (string $correo, string $cual): int {
+        $n = 0;
+        Mail::assertQueued(CorreoDemoAgendada::class, function (CorreoDemoAgendada $m) use ($correo, $cual, &$n): bool {
+            if ($m->hasTo($correo) && $m->recordatorio === $cual) {
+                $n++;
+            }
+
+            return true;
+        });
+
+        return $n;
+    };
+
+    $this->artisan('agendauno:recordar-demos')->assertSuccessful();
+    expect($recordatorios('ana@fluo.mx', 'dia'))->toBe(0);
+
+    // Jueves 09:05: falta una hora para la de hoy (sin la de un día); faltan 25 h para la otra.
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 09:05', 'America/Mexico_City'));
+    $this->artisan('agendauno:recordar-demos')->assertSuccessful();
+    expect($recordatorios('luis@barberia.mx', 'hora'))->toBe(1)
+        ->and($recordatorios('luis@barberia.mx', 'dia'))->toBe(0)
+        ->and($recordatorios('ana@fluo.mx', 'dia'))->toBe(0);
+
+    // Jueves 10:05: la de mañana, un día antes; repetir no la manda otra vez.
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 10:05', 'America/Mexico_City'));
+    $this->artisan('agendauno:recordar-demos')->assertSuccessful();
+    $this->artisan('agendauno:recordar-demos')->assertSuccessful();
+    expect($recordatorios('ana@fluo.mx', 'dia'))->toBe(1);
+
+    // Viernes 09:10: una hora antes.
+    $this->travelTo(CarbonImmutable::parse('2026-10-02 09:10', 'America/Mexico_City'));
+    $this->artisan('agendauno:recordar-demos')->assertSuccessful();
+    expect($recordatorios('ana@fluo.mx', 'hora'))->toBe(1)
+        ->and(DemoAgendada::query()->where('correo', 'ana@fluo.mx')->value('recordatorio_hora_en'))->not->toBeNull();
+});
+
+it('una demo cancelada no se recuerda', function (): void {
+    demosEncendidas();
+    $this->postJson('/api/v1/demos', datosDeDemo(['fecha' => '2026-10-02', 'hora' => '10:00']))->assertCreated();
+    DemoAgendada::query()->update(['estado' => 'cancelada', 'ranura' => null]);
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 10:05', 'America/Mexico_City'));
+    $this->artisan('agendauno:recordar-demos')->assertSuccessful();
+    Mail::assertNotQueued(CorreoDemoAgendada::class, fn (CorreoDemoAgendada $m): bool => $m->recordatorio !== null);
 });
