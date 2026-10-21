@@ -43,7 +43,8 @@ return new class extends Migration
             $t->string('huella', 64);
             $t->timestamps();
 
-            $t->unique(['calendario_externo_id', 'sesion_id']);
+            // Nombre propio: el automático pasa de los 64 caracteres que acepta MySQL.
+            $t->unique(['calendario_externo_id', 'sesion_id'], 'eventos_calendario_sesion_unique');
         });
 
         Schema::connection('tenant')->table('bloqueos_agenda', function (Blueprint $t): void {
