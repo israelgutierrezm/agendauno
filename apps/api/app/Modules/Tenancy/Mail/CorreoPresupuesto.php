@@ -15,8 +15,8 @@ use Illuminate\Queue\SerializesModels;
 
 /**
  * El presupuesto que el negocio le manda a su cliente (ADR 0127): folio, conceptos,
- * totales con sus impuestos, vigencia y notas. Lo acepta o rechaza respondiéndole al
- * negocio; el negocio lo registra.
+ * totales con sus impuestos, vigencia y notas, con el enlace para verlo, aceptarlo o
+ * rechazarlo y pagarlo en línea. También puede responderle al negocio.
  */
 class CorreoPresupuesto extends Mailable implements ShouldQueue
 {
@@ -32,6 +32,8 @@ class CorreoPresupuesto extends Mailable implements ShouldQueue
         public readonly array $presupuesto,
         // Responder le escribe al negocio (su correo de contacto).
         public readonly ?string $responderA = null,
+        // Para verlo y responderlo en línea.
+        public readonly ?string $enlace = null,
     ) {}
 
     public function envelope(): Envelope
@@ -73,7 +75,10 @@ class CorreoPresupuesto extends Mailable implements ShouldQueue
             .'<hr style="border:0;border-top:1px solid #e5e7eb">'
             .'<table style="width:100%">'.$totales.'</table>'.$nota
             .(($p['notas'] ?? '') !== '' ? '<p>'.nl2br(e((string) $p['notas'])).'</p>' : '')
-            .'<p>Para aceptarlo o si tienes dudas, responde este correo o escríbenos.</p>';
+            .($this->enlace !== null
+                ? '<p><a href="'.e($this->enlace).'" style="display:inline-block;padding:10px 18px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none">Ver y responder el presupuesto</a></p>'
+                    .'<p>Desde ahí lo aceptas o lo rechazas y, si quieres, lo pagas en línea. Si tienes dudas, responde este correo.</p>'
+                : '<p>Para aceptarlo o si tienes dudas, responde este correo o escríbenos.</p>');
 
         return new Content(htmlString: DisenoCorreo::envolver($this->negocio, $html, MarcaProducto::deSlug($this->slug)));
     }

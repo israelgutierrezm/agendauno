@@ -120,4 +120,38 @@ export default {
     imprimir: "Imprimir o guardar como PDF",
     volver: "Volver a presupuestos",
   },
+  // En línea: el cliente lo responde y lo paga desde su correo o su cuenta.
+  enLinea: {
+    porElCliente: "respondido por el cliente en línea",
+    motivoDelCliente: "Su motivo: {motivo}",
+    misTitulo: "Mis presupuestos",
+    valeHasta: "Vale hasta el {fecha}",
+    para: "Para {nombre}",
+    porResponder: "Por responder",
+    aceptado: "Aceptado",
+    pagado: "Aceptado y pagado",
+    rechazado: "Rechazado",
+    vencido: "Vencido",
+    vencidoAyuda:
+      "Ya pasó su vigencia: pide al negocio uno nuevo si aún te interesa.",
+    aceptar: "Aceptar presupuesto",
+    aceptando: "Aceptando…",
+    confirmarAceptar:
+      "¿Aceptas este presupuesto? Quedará como tu cobro con el negocio: lo pagas en línea o en el negocio.",
+    rechazar: "Rechazar",
+    motivo: "¿Por qué lo rechazas? (opcional)",
+    confirmarRechazo: "Rechazar presupuesto",
+    pagar: "Pagar en línea",
+    abriendoPago: "Abriendo el pago…",
+    pagarEnNegocio: "Págalo en el negocio cuando vayas.",
+    sinCheckout: "No se pudo abrir el pago en línea: inténtalo de nuevo.",
+    agendarTitulo: "Agenda tus citas",
+    agendar: "Agendar {servicio}",
+    pagoExito: "Recibimos tu pago. Gracias.",
+    pagoPendiente: "Tu pago está en proceso: te avisamos cuando se confirme.",
+    pagoCancelado: "No se completó el pago. Puedes intentarlo de nuevo.",
+    invalido: "Este enlace ya no es válido",
+    invalidoTexto:
+      "Puede que el negocio te haya mandado uno más nuevo. Revisa tu correo o escríbele.",
+  },
 };

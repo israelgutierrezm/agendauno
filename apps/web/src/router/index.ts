@@ -84,6 +84,13 @@ const router = createRouter({
       props: true,
     },
     {
+      // Un presupuesto en línea desde el enlace del correo (`?t=`): verlo,
+      // responderlo y pagarlo sin cuenta.
+      path: "/presupuesto/:slug/:id",
+      name: "presupuesto-en-linea",
+      component: () => import("@/views/PresupuestoEnLineaView.vue"),
+    },
+    {
       // Un formulario de captación por enlace, QR o embebido (`?embed=1`) (ADR 0117).
       path: "/f/:slug/:formulario",
       name: "formulario-captacion",

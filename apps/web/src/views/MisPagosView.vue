@@ -9,6 +9,7 @@ import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import HistorialCompras from "@/components/HistorialCompras.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import MisPresupuestos from "@/components/MisPresupuestos.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -354,6 +355,9 @@ onMounted(() => void cuenta.asegurar());
       >
         <CortePlanes ref="corte" :url="`${cuenta.base.value}/mi/planes`" />
       </div>
+
+      <!-- Citas: los presupuestos que le mandó el negocio, para responderlos y pagarlos. -->
+      <MisPresupuestos v-if="citas" class="order-1" />
 
       <div id="mp-pendientes" class="order-2">
         <!-- Por pagar -->

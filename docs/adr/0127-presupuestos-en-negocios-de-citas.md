@@ -73,7 +73,28 @@ precio del presupuesto.
 - Un negocio de citas cotiza, comparte y cobra lo cotizado sin capturarlo dos veces.
 - Cambiar los impuestos del negocio no altera los presupuestos ya hechos.
 - Fuera de alcance por ahora: aceptación en línea por el cliente, agendar desde el
-  presupuesto y la app móvil (la pantalla es de la web del negocio).
+  presupuesto y la app móvil (la pantalla es de la web del negocio). Resuelto después:
+  ver «Presupuestos en línea».
+
+## Presupuestos en línea (2026-10-21)
+
+Pedido del dueño: el cliente acepta el presupuesto desde un enlace y desde ahí se cobra
+y se agenda; también en la app.
+
+- **El enlace del correo** (`/presupuesto/{negocio}/{id}?t=…`) lo abre sin cuenta. Solo
+  se guarda la huella del token (`presupuestos.enlace_hash`); cada envío da uno nuevo y
+  el anterior deja de servir. Un borrador no se ve.
+- **Desde su cuenta** (web, en Mis pagos, y la app): sus presupuestos enviados y
+  respondidos.
+- **Aceptar** confirma la revisión que vio (si el negocio lo cambió, 409) y lo vuelve su
+  orden de cobro en Por cobrar, como «Convertir»: lo paga en línea con la pasarela del
+  negocio o en el negocio. **Rechazar** guarda su motivo. Uno vencido no se responde.
+- Queda quién lo respondió (`respondido_por`: `cliente` o `negocio`) y se le avisa al
+  negocio por correo.
+- **Agendar**: por cada servicio del presupuesto, un acceso a agendar con ese servicio y
+  la sede ya elegidos (`/agendar/{negocio}?servicio=&sucursal=`). Las citas se siguen
+  agendando aparte.
+- Migración de negocio 000194 (`presupuestos_en_linea`).
 
 ## Ajuste (2026-10-21)
 

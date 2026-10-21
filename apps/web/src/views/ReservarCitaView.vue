@@ -491,6 +491,16 @@ async function cargar(): Promise<void> {
     }
     paso.value = sucursalId.value !== "" ? "servicio" : "sucursal";
     await Promise.all([retomar(), cargarPorPagar(), sumarServiciosConBono()]);
+    // Servicio pre-elegido (?servicio=<ulid>, p. ej. desde un presupuesto aceptado):
+    // con la sede ya elegida, directo a su horario.
+    const preServicio = String(route.query.servicio ?? "");
+    if (
+      paso.value === "servicio" &&
+      preServicio !== "" &&
+      data.data.servicios.some((s) => s.id === preServicio)
+    ) {
+      elegirServicio(preServicio);
+    }
   } catch (e) {
     // Un negocio de clases no agenda citas (ADR 0104): a su página. Pero el enlace
     // para pagar una clase apartada (?pagar) y el regreso de la pasarela llegan

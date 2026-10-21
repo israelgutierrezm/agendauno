@@ -166,6 +166,16 @@ function rutasExclusivasPorModalidad(): array
         'presupuestos.aceptar' => 'citas',
         'presupuestos.rechazar' => 'citas',
         'presupuestos.convertir' => 'citas',
+        // Presupuestos en línea: desde el enlace del correo y desde su cuenta.
+        'presupuestos-en-linea.ver' => 'citas',
+        'presupuestos-en-linea.aceptar' => 'citas',
+        'presupuestos-en-linea.rechazar' => 'citas',
+        'presupuestos-en-linea.pagar' => 'citas',
+        'mi.presupuestos' => 'citas',
+        'mi.presupuestos.ver' => 'citas',
+        'mi.presupuestos.aceptar' => 'citas',
+        'mi.presupuestos.rechazar' => 'citas',
+        'mi.presupuestos.pagar' => 'citas',
         // Cuotas de las membresías (ADR 0130).
         'cuotas.show' => 'clases',
         'cuotas.update' => 'clases',

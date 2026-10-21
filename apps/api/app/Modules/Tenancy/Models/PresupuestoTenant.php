@@ -28,6 +28,8 @@ use Illuminate\Support\Carbon;
  * @property int $total_minor
  * @property string $moneda
  * @property Carbon $valido_hasta
+ * @property string|null $enlace_hash
+ * @property string|null $respondido_por
  */
 class PresupuestoTenant extends Model
 {
@@ -44,7 +46,14 @@ class PresupuestoTenant extends Model
         'enviado_en', 'respondido_en', 'motivo_rechazo', 'orden_id', 'creado_por_id',
         // Sube con cada guardado: enviar o aceptar la confirman (no otra versión).
         'revision',
+        // Quién lo respondió: `cliente` (en línea) o `negocio`.
+        'respondido_por',
     ];
+
+    /**
+     * @var list<string>
+     */
+    protected $hidden = ['enlace_hash'];
 
     /**
      * @var array<string, string>

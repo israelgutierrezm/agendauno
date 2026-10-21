@@ -23,6 +23,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Presupuestos\EstadoPresupuesto;
 use App\Modules\Tenancy\Presupuestos\ModoImpuestos;
 use App\Modules\Tenancy\Presupuestos\TipoLineaPresupuesto;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -124,11 +125,14 @@ class PresupuestosTenantController
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
 
+        // Con su enlace para verlo y responderlo en línea (el anterior deja de servir).
+        $token = $this->presupuestos->nuevoEnlace($presupuesto);
         Mail::to($correo)->send(new CorreoPresupuesto(
             (string) $estudio->slug,
             (string) $estudio->nombre,
             $this->presentar($presupuesto),
             $estudio->contacto_email,
+            MarcaProducto::deSlug((string) $estudio->slug)->urlWeb().'/presupuesto/'.rawurlencode((string) $estudio->slug).'/'.$presupuesto->ulid.'?t='.$token,
         ));
         $this->presupuestos->marcarEnviado($presupuesto);
 
@@ -314,6 +318,8 @@ class PresupuestosTenantController
             'enviado_en' => $p->enviado_en?->toIso8601String(),
             'respondido_en' => $p->respondido_en?->toIso8601String(),
             'motivo_rechazo' => $p->motivo_rechazo,
+            // `cliente` si lo respondió en línea.
+            'respondido_por' => $p->respondido_por,
             'orden' => $p->orden?->ulid,
             'creado_por' => $p->creadoPor?->nombreCorto(),
             'lineas' => $p->lineas->map(fn (LineaPresupuestoTenant $l): array => [

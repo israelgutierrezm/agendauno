@@ -123,6 +123,7 @@ use App\Modules\Tenancy\Http\Controllers\PlataformaWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PorCobrarTenantController;
 use App\Modules\Tenancy\Http\Controllers\PreciosPublicosController;
+use App\Modules\Tenancy\Http\Controllers\PresupuestoEnLineaController;
 use App\Modules\Tenancy\Http\Controllers\PresupuestosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ProspectosTenantController;
@@ -399,12 +400,20 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/marca', [MarcaEstudioController::class, 'mostrar'])->middleware('throttle:negocio-publico')->name('marca');
         // La app instalable (PWA) del negocio: su manifiesto, en su subdominio (ADR 0110).
         Route::get('/pwa/manifest.webmanifest', [PwaNegocioController::class, 'manifest'])->middleware('throttle:negocio-publico')->name('pwa.manifest');
+        // Sus íconos cuadrados, generados del logo.
+        Route::get('/pwa/icono-{tam}.png', [PwaNegocioController::class, 'icono'])->where('tam', '192|512|512-maskable')->middleware('throttle:negocio-publico')->name('pwa.icono');
 
         // Escaparate público (P0 #3): identidad, próximas clases, precios, instructores
         // y ubicación. Sin auth; solo con la página pública abierta. Con throttle.
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
+        // Presupuestos en línea desde el enlace del correo (`?t=`): verlo, aceptarlo o
+        // rechazarlo y pagarlo.
+        Route::get('/presupuestos-en-linea/{presupuesto}', [PresupuestoEnLineaController::class, 'ver'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('presupuestos-en-linea.ver');
+        Route::post('/presupuestos-en-linea/{presupuesto}/aceptar', [PresupuestoEnLineaController::class, 'aceptar'])->middleware(['throttle:login', 'modalidad:citas'])->name('presupuestos-en-linea.aceptar');
+        Route::post('/presupuestos-en-linea/{presupuesto}/rechazar', [PresupuestoEnLineaController::class, 'rechazar'])->middleware(['throttle:login', 'modalidad:citas'])->name('presupuestos-en-linea.rechazar');
+        Route::post('/presupuestos-en-linea/{presupuesto}/pagar', [PresupuestoEnLineaController::class, 'pagar'])->middleware(['throttle:login', 'modalidad:citas'])->name('presupuestos-en-linea.pagar');
         // Una reserva que llegó desde Reserva con Google (ADR 0198): se le avisa a Google.
         Route::post('/reserva-con-google/conversion', [ReservaConGoogleController::class, 'conversion'])->middleware('throttle:negocio-publico')->name('reserva-google.conversion');
         // Kiosco de llegada (ADR 0183): la tableta de recepción, con su propia llave.
@@ -484,6 +493,12 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/perfil', [MiTenantController::class, 'perfil'])->name('mi.perfil');
             Route::get('/mi/pase', [MiTenantController::class, 'pase'])->name('mi.pase');
             // El pase en Apple Wallet y Google Wallet (ADR 0195).
+            // Mis presupuestos (negocios de citas): verlos, responderlos y pagarlos.
+            Route::get('/mi/presupuestos', [PresupuestoEnLineaController::class, 'mios'])->middleware('modalidad:citas')->name('mi.presupuestos');
+            Route::get('/mi/presupuestos/{presupuesto}', [PresupuestoEnLineaController::class, 'miVer'])->middleware('modalidad:citas')->name('mi.presupuestos.ver');
+            Route::post('/mi/presupuestos/{presupuesto}/aceptar', [PresupuestoEnLineaController::class, 'miAceptar'])->middleware('modalidad:citas')->name('mi.presupuestos.aceptar');
+            Route::post('/mi/presupuestos/{presupuesto}/rechazar', [PresupuestoEnLineaController::class, 'miRechazar'])->middleware('modalidad:citas')->name('mi.presupuestos.rechazar');
+            Route::post('/mi/presupuestos/{presupuesto}/pagar', [PresupuestoEnLineaController::class, 'miPagar'])->middleware('modalidad:citas')->name('mi.presupuestos.pagar');
             Route::get('/mi/pase/wallet', [PaseWalletTenantController::class, 'disponibles'])->name('mi.pase.wallet');
             Route::get('/mi/pase/wallet/apple', [PaseWalletTenantController::class, 'apple'])->middleware('throttle:10,1,pase-wallet')->name('mi.pase.wallet.apple');
             Route::get('/mi/pase/wallet/google', [PaseWalletTenantController::class, 'google'])->middleware('throttle:10,1,pase-wallet')->name('mi.pase.wallet.google');

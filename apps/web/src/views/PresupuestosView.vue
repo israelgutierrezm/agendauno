@@ -70,6 +70,9 @@ interface Presupuesto extends Resumen {
   editable: boolean;
   puede_convertir: boolean;
   orden: string | null;
+  // `cliente` si lo respondió en línea (desde su correo o su cuenta).
+  respondido_por?: "cliente" | "negocio" | null;
+  motivo_rechazo?: string | null;
 }
 interface ItemCatalogo {
   id: string;
@@ -857,7 +860,25 @@ onMounted(() => {
             aria-hidden="true"
           />
           {{ $t(`presupuestos.estados.${estadoVisible(actual)}`) }}
+          <span
+            v-if="actual.respondido_por === 'cliente'"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="respondido-en-linea"
+          >
+            · {{ $t("presupuestos.enLinea.porElCliente") }}
+          </span>
         </div>
+        <p
+          v-if="actual?.motivo_rechazo"
+          class="text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{
+            $t("presupuestos.enLinea.motivoDelCliente", {
+              motivo: actual.motivo_rechazo,
+            })
+          }}
+        </p>
 
         <!-- Cliente -->
         <fieldset :disabled="soloLectura" class="space-y-2">

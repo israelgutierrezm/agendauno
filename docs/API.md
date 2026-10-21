@@ -1317,6 +1317,21 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
   `tasa_impuesto_bp`, `vigencia_dias`, `notas`).
 - Errores: `QUOTE_NOT_ALLOWED` con `meta.motivo` (`respondido`, `vencido`,
   `no_aceptado`, `no_borrador`, `sin_correo`, `sin_cliente`, `sin_conceptos`…).
+- El presupuesto suma `respondido_por` (`cliente` si lo respondió en línea).
+- **En línea, desde el enlace del correo** (público, sin sesión; `t` es el token del
+  enlace: cada envío da uno nuevo y el anterior deja de servir; sin él o con otro, 404):
+  - `GET /presupuestos-en-linea/{id}?t=`: como lo ve el cliente (`folio`, `estado`,
+    `vencido`, `revision`, conceptos y totales, `servicios` para agendar, `orden`,
+    `puede_responder`, `puede_pagar`), sin datos internos del negocio;
+  - `POST /presupuestos-en-linea/{id}/aceptar {t, revision}`: lo acepta y lo vuelve su
+    orden de cobro (409 si la revisión cambió; 422 si venció o ya se respondió);
+  - `POST /presupuestos-en-linea/{id}/rechazar {t, motivo?}`;
+  - `POST /presupuestos-en-linea/{id}/pagar {t, idempotency_key?}`: 201 con `checkout`
+    de la pasarela en línea del negocio (422 sin cobro pendiente o sin pasarela).
+  - Al responder se le avisa al negocio por correo.
+- **Desde su cuenta** (web o app): `GET /mi/presupuestos` (los enviados y respondidos,
+  no los borradores), `GET /mi/presupuestos/{id}` y `POST
+  /mi/presupuestos/{id}/aceptar|rechazar|pagar`, con las mismas reglas.
 
 ## Página de cada negocio para buscadores (ADR 0128)
 
@@ -1704,6 +1719,7 @@ en el negocio.
   - 422 en `telefono` si no tiene 10 dígitos;
   - `sitio_web` es un campo trampa y debe llegar vacío.
 - `POST /api/v1/demos/{id}/cancelar` {`token`} la cancela (404 con otro token).
+- Recordatorios por correo un día y una hora antes (`agendauno:recordar-demos`).
 - Superadmin:
   - `GET /plataforma/demos`, las próximas primero;
   - `PUT /plataforma/demos/{id}` {`estado`: `atendida`, `no_asistio` o `cancelada`}.

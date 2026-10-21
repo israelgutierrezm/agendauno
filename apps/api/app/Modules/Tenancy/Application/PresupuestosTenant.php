@@ -35,6 +35,9 @@ use Illuminate\Support\Facades\DB;
  * - Aceptado, se convierte en una orden de cobro con sus conceptos: el plan vendido se
  *   concede al pagarse y el artículo sale del inventario al pagarse; si era para un
  *   contacto que aún no es cliente, se da de alta.
+ * - En línea: el cliente lo ve desde el enlace de su correo (o desde la app) y lo
+ *   acepta o rechaza. Aceptado así, se vuelve su orden de cobro para pagarla en línea o
+ *   en el negocio.
  */
 class PresupuestosTenant
 {
@@ -168,17 +171,17 @@ class PresupuestosTenant
             if ($this->vencido($bloqueado)) {
                 throw new PresupuestoNoPermitido('Este presupuesto ya venció: cambia su vigencia antes de marcarlo aceptado.', 'vencido');
             }
-            $bloqueado->fill(['estado' => EstadoPresupuesto::Aceptado->value, 'respondido_en' => now(), 'motivo_rechazo' => null])->save();
+            $bloqueado->fill(['estado' => EstadoPresupuesto::Aceptado->value, 'respondido_en' => now(), 'motivo_rechazo' => null, 'respondido_por' => $actor instanceof Usuario ? 'negocio' : 'cliente'])->save();
             $this->auditoria->registrar($actor, 'presupuesto.aceptado', 'presupuesto', (string) $bloqueado->ulid, null, ['total_minor' => $bloqueado->total_minor, 'revision' => $bloqueado->revision]);
 
             return $bloqueado;
         });
     }
 
-    public function rechazar(PresupuestoTenant $presupuesto, ?string $motivo, ?Usuario $actor): PresupuestoTenant
+    public function rechazar(PresupuestoTenant $presupuesto, ?string $motivo, ?Usuario $actor, string $por = 'negocio'): PresupuestoTenant
     {
         $this->exigirEditable($presupuesto);
-        $presupuesto->fill(['estado' => EstadoPresupuesto::Rechazado->value, 'respondido_en' => now(), 'motivo_rechazo' => $motivo])->save();
+        $presupuesto->fill(['estado' => EstadoPresupuesto::Rechazado->value, 'respondido_en' => now(), 'motivo_rechazo' => $motivo, 'respondido_por' => $por])->save();
         $this->auditoria->registrar($actor, 'presupuesto.rechazado', 'presupuesto', (string) $presupuesto->ulid, null, null, $motivo);
 
         return $presupuesto;
@@ -235,6 +238,38 @@ class PresupuestosTenant
 
             return $orden;
         });
+    }
+
+    /**
+     * Un enlace nuevo para que el cliente lo vea y lo responda en línea: devuelve el
+     * token (solo va en el correo; se guarda su huella) y el anterior deja de servir.
+     */
+    public function nuevoEnlace(PresupuestoTenant $presupuesto): string
+    {
+        $token = bin2hex(random_bytes(20));
+        $presupuesto->forceFill(['enlace_hash' => hash('sha256', $token)])->save();
+
+        return $token;
+    }
+
+    /** El presupuesto de un enlace (su identificador y su token); null si no coincide. */
+    public function delEnlace(string $ulid, string $token): ?PresupuestoTenant
+    {
+        $presupuesto = PresupuestoTenant::query()->where('ulid', $ulid)->first();
+
+        return $presupuesto instanceof PresupuestoTenant && $token !== '' && is_string($presupuesto->enlace_hash)
+            && hash_equals($presupuesto->enlace_hash, hash('sha256', $token)) ? $presupuesto : null;
+    }
+
+    /**
+     * El cliente lo acepta en línea: queda aceptado por él y se vuelve su orden de cobro
+     * (la ve el negocio en Por cobrar), que puede pagar en línea o en el negocio.
+     */
+    public function aceptarEnLinea(PresupuestoTenant $presupuesto, ?int $revision): OrdenTenant
+    {
+        return DB::connection('tenant')->transaction(
+            fn (): OrdenTenant => $this->convertir($this->aceptar($presupuesto, null, $revision), null),
+        );
     }
 
     public function eliminar(PresupuestoTenant $presupuesto, ?Usuario $actor): void
