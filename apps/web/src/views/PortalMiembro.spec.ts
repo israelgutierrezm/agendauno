@@ -776,6 +776,53 @@ describe("portal del alumno", () => {
     w.unmount();
   });
 
+  it("al cancelar, el aviso dice que se canceló (no se queda el de un cambio anterior)", async () => {
+    ruta.query = { vista: "proximas" };
+    api.post.mockResolvedValue({ data: { data: {} } });
+    api.get.mockImplementation((url: string) => {
+      const r = url.replace("/api/v1/app/demo", "");
+      if (r === "/mi/reservas/r1/cancelacion") {
+        return Promise.resolve({
+          data: {
+            data: { cancelable: true, mensaje: "Se devolverá 1 crédito." },
+          },
+        });
+      }
+      return Promise.resolve({ data: { data: datos[r] ?? [] } });
+    });
+    const w = montar(MisReservasView);
+    const avisos = () => w.findAll('[role="status"]').map((a) => a.text());
+    await flushPromises();
+
+    // Primero cambió el horario: queda su aviso.
+    await w.get('[data-prueba="reserva-proxima"] button').trigger("click");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === miReprogramar.boton)!
+      .trigger("click");
+    await flushPromises();
+    w.findComponent({ name: "ReprogramarMiReserva" }).vm.$emit("hecho");
+    await flushPromises();
+    expect(avisos()).toEqual([miReprogramar.hecho]);
+
+    // Luego la cancela.
+    await w.get('[data-prueba="reserva-proxima"] button').trigger("click");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === esMX.miCuenta.cancelar)!
+      .trigger("click");
+    await flushPromises();
+    await w.get('[data-prueba="confirmar-cancelacion"]').trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/mi/reservas/r1/cancelar",
+      {},
+    );
+    expect(avisos()).toEqual([esMX.miCuenta.cancelado]);
+    expect(w.text()).not.toContain(miReprogramar.hecho);
+  });
+
   it("en próximas muestra fecha visual y abre el detalle sin reservar de nuevo", async () => {
     ruta.query = { vista: "proximas" };
     const w = montar(MisReservasView);

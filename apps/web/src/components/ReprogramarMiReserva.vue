@@ -130,10 +130,14 @@ onMounted(cargar);
       <template v-else>
         <p :style="{ color: 'var(--texto-suave)' }">
           {{
-            $t("miReprogramar.hasta", {
-              fecha: cuando(opciones.hasta, zona),
-              n: opciones.restantes,
-            })
+            $t(
+              "miReprogramar.hasta",
+              {
+                fecha: cuando(opciones.hasta, zona),
+                n: opciones.restantes,
+              },
+              opciones.restantes,
+            )
           }}
         </p>
 

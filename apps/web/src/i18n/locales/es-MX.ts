@@ -3378,6 +3378,8 @@ export default {
     reservado: "Reservado.",
     reservada: "Reservada",
     enListaEspera: "Te anotamos en la lista de espera.",
+    cancelado: "Listo: cancelamos tu reserva.",
+    plazaAceptada: "Listo: el lugar es tuyo.",
     confirmada: "Confirmada",
     en_espera: "En espera",
     ofrecida: "Plaza ofrecida",

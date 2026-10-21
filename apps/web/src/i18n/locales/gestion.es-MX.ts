@@ -1489,7 +1489,8 @@ export const parametrosConfig = {
 export const miReprogramar = {
   titulo: "Cambiar horario",
   boton: "Cambiar horario",
-  hasta: "Puedes cambiarlo hasta el {fecha} (te quedan {n} cambios).",
+  hasta:
+    "Puedes cambiarlo hasta el {fecha} (te queda {n} cambio). | Puedes cambiarlo hasta el {fecha} (te quedan {n} cambios).",
   dia: "Nuevo día",
   sinHorarios: "No hay horarios libres ese día. Prueba otro.",
   sinFechas: "No hay otras fechas de esta clase con lugar por ahora.",

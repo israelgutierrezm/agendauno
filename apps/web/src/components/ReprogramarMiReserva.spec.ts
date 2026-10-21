@@ -55,6 +55,8 @@ describe("cambiar el horario desde la cuenta", () => {
     const w = montar();
     await flushPromises();
 
+    // Cuántos cambios le quedan, en singular si es uno.
+    expect(w.text()).toContain("(te queda 1 cambio).");
     // Pide los horarios del día de la reserva, en la zona de la sede.
     expect(api.get).toHaveBeenCalledWith(
       "/api/v1/app/a/mi/reservas/r1/reprogramar",

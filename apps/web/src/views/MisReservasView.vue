@@ -545,14 +545,19 @@ function detallesMia(e: Evento): string[] {
   }
   return lineas;
 }
+// El aviso dice lo último que pasó: no se queda el de un cambio anterior.
 async function cancelar(e: Evento): Promise<void> {
+  aviso.value = null;
   if (e.reserva && (await cuenta.cancelar(e.reserva))) {
+    aviso.value = t("miCuenta.cancelado");
     cerrar();
     void cargarClases();
   }
 }
 async function aceptar(e: Evento): Promise<void> {
+  aviso.value = null;
   if (e.reserva && (await cuenta.aceptar(e.reserva))) {
+    aviso.value = t("miCuenta.plazaAceptada");
     cerrar();
     void cargarClases();
   }
