@@ -46,14 +46,15 @@ return new class extends Migration
 
         Schema::connection('tenant')->table('publicaciones_plataforma', function (Blueprint $t): void {
             $t->dropUnique(['proveedor', 'oferta_id']);
-            $t->unique(['proveedor', 'integracion_id', 'oferta_id']);
+            // Con nombre propio: el de Laravel pasa de los 64 caracteres de MySQL.
+            $t->unique(['proveedor', 'integracion_id', 'oferta_id'], 'publicaciones_plataforma_conexion_oferta_unique');
         });
     }
 
     public function down(): void
     {
         Schema::connection('tenant')->table('publicaciones_plataforma', function (Blueprint $t): void {
-            $t->dropUnique(['proveedor', 'integracion_id', 'oferta_id']);
+            $t->dropUnique('publicaciones_plataforma_conexion_oferta_unique');
             $t->unique(['proveedor', 'oferta_id']);
             $t->dropIndex(['integracion_id']);
             $t->dropColumn('integracion_id');
