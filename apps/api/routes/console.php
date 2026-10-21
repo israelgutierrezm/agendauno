@@ -38,6 +38,10 @@ Schedule::command('agendauno:procesar-avisos-pasarela')->everyMinute()->withoutO
 // se retira) y cierra las reservas de la plataforma sin check-in (ADR 0149).
 Schedule::command('agendauno:sincronizar-plataformas')->everyFiveMinutes()->withoutOverlapping();
 
+// Publica las clases y citas de cada quien en su Google Calendar u Outlook y trae lo que
+// tiene ocupado como bloqueos de su agenda (ADR 0199).
+Schedule::command('agendauno:sincronizar-calendarios')->everyTenMinutes()->withoutOverlapping();
+
 // Reintenta las entregas de webhook fallidas de cada estudio (R40).
 Schedule::command('agendauno:reintentar-webhooks')->everyFiveMinutes()->withoutOverlapping();
 

@@ -7,6 +7,7 @@ import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import ComprasMostrador from "@/components/ComprasMostrador.vue";
+import ConectarCalendarios from "@/components/ConectarCalendarios.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import FondoDecorado from "@/components/FondoDecorado.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -339,6 +340,10 @@ async function copiarCalendario(): Promise<void> {
     // Sin permiso del portapapeles: el enlace sigue visible para copiarlo a mano.
   }
 }
+
+// Google Calendar y Outlook en las dos direcciones (ADR 0199): solo quien atiende, y
+// solo si la plataforma los tiene configurados (lo dice la tarjeta al cargar).
+const calendariosDisponibles = ref(false);
 
 const aparienciaAbierta = ref(false);
 </script>
@@ -916,6 +921,19 @@ const aparienciaAbierta = ref(false);
               <p class="tu-hint">{{ $t("miPerfil.calendarioNuevoAyuda") }}</p>
             </template>
           </div>
+        </div>
+
+        <!-- Google Calendar y Outlook (ADR 0199) -->
+        <div
+          v-if="apareceEnEquipo"
+          v-show="calendariosDisponibles"
+          class="mp-fila"
+        >
+          <div>
+            <h3 class="mp-titulo">{{ $t("calendariosExternos.titulo") }}</h3>
+            <p class="mp-ayuda">{{ $t("calendariosExternos.ayuda") }}</p>
+          </div>
+          <ConectarCalendarios @disponible="calendariosDisponibles = $event" />
         </div>
 
         <!-- Apariencia -->

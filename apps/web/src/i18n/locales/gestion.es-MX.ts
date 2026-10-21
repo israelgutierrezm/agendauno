@@ -1379,6 +1379,7 @@ export const bloqueosAgenda = {
   errorCarga: "No se pudieron cargar los bloqueos.",
   sede: "Toda la sede ({sede})",
   todaLaSede: "toda la sede",
+  deSuCalendario: "De su calendario",
   unaSala: "Una sala",
   sala: "Sala, cabina o equipo",
   fecha: "Día",

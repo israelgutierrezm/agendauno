@@ -101,6 +101,25 @@ return [
     ],
 
     /*
+    | Google Calendar y Outlook en las dos direcciones (ADR 0199): los clientes OAuth son de
+    | la plataforma (uno de Google Cloud y uno de Microsoft Entra), con la vuelta
+    | `{APP_URL}/api/v1/calendarios/{google|microsoft}/vuelta`. Sin ellos no se ofrece.
+    | `dias`: cuántos días hacia adelante se publican y se leen.
+    */
+    'calendarios' => [
+        'dias' => (int) env('CALENDARIOS_DIAS', 60),
+        'google' => [
+            'client_id' => env('CALENDARIOS_GOOGLE_CLIENT_ID', ''),
+            'client_secret' => env('CALENDARIOS_GOOGLE_CLIENT_SECRET', ''),
+        ],
+        'microsoft' => [
+            'client_id' => env('CALENDARIOS_MICROSOFT_CLIENT_ID', ''),
+            'client_secret' => env('CALENDARIOS_MICROSOFT_CLIENT_SECRET', ''),
+            'tenant' => env('CALENDARIOS_MICROSOFT_TENANT', 'common'),
+        ],
+    ],
+
+    /*
     | El asistente sobre los datos del negocio (ADR 0196): Claude por la API de Anthropic.
     | La llave es de la plataforma; sin ella no se ofrece. Lo enciende el superadmin
     | (parámetro `asistente.activo`).

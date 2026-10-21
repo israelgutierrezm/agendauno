@@ -24,6 +24,8 @@ export interface Bloqueo {
   zona_horaria: string;
   motivo: string;
   creado_por: string | null;
+  // De su Google Calendar u Outlook (ADR 0199): se quita allá, no aquí.
+  origen?: "google" | "microsoft" | null;
 }
 interface Sala {
   id: string;
@@ -284,8 +286,15 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
             ></span
           >
         </span>
+        <span
+          v-if="b.origen"
+          class="text-xs shrink-0"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="bloqueo-externo"
+          >{{ $t("bloqueosAgenda.deSuCalendario") }}</span
+        >
         <button
-          v-if="puedeEliminar ?? puedeGestionar"
+          v-else-if="puedeEliminar ?? puedeGestionar"
           type="button"
           class="tu-enlace text-xs shrink-0"
           data-prueba="quitar-bloqueo"

@@ -49,7 +49,7 @@ class BloqueosAgendaTenantController
         $bloqueos = BloqueoAgendaTenant::query()
             ->when(isset($validado['desde']), fn ($q) => $q->where('hasta', '>', CarbonImmutable::parse((string) $validado['desde'])->subDay()))
             ->when(isset($validado['hasta']), fn ($q) => $q->where('desde', '<', CarbonImmutable::parse((string) $validado['hasta'])->addDays(2)))
-            ->with(['instructor', 'sucursal', 'recurso', 'autor'])
+            ->with(['instructor', 'sucursal', 'recurso', 'autor', 'calendarioExterno'])
             ->orderBy('desde')
             ->limit(self::LIMITE)
             ->get();
@@ -98,6 +98,10 @@ class BloqueosAgendaTenantController
     public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $bloqueo = BloqueoAgendaTenant::query()->where('ulid', (string) $request->route('bloqueo'))->firstOrFail();
+        if ($bloqueo->calendario_externo_id !== null) {
+            // Volvería en la siguiente pasada: se quita en su calendario.
+            throw ValidationException::withMessages(['bloqueo' => ['Viene del calendario de esa persona: se quita allá.']]);
+        }
         $eliminaciones->eliminar($bloqueo, 'bloqueo_agenda', $bloqueo->only(['motivo']) + [
             'desde' => $bloqueo->desde->toIso8601String(),
             'hasta' => $bloqueo->hasta->toIso8601String(),
@@ -218,6 +222,8 @@ class BloqueosAgendaTenantController
             'zona_horaria' => $bloqueo->zona_horaria,
             'motivo' => $bloqueo->motivo,
             'creado_por' => $bloqueo->autor?->name,
+            // De su Google Calendar u Outlook (ADR 0199): se quita allá, no aquí.
+            'origen' => $bloqueo->calendarioExterno?->proveedor,
         ];
     }
 }

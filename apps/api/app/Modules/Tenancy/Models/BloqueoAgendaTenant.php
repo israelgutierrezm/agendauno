@@ -13,7 +13,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Bloqueo de agenda (2.2): un profesional, una sede o una sala no está disponible
- * entre `desde` y `hasta` (UTC), con su motivo y quién lo puso. Tenant-local.
+ * entre `desde` y `hasta` (UTC), con su motivo y quién lo puso. Tenant-local. Los que
+ * trae un calendario externo (ADR 0199) llevan `calendario_externo_id` y se reemplazan
+ * solos en cada sincronización.
+ *
+ * @property int|null $calendario_externo_id
  */
 class BloqueoAgendaTenant extends Model
 {
@@ -24,7 +28,7 @@ class BloqueoAgendaTenant extends Model
 
     protected $table = 'bloqueos_agenda';
 
-    protected $fillable = ['instructor_id', 'sucursal_id', 'recurso_id', 'desde', 'hasta', 'todo_el_dia', 'zona_horaria', 'motivo', 'creado_por'];
+    protected $fillable = ['instructor_id', 'sucursal_id', 'recurso_id', 'desde', 'hasta', 'todo_el_dia', 'zona_horaria', 'motivo', 'creado_por', 'calendario_externo_id'];
 
     /**
      * @var array<string, string>
@@ -67,6 +71,16 @@ class BloqueoAgendaTenant extends Model
     public function recurso(): BelongsTo
     {
         return $this->belongsTo(RecursoTenant::class, 'recurso_id')->withTrashed();
+    }
+
+    /**
+     * El calendario externo del que vino (ADR 0199), si no lo puso alguien aquí.
+     *
+     * @return BelongsTo<CalendarioExternoTenant, $this>
+     */
+    public function calendarioExterno(): BelongsTo
+    {
+        return $this->belongsTo(CalendarioExternoTenant::class, 'calendario_externo_id');
     }
 
     /**

@@ -21,6 +21,7 @@ use App\Modules\Tenancy\Http\Controllers\BajasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CajasTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioPublicoController;
+use App\Modules\Tenancy\Http\Controllers\CalendariosExternosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
 use App\Modules\Tenancy\Http\Controllers\CaptacionPublicaController;
@@ -161,6 +162,7 @@ use App\Modules\Tenancy\Http\Controllers\TiposDocumentoController;
 use App\Modules\Tenancy\Http\Controllers\UsuariosTenantController;
 use App\Modules\Tenancy\Http\Controllers\VideosTenantController;
 use App\Modules\Tenancy\Http\Controllers\VisitantesPlataformaTenantController;
+use App\Modules\Tenancy\Http\Controllers\VueltaCalendarioController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookBienestarController;
 use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
@@ -204,6 +206,11 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:60,1,whatsapp-webhook-verificar')->name('api.v1.webhooks.whatsapp.verificar');
     Route::post('/webhooks/whatsapp', [WebhookWhatsAppController::class, 'recibir'])
         ->middleware('throttle:600,1,whatsapp-webhook')->name('api.v1.webhooks.whatsapp');
+
+    // La vuelta de Google o Microsoft al conectar el calendario de quien atiende (ADR 0199):
+    // una sola para todos los negocios; lleva el código a la web, que lo confirma con su sesión.
+    Route::get('/calendarios/{proveedor}/vuelta', VueltaCalendarioController::class)
+        ->whereIn('proveedor', ['google', 'microsoft'])->middleware('throttle:30,1,calendario-vuelta')->name('api.v1.calendarios.vuelta');
 
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
     // Interesados de un producto que aún no abre registros (ADR 0108): la landing de TurnoUno.
@@ -408,6 +415,12 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/yo/google', [AuthTenantController::class, 'desconectarGoogle'])->name('yo.google.desconectar');
             Route::get('/yo/calendario', [CalendarioTenantController::class, 'enlace'])->name('yo.calendario');
             Route::post('/yo/calendario/regenerar', [CalendarioTenantController::class, 'regenerar'])->name('yo.calendario.regenerar');
+            // Google Calendar y Outlook en las dos direcciones (ADR 0199).
+            Route::get('/yo/calendarios', [CalendariosExternosTenantController::class, 'index'])->name('yo.calendarios');
+            Route::post('/yo/calendarios/{proveedor}/conectar', [CalendariosExternosTenantController::class, 'conectar'])->name('yo.calendarios.conectar');
+            Route::post('/yo/calendarios/{proveedor}/confirmar', [CalendariosExternosTenantController::class, 'confirmar'])->middleware('throttle:login')->name('yo.calendarios.confirmar');
+            Route::post('/yo/calendarios/{proveedor}/sincronizar', [CalendariosExternosTenantController::class, 'sincronizar'])->middleware('throttle:10,1,calendario-sincronizar')->name('yo.calendarios.sincronizar');
+            Route::delete('/yo/calendarios/{proveedor}', [CalendariosExternosTenantController::class, 'desconectar'])->name('yo.calendarios.desconectar');
             // Apariencia personal (tema y colores propios), guardada en la cuenta.
             Route::get('/apariencia', [AparienciaTenantController::class, 'show'])->name('apariencia');
             Route::put('/apariencia', [AparienciaTenantController::class, 'elegir'])->name('apariencia.elegir');

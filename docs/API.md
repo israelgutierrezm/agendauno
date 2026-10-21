@@ -1509,6 +1509,27 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
+### Google Calendar y Outlook (ADR 0199)
+
+- `GET /yo/calendarios` devuelve {`disponible` (quien atiende y la plataforma tiene
+  clientes), `proveedores`: [{`proveedor` (`google`|`microsoft`), `configurado`,
+  `conexion`: {`id`, `cuenta`, `estado` (`activo`|`reconectar`), `ultimo_error`,
+  `sincronizado_en`} | null}]}.
+- `POST /yo/calendarios/{proveedor}/conectar` devuelve {`url`}: la autorización de
+  Google o Microsoft. Responde 422 si no es quien atiende o el proveedor no está
+  configurado.
+- `GET /api/v1/calendarios/{proveedor}/vuelta` (sin sesión, la de los clientes OAuth)
+  regresa a `{web}/mi-perfil?calendario={proveedor}&codigo=…&estado=…`, o con
+  `calendario=cancelado|error`.
+- `POST /yo/calendarios/{proveedor}/confirmar` {`codigo`, `estado`} canjea el código
+  si el estado es de quien tiene la sesión (si no, 422), guarda la conexión y hace la
+  primera pasada. Devuelve la conexión.
+- `POST /yo/calendarios/{proveedor}/sincronizar` hace una pasada ahora.
+- `DELETE /yo/calendarios/{proveedor}` la quita (204).
+- `GET /bloqueos` incluye `origen` (`google`|`microsoft`|null). `DELETE /bloqueos/{id}`
+  de uno con origen responde 422.
+- `agendauno:sincronizar-calendarios` (cada 10 minutos).
+
 ### Reserva con Google (ADR 0198)
 
 - `GET /reserva-con-google` (`integraciones.configurar`) devuelve {`disponible` (la
