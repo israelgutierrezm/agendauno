@@ -7,17 +7,24 @@ namespace App\Modules\Tenancy\Calendarios;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
  * Google Calendar (ADR 0199). Pide lo mínimo: manejar los calendarios que crea la app
  * (`calendar.app.created`) y ver lo ocupado (`calendar.freebusy`), no leer sus eventos.
+ * Para que Google avise al momento de un cambio en su calendario principal
+ * (`events.watch`), también `calendar.events.freebusy`: sigue siendo solo
+ * disponibilidad.
  */
 class CalendarioGoogle implements ProveedorCalendario
 {
     private const API = 'https://www.googleapis.com/calendar/v3';
 
-    private const ALCANCES = 'openid email https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.freebusy';
+    private const ALCANCES = 'openid email https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.freebusy';
+
+    /** Días que dura un canal de avisos (lo que da Google por omisión). */
+    private const DIAS_AVISO = 7;
 
     public function configurado(): bool
     {
@@ -126,6 +133,37 @@ class CalendarioGoogle implements ProveedorCalendario
         }
 
         return $ocupado;
+    }
+
+    /**
+     * Un canal de avisos de su calendario principal. Google no renueva canales: se abre
+     * uno nuevo y se cierra el anterior.
+     */
+    public function vigilar(string $acceso, ?string $avisoId, ?string $recurso, string $direccion, string $secreto): array
+    {
+        $id = (string) Str::uuid();
+        $json = (array) $this->api($acceso)->post(self::API.'/calendars/primary/events/watch', [
+            'id' => $id,
+            'type' => 'web_hook',
+            'address' => $direccion,
+            'token' => $secreto,
+            'params' => ['ttl' => (string) (self::DIAS_AVISO * 86400)],
+        ])->throw()->json();
+        if ($avisoId !== null) {
+            $this->dejarDeVigilar($acceso, $avisoId, $recurso);
+        }
+
+        return [
+            'id' => $id,
+            'recurso' => is_string($json['resourceId'] ?? null) ? $json['resourceId'] : null,
+            'vence_en' => isset($json['expiration']) ? CarbonImmutable::createFromTimestampMs((int) $json['expiration']) : CarbonImmutable::now()->addDays(self::DIAS_AVISO),
+        ];
+    }
+
+    public function dejarDeVigilar(string $acceso, string $avisoId, ?string $recurso): void
+    {
+        // Si ya venció o no existe, Google responde con error: no importa.
+        $this->api($acceso)->post(self::API.'/channels/stop', array_filter(['id' => $avisoId, 'resourceId' => $recurso]));
     }
 
     /**

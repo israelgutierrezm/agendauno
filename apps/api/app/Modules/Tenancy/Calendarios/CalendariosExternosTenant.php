@@ -33,6 +33,11 @@ use Throwable;
  *
  * La autorización es OAuth con el cliente de la plataforma; las llaves de cada cuenta van
  * cifradas en la base del negocio. El estado del OAuth va cifrado y vence en 15 minutos.
+ *
+ * Avisos al momento: cada conexión se suscribe a los cambios de su calendario principal
+ * (canal de Google, suscripción de Microsoft) y un aviso la sincroniza en cola. La
+ * pasada de cada 10 minutos sigue: publica lo nuestro, renueva las suscripciones y
+ * cubre lo que no avisó.
  */
 class CalendariosExternosTenant
 {
@@ -42,6 +47,12 @@ class CalendariosExternosTenant
     public const RECONECTAR = 'reconectar';
 
     private const VIGENCIA_ESTADO_MIN = 15;
+
+    /** La suscripción se renueva cuando le falta menos que esto para vencer. */
+    private const HORAS_RENOVAR_AVISO = 24;
+
+    /** Si no se pudo suscribir, no se intenta otra vez antes de esto. */
+    private const HORAS_REINTENTAR_AVISO = 6;
 
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
 
@@ -133,9 +144,15 @@ class CalendariosExternosTenant
      */
     public function desconectar(CalendarioExternoTenant $calendario): void
     {
-        if ($calendario->calendario_id !== null && $calendario->estado === self::ACTIVO) {
+        if ($calendario->estado === self::ACTIVO && ($calendario->calendario_id !== null || $calendario->aviso_id !== null)) {
             try {
-                $this->proveedor($calendario->proveedor)->borrarCalendario($this->acceso($calendario), $calendario->calendario_id);
+                $acceso = $this->acceso($calendario);
+                if ($calendario->aviso_id !== null) {
+                    $this->proveedor($calendario->proveedor)->dejarDeVigilar($acceso, $calendario->aviso_id, $calendario->aviso_recurso);
+                }
+                if ($calendario->calendario_id !== null) {
+                    $this->proveedor($calendario->proveedor)->borrarCalendario($acceso, $calendario->calendario_id);
+                }
             } catch (Throwable $e) {
                 report($e);
             }
@@ -160,6 +177,7 @@ class CalendariosExternosTenant
                 $this->publicar($calendario, $acceso);
                 $this->traerOcupado($calendario, $acceso);
                 $calendario->forceFill(['estado' => self::ACTIVO, 'ultimo_error' => null, 'sincronizado_en' => CarbonImmutable::now()])->save();
+                $this->asegurarAvisos($calendario, $acceso);
 
                 return true;
             } catch (Throwable $e) {
@@ -187,6 +205,88 @@ class CalendariosExternosTenant
         });
 
         return $bien;
+    }
+
+    /**
+     * A dónde avisan Google y Microsoft de los cambios en los calendarios del negocio
+     * actual. Null sin una dirección HTTPS de la plataforma (en desarrollo): ahí solo
+     * queda la pasada de cada 10 minutos.
+     */
+    public function direccionDeAvisos(string $proveedor): ?string
+    {
+        $base = rtrim((string) config('app.url'), '/');
+        $estudio = $this->gestor->actual();
+        if (! str_starts_with($base, 'https://') || $estudio === null) {
+            return null;
+        }
+
+        return $base.'/api/v1/webhooks/calendarios/'.$proveedor.'/'.$estudio->slug;
+    }
+
+    /**
+     * Un aviso de Google o Microsoft de que cambió un calendario conectado del negocio
+     * actual. Si el canal y su secreto son de una conexión activa, la sincroniza en cola
+     * (varios avisos seguidos, una sola pasada). Falso si no es nuestro.
+     */
+    public function avisoRecibido(string $proveedor, string $avisoId, string $secreto): bool
+    {
+        $estudio = $this->gestor->actual();
+        if ($avisoId === '' || $secreto === '' || $estudio === null) {
+            return false;
+        }
+        $calendario = CalendarioExternoTenant::query()
+            ->where('proveedor', $proveedor)
+            ->where('aviso_id', $avisoId)
+            ->where('estado', self::ACTIVO)
+            ->first();
+        if (! $calendario instanceof CalendarioExternoTenant || $calendario->aviso_secreto === null || ! hash_equals($calendario->aviso_secreto, $secreto)) {
+            return false;
+        }
+        SincronizarCalendarioExterno::dispatch((int) $estudio->getKey(), (int) $calendario->getKey());
+
+        return true;
+    }
+
+    /**
+     * Suscribe la conexión a los avisos de su calendario principal, o renueva la
+     * suscripción si está por vencer. Nunca lanza: sin avisos (una conexión de Google
+     * anterior al permiso que los da, o sin HTTPS) sigue la pasada de cada 10 minutos.
+     */
+    private function asegurarAvisos(CalendarioExternoTenant $calendario, string $acceso): void
+    {
+        $ahora = CarbonImmutable::now();
+        if ($calendario->aviso_id !== null && $calendario->aviso_vence_en?->gt($ahora->addHours(self::HORAS_RENOVAR_AVISO))) {
+            return;
+        }
+        if ($calendario->aviso_reintento_en?->isFuture()) {
+            return;
+        }
+        $direccion = $this->direccionDeAvisos($calendario->proveedor);
+        if ($direccion === null) {
+            return;
+        }
+        $secreto = $calendario->aviso_secreto ?? Str::random(40);
+        try {
+            $aviso = $this->proveedor($calendario->proveedor)->vigilar($acceso, $calendario->aviso_id, $calendario->aviso_recurso, $direccion, $secreto);
+            $calendario->forceFill([
+                'aviso_id' => $aviso['id'],
+                'aviso_recurso' => $aviso['recurso'],
+                'aviso_secreto' => $secreto,
+                'aviso_vence_en' => $aviso['vence_en'],
+                'aviso_reintento_en' => null,
+            ])->save();
+        } catch (Throwable $e) {
+            $calendario->forceFill([
+                'aviso_id' => null,
+                'aviso_recurso' => null,
+                'aviso_vence_en' => null,
+                'aviso_reintento_en' => $ahora->addHours(self::HORAS_REINTENTAR_AVISO),
+            ])->save();
+            // Sin el permiso de avisos (403) no es una falla: se queda con la pasada.
+            if (! ($e instanceof RequestException && in_array($e->response->status(), [401, 403], true))) {
+                report($e);
+            }
+        }
     }
 
     /** El token de acceso vigente (lo renueva si venció). */

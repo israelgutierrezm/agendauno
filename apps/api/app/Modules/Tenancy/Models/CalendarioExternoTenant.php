@@ -23,6 +23,11 @@ use Illuminate\Support\Carbon;
  * @property string $estado
  * @property string|null $ultimo_error
  * @property Carbon|null $sincronizado_en
+ * @property string|null $aviso_id el canal (Google) o la suscripción (Microsoft) de sus avisos
+ * @property string|null $aviso_recurso el recurso del canal de Google (para detenerlo)
+ * @property string|null $aviso_secreto lo que regresa en cada aviso (cifrado)
+ * @property Carbon|null $aviso_vence_en
+ * @property Carbon|null $aviso_reintento_en sin avisos: no se intenta otra vez antes
  * @property-read Usuario|null $usuario
  */
 class CalendarioExternoTenant extends Model
@@ -35,9 +40,12 @@ class CalendarioExternoTenant extends Model
 
     protected $table = 'calendarios_externos';
 
-    protected $fillable = ['usuario_id', 'proveedor', 'cuenta', 'token_refresco', 'token_acceso', 'token_vence_en', 'calendario_id', 'estado', 'ultimo_error', 'sincronizado_en'];
+    protected $fillable = [
+        'usuario_id', 'proveedor', 'cuenta', 'token_refresco', 'token_acceso', 'token_vence_en', 'calendario_id', 'estado', 'ultimo_error', 'sincronizado_en',
+        'aviso_id', 'aviso_recurso', 'aviso_secreto', 'aviso_vence_en', 'aviso_reintento_en',
+    ];
 
-    protected $hidden = ['token_refresco', 'token_acceso'];
+    protected $hidden = ['token_refresco', 'token_acceso', 'aviso_secreto'];
 
     /**
      * @var array<string, string>
@@ -47,6 +55,9 @@ class CalendarioExternoTenant extends Model
         'token_acceso' => 'encrypted',
         'token_vence_en' => 'datetime',
         'sincronizado_en' => 'datetime',
+        'aviso_secreto' => 'encrypted',
+        'aviso_vence_en' => 'datetime',
+        'aviso_reintento_en' => 'datetime',
     ];
 
     /**

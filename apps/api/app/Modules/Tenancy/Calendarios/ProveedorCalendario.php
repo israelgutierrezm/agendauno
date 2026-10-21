@@ -48,4 +48,15 @@ interface ProveedorCalendario
      * @return list<array{desde: CarbonImmutable, hasta: CarbonImmutable}>
      */
     public function ocupado(string $acceso, CarbonImmutable $desde, CarbonImmutable $hasta): array;
+
+    /**
+     * Se suscribe a los cambios de su calendario principal: le avisa a `$direccion`
+     * con `$secreto`. Con un aviso anterior, lo renueva o lo reemplaza.
+     *
+     * @return array{id: string, recurso: string|null, vence_en: CarbonImmutable}
+     */
+    public function vigilar(string $acceso, ?string $avisoId, ?string $recurso, string $direccion, string $secreto): array;
+
+    /** Deja de recibir sus avisos (sin fallar si ya no existían). */
+    public function dejarDeVigilar(string $acceso, string $avisoId, ?string $recurso): void;
 }

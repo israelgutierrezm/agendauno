@@ -25,6 +25,9 @@ class CalendarioMicrosoft implements ProveedorCalendario
 
     private const MAX_PAGINAS = 40;
 
+    /** Minutos que dura la suscripción de avisos (Graph deja hasta 10,080 en eventos). */
+    private const MINUTOS_AVISO = 4320;
+
     public function configurado(): bool
     {
         return (string) config('agendauno.calendarios.microsoft.client_id') !== '' && (string) config('agendauno.calendarios.microsoft.client_secret') !== '';
@@ -168,6 +171,42 @@ class CalendarioMicrosoft implements ProveedorCalendario
             'client_secret' => (string) config('agendauno.calendarios.microsoft.client_secret'),
             'scope' => self::ALCANCES,
         ])->throw()->json();
+    }
+
+    /**
+     * La suscripción a los cambios de su calendario principal (no al del negocio, que
+     * llena la app). Si ya existe, se alarga; si Microsoft ya no la tiene, se crea otra.
+     */
+    public function vigilar(string $acceso, ?string $avisoId, ?string $recurso, string $direccion, string $secreto): array
+    {
+        $vence = CarbonImmutable::now()->addMinutes(self::MINUTOS_AVISO);
+        if ($avisoId !== null) {
+            $renovada = $this->api($acceso)->patch(self::API.'/subscriptions/'.rawurlencode($avisoId), ['expirationDateTime' => $vence->utc()->toIso8601ZuluString()]);
+            if ($renovada->successful()) {
+                return ['id' => $avisoId, 'recurso' => null, 'vence_en' => $vence];
+            }
+            if ($renovada->status() !== 404) {
+                $renovada->throw();
+            }
+        }
+        $json = (array) $this->api($acceso)->post(self::API.'/subscriptions', [
+            'changeType' => 'created,updated,deleted',
+            'notificationUrl' => $direccion,
+            'resource' => 'me/calendar/events',
+            'expirationDateTime' => $vence->utc()->toIso8601ZuluString(),
+            'clientState' => $secreto,
+        ])->throw()->json();
+        $id = (string) ($json['id'] ?? '');
+        if ($id === '') {
+            throw new RuntimeException('Microsoft no dio la suscripción de avisos.');
+        }
+
+        return ['id' => $id, 'recurso' => null, 'vence_en' => $vence];
+    }
+
+    public function dejarDeVigilar(string $acceso, string $avisoId, ?string $recurso): void
+    {
+        $this->api($acceso)->delete(self::API.'/subscriptions/'.rawurlencode($avisoId));
     }
 
     private function autoridad(): string

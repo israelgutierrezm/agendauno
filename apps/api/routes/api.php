@@ -170,6 +170,7 @@ use App\Modules\Tenancy\Http\Controllers\VueltaInstagramController;
 use App\Modules\Tenancy\Http\Controllers\VueltaMessengerController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookBienestarController;
+use App\Modules\Tenancy\Http\Controllers\WebhookCalendariosController;
 use App\Modules\Tenancy\Http\Controllers\WebhookInstagramController;
 use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
@@ -223,6 +224,12 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/webhooks/messenger', [WebhookInstagramController::class, 'recibirMessenger'])
         ->middleware('throttle:600,1,messenger-webhook')->name('api.v1.webhooks.messenger');
 
+    // Avisos al momento de Google Calendar y Outlook de que cambió el calendario de quien
+    // atiende (ADR 0199): el canal o la suscripción y su secreto dicen de qué conexión es.
+    Route::post('/webhooks/calendarios/google/{estudio}', [WebhookCalendariosController::class, 'google'])
+        ->where('estudio', '[a-z0-9-]+')->middleware('throttle:600,1,calendarios-webhook')->name('api.v1.webhooks.calendarios.google');
+    Route::post('/webhooks/calendarios/microsoft/{estudio}', [WebhookCalendariosController::class, 'microsoft'])
+        ->where('estudio', '[a-z0-9-]+')->middleware('throttle:600,1,calendarios-webhook')->name('api.v1.webhooks.calendarios.microsoft');
     // La vuelta de Google o Microsoft al conectar el calendario de quien atiende (ADR 0199):
     // una sola para todos los negocios; lleva el código a la web, que lo confirma con su sesión.
     Route::get('/calendarios/{proveedor}/vuelta', VueltaCalendarioController::class)

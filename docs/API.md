@@ -1590,7 +1590,14 @@ en el negocio.
 - `DELETE /yo/calendarios/{proveedor}` la quita (204).
 - `GET /bloqueos` incluye `origen` (`google`|`microsoft`|null). `DELETE /bloqueos/{id}`
   de uno con origen responde 422.
-- `agendauno:sincronizar-calendarios` (cada 10 minutos).
+- `agendauno:sincronizar-calendarios` (cada 10 minutos). También abre o renueva la
+  suscripción de avisos de cada conexión.
+- Avisos (sin sesión): `POST /api/v1/webhooks/calendarios/google/{negocio}` (encabezados
+  `X-Goog-Channel-ID`, `X-Goog-Channel-Token`, `X-Goog-Resource-State`) y
+  `POST /api/v1/webhooks/calendarios/microsoft/{negocio}` (`?validationToken=` se
+  devuelve en texto; los cambios llegan en `value` con `subscriptionId` y
+  `clientState`). Si el canal y su secreto son de una conexión activa, la sincronizan
+  en cola. Responden 200 o 202 siempre.
 
 ### Reserva con Google (ADR 0198)
 

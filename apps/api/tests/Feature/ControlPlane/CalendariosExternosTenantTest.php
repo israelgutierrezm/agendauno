@@ -61,6 +61,13 @@ function fingirGoogleCalendario(array &$llamadas, array &$ocupado, ?string &$fal
         if (str_ends_with($url, '/calendar/v3/calendars') && $peticion->method() === 'POST') {
             return Http::response(['id' => 'cal-negocio']);
         }
+        // El canal de avisos de su calendario principal (y cerrarlo).
+        if (str_ends_with($url, '/calendars/primary/events/watch')) {
+            return Http::response(['kind' => 'api#channel', 'id' => $peticion->data()['id'] ?? '', 'resourceId' => 'recurso-'.count($llamadas), 'expiration' => (string) now()->addDays(7)->getTimestampMs()]);
+        }
+        if (str_ends_with($url, '/calendar/v3/channels/stop')) {
+            return Http::response(null, 204);
+        }
         if (str_contains($url, '/events')) {
             if ($peticion->method() === 'DELETE') {
                 return Http::response(null, 204);
@@ -345,4 +352,126 @@ it('de Outlook se leen todas las páginas, y una lectura a medias no libera hora
         ->assertJsonPath('data.estado', 'activo');
     expect($desde())->toBe($esperado);
     Http::assertNotSent(fn (PeticionHttp $p): bool => str_contains($p->url(), 'otro.example.com'));
+});
+
+/**
+ * Los bloqueos que trajo su calendario.
+ */
+function bloqueosDeCalendario(string $slug): int
+{
+    return (int) app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $slug)->firstOrFail(),
+        fn (): int => BloqueoAgendaTenant::query()->whereNotNull('calendario_externo_id')->count(),
+    );
+}
+
+// Avisos al momento: un cambio en su calendario bloquea su agenda sin esperar la
+// pasada de cada 10 minutos.
+it('Google avisa al momento: el aviso de su canal con su secreto sincroniza; otro no', function (): void {
+    config(['app.url' => 'https://api.agendauno.test']);
+    $llamadas = [];
+    $ocupado = [];
+    fingirGoogleCalendario($llamadas, $ocupado);
+    $n = negocioConCoachYClase();
+    $slug = $n['e']['slug'];
+    conectarCalendarioDeCoach($n, 'google');
+
+    // Al conectar, se abrió el canal de su calendario principal hacia la plataforma.
+    $abrir = collect($llamadas)->first(fn (array $l): bool => str_ends_with($l['url'], '/calendars/primary/events/watch'));
+    expect($abrir['cuerpo'])->toMatchArray(['type' => 'web_hook', 'address' => "https://api.agendauno.test/api/v1/webhooks/calendarios/google/{$slug}"]);
+    $canal = (string) $abrir['cuerpo']['id'];
+    $secreto = (string) $abrir['cuerpo']['token'];
+    expect(strlen($secreto))->toBe(40);
+
+    $aviso = fn (string $id, string $token, string $estado = 'exists') => $this->call('POST', "/api/v1/webhooks/calendarios/google/{$slug}", [], [], [], [
+        'HTTP_X_GOOG_CHANNEL_ID' => $id, 'HTTP_X_GOOG_CHANNEL_TOKEN' => $token, 'HTTP_X_GOOG_RESOURCE_STATE' => $estado,
+    ]);
+    // Le pusieron algo en su calendario.
+    $ocupado = [['start' => now()->addDays(3)->setTime(15, 0)->utc()->toIso8601ZuluString(), 'end' => now()->addDays(3)->setTime(16, 0)->utc()->toIso8601ZuluString()]];
+    $aviso($canal, $secreto, 'sync')->assertOk();
+    $aviso('otro-canal', $secreto)->assertOk();
+    $aviso($canal, 'otro-secreto')->assertOk();
+    expect(bloqueosDeCalendario($slug))->toBe(0);
+
+    $aviso($canal, $secreto)->assertOk();
+    expect(bloqueosDeCalendario($slug))->toBe(1);
+
+    // Antes de que venza (7 días), la pasada abre otro canal y cierra el anterior.
+    $llamadas = [];
+    $this->travel(6)->days();
+    $this->travel(12)->hours();
+    $this->artisan('agendauno:sincronizar-calendarios')->assertSuccessful();
+    $nuevo = collect($llamadas)->first(fn (array $l): bool => str_ends_with($l['url'], '/calendars/primary/events/watch'));
+    expect($nuevo['cuerpo']['id'])->not->toBe($canal)->and($nuevo['cuerpo']['token'])->toBe($secreto);
+    expect(collect($llamadas)->contains(fn (array $l): bool => str_ends_with($l['url'], '/channels/stop') && $l['cuerpo']['id'] === $canal))->toBeTrue();
+
+    // Al desconectar, se cierra el canal.
+    $llamadas = [];
+    $this->deleteJson("/api/v1/app/{$slug}/yo/calendarios/google", [], conBearer($n['coach']))->assertNoContent();
+    expect(collect($llamadas)->contains(fn (array $l): bool => str_ends_with($l['url'], '/channels/stop') && $l['cuerpo']['id'] === $nuevo['cuerpo']['id']))->toBeTrue();
+});
+
+it('sin una dirección HTTPS de la plataforma no se abren canales: sigue la pasada', function (): void {
+    $llamadas = [];
+    $ocupado = [];
+    fingirGoogleCalendario($llamadas, $ocupado);
+    $n = negocioConCoachYClase();
+    conectarCalendarioDeCoach($n, 'google');
+
+    expect(collect($llamadas)->contains(fn (array $l): bool => str_contains($l['url'], '/events/watch')))->toBeFalse();
+});
+
+it('Outlook valida la dirección, avisa con su clientState y la suscripción se renueva', function (): void {
+    config(['app.url' => 'https://api.agendauno.test']);
+    $llamadas = [];
+    $ocupado = [];
+    Http::fake(function (PeticionHttp $peticion) use (&$llamadas, &$ocupado) {
+        $llamadas[] = ['metodo' => $peticion->method(), 'url' => $peticion->url(), 'cuerpo' => $peticion->data()];
+        $url = $peticion->url();
+
+        return match (true) {
+            str_contains($url, 'login.microsoftonline.com') => Http::response(['access_token' => 'acceso-ms', 'refresh_token' => 'refresco-ms', 'expires_in' => 3600]),
+            str_ends_with($url, '/v1.0/me') => Http::response(['mail' => 'coach@outlook.com']),
+            str_ends_with($url, '/me/calendars') => Http::response(['id' => 'cal-ms']),
+            str_contains($url, '/me/calendars/cal-ms/events') => Http::response(['id' => 'ev-ms']),
+            str_contains($url, '/me/calendar/calendarView') => Http::response(['value' => $ocupado]),
+            str_ends_with($url, '/v1.0/subscriptions') => Http::response(['id' => 'sub-1', 'expirationDateTime' => now()->addDays(3)->utc()->toIso8601ZuluString()], 201),
+            str_ends_with($url, '/v1.0/subscriptions/sub-1') => Http::response(['id' => 'sub-1'], $peticion->method() === 'DELETE' ? 204 : 200),
+            default => Http::response(['error' => 'no esperado: '.$url], 500),
+        };
+    });
+    $n = negocioConCoachYClase();
+    $slug = $n['e']['slug'];
+    conectarCalendarioDeCoach($n, 'microsoft');
+
+    $alta = collect($llamadas)->first(fn (array $l): bool => str_ends_with($l['url'], '/v1.0/subscriptions'));
+    expect($alta['cuerpo'])->toMatchArray([
+        'changeType' => 'created,updated,deleted',
+        'notificationUrl' => "https://api.agendauno.test/api/v1/webhooks/calendarios/microsoft/{$slug}",
+        'resource' => 'me/calendar/events',
+    ]);
+    $secreto = (string) $alta['cuerpo']['clientState'];
+
+    // Microsoft comprueba la dirección: se le devuelve su token tal cual, en texto.
+    $this->post("/api/v1/webhooks/calendarios/microsoft/{$slug}?validationToken=".rawurlencode('Validation: Token 123'))
+        ->assertOk()->assertHeader('Content-Type', 'text/plain; charset=utf-8')->assertSee('Validation: Token 123', false);
+
+    $ocupado = [['showAs' => 'busy', 'start' => ['dateTime' => now()->addDays(5)->setTime(12, 0)->utc()->format('Y-m-d\TH:i:s')], 'end' => ['dateTime' => now()->addDays(5)->setTime(13, 0)->utc()->format('Y-m-d\TH:i:s')]]];
+    $cambio = fn (string $clientState) => $this->postJson("/api/v1/webhooks/calendarios/microsoft/{$slug}", ['value' => [
+        ['subscriptionId' => 'sub-1', 'clientState' => $clientState, 'changeType' => 'created', 'resource' => 'Users/x/Events/y'],
+    ]]);
+    $cambio('otro-secreto')->assertStatus(202);
+    expect(bloqueosDeCalendario($slug))->toBe(0);
+    $cambio($secreto)->assertStatus(202);
+    expect(bloqueosDeCalendario($slug))->toBe(1);
+
+    // A dos días y medio (vence a los 3), la pasada la alarga.
+    $llamadas = [];
+    $this->travel(2)->days();
+    $this->travel(12)->hours();
+    $this->artisan('agendauno:sincronizar-calendarios')->assertSuccessful();
+    expect(collect($llamadas)->contains(fn (array $l): bool => $l['metodo'] === 'PATCH' && str_ends_with($l['url'], '/v1.0/subscriptions/sub-1')))->toBeTrue();
+
+    $this->deleteJson("/api/v1/app/{$slug}/yo/calendarios/microsoft", [], conBearer($n['coach']))->assertNoContent();
+    expect(collect($llamadas)->contains(fn (array $l): bool => $l['metodo'] === 'DELETE' && str_ends_with($l['url'], '/v1.0/subscriptions/sub-1')))->toBeTrue();
 });
