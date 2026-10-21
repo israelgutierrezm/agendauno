@@ -7,7 +7,9 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\ConversacionTenant;
 use App\Modules\Tenancy\Models\Documento;
+use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\NotaPersonaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -27,7 +29,8 @@ use Illuminate\Validation\ValidationException;
  * (responsable) la atiende o la rechaza con motivo.
  *
  * Al atenderla se ANONIMIZA a la persona (no se borra): se quitan nombre, correo y
- * celular, se borran sus documentos, respuestas de formularios y mensajes, se
+ * celular, se borran sus documentos, respuestas de formularios, mensajes y las
+ * conversaciones de la bandeja vinculadas a su ficha (con sus archivos), se
  * cancelan sus reservas futuras y membresías, y su cuenta queda inservible. Se
  * conservan, ya sin datos que la identifiquen, los registros que la ley obliga a
  * guardar (compras, pagos, facturas) y la operación (asistencias, accesos, firmas
@@ -117,6 +120,12 @@ class BajaDePersonaTenant
             Documento::query()->whereKey($documentos->modelKeys())->delete();
             RespuestaFormulario::query()->where('persona_id', $persona->getKey())->delete();
             MensajeTenant::query()->where('persona_id', $persona->getKey())->delete();
+            // Lo que escribió por WhatsApp o Instagram, si su conversación está ligada a
+            // su ficha (ADR 0200): se borra con sus archivos.
+            $conversaciones = ConversacionTenant::query()->where('persona_id', $persona->getKey())->pluck('id')->all();
+            $archivos = [...$archivos, ...MensajeConversacionTenant::query()->whereIn('conversacion_id', $conversaciones)->whereNotNull('archivo_ruta')->pluck('archivo_ruta')->all()];
+            MensajeConversacionTenant::query()->whereIn('conversacion_id', $conversaciones)->delete();
+            ConversacionTenant::query()->whereKey($conversaciones)->delete();
             NotaPersonaTenant::query()->where('persona_id', $persona->getKey())->delete();
             AceptacionWaiverTenant::query()->where('persona_id', $persona->getKey())->update(['ip' => null]);
 

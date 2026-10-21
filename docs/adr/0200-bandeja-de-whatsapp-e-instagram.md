@@ -59,7 +59,7 @@ negocio (ADR 0190) y la bandeja después.
 - La CSP permite los marcos de facebook.com que usa el registro insertado.
 - Pendiente:
   - ~~avisos push al equipo cuando llega un mensaje~~ (hecho, ver el ajuste);
-  - mandar y ver archivos;
+  - ~~mandar y ver archivos~~ (hecho, ver el ajuste);
   - contestar fuera de las 24 horas con plantillas del número del negocio;
   - Facebook Messenger.
 - Sin validar con Meta: probado con respuestas simuladas.
@@ -74,3 +74,21 @@ negocio (ADR 0190) y la bandeja después.
   - Dice el canal y el nombre con que escribió (o «Alguien»), nunca su número ni lo
     que escribió.
   - Se puede apagar o cambiar en Comunicación → Automáticos.
+- **Archivos**:
+  - Lo que llega guarda su referencia en Meta (el id del medio de WhatsApp o la
+    dirección del adjunto de Instagram), su tipo y su nombre. El archivo se baja en
+    cola (`BajarAdjuntoBandeja`, con el negocio en su carga) al disco privado,
+    `bandeja/{negocio}/…`.
+    - El de WhatsApp se baja con la llave del número. Meta lo guarda 30 días.
+    - Lo que pesa más de `bandeja.archivo_max_mb` (16 MB, de la plataforma) no se
+      guarda: el panel dice que se abra en el teléfono.
+  - Se ve solo por la API, con `mensajes.atender`. Una imagen común se abre; lo demás
+    se descarga como `application/octet-stream`, así un HTML o un SVG nunca se
+    ejecuta en el navegador. Si aún no se bajó, se intenta al pedirlo.
+  - El equipo manda una imagen o un PDF, con pie, en las 24 horas:
+    - **WhatsApp:** se sube al número del negocio y se manda como imagen o documento.
+    - **Instagram:** solo imágenes. Meta la toma de una dirección de la plataforma,
+      firmada y que vence en 15 minutos; apunta al archivo, porque Meta puede pedirlo
+      antes de que el mensaje quede guardado. El pie sale como otro mensaje.
+  - **Baja de datos (ARCO):** al atenderla se borran las conversaciones ligadas a su
+    ficha, con sus archivos. Una conversación sin ligar no se puede saber de quién es.

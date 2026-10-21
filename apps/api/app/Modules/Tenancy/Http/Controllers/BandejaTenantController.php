@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Bandeja\AdjuntosBandejaTenant;
 use App\Modules\Tenancy\Bandeja\BandejaTenant;
 use App\Modules\Tenancy\Models\CanalMensajeria;
 use App\Modules\Tenancy\Models\ConversacionTenant;
@@ -11,9 +12,12 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * La bandeja de WhatsApp e Instagram (ADR 0200): las conversaciones del negocio, leerlas,
@@ -27,7 +31,10 @@ class BandejaTenantController
     /** Los mensajes que se muestran de una conversación (los más recientes). */
     private const MENSAJES = 200;
 
-    public function __construct(private readonly BandejaTenant $bandeja) {}
+    public function __construct(
+        private readonly BandejaTenant $bandeja,
+        private readonly AdjuntosBandejaTenant $adjuntos,
+    ) {}
 
     public function resumen(Request $request): JsonResponse
     {
@@ -106,6 +113,47 @@ class BandejaTenantController
         return response()->json(['data' => $this->presentarMensaje($mensaje->load('autor'))], 201);
     }
 
+    /**
+     * Contesta con una imagen o un PDF (por Instagram, solo imágenes), con un pie
+     * opcional, en las 24 horas que deja Meta.
+     */
+    public function enviarArchivo(Request $request): JsonResponse
+    {
+        $conversacion = $this->conversacion($request);
+        $validado = $request->validate([
+            'archivo' => ['required', 'file', 'mimetypes:'.implode(',', array_keys(AdjuntosBandejaTenant::PARA_MANDAR)), 'max:'.intdiv($this->adjuntos->maximoBytes(), 1024)],
+            // El pie de foto de WhatsApp llega a 1,024 caracteres.
+            'texto' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($usuario instanceof Usuario, 401);
+        /** @var UploadedFile $archivo */
+        $archivo = $validado['archivo'];
+        $pie = trim((string) ($validado['texto'] ?? ''));
+
+        $mensaje = $this->bandeja->responderConArchivo($this->estudio($request), $conversacion, $usuario, $archivo, $pie !== '' ? $pie : null);
+
+        return response()->json(['data' => $this->presentarMensaje($mensaje->load('autor'))], 201);
+    }
+
+    /**
+     * El archivo de un mensaje: una imagen se abre; lo demás se descarga (un HTML o un
+     * SVG nunca se abre en el navegador). Si aún no se bajó de Meta, se intenta ahora.
+     */
+    public function archivo(Request $request): StreamedResponse
+    {
+        $mensaje = MensajeConversacionTenant::query()->where('ulid', (string) $request->route('mensaje'))->with('conversacion')->firstOrFail();
+        abort_if($mensaje->archivo_ruta === null && ! $this->adjuntos->bajar($mensaje), 404, 'Ese archivo ya no está en Meta o pesa más de lo que se guarda: ábrelo en el teléfono.');
+        $mime = (string) ($mensaje->adjunto_mime ?? 'application/octet-stream');
+        $enLinea = AdjuntosBandejaTenant::enLinea($mime);
+
+        return DiscosDeArchivos::privado()->response((string) $mensaje->archivo_ruta, AdjuntosBandejaTenant::nombreDe($mensaje), [
+            'Content-Type' => $enLinea ? $mime : 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=300',
+        ], $enLinea ? 'inline' : 'attachment');
+    }
+
     public function actualizar(Request $request): JsonResponse
     {
         $conversacion = $this->conversacion($request);
@@ -160,6 +208,15 @@ class BandejaTenantController
             'estado' => $m->estado,
             'enviado_en' => $m->enviado_en->toIso8601String(),
             'enviado_por' => $m->autor?->nombreCorto(),
+            // Su archivo (se pide aparte con la sesión): si ya está guardado y si se abre
+            // en el navegador (imágenes) o se descarga.
+            'archivo' => $m->adjunto_ref === null && $m->archivo_ruta === null ? null : [
+                'nombre' => AdjuntosBandejaTenant::nombreDe($m),
+                'mime' => $m->adjunto_mime,
+                'bytes' => $m->archivo_bytes,
+                'listo' => $m->archivo_ruta !== null,
+                'en_linea' => AdjuntosBandejaTenant::enLinea($m->adjunto_mime),
+            ],
         ];
     }
 

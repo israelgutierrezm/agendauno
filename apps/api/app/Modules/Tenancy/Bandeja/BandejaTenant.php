@@ -11,12 +11,15 @@ use App\Modules\Tenancy\Models\ConversacionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -42,6 +45,15 @@ class BandejaTenant
 
     private const VIGENCIA_ESTADO_MIN = 15;
 
+    /** Lo que trae archivo en WhatsApp (su id de medio va en `{tipo}.id`). */
+    private const MEDIOS_WHATSAPP = ['image', 'video', 'audio', 'document', 'sticker'];
+
+    /** Tipo de adjunto de Instagram → tipo del mensaje (lo demás no se baja). */
+    private const ADJUNTOS_INSTAGRAM = ['image' => 'image', 'video' => 'video', 'audio' => 'audio', 'file' => 'document'];
+
+    /** Minutos que vale la dirección con que Meta toma un archivo que se manda. */
+    private const MINUTOS_ARCHIVO_PUBLICO = 15;
+
     /** Cómo se llama cada canal en un aviso al equipo. */
     private const NOMBRES = [CanalMensajeria::WHATSAPP => 'WhatsApp', CanalMensajeria::INSTAGRAM => 'Instagram'];
 
@@ -49,6 +61,7 @@ class BandejaTenant
         private readonly ClienteMetaBandeja $meta,
         private readonly GestorDeConexionTenant $gestor,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly AdjuntosBandejaTenant $adjuntos,
     ) {}
 
     public function canal(Estudio $estudio, string $canal): ?CanalMensajeria
@@ -215,11 +228,11 @@ class BandejaTenant
                         continue;
                     }
                     $texto = is_string($mensaje['text'] ?? null) ? $mensaje['text'] : null;
-                    $tipo = $texto !== null ? 'texto' : 'adjunto';
+                    [$tipo, $adjunto] = self::adjuntoDeMeta($mensaje, $texto);
                     $cuando = CarbonImmutable::createFromTimestampMs((int) ($evento['timestamp'] ?? now()->getTimestampMs()));
                     $n += $deNegocio
-                        ? (int) $this->registrarSaliente(CanalMensajeria::INSTAGRAM, $contacto, $id, $tipo, $texto, $cuando)
-                        : (int) $this->registrarEntrante(CanalMensajeria::INSTAGRAM, $contacto, fn (): ?string => $this->meta->nombreEnInstagram($canal->token, $contacto), $id, $tipo, $texto, $cuando);
+                        ? (int) $this->registrarSaliente(CanalMensajeria::INSTAGRAM, $contacto, $id, $tipo, $texto, $cuando, $adjunto)
+                        : (int) $this->registrarEntrante(CanalMensajeria::INSTAGRAM, $contacto, fn (): ?string => $this->meta->nombreEnInstagram($canal->token, $contacto), $id, $tipo, $texto, $cuando, $adjunto);
                 }
 
                 return $n;
@@ -271,6 +284,105 @@ class BandejaTenant
     }
 
     /**
+     * Contesta con una imagen o un PDF (Instagram, solo imágenes), con pie opcional. El
+     * archivo se guarda en el negocio para verlo en la conversación. En el negocio actual.
+     */
+    public function responderConArchivo(Estudio $estudio, ConversacionTenant $conversacion, Usuario $autor, UploadedFile $archivo, ?string $pie): MensajeConversacionTenant
+    {
+        $canal = $this->canal($estudio, $conversacion->canal);
+        if ($canal === null || $canal->estado !== 'activo') {
+            throw ValidationException::withMessages(['archivo' => ['Ese canal ya no está conectado: conéctalo de nuevo en la bandeja.']]);
+        }
+        if (! $conversacion->puedeContestar()) {
+            throw ValidationException::withMessages(['archivo' => ['Pasaron más de 24 horas desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.']]);
+        }
+        $mime = (string) $archivo->getMimeType();
+        $tipo = str_starts_with($mime, 'image/') ? 'image' : 'document';
+        if ($canal->canal === CanalMensajeria::INSTAGRAM && $tipo !== 'image') {
+            throw ValidationException::withMessages(['archivo' => ['Por Instagram solo se mandan imágenes.']]);
+        }
+        // Una imagen de Instagram no lleva pie: el texto sale aparte, después.
+        $pieAparte = $canal->canal === CanalMensajeria::INSTAGRAM ? $pie : null;
+        $pie = $pieAparte !== null ? null : $pie;
+        $contenido = (string) $archivo->get();
+        $nombre = Str::limit($archivo->getClientOriginalName() ?: 'archivo', 200, '');
+        $ruta = $this->adjuntos->guardar($contenido, $mime);
+        $mensaje = new MensajeConversacionTenant([
+            'conversacion_id' => $conversacion->getKey(),
+            'direccion' => MensajeConversacionTenant::SALIENTE,
+            'tipo' => $tipo,
+            'texto' => $pie,
+            'estado' => 'enviado',
+            'enviado_por' => $autor->getKey(),
+            'adjunto_mime' => $mime,
+            'adjunto_nombre' => $nombre,
+            'archivo_ruta' => $ruta,
+            'archivo_bytes' => strlen($contenido),
+        ]);
+
+        try {
+            if ($canal->canal === CanalMensajeria::WHATSAPP) {
+                $medio = $this->meta->subirWhatsApp($canal->token, $canal->cuenta_id, $contenido, $mime, $nombre);
+                $id = $this->meta->enviarArchivoWhatsApp($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $tipo, $medio, $pie, $nombre);
+            } else {
+                $id = $this->meta->enviarImagenInstagram($canal->token, $conversacion->contacto_id, $this->urlPublicaDeArchivo($estudio, $ruta));
+            }
+        } catch (RequestException $e) {
+            DiscosDeArchivos::privado()->delete($ruta);
+            report($e);
+            throw ValidationException::withMessages(['archivo' => ['Meta no aceptó el archivo: '.Str::limit((string) ($e->response->json('error.message') ?? 'inténtalo de nuevo.'), 160)]]);
+        }
+
+        $ahora = CarbonImmutable::now();
+
+        $guardado = DB::connection('tenant')->transaction(function () use ($conversacion, $mensaje, $id, $ahora, $pie, $tipo): MensajeConversacionTenant {
+            $mensaje->fill(['id_externo' => $id !== '' ? $id : null, 'enviado_en' => $ahora])->save();
+            $conversacion->forceFill(['ultimo_texto' => Str::limit($pie ?? '['.$tipo.']', 190), 'ultimo_mensaje_en' => $ahora, 'no_leidos' => 0])->save();
+
+            return $mensaje;
+        });
+        if ($pieAparte !== null) {
+            $this->responder($estudio, $conversacion, $autor, $pieAparte);
+        }
+
+        return $guardado;
+    }
+
+    /**
+     * La dirección firmada y temporal con que Meta toma un archivo que se manda por
+     * Instagram (no pide sesión: la firma vence en minutos). Apunta al archivo, no al
+     * mensaje: Meta puede pedirlo antes de que el mensaje quede guardado.
+     */
+    private function urlPublicaDeArchivo(Estudio $estudio, string $ruta): string
+    {
+        return URL::temporarySignedRoute('api.v1.bandeja.archivo', CarbonImmutable::now()->addMinutes(self::MINUTOS_ARCHIVO_PUBLICO), [
+            'estudio' => $estudio->slug,
+            'archivo' => basename($ruta),
+        ]);
+    }
+
+    /**
+     * El tipo y el adjunto de un mensaje de Instagram (su primer archivo).
+     *
+     * @param  array<string, mixed>  $mensaje
+     * @return array{0: string, 1: array{ref: string, mime: string|null, nombre: string|null}|null}
+     */
+    private static function adjuntoDeMeta(array $mensaje, ?string $texto): array
+    {
+        $primero = $mensaje['attachments'][0] ?? null;
+        if (! is_array($primero)) {
+            return [$texto !== null ? 'texto' : 'adjunto', null];
+        }
+        $tipo = self::ADJUNTOS_INSTAGRAM[(string) ($primero['type'] ?? '')] ?? null;
+        $url = (string) ($primero['payload']['url'] ?? '');
+        if ($tipo === null || $url === '') {
+            return [$texto !== null ? 'texto' : 'adjunto', null];
+        }
+
+        return [$tipo, ['ref' => $url, 'mime' => null, 'nombre' => null]];
+    }
+
+    /**
      * @param  array<string, mixed>  $valor
      */
     private function guardarWhatsApp(array $valor): int
@@ -294,7 +406,13 @@ class BandejaTenant
                 continue;
             }
             $cuando = CarbonImmutable::createFromTimestamp((int) ($mensaje['timestamp'] ?? now()->getTimestamp()));
-            $n += (int) $this->registrarEntrante(CanalMensajeria::WHATSAPP, $de, fn (): ?string => $nombres[$de] ?? null, $id, $tipo === 'text' ? 'texto' : $tipo, self::textoWhatsApp($mensaje), $cuando);
+            $medio = in_array($tipo, self::MEDIOS_WHATSAPP, true) && is_array($mensaje[$tipo] ?? null) ? $mensaje[$tipo] : null;
+            $adjunto = $medio !== null && is_string($medio['id'] ?? null) ? [
+                'ref' => $medio['id'],
+                'mime' => is_string($medio['mime_type'] ?? null) ? $medio['mime_type'] : null,
+                'nombre' => is_string($medio['filename'] ?? null) ? Str::limit($medio['filename'], 200, '') : null,
+            ] : null;
+            $n += (int) $this->registrarEntrante(CanalMensajeria::WHATSAPP, $de, fn (): ?string => $nombres[$de] ?? null, $id, $tipo === 'text' ? 'texto' : $tipo, self::textoWhatsApp($mensaje), $cuando, $adjunto);
         }
         foreach ((array) ($valor['statuses'] ?? []) as $estado) {
             if (is_array($estado) && isset(self::ESTADOS[(string) ($estado['status'] ?? '')])) {
@@ -326,8 +444,9 @@ class BandejaTenant
      * Guarda un mensaje de quien escribe (una vez por id) y abre su conversación.
      *
      * @param  callable(): ?string  $nombre  solo se pide para una conversación nueva
+     * @param  array{ref: string, mime: string|null, nombre: string|null}|null  $adjunto
      */
-    private function registrarEntrante(string $canal, string $contacto, callable $nombre, string $id, string $tipo, ?string $texto, CarbonImmutable $cuando): bool
+    private function registrarEntrante(string $canal, string $contacto, callable $nombre, string $id, string $tipo, ?string $texto, CarbonImmutable $cuando, ?array $adjunto = null): bool
     {
         if (MensajeConversacionTenant::query()->where('id_externo', $id)->exists()) {
             return false;
@@ -335,8 +454,8 @@ class BandejaTenant
         $conversacion = $this->conversacion($canal, $contacto, $nombre);
 
         try {
-            DB::connection('tenant')->transaction(function () use ($conversacion, $id, $tipo, $texto, $cuando): void {
-                MensajeConversacionTenant::query()->create([
+            $guardado = DB::connection('tenant')->transaction(function () use ($conversacion, $id, $tipo, $texto, $cuando, $adjunto): MensajeConversacionTenant {
+                $guardado = MensajeConversacionTenant::query()->create([
                     'conversacion_id' => $conversacion->getKey(),
                     'direccion' => MensajeConversacionTenant::ENTRANTE,
                     'tipo' => $tipo,
@@ -344,6 +463,7 @@ class BandejaTenant
                     'id_externo' => $id,
                     'estado' => 'recibido',
                     'enviado_en' => $cuando,
+                    ...self::columnasDeAdjunto($adjunto),
                 ]);
                 $fila = ConversacionTenant::query()->whereKey($conversacion->getKey())->lockForUpdate()->firstOrFail();
                 // Aviso al equipo (push) solo con el primer mensaje sin leer: una ráfaga
@@ -362,24 +482,49 @@ class BandejaTenant
                     'ultimo_mensaje_en' => $fila->ultimo_mensaje_en === null || $cuando->gt($fila->ultimo_mensaje_en) ? $cuando : $fila->ultimo_mensaje_en,
                     'ultimo_entrante_en' => $fila->ultimo_entrante_en === null || $cuando->gt($fila->ultimo_entrante_en) ? $cuando : $fila->ultimo_entrante_en,
                 ])->save();
+
+                return $guardado;
             });
         } catch (UniqueConstraintViolationException) {
             // Llegó el mismo aviso dos veces a la vez: ya quedó guardado.
             return false;
         }
+        $this->bajarDespues($guardado);
 
         return true;
     }
 
-    /** Lo que el negocio mandó desde la app de Instagram (no desde el panel). */
-    private function registrarSaliente(string $canal, string $contacto, string $id, string $tipo, ?string $texto, CarbonImmutable $cuando): bool
+    /**
+     * @param  array{ref: string, mime: string|null, nombre: string|null}|null  $adjunto
+     * @return array<string, string|null>
+     */
+    private static function columnasDeAdjunto(?array $adjunto): array
+    {
+        return $adjunto === null ? [] : ['adjunto_ref' => $adjunto['ref'], 'adjunto_mime' => $adjunto['mime'], 'adjunto_nombre' => $adjunto['nombre']];
+    }
+
+    /** El archivo se baja en cola, fuera del aviso de Meta. */
+    private function bajarDespues(MensajeConversacionTenant $mensaje): void
+    {
+        $estudio = $this->gestor->actual();
+        if ($mensaje->adjunto_ref !== null && $estudio !== null) {
+            BajarAdjuntoBandeja::dispatch((int) $estudio->getKey(), (int) $mensaje->getKey());
+        }
+    }
+
+    /**
+     * Lo que el negocio mandó desde la app de Instagram (no desde el panel).
+     *
+     * @param  array{ref: string, mime: string|null, nombre: string|null}|null  $adjunto
+     */
+    private function registrarSaliente(string $canal, string $contacto, string $id, string $tipo, ?string $texto, CarbonImmutable $cuando, ?array $adjunto = null): bool
     {
         if (MensajeConversacionTenant::query()->where('id_externo', $id)->exists()) {
             return false;
         }
         $conversacion = $this->conversacion($canal, $contacto, static fn (): ?string => null);
         try {
-            MensajeConversacionTenant::query()->create([
+            $guardado = MensajeConversacionTenant::query()->create([
                 'conversacion_id' => $conversacion->getKey(),
                 'direccion' => MensajeConversacionTenant::SALIENTE,
                 'tipo' => $tipo,
@@ -387,10 +532,12 @@ class BandejaTenant
                 'id_externo' => $id,
                 'estado' => 'enviado',
                 'enviado_en' => $cuando,
+                ...self::columnasDeAdjunto($adjunto),
             ]);
         } catch (UniqueConstraintViolationException) {
             return false;
         }
+        $this->bajarDespues($guardado);
         $conversacion->forceFill(['ultimo_texto' => Str::limit($texto ?? '['.$tipo.']', 190), 'ultimo_mensaje_en' => $cuando])->save();
 
         return true;

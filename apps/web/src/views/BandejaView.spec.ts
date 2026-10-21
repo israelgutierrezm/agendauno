@@ -170,6 +170,94 @@ describe("bandeja de WhatsApp e Instagram", () => {
     );
   });
 
+  it("los archivos: una imagen se muestra (pedida con la sesión) y un documento se descarga", async () => {
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:foto");
+    globalThis.URL.revokeObjectURL = vi.fn();
+    responderGet({
+      mensajes: [
+        {
+          ...detalle.mensajes[0],
+          id: "m-foto",
+          tipo: "image",
+          texto: null,
+          archivo: {
+            nombre: "foto.jpg",
+            mime: "image/jpeg",
+            bytes: 2048,
+            listo: true,
+            en_linea: true,
+          },
+        },
+        {
+          ...detalle.mensajes[0],
+          id: "m-doc",
+          tipo: "document",
+          texto: null,
+          archivo: {
+            nombre: "pagina.html",
+            mime: "text/html",
+            bytes: 20,
+            listo: true,
+            en_linea: false,
+          },
+        },
+      ],
+    });
+    const original = api.get.getMockImplementation()!;
+    api.get.mockImplementation(async (url: string, opciones?: unknown) =>
+      url.endsWith("/archivo")
+        ? { data: new Blob(["x"]) }
+        : original(url, opciones),
+    );
+    const { w } = await montar();
+    await w.find(".bm-conversacion").trigger("click");
+    await flushPromises();
+
+    // La imagen se pide con la sesión (no tiene dirección pública).
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/bandeja/mensajes/m-foto/archivo",
+      { responseType: "blob" },
+    );
+    expect(w.find("img").attributes("src")).toBe("blob:foto");
+    // El documento no se abre: se ofrece descargar.
+    expect(api.get).not.toHaveBeenCalledWith(
+      "/api/v1/app/demo/bandeja/mensajes/m-doc/archivo",
+      expect.anything(),
+    );
+    expect(w.find('[data-prueba="descargar-archivo"]').text()).toContain(
+      "Descargar pagina.html",
+    );
+    // Sin texto, no aparece «[Imagen]» además del archivo.
+    expect(w.find('[data-prueba="conversacion"]').text()).not.toContain(
+      "[Imagen]",
+    );
+  });
+
+  it("adjuntar manda el archivo con lo escrito como pie", async () => {
+    api.post.mockResolvedValue({ data: { data: {} } });
+    const { w } = await montar();
+    await w.find(".bm-conversacion").trigger("click");
+    await flushPromises();
+    await w.find("textarea").setValue("Aquí está");
+
+    const entrada = w.find('[data-prueba="archivo-elegir"]');
+    const archivo = new File(["%PDF"], "temario.pdf", {
+      type: "application/pdf",
+    });
+    Object.defineProperty(entrada.element, "files", { value: [archivo] });
+    await entrada.trigger("change");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/bandeja/conversaciones/c1/archivos",
+      expect.any(FormData),
+    );
+    const datos = api.post.mock.calls[0][1] as FormData;
+    expect(datos.get("archivo")).toBe(archivo);
+    expect(datos.get("texto")).toBe("Aquí está");
+    expect((w.find("textarea").element as HTMLTextAreaElement).value).toBe("");
+  });
+
   it("pasadas las 24 horas no deja escribir y explica por qué", async () => {
     responderGet({ puede_contestar: false });
     const { w } = await montar();

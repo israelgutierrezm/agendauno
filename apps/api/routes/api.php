@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Http\Controllers\AccesosTenantController;
 use App\Modules\Tenancy\Http\Controllers\AgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AparienciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ApartadosTenantController;
+use App\Modules\Tenancy\Http\Controllers\ArchivoBandejaPublicoController;
 use App\Modules\Tenancy\Http\Controllers\AsignacionesPersonalTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsistenciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsistenteTenantController;
@@ -223,6 +224,9 @@ Route::prefix('v1')->group(function (): void {
     // La vuelta de Instagram al conectar la cuenta de la bandeja (ADR 0200).
     Route::get('/bandeja/instagram/vuelta', VueltaInstagramController::class)
         ->middleware('throttle:30,1,instagram-vuelta')->name('api.v1.bandeja.instagram.vuelta');
+    // La imagen que el equipo manda por Instagram: Meta la toma de aquí (firmada, vence en minutos).
+    Route::get('/bandeja/archivos/{estudio}/{archivo}', ArchivoBandejaPublicoController::class)
+        ->middleware(['signed', 'throttle:120,1,bandeja-archivo'])->name('api.v1.bandeja.archivo');
 
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
     // Interesados de un producto que aún no abre registros (ADR 0108): la landing de TurnoUno.
@@ -1179,6 +1183,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/bandeja/conversaciones', [BandejaTenantController::class, 'index'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.index');
             Route::get('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'show'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.show');
             Route::post('/bandeja/conversaciones/{conversacion}/mensajes', [BandejaTenantController::class, 'enviar'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:60,1,bandeja-enviar'])->name('bandeja.enviar');
+            Route::post('/bandeja/conversaciones/{conversacion}/archivos', [BandejaTenantController::class, 'enviarArchivo'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:30,1,bandeja-archivos'])->name('bandeja.archivos');
+            Route::get('/bandeja/mensajes/{mensaje}/archivo', [BandejaTenantController::class, 'archivo'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.archivo');
             Route::put('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'actualizar'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.actualizar');
             Route::get('/bandeja/canales', [CanalesMensajeriaTenantController::class, 'index'])->middleware(['puede:integraciones.configurar', 'plan:mensajes'])->name('bandeja.canales');
             Route::post('/bandeja/canales/whatsapp', [CanalesMensajeriaTenantController::class, 'conectarWhatsApp'])->middleware(['puede:integraciones.configurar', 'plan:mensajes', 'throttle:login'])->name('bandeja.canales.whatsapp');

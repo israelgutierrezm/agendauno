@@ -34,6 +34,17 @@ export default {
     leido: "Leído",
     fallido: "No se entregó",
   },
+  archivo: {
+    ver: "Ver imagen",
+    cargando: "Cargando…",
+    descargar: "Descargar {nombre}",
+    noDisponible:
+      "Este archivo ya no está en Meta o pesa más de lo que se guarda: ábrelo en el teléfono.",
+  },
+  adjuntar: "Adjuntar",
+  adjuntarAyuda: "Imagen o PDF. El texto que escribas va como pie.",
+  adjuntarAyudaInstagram: "Por Instagram solo imágenes.",
+  enviandoArchivo: "Enviando archivo…",
   escribir: "Escribe tu respuesta",
   enviar: "Enviar",
   enviando: "Enviando…",

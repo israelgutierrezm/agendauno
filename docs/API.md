@@ -1525,10 +1525,16 @@ en el negocio.
     `persona` {`id`, `nombre`}|null, `estado`, `no_leidos`, `ultimo_texto`,
     `ultimo_mensaje_en`, `puede_contestar`, `contestar_hasta`}] por páginas.
   - `GET /bandeja/conversaciones/{id}` suma `mensajes` [{`id`, `direccion`
-    (`entrante`|`saliente`), `tipo`, `texto`, `estado`, `enviado_en`, `enviado_por`}] y
-    la deja leída.
+    (`entrante`|`saliente`), `tipo`, `texto`, `estado`, `enviado_en`, `enviado_por`,
+    `archivo` {`nombre`, `mime`, `bytes`, `listo`, `en_linea`}|null}] y la deja leída.
   - `POST /bandeja/conversaciones/{id}/mensajes` {`texto`} contesta (201). Responde
     422 fuera de las 24 horas o sin el canal conectado.
+  - `POST /bandeja/conversaciones/{id}/archivos` (multipart: `archivo` JPG, PNG, WebP o
+    PDF hasta `bandeja.archivo_max_mb`; `texto`? como pie) contesta con el archivo
+    (201). Por Instagram, solo imágenes; el pie sale como otro mensaje.
+  - `GET /bandeja/mensajes/{id}/archivo` lo sirve: una imagen `inline`; lo demás como
+    `application/octet-stream` y `attachment`, con `nosniff`. Si aún no se bajó de
+    Meta, lo intenta; 404 si ya no está o pesa de más.
   - `PUT /bandeja/conversaciones/{id}` {`estado`?, `persona_id`?|null}.
 - Canales (`integraciones.configurar`):
   - `GET /bandeja/canales` devuelve, por canal, {`disponible`, `conexion`} y, en
@@ -1542,6 +1548,8 @@ en el negocio.
   - `DELETE /bandeja/canales/{whatsapp|instagram}` (204).
 - Webhooks: `/webhooks/whatsapp` (el de siempre; devuelve también `bandeja`) y
   `GET`/`POST /webhooks/instagram`.
+- `GET /api/v1/bandeja/archivos/{negocio}/{archivo}`, firmada y vigente 15 minutos: de
+  ahí toma Meta la imagen que se manda por Instagram.
 - `agendauno:renovar-instagram` (diario).
 
 ### Google Calendar y Outlook (ADR 0199)

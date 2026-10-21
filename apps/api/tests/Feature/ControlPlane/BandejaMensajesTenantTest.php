@@ -7,9 +7,11 @@ use App\Modules\Tenancy\Models\CanalMensajeria;
 use App\Modules\Tenancy\Models\ConversacionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\Client\Request as PeticionHttp;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 
 /*
@@ -58,8 +60,16 @@ function fingirMetaBandeja(array &$llamadas): void
             str_ends_with($url, 'graph.instagram.com/access_token') => Http::response(['access_token' => 'llave-ig', 'expires_in' => 5184000]),
             str_ends_with($url, 'graph.instagram.com/refresh_access_token') => Http::response(['access_token' => 'llave-ig-2', 'expires_in' => 5184000]),
             str_ends_with($url, 'graph.instagram.com/v23.0/me') => Http::response(['user_id' => '1789', 'username' => 'estudio.cal']),
-            str_ends_with($url, 'graph.instagram.com/v23.0/me/messages') => Http::response(['recipient_id' => '555', 'message_id' => 'm_salida']),
+            str_ends_with($url, 'graph.instagram.com/v23.0/me/messages') => Http::response(['recipient_id' => '555', 'message_id' => 'm_salida'.(++$enviados)]),
             str_ends_with($url, 'graph.instagram.com/v23.0/555') => Http::response(['name' => 'Ana Instagram']),
+            // Archivos (medios de WhatsApp y adjuntos de Instagram).
+            str_ends_with($url, 'graph.facebook.com/v23.0/media-foto') => Http::response(['url' => 'https://lookaside.fbsbx.com/wa/media-foto', 'mime_type' => 'image/jpeg', 'file_size' => 10]),
+            str_ends_with($url, 'graph.facebook.com/v23.0/media-html') => Http::response(['url' => 'https://lookaside.fbsbx.com/wa/media-html', 'mime_type' => 'text/html', 'file_size' => 25]),
+            str_ends_with($url, 'graph.facebook.com/v23.0/media-grande') => Http::response(['url' => 'https://lookaside.fbsbx.com/wa/media-grande', 'mime_type' => 'video/mp4', 'file_size' => 50 * 1024 * 1024]),
+            str_ends_with($url, 'lookaside.fbsbx.com/wa/media-foto') => Http::response('FOTO-JPEG!', 200, ['Content-Type' => 'image/jpeg']),
+            str_ends_with($url, 'lookaside.fbsbx.com/wa/media-html') => Http::response('<script>alert(1)</script>', 200, ['Content-Type' => 'text/html']),
+            str_ends_with($url, 'cdn.instagram.test/foto.jpg') => Http::response('FOTO-IG', 200, ['Content-Type' => 'image/jpeg']),
+            str_ends_with($url, '/7654321/media') => Http::response(['id' => 'media-subido']),
             // Los avisos push al equipo (FCM).
             str_contains($url, 'oauth2.googleapis.com/token') => Http::response(['access_token' => 'ya29.prueba', 'expires_in' => 3599]),
             str_contains($url, 'fcm.googleapis.com') => Http::response(['name' => 'projects/agendauno-prueba/messages/1']),
@@ -324,4 +334,145 @@ it('avisa por push a quien atiende la bandeja con el primer mensaje sin leer, si
     $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}", conBearer($e['bearer']))->assertOk();
     avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.p3', 'Gracias'))->assertOk();
     expect(pushesDeBandeja($llamadas))->toHaveCount(2);
+});
+
+/**
+ * Un mensaje de WhatsApp con un archivo (su id de medio en Meta).
+ *
+ * @param  array<string, mixed>  $medio
+ * @return array<string, mixed>
+ */
+function whatsappConArchivo(string $id, string $tipo, array $medio): array
+{
+    return ['object' => 'whatsapp_business_account', 'entry' => [[
+        'id' => 'waba-negocio', 'changes' => [['field' => 'messages', 'value' => [
+            'messaging_product' => 'whatsapp',
+            'metadata' => ['phone_number_id' => '7654321'],
+            'contacts' => [['wa_id' => '5215511112222', 'profile' => ['name' => 'Lucía']]],
+            'messages' => [['from' => '5215511112222', 'id' => $id, 'timestamp' => (string) now()->getTimestamp(), 'type' => $tipo, $tipo => $medio]],
+        ]]],
+    ]]];
+}
+
+// ADR 0200 (ajuste del 2026-10-21): los archivos se guardan en el negocio y se ven
+// desde el panel; uno que podría ejecutarse en el navegador solo se descarga.
+it('los archivos que llegan se guardan en el negocio y se abren o se descargan desde el panel', function (): void {
+    Storage::fake('local');
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    conectarWhatsAppDeBandeja($e);
+
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappConArchivo('wamid.f1', 'image', ['id' => 'media-foto', 'mime_type' => 'image/jpeg', 'caption' => 'Mi comprobante']))->assertOk();
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappConArchivo('wamid.f2', 'document', ['id' => 'media-html', 'mime_type' => 'text/html', 'filename' => 'pagina.html']))->assertOk();
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappConArchivo('wamid.f3', 'video', ['id' => 'media-grande', 'mime_type' => 'video/mp4']))->assertOk();
+
+    $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones", conBearer($e['bearer']))->json('data.0.id');
+    $mensajes = $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}", conBearer($e['bearer']))->json('data.mensajes');
+    expect($mensajes[0]['texto'])->toBe('Mi comprobante')
+        ->and($mensajes[0]['archivo'])->toMatchArray(['mime' => 'image/jpeg', 'listo' => true, 'en_linea' => true, 'bytes' => 10])
+        ->and($mensajes[1]['archivo'])->toMatchArray(['nombre' => 'pagina.html', 'listo' => true, 'en_linea' => false])
+        // Más grande que el máximo de la plataforma (16 MB): no se guarda.
+        ->and($mensajes[2]['archivo'])->toMatchArray(['listo' => false]);
+    // Con la llave del número: el archivo de WhatsApp no es público.
+    Http::assertSent(fn (PeticionHttp $p): bool => str_ends_with($p->url(), 'lookaside.fbsbx.com/wa/media-foto') && $p->hasHeader('Authorization', 'Bearer llave-wa'));
+
+    $foto = $this->get("/api/v1/app/{$e['slug']}/bandeja/mensajes/{$mensajes[0]['id']}/archivo", conBearer($e['bearer']))->assertOk();
+    expect($foto->headers->get('Content-Type'))->toBe('image/jpeg')
+        ->and((string) $foto->headers->get('Content-Disposition'))->toStartWith('inline')
+        ->and($foto->streamedContent())->toBe('FOTO-JPEG!');
+    // Un HTML nunca se abre en el navegador: se descarga, sin tipo que lo ejecute.
+    $html = $this->get("/api/v1/app/{$e['slug']}/bandeja/mensajes/{$mensajes[1]['id']}/archivo", conBearer($e['bearer']))->assertOk();
+    expect($html->headers->get('Content-Type'))->toBe('application/octet-stream')
+        ->and((string) $html->headers->get('Content-Disposition'))->toStartWith('attachment')
+        ->and($html->headers->get('X-Content-Type-Options'))->toBe('nosniff');
+    $this->get("/api/v1/app/{$e['slug']}/bandeja/mensajes/{$mensajes[2]['id']}/archivo", conBearer($e['bearer']))->assertNotFound();
+
+    // Quien imparte no atiende la bandeja; otro negocio no ve el archivo.
+    $coach = personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
+    $this->get("/api/v1/app/{$e['slug']}/bandeja/mensajes/{$mensajes[0]['id']}/archivo", conBearer($coach))->assertForbidden();
+    $otro = estudioConSesion('otro-bandeja', 'otro-bandeja@correo.mx');
+    $this->get("/api/v1/app/{$otro['slug']}/bandeja/mensajes/{$mensajes[0]['id']}/archivo", conBearer($otro['bearer']))->assertNotFound();
+});
+
+it('el equipo manda una imagen o un PDF por WhatsApp, y por Instagram solo imágenes', function (): void {
+    Storage::fake('local');
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    conectarWhatsAppDeBandeja($e);
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.a1', 'Mándame el temario'))->assertOk();
+    $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones", conBearer($e['bearer']))->json('data.0.id');
+
+    $pdf = UploadedFile::fake()->createWithContent('temario.pdf', "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
+    $enviado = $this->post("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}/archivos", ['archivo' => $pdf, 'texto' => 'Aquí está'], [...conBearer($e['bearer']), 'Accept' => 'application/json'])
+        ->assertCreated()->json('data');
+    expect($enviado)->toMatchArray(['direccion' => 'saliente', 'tipo' => 'document', 'texto' => 'Aquí está'])
+        ->and($enviado['archivo'])->toMatchArray(['nombre' => 'temario.pdf', 'listo' => true]);
+    // Se sube al número del negocio y se manda como documento con su nombre y pie.
+    Http::assertSent(fn (PeticionHttp $p): bool => str_ends_with($p->url(), '/7654321/messages') && ($p['type'] ?? null) === 'document'
+        && $p['document'] === ['id' => 'media-subido', 'caption' => 'Aquí está', 'filename' => 'temario.pdf']);
+    $this->get("/api/v1/app/{$e['slug']}/bandeja/mensajes/{$enviado['id']}/archivo", conBearer($e['bearer']))->assertOk();
+
+    // Un archivo que no es imagen ni PDF no se manda.
+    $this->post("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}/archivos", ['archivo' => UploadedFile::fake()->createWithContent('x.html', '<html></html>')], [...conBearer($e['bearer']), 'Accept' => 'application/json'])
+        ->assertUnprocessable();
+
+    // Instagram: solo imágenes; Meta la toma de una dirección firmada y temporal.
+    $this->postJson("/api/v1/app/{$e['slug']}/bandeja/canales/instagram/conectar", [], conBearer($e['bearer']))->assertOk();
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    CanalMensajeria::query()->create(['estudio_id' => $estudio->getKey(), 'canal' => 'instagram', 'cuenta_id' => '1789', 'nombre' => '@estudio.cal', 'token' => 'llave-ig', 'estado' => 'activo']);
+    $instante = now()->getTimestampMs();
+    avisoDeBandeja('/api/v1/webhooks/instagram', ['object' => 'instagram', 'entry' => [['id' => '1789', 'time' => $instante, 'messaging' => [
+        ['sender' => ['id' => '555'], 'recipient' => ['id' => '1789'], 'timestamp' => $instante, 'message' => ['mid' => 'm_foto', 'attachments' => [['type' => 'image', 'payload' => ['url' => 'https://cdn.instagram.test/foto.jpg']]]]],
+    ]]]], 'secreto-ig')->assertOk();
+    $ig = $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones?canal=instagram", conBearer($e['bearer']))->json('data.0.id');
+    $recibida = $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$ig}", conBearer($e['bearer']))->json('data.mensajes.0');
+    expect($recibida['tipo'])->toBe('image')->and($recibida['archivo']['listo'])->toBeTrue();
+
+    $this->post("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$ig}/archivos", ['archivo' => UploadedFile::fake()->createWithContent('temario.pdf', "%PDF-1.4\n%%EOF")], [...conBearer($e['bearer']), 'Accept' => 'application/json'])
+        ->assertUnprocessable()->assertJsonValidationErrors(['archivo'], 'meta.errors');
+    $this->post("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$ig}/archivos", ['archivo' => UploadedFile::fake()->image('foto.png', 20, 20), 'texto' => 'Así queda'], [...conBearer($e['bearer']), 'Accept' => 'application/json'])
+        ->assertCreated();
+    $envio = collect($llamadas)->first(fn (array $l): bool => str_ends_with($l['url'], 'graph.instagram.com/v23.0/me/messages') && isset($l['cuerpo']['message']['attachment']));
+    $url = (string) $envio['cuerpo']['message']['attachment']['payload']['url'];
+    expect($url)->toContain('/api/v1/bandeja/archivos/'.$e['slug'].'/')->toContain('signature=');
+    // El pie va aparte: una imagen de Instagram no lleva texto.
+    Http::assertSent(fn (PeticionHttp $p): bool => str_ends_with($p->url(), 'graph.instagram.com/v23.0/me/messages') && ($p['message']['text'] ?? null) === 'Así queda');
+
+    // Meta toma la imagen sin sesión con la firma; alterada o vencida, no.
+    $ruta = (string) parse_url($url, PHP_URL_PATH).'?'.parse_url($url, PHP_URL_QUERY);
+    $this->get($ruta)->assertOk()->assertHeader('Content-Type', 'image/png');
+    $this->get(str_replace('signature=', 'signature=x', $ruta))->assertForbidden();
+    $this->travel(20)->minutes();
+    $this->get($ruta)->assertForbidden();
+
+    // Pasadas las 24 horas, tampoco se manda un archivo.
+    $this->travel(25)->hours();
+    $this->post("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}/archivos", ['archivo' => UploadedFile::fake()->image('foto.jpg')], [...conBearer($e['bearer']), 'Accept' => 'application/json'])
+        ->assertUnprocessable()->assertJsonValidationErrors(['archivo'], 'meta.errors');
+});
+
+// La baja de datos (ARCO) borra también lo que escribió por la bandeja, si su
+// conversación está ligada a su ficha, con sus archivos.
+it('al atender la baja de datos se borran sus conversaciones ligadas y sus archivos', function (): void {
+    Storage::fake('local');
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    conectarWhatsAppDeBandeja($e);
+    $lucia = alumnoConSesion($e, 'Lucía', 'lucia@correo.mx');
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappConArchivo('wamid.b1', 'image', ['id' => 'media-foto', 'mime_type' => 'image/jpeg']))->assertOk();
+    expect(Storage::disk('local')->allFiles())->toHaveCount(1);
+
+    $conversacion = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones", conBearer($e['bearer']))->json('data.0.id');
+    $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q=lucia", conBearer($e['bearer']))->json('data.0.id');
+    $this->putJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$conversacion}", ['persona_id' => $persona], conBearer($e['bearer']))->assertOk();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['motivo' => 'Ya no', 'password' => 'secreto123'], conBearer($lucia['bearer']))->assertCreated();
+    $solicitud = (string) $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))->json('data.0.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad/{$solicitud}/atender", [], conBearer($e['bearer']))->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$conversacion}", conBearer($e['bearer']))->assertNotFound();
+    expect(Storage::disk('local')->allFiles())->toBe([]);
 });

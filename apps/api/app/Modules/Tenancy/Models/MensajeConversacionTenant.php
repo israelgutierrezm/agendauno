@@ -22,7 +22,13 @@ use Illuminate\Support\Carbon;
  * @property string $estado
  * @property int|null $enviado_por
  * @property Carbon $enviado_en
+ * @property string|null $adjunto_ref el id del medio en WhatsApp o la dirección del adjunto
+ * @property string|null $adjunto_mime
+ * @property string|null $adjunto_nombre
+ * @property string|null $archivo_ruta en el disco privado, ya bajado o subido
+ * @property int|null $archivo_bytes
  * @property-read Usuario|null $autor
+ * @property-read ConversacionTenant|null $conversacion
  */
 class MensajeConversacionTenant extends Model
 {
@@ -36,14 +42,26 @@ class MensajeConversacionTenant extends Model
 
     protected $table = 'mensajes_conversacion';
 
-    protected $fillable = ['conversacion_id', 'direccion', 'tipo', 'texto', 'id_externo', 'estado', 'enviado_por', 'enviado_en'];
+    protected $fillable = [
+        'conversacion_id', 'direccion', 'tipo', 'texto', 'id_externo', 'estado', 'enviado_por', 'enviado_en',
+        'adjunto_ref', 'adjunto_mime', 'adjunto_nombre', 'archivo_ruta', 'archivo_bytes',
+    ];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
         'enviado_en' => 'datetime',
+        'archivo_bytes' => 'integer',
     ];
+
+    /**
+     * @return BelongsTo<ConversacionTenant, $this>
+     */
+    public function conversacion(): BelongsTo
+    {
+        return $this->belongsTo(ConversacionTenant::class, 'conversacion_id');
+    }
 
     /**
      * @return BelongsTo<Usuario, $this>

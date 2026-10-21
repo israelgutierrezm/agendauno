@@ -10,6 +10,9 @@ import {
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
+import ArchivoDeMensaje, {
+  type ArchivoMensaje,
+} from "@/components/ArchivoDeMensaje.vue";
 import BuscarPersona, {
   type PersonaBuscable,
 } from "@/components/BuscarPersona.vue";
@@ -54,6 +57,7 @@ interface Mensaje {
   estado: string;
   enviado_en: string;
   enviado_por: string | null;
+  archivo?: ArchivoMensaje | null;
 }
 interface Detalle extends Conversacion {
   mensajes: Mensaje[];
@@ -185,6 +189,38 @@ async function enviar(): Promise<void> {
     texto.value = "";
     await nextTick();
     hilo.value?.scrollTo?.({ top: hilo.value.scrollHeight });
+    void cargarLista(true);
+  } catch (err) {
+    toast.error(mensajeDeError(err, t("bandejaMensajes.error")));
+  } finally {
+    enviando.value = false;
+  }
+}
+
+// Una imagen o un PDF (por Instagram, solo imágenes); lo escrito va como pie.
+const elegirArchivo = ref<HTMLInputElement | null>(null);
+async function adjuntar(evento: Event): Promise<void> {
+  const conversacion = seleccion.value;
+  const entrada = evento.target as HTMLInputElement;
+  const archivo = entrada.files?.[0];
+  entrada.value = "";
+  if (conversacion === null || archivo === undefined || enviando.value) {
+    return;
+  }
+  const datos = new FormData();
+  datos.append("archivo", archivo);
+  if (texto.value.trim() !== "") {
+    datos.append("texto", texto.value.trim());
+  }
+  enviando.value = true;
+  try {
+    await api.post<{ data: Mensaje }>(
+      `${base.value}/bandeja/conversaciones/${conversacion.id}/archivos`,
+      datos,
+    );
+    texto.value = "";
+    // Por Instagram el pie sale como otro mensaje: se vuelve a leer la conversación.
+    await abrir(conversacion.id, true);
     void cargarLista(true);
   } catch (err) {
     toast.error(mensajeDeError(err, t("bandejaMensajes.error")));
@@ -675,7 +711,15 @@ onBeforeUnmount(() => {
             class="bm-burbuja"
             :data-direccion="m.direccion"
           >
-            <p class="bm-texto">{{ textoDe(m) }}</p>
+            <ArchivoDeMensaje
+              v-if="m.archivo"
+              :base="base"
+              :mensaje-id="m.id"
+              :archivo="m.archivo"
+            />
+            <p v-if="m.texto || !m.archivo" class="bm-texto">
+              {{ textoDe(m) }}
+            </p>
             <span class="bm-meta"
               >{{ hora(m.enviado_en, true)
               }}<template v-if="m.enviado_por"> · {{ m.enviado_por }}</template
@@ -706,6 +750,32 @@ onBeforeUnmount(() => {
                 hora: hora(seleccion.contestar_hasta, true),
               })
             }}</span>
+            <input
+              ref="elegirArchivo"
+              type="file"
+              class="hidden"
+              :accept="
+                seleccion.canal === 'instagram'
+                  ? 'image/jpeg,image/png,image/webp'
+                  : 'image/jpeg,image/png,image/webp,application/pdf'
+              "
+              data-prueba="archivo-elegir"
+              @change="adjuntar"
+            />
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              :disabled="enviando"
+              :title="
+                seleccion.canal === 'instagram'
+                  ? $t('bandejaMensajes.adjuntarAyudaInstagram')
+                  : $t('bandejaMensajes.adjuntarAyuda')
+              "
+              data-prueba="adjuntar"
+              @click="elegirArchivo?.click()"
+            >
+              {{ $t("bandejaMensajes.adjuntar") }}
+            </button>
             <button
               type="submit"
               class="tu-btn tu-btn-primario text-sm"

@@ -87,6 +87,83 @@ class ClienteMetaBandeja
         ])->throw()->json('messages.0.id');
     }
 
+    /**
+     * La dirección (válida unos minutos), el tipo y el tamaño de un medio que llegó a
+     * WhatsApp.
+     *
+     * @return array{url: string, mime: string|null, bytes: int|null}
+     */
+    public function medioWhatsApp(string $token, string $medioId): array
+    {
+        $json = (array) $this->api($token)->get($this->graph($medioId))->throw()->json();
+
+        return [
+            'url' => (string) ($json['url'] ?? ''),
+            'mime' => is_string($json['mime_type'] ?? null) ? $json['mime_type'] : null,
+            'bytes' => isset($json['file_size']) ? (int) $json['file_size'] : null,
+        ];
+    }
+
+    /**
+     * Baja un archivo (el de WhatsApp pide la llave del número; el de Instagram es una
+     * dirección firmada). Null si pesa más de `$maximo` bytes: no se guarda.
+     */
+    public function bajar(string $url, ?string $token, int $maximo): ?string
+    {
+        $peticion = $token !== null ? $this->api($token) : Http::timeout(30);
+        $respuesta = $peticion->withOptions(['stream' => false])->get($url)->throw();
+        $largo = $respuesta->header('Content-Length');
+        if ($largo !== '' && (int) $largo > $maximo) {
+            return null;
+        }
+        $cuerpo = $respuesta->body();
+
+        return strlen($cuerpo) > $maximo ? null : $cuerpo;
+    }
+
+    /** Sube un archivo al número del negocio; devuelve el id del medio para mandarlo. */
+    public function subirWhatsApp(string $token, string $numeroId, string $contenido, string $mime, string $nombre): string
+    {
+        return (string) $this->api($token)
+            ->attach('file', $contenido, $nombre, ['Content-Type' => $mime])
+            ->post($this->graph($numeroId.'/media'), ['messaging_product' => 'whatsapp', 'type' => $mime])
+            ->throw()->json('id');
+    }
+
+    /**
+     * Manda una imagen o un documento ya subido (dentro de las 24 horas); devuelve el
+     * id del mensaje.
+     */
+    public function enviarArchivoWhatsApp(string $token, string $numeroId, string $para, string $tipo, string $medioId, ?string $pie, ?string $nombre): string
+    {
+        $medio = array_filter([
+            'id' => $medioId,
+            'caption' => $pie,
+            // Solo un documento lleva su nombre.
+            'filename' => $tipo === 'document' ? $nombre : null,
+        ], static fn (?string $v): bool => $v !== null && $v !== '');
+
+        return (string) $this->api($token)->post($this->graph($numeroId.'/messages'), [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $para,
+            'type' => $tipo,
+            $tipo => $medio,
+        ])->throw()->json('messages.0.id');
+    }
+
+    /**
+     * Manda una imagen por Instagram: Meta la toma de `$url` (una dirección firmada y
+     * temporal de la plataforma). Devuelve el id del mensaje.
+     */
+    public function enviarImagenInstagram(string $token, string $para, string $url): string
+    {
+        return (string) $this->api($token)->post($this->instagram('me/messages'), [
+            'recipient' => ['id' => $para],
+            'message' => ['attachment' => ['type' => 'image', 'payload' => ['url' => $url]]],
+        ])->throw()->json('message_id');
+    }
+
     public function urlAutorizacionInstagram(string $estado, string $vuelta): string
     {
         return 'https://www.instagram.com/oauth/authorize?'.http_build_query([
