@@ -190,8 +190,12 @@ describe("tendencias del dinero", () => {
       },
     });
     await flushPromises();
+    // Solo los reportes (la disponibilidad del asistente, ADR 0196, va aparte).
     const pedidos = () =>
-      api.get.mock.calls.map(([url]) => String(url).split("/reportes/")[1]);
+      api.get.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes("/reportes/"))
+        .map((url) => url.split("/reportes/")[1]);
     expect(pedidos()).toEqual(["negocio"]);
 
     await w

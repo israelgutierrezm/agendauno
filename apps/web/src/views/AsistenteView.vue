@@ -75,7 +75,7 @@ async function preguntar(texto = escrito.value): Promise<void> {
   } finally {
     pensando.value = false;
     await nextTick();
-    lista.value?.scrollTo({ top: lista.value.scrollHeight });
+    lista.value?.scrollTo?.({ top: lista.value.scrollHeight });
   }
 }
 
