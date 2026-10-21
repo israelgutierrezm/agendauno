@@ -99,6 +99,7 @@ use App\Modules\Tenancy\Http\Controllers\PagoRentaController;
 use App\Modules\Tenancy\Http\Controllers\PagosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ParametrosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PasarelasTenantController;
+use App\Modules\Tenancy\Http\Controllers\PaseWalletTenantController;
 use App\Modules\Tenancy\Http\Controllers\PausasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\PerfilPublicoController;
 use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
@@ -422,6 +423,11 @@ Route::prefix('v1')->group(function (): void {
             // permisos de staff). Resuelve la persona del usuario autenticado.
             Route::get('/mi/perfil', [MiTenantController::class, 'perfil'])->name('mi.perfil');
             Route::get('/mi/pase', [MiTenantController::class, 'pase'])->name('mi.pase');
+            // El pase en Apple Wallet y Google Wallet (ADR 0195).
+            Route::get('/mi/pase/wallet', [PaseWalletTenantController::class, 'disponibles'])->name('mi.pase.wallet');
+            Route::get('/mi/pase/wallet/apple', [PaseWalletTenantController::class, 'apple'])->middleware('throttle:10,1,pase-wallet')->name('mi.pase.wallet.apple');
+            Route::get('/mi/pase/wallet/google', [PaseWalletTenantController::class, 'google'])->middleware('throttle:10,1,pase-wallet')->name('mi.pase.wallet.google');
+            Route::post('/mi/pase/wallet/renovar', [PaseWalletTenantController::class, 'renovar'])->middleware('throttle:5,1,pase-wallet')->name('mi.pase.wallet.renovar');
             Route::get('/mi/agenda', [MiTenantController::class, 'agenda'])->name('mi.agenda');
             Route::post('/mi/reservas', [MiTenantController::class, 'reservar'])->name('mi.reservas.store');
             // Antes de reservar una clase: qué pasará, con qué plan y hasta cuándo cancela (M05).

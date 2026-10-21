@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import PaseEnWallet from "@/components/PaseEnWallet.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -98,5 +99,7 @@ onBeforeUnmount(() => clearInterval(temporizador));
     >
       {{ $t("paseEntrada.mostrar") }}
     </button>
+    <!-- En la cartera del teléfono (ADR 0195), si se ofrece. -->
+    <PaseEnWallet :base="base" />
   </div>
 </template>

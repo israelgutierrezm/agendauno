@@ -1509,6 +1509,16 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
+### Pase en Apple Wallet y Google Wallet (ADR 0195)
+
+- `GET /mi/pase/wallet` devuelve {`apple`, `google`}: las que se ofrecen (la plataforma
+  las tiene y el negocio lo permite, `acceso.pase_en_wallet`).
+- `GET /mi/pase/wallet/apple` devuelve el `.pkpass` (`application/vnd.apple.pkpass`).
+- `GET /mi/pase/wallet/google` devuelve {`url`}, el enlace «Guardar en Google Wallet».
+- `POST /mi/pase/wallet/renovar` crea otro código; el anterior deja de servir.
+- El código de la cartera es `AU2.{persona}.{token}`; `POST /accesos` lo acepta como el
+  QR (`ACCESS_PASS_INVALID` si se renovó o el negocio lo apagó).
+
 ### Productos al reservar (ADR 0194)
 
 - Artículos: `POST`/`PUT /articulos` aceptan `ofrecer_al_reservar` (bool), y el

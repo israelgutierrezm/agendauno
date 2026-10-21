@@ -206,6 +206,9 @@ final class CatalogoParametros
 
             // Solo la plataforma (ADR 0047). El pase se renueva cada minuto en la
             // pantalla del alumno: menos de 90 s lo dejaría vencer antes.
+            // Pase en Apple Wallet y Google Wallet (ADR 0195): su código no caduca.
+            new DefinicionParametro('acceso.pase_en_wallet', 'Acceso', 'Pase de entrada en la cartera del teléfono',
+                'El cliente agrega su pase a Apple Wallet o Google Wallet. Su código no cambia cada pocos minutos como el de la app: si lo apagas, esos pases dejan de servir y se usa el QR de la app.', $sn, 1),
             new DefinicionParametro('acceso.segundos_pase_qr', 'Acceso', 'Vigencia del pase QR de entrada',
                 'Segundos. Una captura de pantalla deja de servir después.', $e, 180, 90, 900, 's', porNegocio: false),
             new DefinicionParametro('importaciones.max_filas', 'Importaciones', 'Filas por archivo al importar miembros o personal',

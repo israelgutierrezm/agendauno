@@ -68,6 +68,27 @@ return [
     ],
 
     /*
+    | Pase de entrada en Apple Wallet y Google Wallet (ADR 0195). Las credenciales son de
+    | la plataforma; sin ellas la cartera no se ofrece.
+    | - Apple: el identificador del tipo de pase y del equipo, el certificado del tipo de
+    |   pase (.p12 con su clave, o PEM con su llave) y el intermedio WWDR (G4) de Apple.
+    | - Google: el id del emisor y el archivo JSON de la cuenta de servicio.
+    */
+    'wallet' => [
+        'apple' => [
+            'pass_type_id' => env('WALLET_APPLE_PASS_TYPE_ID', ''),
+            'team_id' => env('WALLET_APPLE_TEAM_ID', ''),
+            'certificado' => env('WALLET_APPLE_CERTIFICADO', ''),
+            'clave' => env('WALLET_APPLE_CLAVE', ''),
+            'wwdr' => env('WALLET_APPLE_WWDR', ''),
+        ],
+        'google' => [
+            'issuer_id' => env('WALLET_GOOGLE_ISSUER_ID', ''),
+            'cuenta_servicio' => env('WALLET_GOOGLE_CUENTA_SERVICIO', ''),
+        ],
+    ],
+
+    /*
     | App móvil (ADR 0104). `version_minima`: la versión más antigua de la app que aún
     | se acepta; viaja en /yo y una instalada más vieja pide actualizarse. Se sube
     | cuando cambia un contrato que las versiones anteriores no entienden.
