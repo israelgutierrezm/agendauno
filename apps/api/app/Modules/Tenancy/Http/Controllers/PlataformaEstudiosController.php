@@ -372,6 +372,8 @@ class PlataformaEstudiosController
                     // Sin familias, ningún responsable sigue pagando por otro: sus pagos
                     // automáticos se quitan ya, también en la pasarela (ADR 0134).
                     ModuloNegocio::Familias => $gestor->ejecutarEn($modelo->refresh(), fn () => app(DomiciliacionesTenant::class)->alApagarFamilias()),
+                    // La app con su marca no deja nada pendiente: su mensualidad ya no se emite (ADR 0188).
+                    ModuloNegocio::AppConMarca => null,
                 };
             }
         }

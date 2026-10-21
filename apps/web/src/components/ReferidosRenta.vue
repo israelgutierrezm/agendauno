@@ -34,10 +34,19 @@ async function copiar(): Promise<void> {
 
 onMounted(async () => {
   try {
-    const { data } = await api.get<{ data: Referidos }>(
+    const { data } = await api.get<{ data?: Partial<Referidos> }>(
       `${props.base}/renta/referidos`,
     );
-    datos.value = data.data;
+    const r = data.data;
+    // Sin código (otra respuesta, un negocio sin renta) no se muestra.
+    datos.value =
+      typeof r?.codigo === "string"
+        ? {
+            codigo: r.codigo,
+            invitados: Number(r.invitados ?? 0),
+            beneficios: Array.isArray(r.beneficios) ? r.beneficios : [],
+          }
+        : null;
   } catch {
     datos.value = null;
   }
