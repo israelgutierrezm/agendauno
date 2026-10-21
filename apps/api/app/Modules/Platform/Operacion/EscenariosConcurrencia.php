@@ -5,30 +5,43 @@ declare(strict_types=1);
 namespace App\Modules\Platform\Operacion;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\BajasDeGrupoTenant;
 use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CobroDeCitaTenant;
+use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
+use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
 use App\Modules\Tenancy\Application\DevolverVentaPosTenant;
+use App\Modules\Tenancy\Application\EmitirFacturaTenant;
 use App\Modules\Tenancy\Application\InscribirEnGrupoTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
+use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
+use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
+use App\Modules\Tenancy\Application\TimbresTenant;
 use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Exceptions\CajaCerrada;
+use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
+use App\Modules\Tenancy\Facturacion\FacturacionFalsa;
 use App\Modules\Tenancy\Inventario\Exceptions\InventarioException;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
+use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\InscripcionGrupoTenant;
@@ -48,7 +61,8 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
-use App\Modules\Tenancy\Pagos\Exceptions\VentaNoDevolvible;
+use App\Modules\Tenancy\Pagos\EstadoReembolso;
+use App\Modules\Tenancy\Pagos\Exceptions\PagoException;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
@@ -88,6 +102,12 @@ class EscenariosConcurrencia
         private readonly BajasDeGrupoTenant $bajas,
         private readonly CajasTenant $cajas,
         private readonly DevolverVentaPosTenant $devoluciones,
+        private readonly OrdenesTenant $ordenes,
+        private readonly AnularCobroTenant $anularCobro,
+        private readonly CorregirMetodoPagoTenant $corregirCobro,
+        private readonly ReembolsarPagoTenant $reembolsos,
+        private readonly CorregirVentaPosTenant $corregirVenta,
+        private readonly TimbresTenant $timbres,
     ) {}
 
     /**
@@ -97,6 +117,8 @@ class EscenariosConcurrencia
      */
     public function prepararBase(): array
     {
+        // Se anulan cobros y ventas del mostrador (los casos de pagos): el negocio lo permite.
+        app(ParametrosTenant::class)->guardarDelNegocio(['pagos.permitir_anular_cobro' => 1], null);
         $organizacion = OrganizacionTenant::query()->create(['nombre' => 'Verificación']);
         $sucursal = $organizacion->sucursales()->create(['nombre' => 'Sede', 'zona_horaria' => 'America/Mexico_City']);
 
@@ -374,7 +396,7 @@ class EscenariosConcurrencia
 
         try {
             return ['hecho' => true, 'esperado' => true, 'detalle' => $accion()];
-        } catch (ReservaException|SaldoInsuficiente|InventarioException|ValidationException|CajaCerrada|VentaNoDevolvible $e) {
+        } catch (ReservaException|SaldoInsuficiente|InventarioException|ValidationException|CajaCerrada|PagoException $e) {
             return ['hecho' => false, 'esperado' => true, 'detalle' => class_basename($e).': '.$e->getMessage()];
         } catch (Throwable $e) {
             return ['hecho' => false, 'esperado' => false, 'detalle' => class_basename($e).': '.Str::limit($e->getMessage(), 300)];
@@ -394,6 +416,12 @@ class EscenariosConcurrencia
             'reservar' => $this->prepararReservar((int) $paso['sesion'], (int) $paso['persona']),
             'agendar' => $this->prepararAgendar($paso),
             'agendar-cualquiera' => $this->prepararAgendarConCualquiera($paso),
+            'agendar-con-clave' => $this->prepararAgendarConClave($paso),
+            'anular-cobro' => $this->prepararAnularCobro((int) $paso['pago']),
+            'corregir-cobro' => $this->prepararCorregirCobro((int) $paso['pago']),
+            'devolver-cobro' => $this->prepararDevolverCobro((int) $paso['pago'], (string) $paso['llave']),
+            'facturar-venta' => $this->prepararFacturarVenta((int) $paso['venta']),
+            'anular-venta' => $this->prepararAnularVenta((int) $paso['venta']),
             'cancelar' => $this->prepararCancelar((int) $paso['reserva']),
             'mover-clase' => $this->prepararMoverClase((int) $paso['reserva'], (int) $paso['sesion']),
             'mover-cita' => $this->prepararMoverCita((int) $paso['reserva'], (string) $paso['inicia']),
@@ -571,6 +599,138 @@ class EscenariosConcurrencia
         return fn (): string => $this->agendar
             ->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 30)
             ->estado->value;
+    }
+
+    /**
+     * Como la cliente en línea que reintenta (ADR 0201): sin elegir profesional y con
+     * la clave del intento. Devuelve la reserva que le tocó.
+     *
+     * @param  array<string, mixed>  $paso
+     */
+    private function prepararAgendarConClave(array $paso): callable
+    {
+        $oferta = OfertaTenant::query()->findOrFail((int) $paso['servicio']);
+        $sucursal = SucursalTenant::query()->findOrFail((int) $paso['sucursal']);
+        $persona = PersonaTenant::query()->findOrFail((int) $paso['persona']);
+        $inicia = CarbonImmutable::parse((string) $paso['inicia']);
+
+        return fn (): string => (string) $this->agendar
+            ->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 30, clave: (string) $paso['clave'])
+            ->ulid;
+    }
+
+    /**
+     * Una venta (un paquete de una clase) cobrada en caja en efectivo: el pago que se
+     * anula, se corrige y se devuelve a la vez.
+     */
+    public function cobroEnCaja(int $sucursalId): PagoTenant
+    {
+        $this->paquetes[1] ??= $this->membresias->crearProducto('Paquete 1', TipoProducto::Paquete, 10000, 'MXN', false, 1000);
+        $orden = $this->ordenes->crear($this->alumno(0), [['producto' => $this->paquetes[1], 'cantidad' => 1]], sucursalId: $sucursalId);
+        $pago = $this->ordenes->liquidar($orden, 'efectivo');
+        if (! $pago instanceof PagoTenant) {
+            throw new InvalidArgumentException('La venta del caso no quedó cobrada.');
+        }
+
+        return $pago;
+    }
+
+    /**
+     * En qué quedó un cobro: su estado, lo devuelto (aprobado o en curso) y si su
+     * venta sigue pagada.
+     *
+     * @return array{estado: string, devuelto: int, orden: string}
+     */
+    public function estadoDelCobro(int $pagoId): array
+    {
+        $pago = PagoTenant::query()->with('orden')->findOrFail($pagoId);
+
+        return [
+            'estado' => $pago->estado->value,
+            'devuelto' => (int) $pago->reembolsos()->whereIn('estado', EstadoReembolso::comprometidos())->sum('monto_minor'),
+            'orden' => (string) $pago->orden?->estado->value,
+        ];
+    }
+
+    private function prepararAnularCobro(int $pagoId): callable
+    {
+        $pago = PagoTenant::query()->findOrFail($pagoId);
+        $cajero = Usuario::query()->orderBy('id')->firstOrFail();
+
+        return fn (): string => $this->anularCobro->anular($pago, $cajero, 'Verificación')->estado->value;
+    }
+
+    private function prepararCorregirCobro(int $pagoId): callable
+    {
+        $pago = PagoTenant::query()->findOrFail($pagoId);
+        $cajero = Usuario::query()->orderBy('id')->firstOrFail();
+
+        return fn (): string => $this->corregirCobro->corregir($pago, 'tarjeta', $cajero, 'Verificación')->estado->value;
+    }
+
+    /** La devolución completa del cobro en caja (devuelve en qué quedó). */
+    private function prepararDevolverCobro(int $pagoId, string $llave): callable
+    {
+        $pago = PagoTenant::query()->findOrFail($pagoId);
+        $cajero = Usuario::query()->orderBy('id')->firstOrFail();
+
+        return fn (): string => $this->reembolsos->ejecutar($pago, null, 'Verificación', $cajero, true, false, $llave)->estado->value;
+    }
+
+    /** Timbres para facturar en el negocio temporal (con el timbrado falso). */
+    public function timbres(int $cantidad): void
+    {
+        $this->timbres->acreditar($cantidad, 'verificacion-'.Str::lower((string) Str::ulid()), 'Verificación');
+    }
+
+    /**
+     * Factura la venta del mostrador a público en general. Siempre con el timbrado
+     * FALSO: la verificación también corre en el servidor de producción y nunca debe
+     * timbrar un CFDI de verdad.
+     */
+    private function prepararFacturarVenta(int $ventaId): callable
+    {
+        app()->instance(ClienteFacturacion::class, new FacturacionFalsa);
+        $emisor = app(EmitirFacturaTenant::class);
+        $venta = VentaPosTenant::query()->findOrFail($ventaId);
+
+        return fn (): string => $emisor->emitir(
+            new DatosFiscalesTenant,
+            ['nombre' => 'PUBLICO EN GENERAL', 'rfc' => 'XAXX010101000', 'codigo_postal' => '06000', 'regimen_fiscal' => '616'],
+            [['descripcion' => 'Venta', 'cantidad' => 1, 'precio_unitario_minor' => (int) $venta->total_minor, 'clave_prod_serv' => '01010101', 'clave_unidad' => 'H87']],
+            'S01',
+            ventaPosId: (int) $venta->getKey(),
+        )->estado->value;
+    }
+
+    private function prepararAnularVenta(int $ventaId): callable
+    {
+        $venta = VentaPosTenant::query()->findOrFail($ventaId);
+        $cajero = Usuario::query()->orderBy('id')->firstOrFail();
+
+        return fn (): string => (string) $this->corregirVenta->anular($venta, 'Verificación', $cajero)->anulada_en;
+    }
+
+    /**
+     * Si la venta quedó anulada y cuántas facturas timbradas tiene.
+     *
+     * @return array{anulada: bool, facturas: int}
+     */
+    public function estadoDeVenta(int $ventaId): array
+    {
+        return [
+            'anulada' => VentaPosTenant::query()->whereKey($ventaId)->whereNotNull('anulada_en')->exists(),
+            'facturas' => FacturaTenant::query()->where('venta_pos_id', $ventaId)->where('estado', EstadoFactura::Timbrada->value)->count(),
+        ];
+    }
+
+    /** Las citas (reservas vivas) de una persona. */
+    public function citasDe(int $personaId): int
+    {
+        return ReservaTenant::query()
+            ->where('persona_id', $personaId)
+            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
+            ->count();
     }
 
     private function prepararCancelar(int $reservaId): callable

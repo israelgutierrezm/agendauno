@@ -86,3 +86,22 @@ solicitud acaba de guardar. Casos encontrados al revisar el código:
   bases, por eso no forma parte de la suite.
 - Si en el futuro hace falta un candado de rango (evitar que aparezca una fila que
   aún no existe), no basta `READ COMMITTED`: se bloquea la fila padre, como hoy.
+
+## Ajuste (2026-10-21)
+
+La verificación suma tres casos de lo que la revisión de dinero y agenda dejó sin
+prueba directa (SQLite no reproduce candados ni carreras):
+
+- **La misma cita a la vez con la misma clave** (ADR 0201): varios intentos del mismo
+  cliente con «cualquier profesional» terminan en una cita, y todos responden esa.
+- **Anular, corregir y devolver el mismo cobro a la vez**: anular y corregir bloquean
+  la venta y luego el pago, como cobrar y confirmar (ADR 0181). No hay candado
+  muerto. El cobro queda anulado sin devoluciones (y la venta por cobrar) o devuelto
+  sin anular, nunca las dos cosas.
+- **Facturar una venta mientras se anula**: el timbrado vuelve a revisar la venta con
+  su fila bloqueada (ADR 0179). Nunca queda una venta anulada con su CFDI timbrado.
+  Los procesos usan siempre el timbrado falso: la verificación también corre en el
+  servidor de producción y no debe timbrar un CFDI de verdad.
+
+`EscenariosConcurrenciaTest` corre cada paso nuevo, solo, en SQLite. Así un paso que
+no se prepara bien falla en la suite y no hasta la verificación en MySQL.

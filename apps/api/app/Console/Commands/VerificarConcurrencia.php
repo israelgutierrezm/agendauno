@@ -123,6 +123,7 @@ class VerificarConcurrencia extends Command
             $this->modalidad(ModalidadServicio::Citas);
             $this->caso('Mismo profesional y horario (agendar y reprogramar)', fn () => $this->mismaCita($escenarios, $rondas, $procesos));
             $this->caso('Misma hora con cualquier profesional disponible', fn () => $this->cualquierProfesional($escenarios, $rondas, $procesos));
+            $this->caso('La misma cita a la vez con la misma clave', fn () => $this->mismaClaveDeCita($escenarios, $rondas, $procesos));
             $this->caso('El mismo cobro de una cita dos veces a la vez', fn () => $this->mismoCobro($escenarios, $rondas));
             $this->modalidad(ModalidadServicio::Clases);
             $this->caso('Cancelar y reprogramar la misma reserva a la vez', fn () => $this->cancelarYReprogramar($escenarios, $rondas));
@@ -134,6 +135,8 @@ class VerificarConcurrencia extends Command
             $this->caso('Ventas con los mismos artículos en distinto orden', fn () => $this->mismosArticulos($escenarios, $rondas));
             $this->caso('Ventas del mostrador mientras se cuenta la caja', fn () => $this->ventasYConteoDeCaja($escenarios, $rondas, $procesos));
             $this->caso('Devoluciones a la vez de la misma venta del mostrador', fn () => $this->devolucionesALaVez($escenarios, $rondas, $procesos));
+            $this->caso('Anular, corregir y devolver el mismo cobro a la vez', fn () => $this->mismoCobroEnCaja($escenarios, $rondas));
+            $this->caso('Facturar una venta mientras se anula', fn () => $this->facturarMientrasSeAnula($escenarios, $rondas));
             $this->caso('Respaldo y restauración de un negocio', fn () => $this->respaldoYRestauracion($gestor));
             $this->caso('Migraciones de varios negocios', fn () => $this->migraciones($gestor, is_string($base)));
         } catch (Throwable $e) {
@@ -325,6 +328,111 @@ class VerificarConcurrencia extends Command
             $this->comprobar($fallas, $this->hechos($res) === $esperadas, "{$this->hechos($res)} procesos dicen haber agendado");
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).": {$procesos} clientes a la misma hora → ".implode(' + ', $porProfesional).' citas', $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * El mismo cliente manda la misma cita varias veces a la vez con la misma clave
+     * (ADR 0201: se perdió la respuesta y volvió a intentar, o tocó dos veces). Con
+     * «cualquier profesional» el segundo intento podía quedar con otra persona: queda
+     * UNA cita y todos los intentos responden esa.
+     *
+     * @return list<string>
+     */
+    private function mismaClaveDeCita(EscenariosConcurrencia $e, int $rondas, int $procesos): array
+    {
+        $fallas = [];
+        $e->abrirAtencion($this->base['sucursal'], $this->base['profesionales']);
+        for ($r = 0; $r < $rondas; $r++) {
+            // Lejos de los días de los casos anteriores (20+, 40+ y 45+).
+            $persona = $e->alumno(0);
+            $res = $this->competir(array_fill(0, max(2, $procesos), [
+                'accion' => 'agendar-con-clave', 'servicio' => $this->base['servicio'], 'sucursal' => $this->base['sucursal'],
+                'persona' => $persona->getKey(), 'inicia' => $e->hueco(50 + $r, 11)->toIso8601String(),
+                'clave' => 'verificacion-cita-'.$persona->getKey(),
+            ]));
+
+            $citas = $e->citasDe((int) $persona->getKey());
+            $hechos = $this->hechos($res);
+            $devueltas = array_unique(array_column(array_filter($res, fn (array $x): bool => $x['hecho']), 'detalle'));
+            $this->comprobar($fallas, $citas === 1, "el cliente quedó con {$citas} citas");
+            $this->comprobar($fallas, $hechos === count($res), "{$hechos} de ".count($res).' intentos devolvieron la cita');
+            $this->comprobar($fallas, count($devueltas) <= 1, 'los intentos devolvieron citas distintas');
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).': '.count($res)." intentos con la misma clave → {$citas} cita", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * El mismo cobro en caja se anula, se le corrige la forma de pago y se devuelve a
+     * la vez. Anular y corregir bloquean la venta y luego el pago (ADR 0181), como al
+     * cobrar: ninguna operación se traba con otra (sin deadlock) y el resultado
+     * cuadra. Queda anulado sin devoluciones (y la venta por cobrar) o devuelto sin
+     * anular, nunca las dos cosas.
+     *
+     * @return list<string>
+     */
+    private function mismoCobroEnCaja(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $pago = (int) $e->cobroEnCaja($this->base['sucursal'])->getKey();
+            [$anular, $corregir, $devolver] = $res = $this->competir([
+                ['accion' => 'anular-cobro', 'pago' => $pago],
+                ['accion' => 'corregir-cobro', 'pago' => $pago],
+                ['accion' => 'devolver-cobro', 'pago' => $pago, 'llave' => "verificacion-devolucion-{$pago}"],
+            ]);
+
+            $cobro = $e->estadoDelCobro($pago);
+            $this->comprobar($fallas, ! ($anular['hecho'] && $devolver['hecho']), 'el cobro se anuló y también se devolvió');
+            $this->comprobar($fallas, $anular['hecho'] || $devolver['hecho'], 'el cobro ni se anuló ni se devolvió');
+            $this->comprobar(
+                $fallas,
+                ! $anular['hecho'] || ($cobro['estado'] === 'anulado' && $cobro['devuelto'] === 0 && $cobro['orden'] === 'pendiente'),
+                "se anuló, pero el cobro quedó {$cobro['estado']} con {$cobro['devuelto']} devuelto y la venta {$cobro['orden']}",
+            );
+            $this->comprobar(
+                $fallas,
+                ! $devolver['hecho'] || ($cobro['estado'] !== 'anulado' && $cobro['devuelto'] > 0),
+                "se devolvió, pero el cobro quedó {$cobro['estado']} con {$cobro['devuelto']} devuelto",
+            );
+            $this->inesperados($fallas, $res);
+            $hecho = $anular['hecho'] ? 'anulado' : ($devolver['hecho'] ? 'devuelto' : 'sin cambio');
+            $this->detalle('ronda '.($r + 1).": anular, corregir y devolver a la vez → {$hecho}".($corregir['hecho'] ? ' (con la forma corregida)' : ''), $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Una venta del mostrador se factura y se anula a la vez. El timbrado vuelve a
+     * revisar la venta con su fila bloqueada (ADR 0179) y la anulación revisa sus
+     * facturas: nunca queda una venta anulada con su CFDI timbrado. Con el timbrado
+     * falso: la verificación nunca timbra un CFDI de verdad.
+     *
+     * @return list<string>
+     */
+    private function facturarMientrasSeAnula(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        $e->timbres($rondas + 1);
+        for ($r = 0; $r < $rondas; $r++) {
+            $venta = $e->ventaHecha($this->base['sucursal'], 1)['venta'];
+            [$factura, $anulacion] = $res = $this->competir([
+                ['accion' => 'facturar-venta', 'venta' => $venta],
+                ['accion' => 'anular-venta', 'venta' => $venta],
+            ]);
+
+            $estado = $e->estadoDeVenta($venta);
+            $this->comprobar($fallas, ! ($estado['anulada'] && $estado['facturas'] > 0), 'la venta quedó anulada y con su CFDI timbrado');
+            $this->comprobar($fallas, $factura['hecho'] !== $anulacion['hecho'], ($factura['hecho'] ? 'se facturó y se anuló' : 'ni se facturó ni se anuló'));
+            $this->comprobar($fallas, $estado['facturas'] <= 1, "{$estado['facturas']} facturas de la misma venta");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).': facturar y anular a la vez → '.($estado['anulada'] ? 'anulada' : "facturada ({$estado['facturas']})"), $res);
         }
 
         return $fallas;
