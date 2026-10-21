@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 
 /*
@@ -134,4 +135,105 @@ it('sin pases en su plan no invita, y nadie cancela la invitación de otro', fun
     $invitado = (string) $this->postJson("{$app}/mi/sesiones/{$clase}/invitados", ['nombre' => 'Mar'], conBearer($con['alumna']['bearer']))
         ->assertCreated()->json('data.id');
     $this->deleteJson("{$app}/mi/invitados/{$invitado}", [], conBearer($sin['alumna']['bearer']))->assertForbidden();
+});
+
+it('con tope por día recibe el lugar de su lista de espera', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $vale = socioConPlan($e, ['max_reservas_dia' => 1]);
+    $ana = socioConPlan($e, ['nombre' => 'Socio Ana'], 'ana@correo.mx');
+    $clase = crearSesionTenant($e, $semilla, 1, '2026-10-02 08:00:00');
+    $app = "/api/v1/app/{$e['slug']}";
+
+    $deAna = (string) $this->postJson("{$app}/mi/reservas", ['sesion_id' => $clase], conBearer($ana['alumna']['bearer']))->assertCreated()->json('data.id');
+    $deVale = (string) $this->postJson("{$app}/mi/reservas", ['sesion_id' => $clase, 'esperar' => true], conBearer($vale['alumna']['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'en_espera')->json('data.id');
+    $this->postJson("{$app}/mi/reservas/{$deAna}/cancelar", [], conBearer($ana['alumna']['bearer']))->assertOk();
+
+    // Su propia espera no cuenta para su tope: el lugar se le ofrece y lo toma.
+    $this->postJson("{$app}/mi/reservas/{$deVale}/aceptar", [], conBearer($vale['alumna']['bearer']))
+        ->assertOk()->assertJsonPath('data.estado', 'confirmada');
+});
+
+it('reprogramar respeta el tope del plan', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $vale = socioConPlan($e, ['max_reservas_dia' => 1]);
+    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['reprogramar.maximo_cliente' => 3]], conBearer($e['bearer']))->assertOk();
+    $lunes8 = crearSesionTenant($e, $semilla, 10, '2026-10-05 08:00:00');
+    $martes8 = crearSesionTenant($e, $semilla, 10, '2026-10-06 08:00:00');
+    $lunes19 = crearSesionTenant($e, $semilla, 10, '2026-10-05 19:00:00');
+    $miercoles8 = crearSesionTenant($e, $semilla, 10, '2026-10-07 08:00:00');
+    $app = "/api/v1/app/{$e['slug']}";
+    $bearer = conBearer($vale['alumna']['bearer']);
+
+    $this->postJson("{$app}/mi/reservas", ['sesion_id' => $lunes8], $bearer)->assertCreated();
+    $martes = (string) $this->postJson("{$app}/mi/reservas", ['sesion_id' => $martes8], $bearer)->assertCreated()->json('data.id');
+
+    // Pasarla al lunes daría dos ese día.
+    $this->postJson("{$app}/mi/reservas/{$martes}/reprogramar", ['sesion_id' => $lunes19], $bearer)
+        ->assertUnprocessable()->assertJsonPath('code', 'BOOKING_LIMIT_REACHED');
+    // A un día libre, sí (la que se mueve no cuenta contra sí misma).
+    $this->postJson("{$app}/mi/reservas/{$martes}/reprogramar", ['sesion_id' => $miercoles8], $bearer)->assertOk();
+});
+
+it('empezada la clase el cliente ya no la cancela y su lugar no se ofrece a la lista de espera', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $vale = socioConPlan($e, []);
+    $ana = socioConPlan($e, ['nombre' => 'Socio Ana'], 'ana@correo.mx');
+    $clase = crearSesionTenant($e, $semilla, 1, '2026-10-02 08:00:00');
+    $app = "/api/v1/app/{$e['slug']}";
+
+    $deAna = (string) $this->postJson("{$app}/mi/reservas", ['sesion_id' => $clase], conBearer($ana['alumna']['bearer']))->assertCreated()->json('data.id');
+    $deVale = (string) $this->postJson("{$app}/mi/reservas", ['sesion_id' => $clase, 'esperar' => true], conBearer($vale['alumna']['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'en_espera')->json('data.id');
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-02 08:20', 'America/Mexico_City'));
+    $this->postJson("{$app}/mi/reservas/{$deAna}/cancelar", [], conBearer($ana['alumna']['bearer']))->assertUnprocessable();
+
+    // El negocio sí la cancela, pero el lugar de una clase empezada no se ofrece.
+    $this->postJson("{$app}/reservas/{$deAna}/cancelar", [], conBearer($e['bearer']))->assertOk();
+    $this->postJson("{$app}/mi/reservas/{$deVale}/aceptar", [], conBearer($vale['alumna']['bearer']))->assertStatus(409);
+});
+
+it('el lugar que deja un invitado se ofrece a la lista de espera', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $socio = socioConPlan($e, ['invitados_por_mes' => 1]);
+    $luz = socioConPlan($e, ['nombre' => 'Socio Luz'], 'luz@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $clase = crearSesionTenant($e, $semilla, 2, '2026-10-02 08:00:00');
+    $vale = conBearer($socio['alumna']['bearer']);
+
+    $invitado = (string) $this->postJson("{$app}/mi/sesiones/{$clase}/invitados", ['nombre' => 'Mar Pérez'], $vale)->assertCreated()->json('data.id');
+    $this->postJson("{$app}/mi/reservas", ['sesion_id' => $clase], $vale)->assertCreated();
+    $deLuz = (string) $this->postJson("{$app}/mi/reservas", ['sesion_id' => $clase, 'esperar' => true], conBearer($luz['alumna']['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'en_espera')->json('data.id');
+
+    $this->deleteJson("{$app}/mi/invitados/{$invitado}", [], $vale)->assertOk();
+    $this->postJson("{$app}/mi/reservas/{$deLuz}/aceptar", [], conBearer($luz['alumna']['bearer']))
+        ->assertOk()->assertJsonPath('data.estado', 'confirmada');
+});
+
+it('gasta primero los créditos del ciclo que se pierden al cerrar el mes', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $alumna = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
+    $app = "/api/v1/app/{$e['slug']}";
+    $persona = (string) collect($this->getJson("{$app}/miembros", conBearer($e['bearer']))->json('data'))->firstWhere('email', 'vale@correo.mx')['id'];
+    $mensual = (string) $this->postJson("{$app}/productos", [
+        'nombre' => 'Mensual 8', 'tipo' => 'membresia', 'precio_minor' => 90000, 'moneda' => 'MXN', 'ilimitado' => false,
+        'politica_reset' => 'calendario', 'unidades_por_ciclo' => 8000, 'politica_rollover' => 'ninguno',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $paquete = (string) $this->postJson("{$app}/productos", [
+        'nombre' => 'Paquete 10', 'tipo' => 'paquete', 'precio_minor' => 99000, 'moneda' => 'MXN', 'ilimitado' => false,
+        'creditos_incluidos' => 10000, 'vigencia_tipo' => 'meses', 'vigencia_cantidad' => 3,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $derecho = (string) $this->postJson("{$app}/acuerdos", ['persona_id' => $persona, 'producto_id' => $mensual, 'motivo' => 'Prueba'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.derecho.id');
+    $this->postJson("{$app}/acuerdos", ['persona_id' => $persona, 'producto_id' => $paquete, 'motivo' => 'Prueba'], conBearer($e['bearer']))->assertCreated();
+
+    $this->postJson("{$app}/mi/reservas", ['sesion_id' => crearSesionTenant($e, $semilla, 10, '2026-10-12 08:00:00')], conBearer($alumna['bearer']))->assertCreated();
+    $this->getJson("{$app}/derechos/{$derecho}/movimientos", conBearer($e['bearer']))->assertOk()->assertJsonPath('disponible', 7000);
 });

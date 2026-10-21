@@ -12,10 +12,12 @@ use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\RetencionCreditoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Ledger de creditos del estudio (data plane del tenant): consumo directo y
@@ -117,6 +119,7 @@ class CreditosTenantController
     {
         $retencion = RetencionCreditoTenant::query()->where('ulid', (string) $request->route('retencion'))->firstOrFail();
         app(AlcancePersonaTenant::class)->exigirRetencion($request, $retencion);
+        self::exigirManual($retencion);
         $this->creditos->confirmar($retencion, $this->contextoManual($request));
 
         return response()->json(['data' => $this->presentarRetencion($retencion->refresh())]);
@@ -126,6 +129,7 @@ class CreditosTenantController
     {
         $retencion = RetencionCreditoTenant::query()->where('ulid', (string) $request->route('retencion'))->firstOrFail();
         app(AlcancePersonaTenant::class)->exigirRetencion($request, $retencion);
+        self::exigirManual($retencion);
         $this->creditos->liberar($retencion);
 
         return response()->json(['data' => $this->presentarRetencion($retencion->refresh())]);
@@ -135,6 +139,7 @@ class CreditosTenantController
     {
         $retencion = RetencionCreditoTenant::query()->where('ulid', (string) $request->route('retencion'))->firstOrFail();
         app(AlcancePersonaTenant::class)->exigirRetencion($request, $retencion);
+        self::exigirManual($retencion);
         $this->creditos->perder($retencion, $this->contextoManual($request));
 
         return response()->json(['data' => $this->presentarRetencion($retencion->refresh())]);
@@ -171,6 +176,17 @@ class CreditosTenantController
             'metadata' => $movimiento->metadata,
             'fecha' => $movimiento->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Lo apartado para una reserva se resuelve con la reserva (cancelarla, asistencia):
+     * a mano descuadraría su crédito cobrado.
+     */
+    private static function exigirManual(RetencionCreditoTenant $retencion): void
+    {
+        if (ReservaTenant::query()->where('retencion_id', $retencion->getKey())->exists()) {
+            throw ValidationException::withMessages(['retencion' => ['Ese crédito está apartado para una reserva: se resuelve desde la reserva.']]);
+        }
     }
 
     /**

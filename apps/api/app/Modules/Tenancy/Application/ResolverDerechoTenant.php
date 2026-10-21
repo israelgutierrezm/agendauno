@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
+use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -128,14 +130,32 @@ class ResolverDerechoTenant
             ->with('ofertas:id')
             ->get()
             ->filter(fn (DerechoTenant $derecho): bool => $this->vigente($derecho, $sesion->inicia_en) && $this->cubre($derecho, $sesion))
-            // Se gasta primero lo que vence antes; con el mismo vencimiento, el paquete
-            // antes que sus clases extra (así el corte muestra cuándo se usaron).
+            // Se gasta primero lo que vence antes (ADR 0050); con el mismo vencimiento, el
+            // paquete antes que sus clases extra (así el corte muestra cuándo se usaron).
             ->sortBy([
-                fn (DerechoTenant $a, DerechoTenant $b): int => ($a->valido_hasta?->toDateString() ?? '9999-12-31') <=> ($b->valido_hasta?->toDateString() ?? '9999-12-31'),
+                fn (DerechoTenant $a, DerechoTenant $b): int => self::vence($a, $sesion) <=> self::vence($b, $sesion),
                 fn (DerechoTenant $a, DerechoTenant $b): int => ($a->extra_de_id !== null) <=> ($b->extra_de_id !== null),
                 fn (DerechoTenant $a, DerechoTenant $b): int => $a->getKey() <=> $b->getKey(),
             ])
             ->values();
+    }
+
+    /**
+     * Cuándo se pierden los créditos con que se pagaría la sesión: los de un ciclo que se
+     * reinicia sin pasar todo al siguiente vencen al cerrar el ciclo, aunque el plan siga
+     * vigente (si no, se gastaría primero un paquete y se perderían los del ciclo).
+     */
+    private static function vence(DerechoTenant $derecho, SesionTenant $sesion): string
+    {
+        $vence = $derecho->valido_hasta?->toDateString() ?? '9999-12-31';
+        $reinicia = $derecho->politica_reset !== PoliticaReset::Ninguno
+            && $derecho->politica_rollover !== PoliticaRollover::Completo;
+        $dia = $sesion->inicia_en->copy()->setTimezone((string) ($sesion->zona_horaria ?: 'UTC'))->toDateString();
+        if ($reinicia && $derecho->ciclo_fin !== null && $dia <= $derecho->ciclo_fin->toDateString()) {
+            return min($vence, $derecho->ciclo_fin->toDateString());
+        }
+
+        return $vence;
     }
 
     /**

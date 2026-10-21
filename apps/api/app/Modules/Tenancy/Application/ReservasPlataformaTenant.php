@@ -233,6 +233,7 @@ class ReservasPlataformaTenant
         // No se le pudo contestar: la plataforma la rechaza sola y el lugar se libera.
         if ($lugar instanceof LugarPlataformaTenant && $lugar->estado === LugarPlataformaTenant::RESERVADO) {
             $lugar->fill(['estado' => LugarPlataformaTenant::RECHAZADO, 'motivo' => 'SIN_RESPUESTA'])->save();
+            $this->ofrecerLiberado($lugar);
             $this->alCambiar($lugar);
         }
         $evento->terminar(EventoPlataformaTenant::FALLIDO, 'No se pudo contestar a '.$proveedor->nombre().': '.$respuesta->error);
@@ -307,9 +308,18 @@ class ReservasPlataformaTenant
         }
         if ($lugar->estado === LugarPlataformaTenant::RESERVADO) {
             $lugar->fill(['estado' => $estado])->save();
+            $this->ofrecerLiberado($lugar);
             $this->alCambiar($lugar);
         }
         $evento->terminar(EventoPlataformaTenant::PROCESADO, $estado === LugarPlataformaTenant::CANCELADO_TARDE ? 'Reserva cancelada tarde.' : 'Reserva cancelada.');
+    }
+
+    /** El lugar que dejó la plataforma se ofrece a la lista de espera, en su orden. */
+    private function ofrecerLiberado(LugarPlataformaTenant $lugar): void
+    {
+        if ($lugar->sesion instanceof SesionTenant) {
+            app(ReservasTenant::class)->promoverCupos($lugar->sesion);
+        }
     }
 
     /** Los lugares de la clase cambiaron: se le vuelven a mandar a la plataforma. */

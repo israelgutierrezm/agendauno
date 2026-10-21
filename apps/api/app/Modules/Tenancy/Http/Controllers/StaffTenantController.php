@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\RolSesionTenant;
+use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,11 +36,15 @@ class StaffTenantController
     public function __construct(
         private readonly CalcularNominaTenant $nomina,
         private readonly VerificarAgendaTenant $agenda,
+        private readonly AccesoSesionTenant $acceso,
     ) {}
 
     public function asignar(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $actor = $request->attributes->get('usuario_tenant');
+        // Solo en clases de sus sedes (R19).
+        abort_unless($this->acceso->puedeOperar($sesion, $actor instanceof Usuario ? $actor : null), 403, 'Esa clase no es de tus sucursales.');
         $validado = $request->validate([
             'usuario_id' => ['required', 'string'],
             'rol' => ['required', Rule::enum(RolSesionTenant::class)],
@@ -71,6 +76,8 @@ class StaffTenantController
     public function staffDeSesion(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless($this->acceso->puedeOperar($sesion, $actor instanceof Usuario ? $actor : null), 403, 'Esa clase no es de tus sucursales.');
 
         $asignaciones = AsignacionSesionTenant::query()->where('sesion_id', $sesion->getKey())->with('usuario')->get();
 

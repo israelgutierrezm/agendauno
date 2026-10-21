@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $motivo
  * @property int|null $usuario_id
  * @property string|null $llave
- * @property array<int, mixed>|null $partes  [{metodo, monto_minor}]; se lee con {@see partesDeSalida()}
+ * @property array<int, mixed>|null $partes [{metodo, monto_minor}]; se lee con {@see partesDeSalida()}
  */
 class DevolucionVentaTenant extends Model
 {

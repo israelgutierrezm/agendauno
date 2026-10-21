@@ -198,3 +198,18 @@ it('un segundo cobro de una compra ya pagada queda por conciliar', function (): 
         ->and($incidencias[0]['tipo'])->toBe('pago_duplicado')
         ->and(enNegocioTardio($c['e'], fn () => ReservaTenant::query()->where('ulid', $c['reserva'])->value('estado')->value))->toBe('confirmada');
 });
+
+it('si mientras tanto se cerró la sede a esa hora, el pago tardío no reactiva la cita', function (): void {
+    $c = citaApartadaSinPagar();
+    $this->travel(31)->minutes();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
+    // La sede cierra el lunes de 9 a 12.
+    $this->postJson("/api/v1/app/{$c['e']['slug']}/bloqueos", [
+        'sucursal_id' => $c['sede']['sucursal'], 'desde_local' => '2026-10-05 09:00:00', 'hasta_local' => '2026-10-05 12:00:00', 'motivo' => 'Fumigación',
+    ], conBearer($c['e']['bearer']))->assertCreated();
+
+    llegaElPagoDeCs1($c['e']);
+
+    expect(enNegocioTardio($c['e'], fn () => ReservaTenant::query()->where('ulid', $c['reserva'])->value('estado')->value))->toBe('cancelada')
+        ->and($this->getJson("/api/v1/app/{$c['e']['slug']}/incidencias-cobro", conBearer($c['e']['bearer']))->json('data'))->toHaveCount(1);
+});

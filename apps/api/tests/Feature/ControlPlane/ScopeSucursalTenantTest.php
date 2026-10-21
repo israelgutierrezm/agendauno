@@ -97,3 +97,29 @@ it('las asignaciones son tenant-local: un estudio no ve las de otro', function (
     $this->getJson("/api/v1/app/{$a['slug']}/asignaciones-personal", conBearer($a['bearer']))->assertOk()->assertJsonCount(1, 'data');
     $this->getJson("/api/v1/app/{$b['slug']}/asignaciones-personal", conBearer($b['bearer']))->assertOk()->assertJsonCount(0, 'data');
 });
+
+it('quien gestiona la agenda de una sede no cancela ni crea clases en otra', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sedeA = agendaSemilla($e);
+    $sedeB = agendaSemilla($e);
+    $rol = (string) $this->postJson("/api/v1/app/{$e['slug']}/roles", [
+        'nombre' => 'Coordinación Norte', 'faceta' => 'equipo',
+        'permisos' => ['agenda.ver', 'agenda.gestionar', 'catalogo.ver', 'sucursales.ver'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.clave');
+    $coord = personalConSesion($e['slug'], $e['bearer'], 'coord@correo.mx', $rol);
+    $this->putJson("/api/v1/app/{$e['slug']}/asignaciones-personal", [
+        'usuario_id' => usuarioIdPorEmail($e, 'coord@correo.mx'), 'sucursal_id' => $sedeA['sucursal'], 'rol' => 'recepcionista',
+    ], conBearer($e['bearer']))->assertCreated();
+    $enA = crearSesionTenant($e, $sedeA, 5);
+    $enB = crearSesionTenant($e, $sedeB, 5);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$enB}/cancelar", [], conBearer($coord))->assertForbidden();
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones", [
+        'oferta_id' => $sedeB['oferta'], 'sucursal_id' => $sedeB['sucursal'], 'inicia_en_local' => '2026-10-03 09:00:00', 'duracion_minutos' => 60,
+    ], conBearer($coord))->assertForbidden();
+    $this->postJson("/api/v1/app/{$e['slug']}/bloqueos", [
+        'sucursal_id' => $sedeB['sucursal'], 'fecha_desde' => '2026-10-03', 'motivo' => 'Cierre',
+    ], conBearer($coord))->assertForbidden();
+    // En la suya, sí.
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$enA}/cancelar", [], conBearer($coord))->assertOk();
+});

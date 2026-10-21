@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,22 @@ class PlantillasHorarioTenantController
     /** El filtro de las series sin instructor (como en la web). */
     private const SIN_INSTRUCTOR = 'sin-asignar';
 
-    public function __construct(private readonly GenerarAgendaTenant $generar) {}
+    public function __construct(
+        private readonly GenerarAgendaTenant $generar,
+        private readonly AccesoSesionTenant $acceso,
+    ) {}
+
+    /** Una serie de otra sede (o, para quien imparte, de otro profesional) no se toca. */
+    private function exigirPlantillaEnAlcance(Request $request, PlantillaHorarioTenant $plantilla): void
+    {
+        $this->exigirAlcance($request, (int) $plantilla->sucursal_id, $plantilla->instructor_id !== null ? (int) $plantilla->instructor_id : null);
+    }
+
+    private function exigirAlcance(Request $request, int $sucursalId, ?int $instructorId): void
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($this->acceso->puedeOperarEn($sucursalId, $instructorId, $usuario instanceof Usuario ? $usuario : null), 403, 'Esa sucursal no es de las tuyas.');
+    }
 
     /**
      * Las series de la agenda. Con `estado=vigentes`, solo las que siguen generando
@@ -106,6 +122,8 @@ class PlantillasHorarioTenantController
 
         $oferta = OfertaTenant::paraAgendar($validado['oferta_id']);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+        // Solo en sus sedes y, quien imparte, para sí (R19, ADR 0095).
+        $this->exigirAlcance($request, (int) $sucursal->getKey(), $this->resolverInstructor($validado['instructor_id'] ?? null));
 
         $plantilla = PlantillaHorarioTenant::query()->create([
             'oferta_id' => $oferta->getKey(),
@@ -127,6 +145,7 @@ class PlantillasHorarioTenantController
     public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $plantilla = PlantillaHorarioTenant::query()->where('ulid', (string) $request->route('plantilla'))->firstOrFail();
+        $this->exigirPlantillaEnAlcance($request, $plantilla);
         // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
         $eliminaciones->eliminar($plantilla, 'plantilla_horario', $plantilla->only(['dias_semana', 'hora_local', 'duracion_minutos', 'vigente_desde', 'vigente_hasta']));
 
@@ -136,6 +155,7 @@ class PlantillasHorarioTenantController
     public function generar(Request $request): JsonResponse
     {
         $plantilla = PlantillaHorarioTenant::query()->where('ulid', (string) $request->route('plantilla'))->firstOrFail();
+        $this->exigirPlantillaEnAlcance($request, $plantilla);
 
         $validado = $request->validate([
             'desde' => ['required', 'date'],
@@ -155,6 +175,7 @@ class PlantillasHorarioTenantController
     public function cambiar(Request $request, CambiarSerieTenant $cambiar): JsonResponse
     {
         $plantilla = PlantillaHorarioTenant::query()->where('ulid', (string) $request->route('plantilla'))->firstOrFail();
+        $this->exigirPlantillaEnAlcance($request, $plantilla);
         $validado = $request->validate([
             'desde' => ['required', 'date_format:Y-m-d'],
             'dias_semana' => ['nullable', 'array', 'min:1'],
@@ -181,6 +202,7 @@ class PlantillasHorarioTenantController
         // Profesional y sala: si vienen (aunque vacíos), se cambian (vacío = sin asignar).
         if ($request->has('instructor_id')) {
             $cambios['instructor_id'] = $this->resolverInstructor($validado['instructor_id'] ?? null);
+            $this->exigirAlcance($request, (int) $plantilla->sucursal_id, $cambios['instructor_id']);
         }
         if ($request->has('recurso_id')) {
             $cambios['recurso_id'] = $this->resolverRecurso($validado['recurso_id'] ?? null);

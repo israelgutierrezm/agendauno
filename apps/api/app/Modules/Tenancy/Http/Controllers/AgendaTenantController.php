@@ -103,6 +103,8 @@ class AgendaTenantController
         $termina = $inicia->addMinutes((int) $validado['duracion_minutos']);
 
         $instructorId = $this->resolverInstructor($validado['instructor_id'] ?? null);
+        // Solo en sus sedes y, quien imparte, para sí (R19, ADR 0095).
+        $this->exigirAlcance($request, (int) $sucursal->getKey(), $instructorId);
         $recurso = ($validado['recurso_id'] ?? '') !== ''
             ? RecursoTenant::query()->where('ulid', $validado['recurso_id'])->firstOrFail()
             : null;
@@ -242,6 +244,9 @@ class AgendaTenantController
         $validado = $request->validate(['instructor_id' => ['nullable', 'string']]);
 
         $instructorId = $this->resolverInstructor($validado['instructor_id'] ?? null);
+        // La sesión y a quién se la pasa, dentro de su alcance.
+        $this->exigirSesionEnAlcance($request, $sesion);
+        $this->exigirAlcance($request, (int) $sesion->sucursal_id, $instructorId);
         // Al reasignar, el nuevo instructor no puede chocar con otra clase (excluye
         // esta), revalidado bajo su candado.
         DB::connection('tenant')->transaction(function () use ($sesion, $instructorId): void {
@@ -451,6 +456,7 @@ class AgendaTenantController
     public function cancelar(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesionEnAlcance($request, $sesion);
         // Cancela la sesion Y sus reservas activas, liberando los holds (el credito
         // retenido vuelve al miembro). Antes solo marcaba la sesion y dejaba holds colgados.
         $usuario = $request->attributes->get('usuario_tenant');
@@ -466,8 +472,23 @@ class AgendaTenantController
     public function previsualizarCancelacion(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesionEnAlcance($request, $sesion);
 
         return response()->json(['data' => $this->reservas->efectoDeCancelarSesion($sesion)]);
+    }
+
+    /** Una sesión de otra sede (o, para quien imparte, de otro profesional) no se toca. */
+    private function exigirSesionEnAlcance(Request $request, SesionTenant $sesion): void
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($this->acceso->puedeOperar($sesion, $usuario instanceof Usuario ? $usuario : null), 403, 'Esa clase no es de tus sucursales.');
+    }
+
+    /** Agendar en esa sede con ese profesional, dentro de su alcance. */
+    private function exigirAlcance(Request $request, int $sucursalId, ?int $instructorId): void
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($this->acceso->puedeOperarEn($sucursalId, $instructorId, $usuario instanceof Usuario ? $usuario : null), 403, 'Esa sucursal no es de las tuyas.');
     }
 
     /**

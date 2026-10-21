@@ -55,3 +55,10 @@ profesional a la misma hora:
   profesional al mismo tiempo.
 - Reprogramar (mover una sesión de hora) todavía no existe como operación. Cuando se
   agregue, debe usar el mismo verificador con `excluirSesionId`.
+
+## Ajuste (2026-10-21)
+
+- Al buscar choques, el profesional cuenta como ocupado también donde está asignado
+  como sustituto o asistente (antes solo contaba la sesión que imparte). Donde alguien
+  lo sustituye queda libre. Aplica a crear sesiones, agendar citas, series,
+  reprogramar, asignar personal y los huecos de la página pública.

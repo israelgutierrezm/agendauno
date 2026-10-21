@@ -111,3 +111,23 @@ it('el mostrador cobra lo apartado y queda entregado; cancelarlo lo libera', fun
     $this->getJson("/api/v1/app/{$e['slug']}/mi/sesiones/{$sesion}/articulos", conBearer($luz))->assertOk()
         ->assertJsonPath('data.articulos.0.disponibles', 2);
 });
+
+it('cancelar la reserva libera lo apartado, y el mostrador no lo da por entregado sin cobrarlo completo', function (): void {
+    ['e' => $e, 'luz' => $luz, 'sesion' => $sesion, 'sucursal' => $sucursal, 'agua' => $agua, 'persona' => $persona] = claseConAguaParaApartar();
+    $app = "/api/v1/app/{$e['slug']}";
+    $apartado = (string) $this->postJson("{$app}/mi/sesiones/{$sesion}/articulos", ['articulo_id' => $agua, 'cantidad' => 2], conBearer($luz))
+        ->assertCreated()->json('data.id');
+
+    // Cobrar solo 1 de las 2 apartadas no la entrega (ni guarda la venta).
+    $this->postJson("{$app}/pos/ventas", [
+        'sucursal_id' => $sucursal, 'metodo_pago' => 'efectivo', 'comprador_id' => 'persona:'.$persona,
+        'items' => [['articulo_id' => $agua, 'cantidad' => 1]],
+        'apartados' => [$apartado],
+    ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['apartados'], 'meta.errors');
+    $this->getJson("{$app}/sesiones/{$sesion}/apartados", conBearer($e['bearer']))->assertOk()->assertJsonCount(1, 'data');
+
+    // Si cancela su reserva, lo apartado se libera y vuelve a estar disponible.
+    $reserva = (string) collect($this->getJson("{$app}/sesiones/{$sesion}/reservas", conBearer($e['bearer']))->json('data'))->first()['id'];
+    $this->postJson("{$app}/reservas/{$reserva}/cancelar", [], conBearer($e['bearer']))->assertOk();
+    $this->getJson("{$app}/sesiones/{$sesion}/apartados", conBearer($e['bearer']))->assertOk()->assertJsonCount(0, 'data');
+});

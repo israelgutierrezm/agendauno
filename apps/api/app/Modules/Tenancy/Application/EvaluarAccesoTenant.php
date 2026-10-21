@@ -25,7 +25,10 @@ use Carbon\CarbonInterface;
 class EvaluarAccesoTenant
 {
     // Minutos antes del inicio en que una reserva ya habilita el acceso (configurable).
-    public function __construct(private readonly ParametrosTenant $parametros) {}
+    public function __construct(
+        private readonly ParametrosTenant $parametros,
+        private readonly FechasNegocioTenant $fechas,
+    ) {}
 
     public function evaluar(PersonaTenant $persona, ?int $sucursalId, CarbonInterface $momento): DecisionAcceso
     {
@@ -44,19 +47,28 @@ class EvaluarAccesoTenant
             return DecisionAcceso::permitir('ACCESS_BY_BOOKING', (int) $reserva->sesion_id);
         }
 
-        if ($this->tieneAccesoAbierto($persona, $momento)) {
+        if ($this->tieneAccesoAbierto($persona, $sucursalId, $momento)) {
             return DecisionAcceso::permitir('ACCESS_OPEN');
         }
 
         return DecisionAcceso::denegar('NO_ACCESS');
     }
 
-    private function tieneAccesoAbierto(PersonaTenant $persona, CarbonInterface $momento): bool
+    /**
+     * Un plan ilimitado activo que cubre ese momento en días del negocio (desde su
+     * inicio hasta las 23:59 locales de su último día) y, si se sabe la sede, que vale
+     * en ella (ADR 0017).
+     */
+    private function tieneAccesoAbierto(PersonaTenant $persona, ?int $sucursalId, CarbonInterface $momento): bool
     {
         return DerechoTenant::query()
             ->where('ilimitado', true)
-            ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhereDate('valido_hasta', '>=', $momento->toDateString()))
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey())->where('estado', EstadoAcuerdo::Activo->value))
-            ->exists();
+            ->get()
+            ->contains(fn (DerechoTenant $d): bool => $this->fechas->cubre($d->valido_desde, $d->valido_hasta, $momento)
+                && ($sucursalId === null || (
+                    ($d->sucursal_id === null || (int) $d->sucursal_id === $sucursalId)
+                    && ($d->sucursales_ids === null || in_array($sucursalId, array_map('intval', $d->sucursales_ids), true))
+                )));
     }
 }

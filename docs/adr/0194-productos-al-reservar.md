@@ -35,3 +35,10 @@ hay venta en línea de artículos.
 - Lo que nadie recoge queda apartado hasta que el equipo lo cancela; mientras tanto
   resta de lo disponible para apartar.
 - En la app móvil aún no se aparta; se hace desde la cuenta en la web.
+
+## Ajuste (2026-10-21)
+
+- Al cancelar o mover la reserva, o al cancelar la clase, lo apartado se libera.
+- El mostrador solo da por entregado lo apartado si la venta lleva todas sus piezas; si
+  no, la venta se rechaza.
+- Cancelar un apartado solo pasa si sigue apartado: no pisa una entrega simultánea.

@@ -124,7 +124,30 @@ class ApartadosArticuloTenant
         if ($porElCliente && $apartado->sesion?->inicia_en->isPast() === true) {
             throw ValidationException::withMessages(['apartado' => ['La clase ya empezó: avisa en el mostrador.']]);
         }
-        $apartado->update(['estado' => 'cancelado']);
+        // Solo si sigue apartado: no pisa una entrega que llegó al mismo tiempo.
+        $cancelado = ApartadoArticuloTenant::query()->whereKey($apartado->getKey())->where('estado', 'apartado')->update(['estado' => 'cancelado']);
+        if ($cancelado === 0) {
+            throw ValidationException::withMessages(['apartado' => ['Ya se entregó o se canceló.']]);
+        }
+        $apartado->estado = 'cancelado';
+    }
+
+    /** La reserva se canceló o se movió de clase: lo apartado para ella se libera. */
+    public function liberarDeReserva(ReservaTenant $reserva): int
+    {
+        return ApartadoArticuloTenant::query()
+            ->where('reserva_id', $reserva->getKey())
+            ->where('estado', 'apartado')
+            ->update(['estado' => 'cancelado']);
+    }
+
+    /** La clase se canceló: lo apartado para ella se libera. */
+    public function liberarDeSesion(SesionTenant $sesion): int
+    {
+        return ApartadoArticuloTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->where('estado', 'apartado')
+            ->update(['estado' => 'cancelado']);
     }
 
     /**
@@ -143,7 +166,8 @@ class ApartadosArticuloTenant
 
     /**
      * Los cobrados en una venta del mostrador quedan entregados con ella. Solo los de su
-     * comprador y su sede, aún apartados.
+     * comprador y su sede, aún apartados, y solo si la venta lleva todas sus piezas: lo
+     * que no se cobró no se da por entregado (la venta no se guarda).
      *
      * @param  list<string>  $ulids
      */
@@ -153,10 +177,30 @@ class ApartadosArticuloTenant
             return 0;
         }
 
-        return ApartadoArticuloTenant::query()
+        $apartados = ApartadoArticuloTenant::query()
             ->whereIn('ulid', $ulids)
             ->where('persona_id', $venta->persona_id)
             ->where('sucursal_id', $venta->sucursal_id)
+            ->where('estado', 'apartado')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        $vendidas = [];
+        foreach ($venta->lineas()->get() as $linea) {
+            $vendidas[(int) $linea->articulo_id] = ($vendidas[(int) $linea->articulo_id] ?? 0) + (int) $linea->cantidad;
+        }
+        $apartadas = [];
+        foreach ($apartados as $apartado) {
+            $apartadas[(int) $apartado->articulo_id] = ($apartadas[(int) $apartado->articulo_id] ?? 0) + (int) $apartado->cantidad;
+        }
+        foreach ($apartadas as $articulo => $piezas) {
+            if (($vendidas[$articulo] ?? 0) < $piezas) {
+                throw ValidationException::withMessages(['apartados' => ['La venta no lleva todo lo que apartó: agrega las piezas o cancela el apartado.']]);
+            }
+        }
+
+        return ApartadoArticuloTenant::query()
+            ->whereKey($apartados->modelKeys())
             ->where('estado', 'apartado')
             ->update(['estado' => 'entregado', 'venta_pos_id' => $venta->getKey()]);
     }

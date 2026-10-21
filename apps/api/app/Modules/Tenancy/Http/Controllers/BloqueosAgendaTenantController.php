@@ -8,13 +8,16 @@ use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -46,7 +49,17 @@ class BloqueosAgendaTenantController
             'hasta' => ['nullable', 'date'],
         ]);
 
+        // Quien imparte ve los suyos y los de sedes y salas; el equipo con sedes asignadas,
+        // los de sus sedes y salas y los de las personas (su disponibilidad).
+        $actor = $request->attributes->get('usuario_tenant');
+        $actor = $actor instanceof Usuario ? $actor : null;
+        $sedes = $actor !== null ? app(ResolverAccesoTenant::class)->sucursalesPermitidas($actor) : null;
+        $soloSuyos = app(AccesoSesionTenant::class)->esInstructorAcotado($actor);
         $bloqueos = BloqueoAgendaTenant::query()
+            ->when($soloSuyos, fn ($q) => $q->where(fn ($w) => $w->whereNull('instructor_id')->orWhere('instructor_id', $actor?->getKey())))
+            ->when($sedes !== null && ! $soloSuyos, fn ($q) => $q->where(fn ($w) => $w->whereNotNull('instructor_id')
+                ->orWhereIn('sucursal_id', $sedes)
+                ->orWhereIn('recurso_id', RecursoTenant::query()->whereIn('sucursal_id', $sedes)->select('id'))))
             ->when(isset($validado['desde']), fn ($q) => $q->where('hasta', '>', CarbonImmutable::parse((string) $validado['desde'])->subDay()))
             ->when(isset($validado['hasta']), fn ($q) => $q->where('desde', '<', CarbonImmutable::parse((string) $validado['hasta'])->addDays(2)))
             ->with(['instructor', 'sucursal', 'recurso', 'autor', 'calendarioExterno'])
@@ -63,6 +76,7 @@ class BloqueosAgendaTenantController
     public function previsualizar(Request $request): JsonResponse
     {
         $propuesto = $this->propuesto($request);
+        $this->exigirAlcance($request, $propuesto);
 
         return response()->json(['data' => ['afectadas' => $this->afectadas($propuesto)]]);
     }
@@ -70,6 +84,7 @@ class BloqueosAgendaTenantController
     public function crear(Request $request): JsonResponse
     {
         $propuesto = $this->propuesto($request);
+        $this->exigirAlcance($request, $propuesto);
         $actor = $request->attributes->get('usuario_tenant');
         $propuesto->creado_por = $actor instanceof Usuario ? (int) $actor->getKey() : null;
         $propuesto->save();
@@ -98,6 +113,7 @@ class BloqueosAgendaTenantController
     public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $bloqueo = BloqueoAgendaTenant::query()->where('ulid', (string) $request->route('bloqueo'))->firstOrFail();
+        $this->exigirAlcance($request, $bloqueo);
         if ($bloqueo->calendario_externo_id !== null) {
             // Volvería en la siguiente pasada: se quita en su calendario.
             throw ValidationException::withMessages(['bloqueo' => ['Viene del calendario de esa persona: se quita allá.']]);
@@ -193,6 +209,32 @@ class BloqueosAgendaTenantController
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Un bloqueo de una sede o de una sala, solo en sus sedes (R19). El de una persona:
+     * quien imparte, solo el suyo (ADR 0095); su disponibilidad vale en todas las sedes,
+     * así que el equipo con sedes asignadas lo pone si esa persona atiende en alguna.
+     */
+    private function exigirAlcance(Request $request, BloqueoAgendaTenant $bloqueo): void
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+        $actor = $actor instanceof Usuario ? $actor : null;
+        $acceso = app(AccesoSesionTenant::class);
+        $sede = $bloqueo->sucursal_id ?? ($bloqueo->recurso_id !== null ? RecursoTenant::query()->whereKey($bloqueo->recurso_id)->value('sucursal_id') : null);
+        if ($sede !== null) {
+            abort_unless($acceso->puedeOperarEn((int) $sede, null, $actor), 403, 'Esa sucursal no es de las tuyas.');
+
+            return;
+        }
+        $instructor = (int) $bloqueo->instructor_id;
+        $sedes = HorarioAtencionTenant::query()->where('instructor_id', $instructor)->distinct()->pluck('sucursal_id')
+            ->merge(SesionTenant::query()->where('instructor_id', $instructor)->distinct()->pluck('sucursal_id'))
+            ->unique();
+        $permitido = $acceso->esInstructorAcotado($actor)
+            ? $actor !== null && (int) $actor->getKey() === $instructor
+            : $actor !== null && ($sedes->isEmpty() || $sedes->contains(fn ($s): bool => $acceso->puedeOperarEn((int) $s, $instructor, $actor)));
+        abort_unless($permitido, 403, 'Esa persona no atiende en tus sucursales.');
     }
 
     private function zonaDelNegocio(Request $request): string

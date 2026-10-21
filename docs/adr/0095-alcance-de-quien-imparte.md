@@ -45,3 +45,14 @@ sus sesiones). Faltaba aplicar el mismo criterio a lo demás.
 - Queda pendiente separar en permisos explícitos «clientes de sus sesiones» y «todo
   el directorio» para roles propios que no son de quien imparte; hoy el alcance se
   decide por la faceta del rol activo.
+
+## Ajuste (2026-10-21)
+
+- Crear sesiones, reasignar al profesional, cancelar una sesión (y su vista previa),
+  el personal de la sesión, las series (crear, cambiar, generar, eliminar), los
+  horarios de atención y los bloqueos aplican el mismo alcance que las reservas:
+  - el equipo con sedes asignadas, solo en sus sedes;
+  - quien imparte, solo lo suyo.
+- La lista de bloqueos se acota igual.
+- Empezada la clase o la cita, el cliente ya no la cancela (el negocio sí). El lugar de
+  una clase que ya empezó no se ofrece a la lista de espera ni se acepta.

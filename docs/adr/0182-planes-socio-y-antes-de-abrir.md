@@ -66,3 +66,14 @@ Salieron dos grupos de pendientes:
   detalle de la clase) usan las reglas nuevas.
 - Los planes vendidos antes de esta versión no tienen topes, acceso anticipado ni
   invitados, aunque su plan los tenga después.
+
+## Ajuste (2026-10-21)
+
+- El tope cuenta las reservas del plan en **otras** clases del día o la semana. Antes
+  contaba también la propia espera en la clase evaluada: quien tenía tope 1 nunca
+  recibía el lugar de su lista de espera.
+- Reprogramar también respeta el tope, sin contar la reserva que se mueve.
+- Los cambios de horario del cliente se cuentan en la misma transacción del cambio:
+  dos cambios a la vez no se saltan el máximo.
+- El lugar que deja un invitado o una plataforma (Wellhub, TotalPass) se ofrece a la
+  lista de espera.

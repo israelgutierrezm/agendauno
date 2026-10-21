@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\RetencionCreditoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -591,6 +592,8 @@ class ReservasTenant
             }
             // Si su orden (cita de pago) seguía sin cobrar, ya no se entregará: se cancela.
             $this->cancelarOrdenPendiente($bloqueada);
+            // Lo que apartó para recoger en la clase (ADR 0194) se libera.
+            app(ApartadosArticuloTenant::class)->liberarDeReserva($bloqueada);
 
             $this->liberarLugar($sesion);
 
@@ -627,6 +630,13 @@ class ReservasTenant
         }
         if ($reserva->estado === EstadoReserva::EnEspera) {
             return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, 'Sale de la lista de espera. No usa créditos.');
+        }
+        // Empezada la clase o la cita, el cliente ya no la cancela: es asistencia o falta
+        // (si no, cancelaría después de faltar y recuperaría el crédito). El negocio sí.
+        if ($quien === QuienCancela::Cliente && ! $sesion->inicia_en->isFuture()) {
+            return EfectoCancelacion::noCancelable($sesion->esCita()
+                ? 'La cita ya empezó: ya no se puede cancelar.'
+                : 'La clase ya empezó: ya no se puede cancelar.');
         }
 
         $retencion = $reserva->retencion;
@@ -777,6 +787,15 @@ class ReservasTenant
         if ($derecho instanceof DerechoTenant && ($motivo = $this->resolver->motivoParaMover($derecho, $nueva)) !== null) {
             throw new SesionNoReservable($motivo);
         }
+        // El tope del plan (ADR 0182) también al mover: con el derecho bloqueado y sin
+        // contar la reserva que se mueve.
+        if ($derecho instanceof DerechoTenant && TopesDeReservaTenant::tieneTope($derecho)) {
+            $derecho = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
+            $tope = app(TopesDeReservaTenant::class)->alcanzado($derecho, $nueva, (int) $reserva->getKey());
+            if ($tope !== null) {
+                throw new TopeDeReservas($tope);
+            }
+        }
         if ($nueva->estado !== EstadoSesionTenant::Programada || ! $nueva->inicia_en->isFuture()) {
             throw new SesionNoReservable('Esa clase ya no se puede reservar.');
         }
@@ -794,6 +813,8 @@ class ReservasTenant
         }
 
         $reserva->update(['sesion_id' => $nueva->getKey(), 'lugar' => null]);
+        // Lo apartado era para la otra clase: se libera (puede apartarlo para esta).
+        app(ApartadosArticuloTenant::class)->liberarDeReserva($reserva);
         $this->liberarLugar($origen);
     }
 
@@ -807,8 +828,9 @@ class ReservasTenant
      */
     public function promover(SesionTenant $sesion): ?ReservaTenant
     {
-        // Una cita no tiene lista de espera: nunca se ofrece a otra persona.
-        if ($sesion->capacidad === null || $sesion->esCita()) {
+        // Una cita no tiene lista de espera: nunca se ofrece a otra persona. Ni se ofrece
+        // el lugar de una clase que ya empezó.
+        if ($sesion->capacidad === null || $sesion->esCita() || ! $sesion->inicia_en->isFuture()) {
             return null;
         }
 
@@ -920,6 +942,10 @@ class ReservasTenant
             if ($bloqueada->estado !== EstadoReserva::Ofrecida
                 || ($bloqueada->oferta_expira_en !== null && now()->greaterThan($bloqueada->oferta_expira_en))) {
                 throw new OfertaNoDisponible('La oferta no esta disponible o ya expiro.');
+            }
+            // Un lugar de una clase que ya empezó ya no se toma (al vencer, se libera).
+            if ($bloqueada->sesion !== null && ! $bloqueada->sesion->inicia_en->isFuture()) {
+                throw new OfertaNoDisponible('La clase ya empezó: ese lugar ya no se puede tomar.');
             }
 
             $bloqueada->update([
@@ -1060,10 +1086,12 @@ class ReservasTenant
             if ($this->citaOcupada($sesion)) {
                 return false;
             }
-            // Mismo punto de serialización por profesional que al agendar una cita.
-            $this->agenda->bloquear($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, null);
+            // Mismo punto de serialización que al agendar una cita: el profesional y su
+            // cabina. Mientras estuvo cancelada pudieron tomar la cabina o cerrar la sede.
+            $recurso = $sesion->recurso_id !== null ? RecursoTenant::query()->find($sesion->recurso_id) : null;
+            $this->agenda->bloquear($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, $recurso);
             if ($sesion->estado !== EstadoSesionTenant::Programada
-                && $this->agenda->conflictos($sesion->instructor_id, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey(), margenes: MargenesServicio::deSesion($sesion)) !== []) {
+                && $this->agenda->conflictos($sesion->instructor_id, $recurso, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey(), (int) $sesion->sucursal_id, margenes: MargenesServicio::deSesion($sesion)) !== []) {
                 return false;
             }
             $sesion->update(['estado' => EstadoSesionTenant::Programada->value]);
@@ -1138,6 +1166,7 @@ class ReservasTenant
             }
 
             $bloqueada->update(['estado' => EstadoSesionTenant::Cancelada->value]);
+            app(ApartadosArticuloTenant::class)->liberarDeSesion($bloqueada);
         });
     }
 

@@ -22,6 +22,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * El cliente cambia el horario de su reserva desde su cuenta (ADR 0044): una cita a
@@ -128,6 +129,36 @@ class MiReprogramarTenantController
         $actor = $actor instanceof Usuario ? $actor : null;
         $antes = $sesion->inicia_en->toIso8601String();
 
+        // El cambio y su cuenta van juntos: dos cambios a la vez no se saltan el máximo
+        // (el segundo deshace su cambio).
+        $movida = DB::connection('tenant')->transaction(function () use ($request, $reserva, $sesion, $actor): ReservaTenant {
+            $movida = $this->mover($request, $reserva, $sesion, $actor);
+            $contada = ReservaTenant::query()
+                ->whereKey($movida->getKey())
+                ->where('reprogramaciones_cliente', '<', $this->parametros->entero('reprogramar.maximo_cliente'))
+                ->increment('reprogramaciones_cliente');
+            if ($contada === 0) {
+                throw new SesionNoReservable('Ya cambiaste el horario de esta reserva; para otro cambio, comunícate con el negocio.');
+            }
+
+            return $movida->refresh();
+        });
+        $movida->load('sesion');
+
+        return response()->json(['data' => [
+            // 'clase' | 'cita': qué forma de entrada se usó.
+            'tipo' => $sesion->tipo->value,
+            'reserva' => $movida->ulid,
+            'sesion_id' => $movida->sesion?->ulid,
+            'antes' => $antes,
+            'ahora' => $movida->sesion?->inicia_en->toIso8601String(),
+            'restantes' => max(0, $this->parametros->entero('reprogramar.maximo_cliente') - (int) $movida->reprogramaciones_cliente),
+        ]]);
+    }
+
+    /** Mueve la cita a otro horario o la reserva a otra fecha de la clase. */
+    private function mover(Request $request, ReservaTenant $reserva, SesionTenant $sesion, ?Usuario $actor): ReservaTenant
+    {
         if ($sesion->esCita()) {
             $validado = $request->validate([
                 'inicia_en_local' => ['required', 'date'],
@@ -146,33 +177,23 @@ class MiReprogramarTenantController
             }
             // Y dentro de la anticipación y el horizonte del negocio.
             app(VentanaDeReservaTenant::class)->exigirParaCita($inicia);
-            $movida = $this->reprogramar->moverCita($reserva, $inicia, null, $actor);
-        } else {
-            $validado = $request->validate([
-                'sesion_id' => ['required', 'string'],
-                'inicia_en_local' => ['prohibited'],
-            ], [
-                'sesion_id.required' => 'Elige la nueva fecha.',
-                'inicia_en_local.prohibited' => 'En una clase se elige otra fecha de la clase.',
-            ]);
-            $destino = SesionTenant::query()->where('ulid', (string) $validado['sesion_id'])->firstOrFail();
-            // Como al reservar desde la cuenta: dentro de la apertura y el cierre de
-            // reservas del negocio (no se adelanta a quienes aún no pueden reservar).
-            app(VentanaDeReservaTenant::class)->exigirParaClase($destino, $reserva->persona);
-            $movida = $this->reprogramar->moverAClase($reserva, $destino, $actor);
-        }
-        $movida->forceFill(['reprogramaciones_cliente' => (int) $movida->reprogramaciones_cliente + 1])->save();
-        $movida->load('sesion');
 
-        return response()->json(['data' => [
-            // 'clase' | 'cita': qué forma de entrada se usó.
-            'tipo' => $sesion->tipo->value,
-            'reserva' => $movida->ulid,
-            'sesion_id' => $movida->sesion?->ulid,
-            'antes' => $antes,
-            'ahora' => $movida->sesion?->inicia_en->toIso8601String(),
-            'restantes' => max(0, $this->parametros->entero('reprogramar.maximo_cliente') - (int) $movida->reprogramaciones_cliente),
-        ]]);
+            return $this->reprogramar->moverCita($reserva, $inicia, null, $actor);
+        }
+
+        $validado = $request->validate([
+            'sesion_id' => ['required', 'string'],
+            'inicia_en_local' => ['prohibited'],
+        ], [
+            'sesion_id.required' => 'Elige la nueva fecha.',
+            'inicia_en_local.prohibited' => 'En una clase se elige otra fecha de la clase.',
+        ]);
+        $destino = SesionTenant::query()->where('ulid', (string) $validado['sesion_id'])->firstOrFail();
+        // Como al reservar desde la cuenta: dentro de la apertura y el cierre de
+        // reservas del negocio (no se adelanta a quienes aún no pueden reservar).
+        app(VentanaDeReservaTenant::class)->exigirParaClase($destino, $reserva->persona);
+
+        return $this->reprogramar->moverAClase($reserva, $destino, $actor);
     }
 
     private function reservaPropia(Request $request): ReservaTenant

@@ -62,3 +62,12 @@ precios. Hasta ahora eso no alcanzaba:
   `vigencia_cantidad`, y agrega `vence_si_compra_hoy` y `ofertas`.
 - El menú separa Membresías (planes y ventas a alumnos), Punto de venta (mostrador
   e inventario) y Cobros. "Clases y servicios" pasa a Operación.
+
+## Ajuste (2026-10-21)
+
+- «Primero lo que vence antes» considera el cierre del ciclo. Los créditos de un plan
+  que se reinicia sin pasar todo al siguiente ciclo vencen en `ciclo_fin`, aunque el
+  plan siga vigente. Antes se gastaba primero un paquete y se perdían los del ciclo.
+- El acceso abierto (kiosco, QR, puerta) revisa la vigencia en días del negocio (el
+  último día vale hasta las 23:59 locales), desde su inicio y solo en las sedes del
+  plan.

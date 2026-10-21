@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +75,9 @@ class DisponibilidadTenantController
 
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+        // Solo en sus sedes y, quien atiende, su propio horario (R19, ADR 0095).
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless(app(AccesoSesionTenant::class)->puedeOperarEn((int) $sucursal->getKey(), (int) $instructor->getKey(), $actor instanceof Usuario ? $actor : null), 403, 'Esa sucursal no es de las tuyas.');
 
         // Se reemplazan todas o ninguna: un error a la mitad no deja el horario vacío.
         DB::connection('tenant')->transaction(function () use ($instructor, $sucursal, $validado): void {

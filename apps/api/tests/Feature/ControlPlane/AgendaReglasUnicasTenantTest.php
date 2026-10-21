@@ -147,3 +147,21 @@ it('nadie del equipo puede estar en dos clases a la vez, sea sustituto o asisten
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$tarde}/staff", ['usuario_id' => $beto, 'rol' => 'sustituto'], conBearer($e['bearer']))
         ->assertCreated();
 });
+
+it('quien sustituye o asiste en una clase está ocupado en esa hora; a quien sustituyen queda libre', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    $beto = profesor($e, 'beto@correo.mx');
+    $caro = profesor($e, 'caro@correo.mx');
+    $deCaro = (string) sesionSuelta($e, ['oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $caro, 'inicia_en_local' => '2030-01-09 18:00:00'])
+        ->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$deCaro}/staff", ['usuario_id' => $beto, 'rol' => 'sustituto', 'sustituye_a' => $caro], conBearer($e['bearer']))
+        ->assertCreated();
+
+    // Beto ya está a las 18:00: no se le agenda otra clase encima.
+    sesionSuelta($e, ['oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $beto, 'inicia_en_local' => '2030-01-09 18:15:00'])
+        ->assertUnprocessable();
+    // Caro, a quien sustituye, queda libre a esa hora.
+    sesionSuelta($e, ['oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $caro, 'inicia_en_local' => '2030-01-09 18:15:00'])
+        ->assertCreated();
+});

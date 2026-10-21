@@ -81,8 +81,14 @@ class CreditosTenant
      */
     public function liberar(RetencionCreditoTenant $retencion): void
     {
-        if ($retencion->estado === EstadoRetencion::Activa) {
-            $retencion->update(['estado' => EstadoRetencion::Liberada]);
+        // Solo si sigue activa en la base: no pisa una confirmación o pérdida que llegó al
+        // mismo tiempo (esas sí tocan el ledger).
+        $liberada = RetencionCreditoTenant::query()
+            ->whereKey($retencion->getKey())
+            ->where('estado', EstadoRetencion::Activa->value)
+            ->update(['estado' => EstadoRetencion::Liberada->value]);
+        if ($liberada > 0) {
+            $retencion->estado = EstadoRetencion::Liberada;
         }
     }
 

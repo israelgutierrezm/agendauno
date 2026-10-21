@@ -125,6 +125,8 @@ class InvitadosTenant
                 throw new FueraDeVentana('La clase ya empezó: la invitación ya no se cancela.');
             }
             $bloqueado->update(['estado' => InvitadoSesionTenant::CANCELADO, 'cancelado_en' => now()]);
+            // El lugar que deja se ofrece a la lista de espera, en su orden.
+            app(ReservasTenant::class)->promoverCupos($sesion);
 
             return $bloqueado;
         });

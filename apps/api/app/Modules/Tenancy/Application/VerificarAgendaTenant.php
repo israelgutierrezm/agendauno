@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -73,10 +74,15 @@ class VerificarAgendaTenant
         $hasta = $margenes->hasta($termina);
         $conflictos = [];
 
-        // Profesional: no puede atender dos cosas que se solapan (con sus márgenes).
+        // Profesional: no puede atender dos cosas que se solapan (con sus márgenes), sea
+        // quien la imparte, su sustituto o su asistente (ADR 0033). Donde alguien lo
+        // sustituye, queda libre.
         if ($instructorId !== null) {
             $choque = SesionTenant::query()
-                ->where('instructor_id', $instructorId)
+                ->where(fn ($q) => $q
+                    ->where(fn ($propia) => $propia->where('instructor_id', $instructorId)
+                        ->whereNotIn('id', AsignacionSesionTenant::query()->select('sesion_id')->where('sustituye_a', $instructorId)))
+                    ->orWhereIn('id', AsignacionSesionTenant::query()->select('sesion_id')->where('usuario_id', $instructorId)))
                 ->where('estado', EstadoSesionTenant::Programada->value)
                 ->where('ocupa_desde', '<', $hasta)
                 ->where('ocupa_hasta', '>', $desde)
