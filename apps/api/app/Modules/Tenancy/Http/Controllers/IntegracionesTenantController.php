@@ -47,6 +47,7 @@ class IntegracionesTenantController
         private readonly RegistrarAuditoria $auditoria,
         private readonly ClienteTotalPass $totalpass,
         private readonly PublicadorWellhub $wellhub,
+        private readonly GestorDeConexionTenant $gestor,
     ) {}
 
     public function index(): JsonResponse
@@ -190,6 +191,8 @@ class IntegracionesTenantController
             'llaves' => $proveedor->credenciales(),
             'llaves_configuradas' => array_keys($llaves),
             // Sin estas no se puede activar.
+            // Lo que se le da a Wellhub al elegir a AgendaUno como su sistema (ADR 0202).
+            'codigo_para_plataforma' => $proveedor === ProveedorPartner::Wellhub ? $this->gestor->actual()?->slug : null,
             'llaves_obligatorias' => $proveedor->credencialesObligatorias()[0] ?? [],
             // Otro grupo que también basta (TotalPass: solo la llave de la sede).
             'llaves_alternativas' => array_slice($proveedor->credencialesObligatorias(), 1),

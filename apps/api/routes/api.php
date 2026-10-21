@@ -155,6 +155,7 @@ use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
 use App\Modules\Tenancy\Http\Controllers\RolesTenantController;
 use App\Modules\Tenancy\Http\Controllers\SitioWebController;
 use App\Modules\Tenancy\Http\Controllers\SolicitudesPrivacidadTenantController;
+use App\Modules\Tenancy\Http\Controllers\SolicitudesWellhubPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\TareasTenantController;
@@ -177,6 +178,7 @@ use App\Modules\Tenancy\Http\Controllers\WebhookInstagramController;
 use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookTenantController;
+use App\Modules\Tenancy\Http\Controllers\WebhookWellhubSistemaController;
 use App\Modules\Tenancy\Http\Controllers\WebhookWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\WhatsAppSaldoTenantController;
 use App\Modules\Tenancy\Http\Controllers\WidgetsTenantController;
@@ -206,6 +208,9 @@ Route::prefix('v1')->group(function (): void {
     // Webhook publico de la pasarela de la PLATAFORMA: confirma el cargo de renta del
     // SaaS (plataforma -> dueño) -> pagado. Sin sesion; idempotente.
     // Avisos de Wellhub y TotalPass de cada negocio (check-in automático, ADR 0148).
+    // Wellhub avisa que un gimnasio eligió a AgendaUno como su sistema (ADR 0202).
+    Route::post('/webhooks/wellhub/sistema', WebhookWellhubSistemaController::class)
+        ->middleware('throttle:120,1,wellhub-sistema')->name('api.v1.webhooks.wellhub-sistema');
     Route::post('/webhooks/bienestar/{estudio}/{proveedor}/{token}', WebhookBienestarController::class)
         ->middleware(['throttle:bienestar-webhook', 'estudio.resolver'])->name('api.v1.webhooks.bienestar');
     Route::post('/webhooks/plataforma/{proveedor}', WebhookPlataformaController::class)
@@ -304,6 +309,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/sesiones', [EquipoPlataformaController::class, 'sesiones'])->name('sesiones');
         Route::delete('/sesiones/{sesion}', [EquipoPlataformaController::class, 'cerrarSesion'])->name('sesiones.cerrar');
         Route::get('/bitacora', [EquipoPlataformaController::class, 'bitacora'])->name('bitacora');
+        // Gimnasios que eligieron a AgendaUno en Wellhub sin saber de qué negocio (ADR 0202).
+        Route::get('/wellhub/solicitudes', [SolicitudesWellhubPlataformaController::class, 'index'])->name('wellhub.solicitudes');
+        Route::post('/wellhub/solicitudes/{solicitud}/asignar', [SolicitudesWellhubPlataformaController::class, 'asignar'])->name('wellhub.solicitudes.asignar');
+        Route::post('/wellhub/solicitudes/{solicitud}/descartar', [SolicitudesWellhubPlataformaController::class, 'descartar'])->name('wellhub.solicitudes.descartar');
         Route::get('/estudios', [PlataformaController::class, 'estudios'])->name('estudios');
         Route::get('/estudios/{estudio}', [PlataformaEstudiosController::class, 'show'])->name('estudios.show');
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');

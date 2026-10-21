@@ -3461,6 +3461,8 @@ export default {
       totalpass: "TotalPass",
       fitpass: "Fitpass",
     },
+    codigoParaWellhub:
+      "Al elegir a AgendaUno como tu sistema en Wellhub, da este código: {codigo}. Con él, tu Gym ID se captura solo.",
   },
   checkins: {
     titulo: "Check-ins de bienestar",

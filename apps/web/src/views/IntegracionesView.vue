@@ -54,6 +54,8 @@ interface Integracion {
   ultimo_exito_anterior_en?: string | null;
   comprobada_por?: "checkin" | "aviso" | null;
   // Check-in automático (ADR 0148): dónde avisa la plataforma y si ya está activo.
+  // El código que el negocio da a Wellhub al elegir a AgendaUno (ADR 0202).
+  codigo_para_plataforma?: string | null;
   automatico?: {
     aviso_url: string | null;
     listo: boolean;
@@ -659,6 +661,17 @@ onMounted(cargar);
           :proveedor="i.proveedor"
           :automatico="i.automatico"
         />
+        <p
+          v-if="i.codigo_para_plataforma"
+          class="mt-3 text-sm"
+          data-prueba="codigo-para-plataforma"
+        >
+          {{
+            $t("integraciones.codigoParaWellhub", {
+              codigo: i.codigo_para_plataforma,
+            })
+          }}
+        </p>
 
         <button
           class="tu-btn tu-btn-primario mt-4 text-sm"

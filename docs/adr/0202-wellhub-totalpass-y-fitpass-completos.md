@@ -100,6 +100,15 @@ Huecos completados:
   horario de más de 200 minutos no se publica (antes se recortaba sin avisar).
 - **Token de AgendaUno como sistema integrado** (`WELLHUB_API_TOKEN`): con él, el negocio
   solo da su Gym ID.
+- **Alta como sistema integrado:** cuando un gimnasio elige a AgendaUno en Wellhub,
+  Wellhub avisa a la plataforma (`SYSTEM_INTEGRATION_REQUESTED`, en
+  `/api/v1/webhooks/wellhub/sistema`, firmado con `WELLHUB_WEBHOOK_SECRET`) con su Gym ID
+  y los campos que AgendaUno le pide (`custom_fields`). Si uno es el código del negocio
+  (su slug, que el dueño ve en Integraciones), el Gym ID se le captura solo en su
+  integración, apagada (el dueño la activa); si no, queda en `solicitudes_wellhub`
+  (control plane) y el superadmin lo asigna o lo descarta. `agendauno:wellhub-sistema
+  --suscribir` registra esa dirección con Wellhub y `--revisar` lista los gimnasios que
+  eligieron a AgendaUno y si están activos.
 - **Límite de avisos por negocio:** los avisos llegan de las mismas IP de Wellhub para
   todos; el límite de 600 por minuto ahora es de cada negocio.
 - La búsqueda de un horario que Wellhub ya tenía usa un minuto de margen.

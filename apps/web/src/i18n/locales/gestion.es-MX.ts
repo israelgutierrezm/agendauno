@@ -938,6 +938,16 @@ export const plataformaAdmin = {
     webhook_user: "Usuario del webhook",
     webhook_password: "Contraseña del webhook",
   },
+  wellhub: {
+    titulo: "Gimnasios que eligieron a AgendaUno en Wellhub",
+    ayuda:
+      "Wellhub avisó y no venía el código del negocio. Escribe su código (el de su dirección) para ponerle su Gym ID, o descártalo.",
+    sinNombre: "Sin nombre",
+    codigo: "Código del negocio",
+    asignar: "Asignar",
+    descartar: "Descartar",
+    asignada: "Gym ID asignado al negocio.",
+  },
   paisesBienestar: {
     titulo: "Wellhub y TotalPass por país",
     ayuda:

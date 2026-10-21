@@ -26,6 +26,7 @@ import ModulosNegocio, {
   type ModuloDelNegocio,
 } from "@/components/ModulosNegocio.vue";
 import ComercialPlataforma from "@/components/ComercialPlataforma.vue";
+import SolicitudesWellhub from "@/components/SolicitudesWellhub.vue";
 import MedicionPlataforma from "@/components/MedicionPlataforma.vue";
 import CondonarCargo from "@/components/CondonarCargo.vue";
 import type { PlanCitas } from "@/lib/suscripcion";
@@ -1954,6 +1955,9 @@ function borrar(): void {
             </button>
           </div>
         </form>
+
+        <!-- Gimnasios que eligieron a AgendaUno en Wellhub (ADR 0202). -->
+        <SolicitudesWellhub :api-url="apiUrl" :token="token" />
 
         <!-- Ventas, Banco de México y timbres (ADR 0107). -->
         <ComercialPlataforma :api-url="apiUrl" :token="token" />
