@@ -291,6 +291,7 @@ class ReservaMiembro {
     this.ocupacion,
     this.cita,
     this.lugar,
+    this.lugares = 0,
     this.enlaceEnLinea,
   });
 
@@ -303,6 +304,10 @@ class ReservaMiembro {
 
   /// Su lugar numerado, si la clase los numera y lo eligió (B06).
   final int? lugar;
+
+  /// Cuántos lugares numerados tiene su clase (0 = no numera): con ellos elige o
+  /// cambia el suyo.
+  final int lugares;
 
   /// Cómo llegar a la sucursal (enlace del mapa), si el negocio lo tiene.
   final String? mapaUrl;
@@ -370,6 +375,7 @@ class ReservaMiembro {
       asiste: j['asiste'] as String?,
       mapaUrl: j['mapa_url'] as String?,
       lugar: (j['lugar'] as num?)?.toInt(),
+      lugares: (j['lugares'] as num? ?? 0).toInt(),
       enlaceEnLinea: j['enlace_en_linea'] as String?,
       clase: tipo == TipoSesion.clase && j['clase'] is Map<String, dynamic>
           ? BloqueClase.desdeJson(j['clase'])
@@ -990,6 +996,7 @@ class RequisitoDocumento {
     this.obligatorio = false,
     this.estado,
     this.motivo,
+    this.documento,
   });
 
   final String tipoId;
@@ -999,6 +1006,9 @@ class RequisitoDocumento {
   /// null (falta) | pendiente | aprobado | rechazado.
   final String? estado;
   final String? motivo;
+
+  /// Lo último que subió para este requisito (se puede ver); null si falta.
+  final DocumentoMio? documento;
 
   String get estadoTexto => switch (estado) {
     'pendiente' => 'En revisión',
@@ -1023,8 +1033,35 @@ class RequisitoDocumento {
       obligatorio: (tipo['obligatorio'] ?? false) as bool,
       estado: documento?['estado'] as String?,
       motivo: documento?['motivo'] as String?,
+      documento: documento == null ? null : DocumentoMio.desdeJson(documento),
     );
   }
+}
+
+/// Un documento que subió (`GET /mi/documentos/{id}` lo descarga con su sesión).
+class DocumentoMio {
+  const DocumentoMio({required this.id, required this.nombre, this.estado});
+
+  final String id;
+
+  /// El nombre del archivo como lo subió (de ahí su tipo si el servidor no lo dice).
+  final String nombre;
+
+  /// pendiente | aprobado | rechazado.
+  final String? estado;
+
+  String get estadoTexto => switch (estado) {
+    'pendiente' => 'En revisión',
+    'aprobado' => 'Aprobado',
+    'rechazado' => 'Rechazado',
+    _ => '',
+  };
+
+  factory DocumentoMio.desdeJson(Map<String, dynamic> j) => DocumentoMio(
+    id: (j['id'] ?? '') as String,
+    nombre: (j['nombre'] ?? '') as String,
+    estado: j['estado'] as String?,
+  );
 }
 
 /// Tarjeta con la que se cobran los pagos automáticos (nunca el número completo).

@@ -14,6 +14,7 @@ import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
 import 'apartados_clase.dart';
+import 'cambiar_lugar_sheet.dart';
 import 'cuenta_screen.dart';
 import 'reprogramar_sheet.dart';
 
@@ -338,7 +339,7 @@ class _PorPagarTileState extends ConsumerState<PorPagarTile> {
 }
 
 /// Detalle de una reserva suya: agregar a mi calendario, pagar, aceptar el lugar,
-/// cambiar horario o cancelar.
+/// cambiar horario, elegir o cambiar su lugar numerado o cancelar.
 Future<void> mostrarDetalleReserva(
   BuildContext context,
   WidgetRef ref,
@@ -570,6 +571,30 @@ class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
                       );
                     },
                     child: const Text('Cambiar horario'),
+                  ),
+                // Lugares numerados (B06): elegir o cambiar el suyo antes de la
+                // clase.
+                if (!r.esCita &&
+                    r.lugares > 0 &&
+                    r.sesionId != null &&
+                    (r.estado == 'confirmada' ||
+                        r.estado == 'pendiente_pago') &&
+                    inicio != null &&
+                    inicio.isAfter(DateTime.now()))
+                  OutlinedButton(
+                    key: const Key('cambiar-lugar'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        showDragHandle: true,
+                        builder: (_) => CambiarLugarSheet(r),
+                      );
+                    },
+                    child: Text(
+                      r.lugar == null ? 'Elegir mi lugar' : 'Cambiar mi lugar',
+                    ),
                   ),
                 TextButton(
                   style: TextButton.styleFrom(

@@ -6,13 +6,15 @@ import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import 'comprar_planes.dart';
+import 'compras_mostrador.dart';
 import 'corte_planes_card.dart';
 import 'cuenta_widgets.dart';
 import 'historial_compras.dart';
 import 'pago_automatico_screen.dart';
 
 /// Pagos del portal: lo que tiene por pagar, comprar un plan, el corte de sus
-/// planes, el pago automático si el negocio lo ofrece y su historial de pagos.
+/// planes, el pago automático si el negocio lo ofrece, su historial de pagos y lo
+/// que compró en el mostrador.
 class PagosTab extends ConsumerWidget {
   const PagosTab({super.key, required this.cuenta});
 
@@ -79,6 +81,8 @@ class PagosTab extends ConsumerWidget {
           ],
           const TituloSeccion('Historial de pagos'),
           const HistorialComprasSeccion(),
+          // Lo que compró en recepción (ADR 0145); sin compras, no aparece.
+          const ComprasMostradorSeccion(),
         ],
       ),
     );

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lo que ArchivosProvider puede compartir: solo la carpeta de la caché donde la app
+     deja el documento que se va a abrir (MainActivity). -->
+<paths>
+    <cache-path name="compartidos" path="compartidos/" />
+</paths>

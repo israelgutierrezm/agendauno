@@ -62,6 +62,10 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
   Future<void> aceptarLugar(String reservaId) =>
       _hacer((repo) => repo.aceptarLugar(reservaId));
 
+  /// Elige o cambia su lugar numerado (B06); la reserva se lee de nuevo con él.
+  Future<void> cambiarLugar(String reservaId, int lugar) =>
+      _hacer((repo) => repo.cambiarLugar(reservaId, lugar));
+
   Future<void> firmar(String consentimientoId) =>
       _hacer((repo) => repo.firmar(consentimientoId));
 

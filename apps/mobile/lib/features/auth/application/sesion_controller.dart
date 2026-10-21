@@ -443,14 +443,26 @@ class SesionController extends Notifier<Sesion?> {
     return plantilla?.replaceAll('{evento}', evento);
   }
 
-  Future<Map<String, dynamic>?> _calendario() async {
+  /// El enlace `https` de su calendario: para copiarlo y pegarlo en Google Calendar
+  /// («Desde URL»), que no abre `webcal://`.
+  Future<String?> urlCalendario() async =>
+      (await _calendario())?['url'] as String?;
+
+  /// Genera un enlace nuevo (si compartió el suyo): el anterior deja de funcionar y
+  /// los calendarios suscritos con él ya no se actualizan. Devuelve el `https`.
+  Future<String?> regenerarCalendario() async =>
+      (await _calendario(nuevo: true))?['url'] as String?;
+
+  Future<Map<String, dynamic>?> _calendario({bool nuevo = false}) async {
     final actual = state;
     if (actual == null) {
       return null;
     }
-    final res = await ref
-        .read(dioProvider)
-        .get<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo/calendario');
+    final ruta = '/api/v1/app/${actual.slug}/yo/calendario';
+    final dio = ref.read(dioProvider);
+    final res = nuevo
+        ? await dio.post<Map<String, dynamic>>('$ruta/regenerar')
+        : await dio.get<Map<String, dynamic>>(ruta);
     return (res.data?['data'] ?? {}) as Map<String, dynamic>;
   }
 

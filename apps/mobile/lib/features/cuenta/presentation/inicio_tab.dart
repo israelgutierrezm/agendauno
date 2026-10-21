@@ -11,6 +11,7 @@ import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
 import 'cuenta_widgets.dart';
+import 'mis_videos_screen.dart';
 import 'pase_sheet.dart';
 import 'personas_a_cargo.dart';
 import 'tarjeta_principal.dart';
@@ -58,6 +59,9 @@ class InicioTab extends ConsumerWidget {
     final mapa = proxima?.mapaUrl;
     final nombre = _primerNombre(sesion);
     final estudio = sesion?.estudioNombre;
+    // Videos del negocio (ADR 0184, clases): el acceso sale solo si publicó alguno.
+    final videos = esCitas ? null : ref.watch(videosProvider).value;
+    final videosDisponibles = videos?.where((v) => v.disponible).length ?? 0;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -274,6 +278,23 @@ class InicioTab extends ConsumerWidget {
               atencion: pagar > 0,
               onTap: () => onIr(PestanaCuenta.pagos),
             ),
+            videos: videos != null && videos.isNotEmpty
+                ? TarjetaAcceso(
+                    icono: Icons.play_circle_outline,
+                    titulo: 'Videos',
+                    tono: TonosAcceso.pase,
+                    valor: videosDisponibles == 1
+                        ? '1 disponible'
+                        : '$videosDisponibles disponibles',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => MisVideosScreen(
+                          onVerPlanes: () => onIr(PestanaCuenta.pagos),
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
             // El pase y el expediente, solo si el negocio los usa (o hay algo por
             // firmar).
             pase: usa?.pase ?? false
@@ -311,7 +332,7 @@ class InicioTab extends ConsumerWidget {
 
   /// Citas: sus citas, volver a agendar, pagos y, si aplican, su bono, el
   /// expediente y el pase. Clases: reservar, sus reservas, su plan, su
-  /// asistencia, pagos, el pase y el expediente.
+  /// asistencia, pagos, los videos, el pase y el expediente (como en la web).
   static List<TarjetaAcceso> _accesos({
     required bool esCitas,
     required TarjetaAcceso reservar,
@@ -319,12 +340,22 @@ class InicioTab extends ConsumerWidget {
     required TarjetaAcceso pagos,
     TarjetaAcceso? plan,
     TarjetaAcceso? asistencia,
+    TarjetaAcceso? videos,
     TarjetaAcceso? pase,
     TarjetaAcceso? expediente,
   }) => [
     ...esCitas
         ? [reservas, reservar, pagos, plan, expediente, pase]
-        : [reservar, reservas, plan, asistencia, pagos, pase, expediente],
+        : [
+            reservar,
+            reservas,
+            plan,
+            asistencia,
+            pagos,
+            videos,
+            pase,
+            expediente,
+          ],
   ].whereType<TarjetaAcceso>().toList();
 
   /// Sin plan vigente: en pausa, suspendido o por empezar (en ese orden).

@@ -7,11 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/archivos/archivos_nativos.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../data/cuenta_repository.dart';
 
 /// Pase de entrada del alumno: un QR firmado que vence en minutos. Mientras se
 /// muestra se renueva solo cada minuto (una captura de pantalla deja de servir).
+/// Si el negocio lo permite, también va a la cartera del teléfono (ADR 0195):
+/// Google Wallet en Android y Apple Wallet en iPhone.
 class PaseSheet extends ConsumerStatefulWidget {
   const PaseSheet({super.key});
 
@@ -26,6 +29,7 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
   String? _error;
   Timer? _temporizador;
   bool _googleWallet = false;
+  bool _appleWallet = false;
   bool _abriendoWallet = false;
 
   @override
@@ -36,18 +40,54 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
     _revisarWallet();
   }
 
+  /// Cada teléfono, su cartera: Google Wallet en Android y Apple Wallet en iPhone.
   Future<void> _revisarWallet() async {
     final repo = ref.read(cuentaRepositoryProvider);
-    if (repo == null || defaultTargetPlatform != TargetPlatform.android) {
+    final plataforma = defaultTargetPlatform;
+    final android = plataforma == TargetPlatform.android;
+    final iphone = plataforma == TargetPlatform.iOS;
+    if (repo == null || (!android && !iphone)) {
       return;
     }
     try {
       final disponible = await repo.walletDisponible();
       if (mounted) {
-        setState(() => _googleWallet = disponible.google);
+        setState(() {
+          _googleWallet = android && disponible.google;
+          _appleWallet = iphone && disponible.apple;
+        });
       }
     } on DioException {
       // Sin cartera: el QR de siempre sigue sirviendo.
+    }
+  }
+
+  /// Baja el pase (`.pkpass`, con su sesión) y el iPhone muestra la hoja de Apple
+  /// Wallet para agregarlo.
+  Future<void> _agregarAAppleWallet() async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    if (repo == null) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _abriendoWallet = true);
+    try {
+      final pase = await repo.paseAppleWallet();
+      final abierto =
+          pase.isNotEmpty && await ArchivosNativos.agregarPaseWallet(pase);
+      if (!abierto) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir Apple Wallet.')),
+        );
+      }
+    } on DioException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No se pudo preparar tu pase.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _abriendoWallet = false);
+      }
     }
   }
 
@@ -151,13 +191,24 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
                 height: 240,
                 child: Center(child: CircularProgressIndicator()),
               ),
-            if (_googleWallet) ...[
+            if (_googleWallet || _appleWallet) ...[
               const SizedBox(height: 16),
-              OutlinedButton(
-                key: const Key('pase-google-wallet'),
-                onPressed: _abriendoWallet ? null : _guardarEnGoogleWallet,
-                child: const Text('Guardar en Google Wallet'),
-              ),
+              if (_googleWallet)
+                OutlinedButton(
+                  key: const Key('pase-google-wallet'),
+                  onPressed: _abriendoWallet ? null : _guardarEnGoogleWallet,
+                  child: const Text('Guardar en Google Wallet'),
+                ),
+              if (_appleWallet)
+                OutlinedButton(
+                  key: const Key('pase-apple-wallet'),
+                  onPressed: _abriendoWallet ? null : _agregarAAppleWallet,
+                  child: Text(
+                    _abriendoWallet
+                        ? 'Preparando tu pase…'
+                        : 'Agregar a Apple Wallet',
+                  ),
+                ),
               const SizedBox(height: 4),
               Text(
                 'El pase de la cartera no cambia cada minuto como este QR.',

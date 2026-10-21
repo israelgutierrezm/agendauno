@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -355,6 +356,66 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     });
   }
 
+  /// Copia el enlace `https` (Google Calendar lo pide así: «Desde URL»).
+  Future<void> _copiarCalendario() async {
+    final messenger = ScaffoldMessenger.of(context);
+    await hacerConAviso(context, () async {
+      final url = await ref.read(sesionProvider.notifier).urlCalendario();
+      if (url == null || url.isEmpty) {
+        return;
+      }
+      await Clipboard.setData(ClipboardData(text: url));
+      messenger.showSnackBar(const SnackBar(content: Text('Enlace copiado.')));
+    });
+  }
+
+  /// Genera un enlace nuevo, si compartió el suyo: el anterior deja de funcionar
+  /// (se confirma antes) y el nuevo queda copiado para agregarlo otra vez.
+  Future<void> _regenerarCalendario() async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (contexto) => AlertDialog(
+        title: const Text('Generar un enlace nuevo'),
+        content: const Text(
+          'El enlace anterior dejará de funcionar: los calendarios que lo usan ya '
+          'no se actualizarán y tendrás que agregar el nuevo. Hazlo si compartiste '
+          'tu enlace.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(contexto).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            key: const Key('confirmar-regenerar-calendario'),
+            onPressed: () => Navigator.of(contexto).pop(true),
+            child: const Text('Generar enlace nuevo'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) {
+      return;
+    }
+    setState(() => _guardando = true);
+    await hacerConAviso(
+      context,
+      () async {
+        final url = await ref
+            .read(sesionProvider.notifier)
+            .regenerarCalendario();
+        if (url != null && url.isNotEmpty) {
+          await Clipboard.setData(ClipboardData(text: url));
+        }
+      },
+      exito:
+          'Listo: tu enlace es nuevo y lo copiamos. Vuelve a agregarlo a tu calendario.',
+    );
+    if (mounted) {
+      setState(() => _guardando = false);
+    }
+  }
+
   /// «Cambiar de rol»: elige otro de sus roles; la app vuelve a su inicio con el
   /// rol nuevo (lo que ve y lo que el servidor le concede son de ese rol).
   Future<void> _cambiarRol() async {
@@ -699,31 +760,66 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               ),
             ),
           Card(
-            child: ListTile(
-              leading: const Icon(Icons.calendar_month_outlined),
-              title: const Text('Agregar a mi calendario'),
-              // Funciona con Google Calendar, Apple Calendar y Outlook (como en la web).
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Sus clases o sus citas, según el negocio (no las dos).
-                  Text(
-                    'Tus ${sesion.terminologia.sesiones.toLowerCase()} '
-                    'en el calendario del teléfono; se actualiza solo.',
-                  ),
-                  SizedBox(height: 6),
-                  Row(
+            key: const Key('calendario'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.calendar_month_outlined),
+                  title: const Text('Agregar a mi calendario'),
+                  // Funciona con Google Calendar, Apple Calendar y Outlook (como en
+                  // la web).
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      LogoCalendario(MarcaCalendario.google, tam: 18),
-                      SizedBox(width: 6),
-                      LogoCalendario(MarcaCalendario.apple, tam: 18),
-                      SizedBox(width: 6),
-                      LogoCalendario(MarcaCalendario.outlook, tam: 18),
+                      // Sus clases o sus citas, según el negocio (no las dos).
+                      Text(
+                        'Tus ${sesion.terminologia.sesiones.toLowerCase()} '
+                        'en el calendario del teléfono; se actualiza solo.',
+                      ),
+                      SizedBox(height: 6),
+                      Row(
+                        children: [
+                          LogoCalendario(MarcaCalendario.google, tam: 18),
+                          SizedBox(width: 6),
+                          LogoCalendario(MarcaCalendario.apple, tam: 18),
+                          SizedBox(width: 6),
+                          LogoCalendario(MarcaCalendario.outlook, tam: 18),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-              onTap: _guardando ? null : _agregarCalendario,
+                  onTap: _guardando ? null : _agregarCalendario,
+                ),
+                // El enlace privado: copiarlo (Google Calendar: «Desde URL») o
+                // cambiarlo por uno nuevo si lo compartió.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+                  child: OverflowBar(
+                    spacing: 4,
+                    children: [
+                      TextButton(
+                        key: const Key('copiar-calendario'),
+                        onPressed: _guardando ? null : _copiarCalendario,
+                        child: const Text('Copiar enlace'),
+                      ),
+                      TextButton(
+                        key: const Key('regenerar-calendario'),
+                        onPressed: _guardando ? null : _regenerarCalendario,
+                        child: const Text('Generar un enlace nuevo'),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Text(
+                    'Es privado: no lo compartas. En Google Calendar: Otros '
+                    'calendarios → Desde URL, y pega el enlace.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
             ),
           ),
           if (sesion.tieneVariosRoles)

@@ -36,6 +36,17 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notificacion" />
+        <!-- Abrir con el visor del teléfono un documento que la app bajó con su sesión
+             (un PDF): solo la carpeta compartidos/ de la caché y solo lectura. -->
+        <provider
+            android:name=".ArchivosProvider"
+            android:authorities="${applicationId}.archivos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/archivos_compartidos" />
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

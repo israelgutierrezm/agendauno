@@ -1,13 +1,19 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/archivos/archivos_nativos.dart';
 import '../../../core/intento.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/participante_en_uso.dart';
 import '../../auth/application/sesion_controller.dart';
+import 'compras_mostrador.dart';
 import 'corte_planes.dart';
 import 'cuenta_models.dart';
 import 'formularios.dart';
+import 'lugares_clase.dart';
+import 'videos.dart';
 
 /// Acceso a los datos del autoservicio del miembro (`/app/{slug}/mi/*`), sobre el
 /// estudio de la sesion activa.
@@ -377,6 +383,50 @@ class CuentaRepository {
     );
   }
 
+  /// Lo que compró en el mostrador del negocio (ADR 0145), de 10 en 10 (lo más
+  /// reciente primero). Sin perfil de cliente, ninguna.
+  Future<PaginaComprasMostrador> comprasMostrador({int pagina = 1}) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/compras-mostrador',
+      queryParameters: {'page': pagina, 'per_page': 10},
+    );
+    final meta = (res.data?['meta'] as Map<String, dynamic>?) ?? const {};
+    return PaginaComprasMostrador(
+      compras: ((res.data?['data'] ?? []) as List)
+          .whereType<Map<String, dynamic>>()
+          .map((c) => CompraMostrador.desdeJson(c, moneda: _moneda))
+          .toList(),
+      pagina: (meta['page'] as num? ?? pagina).toInt(),
+      ultimaPagina: (meta['ultima_pagina'] as num? ?? pagina).toInt(),
+    );
+  }
+
+  /// La biblioteca de videos del negocio (ADR 0184, solo en clases): todos los
+  /// publicados, con el enlace solo de los que incluye su plan.
+  Future<List<VideoMiembro>> videos() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/videos');
+    return ((res.data?['data'] ?? []) as List)
+        .whereType<Map<String, dynamic>>()
+        .map(VideoMiembro.desdeJson)
+        .toList();
+  }
+
+  /// Los lugares numerados de una clase y el suyo (B06); null si no los numera.
+  Future<LugaresDeClase?> lugaresDeClase(String sesionId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/sesiones/$sesionId/lugares',
+    );
+    return LugaresDeClase.desdeJson(res.data?['data']);
+  }
+
+  /// Elige o cambia el lugar de su reserva. Si alguien lo tomó mientras tanto, el
+  /// servidor lo rechaza (422): nunca se cambia a otro en silencio.
+  Future<void> cambiarLugar(String reservaId, int lugar) =>
+      _dio.put<Map<String, dynamic>>(
+        '$_base/mi/reservas/$reservaId/lugar',
+        data: {'lugar': lugar},
+      );
+
   /// Las fichas de datos que le pide el negocio, con lo que ya respondió. Sin
   /// perfil de cliente (403), no hay nada que llenar.
   Future<FormulariosDeCuenta> formularios() async {
@@ -406,13 +456,40 @@ class CuentaRepository {
     data: {'valores': valores},
   );
 
-  /// Los documentos que pide el negocio y cómo va cada uno.
-  Future<List<RequisitoDocumento>> misDocumentos() async {
+  /// Los documentos que pide el negocio y cómo va cada uno; aparte, lo que subió
+  /// sin un requisito (p. ej. porque se lo pidieron en recepción).
+  Future<({List<RequisitoDocumento> requisitos, List<DocumentoMio> otros})>
+  misDocumentos() async {
     final res = await _dio.get<Map<String, dynamic>>('$_base/mi/documentos');
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
-    return ((data['requisitos'] ?? []) as List)
-        .map((e) => RequisitoDocumento.desdeJson(e as Map<String, dynamic>))
-        .toList();
+    return (
+      requisitos: ((data['requisitos'] ?? []) as List)
+          .map((e) => RequisitoDocumento.desdeJson(e as Map<String, dynamic>))
+          .toList(),
+      otros: ((data['otros'] ?? []) as List)
+          .whereType<Map<String, dynamic>>()
+          .map(DocumentoMio.desdeJson)
+          .toList(),
+    );
+  }
+
+  /// Descarga uno de sus documentos (con su sesión: el archivo es privado). El tipo
+  /// lo dice el servidor o, si no, la extensión de [nombre].
+  Future<ArchivoDescargado> documento(
+    String documentoId, {
+    String? nombre,
+  }) async {
+    final res = await _dio.get<List<int>>(
+      '$_base/mi/documentos/$documentoId',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return ArchivoDescargado(
+      bytes: Uint8List.fromList(res.data ?? const []),
+      mime: ArchivoDescargado.tipoDe(
+        res.headers.value(Headers.contentTypeHeader),
+        nombre,
+      ),
+    );
   }
 
   /// Sube la foto del documento; queda en revisión.
@@ -485,6 +562,16 @@ class CuentaRepository {
     return ((res.data?['data'] ?? {}) as Map<String, dynamic>)['url']
             as String? ??
         '';
+  }
+
+  /// El pase para Apple Wallet (`.pkpass` firmado, ADR 0195). Se baja con la sesión
+  /// y el teléfono lo agrega a la cartera ([ArchivosNativos.agregarPaseWallet]).
+  Future<Uint8List> paseAppleWallet() async {
+    final res = await _dio.get<List<int>>(
+      '$_base/mi/pase/wallet/apple',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return Uint8List.fromList(res.data ?? const []);
   }
 
   /// Lo que pasará si reserva esa clase (M05); no aparta nada.
