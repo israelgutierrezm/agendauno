@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use Carbon\CarbonImmutable;
@@ -31,6 +32,12 @@ class PorCobrarTenant
         return $this->pendientes($permitidas)
             ->where(fn (Builder $q) => $q->whereNull('sesion_id')
                 ->orWhereHas('sesion', fn (Builder $s) => $s->where('inicia_en', '<=', $ahora)))
+            // Una cita a la que no vino no se cobra en caja (ADR 0166): ni la del anticipo
+            // ni la del resto.
+            ->whereNotExists(fn ($q) => $q->from('reservas')
+                ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+                ->where('asistencias.estado', EstadoAsistencia::Ausente->value)
+                ->where(fn ($w) => $w->whereColumn('reservas.orden_id', 'ordenes.id')->orWhereColumn('reservas.saldo_orden_id', 'ordenes.id')))
             ->orderBy('id');
     }
 

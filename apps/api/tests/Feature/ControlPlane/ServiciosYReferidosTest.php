@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
@@ -84,4 +85,55 @@ it('cuando el invitado paga su primer mes, los dos ganan un mes gratis', functio
         ->where('clave', 'periodo')->orderByDesc('periodo')->first();
     expect($siguiente?->estado)->toBe(EstadoCargoRenta::SinCargo)
         ->and($siguiente?->desglose['beneficio']['tipo'] ?? null)->toBe('mes_gratis');
+});
+
+it('la app con marca se cobra solo por los meses en que estuvo encendida', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
+    $mensualidades = fn (): array => CargoRenta::query()->where('concepto', 'complemento')->orderBy('clave')->pluck('clave')->all();
+
+    // Se enciende el 20 de noviembre: octubre no se cobra.
+    $this->travelTo(CarbonImmutable::parse('2026-11-20 12:00', 'America/Mexico_City'));
+    $this->putJson('/api/v1/plataforma/estudios/estudio-a/modulos', ['modulo' => 'app_marca', 'habilitado' => true], conPlataforma())->assertOk();
+    $this->travelTo(CarbonImmutable::parse('2026-11-21 12:00', 'America/Mexico_City'));
+    $this->artisan('agendauno:generar-cargos-renta', ['--periodo' => '2026-10'])->assertSuccessful();
+    expect($mensualidades())->toBe([]);
+
+    // Se apaga el 10 de diciembre: noviembre y diciembre sí se cobran; enero, no.
+    $this->travelTo(CarbonImmutable::parse('2026-12-10 12:00', 'America/Mexico_City'));
+    $this->putJson('/api/v1/plataforma/estudios/estudio-a/modulos', ['modulo' => 'app_marca', 'habilitado' => false], conPlataforma())->assertOk();
+    foreach (['2026-11' => '2026-12-01', '2026-12' => '2027-01-01', '2027-01' => '2027-02-01'] as $periodo => $dia) {
+        $this->travelTo(CarbonImmutable::parse($dia.' 12:00', 'America/Mexico_City'));
+        $this->artisan('agendauno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
+    }
+    expect($mensualidades())->toBe(['app_marca:2026-11', 'app_marca:2026-12']);
+});
+
+it('el mes gratis de un plan mensual cubre el mes siguiente completo, y el pendiente se aplica al cobrar el plan', function (): void {
+    $anfitrion = estudioConSesion('barberia-a', 'a@barberia-a.mx', 'barberia');
+    // Sigue en prueba mientras el invitado paga.
+    Estudio::query()->where('slug', 'barberia-a')->update(['trial_termina_en' => '2027-01-31']);
+    $codigo = (string) $this->getJson("/api/v1/app/{$anfitrion['slug']}/renta/referidos", conBearer($anfitrion['bearer']))->assertOk()->json('data.codigo');
+    $invitado = estudioConSesion('estudio-b', 'b@correo.mx');
+    $b = Estudio::query()->where('slug', 'estudio-b')->firstOrFail();
+    app(ReferidosSaas::class)->vincular($b, $codigo);
+
+    // El invitado paga su primer mes mientras el anfitrión (citas, plan por adelantado)
+    // sigue en prueba: su mes gratis queda pendiente.
+    terminarPrueba($invitado);
+    $this->putJson("/api/v1/plataforma/estudios/{$invitado['slug']}", ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900], conPlataforma())->assertOk();
+    emitirCargoDelMesEnCurso();
+    $primero = CargoRenta::query()->where('estudio_id', $b->getKey())->where('clave', 'periodo')->sole();
+    $primero->update(['estado' => EstadoCargoRenta::Pagado->value, 'pagado_en' => now()]);
+    app(ReferidosSaas::class)->alPagar($primero->refresh());
+    $a = fn (): Estudio => Estudio::query()->where('slug', 'barberia-a')->firstOrFail();
+    expect($a()->plan_cubierto_hasta)->toBeNull();
+
+    // Al cobrarle su plan, el mes gratis se suma: noviembre cubierto hasta el 31 de diciembre.
+    terminarPrueba($anfitrion);
+    $this->travelTo(CarbonImmutable::parse('2026-11-01 09:00', 'America/Mexico_City'));
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
+    expect($a()->plan_cubierto_hasta?->toDateString())->toBe('2026-12-31');
+    $this->getJson("/api/v1/app/{$anfitrion['slug']}/renta/referidos", conBearer($anfitrion['bearer']))->assertOk()
+        ->assertJsonPath('data.beneficios.0.aplicado', true);
 });

@@ -192,3 +192,15 @@ Nada del modelo comercial vive fijo en el código:
 - La app móvil guarda el nivel y las funciones que no incluye el plan (de `/yo`) y no
   ofrece lo que falta (compra en línea, pago automático).
 - Pendiente: Mercado Pago y OpenPay para la renta.
+
+## Ajuste (2026-10-21)
+
+- **Subir de nivel un plan anual:** la diferencia se prorratea sobre lo cubierto desde
+  el inicio del año pagado, incluido un mes gratis. Antes, con un mes gratis no se
+  encontraba el periodo y la base era un mes, lo que cobraba unas 12 veces de más. Sin
+  periodo pagado no se cobra.
+- **Condonar un cargo** cierra el intento abierto de Stripe, Mercado Pago u OpenPay. Si
+  ya se cobró o está en curso, no se condona.
+- **La cuota fija pactada** empieza después de lo que cubre un plan anual pagado: no se
+  cobran dos veces esos meses.
+- **Los mensajes de WhatsApp** llevan el IVA del país del negocio, como la renta.

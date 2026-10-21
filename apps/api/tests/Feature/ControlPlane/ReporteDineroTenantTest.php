@@ -93,3 +93,19 @@ it('lo vendido cuenta el día de la compra y lo cobrado, el día del cobro', fun
         ->and($dia4['ingresos_minor'])->toBe(10000)
         ->and($dia4['ordenes_pagadas'])->toBe(1);
 });
+
+it('una devolución total no borra la venta de su día: va en lo devuelto el día de la devolución', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $orden = comprarReporteDinero($e, crearMiembroTenant($e, 'Ana'), 10000);
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    $pago = (string) $this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->json('data.0.id');
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-05 12:00', 'America/Mexico_City'));
+    $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pago}/reembolsos", ['motivo' => 'Todo'], conBearer($e['bearer']))->assertCreated();
+
+    $dia1 = $this->getJson("/api/v1/app/{$e['slug']}/reportes/negocio?desde=2026-10-01&hasta=2026-10-01", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($dia1['dinero_por_moneda'][0])->toMatchArray(['ventas_minor' => 10000, 'cobrado_minor' => 10000, 'devuelto_minor' => 0])
+        ->and($dia1['ordenes_pagadas'])->toBe(1);
+    $dia5 = $this->getJson("/api/v1/app/{$e['slug']}/reportes/negocio?desde=2026-10-05&hasta=2026-10-05", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($dia5['dinero_por_moneda'][0])->toMatchArray(['ventas_minor' => 0, 'devuelto_minor' => 10000]);
+});

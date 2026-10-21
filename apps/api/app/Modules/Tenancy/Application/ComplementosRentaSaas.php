@@ -43,6 +43,25 @@ class ComplementosRentaSaas
         ];
     }
 
+    /**
+     * ¿Tuvo la app con su marca encendida en algún momento de ese mes? Encendida antes de
+     * guardar las fechas (sin `app_marca_desde`), cuenta como encendida desde siempre.
+     */
+    public static function encendidaEn(Estudio $estudio, string $periodo): bool
+    {
+        $desde = $estudio->getAttribute('app_marca_desde');
+        $hasta = $estudio->getAttribute('app_marca_hasta');
+        if ($desde === null && $hasta === null) {
+            return $estudio->moduloHabilitado(ModuloNegocio::AppConMarca);
+        }
+        $inicio = $periodo.'-01';
+        $fin = CarbonImmutable::parse($inicio)->endOfMonth()->toDateString();
+        $desde = $desde !== null ? substr((string) $desde, 0, 10) : null;
+        $hasta = $hasta !== null ? substr((string) $hasta, 0, 10) : null;
+
+        return ($desde === null || $desde <= $fin) && ($hasta === null || $hasta >= $inicio);
+    }
+
     /** ¿El arranque le sale gratis? Con el plan anual, sí. */
     public function arranqueGratis(Estudio $estudio): bool
     {
@@ -55,7 +74,7 @@ class ComplementosRentaSaas
      */
     public function emitirMensualidades(Estudio $estudio, string $periodo): ?CargoRenta
     {
-        if (! $estudio->moduloHabilitado(ModuloNegocio::AppConMarca)) {
+        if (! self::encendidaEn($estudio, $periodo)) {
             return null;
         }
         $subtotal = $this->precios()['app_marca_mensual_minor'];

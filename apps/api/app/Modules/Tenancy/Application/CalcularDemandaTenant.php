@@ -49,7 +49,9 @@ class CalcularDemandaTenant
         $fin = CarbonImmutable::parse($hasta.' 00:00:00', $zona)->addDay()->utc();
 
         $sesiones = SesionTenant::query()
-            ->whereBetween('inicia_en', [$inicio, $fin])
+            // [inicio, fin): la sesión de las 00:00 del día siguiente es de ese día.
+            ->where('inicia_en', '>=', $inicio)
+            ->where('inicia_en', '<', $fin)
             ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
             ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
             ->with('oferta.actividad')

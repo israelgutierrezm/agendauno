@@ -239,3 +239,19 @@ Sin cambiar a propósito:
 - **Devolución parcial en el mostrador.**
 - **La anulación como movimiento del día en que ocurre**, en lugar de quitar la venta
   del corte de su día. Va junto con el cierre de caja.
+
+## Ajuste (2026-10-21): reportes
+
+- **Lo vendido** incluye lo que se pagó aunque luego se devolviera todo: la devolución
+  va en «Devuelto» el día en que se hace. Antes, una devolución total borraba la venta
+  de su día y cambiaba meses ya cerrados. Las órdenes pagadas se cuentan por su fecha
+  de pago, aunque se hayan devuelto.
+- **Una cita con anticipo** (dos órdenes: anticipo y resto) es una sola venta y una
+  sola unidad en los reportes. Las órdenes de total 0 no cuentan como venta.
+- **«Por cobrar»** (Inicio y Cobranza) no cuenta las citas a las que el cliente no
+  vino, ni la orden del anticipo ni la del resto.
+- **Equipo y Demanda** toman el periodo como [inicio, fin): la sesión de las 00:00 del
+  día siguiente es de ese día.
+- **El CSV del corte** trae la propina de cada movimiento, el total de propinas y los
+  totales por forma de pago, como la pantalla.
+- **El asistente (ADR 0196)** describe cada reporte con lo que de verdad devuelve.

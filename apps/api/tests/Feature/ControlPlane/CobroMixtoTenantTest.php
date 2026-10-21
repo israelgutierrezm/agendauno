@@ -239,3 +239,19 @@ it('de la venta de una cita se devuelve por la forma con que se cobraron los pro
     $devolver([])->assertCreated()->assertJsonPath('devolucion.partes', [['metodo' => 'tarjeta', 'monto_minor' => 5000]]);
     expect(esperadoEnCajaMixta($c))->toMatchArray(['efectivo' => 20000, 'tarjeta' => 18000 - 5000]);
 });
+
+it('el CSV del corte trae la propina y los totales por forma, como la pantalla', function (): void {
+    $c = barberiaConCajaMixta();
+    $this->postJson("{$c['base']}/pos/ventas", [
+        'sucursal_id' => $c['sede']['sucursal'], 'items' => [['articulo_id' => $c['cera'], 'cantidad' => 2]],
+        'propina_minor' => 2000, 'recibido_minor' => 10000,
+        'partes' => [['metodo' => 'efectivo', 'monto_minor' => 7000], ['metodo' => 'tarjeta', 'monto_minor' => 5000]],
+    ], conBearer($c['e']['bearer']))->assertCreated();
+
+    $csv = (string) $this->get("{$c['base']}/pagos/movimientos?formato=csv", conBearer($c['e']['bearer']))->assertOk()->getContent();
+    expect($csv)->toContain('Fecha,Tipo,Monto,Propina,Moneda')
+        ->toContain('Propinas,20.00,MXN')
+        ->toContain('Por forma: Efectivo,70.00,MXN')
+        ->toContain('Por forma: Tarjeta (terminal),30.00,MXN')
+        ->toContain('Propinas por forma: Tarjeta (terminal),20.00,MXN');
+});

@@ -250,3 +250,19 @@ it('en caja, anticipo y resto juntos con varias formas: el ticket trae las dos y
         ->and($datos['cambio_minor'])->toBe(5000)
         ->and(collect($datos['partes'])->pluck('monto_minor', 'metodo')->sortKeys()->all())->toBe(['efectivo' => 15000, 'tarjeta' => 10000]);
 });
+
+it('una cita con anticipo y resto es una sola venta en los reportes', function (): void {
+    $ctx = citaConAnticipoParaRevisar();
+    $slug = $ctx['e']['slug'];
+    $reserva = (string) citaEnAgendaParaRevisar($ctx)['reserva_id'];
+    $this->postJson("/api/v1/app/{$slug}/reservas/{$reserva}/cobro", ['metodo' => 'efectivo'], conBearer($ctx['e']['bearer']))->assertCreated();
+
+    $hoy = now('America/Mexico_City')->toDateString();
+    $tendencias = $this->getJson("/api/v1/app/{$slug}/reportes/tendencias?desde={$hoy}&hasta={$hoy}", conBearer($ctx['e']['bearer']))->assertOk()->json('data');
+    expect($tendencias['totales']['ventas'])->toBe(1)
+        ->and($tendencias['totales']['ventas_minor'])->toBe(25000)
+        ->and($tendencias['totales']['ticket_promedio_minor'])->toBe(25000)
+        ->and(collect($tendencias['por_producto'])->sum('unidades'))->toBe(1);
+    $negocio = $this->getJson("/api/v1/app/{$slug}/reportes/negocio?desde={$hoy}&hasta={$hoy}", conBearer($ctx['e']['bearer']))->assertOk()->json('data');
+    expect($negocio['ordenes_pagadas'])->toBe(1);
+});

@@ -161,7 +161,9 @@ class MovimientosDePagoTenant
         $vendido = OrdenTenant::query()
             ->selectRaw('moneda, SUM(total_minor) AS total')
             ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
-            ->where('estado', '!=', EstadoOrden::Cancelada->value)
+            // Vendido: lo no cancelado y lo que se pagó aunque luego se devolviera todo (lo
+            // devuelto va en «Devuelto», en su fecha; ADR 0181).
+            ->where(fn ($q) => $q->where('estado', '!=', EstadoOrden::Cancelada->value)->orWhereNotNull('pagada_en'))
             ->whereBetween('created_at', [$inicio, $fin])
             ->groupBy('moneda')
             ->toBase()
@@ -219,12 +221,17 @@ class MovimientosDePagoTenant
 
         $compras = OrdenTenant::query()
             ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
-            ->where('estado', '!=', EstadoOrden::Cancelada->value)
+            // Vendido: lo no cancelado y lo que se pagó aunque luego se devolviera todo (lo
+            // devuelto va en «Devuelto», en su fecha; ADR 0181).
+            ->where(fn ($q) => $q->where('estado', '!=', EstadoOrden::Cancelada->value)->orWhereNotNull('pagada_en'))
             ->whereBetween('created_at', [$inicio, $fin])
+            // El resto de una cita con anticipo (ADR 0161) suma su dinero, pero no es otra
+            // venta: la cita ya cuenta por la orden de su anticipo.
+            ->selectRaw('moneda, total_minor, created_at, CASE WHEN EXISTS (SELECT 1 FROM reservas WHERE reservas.saldo_orden_id = ordenes.id) THEN 1 ELSE 0 END AS es_resto')
             ->toBase()
-            ->get(['moneda', 'total_minor', 'created_at']);
+            ->get();
         foreach ($compras as $o) {
-            $sumar((string) $o->moneda, $o->created_at, 'ventas_minor', (int) $o->total_minor, true);
+            $sumar((string) $o->moneda, $o->created_at, 'ventas_minor', (int) $o->total_minor, (int) $o->es_resto === 0 && (int) $o->total_minor > 0);
         }
 
         // Mostrador: se vende y se cobra en el momento. El comprobante de solo el

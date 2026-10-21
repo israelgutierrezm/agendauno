@@ -83,17 +83,18 @@ class MovimientosPagoTenantController
 
     /**
      * @param  list<array<string, mixed>>  $movimientos
-     * @param  list<array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int}>  $totales
+     * @param  list<array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, propinas_minor: int, por_metodo: array<string, int>, propinas_por_metodo: array<string, int>}>  $totales
      */
     private function csv(array $movimientos, array $totales, string $desde, string $hasta, string $zona): Response
     {
-        $lineas = ['Fecha,Tipo,Monto,Moneda,Método,Persona,Concepto,Quién,Referencia,Detalle'];
+        $lineas = ['Fecha,Tipo,Monto,Propina,Moneda,Método,Persona,Concepto,Quién,Referencia,Detalle'];
         foreach ($movimientos as $m) {
             $fecha = $m['fecha'] !== '' ? CarbonImmutable::parse((string) $m['fecha'])->setTimezone($zona)->format('Y-m-d H:i') : '';
             $lineas[] = implode(',', array_map(Csv::celda(...), [
                 $fecha,
                 self::TIPOS[(string) $m['tipo']] ?? (string) $m['tipo'],
                 number_format(((int) $m['monto_minor']) / 100, 2, '.', ''),
+                number_format(((int) ($m['propina_minor'] ?? 0)) / 100, 2, '.', ''),
                 (string) $m['moneda'],
                 (string) ($m['metodo'] ?? ''),
                 (string) ($m['persona'] ?? ''),
@@ -107,8 +108,15 @@ class MovimientosPagoTenantController
         // Los mismos totales del reporte, por moneda.
         $lineas[] = '';
         foreach ($totales as $t) {
-            foreach (['Total cobrado' => $t['cobrado_minor'], 'Total devuelto' => $t['devuelto_minor'], 'Neto' => $t['neto_minor'], 'Por cobrar' => $t['por_cobrar_minor']] as $concepto => $minor) {
+            foreach (['Total cobrado' => $t['cobrado_minor'], 'Total devuelto' => $t['devuelto_minor'], 'Neto' => $t['neto_minor'], 'Por cobrar' => $t['por_cobrar_minor'], 'Propinas' => $t['propinas_minor']] as $concepto => $minor) {
                 $lineas[] = $concepto.','.number_format($minor / 100, 2, '.', '').','.$t['moneda'];
+            }
+            // Por forma de pago, para cuadrar cada cajón y la terminal.
+            foreach ($t['por_metodo'] as $forma => $minor) {
+                $lineas[] = implode(',', array_map(Csv::celda(...), ['Por forma: '.$forma, number_format($minor / 100, 2, '.', ''), $t['moneda']]));
+            }
+            foreach ($t['propinas_por_metodo'] as $forma => $minor) {
+                $lineas[] = implode(',', array_map(Csv::celda(...), ['Propinas por forma: '.$forma, number_format($minor / 100, 2, '.', ''), $t['moneda']]));
             }
         }
 

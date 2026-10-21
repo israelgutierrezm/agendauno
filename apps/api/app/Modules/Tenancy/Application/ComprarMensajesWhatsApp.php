@@ -42,7 +42,9 @@ class ComprarMensajesWhatsApp
 
         $precio = $this->mensajes->precioMinor();
         $subtotal = $cantidad * $precio;
-        $ivaPorcentaje = (int) (TarifaSaas::vigente($estudio->modalidad())->definicion['iva_porcentaje'] ?? 16);
+        // Como la renta: el IVA del país del negocio (ADR 0107).
+        $definicion = MonedaDeCobroSaas::conIvaDelPais((array) (TarifaSaas::vigente($estudio->modalidad())->definicion ?? []), $estudio);
+        $ivaPorcentaje = (int) ($definicion['iva_porcentaje'] ?? 16);
         $iva = intdiv($subtotal * $ivaPorcentaje + 50, 100);
         $hoy = CarbonImmutable::now((string) ($estudio->zona_horaria ?: 'UTC'));
 

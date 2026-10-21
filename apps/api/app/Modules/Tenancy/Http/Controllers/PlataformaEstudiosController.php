@@ -26,6 +26,7 @@ use App\Modules\Tenancy\Models\FacturaPlataforma;
 use App\Modules\Tenancy\Models\MedicionUso;
 use App\Modules\Tenancy\ModuloNegocio;
 use App\Modules\Tenancy\PerfilNegocio;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -365,6 +366,13 @@ class PlataformaEstudiosController
                 ? [...$actuales, $modulo->value]
                 : array_values(array_diff($actuales, [$modulo->value])),
             ])->save();
+            // La app con su marca se cobra por los meses en que estuvo encendida (ADR 0188).
+            if ($modulo === ModuloNegocio::AppConMarca) {
+                $hoy = CarbonImmutable::now((string) ($modelo->zona_horaria ?: 'UTC'))->toDateString();
+                $modelo->forceFill($habilitado
+                    ? ['app_marca_desde' => $hoy, 'app_marca_hasta' => null]
+                    : ['app_marca_hasta' => $hoy])->save();
+            }
             Log::info('plataforma.estudio.modulo', ['estudio' => $modelo->slug, 'modulo' => $modulo->value, 'habilitado' => $habilitado]);
 
             if (! $habilitado && $gestor->baseDeDatosExiste($modelo)) {

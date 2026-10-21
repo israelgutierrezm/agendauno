@@ -115,7 +115,7 @@ class CobrarCargoRenta
      * Cierra el intento anterior, de la pasarela con que se abrió, antes de abrir otro.
      * False si ya se pagó o se está cobrando (ADR 0192).
      */
-    private function cerrarAnterior(CargoRenta $cargo, string $anterior): bool
+    public function cerrarAnterior(CargoRenta $cargo, string $anterior): bool
     {
         return match ($cargo->metodo_pago) {
             'stripe' => $this->stripe->cancelarIntento($anterior, $this->registro->llaves('stripe')),

@@ -85,3 +85,13 @@ it('la analitica de demanda exige permiso de facturacion', function (): void {
     $this->getJson("/api/v1/app/{$e['slug']}/reportes/demanda?desde={$hoy}&hasta={$hoy}", conBearer($coach))
         ->assertForbidden();
 });
+
+it('una clase a las 00:00 cuenta en su día, no también en el anterior', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    crearSesionTenant($e, $semilla, capacidad: 2, cuando: '2026-10-02 00:00:00');
+
+    $dia1 = $this->getJson("/api/v1/app/{$e['slug']}/reportes/demanda?desde=2026-10-01&hasta=2026-10-01", conBearer($e['bearer']))->assertOk()->json('data');
+    $dia2 = $this->getJson("/api/v1/app/{$e['slug']}/reportes/demanda?desde=2026-10-02&hasta=2026-10-02", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($dia1['totales']['sesiones'])->toBe(0)->and($dia2['totales']['sesiones'])->toBe(1);
+});

@@ -490,3 +490,20 @@ it('el ticket queda enviado cuando la cola lo manda y fallido si agota sus inten
     asignarSucursal($e, usuarioIdPorEmail($e, 'recepcion@barberia.mx'), $otra);
     $this->postJson("/api/v1/app/{$e['slug']}/pos/ventas/{$datos['venta_id']}/ticket", [], $recepcion)->assertForbidden();
 });
+
+it('una cita a la que no vino no queda por cobrar', function (): void {
+    $ctx = barberiaParaCobrar();
+    $slug = $ctx['e']['slug'];
+    $cita = $this->postJson("/api/v1/app/{$slug}/agenda/citas", [
+        'persona_id' => crearMiembroTenant($ctx['e'], 'Lola'), 'oferta_id' => $ctx['sede']['oferta'],
+        'sucursal_id' => $ctx['sede']['sucursal'], 'instructor_id' => $ctx['pro'],
+        'inicia_en_local' => '2026-10-01 07:00:00',
+    ], conBearer($ctx['e']['bearer']))->assertCreated()->json('data.cita');
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 09:00', 'America/Mexico_City'));
+    expect($this->getJson("/api/v1/app/{$slug}/cobranza/pendientes", conBearer($ctx['e']['bearer']))->assertOk()->json('meta.total'))->toBe(1);
+    $this->postJson("/api/v1/app/{$slug}/reservas/{$cita['reserva_id']}/asistencia", ['estado' => 'ausente'], conBearer($ctx['e']['bearer']))->assertCreated();
+
+    expect($this->getJson("/api/v1/app/{$slug}/cobranza/pendientes", conBearer($ctx['e']['bearer']))->assertOk()->json('meta.total'))->toBe(0)
+        ->and($this->getJson("/api/v1/app/{$slug}/inicio/hoy", conBearer($ctx['e']['bearer']))->assertOk()->json('data.cobros.ordenes_pendientes'))->toBe(0);
+});

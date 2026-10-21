@@ -93,8 +93,18 @@ class CondicionesDeCobroSaas
             ->where('estudio_id', $estudio->getKey())
             ->where('clave', 'periodo')
             ->max('periodo');
+        // Un plan anual pagado cubre meses después de su periodo: tampoco se cambian.
+        $cubre = CargoRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('clave', 'periodo')
+            ->max('cubre_hasta');
+        $despuesDeCubierto = is_string($cubre) && $cubre !== ''
+            ? CarbonImmutable::parse(substr($cubre, 0, 10))->addDay()->format('Y-m')
+            : null;
         if (is_string($ultimo) && $ultimo !== '') {
-            return CarbonImmutable::createFromFormat('Y-m-d', $ultimo.'-01')?->addMonthNoOverflow()->format('Y-m') ?? $ultimo;
+            $siguiente = CarbonImmutable::createFromFormat('Y-m-d', $ultimo.'-01')?->addMonthNoOverflow()->format('Y-m') ?? $ultimo;
+
+            return $despuesDeCubierto !== null && $despuesDeCubierto > $siguiente ? $despuesDeCubierto : $siguiente;
         }
 
         return $estudio->created_at !== null

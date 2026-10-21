@@ -66,11 +66,16 @@ class ReferidosSaas
         if (! $invitado instanceof Estudio || $invitado->referido_por_id === null) {
             return;
         }
-        $pagados = CargoRenta::query()->where('estudio_id', $invitado->getKey())
+        // Su primer pago de renta o de plan, lo avise quien lo avise (la pasarela, la
+        // domiciliación o la conciliación) y aunque llegue después de otro: otorgar es
+        // idempotente por anfitrión e invitado.
+        $primero = CargoRenta::query()->where('estudio_id', $invitado->getKey())
             ->where('estado', EstadoCargoRenta::Pagado->value)
             ->where(fn ($q) => $q->whereNull('concepto')->orWhereIn('concepto', ['renta', 'plan']))
-            ->count();
-        if ($pagados !== 1) {
+            ->orderBy('pagado_en')
+            ->orderBy('id')
+            ->first();
+        if (! $primero instanceof CargoRenta || (int) $primero->getKey() !== (int) $cargo->getKey()) {
             return;
         }
         $anfitrion = Estudio::query()->find($invitado->referido_por_id);
@@ -135,8 +140,47 @@ class ReferidosSaas
         }
         // Con plan por adelantado (citas): un mes más cubierto, ya.
         if ($estudio->plan_cubierto_hasta !== null) {
-            $estudio->forceFill(['plan_cubierto_hasta' => CarbonImmutable::parse($estudio->plan_cubierto_hasta)->addMonthNoOverflow()->toDateString()])->save();
+            self::unMesMas($estudio);
             $beneficio->update(['aplicado_en' => now()]);
         }
+    }
+
+    /**
+     * Un plan por adelantado recién cobrado (citas): si tenía un mes gratis pendiente
+     * (se otorgó cuando aún no tenía periodo cubierto, p. ej. en la prueba), se le
+     * suma ahora.
+     */
+    public function aplicarAlPlan(Estudio $estudio): void
+    {
+        if ($estudio->plan_cubierto_hasta === null) {
+            return;
+        }
+        DB::transaction(function () use ($estudio): void {
+            $beneficio = BeneficioRenta::query()
+                ->where('estudio_id', $estudio->getKey())
+                ->where('tipo', self::MES_GRATIS)
+                ->whereNull('aplicado_en')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+            if (! $beneficio instanceof BeneficioRenta) {
+                return;
+            }
+            self::unMesMas($estudio);
+            $beneficio->update(['aplicado_en' => now()]);
+        });
+    }
+
+    /**
+     * Un mes más de plan cubierto: en mensual hasta el fin del mes siguiente (cubre ese
+     * mes completo, sin un cargo de uno o tres días); en anual, al mismo día un mes después.
+     */
+    private static function unMesMas(Estudio $estudio): void
+    {
+        $hasta = CarbonImmutable::parse((string) $estudio->plan_cubierto_hasta?->toDateString());
+        $nuevo = $estudio->plan_periodicidad === 'anual'
+            ? $hasta->addMonthNoOverflow()
+            : $hasta->startOfMonth()->addMonthNoOverflow()->endOfMonth()->startOfDay();
+        $estudio->forceFill(['plan_cubierto_hasta' => $nuevo->toDateString()])->save();
     }
 }

@@ -46,3 +46,17 @@ sedes incluidas):
   suscripción.
 - El arranque se cobra fuera del sistema (lo agenda y cobra ventas). Si se vuelve
   frecuente, se cobrará como los timbres.
+
+## Ajuste (2026-10-21)
+
+- **La app con marca** se cobra por los meses en que estuvo encendida
+  (`estudios.app_marca_desde` y `app_marca_hasta`). Antes se miraba solo si estaba
+  encendida el día de emitir: encenderla a mitad de mes cobraba el mes anterior, y
+  apagarla dejaba sin cobrar el mes en que sí la tuvo.
+- **Mes gratis por referido:**
+  - Se otorga con el primer pago de renta o de plan del invitado, lo avise quien lo
+    avise. Antes, si lo cobraba la domiciliación, no se otorgaba nunca.
+  - Si el anfitrión tiene plan por adelantado y aún no tiene periodo cubierto, el mes
+    pendiente se suma al cobrarle su plan.
+  - En un plan mensual, el mes gratis cubre el mes siguiente completo (hasta su último
+    día), sin un cargo de uno a tres días.

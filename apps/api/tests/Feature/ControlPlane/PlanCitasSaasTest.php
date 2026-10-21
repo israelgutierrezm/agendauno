@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TipoCambio;
@@ -314,4 +315,22 @@ it('un año que empieza el 29 de febrero cubre un año completo y el siguiente n
     $this->travelTo(CarbonImmutable::parse('2029-03-01 09:00', 'America/Mexico_City'));
     $segundo = $planes->siguientePeriodo($estudio, 'anual');
     expect([$segundo['desde']->toDateString(), $segundo['hasta']->toDateString()])->toBe(['2029-03-01', '2030-02-28']);
+});
+
+it('subir de nivel en un plan anual con un mes gratis cobra la diferencia sobre lo cubierto, no 12 veces', function (): void {
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    terminarPrueba($e);
+    cambiarPlanCitas($e, 'premium', 3, 'anual')->assertOk();
+    emitirRentaEl('2026-11-01 09:00');
+    $anual = cargoDelPlan('2026-11');
+    expect($anual->cubre_hasta?->toDateString())->toBe('2027-10-31');
+    $anual->update(['estado' => EstadoCargoRenta::Pagado->value, 'pagado_en' => now()]);
+    // Un mes gratis por referido alarga lo cubierto sin un cargo propio.
+    Estudio::query()->where('slug', $e['slug'])->update(['plan_cubierto_hasta' => '2027-11-30']);
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00', 'America/Mexico_City'));
+    cambiarPlanCitas($e, 'premium', 4, 'anual')->assertOk()->assertJsonPath('data.aplica', 'ahora');
+    $ajuste = CargoRenta::query()->where('concepto', 'ajuste')->sole();
+    // La diferencia de 394 de 395 días de un año: menos que el año completo de 3.
+    expect($ajuste->monto_tarifa_minor)->toBeLessThan((int) $anual->monto_tarifa_minor);
 });

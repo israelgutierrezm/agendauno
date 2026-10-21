@@ -7,8 +7,6 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Exceptions\CargoRentaNoPagable;
 use App\Modules\Tenancy\Models\CargoRenta;
-use App\Modules\Tenancy\Pasarelas\PasarelaStripePlataforma;
-use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -21,8 +19,7 @@ use Illuminate\Support\Facades\Log;
 class CondonarCargoRenta
 {
     public function __construct(
-        private readonly RegistroDePasarelasPlataforma $registro,
-        private readonly PasarelaStripePlataforma $stripe,
+        private readonly CobrarCargoRenta $cobrar,
         private readonly SuspensionPorRenta $suspension,
     ) {}
 
@@ -36,9 +33,10 @@ class CondonarCargoRenta
             if ($bloqueado->estado !== EstadoCargoRenta::Pendiente) {
                 throw new CargoRentaNoPagable('Solo se condona un cargo pendiente.');
             }
+            // El intento abierto de cualquier pasarela (Stripe, Mercado Pago u OpenPay) se
+            // cierra; si ya se cobró o está en curso, no se condona.
             $referencia = (string) $bloqueado->referencia_pago;
-            if ($referencia !== '' && $bloqueado->metodo_pago === 'stripe'
-                && ! $this->stripe->cancelarIntento($referencia, $this->registro->llaves('stripe'))) {
+            if ($referencia !== '' && ! $this->cobrar->cerrarAnterior($bloqueado, $referencia)) {
                 throw new CargoRentaNoPagable('Este cargo tiene un pago en curso; espera su confirmación.');
             }
 

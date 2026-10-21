@@ -192,9 +192,9 @@ class AsistenteNegocioTenant
 
         return [
             ['name' => 'reporte_negocio', 'description' => 'Dinero (vendido, cobrado, devuelto y neto por moneda, en centavos), órdenes pagadas, ocupación de clases, inasistencias, clientes activos e ingreso por cliente de un periodo.', 'input_schema' => $periodo],
-            ['name' => 'reporte_sucursales', 'description' => 'Las mismas cifras por sucursal en un periodo.', 'input_schema' => $periodo],
+            ['name' => 'reporte_sucursales', 'description' => 'Cada sucursal hoy: clientes con plan activo y sesiones próximas (no depende del periodo ni trae dinero).', 'input_schema' => $periodo],
             ['name' => 'reporte_demanda', 'description' => 'Demanda por día de la semana y hora: reservas, ocupación y lista de espera en un periodo.', 'input_schema' => $periodo],
-            ['name' => 'reporte_tendencias', 'description' => 'Cómo van ingresos, reservas y clientes en el tiempo, agrupado por día, semana o mes.', 'input_schema' => [
+            ['name' => 'reporte_tendencias', 'description' => 'Cómo va el dinero en el tiempo (vendido, cobrado, devuelto, ventas y lo más vendido), agrupado por día, semana o mes.', 'input_schema' => [
                 ...$periodo,
                 'properties' => [...$periodo['properties'], 'agrupacion' => ['type' => 'string', 'enum' => ['dia', 'semana', 'mes']]],
             ]],

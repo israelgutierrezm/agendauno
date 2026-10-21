@@ -176,7 +176,8 @@ class ReporteTendenciasTenantController
     {
         $filas = LineaOrdenTenant::query()
             ->join('ordenes', 'ordenes.id', '=', 'lineas_orden.orden_id')
-            ->where('ordenes.estado', '!=', EstadoOrden::Cancelada->value)
+            // Lo pagado sigue vendido aunque luego se devolviera (va en «Devuelto»).
+            ->where(fn ($q) => $q->where('ordenes.estado', '!=', EstadoOrden::Cancelada->value)->orWhereNotNull('ordenes.pagada_en'))
             ->where('ordenes.moneda', $moneda)
             ->when($sedes !== null, fn ($q) => $q->whereIn('ordenes.sucursal_id', $sedes))
             ->whereBetween('ordenes.created_at', [$inicio, $fin])
@@ -207,7 +208,7 @@ class ReporteTendenciasTenantController
             ->pluck('nombre', 'id');
 
         $compras = fn () => OrdenTenant::query()
-            ->where('ordenes.estado', '!=', EstadoOrden::Cancelada->value)
+            ->where(fn ($q) => $q->where('ordenes.estado', '!=', EstadoOrden::Cancelada->value)->orWhereNotNull('ordenes.pagada_en'))
             ->where('ordenes.moneda', $moneda)
             ->when($sedes !== null, fn ($q) => $q->whereIn('ordenes.sucursal_id', $sedes))
             ->whereBetween('ordenes.created_at', [$inicio, $fin]);
@@ -217,7 +218,8 @@ class ReporteTendenciasTenantController
             ->leftJoin('sesiones', 'sesiones.id', '=', 'ordenes.sesion_id')
             ->leftJoin('ofertas', 'ofertas.id', '=', 'sesiones.oferta_id')
             ->groupBy('ofertas.nombre')
-            ->selectRaw('ofertas.nombre as nombre, SUM(ordenes.total_minor) as vendido, COUNT(*) as unidades')
+            // Una cita con anticipo son dos órdenes (anticipo y resto): una sola unidad.
+            ->selectRaw('ofertas.nombre as nombre, SUM(ordenes.total_minor) as vendido, SUM(CASE WHEN EXISTS (SELECT 1 FROM reservas WHERE reservas.saldo_orden_id = ordenes.id) THEN 0 ELSE 1 END) as unidades')
             ->toBase()
             ->get();
         $descuentos = (int) $compras()

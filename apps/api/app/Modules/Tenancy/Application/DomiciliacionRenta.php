@@ -225,6 +225,8 @@ class DomiciliacionRenta
 
         if ($resultado === 'pagado') {
             $this->suspension->reactivarSiPago($estudio->refresh());
+            // El primer pago de un invitado da el mes gratis, también si fue domiciliado.
+            app(ReferidosSaas::class)->alPagar($cargo->refresh());
         }
 
         return $resultado;

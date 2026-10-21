@@ -411,11 +411,20 @@ class PlanCitasSaas
     {
         $hasta = CarbonImmutable::parse((string) $e->plan_cubierto_hasta?->toDateString());
         $anual = $actual['periodicidad'] === 'anual';
+        // El periodo pagado que rige hoy (lo cubierto puede ir más allá: un mes gratis
+        // por referido se suma sin cargo propio).
         $periodo = CargoRenta::query()->where('estudio_id', $e->getKey())->where('clave', 'periodo')
-            ->whereDate('cubre_hasta', $hasta->toDateString())->first();
+            ->whereDate('cubre_desde', '<=', $hoy->toDateString())
+            ->orderByDesc('cubre_desde')
+            ->first();
         $desde = $periodo?->cubre_desde !== null ? CarbonImmutable::parse($periodo->cubre_desde->toDateString()) : null;
-        // Base del prorrateo: los días del mes (mensual) o los del año pagado (anual).
-        $base = $anual && $desde !== null ? (int) $desde->diffInDays($hasta) + 1 : $hasta->daysInMonth;
+        if ($anual && $desde === null) {
+            // Sin el periodo pagado no hay base cierta: el cambio aplica sin cobrar.
+            return null;
+        }
+        // Base del prorrateo: los días del mes (mensual) o los de lo cubierto desde el
+        // inicio del año pagado (anual).
+        $base = $anual ? (int) $desde->diffInDays($hasta) + 1 : $hasta->daysInMonth;
         $dias = (int) $hoy->diffInDays($hasta) + 1;
         $importe = intdiv($diferenciaMensual * ($anual ? CalcularRentaSaas::mesesAnual($definicion) : 1) * $dias, max(1, $base));
         if ($importe <= 0) {
@@ -519,6 +528,8 @@ class PlanCitasSaas
                 'plan_cubierto_hasta' => $cargo->cubre_hasta?->toDateString() ?? $periodo['hasta']->toDateString(),
                 'plan_siguiente' => null,
             ]);
+            // Un mes gratis por referido que quedó pendiente se suma ahora.
+            app(ReferidosSaas::class)->aplicarAlPlan($e);
 
             return $cargo;
         });

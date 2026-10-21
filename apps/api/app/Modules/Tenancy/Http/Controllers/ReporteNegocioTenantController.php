@@ -16,7 +16,6 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
-use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -62,10 +61,12 @@ class ReporteNegocioTenantController
         $dinero = $movimientos->porMoneda($desde, $hasta, $sedes);
         $principal = $dinero[0] ?? ['moneda' => app(ParametrosTenant::class)->moneda(), 'ventas_minor' => 0, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0];
         $ingresos = $principal['neto_minor'];
-        // Órdenes que quedaron pagadas en el periodo (por la fecha del pago).
+        // Órdenes que quedaron pagadas en el periodo (por la fecha del pago), aunque luego
+        // se devolvieran; el resto de una cita con anticipo no es otra venta (ADR 0161).
         $ordenesPagadas = OrdenTenant::query()
-            ->where('estado', EstadoOrden::Pagada->value)
+            ->whereNotNull('pagada_en')
             ->whereBetween('pagada_en', [$inicio, $fin])
+            ->whereNotExists(fn ($q) => $q->from('reservas')->whereColumn('reservas.saldo_orden_id', 'ordenes.id'))
             ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->count();
 
