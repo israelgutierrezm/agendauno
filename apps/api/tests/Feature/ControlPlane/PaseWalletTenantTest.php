@@ -32,10 +32,10 @@ afterEach(function (): void {
 function walletDePrueba(string $carpeta): string
 {
     // Una configuración mínima de OpenSSL: en Windows no hay una por omisión.
-    file_put_contents($carpeta.'/openssl.cnf', "[ req ]
+    file_put_contents($carpeta.'/openssl.cnf', '[ req ]
 distinguished_name = dn
 [ dn ]
-");
+');
     $o = ['config' => $carpeta.'/openssl.cnf', 'private_key_bits' => 2048];
     $dn = static fn (string $cn): array => ['commonName' => $cn, 'organizationName' => 'Pruebas', 'countryName' => 'MX'];
     $llaveCa = openssl_pkey_new($o);

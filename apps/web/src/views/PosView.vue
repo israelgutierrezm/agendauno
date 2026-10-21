@@ -617,7 +617,8 @@ const ruta = useRoute();
 const apartadosACobrar = ref<string[]>([]);
 const apartadoDe = ref<string | null>(null);
 function precargarApartados(): void {
-  const q = ruta.query;
+  // Sin enrutador (p. ej. en pruebas aisladas) no hay nada que precargar.
+  const q = (ruta as typeof ruta | undefined)?.query ?? {};
   const lista =
     typeof q.apartados === "string"
       ? q.apartados.split(",").filter(Boolean)
