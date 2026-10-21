@@ -42,7 +42,7 @@ class CalendarioExternoTenant extends Model
 
     protected $fillable = [
         'usuario_id', 'proveedor', 'cuenta', 'token_refresco', 'token_acceso', 'token_vence_en', 'calendario_id', 'estado', 'ultimo_error', 'sincronizado_en',
-        'aviso_id', 'aviso_recurso', 'aviso_secreto', 'aviso_vence_en', 'aviso_reintento_en',
+        'aviso_id', 'aviso_recurso', 'aviso_secreto', 'aviso_vence_en', 'aviso_reintento_en', 'aviso_falta_permiso',
     ];
 
     protected $hidden = ['token_refresco', 'token_acceso', 'aviso_secreto'];
@@ -58,6 +58,7 @@ class CalendarioExternoTenant extends Model
         'aviso_secreto' => 'encrypted',
         'aviso_vence_en' => 'datetime',
         'aviso_reintento_en' => 'datetime',
+        'aviso_falta_permiso' => 'boolean',
     ];
 
     /**

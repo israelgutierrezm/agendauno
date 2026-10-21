@@ -11,6 +11,12 @@ export default {
   sincronizar: "Sincronizar ahora",
   sincronizado: "Al día",
   ultima: "Última vez: {cuando}",
+  avisos: {
+    al_momento: "Los cambios de tu calendario llegan al momento.",
+    cada_10_minutos: "Tu calendario se revisa cada 10 minutos.",
+    reconectar:
+      "Vuelve a conectarlo para que los cambios lleguen al momento (hoy se revisa cada 10 minutos).",
+  },
   desconectar: "Desconectar",
   desconectarConfirmar:
     "Se quita de tu cuenta el calendario del negocio y dejan de bloquearse tus horas ocupadas.",

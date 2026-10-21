@@ -86,3 +86,13 @@ las dos direcciones con Google Calendar.
 - **La pasada de cada 10 minutos sigue:** publica nuestras clases y citas en su
   calendario, renueva las suscripciones y cubre un aviso perdido.
 - Sin validar con Google ni con Microsoft: probado con respuestas simuladas.
+
+## Ajuste (2026-10-21, tarde): cómo llegan los cambios, en Mi perfil
+
+- Cada conexión dice en Mi perfil cómo le llegan los cambios de su calendario
+  (`avisos`): `al_momento` (canal abierto), `cada_10_minutos` (sin dirección HTTPS de
+  la plataforma o mientras se reintenta) o `reconectar`.
+- `reconectar`: Google o Microsoft contestaron 401/403 al abrir el canal porque conectó
+  antes de que se pidiera el permiso de avisos (`calendarios_externos.aviso_falta_permiso`,
+  migración de negocio 000190). Se le ofrece «Conectar» otra vez; al volver a conectar,
+  el canal se intenta enseguida, sin esperar las 6 horas del reintento.

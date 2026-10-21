@@ -142,4 +142,26 @@ describe("Google Calendar y Outlook en Mi perfil", () => {
     );
     expect(boton(w, "Conectar")).toBeDefined();
   });
+
+  it("dice cómo llegan los cambios y ofrece reconectar si falta el permiso de avisos", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          disponible: true,
+          proveedores: [
+            {
+              proveedor: "google",
+              configurado: true,
+              conexion: { ...conexion, avisos: "reconectar" },
+            },
+          ],
+        },
+      },
+    });
+    const { w } = await montar();
+    expect(w.get('[data-prueba="calendario-avisos"]').text()).toBe(
+      calendariosExternos.avisos.reconectar,
+    );
+    expect(boton(w, calendariosExternos.conectar)).toBeDefined();
+  });
 });

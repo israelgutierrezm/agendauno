@@ -63,6 +63,11 @@ function fingirGoogleCalendario(array &$llamadas, array &$ocupado, ?string &$fal
         }
         // El canal de avisos de su calendario principal (y cerrarlo).
         if (str_ends_with($url, '/calendars/primary/events/watch')) {
+            // Conectó antes de que se pidiera el permiso de avisos.
+            if ($falla === 'sin_permiso') {
+                return Http::response(['error' => ['code' => 403, 'message' => 'Insufficient Permission']], 403);
+            }
+
             return Http::response(['kind' => 'api#channel', 'id' => $peticion->data()['id'] ?? '', 'resourceId' => 'recurso-'.count($llamadas), 'expiration' => (string) now()->addDays(7)->getTimestampMs()]);
         }
         if (str_ends_with($url, '/calendar/v3/channels/stop')) {
@@ -474,4 +479,31 @@ it('Outlook valida la dirección, avisa con su clientState y la suscripción se 
 
     $this->deleteJson("/api/v1/app/{$slug}/yo/calendarios/microsoft", [], conBearer($n['coach']))->assertNoContent();
     expect(collect($llamadas)->contains(fn (array $l): bool => $l['metodo'] === 'DELETE' && str_ends_with($l['url'], '/v1.0/subscriptions/sub-1')))->toBeTrue();
+});
+
+it('Mi perfil dice cómo llegan los cambios y pide reconectar a quien no dio el permiso de avisos', function (): void {
+    $llamadas = [];
+    $ocupado = [];
+    $falla = null;
+    fingirGoogleCalendario($llamadas, $ocupado, $falla);
+    $n = negocioConCoachYClase();
+    $slug = $n['e']['slug'];
+    $estado = fn (): ?string => collect($this->getJson("/api/v1/app/{$slug}/yo/calendarios", conBearer($n['coach']))->assertOk()->json('data.proveedores'))
+        ->firstWhere('proveedor', 'google')['conexion']['avisos'] ?? null;
+
+    // Sin dirección HTTPS de la plataforma: la pasada de cada 10 minutos.
+    conectarCalendarioDeCoach($n, 'google');
+    expect($estado())->toBe('cada_10_minutos');
+
+    // Google no deja abrir el canal: le falta el permiso.
+    config(['app.url' => 'https://api.agendauno.test']);
+    $falla = 'sin_permiso';
+    $this->postJson("/api/v1/app/{$slug}/yo/calendarios/google/sincronizar", [], conBearer($n['coach']))->assertOk();
+    expect($estado())->toBe('reconectar');
+
+    // Vuelve a conectarlo (con el permiso) y el canal se abre ya, sin esperar el reintento.
+    $falla = null;
+    conectarCalendarioDeCoach($n, 'google');
+    $this->postJson("/api/v1/app/{$slug}/yo/calendarios/google/sincronizar", [], conBearer($n['coach']))->assertOk();
+    expect($estado())->toBe('al_momento');
 });

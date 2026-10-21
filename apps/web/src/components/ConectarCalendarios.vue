@@ -22,6 +22,8 @@ type Conexion = {
   estado: "activo" | "reconectar";
   ultimo_error: string | null;
   sincronizado_en: string | null;
+  // Cómo le llegan los cambios de su calendario.
+  avisos?: "al_momento" | "cada_10_minutos" | "reconectar";
 };
 type Opcion = {
   proveedor: Proveedor;
@@ -194,11 +196,21 @@ onMounted(async () => {
               cuando: cuando(o.conexion.sincronizado_en),
             })
           }}</span>
+          <span
+            v-if="o.conexion.estado === 'activo' && o.conexion.avisos"
+            class="tu-hint"
+            data-prueba="calendario-avisos"
+            >{{ $t(`calendariosExternos.avisos.${o.conexion.avisos}`) }}</span
+          >
         </template>
       </div>
       <div class="cc-acciones">
         <button
-          v-if="!o.conexion || o.conexion.estado === 'reconectar'"
+          v-if="
+            !o.conexion ||
+            o.conexion.estado === 'reconectar' ||
+            o.conexion.avisos === 'reconectar'
+          "
           type="button"
           class="tu-btn tu-btn-fantasma text-sm"
           :disabled="ocupado !== null || !o.configurado"

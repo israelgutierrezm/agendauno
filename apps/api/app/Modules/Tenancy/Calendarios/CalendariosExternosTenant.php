@@ -133,6 +133,9 @@ class CalendariosExternosTenant
             'token_vence_en' => $tokens['vence_en'],
             'estado' => self::ACTIVO,
             'ultimo_error' => null,
+            // Con los permisos de ahora: el canal de avisos se vuelve a intentar ya.
+            'aviso_reintento_en' => null,
+            'aviso_falta_permiso' => false,
         ])->save();
 
         return $calendario;
@@ -274,19 +277,37 @@ class CalendariosExternosTenant
                 'aviso_secreto' => $secreto,
                 'aviso_vence_en' => $aviso['vence_en'],
                 'aviso_reintento_en' => null,
+                'aviso_falta_permiso' => false,
             ])->save();
         } catch (Throwable $e) {
+            // Sin el permiso de avisos (401/403) no es una falla: se queda con la pasada y
+            // en Mi perfil se le pide volver a conectar.
+            $sinPermiso = $e instanceof RequestException && in_array($e->response->status(), [401, 403], true);
             $calendario->forceFill([
                 'aviso_id' => null,
                 'aviso_recurso' => null,
                 'aviso_vence_en' => null,
                 'aviso_reintento_en' => $ahora->addHours(self::HORAS_REINTENTAR_AVISO),
+                'aviso_falta_permiso' => $sinPermiso,
             ])->save();
-            // Sin el permiso de avisos (403) no es una falla: se queda con la pasada.
-            if (! ($e instanceof RequestException && in_array($e->response->status(), [401, 403], true))) {
+            if (! $sinPermiso) {
                 report($e);
             }
         }
+    }
+
+    /**
+     * Cómo le llegan los cambios de su calendario: `al_momento` (canal abierto),
+     * `reconectar` (le falta el permiso de avisos: conectó antes de pedirlo) o
+     * `cada_10_minutos` (sin dirección HTTPS de la plataforma o mientras se reintenta).
+     */
+    public function avisos(CalendarioExternoTenant $calendario): string
+    {
+        if ($calendario->aviso_id !== null && $calendario->aviso_vence_en?->isFuture() === true) {
+            return 'al_momento';
+        }
+
+        return $calendario->aviso_falta_permiso ? 'reconectar' : 'cada_10_minutos';
     }
 
     /** El token de acceso vigente (lo renueva si venció). */

@@ -106,6 +106,7 @@ class CalendariosExternosTenantController
             'estado' => $calendario->estado,
             'ultimo_error' => $calendario->ultimo_error,
             'sincronizado_en' => $calendario->sincronizado_en?->toIso8601String(),
+            'avisos' => $this->calendarios->avisos($calendario),
         ];
     }
 
