@@ -1183,6 +1183,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/bandeja/conversaciones', [BandejaTenantController::class, 'index'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.index');
             Route::get('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'show'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.show');
             Route::post('/bandeja/conversaciones/{conversacion}/mensajes', [BandejaTenantController::class, 'enviar'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:60,1,bandeja-enviar'])->name('bandeja.enviar');
+            Route::get('/bandeja/plantillas', [BandejaTenantController::class, 'plantillas'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.plantillas');
+            Route::post('/bandeja/conversaciones/{conversacion}/plantilla', [BandejaTenantController::class, 'enviarPlantilla'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:30,1,bandeja-plantillas'])->name('bandeja.plantilla');
             Route::post('/bandeja/conversaciones/{conversacion}/archivos', [BandejaTenantController::class, 'enviarArchivo'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:30,1,bandeja-archivos'])->name('bandeja.archivos');
             Route::get('/bandeja/mensajes/{mensaje}/archivo', [BandejaTenantController::class, 'archivo'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.archivo');
             Route::put('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'actualizar'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.actualizar');

@@ -70,6 +70,20 @@ function fingirMetaBandeja(array &$llamadas): void
             str_ends_with($url, 'lookaside.fbsbx.com/wa/media-html') => Http::response('<script>alert(1)</script>', 200, ['Content-Type' => 'text/html']),
             str_ends_with($url, 'cdn.instagram.test/foto.jpg') => Http::response('FOTO-IG', 200, ['Content-Type' => 'image/jpeg']),
             str_ends_with($url, '/7654321/media') => Http::response(['id' => 'media-subido']),
+            // Las plantillas aprobadas de la cuenta de WhatsApp del negocio.
+            str_ends_with($url, '/1234567/message_templates') => Http::response(['data' => [
+                ['name' => 'recordatorio_cita', 'language' => 'es_MX', 'status' => 'APPROVED', 'category' => 'UTILITY', 'parameter_format' => 'POSITIONAL', 'components' => [
+                    ['type' => 'HEADER', 'format' => 'TEXT', 'text' => 'Estudio Cal'],
+                    ['type' => 'BODY', 'text' => 'Hola {{1}}, ¿seguimos con tu cita del {{2}}?'],
+                    ['type' => 'FOOTER', 'text' => 'Contesta para hablar con nosotros'],
+                    ['type' => 'BUTTONS', 'buttons' => [['type' => 'QUICK_REPLY', 'text' => 'Sí']]],
+                ]],
+                // Lo que el panel no pregunta: imagen en el encabezado, variables con
+                // nombre y un enlace con variable.
+                ['name' => 'promo_foto', 'language' => 'es_MX', 'category' => 'MARKETING', 'components' => [['type' => 'HEADER', 'format' => 'IMAGE'], ['type' => 'BODY', 'text' => 'Promo']]],
+                ['name' => 'con_nombre', 'language' => 'es_MX', 'category' => 'UTILITY', 'parameter_format' => 'NAMED', 'components' => [['type' => 'BODY', 'text' => 'Hola {{nombre}}']]],
+                ['name' => 'enlace', 'language' => 'es_MX', 'category' => 'UTILITY', 'components' => [['type' => 'BODY', 'text' => 'Mira'], ['type' => 'BUTTONS', 'buttons' => [['type' => 'URL', 'url' => 'https://estudio.mx/{{1}}']]]]],
+            ]]),
             // Los avisos push al equipo (FCM).
             str_contains($url, 'oauth2.googleapis.com/token') => Http::response(['access_token' => 'ya29.prueba', 'expires_in' => 3599]),
             str_contains($url, 'fcm.googleapis.com') => Http::response(['name' => 'projects/agendauno-prueba/messages/1']),
@@ -475,4 +489,37 @@ it('al atender la baja de datos se borran sus conversaciones ligadas y sus archi
 
     $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$conversacion}", conBearer($e['bearer']))->assertNotFound();
     expect(Storage::disk('local')->allFiles())->toBe([]);
+});
+
+// Fuera de las 24 horas, Meta solo deja mandar una plantilla aprobada del número.
+it('pasadas las 24 horas se contesta por WhatsApp con una plantilla aprobada del número', function (): void {
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    conectarWhatsAppDeBandeja($e);
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.t1', 'Luego te confirmo'))->assertOk();
+    $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones", conBearer($e['bearer']))->json('data.0.id');
+    $this->travel(25)->hours();
+
+    // Solo la que el panel puede llenar.
+    $plantillas = $this->getJson("/api/v1/app/{$e['slug']}/bandeja/plantillas", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($plantillas)->toBe([[
+        'nombre' => 'recordatorio_cita', 'idioma' => 'es_MX', 'categoria' => 'utility', 'encabezado' => 'Estudio Cal',
+        'cuerpo' => 'Hola {{1}}, ¿seguimos con tu cita del {{2}}?', 'pie' => 'Contesta para hablar con nosotros', 'variables' => 2,
+    ]]);
+
+    $ruta = "/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}/plantilla";
+    $this->postJson($ruta, ['nombre' => 'recordatorio_cita', 'idioma' => 'es_MX', 'variables' => ['Lucía']], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['variables'], 'meta.errors');
+    $this->postJson($ruta, ['nombre' => 'recordatorio_cita', 'idioma' => 'es_MX', 'variables' => ["Lucía\nhola", 'martes']], conBearer($e['bearer']))
+        ->assertUnprocessable();
+    $this->postJson($ruta, ['nombre' => 'promo_foto', 'idioma' => 'es_MX', 'variables' => []], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['plantilla'], 'meta.errors');
+
+    $mensaje = $this->postJson($ruta, ['nombre' => 'recordatorio_cita', 'idioma' => 'es_MX', 'variables' => ['Lucía', 'martes']], conBearer($e['bearer']))
+        ->assertCreated()->json('data');
+    expect($mensaje['tipo'])->toBe('plantilla')
+        ->and($mensaje['texto'])->toBe("Estudio Cal\n\nHola Lucía, ¿seguimos con tu cita del martes?\n\nContesta para hablar con nosotros");
+    Http::assertSent(fn (PeticionHttp $p): bool => str_ends_with($p->url(), '/7654321/messages') && ($p['type'] ?? null) === 'template'
+        && $p['template'] === ['name' => 'recordatorio_cita', 'language' => ['code' => 'es_MX'], 'components' => [['type' => 'body', 'parameters' => [['type' => 'text', 'text' => 'Lucía'], ['type' => 'text', 'text' => 'martes']]]]]);
 });

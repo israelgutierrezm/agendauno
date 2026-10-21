@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Support\DiscosDeArchivos;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -109,6 +110,46 @@ class BandejaTenantController
         abort_unless($usuario instanceof Usuario, 401);
 
         $mensaje = $this->bandeja->responder($this->estudio($request), $conversacion, $usuario, trim((string) $validado['texto']));
+
+        return response()->json(['data' => $this->presentarMensaje($mensaje->load('autor'))], 201);
+    }
+
+    /**
+     * Las plantillas aprobadas del número de WhatsApp del negocio que se pueden mandar
+     * desde aquí (fuera de las 24 horas es lo único que deja Meta).
+     */
+    public function plantillas(Request $request): JsonResponse
+    {
+        try {
+            $plantillas = $this->bandeja->plantillas($this->estudio($request));
+        } catch (RequestException $e) {
+            report($e);
+            abort(502, 'Meta no respondió con las plantillas de tu WhatsApp: inténtalo en un momento.');
+        }
+
+        return response()->json(['data' => $plantillas]);
+    }
+
+    /**
+     * Contesta con una plantilla aprobada (también fuera de las 24 horas); Meta la
+     * cobra a la cuenta de WhatsApp del negocio.
+     */
+    public function enviarPlantilla(Request $request): JsonResponse
+    {
+        $conversacion = $this->conversacion($request);
+        $validado = $request->validate([
+            'nombre' => ['required', 'string', 'max:512'],
+            'idioma' => ['required', 'string', 'max:20'],
+            'variables' => ['present', 'array', 'max:20'],
+            // Meta no admite saltos de línea, tabuladores ni más de 4 espacios seguidos.
+            'variables.*' => ['required', 'string', 'max:1000', 'not_regex:/[\n\t]| {5,}/'],
+        ]);
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($usuario instanceof Usuario, 401);
+        /** @var list<string> $valores */
+        $valores = array_values(array_map(static fn (mixed $v): string => trim((string) $v), $validado['variables']));
+
+        $mensaje = $this->bandeja->responderConPlantilla($this->estudio($request), $conversacion, $usuario, (string) $validado['nombre'], (string) $validado['idioma'], $valores);
 
         return response()->json(['data' => $this->presentarMensaje($mensaje->load('autor'))], 201);
     }

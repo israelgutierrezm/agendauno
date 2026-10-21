@@ -19,6 +19,7 @@ import BuscarPersona, {
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import PlantillaBandeja from "@/components/PlantillaBandeja.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import {
@@ -195,6 +196,23 @@ async function enviar(): Promise<void> {
   } finally {
     enviando.value = false;
   }
+}
+
+// Fuera de las 24 horas, por WhatsApp: una plantilla aprobada del número.
+const conPlantilla = ref(false);
+watch(
+  () => seleccion.value?.id,
+  () => {
+    conPlantilla.value = false;
+  },
+);
+async function plantillaEnviada(): Promise<void> {
+  conPlantilla.value = false;
+  toast.exito(t("bandejaMensajes.plantillas.enviada"));
+  if (seleccion.value !== null) {
+    await abrir(seleccion.value.id, true);
+  }
+  void cargarLista(true);
 }
 
 // Una imagen o un PDF (por Instagram, solo imágenes); lo escrito va como pie.
@@ -789,9 +807,31 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </form>
-        <p v-else class="tu-hint bm-fuera" data-prueba="fuera-de-plazo">
-          {{ $t("bandejaMensajes.fueraDePlazo") }}
-        </p>
+        <div v-else class="bm-fuera">
+          <p class="tu-hint" data-prueba="fuera-de-plazo">
+            {{ $t("bandejaMensajes.fueraDePlazo") }}
+          </p>
+          <template v-if="seleccion.canal === 'whatsapp'">
+            <PlantillaBandeja
+              v-if="conPlantilla"
+              :base="base"
+              :conversacion-id="seleccion.id"
+              @enviada="plantillaEnviada"
+            />
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              data-prueba="con-plantilla"
+              @click="conPlantilla = !conPlantilla"
+            >
+              {{
+                conPlantilla
+                  ? $t("bandejaMensajes.plantillas.cerrar")
+                  : $t("bandejaMensajes.plantillas.abrir")
+              }}
+            </button>
+          </template>
+        </div>
       </article>
       <div v-else class="tu-tarjeta bm-columna-hilo bm-elegir">
         <p class="tu-hint">{{ $t("bandejaMensajes.elegir") }}</p>
@@ -981,9 +1021,13 @@ onBeforeUnmount(() => {
   color: var(--texto-suave);
   font-size: 0.75rem;
 }
-.bm-redactar {
+.bm-redactar,
+.bm-fuera {
   display: grid;
   gap: 0.5rem;
+}
+.bm-fuera > button {
+  justify-self: start;
 }
 .bm-elegir {
   place-items: center;

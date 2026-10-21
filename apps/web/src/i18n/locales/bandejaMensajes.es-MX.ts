@@ -51,6 +51,27 @@ export default {
   contestarHasta: "Puedes contestar hasta las {hora}.",
   fueraDePlazo:
     "Pasaron más de 24 horas desde su último mensaje: Meta no deja contestarle hasta que vuelva a escribir.",
+  plantillas: {
+    abrir: "Mandar una plantilla",
+    cerrar: "Cancelar",
+    cargando: "Cargando tus plantillas…",
+    ninguna:
+      "No tienes plantillas aprobadas que se puedan mandar desde aquí. Créalas en el administrador de WhatsApp de Meta (de texto, sin imagen en el encabezado).",
+    error: "No se pudieron leer tus plantillas de WhatsApp.",
+    elegir: "Plantilla aprobada",
+    ningunaElegida: "Elige una",
+    dato: "Dato {n}",
+    asiLlega: "Así le llega",
+    cobro:
+      "Meta cobra este mensaje a la cuenta de WhatsApp de tu negocio, según su categoría.",
+    enviar: "Mandar plantilla",
+    enviada: "Plantilla enviada.",
+    categorias: {
+      utility: "Utilidad",
+      marketing: "Marketing",
+      authentication: "Autenticación",
+    },
+  },
   archivar: "Archivar",
   reabrir: "Reabrir",
   archivada: "Conversación archivada.",

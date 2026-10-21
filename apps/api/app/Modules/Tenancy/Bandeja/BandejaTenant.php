@@ -17,6 +17,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
@@ -50,6 +51,12 @@ class BandejaTenant
 
     /** Tipo de adjunto de Instagram → tipo del mensaje (lo demás no se baja). */
     private const ADJUNTOS_INSTAGRAM = ['image' => 'image', 'video' => 'video', 'audio' => 'audio', 'file' => 'document'];
+
+    /** Minutos que se guardan las plantillas del número (Meta las aprueba aparte). */
+    private const MINUTOS_PLANTILLAS = 10;
+
+    /** Botones de plantilla que piden un dato que el panel no pregunta. */
+    private const BOTONES_CON_DATOS = ['OTP', 'COPY_CODE', 'FLOW', 'CATALOG', 'MPM', 'VOICE_CALL'];
 
     /** Minutos que vale la dirección con que Meta toma un archivo que se manda. */
     private const MINUTOS_ARCHIVO_PUBLICO = 15;
@@ -346,6 +353,152 @@ class BandejaTenant
         }
 
         return $guardado;
+    }
+
+    /**
+     * Las plantillas aprobadas del número de WhatsApp del negocio que se pueden mandar
+     * desde el panel: de texto, sin imagen en el encabezado ni botones o enlaces que
+     * pidan un dato. Cada una con su texto y cuántos valores pide (`{{1}}`, `{{2}}`…).
+     * Se guardan unos minutos: Meta las aprueba aparte, en su administrador.
+     *
+     * @return list<array{nombre: string, idioma: string, categoria: string, encabezado: string|null, cuerpo: string, pie: string|null, variables: int}>
+     */
+    public function plantillas(Estudio $estudio): array
+    {
+        $canal = $this->canal($estudio, CanalMensajeria::WHATSAPP);
+        if ($canal === null || $canal->estado !== 'activo' || $canal->waba_id === null) {
+            return [];
+        }
+
+        return Cache::remember('bandeja:plantillas:'.$estudio->getKey().':'.$canal->waba_id, now()->addMinutes(self::MINUTOS_PLANTILLAS), function () use ($canal): array {
+            $lista = [];
+            foreach ($this->meta->plantillasWhatsApp($canal->token, (string) $canal->waba_id) as $plantilla) {
+                $usable = self::plantillaUsable($plantilla);
+                if ($usable !== null) {
+                    $lista[] = $usable;
+                }
+            }
+
+            return $lista;
+        });
+    }
+
+    /**
+     * Contesta con una plantilla aprobada del número del negocio: lo que deja Meta
+     * fuera de las 24 horas. Meta la cobra a la cuenta de WhatsApp del negocio.
+     *
+     * @param  list<string>  $valores  los de su texto, en orden
+     */
+    public function responderConPlantilla(Estudio $estudio, ConversacionTenant $conversacion, Usuario $autor, string $nombre, string $idioma, array $valores): MensajeConversacionTenant
+    {
+        $canal = $this->canal($estudio, $conversacion->canal);
+        if ($conversacion->canal !== CanalMensajeria::WHATSAPP) {
+            throw ValidationException::withMessages(['plantilla' => ['Las plantillas son de WhatsApp: por Instagram se contesta cuando vuelva a escribir.']]);
+        }
+        if ($canal === null || $canal->estado !== 'activo') {
+            throw ValidationException::withMessages(['plantilla' => ['Ese canal ya no está conectado: conéctalo de nuevo en la bandeja.']]);
+        }
+        $plantilla = null;
+        foreach ($this->plantillas($estudio) as $p) {
+            if ($p['nombre'] === $nombre && $p['idioma'] === $idioma) {
+                $plantilla = $p;
+            }
+        }
+        if ($plantilla === null) {
+            throw ValidationException::withMessages(['plantilla' => ['Esa plantilla ya no está aprobada en tu WhatsApp: elige otra.']]);
+        }
+        if (count($valores) !== $plantilla['variables']) {
+            throw ValidationException::withMessages(['variables' => ["Esta plantilla pide {$plantilla['variables']} dato(s)."]]);
+        }
+
+        try {
+            $id = $this->meta->enviarPlantillaWhatsApp($canal->token, $canal->cuenta_id, $conversacion->contacto_id, $nombre, $idioma, $valores);
+        } catch (RequestException $e) {
+            report($e);
+            throw ValidationException::withMessages(['plantilla' => ['Meta no aceptó la plantilla: '.Str::limit((string) ($e->response->json('error.message') ?? 'inténtalo de nuevo.'), 160)]]);
+        }
+
+        // Lo que le llegó, para leerlo en la conversación.
+        $cuerpo = preg_replace_callback('/\{\{(\d+)\}\}/', static fn (array $m): string => $valores[((int) $m[1]) - 1] ?? $m[0], $plantilla['cuerpo']);
+        $texto = implode("\n\n", array_filter([$plantilla['encabezado'], $cuerpo, $plantilla['pie']], static fn (?string $t): bool => $t !== null && $t !== ''));
+        $ahora = CarbonImmutable::now();
+
+        return DB::connection('tenant')->transaction(function () use ($conversacion, $autor, $texto, $id, $ahora): MensajeConversacionTenant {
+            $mensaje = MensajeConversacionTenant::query()->create([
+                'id_externo' => $id !== '' ? $id : null,
+                'conversacion_id' => $conversacion->getKey(),
+                'direccion' => MensajeConversacionTenant::SALIENTE,
+                'tipo' => 'plantilla',
+                'texto' => $texto,
+                'estado' => 'enviado',
+                'enviado_por' => $autor->getKey(),
+                'enviado_en' => $ahora,
+            ]);
+            $conversacion->forceFill(['ultimo_texto' => Str::limit($texto, 190), 'ultimo_mensaje_en' => $ahora, 'no_leidos' => 0])->save();
+
+            return $mensaje;
+        });
+    }
+
+    /**
+     * Una plantilla de Meta como la usa el panel, o null si pide algo que el panel no
+     * pregunta (imagen o variables en el encabezado, botones con datos, carrusel,
+     * variables con nombre).
+     *
+     * @param  array<string, mixed>  $plantilla
+     * @return array{nombre: string, idioma: string, categoria: string, encabezado: string|null, cuerpo: string, pie: string|null, variables: int}|null
+     */
+    private static function plantillaUsable(array $plantilla): ?array
+    {
+        if (strtoupper((string) ($plantilla['parameter_format'] ?? 'POSITIONAL')) !== 'POSITIONAL') {
+            return null;
+        }
+        $encabezado = $pie = $cuerpo = null;
+        foreach ((array) ($plantilla['components'] ?? []) as $parte) {
+            if (! is_array($parte)) {
+                return null;
+            }
+            $texto = (string) ($parte['text'] ?? '');
+            switch (strtoupper((string) ($parte['type'] ?? ''))) {
+                case 'HEADER':
+                    if (strtoupper((string) ($parte['format'] ?? '')) !== 'TEXT' || str_contains($texto, '{{')) {
+                        return null;
+                    }
+                    $encabezado = $texto;
+                    break;
+                case 'BODY':
+                    $cuerpo = $texto;
+                    break;
+                case 'FOOTER':
+                    $pie = $texto;
+                    break;
+                case 'BUTTONS':
+                    foreach ((array) ($parte['buttons'] ?? []) as $boton) {
+                        if (! is_array($boton) || str_contains((string) ($boton['url'] ?? ''), '{{')
+                            || in_array(strtoupper((string) ($boton['type'] ?? '')), self::BOTONES_CON_DATOS, true)) {
+                            return null;
+                        }
+                    }
+                    break;
+                default:
+                    return null;
+            }
+        }
+        if ($cuerpo === null || $cuerpo === '' || ! is_string($plantilla['name'] ?? null) || ! is_string($plantilla['language'] ?? null)) {
+            return null;
+        }
+        preg_match_all('/\{\{(\d+)\}\}/', $cuerpo, $marcas);
+        $numeros = array_map('intval', $marcas[1]);
+
+        return [
+            'nombre' => $plantilla['name'],
+            'idioma' => $plantilla['language'],
+            'categoria' => strtolower((string) ($plantilla['category'] ?? '')),
+            'encabezado' => $encabezado,
+            'cuerpo' => $cuerpo,
+            'pie' => $pie,
+            'variables' => $numeros === [] ? 0 : max($numeros),
+        ];
     }
 
     /**

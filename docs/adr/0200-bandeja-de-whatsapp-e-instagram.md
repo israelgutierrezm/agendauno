@@ -60,7 +60,8 @@ negocio (ADR 0190) y la bandeja después.
 - Pendiente:
   - ~~avisos push al equipo cuando llega un mensaje~~ (hecho, ver el ajuste);
   - ~~mandar y ver archivos~~ (hecho, ver el ajuste);
-  - contestar fuera de las 24 horas con plantillas del número del negocio;
+  - ~~contestar fuera de las 24 horas con plantillas del número del negocio~~ (hecho,
+    ver el ajuste);
   - Facebook Messenger.
 - Sin validar con Meta: probado con respuestas simuladas.
 
@@ -92,3 +93,14 @@ negocio (ADR 0190) y la bandeja después.
       antes de que el mensaje quede guardado. El pie sale como otro mensaje.
   - **Baja de datos (ARCO):** al atenderla se borran las conversaciones ligadas a su
     ficha, con sus archivos. Una conversación sin ligar no se puede saber de quién es.
+- **Plantillas fuera de las 24 horas (WhatsApp)**:
+  - El panel lee las plantillas aprobadas de la cuenta de WhatsApp del negocio
+    (`message_templates`), guardadas 10 minutos. Solo ofrece las que puede llenar: de
+    texto, con variables `{{1}}`, `{{2}}`…, sin imagen ni variables en el
+    encabezado, y sin botones con datos (enlace con variable, código, flujo).
+  - Las plantillas se crean y Meta las aprueba en su administrador, no aquí. Son
+    del número del negocio, no las de la plataforma (ADR 0190).
+  - Se mandan también fuera de las 24 horas. En la conversación queda el texto tal
+    como le llegó. El panel avisa que Meta cobra el mensaje a la cuenta de WhatsApp
+    del negocio, según su categoría.
+  - Instagram no tiene plantillas: ahí se espera a que vuelva a escribir.

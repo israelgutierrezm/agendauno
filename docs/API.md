@@ -1532,6 +1532,14 @@ en el negocio.
   - `POST /bandeja/conversaciones/{id}/archivos` (multipart: `archivo` JPG, PNG, WebP o
     PDF hasta `bandeja.archivo_max_mb`; `texto`? como pie) contesta con el archivo
     (201). Por Instagram, solo imágenes; el pie sale como otro mensaje.
+  - `GET /bandeja/plantillas` devuelve las plantillas aprobadas del número de WhatsApp
+    que se pueden mandar desde el panel: [{`nombre`, `idioma`, `categoria`,
+    `encabezado`, `cuerpo`, `pie`, `variables`}]. Sin imagen en el encabezado, sin
+    variables con nombre y sin botones que pidan datos. 502 si Meta no responde.
+  - `POST /bandeja/conversaciones/{id}/plantilla` {`nombre`, `idioma`, `variables`:
+    [texto, …]} contesta con ella, también fuera de las 24 horas (201). Solo
+    WhatsApp. Las variables no admiten saltos de línea, tabuladores ni más de 4
+    espacios seguidos. Meta la cobra a la cuenta de WhatsApp del negocio.
   - `GET /bandeja/mensajes/{id}/archivo` lo sirve: una imagen `inline`; lo demás como
     `application/octet-stream` y `attachment`, con `nosniff`. Si aún no se bajó de
     Meta, lo intenta; 404 si ya no está o pesa de más.

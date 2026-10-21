@@ -164,6 +164,48 @@ class ClienteMetaBandeja
         ])->throw()->json('message_id');
     }
 
+    /**
+     * Las plantillas aprobadas de la cuenta de WhatsApp del negocio, tal como las da
+     * Meta (nombre, idioma, categoría y sus partes).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function plantillasWhatsApp(string $token, string $wabaId): array
+    {
+        $json = (array) $this->api($token)->get($this->graph($wabaId.'/message_templates'), [
+            'fields' => 'name,language,status,category,components,parameter_format',
+            'status' => 'APPROVED',
+            'limit' => 200,
+        ])->throw()->json();
+
+        return array_values(array_filter((array) ($json['data'] ?? []), 'is_array'));
+    }
+
+    /**
+     * Manda una plantilla aprobada (también fuera de las 24 horas) con los valores de
+     * su cuerpo en orden; devuelve el id del mensaje.
+     *
+     * @param  list<string>  $valores
+     */
+    public function enviarPlantillaWhatsApp(string $token, string $numeroId, string $para, string $nombre, string $idioma, array $valores): string
+    {
+        $plantilla = ['name' => $nombre, 'language' => ['code' => $idioma]];
+        if ($valores !== []) {
+            $plantilla['components'] = [[
+                'type' => 'body',
+                'parameters' => array_map(static fn (string $v): array => ['type' => 'text', 'text' => $v], $valores),
+            ]];
+        }
+
+        return (string) $this->api($token)->post($this->graph($numeroId.'/messages'), [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $para,
+            'type' => 'template',
+            'template' => $plantilla,
+        ])->throw()->json('messages.0.id');
+    }
+
     public function urlAutorizacionInstagram(string $estado, string $vuelta): string
     {
         return 'https://www.instagram.com/oauth/authorize?'.http_build_query([
