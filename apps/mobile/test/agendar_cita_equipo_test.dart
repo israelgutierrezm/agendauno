@@ -681,7 +681,14 @@ void main() {
       final p = api.pedidos.single;
       expect(p.method, 'POST');
       expect(p.path, '/api/v1/app/demo/agenda/citas');
-      expect(p.data, {
+      // Lo mismo que la web, con la clave del intento (ADR 0201): un reintento de lo
+      // mismo no agenda otra cita.
+      final datos = Map<String, dynamic>.from(p.data as Map);
+      expect(
+        datos.remove('idempotency_key'),
+        matches(RegExp(r'^[0-9a-f]{32}$')),
+      );
+      expect(datos, {
         'persona_id': 'a1',
         'oferta_id': 'o1',
         'sucursal_id': 's1',
