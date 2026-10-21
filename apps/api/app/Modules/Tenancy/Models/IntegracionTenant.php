@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -53,6 +54,16 @@ class IntegracionTenant extends Model
         'sucursal_id' => 'integer',
         'reservas_registradas_en' => 'datetime',
     ];
+
+    /**
+     * La sede de esta conexión (sin sede: la del negocio entero; ADR 0202).
+     *
+     * @return BelongsTo<SucursalTenant, $this>
+     */
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(SucursalTenant::class, 'sucursal_id');
+    }
 
     /**
      * @return array<string, string>

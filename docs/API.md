@@ -987,6 +987,11 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
   (`paises_bienestar` del superadmin, México por omisión); `llaves_alternativas` son
   otros grupos de llaves que bastan para activarla (TotalPass: `place_api_key`; Wellhub,
   con el token de sistema de AgendaUno: `gym_id`).
+- Una conexión por sede (ADR 0202): `GET`, `PUT` y `DELETE /integraciones/{proveedor}`
+  y `GET`/`PUT /integraciones/{proveedor}/reservas` aceptan `?sucursal=<id>` (sin él, la
+  del negocio entero). La respuesta suma `sede` (de cuál es, o `null`) y `sedes` (las
+  conexiones que hay: `sucursal` y `activa`). `DELETE` responde 204 y 422 mientras
+  publique clases; queda en la bitácora `integracion.quitada`.
 - `GET` y `PUT /integraciones/{proveedor}` suman `automatico`: `aviso_url` (la dirección
   de avisos del negocio), `listo` y `registrado_en`. Las credenciales suman
   `webhook_secret` (Wellhub) y `place_api_key` (TotalPass). Con `place_api_key`,

@@ -75,7 +75,7 @@ class CheckinsAutomaticosTenant
     private function wellhub(EventoPlataformaTenant $evento): void
     {
         $datos = $evento->payload;
-        $credenciales = $this->registro->credenciales(ProveedorPartner::Wellhub->value);
+        $credenciales = $this->credencialesDe($evento, ProveedorPartner::Wellhub);
         $gimnasio = (string) Arr::get($datos, 'event_data.gym.id', '');
         if ($gimnasio !== '' && ($credenciales['gym_id'] ?? '') !== '' && $gimnasio !== (string) $credenciales['gym_id']) {
             $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'El aviso es de otro gimnasio de Wellhub.');
@@ -111,7 +111,7 @@ class CheckinsAutomaticosTenant
     private function totalPass(EventoPlataformaTenant $evento): void
     {
         $datos = $evento->payload;
-        $credenciales = $this->registro->credenciales(ProveedorPartner::TotalPass->value);
+        $credenciales = $this->credencialesDe($evento, ProveedorPartner::TotalPass);
         // Sus avisos no van firmados: el de otro gimnasio no se atiende.
         $gimnasio = trim((string) Arr::get($datos, 'place.code', ''));
         $propio = trim((string) ($credenciales['codigo_gimnasio'] ?? ''));
@@ -140,6 +140,16 @@ class CheckinsAutomaticosTenant
 
         $resultado = $this->totalpass->confirmar($credenciales['place_api_key'] ?? '', $token, 'totalpass:checkin:'.substr(hash('sha256', $token), 0, 40));
         $this->asentar($evento, ProveedorPartner::TotalPass, $resultado, $visitante, $cuando, $limite);
+    }
+
+    /**
+     * Las llaves de la conexión (la sede) por la que llegó el aviso (ADR 0202).
+     *
+     * @return array<string, string>
+     */
+    private function credencialesDe(EventoPlataformaTenant $evento, ProveedorPartner $proveedor): array
+    {
+        return $evento->integracion?->llaves() ?? $this->registro->credenciales($proveedor->value);
     }
 
     /**

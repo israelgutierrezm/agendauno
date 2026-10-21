@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Exceptions\IntegracionSoloMexico;
 use App\Modules\Tenancy\Integraciones\ClienteTotalPassReservas;
 use App\Modules\Tenancy\Integraciones\ClienteWellhubReservas;
 use App\Modules\Tenancy\Integraciones\PublicadorPlataforma;
+use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\HorarioPlataformaTenant;
@@ -52,12 +53,13 @@ class ReservasPlataformaTenantController
         private readonly ClienteWellhubReservas $wellhub,
         private readonly ClienteTotalPassReservas $totalpass,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly RegistroDeIntegracionesTenant $registro,
     ) {}
 
     public function show(Request $request): JsonResponse
     {
         $proveedor = $this->proveedor($request);
-        $integracion = IntegracionTenant::query()->where('proveedor', $proveedor->value)->first();
+        $integracion = $this->conexion($request, $proveedor);
 
         return response()->json(['data' => $this->presentar($proveedor, $integracion, $this->productos($proveedor, $integracion))]);
     }
@@ -66,7 +68,7 @@ class ReservasPlataformaTenantController
     {
         $proveedor = $this->proveedor($request);
         $publicador = $this->publicar->publicador($proveedor);
-        $integracion = IntegracionTenant::query()->where('proveedor', $proveedor->value)->first();
+        $integracion = $this->conexion($request, $proveedor);
         if (! $publicador instanceof PublicadorPlataforma || ! $this->disponible($proveedor)) {
             throw ValidationException::withMessages(['activas' => 'Aún no se publican clases en '.$proveedor->nombre().'.']);
         }
@@ -94,7 +96,8 @@ class ReservasPlataformaTenantController
         /** @var list<array{oferta_id: string, publicada: bool, producto?: string|null}> $clases */
         $clases = $validado['clases'] ?? [];
         $ofertas = OfertaTenant::query()->whereIn('ulid', array_column($clases, 'oferta_id'))->get()->keyBy('ulid');
-        $actuales = PublicacionPlataformaTenant::query()->where('proveedor', $proveedor->value)->with('oferta.actividad')->get()->keyBy('oferta_id');
+        // Las clases de esta conexión (de su sede: sus productos o planes son de ese gimnasio).
+        $actuales = PublicacionPlataformaTenant::query()->where('integracion_id', $integracion->getKey())->with('oferta.actividad')->get()->keyBy('oferta_id');
         $cambios = [];
         foreach ($clases as $i => $clase) {
             $oferta = $ofertas->get($clase['oferta_id']);
@@ -112,6 +115,7 @@ class ReservasPlataformaTenantController
             }
             $publicacion ??= new PublicacionPlataformaTenant([
                 'proveedor' => $proveedor->value,
+                'integracion_id' => $integracion->getKey(),
                 'oferta_id' => $oferta->getKey(),
             ]);
             $publicacion->activa = (bool) $clase['publicada'];
@@ -133,6 +137,11 @@ class ReservasPlataformaTenantController
         }
 
         $antes = ['activas' => $integracion->reservas_activas, 'sucursal_id' => $integracion->sucursal_id];
+        // Otra conexión ya es de esa sede (cada sede es otro gimnasio, ADR 0202).
+        if ($sucursal instanceof SucursalTenant && (int) $sucursal->getKey() !== (int) $integracion->sucursal_id
+            && IntegracionTenant::query()->where('proveedor', $proveedor->value)->where('sucursal_id', $sucursal->getKey())->exists()) {
+            throw ValidationException::withMessages(['sucursal_id' => 'Esa sede ya tiene su propia conexión con '.$proveedor->nombre().'.']);
+        }
         $seApaga = $integracion->reservas_activas && ! (bool) $validado['activas'];
         DB::connection('tenant')->transaction(function () use ($integracion, $validado, $sucursal, $cambios): void {
             $integracion->reservas_activas = (bool) $validado['activas'];
@@ -165,7 +174,7 @@ class ReservasPlataformaTenantController
             [
                 'activas' => $integracion->reservas_activas,
                 'sucursal_id' => $integracion->sucursal_id,
-                'clases_publicadas' => PublicacionPlataformaTenant::query()->where('proveedor', $proveedor->value)->where('activa', true)->count(),
+                'clases_publicadas' => PublicacionPlataformaTenant::query()->where('integracion_id', $integracion->getKey())->where('activa', true)->count(),
             ],
         );
 
@@ -195,7 +204,9 @@ class ReservasPlataformaTenantController
      */
     private function presentar(ProveedorPartner $proveedor, ?IntegracionTenant $integracion, ?array $productos): array
     {
-        $publicaciones = PublicacionPlataformaTenant::query()->where('proveedor', $proveedor->value)->get()->keyBy('oferta_id');
+        $publicaciones = $integracion instanceof IntegracionTenant
+            ? PublicacionPlataformaTenant::query()->where('integracion_id', $integracion->getKey())->get()->keyBy('oferta_id')
+            : collect();
         $ofertas = OfertaTenant::query()
             ->vigentes()
             ->where('modalidad', ModalidadOfertaTenant::Grupal->value)
@@ -207,6 +218,7 @@ class ReservasPlataformaTenantController
         $ahora = now();
         $futuros = HorarioPlataformaTenant::query()
             ->where('proveedor', $proveedor->value)
+            ->whereHas('publicacion', fn ($q) => $q->where('integracion_id', $integracion?->getKey()))
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', $ahora));
         $token = $integracion instanceof IntegracionTenant ? (string) $integracion->token_webhook : '';
 
@@ -251,7 +263,8 @@ class ReservasPlataformaTenantController
                 ->where('proveedor', $proveedor->value)
                 ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
                 ->where('estado', LugarPlataformaTenant::RESERVADO)
-                ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', $ahora))
+                ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', $ahora)
+                    ->when($integracion?->sucursal_id !== null, fn ($s) => $s->where('sucursal_id', $integracion?->sucursal_id)))
                 ->count(),
         ];
     }
@@ -283,6 +296,20 @@ class ReservasPlataformaTenantController
             ProveedorPartner::TotalPass => $this->totalpass->planes($integracion->llaves()['place_api_key'] ?? ''),
             ProveedorPartner::Fitpass => null,
         };
+    }
+
+    /** La conexión de la sede pedida (`?sucursal=`) o la del negocio entero (ADR 0202). */
+    private function conexion(Request $request, ProveedorPartner $proveedor): ?IntegracionTenant
+    {
+        $ulid = trim((string) $request->query('sucursal', ''));
+        if ($ulid === '') {
+            return $this->registro->integracion($proveedor->value);
+        }
+        $sede = SucursalTenant::query()->where('ulid', $ulid)->first();
+
+        return $sede instanceof SucursalTenant
+            ? IntegracionTenant::query()->where('proveedor', $proveedor->value)->where('sucursal_id', $sede->getKey())->first()
+            : null;
     }
 
     private function proveedor(Request $request): ProveedorPartner

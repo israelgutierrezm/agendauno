@@ -160,6 +160,22 @@ Wellhub opera en varios países: dónde se ofrecen Wellhub y TotalPass lo decide
 superadmin (`paises_bienestar` en su configuración, México por omisión). Fitpass sigue
 solo en México. Un negocio de otro país no las ve, no las configura y no publica.
 
+## Varias sedes
+
+Para Wellhub y TotalPass cada sede de un estudio es otro gimnasio («gym» o «place»), con
+sus propias llaves, su dirección de avisos y sus clases publicadas. Por eso hay una
+conexión por plataforma y sede (`integraciones.sucursal_id`); la que no tiene sede es la
+del negocio entero y vale para las sedes sin conexión propia.
+
+- La visita se valida con las llaves de la sede de su clase; un aviso, con las de la
+  conexión cuya dirección (su token) lo recibió.
+- Lo que se publica es de una conexión (`publicaciones_plataforma.integracion_id`):
+  publicar, ocultar, retirar y conciliar las reservas de una sede no toca las de otra.
+- Cuando Wellhub elige a AgendaUno como sistema, el Gym ID va a la conexión que ya lo
+  tiene o a la primera que aún no tiene uno.
+- Quitar la conexión de una sede pide antes dejar de publicar sus clases y, en
+  TotalPass, da de baja su aviso.
+
 ## Wellhub y TotalPass: reintentos
 
 Cuando la plataforma no responde, el aviso se reintenta mientras ella espere (15 minutos

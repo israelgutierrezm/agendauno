@@ -48,11 +48,13 @@ class RegistrarCheckin
     {
         $validador = $this->registro->resolver($proveedor);
 
-        if ($validador === null || ! $this->registro->activa($proveedor)) {
+        // Con la conexión de la sede de la clase (cada sede es otro gimnasio, ADR 0202).
+        $sede = (int) $sesion->sucursal_id;
+        if ($validador === null || ! $this->registro->activa($proveedor, $sede)) {
             throw new IntegracionNoDisponible('La integración no está activa en este negocio.');
         }
 
-        $resultado = $validador->validar($codigo, $this->registro->credenciales($proveedor));
+        $resultado = $validador->validar($codigo, $this->registro->credenciales($proveedor, $sede));
 
         if (! $resultado->valido && $resultado->verificable) {
             throw new CheckinInvalido($resultado->motivo ?? 'Codigo de check-in no valido.');

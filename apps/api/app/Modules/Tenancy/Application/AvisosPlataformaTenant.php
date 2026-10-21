@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
+use App\Modules\Tenancy\Models\IntegracionTenant;
 use App\Modules\Tenancy\ProveedorPartner;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
@@ -66,7 +67,7 @@ class AvisosPlataformaTenant
      *
      * @param  array<string, mixed>  $datos
      */
-    public function recibir(ProveedorPartner $proveedor, array $datos): ?EventoPlataformaTenant
+    public function recibir(ProveedorPartner $proveedor, array $datos, ?IntegracionTenant $integracion = null): ?EventoPlataformaTenant
     {
         $clasificado = match ($proveedor) {
             ProveedorPartner::Wellhub => self::wellhub($datos),
@@ -86,6 +87,7 @@ class AvisosPlataformaTenant
         try {
             return EventoPlataformaTenant::query()->create([
                 'proveedor' => $proveedor->value,
+                'integracion_id' => $integracion?->getKey(),
                 'tipo' => $tipo,
                 'clave' => $clave,
                 'payload' => $datos,
@@ -134,7 +136,9 @@ class AvisosPlataformaTenant
             return;
         }
         $proveedor = ProveedorPartner::tryFrom($evento->proveedor);
-        if ($proveedor === null || ! $this->registro->activa($proveedor->value)) {
+        // Con la conexión (la sede) por la que llegó; los avisos de antes, con la única.
+        $integracion = $evento->integracion ?? ($proveedor !== null ? $this->registro->integracion($proveedor->value) : null);
+        if ($proveedor === null || ! $this->registro->vigente($integracion)) {
             $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'La integración no está activa.');
 
             return;

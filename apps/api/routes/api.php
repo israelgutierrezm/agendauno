@@ -1198,7 +1198,10 @@ Route::prefix('v1')->group(function (): void {
             // Aparecer en Reserva con Google (ADR 0198).
             Route::get('/reserva-con-google', [ReservaConGoogleController::class, 'mostrar'])->middleware('puede:integraciones.configurar')->name('reserva-google.show');
             Route::put('/reserva-con-google', [ReservaConGoogleController::class, 'guardar'])->middleware('puede:integraciones.configurar')->name('reserva-google.guardar');
+            Route::get('/integraciones/{proveedor}', [IntegracionesTenantController::class, 'show'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.show');
             Route::put('/integraciones/{proveedor}', [IntegracionesTenantController::class, 'upsert'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.upsert');
+            // Quitar la conexión de una sede (`?sucursal=`, ADR 0202).
+            Route::delete('/integraciones/{proveedor}', [IntegracionesTenantController::class, 'quitar'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.quitar');
             // Reservas desde la app de Wellhub y TotalPass (ADR 0149).
             Route::get('/integraciones/{proveedor}/reservas', [ReservasPlataformaTenantController::class, 'show'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.reservas.show');
             Route::put('/integraciones/{proveedor}/reservas', [ReservasPlataformaTenantController::class, 'guardar'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.reservas.guardar');

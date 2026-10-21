@@ -104,7 +104,7 @@ class LugaresPlataformaTenantController
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
         abort_unless($this->acceso->puedeOperar($sesion, $this->usuario($request)), 403);
-        if (! $this->registro->activa(ProveedorPartner::Fitpass->value)) {
+        if (! $this->registro->activa(ProveedorPartner::Fitpass->value, (int) $sesion->sucursal_id)) {
             throw ValidationException::withMessages(['reservas' => ['Activa Fitpass en Integraciones para capturar sus reservas.']]);
         }
         $validado = $request->validate([

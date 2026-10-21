@@ -86,12 +86,18 @@ class SistemaWellhub
             return 'El negocio aún no tiene su base de datos.';
         }
         $error = $this->gestor->ejecutarEn($estudio, function () use ($solicitud): ?string {
-            $integracion = IntegracionTenant::query()->firstOrNew(['proveedor' => ProveedorPartner::Wellhub->value]);
-            $llaves = $integracion->llaves();
-            $actual = trim($llaves['gym_id'] ?? '');
-            if ($actual !== '' && $actual !== $solicitud->gym_id) {
-                return 'El negocio ya tiene otro Gym ID de Wellhub ('.$actual.'): revísalo con el dueño.';
+            $conexiones = IntegracionTenant::query()->where('proveedor', ProveedorPartner::Wellhub->value)->orderBy('id')->get();
+            // Ya la tiene, o una conexión (una sede) aún sin Gym ID la toma.
+            $integracion = $conexiones->first(fn (IntegracionTenant $i): bool => trim($i->llaves()['gym_id'] ?? '') === $solicitud->gym_id)
+                ?? $conexiones->first(fn (IntegracionTenant $i): bool => trim($i->llaves()['gym_id'] ?? '') === '');
+            if (! $integracion instanceof IntegracionTenant) {
+                $conGym = $conexiones->first(fn (IntegracionTenant $i): bool => $i->sucursal_id === null);
+                if ($conGym instanceof IntegracionTenant) {
+                    return 'El negocio ya tiene otro Gym ID de Wellhub ('.trim($conGym->llaves()['gym_id'] ?? '').'): revísalo con el dueño.';
+                }
+                $integracion = new IntegracionTenant(['proveedor' => ProveedorPartner::Wellhub->value]);
             }
+            $llaves = $integracion->llaves();
             $integracion->credenciales = [...$llaves, 'gym_id' => $solicitud->gym_id];
             $integracion->configurada_en ??= now();
             if (! $integracion->exists) {

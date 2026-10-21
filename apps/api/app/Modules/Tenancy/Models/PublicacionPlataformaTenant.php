@@ -29,7 +29,7 @@ class PublicacionPlataformaTenant extends Model
 
     protected $table = 'publicaciones_plataforma';
 
-    protected $fillable = ['proveedor', 'oferta_id', 'producto_externo', 'clase_externa', 'activa', 'error', 'oculta_en'];
+    protected $fillable = ['proveedor', 'integracion_id', 'oferta_id', 'producto_externo', 'clase_externa', 'activa', 'error', 'oculta_en'];
 
     /**
      * @var array<string, string>
@@ -37,6 +37,7 @@ class PublicacionPlataformaTenant extends Model
     protected $casts = [
         'activa' => 'boolean',
         'oculta_en' => 'datetime',
+        'integracion_id' => 'integer',
     ];
 
     /**
@@ -45,6 +46,16 @@ class PublicacionPlataformaTenant extends Model
     public function oferta(): BelongsTo
     {
         return $this->belongsTo(OfertaTenant::class, 'oferta_id');
+    }
+
+    /**
+     * La conexión (plataforma y sede) de la que es (ADR 0202).
+     *
+     * @return BelongsTo<IntegracionTenant, $this>
+     */
+    public function integracion(): BelongsTo
+    {
+        return $this->belongsTo(IntegracionTenant::class, 'integracion_id');
     }
 
     /**

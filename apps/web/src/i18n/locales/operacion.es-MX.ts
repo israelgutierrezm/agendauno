@@ -895,6 +895,16 @@ export default {
     obligatoria: "Obligatoria para activarla",
     reemplazar: "Escribe para reemplazar",
     capturar: "Pega aquí la llave",
+    // Una conexión por sede (ADR 0202).
+    sede: "Conexión de",
+    todoElNegocio: "Todo el negocio",
+    sedeAyuda:
+      "Si cada sede está dada de alta en {plataforma} como otro gimnasio, conecta cada una con sus propias llaves.",
+    sedesConectadas: "Conectadas: {sedes}.",
+    quitarSede: "Quitar la conexión de esta sede",
+    confirmarQuitar:
+      "¿Quitar la conexión de {sede} con {plataforma}? Dejará de validar las visitas de esa sede.",
+    quitada: "Conexión quitada.",
   },
   lealtad: {
     sinPuntos:

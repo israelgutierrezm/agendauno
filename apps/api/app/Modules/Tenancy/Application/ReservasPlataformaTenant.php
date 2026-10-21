@@ -91,7 +91,8 @@ class ReservasPlataformaTenant
             return;
         }
         $datos = $evento->payload;
-        $credenciales = $this->registro->credenciales($proveedor->value);
+        // Las llaves de la conexión (la sede) por la que llegó el aviso (ADR 0202).
+        $credenciales = $evento->integracion?->llaves() ?? $this->registro->credenciales($proveedor->value);
         $gimnasio = (string) Arr::get($datos, 'event_data.slot.gym_id', '');
         if ($gimnasio !== '' && ($credenciales['gym_id'] ?? '') !== '' && $gimnasio !== (string) $credenciales['gym_id']) {
             $evento->terminar(EventoPlataformaTenant::DESCARTADO, 'El aviso es de otro gimnasio de Wellhub.');
@@ -128,13 +129,24 @@ class ReservasPlataformaTenant
      */
     public function conciliarTotalPass(): int
     {
-        $integracion = IntegracionTenant::query()->where('proveedor', ProveedorPartner::TotalPass->value)->first();
-        if (! $integracion instanceof IntegracionTenant || ! $integracion->reservas_activas || ! $this->registro->activa(ProveedorPartner::TotalPass->value)) {
-            return 0;
-        }
+        $cambios = 0;
+        // Cada sede es otro «place» de TotalPass con su llave (ADR 0202).
+        IntegracionTenant::query()->where('proveedor', ProveedorPartner::TotalPass->value)->where('reservas_activas', true)->get()
+            ->each(function (IntegracionTenant $integracion) use (&$cambios): void {
+                if ($this->registro->vigente($integracion)) {
+                    $cambios += $this->conciliarConexionTotalPass($integracion);
+                }
+            });
+
+        return $cambios;
+    }
+
+    private function conciliarConexionTotalPass(IntegracionTenant $integracion): int
+    {
         $publicados = HorarioPlataformaTenant::query()
             ->where('proveedor', ProveedorPartner::TotalPass->value)
             ->where('estado', HorarioPlataformaTenant::PUBLICADO)
+            ->whereHas('publicacion', fn ($q) => $q->where('integracion_id', $integracion->getKey()))
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
             ->with('sesion')
             ->get();
@@ -165,6 +177,7 @@ class ReservasPlataformaTenant
             EventoPlataformaTenant::query()->firstOrCreate(
                 ['proveedor' => ProveedorPartner::TotalPass->value, 'clave' => 'reserva:'.$slot.':'.AvisosPlataformaTenant::RESERVA_SOLICITADA],
                 [
+                    'integracion_id' => $integracion->getKey(),
                     'tipo' => AvisosPlataformaTenant::RESERVA_SOLICITADA,
                     'payload' => [
                         'event' => ['id' => (string) ($publicado->evento_externo ?? '')],
@@ -183,7 +196,8 @@ class ReservasPlataformaTenant
             ->where('proveedor', ProveedorPartner::TotalPass->value)
             ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
             ->where('estado', LugarPlataformaTenant::RESERVADO)
-            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now())
+                ->when($integracion->sucursal_id !== null, fn ($s) => $s->where('sucursal_id', $integracion->sucursal_id)))
             ->get()
             ->each(function (LugarPlataformaTenant $lugar) use ($vistas, $llave, &$cambios): void {
                 $slot = substr((string) $lugar->referencia_externa, strlen(self::referencia(ProveedorPartner::TotalPass, '')));
@@ -246,7 +260,7 @@ class ReservasPlataformaTenant
     private function solicitudTotalPass(EventoPlataformaTenant $evento, string $slot): void
     {
         $datos = $evento->payload;
-        $llave = $this->registro->credenciales(ProveedorPartner::TotalPass->value)['place_api_key'] ?? '';
+        $llave = ($evento->integracion?->llaves() ?? $this->registro->credenciales(ProveedorPartner::TotalPass->value))['place_api_key'] ?? '';
         $referencia = self::referencia(ProveedorPartner::TotalPass, $slot);
         $limite = CarbonImmutable::instance($evento->recibido_en)->addMinutes(self::MINUTOS_TOTALPASS);
         $claseDelAviso = (string) Arr::get($datos, 'event.id', '');
@@ -382,7 +396,7 @@ class ReservasPlataformaTenant
         if ($proveedor === ProveedorPartner::Wellhub && $lugar instanceof LugarPlataformaTenant && $lugar->estado === LugarPlataformaTenant::RESERVADO) {
             // Lo último que se intenta: que Wellhub sepa que fue un error técnico.
             $this->wellhub->responderReserva(
-                $this->registro->credenciales(ProveedorPartner::Wellhub->value),
+                $evento->integracion?->llaves() ?? $this->registro->credenciales(ProveedorPartner::Wellhub->value),
                 substr((string) $lugar->referencia_externa, strlen(self::referencia(ProveedorPartner::Wellhub, ''))),
                 'TECHNICAL_ERROR',
                 'No pudimos confirmar tu reserva a tiempo. Intenta de nuevo.',
@@ -485,9 +499,10 @@ class ReservasPlataformaTenant
         }
         $proveedor = ProveedorPartner::tryFrom($lugar->proveedor);
         $numero = $proveedor !== null ? substr((string) $lugar->referencia_externa, strlen(self::referencia($proveedor, ''))) : '';
+        $sede = $lugar->sesion?->sucursal_id !== null ? (int) $lugar->sesion->sucursal_id : null;
         $resultado = match ($proveedor) {
-            ProveedorPartner::Wellhub => $this->wellhub->cancelarReserva($this->registro->credenciales($proveedor->value), $numero, $motivo),
-            ProveedorPartner::TotalPass => $this->totalpass->cancelarReserva($this->registro->credenciales($proveedor->value)['place_api_key'] ?? '', $numero),
+            ProveedorPartner::Wellhub => $this->wellhub->cancelarReserva($this->registro->credenciales($proveedor->value, $sede), $numero, $motivo),
+            ProveedorPartner::TotalPass => $this->totalpass->cancelarReserva($this->registro->credenciales($proveedor->value, $sede)['place_api_key'] ?? '', $numero),
             // Fitpass no tiene API: se cancela en su panel (ADR 0197).
             default => ResultadoPlataforma::hecho(),
         };
@@ -602,7 +617,8 @@ class ReservasPlataformaTenant
             return false;
         }
         $slot = substr((string) $lugar->referencia_externa, strlen(self::referencia(ProveedorPartner::TotalPass, '')));
-        $reserva = $this->totalpass->reserva($this->registro->credenciales(ProveedorPartner::TotalPass->value)['place_api_key'] ?? '', $slot);
+        $sede = $lugar->sesion?->sucursal_id !== null ? (int) $lugar->sesion->sucursal_id : null;
+        $reserva = $this->totalpass->reserva($this->registro->credenciales(ProveedorPartner::TotalPass->value, $sede)['place_api_key'] ?? '', $slot);
 
         return is_array($reserva) && self::viva($reserva);
     }

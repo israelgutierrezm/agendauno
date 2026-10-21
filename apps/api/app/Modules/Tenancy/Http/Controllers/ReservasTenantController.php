@@ -96,7 +96,7 @@ class ReservasTenantController
                 // Quien reservó desde la app de Wellhub, TotalPass o Fitpass (ADR 0202).
                 'plataforma' => LugaresPlataformaTenantController::deLaSesion($sesion),
                 // Con Fitpass activo, recepción captura aquí sus reservas (sin API).
-                'fitpass' => app(RegistroDeIntegracionesTenant::class)->activa(ProveedorPartner::Fitpass->value),
+                'fitpass' => app(RegistroDeIntegracionesTenant::class)->activa(ProveedorPartner::Fitpass->value, (int) $sesion->sucursal_id),
             ],
         ]);
     }

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -44,7 +45,7 @@ class EventoPlataformaTenant extends Model
     protected $table = 'eventos_plataforma';
 
     protected $fillable = [
-        'proveedor', 'tipo', 'clave', 'payload', 'estado', 'resultado', 'intentos', 'recibido_en', 'procesado_en',
+        'proveedor', 'tipo', 'clave', 'payload', 'estado', 'resultado', 'intentos', 'recibido_en', 'procesado_en', 'integracion_id',
     ];
 
     /**
@@ -55,7 +56,18 @@ class EventoPlataformaTenant extends Model
         'intentos' => 'integer',
         'recibido_en' => 'datetime',
         'procesado_en' => 'datetime',
+        'integracion_id' => 'integer',
     ];
+
+    /**
+     * La conexión (plataforma y sede) de la que es (ADR 0202).
+     *
+     * @return BelongsTo<IntegracionTenant, $this>
+     */
+    public function integracion(): BelongsTo
+    {
+        return $this->belongsTo(IntegracionTenant::class, 'integracion_id');
+    }
 
     /** Lo deja terminado (procesado, descartado o fallido) con lo que pasó. */
     public function terminar(string $estado, string $resultado): void

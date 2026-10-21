@@ -38,6 +38,13 @@ const alcance = computed(() => {
 
 interface Integracion {
   proveedor: string;
+  // De qué sede es esta conexión (null: del negocio entero) y las que hay: cada sede
+  // es otro gimnasio en la plataforma, con sus llaves (ADR 0202).
+  sede?: { id: string; nombre: string } | null;
+  sedes?: {
+    sucursal: { id: string; nombre: string } | null;
+    activa: boolean;
+  }[];
   activa: boolean;
   // Las credenciales que pide el proveedor y las que ya se capturaron.
   llaves: string[];
@@ -135,6 +142,71 @@ const edicion = reactive<
 >({});
 // Las llaves que la API rechazó, por plataforma.
 const llavesConError = reactive<Record<string, string[]>>({});
+// La sede cuya conexión se ve, por plataforma ("" = la del negocio entero).
+const sedeDe = reactive<Record<string, string>>({});
+const sedesNegocio = computed(() => sesion.usuario?.sucursales ?? []);
+
+function tomarIntegracion(i: Integracion): void {
+  const idx = integraciones.value.findIndex((x) => x.proveedor === i.proveedor);
+  if (idx !== -1) {
+    integraciones.value[idx] = i;
+  }
+  edicion[i.proveedor] = {
+    activa: i.activa,
+    llaves: Object.fromEntries(i.llaves.map((k) => [k, ""])),
+  };
+}
+
+function paramsDeSede(proveedor: string): { sucursal?: string } {
+  const sede = sedeDe[proveedor] ?? "";
+  return sede !== "" ? { sucursal: sede } : {};
+}
+
+/** Las sedes con conexión, para leerlas de un vistazo. */
+function sedesConectadas(i: Integracion): string {
+  return (i.sedes ?? [])
+    .map(
+      (s) => s.sucursal?.nombre ?? t("operacion.integraciones.todoElNegocio"),
+    )
+    .join(", ");
+}
+
+async function elegirSede(proveedor: string, sede: string): Promise<void> {
+  sedeDe[proveedor] = sede;
+  llavesConError[proveedor] = [];
+  try {
+    const { data } = await api.get<{ data: Integracion }>(
+      `${base.value}/integraciones/${proveedor}`,
+      { params: paramsDeSede(proveedor) },
+    );
+    tomarIntegracion(data.data);
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
+}
+
+async function quitarSede(i: Integracion): Promise<void> {
+  if (
+    !(await confirmar(
+      t("operacion.integraciones.confirmarQuitar", {
+        sede: i.sede?.nombre ?? "",
+        plataforma: t(`integraciones.proveedores.${i.proveedor}`),
+      }),
+      { peligro: true },
+    ))
+  ) {
+    return;
+  }
+  try {
+    await api.delete(`${base.value}/integraciones/${i.proveedor}`, {
+      params: paramsDeSede(i.proveedor),
+    });
+    toast.exito(t("operacion.integraciones.quitada"));
+    await elegirSede(i.proveedor, "");
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
+}
 
 /**
  * Las llaves sin las que no se puede activar y que no están ni guardadas ni escritas:
@@ -213,14 +285,9 @@ async function guardar(proveedor: string): Promise<void> {
     const { data } = await api.put<{ data: Integracion }>(
       `${base.value}/integraciones/${proveedor}`,
       { activa: ed.activa, credenciales },
+      { params: paramsDeSede(proveedor) },
     );
-    const idx = integraciones.value.findIndex((i) => i.proveedor === proveedor);
-    if (idx !== -1) {
-      integraciones.value[idx] = data.data;
-    }
-    for (const k of Object.keys(ed.llaves)) {
-      ed.llaves[k] = "";
-    }
+    tomarIntegracion(data.data);
     toast.exito(t("integraciones.guardado"));
   } catch (e) {
     llavesConError[proveedor] = camposConError(e)
@@ -454,10 +521,8 @@ async function cargar(): Promise<void> {
     ]);
     integraciones.value = bienestar?.data.data ?? [];
     for (const i of integraciones.value) {
-      edicion[i.proveedor] = {
-        activa: i.activa,
-        llaves: Object.fromEntries(i.llaves.map((k) => [k, ""])),
-      };
+      sedeDe[i.proveedor] = i.sede?.id ?? "";
+      tomarIntegracion(i);
     }
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -612,6 +677,60 @@ onMounted(cargar);
             :prueba="`activa-${i.proveedor}`"
           />
         </div>
+        <!-- Con varias sedes, cada una es otro gimnasio en la plataforma: se elige
+             de cuál es la conexión que se ve (ADR 0202). -->
+        <div
+          v-if="sedesNegocio.length > 1"
+          class="mt-4 flex flex-wrap items-end gap-3"
+          :data-prueba="`sedes-${i.proveedor}`"
+        >
+          <div class="min-w-48">
+            <label class="tu-label" :for="`${i.proveedor}-sede`">{{
+              $t("operacion.integraciones.sede")
+            }}</label>
+            <select
+              :id="`${i.proveedor}-sede`"
+              class="tu-input"
+              :value="sedeDe[i.proveedor] ?? ''"
+              @change="
+                elegirSede(
+                  i.proveedor,
+                  ($event.target as HTMLSelectElement).value,
+                )
+              "
+            >
+              <option value="">
+                {{ $t("operacion.integraciones.todoElNegocio") }}
+              </option>
+              <option v-for="s in sedesNegocio" :key="s.id" :value="s.id">
+                {{ s.nombre }}
+              </option>
+            </select>
+          </div>
+          <button
+            v-if="i.sede && i.llaves_configuradas.length > 0"
+            type="button"
+            class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+            :data-prueba="`quitar-sede-${i.proveedor}`"
+            @click="quitarSede(i)"
+          >
+            {{ $t("operacion.integraciones.quitarSede") }}
+          </button>
+          <p class="tu-hint w-full">
+            {{
+              $t("operacion.integraciones.sedeAyuda", {
+                plataforma: $t(`integraciones.proveedores.${i.proveedor}`),
+              })
+            }}
+            <template v-if="(i.sedes ?? []).length > 0">
+              {{
+                $t("operacion.integraciones.sedesConectadas", {
+                  sedes: sedesConectadas(i),
+                })
+              }}
+            </template>
+          </p>
+        </div>
         <!-- Qué falta para poder activarla -->
         <p
           v-if="!edicion[i.proveedor].activa && faltanLlaves(i).length > 0"
@@ -687,7 +806,9 @@ onMounted(cargar);
         <!-- Reservas desde la app de la plataforma (ADR 0149). -->
         <ReservasBienestar
           v-if="i.activa && i.proveedor !== 'fitpass'"
+          :key="`${i.proveedor}-${i.sede?.id ?? ''}`"
           :proveedor="i.proveedor"
+          :sucursal="i.sede?.id"
         />
         <!-- Fitpass sin API: horarios para capturar y asistencia por marcar (ADR 0202). -->
         <FitpassOperacion v-if="i.activa && i.proveedor === 'fitpass'" />

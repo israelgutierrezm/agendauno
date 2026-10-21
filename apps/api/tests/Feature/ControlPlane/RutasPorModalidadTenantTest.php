@@ -81,6 +81,8 @@ function rutasExclusivasPorModalidad(): array
         'sesiones.checkins.index' => 'clases',
         'integraciones.index' => 'clases',
         'integraciones.upsert' => 'clases',
+        'integraciones.show' => 'clases',
+        'integraciones.quitar' => 'clases',
         // Reservas desde la app de Wellhub y TotalPass (ADR 0149).
         'integraciones.reservas.show' => 'clases',
         'integraciones.reservas.guardar' => 'clases',

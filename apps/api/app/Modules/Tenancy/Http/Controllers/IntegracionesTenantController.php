@@ -10,9 +10,12 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\IntegracionSoloMexico;
 use App\Modules\Tenancy\Integraciones\ClienteTotalPass;
 use App\Modules\Tenancy\Integraciones\PublicadorWellhub;
+use App\Modules\Tenancy\Integraciones\RegistroDeIntegracionesTenant;
 use App\Modules\Tenancy\Models\CheckinTenant;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
+use App\Modules\Tenancy\Models\PublicacionPlataformaTenant;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
 use Carbon\CarbonImmutable;
@@ -43,6 +46,7 @@ use Illuminate\Validation\ValidationException;
 class IntegracionesTenantController
 {
     public function __construct(
+        private readonly RegistroDeIntegracionesTenant $registro,
         private readonly RegionNegocioTenant $region,
         private readonly RegistrarAuditoria $auditoria,
         private readonly ClienteTotalPass $totalpass,
@@ -56,14 +60,80 @@ class IntegracionesTenantController
         if ($disponibles === []) {
             throw new IntegracionSoloMexico('Wellhub, TotalPass y Fitpass aún no se ofrecen en el país de tu negocio.');
         }
-        $configs = IntegracionTenant::query()->get()->keyBy('proveedor');
-
+        // De cada plataforma, la conexión del negocio entero (o la primera de sus sedes).
         $data = array_map(fn (ProveedorPartner $proveedor): array => $this->presentar(
             $proveedor,
-            $configs->get($proveedor->value),
+            $this->registro->integracion($proveedor->value),
         ), $disponibles);
 
         return response()->json(['data' => $data]);
+    }
+
+    /** La conexión de una plataforma para una sede (`?sucursal=`) o la del negocio. */
+    public function show(Request $request): JsonResponse
+    {
+        $proveedor = ProveedorPartner::tryFrom((string) $request->route('proveedor'));
+        abort_if($proveedor === null, 404);
+        $this->exigirDisponible($proveedor);
+
+        return response()->json(['data' => $this->presentar($proveedor, $this->conexion($request, $proveedor), $this->sedePedida($request))]);
+    }
+
+    /**
+     * Quita la conexión de una sede (la plataforma ya no la ve como gimnasio de este
+     * negocio aquí). Primero se deja de publicar sus clases.
+     */
+    public function quitar(Request $request): JsonResponse
+    {
+        $proveedor = ProveedorPartner::tryFrom((string) $request->route('proveedor'));
+        abort_if($proveedor === null, 404);
+        $config = $this->conexion($request, $proveedor);
+        if (! $config instanceof IntegracionTenant) {
+            return response()->json(null, 204);
+        }
+        if ($config->reservas_activas) {
+            throw ValidationException::withMessages(['sucursal' => ['Primero deja de publicar las clases de esa sede en '.$proveedor->nombre().'.']]);
+        }
+        if ($proveedor === ProveedorPartner::TotalPass && $config->webhook_registrado_en !== null) {
+            $this->totalpass->quitarAviso($config->llaves()['place_api_key'] ?? '');
+        }
+        PublicacionPlataformaTenant::query()->where('integracion_id', $config->getKey())->delete();
+        $config->delete();
+        $usuario = $request->attributes->get('usuario_tenant');
+        $this->auditoria->registrar($usuario instanceof Usuario ? $usuario : null, 'integracion.quitada', 'integracion', $proveedor->value, null, ['sucursal' => $config->sucursal_id]);
+
+        return response()->json(null, 204);
+    }
+
+    /** La sede pedida (`?sucursal=`, su identificador público); null sin pedirla. */
+    private function sedePedida(Request $request): ?SucursalTenant
+    {
+        $ulid = trim((string) $request->query('sucursal', ''));
+        if ($ulid === '') {
+            return null;
+        }
+        $sede = SucursalTenant::query()->where('ulid', $ulid)->first();
+        if (! $sede instanceof SucursalTenant) {
+            throw ValidationException::withMessages(['sucursal' => ['Esa sede no existe.']]);
+        }
+
+        return $sede;
+    }
+
+    /**
+     * La conexión de la sede pedida o, sin pedirla, la del negocio entero (ADR 0202). Con
+     * `$crear`, una nueva si aún no hay.
+     */
+    private function conexion(Request $request, ProveedorPartner $proveedor, bool $crear = false): ?IntegracionTenant
+    {
+        $sede = $this->sedePedida($request);
+        if ($sede instanceof SucursalTenant) {
+            return IntegracionTenant::query()->where('proveedor', $proveedor->value)->where('sucursal_id', $sede->getKey())->first()
+                ?? ($crear ? new IntegracionTenant(['proveedor' => $proveedor->value, 'sucursal_id' => $sede->getKey()]) : null);
+        }
+
+        return $this->registro->integracion($proveedor->value)
+            ?? ($crear ? new IntegracionTenant(['proveedor' => $proveedor->value]) : null);
     }
 
     public function upsert(Request $request): JsonResponse
@@ -81,7 +151,9 @@ class IntegracionesTenantController
             'credenciales.webhook_secret' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $config = IntegracionTenant::query()->firstOrNew(['proveedor' => $proveedor->value]);
+        // Cada sede es otro gimnasio en la plataforma: su propia conexión (ADR 0202).
+        $config = $this->conexion($request, $proveedor, true);
+        abort_unless($config instanceof IntegracionTenant, 404);
         $antes = ['activa' => $config->exists && $config->activa, 'llaves' => array_keys($config->llaves())];
         $config->activa = (bool) $validado['activa'];
         $cambiadas = [];
@@ -153,27 +225,37 @@ class IntegracionesTenantController
             );
         }
 
-        return response()->json(['data' => $this->presentar($proveedor, $config)]);
+        return response()->json(['data' => $this->presentar($proveedor, $config, $this->sedePedida($request))]);
     }
 
     /**
      * La integración como la ve el negocio: sus llaves (solo los nombres) y su check-in
-     * automático: la dirección de avisos y si ya está listo.
+     * automático: la dirección de avisos y si ya está listo. Con sus conexiones por sede
+     * (`sedes`) y de qué sede es esta (`sede`).
      *
      * @return array<string, mixed>
      */
-    private function presentar(ProveedorPartner $proveedor, ?IntegracionTenant $config): array
+    private function presentar(ProveedorPartner $proveedor, ?IntegracionTenant $config, ?SucursalTenant $pedida = null): array
     {
+        $sedes = IntegracionTenant::query()->where('proveedor', $proveedor->value)->with('sucursal')->orderBy('id')->get()
+            ->map(static fn (IntegracionTenant $i): array => [
+                'sucursal' => $i->sucursal === null ? null : ['id' => $i->sucursal->ulid, 'nombre' => $i->sucursal->nombre],
+                'activa' => $i->activa,
+            ])->values()->all();
+        $sede = $config->sucursal ?? $pedida;
         $llaves = $config instanceof IntegracionTenant ? $config->llaves() : [];
         $token = $config instanceof IntegracionTenant ? (string) $config->token_webhook : '';
         $activa = $config instanceof IntegracionTenant && $config->activa;
-        $ultima = $llaves !== [] && $activa ? $this->evidencia($proveedor) : null;
+        $ultima = $llaves !== [] && $activa ? $this->evidencia($proveedor, $config) : null;
         // Solo cuenta la que llegó con sus llaves de ahora (R13); la anterior es historial.
         $desde = $config?->configurada_en;
         $evidencia = $ultima !== null && ($desde === null || CarbonImmutable::parse($ultima['en'])->greaterThanOrEqualTo($desde)) ? $ultima : null;
 
         return [
             'proveedor' => $proveedor->value,
+            // De qué sede es esta conexión (null: del negocio entero) y las que hay.
+            'sede' => $sede instanceof SucursalTenant ? ['id' => $sede->ulid, 'nombre' => $sede->nombre] : null,
+            'sedes' => $sedes,
             'activa' => $activa,
             // sin_configurar → credenciales → activa_sin_comprobar → comprobada.
             'estado_conexion' => match (true) {
@@ -219,14 +301,18 @@ class IntegracionesTenantController
      *
      * @return array{en: string, por: 'checkin'|'aviso'}|null
      */
-    private function evidencia(ProveedorPartner $proveedor): ?array
+    private function evidencia(ProveedorPartner $proveedor, ?IntegracionTenant $config = null): ?array
     {
+        // De su sede, si la conexión es de una.
+        $sede = $config?->sucursal_id;
         $checkin = CheckinTenant::query()
             ->where('proveedor', $proveedor->value)
             ->where('estado', CheckinTenant::VALIDADO)
+            ->when($sede !== null, fn ($q) => $q->whereHas('sesion', fn ($s) => $s->where('sucursal_id', $sede)))
             ->max('registrado_en');
         $aviso = EventoPlataformaTenant::query()
             ->where('proveedor', $proveedor->value)
+            ->when($config?->exists === true, fn ($q) => $q->where(fn ($w) => $w->where('integracion_id', $config?->getKey())->orWhereNull('integracion_id')))
             ->max('recibido_en');
 
         $enCheckin = $checkin !== null ? CarbonImmutable::parse((string) $checkin) : null;

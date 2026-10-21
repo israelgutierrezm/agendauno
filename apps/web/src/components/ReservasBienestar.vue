@@ -40,7 +40,8 @@ interface Configuracion {
   error_avisos?: string | null;
 }
 
-const props = defineProps<{ proveedor: string }>();
+// `sucursal`: la conexión de esa sede (cada sede es otro gimnasio, ADR 0202).
+const props = defineProps<{ proveedor: string; sucursal?: string }>();
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -58,6 +59,9 @@ const edicion = reactive<{
 const url = computed(
   () => `/api/v1/app/${sesion.slug}/integraciones/${props.proveedor}/reservas`,
 );
+const params = computed(() =>
+  props.sucursal ? { sucursal: props.sucursal } : {},
+);
 const plataforma = computed(() =>
   t(`operacion.plataformas.proveedores.${props.proveedor}`),
 );
@@ -70,6 +74,7 @@ function tomar(datos: Configuracion): void {
   }
   edicion.activas = datos.activas;
   edicion.sucursal_id =
+    props.sucursal ??
     datos.sucursal_id ??
     (datos.sucursales.length === 1 ? datos.sucursales[0].id : "");
   edicion.clases = Object.fromEntries(
@@ -82,7 +87,9 @@ function tomar(datos: Configuracion): void {
 
 async function cargar(): Promise<void> {
   try {
-    const { data } = await api.get<{ data: Configuracion }>(url.value);
+    const { data } = await api.get<{ data: Configuracion }>(url.value, {
+      params: params.value,
+    });
     tomar(data.data);
   } catch (e) {
     toast.error(mensajeDeError(e));
@@ -92,15 +99,19 @@ async function cargar(): Promise<void> {
 async function guardar(): Promise<void> {
   guardando.value = true;
   try {
-    const { data } = await api.put<{ data: Configuracion }>(url.value, {
-      activas: edicion.activas,
-      sucursal_id: edicion.sucursal_id || null,
-      clases: Object.entries(edicion.clases).map(([oferta_id, c]) => ({
-        oferta_id,
-        publicada: c.publicada,
-        producto: c.producto || null,
-      })),
-    });
+    const { data } = await api.put<{ data: Configuracion }>(
+      url.value,
+      {
+        activas: edicion.activas,
+        sucursal_id: edicion.sucursal_id || null,
+        clases: Object.entries(edicion.clases).map(([oferta_id, c]) => ({
+          oferta_id,
+          publicada: c.publicada,
+          producto: c.producto || null,
+        })),
+      },
+      { params: params.value },
+    );
     tomar(data.data);
     if (data.data.error_avisos) {
       toast.error(data.data.error_avisos);
@@ -157,7 +168,8 @@ onMounted(cargar);
     />
 
     <template v-if="edicion.activas">
-      <div class="mt-3 max-w-sm">
+      <!-- La conexión de una sede publica las clases de esa sede. -->
+      <div v-if="!sucursal" class="mt-3 max-w-sm">
         <label class="tu-label" :for="`rb-sucursal-${proveedor}`">{{
           $t("operacion.plataformas.reservas.sucursal")
         }}</label>

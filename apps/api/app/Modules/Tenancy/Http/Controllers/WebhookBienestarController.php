@@ -43,15 +43,11 @@ class WebhookBienestarController
         $proveedor = ProveedorPartner::tryFrom((string) $request->route('proveedor'));
         abort_if($proveedor === null, 404);
 
-        $config = IntegracionTenant::query()->where('proveedor', $proveedor->value)->first();
+        // La dirección lleva el token de la conexión (cada sede tiene la suya, ADR 0202).
         $token = (string) $request->route('token');
-        abort_unless(
-            $config instanceof IntegracionTenant
-            && (string) $config->token_webhook !== ''
-            && hash_equals((string) $config->token_webhook, $token)
-            && $this->registro->activa($proveedor->value),
-            404,
-        );
+        $config = IntegracionTenant::query()->where('proveedor', $proveedor->value)->get()
+            ->first(fn (IntegracionTenant $i): bool => (string) $i->token_webhook !== '' && hash_equals((string) $i->token_webhook, $token));
+        abort_unless($config instanceof IntegracionTenant && $this->registro->vigente($config), 404);
 
         $cuerpo = $request->getContent();
         if ($proveedor === ProveedorPartner::Wellhub) {
@@ -61,7 +57,7 @@ class WebhookBienestarController
         $datos = json_decode($cuerpo, true);
         abort_unless(is_array($datos), 400, 'El aviso no es JSON.');
 
-        $evento = $this->avisos->recibir($proveedor, $datos);
+        $evento = $this->avisos->recibir($proveedor, $datos, $config);
         $estudio = $this->gestor->actual();
         if ($evento instanceof EventoPlataformaTenant && $estudio instanceof Estudio) {
             $id = (int) $evento->getKey();

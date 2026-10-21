@@ -132,6 +132,7 @@ class PublicarEnPlataformasTenant
             ->where('proveedor', $proveedor->value)
             ->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)
             ->whereNotNull('id_externo')
+            ->whereHas('publicacion', fn ($q) => $q->where('integracion_id', $integracion->getKey()))
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', $ahora))
             ->where(fn ($q) => $q
                 ->whereNotIn('publicacion_id', $publicaciones)
@@ -161,12 +162,12 @@ class PublicarEnPlataformasTenant
             ->where('sesion_id', $sesion->getKey())
             ->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)
             ->whereNotNull('id_externo')
-            ->with(['sesion', 'publicacion'])
+            ->with(['sesion', 'publicacion.integracion'])
             ->get()
             ->each(function (HorarioPlataformaTenant $publicado) use ($sesion): void {
                 $proveedor = ProveedorPartner::tryFrom($publicado->proveedor);
                 $publicador = $proveedor !== null ? $this->publicador($proveedor) : null;
-                $integracion = IntegracionTenant::query()->where('proveedor', $publicado->proveedor)->first();
+                $integracion = $publicado->publicacion->integracion ?? IntegracionTenant::query()->where('proveedor', $publicado->proveedor)->first();
                 if ($proveedor === null || ! $publicador instanceof PublicadorPlataforma || ! $integracion instanceof IntegracionTenant) {
                     return;
                 }
@@ -190,13 +191,13 @@ class PublicarEnPlataformasTenant
             ->where('estado', '!=', HorarioPlataformaTenant::RETIRADO)
             ->whereNotNull('id_externo')
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
-            ->with(['sesion', 'publicacion'])
+            ->with(['sesion', 'publicacion.integracion'])
             ->limit(self::LOTE)
             ->get()
             ->each(function (HorarioPlataformaTenant $publicado) use (&$retirados): void {
                 $proveedor = ProveedorPartner::tryFrom($publicado->proveedor);
                 $publicador = $proveedor !== null ? $this->publicador($proveedor) : null;
-                $integracion = IntegracionTenant::query()->where('proveedor', $publicado->proveedor)->first();
+                $integracion = $publicado->publicacion->integracion ?? IntegracionTenant::query()->where('proveedor', $publicado->proveedor)->first();
                 if ($publicador instanceof PublicadorPlataforma && $integracion instanceof IntegracionTenant) {
                     $retirados += $this->retirar($publicador, $publicado, $integracion->llaves());
                 }
@@ -207,7 +208,7 @@ class PublicarEnPlataformasTenant
             if (! $publicador instanceof PublicadorPlataforma) {
                 return;
             }
-            PublicacionPlataformaTenant::query()->where('proveedor', $integracion->proveedor)->whereNull('oculta_en')->get()
+            PublicacionPlataformaTenant::query()->where('integracion_id', $integracion->getKey())->whereNull('oculta_en')->get()
                 ->each(function (PublicacionPlataformaTenant $publicacion) use ($publicador, $integracion): void {
                     if ($publicador->visibilidadDeClase($publicacion, $integracion->llaves(), false) === null) {
                         $publicacion->forceFill(['oculta_en' => now()])->save();
@@ -228,7 +229,7 @@ class PublicarEnPlataformasTenant
     {
         $publica = $this->publica($integracion);
         PublicacionPlataformaTenant::query()
-            ->where('proveedor', $integracion->proveedor)
+            ->where('integracion_id', $integracion->getKey())
             ->whereNull('oculta_en')
             ->whereNotNull('clase_externa')
             ->where(fn ($q) => $publica ? $q->where('activa', false) : $q)
@@ -248,15 +249,18 @@ class PublicarEnPlataformasTenant
     public function sincronizarSesion(SesionTenant $sesion, ProveedorPartner $proveedor): void
     {
         $publicador = $this->publicador($proveedor);
-        $integracion = IntegracionTenant::query()->where('proveedor', $proveedor->value)->first();
         $publicado = HorarioPlataformaTenant::query()
             ->where('proveedor', $proveedor->value)
             ->where('sesion_id', $sesion->getKey())
             ->where('estado', HorarioPlataformaTenant::PUBLICADO)
-            ->with('publicacion')
+            ->with('publicacion.integracion')
             ->first();
+        if (! $publicado instanceof HorarioPlataformaTenant || ! $publicado->publicacion instanceof PublicacionPlataformaTenant) {
+            return;
+        }
+        // La conexión (la sede) que la publicó.
+        $integracion = $publicado->publicacion->integracion;
         if (! $publicador instanceof PublicadorPlataforma || ! $integracion instanceof IntegracionTenant
-            || ! $publicado instanceof HorarioPlataformaTenant || ! $publicado->publicacion instanceof PublicacionPlataformaTenant
             || ! $this->publica($integracion) || $sesion->inicia_en->isPast()) {
             return;
         }
@@ -316,7 +320,7 @@ class PublicarEnPlataformasTenant
         }
         $listas = [];
         PublicacionPlataformaTenant::query()
-            ->where('proveedor', $integracion->proveedor)
+            ->where('integracion_id', $integracion->getKey())
             ->where('activa', true)
             ->with('oferta.actividad')
             ->get()

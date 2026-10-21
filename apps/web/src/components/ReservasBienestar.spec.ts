@@ -82,6 +82,7 @@ describe("reservas desde la app de la plataforma", () => {
 
     expect(api.get).toHaveBeenCalledWith(
       "/api/v1/app/fluo/integraciones/wellhub/reservas",
+      { params: {} },
     );
     expect(w.get('[data-prueba="reservas-plataforma-estado"]').text()).toBe(
       "Sin publicar",
@@ -101,6 +102,7 @@ describe("reservas desde la app de la plataforma", () => {
         sucursal_id: "suc1",
         clases: [{ oferta_id: "of1", publicada: true, producto: "987" }],
       },
+      { params: {} },
     );
     expect(toast.exito).toHaveBeenCalled();
     expect(
@@ -164,6 +166,7 @@ describe("reservas desde la app de la plataforma", () => {
 
     expect(api.get).toHaveBeenCalledWith(
       "/api/v1/app/fluo/integraciones/totalpass/reservas",
+      { params: {} },
     );
     expect(w.text()).toContain(
       "No se pudieron consultar los planes de TotalPass",
@@ -173,6 +176,41 @@ describe("reservas desde la app de la plataforma", () => {
         .get('[data-prueba="reservas-clase"] input.tu-input')
         .attributes("placeholder"),
     ).toBe("ID del plan");
+  });
+
+  it("la conexión de una sede publica las clases de esa sede", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: configuracion({
+          activas: true,
+          sucursal_id: "suc2",
+          sucursales: [
+            { id: "suc1", nombre: "Roma Norte" },
+            { id: "suc2", nombre: "Del Valle" },
+          ],
+        }),
+      },
+    });
+    api.put.mockResolvedValue({ data: { data: configuracion() } });
+    const w = mount(ReservasBienestar, {
+      props: { proveedor: "wellhub", sucursal: "suc2" },
+      global: { plugins: [i18n] },
+    });
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/fluo/integraciones/wellhub/reservas",
+      { params: { sucursal: "suc2" } },
+    );
+    // Sin elegir sucursal: es la de la conexión.
+    expect(w.find("#rb-sucursal-wellhub").exists()).toBe(false);
+    await w.get('[data-prueba="reservas-guardar"]').trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/fluo/integraciones/wellhub/reservas",
+      expect.objectContaining({ sucursal_id: "suc2" }),
+      { params: { sucursal: "suc2" } },
+    );
   });
 
   it("no se muestra si la plataforma aún no publica clases", async () => {
