@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/sesion_controller.dart';
@@ -105,14 +106,7 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
         clave ??
         'app-${s.cita!.reservaId}-${DateTime.now().microsecondsSinceEpoch}';
     await repo.cobrarCita(s.cita!.reservaId, metodo, clave: intento);
-    if (ref.mounted) {
-      ref.invalidateSelf();
-      try {
-        await future;
-      } on Object {
-        // La agenda se vuelve a cargar al reintentar; el cobro ya quedó.
-      }
-    }
+    await _recargar();
     return true;
   }
 
@@ -170,8 +164,7 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
     ref
         .read(fechaAgendaProvider.notifier)
         .elegir(DateTime(dia.year, dia.month, dia.day));
-    ref.invalidateSelf();
-    await future;
+    await _recargar();
     return creada;
   }
 
@@ -199,11 +192,28 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
       return;
     }
     await fn(repo);
+    await _recargar();
+  }
+
+  /// Cuánto se espera la recarga tras una acción antes de darla por hecha.
+  @visibleForTesting
+  static Duration esperaRecarga = const Duration(seconds: 8);
+
+  /// Vuelve a cargar el día después de algo que el servidor YA hizo (agendar,
+  /// cobrar, cancelar, marcar, reprogramar). Si la recarga falla o tarda (sin red,
+  /// Riverpod la reintenta por casi un minuto), la acción no se anuncia como
+  /// fallida: se repetiría (dos citas, dos cobros, dos avisos al cliente). La
+  /// agenda se pone al día sola y, si no puede, muestra su propio error.
+  Future<void> _recargar() async {
     if (!ref.mounted) {
       return; // Se salió o cambió la sesión mientras tanto.
     }
     ref.invalidateSelf();
-    await future;
+    try {
+      await future.timeout(esperaRecarga);
+    } on Object {
+      // La acción ya quedó.
+    }
   }
 }
 

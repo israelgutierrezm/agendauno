@@ -357,17 +357,28 @@ Future<void> mostrarDetalleReserva(
   }
 }
 
-class _DetalleReserva extends ConsumerWidget {
+class _DetalleReserva extends ConsumerStatefulWidget {
   const _DetalleReserva(this.r, {this.pagoEnLinea = false});
 
   final ReservaMiembro r;
   final bool pagoEnLinea;
 
+  @override
+  ConsumerState<_DetalleReserva> createState() => _DetalleReservaState();
+}
+
+class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
+  /// Mientras se acepta el lugar: un segundo toque no manda otra petición (y no
+  /// muestra un error después del «¡Lugar confirmado!»).
+  var _ocupado = false;
+
+  ReservaMiembro get r => widget.r;
+
   bool get _sePagaAqui =>
-      r.estado == 'pendiente_pago' && pagoEnLinea && r.ordenId != null;
+      r.estado == 'pendiente_pago' && widget.pagoEnLinea && r.ordenId != null;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final notifier = ref.read(cuentaProvider.notifier);
     // Las horas que se muestran son las de su sede o, si el API no la manda, las
     // del negocio (no las del teléfono).
@@ -400,8 +411,15 @@ class _DetalleReserva extends ConsumerWidget {
         : null;
     // Al terminar una acción, se cierra la hoja (la cuenta ya se recargó).
     Future<void> y(Future<void> Function() accion, String exito) async {
+      if (_ocupado) {
+        return;
+      }
+      setState(() => _ocupado = true);
       final nav = Navigator.of(context);
       await hacerConAviso(context, accion, exito: exito);
+      if (mounted) {
+        setState(() => _ocupado = false);
+      }
       if (nav.mounted) {
         nav.pop();
       }
@@ -531,10 +549,13 @@ class _DetalleReserva extends ConsumerWidget {
                   ),
                 if (r.ofrecida)
                   FilledButton(
-                    onPressed: () => y(
-                      () => notifier.aceptarLugar(r.id),
-                      '¡Lugar confirmado!',
-                    ),
+                    key: const Key('aceptar-lugar'),
+                    onPressed: _ocupado
+                        ? null
+                        : () => y(
+                            () => notifier.aceptarLugar(r.id),
+                            '¡Lugar confirmado!',
+                          ),
                     child: const Text('Aceptar lugar'),
                   ),
                 if (r.estado == 'confirmada' || r.estado == 'pendiente_pago')
@@ -602,6 +623,10 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
   /// El lugar numerado que eligió (opcional; B06).
   int? _lugar;
 
+  /// Mientras se reserva: un segundo toque no manda otra reserva (el servidor la
+  /// rechazaría y se vería un error después del «Reservado.»).
+  var _reservando = false;
+
   ClaseMiembro get c => widget.c;
 
   /// Pase de invitado (ADR 0182): aparta un lugar para alguien que no es cliente.
@@ -648,6 +673,10 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
     // Si alguien tomó el lugar (u otra cosa cambió), se dice y se vuelve a pedir la
     // vista previa: nunca se cambia a otro lugar en silencio.
     Future<void> reservar({bool esperar = false}) async {
+      if (_reservando) {
+        return;
+      }
+      setState(() => _reservando = true);
       final nav = Navigator.of(context);
       final messenger = ScaffoldMessenger.of(context);
       try {
@@ -677,8 +706,14 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
         }
       } on DioException catch (e) {
         messenger.showSnackBar(SnackBar(content: Text(mensajeDeError(e))));
-        setState(() => _lugar = null);
-        ref.invalidate(antesDeReservarProvider(c.id));
+        if (mounted) {
+          setState(() => _lugar = null);
+          ref.invalidate(antesDeReservarProvider(c.id));
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _reservando = false);
+        }
       }
     }
 
@@ -814,7 +849,10 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => reservar(esperar: antes.esListaEspera),
+                  key: const Key('confirmar-reserva'),
+                  onPressed: _reservando
+                      ? null
+                      : () => reservar(esperar: antes.esListaEspera),
                   child: Text(
                     antes.esListaEspera
                         ? 'Anotarme en la lista de espera'
@@ -829,11 +867,13 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                 width: double.infinity,
                 child: c.llena
                     ? OutlinedButton(
-                        onPressed: () => reservar(esperar: true),
+                        onPressed: _reservando
+                            ? null
+                            : () => reservar(esperar: true),
                         child: const Text('Anotarme en la lista de espera'),
                       )
                     : FilledButton(
-                        onPressed: reservar,
+                        onPressed: _reservando ? null : reservar,
                         child: const Text('Reservar'),
                       ),
               ),

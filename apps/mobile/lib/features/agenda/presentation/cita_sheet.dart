@@ -17,13 +17,26 @@ import 'reprogramar_cita_sheet.dart';
 /// historial, con las acciones de recepción (llegó, no asistió, cobrar en caja,
 /// reprogramar, cancelar). Lo que mueve dinero o créditos se confirma antes, como
 /// en la web.
-Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _HojaCita(sesionId: sesion.id),
-    );
+///
+/// La hoja lee la cita de la agenda del día: abierta desde el Inicio o Mis clases
+/// (una cita de otro día), la agenda pasa al día de la cita en su sucursal, como al
+/// agendar una. Si no, diría que la cita «ya no está en la agenda».
+Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) {
+  final dia = sesion.iniciaLocal;
+  final contenedor = ProviderScope.containerOf(context, listen: false);
+  final actual = contenedor.read(fechaAgendaProvider);
+  if (actual.year != dia.year ||
+      actual.month != dia.month ||
+      actual.day != dia.day) {
+    contenedor.read(fechaAgendaProvider.notifier).elegir(dia);
+  }
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _HojaCita(sesionId: sesion.id),
+  );
+}
 
 String _hhmm(DateTime d) =>
     '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

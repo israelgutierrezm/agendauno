@@ -361,14 +361,6 @@ class InicioTab extends ConsumerWidget {
   }
 
   /// "Ilimitado", "6 créditos" o "Sin paquete activo" (1000 unidades = 1).
-  static String _creditos(List<DerechoMiembro> derechos) {
-    if (derechos.isEmpty) {
-      return 'Sin paquete activo';
-    }
-    if (derechos.any((d) => d.ilimitado)) {
-      return 'Ilimitado';
-    }
-    final n = derechos.fold<int>(0, (a, d) => a + d.creditosDisponibles);
-    return n == 1 ? '1 crédito' : '$n créditos';
-  }
+  static String _creditos(List<DerechoMiembro> derechos) =>
+      DerechoMiembro.resumenCreditos(derechos);
 }

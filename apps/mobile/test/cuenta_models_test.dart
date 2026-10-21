@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agendauno/core/formato.dart';
 import 'package:agendauno/features/auth/data/sesion.dart';
 import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
 
@@ -13,14 +14,35 @@ void main() {
 
       expect(d.ilimitado, isFalse);
       expect(d.disponible, 7000);
-      expect(d.creditosDisponibles, 7); // 1 credito = 1000 unidades
+      expect(DerechoMiembro.resumenCreditos([d]), '7 créditos');
     });
 
     test('parsea una membresia ilimitada', () {
-      final d = DerechoMiembro.desdeJson({'ilimitado': true, 'saldo': null, 'disponible': null});
+      final d = DerechoMiembro.desdeJson({
+        'ilimitado': true,
+        'saldo': null,
+        'disponible': null,
+      });
 
       expect(d.ilimitado, isTrue);
-      expect(d.creditosDisponibles, 0);
+      expect(DerechoMiembro.resumenCreditos([d]), 'Ilimitado');
+    });
+
+    // Antes se redondeaba cada plan: medio crédito decía «1 crédito» y el
+    // servidor no la dejaba reservar.
+    test('los créditos se suman en unidades y no se redondean', () {
+      DerechoMiembro con(int disponible) =>
+          DerechoMiembro(ilimitado: false, disponible: disponible);
+
+      expect(DerechoMiembro.resumenCreditos([con(500)]), '0.5 créditos');
+      expect(DerechoMiembro.resumenCreditos([con(400)]), '0.4 créditos');
+      expect(DerechoMiembro.resumenCreditos([con(500), con(500)]), '1 crédito');
+      expect(DerechoMiembro.resumenCreditos([con(250)]), '0.25 créditos');
+      expect(
+        DerechoMiembro.resumenCreditos([con(3000), con(-500)]),
+        '3 créditos',
+      );
+      expect(DerechoMiembro.resumenCreditos(const []), 'Sin paquete activo');
     });
   });
 
@@ -49,7 +71,10 @@ void main() {
   });
 
   test('Sesion se arma desde el usuario del login', () {
-    final s = Sesion.desdeJson('estudio-a', '1|abc', {'nombre': 'Ana', 'rol': 'miembro'});
+    final s = Sesion.desdeJson('estudio-a', '1|abc', {
+      'nombre': 'Ana',
+      'rol': 'miembro',
+    });
 
     expect(s.slug, 'estudio-a');
     expect(s.bearer, '1|abc');
@@ -62,12 +87,21 @@ void main() {
   });
 
   test('Sesion toma la modalidad y la terminología del perfil del estudio', () {
-    final s = Sesion.desdeJson('barberia', '1|abc', {'nombre': 'Beto', 'rol': 'recepcionista'}, {
-      'perfil_config': {
-        'modalidad': 'citas',
-        'terminologia': {'sesion': 'Cita', 'miembro': 'Cliente', 'instructor': 'Barbero'},
+    final s = Sesion.desdeJson(
+      'barberia',
+      '1|abc',
+      {'nombre': 'Beto', 'rol': 'recepcionista'},
+      {
+        'perfil_config': {
+          'modalidad': 'citas',
+          'terminologia': {
+            'sesion': 'Cita',
+            'miembro': 'Cliente',
+            'instructor': 'Barbero',
+          },
+        },
       },
-    });
+    );
 
     expect(s.esCitas, isTrue);
     expect(s.terminologia.miembro, 'Cliente');
@@ -82,7 +116,10 @@ void main() {
         'tipo': 'cita',
         'restantes': 1,
         'slots': [
-          {'inicia': '2030-01-08T18:00:00+00:00', 'termina': '2030-01-08T19:00:00+00:00'},
+          {
+            'inicia': '2030-01-08T18:00:00+00:00',
+            'termina': '2030-01-08T19:00:00+00:00',
+          },
         ],
       });
       expect(o.puede, isTrue);
@@ -97,7 +134,11 @@ void main() {
         'tipo': 'clase',
         'restantes': 2,
         'sesiones': [
-          {'id': 's9', 'inicia_en': '2030-01-09T14:00:00+00:00', 'zona_horaria': 'America/Mexico_City'},
+          {
+            'id': 's9',
+            'inicia_en': '2030-01-09T14:00:00+00:00',
+            'zona_horaria': 'America/Mexico_City',
+          },
         ],
       });
       expect(o.sesiones.single.id, 's9');
@@ -152,5 +193,14 @@ void main() {
 
       expect(o.incluye, isEmpty);
     });
+  });
+
+  test('Formato.creditos es exacto: entero o hasta 3 decimales', () {
+    expect(Formato.creditos(8000), '8');
+    expect(Formato.creditos(1500), '1.5');
+    expect(Formato.creditos(250), '0.25');
+    expect(Formato.creditos(1005), '1.005');
+    expect(Formato.creditos(-500), '-0.5');
+    expect(Formato.creditos(0), '0');
   });
 }

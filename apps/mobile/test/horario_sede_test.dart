@@ -237,4 +237,55 @@ void main() {
             as Map<String, dynamic>;
     expect(enviado['inicia_en_local'], _local(_sede));
   });
+
+  testWidgets('mover una cita pide los horarios del día de su sede', (
+    tester,
+  ) async {
+    // 05:30 UTC: 00:30 del 9 en la sede (UTC-5) y 23:30 del 8 en el negocio
+    // (UTC-6). Antes se pedían los horarios del 8.
+    final api = _ApiHorarios({
+      'GET /api/v1/app/demo/mi/reservas/r1/reprogramar': {
+        'puede': true,
+        'tipo': 'cita',
+        'restantes': 1,
+        'slots': <Object>[],
+      },
+    });
+    final repo = CuentaRepository(Dio()..httpClientAdapter = api, 'demo');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sesionInicialProvider.overrideWithValue(
+            const Sesion(
+              slug: 'demo',
+              bearer: 't',
+              nombre: 'Ana',
+              rol: 'miembro',
+              desfaseNegocioMin: -360,
+            ),
+          ),
+          cuentaRepositoryProvider.overrideWithValue(repo),
+          cuentaProvider.overrideWith(_CuentaVacia.new),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: ReprogramarSheet(
+              ReservaMiembro(
+                id: 'r1',
+                estado: 'confirmada',
+                oferta: 'Corte',
+                tipo: TipoSesion.cita,
+                iniciaEn: '2030-01-09T05:30:00+00:00',
+                desfaseMin: -300,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final pedido = api.peticiones.firstWhere((p) => p.method == 'GET');
+    expect(pedido.queryParameters['fecha'], '2030-01-09');
+  });
 }

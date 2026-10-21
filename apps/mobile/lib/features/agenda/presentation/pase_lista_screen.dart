@@ -362,12 +362,20 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                   ),
                 ),
               for (final a in enSala)
-                _fila(a, abierta: abierta, gestionar: gestionar),
+                _fila(
+                  a,
+                  abierta: abierta,
+                  // Empezada la clase, ya no se ofrecen ni se aceptan lugares: el
+                  // servidor lo rechaza (ADR 0095).
+                  gestionar: gestionar && !lista.empezo,
+                ),
               // Lista de espera: en su orden; al liberarse un lugar se ofrece así.
               if (enEspera.isNotEmpty)
                 _ListaEspera(
                   personas: enEspera,
-                  onPromover: gestionar && libres > 0 ? _promover : null,
+                  onPromover: gestionar && libres > 0 && !lista.empezo
+                      ? _promover
+                      : null,
                 ),
               // Ya empezada la clase (lo dice el servidor): quien sigue sin registro
               // queda como «no vino».

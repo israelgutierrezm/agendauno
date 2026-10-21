@@ -1,3 +1,4 @@
+import '../../../core/formato.dart';
 import '../../../core/hora_negocio.dart';
 import '../../auth/data/sesion.dart';
 import 'cuenta_models.dart';
@@ -135,10 +136,7 @@ class PlanCorte {
   };
 
   /// "3" o "1.5" clases a partir de unidades.
-  static String clases(int unidades) {
-    final n = unidades / 1000;
-    return n == n.roundToDouble() ? n.round().toString() : n.toStringAsFixed(1);
-  }
+  static String clases(int unidades) => Formato.creditos(unidades);
 
   /// Los números que se muestran: siempre incluidas, usadas y disponibles (si no
   /// es ilimitado); los demás solo si hay algo.

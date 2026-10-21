@@ -76,8 +76,24 @@ class DerechoMiembro {
   /// Se puede usar hoy (aunque se le hayan acabado las clases).
   bool get vigente => estado == 'vigente' || estado == 'agotado';
 
-  /// Créditos disponibles (1 crédito = 1000 unidades).
-  int get creditosDisponibles => ((disponible ?? 0) / 1000).round();
+  /// "Ilimitado", "1 crédito", "0.5 créditos" o "Sin paquete activo": lo que
+  /// tiene disponible entre todos sus planes, sumado en unidades (1000 = 1
+  /// crédito) y sin redondear: con medio crédito no se le promete una clase.
+  static String resumenCreditos(List<DerechoMiembro> derechos) {
+    if (derechos.isEmpty) {
+      return 'Sin paquete activo';
+    }
+    if (derechos.any((d) => d.ilimitado)) {
+      return 'Ilimitado';
+    }
+    final unidades = derechos.fold<int>(
+      0,
+      (a, d) => a + ((d.disponible ?? 0) > 0 ? d.disponible! : 0),
+    );
+    return unidades == 1000
+        ? '1 crédito'
+        : '${Formato.creditos(unidades)} créditos';
+  }
 
   factory DerechoMiembro.desdeJson(Map<String, dynamic> j) => DerechoMiembro(
     ilimitado: (j['ilimitado'] ?? false) as bool,
@@ -233,11 +249,8 @@ class MovimientoCredito {
 
   /// "+8", "-1", "-0.5" (1 crédito = 1000 unidades).
   static String creditos(int unidades, {bool conSigno = true}) {
-    final n = unidades / 1000;
-    final texto = n == n.roundToDouble()
-        ? n.round().toString()
-        : n.toStringAsFixed(1);
-    return conSigno && n > 0 ? '+$texto' : texto;
+    final texto = Formato.creditos(unidades);
+    return conSigno && unidades > 0 ? '+$texto' : texto;
   }
 
   factory MovimientoCredito.desdeJson(Map<String, dynamic> j) {

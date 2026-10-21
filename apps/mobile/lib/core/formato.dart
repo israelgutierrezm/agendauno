@@ -71,6 +71,17 @@ abstract final class Formato {
     return '${minor < 0 ? '-' : ''}$prefijo$enteros.${_dos(abs % 100)}';
   }
 
+  /// Créditos a partir de unidades (1000 = 1 crédito), exactos y sin punto
+  /// flotante: "3", "0.5", "1.25", "-0.5". Nunca se redondean (0.5 no es «1»).
+  static String creditos(int unidades) {
+    final abs = unidades.abs();
+    final resto = abs % 1000;
+    final decimales = resto == 0
+        ? ''
+        : '.${resto.toString().padLeft(3, '0').replaceFirst(RegExp(r'0+$'), '')}';
+    return '${unidades < 0 ? '-' : ''}${abs ~/ 1000}$decimales';
+  }
+
   /// La moneda (ISO 4217) que trae una respuesta del API o, si no la trae, la del
   /// negocio ([respaldo], la de la sesión).
   static String moneda(Object? valor, String respaldo) =>

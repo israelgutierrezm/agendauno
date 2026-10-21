@@ -117,6 +117,8 @@ class HechoCita {
     'ventanilla' => 'Ventanilla',
     'tarjeta' => 'Tarjeta',
     'oxxo' => 'OXXO',
+    // Cobrada con varias formas (ADR 0177).
+    'mixto' => 'Varias formas',
     _ => '—',
   };
 
@@ -805,11 +807,7 @@ class EfectoInasistencia {
       if (unidades == 1000) {
         return 'Pierde 1 crédito de su plan.';
       }
-      final n = unidades / 1000;
-      final cifra = n == n.truncateToDouble()
-          ? n.toInt().toString()
-          : n.toStringAsFixed(1);
-      return 'Pierde $cifra créditos de su plan.';
+      return 'Pierde ${Formato.creditos(unidades)} créditos de su plan.';
     }
     return tolerada
         ? 'Esta falta entra en la tolerancia de su política: no pierde el crédito.'

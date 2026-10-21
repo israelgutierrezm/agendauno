@@ -337,8 +337,10 @@ class _AgendaCitas extends ConsumerWidget {
         )
         .length;
     // Lo que falta de cada cita (con anticipo ya pagado, solo el resto), no su total.
+    // Una cita a la que el cliente no vino no se cobra en caja (ADR 0166): no
+    // suma, como en la web y en el Inicio.
     final porCobrar = citas
-        .where((s) => s.porCobrar)
+        .where((s) => s.porCobrar && s.estadoCita != EstadoCita.noAsistio)
         .fold<int>(0, (a, s) => a + (s.porCobrarMinor ?? s.montoMinor ?? 0));
     // Los precios son de la moneda del negocio (una sola, ADR 0099).
     final moneda = ref.watch(sesionProvider)?.moneda ?? 'MXN';

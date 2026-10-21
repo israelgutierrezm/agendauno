@@ -36,9 +36,12 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   // versión no entiende).
   String? _error;
 
-  /// Desfase con UTC (minutos) de la zona del negocio: los días y las horas son
-  /// los de allá, no los del teléfono.
-  int? get _desfase => ref.read(sesionProvider)?.desfaseNegocioMin;
+  /// Desfase con UTC (minutos) de la sede de la reserva o, si el API no lo manda,
+  /// del negocio: los días y las horas son los de allá, no los del teléfono. Con
+  /// el del negocio, una cita a las 00:30 de una sede en otra zona abría los
+  /// horarios del día anterior.
+  int? get _desfase =>
+      widget.reserva.desfaseMin ?? ref.read(sesionProvider)?.desfaseNegocioMin;
 
   /// Hoy en el negocio.
   DateTime get _hoy {
@@ -49,7 +52,7 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   @override
   void initState() {
     super.initState();
-    // El día de la reserva en el negocio (el API no manda su hora local).
+    // El día de la reserva en su sede (el API no manda su hora local).
     final inicio = HoraNegocio.pared(
       widget.reserva.iniciaEn,
       desfaseMin: _desfase,

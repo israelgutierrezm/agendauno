@@ -102,6 +102,30 @@ class _Agenda extends AgendaController {
       _hechas.add('llego:$retardo');
 }
 
+/// Como el servidor: solo las sesiones del día que se ve en la agenda.
+class _AgendaDelDia extends AgendaController {
+  _AgendaDelDia(this._sesiones);
+
+  final List<Map<String, dynamic>> _sesiones;
+
+  @override
+  Future<AgendaDia> build() async {
+    final dia = ref.watch(fechaAgendaProvider);
+    return AgendaDia(
+      sesiones: _sesiones
+          .map(SesionAgenda.desdeJson)
+          .where(
+            (s) =>
+                s.iniciaLocal.year == dia.year &&
+                s.iniciaLocal.month == dia.month &&
+                s.iniciaLocal.day == dia.day,
+          )
+          .toList(),
+      profesionales: _equipo,
+    );
+  }
+}
+
 const _recepcion = Sesion(
   slug: 'demo',
   bearer: 't',
@@ -204,6 +228,31 @@ void main() {
     expect(find.text('Ana López'), findsOneWidget);
     // Por cobrar: el total de la cita, no el precio de hoy en el catálogo.
     expect(find.text('\$15.00'), findsOneWidget);
+  });
+
+  testWidgets('«Por cobrar» no suma la cita a la que el cliente no vino', (
+    tester,
+  ) async {
+    final antes = DateTime.now().subtract(const Duration(hours: 3));
+    await _abrirAgenda(tester, _recepcion, [
+      _cita(id: 'c1', instructorId: 'p2', instructor: 'Beto Ramírez'),
+      _cita(
+        id: 'c2',
+        instructorId: 'p2',
+        instructor: 'Beto Ramírez',
+        inicia: antes,
+        extra: {
+          'estado_atencion': 'no_asistio',
+          'asistencia': 'ausente',
+          'total_minor': 2000,
+          'por_cobrar_minor': 2000,
+        },
+      ),
+    ]);
+
+    // Como la web y el Inicio (ADR 0166): solo la que sí se cobra en caja.
+    expect(find.text('\$15.00'), findsOneWidget);
+    expect(find.text('\$35.00'), findsNothing);
   });
 
   testWidgets('las flechas recorren las semanas y «Hoy» regresa', (
@@ -362,6 +411,46 @@ void main() {
     expect(find.text('WhatsApp'), findsOneWidget);
   });
 
+  testWidgets('la cita de otro día (desde el Inicio) abre con sus datos', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(600, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final manana = DateTime.now().add(const Duration(days: 1));
+    final cita = _cita(
+      id: 'c1',
+      instructorId: 'p2',
+      instructor: 'Beto Ramírez',
+      inicia: DateTime(manana.year, manana.month, manana.day, 10),
+    );
+    final s = SesionAgenda.desdeJson(cita);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sesionInicialProvider.overrideWithValue(_beto),
+          agendaProvider.overrideWith(() => _AgendaDelDia([cita])),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => mostrarHojaCita(context, s),
+                child: const Text('Ver cita'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Ver cita'));
+    await tester.pumpAndSettle();
+
+    // Antes buscaba la cita en la agenda de hoy y decía que ya no estaba.
+    expect(find.text('Esta cita ya no está en la agenda.'), findsNothing);
+    expect(find.text('Ana López'), findsOneWidget);
+  });
+
   test('el historial de una cita se lee como en la web', () {
     HechoCita h(String tipo, Map<String, dynamic> d) =>
         HechoCita(tipo: tipo, fecha: DateTime(2026, 10, 1, 10), detalle: d);
@@ -371,6 +460,11 @@ void main() {
       'Cobrada en caja · Efectivo',
     );
     expect(h('cobrada', {'en_caja': false}).titulo, 'Pagada en línea');
+    // Con varias formas de pago (ADR 0177), como en la web.
+    expect(
+      h('cobrada', {'en_caja': true, 'metodo': 'mixto'}).titulo,
+      'Cobrada en caja · Varias formas',
+    );
     expect(
       h('cancelada', {'por': 'cliente'}).titulo,
       'Cancelada por el cliente',
