@@ -12,6 +12,9 @@ enum DestinoPush {
   /// Un cobro, un pago o su plan: Pagos.
   pagos,
 
+  /// Le escribieron al negocio (WhatsApp, Instagram o Messenger): la bandeja.
+  mensajes,
+
   /// Lo demás (bienvenida, difusiones): el Inicio.
   inicio;
 
@@ -19,6 +22,9 @@ enum DestinoPush {
     final t = tipo ?? '';
     if (t.startsWith('reserva.')) {
       return reservas;
+    }
+    if (t.startsWith('bandeja.')) {
+      return mensajes;
     }
     const dePagos = [
       'orden.',

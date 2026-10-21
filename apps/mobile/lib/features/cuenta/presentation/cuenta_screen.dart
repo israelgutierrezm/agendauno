@@ -60,7 +60,7 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
       (destino) => _ir(switch (destino) {
         DestinoPush.reservas => PestanaCuenta.reservas,
         DestinoPush.pagos => PestanaCuenta.pagos,
-        DestinoPush.inicio => PestanaCuenta.inicio,
+        DestinoPush.inicio || DestinoPush.mensajes => PestanaCuenta.inicio,
       }),
     );
   }

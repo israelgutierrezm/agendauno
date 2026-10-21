@@ -50,6 +50,8 @@ void main() {
     expect(DestinoPush.de('cobro.fallido'), DestinoPush.pagos);
     expect(DestinoPush.de('membresia.renovacion_proxima'), DestinoPush.pagos);
     expect(DestinoPush.de('difusion'), DestinoPush.inicio);
+    // Le escribieron al negocio: el equipo abre la bandeja.
+    expect(DestinoPush.de('bandeja.mensaje_recibido'), DestinoPush.mensajes);
     expect(DestinoPush.de(null), DestinoPush.inicio);
   });
 

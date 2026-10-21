@@ -6,6 +6,7 @@ import '../../../core/error_de_carga.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../agenda/presentation/agenda_screen.dart';
+import '../../bandeja/presentation/bandeja_screen.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
@@ -17,10 +18,11 @@ import '../data/inicio_repository.dart';
 import '../data/resumen_hoy.dart';
 import 'resumen_mes_card.dart';
 
-enum PestanaEquipo { inicio, agenda }
+enum PestanaEquipo { inicio, agenda, mensajes }
 
 /// La app del equipo del negocio (dueño, administración, recepción): su Inicio con
-/// el día de hoy —el mismo estilo de los otros portales— y la agenda del día.
+/// el día de hoy —el mismo estilo de los otros portales—, la agenda del día y, para
+/// quien atiende la bandeja, los mensajes de WhatsApp, Instagram y Messenger.
 class EquipoScreen extends ConsumerStatefulWidget {
   const EquipoScreen({super.key});
 
@@ -36,47 +38,71 @@ class _EquipoScreenState extends ConsumerState<EquipoScreen> {
   @override
   void initState() {
     super.initState();
-    // Una notificación de una reserva o una cita abre la agenda.
+    // Una notificación de una reserva o una cita abre la agenda; un mensaje, la
+    // bandeja.
     escucharAvisos(this, (destino) {
       if (destino == DestinoPush.reservas) {
         _ir(PestanaEquipo.agenda);
+      } else if (destino == DestinoPush.mensajes) {
+        _ir(PestanaEquipo.mensajes);
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Un rol propio puede no ver la agenda: entonces solo tiene su Inicio.
-    final verAgenda = ref.watch(sesionProvider)?.puede('agenda.ver') ?? false;
-    final pestana = verAgenda ? _pestana : PestanaEquipo.inicio;
+    final sesion = ref.watch(sesionProvider);
+    // Cada pestaña con su permiso (un rol propio puede no ver la agenda) y la bandeja,
+    // además, con el plan que la incluye.
+    final pestanas = [
+      PestanaEquipo.inicio,
+      if (sesion?.puede('agenda.ver') ?? false) PestanaEquipo.agenda,
+      if ((sesion?.puede('mensajes.atender') ?? false) &&
+          (sesion?.tieneFuncion('mensajes') ?? false))
+        PestanaEquipo.mensajes,
+    ];
+    final pestana = pestanas.contains(_pestana)
+        ? _pestana
+        : PestanaEquipo.inicio;
     return Scaffold(
       // La agenda del día trae su propia barra.
       appBar: pestana == PestanaEquipo.agenda
           ? null
           : AppBar(
-              title: const Text('Inicio'),
+              title: Text(
+                pestana == PestanaEquipo.mensajes ? 'Mensajes' : 'Inicio',
+              ),
               actions: [const BotonMiPerfil()],
             ),
       body: switch (pestana) {
         PestanaEquipo.inicio => _InicioNegocio(onIr: _ir),
         PestanaEquipo.agenda => const AgendaScreen(),
+        PestanaEquipo.mensajes => const BandejaScreen(),
       },
-      bottomNavigationBar: !verAgenda
+      bottomNavigationBar: pestanas.length < 2
           ? null
           : NavigationBar(
-              selectedIndex: pestana.index,
-              onDestinationSelected: (i) => _ir(PestanaEquipo.values[i]),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Inicio',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.schedule_outlined),
-                  selectedIcon: Icon(Icons.schedule),
-                  label: 'Agenda',
-                ),
+              selectedIndex: pestanas.indexOf(pestana),
+              onDestinationSelected: (i) => _ir(pestanas[i]),
+              destinations: [
+                for (final p in pestanas)
+                  switch (p) {
+                    PestanaEquipo.inicio => const NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: 'Inicio',
+                    ),
+                    PestanaEquipo.agenda => const NavigationDestination(
+                      icon: Icon(Icons.schedule_outlined),
+                      selectedIcon: Icon(Icons.schedule),
+                      label: 'Agenda',
+                    ),
+                    PestanaEquipo.mensajes => const NavigationDestination(
+                      icon: Icon(Icons.chat_bubble_outline),
+                      selectedIcon: Icon(Icons.chat_bubble),
+                      label: 'Mensajes',
+                    ),
+                  },
               ],
             ),
     );
