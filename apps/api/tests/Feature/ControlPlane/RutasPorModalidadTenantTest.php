@@ -117,6 +117,12 @@ function rutasExclusivasPorModalidad(): array
         'plataformas.conciliacion.store' => 'clases',
         'miembros.niveles.index' => 'clases',
         'miembros.niveles.update' => 'clases',
+        // Productos para recoger al reservar (ADR 0194).
+        'mi.apartados.ofrecidos' => 'clases',
+        'mi.apartados.store' => 'clases',
+        'mi.apartados.destroy' => 'clases',
+        'sesiones.apartados.index' => 'clases',
+        'apartados.destroy' => 'clases',
         // Citas: horarios de atención y disponibilidad del equipo, agendar desde el
         // panel, desde la cuenta y sin cuenta, y el historial de una cita.
         'horarios-atencion.index' => 'citas',

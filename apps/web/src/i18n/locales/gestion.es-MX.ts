@@ -324,6 +324,10 @@ export const inventarioExtra = {
   entrada: "Entrada",
   ajuste: "Ajuste (+/−)",
   ajusteAyuda: "Usa un número negativo para mermas o conteos menores.",
+  // Productos al reservar (ADR 0194).
+  ofrecerAlReservar: "Ofrecerlo al reservar una clase",
+  ofrecerAlReservarAyuda:
+    "El cliente lo aparta para su clase y lo paga al recogerlo en el mostrador.",
 };
 
 export const accesoRecepcion = {

@@ -143,6 +143,8 @@ describe("inventario", () => {
       sku: null,
       precio_minor: 6000,
       categoria_id: null,
+      // En un negocio de clases, si se ofrece al reservar (ADR 0194).
+      ofrecer_al_reservar: false,
       extras: [{ id: undefined, nombre: "Fresas", precio_minor: 1500 }],
     });
   });

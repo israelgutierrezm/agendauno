@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -527,6 +528,9 @@ async function cobrar(): Promise<void> {
       recibido_minor: recibidoMinor.value,
       comprador_id: comprador.value !== "" ? comprador.value : null,
       enviar_ticket: comprador.value !== "" && enviarTicket.value,
+      ...(apartadosACobrar.value.length > 0
+        ? { apartados: apartadosACobrar.value }
+        : {}),
     });
     const vuelto = data?.data?.cambio_minor ?? null;
     const ticket =
@@ -544,6 +548,8 @@ async function cobrar(): Promise<void> {
     );
     carrito.value = [];
     claveIntento = null;
+    apartadosACobrar.value = [];
+    apartadoDe.value = null;
     reiniciarCobro();
     await Promise.all([cargar(), listaVentas.value?.cargar()]);
   } catch (e) {
@@ -605,7 +611,45 @@ const indicadores = computed<Indicador[]>(() => {
   ];
 });
 
-onMounted(cargar);
+// Lo que un cliente apartó para su clase (ADR 0194): llega desde la lista de la clase
+// con sus artículos, su sede y quién es; la venta los entrega.
+const ruta = useRoute();
+const apartadosACobrar = ref<string[]>([]);
+const apartadoDe = ref<string | null>(null);
+function precargarApartados(): void {
+  const q = ruta.query;
+  const lista =
+    typeof q.apartados === "string"
+      ? q.apartados.split(",").filter(Boolean)
+      : [];
+  if (lista.length === 0) {
+    return;
+  }
+  if (
+    typeof q.sucursal === "string" &&
+    sucursales.value.some((s) => s.id === q.sucursal)
+  ) {
+    sucursalSel.value = q.sucursal;
+  }
+  const piezas = typeof q.articulos === "string" ? q.articulos.split(",") : [];
+  for (const pieza of piezas) {
+    const [id, cuantos] = pieza.split(":");
+    const articulo = articulos.value.find((a) => a.id === id);
+    for (let i = 0; articulo && i < Number(cuantos || 1); i++) {
+      sumarLinea(articulo, []);
+    }
+  }
+  if (typeof q.comprador === "string" && q.comprador !== "") {
+    comprador.value = q.comprador;
+  }
+  apartadoDe.value = typeof q.nombre === "string" ? q.nombre : null;
+  apartadosACobrar.value = lista;
+}
+
+onMounted(async () => {
+  await cargar();
+  precargarApartados();
+});
 </script>
 
 <template>
@@ -873,6 +917,14 @@ onMounted(cargar);
               </li>
             </ul>
 
+            <!-- Lo apartado para una clase (ADR 0194): ya viene en el carrito. -->
+            <p
+              v-if="apartadoDe"
+              class="mt-4 text-sm"
+              data-prueba="cobrando-apartados"
+            >
+              {{ $t("apartados.mostrador.aviso", { nombre: apartadoDe }) }}
+            </p>
             <div class="mt-4" data-prueba="comprador">
               <label class="tu-label" for="pos-comprador">{{
                 $t("mostradorVisual.comprador.titulo")

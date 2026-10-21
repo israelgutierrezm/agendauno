@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Http\Controllers\AccesoPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\AccesosTenantController;
 use App\Modules\Tenancy\Http\Controllers\AgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AparienciaTenantController;
+use App\Modules\Tenancy\Http\Controllers\ApartadosTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsignacionesPersonalTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsistenciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AuditoriaController;
@@ -432,6 +433,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/videos', [VideosTenantController::class, 'mios'])->middleware('modalidad:clases')->name('mi.videos.index');
             // Pases de invitado de su plan (ADR 0182).
             Route::get('/mi/invitados', [InvitadosTenantController::class, 'mios'])->middleware('modalidad:clases')->name('mi.invitados.index');
+            // Productos para recoger al llegar a su clase (ADR 0194).
+            Route::get('/mi/sesiones/{sesion}/articulos', [ApartadosTenantController::class, 'ofrecidos'])->middleware('modalidad:clases')->name('mi.apartados.ofrecidos');
+            Route::post('/mi/sesiones/{sesion}/articulos', [ApartadosTenantController::class, 'apartar'])->middleware(['modalidad:clases', 'throttle:20,1'])->name('mi.apartados.store');
+            Route::delete('/mi/apartados/{apartado}', [ApartadosTenantController::class, 'cancelarMio'])->middleware('modalidad:clases')->name('mi.apartados.destroy');
             Route::post('/mi/sesiones/{sesion}/invitados', [InvitadosTenantController::class, 'invitar'])->middleware(['modalidad:clases', 'throttle:20,1'])->name('mi.invitados.store');
             Route::delete('/mi/invitados/{invitado}', [InvitadosTenantController::class, 'cancelarMio'])->middleware('modalidad:clases')->name('mi.invitados.destroy');
             // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.
@@ -982,6 +987,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/reservas/{reserva}/asistencia', [AsistenciaTenantController::class, 'marcar'])->middleware('puede:asistencia.marcar')->name('reservas.asistencia.store');
             // Invitados de los clientes en la lista de la clase (ADR 0182).
             Route::put('/invitados/{invitado}/asistencia', [InvitadosTenantController::class, 'asistencia'])->middleware(['puede:asistencia.marcar', 'modalidad:clases'])->name('invitados.asistencia');
+            // Lo apartado para una clase, para cobrarlo en el mostrador (ADR 0194).
+            Route::get('/sesiones/{sesion}/apartados', [ApartadosTenantController::class, 'deSesion'])->middleware(['puede:asistencia.marcar', 'modalidad:clases'])->name('sesiones.apartados.index');
+            Route::delete('/apartados/{apartado}', [ApartadosTenantController::class, 'cancelar'])->middleware(['puede:pos.vender', 'modalidad:clases'])->name('apartados.destroy');
             Route::delete('/invitados/{invitado}', [InvitadosTenantController::class, 'cancelar'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('invitados.destroy');
             // Qué pasa con su crédito si no vino, para decirlo antes de marcarlo.
             Route::get('/reservas/{reserva}/inasistencia', [AsistenciaTenantController::class, 'efectoDeInasistencia'])->middleware('puede:asistencia.marcar')->name('reservas.inasistencia');

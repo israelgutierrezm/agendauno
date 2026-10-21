@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
+use App\Modules\Tenancy\Application\ApartadosArticuloTenant;
 use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CompradoresPosTenant;
 use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -172,6 +174,9 @@ class PuntoDeVentaTenantController
             'clave_intento' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
             // Con varias formas de pago (ADR 0177): cuánto con cada una.
             ...PartesCobro::reglas(),
+            // Lo que el comprador apartó al reservar y se cobra ahora (ADR 0194).
+            'apartados' => ['nullable', 'array', 'max:30'],
+            'apartados.*' => ['string', 'max:40'],
         ]);
         $partes = PartesCobro::desde($validado['partes'] ?? null);
 
@@ -221,14 +226,20 @@ class PuntoDeVentaTenantController
         }
 
         try {
-            $venta = $this->pos->vender(
-                $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $actor,
-                (int) ($validado['propina_minor'] ?? 0), $comprador,
-                isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
-                $clave,
-                huella: $huella,
-                partes: $partes,
-            );
+            // La venta y lo apartado que se entrega con ella, juntos (ADR 0194).
+            $venta = DB::connection('tenant')->transaction(function () use ($sucursal, $items, $validado, $actor, $comprador, $clave, $huella, $partes): VentaPosTenant {
+                $venta = $this->pos->vender(
+                    $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $actor,
+                    (int) ($validado['propina_minor'] ?? 0), $comprador,
+                    isset($validado['recibido_minor']) ? (int) $validado['recibido_minor'] : null,
+                    $clave,
+                    huella: $huella,
+                    partes: $partes,
+                );
+                app(ApartadosArticuloTenant::class)->entregar(array_values(array_map('strval', (array) ($validado['apartados'] ?? []))), $venta);
+
+                return $venta;
+            });
         } catch (UniqueConstraintViolationException $e) {
             // Dos intentos con la misma clave a la vez: el otro ya la registró.
             $previa = $clave !== null ? VentaPosTenant::query()->where('clave_intento', $clave)->first() : null;

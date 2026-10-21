@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $moneda
  * @property int|null $categoria_id
  * @property string|null $foto_ruta
+ * @property bool $ofrecer_al_reservar
  */
 class ArticuloTenant extends Model
 {
@@ -29,7 +30,7 @@ class ArticuloTenant extends Model
 
     protected $table = 'articulos';
 
-    protected $fillable = ['nombre', 'sku', 'precio_minor', 'moneda', 'activo', 'categoria_id', 'foto_ruta'];
+    protected $fillable = ['nombre', 'sku', 'precio_minor', 'moneda', 'activo', 'categoria_id', 'foto_ruta', 'ofrecer_al_reservar'];
 
     /**
      * @var array<string, string>
@@ -37,6 +38,8 @@ class ArticuloTenant extends Model
     protected $casts = [
         'precio_minor' => 'integer',
         'activo' => 'boolean',
+        // Se ofrece para apartar al reservar (ADR 0194).
+        'ofrecer_al_reservar' => 'boolean',
     ];
 
     /**

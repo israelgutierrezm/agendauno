@@ -406,6 +406,8 @@ class InventarioTenantController
             'activo' => ['boolean'],
             // Su categoría (id público); null la quita.
             'categoria_id' => ['sometimes', 'nullable', 'string', 'max:40'],
+            // Se ofrece para apartar al reservar una clase (ADR 0194).
+            'ofrecer_al_reservar' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -422,6 +424,9 @@ class InventarioTenantController
             'moneda' => strtoupper($validado['moneda'] ?? app(ParametrosTenant::class)->moneda()),
             'activo' => (bool) ($validado['activo'] ?? true),
         ];
+        if ($request->has('ofrecer_al_reservar')) {
+            $datos['ofrecer_al_reservar'] = (bool) $validado['ofrecer_al_reservar'];
+        }
         // La categoría solo se toca si viene (editar sin ella no la quita).
         if ($request->has('categoria_id')) {
             $datos['categoria_id'] = $this->categoriaId($validado['categoria_id'] ?? null);
@@ -489,6 +494,7 @@ class InventarioTenantController
                 'orden' => $articulo->categoria->orden,
             ] : null,
             'foto_url' => $articulo->fotoUrl(),
+            'ofrecer_al_reservar' => $articulo->ofrecer_al_reservar,
             // Lo que se le puede agregar (ADR 0139).
             'extras' => ($articulo->relationLoaded('extras') ? $articulo->extras : $articulo->extras()->where('activo', true)->get())->map(static fn (ExtraArticuloTenant $e): array => [
                 'id' => $e->ulid, 'nombre' => $e->nombre, 'precio_minor' => $e->precio_minor,

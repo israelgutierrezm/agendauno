@@ -55,6 +55,8 @@ interface Articulo {
   existencias: Existencia[];
   categoria?: { id: string; nombre: string; orden: number } | null;
   foto_url?: string | null;
+  // Se ofrece para apartar al reservar una clase (ADR 0194).
+  ofrecer_al_reservar?: boolean;
 }
 interface Categoria {
   id: string;
@@ -356,6 +358,7 @@ const form = ref({
   precio: "",
   activo: true,
   categoria: "",
+  ofrecer: false,
 });
 // La foto de un producto nuevo: se elige aquí y se sube al crearlo.
 const fotoNueva = ref<File | null>(null);
@@ -421,6 +424,7 @@ function nuevoProducto(): void {
     activo: true,
     // Con un filtro de categoría puesto, el nuevo nace en ella.
     categoria: filtroCategoria.value !== "-" ? filtroCategoria.value : "",
+    ofrecer: false,
   };
   extras.value = [];
   olvidarFotoNueva();
@@ -436,6 +440,7 @@ function editar(a: Articulo): void {
     precio: String(a.precio_minor / 100),
     activo: a.activo,
     categoria: a.categoria?.id ?? "",
+    ofrecer: a.ofrecer_al_reservar === true,
   };
   extras.value = (a.extras ?? []).map((e) => ({
     id: e.id,
@@ -473,6 +478,8 @@ async function guardarProducto(): Promise<void> {
     sku: form.value.sku.trim() !== "" ? form.value.sku.trim() : null,
     precio_minor: Math.round(Number(form.value.precio) * 100),
     categoria_id: form.value.categoria !== "" ? form.value.categoria : null,
+    // Solo en un negocio de clases (ADR 0194).
+    ...(sesion.esCitas ? {} : { ofrecer_al_reservar: form.value.ofrecer }),
     extras: enviados.map(({ e }) => ({
       id: e.id,
       nombre: e.nombre.trim(),
@@ -1180,6 +1187,20 @@ onMounted(cargar);
         <label v-if="editando" class="flex items-center gap-2 text-sm">
           <input v-model="form.activo" type="checkbox" />
           {{ $t("inventarioExtra.activo") }}
+        </label>
+        <label v-if="!sesion.esCitas" class="flex items-start gap-2 text-sm">
+          <input
+            v-model="form.ofrecer"
+            type="checkbox"
+            class="mt-1"
+            data-prueba="ofrecer-al-reservar"
+          />
+          <span>
+            {{ $t("inventarioExtra.ofrecerAlReservar") }}
+            <span class="block" :style="{ color: 'var(--texto-suave)' }">{{
+              $t("inventarioExtra.ofrecerAlReservarAyuda")
+            }}</span>
+          </span>
         </label>
         <p
           v-if="!editando"

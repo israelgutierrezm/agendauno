@@ -1509,6 +1509,24 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
+### Productos al reservar (ADR 0194)
+
+- Artículos: `POST`/`PUT /articulos` aceptan `ofrecer_al_reservar` (bool), y el
+  listado lo devuelve.
+- Cuenta del cliente (clases):
+  - `GET /mi/sesiones/{sesion}/articulos` devuelve `articulos`
+    [{`id`, `nombre`, `precio_minor`, `moneda`, `foto_url`, `disponibles`}] y sus
+    `apartados` para esa clase;
+  - `POST /mi/sesiones/{sesion}/articulos` {`articulo_id`, `cantidad` 1–5} aparta (201).
+    Responde 422 sin lugar confirmado, con la clase empezada o sin suficientes;
+  - `DELETE /mi/apartados/{id}` lo quita antes de la clase.
+- Equipo:
+  - `GET /sesiones/{sesion}/apartados` (`asistencia.marcar`) devuelve lo apartado con
+    `persona` y, en `meta.sucursal_id`, la sede de la clase;
+  - `DELETE /apartados/{id}` (`pos.vender`) lo cancela.
+- `POST /pos/ventas` acepta `apartados` (ids): los de su comprador y su sede quedan
+  entregados con la venta.
+
 ### Demo agendable en la landing (ADR 0193)
 
 - `GET /api/v1/demos` (público) devuelve `activas`, `minutos`, `zona`, `whatsapp` (si se

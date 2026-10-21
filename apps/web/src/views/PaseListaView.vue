@@ -245,6 +245,54 @@ interface InvitadoLista {
   estado: "reservado" | "asistio" | "no_asistio";
 }
 const invitados = ref<InvitadoLista[]>([]);
+// Lo que los clientes apartaron para la clase (ADR 0194), por persona, para cobrarlo
+// en el mostrador de la sede.
+interface ApartadoLista {
+  id: string;
+  articulo: { id: string | null; nombre: string | null };
+  cantidad: number;
+  total_minor: number;
+  moneda: string;
+  persona: { id: string | null; nombre: string | null };
+}
+const apartados = ref<ApartadoLista[]>([]);
+const sedeApartados = ref<string | null>(null);
+const apartadosPorPersona = computed(() => {
+  const grupos = new Map<string, ApartadoLista[]>();
+  for (const a of apartados.value) {
+    const clave = a.persona.id ?? "";
+    grupos.set(clave, [...(grupos.get(clave) ?? []), a]);
+  }
+  return [...grupos.values()];
+});
+function aMostrador(grupo: ApartadoLista[]) {
+  const primero = grupo[0]!;
+  return {
+    name: "pos",
+    query: {
+      apartados: grupo.map((a) => a.id).join(","),
+      articulos: grupo.map((a) => `${a.articulo.id}:${a.cantidad}`).join(","),
+      comprador: `persona:${primero.persona.id}`,
+      nombre: primero.persona.nombre ?? "",
+      ...(sedeApartados.value ? { sucursal: sedeApartados.value } : {}),
+    },
+  };
+}
+async function cargarApartados(): Promise<void> {
+  if (sesion.esCitas || !sesion.puede("pos.vender")) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{
+      data: ApartadoLista[];
+      meta?: { sucursal_id?: string | null };
+    }>(`${base.value}/sesiones/${props.id}/apartados`);
+    apartados.value = data.data;
+    sedeApartados.value = data.meta?.sucursal_id ?? null;
+  } catch {
+    apartados.value = [];
+  }
+}
 async function marcarInvitado(
   i: InvitadoLista,
   asistio: boolean,
@@ -277,6 +325,7 @@ async function cargar(silencioso = false): Promise<void> {
     }>(`${base.value}/sesiones/${props.id}/reservas`);
     lista.value = data.data;
     invitados.value = data.meta?.invitados ?? [];
+    void cargarApartados();
     desde.value = data.meta?.asistencia_desde ?? null;
     empezo.value = data.meta?.empezo ?? false;
     clase.value = data.meta?.sesion ?? null;
@@ -774,6 +823,50 @@ watch(
                 {{ $t("paseLista.acciones.noVino") }}
               </button>
             </template>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Apartados para recoger (ADR 0194): se cobran en el mostrador -->
+      <section
+        v-if="apartados.length > 0"
+        class="pl-espera tu-card"
+        data-prueba="apartados-clase"
+      >
+        <header>
+          <div>
+            <h2>
+              {{ $t("apartados.lista.titulo") }}
+              <span class="tabular-nums">{{ apartadosPorPersona.length }}</span>
+            </h2>
+            <p>{{ $t("apartados.lista.ayuda") }}</p>
+          </div>
+        </header>
+        <ul>
+          <li v-for="grupo in apartadosPorPersona" :key="grupo[0]!.id">
+            <AvatarIniciales
+              :nombre="grupo[0]!.persona.nombre ?? ''"
+              tam="sm"
+            />
+            <span class="min-w-0 flex-1">
+              {{ grupo[0]!.persona.nombre }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{
+                  grupo
+                    .map((a) => `${a.cantidad} × ${a.articulo.nombre}`)
+                    .join(" · ")
+                }}</span
+              >
+            </span>
+            <RouterLink
+              :to="aMostrador(grupo)"
+              class="tu-btn tu-btn-fantasma text-sm"
+              data-prueba="cobrar-apartados"
+            >
+              {{ $t("apartados.lista.cobrar") }}
+            </RouterLink>
           </li>
         </ul>
       </section>

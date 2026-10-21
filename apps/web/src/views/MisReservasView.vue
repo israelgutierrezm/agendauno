@@ -9,6 +9,7 @@ import AntesDeReservar, {
   type AccionAntes,
 } from "@/components/AntesDeReservar.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
+import ApartarParaClase from "@/components/ApartarParaClase.vue";
 import CambiarMiLugar from "@/components/CambiarMiLugar.vue";
 import CalendarioVistas, {
   type EventoPeriodo,
@@ -236,7 +237,9 @@ function quitarFiltros(): void {
 }
 
 const abierto = ref<Evento | null>(null);
-const accion = ref<"reprogramar" | "cancelar" | "lugar" | null>(null);
+const accion = ref<"reprogramar" | "cancelar" | "lugar" | "apartar" | null>(
+  null,
+);
 // Si reservar falla (p. ej. alguien tomó ese lugar), la vista previa se vuelve a pedir.
 const intentoReserva = ref(0);
 const aviso = ref<string | null>(null);
@@ -1129,6 +1132,20 @@ onMounted(() => void cuenta.asegurar());
                   : $t("portal.lugares.elegir")
               }}
             </button>
+            <!-- Productos para recoger al llegar (ADR 0194). -->
+            <button
+              v-if="
+                abierto.estado === 'confirmada' &&
+                abierto.reserva.sesion_id &&
+                !sesion.esCitas
+              "
+              class="tu-btn tu-btn-fantasma"
+              :aria-expanded="accion === 'apartar'"
+              data-prueba="apartar-boton"
+              @click="accion = accion === 'apartar' ? null : 'apartar'"
+            >
+              {{ $t("apartados.boton") }}
+            </button>
             <button
               v-if="
                 abierto.estado === 'confirmada' ||
@@ -1155,6 +1172,12 @@ onMounted(() => void cuenta.asegurar());
             :zona="abierto.zona"
             :inicia-en="abierto.inicia"
             @hecho="reprogramada"
+            @cerrar="accion = null"
+          />
+          <ApartarParaClase
+            v-if="accion === 'apartar' && abierto.reserva.sesion_id"
+            :base="cuenta.base.value"
+            :sesion-id="abierto.reserva.sesion_id"
             @cerrar="accion = null"
           />
           <CambiarMiLugar
