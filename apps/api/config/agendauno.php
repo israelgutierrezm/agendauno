@@ -89,6 +89,18 @@ return [
     ],
 
     /*
+    | Reserva con Google (ADR 0198), integración «redirect» del Actions Center. Sin el id
+    | de socio que da Google al aprobar a la plataforma no se genera ni se avisa nada.
+    | Los feeds se escriben en `disco`/`carpeta`; la plataforma los sube al SFTP de Google.
+    */
+    'reserva_google' => [
+        'partner_id' => env('RESERVA_GOOGLE_PARTNER_ID', ''),
+        'disco' => env('RESERVA_GOOGLE_DISCO', 'local'),
+        'carpeta' => env('RESERVA_GOOGLE_CARPETA', 'reserva-google'),
+        'url_conversion' => env('RESERVA_GOOGLE_URL_CONVERSION', 'https://www.google.com/maps/conversion/collect'),
+    ],
+
+    /*
     | El asistente sobre los datos del negocio (ADR 0196): Claude por la API de Anthropic.
     | La llave es de la plataforma; sin ella no se ofrece. Lo enciende el superadmin
     | (parámetro `asistente.activo`).

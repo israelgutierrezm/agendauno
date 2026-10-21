@@ -92,6 +92,9 @@ Schedule::command('agendauno:dominios-propios')->everyTenMinutes()->withoutOverl
 // Plantillas de WhatsApp de los negocios (ADR 0190): cómo van en Meta.
 Schedule::command('agendauno:revisar-plantillas-whatsapp')->everyFifteenMinutes()->withoutOverlapping();
 
+// Los feeds de Reserva con Google (ADR 0198), una vez al día.
+Schedule::command('agendauno:reserva-con-google')->dailyAt('10:30')->withoutOverlapping();
+
 // Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2), a
 // las 00:45 de CDMX (ya empezó el día del cobro en el negocio). Una vez al día: es la
 // cadencia de los reintentos.

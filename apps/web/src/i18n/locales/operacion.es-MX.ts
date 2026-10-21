@@ -596,7 +596,11 @@ export default {
     desde: "Desde",
     hasta: "Hasta",
     todas: "Todas",
-    proveedores: { wellhub: "Wellhub", totalpass: "TotalPass" },
+    proveedores: {
+      wellhub: "Wellhub",
+      totalpass: "TotalPass",
+      fitpass: "Fitpass",
+    },
     indicadores: {
       visitas: "Visitas",
       visitantes: "Visitantes",

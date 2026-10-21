@@ -20,6 +20,7 @@ const PETALOS = [0, 60, 120, 180, 240, 300];
 // Las que se muestran con sus iniciales.
 const INICIALES: Record<string, string> = {
   totalpass: "TP",
+  fitpass: "FP",
   stripe: "S",
   mercadopago: "MP",
   openpay: "OP",

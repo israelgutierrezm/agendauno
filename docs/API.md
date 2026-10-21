@@ -1509,6 +1509,26 @@ en el negocio.
   - `sitio.publicar`: `POST /sitio/publicar`, `PUT /publicacion`, `PUT /perfil-publico`
     y la portada (`/marca/portada`).
 
+### Reserva con Google (ADR 0198)
+
+- `GET /reserva-con-google` (`integraciones.configurar`) devuelve {`disponible` (la
+  plataforma es socia), `activo`, `faltantes` (`pagina`, `ubicacion`)}.
+- `PUT /reserva-con-google` {`activo`} lo enciende o lo apaga. Responde 422 si no está
+  disponible o le falta algo.
+- `POST /reserva-con-google/conversion` (sin sesión) {`rwg_token`} avisa a Google de
+  una reserva que llegó desde ahí. Devuelve {`enviada`}.
+- `agendauno:reserva-con-google` (diario) escribe los feeds `entity_*.json` y
+  `action_*.json`.
+
+### Fitpass (ADR 0197)
+
+- `GET /integraciones` incluye `fitpass` (sin `llaves`; `automatico.listo` siempre
+  falso). `PUT /integraciones/fitpass` {`activa`} lo activa sin llaves.
+- `POST /checkins` con `proveedor=fitpass` registra el folio que da la app de socios de
+  Fitpass (letras, números y guiones). Responde 422 si no lo es.
+- La conciliación (`/plataformas/tarifas`, `/plataformas/conciliacion`) acepta
+  `proveedor=fitpass`.
+
 ### Asistente sobre los datos del negocio (ADR 0196)
 
 - `GET /asistente` devuelve {`disponible`}.

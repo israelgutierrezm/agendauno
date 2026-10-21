@@ -3443,6 +3443,9 @@ export default {
         "Valida la visita con el Wellhub ID de 13 dígitos que la persona ve en su app, en los 20 minutos después de su check-in.",
       totalpass:
         "Valida la visita con el token del día que la persona muestra en su app de TotalPass.",
+      // Sin API (ADR 0197).
+      fitpass:
+        "Fitpass no tiene API: valida la visita en tu app de socios de Fitpass y registra aquí su folio. Ocupa su lugar en la clase y se concilia con el reporte de pagos de Fitpass.",
     },
     soloMexico: "Disponible para negocios en México.",
     // Lo que hace y lo que no (M10): validar la visita, no sincronizar todo.
@@ -3451,6 +3454,7 @@ export default {
     proveedores: {
       wellhub: "Wellhub",
       totalpass: "TotalPass",
+      fitpass: "Fitpass",
     },
   },
   checkins: {

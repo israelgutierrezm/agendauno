@@ -277,6 +277,7 @@ class ReservasPlataformaTenantController
         return match ($proveedor) {
             ProveedorPartner::Wellhub => $this->wellhub->productos($integracion->llaves()),
             ProveedorPartner::TotalPass => $this->totalpass->planes($integracion->llaves()['place_api_key'] ?? ''),
+            ProveedorPartner::Fitpass => null,
         };
     }
 

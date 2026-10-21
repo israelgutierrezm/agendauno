@@ -16,6 +16,7 @@ class RegistroDeIntegracionesTenant
     public function __construct(
         private readonly ValidadorWellhub $wellhub,
         private readonly ValidadorTotalPass $totalpass,
+        private readonly ValidadorFitpass $fitpass,
         private readonly RegionNegocioTenant $region,
     ) {}
 
@@ -24,6 +25,7 @@ class RegistroDeIntegracionesTenant
         return match ($proveedor) {
             'wellhub' => $this->wellhub,
             'totalpass' => $this->totalpass,
+            'fitpass' => $this->fitpass,
             default => null,
         };
     }

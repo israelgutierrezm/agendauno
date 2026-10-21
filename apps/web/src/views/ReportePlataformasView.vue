@@ -18,7 +18,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * lo que la plataforma manda. Si el negocio ya registró a alguien con el mismo correo,
  * se dice que ya es alumno.
  */
-type Proveedor = "wellhub" | "totalpass";
+type Proveedor = "wellhub" | "totalpass" | "fitpass";
 interface Resumen {
   resumen: {
     visitas: number;
@@ -410,7 +410,7 @@ onMounted(() => {
       </fieldset>
       <div class="tu-segmentado" role="group">
         <button
-          v-for="p in ['', 'wellhub', 'totalpass'] as const"
+          v-for="p in ['', 'wellhub', 'totalpass', 'fitpass'] as const"
           :key="p"
           type="button"
           :aria-pressed="proveedor === p"

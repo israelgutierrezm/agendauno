@@ -62,6 +62,8 @@ class PublicarEnPlataformasTenant
         return match ($proveedor) {
             ProveedorPartner::Wellhub => $this->wellhub,
             ProveedorPartner::TotalPass => $this->totalpass,
+            // Las clases no se publican en Fitpass desde aquí (ADR 0197).
+            ProveedorPartner::Fitpass => null,
         };
     }
 

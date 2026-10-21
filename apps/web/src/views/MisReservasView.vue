@@ -23,6 +23,7 @@ import HistorialReservas, {
 import PanelLateral from "@/components/PanelLateral.vue";
 import ReprogramarMiReserva from "@/components/ReprogramarMiReserva.vue";
 import { libresDeSesion } from "@/lib/agenda";
+import { avisarConversionGoogle } from "@/lib/reservaConGoogle";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   cuandoCorto,
@@ -439,6 +440,10 @@ async function reservar(
     return;
   }
   aviso.value = esperar ? t("miCuenta.enListaEspera") : t("miCuenta.reservado");
+  // Si llegó desde Reserva con Google, se le avisa a Google (ADR 0198).
+  if (!esperar && sesion.slug) {
+    avisarConversionGoogle(sesion.slug);
+  }
   const nueva = mias.value.find((m) => m.reserva?.sesion_id === e.id);
   if (nueva) {
     abrir(nueva);

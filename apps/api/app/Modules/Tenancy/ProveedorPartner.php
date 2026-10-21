@@ -7,11 +7,16 @@ namespace App\Modules\Tenancy;
 /**
  * Plataformas de bienestar corporativo con las que un estudio puede integrarse
  * para aceptar check-ins de sus usuarios (la plataforma cubre la clase).
+ *
+ * Fitpass (ADR 0197) no publica una API para validar visitas: recepción la valida en la
+ * app de socios de Fitpass y la registra aquí a mano; ocupa su lugar y se concilia con
+ * su reporte de pagos, como las demás.
  */
 enum ProveedorPartner: string
 {
     case Wellhub = 'wellhub';
     case TotalPass = 'totalpass';
+    case Fitpass = 'fitpass';
 
     /**
      * @return list<string>
@@ -27,6 +32,7 @@ enum ProveedorPartner: string
         return match ($this) {
             self::Wellhub => 'Wellhub',
             self::TotalPass => 'TotalPass',
+            self::Fitpass => 'Fitpass',
         };
     }
 
@@ -35,7 +41,7 @@ enum ProveedorPartner: string
     {
         return match ($this) {
             self::Wellhub => 'producto',
-            self::TotalPass => 'plan',
+            self::TotalPass, self::Fitpass => 'plan',
         };
     }
 
@@ -52,6 +58,8 @@ enum ProveedorPartner: string
         return match ($this) {
             self::Wellhub => ['api_key', 'gym_id', 'webhook_secret'],
             self::TotalPass => ['api_key', 'codigo_gimnasio', 'codigo_plan', 'place_api_key'],
+            // Sin API: no pide llaves (ADR 0197).
+            self::Fitpass => [],
         };
     }
 
@@ -66,6 +74,13 @@ enum ProveedorPartner: string
         return match ($this) {
             self::Wellhub => ['api_key', 'gym_id'],
             self::TotalPass => ['api_key', 'codigo_gimnasio'],
+            self::Fitpass => [],
         };
+    }
+
+    /** ¿Valida las visitas con su API? Fitpass, no: las valida recepción (ADR 0197). */
+    public function conApi(): bool
+    {
+        return $this !== self::Fitpass;
     }
 }

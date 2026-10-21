@@ -179,6 +179,8 @@ class IntegracionesTenantController
                     ProveedorPartner::Wellhub => $token !== ''
                         && (($llaves['webhook_secret'] ?? '') !== '' || (string) config('agendauno.integraciones.wellhub_webhook_secret') !== ''),
                     ProveedorPartner::TotalPass => $config instanceof IntegracionTenant && $config->webhook_registrado_en !== null,
+                    // Sin check-in automático: recepción registra cada visita (ADR 0197).
+                    ProveedorPartner::Fitpass => false,
                 },
                 'registrado_en' => $config?->webhook_registrado_en?->toIso8601String(),
             ],

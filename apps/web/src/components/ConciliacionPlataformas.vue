@@ -55,7 +55,7 @@ const anterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
 const periodo = ref(
   `${anterior.getFullYear()}-${String(anterior.getMonth() + 1).padStart(2, "0")}`,
 );
-const proveedor = ref<"wellhub" | "totalpass">("totalpass");
+const proveedor = ref<"wellhub" | "totalpass" | "fitpass">("totalpass");
 const resumen = ref<Resumen | null>(null);
 const error = ref<string | null>(null);
 const ocupado = ref(false);
@@ -149,6 +149,7 @@ onMounted(cargar);
         }}</span>
         <select v-model="proveedor" class="tu-input">
           <option value="totalpass">TotalPass</option>
+          <option value="fitpass">Fitpass</option>
           <option value="wellhub">Wellhub</option>
         </select>
       </label>

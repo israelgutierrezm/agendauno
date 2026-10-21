@@ -69,6 +69,8 @@ class CheckinsAutomaticosTenant
         match ($proveedor) {
             ProveedorPartner::Wellhub => $this->wellhub($evento),
             ProveedorPartner::TotalPass => $this->totalPass($evento),
+            // Sin avisos de Fitpass (ADR 0197).
+            ProveedorPartner::Fitpass => null,
         };
     }
 

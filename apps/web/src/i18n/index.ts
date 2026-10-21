@@ -110,6 +110,7 @@ import plantillasWhatsApp from "./locales/plantillasWhatsApp.es-MX";
 import apartados from "./locales/apartados.es-MX";
 import paseWallet from "./locales/paseWallet.es-MX";
 import asistenteIA from "./locales/asistenteIA.es-MX";
+import reservaGoogle from "./locales/reservaGoogle.es-MX";
 import demoAgendable, { demosPlataforma } from "./locales/demoAgendable.es-MX";
 // Niveles por actividad y práctica libre (ADR 0187).
 import nivelesMiembro from "./locales/nivelesMiembro.es-MX";
@@ -237,6 +238,7 @@ const mensajesBase = {
   apartados,
   paseWallet,
   asistenteIA,
+  reservaGoogle,
   demoAgendable,
   demosPlataforma,
   nivelesMiembro,

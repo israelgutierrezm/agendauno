@@ -139,6 +139,7 @@ use App\Modules\Tenancy\Http\Controllers\ReporteSucursalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteTendenciasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResenasTenantController;
+use App\Modules\Tenancy\Http\Controllers\ReservaConGoogleController;
 use App\Modules\Tenancy\Http\Controllers\ReservasPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
@@ -354,6 +355,8 @@ Route::prefix('v1')->group(function (): void {
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
+        // Una reserva que llegó desde Reserva con Google (ADR 0198): se le avisa a Google.
+        Route::post('/reserva-con-google/conversion', [ReservaConGoogleController::class, 'conversion'])->middleware('throttle:negocio-publico')->name('reserva-google.conversion');
         // Kiosco de llegada (ADR 0183): la tableta de recepción, con su propia llave.
         Route::middleware(['kiosco', 'throttle:negocio-publico'])->prefix('kiosco')->name('kiosco.')->group(function (): void {
             Route::get('/', [KioscosTenantController::class, 'mostrar'])->name('mostrar');
@@ -1136,6 +1139,9 @@ Route::prefix('v1')->group(function (): void {
             // (sin consumir creditos del estudio).
             // Son de clases (ADR 0104).
             Route::get('/integraciones', [IntegracionesTenantController::class, 'index'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.index');
+            // Aparecer en Reserva con Google (ADR 0198).
+            Route::get('/reserva-con-google', [ReservaConGoogleController::class, 'mostrar'])->middleware('puede:integraciones.configurar')->name('reserva-google.show');
+            Route::put('/reserva-con-google', [ReservaConGoogleController::class, 'guardar'])->middleware('puede:integraciones.configurar')->name('reserva-google.guardar');
             Route::put('/integraciones/{proveedor}', [IntegracionesTenantController::class, 'upsert'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.upsert');
             // Reservas desde la app de Wellhub y TotalPass (ADR 0149).
             Route::get('/integraciones/{proveedor}/reservas', [ReservasPlataformaTenantController::class, 'show'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.reservas.show');

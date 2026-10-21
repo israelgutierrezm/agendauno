@@ -64,6 +64,8 @@ class AvisosPlataformaTenant
         $clasificado = match ($proveedor) {
             ProveedorPartner::Wellhub => self::wellhub($datos),
             ProveedorPartner::TotalPass => self::totalPass($datos),
+            // Fitpass no manda avisos (sin API, ADR 0197).
+            ProveedorPartner::Fitpass => null,
         };
         if ($clasificado === null) {
             return null;

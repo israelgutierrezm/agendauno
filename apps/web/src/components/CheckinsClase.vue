@@ -160,6 +160,10 @@ watch(
           <option value="totalpass">
             {{ $t("integraciones.proveedores.totalpass") }}
           </option>
+          <!-- Sin API: el folio de la visita que valida recepción (ADR 0197). -->
+          <option value="fitpass">
+            {{ $t("integraciones.proveedores.fitpass") }}
+          </option>
         </select>
       </div>
       <div class="flex-1 min-w-[150px]">
