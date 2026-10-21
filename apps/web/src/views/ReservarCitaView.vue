@@ -16,6 +16,7 @@ import { avisarConversionGoogle } from "@/lib/reservaConGoogle";
 import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import { camposDeMedicion, eventoComercio } from "@/lib/etiquetas";
 import { separarTelefono } from "@/lib/ladas";
+import { intentoUnico } from "@/lib/intento";
 import { esDeOtraModalidad } from "@/lib/modalidad";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
@@ -844,6 +845,9 @@ watch(paso, (p) => {
   }
 });
 
+// Una cita por intento: reintentar lo mismo no agenda otra (ADR 0201).
+const intento = intentoUnico();
+
 async function agendar(): Promise<void> {
   if (!listoParaAgendar.value) {
     error.value = null;
@@ -877,7 +881,11 @@ async function agendar(): Promise<void> {
           cita?: { saldo_minor?: number | null } | null;
           profesional?: { id: string; nombre: string } | null;
         };
-      }>(`/api/v1/app/${slug.value}/mi/citas`, cita);
+      }>(`/api/v1/app/${slug.value}/mi/citas`, {
+        ...cita,
+        // Reintentar lo mismo devuelve la cita ya agendada (ADR 0201).
+        idempotency_key: intento.clave(["cuenta", cita]),
+      });
       // Con anticipo, ahora se paga el precio menos lo que queda para el negocio.
       const saldo = data.data.cita?.saldo_minor ?? null;
       const precio = servicioSel.value?.precio_minor ?? null;
@@ -894,6 +902,16 @@ async function agendar(): Promise<void> {
         profesional: data.data.profesional ?? null,
       };
     } else {
+      const quien = {
+        nombre: datos.value.nombre.trim(),
+        apellidos: datos.value.apellidos.trim() || null,
+        ...celularConLada(),
+        email: datos.value.email.trim(),
+        como_nos_conocio: datos.value.origen || null,
+        ...(ofrecerWhatsApp.value && datos.value.whatsapp
+          ? { acepta_whatsapp: true }
+          : {}),
+      };
       const { data } = await api.post<{
         data: {
           estado?: string;
@@ -904,22 +922,18 @@ async function agendar(): Promise<void> {
           profesional?: { id: string; nombre: string } | null;
         };
       }>(`/api/v1/app/${slug.value}/citas`, {
-        nombre: datos.value.nombre.trim(),
-        apellidos: datos.value.apellidos.trim() || null,
-        ...celularConLada(),
-        email: datos.value.email.trim(),
-        como_nos_conocio: datos.value.origen || null,
-        ...(ofrecerWhatsApp.value && datos.value.whatsapp
-          ? { acepta_whatsapp: true }
-          : {}),
+        ...quien,
         // Sin cuenta: que no sea un bot llenando la agenda (en desarrollo, sin llave, null).
         recaptcha_token: await tokenRecaptcha("cita"),
         ...cita,
+        // Reintentar lo mismo devuelve la cita ya agendada (ADR 0201).
+        idempotency_key: intento.clave([quien, cita]),
         // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
         ...(await camposDeMedicion(`negocio:${slug.value.toLowerCase()}`)),
       });
       resultado.value = data.data;
     }
+    intento.listo();
   } catch (e) {
     error.value = mensajeDeError(e);
     return;

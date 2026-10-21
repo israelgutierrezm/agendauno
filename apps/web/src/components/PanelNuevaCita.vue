@@ -19,6 +19,7 @@ import {
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { api, mensajeDeError } from "@/lib/api";
 import { useDescartarCambios } from "@/lib/editorFormulario";
+import { intentoUnico } from "@/lib/intento";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -234,6 +235,9 @@ const listo = computed(
     form.value.hora !== "",
 );
 
+// Una cita por intento: reintentar lo mismo no agenda otra (ADR 0201).
+const intento = intentoUnico();
+
 async function agendar(): Promise<void> {
   guardando.value = true;
   error.value = null;
@@ -265,14 +269,20 @@ async function agendar(): Promise<void> {
       form.value.clienteId = personaId;
       nuevo.value = false;
     }
-    await api.post(`${props.base}/agenda/citas`, {
+    const pedido = {
       persona_id: personaId,
       oferta_id: form.value.ofertaId,
       sucursal_id: form.value.sucursalId,
       instructor_id: form.value.instructorId,
       inicia_en_local: `${form.value.fecha} ${form.value.hora}:00`,
       duracion_minutos: Number(form.value.duracion),
+    };
+    // Reintentar lo mismo (sin red, doble clic) devuelve la cita ya agendada (ADR 0201).
+    await api.post(`${props.base}/agenda/citas`, {
+      ...pedido,
+      idempotency_key: intento.clave(pedido),
     });
+    intento.listo();
     toast.exito(
       t("agendaVisual.nuevaCita.agendada", {
         cliente: nombre,

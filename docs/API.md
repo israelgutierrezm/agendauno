@@ -326,6 +326,10 @@ ninguna asignada, ninguna, ADR 0098).
 - `POST /agenda/citas`, `POST /mi/citas` y `POST /citas` agendan solo en un negocio de
   citas (en uno de clases, además del 403 de la ruta, el motor responde 422
   `SESSION_NOT_BOOKABLE`, «Este negocio trabaja con clases.»).
+- Las tres aceptan `idempotency_key` (hasta 64 caracteres `A-Za-z0-9_-`, ADR 0201).
+  Un reintento con la misma clave, misma persona, servicio, sede, hora y, si se
+  eligió, profesional devuelve la cita ya agendada con 200 (la nueva responde 201).
+  La misma clave con otra cosa responde 422 `SESSION_NOT_BOOKABLE`.
 - Los eventos `reserva.*` y `asistencia.marcada` (mensajes automáticos y webhooks)
   llevan los datos de su sesión: `sesion_id`, `tipo` (`clase` | `cita`), `inicia_en`,
   `actividad`, `fecha`, `hora`, `sucursal` y `con`. Es aditivo: `reserva.creada`

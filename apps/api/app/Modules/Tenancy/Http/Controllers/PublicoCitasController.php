@@ -194,6 +194,8 @@ class PublicoCitasController
             ...IdentificadoresNavegador::reglas(),
             // Sin cuenta ni correo verificado: que no sea un bot llenando la agenda.
             'recaptcha_token' => ['nullable', 'string', 'max:4000'],
+            // El mismo intento (ADR 0201): un reintento devuelve la cita ya agendada.
+            'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
         if (! app(VerificarRecaptcha::class)->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip())) {
             throw ValidationException::withMessages([
@@ -218,17 +220,21 @@ class PublicoCitasController
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
         $pagarTodo = ($validado['pagar'] ?? null) === 'todo';
 
+        $clave = $validado['idempotency_key'] ?? null;
         try {
             $reserva = $instructor instanceof Usuario
-                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo)
-                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo);
+                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave)
+                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave);
         } catch (LimiteCitasPorPagar) {
             // Sin decir a un anónimo si ese correo es de un cliente ni cuánto debe.
             throw new LimiteCitasPorPagar('No se puede agendar con estos datos desde aquí. Entra a tu cuenta o comunícate con el negocio.');
         }
+        // Un reintento (la misma clave) responde la cita ya agendada sin volver a
+        // registrar de dónde llegó.
+        $nueva = $reserva->wasRecentlyCreated;
         $this->anotar($reserva, $validado['nota'] ?? null, $validado['asiste'] ?? null);
         $reserva->load(['orden', 'saldoOrden', 'sesion.instructor']);
-        $contexto = $atribucion->registrar($validado['atribucion'] ?? null, $persona, $validado['medicion'] ?? null, $request->ip(), $request->userAgent());
+        $contexto = $nueva ? $atribucion->registrar($validado['atribucion'] ?? null, $persona, $validado['medicion'] ?? null, $request->ip(), $request->userAgent()) : null;
         if ($contexto !== null && $reserva->orden !== null) {
             $reserva->orden->update(['contexto_medicion_id' => $contexto->getKey()]);
         }
@@ -247,7 +253,7 @@ class PublicoCitasController
             'moneda' => $reserva->orden?->moneda,
             // Quién atenderá: el elegido o el que se asignó.
             'profesional' => $profesional instanceof Usuario ? ['id' => $profesional->ulid, 'nombre' => (string) $profesional->name] : null,
-        ]], 201);
+        ]], $nueva ? 201 : 200);
     }
 
     /**

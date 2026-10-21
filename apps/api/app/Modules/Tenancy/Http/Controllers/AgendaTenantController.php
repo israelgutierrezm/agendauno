@@ -154,6 +154,8 @@ class AgendaTenantController
             'instructor_id' => ['required', 'string'],
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
+            // El mismo intento (ADR 0201): un reintento devuelve la cita ya agendada.
+            'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
 
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
@@ -186,11 +188,11 @@ class AgendaTenantController
         }
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
-        $reserva = $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, $duracion, porNegocio: true);
+        $reserva = $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, $duracion, porNegocio: true, clave: $validado['idempotency_key'] ?? null);
 
         $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->firstOrFail();
 
-        return response()->json(['data' => $this->presentarUna($sesion, $request)], 201);
+        return response()->json(['data' => $this->presentarUna($sesion, $request)], $reserva->wasRecentlyCreated ? 201 : 200);
     }
 
     /**

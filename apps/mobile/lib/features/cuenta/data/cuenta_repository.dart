@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/intento.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/participante_en_uso.dart';
 import '../../auth/application/sesion_controller.dart';
@@ -20,6 +21,10 @@ class CuentaRepository {
 
   final Dio _dio;
   final String _slug;
+
+  /// Una cita por intento: reintentar la misma no agenda otra; con «cualquier
+  /// profesional» podía quedar una segunda con otra persona (ADR 0201).
+  final _intentoCita = IntentoUnico();
 
   /// Moneda del negocio: la de los precios y adeudos que no traen la suya.
   final String _moneda;
@@ -702,22 +707,24 @@ class CuentaRepository {
     bool aceptaWhatsapp = false,
     String? pagar,
   }) async {
+    final pedido = <String, Object?>{
+      'oferta_id': servicioId,
+      'sucursal_id': sucursalId,
+      'instructor_id': ?profesionalId,
+      'inicia_en_local': iniciaEnLocal,
+      'duracion_minutos': duracionMinutos,
+      // Lo que el cliente quiere que sepa el negocio (ADR 0067).
+      'nota': ?nota,
+      // Pidió los avisos por WhatsApp al agendar (ADR 0069).
+      if (aceptaWhatsapp) 'acepta_whatsapp': true,
+      // Con anticipo: pagar solo el anticipo (por omisión) o todo (ADR 0161).
+      'pagar': ?pagar,
+    };
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/citas',
-      data: {
-        'oferta_id': servicioId,
-        'sucursal_id': sucursalId,
-        'instructor_id': ?profesionalId,
-        'inicia_en_local': iniciaEnLocal,
-        'duracion_minutos': duracionMinutos,
-        // Lo que el cliente quiere que sepa el negocio (ADR 0067).
-        'nota': ?nota,
-        // Pidió los avisos por WhatsApp al agendar (ADR 0069).
-        if (aceptaWhatsapp) 'acepta_whatsapp': true,
-        // Con anticipo: pagar solo el anticipo (por omisión) o todo (ADR 0161).
-        'pagar': ?pagar,
-      },
+      data: {...pedido, 'idempotency_key': _intentoCita.clave(pedido)},
     );
+    _intentoCita.listo();
 
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
     final profesional = data['profesional'] as Map<String, dynamic>?;

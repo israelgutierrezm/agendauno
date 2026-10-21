@@ -7,6 +7,7 @@ import ElegirProfesional from "@/components/ElegirProfesional.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { api, mensajeDeError } from "@/lib/api";
+import { intentoUnico } from "@/lib/intento";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -225,30 +226,38 @@ async function buscarHorarios(): Promise<void> {
 }
 watch([servicioId, profesionalId, sucursalId, fecha], buscarHorarios);
 
+const intento = intentoUnico();
+
 async function agendar(): Promise<void> {
   if (servicio.value === null || slotSel.value === "") {
     return;
   }
   agendando.value = true;
   error.value = null;
+  const pedido = {
+    oferta_id: servicio.value.id,
+    sucursal_id: sucursalId.value,
+    ...(profesionalId.value !== CUALQUIERA
+      ? { instructor_id: profesionalId.value }
+      : {}),
+    inicia_en_local: horaLocal(slotSel.value),
+    duracion_minutos: servicio.value.duracion_minutos ?? 60,
+    ...(ofrecerWhatsApp.value && aceptaWhatsApp.value
+      ? { acepta_whatsapp: true }
+      : {}),
+    ...(anticipo.value !== null
+      ? { pagar: pagarTodo.value ? "todo" : "anticipo" }
+      : {}),
+  };
   try {
     const { data } = await api.post<{
       data: { estado: string; profesional?: { nombre: string } | null };
     }>(`${base.value}/mi/citas`, {
-      oferta_id: servicio.value.id,
-      sucursal_id: sucursalId.value,
-      ...(profesionalId.value !== CUALQUIERA
-        ? { instructor_id: profesionalId.value }
-        : {}),
-      inicia_en_local: horaLocal(slotSel.value),
-      duracion_minutos: servicio.value.duracion_minutos ?? 60,
-      ...(ofrecerWhatsApp.value && aceptaWhatsApp.value
-        ? { acepta_whatsapp: true }
-        : {}),
-      ...(anticipo.value !== null
-        ? { pagar: pagarTodo.value ? "todo" : "anticipo" }
-        : {}),
+      ...pedido,
+      // Reintentar lo mismo devuelve la cita ya agendada, no otra (ADR 0201).
+      idempotency_key: intento.clave(pedido),
     });
+    intento.listo();
     // Ya los aceptó: no se le vuelve a preguntar.
     if (ofrecerWhatsApp.value && aceptaWhatsApp.value) {
       ofrecerWhatsApp.value = false;

@@ -638,6 +638,8 @@ class MiTenantController
             'acepta_whatsapp' => ['boolean'],
             // Si el servicio pide anticipo (ADR 0161): pagar solo el anticipo o todo.
             'pagar' => ['nullable', Rule::in(['anticipo', 'todo'])],
+            // El mismo intento (ADR 0201): un reintento devuelve la cita ya agendada.
+            'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
         if (($validado['acepta_whatsapp'] ?? false) && $whatsapp->enUso()) {
             $whatsapp->aceptar($persona, true);
@@ -650,9 +652,11 @@ class MiTenantController
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
         $pagarTodo = ($validado['pagar'] ?? null) === 'todo';
+        $clave = $validado['idempotency_key'] ?? null;
         $reserva = $instructor instanceof Usuario
-            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo)
-            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo);
+            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave)
+            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave);
+        $nueva = $reserva->wasRecentlyCreated;
         $cambios = array_filter([
             'nota_cliente' => trim((string) ($validado['nota'] ?? '')),
             'asiste' => trim((string) ($validado['asiste'] ?? '')),
@@ -668,7 +672,7 @@ class MiTenantController
             ...$this->presentarReserva($reserva),
             // Quién atenderá: el elegido o el que se asignó.
             'profesional' => $profesional instanceof Usuario ? ['id' => $profesional->ulid, 'nombre' => (string) $profesional->name] : null,
-        ]], 201);
+        ]], $nueva ? 201 : 200);
     }
 
     public function cancelar(Request $request): JsonResponse

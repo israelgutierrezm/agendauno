@@ -151,3 +151,85 @@ it('desde su cuenta el cliente también agenda con cualquier profesional', funct
         ->assertJsonPath('data.instructor', 'Carla')
         ->assertJsonPath('data.profesional.id', $ctx['carla']);
 });
+
+/**
+ * Las citas de ese día en la agenda del negocio.
+ *
+ * @param  array{e: array{slug: string, bearer: string}, sede: array{oferta: string, sucursal: string}, beto: string, carla: string, fecha: string, cliente: string}  $ctx
+ * @return list<array<string, mixed>>
+ */
+function citasDelDiaUnaVez(array $ctx): array
+{
+    return collect(test()->getJson("/api/v1/app/{$ctx['e']['slug']}/sesiones?desde={$ctx['fecha']}&hasta={$ctx['fecha']}", conBearer($ctx['e']['bearer']))
+        ->assertOk()->json('data'))
+        ->filter(fn (array $s): bool => ($s['tipo'] ?? null) === 'cita' && $s['estado'] === 'programada')
+        ->values()->all();
+}
+
+// ADR 0201: un reintento de la misma solicitud (se perdió la respuesta, doble toque)
+// no agenda otra cita. Con «cualquier profesional», el segundo intento quedaba con el
+// otro barbero: dos citas y dos órdenes para el mismo cliente.
+it('desde su cuenta, el reintento con la misma clave devuelve la cita ya agendada', function (): void {
+    $ctx = barberiaConDosBarberos();
+    $cliente = alumnoConSesion($ctx['e']);
+    $pedir = fn () => $this->postJson("/api/v1/app/{$ctx['e']['slug']}/mi/citas", [
+        'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'],
+        'inicia_en_local' => "{$ctx['fecha']} 10:00:00", 'duracion_minutos' => 30,
+        'idempotency_key' => 'app-intento-1',
+    ], conBearer($cliente['bearer']));
+
+    $primera = $pedir()->assertCreated();
+    $pedir()->assertOk()
+        ->assertJsonPath('data.id', $primera->json('data.id'))
+        ->assertJsonPath('data.profesional.id', $primera->json('data.profesional.id'));
+
+    expect(citasDelDiaUnaVez($ctx))->toHaveCount(1);
+});
+
+it('en la página pública, el reintento con la misma clave no crea otra cita ni otra orden', function (): void {
+    $ctx = barberiaConDosBarberos();
+    $pedir = fn () => $this->postJson("/api/v1/app/{$ctx['e']['slug']}/citas", [
+        'nombre' => 'Cliente', 'email' => 'cliente@correo.mx', 'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'],
+        'inicia_en_local' => "{$ctx['fecha']} 10:00:00", 'duracion_minutos' => 30,
+        'idempotency_key' => 'web-intento-1',
+    ]);
+
+    $primera = $pedir()->assertCreated();
+    $pedir()->assertOk()
+        ->assertJsonPath('data.reserva', $primera->json('data.reserva'))
+        ->assertJsonPath('data.orden_id', $primera->json('data.orden_id'));
+
+    expect(citasDelDiaUnaVez($ctx))->toHaveCount(1);
+});
+
+it('en recepción, repetir la misma solicitud responde la cita y no «ya no está disponible»', function (): void {
+    $ctx = barberiaConDosBarberos();
+    $pedir = fn () => $this->postJson("/api/v1/app/{$ctx['e']['slug']}/agenda/citas", [
+        'persona_id' => $ctx['cliente'], 'oferta_id' => $ctx['sede']['oferta'],
+        'sucursal_id' => $ctx['sede']['sucursal'], 'instructor_id' => $ctx['beto'],
+        'inicia_en_local' => "{$ctx['fecha']} 09:00:00", 'idempotency_key' => 'recepcion-1',
+    ], conBearer($ctx['e']['bearer']));
+
+    $primera = $pedir()->assertCreated();
+    $pedir()->assertOk()->assertJsonPath('data.id', $primera->json('data.id'));
+
+    expect(citasDelDiaUnaVez($ctx))->toHaveCount(1);
+});
+
+it('la misma clave para otra hora u otra persona se rechaza: no devuelve una cita ajena', function (): void {
+    $ctx = barberiaConDosBarberos();
+    $vale = alumnoConSesion($ctx['e']);
+    $otro = alumnoConSesion($ctx['e'], 'Otro', 'otro@correo.mx');
+    $pedir = fn (array $quien, string $hora) => $this->postJson("/api/v1/app/{$ctx['e']['slug']}/mi/citas", [
+        'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'],
+        'inicia_en_local' => "{$ctx['fecha']} {$hora}:00", 'duracion_minutos' => 30,
+        'idempotency_key' => 'clave-compartida',
+    ], conBearer($quien['bearer']));
+
+    $pedir($vale, '10:00')->assertCreated();
+    $pedir($vale, '10:30')->assertStatus(422)
+        ->assertJsonPath('message', 'Esta solicitud ya se usó para otra cita. Vuelve a elegir el horario.');
+    $pedir($otro, '10:00')->assertStatus(422)->assertJsonMissingPath('data');
+
+    expect(citasDelDiaUnaVez($ctx))->toHaveCount(1);
+});

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/intento.dart';
 import '../../../core/network/dio_client.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../cuenta/data/cuenta_models.dart';
@@ -13,6 +14,9 @@ class AgendaRepository {
 
   final Dio _dio;
   final String _slug;
+
+  /// Una cita por intento: reintentar la misma no agenda otra (ADR 0201).
+  final _intentoCita = IntentoUnico();
 
   String get _base => '/api/v1/app/$_slug';
 
@@ -253,10 +257,12 @@ class AgendaRepository {
   /// El negocio agenda una cita a un cliente: queda confirmada y, si el servicio es
   /// de pago, se cobra en caja. Devuelve la cita como la muestra la agenda.
   Future<SesionAgenda> agendarCita(NuevaCita cita) async {
+    final pedido = cita.aJson();
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/agenda/citas',
-      data: cita.aJson(),
+      data: {...pedido, 'idempotency_key': _intentoCita.clave(pedido)},
     );
+    _intentoCita.listo();
     return SesionAgenda.desdeJson(
       (res.data?['data'] as Map<String, dynamic>?) ?? const {},
     );

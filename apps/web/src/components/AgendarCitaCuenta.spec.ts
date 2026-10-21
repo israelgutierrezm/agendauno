@@ -131,6 +131,34 @@ describe("agendar desde la cuenta", () => {
     expect(w.find("[data-prueba='acepta-whatsapp']").exists()).toBe(false);
   });
 
+  // ADR 0201: si se perdió la respuesta, volver a enviar lo mismo lleva la misma
+  // clave y el servidor devuelve la cita ya agendada (con «cualquiera» podía quedar
+  // otra con otro profesional).
+  it("reintentar la misma cita manda la misma clave", async () => {
+    api.post
+      .mockRejectedValueOnce(new Error("Sin conexión"))
+      .mockResolvedValue({ data: { data: { estado: "confirmada" } } });
+    const w = montar();
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("corte");
+    await flushPromises();
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("16:00") || b.text().includes("10:00"))
+      ?.trigger("click");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    const claves = api.post.mock.calls.map(
+      ([, cuerpo]) => (cuerpo as { idempotency_key?: string }).idempotency_key,
+    );
+    expect(claves).toHaveLength(2);
+    expect(claves[0]).toMatch(/^[A-Za-z0-9]{32}$/);
+    expect(claves[1]).toBe(claves[0]);
+  });
+
   it("con anticipo elige pagar solo el anticipo (por omisión) o todo (ADR 0161)", async () => {
     extraServicios.lista = [
       {
