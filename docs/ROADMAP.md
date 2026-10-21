@@ -67,11 +67,11 @@
 - Pruebas de punta a punta con llaves de prueba de cada pasarela
   (`docs/VERIFICACION-V1.md`).
 - Instalar en un servidor real y correr `actualizar.sh` / `volver.sh`.
-- Antes de publicar la landing por modalidad, comprobar que ningún negocio usa los
-  slugs `clases` o `citas` (`SELECT slug FROM estudios WHERE slug IN
-  ('clases','citas')`): su enlace corto en el dominio principal quedaría tapado por
-  la landing (en su subdominio sigue funcionando). Reservarlos en el API queda como
-  tarea aparte.
+- Antes de publicar la landing por modalidad, comprobar que ningún negocio registrado
+  antes de reservarlos usa los slugs `clases` o `citas` (`SELECT slug FROM estudios
+  WHERE slug IN ('clases','citas')`): su enlace corto en el dominio principal quedaría
+  tapado por la landing (en su subdominio sigue funcionando). Los negocios nuevos ya no
+  pueden tomarlos (`RegistrarEstudio::SLUGS_RESERVADOS`).
 - WhatsApp (si se enciende): cuenta de WhatsApp Business en Meta, token permanente
   y las plantillas de Configuración → «WhatsApp» aprobadas, de cada uso que se
   encienda (ADR 0069, 0070 y 0071). En la app de Meta, el webhook con la dirección,

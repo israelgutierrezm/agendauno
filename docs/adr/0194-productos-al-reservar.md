@@ -34,7 +34,8 @@ hay venta en línea de artículos.
 
 - Lo que nadie recoge queda apartado hasta que el equipo lo cancela; mientras tanto
   resta de lo disponible para apartar.
-- En la app móvil aún no se aparta; se hace desde la cuenta en la web.
+- La app móvil también aparta y quita lo apartado al reservar una clase (como la cuenta
+  en la web).
 
 ## Ajuste (2026-10-21)
 

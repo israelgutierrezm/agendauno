@@ -247,7 +247,8 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`,
   `checkout.session.expired`, `payment_intent.succeeded`,
   `payment_intent.payment_failed` y `payment_intent.canceled` (la pantalla de Pasarelas
-  muestra la URL). Hoy solo Stripe cobra la renta (Mercado Pago y OpenPay, pendientes).
+  muestra la URL). Mercado Pago y OpenPay también cobran la renta (ADR 0192), cada una
+  con sus llaves de plataforma y su aviso; se verifican igual, con sus llaves de prueba.
 - [ ] Tipo de cambio: con el token de Banxico (Configuración → Datos comerciales) o un
   tipo capturado en Tarifas, el siguiente cobro de un negocio de México sale en pesos
   y su desglose dice «1 USD = … MXN».
