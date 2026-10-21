@@ -154,7 +154,7 @@ describe("comunicación: tres cosas distintas y avisos en palabras", () => {
       "Reservas y asistencia",
       "Pagos y membresías",
       "Cuenta, privacidad y reseñas",
-      "Prospectos",
+      "Prospectos y mensajes",
     ]);
     // Configurado pero apagado: se dice, con su punto gris.
     expect(w.get('[data-prueba="evento-pago.anulado"]').text()).toContain(

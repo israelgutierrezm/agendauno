@@ -30,6 +30,8 @@ const AREA_POR_PREFIJO: Record<string, AreaEvento> = {
   privacidad: "cuenta",
   resena: "cuenta",
   prospecto: "prospectos",
+  // Mensajes de la bandeja (ADR 0200): también es captación.
+  bandeja: "prospectos",
 };
 
 export function areaDeEvento(clave: string): AreaEvento {

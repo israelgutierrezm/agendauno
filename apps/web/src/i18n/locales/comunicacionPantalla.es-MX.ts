@@ -50,7 +50,7 @@ export default {
     reservas: "Reservas y asistencia",
     pagos: "Pagos y membresías",
     cuenta: "Cuenta, privacidad y reseñas",
-    prospectos: "Prospectos",
+    prospectos: "Prospectos y mensajes",
     otros: "Otros avisos",
   },
   // Cómo se llama cada aviso: el evento del negocio que lo dispara
