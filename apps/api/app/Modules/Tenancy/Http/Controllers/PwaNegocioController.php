@@ -84,7 +84,7 @@ class PwaNegocioController
         abort_unless($estudio instanceof Estudio && is_array($icono), 404);
         $logo = (string) $estudio->logo_url;
         abort_if($logo === '', 404);
-        $clave = 'pwa-icono:'.$estudio->getKey().':'.sha1($logo).':'.$icono['tam'];
+        $clave = 'pwa-icono:'.$estudio->getKey().':'.hash('sha256', $logo).':'.$icono['tam'];
         $png = Cache::get($clave);
         if (! is_string($png)) {
             $archivo = self::archivoDelLogo($estudio);
@@ -139,7 +139,7 @@ class PwaNegocioController
         if ($logo === '' || ! function_exists('imagecreatefromstring') || self::archivoDelLogo($estudio) === null) {
             return null;
         }
-        $version = substr(sha1($logo), 0, 10);
+        $version = substr(hash('sha256', $logo), 0, 10);
 
         return array_map(static fn (array $icono): array => [
             'src' => "/api/v1/pwa/icono-{$icono['tam']}.png?v={$version}",
