@@ -1,4 +1,5 @@
 import '../../../core/calendario/calendario.dart';
+import '../../../core/formato.dart';
 import '../../../core/hora_negocio.dart';
 import 'cuenta_models.dart';
 
@@ -86,4 +87,50 @@ List<EventoCal> eventosDeCuenta(
             : TonoEvento.suave,
       ),
   ]..sort((a, b) => a.inicio.compareTo(b.inicio));
+}
+
+/// Lo que dice su plan en el Inicio y en el widget de inicio: «6 créditos · vence
+/// el 14 nov», «Ilimitado», «En pausa hasta el …» o «Sin paquete activo». Lo
+/// vigente (según el estado que da el servidor) suma; lo vencido es historial.
+/// Null si no aplica: el negocio no usa saldo para él, o en citas sin bono.
+String? resumenPlan(MiCuenta c, {required bool esCitas}) {
+  final tienePlan = c.derechos.isNotEmpty;
+  if (!((c.portal?.creditos ?? tienePlan) && (tienePlan || !esCitas))) {
+    return null;
+  }
+  final vigentes = c.derechos.where((d) => d.vigente).toList();
+  final creditos = vigentes.isEmpty
+      ? estadoSinPlanVigente(c.derechos)
+      : DerechoMiembro.resumenCreditos(vigentes);
+  final vence = primerVencimiento(vigentes);
+  return vence != null && tienePlan
+      ? '$creditos · vence el ${Formato.diaMes(vence)}'
+      : creditos;
+}
+
+/// Sin plan vigente, por qué: en pausa, suspendido o por empezar (en ese orden).
+String estadoSinPlanVigente(List<DerechoMiembro> derechos) {
+  DerechoMiembro? con(String estado) =>
+      derechos.where((d) => d.estado == estado).firstOrNull;
+  final pausado = con('pausado');
+  if (pausado != null) {
+    return pausado.pausaHasta == null
+        ? 'En pausa'
+        : 'En pausa hasta el ${Formato.diaMes(pausado.pausaHasta)}';
+  }
+  if (con('suspendido') != null) {
+    return 'Suspendido: paga para reactivarlo';
+  }
+  final porEmpezar = con('por_empezar');
+  if (porEmpezar?.desde != null) {
+    return 'Empieza el ${Formato.diaMes(porEmpezar!.desde)}';
+  }
+  return 'Sin paquete activo';
+}
+
+/// Lo que antes vence de su plan (AAAA-MM-DD), si vence.
+String? primerVencimiento(List<DerechoMiembro> derechos) {
+  final fechas = derechos.map((d) => d.vence).whereType<String>().toList()
+    ..sort();
+  return fechas.firstOrNull;
 }

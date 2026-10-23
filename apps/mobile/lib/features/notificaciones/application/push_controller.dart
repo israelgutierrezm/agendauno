@@ -41,7 +41,13 @@ class PushController {
   static String get plataforma =>
       defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
-  Future<void> iniciar(MostrarAviso mostrar, {AbrirAviso? abrir}) async {
+  /// [recibido]: llegó un aviso con la app abierta (sus datos), p. ej. para leer de
+  /// nuevo la cuenta: una reserva cambió.
+  Future<void> iniciar(
+    MostrarAviso mostrar, {
+    AbrirAviso? abrir,
+    AbrirAviso? recibido,
+  }) async {
     if (!disponible || _listo) {
       return;
     }
@@ -57,6 +63,7 @@ class PushController {
       if (n != null) {
         mostrar(n.title ?? '', n.body ?? '');
       }
+      recibido?.call(mensaje.data);
     });
     if (abrir != null) {
       // Se tocó con la app en segundo plano, o la abrió desde cerrada.

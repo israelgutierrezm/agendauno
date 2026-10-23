@@ -210,6 +210,7 @@ class Sesion {
     this.modulos = const [],
     this.whatsappClientes = false,
     this.accesoAbierto = false,
+    this.facturaPosible = false,
   });
 
   final String slug;
@@ -275,6 +276,11 @@ class Sesion {
   /// ¿El negocio controla la entrada (acceso libre: gimnasio, CrossFit; ADR 0105)?
   /// Solo ahí el cliente tiene pase QR y recepción lo escanea (como en la web).
   final bool accesoAbierto;
+
+  /// ¿El negocio factura a sus clientes (en México, con la facturación de la
+  /// plataforma lista)? Solo entonces el cliente guarda sus datos para facturar,
+  /// como en la web (`factura_posible` y `facturacion_disponible` del negocio).
+  final bool facturaPosible;
 
   /// Estado del negocio en la plataforma (`estudio.estado`: trialing, active,
   /// suspended…; null si el API no lo mandó).
@@ -388,6 +394,7 @@ class Sesion {
     'modulos': modulos,
     'whatsapp_clientes': whatsappClientes,
     'acceso_abierto': accesoAbierto,
+    'factura_posible': facturaPosible,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -439,6 +446,7 @@ class Sesion {
       modulos: _textos(datos['modulos']),
       whatsappClientes: (datos['whatsapp_clientes'] ?? false) as bool,
       accesoAbierto: (datos['acceso_abierto'] ?? false) as bool,
+      facturaPosible: (datos['factura_posible'] ?? false) as bool,
     );
   }
 
@@ -495,6 +503,11 @@ class Sesion {
       whatsappClientes: (estudio?['whatsapp_clientes'] ?? false) as bool,
       // Las banderas de su perfil (`perfil_config.flags`), como la web.
       accesoAbierto: (config?['flags'] as Map?)?['acceso_abierto'] == true,
+      // Factura (México) y la plataforma ya puede timbrar; un API anterior no lo
+      // dice y entonces no se ofrece.
+      facturaPosible:
+          estudio?['factura_posible'] == true &&
+          estudio?['facturacion_disponible'] != false,
     );
   }
 
@@ -568,6 +581,7 @@ class Sesion {
     whatsappClientes:
         (estudio?['whatsapp_clientes'] ?? whatsappClientes) as bool,
     accesoAbierto: accesoAbierto,
+    facturaPosible: facturaPosible,
   );
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.

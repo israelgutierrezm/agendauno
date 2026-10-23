@@ -13,6 +13,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../auth/presentation/elegir_rol_screen.dart';
 import '../../cuenta/presentation/cuenta_screen.dart' show hacerConAviso;
+import 'datos_fiscales_card.dart';
 
 /// Géneros (opcionales), lista breve e incluyente: la misma que en la web y el API.
 const generos = <String, String>{
@@ -675,6 +676,10 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               ),
             ),
           ),
+          // Sus datos para facturar: clientes de un negocio que factura (como la
+          // web).
+          if (sesion.esMiembro && sesion.facturaPosible)
+            const DatosFiscalesCard(),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),

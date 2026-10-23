@@ -44,17 +44,11 @@ class InicioTab extends ConsumerWidget {
     final disponibles = clasesDisponibles(cuenta).length;
     final firmar = cuenta.consentimientos.length;
     final pagar = cuenta.porPagar.length;
-    // Lo vigente (según el estado que da el servidor) suma; lo vencido es
-    // historial (Pagos › Mis planes). Sin vigente, por qué: pausa, suspensión…
-    final vigentes = cuenta.derechos.where((d) => d.vigente).toList();
-    final creditos = vigentes.isEmpty
-        ? _otroEstado(cuenta.derechos)
-        : _creditos(vigentes);
-    final vence = _vencimiento(vigentes);
     final clima = ref.watch(climaProvider).value;
     final esCitas = sesion?.esCitas ?? false;
     final usa = cuenta.portal;
-    final tienePlan = cuenta.derechos.isNotEmpty;
+    // Su bono o su plan (lo mismo que dice el widget de inicio).
+    final plan = resumenPlan(cuenta, esCitas: esCitas);
     // Cómo llegar a la sede de su próxima clase o cita (M06).
     final mapa = proxima?.mapaUrl;
     final nombre = _primerNombre(sesion);
@@ -230,14 +224,12 @@ class InicioTab extends ConsumerWidget {
               onTap: () => onIr(PestanaCuenta.reservas),
             ),
             // Su bono o su plan: si lo tiene, o si el negocio vende planes (clases).
-            plan: (usa?.creditos ?? tienePlan) && (tienePlan || !esCitas)
+            plan: plan != null
                 ? TarjetaAcceso(
                     icono: Icons.local_offer_outlined,
                     titulo: esCitas ? 'Mi bono' : 'Mis créditos',
                     tono: TonosAcceso.creditos,
-                    valor: vence != null && tienePlan
-                        ? '$creditos · vence el ${Formato.diaMes(vence)}'
-                        : creditos,
+                    valor: plan,
                     onTap: () => onIr(PestanaCuenta.pagos),
                   )
                 : null,
@@ -358,40 +350,9 @@ class InicioTab extends ConsumerWidget {
           ],
   ].whereType<TarjetaAcceso>().toList();
 
-  /// Sin plan vigente: en pausa, suspendido o por empezar (en ese orden).
-  static String _otroEstado(List<DerechoMiembro> derechos) {
-    DerechoMiembro? con(String estado) =>
-        derechos.where((d) => d.estado == estado).firstOrNull;
-    final pausado = con('pausado');
-    if (pausado != null) {
-      return pausado.pausaHasta == null
-          ? 'En pausa'
-          : 'En pausa hasta el ${Formato.diaMes(pausado.pausaHasta)}';
-    }
-    if (con('suspendido') != null) {
-      return 'Suspendido: paga para reactivarlo';
-    }
-    final porEmpezar = con('por_empezar');
-    if (porEmpezar?.desde != null) {
-      return 'Empieza el ${Formato.diaMes(porEmpezar!.desde)}';
-    }
-    return 'Sin paquete activo';
-  }
-
-  /// Lo que antes vence de su plan (AAAA-MM-DD), si vence.
-  static String? _vencimiento(List<DerechoMiembro> derechos) {
-    final fechas = derechos.map((d) => d.vence).whereType<String>().toList()
-      ..sort();
-    return fechas.firstOrNull;
-  }
-
   /// Su primer nombre para el saludo.
   static String _primerNombre(Sesion? sesion) {
     final nombre = (sesion?.nombrePila ?? sesion?.nombre ?? '').trim();
     return nombre.isEmpty ? '' : nombre.split(RegExp(r'\s+')).first;
   }
-
-  /// "Ilimitado", "6 créditos" o "Sin paquete activo" (1000 unidades = 1).
-  static String _creditos(List<DerechoMiembro> derechos) =>
-      DerechoMiembro.resumenCreditos(derechos);
 }

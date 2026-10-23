@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- El widget de inicio en oscuro: los colores oscuros de la app. -->
+    <color name="widget_fondo">#131F36</color>
+    <color name="widget_borde">#2A3A57</color>
+    <color name="widget_texto">#EEF2F8</color>
+    <color name="widget_texto_suave">#A3B1C9</color>
+    <color name="widget_aviso">#F5A524</color>
+</resources>

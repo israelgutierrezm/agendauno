@@ -11,6 +11,8 @@ import '../../agenda/presentation/agenda_screen.dart';
 import '../../bandeja/presentation/bandeja_screen.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
+import '../../caja/data/caja_repository.dart';
+import '../../caja/presentation/caja_screen.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
 import '../../cuenta/presentation/tarjeta_principal.dart';
 import '../../notificaciones/application/aviso_abierto.dart';
@@ -313,6 +315,21 @@ class _InicioNegocio extends ConsumerWidget {
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => const EscanerPaseScreen(),
+                      ),
+                    ),
+                  ),
+                // La caja de su sede (ADR 0175): abrir, mover efectivo, contar y
+                // cerrar, con el permiso de sus rutas.
+                if (puedeOperarCaja(sesion))
+                  TarjetaAcceso(
+                    key: const Key('caja'),
+                    icono: Icons.point_of_sale_outlined,
+                    titulo: 'Caja',
+                    valor: 'Abrir, mover efectivo y cerrar',
+                    tono: TonosAcceso.pagos,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const CajaScreen(),
                       ),
                     ),
                   ),

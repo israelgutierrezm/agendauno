@@ -71,6 +71,37 @@ abstract final class Formato {
     return '${minor < 0 ? '-' : ''}$prefijo$enteros.${_dos(abs % 100)}';
   }
 
+  /// Lo que se escribió como monto, en centavos y sin punto flotante (lo contrario
+  /// de [dinero]): "1,299.50", "\$80" o "80.5". Null si no se entiende o se presta a
+  /// confusión (antes que guardar un monto cien veces mayor o menor): más de dos
+  /// decimales, miles mal agrupados («12,50»), letras entre los números o negativo
+  /// sin [negativo].
+  static int? aMinor(String texto, {bool negativo = false}) {
+    var limpio = texto
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceFirst(RegExp(r'^[A-Za-z$]+'), '');
+    var signo = 1;
+    if (limpio.startsWith('-')) {
+      if (!negativo) {
+        return null;
+      }
+      signo = -1;
+      limpio = limpio.substring(1).replaceFirst(RegExp(r'^[A-Za-z$]+'), '');
+    }
+    final forma = RegExp(r'^(\d{1,3}(,\d{3})+|\d*)(\.(\d{1,2}))?$');
+    final m = forma.firstMatch(limpio);
+    final entero = (m?.group(1) ?? '').replaceAll(',', '');
+    final fraccion = m?.group(4) ?? '';
+    // Sin ningún dígito (vacío, «.») o más grande de lo que acepta cualquier monto.
+    if (m == null ||
+        (entero.isEmpty && fraccion.isEmpty) ||
+        entero.length > 12) {
+      return null;
+    }
+    final centavos = int.parse(fraccion.padRight(2, '0'));
+    return signo * ((entero.isEmpty ? 0 : int.parse(entero)) * 100 + centavos);
+  }
+
   /// Créditos a partir de unidades (1000 = 1 crédito), exactos y sin punto
   /// flotante: "3", "0.5", "1.25", "-0.5". Nunca se redondean (0.5 no es «1»).
   static String creditos(int unidades) {

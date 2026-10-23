@@ -13,11 +13,13 @@ import 'features/auth/presentation/actualizar_app_screen.dart';
 import 'features/auth/presentation/elegir_rol_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/negocio_suspendido_screen.dart';
+import 'features/cuenta/application/cuenta_controller.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
 import 'features/inicio/presentation/equipo_screen.dart';
 import 'features/instructor/presentation/instructor_screen.dart';
 import 'features/notificaciones/application/aviso_abierto.dart';
 import 'features/notificaciones/application/push_controller.dart';
+import 'features/widget_inicio/application/widget_inicio.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,6 +72,11 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
     ref.read(sesionProvider.notifier).refrescar();
     ReporteErrores.instancia.estudio = () => ref.read(sesionProvider)?.slug;
     _iniciarPush();
+    // Sin sesión de cliente al abrir (p. ej. se cerró en otro lado), el widget de
+    // inicio no se queda con lo de antes.
+    if (!(ref.read(sesionProvider)?.esMiembro ?? false)) {
+      ref.read(widgetInicioProvider).limpiar();
+    }
   }
 
   @override
@@ -95,6 +102,13 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
     await push.iniciar(
       _mostrarAviso,
       abrir: (datos) => ref.read(avisoAbiertoProvider.notifier).abrir(datos),
+      // Un aviso con la app abierta (una reserva que cambió, un pago): la cuenta
+      // del cliente se lee de nuevo, y con ella su widget de inicio.
+      recibido: (_) {
+        if (ref.read(sesionProvider)?.esMiembro ?? false) {
+          ref.invalidate(cuentaProvider);
+        }
+      },
     );
     final sesion = ref.read(sesionProvider);
     if (sesion != null) {
@@ -125,6 +139,15 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       }
       if (nueva == null && anterior != null) {
         _alSalir();
+      }
+      // Ya no es la cuenta de un cliente (salió, cambió de rol o de negocio): el
+      // widget de inicio deja de mostrar lo suyo.
+      if ((anterior?.esMiembro ?? false) &&
+          (nueva == null ||
+              !nueva.esMiembro ||
+              nueva.slug != anterior?.slug ||
+              nueva.bearer != anterior?.bearer)) {
+        ref.read(widgetInicioProvider).limpiar();
       }
       // Se suspendió con la app abierta: no queda nada encima del aviso.
       if ((nueva?.negocioSuspendido ?? false) &&

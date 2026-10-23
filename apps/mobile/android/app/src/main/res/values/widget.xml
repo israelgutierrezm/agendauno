@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- El widget de inicio del cliente (WidgetProximo.kt). Los textos con datos los
+         pone la app; estos son los de cuando aún no hay nada guardado. -->
+    <string name="widget_proximo_nombre">Mi próxima reserva</string>
+    <string name="widget_proximo_descripcion">Tu próxima reserva o cita y tu saldo.</string>
+    <string name="widget_proximo_etiqueta">Tu próxima reserva</string>
+    <string name="widget_proximo_vacio">Nada agendado por ahora</string>
+    <string name="widget_proximo_sin_sesion">Abre la app para ver tu próxima reserva.</string>
+
+    <!-- Los colores de la app en claro (lib/core/theme/tema_agendauno.dart). -->
+    <color name="widget_fondo">#FFFFFF</color>
+    <color name="widget_borde">#E6E9F0</color>
+    <color name="widget_texto">#1E2A3B</color>
+    <color name="widget_texto_suave">#6B7385</color>
+    <color name="widget_aviso">#B54708</color>
+</resources>

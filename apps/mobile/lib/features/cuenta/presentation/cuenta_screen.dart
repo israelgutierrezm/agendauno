@@ -10,6 +10,7 @@ import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../notificaciones/application/aviso_abierto.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
+import '../../widget_inicio/application/widget_inicio.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
@@ -54,6 +55,13 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
   void initState() {
     super.initState();
     _ciclo;
+    // El widget de la pantalla de inicio sigue a su cuenta: al abrir la app, al
+    // volver a ella y tras reservar, cancelar o pagar (la cuenta se recarga).
+    ref.listenManual<AsyncValue<MiCuenta>>(
+      cuentaProvider,
+      (_, estado) => actualizarWidgetInicio(ref, estado),
+      fireImmediately: true,
+    );
     // Al tocar una notificación se abre lo suyo: su reserva o cita, o sus pagos.
     escucharAvisos(
       this,

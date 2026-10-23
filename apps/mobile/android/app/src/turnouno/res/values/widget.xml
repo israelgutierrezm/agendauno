@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TurnoUno (negocios de citas): el widget se nombra por lo que muestra. -->
+    <string name="widget_proximo_nombre">Mi próxima cita</string>
+    <string name="widget_proximo_descripcion">Tu próxima cita y tu bono.</string>
+    <string name="widget_proximo_etiqueta">Tu próxima cita</string>
+    <string name="widget_proximo_sin_sesion">Abre la app para ver tu próxima cita.</string>
+</resources>
