@@ -132,7 +132,7 @@ describe("personas a cargo en la cuenta", () => {
     await flushPromises();
 
     const boton = w.get('[data-prueba="retirar"]');
-    expect(boton.classes()).toContain("tu-tono-peligro");
+    expect(boton.classes()).toContain("tu-btn-peligro");
     await boton.trigger("click");
     await flushPromises();
     expect(red.post).toHaveBeenCalledWith(
