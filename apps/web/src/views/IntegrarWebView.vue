@@ -309,7 +309,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
       {{ $t("operacion.widgets.paginaOcultaAyuda") }}
       <template #acciones>
         <RouterLink
-          class="tu-btn tu-btn-contorno tu-tono-aviso tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :to="{ name: 'sitio-web', query: { pestana: 'dominio' } }"
           >{{ $t("operacion.widgets.irConfiguracion") }}</RouterLink
         >
@@ -331,7 +331,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
       data-prueba="error-widgets"
       >{{ error }}
       <template #acciones>
-        <button type="button" class="tu-btn tu-btn-contorno" @click="cargar">
+        <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
           {{ $t("comun.reintentar") }}
         </button>
       </template>
@@ -370,7 +370,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
         <div v-if="puedeGestionar" class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             data-prueba="editar-widget"
             @click="editar(w)"
           >
@@ -462,7 +462,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
             <template #acciones>
               <button
                 type="button"
-                class="tu-btn tu-btn-contorno tu-btn-chico"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 @click="cargarOpciones"
               >
                 {{ $t("comun.reintentar") }}
@@ -560,7 +560,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           </div>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma justify-self-start"
+            class="tu-btn tu-btn-secundario justify-self-start"
             @click="agregarDominio"
           >
             {{ $t("captacion.widgets.agregarDominio") }}
@@ -593,7 +593,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="guardando"
             data-prueba="cerrar-widget"
             @click="cerrar"
@@ -629,7 +629,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           />
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma justify-self-start"
+            class="tu-btn tu-btn-secundario justify-self-start"
             data-prueba="copiar-codigo"
             @click="copiar"
           >

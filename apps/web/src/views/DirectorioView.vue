@@ -348,7 +348,7 @@ const esTurnoUno = productoActual() === "turnouno";
       <button
         v-if="q || perfil"
         type="button"
-        class="tu-btn tu-btn-fantasma mt-4"
+        class="tu-btn tu-btn-secundario mt-4"
         @click="limpiar"
       >
         Quitar filtros

@@ -204,7 +204,7 @@ const eventoCalendario = computed(() =>
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :disabled="cargando"
           @click="recargar"
         >

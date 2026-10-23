@@ -1214,7 +1214,7 @@ function borrar(): void {
           {{ $t("plataforma.verificar") }}
         </button>
         <button
-          class="tu-btn tu-btn-fantasma w-full"
+          class="tu-btn tu-btn-secundario w-full"
           type="button"
           :disabled="cargando"
           @click="empezarDeNuevo"
@@ -1281,7 +1281,7 @@ function borrar(): void {
         <!-- Falló la red, no el token: se puede volver a intentar con el guardado. -->
         <button
           v-if="token !== ''"
-          class="tu-btn tu-btn-fantasma w-full"
+          class="tu-btn tu-btn-secundario w-full"
           type="button"
           :disabled="cargando"
           @click="cargar"
@@ -1304,7 +1304,7 @@ function borrar(): void {
             >
           </p>
         </div>
-        <button class="tu-btn tu-btn-fantasma" type="button" @click="salir">
+        <button class="tu-btn tu-btn-secundario" type="button" @click="salir">
           {{ $t("plataforma.salir") }}
         </button>
       </div>
@@ -1621,7 +1621,7 @@ function borrar(): void {
             <span style="color: var(--error)">{{ errorCobros }}</span>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="cargandoCobros"
               @click="cargarCobros"
             >
@@ -1703,7 +1703,7 @@ function borrar(): void {
                   <button
                     v-else
                     type="button"
-                    class="tu-btn tu-btn-contorno tu-tono-peligro text-xs"
+                    class="tu-btn tu-btn-peligro tu-btn-chico"
                     data-prueba="suspender-por-renta"
                     :disabled="suspendiendo === c.id"
                     @click="suspenderPorRenta(c)"
@@ -1862,7 +1862,7 @@ function borrar(): void {
             </button>
             <button
               v-if="facturapiConfigurada"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               type="button"
               data-prueba="quitar-facturapi"
               :disabled="guardando === 'facturapi'"
@@ -2074,7 +2074,7 @@ function borrar(): void {
                   </p>
                 </div>
                 <button
-                  class="tu-btn tu-btn-primario w-full mt-3 text-sm"
+                  class="tu-btn tu-btn-primario w-full mt-3"
                   type="button"
                   :disabled="guardando === p.proveedor"
                   @click="guardarPasarela(p.proveedor)"
@@ -2188,7 +2188,7 @@ function borrar(): void {
           </ul>
           <div class="flex flex-wrap gap-2">
             <button
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               type="submit"
               :disabled="guardando !== null"
             >
@@ -2639,7 +2639,7 @@ function borrar(): void {
               }}
             </p>
             <button
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               type="submit"
               :disabled="accionando"
             >
@@ -2679,7 +2679,7 @@ function borrar(): void {
                 </option>
               </select>
               <button
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 type="button"
                 :disabled="accionando"
                 @click="extenderPrueba"
@@ -2705,7 +2705,7 @@ function borrar(): void {
                 />
               </div>
               <button
-                class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+                class="tu-btn tu-btn-peligro"
                 type="button"
                 :disabled="accionando"
                 @click="suspender"
@@ -2715,7 +2715,7 @@ function borrar(): void {
             </div>
             <button
               v-if="ficha.estado === 'suspended'"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               type="button"
               :disabled="accionando"
               @click="reactivar"

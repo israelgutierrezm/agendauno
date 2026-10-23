@@ -375,7 +375,6 @@ onMounted(cargar);
     <EncabezadoSeccion
       :titulo="$t('sedes.titulo')"
       :total="totalSucursales"
-      icono="ubicacion"
       :subtitulo="$t('adminUsabilidad.sucursales.ayuda')"
     >
       <template #acciones>
@@ -398,7 +397,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -486,12 +485,12 @@ onMounted(cargar);
                 :href="s.mapa_url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 >{{ $t("operacion.sedes.verMapa") }}</a
               >
               <button
                 v-if="puedeGestionar"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 type="button"
                 @click="abrirEdicion(s)"
               >
@@ -905,7 +904,7 @@ onMounted(cargar);
       <template #pie>
         <div class="flex justify-end gap-2">
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardando"
             @click="cerrar"

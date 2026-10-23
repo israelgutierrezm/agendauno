@@ -263,7 +263,7 @@ onMounted(cargar);
         <button
           v-if="puedeEditar && !sesion.esCitas"
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           data-prueba="abrir-cuotas"
           @click="cuotasAbiertas = true"
         >
@@ -292,7 +292,7 @@ onMounted(cargar);
       data-prueba="error-carga-planes"
     >
       <span style="color: var(--error)">{{ error }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>

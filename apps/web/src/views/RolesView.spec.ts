@@ -120,7 +120,7 @@ describe("roles y permisos", () => {
 
     const boton = w.get('[data-prueba="eliminar-rol"]');
     expect(boton.classes()).toEqual(
-      expect.arrayContaining(["tu-btn-contorno", "tu-tono-peligro"]),
+      expect.arrayContaining(["tu-btn-peligro"]),
     );
     await boton.trigger("click");
     await flushPromises();

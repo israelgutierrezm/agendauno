@@ -360,7 +360,7 @@ onMounted(cargar);
       :subtitulo="$t('ventas.vender.subtitulo')"
     >
       <template v-if="puedeEntrar('planes', sesion)" #acciones>
-        <RouterLink :to="{ name: 'planes' }" class="tu-btn tu-btn-fantasma">
+        <RouterLink :to="{ name: 'planes' }" class="tu-btn tu-btn-secundario">
           {{ $t("ventas.vender.administrarPlanes") }}
         </RouterLink>
       </template>
@@ -380,7 +380,7 @@ onMounted(cargar);
       data-prueba="error-carga-ventas"
     >
       <span style="color: var(--error)">{{ $t("ventas.errorCarga") }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -494,7 +494,7 @@ onMounted(cargar);
                   @input="promoPreview = null"
                 />
                 <button
-                  class="tu-btn tu-btn-fantasma shrink-0"
+                  class="tu-btn tu-btn-secundario shrink-0"
                   type="button"
                   :disabled="
                     validandoPromo ||

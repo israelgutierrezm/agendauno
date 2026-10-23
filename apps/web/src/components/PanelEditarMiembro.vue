@@ -271,7 +271,7 @@ async function guardar(): Promise<void> {
         />
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro w-full"
+          class="tu-btn tu-btn-peligro w-full"
           :disabled="dandoDeBaja"
           @click="darDeBaja"
         >
@@ -284,7 +284,7 @@ async function guardar(): Promise<void> {
     <template #pie>
       <div class="flex justify-end gap-2">
         <button
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           type="button"
           :disabled="guardando || dandoDeBaja"
           @click="cerrar"

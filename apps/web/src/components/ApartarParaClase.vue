@@ -111,7 +111,7 @@ onMounted(cargar);
       </div>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma tu-btn-chico"
+        class="tu-btn tu-btn-secundario tu-btn-chico"
         @click="emit('cerrar')"
       >
         {{ t("comun.cerrar") }}
@@ -133,7 +133,7 @@ onMounted(cargar);
         >
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="trabajando !== null"
           @click="quitar(a)"
         >
@@ -181,7 +181,7 @@ onMounted(cargar);
         </select>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="trabajando !== null"
           data-prueba="apartar"
           @click="apartar(o)"

@@ -80,7 +80,7 @@ async function guardar(): Promise<void> {
         <SelectorBuscable v-model="elegido" :opciones="paises" />
       </div>
       <button
-        class="tu-btn tu-btn-fantasma text-sm"
+        class="tu-btn tu-btn-secundario"
         type="button"
         data-prueba="cambiar-pais"
         :disabled="guardando || !cambio"

@@ -174,7 +174,7 @@ function quitar(i: number): void {
         <button
           v-if="renglones.length > 2 && i !== ultimo"
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :aria-label="$t('formasDePago.quitar')"
           @click="quitar(i)"
         >

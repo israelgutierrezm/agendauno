@@ -82,7 +82,7 @@ async function copiar(): Promise<void> {
         >
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico shrink-0"
+          class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
           @click="copiar"
         >
           {{ $t("operacion.plataformas.automatico.copiar") }}

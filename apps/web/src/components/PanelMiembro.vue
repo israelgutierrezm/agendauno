@@ -523,7 +523,7 @@ function cancelarVenta(): void {
       >
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma w-full text-sm"
+          class="tu-btn tu-btn-secundario w-full"
           :disabled="registrandoEntrada"
           @click="registrarEntrada"
         >
@@ -555,7 +555,7 @@ function cancelarVenta(): void {
         <button
           v-if="!vendiendo"
           type="button"
-          class="tu-btn tu-btn-primario w-full text-sm"
+          class="tu-btn tu-btn-primario w-full"
           @click="abrirVenta"
         >
           {{ $t("recepcion.miembro.vender") }}
@@ -614,7 +614,7 @@ function cancelarVenta(): void {
           <div class="flex gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-primario flex-1 text-sm"
+              class="tu-btn tu-btn-primario flex-1"
               :disabled="
                 procesando ||
                 productoSel === '' ||
@@ -630,7 +630,7 @@ function cancelarVenta(): void {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="procesando"
               @click="cancelarVenta"
             >

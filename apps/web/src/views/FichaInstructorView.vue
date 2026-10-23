@@ -122,7 +122,7 @@ function fecha(iso: string | null): string {
         <RouterLink
           v-if="puedeEntrar('usuarios', sesion)"
           :to="{ name: 'usuarios' }"
-          class="tu-btn tu-btn-fantasma ml-auto shrink-0"
+          class="tu-btn tu-btn-secundario ml-auto shrink-0"
           >{{ $t("instructores.administrarAcceso") }}</RouterLink
         >
       </header>

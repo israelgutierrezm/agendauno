@@ -1082,7 +1082,7 @@ onMounted(() => {
         <template #pie>
           <div class="flex justify-end gap-2">
             <button
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               type="button"
               :disabled="accionando"
               @click="cerrarTarea"
@@ -1126,7 +1126,7 @@ onMounted(() => {
           <span style="color: var(--error)">{{ $t("tareas.errorCarga") }}</span>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="cargarTareas"
           >
             {{ $t("comun.reintentar") }}
@@ -1140,7 +1140,7 @@ onMounted(() => {
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="limpiarFiltros"
           >
             {{ $t("operacion.bandeja.quitarFiltros") }}
@@ -1337,7 +1337,7 @@ onMounted(() => {
                     tarea.estado === 'pendiente' &&
                     tarea.motivo
                   "
-                  class="tu-btn tu-btn-fantasma shrink-0"
+                  class="tu-btn tu-btn-secundario shrink-0"
                   type="button"
                   :disabled="accionando"
                   @click="abrirResultado(tarea)"
@@ -1422,7 +1422,7 @@ onMounted(() => {
         <template #pie>
           <div class="flex justify-end gap-2">
             <button
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               type="button"
               :disabled="accionando"
               @click="cerrarResultado"
@@ -1573,7 +1573,7 @@ onMounted(() => {
         <template #pie>
           <div class="flex justify-end gap-2">
             <button
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               type="button"
               :disabled="accionando"
               @click="cerrarRegla"
@@ -1610,7 +1610,7 @@ onMounted(() => {
         }}</span>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           @click="cargarReglas"
         >
           {{ $t("comun.reintentar") }}

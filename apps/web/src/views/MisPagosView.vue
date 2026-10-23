@@ -418,7 +418,7 @@ onMounted(() => void cuenta.asegurar());
                 class="mt-2 flex flex-wrap items-center gap-3"
               >
                 <button
-                  class="tu-btn tu-btn-primario text-sm"
+                  class="tu-btn tu-btn-primario"
                   :disabled="pagando !== null"
                   @click="pagar(o.id)"
                 >

@@ -165,7 +165,7 @@ defineExpose({ cargar });
         <button
           v-if="puedeGestionar"
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="comprando || paquete === null"
           data-prueba="comprar-timbres"
           @click="comprar"
@@ -191,7 +191,7 @@ defineExpose({ cargar });
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}

@@ -297,7 +297,6 @@ onMounted(cargar);
           ? $t('equipoVisual.subtitulo')
           : $t('adminUsabilidad.equipoClases')
       "
-      icono="instructores"
     >
       <template
         v-if="puedeInvitar || puedeEntrar('usuarios', sesion)"
@@ -307,7 +306,7 @@ onMounted(cargar);
         <RouterLink
           v-if="puedeEntrar('usuarios', sesion)"
           :to="{ name: 'usuarios' }"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           >{{ $t("instructores.administrarAcceso") }}</RouterLink
         >
         <template v-if="puedeInvitar">
@@ -340,7 +339,7 @@ onMounted(cargar);
       data-prueba="error-carga-instructores"
     >
       <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -376,7 +375,7 @@ onMounted(cargar);
           <button
             v-if="filtrando"
             type="button"
-            class="tu-btn tu-btn-fantasma mt-3 text-sm"
+            class="tu-btn tu-btn-secundario mt-3"
             @click="
               busqueda = '';
               limpiarFiltros();
@@ -594,7 +593,11 @@ onMounted(cargar);
 
       <template #pie>
         <div class="flex justify-end gap-2">
-          <button class="tu-btn tu-btn-fantasma" type="button" @click="cerrar">
+          <button
+            class="tu-btn tu-btn-secundario"
+            type="button"
+            @click="cerrar"
+          >
             {{ $t("comun.cerrar") }}
           </button>
           <button

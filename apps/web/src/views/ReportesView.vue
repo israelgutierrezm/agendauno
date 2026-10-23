@@ -662,12 +662,11 @@ onMounted(() => {
           ? $t('reportes.equipo.rendimiento')
           : $t('reportes.titulo')
       "
-      icono="reportes"
     >
       <template v-if="asistenteDisponible && !soloRendimiento" #acciones>
         <RouterLink
           :to="{ name: 'asistente-ia' }"
-          class="tu-btn tu-btn-contorno"
+          class="tu-btn tu-btn-secundario"
           data-prueba="ir-asistente"
           >{{ $t("asistenteIA.boton") }}</RouterLink
         >
@@ -711,7 +710,7 @@ onMounted(() => {
           <input id="rh" v-model="hasta" type="date" class="tu-input w-auto" />
         </span>
       </div>
-      <button class="tu-btn tu-btn-fantasma" type="button" @click="esteMes">
+      <button class="tu-btn tu-btn-secundario" type="button" @click="esteMes">
         <IconoNav nombre="agenda" :tam="18" />
         {{ $t("reportes.esteMes") }}
       </button>
@@ -728,7 +727,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno text-sm"
+          class="tu-btn tu-btn-secundario"
           data-prueba="reintentar-reporte"
           @click="reintentar"
         >
@@ -817,7 +816,7 @@ onMounted(() => {
               <option value="mes">{{ $t("reportes.tendencias.mes") }}</option>
             </select>
             <button
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               type="button"
               :disabled="exportando || !tendencias || serieVacia"
               data-prueba="exportar-tendencias"

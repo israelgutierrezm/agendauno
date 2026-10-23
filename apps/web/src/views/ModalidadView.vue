@@ -268,7 +268,7 @@ function medirOtra(): void {
               {{ textoRegistro }}
             </RouterLink>
             <a
-              class="tu-btn tu-btn-fantasma text-base px-7 py-3"
+              class="tu-btn tu-btn-secundario text-base px-7 py-3"
               href="#producto"
               @click="medirProducto"
             >

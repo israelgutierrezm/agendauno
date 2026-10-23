@@ -152,7 +152,7 @@ async function crearSeguimiento(s: Segmento): Promise<void> {
     >
       {{ $t("retencion.segmentos.error") }}
       <template #acciones>
-        <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
           {{ $t("comun.reintentar") }}
         </button>
       </template>
@@ -187,7 +187,7 @@ async function crearSeguimiento(s: Segmento): Promise<void> {
           <div v-if="s.total > 0" class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :aria-expanded="abierto === s.clave"
               @click="alternar(s.clave)"
             >
@@ -199,7 +199,7 @@ async function crearSeguimiento(s: Segmento): Promise<void> {
             </button>
             <RouterLink
               v-if="puedeEscribir && s.con_promociones > 0"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :to="{ name: 'comunicaciones', query: { segmento: s.clave } }"
               :data-prueba="`escribir-${s.clave}`"
             >

@@ -295,7 +295,7 @@ onMounted(cargar);
               <div v-if="s.estado === 'pendiente'" class="flex gap-2">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-primario text-sm"
+                  class="tu-btn tu-btn-primario"
                   :disabled="ocupado === s.id"
                   @click="atender(s)"
                 >
@@ -303,7 +303,7 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma text-sm"
+                  class="tu-btn tu-btn-secundario"
                   @click="rechazando = rechazando === s.id ? null : s.id"
                 >
                   {{ $t("privacidadNegocio.rechazar") }}
@@ -329,7 +329,7 @@ onMounted(cargar);
               </div>
               <button
                 type="submit"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 :disabled="ocupado === s.id || respuesta.trim() === ''"
               >
                 {{ $t("privacidadNegocio.confirmarRechazo") }}

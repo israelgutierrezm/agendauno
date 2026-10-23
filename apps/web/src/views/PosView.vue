@@ -676,7 +676,7 @@ onMounted(async () => {
       <span style="color: var(--error)">{{
         $t("mostradorVisual.errorCarga")
       }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -1176,7 +1176,7 @@ onMounted(async () => {
           v-for="e in eligiendoExtras?.extras ?? []"
           :key="e.id"
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :aria-pressed="extrasElegidos.includes(e.id)"
           :class="{ 'mo-extra-elegido': extrasElegidos.includes(e.id) }"
           @click="alternarExtra(e.id)"

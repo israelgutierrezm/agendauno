@@ -201,7 +201,7 @@ async function subir(): Promise<void> {
           <button
             v-if="puedeSubir && !abiertoSubir"
             type="button"
-            class="tu-btn tu-btn-fantasma px-3 py-1.5 text-sm"
+            class="tu-btn tu-btn-secundario px-3 py-1.5"
             @click="abrirSubir"
           >
             {{ $t("expediente.subir") }}
@@ -255,7 +255,7 @@ async function subir(): Promise<void> {
           <div class="flex gap-2">
             <button
               type="submit"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               :disabled="subiendo || archivo === null"
             >
               {{
@@ -264,7 +264,7 @@ async function subir(): Promise<void> {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="subiendo"
               @click="abiertoSubir = false"
             >

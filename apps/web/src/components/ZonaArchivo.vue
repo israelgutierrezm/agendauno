@@ -158,7 +158,7 @@ function alSoltar(e: DragEvent): void {
     <button
       v-if="!visible"
       type="button"
-      class="tu-btn tu-btn-fantasma text-sm"
+      class="tu-btn tu-btn-secundario"
       data-prueba="abrir-zona"
       :disabled="deshabilitado"
       @click="desplegar"

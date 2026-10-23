@@ -278,7 +278,7 @@ async function guardar(): Promise<void> {
       </span>
     </label>
     <button
-      class="tu-btn tu-btn-primario text-sm"
+      class="tu-btn tu-btn-primario"
       type="submit"
       :disabled="guardando || precio === null"
     >

@@ -584,7 +584,7 @@ onMounted(() => {
           >
           <RouterLink
             :to="{ name: 'mis-reservas', query: { vista: 'proximas' } }"
-            class="tu-btn tu-btn-primario text-sm order-first"
+            class="tu-btn tu-btn-primario order-first"
             data-prueba="ver-detalle"
           >
             {{

@@ -794,7 +794,7 @@ onMounted(() => {
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="filtro = 'todas'"
           >
             {{ $t("operacion.hoy.verTodas") }}
@@ -807,7 +807,11 @@ onMounted(() => {
           class="py-8"
           :titulo="$t('operacion.hoy.sinResultados')"
         >
-          <button type="button" class="tu-btn tu-btn-fantasma" @click="limpiar">
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            @click="limpiar"
+          >
             {{ $t("operacion.hoy.limpiar") }}
           </button>
         </EstadoVacio>

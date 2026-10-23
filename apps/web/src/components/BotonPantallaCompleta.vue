@@ -29,7 +29,7 @@ async function cambiar() {
 <template>
   <button
     type="button"
-    :class="agenda ? 'tu-btn tu-btn-fantasma' : 'tu-icono-btn'"
+    :class="agenda ? 'tu-btn tu-btn-secundario' : 'tu-icono-btn'"
     :disabled="pendiente || (!agenda && !disponible)"
     :aria-label="etiqueta"
     :aria-pressed="activa"

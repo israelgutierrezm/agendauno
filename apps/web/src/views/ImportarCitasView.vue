@@ -237,7 +237,7 @@ function fechaHora(iso: string | null): string {
       :subtitulo="t('importarCitas.subtitulo')"
     >
       <template #acciones>
-        <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-fantasma">{{
+        <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-secundario">{{
           t("importarCitas.volver")
         }}</RouterLink>
       </template>
@@ -257,7 +257,7 @@ function fechaHora(iso: string | null): string {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           @click="cargarCatalogos"
         >
           {{ t("comun.reintentar") }}
@@ -285,7 +285,7 @@ function fechaHora(iso: string | null): string {
         <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-primario">{{
           t("importarCitas.volver")
         }}</RouterLink>
-        <button class="tu-btn tu-btn-fantasma" @click="limpiar">
+        <button class="tu-btn tu-btn-secundario" @click="limpiar">
           {{ t("importarCitas.otra") }}
         </button>
       </div>
@@ -298,7 +298,7 @@ function fechaHora(iso: string | null): string {
             {{ t("importarCitas.preparar") }}
           </h2>
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="ocupado"
             @click="descargar"
           >

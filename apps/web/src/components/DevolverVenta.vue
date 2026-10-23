@@ -206,7 +206,7 @@ async function devolver(): Promise<void> {
     <div class="flex flex-wrap items-center justify-end gap-2">
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         :disabled="enviando"
         @click="emit('cerrar')"
       >

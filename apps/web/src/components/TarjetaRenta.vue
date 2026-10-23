@@ -132,7 +132,7 @@ onMounted(async () => {
     <div v-else-if="puedeGestionar" class="mt-4 flex gap-2 flex-wrap">
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         :disabled="ocupado"
         data-prueba="guardar-tarjeta"
         @click="guardar"
@@ -148,7 +148,7 @@ onMounted(async () => {
       <button
         v-if="tarjeta"
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         :disabled="ocupado"
         data-prueba="quitar-tarjeta"
         @click="quitar"

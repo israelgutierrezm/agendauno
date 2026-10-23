@@ -165,9 +165,9 @@ onMounted(cargar);
               v-for="s in opciones.slots"
               :key="s.inicia"
               type="button"
-              class="tu-btn text-xs px-3 py-1.5"
+              class="tu-btn px-3 py-1.5 tu-btn-chico"
               :class="
-                elegido === s.inicia ? 'tu-btn-primario' : 'tu-btn-fantasma'
+                elegido === s.inicia ? 'tu-btn-primario' : 'tu-btn-secundario'
               "
               :aria-pressed="elegido === s.inicia"
               @click="elegido = s.inicia"
@@ -214,7 +214,7 @@ onMounted(cargar);
       </button>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         :disabled="guardando"
         @click="emit('cerrar')"
       >

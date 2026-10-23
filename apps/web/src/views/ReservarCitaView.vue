@@ -1401,7 +1401,7 @@ onMounted(cargar);
           </p>
           <button
             v-if="resultado.orden_id && pagoEnLinea"
-            class="tu-btn tu-btn-fantasma mt-3 w-full"
+            class="tu-btn tu-btn-secundario mt-3 w-full"
             type="button"
             :disabled="pagando"
             @click="pagar(resultado.orden_id)"
@@ -1583,7 +1583,7 @@ onMounted(cargar);
               <span>{{ $t("perfilPublico.agendar.avisoBono") }}</span>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma shrink-0"
+                class="tu-btn tu-btn-secundario shrink-0"
                 data-prueba="entrar-bono"
                 @click="entrarParaAgendar"
               >
@@ -1845,7 +1845,7 @@ onMounted(cargar);
                   <p>{{ $t("reservar.sinHuecos") }}</p>
                   <button
                     type="button"
-                    class="tu-btn tu-btn-fantasma"
+                    class="tu-btn tu-btn-secundario"
                     :disabled="buscandoSiguiente"
                     data-prueba="siguiente-horario"
                     @click="buscarSiguienteHorario"

@@ -344,7 +344,7 @@ onMounted(cargar);
       <div class="flex justify-end gap-2">
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           @click="editando = null"
         >
           {{ $t("comun.cancelar") }}
@@ -406,7 +406,7 @@ onMounted(cargar);
         <button
           v-if="puedeArchivar"
           type="button"
-          class="tu-btn tu-btn-fantasma tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="trabajando !== null"
           @click="archivar(p)"
         >
@@ -415,7 +415,7 @@ onMounted(cargar);
         <button
           v-if="puedeGestionar && p.editable"
           type="button"
-          class="tu-btn tu-btn-contorno tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="trabajando !== null"
           @click="editar(p)"
         >
@@ -424,7 +424,7 @@ onMounted(cargar);
         <button
           v-if="puedeGestionar && p.estado === 'en_revision'"
           type="button"
-          class="tu-btn tu-btn-contorno tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="trabajando !== null"
           @click="revisar(p)"
         >

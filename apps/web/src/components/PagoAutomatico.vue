@@ -387,7 +387,7 @@ onMounted(async () => {
         <button
           v-else
           type="button"
-          class="tu-btn tu-btn-primario text-sm"
+          class="tu-btn tu-btn-primario"
           :disabled="accionando !== null"
           @click="activar(m)"
         >

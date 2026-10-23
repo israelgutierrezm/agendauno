@@ -85,6 +85,7 @@ import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
 import caja from "./locales/caja.es-MX";
 import importarReservas from "./locales/importarReservas.es-MX";
+import vencimiento from "./locales/vencimiento.es-MX";
 import formasDePago from "./locales/formasDePago.es-MX";
 import devolverVenta from "./locales/devolverVenta.es-MX";
 import facturarVenta from "./locales/facturarVenta.es-MX";
@@ -221,6 +222,7 @@ const mensajesBase = {
   corregirCobro,
   caja,
   importarReservas,
+  vencimiento,
   formasDePago,
   devolverVenta,
   facturarVenta,

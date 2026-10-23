@@ -719,7 +719,7 @@ onMounted(cargar);
         <button
           v-if="puedeGestionar"
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-neutral"
+          class="tu-btn tu-btn-secundario"
           data-prueba="categorias"
           @click="abrirCategorias"
         >
@@ -753,7 +753,7 @@ onMounted(cargar);
       <span style="color: var(--error)">{{
         $t("inventarioVisual.errorCarga")
       }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -1102,7 +1102,7 @@ onMounted(cargar);
               }}</span>
               <button
                 type="button"
-                class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+                class="tu-btn tu-btn-peligro tu-btn-chico"
                 @click="olvidarFotoNueva"
               >
                 {{ $t("operacion.productos.fotoQuitar") }}
@@ -1177,7 +1177,7 @@ onMounted(cargar);
           </div>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma justify-self-start"
+            class="tu-btn tu-btn-secundario justify-self-start"
             data-prueba="agregar-extra"
             @click="agregarExtra"
           >
@@ -1213,7 +1213,7 @@ onMounted(cargar);
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="guardando"
           @click="cerrarProducto"
         >
@@ -1293,7 +1293,7 @@ onMounted(cargar);
           <button
             v-if="(nombres[c.id] ?? '').trim() !== c.nombre"
             type="button"
-            class="tu-btn tu-btn-suave tu-tono-info tu-btn-chico"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             :disabled="guardando || (nombres[c.id] ?? '').trim() === ''"
             @click="renombrarCategoria(c)"
           >
@@ -1301,7 +1301,7 @@ onMounted(cargar);
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+            class="tu-btn tu-btn-peligro tu-btn-chico"
             :disabled="guardando"
             :data-prueba="`quitar-categoria-${c.id}`"
             @click="quitarCategoria(c)"
@@ -1429,7 +1429,7 @@ onMounted(cargar);
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="guardando"
           @click="cerrarMovimiento"
         >
@@ -1496,7 +1496,7 @@ onMounted(cargar);
       >
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           @click="tipoHistorial = ''"
         >
           {{ $t("tabla.restablecer") }}

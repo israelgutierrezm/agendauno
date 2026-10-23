@@ -428,7 +428,7 @@ onMounted(cargar);
             <div class="rp-acciones">
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 @click="alternarVista(rol.clave)"
               >
                 {{
@@ -440,14 +440,14 @@ onMounted(cargar);
               <template v-if="rol.puede_cambiar">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   @click="abrirEdicion(rol)"
                 >
                   {{ $t("operacion.rolesPropios.editar") }}
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-contorno tu-tono-peligro"
+                  class="tu-btn tu-btn-peligro"
                   :disabled="eliminandoId !== null"
                   data-prueba="eliminar-rol"
                   @click="eliminar(rol)"
@@ -503,7 +503,7 @@ onMounted(cargar);
             </div>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               @click="alternarVista(rol.clave)"
             >
               {{
@@ -704,7 +704,7 @@ onMounted(cargar);
       <template #pie>
         <div class="flex justify-end gap-2">
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardando"
             @click="cerrarEditor"

@@ -72,7 +72,11 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" role="status">Cargando el aviso…</p>
     <div v-else-if="error" class="mt-8" role="alert">
       <p>No pudimos consultar el aviso. Intenta de nuevo.</p>
-      <button type="button" class="tu-btn tu-btn-fantasma mt-4" @click="cargar">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario mt-4"
+        @click="cargar"
+      >
         Reintentar
       </button>
     </div>

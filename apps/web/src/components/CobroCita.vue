@@ -373,7 +373,7 @@ async function cerrar(): Promise<void> {
         <template #acciones>
           <button
             type="button"
-            class="tu-btn tu-btn-contorno text-sm"
+            class="tu-btn tu-btn-secundario"
             :disabled="reenviando"
             data-prueba="reenviar-ticket"
             @click="reenviarTicket"
@@ -477,7 +477,7 @@ async function cerrar(): Promise<void> {
           </select>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="elegido === ''"
             data-prueba="agregar-producto-cita"
             @click="agregar"

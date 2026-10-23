@@ -636,7 +636,7 @@ function colorAlerta(codigo: string): string {
         <template #acciones>
           <button
             type="button"
-            class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+            class="tu-btn tu-btn-peligro tu-btn-chico"
             @click="cargarResumen"
           >
             {{ $t("comun.reintentar") }}
@@ -702,7 +702,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="puedeVerPlanes"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm dm-boton"
+              class="tu-btn tu-btn-secundario dm-boton"
               @click="pestana = 'planes'"
             >
               {{ $t("detalleMiembro.plan.verDetalle") }}
@@ -729,7 +729,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="puedeVerPlanes"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm dm-boton"
+              class="tu-btn tu-btn-secundario dm-boton"
               @click="pestana = 'planes'"
             >
               {{ $t("detalleMiembro.saldo.historial") }}
@@ -802,7 +802,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="porCobrar.n > 0"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm dm-boton"
+              class="tu-btn tu-btn-secundario dm-boton"
               @click="pestana = 'pagos'"
             >
               {{ $t("detalleMiembro.pagos.verPendientes") }}
@@ -845,7 +845,7 @@ function colorAlerta(codigo: string): string {
             <RouterLink
               v-if="diaProxima && puedeEntrar('agenda', sesion)"
               :to="{ name: 'agenda', query: { fecha: diaProxima } }"
-              class="tu-btn tu-btn-fantasma text-sm dm-boton"
+              class="tu-btn tu-btn-secundario dm-boton"
               >{{ $t("detalleMiembro.proxima.verAgenda") }}</RouterLink
             >
           </section>
@@ -858,7 +858,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="puedeEditar"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="emit('editar')"
             >
               {{ $t("detalleMiembro.info.editar") }}
@@ -1001,7 +1001,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="puedeEditar && !escribiendo"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="escribiendo = true"
             >
               <IconoNav nombre="mas" :tam="16" />
@@ -1024,14 +1024,14 @@ function colorAlerta(codigo: string): string {
             <div class="flex justify-end gap-2">
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 @click="escribiendo = false"
               >
                 {{ $t("detalleMiembro.notas.cancelar") }}
               </button>
               <button
                 type="submit"
-                class="tu-btn tu-btn-primario text-sm"
+                class="tu-btn tu-btn-primario"
                 :disabled="guardandoNota || textoNota.trim() === ''"
               >
                 {{ $t("detalleMiembro.notas.guardar") }}
@@ -1174,7 +1174,7 @@ function colorAlerta(codigo: string): string {
               <button
                 v-if="puedeCobrarPendiente"
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 @click="registrarPago(o)"
               >
                 {{ $t("detalleMiembro.pagos.registrar") }}
@@ -1248,7 +1248,7 @@ function colorAlerta(codigo: string): string {
           <div class="flex justify-end">
             <button
               type="submit"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               :disabled="guardandoNota || textoNota.trim() === ''"
             >
               {{ $t("detalleMiembro.notas.guardar") }}
@@ -1320,7 +1320,7 @@ function colorAlerta(codigo: string): string {
         <button
           v-if="puedeDarDeBaja"
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro hidden text-sm sm:inline-flex"
+          class="tu-btn tu-btn-peligro hidden sm:inline-flex"
           @click="emit('baja')"
         >
           {{ $t("detalleMiembro.acciones.baja") }}
@@ -1329,21 +1329,21 @@ function colorAlerta(codigo: string): string {
           <!-- En pantallas angostas basta la X de arriba. -->
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma hidden text-sm sm:inline-flex"
+            class="tu-btn tu-btn-secundario hidden sm:inline-flex"
             @click="emit('cerrar')"
           >
             {{ $t("detalleMiembro.acciones.cerrar") }}
           </button>
           <RouterLink
             :to="{ name: 'ficha-miembro', params: { id: persona.id } }"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             data-prueba="ficha-completa"
             >{{ $t("detalleMiembro.acciones.fichaCompleta") }}</RouterLink
           >
           <button
             v-if="puedeVender"
             type="button"
-            class="tu-btn tu-btn-primario text-sm"
+            class="tu-btn tu-btn-primario"
             data-prueba="cobrar-miembro"
             @click="emit('cobrar')"
           >

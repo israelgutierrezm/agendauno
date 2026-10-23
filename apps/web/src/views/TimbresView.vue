@@ -436,7 +436,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -466,7 +466,7 @@ onMounted(() => {
         <template v-if="puedeComprar" #acciones>
           <button
             type="button"
-            class="tu-btn tu-btn-contorno tu-btn-chico"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             :disabled="pagandoPendiente"
             data-prueba="pagar-pendiente"
             @click="pagarPendiente"
@@ -626,7 +626,7 @@ onMounted(() => {
       </h2>
       <button
         type="button"
-        class="tu-btn tu-btn-contorno tu-btn-chico"
+        class="tu-btn tu-btn-secundario tu-btn-chico"
         :disabled="exportando || (meta?.total ?? 0) === 0"
         data-prueba="exportar-timbres"
         @click="exportar"
@@ -684,7 +684,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargarMovimientos"
         >
           {{ $t("comun.reintentar") }}

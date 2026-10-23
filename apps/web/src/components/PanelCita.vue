@@ -928,7 +928,7 @@ watch(
         <button
           v-if="sePuedeMover"
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :aria-expanded="reprogramando"
           @click="abrirReprogramar"
         >
@@ -938,7 +938,7 @@ watch(
         <button
           v-if="sePuedeMover"
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro"
+          class="tu-btn tu-btn-peligro"
           :disabled="accionando"
           :aria-expanded="cancelando"
           @click="abrirCancelacion"

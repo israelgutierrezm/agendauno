@@ -153,7 +153,7 @@ onMounted(cargar);
       <p v-if="error" class="tu-hint" role="alert">{{ error }}</p>
       <button
         type="submit"
-        class="tu-btn tu-btn-primario text-sm"
+        class="tu-btn tu-btn-primario"
         :disabled="!lista || enviando"
       >
         {{

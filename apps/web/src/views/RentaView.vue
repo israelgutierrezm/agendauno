@@ -444,7 +444,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -883,14 +883,14 @@ onMounted(() => {
                   >
                     <button
                       type="button"
-                      class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                      class="tu-btn tu-btn-secundario whitespace-nowrap"
                       @click="descargarFactura(c, 'pdf')"
                     >
                       {{ $t("renta.factura.pdf") }}
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                      class="tu-btn tu-btn-secundario whitespace-nowrap"
                       @click="descargarFactura(c, 'xml')"
                     >
                       {{ $t("renta.factura.xml") }}
@@ -900,7 +900,7 @@ onMounted(() => {
                   <button
                     v-else-if="!facturaPosible || c.moneda !== 'MXN'"
                     type="button"
-                    class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                    class="tu-btn tu-btn-secundario whitespace-nowrap"
                     data-prueba="recibo"
                     @click="descargarRecibo(c)"
                   >
@@ -910,7 +910,7 @@ onMounted(() => {
                   <button
                     v-else-if="puedeGestionar"
                     type="button"
-                    class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                    class="tu-btn tu-btn-secundario whitespace-nowrap"
                     data-prueba="facturar"
                     :disabled="facturando === c.id"
                     @click="facturar(c)"

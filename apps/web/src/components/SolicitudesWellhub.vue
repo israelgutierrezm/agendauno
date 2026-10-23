@@ -124,7 +124,7 @@ onMounted(cargar);
         />
         <button
           type="button"
-          class="tu-btn tu-btn-primario text-sm"
+          class="tu-btn tu-btn-primario"
           :disabled="ocupado === s.id || !(codigos[s.id] ?? '').trim()"
           @click="asignar(s)"
         >
@@ -132,7 +132,7 @@ onMounted(cargar);
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado === s.id"
           @click="descartar(s)"
         >

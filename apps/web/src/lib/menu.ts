@@ -763,26 +763,45 @@ function coincide(x: Vista, ruta: RutaActual, conAncla: boolean): boolean {
  */
 export function ubicacion(ruta: RutaActual): Ubicacion | null {
   const auxiliar = AREA_DE_AUXILIAR[String(ruta.name)];
-  for (const grupo of MENU) {
-    for (const area of grupo.areas) {
-      const vista = auxiliar
-        ? area.clave === auxiliar.area
-          ? area.vistas.find((x) => x.clave === auxiliar.vista)
-          : undefined
-        : (area.vistas.find((x) => coincide(x, ruta, true)) ??
-          area.vistas.find((x) => coincide(x, ruta, false)));
-      if (vista !== undefined) {
-        const categoria =
-          area.clave === "configuracion"
-            ? (CATEGORIAS_CONFIGURACION.find((c) =>
-                c.opciones.some((op) => op.clave === vista.clave),
-              ) ?? null)
-            : null;
-        return { grupo, area, vista, categoria };
+  const buscar = (
+    elegir: (area: Area) => Vista | undefined,
+  ): Ubicacion | null => {
+    for (const grupo of MENU) {
+      for (const area of grupo.areas) {
+        const vista = elegir(area);
+        if (vista !== undefined) {
+          const categoria =
+            area.clave === "configuracion"
+              ? (CATEGORIAS_CONFIGURACION.find((c) =>
+                  c.opciones.some((op) => op.clave === vista.clave),
+                ) ?? null)
+              : null;
+          return { grupo, area, vista, categoria };
+        }
       }
     }
+    return null;
+  };
+  if (auxiliar) {
+    return buscar((area) =>
+      area.clave === auxiliar.area
+        ? area.vistas.find((x) => x.clave === auxiliar.vista)
+        : undefined,
+    );
   }
-  return null;
+  return (
+    buscar(
+      (area) =>
+        area.vistas.find((x) => coincide(x, ruta, true)) ??
+        area.vistas.find((x) => coincide(x, ruta, false)),
+    ) ??
+    // Un `?vista` que no es del menú: la vista de esa ruta sin `vista`.
+    buscar((area) =>
+      area.vistas.find(
+        (x) => x.ruta === String(ruta.name) && x.query?.vista === undefined,
+      ),
+    )
+  );
 }
 
 /** El destino de una vista para un RouterLink. */

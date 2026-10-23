@@ -228,7 +228,7 @@ async function registrar(): Promise<void> {
             <button
               v-if="puedeExentar && exentando !== c.id"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               data-prueba="exentar-cuota"
               @click="
                 exentando = c.id;
@@ -249,7 +249,7 @@ async function registrar(): Promise<void> {
             />
             <button
               type="button"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               :disabled="procesando || motivo.trim() === ''"
               data-prueba="confirmar-exencion"
               @click="exentar(c)"
@@ -302,7 +302,7 @@ async function registrar(): Promise<void> {
       <div class="flex justify-end gap-2">
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="procesando"
           @click="cerrar"
         >

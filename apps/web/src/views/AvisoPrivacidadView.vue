@@ -57,7 +57,11 @@ const marca = PRODUCTOS[productoActual()].nombre;
         No pudimos consultar el aviso vigente. Intenta de nuevo antes de
         proporcionar datos personales.
       </p>
-      <button type="button" class="tu-btn tu-btn-fantasma mt-4" @click="cargar">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario mt-4"
+        @click="cargar"
+      >
         Reintentar
       </button>
     </div>

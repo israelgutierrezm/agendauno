@@ -395,7 +395,7 @@ function descargarPlantilla(): void {
         <div class="mt-3 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="descargarPlantilla"
           >
             {{ $t("importar.plantilla") }}
@@ -403,7 +403,7 @@ function descargarPlantilla(): void {
           <button
             v-if="archivo !== null"
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             data-prueba="revisar-reservas"
             :disabled="!listoParaRevisar || analizando"
             @click="revisar"
@@ -524,7 +524,7 @@ function descargarPlantilla(): void {
         <div class="mt-4 flex flex-wrap justify-end gap-2">
           <button
             v-if="puedeImportarListas"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             data-prueba="importar-listas"
             :disabled="importando"

@@ -592,7 +592,7 @@ function elegirModo(valor: Modo) {
       <div class="precios-contacto-acciones">
         <a
           v-if="ventasWhatsApp"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :href="ventasWhatsApp"
           target="_blank"
           rel="noopener"
@@ -600,7 +600,7 @@ function elegirModo(valor: Modo) {
         >
         <!-- Contacto es una acción secundaria frente a empezar la prueba. -->
         <a
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :href="`mailto:${ventasCorreo}?subject=${encodeURIComponent(`Cotización ${marca}`)}`"
           >Contáctanos</a
         >

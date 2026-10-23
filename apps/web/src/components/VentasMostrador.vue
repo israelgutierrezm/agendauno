@@ -256,7 +256,7 @@ onMounted(cargar);
         <button
           v-if="filtrando"
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           data-prueba="ventas-quitar-filtro"
           @click="quitarFiltro"
         >

@@ -355,7 +355,7 @@ onMounted(cargarTabla);
         <span style="color: var(--error)">{{
           $t("operacion.renovaciones.errorCarga")
         }}</span>
-        <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
           {{ $t("comun.reintentar") }}
         </button>
       </div>
@@ -371,7 +371,7 @@ onMounted(cargarTabla);
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="quitarFiltros"
           >
             {{ $t("tabla.restablecer") }}

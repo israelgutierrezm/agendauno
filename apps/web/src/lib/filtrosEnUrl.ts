@@ -1,4 +1,12 @@
-import { computed, watch, type Ref, type WritableComputedRef } from "vue";
+import {
+  computed,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+  type Ref,
+  type WritableComputedRef,
+} from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 
 type Campo = Ref<string> | WritableComputedRef<string>;
@@ -66,4 +74,55 @@ export function useFiltrosEnUrl(campos: Record<string, Campo>): void {
       void router.replace({ query });
     },
   );
+}
+
+/**
+ * La pestaña de una pantalla en la dirección (`?pestana=ingresos`): recargar, volver
+ * atrás o compartir el enlace abre la misma. La predeterminada no se escribe y lo que
+ * llegue sin estar permitido se ignora. La clave nunca es `vista` (esa es la del menú,
+ * lib/menu.ts). Cambia sin sumar al historial. Sin router (una prueba), vive en memoria.
+ */
+export function usePestanaEnUrl<T extends string>(
+  permitidas: MaybeRefOrGetter<readonly T[]>,
+  opciones: { clave?: string; predeterminada?: MaybeRefOrGetter<T> } = {},
+): WritableComputedRef<T> {
+  const clave = opciones.clave ?? "pestana";
+  const route = useRoute() as ReturnType<typeof useRoute> | undefined;
+  const router = useRouter() as ReturnType<typeof useRouter> | undefined;
+  const lista = (): readonly string[] => toValue(permitidas);
+  const porOmision = (): T =>
+    toValue(opciones.predeterminada) ?? (lista()[0] as T);
+  const valida = (v: unknown): v is T =>
+    typeof v === "string" && lista().includes(v);
+  const actual = ref<string>(
+    valida(route?.query?.[clave]) ? String(route?.query?.[clave]) : "",
+  );
+  if (route?.query) {
+    watch(
+      () => route.query[clave],
+      (v) => {
+        actual.value = valida(v) ? v : "";
+      },
+    );
+  }
+
+  return computed({
+    get: () => (valida(actual.value) ? actual.value : porOmision()),
+    set: (valor: T) => {
+      if (!valida(valor)) {
+        return;
+      }
+      actual.value = valor;
+      if (!route?.query || !router) {
+        return;
+      }
+      const query: LocationQueryRaw = { ...route.query };
+      if (valor === porOmision()) {
+        delete query[clave];
+      } else {
+        query[clave] = valor;
+      }
+      void router.replace({ query, hash: route.hash });
+    },
+  });
 }

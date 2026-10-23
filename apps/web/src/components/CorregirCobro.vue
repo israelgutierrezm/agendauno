@@ -213,7 +213,7 @@ async function anular(): Promise<void> {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="guardando"
           @click="abierta = null"
         >
@@ -240,14 +240,14 @@ async function anular(): Promise<void> {
       <div class="flex flex-wrap gap-2">
         <button
           type="submit"
-          class="tu-btn tu-btn-contorno tu-tono-peligro flex-1"
+          class="tu-btn tu-btn-peligro flex-1"
           :disabled="guardando || motivo.trim() === ''"
         >
           {{ $t(k("anular")) }}
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="guardando"
           @click="abierta = null"
         >

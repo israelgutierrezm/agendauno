@@ -101,7 +101,7 @@ describe("encabezado público", () => {
       },
     });
     const vista = await montar({ pagina: "directorio" }, "/directorio");
-    expect(vista.get(".tu-public-nav .tu-btn-fantasma").text()).toContain(
+    expect(vista.get(".tu-public-nav .tu-btn-secundario").text()).toContain(
       "Ir a mi panel",
     );
     expect(vista.text()).not.toContain("Iniciar sesión");

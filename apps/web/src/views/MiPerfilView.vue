@@ -455,7 +455,7 @@ const aparienciaAbierta = ref(false);
           <button
             v-if="usuario.foto_url && !zonaFotoAbierta && !arrastrandoFoto"
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm mp-quitar-foto"
+            class="tu-btn tu-btn-secundario mp-quitar-foto"
             :disabled="subiendoFoto"
             @click="quitarFoto"
           >
@@ -634,7 +634,7 @@ const aparienciaAbierta = ref(false);
               </p>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 :disabled="enviandoCorreo"
                 @click="cancelarCambioCorreo"
               >
@@ -698,7 +698,7 @@ const aparienciaAbierta = ref(false);
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   @click="abrirCorreo(false)"
                 >
                   {{ $t("miPerfil.cancelar") }}
@@ -708,7 +708,7 @@ const aparienciaAbierta = ref(false);
             <button
               v-else
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="abrirCorreo(true)"
             >
               {{ $t("miPerfil.cambiarCorreo") }}
@@ -820,7 +820,7 @@ const aparienciaAbierta = ref(false);
               </p>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 data-prueba="desconectar-google"
                 :disabled="conectandoGoogle"
                 @click="desconectarGoogle"
@@ -883,7 +883,7 @@ const aparienciaAbierta = ref(false);
             <button
               v-if="calendario === null"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="cargandoCalendario"
               @click="obtenerCalendario()"
             >
@@ -898,22 +898,19 @@ const aparienciaAbierta = ref(false);
                 @focus="($event.target as HTMLInputElement).select()"
               />
               <div class="flex flex-wrap gap-2">
-                <a
-                  class="tu-btn tu-btn-primario text-sm"
-                  :href="calendario.webcal"
-                >
+                <a class="tu-btn tu-btn-primario" :href="calendario.webcal">
                   {{ $t("miPerfil.calendarioAbrir") }}
                 </a>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma text-sm"
+                  class="tu-btn tu-btn-secundario"
                   @click="copiarCalendario"
                 >
                   {{ $t("miPerfil.calendarioCopiar") }}
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma text-sm"
+                  class="tu-btn tu-btn-secundario"
                   :disabled="cargandoCalendario"
                   @click="obtenerCalendario(true)"
                 >
@@ -952,7 +949,7 @@ const aparienciaAbierta = ref(false);
           <div>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="aparienciaAbierta = true"
             >
               {{ $t("miPerfil.abrirApariencia") }}

@@ -122,7 +122,7 @@ describe("PWA del negocio", () => {
       props: { negocio: "Fluō Pilates" },
       global: { plugins: [i18n] },
     });
-    await otra.get("button.tu-btn-fantasma").trigger("click");
+    await otra.get("button.tu-btn-secundario").trigger("click");
     expect(otra.find('[data-prueba="instalar-app"]').exists()).toBe(false);
     expect(localStorage.getItem("tu.pwa.descartada")).toBe("1");
     otra.unmount();

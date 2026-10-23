@@ -827,7 +827,7 @@ watch(vista, cargar, { immediate: true });
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -919,7 +919,7 @@ watch(vista, cargar, { immediate: true });
                   <button
                     v-if="puedeRegularizar"
                     type="button"
-                    class="tu-btn tu-btn-fantasma text-sm"
+                    class="tu-btn tu-btn-secundario"
                     data-prueba="registrar-pago"
                     @click="abrirCobro(p)"
                   >
@@ -1119,7 +1119,7 @@ watch(vista, cargar, { immediate: true });
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma ml-auto text-sm"
+              class="tu-btn tu-btn-secundario ml-auto"
               :disabled="descargandoPagos || pagos.length === 0"
               data-prueba="descargar-pagos"
               @click="descargarPagos"
@@ -1724,7 +1724,7 @@ watch(vista, cargar, { immediate: true });
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="rProcesando"
           @click="reembolsando = null"
         >

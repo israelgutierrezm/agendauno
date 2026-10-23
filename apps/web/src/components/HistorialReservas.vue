@@ -223,7 +223,7 @@ onMounted(cargar);
       <button
         v-if="filtrando"
         type="button"
-        class="tu-btn tu-btn-fantasma text-sm"
+        class="tu-btn tu-btn-secundario"
         @click="quitarFiltro"
       >
         {{ $t("portal.historial.quitarFiltro") }}
@@ -295,7 +295,7 @@ onMounted(cargar);
           <button
             v-if="i.calificable"
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             :aria-expanded="calificando === i.id"
             data-prueba="historial-calificar"
             @click="abrirCalificar(i)"
@@ -305,7 +305,7 @@ onMounted(cargar);
           <button
             v-if="i.oferta_id"
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             data-prueba="historial-de-nuevo"
             @click="emit('reservarDeNuevo', i)"
           >
@@ -353,7 +353,7 @@ onMounted(cargar);
             />
             <button
               type="submit"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               :disabled="enviando || estrellas < 1"
             >
               {{ $t("resenas.enviar") }}

@@ -515,7 +515,7 @@ onMounted(async () => {
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('recepcion.titulo')">
       <template #acciones>
-        <RouterLink class="tu-btn tu-btn-fantasma" :to="{ name: 'agenda' }">{{
+        <RouterLink class="tu-btn tu-btn-secundario" :to="{ name: 'agenda' }">{{
           $t("recepcion.abrirAgenda")
         }}</RouterLink>
       </template>
@@ -534,7 +534,7 @@ onMounted(async () => {
     <button
       v-if="sesion.esCitas && sesion.puede('miembros.ver')"
       type="button"
-      class="tu-btn tu-btn-fantasma mt-4"
+      class="tu-btn tu-btn-secundario mt-4"
       :aria-expanded="directorioAbierto"
       aria-controls="fd-directorio"
       @click="directorioAbierto = !directorioAbierto"
@@ -565,7 +565,7 @@ onMounted(async () => {
           <button
             v-if="camaraDisponible && conPase"
             type="button"
-            class="tu-btn tu-btn-fantasma shrink-0"
+            class="tu-btn tu-btn-secundario shrink-0"
             @click="escanerAbierto = true"
           >
             {{ $t("paseEntrada.escanear") }}
@@ -657,7 +657,7 @@ onMounted(async () => {
       >
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma fd-paso"
+          class="tu-btn tu-btn-secundario fd-paso"
           :aria-label="$t('recepcionVisual.diaAnterior')"
           @click="moverDia(-1)"
         >
@@ -665,14 +665,14 @@ onMounted(async () => {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma fd-hoy text-sm"
+          class="tu-btn tu-btn-secundario fd-hoy"
           @click="fecha = isoHoy()"
         >
           {{ $t("recepcion.hoy") }}
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma fd-paso"
+          class="tu-btn tu-btn-secundario fd-paso"
           :aria-label="$t('recepcionVisual.diaSiguiente')"
           @click="moverDia(1)"
         >
@@ -751,7 +751,7 @@ onMounted(async () => {
           >
             <RouterLink
               :to="{ name: 'agenda' }"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               >{{ $t("operacion.recepcion.irAgenda") }}</RouterLink
             >
           </EstadoVacio>

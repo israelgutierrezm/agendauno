@@ -587,7 +587,7 @@ onMounted(async () => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           :disabled="cargando"
           @click="cargar"
         >
@@ -847,7 +847,7 @@ onMounted(async () => {
           <template #acciones>
             <button
               type="button"
-              class="tu-btn tu-btn-contorno tu-btn-chico"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               data-prueba="soltar-venta"
               @click="soltarVenta"
             >
@@ -1138,7 +1138,7 @@ onMounted(async () => {
               </div>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma sm:col-span-1"
+                class="tu-btn tu-btn-secundario sm:col-span-1"
                 :disabled="conceptos.length === 1"
                 :aria-label="$t('facturas.nueva.quitar')"
                 @click="quitarConcepto(i)"
@@ -1148,7 +1148,7 @@ onMounted(async () => {
             </div>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="agregarConcepto"
             >
               {{ $t("facturas.nueva.agregarConcepto") }}

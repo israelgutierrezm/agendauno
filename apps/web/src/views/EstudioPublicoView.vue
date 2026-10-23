@@ -1174,7 +1174,7 @@ onBeforeUnmount(() => {
                 </button>
                 <RouterLink
                   :to="{ name: 'entrar', query: { estudio: slug } }"
-                  class="tu-btn tu-btn-fantasma px-6"
+                  class="tu-btn tu-btn-secundario px-6"
                   @click="
                     trackEvent('student_login_clicked', {
                       source: 'public_studio',
@@ -1538,7 +1538,7 @@ onBeforeUnmount(() => {
                     <RouterLink
                       v-if="usaCitas && x.agendable"
                       :to="{ name: 'agendar-cita', params: { slug } }"
-                      class="tu-btn tu-btn-fantasma"
+                      class="tu-btn tu-btn-secundario"
                       @click="
                         trackEvent('book_appointment_clicked', {
                           source: 'service',
@@ -2238,7 +2238,9 @@ onBeforeUnmount(() => {
               target="_blank"
               rel="noopener"
               class="tu-btn w-full"
-              :class="formularioAcceso ? 'tu-btn-fantasma' : 'tu-btn-primario'"
+              :class="
+                formularioAcceso ? 'tu-btn-secundario' : 'tu-btn-primario'
+              "
               @click="
                 trackEvent('student_access_requested', { channel: 'whatsapp' })
               "
@@ -2268,7 +2270,7 @@ onBeforeUnmount(() => {
                   ...(volverTrasEntrar ? { volver: volverTrasEntrar } : {}),
                 },
               }"
-              class="tu-btn tu-btn-fantasma w-full"
+              class="tu-btn tu-btn-secundario w-full"
               data-prueba="ya-tengo-cuenta"
             >
               {{ tn("escaparate.acceso.yaTengo") }}
@@ -2502,7 +2504,7 @@ div.ep-integrante {
   color: #fff;
   box-shadow: inset 0 0 0 100vmax rgb(0 0 0 / 0.5);
 }
-.ep-portada-foto .tu-btn-fantasma {
+.ep-portada-foto .tu-btn-secundario {
   color: #fff;
   border-color: rgb(255 255 255 / 0.7);
 }

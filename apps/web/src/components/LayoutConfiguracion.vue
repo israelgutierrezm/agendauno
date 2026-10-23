@@ -177,7 +177,7 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
       <button
         ref="botonSecciones"
         type="button"
-        class="tu-btn tu-btn-fantasma lc-boton"
+        class="tu-btn tu-btn-secundario lc-boton"
         :aria-expanded="panelAbierto"
         aria-controls="lc-panel"
         @click="panelAbierto = !panelAbierto"
@@ -289,15 +289,6 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
 .lc-contenido :deep(.tu-encabezado h1 + p) {
   margin-top: 0.1rem;
   font-size: 0.8rem;
-}
-.lc-contenido :deep(.tu-encabezado .es-icono) {
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 0.6rem;
-}
-.lc-contenido :deep(.tu-encabezado .es-icono svg) {
-  width: 1.1rem;
-  height: 1.1rem;
 }
 .lc-boton {
   margin: 0 0 1rem;

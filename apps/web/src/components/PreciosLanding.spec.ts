@@ -291,7 +291,7 @@ describe("precios públicos (ADR 0107)", () => {
   it("cotizar es una acción secundaria frente a probar gratis", () => {
     const vista = montar();
     expect(vista.get(".precios-contacto a[href^='mailto:']").classes()).toEqual(
-      expect.arrayContaining(["tu-btn-fantasma"]),
+      expect.arrayContaining(["tu-btn-secundario"]),
     );
     vista.unmount();
   });

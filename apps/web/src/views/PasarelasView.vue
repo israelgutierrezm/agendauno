@@ -418,7 +418,7 @@ onMounted(cargar);
               >
               <button
                 type="button"
-                class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 @click="copiar(p)"
               >
                 {{

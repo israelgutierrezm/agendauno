@@ -70,16 +70,12 @@ function descartar(): void {
       <button
         v-if="instalacion.disponible"
         type="button"
-        class="tu-btn tu-btn-primario text-sm"
+        class="tu-btn tu-btn-primario"
         @click="instalar"
       >
         {{ $t("pwa.instalar") }}
       </button>
-      <button
-        type="button"
-        class="tu-btn tu-btn-fantasma text-sm"
-        @click="descartar"
-      >
+      <button type="button" class="tu-btn tu-btn-secundario" @click="descartar">
         {{ $t("pwa.ahoraNo") }}
       </button>
     </div>

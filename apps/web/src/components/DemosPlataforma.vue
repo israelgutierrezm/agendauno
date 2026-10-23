@@ -137,7 +137,7 @@ onMounted(cargar);
               <template v-if="d.estado === 'agendada'">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma tu-btn-chico"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
                   :disabled="cambiando === d.id"
                   @click="marcar(d, 'atendida')"
                 >
@@ -145,7 +145,7 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma tu-btn-chico"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
                   :disabled="cambiando === d.id"
                   @click="marcar(d, 'no_asistio')"
                 >
@@ -153,7 +153,7 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma tu-btn-chico"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
                   :disabled="cambiando === d.id"
                   @click="marcar(d, 'cancelada')"
                 >

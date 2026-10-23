@@ -244,7 +244,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
           <button
             v-else-if="modo === null"
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm shrink-0"
+            class="tu-btn tu-btn-secundario shrink-0"
             data-prueba="verificar-whatsapp"
             :disabled="ocupado"
             @click="enviarCodigo('verificar')"
@@ -282,7 +282,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
         </p>
         <div class="mt-3 flex gap-2">
           <button
-            class="tu-btn tu-btn-primario text-sm"
+            class="tu-btn tu-btn-primario"
             type="submit"
             :disabled="ocupado || partesNuevo.numero === ''"
           >
@@ -294,7 +294,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             @click="cerrarCambio"
           >
             {{ $t("avisosAgendaUno.cancelar") }}

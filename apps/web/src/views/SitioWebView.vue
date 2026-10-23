@@ -815,7 +815,7 @@ onBeforeUnmount(() => {
               :href="urlPrevia"
               target="_blank"
               rel="noopener"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               data-prueba="abrir-vista-previa"
               >{{ $t("sitioWeb.acciones.vistaPrevia") }}</a
             >
@@ -824,14 +824,14 @@ onBeforeUnmount(() => {
               :href="urlSitio"
               target="_blank"
               rel="noopener"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               data-prueba="ver-sitio"
               >{{ $t("sitioWeb.barra.verSitio") }}</a
             >
             <button
               v-if="datos.cambios_sin_publicar && !sinGuardar"
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="ocupado"
               @click="descartar"
             >
@@ -839,7 +839,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="ocupado || !sinGuardar"
               data-prueba="guardar-sitio"
               @click="guardar()"
@@ -1197,7 +1197,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                      class="tu-btn tu-btn-secundario shrink-0"
                       :aria-expanded="configAbierta === 'inicio'"
                       data-prueba="config-inicio"
                       @click="
@@ -1266,7 +1266,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                      class="tu-btn tu-btn-secundario shrink-0"
                       :aria-expanded="configAbierta === p.id"
                       :data-prueba="`config-${p.slug}`"
                       @click="
@@ -1338,7 +1338,7 @@ onBeforeUnmount(() => {
                     </p>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+                      class="tu-btn tu-btn-peligro"
                       :data-prueba="`quitar-pagina-${p.slug}`"
                       @click="quitarPagina(n)"
                     >
@@ -1350,7 +1350,7 @@ onBeforeUnmount(() => {
               <div class="mt-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   :disabled="!cabenPaginas || !conPlus"
                   data-prueba="agregar-pagina"
                   @click="agregandoPagina = true"
@@ -1507,7 +1507,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+                      class="tu-btn tu-btn-secundario shrink-0"
                       :aria-expanded="abierta === claveSeccion(s)"
                       :data-prueba="`editar-${claveSeccion(s)}`"
                       @click="
@@ -1537,7 +1537,7 @@ onBeforeUnmount(() => {
                     <div class="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        class="tu-btn tu-btn-fantasma text-sm"
+                        class="tu-btn tu-btn-secundario"
                         :disabled="!caben"
                         :data-prueba="`duplicar-${claveSeccion(s)}`"
                         @click="duplicar(i)"
@@ -1546,7 +1546,7 @@ onBeforeUnmount(() => {
                       </button>
                       <button
                         type="button"
-                        class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+                        class="tu-btn tu-btn-peligro"
                         :data-prueba="`quitar-${claveSeccion(s)}`"
                         @click="quitarBloque(i)"
                       >
@@ -1689,7 +1689,7 @@ onBeforeUnmount(() => {
                     <button
                       v-if="paginaEditada"
                       type="button"
-                      class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+                      class="tu-btn tu-btn-peligro"
                       :data-prueba="`quitar-${claveSeccion(s)}`"
                       @click="quitarSeccion(i)"
                     >
@@ -1783,7 +1783,7 @@ onBeforeUnmount(() => {
                   <button
                     v-else
                     type="button"
-                    class="tu-btn tu-btn-fantasma text-sm"
+                    class="tu-btn tu-btn-secundario"
                     :disabled="ocupado"
                     :data-prueba="`restaurar-${v.id}`"
                     @click="restaurarVersion(v)"
@@ -1883,7 +1883,7 @@ onBeforeUnmount(() => {
                 </div>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma text-sm"
+                  class="tu-btn tu-btn-secundario"
                   :disabled="
                     borrador.banners.length >= datos.catalogo.banners_maximos
                   "
@@ -2096,7 +2096,7 @@ onBeforeUnmount(() => {
                 </div>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma text-sm"
+                  class="tu-btn tu-btn-secundario"
                   @click="vuelta++"
                 >
                   {{ $t("sitioWeb.acciones.actualizar") }}

@@ -148,7 +148,7 @@ function detalle(p: Propuesta): string {
               v-for="s in SUGERENCIAS"
               :key="s"
               type="button"
-              class="tu-btn tu-btn-contorno tu-btn-chico"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               @click="preguntar(s)"
             >
               {{ s }}

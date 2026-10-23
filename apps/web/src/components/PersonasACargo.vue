@@ -128,7 +128,7 @@ async function retirar(p: Participante): Promise<void> {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
               :disabled="retirando !== null"
               data-prueba="retirar"
               @click="retirar(p)"
@@ -175,7 +175,7 @@ async function retirar(p: Participante): Promise<void> {
         <div class="flex justify-end gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="guardando"
             @click="leyendo = null"
           >

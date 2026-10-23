@@ -229,7 +229,7 @@ onMounted(cargar);
                   <td>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-fantasma text-sm"
+                      class="tu-btn tu-btn-secundario"
                       @click="copiar(r.valor)"
                     >
                       {{
@@ -254,7 +254,7 @@ onMounted(cargar);
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="trabajando"
             data-prueba="dominio-quitar"
             @click="quitar"

@@ -642,7 +642,7 @@ onBeforeUnmount(() => {
                 (!fila.conexion || fila.conexion.estado === 'reconectar')
               "
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="conectando !== null"
               @click="conectar(fila.clave)"
             >
@@ -655,7 +655,7 @@ onBeforeUnmount(() => {
             <button
               v-if="fila.conexion"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="desconectar(fila.conexion)"
             >
               {{ $t("bandejaMensajes.canales.desconectar") }}
@@ -690,7 +690,7 @@ onBeforeUnmount(() => {
         </select>
         <button
           type="submit"
-          class="tu-btn tu-btn-primario text-sm"
+          class="tu-btn tu-btn-primario"
           :disabled="paginaElegida === '' || conectando !== null"
         >
           {{ $t("bandejaMensajes.canales.elegir") }}
@@ -828,7 +828,7 @@ onBeforeUnmount(() => {
           <div class="bm-acciones">
             <RouterLink
               v-if="seleccion.persona"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :to="{
                 name: 'ficha-miembro',
                 params: { id: seleccion.persona.id },
@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
             </RouterLink>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="eligiendoFicha = !eligiendoFicha"
             >
               {{
@@ -849,7 +849,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="
                 seleccion.estado === 'abierta'
                   ? actualizar(
@@ -896,7 +896,7 @@ onBeforeUnmount(() => {
           <li v-if="seleccion.hay_anteriores" class="bm-anteriores">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="cargandoAnteriores"
               data-prueba="anteriores"
               @click="cargarAnteriores"
@@ -978,7 +978,7 @@ onBeforeUnmount(() => {
             />
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="enviando"
               :title="
                 seleccion.canal === 'instagram'
@@ -992,7 +992,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="submit"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               :disabled="enviando || texto.trim() === ''"
             >
               {{
@@ -1016,7 +1016,7 @@ onBeforeUnmount(() => {
             />
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               data-prueba="con-plantilla"
               @click="conPlantilla = !conPlantilla"
             >

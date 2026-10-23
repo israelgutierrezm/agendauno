@@ -277,7 +277,7 @@ defineExpose({ irDia });
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma px-3 py-1.5"
+          class="tu-btn tu-btn-secundario px-3 py-1.5"
           @click="fecha = hoy()"
         >
           {{ $t("portal.periodo.hoy") }}
@@ -320,7 +320,7 @@ defineExpose({ irDia });
       <p style="color: var(--error)">{{ error }}</p>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-3"
+        class="tu-btn tu-btn-secundario mt-3"
         @click="emit('reintentar')"
       >
         {{ $t("comun.reintentar") }}

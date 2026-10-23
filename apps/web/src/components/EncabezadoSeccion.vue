@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import IconoNav from "@/components/IconoNav.vue";
 /**
  * Encabezado de una pantalla del panel: el único título de la página (con su total,
- * si aplica), una línea opcional de qué se hace ahí y las acciones a la derecha.
+ * si aplica), una línea opcional de qué se hace ahí y las acciones a la derecha. Sin
+ * ícono: el menú ya dice en qué sección se está.
  */
 defineProps<{
   titulo: string;
   total?: number | string;
   subtitulo?: string;
-  icono?: string;
 }>();
 </script>
 
@@ -17,9 +16,6 @@ defineProps<{
     <!-- El título cede espacio (su texto baja de renglón) para que las acciones se
          queden a la derecha; con poco ancho, las acciones pasan abajo. -->
     <div class="flex min-w-0 flex-1 basis-64 items-center gap-3">
-      <span v-if="icono" class="es-icono" aria-hidden="true"
-        ><IconoNav :nombre="icono" :tam="23"
-      /></span>
       <div class="min-w-0">
         <h1
           class="text-2xl font-semibold tracking-tight leading-tight min-w-0 break-words"
@@ -51,17 +47,6 @@ defineProps<{
 </template>
 
 <style scoped>
-.es-icono {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 3rem;
-  height: 3rem;
-  border: 1px solid var(--borde);
-  border-radius: 0.85rem;
-  background: var(--primario-suave);
-  color: var(--primario-fuerte);
-}
 .es-total {
   display: inline-block;
   padding: 0.2rem 0.6rem;

@@ -198,7 +198,7 @@ onMounted(cargar);
       data-prueba="comercial-error"
     >
       <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>

@@ -1034,7 +1034,7 @@ async function crear(): Promise<void> {
             />
             <a
               v-if="actual.telefono"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :href="`tel:${actual.telefono}`"
               data-prueba="llamar"
               @click="registrarContacto('llamada')"
@@ -1044,7 +1044,7 @@ async function crear(): Promise<void> {
             >
             <a
               v-if="actual.email"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :href="`mailto:${actual.email}`"
               data-prueba="enviar-correo"
               @click="registrarContacto('correo')"
@@ -1200,7 +1200,7 @@ async function crear(): Promise<void> {
               <button
                 v-if="actual.responsable?.id !== sesion.usuario?.ulid"
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 :disabled="accionando"
                 data-prueba="asignarme"
                 @click="asignarA(sesion.usuario?.ulid ?? null)"
@@ -1232,7 +1232,7 @@ async function crear(): Promise<void> {
               />
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 :disabled="accionando"
                 @click="guardarSeguimiento()"
               >
@@ -1254,7 +1254,7 @@ async function crear(): Promise<void> {
             <button
               v-if="actual.estado === 'nuevo'"
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="accionando"
               @click="cambiarEstado('en_seguimiento')"
             >
@@ -1266,7 +1266,7 @@ async function crear(): Promise<void> {
                 actual.estado !== 'invitacion_enviada'
               "
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="accionando"
               @click="cambiarEstado('aprobado')"
             >
@@ -1283,7 +1283,7 @@ async function crear(): Promise<void> {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="accionando"
               @click="descartando.abierto = !descartando.abierto"
             >
@@ -1401,7 +1401,7 @@ async function crear(): Promise<void> {
             />
             <button
               type="submit"
-              class="tu-btn tu-btn-fantasma justify-self-start"
+              class="tu-btn tu-btn-secundario justify-self-start"
               :disabled="accionando || nota.trim() === ''"
             >
               {{ $t("captacion.prospectos.acciones.anotar") }}
@@ -1411,7 +1411,7 @@ async function crear(): Promise<void> {
         <button
           v-else-if="puedeGestionar && actual.estado === 'descartado'"
           type="button"
-          class="tu-btn tu-btn-fantasma justify-self-start"
+          class="tu-btn tu-btn-secundario justify-self-start"
           :disabled="accionando"
           @click="cambiarEstado('en_seguimiento')"
         >

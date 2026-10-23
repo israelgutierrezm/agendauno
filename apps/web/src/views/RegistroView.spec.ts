@@ -647,8 +647,8 @@ describe("país del negocio", () => {
     await vista.get("#cwhatsapp").setValue("300 123 4567");
 
     // Regresa al primer paso y cambia el país: la lada pasa a la del nuevo.
-    await vista.get("button.tu-btn-fantasma").trigger("click");
-    await vista.get("button.tu-btn-fantasma").trigger("click");
+    await vista.get("button.tu-btn-secundario").trigger("click");
+    await vista.get("button.tu-btn-secundario").trigger("click");
     await elegirPais(vista, "colombia");
     await vista.get("form").trigger("submit");
     await vista.get("form").trigger("submit");

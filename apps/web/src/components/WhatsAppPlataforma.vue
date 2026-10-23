@@ -411,7 +411,7 @@ onMounted(cargar);
           />
         </div>
         <button
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           type="submit"
           :disabled="ocupado === 'prueba'"
         >

@@ -212,7 +212,7 @@ const motivo = computed(() => {
       <button
         type="button"
         class="tu-btn"
-        :class="llena ? 'tu-btn-fantasma' : 'tu-btn-primario'"
+        :class="llena ? 'tu-btn-secundario' : 'tu-btn-primario'"
         :disabled="ocupado"
         @click="emit('confirmar', !!llena, null)"
       >
@@ -313,7 +313,7 @@ const motivo = computed(() => {
           </label>
           <button
             type="submit"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="invitando"
             data-prueba="invitar-confirmar"
           >
@@ -362,7 +362,7 @@ const motivo = computed(() => {
         <button
           v-else-if="antes.accion"
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           data-prueba="antes-accion"
           @click="emit('accion', antes.accion)"
         >

@@ -263,7 +263,7 @@ onMounted(cargar);
       <button
         v-if="propios && guardados"
         type="button"
-        class="tu-btn tu-btn-contorno tu-tono-peligro"
+        class="tu-btn tu-btn-peligro"
         @click="borrar"
       >
         {{ $t("datosFacturacion.borrar") }}

@@ -942,7 +942,7 @@ onMounted(cargar);
       <template v-if="errorCarga" #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           data-prueba="reintentar-comunicaciones"
           @click="cargar"
         >
@@ -1172,7 +1172,7 @@ onMounted(cargar);
         <div class="mt-6 flex justify-end gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="enviando"
             @click="revisando = false"
           >
@@ -1732,14 +1732,14 @@ onMounted(cargar);
               plantillaDe(editor.clave, borrador.canal, borrador.destinatario)
             "
             type="button"
-            class="tu-btn tu-btn-contorno tu-tono-peligro mr-auto"
+            class="tu-btn tu-btn-peligro mr-auto"
             @click="eliminarPlantilla"
           >
             {{ $t("comunicacionesAuto.eliminar") }}
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="guardandoPlantilla"
             @click="plantillaForm.cerrar"
           >

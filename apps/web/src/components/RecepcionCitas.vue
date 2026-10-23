@@ -328,7 +328,7 @@ defineExpose({ cargar });
       icono="buscar"
       :titulo="$t('operacion.admin.sinResultados')"
     >
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="limpiar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="limpiar">
         {{ $t("operacion.admin.limpiar") }}
       </button>
     </EstadoVacio>

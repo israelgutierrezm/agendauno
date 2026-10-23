@@ -9,13 +9,7 @@
 
 @layer components {
   /* Sin tono explícito, neutral (sin especificidad: cualquier `tu-tono-*` gana). */
-  :where(
-    .tu-alerta,
-    .tu-pastilla,
-    .tu-btn-solido,
-    .tu-btn-contorno,
-    .tu-btn-suave
-  ) {
+  :where(.tu-alerta, .tu-pastilla, .tu-btn-solido) {
     --tono-fondo: #f8fafc;
     --tono-borde: #e2e8f0;
     --tono-texto: #475569;
@@ -31,7 +25,8 @@
     --tono-solido: #246953;
     --tono-solido-fuerte: #1c5543;
   }
-  .tu-tono-peligro {
+  .tu-tono-peligro,
+  .tu-btn-peligro {
     --tono-fondo: #fdf4f3;
     --tono-borde: #f2dbd8;
     --tono-texto: #a24747;
@@ -71,7 +66,8 @@
     --tono-solido: #2f8a6b;
     --tono-solido-fuerte: #36a07d;
   }
-  .dark .tu-tono-peligro {
+  .dark .tu-tono-peligro,
+  .dark .tu-btn-peligro {
     --tono-texto: #f0aaaa;
     --tono-solido: #b55454;
     --tono-solido-fuerte: #c66565;
@@ -95,6 +91,7 @@
     :is(
       .tu-tono-exito,
       .tu-tono-peligro,
+      .tu-btn-peligro,
       .tu-tono-aviso,
       .tu-tono-info,
       .tu-tono-neutral
@@ -103,14 +100,7 @@
     --tono-borde: color-mix(in srgb, var(--tono-texto) 28%, var(--superficie));
     --tono-suave: color-mix(in srgb, var(--tono-texto) 16%, var(--superficie));
   }
-  :where(.dark)
-    :where(
-      .tu-alerta,
-      .tu-pastilla,
-      .tu-btn-solido,
-      .tu-btn-contorno,
-      .tu-btn-suave
-    ) {
+  :where(.dark) :where(.tu-alerta, .tu-pastilla, .tu-btn-solido) {
     --tono-texto: #cbd5e1;
     --tono-solido: #475569;
     --tono-solido-fuerte: #56657a;
@@ -222,51 +212,15 @@
   .tu-btn-solido:hover:not(:disabled) {
     background: var(--tono-solido-fuerte);
   }
-  /* Con contorno: modales, formularios y acciones secundarias. */
-  .tu-btn-contorno {
+  /* Peligro (eliminar, cancelar, revocar, dar de baja): el contorno del tono
+     peligro. El resto de los botones vive en style.css (un solo contrato). */
+  .tu-btn-peligro {
     background: var(--superficie);
     color: var(--tono-texto);
     border-color: var(--tono-borde);
   }
-  .tu-btn-contorno:hover:not(:disabled) {
+  .tu-btn-peligro:hover:not(:disabled) {
     background: var(--tono-fondo);
-  }
-  /* Suaves (pastel): acciones dentro de tablas y módulos administrativos. */
-  .tu-btn-suave {
-    background: var(--tono-suave);
-    color: var(--tono-texto);
-  }
-  .tu-btn-suave:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--tono-texto) 16%, var(--tono-fondo));
-  }
-  /* Mínimos: pantallas con muchas acciones. */
-  .tu-btn-minimo {
-    background: transparent;
-    color: var(--texto-suave);
-    padding-inline: 0.5rem;
-  }
-  .tu-btn-minimo:hover:not(:disabled) {
-    background: var(--superficie-2);
-    color: var(--texto);
-  }
-  /* Compactos para filas de tablas, y solo con icono. */
-  .tu-btn-chico {
-    gap: 0.3rem;
-    padding: 0.32rem 0.65rem;
-    font-size: 0.8rem;
-    border-radius: 0.45rem;
-  }
-  .tu-btn-icono {
-    width: 2rem;
-    height: 2rem;
-    padding: 0;
-    border-radius: 0.45rem;
-  }
-  /* Deshabilitados: se ven claramente apagados, sin perder su tono. */
-  .tu-btn-solido:disabled,
-  .tu-btn-contorno:disabled,
-  .tu-btn-suave:disabled {
-    opacity: 0.55;
   }
 
   /* ------------------------------------------------------------ campos */

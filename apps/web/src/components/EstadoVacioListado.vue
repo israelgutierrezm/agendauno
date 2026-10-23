@@ -34,7 +34,7 @@ defineEmits<{ restablecer: [] }>();
     <button
       v-if="filtrado"
       type="button"
-      class="tu-btn tu-btn-fantasma mt-4"
+      class="tu-btn tu-btn-secundario mt-4"
       @click="$emit('restablecer')"
     >
       {{ $t("tabla.restablecer") }}

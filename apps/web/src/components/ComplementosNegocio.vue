@@ -154,7 +154,7 @@ onMounted(cargar);
         <button
           v-if="!c.activo && puedePedir"
           type="button"
-          class="tu-btn tu-btn-fantasma justify-self-start"
+          class="tu-btn tu-btn-secundario justify-self-start"
           :disabled="pidiendo !== null"
           data-prueba="pedir-complemento"
           @click="pedir(c)"

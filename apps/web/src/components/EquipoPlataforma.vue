@@ -186,7 +186,7 @@ onMounted(() => void cargar());
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargar"
         >
           {{ t("plataformaAdmin.equipo.reintentar") }}
@@ -250,7 +250,7 @@ onMounted(() => void cargar());
               />
               <button
                 type="submit"
-                class="tu-btn tu-btn-primario text-sm"
+                class="tu-btn tu-btn-primario"
                 :disabled="nuevaContrasena.length < 12 || accionando !== null"
               >
                 {{ t("plataformaAdmin.equipo.guardar") }}

@@ -113,7 +113,7 @@ async function quitar(): Promise<void> {
       <button
         v-if="logoUrl && !abierta"
         type="button"
-        class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+        class="tu-btn tu-btn-peligro"
         :disabled="subiendo"
         @click="quitar"
       >

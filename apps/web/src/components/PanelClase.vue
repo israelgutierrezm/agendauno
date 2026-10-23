@@ -350,7 +350,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
       <button
         v-if="!agregando"
         type="button"
-        class="tu-btn tu-btn-fantasma text-xs px-3 py-1.5"
+        class="tu-btn tu-btn-secundario px-3 py-1.5 tu-btn-chico"
         @click="agregando = true"
       >
         {{ $t("recepcion.panel.agregar") }}
@@ -444,7 +444,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             <button
               v-if="r.orden && puedeCobrar"
               type="button"
-              class="tu-btn tu-btn-primario text-xs px-3 py-1.5"
+              class="tu-btn tu-btn-primario px-3 py-1.5 tu-btn-chico"
               data-prueba="cobrar-reserva"
               :disabled="accionando"
               @click="abrirCobro(r)"
@@ -454,7 +454,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             <button
               v-if="r.estado === 'ofrecida' && puedeGestionar"
               type="button"
-              class="tu-btn tu-btn-primario text-xs px-3 py-1.5"
+              class="tu-btn tu-btn-primario px-3 py-1.5 tu-btn-chico"
               :disabled="accionando"
               @click="aceptar(r)"
             >
@@ -520,7 +520,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
           <button
             v-if="puedeGestionar && (libres ?? 0) > 0"
             type="button"
-            class="tu-btn tu-btn-fantasma text-xs px-3 py-1.5"
+            class="tu-btn tu-btn-secundario px-3 py-1.5 tu-btn-chico"
             :disabled="accionando"
             @click="promover"
           >

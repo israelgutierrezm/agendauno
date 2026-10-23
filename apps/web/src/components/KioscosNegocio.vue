@@ -151,7 +151,11 @@ onMounted(cargar);
     >
       <p>{{ $t("kiosco.panel.enlace") }}</p>
       <p class="mt-2 break-all font-mono text-xs">{{ enlace }}</p>
-      <button type="button" class="tu-btn tu-btn-fantasma mt-2" @click="copiar">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario mt-2"
+        @click="copiar"
+      >
         {{ $t("kiosco.panel.copiar") }}
       </button>
     </div>
@@ -189,7 +193,7 @@ onMounted(cargar);
         <button
           v-if="k.activo"
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           @click="darDeBaja(k)"
         >
           {{ $t("kiosco.panel.darDeBaja") }}

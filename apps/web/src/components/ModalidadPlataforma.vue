@@ -86,7 +86,7 @@ async function cambiar(): Promise<void> {
       }}</span>
       <button
         v-if="cambiable === true"
-        class="tu-btn tu-btn-fantasma text-sm"
+        class="tu-btn tu-btn-secundario"
         type="button"
         data-prueba="cambiar-modalidad"
         :disabled="guardando"

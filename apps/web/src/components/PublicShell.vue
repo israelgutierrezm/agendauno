@@ -133,7 +133,7 @@ defineEmits<{ alternarTema: [] }>();
           >
           <RouterLink
             v-if="mostrarAcceso"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :to="acceso.to"
           >
             <span class="tu-public-login-full">{{ $t(acceso.largo) }}</span>

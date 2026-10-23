@@ -48,7 +48,7 @@ onMounted(() => {
       <button
         v-if="puedeVolver"
         type="button"
-        class="tu-btn tu-btn-contorno"
+        class="tu-btn tu-btn-secundario"
         data-prueba="ne-volver"
         @click="router.back()"
       >

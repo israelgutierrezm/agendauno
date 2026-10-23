@@ -722,7 +722,7 @@ onMounted(async () => {
             <!-- En el subdominio de un negocio, un enlace al dominio raíz. -->
             <template v-else-if="googleEnRaiz">
               <a
-                class="tu-btn tu-btn-fantasma w-full justify-center"
+                class="tu-btn tu-btn-secundario w-full justify-center"
                 :href="urlGoogleRaiz"
                 data-prueba="google-en-raiz"
               >

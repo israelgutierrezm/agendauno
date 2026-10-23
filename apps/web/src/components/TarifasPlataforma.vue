@@ -340,7 +340,11 @@ onMounted(reintentar);
       data-prueba="tarifas-error"
     >
       <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="reintentar">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario"
+        @click="reintentar"
+      >
         {{ $t("comun.reintentar") }}
       </button>
     </div>

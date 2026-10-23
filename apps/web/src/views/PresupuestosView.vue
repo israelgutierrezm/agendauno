@@ -718,7 +718,7 @@ onMounted(() => {
       <template v-if="puedeGestionar" #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           data-prueba="ajustes-presupuestos"
           @click="abrirAjustes"
         >
@@ -1073,7 +1073,7 @@ onMounted(() => {
           <button
             v-if="!soloLectura"
             type="button"
-            class="tu-btn tu-btn-fantasma mt-3"
+            class="tu-btn tu-btn-secundario mt-3"
             data-prueba="agregar-concepto"
             @click="nuevaLinea()"
           >
@@ -1163,7 +1163,7 @@ onMounted(() => {
           <input id="pr-motivo" v-model="motivoRechazo" class="tu-input" />
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="guardando"
             @click="rechazar"
           >
@@ -1187,7 +1187,7 @@ onMounted(() => {
           <RouterLink
             v-if="actual && !hayCambios"
             :to="{ name: 'presupuesto-impreso', params: { id: actual.id } }"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             target="_blank"
           >
             {{ $t("presupuestos.acciones.imprimir") }}
@@ -1195,7 +1195,7 @@ onMounted(() => {
           <template v-if="actual?.editable && puedeGestionar">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="guardando"
               data-prueba="enviar-presupuesto"
               @click="enviar"
@@ -1208,7 +1208,7 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="guardando || hayCambios"
               @click="rechazando = !rechazando"
             >
@@ -1216,7 +1216,7 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="guardando"
               data-prueba="aceptar-presupuesto"
               @click="aceptar"
@@ -1241,7 +1241,7 @@ onMounted(() => {
           <RouterLink
             v-if="actual?.orden"
             :to="{ name: 'cobranza' }"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
           >
             {{ $t("presupuestos.acciones.verCobro") }}
           </RouterLink>

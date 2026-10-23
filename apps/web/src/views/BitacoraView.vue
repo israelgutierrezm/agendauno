@@ -371,7 +371,7 @@ onMounted(cargar);
         </label>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :disabled="descargando"
           @click="descargar"
         >
@@ -446,7 +446,11 @@ onMounted(cargar);
           data-prueba="error-carga-bitacora"
         >
           <span style="color: var(--error)">{{ errorCarga }}</span>
-          <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            @click="cargar"
+          >
             {{ $t("comun.reintentar") }}
           </button>
         </div>
@@ -464,7 +468,7 @@ onMounted(cargar);
           >
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               @click="limpiarFiltrosCambios"
             >
               {{ $t("tabla.restablecer") }}

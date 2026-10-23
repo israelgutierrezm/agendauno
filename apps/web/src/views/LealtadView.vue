@@ -494,7 +494,7 @@ const indicadores = computed<Indicador[]>(() => {
       <span style="color: var(--error)">{{
         $t("lealtadVisual.errorCarga")
       }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -546,7 +546,7 @@ const indicadores = computed<Indicador[]>(() => {
             <button
               v-if="puedeGestionar"
               type="button"
-              class="tu-btn tu-btn-fantasma mt-4"
+              class="tu-btn tu-btn-secundario mt-4"
               @click="abrirPrograma"
             >
               {{ $t("adminUsabilidad.configurarPrograma") }}
@@ -562,7 +562,7 @@ const indicadores = computed<Indicador[]>(() => {
               <button
                 v-if="puedeGestionar"
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 @click="abrirRecompensa(null)"
               >
                 {{ $t("adminUsabilidad.recompensas.nueva") }}
@@ -694,7 +694,7 @@ const indicadores = computed<Indicador[]>(() => {
           <div class="mt-4 flex justify-end gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="guardandoPrograma"
               @click="cerrarPrograma"
             >
@@ -809,7 +809,7 @@ const indicadores = computed<Indicador[]>(() => {
           <div class="flex justify-end gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="guardandoRecompensa"
               @click="cerrarRecompensa"
             >
@@ -900,7 +900,7 @@ const indicadores = computed<Indicador[]>(() => {
                 />
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                  class="tu-btn tu-btn-secundario whitespace-nowrap"
                   @click="ajustar"
                 >
                   {{ $t("lealtad.miembro.ajustar") }}
@@ -1048,14 +1048,14 @@ const indicadores = computed<Indicador[]>(() => {
                   >
                     <button
                       type="button"
-                      class="tu-btn tu-btn-suave tu-tono-exito tu-btn-chico whitespace-nowrap"
+                      class="tu-btn tu-btn-secundario tu-btn-chico whitespace-nowrap"
                       @click="accionCanje(c, 'entregar')"
                     >
                       {{ $t("lealtad.canjes.entregar") }}
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico whitespace-nowrap"
+                      class="tu-btn tu-btn-peligro tu-btn-chico whitespace-nowrap"
                       @click="accionCanje(c, 'cancelar')"
                     >
                       {{ $t("lealtad.canjes.cancelar") }}

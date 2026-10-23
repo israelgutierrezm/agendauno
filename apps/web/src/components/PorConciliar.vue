@@ -194,7 +194,7 @@ defineExpose({ cargar });
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno text-sm"
+          class="tu-btn tu-btn-secundario"
           data-prueba="reintentar-conciliar"
           @click="cargar"
         >
@@ -276,7 +276,7 @@ defineExpose({ cargar });
               </button>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 :disabled="guardando"
                 @click="resolver(i, 'fallido')"
               >
@@ -299,7 +299,7 @@ defineExpose({ cargar });
                 type="button"
                 :class="
                   i.aplicable
-                    ? 'tu-btn tu-btn-fantasma'
+                    ? 'tu-btn tu-btn-secundario'
                     : 'tu-btn tu-btn-primario'
                 "
                 :disabled="guardando"
@@ -315,7 +315,7 @@ defineExpose({ cargar });
               </button>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 :disabled="guardando"
                 @click="resolver(i, null)"
               >

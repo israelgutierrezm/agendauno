@@ -25,8 +25,8 @@ const boton = ref<HTMLElement | null>(null);
     <button
       ref="boton"
       type="button"
-      class="tu-btn text-sm"
-      :class="props.primario ? 'tu-btn-primario' : 'tu-btn-fantasma'"
+      class="tu-btn"
+      :class="props.primario ? 'tu-btn-primario' : 'tu-btn-secundario'"
       :aria-expanded="abierto"
       aria-haspopup="menu"
       @click="abierto = !abierto"

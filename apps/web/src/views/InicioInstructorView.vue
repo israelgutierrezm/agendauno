@@ -311,7 +311,7 @@ onUnmounted(() => clearInterval(reloj));
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="actualizar"
         >
           {{ $t("comun.reintentar") }}
@@ -464,7 +464,7 @@ onUnmounted(() => clearInterval(reloj));
           </h2>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             :disabled="actualizando"
             data-prueba="actualizar"
             @click="actualizar"

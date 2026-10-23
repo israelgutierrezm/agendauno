@@ -10,6 +10,8 @@ interface Columna {
   clave: string;
   etiqueta: string;
   alinear?: "izquierda" | "derecha";
+  // Las acciones de la fila: en el teléfono, al pie de la ficha y sin etiqueta.
+  acciones?: boolean;
 }
 interface DefinicionFiltro {
   clave: string;
@@ -137,7 +139,7 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
 </script>
 
 <template>
-  <div :class="{ 'td-adaptable': adaptarMovil }">
+  <div :class="{ 'tu-tabla-adaptable': adaptarMovil }">
     <BarraListado
       v-if="conBarra"
       v-model:busqueda="q"
@@ -239,8 +241,14 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
               <td
                 v-for="c in columnas"
                 :key="c.clave"
-                :data-etiqueta="c.etiqueta"
-                :class="c.alinear === 'derecha' ? 'text-right' : 'text-left'"
+                :data-etiqueta="c.acciones ? undefined : c.etiqueta"
+                :class="
+                  c.acciones
+                    ? 'tu-celda-acciones'
+                    : c.alinear === 'derecha'
+                      ? 'text-right'
+                      : 'text-left'
+                "
               >
                 <slot
                   :name="`col-${c.clave}`"
@@ -267,53 +275,6 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
 </template>
 
 <style scoped>
-@media (max-width: 639px) {
-  .td-adaptable .tu-tabla,
-  .td-adaptable .tu-tabla tbody,
-  .td-adaptable .tu-tabla tbody tr {
-    display: block;
-    width: 100%;
-  }
-  /* El encabezado sigue disponible para lectores de pantalla. */
-  .td-adaptable .tu-tabla thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-  .td-adaptable .tu-tabla tbody tr {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--borde);
-  }
-  .td-adaptable .tu-tabla tbody tr:last-child {
-    border-bottom: 0;
-  }
-  .td-adaptable .tu-tabla td[data-etiqueta] {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
-    align-items: start;
-    gap: 0.75rem;
-    padding: 0.45rem 0;
-    border: 0;
-    text-align: left;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-  .td-adaptable .tu-tabla td[data-etiqueta]::before {
-    content: attr(data-etiqueta);
-    color: var(--texto-suave);
-    font-size: 0.8rem;
-  }
-  .td-adaptable .tu-tabla td[data-etiqueta]:first-child {
-    display: block;
-    padding-bottom: 0.65rem;
-    font-weight: 600;
-  }
-  .td-adaptable .tu-tabla td[data-etiqueta]:first-child::before {
-    display: none;
-  }
-}
 .tu-tabla-cuerpo tr {
   transition: background-color 0.12s ease;
 }

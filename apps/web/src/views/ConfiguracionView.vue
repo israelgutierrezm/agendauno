@@ -78,7 +78,6 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t(secciones[seccion] ?? 'configuracion.titulo')"
-      icono="comercio"
     />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">

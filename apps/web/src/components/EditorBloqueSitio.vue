@@ -326,7 +326,7 @@ const id = computed(() => bloque.value.id ?? bloque.value.tipo);
       <button
         v-if="(datos.items?.length ?? 0) < maxItems"
         type="button"
-        class="tu-btn tu-btn-fantasma mt-2 text-sm"
+        class="tu-btn tu-btn-secundario mt-2"
         data-prueba="agregar-item"
         @click="agregarItem"
       >

@@ -301,7 +301,7 @@ onMounted(cargar);
           <button
             v-if="fecha"
             type="button"
-            class="tu-btn tu-btn-fantasma tu-btn-chico"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             data-prueba="filtro-fecha"
             @click="fecha = ''"
           >
@@ -333,7 +333,7 @@ onMounted(cargar);
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="quitarFiltros"
           >
             {{ $t("tabla.restablecer") }}

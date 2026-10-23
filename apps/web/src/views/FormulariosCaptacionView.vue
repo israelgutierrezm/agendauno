@@ -372,7 +372,7 @@ function descargarQr(): void {
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+            class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5"
             data-prueba="compartir-tarjeta"
             @click="compartir(f)"
           >
@@ -382,7 +382,7 @@ function descargarQr(): void {
           <button
             v-if="puedeGestionar"
             type="button"
-            class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+            class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5"
             data-prueba="editar-tarjeta"
             @click="editar(f)"
           >
@@ -548,7 +548,7 @@ function descargarQr(): void {
           </div>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma justify-self-start"
+            class="tu-btn tu-btn-secundario justify-self-start"
             @click="agregarPregunta"
           >
             {{ $t("captacion.formularios.editor.agregarPregunta") }}
@@ -625,7 +625,7 @@ function descargarQr(): void {
                 >
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5 shrink-0"
+                  class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5 shrink-0"
                   data-prueba="copiar-enlace"
                   @click="copiar(enlace, 'enlace')"
                 >
@@ -661,7 +661,7 @@ function descargarQr(): void {
                 <div class="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+                    class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5"
                     @click="descargarQr"
                   >
                     <IconoNav nombre="descargar" :tam="16" />
@@ -671,7 +671,7 @@ function descargarQr(): void {
                     :href="enlace"
                     target="_blank"
                     rel="noopener"
-                    class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5"
+                    class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5"
                   >
                     <IconoNav nombre="externo" :tam="16" />
                     {{ $t("captacion.formularios.compartirPanel.abrir") }}
@@ -710,7 +710,7 @@ function descargarQr(): void {
             </div>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma inline-flex items-center gap-1.5 justify-self-start"
+              class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5 justify-self-start"
               data-prueba="copiar-codigo"
               @click="copiar(codigo, 'codigo')"
             >

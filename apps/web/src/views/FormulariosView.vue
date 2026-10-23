@@ -643,14 +643,14 @@ onMounted(cargar);
           v-if="soloRespuestas"
           :to="{ name: 'formularios' }"
           aria-current-value="false"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           >{{ $t("formularios.disenar") }}</RouterLink
         >
         <RouterLink
           v-else
           :to="{ name: 'formularios', query: { vista: 'respuestas' } }"
           aria-current-value="false"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           >{{ $t("formularios.verRespuestas") }}</RouterLink
         >
       </template>
@@ -770,7 +770,7 @@ onMounted(cargar);
             <button
               v-if="f.archivado"
               type="button"
-              class="tu-btn tu-btn-contorno tu-tono-neutral self-start mt-auto"
+              class="tu-btn tu-btn-secundario self-start mt-auto"
               :data-prueba="`restaurar-${f.id}`"
               @click="restaurar(f)"
             >
@@ -779,7 +779,7 @@ onMounted(cargar);
             <button
               v-else
               type="button"
-              class="tu-btn tu-btn-fantasma self-start mt-auto"
+              class="tu-btn tu-btn-secundario self-start mt-auto"
               :aria-label="`${$t(puedeGestionar ? 'adminUsabilidad.fichas.gestionar' : 'adminUsabilidad.fichas.consultar')}: ${f.nombre}`"
               @click="gestionar(f)"
             >
@@ -848,7 +848,7 @@ onMounted(cargar);
             <div class="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 :disabled="creando"
                 @click="cerrarNuevaFicha"
               >
@@ -921,7 +921,7 @@ onMounted(cargar);
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
-                class="tu-btn tu-btn-contorno tu-tono-neutral"
+                class="tu-btn tu-btn-secundario"
                 data-prueba="vista-previa"
                 @click="vistaPrevia = true"
               >
@@ -930,7 +930,7 @@ onMounted(cargar);
               <template v-if="puedeGestionar">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-contorno tu-tono-neutral"
+                  class="tu-btn tu-btn-secundario"
                   data-prueba="editar-ficha"
                   @click="abrirDatos"
                 >
@@ -938,7 +938,7 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-contorno tu-tono-peligro"
+                  class="tu-btn tu-btn-peligro"
                   data-prueba="archivar-ficha"
                   @click="archivar(seleccionado)"
                 >
@@ -1165,7 +1165,7 @@ onMounted(cargar);
               <div class="sm:col-span-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   :disabled="agregandoCampo"
                   @click="cerrarPregunta"
                 >
@@ -1253,7 +1253,7 @@ onMounted(cargar);
               <div class="flex justify-end gap-2">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   :disabled="guardandoFicha"
                   @click="cerrarDatos"
                 >

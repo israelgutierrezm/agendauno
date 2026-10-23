@@ -212,7 +212,7 @@ onMounted(async () => {
             o.conexion.avisos === 'reconectar'
           "
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado !== null || !o.configurado"
           @click="conectar(o.proveedor)"
         >
@@ -221,7 +221,7 @@ onMounted(async () => {
         <button
           v-if="o.conexion?.estado === 'activo'"
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado !== null"
           @click="sincronizar(o.proveedor)"
         >
@@ -230,7 +230,7 @@ onMounted(async () => {
         <button
           v-if="o.conexion"
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado !== null"
           @click="desconectar(o.proveedor)"
         >

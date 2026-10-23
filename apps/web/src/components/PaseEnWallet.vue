@@ -93,7 +93,7 @@ async function renovar(): Promise<void> {
       <button
         v-if="disponibles.apple"
         type="button"
-        class="tu-btn tu-btn-contorno"
+        class="tu-btn tu-btn-secundario"
         :disabled="trabajando"
         data-prueba="wallet-apple"
         @click="apple"
@@ -103,7 +103,7 @@ async function renovar(): Promise<void> {
       <button
         v-if="disponibles.google"
         type="button"
-        class="tu-btn tu-btn-contorno"
+        class="tu-btn tu-btn-secundario"
         :disabled="trabajando"
         data-prueba="wallet-google"
         @click="google"

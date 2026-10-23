@@ -254,7 +254,7 @@ onMounted(cargar);
         </p>
         <button
           type="submit"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado || tarifa.trim() === ''"
         >
           {{ $t("operacion.plataformas.conciliacion.guardarTarifa") }}

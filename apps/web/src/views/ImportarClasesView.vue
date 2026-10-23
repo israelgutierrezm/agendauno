@@ -206,7 +206,7 @@ async function descargar() {
       :subtitulo="t('importarClases.subtitulo')"
     >
       <template #acciones>
-        <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-fantasma">{{
+        <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-secundario">{{
           t("importarClases.volver")
         }}</RouterLink>
       </template>
@@ -225,7 +225,7 @@ async function descargar() {
         <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-primario">{{
           t("importarClases.volver")
         }}</RouterLink>
-        <button class="tu-btn tu-btn-fantasma" @click="limpiar">
+        <button class="tu-btn tu-btn-secundario" @click="limpiar">
           {{ t("importarClases.otra") }}
         </button>
       </div>
@@ -261,7 +261,7 @@ async function descargar() {
             {{ t("importarClases.preparar") }}
           </h2>
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="ocupado"
             @click="descargar"
           >
@@ -377,7 +377,7 @@ async function descargar() {
         <div v-if="archivo" class="mt-3 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="ocupado"
             @click="revisar"
           >

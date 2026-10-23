@@ -670,7 +670,7 @@ onMounted(() => void cuenta.asegurar());
       </p>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-3"
+        class="tu-btn tu-btn-secundario mt-3"
         @click="cuenta.cargar(true)"
       >
         {{ $t("comun.reintentar") }}
@@ -859,9 +859,9 @@ onMounted(() => void cuenta.asegurar());
                       <button
                         v-if="reservable(e)"
                         type="button"
-                        class="tu-btn shrink-0 text-sm"
+                        class="tu-btn shrink-0"
                         :class="
-                          llena(e) ? 'tu-btn-fantasma' : 'tu-btn-primario'
+                          llena(e) ? 'tu-btn-secundario' : 'tu-btn-primario'
                         "
                         :disabled="cuenta.accionando.value"
                         data-prueba="reservar-clase"
@@ -880,7 +880,7 @@ onMounted(() => void cuenta.asegurar());
               <div v-if="libres.length > enLista.length" class="p-4">
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma w-full text-sm"
+                  class="tu-btn tu-btn-secundario w-full"
                   @click="limite += POR_TANDA"
                 >
                   {{ $t("portal.reservas.verMas") }}
@@ -962,7 +962,7 @@ onMounted(() => void cuenta.asegurar());
         </p>
         <button
           type="button"
-          class="tu-btn tu-btn-primario mt-3 text-sm"
+          class="tu-btn tu-btn-primario mt-3"
           @click="irA('reservar')"
         >
           {{
@@ -1079,7 +1079,7 @@ onMounted(() => void cuenta.asegurar());
             :href="abierto.reserva.enlace_en_linea"
             target="_blank"
             rel="noopener noreferrer"
-            class="tu-btn tu-btn-primario inline-block text-sm"
+            class="tu-btn tu-btn-primario inline-block"
             data-prueba="entrar-en-linea"
             >{{ $t("portal.miReserva.entrarEnLinea") }}</a
           >
@@ -1126,7 +1126,7 @@ onMounted(() => void cuenta.asegurar());
                 (abierto.estado === 'confirmada' ||
                   abierto.estado === 'pendiente_pago')
               "
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :aria-expanded="accion === 'lugar'"
               data-prueba="mi-lugar"
               @click="accion = accion === 'lugar' ? null : 'lugar'"
@@ -1144,7 +1144,7 @@ onMounted(() => void cuenta.asegurar());
                 abierto.reserva.sesion_id &&
                 !sesion.esCitas
               "
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :aria-expanded="accion === 'apartar'"
               data-prueba="apartar-boton"
               @click="accion = accion === 'apartar' ? null : 'apartar'"
@@ -1156,14 +1156,14 @@ onMounted(() => void cuenta.asegurar());
                 abierto.estado === 'confirmada' ||
                 abierto.estado === 'pendiente_pago'
               "
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :aria-expanded="accion === 'reprogramar'"
               @click="accion = accion === 'reprogramar' ? null : 'reprogramar'"
             >
               {{ $t("miReprogramar.boton") }}
             </button>
             <button
-              class="tu-btn tu-btn-contorno tu-tono-peligro"
+              class="tu-btn tu-btn-peligro"
               :aria-expanded="accion === 'cancelar'"
               @click="accion = accion === 'cancelar' ? null : 'cancelar'"
             >
@@ -1218,7 +1218,7 @@ onMounted(() => void cuenta.asegurar());
           <RouterLink
             v-else
             :to="{ name: 'mis-pagos' }"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             data-prueba="ver-planes"
             >{{ $t("portal.reservas.verPlanes") }}</RouterLink
           >

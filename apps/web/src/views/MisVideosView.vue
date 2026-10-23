@@ -88,7 +88,7 @@ onMounted(async () => {
             <button
               v-if="reproductorDe(v.url) && viendo !== v.id"
               type="button"
-              class="tu-btn tu-btn-primario mt-3 text-sm"
+              class="tu-btn tu-btn-primario mt-3"
               @click="viendo = v.id"
             >
               {{ $t("videos.mios.ver") }}
@@ -98,7 +98,7 @@ onMounted(async () => {
               :href="v.url"
               target="_blank"
               rel="noopener noreferrer"
-              class="tu-btn tu-btn-primario mt-3 inline-block text-sm"
+              class="tu-btn tu-btn-primario mt-3 inline-block"
               >{{ $t("videos.mios.abrir") }}</a
             >
           </template>

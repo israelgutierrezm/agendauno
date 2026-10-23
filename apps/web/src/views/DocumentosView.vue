@@ -507,7 +507,7 @@ onMounted(cargar);
       >
         <button
           type="button"
-          class="tu-btn tu-btn-primario tu-btn-crear text-sm"
+          class="tu-btn tu-btn-primario tu-btn-crear"
           @click="nuevoConsentimiento"
         >
           {{ $t("consentimientos.nuevo") }}
@@ -568,7 +568,7 @@ onMounted(cargar);
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="
               filtroEstado = '';
               pagina = 1;
@@ -819,14 +819,14 @@ onMounted(cargar);
                 <div class="flex gap-2">
                   <button
                     type="submit"
-                    class="tu-btn tu-btn-primario text-sm"
+                    class="tu-btn tu-btn-primario"
                     :disabled="accionando"
                   >
                     {{ $t("documentosTabs.guardar") }}
                   </button>
                   <button
                     type="button"
-                    class="tu-btn tu-btn-fantasma text-sm"
+                    class="tu-btn tu-btn-secundario"
                     :disabled="accionando"
                     @click="cerrarTipo"
                   >
@@ -935,7 +935,7 @@ onMounted(cargar);
           <div class="flex justify-end gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="creandoTipo"
               @click="cerrarNuevoRequisito"
             >
@@ -1100,7 +1100,7 @@ onMounted(cargar);
         <div class="flex justify-end gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="publicando"
             @click="cerrarConsentimiento"
           >
@@ -1164,7 +1164,7 @@ onMounted(cargar);
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           @click="rechazando = null"
         >
           {{ $t("comun.cancelar") }}

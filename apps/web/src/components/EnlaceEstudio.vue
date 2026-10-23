@@ -82,12 +82,16 @@ onMounted(generarQr);
           >{{ enlaceCorto }}</a
         >
         <div class="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
-          <button type="button" class="tu-btn tu-btn-fantasma" @click="copiar">
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            @click="copiar"
+          >
             {{ copiado ? $t("enlace.copiado") : $t("enlace.copiar") }}
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="!qr"
             @click="descargar"
           >

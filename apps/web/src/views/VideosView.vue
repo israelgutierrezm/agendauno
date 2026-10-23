@@ -255,7 +255,7 @@ onMounted(cargar);
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           @click="abierto = false"
         >
           {{ $t("comun.cancelar") }}
@@ -293,14 +293,14 @@ onMounted(cargar);
         <div v-if="puedeEditar" class="flex gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             @click="abrir(v)"
           >
             {{ $t("videos.editar") }}
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             @click="borrar(v)"
           >
             {{ $t("videos.borrar") }}

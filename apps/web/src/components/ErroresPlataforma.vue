@@ -162,7 +162,7 @@ onMounted(() => void cargar());
       </div>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma text-sm"
+        class="tu-btn tu-btn-secundario"
         :disabled="cargando"
         @click="cargar()"
       >
@@ -253,7 +253,7 @@ onMounted(() => void cargar());
     <button
       v-if="hayMas"
       type="button"
-      class="tu-btn tu-btn-fantasma mt-3 text-sm"
+      class="tu-btn tu-btn-secundario mt-3"
       :disabled="cargando"
       @click="cargar(pagina + 1)"
     >
@@ -343,7 +343,7 @@ onMounted(() => void cargar());
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma flex-1"
+              class="tu-btn tu-btn-secundario flex-1"
               :disabled="cambiando"
               data-prueba="ignorar"
               @click="marcar('ignorado')"
@@ -354,7 +354,7 @@ onMounted(() => void cargar());
           <button
             v-else
             type="button"
-            class="tu-btn tu-btn-fantasma flex-1"
+            class="tu-btn tu-btn-secundario flex-1"
             :disabled="cambiando"
             data-prueba="reabrir"
             @click="marcar('abierto')"

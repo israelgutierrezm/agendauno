@@ -538,7 +538,6 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('conexiones.titulo')"
-      icono="integraciones"
       :subtitulo="$t('adminUsabilidad.integraciones.ayuda')"
     >
       <template
@@ -618,7 +617,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           :disabled="cargando"
           data-prueba="reintentar-integraciones"
           @click="cargar"
@@ -710,7 +709,7 @@ onMounted(cargar);
           <button
             v-if="i.sede && i.llaves_configuradas.length > 0"
             type="button"
-            class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+            class="tu-btn tu-btn-peligro tu-btn-chico"
             :data-prueba="`quitar-sede-${i.proveedor}`"
             @click="quitarSede(i)"
           >
@@ -793,7 +792,7 @@ onMounted(cargar);
         </p>
 
         <button
-          class="tu-btn tu-btn-primario mt-4 text-sm"
+          class="tu-btn tu-btn-primario mt-4"
           :disabled="guardando === i.proveedor"
           @click="guardar(i.proveedor)"
         >
@@ -839,7 +838,7 @@ onMounted(cargar);
             }}</code>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="copiar(secretoLlave)"
             >
               {{ $t("conexiones.copiar") }}
@@ -951,7 +950,7 @@ onMounted(cargar);
         <template #pie>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="creandoLlave"
             @click="editorLlave.cerrar"
           >
@@ -960,7 +959,7 @@ onMounted(cargar);
           <button
             type="submit"
             form="integracion-llave"
-            class="tu-btn tu-btn-primario text-sm"
+            class="tu-btn tu-btn-primario"
             :disabled="
               creandoLlave ||
               nuevaLlave.nombre.trim() === '' ||
@@ -1000,7 +999,7 @@ onMounted(cargar);
             }}</code>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="copiar(secretoWebhook)"
             >
               {{ $t("conexiones.copiar") }}
@@ -1110,7 +1109,7 @@ onMounted(cargar);
               >
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   @click="filtrarEntregas('')"
                 >
                   {{ $t("tabla.restablecer") }}
@@ -1234,7 +1233,7 @@ onMounted(cargar);
         <template #pie>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="creandoWebhook"
             @click="editorWebhook.cerrar"
           >
@@ -1243,7 +1242,7 @@ onMounted(cargar);
           <button
             type="submit"
             form="integracion-webhook"
-            class="tu-btn tu-btn-primario text-sm"
+            class="tu-btn tu-btn-primario"
             :disabled="creandoWebhook || nuevoWebhook.url.trim() === ''"
           >
             {{ $t("conexiones.webhook.crear") }}

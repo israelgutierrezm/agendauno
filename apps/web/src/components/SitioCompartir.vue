@@ -48,7 +48,7 @@ async function copiar(): Promise<void> {
           class="tu-enlace break-all"
           >{{ enlaces.replace("https://", "") }}</a
         >
-        <button type="button" class="tu-btn tu-btn-fantasma" @click="copiar">
+        <button type="button" class="tu-btn tu-btn-secundario" @click="copiar">
           {{ copiado ? $t("enlace.copiado") : $t("enlace.copiar") }}
         </button>
       </div>

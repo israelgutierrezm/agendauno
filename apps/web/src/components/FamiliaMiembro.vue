@@ -358,7 +358,7 @@ async function retirar(
         <div class="flex justify-end gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="guardando"
             @click="cerrarAgregar"
           >
@@ -409,7 +409,7 @@ async function retirar(
         <div class="flex justify-end gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="guardando"
             @click="enMostrador = null"
           >

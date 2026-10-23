@@ -368,7 +368,7 @@ onMounted(async () => {
       <p :style="{ color: 'var(--error)' }">{{ errorCarga }}</p>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-2"
+        class="tu-btn tu-btn-secundario mt-2"
         data-prueba="reintentar-opciones"
         @click="cargarOpciones"
       >
@@ -442,7 +442,11 @@ onMounted(async () => {
         {{ $t("citaCuenta.pendientePagoAyuda") }}
       </p>
       <div class="flex flex-wrap justify-end gap-2">
-        <button type="button" class="tu-btn tu-btn-fantasma" @click="otraCita">
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          @click="otraCita"
+        >
           {{ $t("citaCuenta.otra") }}
         </button>
         <button

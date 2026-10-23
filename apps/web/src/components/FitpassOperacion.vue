@@ -204,7 +204,7 @@ onMounted(cargar);
       </ul>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-2 text-sm"
+        class="tu-btn tu-btn-secundario mt-2"
         :disabled="guardando"
         @click="guardarClases"
       >
@@ -218,7 +218,7 @@ onMounted(cargar);
         <button
           v-if="horarios.length > 0"
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           data-prueba="descargar-horarios-fitpass"
           @click="descargar"
         >
@@ -296,7 +296,7 @@ onMounted(cargar);
           </span>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             @click="yaMarcado(p)"
           >
             {{ $t("fitpass.yaMarcado") }}

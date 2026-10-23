@@ -55,7 +55,11 @@ const marca = PRODUCTOS[productoActual()].nombre;
     <p v-if="cargando" role="status">Cargando el documento…</p>
     <div v-else-if="error" role="alert">
       <p>No pudimos consultar los términos vigentes. Intenta de nuevo.</p>
-      <button type="button" class="tu-btn tu-btn-fantasma mt-4" @click="cargar">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario mt-4"
+        @click="cargar"
+      >
         Reintentar
       </button>
     </div>

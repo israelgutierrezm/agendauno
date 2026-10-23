@@ -141,7 +141,7 @@ async function mover(): Promise<void> {
       </button>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         :disabled="guardando"
         @click="emit('cerrar')"
       >

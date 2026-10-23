@@ -1139,7 +1139,7 @@ onMounted(cargar);
             </div>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               @click="agregarFila"
             >
               <IconoNav nombre="mas" :tam="16" />
@@ -1218,7 +1218,7 @@ onMounted(cargar);
               </p>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 @click="equipo.otros.push({ nombre: '', email: '' })"
               >
                 <IconoNav nombre="mas" :tam="16" />
@@ -1585,7 +1585,7 @@ onMounted(cargar);
                 <code class="ci-enlace">{{ enlace }}</code>
                 <button
                   type="button"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   @click="copiarEnlace"
                 >
                   {{ $t("configuracionInicial.publicacion.copiar") }}
@@ -1594,7 +1594,7 @@ onMounted(cargar);
                   :href="enlace"
                   target="_blank"
                   rel="noopener"
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   data-prueba="vista-previa"
                   >{{ $t("configuracionInicial.publicacion.vistaPrevia") }}</a
                 >
@@ -1679,7 +1679,7 @@ onMounted(cargar);
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="indice === 0"
               @click="indice -= 1"
             >

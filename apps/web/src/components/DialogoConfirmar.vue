@@ -28,7 +28,7 @@ onUnmounted(() => {
     <div class="mt-6 flex justify-end gap-2">
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         @click="responderConfirmar(false)"
       >
         {{ $t("operacion.confirmar.cancelar") }}

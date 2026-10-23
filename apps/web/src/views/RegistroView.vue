@@ -849,7 +849,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                   </div>
                   <button
                     type="button"
-                    class="tu-btn tu-btn-fantasma shrink-0"
+                    class="tu-btn tu-btn-secundario shrink-0"
                     @click="personalizarSlug = true"
                   >
                     {{ $t("registro.personalizar") }}
@@ -1135,7 +1135,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
             <div class="flex gap-2 pt-1">
               <button
                 v-if="paso > 1"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 type="button"
                 :disabled="enviando"
                 @click="atras"
@@ -1180,7 +1180,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 
           <div class="mt-5">
             <button
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               :disabled="reenviando"
               @click="reenviar"
             >

@@ -228,7 +228,7 @@ function mover(delta: number): void {
         <div class="recorrido-navegar">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="actual === 0"
             @click="actual--"
           >
@@ -236,7 +236,7 @@ function mover(delta: number): void {
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="actual === pasos.length - 1"
             data-prueba="recorrido-siguiente"
             @click="actual++"

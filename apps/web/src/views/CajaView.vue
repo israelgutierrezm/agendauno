@@ -434,7 +434,7 @@ onMounted(() => void cargar());
         <p>{{ $t("caja.errorCarga") }}</p>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma mt-3"
+          class="tu-btn tu-btn-secundario mt-3"
           @click="cargar"
         >
           {{ $t("caja.reintentar") }}
@@ -596,7 +596,7 @@ onMounted(() => void cargar());
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-contorno"
+              class="tu-btn tu-btn-secundario"
               data-prueba="retiro"
               @click="abrirMovimiento('retiro')"
             >
@@ -604,7 +604,7 @@ onMounted(() => void cargar());
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-contorno"
+              class="tu-btn tu-btn-secundario"
               data-prueba="ingreso"
               @click="abrirMovimiento('ingreso')"
             >
@@ -728,7 +728,7 @@ onMounted(() => void cargar());
         <p>{{ $t("caja.errorCarga") }}</p>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma mt-3"
+          class="tu-btn tu-btn-secundario mt-3"
           @click="cargarCierres(meta.page)"
         >
           {{ $t("caja.reintentar") }}
@@ -875,7 +875,7 @@ onMounted(() => void cargar());
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="guardandoMovimiento"
           @click="movimiento = null"
         >
@@ -927,7 +927,7 @@ onMounted(() => void cargar());
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="guardandoConteo"
           @click="contando = false"
         >
@@ -1080,7 +1080,7 @@ onMounted(() => void cargar());
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="revisando"
           @click="detalle = null"
         >

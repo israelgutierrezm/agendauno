@@ -171,7 +171,7 @@ async function guardar(f: FormularioPersona): Promise<void> {
           <button
             v-if="puedeResponder && f.campos.length > 0"
             type="button"
-            class="tu-btn tu-btn-fantasma px-3 py-1.5 text-sm"
+            class="tu-btn tu-btn-secundario px-3 py-1.5"
             @click="llenar(f)"
           >
             {{
@@ -249,14 +249,14 @@ async function guardar(f: FormularioPersona): Promise<void> {
         <div class="flex gap-2">
           <button
             type="submit"
-            class="tu-btn tu-btn-primario text-sm"
+            class="tu-btn tu-btn-primario"
             :disabled="guardando"
           >
             {{ $t("expediente.guardarRespuestas") }}
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             :disabled="guardando"
             @click="llenando = null"
           >

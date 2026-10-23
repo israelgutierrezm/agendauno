@@ -1063,7 +1063,7 @@ const indicadores = computed<Indicador[]>(() => {
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="saliendo"
           @click="salida = null"
         >
@@ -1125,7 +1125,7 @@ const indicadores = computed<Indicador[]>(() => {
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="cerrando"
           @click="cierre = null"
         >
@@ -1133,7 +1133,7 @@ const indicadores = computed<Indicador[]>(() => {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro"
+          class="tu-btn tu-btn-peligro"
           :disabled="cerrando || !cierre?.desde"
           data-prueba="confirmar-cierre"
           @click="confirmarCierre"
@@ -1177,7 +1177,7 @@ const indicadores = computed<Indicador[]>(() => {
       <template #pie>
         <div class="flex justify-end gap-2">
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="creando"
             @click="cerrar"

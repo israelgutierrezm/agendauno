@@ -705,7 +705,7 @@ const regreso = useRegreso({
             <button
               v-if="puedeVender"
               type="button"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               @click="vendiendo = true"
             >
               {{ $t("ficha.vender") }}
@@ -713,7 +713,7 @@ const regreso = useRegreso({
             <button
               v-if="puedeGestionar"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="abrirEditar"
             >
               {{ $t("ficha.editar") }}
@@ -806,7 +806,7 @@ const regreso = useRegreso({
                       <button
                         v-if="puedeVender"
                         type="button"
-                        class="tu-btn tu-btn-primario text-sm"
+                        class="tu-btn tu-btn-primario"
                         data-prueba="cobrar-pendiente"
                         @click="abrirCobro(o)"
                       >
@@ -1100,7 +1100,7 @@ const regreso = useRegreso({
                             </div>
                             <button
                               type="submit"
-                              class="tu-btn tu-btn-primario text-sm"
+                              class="tu-btn tu-btn-primario"
                               :disabled="guardandoPausa || pausa.hasta === ''"
                             >
                               {{ $t("pausaMembresia.confirmar") }}
@@ -1175,7 +1175,7 @@ const regreso = useRegreso({
                           </div>
                           <button
                             type="submit"
-                            class="tu-btn tu-btn-primario text-sm"
+                            class="tu-btn tu-btn-primario"
                             :disabled="
                               guardandoRecarga || recarga.creditos <= 0
                             "
@@ -1367,7 +1367,7 @@ const regreso = useRegreso({
                     ficha.reservas.length >= HISTORIAL_FICHA
                   "
                   type="button"
-                  class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico mt-3"
+                  class="tu-btn tu-btn-secundario tu-btn-chico mt-3"
                   data-prueba="ver-todas-reservas"
                   @click="verTodasReservas()"
                 >
@@ -1447,7 +1447,7 @@ const regreso = useRegreso({
                     (ficha.ordenes ?? []).length >= HISTORIAL_FICHA
                   "
                   type="button"
-                  class="tu-btn tu-btn-contorno tu-tono-neutral tu-btn-chico mt-3"
+                  class="tu-btn tu-btn-secundario tu-btn-chico mt-3"
                   data-prueba="ver-todas-ordenes"
                   @click="verTodasOrdenes()"
                 >

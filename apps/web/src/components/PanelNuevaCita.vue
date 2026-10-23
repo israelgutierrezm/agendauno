@@ -487,7 +487,7 @@ async function agendar(): Promise<void> {
     <template #pie>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         :disabled="guardando"
         @click="cerrar"
       >

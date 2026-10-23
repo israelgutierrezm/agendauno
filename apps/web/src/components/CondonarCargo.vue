@@ -30,7 +30,7 @@ defineExpose({ cerrar });
   <button
     v-if="!abierto"
     type="button"
-    class="tu-btn tu-btn-fantasma text-xs"
+    class="tu-btn tu-btn-secundario tu-btn-chico"
     data-prueba="condonar"
     @click="abierto = true"
   >
@@ -56,14 +56,14 @@ defineExpose({ cerrar });
     </label>
     <button
       type="submit"
-      class="tu-btn tu-btn-fantasma text-xs"
+      class="tu-btn tu-btn-secundario tu-btn-chico"
       :disabled="ocupado || motivo.trim() === ''"
     >
       {{ $t("plataformaAdmin.cobros.condonar") }}
     </button>
     <button
       type="button"
-      class="tu-btn tu-btn-fantasma text-xs"
+      class="tu-btn tu-btn-secundario tu-btn-chico"
       @click="cerrar"
     >
       {{ $t("comun.cancelar") }}

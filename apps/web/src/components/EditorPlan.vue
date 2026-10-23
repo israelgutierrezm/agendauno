@@ -1049,7 +1049,7 @@ onMounted(async () => {
     <div class="flex justify-end gap-2">
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         @click="emit('cerrar')"
       >
         {{ $t("planes.editor.cancelar") }}

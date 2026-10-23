@@ -458,7 +458,7 @@ onMounted(cargar);
       <template #pie>
         <div class="flex justify-end gap-2">
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardando"
             @click="cerrarForm"
@@ -494,7 +494,7 @@ onMounted(cargar);
       data-prueba="error-carga-promociones"
     >
       <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>

@@ -87,7 +87,7 @@ function esActivo(clave: string): boolean {
       <button
         v-if="filtros.length"
         type="button"
-        class="tu-btn tu-btn-fantasma shrink-0"
+        class="tu-btn tu-btn-secundario shrink-0"
         :aria-expanded="abierto"
         :aria-controls="filtrosId"
         :style="

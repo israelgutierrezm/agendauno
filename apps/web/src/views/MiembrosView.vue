@@ -795,7 +795,7 @@ onMounted(() => {
           <button
             v-if="puedeFamilias && tipo === 'miembro'"
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             data-prueba="abrir-familias"
             @click="familiasAbiertas = true"
           >
@@ -841,7 +841,7 @@ onMounted(() => {
             <button
               v-if="puedeGestionar"
               type="button"
-              class="tu-btn tu-btn-fantasma shrink-0 text-sm"
+              class="tu-btn tu-btn-secundario shrink-0"
               data-prueba="exportar-miembros"
               :disabled="exportando"
               @click="exportar"
@@ -857,7 +857,7 @@ onMounted(() => {
           <template #acciones>
             <button
               type="button"
-              class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
               @click="cargar"
             >
               {{ $t("comun.reintentar") }}
@@ -882,7 +882,7 @@ onMounted(() => {
           >
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               @click="quitarBusquedaYFiltros"
             >
               {{ $t("miembros.quitarBusqueda") }}
@@ -1497,7 +1497,7 @@ onMounted(() => {
           <div class="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-primario text-sm"
+              class="tu-btn tu-btn-primario"
               :disabled="guardando || reactivandoId !== null"
               @click="reactivarCoincidencia"
             >
@@ -1505,7 +1505,7 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="guardando"
               @click="crear(true)"
             >
@@ -1521,7 +1521,7 @@ onMounted(() => {
       <template #pie>
         <div class="flex justify-end gap-2">
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardando || reactivandoId !== null"
             @click="cerrarAlta"

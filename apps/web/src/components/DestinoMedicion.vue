@@ -277,7 +277,7 @@ async function desconectar(): Promise<void> {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="probando || !destino.secreto_configurado"
           data-prueba="probar-destino"
           @click="probar"
@@ -287,7 +287,7 @@ async function desconectar(): Promise<void> {
         <button
           v-if="configurado"
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           data-prueba="desconectar-destino"
           @click="desconectar"
         >

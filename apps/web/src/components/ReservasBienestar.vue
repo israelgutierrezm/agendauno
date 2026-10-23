@@ -317,7 +317,7 @@ onMounted(cargar);
 
     <button
       type="button"
-      class="tu-btn tu-btn-solido tu-tono-info mt-4 text-sm"
+      class="tu-btn tu-btn-primario mt-4"
       :disabled="guardando"
       data-prueba="reservas-guardar"
       @click="guardar"

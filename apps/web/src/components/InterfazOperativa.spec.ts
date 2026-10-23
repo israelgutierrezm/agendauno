@@ -24,12 +24,12 @@ describe("listados operativos", () => {
         filas: [{ nombre: "Andrea", estado: "Activa" }],
       },
     });
-    expect(vista.classes()).toContain("td-adaptable");
+    expect(vista.classes()).toContain("tu-tabla-adaptable");
     expect(
       vista.findAll("tbody td").map((c) => c.attributes("data-etiqueta")),
     ).toEqual(["Nombre", "Estado"]);
     await vista.setProps({ adaptarMovil: false });
-    expect(vista.classes()).not.toContain("td-adaptable");
+    expect(vista.classes()).not.toContain("tu-tabla-adaptable");
     vista.unmount();
   });
   it("mantiene visibles los filtros aplicados y permite quitar uno sin borrar los demás", async () => {

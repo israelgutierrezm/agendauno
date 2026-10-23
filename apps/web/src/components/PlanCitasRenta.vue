@@ -243,7 +243,7 @@ const enlaceWhatsApp = computed(() =>
       </div>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         data-prueba="cambiar-plan"
         :aria-expanded="abierto"
         @click="abierto = !abierto"
@@ -333,7 +333,7 @@ const enlaceWhatsApp = computed(() =>
         <span class="text-sm">{{ $t("suscripcion.plan.porProfesional") }}</span>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma pc-paso"
+          class="tu-btn tu-btn-secundario pc-paso"
           :aria-label="$t('suscripcion.plan.menos')"
           :disabled="profesionales <= minimo"
           @click="profesionales--"
@@ -345,7 +345,7 @@ const enlaceWhatsApp = computed(() =>
         }}</span>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma pc-paso"
+          class="tu-btn tu-btn-secundario pc-paso"
           :aria-label="$t('suscripcion.plan.mas')"
           :disabled="profesionales >= plan.max_profesionales"
           @click="profesionales++"
@@ -413,7 +413,7 @@ const enlaceWhatsApp = computed(() =>
             v-if="puedeGestionar"
             type="button"
             class="tu-btn mt-4 w-full"
-            :class="esActual(nivel) ? 'tu-btn-fantasma' : 'tu-btn-primario'"
+            :class="esActual(nivel) ? 'tu-btn-secundario' : 'tu-btn-primario'"
             :disabled="
               (esActual(nivel) && !plan.siguiente) ||
               !disponible(nivel) ||

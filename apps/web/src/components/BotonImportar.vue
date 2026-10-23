@@ -12,7 +12,7 @@ defineProps<{ ruta: string; texto: string }>();
 <template>
   <RouterLink
     :to="{ name: ruta }"
-    class="tu-btn tu-btn-fantasma shrink-0 inline-flex items-center gap-2"
+    class="tu-btn tu-btn-secundario shrink-0 inline-flex items-center gap-2"
     data-prueba="boton-importar"
   >
     <svg

@@ -102,7 +102,7 @@ async function cambiar(m: ModuloDelNegocio): Promise<void> {
             }}
           </span>
           <button
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardando !== null"
             @click="cambiar(m)"

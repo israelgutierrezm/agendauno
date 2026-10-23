@@ -336,7 +336,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           data-prueba="reintentar-reglas"
           @click="cargar"
         >
@@ -430,7 +430,7 @@ onMounted(cargar);
           <button
             v-if="puedePoliticas"
             type="submit"
-            class="tu-btn tu-btn-primario text-sm"
+            class="tu-btn tu-btn-primario"
             :disabled="guardando"
           >
             {{ $t("reglasAgenda.guardar") }}
@@ -548,14 +548,14 @@ onMounted(cargar);
             <div class="flex gap-2">
               <button
                 type="submit"
-                class="tu-btn tu-btn-primario text-sm"
+                class="tu-btn tu-btn-primario"
                 :disabled="guardando"
               >
                 {{ $t("reglasAgenda.guardar") }}
               </button>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 @click="
                   editando = null;
                   nuevaActividad = '';
@@ -611,7 +611,7 @@ onMounted(cargar);
           </div>
           <button
             type="submit"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             :disabled="nuevoDia.fecha === ''"
           >
             {{ $t("reglasAgenda.agregarDia") }}

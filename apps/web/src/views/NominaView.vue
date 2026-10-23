@@ -559,7 +559,7 @@ onMounted(async () => {
             <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 :disabled="guardando"
                 @click="cerrarEsquema"
               >
@@ -648,7 +648,7 @@ onMounted(async () => {
           }}</span>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="conEsquema === 0"
             @click="exportar"
           >
@@ -672,7 +672,7 @@ onMounted(async () => {
           {{ $t("nominaVisual.errorCalculo") }}
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="calcular"
           >
             {{ $t("comun.reintentar") }}

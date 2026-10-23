@@ -1989,13 +1989,13 @@ onMounted(async () => {
           <RouterLink
             v-if="puedeEntrar('horarios', sesion)"
             :to="{ name: 'horarios' }"
-            class="tu-btn tu-btn-fantasma max-sm:hidden"
+            class="tu-btn tu-btn-secundario max-sm:hidden"
             >{{ $t("agenda.disponibilidadEquipo") }}</RouterLink
           >
           <RouterLink
             v-if="puedeEntrar('reglas-agenda', sesion)"
             :to="{ name: 'reglas-agenda', hash: '#politicas' }"
-            class="tu-btn tu-btn-fantasma max-sm:hidden"
+            class="tu-btn tu-btn-secundario max-sm:hidden"
             >{{ $t("agenda.reglasReserva") }}</RouterLink
           >
           <!-- Importar es secundaria: la principal es crear (al final). -->
@@ -2055,7 +2055,7 @@ onMounted(async () => {
       <div class="mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
         <div class="flex items-center gap-1 max-sm:mr-auto">
           <button
-            class="tu-btn tu-btn-fantasma ag-paso"
+            class="tu-btn tu-btn-secundario ag-paso"
             :aria-label="
               vista === 'profesionales'
                 ? $t('agendaVisual.diaAnterior')
@@ -2067,11 +2067,11 @@ onMounted(async () => {
           >
             <IconoNav nombre="chevron" :tam="18" class="rotate-180" />
           </button>
-          <button class="tu-btn tu-btn-fantasma ag-hoy" @click="irHoy">
+          <button class="tu-btn tu-btn-secundario ag-hoy" @click="irHoy">
             {{ $t("agenda.hoy") }}
           </button>
           <button
-            class="tu-btn tu-btn-fantasma ag-paso"
+            class="tu-btn tu-btn-secundario ag-paso"
             :aria-label="
               vista === 'profesionales'
                 ? $t('agendaVisual.diaSiguiente')
@@ -2119,7 +2119,7 @@ onMounted(async () => {
         <button
           v-if="hayFiltros"
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           data-prueba="mostrar-filtros"
           :aria-expanded="filtrosAbiertos"
           :style="
@@ -2728,7 +2728,7 @@ onMounted(async () => {
           >
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               @click="quitarFiltros"
             >
               {{ $t("tabla.restablecer") }}
@@ -3059,7 +3059,7 @@ onMounted(async () => {
                     roster.length > 0
                   "
                   :to="{ name: 'pase-lista', params: { id: detalle.id } }"
-                  class="tu-btn tu-btn-primario inline-flex items-center gap-2 text-sm"
+                  class="tu-btn tu-btn-primario inline-flex items-center gap-2"
                   data-prueba="pasar-lista"
                 >
                   <IconoNav nombre="lista" :tam="16" />
@@ -3230,7 +3230,7 @@ onMounted(async () => {
                       {{ $t("agenda.roster.confirmarTransfer") }}
                     </button>
                     <button
-                      class="tu-btn tu-btn-fantasma"
+                      class="tu-btn tu-btn-secundario"
                       type="button"
                       :disabled="accionando"
                       @click="
@@ -3364,7 +3364,7 @@ onMounted(async () => {
                   }}
                 </AvisoTono>
                 <button
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   type="submit"
                   :disabled="guardandoCanal"
                 >
@@ -3415,7 +3415,7 @@ onMounted(async () => {
                   />
                 </div>
                 <button
-                  class="tu-btn tu-btn-fantasma"
+                  class="tu-btn tu-btn-secundario"
                   type="submit"
                   :disabled="guardandoLugares"
                 >
@@ -3524,7 +3524,7 @@ onMounted(async () => {
               </div>
               <div class="col-span-2 flex justify-end">
                 <button
-                  class="tu-btn tu-btn-fantasma text-sm"
+                  class="tu-btn tu-btn-secundario"
                   type="submit"
                   :disabled="asignandoStaff || staffModel.usuarioId === ''"
                 >
@@ -3544,7 +3544,7 @@ onMounted(async () => {
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="accionando"
             :aria-expanded="cambiandoHorario"
             @click="
@@ -3563,7 +3563,7 @@ onMounted(async () => {
           <button
             v-if="detalle.serie_id && detalle.fecha_serie"
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             :disabled="accionando"
             :aria-expanded="cambiandoSerie"
             @click="
@@ -3576,7 +3576,7 @@ onMounted(async () => {
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             style="color: var(--error)"
             :disabled="accionando"
             :aria-expanded="cancelandoSesion"
@@ -3838,7 +3838,7 @@ onMounted(async () => {
           </ul>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma mt-2 text-sm"
+            class="tu-btn tu-btn-secundario mt-2"
             @click="agregarHorario"
           >
             {{ $t("nuevaClase.agregarDia") }}
@@ -3884,7 +3884,7 @@ onMounted(async () => {
       <template v-if="ofertas.length > 0 && sucursales.length > 0" #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="creando"
           @click="cerrarNuevaClase"
         >

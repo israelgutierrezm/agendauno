@@ -112,7 +112,11 @@ onMounted(cargar);
     </p>
     <div v-else-if="cargaError" class="mt-4 text-sm" role="alert">
       <p style="color: var(--error)">{{ cargaError }}</p>
-      <button type="button" class="tu-btn tu-btn-fantasma mt-3" @click="cargar">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario mt-3"
+        @click="cargar"
+      >
         {{ $t("comun.reintentar") }}
       </button>
     </div>

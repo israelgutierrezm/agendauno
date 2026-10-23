@@ -269,7 +269,7 @@ onMounted(cargar);
             <input class="tu-input" :value="enlaces[clave]" readonly />
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma shrink-0"
+              class="tu-btn tu-btn-secundario shrink-0"
               @click="copiar(clave)"
             >
               {{

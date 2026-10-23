@@ -248,7 +248,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           :disabled="cargando"
           data-prueba="reintentar-resenas"
           @click="cargar"
@@ -325,7 +325,7 @@ onMounted(cargar);
         >
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="quitarFiltros"
           >
             {{ $t("tabla.restablecer") }}

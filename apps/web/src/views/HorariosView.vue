@@ -549,7 +549,7 @@ onMounted(cargarReferencias);
       }}</span>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         @click="cargarReferencias"
       >
         {{ $t("comun.reintentar") }}
@@ -596,7 +596,7 @@ onMounted(cargarReferencias);
           <button
             v-if="puedeGestionar && otrasPersonas.length > 0"
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="
               copiando = true;
               copiarDe = '';
@@ -608,7 +608,7 @@ onMounted(cargarReferencias);
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="irABloqueos"
           >
             <IconoNav nombre="ausente" :tam="16" />
@@ -653,7 +653,7 @@ onMounted(cargarReferencias);
           </p>
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma mt-3"
+            class="tu-btn tu-btn-secundario mt-3"
             @click="cargarHorario"
           >
             {{ $t("comun.reintentar") }}
@@ -891,7 +891,7 @@ onMounted(cargarReferencias);
                   }}
                 </button>
                 <button
-                  class="tu-btn tu-btn-fantasma w-full"
+                  class="tu-btn tu-btn-secundario w-full"
                   type="button"
                   :disabled="guardando || !sinGuardar"
                   @click="restablecer"
@@ -973,7 +973,7 @@ onMounted(cargarReferencias);
               />
             </div>
             <button
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               type="submit"
               :disabled="previewCargando || preview.fecha === ''"
             >
@@ -1146,7 +1146,7 @@ onMounted(cargarReferencias);
         <div class="flex justify-end gap-2 pt-1">
           <button
             type="button"
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             @click="copiando = false"
           >
             {{ $t("comun.cancelar") }}

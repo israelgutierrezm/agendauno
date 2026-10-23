@@ -274,19 +274,34 @@
     box-shadow: var(--sombra-tarjeta);
   }
 
-  /* Botones: forma píldora (Apple). */
+  /*
+   * Botones: un solo contrato (misma altura, letra, foco, deshabilitado y carga).
+   * Cinco variantes y ninguna más:
+   * - `tu-btn-primario`: guardar, crear, confirmar o cobrar. Una por zona.
+   * - `tu-btn-secundario` (con borde): editar, configurar, vista previa, dividir el
+   *   pago y las demás acciones relevantes; también «Cancelar» de un formulario.
+   * - `tu-btn-discreto` (sin borde): lo auxiliar (reintentar, limpiar, omitir).
+   * - `tu-btn-peligro`: eliminar, cancelar una reserva, revocar, dar de baja,
+   *   desconectar, quitar algo guardado. Su confirmación final en el diálogo va con
+   *   `tu-btn-solido tu-tono-peligro`.
+   * - `tu-enlace`: solo para ir a otra pantalla o abrir información.
+   * `tu-btn-chico` para filas, listas y avisos. Sin `text-sm`, `px-*` ni `py-*` encima.
+   * Guardando: `:disabled="guardando" :aria-busy="guardando || undefined"`.
+   */
   .tu-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
+    min-height: 2.5rem;
     border-radius: var(--radio-boton);
     border: 1px solid transparent;
-    padding: 0.55rem 1.1rem;
+    padding: 0.5rem 1rem;
     font-weight: 500;
-    font-size: 0.94rem;
-    line-height: 1.2;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
     letter-spacing: -0.01em;
+    white-space: nowrap;
     cursor: pointer;
     transition:
       background-color 0.15s ease,
@@ -294,12 +309,34 @@
       opacity 0.15s ease,
       transform 0.05s ease;
   }
-  .tu-btn:active {
+  .tu-btn:active:not(:disabled) {
     transform: translateY(0.5px);
   }
-  .tu-btn:disabled {
+  .tu-btn:disabled,
+  .tu-btn[aria-disabled="true"] {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .tu-btn[aria-busy="true"] {
+    cursor: progress;
+  }
+  /* Guardando: un aro que gira antes del texto («Guardando…»). */
+  .tu-btn[aria-busy="true"]::before {
+    content: "";
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    background: none;
+    mask: none;
+    animation: tu-girar 0.7s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tu-btn[aria-busy="true"]::before {
+      animation: none;
+    }
   }
   .tu-btn-primario {
     background: var(--primario);
@@ -308,13 +345,63 @@
   .tu-btn-primario:hover:not(:disabled) {
     background: var(--primario-fuerte);
   }
-  .tu-btn-fantasma {
+  .tu-btn-secundario {
     background: transparent;
     color: var(--texto);
     border-color: var(--borde);
   }
-  .tu-btn-fantasma:hover:not(:disabled) {
+  .tu-btn-secundario:hover:not(:disabled) {
     background: var(--superficie-2);
+  }
+  .tu-btn-discreto {
+    background: transparent;
+    color: var(--texto-suave);
+    padding-inline: 0.6rem;
+  }
+  .tu-btn-discreto:hover:not(:disabled) {
+    background: var(--superficie-2);
+    color: var(--texto);
+  }
+  /* `tu-btn-peligro` usa el tono peligro: está en estilos/tonos.css. */
+  .tu-btn-chico {
+    min-height: 2rem;
+    gap: 0.3rem;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.8rem;
+    line-height: 1rem;
+    border-radius: 0.45rem;
+  }
+  /* Solo con ícono (cerrar, subir, bajar): siempre con su aria-label. */
+  .tu-icono-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    height: 2.25rem;
+    width: 2.25rem;
+    border-radius: 980px;
+    color: var(--texto-suave);
+    cursor: pointer;
+  }
+  .tu-icono-btn:hover:not(:disabled) {
+    background: var(--superficie-2);
+    color: var(--texto);
+  }
+  .tu-icono-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  /* Un mismo foco para todo lo que se acciona. */
+  :is(
+    .tu-btn,
+    .tu-enlace,
+    .tu-icono-btn,
+    .tu-pestanas > a,
+    .tu-pestanas > button,
+    .tu-segmentado > button
+  ):focus-visible {
+    outline: 2px solid var(--acento);
+    outline-offset: 2px;
   }
 
   /* Campos: redondeo generoso, anillo de foco azul. */
@@ -589,6 +676,18 @@
   }
   .tu-enlace:hover {
     text-decoration: underline;
+  }
+  /* Un botón con aspecto de enlace solo abre información o va dentro de una frase. */
+  button.tu-enlace {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .tu-enlace:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    text-decoration: none;
   }
 
   /* Control segmentado (Semana | Día…): riel gris y la opción activa en blanco. */
@@ -933,4 +1032,137 @@
 .pagina-publica-texto ul {
   padding-left: 1.2rem;
   list-style: disc;
+}
+
+@keyframes tu-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * Listados: tabla en escritorio, ficha en el teléfono. El contenedor lleva
+ * `tu-tabla-adaptable`; cada celda de datos, `data-etiqueta` con el texto de su
+ * columna (la primera es el título de la ficha); la de acciones, `tu-celda-acciones`
+ * (siempre visible, sin etiqueta). Fuera de @layer para ganarle a `hidden sm:table-cell`:
+ * en la ficha se ve todo lo que importa. Las tablas comparativas no lo llevan.
+ */
+.tu-celda-acciones {
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 639px) {
+  .tu-tabla-adaptable .tu-tabla,
+  .tu-tabla-adaptable .tu-tabla tbody,
+  .tu-tabla-adaptable .tu-tabla tbody tr,
+  .tu-tabla-adaptable .tu-tabla tfoot,
+  .tu-tabla-adaptable .tu-tabla tfoot tr {
+    display: block;
+    width: 100%;
+  }
+  /* El encabezado sigue disponible para lectores de pantalla. */
+  .tu-tabla-adaptable .tu-tabla thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .tu-tabla-adaptable .tu-tabla tbody tr {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--borde);
+  }
+  .tu-tabla-adaptable .tu-tabla tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .tu-tabla-adaptable .tu-tabla td[data-etiqueta] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+    align-items: start;
+    gap: 0.75rem;
+    padding: 0.45rem 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .tu-tabla-adaptable .tu-tabla td[data-etiqueta]::before {
+    content: attr(data-etiqueta);
+    color: var(--texto-suave);
+    font-size: 0.8rem;
+  }
+  .tu-tabla-adaptable .tu-tabla td[data-etiqueta]:first-child {
+    display: block;
+    padding-bottom: 0.65rem;
+    font-weight: 600;
+  }
+  .tu-tabla-adaptable .tu-tabla td[data-etiqueta]:first-child::before {
+    display: none;
+  }
+  .tu-tabla-adaptable .tu-tabla td.tu-celda-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-start;
+    padding: 0.6rem 0 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+  }
+  .tu-tabla-adaptable .tu-tabla td.tu-celda-detalle {
+    display: block;
+    padding: 0;
+  }
+  .tu-tabla-adaptable .tu-tabla td.tu-solo-tabla {
+    display: none;
+  }
+  .tu-tabla-adaptable .tu-tabla tfoot td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 0;
+  }
+}
+
+/*
+ * Formularios en página (los de diálogo usan el pie del ModalDialogo o el PanelLateral):
+ * Guardar y Cancelar siempre a la vista, al fondo de la pantalla.
+ */
+.tu-pie-acciones {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--borde);
+  background: var(--superficie);
+}
+
+/* Opciones avanzadas de un formulario: plegadas, con cuántas hay activas. */
+.tu-avanzado {
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+}
+.tu-avanzado > summary {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tu-avanzado[open] > summary {
+  border-bottom: 1px solid var(--borde);
+}
+.tu-avanzado > :not(summary) {
+  margin: 1rem;
+}
+
+/* Título de una sección dentro de la pantalla (el único h1 es el del encabezado). */
+.tu-titulo-seccion {
+  font-size: 1.125rem;
+  font-weight: 500;
 }

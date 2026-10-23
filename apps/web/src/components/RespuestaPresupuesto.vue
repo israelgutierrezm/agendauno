@@ -158,7 +158,7 @@ function agendar(servicio: string): string {
       </button>
       <button
         type="button"
-        class="tu-btn tu-btn-contorno"
+        class="tu-btn tu-btn-secundario"
         :disabled="ocupado !== null"
         data-prueba="presupuesto-rechazar"
         @click="rechazando = true"
@@ -180,7 +180,7 @@ function agendar(servicio: string): string {
       <div class="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro"
+          class="tu-btn tu-btn-peligro"
           :disabled="ocupado !== null"
           data-prueba="presupuesto-confirmar-rechazo"
           @click="rechazar"
@@ -189,7 +189,7 @@ function agendar(servicio: string): string {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado !== null"
           @click="rechazando = false"
         >
@@ -238,7 +238,7 @@ function agendar(servicio: string): string {
           v-for="s in presupuesto.servicios"
           :key="s.id"
           :href="agendar(s.id)"
-          class="tu-btn tu-btn-contorno tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           data-prueba="presupuesto-agendar"
         >
           {{ $t("presupuestos.enLinea.agendar", { servicio: s.nombre }) }}

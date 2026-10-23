@@ -102,7 +102,7 @@ async function cambiar(): Promise<void> {
         {{ resumen.texto }}
       </span>
       <button
-        class="tu-btn tu-btn-fantasma text-sm"
+        class="tu-btn tu-btn-secundario"
         type="button"
         data-prueba="cambiar"
         :disabled="guardando"

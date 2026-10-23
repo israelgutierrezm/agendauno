@@ -352,7 +352,7 @@ defineExpose({ cargar });
     >
       <span class="flex flex-wrap items-center justify-between gap-3">
         {{ $t("nominaVisual.cortes.errorCarga") }}
-        <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
           {{ $t("comun.reintentar") }}
         </button>
       </span>
@@ -419,7 +419,7 @@ defineExpose({ cargar });
             <td class="text-right">
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 :data-prueba="`ver-corte-${c.id}`"
                 @click="verCorte(c.id)"
               >
@@ -566,7 +566,7 @@ defineExpose({ cargar });
                   d.diferencia_minor !== 0
                 "
                 type="button"
-                class="tu-btn tu-btn-fantasma"
+                class="tu-btn tu-btn-secundario"
                 @click="usarDiferencia(d)"
               >
                 {{ $t("nominaVisual.cortes.usarDiferencia") }}
@@ -619,7 +619,7 @@ defineExpose({ cargar });
           <div class="flex flex-wrap justify-between gap-2">
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
+              class="tu-btn tu-btn-secundario"
               data-prueba="reabrir-corte"
               @click="reabrir"
             >

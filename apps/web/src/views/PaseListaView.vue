@@ -630,7 +630,7 @@ watch(
       </p>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-3"
+        class="tu-btn tu-btn-secundario mt-3"
         @click="cargar()"
       >
         {{ $t("comun.reintentar") }}
@@ -725,7 +725,7 @@ watch(
         <button
           v-if="puedeGestionar && !agregando"
           type="button"
-          class="tu-btn tu-btn-fantasma pl-agregar"
+          class="tu-btn tu-btn-secundario pl-agregar"
           data-prueba="abrir-agregar"
           @click="agregando = true"
         >
@@ -786,7 +786,7 @@ watch(
             <!-- Los tres iguales; el elegido se resalta (aria-pressed). -->
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma pl-boton"
+              class="tu-btn tu-btn-secundario pl-boton"
               :aria-pressed="r.asistencia === 'presente' && !r.retardo"
               :aria-label="`${$t('paseLista.acciones.llego')}: ${r.persona ?? ''}`"
               :disabled="!abierta || marcando.has(r.id)"
@@ -798,7 +798,7 @@ watch(
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma pl-boton"
+              class="tu-btn tu-btn-secundario pl-boton"
               :aria-pressed="r.asistencia === 'presente' && !!r.retardo"
               :aria-label="`${$t('paseLista.acciones.tarde')}: ${r.persona ?? ''}`"
               :disabled="!abierta || marcando.has(r.id)"
@@ -810,7 +810,7 @@ watch(
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma pl-boton"
+              class="tu-btn tu-btn-secundario pl-boton"
               :aria-pressed="r.asistencia === 'ausente'"
               :aria-label="`${$t('paseLista.acciones.noVino')}: ${r.persona ?? ''}`"
               :disabled="!abierta || marcando.has(r.id)"
@@ -849,7 +849,7 @@ watch(
             <button
               v-if="r.estado === 'ofrecida' && puedeGestionar"
               type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               :disabled="ocupado"
               @click="aceptar(r)"
             >
@@ -910,7 +910,7 @@ watch(
             <template v-if="puedeMarcar">
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 :disabled="ocupado || i.estado === 'asistio'"
                 @click="marcarInvitado(i, true)"
               >
@@ -918,7 +918,7 @@ watch(
               </button>
               <button
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 :disabled="ocupado || i.estado === 'no_asistio'"
                 @click="marcarInvitado(i, false)"
               >
@@ -949,7 +949,7 @@ watch(
           <button
             v-if="fitpassActivo && sesion.puede('reservas.gestionar')"
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             data-prueba="capturar-fitpass"
             @click="capturandoFitpass = !capturandoFitpass"
           >
@@ -984,7 +984,7 @@ watch(
           </ul>
           <button
             type="submit"
-            class="tu-btn tu-btn-primario text-sm"
+            class="tu-btn tu-btn-primario"
             :disabled="ocupado || textoFitpass.trim() === ''"
           >
             {{ $t("paseLista.plataforma.guardarFitpass") }}
@@ -1009,7 +1009,7 @@ watch(
               <button
                 v-if="l.puede_marcar"
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 :disabled="ocupado"
                 @click="llegoDePlataforma(l)"
               >
@@ -1021,7 +1021,7 @@ watch(
               <button
                 v-if="sesion.puede('reservas.gestionar')"
                 type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
+                class="tu-btn tu-btn-secundario"
                 :disabled="ocupado"
                 @click="cancelarDePlataforma(l)"
               >
@@ -1067,7 +1067,7 @@ watch(
             </span>
             <RouterLink
               :to="aMostrador(grupo)"
-              class="tu-btn tu-btn-fantasma text-sm"
+              class="tu-btn tu-btn-secundario"
               data-prueba="cobrar-apartados"
             >
               {{ $t("apartados.lista.cobrar") }}
@@ -1089,7 +1089,7 @@ watch(
           <button
             v-if="puedeGestionar && (resumen.libres ?? 0) > 0"
             type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             :disabled="ocupado"
             @click="promover"
           >

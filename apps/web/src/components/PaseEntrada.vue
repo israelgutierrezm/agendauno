@@ -85,7 +85,7 @@ onBeforeUnmount(() => clearInterval(temporizador));
       </AvisoTono>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-4 w-full"
+        class="tu-btn tu-btn-secundario mt-4 w-full"
         @click="ocultar"
       >
         {{ $t("paseEntrada.ocultar") }}

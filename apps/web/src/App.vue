@@ -823,22 +823,6 @@ a.tu-miga:hover {
   border-radius: 999px;
 }
 
-/* Botón de icono del encabezado. */
-.tu-icono-btn {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  height: 2.25rem;
-  width: 2.25rem;
-  border-radius: 980px;
-  color: var(--texto-suave);
-  cursor: pointer;
-}
-.tu-icono-btn:hover {
-  background: var(--superficie-2);
-  color: var(--texto);
-}
 /* En el teléfono la barra solo lleva el menú y la sucursal activa: el perfil, el rol,
    la apariencia y la pantalla completa van al pie del menú lateral. */
 @media (max-width: 639.98px) {

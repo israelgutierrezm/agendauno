@@ -114,6 +114,8 @@ export function useEditorFormulario(opciones: {
 export interface EstadoEditor {
   guardando: boolean;
   sucio: boolean;
+  // Si se puede guardar (el pie del contenedor desactiva «Guardar»); sin él, sí.
+  valido?: boolean;
 }
 
 /**
@@ -127,6 +129,7 @@ export function useContenedorEditor(abierto: Ref<boolean>) {
   const estado = ref<EstadoEditor>({ guardando: false, sucio: false });
   useCambiosPendientes(() => abierto.value && estado.value.sucio);
   const ocupado = computed(() => estado.value.guardando);
+  const valido = computed(() => estado.value.valido !== false);
 
   function alEstado(e: EstadoEditor): void {
     estado.value = e;
@@ -152,7 +155,7 @@ export function useContenedorEditor(abierto: Ref<boolean>) {
     cerrado();
   }
 
-  return { ocupado, alEstado, cerrar, cerrado };
+  return { ocupado, valido, alEstado, cerrar, cerrado };
 }
 
 /**

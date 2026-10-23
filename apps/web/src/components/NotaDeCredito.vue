@@ -237,7 +237,7 @@ async function timbrar(): Promise<void> {
     <template #pie>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-secundario"
         :disabled="timbrando"
         @click="emit('cerrar')"
       >

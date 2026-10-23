@@ -742,7 +742,7 @@ onMounted(cargar);
       <template v-if="errorCarga" #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -1430,7 +1430,7 @@ onMounted(cargar);
       <template #pie>
         <button
           v-if="editando"
-          class="tu-btn tu-btn-contorno tu-tono-peligro mr-auto"
+          class="tu-btn tu-btn-peligro mr-auto"
           type="button"
           data-prueba="archivar"
           :disabled="guardando || archivando"
@@ -1439,7 +1439,7 @@ onMounted(cargar);
           {{ $t("listadosVisual.catalogo.archivar") }}
         </button>
         <button
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           type="button"
           :disabled="guardando || archivando"
           @click="cerrar"
@@ -1585,7 +1585,7 @@ onMounted(cargar);
       </div>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-3"
+        class="tu-btn tu-btn-secundario mt-3"
         @click="agregarFila"
       >
         <IconoNav nombre="mas" :tam="16" />
@@ -1593,7 +1593,7 @@ onMounted(cargar);
       </button>
       <template #pie>
         <button
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           type="button"
           :disabled="dandoAltaGuardando"
           @click="cerrarAlta"

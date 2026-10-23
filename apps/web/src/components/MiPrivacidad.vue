@@ -163,7 +163,7 @@ onMounted(cargar);
       </p>
       <button
         type="button"
-        class="tu-btn tu-btn-fantasma mt-3 text-sm"
+        class="tu-btn tu-btn-secundario mt-3"
         @click="cargar"
       >
         {{ $t("miPrivacidad.reintentar") }}
@@ -225,7 +225,7 @@ onMounted(cargar);
       <div class="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma text-sm"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado"
           @click="pedirContrasena('descargar')"
         >
@@ -234,7 +234,7 @@ onMounted(cargar);
         <button
           v-if="!datos.baja || datos.baja.estado === 'rechazada'"
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
+          class="tu-btn tu-btn-peligro"
           @click="pidiendoBaja = !pidiendoBaja"
         >
           {{ $t("miPrivacidad.baja") }}
@@ -277,11 +277,7 @@ onMounted(cargar);
             maxlength="500"
           />
         </div>
-        <button
-          type="submit"
-          class="tu-btn tu-btn-contorno tu-tono-peligro text-sm"
-          :disabled="ocupado"
-        >
+        <button type="submit" class="tu-btn tu-btn-peligro" :disabled="ocupado">
           {{ $t("miPrivacidad.confirmarBaja") }}
         </button>
       </form>
@@ -329,7 +325,7 @@ onMounted(cargar);
       <template #pie>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-secundario"
           :disabled="ocupado"
           @click="cerrarConfirmacion"
         >
@@ -339,11 +335,7 @@ onMounted(cargar);
           type="submit"
           form="mp-confirmar"
           class="tu-btn"
-          :class="
-            confirmando === 'baja'
-              ? 'tu-btn-contorno tu-tono-peligro'
-              : 'tu-btn-primario'
-          "
+          :class="confirmando === 'baja' ? 'tu-btn-peligro' : 'tu-btn-primario'"
           :disabled="ocupado || contrasena === ''"
         >
           {{

@@ -559,7 +559,7 @@ onMounted(cargar);
           class="flex items-center justify-end"
         >
           <button
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="reactivandoId === (fila as UsuarioRow).id"
             @click="reactivar(fila as UsuarioRow)"
@@ -570,7 +570,7 @@ onMounted(cargar);
         <div v-else class="flex items-center justify-end gap-2">
           <button
             v-if="!(fila as UsuarioRow).activo"
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="reenviandoId === (fila as UsuarioRow).id"
             @click="reenviar(fila as UsuarioRow)"
@@ -584,7 +584,7 @@ onMounted(cargar);
             }}
           </button>
           <button
-            class="tu-btn tu-btn-fantasma text-sm"
+            class="tu-btn tu-btn-secundario"
             type="button"
             @click="abrirEdicion(fila as UsuarioRow)"
           >
@@ -662,7 +662,7 @@ onMounted(cargar);
               <span class="tu-badge ml-2">{{ nombreRol(a.rol) }}</span>
             </span>
             <button
-              class="tu-btn tu-btn-contorno tu-tono-peligro tu-btn-chico"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
               type="button"
               data-prueba="quitar-sede"
               :disabled="
@@ -735,7 +735,7 @@ onMounted(cargar);
             </select>
           </div>
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardandoSede || nuevaSede.sucursalId === ''"
             @click="asignarSede"
@@ -778,7 +778,7 @@ onMounted(cargar);
         />
         <button
           type="button"
-          class="tu-btn tu-btn-contorno tu-tono-peligro"
+          class="tu-btn tu-btn-peligro"
           :disabled="dandoDeBaja"
           @click="darDeBaja"
         >
@@ -798,7 +798,7 @@ onMounted(cargar);
       <template #pie>
         <div class="flex justify-end gap-2">
           <button
-            class="tu-btn tu-btn-fantasma"
+            class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardando"
             @click="cerrarEditor"
