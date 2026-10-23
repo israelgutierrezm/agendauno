@@ -60,7 +60,9 @@ describe("una campaña en curso se controla (B08)", () => {
 
     const estado = w.get('[data-prueba="estado-difusion"]');
     expect(estado.text()).toContain("Enviando · faltan 30");
-    await estado
+    // Los controles van en su propia celda (en el teléfono, a la vista).
+    await w
+      .get('[data-prueba="acciones-difusion"]')
       .findAll("button")
       .find((b) => b.text() === "Pausar")!
       .trigger("click");
@@ -75,7 +77,7 @@ describe("una campaña en curso se controla (B08)", () => {
     );
     expect(
       w
-        .get('[data-prueba="estado-difusion"]')
+        .get('[data-prueba="acciones-difusion"]')
         .findAll("button")
         .some((b) => b.text() === "Reanudar"),
     ).toBe(true);

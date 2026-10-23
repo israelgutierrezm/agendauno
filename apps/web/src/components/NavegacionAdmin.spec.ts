@@ -188,20 +188,30 @@ describe("pestañas del área", () => {
 
     // Recepción y Lugares disponibles: dos vistas.
     expect(w.find('[data-prueba="pestanas-area"]').exists()).toBe(true);
-    // Reportes en un negocio de citas: una sola vista (Plataformas es de clases).
+    // Campañas: una sola vista.
     entrar(["facturacion.ver"], "citas");
-    const otra = await montar(PestanasArea, { name: "reportes" });
+    const otra = await montar(PestanasArea, { name: "campanas" });
     expect(otra.w.find('[data-prueba="pestanas-area"]').exists()).toBe(false);
-    // En uno de clases que recibe visitantes de Wellhub o TotalPass suma Plataformas
-    // (ADR 0148); sin ellos, no (ADR 0162).
+    // Reportes: cada reporte es una vista del área (Resumen, Ingresos, Ocupación,
+    // Alumnos, Embudo y Equipo y sucursales). En un negocio de clases que recibe
+    // visitantes de Wellhub o TotalPass suma Plataformas (ADR 0148); sin ellos, no
+    // (ADR 0162).
     entrar(["facturacion.ver"]);
     const sinPlataformas = await montar(PestanasArea, { name: "reportes" });
     expect(
-      sinPlataformas.w.find('[data-prueba="pestanas-area"]').exists(),
-    ).toBe(false);
+      sinPlataformas.w.findAll('[data-prueba="pestanas-area"] a'),
+    ).toHaveLength(6);
     entrar(["facturacion.ver"], "clases", { plataformas_bienestar: true });
-    const clases = await montar(PestanasArea, { name: "reportes" });
-    expect(clases.w.findAll('[data-prueba="pestanas-area"] a')).toHaveLength(2);
+    const clases = await montar(PestanasArea, {
+      name: "reportes",
+      query: { vista: "ingresos" },
+    });
+    expect(clases.w.findAll('[data-prueba="pestanas-area"] a')).toHaveLength(7);
+    expect(
+      clases.w
+        .get('[data-prueba="pestanas-area"] [aria-current="page"]')
+        .attributes("href"),
+    ).toBe("/reportes?vista=ingresos");
   });
 });
 

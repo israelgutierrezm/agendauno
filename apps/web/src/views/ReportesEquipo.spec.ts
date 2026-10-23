@@ -1,5 +1,5 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import esMX from "@/i18n/locales/es-MX";
@@ -21,8 +21,12 @@ const sesion = vi.hoisted(() => ({
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));
-// Desde Equipo › Rendimiento llega con `?vista=equipo`.
-const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
+// Cada reporte es una vista del menú (`?vista=ocupacion`, `?vista=sucursales`…); desde
+// Equipo › Rendimiento llega con `?vista=equipo`.
+const ruta = await vi.hoisted(async () => {
+  const { reactive } = await import("vue");
+  return reactive({ query: {} as Record<string, string> });
+});
 vi.mock("vue-router", async (original) => ({
   ...(await original<typeof import("vue-router")>()),
   useRoute: () => ruta,
@@ -151,17 +155,15 @@ function montar() {
   });
 }
 
-async function irA(
-  w: ReturnType<typeof montar>,
-  pestana: string,
-): Promise<void> {
-  await w
-    .findAll(".tu-pestanas button")
-    .find((b) => b.text() === pestana)!
-    .trigger("click");
-  // Cada pestaña pide lo suyo al abrirse.
+// Abre otra vista del área, como la pestaña del menú.
+async function irA(vista: string): Promise<void> {
+  ruta.query = { vista };
+  // Cada vista pide lo suyo al abrirse.
   await flushPromises();
 }
+
+// Una pantalla de otra prueba no debe reaccionar al cambiar la vista.
+enableAutoUnmount(afterEach);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -174,7 +176,11 @@ describe("agenda del equipo y ocupación por agenda", () => {
   it("lista a cada quien con su ocupación, citas, inasistencias, valor, pago y margen", async () => {
     const w = montar();
     await flushPromises();
-    await irA(w, "Equipo y sucursales");
+    await irA("sucursales");
+
+    expect(w.get("encabezado-seccion-stub").attributes("titulo")).toBe(
+      "Equipo y sucursales",
+    );
 
     expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/reportes/equipo", {
       params: expect.objectContaining({ desde: expect.any(String) }),
@@ -192,12 +198,14 @@ describe("agenda del equipo y ocupación por agenda", () => {
     expect(filas[1].text()).toContain("Sin horario");
   });
 
-  it("desde Equipo › Rendimiento solo muestra el reporte del equipo: sin pestañas ni sucursales", async () => {
+  it("desde Equipo › Rendimiento solo muestra el reporte del equipo, con su título y sin sucursales", async () => {
     ruta.query = { vista: "equipo" };
     const w = montar();
     await flushPromises();
 
-    expect(w.find(".tu-pestanas").exists()).toBe(false);
+    expect(w.get("encabezado-seccion-stub").attributes("titulo")).toBe(
+      "Rendimiento del equipo",
+    );
     expect(w.findAll('[data-prueba="profesional"]')).toHaveLength(2);
     expect(api.get).toHaveBeenCalledWith(
       "/api/v1/app/demo/reportes/equipo",
@@ -216,7 +224,7 @@ describe("agenda del equipo y ocupación por agenda", () => {
     sesion.conEquipo = false;
     const w = montar();
     await flushPromises();
-    await irA(w, "Tu agenda y sucursales");
+    await irA("sucursales");
 
     expect(w.text()).toContain("Tu agenda");
     const carlos = w.findAll('[data-prueba="profesional"]')[0].text();
@@ -233,7 +241,7 @@ describe("agenda del equipo y ocupación por agenda", () => {
     expect(w.text()).toContain("67%");
     expect(w.text()).not.toContain("100%");
 
-    await irA(w, "Ocupación");
+    await irA("ocupacion");
     expect(w.get('[data-prueba="resumen-agenda"]').text()).toContain("67%");
     expect(w.get('[data-prueba="celda-1-10"]').text()).toBe("50%");
     // La franja con horario y sin nada agendado también aparece.
@@ -244,7 +252,7 @@ describe("agenda del equipo y ocupación por agenda", () => {
     sesion.modalidad = "clases";
     const w = montar();
     await flushPromises();
-    await irA(w, "Ocupación");
+    await irA("ocupacion");
 
     expect(w.get('[data-prueba="celda-1-10"]').text()).toBe("100%");
     expect(w.find('[data-prueba="celda-2-9"]').exists()).toBe(false);

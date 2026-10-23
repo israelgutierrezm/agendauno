@@ -106,7 +106,7 @@ export default {
     pestana: "Medición",
     titulo: "Medición del SaaS",
     descripcion:
-      "Los destinos de GA4 y Meta de cada producto, para medir cómo llegan los negocios que contratan. Son distintos de los que configura cada negocio para sus clientes.",
+      "Los destinos de GA4 y Meta de cada producto, para medir cómo llegan los negocios que contratan. Son distintos de los que configura cada negocio para su propia página.",
     embudo:
       "Se envía: negocio creado, prueba iniciada, activación operativa (su primera operación real) y primera suscripción pagada. Una prueba gratuita no es una venta.",
   },
@@ -114,7 +114,7 @@ export default {
     pestana: "Medición",
     titulo: "Medición de tus campañas",
     descripcion:
-      "Conecta tu propia cuenta de Google Analytics 4 y tu píxel de Meta para medir cómo llegan tus alumnos o clientes. Son tuyas: distintas de las de la plataforma y de las de otros negocios.",
+      "Conecta tu propia cuenta de Google Analytics 4 y tu píxel de Meta para medir cómo llegan tus alumnos. Son tuyas: distintas de las de la plataforma y de las de otros negocios.",
     embudo:
       "Se envía: visita a tu página (GA4), solicitud, cuenta activada, compra pagada, devolución y primera reserva confirmada, solo con el permiso de cada persona. Nunca nombres, correos, teléfonos ni respuestas de formularios.",
     extras: "Eventos adicionales",

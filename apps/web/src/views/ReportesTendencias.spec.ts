@@ -1,5 +1,5 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import esMX from "@/i18n/locales/es-MX";
@@ -16,6 +16,15 @@ const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
+}));
+// Cada reporte es una vista del menú (`?vista=ingresos`).
+const ruta = await vi.hoisted(async () => {
+  const { reactive } = await import("vue");
+  return reactive({ query: {} as Record<string, string> });
+});
+vi.mock("vue-router", async (original) => ({
+  ...(await original<typeof import("vue-router")>()),
+  useRoute: () => ruta,
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
@@ -59,6 +68,13 @@ const tendencias = {
   ],
 };
 
+// Una pantalla de otra prueba no debe reaccionar al cambiar la vista.
+enableAutoUnmount(afterEach);
+
+beforeEach(() => {
+  ruta.query = {};
+});
+
 describe("tendencias del dinero", () => {
   it("muestra cobrado neto o vendido, cada uno con su fecha, y otras monedas aparte", async () => {
     api.get.mockImplementation((url: string) =>
@@ -83,10 +99,8 @@ describe("tendencias del dinero", () => {
       },
     });
     await flushPromises();
-    await w
-      .findAll(".tu-pestanas button")
-      .find((b) => b.text() === "Ingresos")!
-      .trigger("click");
+    // Reportes › Ingresos, la pestaña del menú.
+    ruta.query = { vista: "ingresos" };
     await flushPromises();
 
     const totales = w.get('[data-prueba="tendencias-totales"]').text();
@@ -150,10 +164,8 @@ describe("tendencias del dinero", () => {
       },
     });
     await flushPromises();
-    await w
-      .findAll(".tu-pestanas button")
-      .find((b) => b.text() === "Ingresos")!
-      .trigger("click");
+    // Reportes › Ingresos, la pestaña del menú.
+    ruta.query = { vista: "ingresos" };
     await flushPromises();
 
     expect(w.text()).not.toContain("Sin ventas ni cobros en el periodo.");
@@ -175,7 +187,7 @@ describe("tendencias del dinero", () => {
         },
       }),
     );
-    const w = mount(ReportesView, {
+    mount(ReportesView, {
       global: {
         plugins: [
           createI18n({
@@ -198,10 +210,8 @@ describe("tendencias del dinero", () => {
         .map((url) => url.split("/reportes/")[1]);
     expect(pedidos()).toEqual(["negocio"]);
 
-    await w
-      .findAll(".tu-pestanas button")
-      .find((b) => b.text() === "Ingresos")!
-      .trigger("click");
+    // Reportes › Ingresos, la pestaña del menú.
+    ruta.query = { vista: "ingresos" };
     await flushPromises();
     expect(pedidos()).toEqual(["negocio", "tendencias", "rentabilidad"]);
   });
@@ -231,24 +241,22 @@ describe("tendencias del dinero", () => {
         stubs: { EncabezadoSeccion: true },
       },
     });
-    const ir = async (nombre: string) => {
-      await w
-        .findAll(".tu-pestanas button")
-        .find((b) => b.text() === nombre)!
-        .trigger("click");
+    // Como la pestaña del menú: otra vista del área («» es el resumen).
+    const ir = async (vista: string) => {
+      ruta.query = vista === "" ? {} : { vista };
       await flushPromises();
     };
     await flushPromises();
 
-    await ir("Ingresos");
+    await ir("ingresos");
     expect(w.get('[data-prueba="error-reporte"]').text()).toContain(
       "No se pudo consultar este reporte",
     );
     // El error es de Ingresos: en Resumen no se queda.
-    await ir("Resumen");
+    await ir("");
     expect(w.find('[data-prueba="error-reporte"]').exists()).toBe(false);
 
-    await ir("Ingresos");
+    await ir("ingresos");
     falla = false;
     await w.get('[data-prueba="reintentar-reporte"]').trigger("click");
     await flushPromises();
@@ -296,10 +304,8 @@ describe("tendencias del dinero", () => {
       },
     });
     await flushPromises();
-    await w
-      .findAll(".tu-pestanas button")
-      .find((b) => b.text() === "Ingresos")!
-      .trigger("click");
+    // Reportes › Ingresos, la pestaña del menú.
+    ruta.query = { vista: "ingresos" };
     await flushPromises();
 
     const agrupar = w.get("select.tu-input");

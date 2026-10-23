@@ -7,8 +7,10 @@ import TarjetaOpenPay from "@/components/TarjetaOpenPay.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import type { FormularioOpenPay } from "@/lib/openpay";
 import { useRetornoPago } from "@/lib/retornoPago";
+import { situacionDeFecha } from "@/lib/vencimiento";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -87,6 +89,21 @@ function fecha(iso: string | null): string {
 }
 function marca(m: string | null): string {
   return m ? m.charAt(0).toUpperCase() + m.slice(1) : "";
+}
+// Cuándo se renueva y por cuánto; si la fecha ya pasó (con hoy del negocio), se dice
+// que venció y dónde pagarla, en vez de mostrarla como si fuera a venir.
+function renovacion(m: Membresia): string {
+  const datos = {
+    fecha: fecha(m.proxima_cobro_en),
+    monto: dinero(m.monto_minor, m.moneda),
+  };
+  const vencida =
+    m.proxima_cobro_en !== null &&
+    situacionDeFecha(m.proxima_cobro_en, hoyEnNegocio(sesion.zonaHoraria))
+      .situacion === "vencida";
+  return vencida
+    ? t("pagoAutomatico.vencio", datos)
+    : t("pagoAutomatico.renueva", datos);
 }
 
 async function cargar(): Promise<void> {
@@ -268,8 +285,9 @@ onMounted(async () => {
       </span>
       <button
         type="button"
-        class="tu-enlace"
+        class="tu-btn tu-btn-secundario"
         :disabled="accionando !== null"
+        :aria-busy="accionando === 'tarjeta' || undefined"
         @click="cambiarTarjeta"
       >
         {{ $t("pagoAutomatico.cambiarTarjeta") }}
@@ -294,16 +312,14 @@ onMounted(async () => {
             {{ $t("pagoAutomatico.para", { nombre: m.para.nombre }) }}
           </p>
           <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{
-              $t("pagoAutomatico.renueva", {
-                fecha: fecha(m.proxima_cobro_en),
-                monto: dinero(m.monto_minor, m.moneda),
-              })
-            }}
+            {{ renovacion(m) }}
             ·
-            <span v-if="m.automatico" class="tu-badge tu-badge-exito">{{
-              $t("pagoAutomatico.automatico")
-            }}</span>
+            <span
+              v-if="m.automatico"
+              class="tu-estado"
+              :style="{ '--tono': 'var(--exito)' }"
+              >{{ $t("pagoAutomatico.automatico") }}</span
+            >
             <span
               v-else-if="m.cancelando"
               class="tu-estado"
@@ -311,9 +327,12 @@ onMounted(async () => {
               :style="{ '--tono': 'var(--aviso)' }"
               >{{ $t("pagoAutomatico.cancelando") }}</span
             >
-            <span v-else-if="m.pendiente" class="tu-badge tu-badge-aviso">{{
-              $t("pagoAutomatico.porAutorizar")
-            }}</span>
+            <span
+              v-else-if="m.pendiente"
+              class="tu-estado"
+              :style="{ '--tono': 'var(--aviso)' }"
+              >{{ $t("pagoAutomatico.porAutorizar") }}</span
+            >
             <span v-else>{{ $t("pagoAutomatico.manual") }}</span>
             <template v-if="m.automatico && m.tarjeta && !tarjeta">
               ·
@@ -351,7 +370,7 @@ onMounted(async () => {
             </p>
             <button
               type="button"
-              class="tu-enlace mt-0.5"
+              class="tu-btn tu-btn-secundario tu-btn-chico mt-1"
               :disabled="accionando !== null"
               @click="autorizarPrecio(m)"
             >
@@ -378,8 +397,9 @@ onMounted(async () => {
         <button
           v-if="m.automatico"
           type="button"
-          class="tu-enlace"
+          class="tu-btn tu-btn-peligro"
           :disabled="accionando !== null"
+          :aria-busy="accionando === m.id || undefined"
           @click="quitar(m)"
         >
           {{ $t("pagoAutomatico.quitar") }}

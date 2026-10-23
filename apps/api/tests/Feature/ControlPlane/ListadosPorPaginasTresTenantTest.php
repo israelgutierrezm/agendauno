@@ -83,7 +83,7 @@ it('renovaciones y morosos van por páginas y sus indicadores cuentan todo', fun
     $this->getJson("/api/v1/app/{$e['slug']}/suscripciones?per_page=2", conBearer($e['bearer']))->assertOk()
         ->assertJsonCount(2, 'data')
         ->assertJsonPath('meta.ultima_pagina', 2)
-        ->assertJsonPath('meta.resumen', ['total' => 3, 'automaticos' => 0]);
+        ->assertJsonPath('meta.resumen', ['total' => 3, 'automaticos' => 0, 'proximas' => 3, 'vencidas' => 0, 'en_mora' => 0]);
     $this->getJson("/api/v1/app/{$e['slug']}/suscripciones?q=beto", conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.persona', fn (string $p): bool => str_starts_with($p, 'Beto'))
         ->assertJsonPath('meta.resumen.total', 3);

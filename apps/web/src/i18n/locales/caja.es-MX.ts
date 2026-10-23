@@ -4,6 +4,8 @@ export default {
   titulo: "Caja",
   pestanaCaja: "Caja",
   pestanaCierres: "Cierres",
+  // aria-label de las pestañas «Caja | Cierres».
+  pestanas: "Secciones de la caja",
   eligeSucursal: "Elige la sucursal de la caja",
   sucursal: "Sucursal",
   cargando: "Cargando la caja…",

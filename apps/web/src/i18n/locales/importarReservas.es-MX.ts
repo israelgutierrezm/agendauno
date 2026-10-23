@@ -2,6 +2,8 @@
 // ADR 0176): con el corte y la regla para no descontar créditos dos veces.
 export default {
   titulo: "Importar reservas",
+  subtitulo:
+    "Trae las reservas futuras que tus alumnos ya tenían en otro sistema.",
   ir: "Importar las reservas futuras",
   instrucciones:
     "Trae las clases que tus alumnos ya tenían reservadas en el otro sistema, confirmadas o en lista de espera. Cada reserva entra como si la hubieran hecho aquí: aparta su crédito, respeta el cupo y, si cancelan a tiempo, el crédito vuelve solo. La importación no le avisa nada a nadie; el recordatorio antes de cada clase, solo si lo marcas.",

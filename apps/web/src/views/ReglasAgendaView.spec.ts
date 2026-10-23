@@ -18,6 +18,8 @@ const mocks = await vi.hoisted(async () => {
     get: vi.fn(),
     delete: vi.fn(),
     ruta: reactive({ hash: "", query: {} as Record<string, string> }),
+    // La pestaña es el ancla: cambiarla reemplaza la dirección (sin sumar historial).
+    replace: vi.fn(),
     sesion: { esCitas: false },
     confirmar: vi.fn(async () => true),
   };
@@ -44,6 +46,7 @@ vi.mock("@/stores/toast", () => ({
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.ruta,
+  useRouter: () => ({ replace: mocks.replace }),
   onBeforeRouteLeave: vi.fn(),
 }));
 
@@ -94,6 +97,10 @@ enableAutoUnmount(afterEach);
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.ruta.hash = "";
+  mocks.replace.mockImplementation((destino: { hash?: string }) => {
+    mocks.ruta.hash = destino.hash ?? "";
+    return Promise.resolve();
+  });
   mocks.sesion.esCitas = false;
   // Las vigentes, para la semana; las que ya no se repiten, por páginas.
   mocks.get.mockImplementation(
@@ -119,7 +126,7 @@ function montar() {
 }
 
 const pestanas = (w: ReturnType<typeof montar>) =>
-  w.get('[data-prueba="pestanas"]').findAll("button");
+  w.get('[data-prueba="pestanas-seccion"]').findAll("button");
 const activa = (w: ReturnType<typeof montar>) =>
   pestanas(w)
     .find((b) => b.attributes("aria-pressed") === "true")
@@ -146,6 +153,16 @@ describe("reglas de la agenda", () => {
     await nextTick();
     expect(activa(w)).toBe("Programación recurrente");
     expect(w.text()).not.toContain("Agregar día");
+
+    // Una pestaña queda en el ancla: el lateral la marca y recargar abre la misma.
+    await pestanas(w)
+      .find((b) => b.text() === "Días de cierre")!
+      .trigger("click");
+    expect(mocks.replace).toHaveBeenLastCalledWith({
+      query: {},
+      hash: "#cierres",
+    });
+    expect(activa(w)).toBe("Días de cierre");
   });
 
   it("quitar un día de cierre se confirma antes de abrirlo de nuevo", async () => {

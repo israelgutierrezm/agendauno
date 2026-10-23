@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { porCategoria, reproductorDe, type Video } from "@/lib/videos";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -35,10 +36,10 @@ onMounted(async () => {
 
 <template>
   <section class="tu-pagina">
-    <h1 class="text-2xl font-semibold">{{ $t("videos.mios.titulo") }}</h1>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("videos.mios.subtitulo") }}
-    </p>
+    <EncabezadoSeccion
+      :titulo="$t('videos.mios.titulo')"
+      :subtitulo="$t('videos.mios.subtitulo')"
+    />
 
     <p v-if="cargando" class="mt-6" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -98,7 +99,7 @@ onMounted(async () => {
               :href="v.url"
               target="_blank"
               rel="noopener noreferrer"
-              class="tu-btn tu-btn-primario mt-3 inline-block"
+              class="tu-btn tu-btn-primario mt-3"
               >{{ $t("videos.mios.abrir") }}</a
             >
           </template>

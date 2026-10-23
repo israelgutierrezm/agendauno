@@ -161,9 +161,9 @@ function dejar(s: SerieProgramada): void {
 </script>
 
 <template>
+  <!-- Sin título propio: la pestaña «Programación recurrente» ya la nombra. -->
   <div class="mt-5 tu-card p-5">
-    <h2 class="font-medium">{{ $t("reglasAgenda.series") }}</h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("reglasAgenda.seriesAyuda") }}
     </p>
 
@@ -216,7 +216,8 @@ function dejar(s: SerieProgramada): void {
         <button
           v-if="filtrando"
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-discreto tu-btn-chico"
+          data-prueba="quitar-filtros"
           @click="limpiar"
         >
           {{ $t("reglasAgenda.quitarFiltros") }}

@@ -771,7 +771,7 @@ onBeforeUnmount(() => {
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('sitioWeb.titulo')"
-      :descripcion="$t('sitioWeb.descripcion')"
+      :subtitulo="$t('sitioWeb.descripcion')"
     />
 
     <SitioCompartir v-if="!puedeEditar" class="mt-6" />
@@ -792,12 +792,12 @@ onBeforeUnmount(() => {
       <div class="sw-barra tu-card mt-6 p-4" data-prueba="estado-sitio">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
-            <p class="flex items-center gap-2 font-medium">
-              <span
-                class="sw-punto"
-                :class="hayCambios ? 'sw-punto-aviso' : 'sw-punto-exito'"
-                aria-hidden="true"
-              ></span>
+            <p
+              class="tu-estado font-medium"
+              :style="{
+                '--tono': hayCambios ? 'var(--aviso)' : 'var(--exito)',
+              }"
+            >
               {{ etiquetaEstado }}
             </p>
             <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -831,7 +831,7 @@ onBeforeUnmount(() => {
             <button
               v-if="datos.cambios_sin_publicar && !sinGuardar"
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-peligro"
               :disabled="ocupado"
               @click="descartar"
             >
@@ -841,6 +841,7 @@ onBeforeUnmount(() => {
               type="button"
               class="tu-btn tu-btn-secundario"
               :disabled="ocupado || !sinGuardar"
+              :aria-busy="(ocupado && sinGuardar) || undefined"
               data-prueba="guardar-sitio"
               @click="guardar()"
             >
@@ -910,7 +911,7 @@ onBeforeUnmount(() => {
           <div class="min-w-0 space-y-6">
             <!-- Plantilla -->
             <div class="tu-card p-5">
-              <h2 class="text-lg font-medium">
+              <h2 class="tu-titulo-seccion">
                 {{ $t("sitioWeb.plantillas.titulo") }}
               </h2>
               <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -961,7 +962,7 @@ onBeforeUnmount(() => {
 
             <!-- Estilo del sitio (ADR 0146, fase 3) -->
             <div class="tu-card p-5" data-prueba="estilo-sitio">
-              <h2 class="flex items-center gap-2 text-lg font-medium">
+              <h2 class="tu-titulo-seccion flex items-center gap-2">
                 {{ $t("sitioWeb.estilo.titulo") }}
                 <span class="tu-badge">{{ $t("sitioWeb.plus.etiqueta") }}</span>
               </h2>
@@ -1003,7 +1004,7 @@ onBeforeUnmount(() => {
                     <button
                       v-if="borrador.estilo.color"
                       type="button"
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-discreto tu-btn-chico"
                       data-prueba="estilo-color-marca"
                       @click="borrador.estilo.color = null"
                     >
@@ -1171,7 +1172,7 @@ onBeforeUnmount(() => {
 
             <!-- Páginas (ADR 0146): Inicio y las propias -->
             <div class="tu-card p-5" data-prueba="paginas-sitio">
-              <h2 class="text-lg font-medium">
+              <h2 class="tu-titulo-seccion">
                 {{ $t("sitioWeb.paginas.titulo") }}
               </h2>
               <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1197,7 +1198,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-secundario shrink-0"
+                      class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                       :aria-expanded="configAbierta === 'inicio'"
                       data-prueba="config-inicio"
                       @click="
@@ -1266,7 +1267,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-secundario shrink-0"
+                      class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                       :aria-expanded="configAbierta === p.id"
                       :data-prueba="`config-${p.slug}`"
                       @click="
@@ -1338,7 +1339,7 @@ onBeforeUnmount(() => {
                     </p>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-peligro"
+                      class="tu-btn tu-btn-peligro tu-btn-chico"
                       :data-prueba="`quitar-pagina-${p.slug}`"
                       @click="quitarPagina(n)"
                     >
@@ -1389,7 +1390,11 @@ onBeforeUnmount(() => {
               tam="md"
               @cerrar="agregandoPagina = false"
             >
-              <form @submit.prevent="crearPagina">
+              <form
+                id="sw-form-pagina"
+                data-prueba="form-pagina-nueva"
+                @submit.prevent="crearPagina"
+              >
                 <label class="tu-label" for="sw-nueva-pagina">{{
                   $t("sitioWeb.paginas.campos.titulo")
                 }}</label>
@@ -1408,20 +1413,30 @@ onBeforeUnmount(() => {
                     })
                   }}
                 </p>
+              </form>
+              <template #pie>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-secundario"
+                  @click="agregandoPagina = false"
+                >
+                  {{ $t("comun.cancelar") }}
+                </button>
                 <button
                   type="submit"
-                  class="tu-btn tu-btn-primario mt-4"
+                  form="sw-form-pagina"
+                  class="tu-btn tu-btn-primario"
                   :disabled="tituloNueva.trim() === ''"
                   data-prueba="crear-pagina"
                 >
                   {{ $t("sitioWeb.paginas.crear") }}
                 </button>
-              </form>
+              </template>
             </ModalDialogo>
 
             <!-- Secciones -->
             <div class="tu-card p-5">
-              <h2 class="text-lg font-medium" data-prueba="titulo-secciones">
+              <h2 class="tu-titulo-seccion" data-prueba="titulo-secciones">
                 {{
                   paginaEditada
                     ? $t("sitioWeb.paginas.seccionesDe", {
@@ -1507,7 +1522,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-secundario shrink-0"
+                      class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                       :aria-expanded="abierta === claveSeccion(s)"
                       :data-prueba="`editar-${claveSeccion(s)}`"
                       @click="
@@ -1537,7 +1552,7 @@ onBeforeUnmount(() => {
                     <div class="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        class="tu-btn tu-btn-secundario"
+                        class="tu-btn tu-btn-secundario tu-btn-chico"
                         :disabled="!caben"
                         :data-prueba="`duplicar-${claveSeccion(s)}`"
                         @click="duplicar(i)"
@@ -1546,7 +1561,7 @@ onBeforeUnmount(() => {
                       </button>
                       <button
                         type="button"
-                        class="tu-btn tu-btn-peligro"
+                        class="tu-btn tu-btn-peligro tu-btn-chico"
                         :data-prueba="`quitar-${claveSeccion(s)}`"
                         @click="quitarBloque(i)"
                       >
@@ -1689,7 +1704,7 @@ onBeforeUnmount(() => {
                     <button
                       v-if="paginaEditada"
                       type="button"
-                      class="tu-btn tu-btn-peligro"
+                      class="tu-btn tu-btn-peligro tu-btn-chico"
                       :data-prueba="`quitar-${claveSeccion(s)}`"
                       @click="quitarSeccion(i)"
                     >
@@ -1744,7 +1759,7 @@ onBeforeUnmount(() => {
               class="tu-card p-5"
               data-prueba="versiones-sitio"
             >
-              <h2 class="text-lg font-medium">
+              <h2 class="tu-titulo-seccion">
                 {{ $t("sitioWeb.versiones.titulo") }}
               </h2>
               <p class="mt-1 text-sm sw-suave">
@@ -1783,7 +1798,7 @@ onBeforeUnmount(() => {
                   <button
                     v-else
                     type="button"
-                    class="tu-btn tu-btn-secundario"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     :disabled="ocupado"
                     :data-prueba="`restaurar-${v.id}`"
                     @click="restaurarVersion(v)"
@@ -1796,7 +1811,7 @@ onBeforeUnmount(() => {
 
             <!-- Pie de página: en todas las páginas -->
             <div class="tu-card p-5" data-prueba="pie-editor">
-              <h2 class="text-lg font-medium">
+              <h2 class="tu-titulo-seccion">
                 {{ $t("sitioWeb.pie.titulo") }}
               </h2>
               <p class="mt-1 text-sm sw-suave">
@@ -1871,7 +1886,7 @@ onBeforeUnmount(() => {
             <div class="tu-card p-5" data-prueba="banners">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 class="text-lg font-medium">
+                  <h2 class="tu-titulo-seccion">
                     {{ $t("sitioWeb.banners.titulo") }}
                   </h2>
                   <p
@@ -2074,7 +2089,7 @@ onBeforeUnmount(() => {
           <!-- Vista previa (en pantallas angostas, en otra pestaña) -->
           <aside class="sw-previa" data-prueba="vista-previa">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <h2 class="text-lg font-medium">
+              <h2 class="tu-titulo-seccion">
                 {{ $t("sitioWeb.acciones.vistaPrevia") }}
               </h2>
               <div class="flex flex-wrap items-center gap-2">
@@ -2171,7 +2186,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* La barra del estado y publicar queda a la vista al bajar (debajo de la barra
-   superior del panel). En el teléfono no: con sus botones ocuparía media pantalla. */
+   superior del panel). En el teléfono no: con sus botones ocuparía media pantalla.
+   Es la excepción a `tu-pie-acciones` de los formularios en página: ADR 0167 pide el
+   estado y «Publicar» arriba, siempre a la vista. */
 @media (min-width: 768px) {
   .sw-barra {
     position: sticky;
@@ -2209,9 +2226,6 @@ onBeforeUnmount(() => {
 }
 .sw-punto-exito {
   background: var(--exito);
-}
-.sw-punto-aviso {
-  background: var(--aviso);
 }
 .sw-plantilla {
   display: block;

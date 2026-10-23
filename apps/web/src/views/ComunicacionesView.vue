@@ -10,6 +10,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import PlantillasWhatsAppNegocio, {
   type PlantillaWhatsApp,
 } from "@/components/PlantillasWhatsAppNegocio.vue";
@@ -18,6 +19,13 @@ import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
 import { eventosPorArea, useEventosNegocio } from "@/lib/eventosNegocio";
+import {
+  fechaEnUrl,
+  opcionEnUrl,
+  useFiltrosEnUrl,
+  usePestanaEnUrl,
+} from "@/lib/filtrosEnUrl";
+import { conTerminosActuales } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -27,7 +35,7 @@ import { useToastStore } from "@/stores/toast";
  * bandeja de salida con el estado de cada mensaje. Son tres cosas distintas y cada
  * pestaña dice cuál es; las reglas que crean tareas están en Tareas › Automatización.
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 const toast = useToastStore();
 // Cada aviso con su nombre en palabras (nunca «pago.anulado»).
 const { nombreEvento } = useEventosNegocio();
@@ -137,8 +145,6 @@ async function controlar(
     controlando.value = null;
   }
 }
-const pestana = ref<Pestana>("difusion");
-
 const segmentos = ref<Segmento[]>([]);
 const difusiones = ref<Difusion[]>([]);
 // Por páginas: un negocio que difunde varias veces por semana junta cientos.
@@ -378,6 +384,35 @@ const canalesDeSalida = computed<Canal[]>(() =>
   ),
 );
 
+// Las pestañas que puede ver, en la dirección (`?pestana=salida`): recargar o
+// compartir el enlace abre la misma. WhatsApp, solo si el negocio lo tiene.
+const pestanasPermitidas = computed<Pestana[]>(() => [
+  "difusion",
+  ...(puedeAutomaticos.value ? (["automaticos"] as const) : []),
+  ...(puedeAutomaticos.value && canalesDifusion.value.includes("whatsapp")
+    ? (["whatsapp"] as const)
+    : []),
+  ...(puedeSalida.value ? (["salida"] as const) : []),
+]);
+const pestana = usePestanaEnUrl(pestanasPermitidas);
+const opcionesPestana = computed(() =>
+  pestanasPermitidas.value.map((clave) => ({
+    clave,
+    texto: t(`comunicacionPantalla.pestanas.${clave}.titulo`),
+  })),
+);
+
+// El nombre y la descripción de cada grupo con el término del negocio (el API los
+// redacta con «miembro»): por su clave y, si es uno nuevo, el texto del API adaptado.
+function textoSegmento(
+  clave: string,
+  campo: "etiqueta" | "descripcion",
+  respaldo: string,
+): string {
+  const llave = `comunicaciones.segmentos.${clave}.${campo}`;
+  return te(llave) ? t(llave) : conTerminosActuales(respaldo);
+}
+
 function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
@@ -407,6 +442,13 @@ async function cargar(): Promise<void> {
     segmentos.value = seg.data.data;
     canalesDifusion.value = seg.data.canales ?? ["interno", "email"];
     await cargarPlantillasWhatsApp();
+    // `?pestana=whatsapp` en la dirección: esa pestaña existe hasta saber los canales.
+    if (
+      ruta?.query.pestana === "whatsapp" &&
+      pestanasPermitidas.value.includes("whatsapp")
+    ) {
+      pestana.value = "whatsapp";
+    }
     // Desde Renovaciones › Para recuperar: «Escribirles» llega con su grupo elegido.
     const pedido = ruta?.query.segmento;
     if (
@@ -770,6 +812,15 @@ const paginaSalida = ref(1);
 const cargandoSalida = ref(false);
 // No se pudo consultar: no es «aún no se envían mensajes».
 const errorSalida = ref(false);
+// Los filtros de lo enviado en la dirección: recargar o compartir el enlace conserva
+// la búsqueda. Antes de vigilarlos, para no cargar de más.
+useFiltrosEnUrl({
+  q: buscarSalida,
+  estado: opcionEnUrl(filtroEstado, ["", ...ESTADOS_SALIDA]),
+  canal: opcionEnUrl(filtroCanal, ["", "email", "whatsapp", "push", "interno"]),
+  desde: fechaEnUrl(desdeSalida),
+  hasta: fechaEnUrl(hastaSalida),
+});
 
 let peticionSalida = 0;
 async function cargarSalida(): Promise<void> {
@@ -861,8 +912,8 @@ async function abrirAutomaticos(): Promise<void> {
   }
 }
 
-async function irPestana(p: Pestana): Promise<void> {
-  pestana.value = p;
+// Cada pestaña carga lo suyo al elegirla, también si llega en la dirección.
+async function cargarPestana(p: Pestana): Promise<void> {
   try {
     if (p === "automaticos") {
       await abrirAutomaticos();
@@ -875,6 +926,7 @@ async function irPestana(p: Pestana): Promise<void> {
     error.value = mensajeDeError(e);
   }
 }
+watch(pestana, (p) => void cargarPestana(p), { immediate: true });
 
 onMounted(cargar);
 </script>
@@ -888,47 +940,11 @@ onMounted(cargar);
 
     <!-- Tres cosas distintas: lo que escribes una vez, lo que se envía solo y lo
          que ya salió. Cada pestaña dice cuál es. -->
-    <div
-      v-if="puedeAutomaticos || puedeSalida"
-      class="tu-pestanas mt-6"
-      role="group"
-    >
-      <button
-        type="button"
-        :aria-pressed="pestana === 'difusion'"
-        data-prueba="pestana-difusion"
-        @click="irPestana('difusion')"
-      >
-        {{ $t("comunicacionPantalla.pestanas.difusion.titulo") }}
-      </button>
-      <button
-        v-if="puedeAutomaticos"
-        type="button"
-        :aria-pressed="pestana === 'automaticos'"
-        data-prueba="pestana-automaticos"
-        @click="irPestana('automaticos')"
-      >
-        {{ $t("comunicacionPantalla.pestanas.automaticos.titulo") }}
-      </button>
-      <button
-        v-if="puedeAutomaticos && canalesDifusion.includes('whatsapp')"
-        type="button"
-        :aria-pressed="pestana === 'whatsapp'"
-        data-prueba="pestana-whatsapp"
-        @click="irPestana('whatsapp')"
-      >
-        {{ $t("comunicacionPantalla.pestanas.whatsapp.titulo") }}
-      </button>
-      <button
-        v-if="puedeSalida"
-        type="button"
-        :aria-pressed="pestana === 'salida'"
-        data-prueba="pestana-salida"
-        @click="irPestana('salida')"
-      >
-        {{ $t("comunicacionPantalla.pestanas.salida.titulo") }}
-      </button>
-    </div>
+    <PestanasSeccion
+      v-model="pestana"
+      :opciones="opcionesPestana"
+      :etiqueta="$t('comunicacionPantalla.etiquetaPestanas')"
+    />
     <p
       class="mt-3 text-sm"
       :style="{ color: 'var(--texto-suave)' }"
@@ -942,7 +958,7 @@ onMounted(cargar);
       <template v-if="errorCarga" #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           data-prueba="reintentar-comunicaciones"
           @click="cargar"
         >
@@ -977,6 +993,7 @@ onMounted(cargar);
             :key="s.clave"
             type="button"
             class="text-left rounded-2xl border p-4 transition"
+            :aria-pressed="form.segmento === s.clave"
             :style="
               form.segmento === s.clave
                 ? {
@@ -988,35 +1005,33 @@ onMounted(cargar);
             @click="form.segmento = s.clave"
           >
             <div class="flex items-center justify-between">
-              <span class="font-semibold">{{ s.etiqueta }}</span>
+              <span class="font-semibold">{{
+                textoSegmento(s.clave, "etiqueta", s.etiqueta)
+              }}</span>
               <span class="tu-badge">{{ s.total }}</span>
             </div>
             <span
               class="block text-xs mt-1"
               :style="{ color: 'var(--texto-suave)' }"
-              >{{ s.descripcion }}</span
+              >{{ textoSegmento(s.clave, "descripcion", s.descripcion) }}</span
             >
           </button>
         </div>
 
-        <div class="mt-5 flex items-center gap-2">
-          <span class="text-sm font-semibold">{{
+        <div class="mt-5 flex flex-wrap items-center gap-2">
+          <span id="com-canal-etiqueta" class="text-sm font-semibold">{{
             $t("comunicaciones.canalLabel")
           }}</span>
-          <div class="flex gap-1">
+          <div
+            class="tu-segmentado"
+            role="group"
+            aria-labelledby="com-canal-etiqueta"
+          >
             <button
               v-for="canal in canalesDifusion"
               :key="canal"
               type="button"
-              class="tu-badge cursor-pointer"
-              :style="
-                form.canal === canal
-                  ? {
-                      background: 'var(--primario)',
-                      color: 'var(--primario-contraste)',
-                    }
-                  : {}
-              "
+              :aria-pressed="form.canal === canal"
               @click="form.canal = canal"
             >
               {{ canalTexto(canal) }}
@@ -1122,7 +1137,16 @@ onMounted(cargar);
           }}
         </p>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ segmentoSel?.etiqueta }} ·
+          {{
+            segmentoSel
+              ? textoSegmento(
+                  segmentoSel.clave,
+                  "etiqueta",
+                  segmentoSel.etiqueta,
+                )
+              : ""
+          }}
+          ·
           {{
             $t("operacion.comunicacion.canal", {
               canal: canalTexto(form.canal),
@@ -1169,7 +1193,7 @@ onMounted(cargar);
         >
           {{ errorEnvio }}
         </AvisoTono>
-        <div class="mt-6 flex justify-end gap-2">
+        <template #pie>
           <button
             type="button"
             class="tu-btn tu-btn-secundario"
@@ -1182,6 +1206,7 @@ onMounted(cargar);
             type="button"
             class="tu-btn tu-btn-primario"
             :disabled="enviando || destinatarios === 0"
+            :aria-busy="enviando || undefined"
             data-prueba="enviar-difusion"
             @click="enviar"
           >
@@ -1191,13 +1216,13 @@ onMounted(cargar);
                 : $t("operacion.comunicacion.enviar")
             }}
           </button>
-        </div>
+        </template>
       </ModalDialogo>
 
-      <!-- Historial -->
-      <h3 class="mt-8 text-sm font-semibold">
+      <!-- Historial: en el teléfono, una ficha por envío con sus controles a la vista -->
+      <h2 class="tu-titulo-seccion mt-8">
         {{ $t("comunicaciones.historial") }}
-      </h3>
+      </h2>
       <EstadoVacio
         v-if="!cargando && !errorCarga && difusiones.length === 0"
         class="tu-card mt-3"
@@ -1206,113 +1231,125 @@ onMounted(cargar);
       />
       <div
         v-else-if="difusiones.length > 0"
-        class="mt-3 tu-card overflow-x-auto"
+        class="relative mt-3 tu-card overflow-x-auto tu-tabla-adaptable"
       >
         <table class="tu-tabla">
           <thead>
             <tr>
-              <th>
-                {{ $t("comunicaciones.colFecha") }}
-              </th>
-              <th>
-                {{ $t("comunicaciones.colSegmento") }}
-              </th>
-              <th>
-                {{ $t("comunicaciones.colAsunto") }}
-              </th>
+              <th>{{ $t("comunicaciones.colAsunto") }}</th>
               <th class="text-right">
                 {{ $t("comunicaciones.colTotal") }}
               </th>
+              <th>{{ $t("comunicaciones.colSegmento") }}</th>
               <th>{{ $t("comunicaciones.colEstado") }}</th>
+              <th v-if="puedeControlar" class="text-right">
+                {{ $t("comunicaciones.colAcciones") }}
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="d in difusiones" :key="d.id">
+              <td :data-etiqueta="$t('comunicaciones.colAsunto')">
+                {{ d.asunto }}
+                <span class="tu-sub font-normal whitespace-nowrap">{{
+                  fecha(d.enviada_en)
+                }}</span>
+              </td>
               <td
-                class="whitespace-nowrap"
-                :style="{ color: 'var(--texto-suave)' }"
+                class="text-right font-semibold"
+                :data-etiqueta="$t('comunicaciones.colTotal')"
               >
-                {{ fecha(d.enviada_en) }}
+                {{ d.total }}
               </td>
-              <td>
-                <span class="tu-badge">{{ d.segmento_etiqueta }}</span>
-                <span
-                  class="block text-xs mt-1"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ canalTexto(d.canal) }}</span
-                >
-              </td>
-              <td>{{ d.asunto }}</td>
-              <td class="text-right font-semibold">{{ d.total }}</td>
-              <td data-prueba="estado-difusion">
-                <span
-                  class="tu-estado text-sm"
-                  :style="{
-                    '--tono':
-                      d.estado === 'pausada'
-                        ? 'var(--aviso)'
-                        : d.estado === 'cancelada'
-                          ? 'var(--texto-suave)'
-                          : (d.pendientes ?? 0) > 0
-                            ? 'var(--primario)'
-                            : 'var(--exito)',
-                  }"
-                >
-                  {{
-                    d.estado === "pausada"
-                      ? $t("comunicaciones.estados.pausada")
-                      : d.estado === "cancelada"
-                        ? $t("comunicaciones.estados.cancelada")
-                        : (d.pendientes ?? 0) > 0
-                          ? $t("comunicaciones.estados.enviando", {
-                              n: d.pendientes ?? 0,
-                            })
-                          : $t("comunicaciones.estados.enviada")
-                  }}
+              <td :data-etiqueta="$t('comunicaciones.colSegmento')">
+                <span>
+                  <span class="tu-badge">{{
+                    textoSegmento(d.segmento, "etiqueta", d.segmento_etiqueta)
+                  }}</span>
+                  <span
+                    class="block text-xs mt-1"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ canalTexto(d.canal) }}</span
+                  >
                 </span>
-                <!-- El resultado del envío: llegó, no se pudo, no se mandó. -->
-                <span
-                  v-if="
-                    (d.enviados ?? 0) +
-                      (d.fallidos ?? 0) +
-                      (d.descartados ?? 0) >
-                    0
-                  "
-                  class="block text-xs mt-1"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  data-prueba="resultado-difusion"
-                  >{{
-                    [
-                      $t("comunicaciones.resultado.enviados", {
-                        n: d.enviados ?? 0,
-                      }),
-                      (d.fallidos ?? 0) > 0
-                        ? $t("comunicaciones.resultado.fallidos", {
-                            n: d.fallidos ?? 0,
-                          })
-                        : null,
-                      (d.descartados ?? 0) > 0
-                        ? $t("comunicaciones.resultado.descartados", {
-                            n: d.descartados ?? 0,
-                          })
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")
-                  }}</span
-                >
-                <span
-                  v-if="
-                    puedeControlar &&
-                    d.estado !== 'cancelada' &&
-                    (d.pendientes ?? 0) > 0
-                  "
-                  class="mt-1 flex flex-wrap gap-3 text-xs"
+              </td>
+              <td
+                :data-etiqueta="$t('comunicaciones.colEstado')"
+                data-prueba="estado-difusion"
+              >
+                <span>
+                  <span
+                    class="tu-estado text-sm"
+                    :style="{
+                      '--tono':
+                        d.estado === 'pausada'
+                          ? 'var(--aviso)'
+                          : d.estado === 'cancelada'
+                            ? 'var(--texto-suave)'
+                            : (d.pendientes ?? 0) > 0
+                              ? 'var(--primario)'
+                              : 'var(--exito)',
+                    }"
+                  >
+                    {{
+                      d.estado === "pausada"
+                        ? $t("comunicaciones.estados.pausada")
+                        : d.estado === "cancelada"
+                          ? $t("comunicaciones.estados.cancelada")
+                          : (d.pendientes ?? 0) > 0
+                            ? $t("comunicaciones.estados.enviando", {
+                                n: d.pendientes ?? 0,
+                              })
+                            : $t("comunicaciones.estados.enviada")
+                    }}
+                  </span>
+                  <!-- El resultado del envío: llegó, no se pudo, no se mandó. -->
+                  <span
+                    v-if="
+                      (d.enviados ?? 0) +
+                        (d.fallidos ?? 0) +
+                        (d.descartados ?? 0) >
+                      0
+                    "
+                    class="block text-xs mt-1"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    data-prueba="resultado-difusion"
+                    >{{
+                      [
+                        $t("comunicaciones.resultado.enviados", {
+                          n: d.enviados ?? 0,
+                        }),
+                        (d.fallidos ?? 0) > 0
+                          ? $t("comunicaciones.resultado.fallidos", {
+                              n: d.fallidos ?? 0,
+                            })
+                          : null,
+                        (d.descartados ?? 0) > 0
+                          ? $t("comunicaciones.resultado.descartados", {
+                              n: d.descartados ?? 0,
+                            })
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    }}</span
+                  >
+                </span>
+              </td>
+              <!-- Un envío en curso se pausa, se reanuda o se cancela lo que falta. -->
+              <td
+                v-if="puedeControlar"
+                class="tu-celda-acciones"
+                data-prueba="acciones-difusion"
+              >
+                <div
+                  v-if="d.estado !== 'cancelada' && (d.pendientes ?? 0) > 0"
+                  class="inline-flex flex-wrap gap-2"
                 >
                   <button
                     v-if="d.estado !== 'pausada'"
                     type="button"
-                    class="tu-enlace"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     :disabled="controlando === d.id"
                     @click="controlar(d, 'pausar')"
                   >
@@ -1321,7 +1358,7 @@ onMounted(cargar);
                   <button
                     v-else
                     type="button"
-                    class="tu-enlace"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     :disabled="controlando === d.id"
                     @click="controlar(d, 'reanudar')"
                   >
@@ -1329,14 +1366,13 @@ onMounted(cargar);
                   </button>
                   <button
                     type="button"
-                    class="tu-enlace"
-                    :style="{ color: 'var(--error)' }"
+                    class="tu-btn tu-btn-peligro tu-btn-chico"
                     :disabled="controlando === d.id"
                     @click="controlar(d, 'cancelar')"
                   >
                     {{ $t("comunicaciones.cancelar") }}
                   </button>
-                </span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -1379,7 +1415,7 @@ onMounted(cargar);
         }}</span>
         <button
           type="button"
-          class="tu-enlace ml-2"
+          class="tu-btn tu-btn-discreto tu-btn-chico ml-2"
           :disabled="cargandoAuto"
           @click="abrirAutomaticos"
         >
@@ -1438,7 +1474,7 @@ onMounted(cargar);
               </div>
               <button
                 type="button"
-                class="tu-enlace shrink-0"
+                class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                 @click="configurar(ev)"
               >
                 {{ $t("comunicacionesAuto.configurar") }}
@@ -1518,7 +1554,7 @@ onMounted(cargar);
         <button
           v-if="conFiltrosSalida"
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-discreto"
           @click="limpiarFiltrosSalida"
         >
           {{ $t("operacion.listados.quitarFiltros") }}
@@ -1535,7 +1571,7 @@ onMounted(cargar);
         }}</span>
         <button
           type="button"
-          class="tu-enlace ml-2"
+          class="tu-btn tu-btn-discreto tu-btn-chico ml-2"
           @click="irPaginaSalida(paginaSalida)"
         >
           {{ $t("comun.reintentar") }}
@@ -1750,6 +1786,7 @@ onMounted(cargar);
             form="form-plantilla"
             class="tu-btn tu-btn-primario"
             :disabled="guardandoPlantilla"
+            :aria-busy="guardandoPlantilla || undefined"
           >
             {{ $t("comunicacionesAuto.guardar") }}
           </button>

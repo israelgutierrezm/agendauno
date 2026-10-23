@@ -8,6 +8,9 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import CorregirCobro from "@/components/CorregirCobro.vue";
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import EstadoVencimiento, {
+  type SituacionVencimiento,
+} from "@/components/EstadoVencimiento.vue";
 import PorConciliar from "@/components/PorConciliar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -24,7 +27,10 @@ import TarjetasIndicadores, {
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
+import { situacionDeFecha } from "@/lib/vencimiento";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import {
   puedeFacturarVentas,
   rutaFacturaDeVenta,
@@ -50,6 +56,11 @@ interface Pendiente {
     zona_horaria: string | null;
     sucursal: string | null;
   } | null;
+  // Una renovación: cuándo vence y si ya venció (con hoy del negocio).
+  renovacion?: {
+    vence_el: string;
+    situacion: "proxima" | "hoy" | "vencida";
+  } | null;
 }
 interface MetaPendientes {
   page: number;
@@ -66,7 +77,12 @@ interface Moroso {
   estado: string;
   intentos: number;
   gracia_hasta: string;
+  // Escrito para el alumno: aquí no se muestra (se usa la clave del motivo).
   ultimo_motivo: string | null;
+  // Por qué no se cobró, para quien administra (`cobranza.motivosMora.*`) y el detalle
+  // (el motivo del banco o lo que escribió el equipo al registrar el fallo a mano).
+  motivo_clave?: string | null;
+  motivo_detalle?: string | null;
 }
 interface Pago {
   id: string;
@@ -107,6 +123,9 @@ interface Suscripcion {
   moneda: string | null;
   proxima_cobro_en: string | null;
   estado: string;
+  // Cómo va la renovación con hoy del negocio y los procesos de mora abiertos.
+  situacion?: SituacionVencimiento | null;
+  dias?: number;
   // Pago automático: la tarjeta con la que se cobra sola (y el último rechazo).
   pago_automatico: {
     marca: string | null;
@@ -123,7 +142,7 @@ interface Suscripcion {
   cancelando_pago_automatico?: boolean;
 }
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeRegularizar = computed(() => sesion.puede("ordenes.gestionar"));
@@ -165,15 +184,43 @@ interface MetaLista {
   page: number;
   per_page: number;
   ultima_pagina: number;
-  resumen?: { total: number; automaticos?: number };
+  resumen?: {
+    total: number;
+    automaticos?: number;
+    // Renovaciones: las que aún no vencen, las vencidas sin cobrar y las en mora.
+    proximas?: number;
+    vencidas?: number;
+    en_mora?: number;
+  };
 }
 const metaSuscripciones = ref<MetaLista | null>(null);
 const metaMorosos = ref<MetaLista | null>(null);
 const buscarRenovaciones = ref("");
 const filtroAutomatico = ref<"" | "si" | "no">("");
+// Próximas o vencidas sin cobrar (sin filtro, todas).
+const filtroSituacion = ref<"" | "proximas" | "vencidas">("");
 const paginaRenovaciones = ref(1);
 const buscarMorosos = ref("");
 const paginaMorosos = ref(1);
+// Los filtros de renovaciones y de mora van en la dirección, con claves propias (las
+// de Movimientos, `q`, `estado`, `desde` y `hasta`, ya están tomadas). Antes de
+// vigilarlos, para no cargar dos veces.
+useFiltrosEnUrl({
+  ren_q: buscarRenovaciones,
+  automatico: opcionEnUrl(filtroAutomatico, ["", "si", "no"] as const),
+  situacion: opcionEnUrl(filtroSituacion, [
+    "",
+    "proximas",
+    "vencidas",
+  ] as const),
+  mora_q: buscarMorosos,
+});
+const conFiltrosRenovaciones = computed(
+  () =>
+    buscarRenovaciones.value.trim() !== "" ||
+    filtroAutomatico.value !== "" ||
+    filtroSituacion.value !== "",
+);
 async function cargarSuscripciones(): Promise<void> {
   const { data } = await api.get<{
     data: Suscripcion[];
@@ -187,6 +234,9 @@ async function cargarSuscripciones(): Promise<void> {
         : {}),
       ...(filtroAutomatico.value !== ""
         ? { automatico: filtroAutomatico.value }
+        : {}),
+      ...(filtroSituacion.value !== ""
+        ? { situacion: filtroSituacion.value }
         : {}),
     },
   });
@@ -225,7 +275,7 @@ function irPaginaMorosos(n: number): void {
   void recargarLista(cargarMorosos);
 }
 let esperaRenovaciones: ReturnType<typeof setTimeout> | undefined;
-watch([buscarRenovaciones, filtroAutomatico], () => {
+watch([buscarRenovaciones, filtroAutomatico, filtroSituacion], () => {
   clearTimeout(esperaRenovaciones);
   esperaRenovaciones = setTimeout(() => {
     paginaRenovaciones.value = 1;
@@ -261,6 +311,8 @@ const erroresReembolso = ref<Record<string, string>>({});
 const PASARELAS_EN_LINEA = ["stripe", "openpay", "mercadopago"];
 const avisoReembolso = ref<string | null>(null);
 const porConciliar = ref<InstanceType<typeof PorConciliar> | null>(null);
+// El corte de caja expone su descarga para el encabezado de la vista.
+const corteCaja = ref<InstanceType<typeof CorteDeCaja> | null>(null);
 
 // Sin moneda, la del negocio (ADR 0099); con los números de su país.
 function dinero(minor: number, moneda?: string | null): string {
@@ -447,6 +499,51 @@ function marca(m: string | null): string {
   return m ? m.charAt(0).toUpperCase() + m.slice(1) : "";
 }
 
+// Por qué alguien está en mora, dicho a quien administra (qué pasó y qué puede hacer).
+// Nunca la frase que se le manda al alumno (`ultimo_motivo`); sin clave, el detalle
+// que haya o «Cobro no realizado».
+function claveMora(m: Moroso): string | null {
+  const clave = m.motivo_clave
+    ? `cobranza.motivosMora.${m.motivo_clave}`
+    : null;
+  return clave !== null && te(clave) ? clave : null;
+}
+function motivoMora(m: Moroso): string {
+  const clave = claveMora(m);
+  const detalle = m.motivo_detalle?.trim() || null;
+  if (clave !== null) {
+    return t(clave, { detalle: detalle ?? "" });
+  }
+  return detalle ?? t("cobranza.motivosMora.sinClave");
+}
+// Con clave, el detalle (p. ej. el motivo del banco) va debajo, en su línea.
+function detalleMora(m: Moroso): string | null {
+  return claveMora(m) !== null ? m.motivo_detalle?.trim() || null : null;
+}
+
+// La gracia ya pasó: se dice así (la suspensión llega en el siguiente intento).
+function graciaVencida(fecha: string): boolean {
+  return (
+    situacionDeFecha(fecha, hoyEnNegocio(sesion.zonaHoraria)).situacion ===
+    "vencida"
+  );
+}
+
+// Cómo va una renovación (próxima, hoy, vencida, en mora, suspendida o en pausa). Si
+// el API no la manda, el estado de la suscripción y, sin él, la fecha con hoy del
+// negocio (EstadoVencimiento la calcula).
+function situacionRenovacion(s: Suscripcion): SituacionVencimiento | undefined {
+  if (s.situacion) {
+    return s.situacion;
+  }
+  const porEstado: Record<string, SituacionVencimiento> = {
+    pausado: "pausada",
+    suspendido: "suspendida",
+    en_mora: "en_mora",
+  };
+  return porEstado[s.estado];
+}
+
 // Correo al alumno con el enlace para activar su pago automático.
 async function invitarPagoAutomatico(s: Suscripcion): Promise<void> {
   accionando.value = s.id;
@@ -553,8 +650,25 @@ async function alCorregirCobro(): Promise<void> {
 
 // De un cobro mixto: por qué forma sale la devolución (la primera, por omisión).
 const rMetodo = ref("");
+// Con el motivo o el monto escritos y sin devolver, cerrar o salir pregunta antes.
+const conReembolso = computed({
+  get: () => reembolsando.value !== null,
+  set: (v: boolean) => {
+    if (!v) reembolsando.value = null;
+  },
+});
+const descartarReembolso = useDescartarCambios({
+  abierto: conReembolso,
+  valor: () => [
+    rMonto.value,
+    rMotivo.value,
+    rRevertir.value,
+    rManual.value,
+    rMetodo.value,
+  ],
+  guardando: rProcesando,
+});
 function abrirReembolso(p: Pago): void {
-  reembolsando.value = p;
   rLlave.value = crypto.randomUUID();
   rMetodo.value = p.partes?.[0]?.metodo ?? "";
   rMonto.value = String(p.reembolsable_minor / 100);
@@ -563,6 +677,11 @@ function abrirReembolso(p: Pago): void {
   rManual.value = false;
   errorReembolso.value = null;
   erroresReembolso.value = {};
+  descartarReembolso.fijar();
+  reembolsando.value = p;
+}
+function cerrarReembolso(): void {
+  void descartarReembolso.cerrar();
 }
 
 async function reembolsar(): Promise<void> {
@@ -746,11 +865,15 @@ const indicadores = computed<Indicador[]>(() => {
   }
   if (vista.value === "por-cobrar") {
     // Del resumen del negocio (sin búsqueda ni páginas).
+    const resumenRenovaciones = metaSuscripciones.value?.resumen;
     const automaticos =
-      metaSuscripciones.value?.resumen?.automaticos ??
+      resumenRenovaciones?.automaticos ??
       suscripciones.value.filter((x) => x.pago_automatico !== null).length;
     const renovaciones =
-      metaSuscripciones.value?.resumen?.total ?? suscripciones.value.length;
+      resumenRenovaciones?.total ?? suscripciones.value.length;
+    // «Próximas» son las que aún no vencen; las vencidas sin cobrar, aparte.
+    const proximas = resumenRenovaciones?.proximas ?? renovaciones;
+    const vencidas = resumenRenovaciones?.vencidas;
     const enMora = metaMorosos.value?.resumen?.total ?? morosos.value.length;
     const debe = metaPendientes.value;
     const lista: Indicador[] = [
@@ -776,9 +899,20 @@ const indicadores = computed<Indicador[]>(() => {
       {
         clave: "renovaciones",
         etiqueta: t("cobranzaVisual.kpi.renovaciones"),
-        valor: String(renovaciones),
+        valor: String(proximas),
         icono: "reloj",
       },
+      ...(vencidas !== undefined
+        ? [
+            {
+              clave: "vencidas",
+              etiqueta: t("cobranzaVisual.kpi.vencidas"),
+              valor: String(vencidas),
+              icono: "reloj",
+              aviso: vencidas > 0,
+            },
+          ]
+        : []),
       {
         clave: "automatico",
         etiqueta: t("cobranzaVisual.kpi.automatico"),
@@ -791,7 +925,10 @@ const indicadores = computed<Indicador[]>(() => {
     ];
     return sesion.esCitas && renovaciones === 0
       ? lista.filter(
-          (k) => k.clave !== "renovaciones" && k.clave !== "automatico",
+          (k) =>
+            k.clave !== "renovaciones" &&
+            k.clave !== "vencidas" &&
+            k.clave !== "automatico",
         )
       : lista;
   }
@@ -817,7 +954,22 @@ watch(vista, cargar, { immediate: true });
     <EncabezadoSeccion
       :titulo="$t(TITULOS[vista])"
       :subtitulo="$t(`operacion.admin.cobros.${vista}`)"
-    />
+    >
+      <!-- Corte de caja: su descarga es una acción de la vista (el corte no se titula). -->
+      <template v-if="vista === 'caja' && corteCaja" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="corteCaja?.descargando || !corteCaja?.hayMovimientos"
+          :aria-busy="corteCaja?.descargando || undefined"
+          data-prueba="descargar-corte"
+          @click="corteCaja?.descargar()"
+        >
+          <IconoNav nombre="descargar" :tam="16" />
+          {{ $t("corteCaja.descargar") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <AvisoTono v-if="avisoReembolso" tono="aviso" class="mt-4" role="status">
       {{ avisoReembolso }}
@@ -827,7 +979,7 @@ watch(vista, cargar, { immediate: true });
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -853,8 +1005,7 @@ watch(vista, cargar, { immediate: true });
           {{ avisoCobro }}
         </AvisoTono>
         <!-- Lo que ya se debe: compras sin pagar y citas o clases ya pasadas -->
-        <h2 id="pendientes" class="cb-seccion mt-6">
-          <IconoNav nombre="dinero" :tam="21" />
+        <h2 id="pendientes" class="tu-titulo-seccion mt-6">
           {{ $t("cobranza.pendientes.titulo") }}
         </h2>
         <p
@@ -876,59 +1027,74 @@ watch(vista, cargar, { immediate: true });
           icono="hecho"
           :titulo="$t('cobranza.pendientes.vacio')"
         />
-        <div
-          v-else
-          class="mt-3 tu-card overflow-x-auto"
-          data-prueba="pendientes"
-        >
-          <table class="tu-tabla">
-            <thead>
-              <tr>
-                <th>{{ $t("cobranza.pendientes.colCliente") }}</th>
-                <th>{{ $t("cobranza.pendientes.colConcepto") }}</th>
-                <th class="text-right">{{ $t("cobranza.colMonto") }}</th>
-                <th class="text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in pendientes" :key="p.id">
-                <td>
-                  <RouterLink
-                    v-if="p.persona"
-                    :to="{
-                      name: 'ficha-miembro',
-                      params: { id: p.persona.id },
-                    }"
-                    class="font-medium hover:underline"
-                    >{{ p.persona.nombre }}</RouterLink
+        <div v-else class="mt-3 tu-card" data-prueba="pendientes">
+          <!-- En el teléfono, una ficha por adeudo con «Registrar pago» a la vista. -->
+          <div class="relative overflow-x-auto tu-tabla-adaptable">
+            <table class="tu-tabla">
+              <thead>
+                <tr>
+                  <th>{{ $t("cobranza.pendientes.colCliente") }}</th>
+                  <th class="text-right">{{ $t("cobranza.colMonto") }}</th>
+                  <th>{{ $t("cobranza.pendientes.colConcepto") }}</th>
+                  <th class="text-right"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in pendientes" :key="p.id">
+                  <td :data-etiqueta="$t('cobranza.pendientes.colCliente')">
+                    <RouterLink
+                      v-if="p.persona"
+                      :to="{
+                        name: 'ficha-miembro',
+                        params: { id: p.persona.id },
+                      }"
+                      class="font-medium hover:underline"
+                      >{{ p.persona.nombre }}</RouterLink
+                    >
+                    <span v-else>—</span>
+                  </td>
+                  <td
+                    :data-etiqueta="$t('cobranza.colMonto')"
+                    class="text-right tabular-nums font-medium"
                   >
-                  <span v-else>—</span>
-                </td>
-                <td>
-                  <span class="block">{{ p.concepto ?? "—" }}</span>
-                  <span
-                    class="block text-xs first-letter:uppercase"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ detallePendiente(p) }}</span
-                  >
-                </td>
-                <td class="text-right tabular-nums font-medium">
-                  {{ dinero(p.total_minor, p.moneda) }}
-                </td>
-                <td class="text-right">
-                  <button
-                    v-if="puedeRegularizar"
-                    type="button"
-                    class="tu-btn tu-btn-secundario"
-                    data-prueba="registrar-pago"
-                    @click="abrirCobro(p)"
-                  >
-                    {{ $t("cobranza.pendientes.registrar") }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                    {{ dinero(p.total_minor, p.moneda) }}
+                  </td>
+                  <td :data-etiqueta="$t('cobranza.pendientes.colConcepto')">
+                    <div>
+                      <span class="block">{{ p.concepto ?? "—" }}</span>
+                      <!-- Una renovación dice cuándo vence (o que ya venció). -->
+                      <template v-if="p.renovacion">
+                        <span class="tu-sub">{{
+                          $t("cobranza.pendientes.renovacion")
+                        }}</span>
+                        <EstadoVencimiento
+                          :fecha="p.renovacion.vence_el"
+                          :situacion="p.renovacion.situacion"
+                        />
+                      </template>
+                      <span
+                        v-else
+                        class="block text-xs first-letter:uppercase"
+                        :style="{ color: 'var(--texto-suave)' }"
+                        >{{ detallePendiente(p) }}</span
+                      >
+                    </div>
+                  </td>
+                  <td class="tu-celda-acciones">
+                    <button
+                      v-if="puedeRegularizar"
+                      type="button"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
+                      data-prueba="registrar-pago"
+                      @click="abrirCobro(p)"
+                    >
+                      {{ $t("cobranza.pendientes.registrar") }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <PaginacionListado
             v-if="metaPendientes && metaPendientes.ultima_pagina > 1"
             :page="metaPendientes.page"
@@ -943,106 +1109,132 @@ watch(vista, cargar, { immediate: true });
         <h2
           v-if="!sesion.esCitas || morosos.length > 0 || buscarMorosos !== ''"
           id="morosos"
-          class="cb-seccion mt-8"
+          class="tu-titulo-seccion mt-8"
         >
-          <IconoNav nombre="facturas" :tam="21" />{{ $t("cobranza.morosos") }}
+          {{ $t("cobranza.morosos") }}
         </h2>
-        <input
-          v-if="(metaMorosos?.resumen?.total ?? 0) > 10 || buscarMorosos !== ''"
-          v-model="buscarMorosos"
-          type="search"
-          class="tu-input mt-3 max-w-sm"
-          :placeholder="$t('operacion.listadosTres.buscarPersona')"
-          :aria-label="$t('operacion.listadosTres.buscarPersona')"
-          data-prueba="buscar-morosos"
-        />
         <EstadoVacio
-          v-if="morosos.length === 0 && buscarMorosos !== ''"
-          class="tu-card mt-3"
-          icono="buscar"
-          :titulo="$t('operacion.listadosDos.sinResultados')"
-        />
-        <EstadoVacio
-          v-else-if="morosos.length === 0 && !sesion.esCitas"
+          v-if="morosos.length === 0 && buscarMorosos === '' && !sesion.esCitas"
           class="tu-card mt-3"
           icono="hecho"
           :titulo="$t('cobranza.sinMorosos')"
         />
         <div
-          v-else-if="morosos.length > 0"
-          class="mt-3 tu-card overflow-x-auto"
+          v-else-if="morosos.length > 0 || buscarMorosos !== ''"
+          class="mt-3 tu-card"
         >
-          <table class="tu-tabla">
-            <thead>
-              <tr>
-                <th>
-                  {{ $t("cobranza.colAlumno") }}
-                </th>
-                <th>
-                  {{ $t("cobranza.colEstado") }}
-                </th>
-                <th class="text-right hidden sm:table-cell">
-                  {{ $t("cobranza.colIntentos") }}
-                </th>
-                <th class="hidden md:table-cell">
-                  {{ $t("cobranza.colGracia") }}
-                </th>
-                <th class="text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="m in morosos" :key="m.id">
-                <td>
-                  <span class="font-semibold">{{
-                    m.persona?.nombre ?? "—"
-                  }}</span>
-                  <span
-                    v-if="m.ultimo_motivo"
-                    class="block text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ m.ultimo_motivo }}</span
+          <!-- La búsqueda, dentro de la tarjeta de lo que busca (con muchos en mora). -->
+          <div
+            v-if="
+              (metaMorosos?.resumen?.total ?? 0) > 10 || buscarMorosos !== ''
+            "
+            class="tu-filtros"
+          >
+            <label class="tu-buscar">
+              <IconoNav nombre="buscar" :tam="16" />
+              <input
+                v-model="buscarMorosos"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('operacion.listadosTres.buscarPersona')"
+                :aria-label="$t('operacion.listadosTres.buscarPersona')"
+                data-prueba="buscar-morosos"
+              />
+            </label>
+          </div>
+          <p v-if="morosos.length === 0" class="tu-sin-resultados">
+            {{ $t("operacion.listadosDos.sinResultados") }}
+          </p>
+          <!-- En el teléfono, una ficha: intentos y gracia como campos, Regularizar abajo. -->
+          <div v-else class="relative overflow-x-auto tu-tabla-adaptable">
+            <table class="tu-tabla">
+              <thead>
+                <tr>
+                  <th>
+                    {{ $t("cobranza.colAlumno") }}
+                  </th>
+                  <th>
+                    {{ $t("cobranza.colEstado") }}
+                  </th>
+                  <th class="text-right hidden sm:table-cell">
+                    {{ $t("cobranza.colIntentos") }}
+                  </th>
+                  <th class="hidden md:table-cell">
+                    {{ $t("cobranza.colGracia") }}
+                  </th>
+                  <th class="text-right"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in morosos" :key="m.id">
+                  <td :data-etiqueta="$t('cobranza.colAlumno')">
+                    <span class="font-semibold">{{
+                      m.persona?.nombre ?? "—"
+                    }}</span>
+                    <!-- Qué pasó, para quien administra (no la frase del alumno). -->
+                    <span
+                      class="tu-sub font-normal"
+                      data-prueba="motivo-mora"
+                      >{{ motivoMora(m) }}</span
+                    >
+                    <span v-if="detalleMora(m)" class="tu-sub font-normal">{{
+                      detalleMora(m)
+                    }}</span>
+                  </td>
+                  <td :data-etiqueta="$t('cobranza.colEstado')">
+                    <span
+                      class="tu-estado"
+                      :style="{
+                        '--tono':
+                          m.estado === 'suspendido'
+                            ? 'var(--error)'
+                            : 'var(--aviso)',
+                      }"
+                      >{{ $t(`cobranza.estados.${m.estado}`) }}</span
+                    >
+                  </td>
+                  <td
+                    :data-etiqueta="$t('cobranza.colIntentos')"
+                    class="text-right hidden sm:table-cell"
                   >
-                </td>
-                <td>
-                  <span
-                    class="tu-pildora"
-                    :style="{
-                      '--tono':
-                        m.estado === 'suspendido'
-                          ? 'var(--error)'
-                          : 'var(--aviso)',
-                    }"
+                    {{ m.intentos }}
+                  </td>
+                  <td
+                    :data-etiqueta="$t('cobranza.colGracia')"
+                    class="hidden md:table-cell"
                   >
-                    {{ $t(`cobranza.estados.${m.estado}`) }}
-                  </span>
-                </td>
-                <td class="text-right hidden sm:table-cell">
-                  {{ m.intentos }}
-                </td>
-                <td
-                  class="hidden md:table-cell"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ fecha(m.gracia_hasta) }}
-                </td>
-                <td class="text-right">
-                  <button
-                    v-if="puedeRegularizar && m.acuerdo"
-                    class="tu-enlace text-sm"
-                    type="button"
-                    :disabled="accionando === m.id"
-                    @click="regularizar(m)"
-                  >
-                    {{
-                      accionando === m.id
-                        ? $t("cobranza.regularizando")
-                        : $t("cobranza.regularizar")
-                    }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                    <!-- El plazo antes de suspender: cuánto falta o desde cuándo venció. -->
+                    <EstadoVencimiento
+                      v-if="m.gracia_hasta"
+                      :fecha="m.gracia_hasta"
+                      :etiqueta="
+                        graciaVencida(m.gracia_hasta)
+                          ? $t('cobranza.graciaVencida')
+                          : undefined
+                      "
+                    />
+                    <template v-else>—</template>
+                  </td>
+                  <td class="tu-celda-acciones">
+                    <button
+                      v-if="puedeRegularizar && m.acuerdo"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
+                      type="button"
+                      :disabled="accionando === m.id"
+                      :aria-busy="accionando === m.id || undefined"
+                      @click="regularizar(m)"
+                    >
+                      {{
+                        accionando === m.id
+                          ? $t("cobranza.regularizando")
+                          : $t("cobranza.regularizar")
+                      }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <PaginacionListado
             v-if="metaMorosos && metaMorosos.ultima_pagina > 1"
             :page="metaMorosos.page"
@@ -1065,6 +1257,7 @@ watch(vista, cargar, { immediate: true });
       <!-- Corte de caja: movimientos por fecha y por quién -->
       <CorteDeCaja
         v-if="vista === 'caja' && sesion.puede('facturacion.ver')"
+        ref="corteCaja"
         class="mt-6"
       />
 
@@ -1076,7 +1269,7 @@ watch(vista, cargar, { immediate: true });
           icono="dinero"
           :titulo="$t('cobranza.sinPagos')"
         />
-        <div v-else class="mt-5 tu-card overflow-x-auto">
+        <div v-else class="mt-5 tu-card">
           <div class="tu-filtros">
             <label class="tu-buscar">
               <IconoNav nombre="buscar" :tam="16" />
@@ -1112,7 +1305,7 @@ watch(vista, cargar, { immediate: true });
             <button
               v-if="conFiltrosPagos"
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-discreto"
               @click="limpiarFiltrosPagos"
             >
               {{ $t("tabla.limpiar") }}
@@ -1132,238 +1325,259 @@ watch(vista, cargar, { immediate: true });
               }}
             </button>
           </div>
-          <table class="tu-tabla">
-            <thead>
-              <tr>
-                <th>
-                  {{ $t("cobranza.colFecha") }}
-                </th>
-                <th>
-                  {{ $t("cobranza.colAlumno") }}
-                </th>
-                <th class="text-right">
-                  {{ $t("cobranza.colMonto") }}
-                </th>
-                <th>
-                  {{ $t("cobranza.colEstado") }}
-                </th>
-                <th class="text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-for="p in pagos" :key="p.id">
+          <!-- En el teléfono, una ficha por cobro: quién, cuánto y sus acciones a la vista. -->
+          <div class="relative overflow-x-auto tu-tabla-adaptable">
+            <table class="tu-tabla">
+              <thead>
                 <tr>
-                  <td
-                    class="whitespace-nowrap"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
-                    {{ fechaHora(p.fecha) }}
-                  </td>
-                  <td>
-                    <span class="font-semibold">{{ p.persona ?? "—" }}</span>
-                    <span
-                      v-if="p.registrado_por"
-                      class="block text-xs"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{
-                        $t("corteCaja.registro", { quien: p.registrado_por })
-                      }}</span
-                    >
-                  </td>
-                  <td class="text-right">
-                    {{ dinero(p.monto_minor, p.moneda) }}
-                    <span
-                      v-if="p.con_reembolsos && !puedeReembolsar"
-                      class="block ml-auto text-xs"
-                      :style="{ color: 'var(--texto-suave)' }"
-                    >
-                      −{{ dinero(p.reembolsado_minor, p.moneda) }}
-                    </span>
-                    <button
-                      v-else-if="p.con_reembolsos"
-                      type="button"
-                      class="block ml-auto text-xs underline-offset-2 hover:underline"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      :aria-expanded="reembolsosDe === p.id"
-                      :title="
-                        reembolsosDe === p.id
-                          ? $t('reembolsosPago.ocultar')
-                          : $t('reembolsosPago.ver')
-                      "
-                      @click="verReembolsos(p)"
-                    >
-                      −{{ dinero(p.reembolsado_minor, p.moneda) }}
-                    </button>
-                  </td>
-                  <td>
-                    <span
-                      class="tu-pildora"
-                      :style="{
-                        '--tono': TONO_PAGO[p.estado] ?? 'var(--aviso)',
-                      }"
-                      >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
-                    >
-                    <!-- Pagado no es lo mismo que conciliado ni que el recibo enviado. -->
-                    <span
-                      v-if="p.por_conciliar"
-                      class="block text-xs"
-                      :style="{ color: 'var(--aviso)' }"
-                      data-prueba="pago-por-conciliar"
-                      >{{ $t("cobranza.porConciliar") }}</span
-                    >
-                    <span
-                      v-if="p.contracargo"
-                      class="block text-xs"
-                      :style="{
-                        color:
-                          p.contracargo === 'ganado'
-                            ? 'var(--texto-suave)'
-                            : 'var(--error)',
-                      }"
-                      data-prueba="pago-contracargo"
-                      >{{ $t(`cobranza.contracargo.${p.contracargo}`) }}</span
-                    >
-                    <span
-                      v-if="p.comprobante"
-                      class="block text-xs"
-                      :style="{
-                        color:
-                          p.comprobante === 'fallido'
-                            ? 'var(--error)'
-                            : 'var(--texto-suave)',
-                      }"
-                      data-prueba="pago-comprobante"
-                      >{{ $t(`cobranza.comprobante.${p.comprobante}`) }}</span
-                    >
-                  </td>
-                  <td class="text-right">
-                    <span class="inline-flex flex-wrap justify-end gap-x-3">
-                      <RouterLink
-                        v-if="p.factura"
-                        class="tu-enlace text-sm"
-                        :to="rutaFacturaDeVenta(p.factura.uuid)"
-                        data-prueba="pago-facturado"
-                        >{{ $t("facturarVenta.facturada") }}</RouterLink
-                      >
-                      <RouterLink
-                        v-else-if="puedeFacturar && p.facturable && p.orden"
-                        class="tu-enlace text-sm"
-                        :to="rutaFacturarVenta({ orden: p.orden })"
-                        data-prueba="pago-facturar"
-                        >{{ $t("facturarVenta.facturar") }}</RouterLink
-                      >
-                      <!-- Solo a quien puede hacer algo: corregir o anular. -->
-                      <button
-                        v-if="
-                          (p.corregible && sesion.puede('ordenes.gestionar')) ||
-                          (p.anulable && puedeReembolsar)
-                        "
-                        class="tu-enlace text-sm"
-                        type="button"
-                        :aria-expanded="corrigiendo === p.id"
-                        @click="
-                          corrigiendo = corrigiendo === p.id ? null : p.id
-                        "
-                      >
-                        {{ $t("cobranza.corregir") }}
-                      </button>
-                      <button
-                        v-if="puedeReembolsar && p.reembolsable_minor > 0"
-                        class="tu-enlace text-sm"
-                        type="button"
-                        @click="abrirReembolso(p)"
-                      >
-                        {{ $t("cobranza.reembolsar") }}
-                      </button>
-                    </span>
-                  </td>
+                  <th>
+                    {{ $t("cobranza.colAlumno") }}
+                  </th>
+                  <th class="text-right">
+                    {{ $t("cobranza.colMonto") }}
+                  </th>
+                  <th>
+                    {{ $t("cobranza.colFecha") }}
+                  </th>
+                  <th>
+                    {{ $t("cobranza.colEstado") }}
+                  </th>
+                  <th class="text-right"></th>
                 </tr>
-                <!-- Cobro en caja con error: corregir la forma o anularlo -->
-                <tr v-if="corrigiendo === p.id">
-                  <td colspan="5" class="tu-celda-detalle">
-                    <CorregirCobro
-                      :base="base"
-                      :pago="{
-                        id: p.id,
-                        metodo: p.metodo_caja ?? null,
-                        corregible: p.corregible === true,
-                        anulable: p.anulable === true,
-                      }"
-                      @cambiado="alCorregirCobro"
-                    />
-                  </td>
-                </tr>
-                <tr v-if="reembolsosDe === p.id">
-                  <td colspan="5" class="tu-celda-detalle">
-                    <div
-                      class="rounded-xl border px-4 text-xs"
-                      :style="{
-                        borderColor: 'var(--borde)',
-                        background: 'var(--fondo)',
-                      }"
-                    >
-                      <div
-                        v-for="r in reembolsos"
-                        :key="r.id"
-                        class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
-                        :style="{ borderColor: 'var(--borde)' }"
+              </thead>
+              <tbody>
+                <template v-for="p in pagos" :key="p.id">
+                  <tr>
+                    <td :data-etiqueta="$t('cobranza.colAlumno')">
+                      <span class="font-semibold">{{ p.persona ?? "—" }}</span>
+                      <span
+                        v-if="p.registrado_por"
+                        class="tu-sub font-normal"
+                        >{{
+                          $t("corteCaja.registro", { quien: p.registrado_por })
+                        }}</span
                       >
-                        <span class="min-w-0">
-                          <span class="block font-medium">{{
-                            r.motivo ?? "—"
-                          }}</span>
-                          <span
-                            class="block"
-                            :style="{ color: 'var(--texto-suave)' }"
-                            >{{ fechaHora(r.fecha) }}
-                            <template v-if="r.actor">
-                              ·
-                              {{
-                                $t("reembolsosPago.por", { actor: r.actor })
-                              }}</template
-                            >
-                            <template v-if="r.via">
-                              ·
-                              {{ $t(`reembolsosPago.via.${r.via}`) }}</template
-                            >
-                            <template v-if="r.revirtio_creditos">
-                              ·
-                              {{
-                                $t("reembolsosPago.creditosRevertidos")
-                              }}</template
-                            ></span
-                          >
-                          <span
-                            v-if="r.motivo_fallo"
-                            class="block"
-                            style="color: var(--error)"
-                            >{{ r.motivo_fallo }}</span
-                          >
+                    </td>
+                    <td
+                      :data-etiqueta="$t('cobranza.colMonto')"
+                      class="text-right"
+                    >
+                      <div>
+                        {{ dinero(p.monto_minor, p.moneda) }}
+                        <span
+                          v-if="p.con_reembolsos && !puedeReembolsar"
+                          class="block ml-auto text-xs"
+                          :style="{ color: 'var(--texto-suave)' }"
+                        >
+                          −{{ dinero(p.reembolsado_minor, p.moneda) }}
                         </span>
-                        <span class="flex items-center gap-2 shrink-0">
-                          <span class="font-semibold tabular-nums">{{
-                            dinero(r.monto_minor, r.moneda)
-                          }}</span>
-                          <span
-                            class="tu-pildora"
-                            :style="{
-                              '--tono':
-                                r.estado === 'aprobado'
-                                  ? 'var(--exito)'
-                                  : 'var(--aviso)',
-                            }"
-                            >{{
-                              $t(`reembolsosPago.estados.${r.estado}`)
-                            }}</span
-                          >
-                        </span>
+                        <!-- Abre el detalle de las devoluciones (información). -->
+                        <button
+                          v-else-if="p.con_reembolsos"
+                          type="button"
+                          class="block ml-auto text-xs underline-offset-2 hover:underline"
+                          :style="{ color: 'var(--texto-suave)' }"
+                          :aria-expanded="reembolsosDe === p.id"
+                          :title="
+                            reembolsosDe === p.id
+                              ? $t('reembolsosPago.ocultar')
+                              : $t('reembolsosPago.ver')
+                          "
+                          @click="verReembolsos(p)"
+                        >
+                          −{{ dinero(p.reembolsado_minor, p.moneda) }}
+                        </button>
                       </div>
-                    </div>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
+                    </td>
+                    <td
+                      :data-etiqueta="$t('cobranza.colFecha')"
+                      class="whitespace-nowrap"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{ fechaHora(p.fecha) }}
+                    </td>
+                    <td :data-etiqueta="$t('cobranza.colEstado')">
+                      <div>
+                        <span
+                          class="tu-estado"
+                          :style="{
+                            '--tono': TONO_PAGO[p.estado] ?? 'var(--aviso)',
+                          }"
+                          >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
+                        >
+                        <!-- Pagado no es lo mismo que conciliado ni que el recibo enviado. -->
+                        <span
+                          v-if="p.por_conciliar"
+                          class="block text-xs"
+                          :style="{ color: 'var(--aviso)' }"
+                          data-prueba="pago-por-conciliar"
+                          >{{ $t("cobranza.porConciliar") }}</span
+                        >
+                        <span
+                          v-if="p.contracargo"
+                          class="block text-xs"
+                          :style="{
+                            color:
+                              p.contracargo === 'ganado'
+                                ? 'var(--texto-suave)'
+                                : 'var(--error)',
+                          }"
+                          data-prueba="pago-contracargo"
+                          >{{
+                            $t(`cobranza.contracargo.${p.contracargo}`)
+                          }}</span
+                        >
+                        <span
+                          v-if="p.comprobante"
+                          class="block text-xs"
+                          :style="{
+                            color:
+                              p.comprobante === 'fallido'
+                                ? 'var(--error)'
+                                : 'var(--texto-suave)',
+                          }"
+                          data-prueba="pago-comprobante"
+                          >{{
+                            $t(`cobranza.comprobante.${p.comprobante}`)
+                          }}</span
+                        >
+                      </div>
+                    </td>
+                    <td class="tu-celda-acciones">
+                      <span
+                        class="inline-flex flex-wrap items-center justify-end gap-2"
+                      >
+                        <RouterLink
+                          v-if="p.factura"
+                          class="tu-enlace text-sm"
+                          :to="rutaFacturaDeVenta(p.factura.uuid)"
+                          data-prueba="pago-facturado"
+                          >{{ $t("facturarVenta.facturada") }}</RouterLink
+                        >
+                        <RouterLink
+                          v-else-if="puedeFacturar && p.facturable && p.orden"
+                          class="tu-enlace text-sm"
+                          :to="rutaFacturarVenta({ orden: p.orden })"
+                          data-prueba="pago-facturar"
+                          >{{ $t("facturarVenta.facturar") }}</RouterLink
+                        >
+                        <!-- Solo a quien puede hacer algo: corregir o anular. -->
+                        <button
+                          v-if="
+                            (p.corregible &&
+                              sesion.puede('ordenes.gestionar')) ||
+                            (p.anulable && puedeReembolsar)
+                          "
+                          class="tu-btn tu-btn-secundario tu-btn-chico"
+                          type="button"
+                          :aria-expanded="corrigiendo === p.id"
+                          @click="
+                            corrigiendo = corrigiendo === p.id ? null : p.id
+                          "
+                        >
+                          {{ $t("cobranza.corregir") }}
+                        </button>
+                        <!-- Devolver dinero: destructiva (el diálogo pide monto y motivo). -->
+                        <button
+                          v-if="puedeReembolsar && p.reembolsable_minor > 0"
+                          class="tu-btn tu-btn-peligro tu-btn-chico"
+                          type="button"
+                          @click="abrirReembolso(p)"
+                        >
+                          {{ $t("cobranza.reembolsar") }}
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                  <!-- Cobro en caja con error: corregir la forma o anularlo -->
+                  <tr v-if="corrigiendo === p.id">
+                    <td colspan="5" class="tu-celda-detalle">
+                      <CorregirCobro
+                        :base="base"
+                        :pago="{
+                          id: p.id,
+                          metodo: p.metodo_caja ?? null,
+                          corregible: p.corregible === true,
+                          anulable: p.anulable === true,
+                        }"
+                        @cambiado="alCorregirCobro"
+                      />
+                    </td>
+                  </tr>
+                  <tr v-if="reembolsosDe === p.id">
+                    <td colspan="5" class="tu-celda-detalle">
+                      <div
+                        class="rounded-xl border px-4 text-xs"
+                        :style="{
+                          borderColor: 'var(--borde)',
+                          background: 'var(--fondo)',
+                        }"
+                      >
+                        <div
+                          v-for="r in reembolsos"
+                          :key="r.id"
+                          class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
+                          :style="{ borderColor: 'var(--borde)' }"
+                        >
+                          <span class="min-w-0">
+                            <span class="block font-medium">{{
+                              r.motivo ?? "—"
+                            }}</span>
+                            <span
+                              class="block"
+                              :style="{ color: 'var(--texto-suave)' }"
+                              >{{ fechaHora(r.fecha) }}
+                              <template v-if="r.actor">
+                                ·
+                                {{
+                                  $t("reembolsosPago.por", { actor: r.actor })
+                                }}</template
+                              >
+                              <template v-if="r.via">
+                                ·
+                                {{
+                                  $t(`reembolsosPago.via.${r.via}`)
+                                }}</template
+                              >
+                              <template v-if="r.revirtio_creditos">
+                                ·
+                                {{
+                                  $t("reembolsosPago.creditosRevertidos")
+                                }}</template
+                              ></span
+                            >
+                            <span
+                              v-if="r.motivo_fallo"
+                              class="block"
+                              style="color: var(--error)"
+                              >{{ r.motivo_fallo }}</span
+                            >
+                          </span>
+                          <span class="flex items-center gap-2 shrink-0">
+                            <span class="font-semibold tabular-nums">{{
+                              dinero(r.monto_minor, r.moneda)
+                            }}</span>
+                            <span
+                              class="tu-estado"
+                              :style="{
+                                '--tono':
+                                  r.estado === 'aprobado'
+                                    ? 'var(--exito)'
+                                    : 'var(--aviso)',
+                              }"
+                              >{{
+                                $t(`reembolsosPago.estados.${r.estado}`)
+                              }}</span
+                            >
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
           <p v-if="pagos.length === 0" class="tu-sin-resultados">
             {{ $t("cobranzaVisual.sinResultados") }}
           </p>
@@ -1378,47 +1592,16 @@ watch(vista, cargar, { immediate: true });
         </div>
       </template>
 
-      <!-- Próximas renovaciones (cobro recurrente) -->
+      <!-- Renovaciones (cobro recurrente): próximas y vencidas sin cobrar -->
       <template
         v-if="
           vista === 'por-cobrar' &&
           (!sesion.esCitas || (metaSuscripciones?.resumen?.total ?? 0) > 0)
         "
       >
-        <h2 class="mt-8 font-medium">
+        <h2 class="tu-titulo-seccion mt-8" data-prueba="titulo-renovaciones">
           {{ $t("cobranza.renovaciones") }}
         </h2>
-        <div
-          v-if="(metaSuscripciones?.resumen?.total ?? 0) > 0"
-          class="mt-3 flex flex-wrap items-center gap-2"
-          data-prueba="filtros-renovaciones"
-        >
-          <input
-            v-model="buscarRenovaciones"
-            type="search"
-            class="tu-input max-w-sm"
-            :placeholder="$t('operacion.listadosTres.buscarPersona')"
-            :aria-label="$t('operacion.listadosTres.buscarPersona')"
-            data-prueba="buscar-renovaciones"
-          />
-          <select
-            v-if="!sesion.esCitas"
-            v-model="filtroAutomatico"
-            class="tu-input max-w-[14rem]"
-            :aria-label="$t('operacion.listadosTres.pagoAutomatico')"
-            data-prueba="filtro-automatico"
-          >
-            <option value="">
-              {{ $t("operacion.listadosTres.automaticoTodos") }}
-            </option>
-            <option value="si">
-              {{ $t("operacion.listadosTres.automaticoSi") }}
-            </option>
-            <option value="no">
-              {{ $t("operacion.listadosTres.automaticoNo") }}
-            </option>
-          </select>
-        </div>
         <AvisoTono
           v-if="avisoRenovacion"
           tono="exito"
@@ -1428,146 +1611,218 @@ watch(vista, cargar, { immediate: true });
           {{ avisoRenovacion }}
         </AvisoTono>
         <EstadoVacio
-          v-if="suscripciones.length === 0"
+          v-if="
+            suscripciones.length === 0 &&
+            !conFiltrosRenovaciones &&
+            (metaSuscripciones?.resumen?.total ?? 0) === 0
+          "
           class="tu-card mt-3"
           icono="reloj"
-          :titulo="
-            buscarRenovaciones !== '' || filtroAutomatico !== ''
-              ? $t('operacion.listadosDos.sinResultados')
-              : $t('cobranza.sinRenovaciones')
-          "
+          :titulo="$t('cobranza.sinRenovaciones')"
         />
-        <div v-else class="mt-3 tu-card overflow-x-auto">
-          <table class="tu-tabla">
-            <thead>
-              <tr>
-                <th>
-                  {{ $t("cobranza.colAlumno") }}
-                </th>
-                <th class="hidden sm:table-cell">
-                  {{ $t("cobranza.colMembresia") }}
-                </th>
-                <th class="text-right">
-                  {{ $t("cobranza.colMonto") }}
-                </th>
-                <th>
-                  {{ $t("cobranza.colProxima") }}
-                </th>
-                <th>
-                  {{ $t("pagoAutomatico.colCobro") }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="s in suscripciones" :key="s.id">
-                <td class="font-semibold">{{ s.persona ?? "—" }}</td>
-                <td
-                  class="hidden sm:table-cell"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ s.producto ?? "—" }}
-                </td>
-                <td class="text-right">
-                  {{
-                    s.precio_minor !== null
-                      ? dinero(s.precio_minor, s.moneda)
-                      : "—"
-                  }}
-                </td>
-                <td>
-                  {{ fecha(s.proxima_cobro_en) }}
-                  <span
-                    v-if="s.estado !== 'activo'"
-                    class="tu-pildora ml-1"
-                    :style="{ '--tono': 'var(--error)' }"
-                    >{{ $t(`cobranza.estados.${s.estado}`, s.estado) }}</span
+        <div v-else class="mt-3 tu-card">
+          <!-- Los filtros, dentro de la tarjeta de lo que filtran (y en la dirección). -->
+          <div class="tu-filtros" data-prueba="filtros-renovaciones">
+            <label class="tu-buscar">
+              <IconoNav nombre="buscar" :tam="16" />
+              <input
+                v-model="buscarRenovaciones"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('operacion.listadosTres.buscarPersona')"
+                :aria-label="$t('operacion.listadosTres.buscarPersona')"
+                data-prueba="buscar-renovaciones"
+              />
+            </label>
+            <div
+              class="tu-segmentado"
+              role="group"
+              :aria-label="$t('cobranza.situacion.etiqueta')"
+            >
+              <button
+                v-for="f in ['', 'proximas', 'vencidas'] as const"
+                :key="f"
+                type="button"
+                :aria-pressed="filtroSituacion === f"
+                :data-prueba="`renovaciones-${f || 'todas'}`"
+                @click="filtroSituacion = f"
+              >
+                {{ $t(`cobranza.situacion.${f || "todas"}`) }}
+              </button>
+            </div>
+            <select
+              v-if="!sesion.esCitas"
+              v-model="filtroAutomatico"
+              class="tu-input max-w-[14rem]"
+              :aria-label="$t('operacion.listadosTres.pagoAutomatico')"
+              data-prueba="filtro-automatico"
+            >
+              <option value="">
+                {{ $t("operacion.listadosTres.automaticoTodos") }}
+              </option>
+              <option value="si">
+                {{ $t("operacion.listadosTres.automaticoSi") }}
+              </option>
+              <option value="no">
+                {{ $t("operacion.listadosTres.automaticoNo") }}
+              </option>
+            </select>
+          </div>
+          <p v-if="suscripciones.length === 0" class="tu-sin-resultados">
+            {{ $t("operacion.listadosDos.sinResultados") }}
+          </p>
+          <!-- En el teléfono, una ficha: qué se renueva, cuándo y con qué se cobra. -->
+          <div v-else class="relative overflow-x-auto tu-tabla-adaptable">
+            <table class="tu-tabla">
+              <thead>
+                <tr>
+                  <th>
+                    {{ $t("cobranza.colAlumno") }}
+                  </th>
+                  <th class="text-right">
+                    {{ $t("cobranza.colMonto") }}
+                  </th>
+                  <th class="hidden sm:table-cell">
+                    {{ $t("cobranza.colMembresia") }}
+                  </th>
+                  <th>
+                    {{ $t("cobranza.colProxima") }}
+                  </th>
+                  <th>
+                    {{ $t("pagoAutomatico.colCobro") }}
+                  </th>
+                  <th class="text-right"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in suscripciones" :key="s.id">
+                  <td
+                    :data-etiqueta="$t('cobranza.colAlumno')"
+                    class="font-semibold"
                   >
-                </td>
-                <td>
-                  <template v-if="s.pago_automatico">
-                    <span
-                      class="tu-pildora"
-                      :style="{ '--tono': 'var(--exito)' }"
-                      >{{
-                        $t("pagoAutomatico.tarjeta", {
-                          marca: marca(s.pago_automatico.marca),
-                          ultimos4: s.pago_automatico.ultimos4 ?? "····",
-                        })
-                      }}</span
-                    >
+                    {{ s.persona ?? "—" }}
+                  </td>
+                  <td
+                    :data-etiqueta="$t('cobranza.colMonto')"
+                    class="text-right tabular-nums"
+                  >
+                    {{
+                      s.precio_minor !== null
+                        ? dinero(s.precio_minor, s.moneda)
+                        : "—"
+                    }}
+                  </td>
+                  <td
+                    :data-etiqueta="$t('cobranza.colMembresia')"
+                    class="hidden sm:table-cell"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ s.producto ?? "—" }}
+                  </td>
+                  <td :data-etiqueta="$t('cobranza.colProxima')">
+                    <!-- Próxima, hoy, vencida, en mora, suspendida o en pausa. -->
+                    <EstadoVencimiento
+                      v-if="s.proxima_cobro_en"
+                      :fecha="s.proxima_cobro_en"
+                      :situacion="situacionRenovacion(s)"
+                    />
+                    <template v-else>—</template>
+                  </td>
+                  <td :data-etiqueta="$t('pagoAutomatico.colCobro')">
+                    <div v-if="s.pago_automatico">
+                      <span
+                        class="tu-estado"
+                        :style="{ '--tono': 'var(--exito)' }"
+                        >{{
+                          $t("pagoAutomatico.tarjeta", {
+                            marca: marca(s.pago_automatico.marca),
+                            ultimos4: s.pago_automatico.ultimos4 ?? "····",
+                          })
+                        }}</span
+                      >
+                      <p
+                        v-if="s.pago_automatico.paga"
+                        class="text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{
+                          $t("pagoAutomatico.paga", {
+                            nombre: s.pago_automatico.paga,
+                          })
+                        }}
+                      </p>
+                      <p
+                        v-if="s.pago_automatico.error"
+                        class="text-xs"
+                        style="color: var(--error)"
+                      >
+                        {{ s.pago_automatico.error }}
+                      </p>
+                      <p
+                        v-if="
+                          s.pago_automatico.precio_nuevo_minor &&
+                          s.pago_automatico.monto_minor
+                        "
+                        class="text-xs"
+                        :style="{ color: 'var(--aviso)' }"
+                      >
+                        {{
+                          $t("pagoAutomatico.precioNuevoNegocio", {
+                            monto: dinero(
+                              s.pago_automatico.monto_minor,
+                              s.moneda,
+                            ),
+                            nuevo: dinero(
+                              s.pago_automatico.precio_nuevo_minor,
+                              s.moneda,
+                            ),
+                          })
+                        }}
+                      </p>
+                    </div>
+                    <div v-else>
+                      <span
+                        v-if="s.cancelando_pago_automatico"
+                        class="tu-estado mr-2"
+                        :style="{ '--tono': 'var(--aviso)' }"
+                        >{{ $t("pagoAutomatico.cancelando") }}</span
+                      >
+                      <span :style="{ color: 'var(--texto-suave)' }">{{
+                        $t("pagoAutomatico.pagoManual")
+                      }}</span>
+                    </div>
+                  </td>
+                  <!-- Quitar el pago automático (destructiva) o invitar a activarlo. -->
+                  <td class="tu-celda-acciones">
                     <button
-                      v-if="puedeRegularizar"
+                      v-if="s.pago_automatico && puedeRegularizar"
                       type="button"
-                      class="tu-enlace ml-2 text-xs"
+                      class="tu-btn tu-btn-peligro tu-btn-chico"
                       :disabled="accionando !== null"
+                      :aria-busy="accionando === s.id || undefined"
                       @click="quitarPagoAutomatico(s)"
                     >
                       {{ $t("pagoAutomatico.quitar") }}
                     </button>
-                    <p
-                      v-if="s.pago_automatico.paga"
-                      class="text-xs"
-                      :style="{ color: 'var(--texto-suave)' }"
-                    >
-                      {{
-                        $t("pagoAutomatico.paga", {
-                          nombre: s.pago_automatico.paga,
-                        })
-                      }}
-                    </p>
-                    <p
-                      v-if="s.pago_automatico.error"
-                      class="text-xs"
-                      style="color: var(--error)"
-                    >
-                      {{ s.pago_automatico.error }}
-                    </p>
-                    <p
-                      v-if="
-                        s.pago_automatico.precio_nuevo_minor &&
-                        s.pago_automatico.monto_minor
-                      "
-                      class="text-xs"
-                      :style="{ color: 'var(--aviso)' }"
-                    >
-                      {{
-                        $t("pagoAutomatico.precioNuevoNegocio", {
-                          monto: dinero(
-                            s.pago_automatico.monto_minor,
-                            s.moneda,
-                          ),
-                          nuevo: dinero(
-                            s.pago_automatico.precio_nuevo_minor,
-                            s.moneda,
-                          ),
-                        })
-                      }}
-                    </p>
-                  </template>
-                  <template v-else>
-                    <span
-                      v-if="s.cancelando_pago_automatico"
-                      class="tu-estado mr-2"
-                      :style="{ '--tono': 'var(--aviso)' }"
-                      >{{ $t("pagoAutomatico.cancelando") }}</span
-                    >
-                    <span :style="{ color: 'var(--texto-suave)' }">{{
-                      $t("pagoAutomatico.pagoManual")
-                    }}</span>
                     <button
-                      v-if="puedeRegularizar && pagoAutomaticoDisponible"
+                      v-else-if="
+                        !s.pago_automatico &&
+                        puedeRegularizar &&
+                        pagoAutomaticoDisponible
+                      "
                       type="button"
-                      class="tu-enlace ml-2 text-xs"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       :disabled="accionando !== null"
+                      :aria-busy="accionando === s.id || undefined"
                       @click="invitarPagoAutomatico(s)"
                     >
                       {{ $t("pagoAutomatico.invitar") }}
                     </button>
-                  </template>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <PaginacionListado
             v-if="metaSuscripciones && metaSuscripciones.ultima_pagina > 1"
             :page="metaSuscripciones.page"
@@ -1585,7 +1840,7 @@ watch(vista, cargar, { immediate: true });
       :abierto="reembolsando !== null"
       :titulo="$t('cobranza.reembolso.titulo')"
       :ocupado="rProcesando"
-      @cerrar="reembolsando = null"
+      @cerrar="cerrarReembolso"
     >
       <template v-if="reembolsando">
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1726,16 +1981,18 @@ watch(vista, cargar, { immediate: true });
           type="button"
           class="tu-btn tu-btn-secundario"
           :disabled="rProcesando"
-          @click="reembolsando = null"
+          @click="cerrarReembolso"
         >
           {{ $t("comun.cancelar") }}
         </button>
+        <!-- La confirmación final de devolver dinero: sólida de peligro. -->
         <button
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-solido tu-tono-peligro"
           type="submit"
           form="form-reembolso"
           data-prueba="confirmar-reembolso"
           :disabled="rProcesando || rMotivo.trim() === ''"
+          :aria-busy="rProcesando || undefined"
         >
           {{
             rProcesando
@@ -1754,16 +2011,3 @@ watch(vista, cargar, { immediate: true });
     />
   </section>
 </template>
-
-<style scoped>
-.cb-seccion {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-weight: 600;
-}
-.cb-seccion > svg {
-  color: var(--primario);
-  flex-shrink: 0;
-}
-</style>

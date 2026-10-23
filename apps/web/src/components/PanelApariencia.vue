@@ -112,7 +112,7 @@ function restablecer(): void {
 
       <!-- Temas -->
       <section>
-        <h3 class="pa-seccion">{{ $t("apariencia.tema") }}</h3>
+        <h3 class="tu-titulo-seccion">{{ $t("apariencia.tema") }}</h3>
         <div class="mt-3 space-y-2">
           <button
             v-for="opcion in apariencia.disponibles"
@@ -192,7 +192,7 @@ function restablecer(): void {
           class="pa-fila"
           for="pa-fuente"
         >
-          <span class="pa-seccion">{{ $t("apariencia.fuente") }}</span>
+          <span class="pa-etiqueta">{{ $t("apariencia.fuente") }}</span>
           <span class="flex min-w-0 items-center gap-2">
             <span
               class="pa-muestra-letra"
@@ -224,7 +224,7 @@ function restablecer(): void {
         </label>
 
         <div class="pa-fila">
-          <span class="pa-seccion" :title="$t('apariencia.letraAyuda')">{{
+          <span class="pa-etiqueta" :title="$t('apariencia.letraAyuda')">{{
             $t("apariencia.letra")
           }}</span>
           <span class="flex items-center gap-1.5">
@@ -254,12 +254,12 @@ function restablecer(): void {
 
         <div v-if="apariencia.actual?.permite_personalizar">
           <div class="pa-fila">
-            <span class="pa-seccion" :title="$t('apariencia.propiosAyuda')">{{
+            <span class="pa-etiqueta" :title="$t('apariencia.propiosAyuda')">{{
               $t("apariencia.propios")
             }}</span>
             <button
               type="button"
-              class="tu-enlace text-xs"
+              class="tu-btn tu-btn-discreto tu-btn-chico"
               :disabled="
                 guardando ||
                 Object.keys(apariencia.actual.personalizacion).length === 0
@@ -299,12 +299,10 @@ function restablecer(): void {
 </template>
 
 <style scoped>
-.pa-seccion {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--texto-suave);
+/* El nombre de cada ajuste del pie (letra, tamaño, colores). */
+.pa-etiqueta {
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 .pa-tema {
   display: flex;

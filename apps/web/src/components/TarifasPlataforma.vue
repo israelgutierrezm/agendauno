@@ -321,7 +321,7 @@ onMounted(reintentar);
 
 <template>
   <div>
-    <h2 class="font-medium text-lg">{{ $t("cobro.tarifas.titulo") }}</h2>
+    <!-- La pestaña «Tarifas» ya la nombra: sin título propio, solo su ayuda. -->
     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("cobro.tarifas.ayuda") }}
     </p>
@@ -340,11 +340,7 @@ onMounted(reintentar);
       data-prueba="tarifas-error"
     >
       <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button
-        type="button"
-        class="tu-btn tu-btn-secundario"
-        @click="reintentar"
-      >
+      <button type="button" class="tu-btn tu-btn-discreto" @click="reintentar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -422,10 +418,11 @@ onMounted(reintentar);
                     />
                   </td>
                   <td class="text-right">
+                    <!-- Un renglón que aún no se publica: discreto. -->
                     <button
                       v-if="borradores[m]!.escalones.length > 1"
                       type="button"
-                      class="tu-enlace text-xs"
+                      class="tu-btn tu-btn-discreto tu-btn-chico"
                       @click="quitar(m, i)"
                     >
                       {{ $t("cobro.tarifas.quitar") }}
@@ -434,7 +431,11 @@ onMounted(reintentar);
                 </tr>
               </tbody>
             </table>
-            <button type="button" class="tu-enlace text-sm" @click="agregar(m)">
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
+              @click="agregar(m)"
+            >
               {{ $t("cobro.tarifas.agregar") }}
             </button>
           </template>
@@ -496,10 +497,10 @@ onMounted(reintentar);
                 </tr>
               </tbody>
             </table>
-            <div class="flex gap-4">
+            <div class="flex flex-wrap gap-2">
               <button
                 type="button"
-                class="tu-enlace text-sm"
+                class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
                 @click="agregar(m)"
               >
                 {{ $t("suscripcion.plataforma.tarifas.agregarFila") }}
@@ -507,7 +508,7 @@ onMounted(reintentar);
               <button
                 v-if="borradores[m]!.filas.length > 1"
                 type="button"
-                class="tu-enlace text-sm"
+                class="tu-btn tu-btn-discreto tu-btn-chico"
                 @click="quitar(m, 0)"
               >
                 {{ $t("suscripcion.plataforma.tarifas.quitarFila") }}
@@ -610,17 +611,21 @@ onMounted(reintentar);
             {{ $t("cobro.tarifas.incompleta") }}
           </AvisoTono>
 
-          <button
-            class="tu-btn tu-btn-primario w-full"
-            type="submit"
-            :disabled="publicando === m"
-          >
-            {{
-              publicando === m
-                ? $t("cobro.tarifas.publicando")
-                : $t("cobro.tarifas.publicar")
-            }}
-          </button>
+          <!-- «Publicar» siempre a la vista al bajar por la tarjeta. -->
+          <div class="tu-pie-acciones">
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="publicando === m"
+              :aria-busy="publicando === m || undefined"
+            >
+              {{
+                publicando === m
+                  ? $t("cobro.tarifas.publicando")
+                  : $t("cobro.tarifas.publicar")
+              }}
+            </button>
+          </div>
         </template>
       </form>
     </div>
@@ -631,7 +636,7 @@ onMounted(reintentar);
       data-prueba="tipo-cambio"
       @submit.prevent="guardarCambio"
     >
-      <h2 class="font-medium text-lg">
+      <h2 class="tu-titulo-seccion">
         {{ $t("suscripcion.plataforma.tipoCambio.titulo") }}
       </h2>
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -686,6 +691,7 @@ onMounted(reintentar);
           type="submit"
           class="tu-btn tu-btn-primario"
           :disabled="guardandoCambio || nuevoCambio.trim() === ''"
+          :aria-busy="guardandoCambio || undefined"
         >
           {{ $t("suscripcion.plataforma.tipoCambio.guardar") }}
         </button>

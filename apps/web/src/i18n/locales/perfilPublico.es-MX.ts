@@ -7,13 +7,13 @@ export default {
   config: {
     titulo: "Perfil público",
     ayuda:
-      "Lo que ven tus clientes en tu página y en tu página de enlaces para redes.",
+      "Lo que ve quien visita tu página y tu página de enlaces para redes.",
     descripcion: "Descripción",
     color: "Color de tu marca",
     colorSin: "El de la plataforma",
     colorQuitar: "Usar el de la plataforma",
     colorAyuda:
-      "Lo usa la app de tu negocio cuando tus clientes la instalan en su teléfono.",
+      "Lo usa la app de tu negocio cuando tus alumnos la instalan en su teléfono.",
     descripcionPh:
       "Cuéntales quiénes son, qué ofrecen y qué los hace distintos.",
     portada: "Portada",
@@ -56,7 +56,7 @@ export default {
     foto: "Foto de la sede",
     fotoArrastra: "Arrastra la foto aquí o",
     fotoAyuda:
-      "La fachada o la entrada: así tus clientes eligen la sede correcta. PNG, JPG o WebP de hasta 4 MB.",
+      "La fachada o la entrada: así tus alumnos eligen la sede correcta. PNG, JPG o WebP de hasta 4 MB.",
     fotoQuitar: "Quitar foto",
     fotoAlGuardar: "Guarda la sede para agregar su foto.",
     mapa: "Enlace de Google Maps",
@@ -82,14 +82,14 @@ export default {
         "Cómo se llama, su zona horaria, el impuesto que cobra y su foto.",
       ubicacion: "Ubicación",
       ubicacionAyuda:
-        "Dónde está: la dirección y el mapa que ven tus clientes al elegirla.",
+        "Dónde está: la dirección y el mapa que ven tus alumnos al elegirla.",
       contacto: "Contacto",
       contactoAyuda: "Teléfono, WhatsApp y redes que se muestran en tu página.",
       horarios: "Horarios",
     },
   },
   catalogo: {
-    descripcion: "Descripción para tus clientes",
+    descripcionAlumnos: "Descripción para tus alumnos",
     descripcionPh:
       "Qué incluye, para quién es o qué necesita traer. Se ve en tu página y al agendar.",
     incluye: "Servicios que incluye (paquete)",
@@ -99,7 +99,8 @@ export default {
     incluyeResumen: "Incluye {lista}",
     foto: "Foto del servicio",
     fotoArrastra: "Arrastra la foto aquí o",
-    fotoAyuda: "La ven tus clientes al elegir. PNG, JPG o WebP de hasta 4 MB.",
+    fotoAyudaAlumnos:
+      "La ven tus alumnos al elegir. PNG, JPG o WebP de hasta 4 MB.",
     fotoQuitar: "Quitar foto",
     // Para quien llega por primera vez (C03): lo que el negocio valida.
     principiantes: "Apta para principiantes",
@@ -277,7 +278,6 @@ export default {
     comoNosConociste: "¿Cómo nos conociste? (opcional)",
     prefieroNoDecir: "Prefiero no decir",
     nota: "Nota para el negocio (opcional)",
-    notaDelCliente: "Nota del cliente",
     paraOtra: "Es para otra persona",
     quienAsiste: "¿Quién asiste?",
     aceptaWhatsApp:

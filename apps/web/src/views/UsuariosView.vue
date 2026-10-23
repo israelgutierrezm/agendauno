@@ -11,6 +11,7 @@ import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -69,7 +70,30 @@ function irPaginaClientes(n: number): void {
   paginaClientes.value = n;
   void cargar();
 }
-watch(alcance, () => {
+// Equipo o alumnos, activos o dados de baja y la búsqueda, en la dirección: recargar
+// o volver conserva lo que se veía. Lo de siempre (el equipo activo) no se escribe.
+useFiltrosEnUrl({
+  alcance: computed({
+    get: () => (alcance.value === "equipo" ? "" : alcance.value),
+    set: (valor: string) => {
+      alcance.value = valor === "clientes" ? "clientes" : "equipo";
+    },
+  }),
+  bajas: computed({
+    get: () => (verBajas.value ? "si" : ""),
+    set: (valor: string) => {
+      verBajas.value = valor === "si";
+    },
+  }),
+  q: buscarClientes,
+});
+// Los nombres de cada lado: el equipo y el público («alumnos» se adapta al término
+// del negocio).
+const textoAlcance = computed(() => ({
+  equipo: t("operacion.usuarios.equipo"),
+  clientes: t("operacion.usuarios.alumnosConCuenta"),
+}));
+watch([alcance, verBajas], () => {
   paginaClientes.value = 1;
   void cargar();
 });
@@ -117,7 +141,13 @@ const columnas = computed(() => [
   { clave: "nombre", etiqueta: t("usuarios.colUsuario") },
   { clave: "roles", etiqueta: t("usuarios.colRoles") },
   { clave: "activo", etiqueta: t("usuarios.colEstado") },
-  { clave: "acciones", etiqueta: "", alinear: "derecha" as const },
+  // En el teléfono, las acciones al pie de la ficha y sin etiqueta.
+  {
+    clave: "acciones",
+    etiqueta: "",
+    alinear: "derecha" as const,
+    acciones: true,
+  },
 ]);
 
 // Nombres de los roles propios del negocio (los de sistema se traducen).
@@ -385,11 +415,6 @@ function detalleBaja(u: UsuarioRow): string {
     : t("bajas.detalle", { fecha });
 }
 
-function alternarBajas(): void {
-  verBajas.value = !verBajas.value;
-  void cargar();
-}
-
 // Baja lógica: pierde el acceso; su historial se conserva (se reactiva al invitarlo).
 const motivoBaja = ref("");
 const dandoDeBaja = ref(false);
@@ -446,8 +471,15 @@ onMounted(cargar);
       "
     />
 
+    <!-- Dos filtros de la misma lista: de quién (equipo o alumnos con cuenta) y si
+         están activos o dados de baja. -->
     <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
-      <div class="tu-segmentado" role="group" data-prueba="alcance-usuarios">
+      <div
+        class="tu-segmentado"
+        role="group"
+        :aria-label="$t('usuarios.titulo')"
+        data-prueba="alcance-usuarios"
+      >
         <button
           v-for="a in ['equipo', 'clientes'] as const"
           :key="a"
@@ -456,7 +488,7 @@ onMounted(cargar);
           :data-prueba="`usuarios-${a}`"
           @click="alcance = a"
         >
-          {{ $t(`operacion.usuarios.${a}`) }}
+          {{ textoAlcance[a] }}
           <span
             v-if="metaUsuarios?.conteos"
             class="ml-1 tabular-nums"
@@ -465,9 +497,23 @@ onMounted(cargar);
           >
         </button>
       </div>
-      <button type="button" class="tu-enlace text-sm" @click="alternarBajas">
-        {{ verBajas ? $t("bajas.verEquipo") : $t("bajas.verBajas") }}
-      </button>
+      <div
+        class="tu-segmentado"
+        role="group"
+        :aria-label="$t('usuarios.colEstado')"
+        data-prueba="bajas-usuarios"
+      >
+        <button
+          type="button"
+          :aria-pressed="!verBajas"
+          @click="verBajas = false"
+        >
+          {{ $t("bajas.activos") }}
+        </button>
+        <button type="button" :aria-pressed="verBajas" @click="verBajas = true">
+          {{ $t("bajas.dadosDeBaja") }}
+        </button>
+      </div>
     </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
@@ -482,8 +528,8 @@ onMounted(cargar);
       v-model="buscarClientes"
       type="search"
       class="tu-input mt-4 max-w-sm"
-      :placeholder="$t('operacion.usuarios.buscarClientes')"
-      :aria-label="$t('operacion.usuarios.buscarClientes')"
+      :placeholder="$t('operacion.usuarios.buscarAlumnos')"
+      :aria-label="$t('operacion.usuarios.buscarAlumnos')"
       data-prueba="buscar-clientes-usuarios"
     />
     <TablaDatos
@@ -545,10 +591,18 @@ onMounted(cargar);
         >
           {{ detalleBaja(fila as UsuarioRow) }}
         </span>
-        <span v-else-if="valor" class="tu-badge tu-badge-exito">
+        <span
+          v-else-if="valor"
+          class="tu-estado"
+          :style="{ '--tono': 'var(--exito)' }"
+        >
           {{ $t("usuarios.activo") }}
         </span>
-        <span v-else :style="{ color: 'var(--texto-suave)' }">
+        <span
+          v-else
+          class="tu-estado"
+          :style="{ '--tono': 'var(--aviso)', color: 'var(--texto-suave)' }"
+        >
           {{ $t("usuarios.inactivo") }}
         </span>
       </template>
@@ -559,20 +613,22 @@ onMounted(cargar);
           class="flex items-center justify-end"
         >
           <button
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             type="button"
             :disabled="reactivandoId === (fila as UsuarioRow).id"
+            :aria-busy="reactivandoId === (fila as UsuarioRow).id || undefined"
             @click="reactivar(fila as UsuarioRow)"
           >
             {{ $t("bajas.reactivar") }}
           </button>
         </div>
-        <div v-else class="flex items-center justify-end gap-2">
+        <div v-else class="flex flex-wrap items-center justify-end gap-2">
           <button
             v-if="!(fila as UsuarioRow).activo"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             type="button"
             :disabled="reenviandoId === (fila as UsuarioRow).id"
+            :aria-busy="reenviandoId === (fila as UsuarioRow).id || undefined"
             @click="reenviar(fila as UsuarioRow)"
           >
             {{
@@ -584,7 +640,7 @@ onMounted(cargar);
             }}
           </button>
           <button
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             type="button"
             @click="abrirEdicion(fila as UsuarioRow)"
           >
@@ -618,7 +674,7 @@ onMounted(cargar);
         {{ editando?.email ?? $t("usuarios.sinCorreo") }}
       </p>
 
-      <div class="mt-4 space-y-2">
+      <form id="form-roles" class="mt-4 space-y-2" @submit.prevent="guardar">
         <label
           v-for="r in rolesDisponibles"
           :key="r"
@@ -636,7 +692,7 @@ onMounted(cargar);
           />
           <span class="font-medium">{{ nombreRol(r) }}</span>
         </label>
-      </div>
+      </form>
 
       <!-- Sedes asignadas (RBAC con scope por sucursal, R19): solo con varias sedes. -->
       <div
@@ -738,6 +794,7 @@ onMounted(cargar);
             class="tu-btn tu-btn-secundario"
             type="button"
             :disabled="guardandoSede || nuevaSede.sucursalId === ''"
+            :aria-busy="guardandoSede || undefined"
             @click="asignarSede"
           >
             {{
@@ -780,6 +837,7 @@ onMounted(cargar);
           type="button"
           class="tu-btn tu-btn-peligro"
           :disabled="dandoDeBaja"
+          :aria-busy="dandoDeBaja || undefined"
           @click="darDeBaja"
         >
           {{ $t("bajas.darDeBaja") }}
@@ -806,10 +864,11 @@ onMounted(cargar);
             {{ $t("usuarios.cancelar") }}
           </button>
           <button
+            type="submit"
+            form="form-roles"
             class="tu-btn tu-btn-primario"
-            type="button"
             :disabled="guardando || seleccion.size === 0"
-            @click="guardar"
+            :aria-busy="guardando || undefined"
           >
             {{ guardando ? $t("usuarios.guardando") : $t("usuarios.guardar") }}
           </button>

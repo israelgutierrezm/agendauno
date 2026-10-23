@@ -14,6 +14,7 @@ import TarjetasIndicadores, {
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -194,6 +195,11 @@ async function eliminar(p: Promo): Promise<void> {
 // ---- Indicadores, búsqueda y filtro (patrón de los listados) ----
 const busqueda = ref("");
 const filtro = ref<"" | "vigentes" | "no_vigentes">("");
+// En la dirección: recargar o compartir el enlace conserva lo que se buscaba.
+useFiltrosEnUrl({
+  q: busqueda,
+  vigencia: opcionEnUrl(filtro, ["", "vigentes", "no_vigentes"] as const),
+});
 const visibles = computed(() => {
   const q = busqueda.value.trim().toLowerCase();
   return (
@@ -467,9 +473,10 @@ onMounted(cargar);
           </button>
           <button
             class="tu-btn tu-btn-primario"
-            type="button"
+            type="submit"
+            form="form-promo"
             :disabled="guardando || form.codigo.trim() === ''"
-            @click="guardar"
+            :aria-busy="guardando || undefined"
           >
             {{ $t("promociones.guardar") }}
           </button>
@@ -508,7 +515,7 @@ onMounted(cargar);
     <template v-else>
       <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-      <div class="relative tu-card mt-5 overflow-x-auto">
+      <div class="tu-card mt-5">
         <div class="tu-filtros">
           <label class="tu-buscar">
             <IconoNav nombre="buscar" :tam="16" />
@@ -533,85 +540,104 @@ onMounted(cargar);
             </button>
           </div>
         </div>
-        <table class="tu-tabla">
-          <thead>
-            <tr>
-              <th>{{ $t("promocionesVisual.col.codigo") }}</th>
-              <th>{{ $t("promocionesVisual.col.descuento") }}</th>
-              <th class="hidden sm:table-cell">
-                {{ $t("promociones.usos") }}
-              </th>
-              <th class="hidden md:table-cell">
-                {{ $t("promociones.vence") }}
-              </th>
-              <th>{{ $t("promocionesVisual.col.estado") }}</th>
-              <th>
-                <span class="sr-only">{{
-                  $t("promocionesVisual.col.acciones")
-                }}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in enPagina" :key="p.id" data-prueba="promo">
-              <td>
-                <span class="font-semibold tracking-wide">{{ p.codigo }}</span>
-                <span v-if="p.descripcion" class="tu-sub">{{
-                  p.descripcion
-                }}</span>
-              </td>
-              <td class="tabular-nums">
-                {{ valorLegible(p) }}
-                <span v-if="p.monto_minimo_minor" class="tu-sub">{{
-                  $t("promocionesVisual.desde", {
-                    monto: dinero(p.monto_minimo_minor),
-                  })
-                }}</span>
-              </td>
-              <td class="hidden sm:table-cell tabular-nums">{{ usos(p) }}</td>
-              <td
-                class="hidden md:table-cell"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ fechaCorta(p.vence_en) }}
-              </td>
-              <td>
-                <span
-                  class="tu-pildora"
-                  :style="{
-                    '--tono': p.vigente ? 'var(--exito)' : 'var(--texto-suave)',
-                  }"
-                  >{{
-                    p.vigente
-                      ? $t("promociones.vigente")
-                      : $t("promociones.noVigente")
-                  }}</span
+        <div class="relative overflow-x-auto tu-tabla-adaptable">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("promocionesVisual.col.codigo") }}</th>
+                <th>{{ $t("promocionesVisual.col.descuento") }}</th>
+                <th class="hidden sm:table-cell">
+                  {{ $t("promociones.usos") }}
+                </th>
+                <th class="hidden md:table-cell">
+                  {{ $t("promociones.vence") }}
+                </th>
+                <th>{{ $t("promocionesVisual.col.estado") }}</th>
+                <th>
+                  <span class="sr-only">{{
+                    $t("promocionesVisual.col.acciones")
+                  }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in enPagina" :key="p.id" data-prueba="promo">
+                <td :data-etiqueta="$t('promocionesVisual.col.codigo')">
+                  <span class="font-semibold tracking-wide">{{
+                    p.codigo
+                  }}</span>
+                  <span v-if="p.descripcion" class="tu-sub">{{
+                    p.descripcion
+                  }}</span>
+                </td>
+                <td
+                  class="tabular-nums"
+                  :data-etiqueta="$t('promocionesVisual.col.descuento')"
                 >
-              </td>
-              <td class="text-right whitespace-nowrap">
-                <button
-                  class="tu-enlace text-sm"
-                  type="button"
-                  :disabled="accionando"
-                  :data-prueba="`editar-promo-${p.id}`"
-                  @click="editar(p)"
+                  <span>
+                    {{ valorLegible(p) }}
+                    <span v-if="p.monto_minimo_minor" class="tu-sub">{{
+                      $t("promocionesVisual.desde", {
+                        monto: dinero(p.monto_minimo_minor),
+                      })
+                    }}</span>
+                  </span>
+                </td>
+                <td
+                  class="hidden sm:table-cell tabular-nums"
+                  :data-etiqueta="$t('promociones.usos')"
                 >
-                  {{ $t("promociones.editar") }}
-                </button>
-                <button
-                  v-if="puedeEliminar"
-                  class="tu-enlace text-sm ml-4"
-                  style="color: var(--error)"
-                  type="button"
-                  :disabled="accionando"
-                  @click="eliminar(p)"
+                  {{ usos(p) }}
+                </td>
+                <td
+                  class="hidden md:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  :data-etiqueta="$t('promociones.vence')"
                 >
-                  {{ $t("promociones.eliminar") }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                  {{ fechaCorta(p.vence_en) }}
+                </td>
+                <td :data-etiqueta="$t('promocionesVisual.col.estado')">
+                  <span
+                    class="tu-estado"
+                    :style="{
+                      '--tono': p.vigente
+                        ? 'var(--exito)'
+                        : 'var(--texto-suave)',
+                    }"
+                    >{{
+                      p.vigente
+                        ? $t("promociones.vigente")
+                        : $t("promociones.noVigente")
+                    }}</span
+                  >
+                </td>
+                <td class="tu-celda-acciones">
+                  <div class="inline-flex flex-wrap items-center gap-2">
+                    <button
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
+                      type="button"
+                      :disabled="accionando"
+                      :data-prueba="`editar-promo-${p.id}`"
+                      @click="editar(p)"
+                    >
+                      {{ $t("promociones.editar") }}
+                    </button>
+                    <button
+                      v-if="puedeEliminar"
+                      class="tu-btn tu-btn-peligro tu-btn-chico"
+                      type="button"
+                      :disabled="accionando"
+                      :data-prueba="`eliminar-promo-${p.id}`"
+                      @click="eliminar(p)"
+                    >
+                      {{ $t("promociones.eliminar") }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <p v-if="visibles.length === 0" class="tu-sin-resultados">
           {{ $t("promocionesVisual.sinResultados") }}
         </p>

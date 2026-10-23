@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { conTerminosActuales } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -166,8 +167,8 @@ defineExpose({ cargar });
 </script>
 
 <template>
-  <section v-if="puedeVer" class="mt-8" data-prueba="por-conciliar">
-    <h2 class="font-medium text-lg">{{ $t("porConciliar.titulo") }}</h2>
+  <!-- El título es el de la vista (Cobros › Conciliación); el margen lo pone quien lo usa. -->
+  <section v-if="puedeVer" data-prueba="por-conciliar">
     <p
       v-if="estado === 'cargando'"
       class="mt-1 text-sm"
@@ -194,7 +195,7 @@ defineExpose({ cargar });
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           data-prueba="reintentar-conciliar"
           @click="cargar"
         >
@@ -229,15 +230,17 @@ defineExpose({ cargar });
               {{ titulo(i) }}
               <template v-if="i.persona"> · {{ i.persona }}</template>
             </p>
+            <!-- Lo escribe el API: con los términos del negocio (alumno, cliente…). -->
             <p class="mt-0.5" :style="{ color: 'var(--texto-suave)' }">
-              {{ i.detalle }}
+              {{ conTerminosActuales(i.detalle) }}
             </p>
           </div>
           <button
             v-if="puedeResolver"
             type="button"
-            class="tu-enlace shrink-0"
+            class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
             :aria-expanded="abierta === i.id"
+            data-prueba="resolver-incidencia"
             @click="abrir(i)"
           >
             {{ $t("porConciliar.resolver") }}
@@ -268,15 +271,16 @@ defineExpose({ cargar });
             >
               <button
                 type="button"
-                class="tu-btn tu-btn-primario"
+                class="tu-btn tu-btn-primario tu-btn-chico"
                 :disabled="guardando"
+                :aria-busy="guardando || undefined"
                 @click="resolver(i, 'aprobado')"
               >
                 {{ $t("porConciliar.siSeDevolvio") }}
               </button>
               <button
                 type="button"
-                class="tu-btn tu-btn-secundario"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 :disabled="guardando"
                 @click="resolver(i, 'fallido')"
               >
@@ -288,20 +292,18 @@ defineExpose({ cargar });
               <button
                 v-if="i.aplicable"
                 type="button"
-                class="tu-btn tu-btn-primario"
+                class="tu-btn tu-btn-primario tu-btn-chico"
                 :disabled="guardando"
+                :aria-busy="guardando || undefined"
                 @click="resolver(i, null, 'aplicar')"
               >
                 {{ $t("porConciliar.darPorPagada") }}
               </button>
+              <!-- Devolver el dinero: destructiva (sale del negocio). -->
               <button
                 v-if="i.reembolso === null && i.monto_minor !== null"
                 type="button"
-                :class="
-                  i.aplicable
-                    ? 'tu-btn tu-btn-secundario'
-                    : 'tu-btn tu-btn-primario'
-                "
+                class="tu-btn tu-btn-peligro tu-btn-chico"
                 :disabled="guardando"
                 @click="resolver(i, null, 'devolver')"
               >
@@ -315,7 +317,7 @@ defineExpose({ cargar });
               </button>
               <button
                 type="button"
-                class="tu-btn tu-btn-secundario"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 :disabled="guardando"
                 @click="resolver(i, null)"
               >

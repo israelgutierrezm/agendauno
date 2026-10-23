@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import FiltroFilasImportacion from "@/components/FiltroFilasImportacion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -15,7 +16,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Importar las citas futuras de otro sistema (ADR 0160). Se sube el CSV, se revisa
  * (las mismas reglas que al agendar, sin guardar), se eligen las correspondencias de
- * los nombres que no coinciden y se importa todo o nada. A los clientes no se les
+ * los nombres que no coinciden y se importa todo o nada. A los alumnos no se les
  * avisa; los recordatorios antes de cada cita, solo si se marcan.
  */
 type Campo = "servicio" | "profesional" | "sucursal";
@@ -232,16 +233,16 @@ function fechaHora(iso: string | null): string {
 
 <template>
   <section class="tu-pagina" :aria-busy="ocupado">
-    <EncabezadoSeccion
-      :titulo="t('importarCitas.titulo')"
-      :subtitulo="t('importarCitas.subtitulo')"
+    <!-- «Volver» a la lista de origen, encima del encabezado (como en las fichas). -->
+    <RouterLink :to="{ name: 'agenda' }" class="tu-volver"
+      ><IconoNav nombre="atras" :tam="16" />
+      {{ t("importarCitas.volver") }}</RouterLink
     >
-      <template #acciones>
-        <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-secundario">{{
-          t("importarCitas.volver")
-        }}</RouterLink>
-      </template>
-    </EncabezadoSeccion>
+    <EncabezadoSeccion
+      class="mt-4"
+      :titulo="t('importarCitas.titulo')"
+      :subtitulo="t('importarCitas.subtituloAlumnos')"
+    />
 
     <AvisoTono v-if="error" tono="peligro" role="alert" class="mt-4">
       {{ error }}
@@ -257,7 +258,7 @@ function fechaHora(iso: string | null): string {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargarCatalogos"
         >
           {{ t("comun.reintentar") }}
@@ -271,21 +272,21 @@ function fechaHora(iso: string | null): string {
       role="status"
       data-prueba="exito-citas"
     >
-      <h2 class="text-2xl font-semibold" style="color: var(--exito)">
+      <p class="text-lg font-semibold" style="color: var(--exito)">
         {{ t("importarCitas.creadas", exito.creados) }}
-      </h2>
+      </p>
       <p class="mt-2 text-sm" style="color: var(--texto-suave)">
         {{
           recordatorios
             ? t("importarCitas.conRecordatorios")
-            : t("importarCitas.sinAvisos")
+            : t("importarCitas.sinAvisosAlumnos")
         }}
       </p>
       <div class="mt-5 flex flex-wrap justify-center gap-3">
         <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-primario">{{
           t("importarCitas.volver")
         }}</RouterLink>
-        <button class="tu-btn tu-btn-secundario" @click="limpiar">
+        <button type="button" class="tu-btn tu-btn-secundario" @click="limpiar">
           {{ t("importarCitas.otra") }}
         </button>
       </div>
@@ -298,6 +299,7 @@ function fechaHora(iso: string | null): string {
             {{ t("importarCitas.preparar") }}
           </h2>
           <button
+            type="button"
             class="tu-btn tu-btn-secundario"
             :disabled="ocupado"
             @click="descargar"
@@ -312,7 +314,7 @@ function fechaHora(iso: string | null): string {
         </div>
         <ul class="mt-4 space-y-2 pl-5 text-sm lista-ayuda">
           <li>{{ t("importarCitas.reglaFormato") }}</li>
-          <li>{{ t("importarCitas.reglaClientes") }}</li>
+          <li>{{ t("importarCitas.reglaAlumnos") }}</li>
           <li>{{ t("importarCitas.reglaReferencia") }}</li>
           <li>{{ t("importarCitas.reglaCobro") }}</li>
           <li>{{ t("importarCitas.reglaNombres") }}</li>
@@ -412,7 +414,10 @@ function fechaHora(iso: string | null): string {
           <div
             v-for="indicador in [
               { clave: 'filas', valor: preview.resumen.total },
-              { clave: 'nuevos', valor: preview.resumen.clientes_nuevos },
+              {
+                clave: 'alumnosNuevos',
+                valor: preview.resumen.clientes_nuevos,
+              },
               { clave: 'errores', valor: preview.resumen.invalidas },
               { clave: 'omitidas', valor: preview.resumen.omitidas },
             ]"
@@ -483,75 +488,80 @@ function fechaHora(iso: string | null): string {
           :todas="todas"
           :con-errores="conErrores"
         />
-        <div class="tu-card mt-4 overflow-x-auto">
+        <!-- En el teléfono, una ficha por fila: quién (con su n.º de fila) como
+             título y la revisión a la vista, sin desplazar. -->
+        <div class="tu-card relative mt-4 overflow-x-auto tu-tabla-adaptable">
           <table class="tu-tabla">
             <thead>
               <tr>
-                <th>{{ t("importarCitas.fila") }}</th>
-                <th>{{ t("importarCitas.cliente") }}</th>
+                <th>{{ t("importarCitas.alumno") }}</th>
                 <th>{{ t("importarCitas.cita") }}</th>
                 <th>{{ t("importarCitas.revision") }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="fila in enPagina" :key="fila.fila">
-                <td>{{ fila.fila }}</td>
-                <td>
+                <td :data-etiqueta="t('importarCitas.alumno')">
                   <strong>{{
                     fila.cliente?.nombre ?? fila.datos.cliente
                   }}</strong>
-                  <span
-                    v-if="fila.cliente"
-                    class="block text-xs"
-                    style="color: var(--texto-suave)"
-                    >{{
-                      fila.cliente.nueva
-                        ? t("importarCitas.fichaNueva")
-                        : t("importarCitas.fichaExistente")
-                    }}</span
+                  <span class="tu-sub"
+                    >{{ t("importar.filaN", { n: fila.fila })
+                    }}<template v-if="fila.cliente">
+                      ·
+                      {{
+                        fila.cliente.nueva
+                          ? t("importarCitas.fichaNueva")
+                          : t("importarCitas.fichaExistente")
+                      }}</template
+                    ></span
                   >
                 </td>
-                <td>
-                  {{ fila.datos.servicio }} · {{ fila.datos.profesional }}
-                  <span class="block" style="color: var(--texto-suave)"
-                    >{{ fila.datos.sucursal }} ·
-                    {{
-                      fila.inicia_en
-                        ? fechaHora(fila.inicia_en)
-                        : `${fila.datos.fecha} ${fila.datos.hora}`
-                    }}</span
-                  >
+                <td :data-etiqueta="t('importarCitas.cita')">
+                  <div>
+                    {{ fila.datos.servicio }} · {{ fila.datos.profesional }}
+                    <span class="block" style="color: var(--texto-suave)"
+                      >{{ fila.datos.sucursal }} ·
+                      {{
+                        fila.inicia_en
+                          ? fechaHora(fila.inicia_en)
+                          : `${fila.datos.fecha} ${fila.datos.hora}`
+                      }}</span
+                    >
+                  </div>
                 </td>
-                <td>
-                  <span
-                    v-if="!fila.errores.length"
-                    class="tu-estado"
-                    :style="{
-                      '--tono': fila.omitida
-                        ? 'var(--texto-suave)'
-                        : 'var(--exito)',
-                    }"
-                    >{{
-                      fila.omitida
-                        ? t("importarCitas.omitida")
-                        : t("importarCitas.lista")
-                    }}</span
-                  >
-                  <p
-                    v-for="mensaje in fila.errores"
-                    :key="mensaje"
-                    style="color: var(--error)"
-                  >
-                    {{ mensaje }}
-                  </p>
-                  <p
-                    v-for="aviso in fila.avisos"
-                    :key="aviso"
-                    class="mt-1"
-                    style="color: var(--texto-suave)"
-                  >
-                    {{ aviso }}
-                  </p>
+                <td :data-etiqueta="t('importarCitas.revision')">
+                  <div>
+                    <span
+                      v-if="!fila.errores.length"
+                      class="tu-estado"
+                      :style="{
+                        '--tono': fila.omitida
+                          ? 'var(--texto-suave)'
+                          : 'var(--exito)',
+                      }"
+                      >{{
+                        fila.omitida
+                          ? t("importarCitas.omitida")
+                          : t("importarCitas.lista")
+                      }}</span
+                    >
+                    <p
+                      v-for="mensaje in fila.errores"
+                      :key="mensaje"
+                      style="color: var(--error)"
+                    >
+                      {{ mensaje }}
+                    </p>
+                    <p
+                      v-for="aviso in fila.avisos"
+                      :key="aviso"
+                      class="mt-1"
+                      style="color: var(--texto-suave)"
+                    >
+                      {{ aviso }}
+                    </p>
+                  </div>
                 </td>
               </tr>
             </tbody>

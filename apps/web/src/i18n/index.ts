@@ -143,8 +143,8 @@ import recepcionVisual from "./locales/recepcionVisual.es-MX";
 import comunicacionPantalla from "./locales/comunicacionPantalla.es-MX";
 import datosFiscalesSat from "./locales/datosFiscalesSat.es-MX";
 
-// Textos base (sin adaptar a ningún negocio).
-const mensajesBase = {
+// Textos base (sin adaptar a ningún negocio); los revisa vocabularioPanel.spec.ts.
+export const mensajesBase = {
   ...esMX,
   adminUsabilidad,
   presupuestos,
@@ -282,7 +282,7 @@ export const i18n = createI18n({
  * Secciones que no se adaptan a la terminología del negocio: las páginas públicas y
  * comerciales y el cobro del SaaS hablan de "clases y citas" en general.
  */
-const SIN_ADAPTAR = new Set([
+export const SIN_ADAPTAR: ReadonlySet<string> = new Set([
   "landing",
   "registro",
   "activacion",

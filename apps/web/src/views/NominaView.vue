@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, type WritableComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
@@ -19,6 +19,7 @@ import { nombreDeRol } from "@/lib/roles";
 import { plural } from "@/lib/terminologia";
 import { hoyComoFecha } from "@/lib/hoyNegocio";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -125,6 +126,24 @@ const hoy = hoyComoFecha(sesion.zonaHoraria);
 const periodo = ref({
   desde: iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1)),
   hasta: iso(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)),
+});
+// El periodo va en la dirección (`?desde=…&hasta=…`): recargar o compartir el enlace
+// calcula el mismo. Lo que no sea una fecha se ignora (queda el mes en curso).
+function fechaDelPeriodo(
+  clave: "desde" | "hasta",
+): WritableComputedRef<string> {
+  return computed({
+    get: () => periodo.value[clave],
+    set: (v: string) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        periodo.value = { ...periodo.value, [clave]: v };
+      }
+    },
+  });
+}
+useFiltrosEnUrl({
+  desde: fechaDelPeriodo("desde"),
+  hasta: fechaDelPeriodo("hasta"),
 });
 // Periodo de lo que se ve en el resumen (el calculado, no el que se está editando).
 const periodoCalculado = ref({ ...periodo.value });
@@ -445,10 +464,14 @@ onMounted(async () => {
           "
           :descripcion="$t('adminUsabilidad.nomina.ayuda')"
           icono="nomina"
+          tam="md"
           :ocupado="guardando"
           @cerrar="cerrarEsquema"
         >
+          <!-- El diálogo ya dice qué es (título y descripción): el formulario va
+               directo a los campos y sus botones, en el pie. -->
           <form
+            id="form-esquema-nomina"
             data-prueba="editor-esquema"
             class="space-y-4"
             @submit.prevent="guardarEsquema"
@@ -456,17 +479,8 @@ onMounted(async () => {
             <AvisoTono v-if="errorEsquema" tono="peligro" role="alert">
               {{ errorEsquema }}
             </AvisoTono>
-            <header class="nm-cabeza">
-              <span class="tu-icono-tono tu-tono-azul">
-                <IconoNav nombre="nomina" :tam="20" />
-              </span>
-              <span>
-                <h2 class="font-semibold">{{ $t("nomina.esquemas") }}</h2>
-                <p class="nm-sub">{{ $t("nominaVisual.esquemasAyuda") }}</p>
-              </span>
-            </header>
 
-            <div class="mt-5 grid gap-4 md:grid-cols-2">
+            <div class="grid gap-4 md:grid-cols-2">
               <div>
                 <label class="tu-label" for="es">{{
                   $t("nominaVisual.quien")
@@ -555,39 +569,35 @@ onMounted(async () => {
             </fieldset>
             <!-- Cambiar la tarifa no recalcula lo ya trabajado (ADR 0153). -->
             <p class="tu-hint mt-3">{{ $t("nominaVisual.cambioDesdeHoy") }}</p>
-
-            <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
-              <button
-                type="button"
-                class="tu-btn tu-btn-secundario"
-                :disabled="guardando"
-                @click="cerrarEsquema"
-              >
-                {{ $t("comun.cancelar") }}
-              </button>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="
-                  guardando || esquema.usuarioId === '' || esquema.monto === ''
-                "
-              >
-                {{ $t("nomina.guardarEsquema") }}
-              </button>
-            </div>
           </form>
+          <template #pie>
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario"
+              :disabled="guardando"
+              @click="cerrarEsquema"
+            >
+              {{ $t("comun.cancelar") }}
+            </button>
+            <button
+              type="submit"
+              form="form-esquema-nomina"
+              class="tu-btn tu-btn-primario"
+              :disabled="
+                guardando || esquema.usuarioId === '' || esquema.monto === ''
+              "
+              :aria-busy="guardando || undefined"
+            >
+              {{ $t("nomina.guardarEsquema") }}
+            </button>
+          </template>
         </ModalDialogo>
 
         <!-- Periodo -->
         <div class="tu-card p-5">
-          <header class="nm-cabeza">
-            <span class="tu-icono-tono tu-tono-azul">
-              <IconoNav nombre="agenda" :tam="20" />
-            </span>
-            <span>
-              <h2 class="font-semibold">{{ $t("nomina.periodo") }}</h2>
-              <p class="nm-sub">{{ $t("nominaVisual.periodoAyuda") }}</p>
-            </span>
+          <header>
+            <h2 class="tu-titulo-seccion">{{ $t("nomina.periodo") }}</h2>
+            <p class="nm-sub">{{ $t("nominaVisual.periodoAyuda") }}</p>
           </header>
           <form
             class="mt-4 flex flex-wrap items-end gap-3"
@@ -632,11 +642,8 @@ onMounted(async () => {
     <!-- Resumen del periodo -->
     <div class="tu-card mt-5 p-5">
       <header class="nm-cabeza flex-wrap">
-        <span class="tu-icono-tono tu-tono-azul">
-          <IconoNav nombre="reportes" :tam="20" />
-        </span>
-        <span class="min-w-0 flex-1">
-          <h2 class="font-semibold">{{ $t("nominaVisual.resumen") }}</h2>
+        <span class="min-w-0 flex-1 basis-64">
+          <h2 class="tu-titulo-seccion">{{ $t("nominaVisual.resumen") }}</h2>
           <p class="nm-sub">{{ $t("nominaVisual.resumenAyuda") }}</p>
         </span>
         <span class="flex flex-wrap items-center gap-3">
@@ -668,16 +675,16 @@ onMounted(async () => {
         role="alert"
         data-prueba="error-calculo"
       >
-        <span class="flex flex-wrap items-center justify-between gap-3">
-          {{ $t("nominaVisual.errorCalculo") }}
+        {{ $t("nominaVisual.errorCalculo") }}
+        <template #acciones>
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             @click="calcular"
           >
             {{ $t("comun.reintentar") }}
           </button>
-        </span>
+        </template>
       </AvisoTono>
       <EstadoVacio
         v-else-if="filasVista.length === 0"
@@ -688,15 +695,17 @@ onMounted(async () => {
           calculado ? $t('nominaVisual.vacio') : $t('nominaVisual.sinCalcular')
         "
       />
-      <!-- relative: lo oculto para lectores de pantalla no ensancha la página. -->
-      <div v-else class="relative mt-4 overflow-x-auto">
-        <table class="nm-tabla">
+      <!-- relative: lo oculto para lectores de pantalla no ensancha la página. En
+           el teléfono, una ficha por persona con lo devengado y su esquema a la
+           vista. -->
+      <div v-else class="relative mt-4 overflow-x-auto tu-tabla-adaptable">
+        <table class="tu-tabla">
           <thead>
             <tr>
               <th>{{ $t("nominaVisual.colMiembro") }}</th>
+              <th class="text-right">{{ $t("nominaVisual.colTotal") }}</th>
               <th>{{ $t("nominaVisual.colEsquema") }}</th>
               <th>{{ $t("nominaVisual.colCantidad") }}</th>
-              <th class="text-right">{{ $t("nominaVisual.colTotal") }}</th>
               <th class="text-right">{{ $t("nominaVisual.colPorVenir") }}</th>
               <th>{{ $t("nominaVisual.colEstado") }}</th>
               <th>
@@ -708,48 +717,57 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="(x, i) in filasVista" :key="x.id ?? `f${i}`">
-              <td>
+              <td :data-etiqueta="$t('nominaVisual.colMiembro')">
                 <span class="flex items-center gap-3">
                   <AvatarIniciales :nombre="x.nombre" :foto="x.foto" tam="sm" />
                   <span class="min-w-0">
                     <span class="block truncate font-medium">{{
                       x.nombre
                     }}</span>
-                    <span v-if="x.rol" class="block nm-sub">{{
-                      rolDe(x.rol)
-                    }}</span>
+                    <span v-if="x.rol" class="tu-sub">{{ rolDe(x.rol) }}</span>
                   </span>
                 </span>
               </td>
-              <td>
-                <span
-                  v-if="x.fila"
-                  class="nm-pastilla"
-                  :class="TONO_TIPO[x.fila.tipo]"
-                  >{{ etiquetaTipo(x.fila.tipo) }}</span
-                >
-                <span v-else class="nm-sub">—</span>
-                <span
-                  v-if="cambioDeTarifa(x)"
-                  class="block nm-sub mt-1"
-                  data-prueba="cambio-tarifa"
-                  >{{ cambioDeTarifa(x) }}</span
-                >
-              </td>
-              <td class="tabular-nums">
-                {{ x.fila ? cantidadDe(x) : "—" }}
-              </td>
-              <td class="text-right font-semibold tabular-nums">
+              <td
+                class="text-right font-semibold tabular-nums"
+                :data-etiqueta="$t('nominaVisual.colTotal')"
+              >
                 {{ x.fila ? dinero(x.devengado, x.fila.moneda) : "—" }}
               </td>
-              <td class="text-right tabular-nums nm-sub">
-                <template v-if="x.fila && x.porVenir > 0">
+              <td :data-etiqueta="$t('nominaVisual.colEsquema')">
+                <span>
+                  <span
+                    v-if="x.fila"
+                    class="nm-pastilla"
+                    :class="TONO_TIPO[x.fila.tipo]"
+                    >{{ etiquetaTipo(x.fila.tipo) }}</span
+                  >
+                  <span v-else class="nm-sub">—</span>
+                  <span
+                    v-if="cambioDeTarifa(x)"
+                    class="block nm-sub mt-1"
+                    data-prueba="cambio-tarifa"
+                    >{{ cambioDeTarifa(x) }}</span
+                  >
+                </span>
+              </td>
+              <td
+                class="tabular-nums"
+                :data-etiqueta="$t('nominaVisual.colCantidad')"
+              >
+                {{ x.fila ? cantidadDe(x) : "—" }}
+              </td>
+              <td
+                class="text-right tabular-nums nm-sub"
+                :data-etiqueta="$t('nominaVisual.colPorVenir')"
+              >
+                <span v-if="x.fila && x.porVenir > 0">
                   {{ dinero(x.porVenir, x.fila.moneda) }}
                   <span class="block">{{ cantidadDe(x, true) }}</span>
-                </template>
+                </span>
                 <template v-else>—</template>
               </td>
-              <td>
+              <td :data-etiqueta="$t('nominaVisual.colEstado')">
                 <span
                   :class="x.fila ? 'tu-badge-exito' : 'tu-badge-aviso'"
                   class="tu-badge"
@@ -760,11 +778,11 @@ onMounted(async () => {
                   }}</span
                 >
               </td>
-              <td class="text-right">
+              <td class="tu-celda-acciones">
                 <button
                   v-if="x.id !== null"
                   type="button"
-                  class="tu-enlace text-sm whitespace-nowrap"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
                   @click="editar(x)"
                 >
                   {{
@@ -776,18 +794,26 @@ onMounted(async () => {
               </td>
             </tr>
           </tbody>
+          <!-- Totales: en el teléfono, cada cifra con su etiqueta en una línea. -->
           <tfoot v-if="conEsquema > 0">
-            <tr>
-              <td colspan="3" class="font-semibold">
+            <tr class="nm-totales">
+              <td class="tu-solo-tabla font-semibold">
                 {{ $t("nomina.totalPeriodo") }}
               </td>
-              <td class="text-right font-semibold tabular-nums">
+              <td
+                class="text-right font-semibold tabular-nums"
+                :data-etiqueta="$t('nomina.totalPeriodo')"
+              >
                 {{ dinero(total, moneda) }}
               </td>
-              <td class="text-right tabular-nums nm-sub">
+              <td colspan="2" class="tu-solo-tabla"></td>
+              <td
+                class="text-right tabular-nums nm-sub"
+                :data-etiqueta="$t('nominaVisual.colPorVenir')"
+              >
                 {{ totalPorVenir > 0 ? dinero(totalPorVenir, moneda) : "—" }}
               </td>
-              <td colspan="2"></td>
+              <td colspan="2" class="tu-solo-tabla"></td>
             </tr>
           </tfoot>
         </table>
@@ -873,35 +899,12 @@ onMounted(async () => {
   color: var(--primario);
   font-weight: 500;
 }
-.nm-tabla {
-  width: 100%;
-  min-width: 44rem;
-  font-size: 0.875rem;
-  border-collapse: collapse;
-}
-.nm-tabla th {
-  padding: 0.6rem 0.75rem;
-  background: var(--superficie-2);
-  color: var(--texto-suave);
-  font-weight: 500;
-  text-align: left;
-}
-/* Sin capa, el text-align de arriba anularía la utilidad text-right. */
-.nm-tabla th.text-right {
-  text-align: right;
-}
-.nm-tabla th:first-child {
-  border-radius: 0.6rem 0 0 0.6rem;
-}
-.nm-tabla th:last-child {
-  border-radius: 0 0.6rem 0.6rem 0;
-}
-.nm-tabla td {
-  padding: 0.7rem 0.75rem;
-  border-bottom: 1px solid var(--borde);
-}
-.nm-tabla tfoot td {
-  border-bottom: 0;
+/* En el teléfono, los totales con el mismo margen que las fichas de arriba. */
+@media (max-width: 639px) {
+  .nm-totales {
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--borde);
+  }
 }
 .nm-pastilla {
   display: inline-block;

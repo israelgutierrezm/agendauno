@@ -156,7 +156,7 @@ async function anular(): Promise<void> {
       <button
         v-if="puedeCorregir"
         type="button"
-        class="tu-enlace text-sm"
+        class="tu-btn tu-btn-secundario tu-btn-chico"
         data-prueba="corregir-pago"
         @click="abrir('metodo')"
       >
@@ -165,8 +165,7 @@ async function anular(): Promise<void> {
       <button
         v-if="puedeAnular"
         type="button"
-        class="tu-enlace text-sm"
-        style="color: var(--error)"
+        class="tu-btn tu-btn-peligro tu-btn-chico"
         data-prueba="anular-cobro"
         @click="abrir('anular')"
       >
@@ -207,6 +206,7 @@ async function anular(): Promise<void> {
           type="button"
           class="tu-btn tu-btn-primario flex-1"
           :disabled="guardando || motivo.trim() === ''"
+          :aria-busy="guardando || undefined"
           @click="corregirMetodo"
         >
           {{ $t("corregirCobro.guardarMetodo") }}
@@ -240,8 +240,9 @@ async function anular(): Promise<void> {
       <div class="flex flex-wrap gap-2">
         <button
           type="submit"
-          class="tu-btn tu-btn-peligro flex-1"
+          class="tu-btn tu-btn-solido tu-tono-peligro flex-1"
           :disabled="guardando || motivo.trim() === ''"
+          :aria-busy="guardando || undefined"
         >
           {{ $t(k("anular")) }}
         </button>
@@ -262,6 +263,6 @@ async function anular(): Promise<void> {
 .cc-enlaces {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1.25rem;
+  gap: 0.5rem;
 }
 </style>

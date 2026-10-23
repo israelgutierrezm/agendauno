@@ -358,13 +358,17 @@ onMounted(cargar);
           : $t('ventasVisual.titulo')
       "
       :subtitulo="$t('ventas.vender.subtitulo')"
+    />
+    <!-- Qué se vende se define en otra sección: se llega con un enlace. -->
+    <p
+      v-if="puedeEntrar('planes', sesion)"
+      class="mt-2 text-sm"
+      data-prueba="administrar-planes"
     >
-      <template v-if="puedeEntrar('planes', sesion)" #acciones>
-        <RouterLink :to="{ name: 'planes' }" class="tu-btn tu-btn-secundario">
-          {{ $t("ventas.vender.administrarPlanes") }}
-        </RouterLink>
-      </template>
-    </EncabezadoSeccion>
+      <RouterLink :to="{ name: 'planes' }" class="tu-enlace">
+        {{ $t("ventas.vender.administrarPlanes") }}
+      </RouterLink>
+    </p>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -590,6 +594,7 @@ onMounted(cargar);
               class="tu-btn tu-btn-primario w-full"
               type="submit"
               data-prueba="cobrar-plan"
+              :aria-busy="vendiendo || undefined"
               :disabled="
                 vendiendo ||
                 venta.compradorId === '' ||
@@ -609,7 +614,7 @@ onMounted(cargar);
       </div>
 
       <!-- Ventas recientes -->
-      <h2 class="mt-8 font-medium">{{ $t("ventas.ordenes.titulo") }}</h2>
+      <h2 class="mt-8 tu-titulo-seccion">{{ $t("ventas.ordenes.titulo") }}</h2>
       <EstadoVacio
         v-if="ordenes.length === 0"
         class="mt-3 py-6"
@@ -617,59 +622,79 @@ onMounted(cargar);
         compacto
         :titulo="$t('ventas.ordenes.vacio')"
       />
-      <div v-else class="tu-card mt-3 overflow-x-auto">
-        <table class="vv-tabla">
-          <thead>
-            <tr>
-              <th>{{ $t("ventasVisual.col.cuando") }}</th>
-              <th>{{ $t("ventas.ordenes.colComprador") }}</th>
-              <th class="hidden md:table-cell">
-                {{ $t("ventasVisual.col.plan") }}
-              </th>
-              <th class="hidden sm:table-cell">
-                {{ $t("ventas.vender.metodo") }}
-              </th>
-              <th>{{ $t("ventas.ordenes.colEstado") }}</th>
-              <th class="text-right">{{ $t("ventas.ordenes.colTotal") }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="o in ordenes" :key="o.id">
-              <td class="whitespace-nowrap vv-suave">
-                {{ cuando(o.pagada_en) }}
-              </td>
-              <td class="font-medium">{{ o.comprador ?? "—" }}</td>
-              <td class="hidden md:table-cell">
-                {{
-                  (o.lineas ?? [])
-                    .map((l) => l.producto ?? "")
-                    .filter(Boolean)
-                    .join(", ") || "—"
-                }}
-              </td>
-              <td class="hidden sm:table-cell vv-suave">
-                {{ nombreMetodo(o.metodo_pago) }}
-              </td>
-              <td>
-                <span
-                  class="tu-pildora"
-                  :style="{
-                    '--tono':
-                      o.estado === 'pagada' ? 'var(--exito)' : 'var(--aviso)',
-                  }"
-                  >{{
-                    o.estado === "pagada"
-                      ? $t("ventas.ordenes.pagada")
-                      : $t("ventas.ordenes.pendiente")
-                  }}</span
+      <div v-else class="tu-card mt-3">
+        <!-- En el teléfono, una ficha por venta: a quién, cuánto y qué se vendió. -->
+        <div class="relative overflow-x-auto tu-tabla-adaptable">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("ventas.ordenes.colComprador") }}</th>
+                <th class="text-right">{{ $t("ventas.ordenes.colTotal") }}</th>
+                <th>{{ $t("ventasVisual.col.cuando") }}</th>
+                <th class="hidden md:table-cell">
+                  {{ $t("ventasVisual.col.plan") }}
+                </th>
+                <th class="hidden sm:table-cell">
+                  {{ $t("ventas.vender.metodo") }}
+                </th>
+                <th>{{ $t("ventas.ordenes.colEstado") }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="o in ordenes" :key="o.id" data-prueba="orden-reciente">
+                <td
+                  :data-etiqueta="$t('ventas.ordenes.colComprador')"
+                  class="font-medium"
                 >
-              </td>
-              <td class="text-right font-medium tabular-nums">
-                {{ dinero(o.total_minor, o.moneda) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                  {{ o.comprador ?? "—" }}
+                </td>
+                <td
+                  :data-etiqueta="$t('ventas.ordenes.colTotal')"
+                  class="text-right font-medium tabular-nums"
+                >
+                  {{ dinero(o.total_minor, o.moneda) }}
+                </td>
+                <td
+                  :data-etiqueta="$t('ventasVisual.col.cuando')"
+                  class="whitespace-nowrap vv-suave"
+                >
+                  {{ cuando(o.pagada_en) }}
+                </td>
+                <td
+                  :data-etiqueta="$t('ventasVisual.col.plan')"
+                  class="hidden md:table-cell"
+                >
+                  {{
+                    (o.lineas ?? [])
+                      .map((l) => l.producto ?? "")
+                      .filter(Boolean)
+                      .join(", ") || "—"
+                  }}
+                </td>
+                <td
+                  :data-etiqueta="$t('ventas.vender.metodo')"
+                  class="hidden sm:table-cell vv-suave"
+                >
+                  {{ nombreMetodo(o.metodo_pago) }}
+                </td>
+                <td :data-etiqueta="$t('ventas.ordenes.colEstado')">
+                  <span
+                    class="tu-estado"
+                    :style="{
+                      '--tono':
+                        o.estado === 'pagada' ? 'var(--exito)' : 'var(--aviso)',
+                    }"
+                    >{{
+                      o.estado === "pagada"
+                        ? $t("ventas.ordenes.pagada")
+                        : $t("ventas.ordenes.pendiente")
+                    }}</span
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <RouterLink
           v-if="totalOrdenes > RECIENTES && puedeEntrar('cobranza', sesion)"
           :to="{ name: 'cobranza' }"
@@ -737,26 +762,6 @@ onMounted(cargar);
   border-top: 1px solid var(--borde);
   font-size: 1.05rem;
   font-weight: 600;
-}
-.vv-tabla {
-  width: 100%;
-  font-size: 0.9rem;
-  border-collapse: collapse;
-}
-.vv-tabla th {
-  padding: 0.7rem 1rem;
-  color: var(--texto-suave);
-  font-size: 0.78rem;
-  font-weight: 500;
-  text-align: left;
-}
-.vv-tabla th.text-right {
-  text-align: right;
-}
-.vv-tabla td {
-  padding: 0.7rem 1rem;
-  border-top: 1px solid var(--borde);
-  vertical-align: middle;
 }
 .vv-suave {
   color: var(--texto-suave);

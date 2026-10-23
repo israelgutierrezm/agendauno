@@ -578,9 +578,13 @@ onMounted(() => {
   <p v-if="cargando" class="mt-6" :style="{ color: 'var(--texto-suave)' }">
     {{ $t("comun.cargando") }}
   </p>
-  <div v-else-if="error" class="mt-6 tu-card p-5" style="color: var(--error)">
-    {{ error }}
-    <button type="button" class="tu-enlace ml-2" @click="cargar()">
+  <div
+    v-else-if="error"
+    class="mt-6 tu-card p-5 flex flex-wrap items-center justify-between gap-3"
+    role="alert"
+  >
+    <span style="color: var(--error)">{{ error }}</span>
+    <button type="button" class="tu-btn tu-btn-discreto" @click="cargar()">
       {{ $t("comun.reintentar") }}
     </button>
   </div>
@@ -705,8 +709,7 @@ onMounted(() => {
         aria-labelledby="hoy-agenda"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="hoy-agenda" class="hoy-seccion">
-            <IconoNav nombre="agenda" :tam="20" />
+          <h2 id="hoy-agenda" class="tu-titulo-seccion">
             {{ $t("operacion.hoy.agenda") }}
           </h2>
           <RouterLink
@@ -794,7 +797,7 @@ onMounted(() => {
         >
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-discreto"
             @click="filtro = 'todas'"
           >
             {{ $t("operacion.hoy.verTodas") }}
@@ -807,11 +810,7 @@ onMounted(() => {
           class="py-8"
           :titulo="$t('operacion.hoy.sinResultados')"
         >
-          <button
-            type="button"
-            class="tu-btn tu-btn-secundario"
-            @click="limpiar"
-          >
+          <button type="button" class="tu-btn tu-btn-discreto" @click="limpiar">
             {{ $t("operacion.hoy.limpiar") }}
           </button>
         </EstadoVacio>
@@ -951,8 +950,7 @@ onMounted(() => {
           data-prueba="libres"
         >
           <div class="flex items-baseline justify-between gap-3">
-            <h2 id="hoy-libres" class="hoy-seccion">
-              <IconoNav nombre="reloj" :tam="20" />
+            <h2 id="hoy-libres" class="tu-titulo-seccion">
               {{ $t("operacion.hoy.citas.libres") }}
             </h2>
             <RouterLink
@@ -1019,10 +1017,10 @@ onMounted(() => {
           class="tu-card p-5"
           aria-labelledby="hoy-pendientes"
         >
-          <h2 id="hoy-pendientes" class="hoy-seccion">
-            <IconoNav nombre="pulso" :tam="20" />
+          <h2 id="hoy-pendientes" class="tu-titulo-seccion">
             {{ $t("operacion.hoy.pendientes") }}
           </h2>
+          <!-- Cada pendiente con su estado (punto y texto), sin íconos de color. -->
           <EstadoVacio
             v-if="!hayPendientes"
             icono="hecho"
@@ -1036,12 +1034,13 @@ onMounted(() => {
                 :to="{ name: 'cobranza', hash: '#pendientes' }"
                 class="hoy-pendiente"
               >
-                <span class="tu-icono-tono tu-tono-naranja" aria-hidden="true">
-                  <IconoNav nombre="dinero" :tam="18" />
-                </span>
-                <span class="hoy-texto">{{
-                  $t("operacion.hoy.porCobrar", hoy.cobros.ordenes_pendientes)
-                }}</span>
+                <span
+                  class="hoy-texto tu-estado"
+                  :style="{ '--tono': 'var(--aviso)' }"
+                  >{{
+                    $t("operacion.hoy.porCobrar", hoy.cobros.ordenes_pendientes)
+                  }}</span
+                >
                 <span class="tabular-nums font-medium">{{ porCobrar }}</span>
               </RouterLink>
             </li>
@@ -1050,12 +1049,11 @@ onMounted(() => {
                 :to="{ name: 'cobranza', hash: '#morosos' }"
                 class="hoy-pendiente"
               >
-                <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
-                  <IconoNav nombre="facturas" :tam="18" />
-                </span>
-                <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
-                  $t("operacion.hoy.enMora", hoy.cobros.en_mora)
-                }}</span>
+                <span
+                  class="hoy-texto tu-estado"
+                  :style="{ '--tono': 'var(--error)' }"
+                  >{{ $t("operacion.hoy.enMora", hoy.cobros.en_mora) }}</span
+                >
               </RouterLink>
             </li>
             <li v-if="hoy.renovaciones && hoy.renovaciones.por_vencer > 0">
@@ -1067,21 +1065,22 @@ onMounted(() => {
                 "
                 class="hoy-pendiente"
               >
-                <span class="tu-icono-tono tu-tono-morado" aria-hidden="true">
-                  <IconoNav nombre="reloj" :tam="18" />
-                </span>
-                <span class="hoy-texto">{{
-                  $t(
-                    esCitas
-                      ? "operacion.hoy.porVencerCitas"
-                      : "operacion.hoy.porVencer",
-                    {
-                      n: hoy.renovaciones.por_vencer,
-                      dias: hoy.renovaciones.dias,
-                    },
-                    hoy.renovaciones.por_vencer,
-                  )
-                }}</span>
+                <span
+                  class="hoy-texto tu-estado"
+                  :style="{ '--tono': 'var(--aviso)' }"
+                  >{{
+                    $t(
+                      esCitas
+                        ? "operacion.hoy.porVencerCitas"
+                        : "operacion.hoy.porVencer",
+                      {
+                        n: hoy.renovaciones.por_vencer,
+                        dias: hoy.renovaciones.dias,
+                      },
+                      hoy.renovaciones.por_vencer,
+                    )
+                  }}</span
+                >
               </RouterLink>
             </li>
             <li v-if="hoy.renovaciones && hoy.renovaciones.vencidas > 0">
@@ -1089,17 +1088,18 @@ onMounted(() => {
                 :to="aRenovaciones('vencida') ?? { name: 'retencion' }"
                 class="hoy-pendiente"
               >
-                <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
-                  <IconoNav nombre="pulso" :tam="18" />
-                </span>
-                <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
-                  $t(
-                    esCitas
-                      ? "operacion.hoy.vencidasCitas"
-                      : "operacion.hoy.vencidas",
-                    hoy.renovaciones.vencidas,
-                  )
-                }}</span>
+                <span
+                  class="hoy-texto tu-estado"
+                  :style="{ '--tono': 'var(--error)' }"
+                  >{{
+                    $t(
+                      esCitas
+                        ? "operacion.hoy.vencidasCitas"
+                        : "operacion.hoy.vencidas",
+                      hoy.renovaciones.vencidas,
+                    )
+                  }}</span
+                >
               </RouterLink>
             </li>
             <li
@@ -1113,15 +1113,16 @@ onMounted(() => {
                 class="hoy-pendiente"
                 data-prueba="pendiente-solicitudes"
               >
-                <span class="tu-icono-tono tu-tono-azul" aria-hidden="true">
-                  <IconoNav nombre="personas" :tam="18" />
-                </span>
-                <span class="hoy-texto">{{
-                  $t(
-                    "operacion.hoy.solicitudes",
-                    hoy.atencion?.solicitudes ?? 0,
-                  )
-                }}</span>
+                <span
+                  class="hoy-texto tu-estado"
+                  :style="{ '--tono': 'var(--primario)' }"
+                  >{{
+                    $t(
+                      "operacion.hoy.solicitudes",
+                      hoy.atencion?.solicitudes ?? 0,
+                    )
+                  }}</span
+                >
               </RouterLink>
             </li>
             <li
@@ -1135,15 +1136,16 @@ onMounted(() => {
                 class="hoy-pendiente"
                 data-prueba="pendiente-seguimientos"
               >
-                <span class="tu-icono-tono tu-tono-cielo" aria-hidden="true">
-                  <IconoNav nombre="tareas" :tam="18" />
-                </span>
-                <span class="hoy-texto">{{
-                  $t(
-                    "operacion.hoy.seguimientos",
-                    hoy.atencion?.seguimientos ?? 0,
-                  )
-                }}</span>
+                <span
+                  class="hoy-texto tu-estado"
+                  :style="{ '--tono': 'var(--primario)' }"
+                  >{{
+                    $t(
+                      "operacion.hoy.seguimientos",
+                      hoy.atencion?.seguimientos ?? 0,
+                    )
+                  }}</span
+                >
               </RouterLink>
             </li>
           </ul>
@@ -1204,16 +1206,6 @@ onMounted(() => {
   .hoy-metrica :deep(.pc span) {
     font-size: 1.25rem;
   }
-}
-.hoy-seccion {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-weight: 600;
-}
-.hoy-seccion > svg {
-  color: var(--primario);
-  flex-shrink: 0;
 }
 .hoy-filtros {
   display: flex;

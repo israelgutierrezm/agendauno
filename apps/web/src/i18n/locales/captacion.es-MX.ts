@@ -6,7 +6,7 @@ export default {
     nav: "Integrar en mi web",
     titulo: "Integrar en mi web",
     descripcion:
-      "Muestra tu calendario de clases, tus servicios para agendar o tus planes dentro de tu propia web. En citas, quien visita agenda y paga ahí mismo, sin cuenta; quien ya es cliente reserva o compra con su cuenta, y quien aún no lo es te deja sus datos.",
+      "Muestra tu calendario de clases, tus servicios para agendar o tus planes dentro de tu propia web. En citas, quien visita agenda y paga ahí mismo, sin cuenta; quien ya es alumno reserva o compra con su cuenta, y quien aún no lo es te deja sus datos.",
     nuevo: "Nuevo widget",
     vacio: "Aún no tienes widgets. Crea uno y copia su código en tu web.",
     tipos: {
@@ -16,11 +16,11 @@ export default {
     },
     tiposAyuda: {
       calendario:
-        "Fecha, actividad, instructor y lugares libres, con filtros por sucursal y actividad. El cliente reserva con su cuenta.",
+        "Fecha, actividad, instructor y lugares libres, con filtros por sucursal y actividad. El alumno reserva con su cuenta.",
       agendar:
         "Tus servicios con su precio y duración: quien visita elige uno y agenda (y paga, si lo pides) sin cuenta.",
       planes:
-        "Precio, vigencia, lo que incluye y sus restricciones. El cliente lo compra con su cuenta.",
+        "Precio, vigencia, lo que incluye y sus restricciones. El alumno lo compra con su cuenta.",
     },
     nombre: "Nombre (solo para ti)",
     filtros: "Filtros iniciales",
@@ -39,6 +39,7 @@ export default {
     dominiosAyuda:
       "Escribe la dirección de tu web (por ejemplo www.miestudio.com). Solo se mostrará ahí; sin ninguna, en cualquier web.",
     agregarDominio: "Agregar web",
+    quitarDominio: "Quitar",
     activo: "Activo",
     apagado: "Apagado",
     guardar: "Guardar",
@@ -84,7 +85,7 @@ export default {
   prospectos: {
     titulo: "Prospectos",
     descripcion:
-      "Quien todavía no es cliente y dejó sus datos. No es un miembro: no reserva ni cuenta como alumno hasta que le das acceso.",
+      "Quien todavía no es alumno y dejó sus datos: no reserva ni cuenta como alumno hasta que le das acceso.",
     nuevo: "Agregar prospecto",
     buscar: "Buscar por nombre, correo o teléfono",
     vacio: "Aún no hay prospectos.",
@@ -215,7 +216,7 @@ export default {
       invitar: "Enviarle la invitación a su cuenta",
       sinCorreo:
         "Sin correo no se le puede invitar: queda su ficha para atenderlo en recepción.",
-      fichaExistente: "Ya es cliente: enlazarlo a su ficha",
+      fichaExistenteAlumno: "Ya es alumno: enlazarlo a su ficha",
       fichaNueva: "Crear una ficha nueva",
       buscarFicha: "Buscar su ficha en Miembros",
       confirmar: "Darle acceso",
@@ -264,7 +265,7 @@ export default {
   formularios: {
     titulo: "Formularios de captación",
     descripcion:
-      "Lo que llena quien quiere saber más o pedir acceso: el de tu página, y los que compartes por enlace o QR o pones en tu propio sitio. Distintos de las fichas de datos de tus miembros.",
+      "Lo que llena quien quiere saber más o pedir acceso: el de tu página, y los que compartes por enlace o QR o pones en tu propio sitio. Distintos de las fichas de datos de tus alumnos.",
     activa: "Recibir prospectos",
     activaAyuda:
       "Apagado, nadie puede dejar sus datos y «Pedir acceso» en tu página muestra tu WhatsApp o teléfono.",

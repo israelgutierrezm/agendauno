@@ -122,10 +122,14 @@ describe("promociones", () => {
       .find((b) => b.text().includes("Nueva promoción"))!
       .trigger("click");
     await w.get("#p-codigo").setValue("verano");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "Guardar")!
-      .trigger("click");
+    // «Guardar» va en el pie y envía el formulario (también con Enter en un campo).
+    expect(
+      w
+        .findAll("button")
+        .find((b) => b.text() === "Guardar")!
+        .attributes("form"),
+    ).toBe("form-promo");
+    await w.get("#form-promo").trigger("submit");
     await flushPromises();
 
     expect(w.get("#p-codigo-error").text()).toBe(
@@ -153,7 +157,16 @@ describe("promociones", () => {
       global: { plugins: [i18n], stubs: { teleport: true } },
     });
     await flushPromises();
-    await w.get('[data-prueba="editar-promo-1"]').trigger("click");
+    // Editar y Eliminar son botones de la fila (no enlaces), a la vista en el teléfono.
+    const editarFila = w.get('[data-prueba="editar-promo-1"]');
+    expect(editarFila.classes()).toContain("tu-btn-secundario");
+    expect(w.get('[data-prueba="eliminar-promo-1"]').classes()).toContain(
+      "tu-btn-peligro",
+    );
+    expect(editarFila.element.closest("td")?.className).toContain(
+      "tu-celda-acciones",
+    );
+    await editarFila.trigger("click");
 
     // El título dice cuál se edita y el formulario trae lo guardado.
     expect(w.text()).toContain("Editar promoción VERANO");
@@ -168,10 +181,7 @@ describe("promociones", () => {
     await w.get("#p-valor").setValue("20");
     await w.get("#p-usos").setValue("50");
     await w.get("#p-vence").setValue("2026-12-31");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "Guardar")!
-      .trigger("click");
+    await w.get("#form-promo").trigger("submit");
     await flushPromises();
 
     expect(mocks.put).toHaveBeenCalledWith("/api/v1/app/demo/promociones/1", {

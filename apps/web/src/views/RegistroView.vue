@@ -746,7 +746,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                 </p>
                 <button
                   type="button"
-                  class="tu-enlace registro-resumen-cambiar shrink-0 text-sm"
+                  class="tu-btn tu-btn-discreto tu-btn-chico shrink-0"
                   data-prueba="cambiar-giro"
                   :aria-label="$t('modalidadNegocio.resumen.cambiarEtiqueta')"
                   @click="cambiarGiro"
@@ -964,7 +964,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                 </div>
                 <button
                   type="button"
-                  class="tu-enlace registro-resumen-cambiar shrink-0 text-sm"
+                  class="tu-btn tu-btn-discreto tu-btn-chico shrink-0"
                   :aria-label="$t('modalidadNegocio.resumen.cambiarEtiqueta')"
                   :disabled="enviando"
                   @click="cambiarGiro"
@@ -1022,7 +1022,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                       </p>
                       <button
                         type="button"
-                        class="tu-enlace mt-1 text-sm"
+                        class="tu-btn tu-btn-secundario tu-btn-chico mt-1"
                         data-prueba="enviar-codigo"
                         :disabled="!whatsappValido || enviandoCodigo"
                         @click="enviarCodigo"
@@ -1502,12 +1502,6 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
   font-weight: 500;
   overflow-wrap: anywhere;
 }
-.registro-resumen-cambiar {
-  min-height: 44px;
-  padding-inline: 0.25rem;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
 .registro-resumen-ayuda {
   margin-top: 0.25rem;
   font-size: 0.75rem;
@@ -1531,7 +1525,6 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
   text-underline-offset: 0.2em;
 }
 .registro .tu-btn:focus-visible,
-.registro-resumen-cambiar:focus-visible,
 .registro-otra-modalidad-enlace:focus-visible,
 .registro-legales button:focus-visible,
 .registro-legales input:focus-visible {

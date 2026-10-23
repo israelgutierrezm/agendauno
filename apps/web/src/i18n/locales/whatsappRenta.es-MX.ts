@@ -2,11 +2,11 @@
 export default {
   titulo: "Mensajes de WhatsApp",
   cobra:
-    "Cada aviso por WhatsApp a tus clientes gasta un mensaje de tu saldo: {precio} por mensaje, más IVA.",
+    "Cada aviso por WhatsApp a tus alumnos gasta un mensaje de tu saldo: {precio} por mensaje, más IVA.",
   // Fuera de México: en dólares y sin IVA (exportación de servicios).
   cobraSinIva:
-    "Cada aviso por WhatsApp a tus clientes gasta un mensaje de tu saldo: {precio} por mensaje.",
-  incluido: "Por ahora los avisos por WhatsApp a tus clientes no tienen costo.",
+    "Cada aviso por WhatsApp a tus alumnos gasta un mensaje de tu saldo: {precio} por mensaje.",
+  incluido: "Por ahora los avisos por WhatsApp a tus alumnos no tienen costo.",
   disponibles: "Mensajes disponibles",
   usadosMes: "Usados este mes",
   tope: "Tope del mes",

@@ -151,7 +151,7 @@ export const conexiones = {
       pago_automatico: { solicitado: "Invitación a pago automático" },
       prospecto: {
         creado: "Prospecto nuevo (dejó sus datos)",
-        convertido: "Prospecto convertido en cliente",
+        convertido: "Prospecto convertido en alumno",
         sin_atender: "Prospecto sin atender",
       },
       bandeja: { mensaje_recibido: "Mensaje nuevo en la bandeja" },
@@ -167,7 +167,7 @@ export const comunicacionesAuto = {
   editor: "Mensaje automático",
   canal: "Canal",
   para: "Para",
-  paraPersona: "Alumno o cliente",
+  paraPersona: "Alumno",
   paraProfesional: "Profesional de la cita",
   ayudaProfesional:
     "Le llega a quien atiende la cita, por correo o en la app. En clases grupales no se avisa al instructor por cada reserva.",
@@ -182,7 +182,7 @@ export const comunicacionesAuto = {
   canalWhatsApp: "WhatsApp",
   textoWhatsApp: "Texto del mensaje",
   ayudaWhatsApp:
-    "Es el texto aprobado por WhatsApp; no se puede cambiar, solo encender o apagar. Le llega a quien aceptó recibir avisos por WhatsApp y tiene su celular registrado. Solo envía avisos: si tu cliente contesta, su respuesta no llega aquí; para platicar con él, usa tu propio WhatsApp.",
+    "Es el texto aprobado por WhatsApp; no se puede cambiar, solo encender o apagar. Le llega a quien aceptó recibir avisos por WhatsApp y tiene su celular registrado. Solo envía avisos: si te contestan, la respuesta no llega aquí; para platicar, usa tu propio WhatsApp.",
   asunto: "Asunto",
   asuntoPush: "Título",
   cuerpo: "Mensaje",
@@ -213,8 +213,11 @@ export const avisosWhatsApp = {
   acepta: "Aceptó",
   sinCelular: "Falta su celular",
   aceptaCliente: "Acepta recibir avisos por WhatsApp",
+  // Base con «clases»: en un negocio de citas el adaptador la lee «citas».
   ayudaCliente:
-    "Márcalo solo si el cliente te lo pidió. Le llegan la confirmación y los recordatorios de sus citas.",
+    "Márcalo solo si el alumno te lo pidió. Le llegan la confirmación y los recordatorios de sus clases.",
+  ayudaAlumno:
+    "Márcalo solo si el alumno te lo pidió. Le llegan la confirmación y los recordatorios de sus clases.",
 };
 
 export const reglasAgenda = {
@@ -328,7 +331,7 @@ export const inventarioExtra = {
   // Productos al reservar (ADR 0194).
   ofrecerAlReservar: "Ofrecerlo al reservar una clase",
   ofrecerAlReservarAyuda:
-    "El cliente lo aparta para su clase y lo paga al recogerlo en el mostrador.",
+    "El alumno lo aparta para su clase y lo paga al recogerlo en el mostrador.",
 };
 
 export const accesoRecepcion = {
@@ -1266,6 +1269,8 @@ export const pagoAutomatico = {
   vence: "vence {fecha}",
   cambiarTarjeta: "Cambiar tarjeta",
   renueva: "Se renueva el {fecha} · {monto}",
+  // La renovación ya venció y no se ha pagado (MisPagos).
+  vencio: "Venció el {fecha} · {monto}: págala en Por pagar.",
   automatico: "Cobro automático",
   manual: "Te avisamos para pagar",
   activar: "Activar",
@@ -1317,6 +1322,8 @@ export const bajas = {
   ayudaUsuario:
     "Pierde el acceso y se cierran sus sesiones. Su historial se conserva; si lo vuelves a invitar con su correo, se reactiva.",
   motivo: "Motivo (opcional)",
+  // Segmentado «Activos | Dados de baja» de Usuarios.
+  activos: "Activos",
   dadosDeBaja: "Dados de baja",
   detalle: "Dado de baja el {fecha}",
   detallePor: "Dado de baja el {fecha} por {quien}",
@@ -1384,8 +1391,8 @@ export const cancelacion = {
 export const margenesServicio = {
   preparacion: "Preparación antes (min)",
   limpieza: "Limpieza después (min)",
-  ayuda:
-    "Ocupan la agenda del profesional y de la sala, pero no se le cobran ni se le muestran al cliente.",
+  ayudaAlumno:
+    "Ocupan la agenda del profesional y de la sala, pero no se le cobran ni se le muestran al alumno.",
   resumen: "+{n} min de preparación y limpieza",
   enAgenda: "Preparación o limpieza",
 };
@@ -1428,7 +1435,7 @@ export const reprogramar = {
   hora: "Hora",
   profesional: "Con",
   ayuda:
-    "Se conserva todo: cliente, pagos e historial. Si el nuevo horario ya no está libre, no cambia nada.",
+    "Se conserva todo: alumno, pagos e historial. Si el nuevo horario ya no está libre, no cambia nada.",
   guardar: "Cambiar",
   volver: "Volver",
   hecho: "Movida: antes {antes}, ahora {ahora}.",

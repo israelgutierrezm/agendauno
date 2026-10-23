@@ -4,11 +4,11 @@
  */
 export default {
   admin: {
-    jornadaCitas: "Citas y atención a clientes",
+    jornadaCitas: "Citas y atención a alumnos",
     jornadaClases: "Clases y asistencia",
     suscripcion: "Tu suscripción a AgendaUno",
     buscarJornada: "Buscar en las citas de este día…",
-    buscarDirectorio: "Buscar otro cliente en el directorio",
+    buscarDirectorio: "Buscar otro alumno en el directorio",
     filtrarAtencion: "Filtrar por atención",
     atencion: {
       todas: "Activas",
@@ -23,8 +23,8 @@ export default {
     limpiar: "Limpiar filtros",
     progresoAsistencia: "Asistencia registrada",
     ocupacion: "Ocupación",
-    clientesCitas:
-      "Encuentra a tus clientes, consulta sus visitas y revisa su próxima cita.",
+    alumnosCitas:
+      "Encuentra a tus alumnos, consulta sus visitas y revisa su próxima cita.",
     clientesClases:
       "Consulta planes, créditos y próximas clases de tus alumnos.",
     cobros: {
@@ -378,8 +378,8 @@ export default {
     invitarCorto: "Invitar",
     reenviarCorto: "Reenviar",
     otrosPlanes: "También: {lista}",
-    estadoAyuda:
-      "Si es cliente activo del negocio (no se refiere a su cuenta).",
+    estadoAyudaAlumno:
+      "Si es alumno activo del negocio (no se refiere a su cuenta).",
     plan: "Plan vigente",
     saldo: "Saldo",
     proxima: "Próxima reserva",
@@ -438,11 +438,11 @@ export default {
     sinPermiso: "No pudimos obtener tu ubicación desde este dispositivo.",
   },
   reportes: {
-    // Cómo conocieron al negocio los clientes nuevos (ADR 0067).
+    // Cómo conocieron al negocio los alumnos nuevos (ADR 0067).
     origenes: {
       titulo: "Cómo nos conocieron",
       subtitulo:
-        "Clientes nuevos de los últimos {n} meses que lo dijeron al agendar en línea. Sin dato: {sinDato}.",
+        "Alumnos nuevos de los últimos {n} meses que lo dijeron al agendar en línea. Sin dato: {sinDato}.",
     },
     sinSucursal: "Sin sucursal asignada",
     total: "Total",
@@ -457,7 +457,7 @@ export default {
       resumen: "Resumen",
       ingresos: "Ingresos",
       ocupacion: "Ocupación",
-      clientes: "Clientes",
+      clientes: "Alumnos",
       embudo: "Embudo",
       equipo: "Equipo y sucursales",
       equipoSolo: "Tu agenda y sucursales",
@@ -519,9 +519,9 @@ export default {
           titulo: "Cita → asistencia",
           cifra: "{n} de {de}",
           ayuda:
-            "Citas del periodo que ya pasaron (sin las canceladas) en las que llegó el cliente.",
+            "Citas del periodo que ya pasaron (sin las canceladas) en las que llegó el alumno.",
           ayudaCitas:
-            "Citas del periodo que ya pasaron (sin las canceladas) en las que llegó el cliente.",
+            "Citas del periodo que ya pasaron (sin las canceladas) en las que llegó el alumno.",
         },
         cobro: {
           titulo: "Asistencia → cobro",
@@ -535,9 +535,9 @@ export default {
           titulo: "Siguiente visita",
           cifra: "{n} de {de}",
           ayuda:
-            "Clientes atendidos en el periodo que ya tienen otra cita después.",
+            "Alumnos atendidos en el periodo que ya tienen otra cita después.",
           ayudaCitas:
-            "Clientes atendidos en el periodo que ya tienen otra cita después.",
+            "Alumnos atendidos en el periodo que ya tienen otra cita después.",
         },
       },
       // Lo que no pasa por una visita medida: aparte, sin porcentaje.
@@ -598,7 +598,7 @@ export default {
     tab: "Plataformas",
     titulo: "Wellhub y TotalPass",
     subtitulo:
-      "Quién vino por cada plataforma y sus visitas. Son clientes de la plataforma, no de tu negocio: no aparecen en tu directorio hasta que los registres.",
+      "Quién vino por cada plataforma y sus visitas. Son usuarios de la plataforma, no alumnos de tu negocio: no aparecen en tu directorio hasta que los registres.",
     periodo: "Periodo",
     desde: "Desde",
     hasta: "Hasta",
@@ -959,17 +959,18 @@ export default {
   ficha: {
     verTodo: "Ver todo el historial",
   },
-  // Usuarios: el equipo aparte de los clientes con cuenta.
+  // Usuarios: el equipo aparte de los alumnos con cuenta.
   usuarios: {
     equipo: "Equipo",
-    clientes: "Clientes con cuenta",
-    buscarClientes: "Buscar cliente por nombre o correo",
+    alumnosConCuenta: "Alumnos con cuenta",
+    buscarAlumnos: "Buscar alumno por nombre o correo",
   },
   // Más listados por páginas (barrido de listados sin límite).
   listadosTres: {
     buscarInteresados: "Buscar por nombre, correo, negocio o ciudad",
     buscarNegocio: "Buscar negocio",
-    buscarPersona: "Buscar por persona",
+    // Renovaciones y En mora (Cobranza): el público del negocio.
+    buscarPersona: "Buscar por alumno",
     buscarPadron: "Buscar por nombre o correo",
     buscarGrupo: "Buscar grupo o clase",
     buscar: "Buscar",
@@ -1063,7 +1064,7 @@ export default {
       mercadopago: "Tarjeta, OXXO y más, en la página de pago de Mercado Pago.",
       openpay: "Tarjeta y pago en tienda con referencia.",
       ventanilla:
-        "Depósito o transferencia: el cliente sube su comprobante y tú lo validas.",
+        "Depósito o transferencia: el alumno sube su comprobante y tú lo validas.",
     },
     estado: {
       cobrando: "Cobrando",

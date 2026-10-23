@@ -636,7 +636,7 @@ function colorAlerta(codigo: string): string {
         <template #acciones>
           <button
             type="button"
-            class="tu-btn tu-btn-peligro tu-btn-chico"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             @click="cargarResumen"
           >
             {{ $t("comun.reintentar") }}
@@ -699,10 +699,11 @@ function colorAlerta(codigo: string): string {
                 </p>
               </div>
             </div>
+            <!-- Abrir otra pestaña o la agenda es ver información: enlace. -->
             <button
               v-if="puedeVerPlanes"
               type="button"
-              class="tu-btn tu-btn-secundario dm-boton"
+              class="tu-enlace dm-boton"
               @click="pestana = 'planes'"
             >
               {{ $t("detalleMiembro.plan.verDetalle") }}
@@ -729,7 +730,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="puedeVerPlanes"
               type="button"
-              class="tu-btn tu-btn-secundario dm-boton"
+              class="tu-enlace dm-boton"
               @click="pestana = 'planes'"
             >
               {{ $t("detalleMiembro.saldo.historial") }}
@@ -802,7 +803,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="porCobrar.n > 0"
               type="button"
-              class="tu-btn tu-btn-secundario dm-boton"
+              class="tu-enlace dm-boton"
               @click="pestana = 'pagos'"
             >
               {{ $t("detalleMiembro.pagos.verPendientes") }}
@@ -845,7 +846,7 @@ function colorAlerta(codigo: string): string {
             <RouterLink
               v-if="diaProxima && puedeEntrar('agenda', sesion)"
               :to="{ name: 'agenda', query: { fecha: diaProxima } }"
-              class="tu-btn tu-btn-secundario dm-boton"
+              class="tu-enlace dm-boton"
               >{{ $t("detalleMiembro.proxima.verAgenda") }}</RouterLink
             >
           </section>
@@ -858,7 +859,7 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="puedeEditar"
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               @click="emit('editar')"
             >
               {{ $t("detalleMiembro.info.editar") }}
@@ -1001,10 +1002,9 @@ function colorAlerta(codigo: string): string {
             <button
               v-if="puedeEditar && !escribiendo"
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
               @click="escribiendo = true"
             >
-              <IconoNav nombre="mas" :tam="16" />
               {{ $t("detalleMiembro.notas.agregar") }}
             </button>
           </div>
@@ -1033,6 +1033,7 @@ function colorAlerta(codigo: string): string {
                 type="submit"
                 class="tu-btn tu-btn-primario"
                 :disabled="guardandoNota || textoNota.trim() === ''"
+                :aria-busy="guardandoNota || undefined"
               >
                 {{ $t("detalleMiembro.notas.guardar") }}
               </button>
@@ -1174,7 +1175,7 @@ function colorAlerta(codigo: string): string {
               <button
                 v-if="puedeCobrarPendiente"
                 type="button"
-                class="tu-btn tu-btn-secundario"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 @click="registrarPago(o)"
               >
                 {{ $t("detalleMiembro.pagos.registrar") }}
@@ -1250,6 +1251,7 @@ function colorAlerta(codigo: string): string {
               type="submit"
               class="tu-btn tu-btn-primario"
               :disabled="guardandoNota || textoNota.trim() === ''"
+              :aria-busy="guardandoNota || undefined"
             >
               {{ $t("detalleMiembro.notas.guardar") }}
             </button>
@@ -1284,8 +1286,7 @@ function colorAlerta(codigo: string): string {
               <button
                 v-if="puedeEditar"
                 type="button"
-                class="tu-enlace shrink-0 text-xs"
-                style="color: var(--error)"
+                class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
                 @click="eliminarNota(n)"
               >
                 {{ $t("detalleMiembro.notas.eliminar") }}
@@ -1326,6 +1327,13 @@ function colorAlerta(codigo: string): string {
           {{ $t("detalleMiembro.acciones.baja") }}
         </button>
         <div class="dm-pie-acciones">
+          <!-- Su ficha es otra pantalla: un enlace, a la izquierda de «Cerrar». -->
+          <RouterLink
+            :to="{ name: 'ficha-miembro', params: { id: persona.id } }"
+            class="tu-enlace dm-pie-enlace"
+            data-prueba="ficha-completa"
+            >{{ $t("detalleMiembro.acciones.fichaCompleta") }}</RouterLink
+          >
           <!-- En pantallas angostas basta la X de arriba. -->
           <button
             type="button"
@@ -1334,12 +1342,6 @@ function colorAlerta(codigo: string): string {
           >
             {{ $t("detalleMiembro.acciones.cerrar") }}
           </button>
-          <RouterLink
-            :to="{ name: 'ficha-miembro', params: { id: persona.id } }"
-            class="tu-btn tu-btn-secundario"
-            data-prueba="ficha-completa"
-            >{{ $t("detalleMiembro.acciones.fichaCompleta") }}</RouterLink
-          >
           <button
             v-if="puedeVender"
             type="button"
@@ -1546,8 +1548,12 @@ function colorAlerta(codigo: string): string {
 .dm-pie-acciones {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+}
+.dm-pie-enlace {
+  margin-right: 0.5rem;
 }
 /* En pantallas angostas, la ficha y el cobro se reparten el ancho. */
 @media (max-width: 639px) {
@@ -1557,6 +1563,7 @@ function colorAlerta(codigo: string): string {
   .dm-pie-acciones > * {
     flex: 1 1 auto;
     justify-content: center;
+    text-align: center;
     white-space: nowrap;
   }
 }

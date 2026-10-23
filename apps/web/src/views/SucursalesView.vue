@@ -14,6 +14,7 @@ import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { etiquetaZona, opcionesZona, ZONA_POR_OMISION } from "@/lib/region";
 import { useDescartarCambios } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 import { normalizar } from "@/lib/menu";
@@ -93,6 +94,8 @@ const totalSucursales = computed(() =>
   organizaciones.value.reduce((n, o) => n + o.sucursales.length, 0),
 );
 const busqueda = ref("");
+// La búsqueda va en la dirección: un enlace o volver atrás la conserva.
+useFiltrosEnUrl({ q: busqueda });
 const listado = computed(() => {
   const q = normalizar(busqueda.value.trim());
   return organizaciones.value
@@ -397,7 +400,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -480,12 +483,13 @@ onMounted(cargar);
               </div>
             </dl>
             <div class="su-acciones">
+              <!-- Ver el mapa abre información (otra página): es un enlace. -->
               <a
                 v-if="s.mapa_url"
                 :href="s.mapa_url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="tu-btn tu-btn-secundario"
+                class="tu-enlace text-sm"
                 >{{ $t("operacion.sedes.verMapa") }}</a
               >
               <button
@@ -502,11 +506,13 @@ onMounted(cargar);
       </div>
     </template>
 
-    <!-- Formulario amplio por secciones: Datos, Ubicación, Contacto y Horarios. -->
+    <!-- Formulario amplio por secciones: Datos, Ubicación, Contacto y Horarios
+         (más de doce campos: el diálogo ancho). -->
     <ModalDialogo
       :abierto="abierto"
       :titulo="esNueva ? $t('sedes.nueva') : $t('sedes.editarTitulo')"
       icono="ubicacion"
+      tam="xl"
       :descripcion="$t('adminUsabilidad.sucursales.formulario')"
       :ocupado="guardando"
       @cerrar="cerrar"
@@ -728,10 +734,12 @@ onMounted(cargar);
                 {{ errores.latitud || errores.longitud }}
               </p>
               <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                <!-- Llena el campo de arriba: es una acción, no un enlace. -->
                 <button
                   type="button"
-                  class="tu-enlace"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
                   :disabled="ubicando"
+                  :aria-busy="ubicando || undefined"
                   @click="usarMiUbicacion"
                 >
                   {{
@@ -913,15 +921,16 @@ onMounted(cargar);
           </button>
           <button
             class="tu-btn tu-btn-primario"
-            type="button"
+            type="submit"
+            form="s-form"
             :disabled="
               guardando ||
               form.nombre.trim() === '' ||
               coordenadas === 'invalida'
             "
-            @click="guardar"
+            :aria-busy="guardando || undefined"
           >
-            {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}
+            {{ guardando ? $t("comun.guardando") : $t("comun.guardar") }}
           </button>
         </div>
       </template>
@@ -1012,6 +1021,7 @@ onMounted(cargar);
 .su-acciones {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: auto;

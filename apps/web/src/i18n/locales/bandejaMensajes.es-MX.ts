@@ -5,6 +5,8 @@ export default {
     "Lo que te escriben por WhatsApp, Instagram y Messenger, en un solo lugar. Contesta desde aquí en las 24 horas que da Meta.",
   abiertas: "Abiertas",
   archivadas: "Archivadas",
+  // aria-label del segmentado «Abiertas | Archivadas».
+  filtroEstado: "Abiertas o archivadas",
   todos: "Todos los canales",
   buscar: "Buscar por nombre o número",
   vacio: "Aún no hay mensajes",

@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, type WritableComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
-import PanelLateral from "@/components/PanelLateral.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -102,6 +104,27 @@ const filtrosDef = computed(() => [
 function cambioFiltro(clave: string, valor: string): void {
   filtros.value = { ...filtros.value, [clave]: valor };
 }
+// Un filtro de la lista en la dirección; lo que no sea una de sus opciones se ignora.
+function filtroEnUrl(
+  clave: "sucursal" | "agenda" | "resenas",
+  permitidos?: readonly string[],
+): WritableComputedRef<string> {
+  return computed({
+    get: () => filtros.value[clave],
+    set: (v: string) => {
+      if (permitidos === undefined || permitidos.includes(v)) {
+        filtros.value = { ...filtros.value, [clave]: v };
+      }
+    },
+  });
+}
+// La búsqueda y los filtros van en la dirección: un enlace o volver atrás los conserva.
+useFiltrosEnUrl({
+  q: busqueda,
+  sede: filtroEnUrl("sucursal"),
+  agenda: filtroEnUrl("agenda", ["", "con", "sin"]),
+  resenas: filtroEnUrl("resenas", ["", "4", "con", "sin"]),
+});
 function limpiarFiltros(): void {
   filtros.value = { sucursal: "", agenda: "", resenas: "" };
 }
@@ -302,11 +325,12 @@ onMounted(cargar);
         v-if="puedeInvitar || puedeEntrar('usuarios', sesion)"
         #acciones
       >
-        <!-- Quién entra al panel y con qué permisos vive en Configuración. -->
+        <!-- Quién entra al panel y con qué permisos vive en Configuración: es otra
+             sección, así que va como enlace. -->
         <RouterLink
           v-if="puedeEntrar('usuarios', sesion)"
           :to="{ name: 'usuarios' }"
-          class="tu-btn tu-btn-secundario"
+          class="tu-enlace text-sm"
           >{{ $t("instructores.administrarAcceso") }}</RouterLink
         >
         <template v-if="puedeInvitar">
@@ -332,17 +356,24 @@ onMounted(cargar);
       {{ error }}
     </p>
 
-    <div
+    <AvisoTono
       v-if="!cargando && errorCarga"
-      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      tono="peligro"
+      class="mt-6"
       role="alert"
       data-prueba="error-carga-instructores"
     >
-      <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
-        {{ $t("comun.reintentar") }}
-      </button>
-    </div>
+      {{ errorCarga }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
 
     <template v-else-if="!cargando">
       <!-- Lista -->
@@ -375,7 +406,7 @@ onMounted(cargar);
           <button
             v-if="filtrando"
             type="button"
-            class="tu-btn tu-btn-secundario mt-3"
+            class="tu-btn tu-btn-discreto mt-3"
             @click="
               busqueda = '';
               limpiarFiltros();
@@ -453,16 +484,20 @@ onMounted(cargar);
           </li>
         </ul>
 
-        <!-- Lista: una fila por persona -->
-        <div v-else class="relative mt-4 tu-card overflow-x-auto">
+        <!-- Lista: una fila por persona (en el teléfono, una ficha con su perfil a
+             la vista). -->
+        <div
+          v-else
+          class="relative mt-4 tu-card overflow-x-auto tu-tabla-adaptable"
+        >
           <table class="tu-tabla">
             <thead>
               <tr>
                 <th>{{ $t("equipoVisual.col.persona") }}</th>
+                <th>{{ $t("tarjetas.estaSemana") }}</th>
                 <th class="hidden md:table-cell">
                   {{ $t("equipoVisual.col.sedes") }}
                 </th>
-                <th>{{ $t("tarjetas.estaSemana") }}</th>
                 <th class="hidden lg:table-cell">
                   {{ $t("tarjetas.proxima") }}
                 </th>
@@ -478,21 +513,35 @@ onMounted(cargar);
             </thead>
             <tbody>
               <tr v-for="i in visibles" :key="i.id" data-prueba="profesional">
-                <td>
+                <td :data-etiqueta="$t('equipoVisual.col.persona')">
                   <div class="flex items-center gap-3">
                     <AvatarIniciales
                       :nombre="i.nombre"
                       :foto="i.foto_url"
                       tam="md"
                     />
-                    <span class="font-medium">{{ i.nombre_corto }}</span>
+                    <RouterLink
+                      v-if="puedeVerPerfil"
+                      :to="{ name: 'ficha-instructor', params: { id: i.id } }"
+                      class="in-nombre"
+                      >{{ i.nombre_corto }}</RouterLink
+                    >
+                    <span v-else class="font-medium">{{ i.nombre_corto }}</span>
                   </div>
                 </td>
-                <td class="hidden md:table-cell in-suave">
+                <td :data-etiqueta="$t('tarjetas.estaSemana')">
+                  {{ carga(i) }}
+                </td>
+                <td
+                  class="hidden md:table-cell in-suave"
+                  :data-etiqueta="$t('equipoVisual.col.sedes')"
+                >
                   {{ i.resumen?.sedes.join(" · ") || "—" }}
                 </td>
-                <td>{{ carga(i) }}</td>
-                <td class="hidden lg:table-cell in-suave">
+                <td
+                  class="hidden lg:table-cell in-suave"
+                  :data-etiqueta="$t('tarjetas.proxima')"
+                >
                   <template v-if="i.resumen?.proxima">
                     {{
                       cuando(
@@ -505,7 +554,10 @@ onMounted(cargar);
                   </template>
                   <template v-else>—</template>
                 </td>
-                <td class="hidden sm:table-cell tabular-nums">
+                <td
+                  class="hidden sm:table-cell tabular-nums"
+                  :data-etiqueta="$t('tarjetas.resenas')"
+                >
                   {{
                     i.resumen?.resenas
                       ? $t("tarjetas.promedio", {
@@ -515,7 +567,7 @@ onMounted(cargar);
                       : "—"
                   }}
                 </td>
-                <td class="text-right whitespace-nowrap">
+                <td class="tu-celda-acciones">
                   <RouterLink
                     v-if="puedeVerPerfil"
                     :to="{ name: 'ficha-instructor', params: { id: i.id } }"
@@ -530,14 +582,19 @@ onMounted(cargar);
       </template>
     </template>
 
-    <!-- Invitar instructor (drawer lateral) -->
-    <PanelLateral
+    <!-- Invitar instructor: pocos campos, en un diálogo chico. -->
+    <ModalDialogo
       :abierto="abierto"
       :titulo="$t('instructores.invitar.titulo')"
+      tam="md"
       :ocupado="invitando"
       @cerrar="cerrar"
     >
-      <form class="space-y-4" @submit.prevent="invitar">
+      <form
+        id="form-invitar-instructor"
+        class="space-y-4"
+        @submit.prevent="invitar"
+      >
         <p
           v-if="error"
           class="text-sm"
@@ -592,34 +649,36 @@ onMounted(cargar);
       </div>
 
       <template #pie>
-        <div class="flex justify-end gap-2">
-          <button
-            class="tu-btn tu-btn-secundario"
-            type="button"
-            @click="cerrar"
-          >
-            {{ $t("comun.cerrar") }}
-          </button>
-          <button
-            class="tu-btn tu-btn-primario"
-            type="button"
-            :disabled="
-              invitando ||
-              form.nombre === '' ||
-              form.email === '' ||
-              (hayMultiSucursal && form.sucursalId === '')
-            "
-            @click="invitar"
-          >
-            {{
-              invitando
-                ? $t("instructores.invitar.enviando")
-                : $t("instructores.invitar.enviar")
-            }}
-          </button>
-        </div>
+        <!-- Con la invitación hecha (y su token a la vista), ya no hay qué
+             cancelar. -->
+        <button
+          class="tu-btn tu-btn-secundario"
+          type="button"
+          :disabled="invitando"
+          @click="cerrar"
+        >
+          {{ activacion ? $t("comun.cerrar") : $t("comun.cancelar") }}
+        </button>
+        <button
+          class="tu-btn tu-btn-primario"
+          type="submit"
+          form="form-invitar-instructor"
+          :disabled="
+            invitando ||
+            form.nombre === '' ||
+            form.email === '' ||
+            (hayMultiSucursal && form.sucursalId === '')
+          "
+          :aria-busy="invitando || undefined"
+        >
+          {{
+            invitando
+              ? $t("instructores.invitar.enviando")
+              : $t("instructores.invitar.enviar")
+          }}
+        </button>
       </template>
-    </PanelLateral>
+    </ModalDialogo>
   </section>
 </template>
 
@@ -659,6 +718,15 @@ onMounted(cargar);
 }
 .in-suave {
   color: var(--texto-suave);
+}
+/* El nombre abre su perfil: se lee como nombre, no como enlace azul. */
+.in-nombre {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+}
+.in-nombre:hover {
+  text-decoration: underline;
 }
 .in-activacion {
   padding: 0.75rem;

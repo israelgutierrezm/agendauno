@@ -17,7 +17,8 @@ use Illuminate\Http\Request;
  * «Por cobrar»: las órdenes que ya se deben (compras sin pagar y citas o clases de
  * pago que ya pasaron), con quién debe, qué y desde cuándo, para registrar el pago
  * desde ahí. Es el mismo criterio que el Inicio (`PorCobrarTenant`), así que los
- * dos dicen lo mismo. Paginado, de lo más antiguo a lo más reciente.
+ * dos dicen lo mismo. Paginado, de lo más antiguo a lo más reciente. Una renovación
+ * dice cuándo vence (`renovacion`); las que aún no vencen se cuentan aparte.
  */
 class PorCobrarTenantController
 {
@@ -73,6 +74,9 @@ class PorCobrarTenantController
             // exentarlas por separado.
             'cuotas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): ?array => $l->comoCuota())->filter()->values()->all(),
             'creada_en' => $orden->created_at?->toIso8601String(),
+            // Una renovación: cuándo vence y si ya venció (con hoy del negocio). Se puede
+            // cobrar antes, por eso sigue en la lista.
+            'renovacion' => $this->porCobrar->renovacion($orden),
             'sesion' => $sesion instanceof SesionTenant ? [
                 'tipo' => $sesion->tipo->value,
                 'profesional' => $sesion->instructor?->name,

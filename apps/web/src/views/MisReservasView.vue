@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
@@ -21,9 +21,11 @@ import HistorialReservas, {
   type ItemHistorial,
 } from "@/components/HistorialReservas.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import ReprogramarMiReserva from "@/components/ReprogramarMiReserva.vue";
 import { libresDeSesion } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
+import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
 import {
   cuandoCorto,
   dinero,
@@ -70,19 +72,15 @@ interface Sede {
 
 const { t } = useI18n();
 const route = useRoute();
-const router = useRouter();
 const sesion = useSesionTenantStore();
 const cuenta = useMiCuenta();
 
-// La pestaña va en la dirección (?vista=…): los accesos del Inicio llevan a la suya
-// y recargar la conserva.
-function pestanaDe(v: unknown): Pestana {
-  return PESTANAS.includes(v as Pestana) ? (v as Pestana) : "reservar";
-}
-const pestana = ref<Pestana>(pestanaDe(route.query.vista));
+// La pestaña va en la dirección (?pestana=…; Reservar, la de omisión, no se escribe):
+// los accesos del Inicio llevan a la suya y recargar la conserva. No usa `vista`:
+// esa clave es la del menú (lib/menu.ts).
+const pestana = usePestanaEnUrl(PESTANAS, { predeterminada: "reservar" });
 function irA(p: Pestana): void {
   pestana.value = p;
-  void router.replace({ query: { ...route.query, vista: p } });
 }
 
 /**
@@ -289,6 +287,18 @@ function deClase(c: Clase): Evento {
 }
 
 const mias = computed<Evento[]>(() => cuenta.proximas.value.map(deReserva));
+// Las pestañas por tarea; Próximas con cuántas tiene.
+const opcionesPestanas = computed(() =>
+  PESTANAS.map((p) => ({
+    clave: p,
+    texto:
+      p === "reservar" && sesion.esCitas
+        ? t("portal.reservas.pestanas.agendar")
+        : t(`portal.reservas.pestanas.${p}`),
+    cuenta:
+      p === "proximas" && mias.value.length > 0 ? mias.value.length : undefined,
+  })),
+);
 const libres = computed<Evento[]>(() =>
   clasesPeriodo.value
     .filter((c) => !cuenta.reservadas.value.has(c.id) && pasaFiltros(c))
@@ -621,27 +631,15 @@ onMounted(() => void cuenta.asegurar());
       "
     />
 
-    <div class="tu-pestanas mt-4" role="tablist">
-      <button
-        v-for="p in PESTANAS"
-        :key="p"
-        type="button"
-        role="tab"
-        :aria-selected="pestana === p"
-        :data-prueba="`pestana-${p}`"
-        @click="irA(p)"
-      >
-        {{
-          p === "reservar" && sesion.esCitas
-            ? $t("portal.reservas.pestanas.agendar")
-            : $t(`portal.reservas.pestanas.${p}`)
-        }}<span
-          v-if="p === 'proximas' && mias.length > 0"
-          class="tu-badge ml-2"
-          >{{ mias.length }}</span
-        >
-      </button>
-    </div>
+    <PestanasSeccion
+      v-model="pestana"
+      :opciones="opcionesPestanas"
+      :etiqueta="
+        sesion.esCitas
+          ? $t('portal.reservas.tituloCitas')
+          : $t('portal.reservas.titulo')
+      "
+    />
 
     <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-3">
       {{ cuenta.error.value }}
@@ -779,7 +777,7 @@ onMounted(() => void cuenta.asegurar());
               }}
               <button
                 type="button"
-                class="tu-enlace"
+                class="tu-btn tu-btn-discreto tu-btn-chico"
                 @click="ofertaElegida = null"
               >
                 {{ $t("portal.reservas.quitarFiltro") }}
@@ -788,7 +786,7 @@ onMounted(() => void cuenta.asegurar());
             <button
               v-if="filtrando"
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-discreto tu-btn-chico"
               @click="quitarFiltros"
             >
               {{ $t("portal.reservas.limpiar") }}
@@ -899,7 +897,7 @@ onMounted(() => void cuenta.asegurar());
               <button
                 v-if="filtrando"
                 type="button"
-                class="tu-enlace mt-2"
+                class="tu-btn tu-btn-discreto mt-2"
                 @click="quitarFiltros"
               >
                 {{ $t("portal.reservas.quitarFiltro") }}
@@ -1079,7 +1077,7 @@ onMounted(() => void cuenta.asegurar());
             :href="abierto.reserva.enlace_en_linea"
             target="_blank"
             rel="noopener noreferrer"
-            class="tu-btn tu-btn-primario inline-block"
+            class="tu-btn tu-btn-primario"
             data-prueba="entrar-en-linea"
             >{{ $t("portal.miReserva.entrarEnLinea") }}</a
           >

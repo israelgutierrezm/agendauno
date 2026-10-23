@@ -5,6 +5,8 @@
  * distintas; las reglas que crean tareas están en Tareas › Automatización.
  */
 export default {
+  // aria-label de las pestañas de Comunicación.
+  etiquetaPestanas: "Secciones de Comunicación",
   pestanas: {
     difusion: {
       titulo: "Difusiones",

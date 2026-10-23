@@ -163,7 +163,7 @@ describe("importar citas", () => {
     expect(w.get('[data-prueba="exito-citas"]').text()).toContain(
       "Se importó 1 cita",
     );
-    expect(w.text()).toContain("No se le avisó nada a tus clientes.");
+    expect(w.text()).toContain("No se le avisó nada a tus alumnos.");
   });
 
   it("antes de confirmar dice cuántas quedan por cobrar, cuánto y cuántas ya estaban pagadas (R14)", async () => {

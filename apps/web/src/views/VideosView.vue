@@ -4,15 +4,17 @@ import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import type { Video } from "@/lib/videos";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
  * Biblioteca de videos (ADR 0184): enlaces de YouTube, Vimeo u otro sitio que el
- * negocio publica para sus clientes con plan vigente (todos o solo algunos planes).
+ * negocio publica para sus alumnos con plan vigente (todos o solo algunos planes).
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -36,6 +38,12 @@ const form = reactive({
   duracion: "",
   publicado: true,
   planes: [] as string[],
+});
+// Con cambios sin guardar, cerrar el diálogo pregunta antes de descartarlos.
+const descarte = useDescartarCambios({
+  abierto,
+  valor: () => ({ ...form, planes: [...form.planes] }),
+  guardando,
 });
 
 async function cargar(): Promise<void> {
@@ -70,6 +78,7 @@ function abrir(v: Video | null): void {
     publicado: v?.publicado ?? true,
     planes: v?.planes.map((p) => p.id) ?? [],
   });
+  descarte.fijar();
   abierto.value = true;
 }
 
@@ -96,6 +105,7 @@ async function guardar(): Promise<void> {
       await api.post(`${base.value}/videos`, carga);
     }
     toast.exito(t("videos.guardado"));
+    descarte.fijar();
     abierto.value = false;
     await cargar();
   } catch (e) {
@@ -154,114 +164,121 @@ onMounted(cargar);
       {{ error }}
     </p>
     <EstadoVacio
-      v-else-if="videos.length === 0 && !abierto"
+      v-else-if="videos.length === 0"
       class="tu-card mt-6"
       icono="etiqueta"
       :titulo="$t('videos.vacio')"
     />
 
-    <form
-      v-if="abierto"
-      class="tu-card mt-6 space-y-3 p-5"
-      data-prueba="form-video"
-      @submit.prevent="guardar"
+    <ModalDialogo
+      :abierto="abierto"
+      :titulo="editando ? $t('videos.editarVideo') : $t('videos.nuevo')"
+      :ocupado="guardando"
+      @cerrar="descarte.cerrar"
     >
-      <h2 class="text-base font-semibold">
-        {{ editando ? $t("videos.editar") : $t("videos.nuevo") }}
-      </h2>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <label>
-          <span class="tu-label">{{ $t("videos.campos.titulo") }}</span>
-          <input
-            v-model="form.titulo"
-            class="tu-input"
-            maxlength="150"
-            required
-            :aria-invalid="errores.titulo ? 'true' : undefined"
-          />
-          <span v-if="errores.titulo" class="tu-error-campo">{{
-            errores.titulo
-          }}</span>
-        </label>
-        <label>
-          <span class="tu-label">{{ $t("videos.campos.url") }}</span>
-          <input
-            v-model="form.url"
-            class="tu-input"
-            type="url"
-            inputmode="url"
-            maxlength="500"
-            placeholder="https://"
-            required
-            :aria-invalid="errores.url ? 'true' : undefined"
-            data-prueba="video-url"
-          />
-          <span v-if="errores.url" class="tu-error-campo">{{
-            errores.url
-          }}</span>
-        </label>
-        <label>
-          <span class="tu-label">{{ $t("videos.campos.categoria") }}</span>
-          <input v-model="form.categoria" class="tu-input" maxlength="60" />
-        </label>
-        <label>
-          <span class="tu-label">{{ $t("videos.campos.duracion") }}</span>
-          <input
-            v-model="form.duracion"
-            class="tu-input"
-            type="number"
-            min="1"
-            max="600"
-          />
-        </label>
-        <label class="sm:col-span-2">
-          <span class="tu-label">{{ $t("videos.campos.descripcion") }}</span>
-          <textarea
-            v-model="form.descripcion"
-            class="tu-input"
-            rows="2"
-            maxlength="500"
-          />
-        </label>
-      </div>
-      <fieldset v-if="planes.length > 0">
-        <legend class="tu-label">{{ $t("videos.campos.planes") }}</legend>
-        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("videos.campos.planesAyuda") }}
-        </p>
-        <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-          <label
-            v-for="p in planes"
-            :key="p.id"
-            class="flex items-center gap-2 text-sm"
-          >
-            <input v-model="form.planes" type="checkbox" :value="p.id" />
-            {{ p.nombre }}
+      <form
+        id="form-video"
+        class="space-y-3"
+        data-prueba="form-video"
+        @submit.prevent="guardar"
+      >
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label>
+            <span class="tu-label">{{ $t("videos.campos.titulo") }}</span>
+            <input
+              v-model="form.titulo"
+              class="tu-input"
+              maxlength="150"
+              required
+              :aria-invalid="errores.titulo ? 'true' : undefined"
+            />
+            <span v-if="errores.titulo" class="tu-error-campo">{{
+              errores.titulo
+            }}</span>
+          </label>
+          <label>
+            <span class="tu-label">{{ $t("videos.campos.url") }}</span>
+            <input
+              v-model="form.url"
+              class="tu-input"
+              type="url"
+              inputmode="url"
+              maxlength="500"
+              placeholder="https://"
+              required
+              :aria-invalid="errores.url ? 'true' : undefined"
+              data-prueba="video-url"
+            />
+            <span v-if="errores.url" class="tu-error-campo">{{
+              errores.url
+            }}</span>
+          </label>
+          <label>
+            <span class="tu-label">{{ $t("videos.campos.categoria") }}</span>
+            <input v-model="form.categoria" class="tu-input" maxlength="60" />
+          </label>
+          <label>
+            <span class="tu-label">{{ $t("videos.campos.duracion") }}</span>
+            <input
+              v-model="form.duracion"
+              class="tu-input"
+              type="number"
+              min="1"
+              max="600"
+            />
+          </label>
+          <label class="sm:col-span-2">
+            <span class="tu-label">{{ $t("videos.campos.descripcion") }}</span>
+            <textarea
+              v-model="form.descripcion"
+              class="tu-input"
+              rows="2"
+              maxlength="500"
+            />
           </label>
         </div>
-      </fieldset>
-      <label class="flex items-center gap-2 text-sm">
-        <input v-model="form.publicado" type="checkbox" />
-        {{ $t("videos.campos.publicado") }}
-      </label>
-      <div class="flex gap-2">
+        <fieldset v-if="planes.length > 0">
+          <legend class="tu-label">{{ $t("videos.campos.planes") }}</legend>
+          <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("videos.campos.planesAyuda") }}
+          </p>
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            <label
+              v-for="p in planes"
+              :key="p.id"
+              class="flex items-center gap-2 text-sm"
+            >
+              <input v-model="form.planes" type="checkbox" :value="p.id" />
+              {{ p.nombre }}
+            </label>
+          </div>
+        </fieldset>
+        <label class="flex items-center gap-2 text-sm">
+          <input v-model="form.publicado" type="checkbox" />
+          {{ $t("videos.campos.publicado") }}
+        </label>
+      </form>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="guardando"
+          @click="descarte.cerrar"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
         <button
           type="submit"
+          form="form-video"
           class="tu-btn tu-btn-primario"
           :disabled="guardando"
+          :aria-busy="guardando || undefined"
           data-prueba="guardar-video"
         >
           {{ $t("comun.guardar") }}
         </button>
-        <button
-          type="button"
-          class="tu-btn tu-btn-secundario"
-          @click="abierto = false"
-        >
-          {{ $t("comun.cancelar") }}
-        </button>
-      </div>
-    </form>
+      </template>
+    </ModalDialogo>
 
     <ul v-if="videos.length > 0" class="tu-card mt-6 divide-y">
       <li
@@ -293,14 +310,14 @@ onMounted(cargar);
         <div v-if="puedeEditar" class="flex gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             @click="abrir(v)"
           >
             {{ $t("videos.editar") }}
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-peligro tu-btn-chico"
             @click="borrar(v)"
           >
             {{ $t("videos.borrar") }}

@@ -79,16 +79,17 @@ function ir(n: number): void {
       </select>
     </div>
 
+    <!-- Botones del contrato (style.css): `tu-btn tu-btn-discreto`, con el alto, el
+         foco y el deshabilitado de todos; la página actual, con el color primario. -->
     <div v-if="ultimaPagina > 1" class="flex flex-wrap items-center gap-1">
       <button
         type="button"
-        class="min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-center text-sm disabled:opacity-40"
-        :style="{ color: 'var(--texto-suave)' }"
+        class="tu-btn tu-btn-discreto min-w-10"
         :disabled="page <= 1"
         :aria-label="$t('tabla.anterior')"
         @click="ir(page - 1)"
       >
-        <IconoNav nombre="chevron" :tam="16" class="inline rotate-180" />
+        <IconoNav nombre="chevron" :tam="16" class="rotate-180" />
       </button>
       <template v-for="(n, i) in paginas" :key="i">
         <span
@@ -100,7 +101,7 @@ function ir(n: number): void {
         <button
           v-else
           type="button"
-          class="min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-center text-sm"
+          class="tu-btn tu-btn-discreto min-w-10"
           :aria-current="n === page ? 'page' : undefined"
           :aria-label="$t('tabla.pagina', { n })"
           :style="
@@ -109,7 +110,7 @@ function ir(n: number): void {
                   background: 'var(--primario)',
                   color: 'var(--primario-contraste)',
                 }
-              : { color: 'var(--texto-suave)' }
+              : undefined
           "
           @click="ir(n)"
         >
@@ -118,13 +119,12 @@ function ir(n: number): void {
       </template>
       <button
         type="button"
-        class="min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-center text-sm disabled:opacity-40"
-        :style="{ color: 'var(--texto-suave)' }"
+        class="tu-btn tu-btn-discreto min-w-10"
         :disabled="page >= ultimaPagina"
         :aria-label="$t('tabla.siguiente')"
         @click="ir(page + 1)"
       >
-        <IconoNav nombre="chevron" :tam="16" class="inline" />
+        <IconoNav nombre="chevron" :tam="16" />
       </button>
     </div>
   </nav>

@@ -14,11 +14,15 @@ use Illuminate\Database\Eloquent\Builder;
  * Lo que el negocio tiene por cobrar, con un solo criterio para el Inicio y para
  * «Por cobrar»: las órdenes pendientes que ya se deben (compras sin pagar y citas o
  * clases de pago que ya empezaron). Una cita próxima que se paga al atenderla
- * todavía no es un adeudo: se cuenta aparte (`proximas`). Con alcance por sucursal
+ * todavía no es un adeudo: se cuenta aparte (`proximas`). Una renovación cuya orden
+ * nació con el aviso sigue en la lista (se puede cobrar antes), con su vencimiento, y se
+ * cuenta aparte mientras no vence (`renovaciones_por_vencer`). Con alcance por sucursal
  * (R19): el personal acotado solo ve lo de sus sedes.
  */
 class PorCobrarTenant
 {
+    public function __construct(private readonly FechasNegocioTenant $fechas) {}
+
     /**
      * Las órdenes que ya se deben, de la más antigua a la más reciente.
      *
@@ -42,11 +46,13 @@ class PorCobrarTenant
     }
 
     /**
-     * Cuántas órdenes y cuánto se debe (por moneda), y cuántas citas próximas se
-     * cobrarán al atenderlas.
+     * Cuántas órdenes y cuánto se debe (por moneda), cuántas citas próximas se
+     * cobrarán al atenderlas y cuántas de las órdenes son renovaciones que aún no vencen
+     * (la orden nace días antes, con el aviso: ya se puede cobrar, pero aún no es un
+     * atraso).
      *
      * @param  list<int>|null  $permitidas
-     * @return array{ordenes_pendientes: int, por_cobrar: list<array{moneda: string, total_minor: int}>, proximas: int}
+     * @return array{ordenes_pendientes: int, por_cobrar: list<array{moneda: string, total_minor: int}>, proximas: int, renovaciones_por_vencer: int}
      */
     public function resumen(?array $permitidas): array
     {
@@ -66,6 +72,34 @@ class PorCobrarTenant
             'proximas' => $this->pendientes($permitidas)
                 ->whereHas('sesion', fn (Builder $s) => $s->where('inicia_en', '>', CarbonImmutable::now()))
                 ->count(),
+            'renovaciones_por_vencer' => $this->vencidas($permitidas)
+                ->reorder()
+                ->whereDate('renueva_vence_el', '>=', $this->fechas->hoy())
+                ->count(),
+        ];
+    }
+
+    /**
+     * Si la orden es una renovación: cuándo vence lo que renueva y cómo va con hoy del
+     * negocio (`proxima`, `hoy` o `vencida`). Null si no lo es.
+     *
+     * @return array{vence_el: string, situacion: string}|null
+     */
+    public function renovacion(OrdenTenant $orden): ?array
+    {
+        if ($orden->renueva_vence_el === null) {
+            return null;
+        }
+        $vence = $orden->renueva_vence_el->toDateString();
+        $hoy = $this->fechas->hoy();
+
+        return [
+            'vence_el' => $vence,
+            'situacion' => match (true) {
+                $vence > $hoy => 'proxima',
+                $vence === $hoy => 'hoy',
+                default => 'vencida',
+            },
         ];
     }
 

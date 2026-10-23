@@ -6,6 +6,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -13,7 +14,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Corte de caja: los movimientos de dinero de un rango de fechas con quién hizo cada
  * uno (cobros, devoluciones, ventas de mostrador y cancelaciones) y los totales por
- * método y por persona del equipo. Se descarga en CSV.
+ * método y por persona del equipo. Se descarga en CSV desde el encabezado de la vista
+ * (Cobros › Corte de caja), que es quien lo titula: aquí no hay título propio.
  */
 interface Movimiento {
   fecha: string;
@@ -60,6 +62,21 @@ const desde = ref(hoy());
 const hasta = ref(hoy());
 const usuario = ref("");
 const tipo = ref("");
+// Los filtros van en la dirección, como en Movimientos: recargar o compartir el enlace
+// conserva el corte. Claves propias (Cobros ya usa `desde` y `hasta` en sus vistas).
+// Antes de vigilarlos, para no cargar dos veces.
+useFiltrosEnUrl({
+  corte_desde: fechaEnUrl(desde),
+  corte_hasta: fechaEnUrl(hasta),
+  cajero: usuario,
+  corte_tipo: opcionEnUrl(tipo, [
+    "",
+    "cobro",
+    "devolucion",
+    "venta",
+    "cancelacion",
+  ] as const),
+});
 const movimientos = ref<Movimiento[]>([]);
 const totalesPorMoneda = ref<Totales[]>([]);
 // La lista muestra los más recientes; los totales y el CSV incluyen todo el rango.
@@ -157,7 +174,8 @@ async function cargar(): Promise<void> {
     movimientos.value = data.data;
     totalesPorMoneda.value = data.totales_por_moneda ?? [data.totales];
     truncado.value = data.meta?.truncado ? (data.meta.limite ?? null) : null;
-    if (usuario.value === "") {
+    // Con la persona ya elegida (p. ej. desde la dirección), su nombre en la lista.
+    if (usuario.value === "" || personasEquipo.value.length === 0) {
       const vistos = new Map<string, string>();
       for (const m of data.data) {
         if (m.quien_id) {
@@ -207,23 +225,15 @@ async function descargar(): Promise<void> {
 
 watch([desde, hasta, usuario, tipo], () => void cargar());
 onMounted(cargar);
+
+// «Descargar CSV» va en el encabezado de la vista (CobranzaView).
+const hayMovimientos = computed(() => movimientos.value.length > 0);
+defineExpose({ descargar, descargando, hayMovimientos });
 </script>
 
 <template>
   <div>
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <h2 class="font-medium text-lg">{{ $t("corteCaja.titulo") }}</h2>
-      <button
-        type="button"
-        class="tu-btn tu-btn-secundario"
-        :disabled="descargando || movimientos.length === 0"
-        @click="descargar"
-      >
-        {{ $t("corteCaja.descargar") }}
-      </button>
-    </div>
-
-    <div class="mt-3 flex flex-wrap items-end gap-3 text-sm">
+    <div class="flex flex-wrap items-end gap-3 text-sm">
       <label class="grid gap-1">
         <span class="tu-label">{{ $t("corteCaja.desde") }}</span>
         <input v-model="desde" type="date" class="tu-input" />
@@ -380,7 +390,7 @@ onMounted(cargar);
       </div>
     </template>
 
-    <div class="mt-3 tu-card overflow-x-auto">
+    <div class="mt-3 tu-card">
       <p
         v-if="cargando"
         class="p-5 text-sm"
@@ -395,7 +405,7 @@ onMounted(cargar);
         data-prueba="error-carga-corte"
       >
         <span style="color: var(--error)">{{ errorCarga }}</span>
-        <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
+        <button type="button" class="tu-btn tu-btn-discreto" @click="cargar">
           {{ $t("comun.reintentar") }}
         </button>
       </div>
@@ -409,7 +419,7 @@ onMounted(cargar);
       >
         <button
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-discreto"
           @click="quitarFiltros"
         >
           {{ $t("tabla.restablecer") }}
@@ -422,67 +432,73 @@ onMounted(cargar);
       >
         {{ $t("corteCaja.vacio") }}
       </p>
-      <table v-else class="tu-tabla">
-        <thead>
-          <tr>
-            <th>{{ $t("corteCaja.fecha") }}</th>
-            <th>
-              {{ $t("corteCaja.movimiento") }}
-            </th>
-            <th class="hidden sm:table-cell">
-              {{ $t("corteCaja.quien") }}
-            </th>
-            <th class="text-right">
-              {{ $t("corteCaja.monto") }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in enPagina" :key="`${m.tipo}-${m.referencia}`">
-            <td
-              class="whitespace-nowrap"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ fechaHora(m.fecha) }}
-            </td>
-            <td>
-              <span class="font-medium">{{
-                t(`corteCaja.tipos.${m.tipo}`)
-              }}</span>
-              <span :style="{ color: 'var(--texto-suave)' }">
-                · {{ m.persona ? `${m.persona} · ` : "" }}{{ m.concepto }}</span
+      <!-- En el teléfono, cada movimiento es una ficha: qué fue, cuánto, cuándo y quién. -->
+      <div v-else class="relative overflow-x-auto tu-tabla-adaptable">
+        <table class="tu-tabla">
+          <thead>
+            <tr>
+              <th>
+                {{ $t("corteCaja.movimiento") }}
+              </th>
+              <th class="text-right">
+                {{ $t("corteCaja.monto") }}
+              </th>
+              <th>{{ $t("corteCaja.fecha") }}</th>
+              <th class="hidden sm:table-cell">
+                {{ $t("corteCaja.quien") }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in enPagina" :key="`${m.tipo}-${m.referencia}`">
+              <td :data-etiqueta="$t('corteCaja.movimiento')">
+                <span class="font-medium">{{
+                  t(`corteCaja.tipos.${m.tipo}`)
+                }}</span>
+                <span class="tu-sub font-normal">
+                  {{ m.persona ? `${m.persona} · ` : "" }}{{ m.concepto }}</span
+                >
+                <span
+                  v-if="m.detalle && m.tipo !== 'cobro'"
+                  class="tu-sub font-normal"
+                  >{{ m.detalle }}</span
+                >
+              </td>
+              <td
+                :data-etiqueta="$t('corteCaja.monto')"
+                class="text-right tabular-nums whitespace-nowrap"
+                :style="{
+                  color:
+                    m.monto_minor < 0
+                      ? 'var(--error)'
+                      : m.tipo === 'cancelacion'
+                        ? 'var(--texto-suave)'
+                        : undefined,
+                }"
               >
-              <span
-                v-if="m.detalle && m.tipo !== 'cobro'"
-                class="block text-xs"
+                {{
+                  m.tipo === "cancelacion"
+                    ? "—"
+                    : dinero(m.monto_minor, m.moneda)
+                }}
+              </td>
+              <td
+                :data-etiqueta="$t('corteCaja.fecha')"
+                class="whitespace-nowrap"
                 :style="{ color: 'var(--texto-suave)' }"
-                >{{ m.detalle }}</span
               >
-              <span
-                class="block text-xs sm:hidden"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{ m.quien }}</span
+                {{ fechaHora(m.fecha) }}
+              </td>
+              <td
+                :data-etiqueta="$t('corteCaja.quien')"
+                class="hidden sm:table-cell"
               >
-            </td>
-            <td class="hidden sm:table-cell">{{ m.quien }}</td>
-            <td
-              class="text-right tabular-nums whitespace-nowrap"
-              :style="{
-                color:
-                  m.monto_minor < 0
-                    ? 'var(--error)'
-                    : m.tipo === 'cancelacion'
-                      ? 'var(--texto-suave)'
-                      : undefined,
-              }"
-            >
-              {{
-                m.tipo === "cancelacion" ? "—" : dinero(m.monto_minor, m.moneda)
-              }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                {{ m.quien }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <PaginacionListado
         v-if="ultimaPagina > 1"
         :page="pagina"

@@ -26,6 +26,9 @@ vi.mock("@/stores/sesionTenant", () => ({
 }));
 vi.mock("vue-router", () => ({
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
+  // Los filtros van en la dirección (useFiltrosEnUrl).
+  useRoute: () => ({ query: {}, hash: "" }),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 const equipo = [

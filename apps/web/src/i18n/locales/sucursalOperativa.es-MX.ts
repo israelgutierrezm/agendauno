@@ -12,7 +12,7 @@ export default {
   sinSucursal: {
     titulo: "Aún no tienes una sucursal asignada",
     detalle:
-      "Mientras tanto no verás agenda, clientes ni cobros. Pide al administrador del negocio que te asigne una.",
+      "Mientras tanto no verás agenda, alumnos ni cobros. Pide al administrador del negocio que te asigne una.",
   },
   // En Usuarios: el personal necesita al menos una sucursal.
   sinSucursalUsuario: "Sin sucursal: no ve nada hasta que le asignes una.",

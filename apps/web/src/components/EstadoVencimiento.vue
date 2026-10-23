@@ -24,6 +24,8 @@ const props = defineProps<{
   // AAAA-MM-DD (o una fecha ISO: se toma el día).
   fecha: string;
   situacion?: SituacionVencimiento;
+  // Otro texto para el estado (p. ej. «Gracia vencida»); el tono sigue a la situación.
+  etiqueta?: string;
 }>();
 
 const { t, locale } = useI18n();
@@ -68,7 +70,7 @@ const relativo = computed(() => {
       class="tu-estado"
       :data-situacion="situacion"
       :style="{ '--tono': TONOS[situacion] }"
-      >{{ t(`vencimiento.estados.${situacion}`) }}</span
+      >{{ etiqueta ?? t(`vencimiento.estados.${situacion}`) }}</span
     >
     <span class="text-xs" :style="{ color: 'var(--texto-suave)' }"
       >{{ fechaTexto }} · {{ relativo }}</span

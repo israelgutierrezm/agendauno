@@ -7,15 +7,26 @@ import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
+ * A dónde lleva «Volver» y con qué texto. Toda pantalla que tenga un «Volver» (fichas,
+ * importadores) lo pinta igual: `<RouterLink :to="regreso.destino.value"
+ * class="tu-volver"><IconoNav nombre="atras" :tam="16" />{{ regreso.etiqueta.value }}`
+ * (como FichaInstructorView), sin fijar el destino a mano.
+ */
+export interface Regreso {
+  destino: ComputedRef<RouteLocationRaw>;
+  etiqueta: ComputedRef<string>;
+}
+
+/**
  * «Volver» de una ficha: regresa a la pantalla del panel de donde se llegó (la
  * bandeja de respuestas, Recepción, Expedientes…) para no perder ese contexto. Si se
  * entró directo (un enlace, sin historial) o se viene de la lista de siempre, vuelve
  * a esa lista con su texto de siempre.
  */
-export function useRegreso(lista: { name: string; etiqueta: () => string }): {
-  destino: ComputedRef<RouteLocationRaw>;
-  etiqueta: ComputedRef<string>;
-} {
+export function useRegreso(lista: {
+  name: string;
+  etiqueta: () => string;
+}): Regreso {
   const route = useRoute();
   const router = useRouter();
   const { t } = useI18n();

@@ -14,6 +14,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio, inicioDeMesEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -243,6 +244,14 @@ const error = computed(() => errores.value[pestana.value] ?? null);
 
 // Qué muestra la gráfica: el dinero que entró menos devoluciones, o lo vendido.
 const metrica = ref<"neto" | "ventas">("neto");
+// El periodo, la agrupación y la métrica, en la dirección: recargar o compartir el
+// enlace abre el mismo reporte. Antes de vigilarlos, para no pedir de más.
+useFiltrosEnUrl({
+  desde: fechaEnUrl(desde),
+  hasta: fechaEnUrl(hasta),
+  agrupar: opcionEnUrl(agrupacion, ["dia", "semana", "mes"]),
+  metrica: opcionEnUrl(metrica, ["neto", "ventas"]),
+});
 function valorDe(p: PuntoSerie): number {
   return metrica.value === "neto" ? p.neto_minor : p.ventas_minor;
 }
@@ -538,10 +547,10 @@ function reintentar(): void {
 }
 
 /**
- * Pestañas: Resumen, Ingresos, Ocupación y la agenda del equipo dependen del periodo
- * elegido; Clientes (cohortes por mes de alta) y las sucursales (estado actual), no.
- * El selector de periodo solo aparece donde cuenta, y cada sección dice de qué son
- * sus cifras.
+ * Vistas del área Reportes (el menú las muestra arriba, `?vista=`): Resumen, Ingresos,
+ * Ocupación, el embudo y la agenda del equipo dependen del periodo elegido; los
+ * alumnos (cohortes por mes de alta) y las sucursales (estado actual), no. El selector
+ * de periodo solo aparece donde cuenta, y cada sección dice de qué son sus cifras.
  */
 type Pestana =
   "resumen" | "ingresos" | "ocupacion" | "clientes" | "embudo" | "equipo";
@@ -560,7 +569,49 @@ const pestanas = computed<Pestana[]>(() =>
     ? PESTANAS.filter((p) => p === "resumen" || p === "equipo")
     : PESTANAS,
 );
-const pestana = ref<Pestana>(soloRendimiento.value ? "equipo" : "resumen");
+// La vista de la dirección (lib/menu.ts): la de equipo y sucursales es
+// `vista=sucursales`; `vista=equipo` es Equipo › Rendimiento. Una que el plan no
+// incluye abre el resumen.
+const VISTA_A_PESTANA: Record<string, Pestana> = {
+  ingresos: "ingresos",
+  ocupacion: "ocupacion",
+  clientes: "clientes",
+  embudo: "embudo",
+  sucursales: "equipo",
+  equipo: "equipo",
+};
+const pestana = computed<Pestana>(() => {
+  const vista = route?.query.vista;
+  const elegida =
+    typeof vista === "string" ? VISTA_A_PESTANA[vista] : undefined;
+  return elegida !== undefined && pestanas.value.includes(elegida)
+    ? elegida
+    : "resumen";
+});
+// Título y subtítulo de cada vista (Rendimiento, el suyo).
+const titulo = computed(() => {
+  if (soloRendimiento.value) {
+    return t("reportes.equipo.rendimiento");
+  }
+  if (pestana.value === "clientes") {
+    return plural(
+      sesion.terminologia?.miembro ?? (sesion.esCitas ? "Cliente" : "Alumno"),
+    );
+  }
+  return pestana.value === "equipo" && trabajaSolo.value
+    ? t("operacion.reportes.pestanas.equipoSolo")
+    : t(`operacion.reportes.pestanas.${pestana.value}`);
+});
+const subtitulo = computed(() => {
+  if (soloRendimiento.value) {
+    return trabajaSolo.value
+      ? t("reportes.equipo.subtituloSolo")
+      : t("reportes.equipo.subtitulo");
+  }
+  return pestana.value === "equipo" && trabajaSolo.value
+    ? t("reportes.subtitulos.equipoSolo")
+    : t(`reportes.subtitulos.${pestana.value}`);
+});
 const usaPeriodo = computed(
   () =>
     pestana.value === "resumen" ||
@@ -624,13 +675,18 @@ watch(agrupacion, async () => {
     errores.value = { ...errores.value, ingresos: mensajeDeError(e) };
   }
 });
-watch(pestana, () => void cargar());
-// Entre Reportes y Rendimiento la pantalla es la misma: cambia lo que se pide.
-watch(soloRendimiento, (rendimiento) => {
-  pestana.value = rendimiento ? "equipo" : "resumen";
-  cargadas.delete("equipo");
-  void cargar();
-});
+// Cada vista pide lo suyo al abrirse (también al entrar por un enlace o recargar).
+// Entre Reportes y Rendimiento la pestaña es la misma, pero cambia lo que se pide.
+watch(
+  [pestana, soloRendimiento],
+  ([, rendimiento], [, antes]) => {
+    if (rendimiento !== antes) {
+      cargadas.delete("equipo");
+    }
+    void cargar();
+  },
+  { immediate: true },
+);
 
 // El asistente sobre los datos del negocio (ADR 0196): si se ofrece, a la mano.
 const asistenteDisponible = ref(false);
@@ -649,20 +705,14 @@ async function revisarAsistente(): Promise<void> {
 }
 
 onMounted(() => {
-  void cargar();
   void revisarAsistente();
 });
 </script>
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion
-      :titulo="
-        soloRendimiento
-          ? $t('reportes.equipo.rendimiento')
-          : $t('reportes.titulo')
-      "
-    >
+    <!-- Las vistas (Resumen, Ingresos…) son las pestañas del área, arriba (lib/menu.ts). -->
+    <EncabezadoSeccion :titulo="titulo" :subtitulo="subtitulo">
       <template v-if="asistenteDisponible && !soloRendimiento" #acciones>
         <RouterLink
           :to="{ name: 'asistente-ia' }"
@@ -672,27 +722,6 @@ onMounted(() => {
         >
       </template>
     </EncabezadoSeccion>
-
-    <div v-if="!soloRendimiento" class="tu-pestanas mt-6" role="group">
-      <button
-        v-for="p in pestanas"
-        :key="p"
-        type="button"
-        :aria-pressed="pestana === p"
-        @click="pestana = p"
-      >
-        {{
-          p === "clientes"
-            ? plural(
-                sesion.terminologia?.miembro ??
-                  (sesion.esCitas ? "Cliente" : "Alumno"),
-              )
-            : p === "equipo" && trabajaSolo
-              ? $t("operacion.reportes.pestanas.equipoSolo")
-              : $t(`operacion.reportes.pestanas.${p}`)
-        }}
-      </button>
-    </div>
 
     <!-- Periodo -->
     <div v-if="usaPeriodo" class="mt-4 flex flex-wrap items-end gap-3">
@@ -727,7 +756,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           data-prueba="reintentar-reporte"
           @click="reintentar"
         >
@@ -800,7 +829,7 @@ onMounted(() => {
       <!-- Tendencias de ingresos (Etapa 2) -->
       <template v-if="pestana === 'ingresos'">
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <h2 class="font-medium text-lg">
+          <h2 class="tu-titulo-seccion">
             {{ $t("reportes.tendencias.titulo") }}
           </h2>
           <div class="ml-auto flex items-center gap-2">
@@ -1087,7 +1116,7 @@ onMounted(() => {
       </p>
       <!-- Conversión + cohortes de retención (Etapa 2) -->
       <template v-if="pestana === 'clientes' && cohortes">
-        <h2 class="mt-6 font-medium text-lg">
+        <h2 class="tu-titulo-seccion mt-6">
           {{ $t("reportes.conversion.titulo") }}
         </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1217,20 +1246,23 @@ onMounted(() => {
       <!-- Por sucursal -->
       <!-- Agenda del equipo (ADR 0081) -->
       <template v-if="pestana === 'equipo'">
-        <h2 v-if="!soloRendimiento" class="mt-4 font-medium text-lg">
-          {{
-            trabajaSolo
-              ? $t("reportes.equipo.tituloSolo")
-              : $t("reportes.equipo.titulo")
-          }}
-        </h2>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{
-            trabajaSolo
-              ? $t("reportes.equipo.subtituloSolo")
-              : $t("reportes.equipo.subtitulo")
-          }}
-        </p>
+        <!-- En Rendimiento, el encabezado ya dice qué es y de qué trata. -->
+        <template v-if="!soloRendimiento">
+          <h2 class="tu-titulo-seccion mt-4">
+            {{
+              trabajaSolo
+                ? $t("reportes.equipo.tituloSolo")
+                : $t("reportes.equipo.titulo")
+            }}
+          </h2>
+          <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{
+              trabajaSolo
+                ? $t("reportes.equipo.subtituloSolo")
+                : $t("reportes.equipo.subtitulo")
+            }}
+          </p>
+        </template>
         <!-- Si la pestaña falló, el aviso de arriba lo dice: no es «sin datos». -->
         <template v-if="!equipo || equipo.profesionales.length === 0">
           <p
@@ -1384,7 +1416,7 @@ onMounted(() => {
       </template>
 
       <template v-if="pestana === 'equipo' && !soloRendimiento">
-        <h2 class="mt-8 font-medium text-lg">
+        <h2 class="tu-titulo-seccion mt-8">
           {{ $t("reportes.porSucursal") }}
         </h2>
         <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -1464,7 +1496,7 @@ onMounted(() => {
 
       <!-- Rentabilidad por clase (R30) -->
       <template v-if="pestana === 'ingresos'">
-        <h2 class="mt-8 font-medium text-lg">
+        <h2 class="tu-titulo-seccion mt-8">
           {{
             $t(
               sesion.esCitas

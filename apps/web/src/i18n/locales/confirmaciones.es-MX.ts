@@ -40,7 +40,7 @@ export default {
     "¿Quitar a {persona} de la lista de espera? Ya no se le ofrecerá un lugar en esta clase.",
   quitarDeEsperaAceptar: "Quitar de la espera",
   publicarDocumento:
-    "¿Publicar «{titulo}»? Tus clientes verán esta versión y tendrán que aceptarla.",
+    "¿Publicar «{titulo}»? Tus alumnos verán esta versión y tendrán que aceptarla.",
   publicar: "Publicar",
   quitarImagen:
     "¿Quitar la imagen? Para volver a ponerla tendrás que subirla de nuevo.",
@@ -48,7 +48,7 @@ export default {
     "¿Quitar el logo? Para volver a ponerlo tendrás que subirlo de nuevo.",
   quitar: "Quitar",
   ocultarPagina:
-    "¿Dejar de mostrar tu página? Tus clientes ya no la verán ni podrán agendar en línea.",
+    "¿Dejar de mostrar tu página? Ya nadie podrá verla ni agendar en línea.",
   ocultar: "Ocultar página",
   asistencia: {
     noVino:

@@ -23,6 +23,7 @@ import {
   simboloMoneda,
 } from "@/lib/formato";
 import { useDescartarCambios } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -120,6 +121,17 @@ watch(archivados, (lista) => {
 // El catálogo de una clínica o un salón junta decenas de servicios: se busca por nombre
 // o actividad y se ve por páginas.
 const buscarServicio = ref("");
+// Lo que se busca y si se ven los archivados quedan en la dirección
+// (`?q=…&archivados=1`): recargar o volver atrás conserva la lista.
+useFiltrosEnUrl({
+  q: buscarServicio,
+  archivados: computed<string>({
+    get: () => (verArchivados.value ? "1" : ""),
+    set: (v: string) => {
+      verArchivados.value = v === "1";
+    },
+  }),
+});
 const paginaServicios = ref(1);
 const SERVICIOS_POR_PAGINA = 20;
 const serviciosVisibles = computed(() => {
@@ -321,6 +333,27 @@ const formInvalido = computed(
     duracionInvalida.value ||
     anticipoInvalido.value,
 );
+// Lo básico a la vista; lo demás, en «Más condiciones · N activas» (abierto al
+// configurar uno que ya tiene alguna puesta).
+const avanzadasActivas = computed(() => {
+  const f = form.value;
+  const clases = !esCitas.value;
+  return [
+    clases && f.practicaLibre,
+    clases && f.nivel !== "",
+    clases && f.principiantes,
+    f.requisitos.trim() !== "",
+    f.queLlevar.trim() !== "",
+    clases && f.enlace.trim() !== "",
+    Number(f.preparacion) > 0,
+    Number(f.limpieza) > 0,
+    conAnticipo.value,
+    !clases && Number(f.regreso) > 0,
+    f.recursos.length > 0,
+    !clases && f.incluye.length > 0,
+  ].filter(Boolean).length;
+});
+const avanzadoAbierto = ref(false);
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -383,6 +416,7 @@ function configurar(o: Oferta): void {
           ? String(o.anticipo_pct)
           : "",
   };
+  avanzadoAbierto.value = avanzadasActivas.value > 0;
   descartarEdicion.fijar();
 }
 function cerrar(): void {
@@ -537,6 +571,14 @@ const filasValidas = computed(() =>
   filas.value.filter((f) => conNombre(f) && valorValido(f)),
 );
 async function guardarAlta(): Promise<void> {
+  // Lo mismo que desactiva «Guardar»: con Enter en una fila tampoco se manda.
+  if (
+    dandoAltaGuardando.value ||
+    !filas.value.some(conNombre) ||
+    filas.value.some(precioIlegible)
+  ) {
+    return;
+  }
   if (filas.value.some(filaIncompleta)) {
     revisarAlta.value = true;
     errorAlta.value = t("listadosVisual.catalogo.filasIncompletas");
@@ -577,7 +619,13 @@ async function guardarAlta(): Promise<void> {
 }
 
 async function guardar(o: Oferta): Promise<void> {
-  if (!puedeGestionar.value || formInvalido.value) {
+  // Lo mismo que desactiva «Guardar»: con Enter en un campo tampoco se manda.
+  if (
+    !puedeGestionar.value ||
+    formInvalido.value ||
+    guardando.value ||
+    archivando.value
+  ) {
     return;
   }
   guardando.value = true;
@@ -742,7 +790,7 @@ onMounted(cargar);
       <template v-if="errorCarga" #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -761,7 +809,8 @@ onMounted(cargar);
       <template v-else>
         <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-        <div class="tu-card mt-5 overflow-x-auto">
+        <!-- En el teléfono, cada uno en ficha con Configurar a la vista. -->
+        <div class="tu-card relative mt-5 overflow-x-auto tu-tabla-adaptable">
           <div
             v-if="
               ofertas.length > SERVICIOS_POR_PAGINA / 2 || archivados.length > 0
@@ -810,19 +859,19 @@ onMounted(cargar);
               />
             </label>
           </div>
-          <table class="ct-tabla">
+          <table class="tu-tabla">
             <thead>
               <tr>
                 <th>{{ $t("listadosVisual.catalogo.servicio") }}</th>
-                <th class="hidden sm:table-cell">
-                  {{ $t("listadosVisual.catalogo.duracion") }}
-                </th>
                 <th class="text-right">
                   {{
                     esCitas
                       ? $t("listadosVisual.catalogo.precio")
                       : $t("listadosVisual.catalogo.cupo")
                   }}
+                </th>
+                <th class="hidden sm:table-cell">
+                  {{ $t("listadosVisual.catalogo.duracion") }}
                 </th>
                 <th class="hidden md:table-cell">
                   {{ $t("listadosVisual.catalogo.reserva") }}
@@ -836,7 +885,7 @@ onMounted(cargar);
                 :key="o.id"
                 data-prueba="servicio"
               >
-                <td>
+                <td :data-etiqueta="$t('listadosVisual.catalogo.servicio')">
                   <div class="flex items-center gap-3">
                     <img
                       v-if="o.foto_url"
@@ -849,7 +898,16 @@ onMounted(cargar);
                     </span>
                     <div class="min-w-0">
                       <p class="font-medium">
-                        {{ o.nombre }}
+                        <!-- Tocar el nombre también lo configura. -->
+                        <button
+                          v-if="puedeGestionar && !o.archivado"
+                          type="button"
+                          class="ct-nombre"
+                          @click="configurar(o)"
+                        >
+                          {{ o.nombre }}
+                        </button>
+                        <template v-else>{{ o.nombre }}</template>
                         <span
                           v-if="guardadoId === o.id"
                           class="ml-2 text-sm"
@@ -861,7 +919,7 @@ onMounted(cargar);
                           }}</span
                         >
                       </p>
-                      <p class="ct-sub">
+                      <p class="tu-sub ct-recorte">
                         <template v-if="o.descripcion">{{
                           o.descripcion
                         }}</template>
@@ -869,20 +927,20 @@ onMounted(cargar);
                           $t("listadosVisual.catalogo.sinDescripcion")
                         }}</template>
                       </p>
-                      <p v-if="extras(o)" class="ct-sub">{{ extras(o) }}</p>
+                      <p v-if="extras(o)" class="tu-sub ct-recorte">
+                        {{ extras(o) }}
+                      </p>
                     </div>
                   </div>
                 </td>
-                <td class="hidden sm:table-cell whitespace-nowrap">
-                  {{
-                    o.duracion_minutos
-                      ? $t("listadosVisual.catalogo.minutos", {
-                          n: o.duracion_minutos,
-                        })
-                      : "—"
-                  }}
-                </td>
-                <td class="text-right whitespace-nowrap tabular-nums">
+                <td
+                  class="text-right whitespace-nowrap tabular-nums"
+                  :data-etiqueta="
+                    esCitas
+                      ? $t('listadosVisual.catalogo.precio')
+                      : $t('listadosVisual.catalogo.cupo')
+                  "
+                >
                   <template v-if="o.politica_reserva === 'pago'">{{
                     dinero(o.precio_clase_minor)
                   }}</template>
@@ -891,7 +949,22 @@ onMounted(cargar);
                   }}</template>
                   <template v-else>—</template>
                 </td>
-                <td class="hidden md:table-cell whitespace-nowrap">
+                <td
+                  class="hidden sm:table-cell whitespace-nowrap"
+                  :data-etiqueta="$t('listadosVisual.catalogo.duracion')"
+                >
+                  {{
+                    o.duracion_minutos
+                      ? $t("listadosVisual.catalogo.minutos", {
+                          n: o.duracion_minutos,
+                        })
+                      : "—"
+                  }}
+                </td>
+                <td
+                  class="hidden md:table-cell whitespace-nowrap"
+                  :data-etiqueta="$t('listadosVisual.catalogo.reserva')"
+                >
                   <span
                     class="tu-pildora"
                     :style="{
@@ -913,21 +986,22 @@ onMounted(cargar);
                     }}</span
                   >
                 </td>
-                <td class="text-right whitespace-nowrap">
+                <td class="tu-celda-acciones">
                   <template v-if="puedeGestionar">
                     <button
                       v-if="o.archivado"
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       type="button"
                       data-prueba="restaurar"
                       :disabled="restaurandoId === o.id"
+                      :aria-busy="restaurandoId === o.id || undefined"
                       @click="restaurar(o)"
                     >
                       {{ $t("listadosVisual.catalogo.restaurar") }}
                     </button>
                     <button
                       v-else
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       type="button"
                       data-prueba="configurar"
                       @click="configurar(o)"
@@ -971,7 +1045,13 @@ onMounted(cargar);
       >
         {{ errorEdicion }}
       </AvisoTono>
-      <template v-for="o in editandoLista" :key="o.id">
+      <form
+        v-for="o in editandoLista"
+        id="form-servicio"
+        :key="o.id"
+        novalidate
+        @submit.prevent="guardar(o)"
+      >
         <div class="mb-4 grid gap-3 sm:grid-cols-2">
           <div :class="{ 'sm:col-span-2': esCitas }">
             <label class="tu-label" :for="`c-nombre-${o.id}`">{{
@@ -1020,14 +1100,14 @@ onMounted(cargar);
             clave="foto_url"
             proporcion="4 / 3"
             :arrastra="$t('perfilPublico.catalogo.fotoArrastra')"
-            :ayuda="$t('perfilPublico.catalogo.fotoAyuda')"
+            :ayuda="$t('perfilPublico.catalogo.fotoAyudaAlumnos')"
             :quitar-texto="$t('perfilPublico.catalogo.fotoQuitar')"
             :puede-gestionar="puedeGestionar"
             @update:url="fotoCambiada(o, $event)"
           />
         </div>
         <label class="tu-label" :for="`c-desc-${o.id}`">{{
-          $t("perfilPublico.catalogo.descripcion")
+          $t("perfilPublico.catalogo.descripcionAlumnos")
         }}</label>
         <textarea
           :id="`c-desc-${o.id}`"
@@ -1037,106 +1117,6 @@ onMounted(cargar);
           maxlength="600"
           :placeholder="$t('perfilPublico.catalogo.descripcionPh')"
         />
-        <!-- Práctica libre y nivel que pide (ADR 0187). -->
-        <label
-          v-if="!esCitas"
-          class="mb-3 flex items-start gap-2 text-sm"
-          data-prueba="practica-libre"
-        >
-          <input v-model="form.practicaLibre" type="checkbox" class="mt-1" />
-          <span>
-            {{ $t("nivelesMiembro.clase.practicaLibre") }}
-            <span
-              class="block text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{ $t("nivelesMiembro.clase.practicaLibreAyuda") }}</span
-            >
-          </span>
-        </label>
-        <div
-          v-if="!esCitas && o.niveles_actividad?.length"
-          class="mb-3"
-          data-prueba="nivel-clase"
-        >
-          <label class="tu-label" :for="`c-nivel-${o.id}`">{{
-            $t("nivelesMiembro.clase.nivel")
-          }}</label>
-          <select :id="`c-nivel-${o.id}`" v-model="form.nivel" class="tu-input">
-            <option value="">
-              {{ $t("nivelesMiembro.clase.cualquiera") }}
-            </option>
-            <option v-for="n in o.niveles_actividad" :key="n.id" :value="n.id">
-              {{ n.nombre }}
-            </option>
-          </select>
-          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("nivelesMiembro.clase.nivelAyuda") }}
-          </p>
-        </div>
-        <!-- Para quien llega por primera vez (C03). -->
-        <label
-          v-if="!esCitas"
-          class="mb-3 flex items-start gap-2 text-sm"
-          data-prueba="para-principiantes"
-        >
-          <input v-model="form.principiantes" type="checkbox" class="mt-1" />
-          <span>
-            {{ $t("perfilPublico.catalogo.principiantes") }}
-            <span
-              class="block text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{ $t("perfilPublico.catalogo.principiantesAyuda") }}</span
-            >
-          </span>
-        </label>
-        <div class="mb-4 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label class="tu-label" :for="`c-req-${o.id}`">{{
-              $t("perfilPublico.catalogo.requisitos")
-            }}</label>
-            <input
-              :id="`c-req-${o.id}`"
-              v-model="form.requisitos"
-              class="tu-input"
-              maxlength="300"
-              :placeholder="$t('perfilPublico.catalogo.requisitosPh')"
-            />
-          </div>
-          <div>
-            <label class="tu-label" :for="`c-llevar-${o.id}`">{{
-              $t("perfilPublico.catalogo.queLlevar")
-            }}</label>
-            <input
-              :id="`c-llevar-${o.id}`"
-              v-model="form.queLlevar"
-              class="tu-input"
-              maxlength="300"
-              :placeholder="$t('perfilPublico.catalogo.queLlevarPh')"
-            />
-          </div>
-          <div v-if="!esCitas" class="sm:col-span-2">
-            <label class="tu-label" :for="`c-enlace-${o.id}`">{{
-              $t("perfilPublico.catalogo.enlace")
-            }}</label>
-            <input
-              :id="`c-enlace-${o.id}`"
-              v-model="form.enlace"
-              class="tu-input"
-              type="url"
-              inputmode="url"
-              maxlength="500"
-              placeholder="https://"
-              :aria-describedby="`c-enlace-ayuda-${o.id}`"
-            />
-            <p
-              :id="`c-enlace-ayuda-${o.id}`"
-              class="mt-1 text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t("perfilPublico.catalogo.enlaceAyuda") }}
-            </p>
-          </div>
-        </div>
         <label class="tu-label">{{ $t("catalogo.politica.etiqueta") }}</label>
         <div class="mt-1 space-y-2" data-prueba="politica-reserva">
           <label
@@ -1258,175 +1238,308 @@ onMounted(cargar);
             />
             <span class="tu-hint">{{ $t("catalogo.lugaresAyuda") }}</span>
           </div>
-          <!-- Preparación y limpieza (2.3): ocupan la agenda, no la cita. -->
-          <div>
-            <label class="tu-label" :for="`preparacion-${o.id}`">{{
-              $t("margenesServicio.preparacion")
-            }}</label>
-            <input
-              :id="`preparacion-${o.id}`"
-              v-model="form.preparacion"
-              type="number"
-              min="0"
-              max="240"
-              step="5"
-              class="tu-input"
-            />
-          </div>
-          <div>
-            <label class="tu-label" :for="`limpieza-${o.id}`">{{
-              $t("margenesServicio.limpieza")
-            }}</label>
-            <input
-              :id="`limpieza-${o.id}`"
-              v-model="form.limpieza"
-              type="number"
-              min="0"
-              max="240"
-              step="5"
-              class="tu-input"
-            />
-            <span class="tu-hint">{{ $t("margenesServicio.ayuda") }}</span>
-          </div>
-          <!-- Anticipo para apartar en línea (ADR 0161): citas que se pagan al agendar. -->
+        </div>
+
+        <!-- Lo demás, plegado (abierto si ya tiene algo puesto). -->
+        <details
+          class="tu-avanzado mt-4"
+          :open="avanzadoAbierto"
+          data-prueba="condiciones-servicio"
+        >
+          <summary>
+            {{
+              $t(
+                "listadosVisual.catalogo.masCondiciones",
+                { n: avanzadasActivas },
+                avanzadasActivas,
+              )
+            }}
+          </summary>
+          <!-- Práctica libre y nivel que pide (ADR 0187). -->
+          <label
+            v-if="!esCitas"
+            class="mb-3 flex items-start gap-2 text-sm"
+            data-prueba="practica-libre"
+          >
+            <input v-model="form.practicaLibre" type="checkbox" class="mt-1" />
+            <span>
+              {{ $t("nivelesMiembro.clase.practicaLibre") }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("nivelesMiembro.clase.practicaLibreAyuda") }}</span
+              >
+            </span>
+          </label>
           <div
-            v-if="esCitas && form.politica === 'pago'"
-            class="sm:col-span-2"
-            data-prueba="anticipo-servicio"
+            v-if="!esCitas && o.niveles_actividad?.length"
+            class="mb-3"
+            data-prueba="nivel-clase"
           >
-            <label class="tu-label" :for="`anticipo-tipo-${o.id}`">{{
-              $t("catalogo.anticipo.etiqueta")
+            <label class="tu-label" :for="`c-nivel-${o.id}`">{{
+              $t("nivelesMiembro.clase.nivel")
             }}</label>
-            <div class="flex flex-wrap items-center gap-2">
-              <select
-                :id="`anticipo-tipo-${o.id}`"
-                v-model="form.anticipoTipo"
-                class="tu-input w-auto"
-                data-prueba="anticipo-tipo"
-              >
-                <option
-                  v-for="tipo in TIPOS_ANTICIPO"
-                  :key="tipo"
-                  :value="tipo"
-                >
-                  {{ $t(`catalogo.anticipo.tipos.${tipo}`) }}
-                </option>
-              </select>
-              <template v-if="form.anticipoTipo !== 'ninguno'">
-                <span
-                  v-if="form.anticipoTipo === 'monto'"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ simbolo }}</span
-                >
-                <input
-                  v-model="form.anticipo"
-                  :aria-label="
-                    $t(`catalogo.anticipo.tipos.${form.anticipoTipo}`)
-                  "
-                  :inputmode="
-                    form.anticipoTipo === 'monto' ? 'decimal' : 'numeric'
-                  "
-                  class="tu-input w-32"
-                  data-prueba="anticipo-valor"
-                  :aria-invalid="anticipoInvalido ? 'true' : undefined"
-                  :style="
-                    anticipoInvalido ? { borderColor: 'var(--error)' } : {}
-                  "
-                />
-                <span
-                  v-if="form.anticipoTipo === 'porcentaje'"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >%</span
-                >
-              </template>
-            </div>
-            <span
-              v-if="anticipoInvalido"
-              class="tu-error-campo"
-              data-prueba="anticipo-invalido"
-              >{{
-                $t(
-                  form.anticipoTipo === "porcentaje"
-                    ? "catalogo.anticipo.porcentajeInvalido"
-                    : "catalogo.anticipo.montoInvalido",
-                )
-              }}</span
-            >
-            <span v-else-if="resumenAnticipo" class="tu-hint">{{
-              resumenAnticipo
-            }}</span>
-            <span v-else class="tu-hint">{{
-              $t("catalogo.anticipo.ayuda")
-            }}</span>
-          </div>
-          <!-- Cada cuántos días suele regresar (retención, ADR 0159): solo citas. -->
-          <div v-if="esCitas">
-            <label class="tu-label" :for="`regreso-${o.id}`">{{
-              $t("catalogo.regreso")
-            }}</label>
-            <input
-              :id="`regreso-${o.id}`"
-              v-model="form.regreso"
-              type="number"
-              min="1"
-              max="730"
+            <select
+              :id="`c-nivel-${o.id}`"
+              v-model="form.nivel"
               class="tu-input"
-              data-prueba="regreso-servicio"
-            />
-            <span class="tu-hint">{{ $t("catalogo.regresoAyuda") }}</span>
-          </div>
-          <!-- Espacios que usa (2.4): solo si el negocio tiene espacios. -->
-          <fieldset v-if="recursos.length > 0" class="sm:col-span-2">
-            <legend class="tu-label">
-              {{ $t("recursosServicio.titulo") }}
-            </legend>
-            <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              <label
-                v-for="r in recursos"
-                :key="r.id"
-                class="flex items-center gap-2"
+            >
+              <option value="">
+                {{ $t("nivelesMiembro.clase.cualquiera") }}
+              </option>
+              <option
+                v-for="n in o.niveles_actividad"
+                :key="n.id"
+                :value="n.id"
               >
-                <input v-model="form.recursos" type="checkbox" :value="r.id" />
-                {{ r.nombre
-                }}<span
-                  v-if="r.sucursal"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >· {{ r.sucursal }}</span
-                >
-              </label>
-            </div>
-            <span class="tu-hint">{{ $t("recursosServicio.ayuda") }}</span>
-          </fieldset>
-          <!-- Paquete (ADR 0063): servicios que incluye, sin anidar. Solo citas:
-               una clase no «incluye» otras clases. -->
-          <fieldset
-            v-if="esCitas && (paquetesCon(o) || incluibles(o).length > 0)"
-            class="sm:col-span-2"
-            data-prueba="incluye"
-          >
-            <legend class="tu-label">
-              {{ $t("perfilPublico.catalogo.incluye") }}
-            </legend>
-            <p v-if="paquetesCon(o)" class="tu-hint">
-              {{
-                $t("perfilPublico.catalogo.incluidoEn", {
-                  lista: paquetesCon(o),
-                })
-              }}
+                {{ n.nombre }}
+              </option>
+            </select>
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("nivelesMiembro.clase.nivelAyudaAlumno") }}
             </p>
-            <template v-else>
-              <SelectorOpciones
-                v-model="form.incluye"
-                :opciones="incluibles(o)"
-                class="mt-1"
+          </div>
+          <!-- Para quien llega por primera vez (C03). -->
+          <label
+            v-if="!esCitas"
+            class="mb-3 flex items-start gap-2 text-sm"
+            data-prueba="para-principiantes"
+          >
+            <input v-model="form.principiantes" type="checkbox" class="mt-1" />
+            <span>
+              {{ $t("perfilPublico.catalogo.principiantes") }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("perfilPublico.catalogo.principiantesAyuda") }}</span
+              >
+            </span>
+          </label>
+          <div class="mb-4 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="tu-label" :for="`c-req-${o.id}`">{{
+                $t("perfilPublico.catalogo.requisitos")
+              }}</label>
+              <input
+                :id="`c-req-${o.id}`"
+                v-model="form.requisitos"
+                class="tu-input"
+                maxlength="300"
+                :placeholder="$t('perfilPublico.catalogo.requisitosPh')"
+              />
+            </div>
+            <div>
+              <label class="tu-label" :for="`c-llevar-${o.id}`">{{
+                $t("perfilPublico.catalogo.queLlevar")
+              }}</label>
+              <input
+                :id="`c-llevar-${o.id}`"
+                v-model="form.queLlevar"
+                class="tu-input"
+                maxlength="300"
+                :placeholder="$t('perfilPublico.catalogo.queLlevarPh')"
+              />
+            </div>
+            <div v-if="!esCitas" class="sm:col-span-2">
+              <label class="tu-label" :for="`c-enlace-${o.id}`">{{
+                $t("perfilPublico.catalogo.enlace")
+              }}</label>
+              <input
+                :id="`c-enlace-${o.id}`"
+                v-model="form.enlace"
+                class="tu-input"
+                type="url"
+                inputmode="url"
+                maxlength="500"
+                placeholder="https://"
+                :aria-describedby="`c-enlace-ayuda-${o.id}`"
+              />
+              <p
+                :id="`c-enlace-ayuda-${o.id}`"
+                class="mt-1 text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("perfilPublico.catalogo.enlaceAyuda") }}
+              </p>
+            </div>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <!-- Preparación y limpieza (2.3): ocupan la agenda, no la cita. -->
+            <div>
+              <label class="tu-label" :for="`preparacion-${o.id}`">{{
+                $t("margenesServicio.preparacion")
+              }}</label>
+              <input
+                :id="`preparacion-${o.id}`"
+                v-model="form.preparacion"
+                type="number"
+                min="0"
+                max="240"
+                step="5"
+                class="tu-input"
+              />
+            </div>
+            <div>
+              <label class="tu-label" :for="`limpieza-${o.id}`">{{
+                $t("margenesServicio.limpieza")
+              }}</label>
+              <input
+                :id="`limpieza-${o.id}`"
+                v-model="form.limpieza"
+                type="number"
+                min="0"
+                max="240"
+                step="5"
+                class="tu-input"
               />
               <span class="tu-hint">{{
-                $t("perfilPublico.catalogo.incluyeAyuda")
+                $t("margenesServicio.ayudaAlumno")
               }}</span>
-            </template>
-          </fieldset>
-        </div>
-      </template>
+            </div>
+            <!-- Anticipo para apartar en línea (ADR 0161): citas que se pagan al agendar. -->
+            <div
+              v-if="esCitas && form.politica === 'pago'"
+              class="sm:col-span-2"
+              data-prueba="anticipo-servicio"
+            >
+              <label class="tu-label" :for="`anticipo-tipo-${o.id}`">{{
+                $t("catalogo.anticipo.etiqueta")
+              }}</label>
+              <div class="flex flex-wrap items-center gap-2">
+                <select
+                  :id="`anticipo-tipo-${o.id}`"
+                  v-model="form.anticipoTipo"
+                  class="tu-input w-auto"
+                  data-prueba="anticipo-tipo"
+                >
+                  <option
+                    v-for="tipo in TIPOS_ANTICIPO"
+                    :key="tipo"
+                    :value="tipo"
+                  >
+                    {{ $t(`catalogo.anticipo.tipos.${tipo}`) }}
+                  </option>
+                </select>
+                <template v-if="form.anticipoTipo !== 'ninguno'">
+                  <span
+                    v-if="form.anticipoTipo === 'monto'"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ simbolo }}</span
+                  >
+                  <input
+                    v-model="form.anticipo"
+                    :aria-label="
+                      $t(`catalogo.anticipo.tipos.${form.anticipoTipo}`)
+                    "
+                    :inputmode="
+                      form.anticipoTipo === 'monto' ? 'decimal' : 'numeric'
+                    "
+                    class="tu-input w-32"
+                    data-prueba="anticipo-valor"
+                    :aria-invalid="anticipoInvalido ? 'true' : undefined"
+                    :style="
+                      anticipoInvalido ? { borderColor: 'var(--error)' } : {}
+                    "
+                  />
+                  <span
+                    v-if="form.anticipoTipo === 'porcentaje'"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >%</span
+                  >
+                </template>
+              </div>
+              <span
+                v-if="anticipoInvalido"
+                class="tu-error-campo"
+                data-prueba="anticipo-invalido"
+                >{{
+                  $t(
+                    form.anticipoTipo === "porcentaje"
+                      ? "catalogo.anticipo.porcentajeInvalido"
+                      : "catalogo.anticipo.montoInvalido",
+                  )
+                }}</span
+              >
+              <span v-else-if="resumenAnticipo" class="tu-hint">{{
+                resumenAnticipo
+              }}</span>
+              <span v-else class="tu-hint">{{
+                $t("catalogo.anticipo.ayuda")
+              }}</span>
+            </div>
+            <!-- Cada cuántos días suele regresar (retención, ADR 0159): solo citas. -->
+            <div v-if="esCitas">
+              <label class="tu-label" :for="`regreso-${o.id}`">{{
+                $t("catalogo.regreso")
+              }}</label>
+              <input
+                :id="`regreso-${o.id}`"
+                v-model="form.regreso"
+                type="number"
+                min="1"
+                max="730"
+                class="tu-input"
+                data-prueba="regreso-servicio"
+              />
+              <span class="tu-hint">{{ $t("catalogo.regresoAyuda") }}</span>
+            </div>
+            <!-- Espacios que usa (2.4): solo si el negocio tiene espacios. -->
+            <fieldset v-if="recursos.length > 0" class="sm:col-span-2">
+              <legend class="tu-label">
+                {{ $t("recursosServicio.titulo") }}
+              </legend>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                <label
+                  v-for="r in recursos"
+                  :key="r.id"
+                  class="flex items-center gap-2"
+                >
+                  <input
+                    v-model="form.recursos"
+                    type="checkbox"
+                    :value="r.id"
+                  />
+                  {{ r.nombre
+                  }}<span
+                    v-if="r.sucursal"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >· {{ r.sucursal }}</span
+                  >
+                </label>
+              </div>
+              <span class="tu-hint">{{ $t("recursosServicio.ayuda") }}</span>
+            </fieldset>
+            <!-- Paquete (ADR 0063): servicios que incluye, sin anidar. Solo citas:
+                 una clase no «incluye» otras clases. -->
+            <fieldset
+              v-if="esCitas && (paquetesCon(o) || incluibles(o).length > 0)"
+              class="sm:col-span-2"
+              data-prueba="incluye"
+            >
+              <legend class="tu-label">
+                {{ $t("perfilPublico.catalogo.incluye") }}
+              </legend>
+              <p v-if="paquetesCon(o)" class="tu-hint">
+                {{
+                  $t("perfilPublico.catalogo.incluidoEn", {
+                    lista: paquetesCon(o),
+                  })
+                }}
+              </p>
+              <template v-else>
+                <SelectorOpciones
+                  v-model="form.incluye"
+                  :opciones="incluibles(o)"
+                  class="mt-1"
+                />
+                <span class="tu-hint">{{
+                  $t("perfilPublico.catalogo.incluyeAyuda")
+                }}</span>
+              </template>
+            </fieldset>
+          </div>
+        </details>
+      </form>
       <template #pie>
         <button
           v-if="editando"
@@ -1444,13 +1557,14 @@ onMounted(cargar);
           :disabled="guardando || archivando"
           @click="cerrar"
         >
-          {{ $t("catalogo.cerrar") }}
+          {{ $t("comun.cancelar") }}
         </button>
         <button
           class="tu-btn tu-btn-primario"
-          type="button"
+          type="submit"
+          form="form-servicio"
           :disabled="guardando || archivando || formInvalido"
-          @click="editando && guardar(editando)"
+          :aria-busy="guardando || undefined"
         >
           {{ guardando ? $t("catalogo.guardando") : $t("catalogo.guardar") }}
         </button>
@@ -1481,7 +1595,13 @@ onMounted(cargar);
       >
         {{ errorAlta }}
       </AvisoTono>
-      <div id="ct-alta" class="ct-filas mt-4" data-prueba="filas-alta">
+      <form
+        id="ct-alta"
+        class="ct-filas mt-4"
+        data-prueba="filas-alta"
+        novalidate
+        @submit.prevent="guardarAlta"
+      >
         <div class="ct-fila ct-fila-cabeza" aria-hidden="true">
           <span>{{ $t("listadosVisual.catalogo.nombre") }}</span>
           <span>{{ $t("listadosVisual.catalogo.duracion") }}</span>
@@ -1582,13 +1702,12 @@ onMounted(cargar);
             }}
           </p>
         </div>
-      </div>
+      </form>
       <button
         type="button"
-        class="tu-btn tu-btn-secundario mt-3"
+        class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear mt-3"
         @click="agregarFila"
       >
-        <IconoNav nombre="mas" :tam="16" />
         {{ $t("listadosVisual.catalogo.otraFila") }}
       </button>
       <template #pie>
@@ -1598,18 +1717,19 @@ onMounted(cargar);
           :disabled="dandoAltaGuardando"
           @click="cerrarAlta"
         >
-          {{ $t("catalogo.cerrar") }}
+          {{ $t("comun.cancelar") }}
         </button>
         <button
           class="tu-btn tu-btn-primario"
-          type="button"
+          type="submit"
+          form="ct-alta"
           data-prueba="guardar-alta"
           :disabled="
             dandoAltaGuardando ||
             !filas.some(conNombre) ||
             filas.some(precioIlegible)
           "
-          @click="guardarAlta"
+          :aria-busy="dandoAltaGuardando || undefined"
         >
           {{ $t("catalogo.guardar") }}
         </button>
@@ -1619,29 +1739,13 @@ onMounted(cargar);
 </template>
 
 <style scoped>
-.ct-tabla {
-  width: 100%;
-  font-size: 0.9rem;
-  border-collapse: collapse;
-}
-.ct-tabla th {
-  padding: 0.7rem 1rem;
-  border-bottom: 1px solid var(--borde);
-  color: var(--texto-suave);
-  font-size: 0.78rem;
+/* El nombre abre su configuración (como «Configurar»). */
+.ct-nombre {
   font-weight: 500;
   text-align: left;
 }
-.ct-tabla th.text-right {
-  text-align: right;
-}
-.ct-tabla td {
-  padding: 0.8rem 1rem;
-  border-top: 1px solid var(--borde);
-  vertical-align: middle;
-}
-.ct-tabla tbody tr:first-child td {
-  border-top: 0;
+.ct-nombre:hover {
+  text-decoration: underline;
 }
 .ct-foto {
   width: 2.75rem;
@@ -1656,13 +1760,14 @@ onMounted(cargar);
   border: 1px solid var(--borde);
   color: var(--texto-suave);
 }
-.ct-sub {
+/* Descripción y extras: hasta dos renglones, sin empujar la acción fuera de la vista. */
+.ct-recorte {
+  display: -webkit-box;
   max-width: 36rem;
   overflow: hidden;
-  color: var(--texto-suave);
-  font-size: 0.8rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .ct-opcion {
   display: flex;

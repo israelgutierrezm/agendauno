@@ -16,6 +16,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -80,6 +81,8 @@ const {
 
 // ---- Indicadores y búsqueda (patrón de los listados) ----
 const busqueda = ref("");
+// Lo que se busca queda en la dirección (`?q=…`): recargar lo conserva.
+useFiltrosEnUrl({ q: busqueda });
 // Con una sucursal elegida en la barra, solo los de esa sucursal.
 const deLaSucursal = computed(() =>
   sucursalActual.value
@@ -170,6 +173,10 @@ async function cargar(): Promise<void> {
 }
 
 async function crear(): Promise<void> {
+  // Con Enter mientras guarda no se manda dos veces.
+  if (creando.value) {
+    return;
+  }
   if (editando.value !== null) {
     await guardarCambios(editando.value);
     return;
@@ -311,7 +318,8 @@ onMounted(cargar);
       />
       <template v-else>
         <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
-        <div class="tu-card mt-5 overflow-x-auto">
+        <!-- En el teléfono, cada espacio en ficha con Editar a la vista. -->
+        <div class="tu-card relative mt-5 overflow-x-auto tu-tabla-adaptable">
           <div class="tu-filtros">
             <label class="tu-buscar">
               <IconoNav nombre="buscar" :tam="16" />
@@ -344,28 +352,32 @@ onMounted(cargar);
             </thead>
             <tbody>
               <tr v-for="r in visibles" :key="r.id" data-prueba="recurso">
-                <td class="font-medium">{{ r.nombre }}</td>
+                <td class="font-medium" :data-etiqueta="$t('recursos.nombre')">
+                  {{ r.nombre }}
+                </td>
                 <td
                   v-if="!sucursalActual"
                   class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
+                  :data-etiqueta="$t('recursos.sucursal')"
                 >
                   {{ r.sucursal ?? "—" }}
                 </td>
                 <td
                   class="hidden md:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
+                  :data-etiqueta="$t('recursos.tipo')"
                 >
                   {{ r.tipo ?? "—" }}
                 </td>
-                <td>
+                <td :data-etiqueta="$t('recursos.modo')">
                   {{
                     r.modo === "pool"
                       ? $t("recursosVisual.pool", { n: r.capacidad })
                       : $t("recursosVisual.unidad")
                   }}
                 </td>
-                <td>
+                <td :data-etiqueta="$t('operacion.recursos.estado')">
                   <InterruptorSiNo
                     v-if="puedeGestionar"
                     :model-value="r.activo"
@@ -378,10 +390,15 @@ onMounted(cargar);
                     :prueba="`activo-${r.id}`"
                     @update:model-value="cambiarActivo(r, $event)"
                   />
+                  <!-- Estado: punto + texto. -->
                   <span
                     v-else
-                    class="tu-pastilla"
-                    :class="r.activo ? 'tu-tono-exito' : 'tu-tono-neutral'"
+                    class="tu-estado"
+                    :style="{
+                      '--tono': r.activo
+                        ? 'var(--exito)'
+                        : 'var(--texto-suave)',
+                    }"
                     >{{
                       r.activo
                         ? $t("operacion.recursos.activo")
@@ -389,25 +406,27 @@ onMounted(cargar);
                     }}</span
                   >
                 </td>
-                <td class="text-right whitespace-nowrap">
-                  <button
-                    v-if="puedeGestionar"
-                    class="tu-enlace text-sm"
-                    type="button"
-                    data-prueba="editar-recurso"
-                    @click="editar(r)"
-                  >
-                    {{ $t("recursos.editar") }}
-                  </button>
-                  <button
-                    v-if="puedeEliminar"
-                    class="tu-enlace ml-3 text-sm"
-                    style="color: var(--error)"
-                    type="button"
-                    @click="eliminar(r)"
-                  >
-                    {{ $t("recursos.eliminar") }}
-                  </button>
+                <td class="tu-celda-acciones">
+                  <div class="inline-flex flex-wrap gap-2">
+                    <button
+                      v-if="puedeGestionar"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
+                      type="button"
+                      data-prueba="editar-recurso"
+                      @click="editar(r)"
+                    >
+                      {{ $t("recursos.editar") }}
+                    </button>
+                    <button
+                      v-if="puedeEliminar"
+                      class="tu-btn tu-btn-peligro tu-btn-chico"
+                      type="button"
+                      data-prueba="eliminar-recurso"
+                      @click="eliminar(r)"
+                    >
+                      {{ $t("recursos.eliminar") }}
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -534,13 +553,14 @@ onMounted(cargar);
           </button>
           <button
             class="tu-btn tu-btn-primario"
-            type="button"
+            type="submit"
+            form="form-recurso"
             :disabled="
               creando ||
               form.nombre.trim() === '' ||
               (!editando && form.sucursalId === '')
             "
-            @click="crear"
+            :aria-busy="creando || undefined"
           >
             {{
               creando

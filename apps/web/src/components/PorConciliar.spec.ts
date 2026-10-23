@@ -105,7 +105,7 @@ describe("por conciliar", () => {
     await flushPromises();
 
     expect(w.text()).toContain("Ana López");
-    await w.get("button.tu-enlace").trigger("click");
+    await w.get('[data-prueba="resolver-incidencia"]').trigger("click");
 
     // Sin nota no se envía.
     const siSeDevolvio = w
@@ -178,7 +178,7 @@ describe("por conciliar", () => {
     await flushPromises();
 
     expect(w.text()).toContain("Pago tardío de");
-    await w.get("button.tu-enlace").trigger("click");
+    await w.get('[data-prueba="resolver-incidencia"]').trigger("click");
     await w.get("input").setValue("Se le avisó");
     await w
       .findAll("button")
@@ -214,7 +214,7 @@ describe("por conciliar", () => {
     await flushPromises();
 
     expect(w.text()).toContain("Clase de prueba ya usada");
-    await w.get("button.tu-enlace").trigger("click");
+    await w.get('[data-prueba="resolver-incidencia"]').trigger("click");
     expect(w.findAll("button").map((b) => b.text())).toContain(
       "Devolver el pago",
     );
@@ -301,16 +301,16 @@ describe("por conciliar", () => {
     expect(w.text()).toContain("Pago automático sin cancelar en Mercado Pago");
     const filas = w.findAll("li");
     // De más: solo se ofrece devolver el excedente.
-    await filas[1]!.get("button.tu-enlace").trigger("click");
+    await filas[1]!.get('[data-prueba="resolver-incidencia"]').trigger("click");
     expect(filas[1]!.text()).toContain("Devolver el excedente");
     expect(filas[1]!.text()).not.toContain("Dar por pagada");
     // Sin cancelar: solo se marca (se cierra sola al confirmarse).
-    await filas[2]!.get("button.tu-enlace").trigger("click");
+    await filas[2]!.get('[data-prueba="resolver-incidencia"]').trigger("click");
     expect(filas[2]!.text()).not.toContain("Devolver");
     expect(filas[2]!.text()).toContain("Marcar como resuelta");
 
     // Por menos: se puede dar por pagada.
-    await filas[0]!.get("button.tu-enlace").trigger("click");
+    await filas[0]!.get('[data-prueba="resolver-incidencia"]').trigger("click");
     expect(filas[0]!.text()).toContain("Dar por pagada");
     await filas[0]!.get("input").setValue("Acordamos el precio anterior.");
     await filas[0]!

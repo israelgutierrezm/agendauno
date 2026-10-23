@@ -238,7 +238,7 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
 
 <template>
   <div class="mt-8 tu-card p-6">
-    <h2 class="font-medium text-lg">{{ $t("bloqueosAgenda.titulo") }}</h2>
+    <h2 class="tu-titulo-seccion">{{ $t("bloqueosAgenda.titulo") }}</h2>
     <p class="text-sm mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("bloqueosAgenda.ayuda") }}
     </p>
@@ -250,19 +250,24 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
     >
       {{ $t("comun.cargando") }}
     </p>
-    <p
+    <AvisoTono
       v-else-if="errorCarga"
-      class="mt-4 text-sm"
+      tono="peligro"
+      class="mt-4"
       role="alert"
       data-prueba="error-carga-bloqueos"
     >
-      <span style="color: var(--error)">{{
-        $t("bloqueosAgenda.errorCarga")
-      }}</span>
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ $t("comun.reintentar") }}
-      </button>
-    </p>
+      {{ $t("bloqueosAgenda.errorCarga") }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <ul
       v-else-if="visibles.length > 0"
       class="mt-4 divide-y divide-[var(--borde)] border-y text-sm"
@@ -296,7 +301,7 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
         <button
           v-else-if="puedeEliminar ?? puedeGestionar"
           type="button"
-          class="tu-enlace text-xs shrink-0"
+          class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
           data-prueba="quitar-bloqueo"
           :disabled="quitandoId !== null"
           @click="quitar(b)"
@@ -455,6 +460,7 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
         type="submit"
         class="tu-btn tu-btn-primario"
         :disabled="guardando || form.motivo.trim() === ''"
+        :aria-busy="guardando || undefined"
       >
         {{
           afectadas !== null && afectadas.length > 0

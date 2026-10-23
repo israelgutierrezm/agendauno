@@ -175,7 +175,7 @@ onMounted(cargar);
     @submit.prevent="guardar"
   >
     <div>
-      <h2 class="font-medium text-lg">
+      <h2 class="tu-titulo-seccion">
         {{ $t("suscripcion.plataforma.comercial.titulo") }}
       </h2>
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -198,7 +198,7 @@ onMounted(cargar);
       data-prueba="comercial-error"
     >
       <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-discreto" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -260,11 +260,14 @@ onMounted(cargar);
           errores.ventas_whatsapp
         }}</span>
       </label>
-      <label class="block">
-        <span class="tu-label">{{
+      <!-- Con su botón para quitar el token: un div, no un label (un botón no va
+           dentro de una etiqueta). -->
+      <div class="block">
+        <label class="tu-label" for="cp-banxico">{{
           $t("suscripcion.plataforma.comercial.banxico")
-        }}</span>
+        }}</label>
         <input
+          id="cp-banxico"
           v-model="tokenBanxico"
           class="tu-input"
           type="password"
@@ -288,17 +291,18 @@ onMounted(cargar);
               ? $t("suscripcion.plataforma.tipoCambio.banxico")
               : $t("suscripcion.plataforma.comercial.banxicoAyuda")
           }}
-          <button
-            v-if="banxico"
-            type="button"
-            class="tu-enlace ml-1"
-            data-prueba="quitar-banxico"
-            @click="quitarToken"
-          >
-            {{ $t("suscripcion.plataforma.comercial.quitar") }}
-          </button>
         </span>
-      </label>
+        <!-- Quita el token ya guardado: destructiva (pide confirmación). -->
+        <button
+          v-if="banxico"
+          type="button"
+          class="tu-btn tu-btn-peligro tu-btn-chico mt-2"
+          data-prueba="quitar-banxico"
+          @click="quitarToken"
+        >
+          {{ $t("suscripcion.plataforma.comercial.quitar") }}
+        </button>
+      </div>
       <label class="block">
         <span class="tu-label">{{
           $t("suscripcion.plataforma.comercial.paquetes")
@@ -321,13 +325,17 @@ onMounted(cargar);
         </span>
       </label>
     </fieldset>
-    <button
-      class="tu-btn tu-btn-primario"
-      type="submit"
-      :disabled="!cargado || guardando"
-    >
-      {{ $t("suscripcion.plataforma.comercial.guardar") }}
-    </button>
+    <!-- «Guardar» siempre a la vista al bajar por el formulario. -->
+    <div class="tu-pie-acciones">
+      <button
+        class="tu-btn tu-btn-primario"
+        type="submit"
+        :disabled="!cargado || guardando"
+        :aria-busy="guardando || undefined"
+      >
+        {{ $t("suscripcion.plataforma.comercial.guardar") }}
+      </button>
+    </div>
   </form>
 </template>
 

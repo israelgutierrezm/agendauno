@@ -12,6 +12,7 @@ import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, codigoDeError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useDescartarCambios } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -116,8 +117,17 @@ function cerrarNuevaFicha(): void {
 
 const respuestas = ref<Respuesta[]>([]);
 const versionActual = ref<number | null>(null);
-// Las fichas archivadas aparte (se restauran desde ahí).
+// Las fichas archivadas aparte (se restauran desde ahí), en la dirección
+// (`?archivadas=1`): recargar o compartir el enlace las conserva.
 const verArchivadas = ref(false);
+useFiltrosEnUrl({
+  archivadas: computed({
+    get: () => (verArchivadas.value ? "1" : ""),
+    set: (v: string) => {
+      verArchivadas.value = v === "1";
+    },
+  }),
+});
 // Por páginas (antes, solo las últimas 200) y buscando por la persona.
 const buscarRespuestas = ref("");
 const paginaRespuestas = ref(1);
@@ -599,6 +609,11 @@ function camposDe(r: Respuesta): CampoRespondido[] {
     : (seleccionado.value?.campos ?? []);
 }
 
+function volverAFichas(): void {
+  seleccionadoId.value = null;
+  nuevaPregunta.value = false;
+}
+
 function gestionar(f: Formulario): void {
   seleccionadoId.value = f.id;
   nuevoCampo.value = {
@@ -615,22 +630,46 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
+    <!-- Una ficha abierta: su nombre es el título y «Volver» regresa a la lista. -->
+    <button
+      v-if="seleccionado && !soloRespuestas"
+      type="button"
+      class="tu-volver mb-4"
+      @click="volverAFichas"
+    >
+      <IconoNav nombre="atras" :tam="16" />
+      {{ $t("adminUsabilidad.fichas.volver") }}
+    </button>
     <EncabezadoSeccion
       :titulo="
         soloRespuestas
           ? $t('nav.vistas.respuestas')
-          : $t('adminUsabilidad.fichas.titulo')
+          : seleccionado
+            ? $t(
+                puedeGestionar
+                  ? 'adminUsabilidad.fichas.gestionando'
+                  : 'adminUsabilidad.fichas.consultando',
+                { nombre: seleccionado.nombre },
+              )
+            : $t('adminUsabilidad.fichas.titulo')
       "
       :subtitulo="
-        !soloRespuestas && !seleccionado
-          ? $t('adminUsabilidad.fichas.listadoAyuda')
-          : undefined
+        soloRespuestas
+          ? undefined
+          : seleccionado
+            ? $t(
+                puedeGestionar
+                  ? 'adminUsabilidad.fichas.editorAyuda'
+                  : 'adminUsabilidad.fichas.lecturaAyuda',
+              )
+            : $t('adminUsabilidad.fichas.listadoAyuda')
       "
-      icono="formularios"
     >
-      <template v-if="puedeGestionar" #acciones>
+      <template
+        v-if="puedeGestionar && !soloRespuestas && !seleccionado"
+        #acciones
+      >
         <button
-          v-if="!soloRespuestas"
           class="tu-btn tu-btn-primario tu-btn-crear"
           type="button"
           data-prueba="nueva-ficha"
@@ -638,23 +677,31 @@ onMounted(cargar);
         >
           {{ $t("formularios.nuevo") }}
         </button>
-        <!-- Misma ruta, otra vista: el router las daría por «página actual». -->
-        <RouterLink
-          v-if="soloRespuestas"
-          :to="{ name: 'formularios' }"
-          aria-current-value="false"
-          class="tu-btn tu-btn-secundario"
-          >{{ $t("formularios.disenar") }}</RouterLink
-        >
-        <RouterLink
-          v-else
-          :to="{ name: 'formularios', query: { vista: 'respuestas' } }"
-          aria-current-value="false"
-          class="tu-btn tu-btn-secundario"
-          >{{ $t("formularios.verRespuestas") }}</RouterLink
-        >
       </template>
     </EncabezadoSeccion>
+    <!-- La otra vista es de otra área (Alumnos › Respuestas o Configuración): un
+         enlace de texto, no una acción de la página. Misma ruta, otra vista: el
+         router las daría por «página actual». -->
+    <p
+      v-if="puedeGestionar && (soloRespuestas || !seleccionado)"
+      class="mt-2 text-sm"
+      data-prueba="cruce-formularios"
+    >
+      <RouterLink
+        v-if="soloRespuestas"
+        :to="{ name: 'formularios' }"
+        aria-current-value="false"
+        class="tu-enlace"
+        >{{ $t("formularios.disenar") }}</RouterLink
+      >
+      <RouterLink
+        v-else
+        :to="{ name: 'formularios', query: { vista: 'respuestas' } }"
+        aria-current-value="false"
+        class="tu-enlace"
+        >{{ $t("formularios.verRespuestas") }}</RouterLink
+      >
+    </p>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -691,7 +738,11 @@ onMounted(cargar);
           <span style="color: var(--error)">{{
             $t("formularios.errorCarga")
           }}</span>
-          <button type="button" class="tu-enlace ml-2" @click="cargar">
+          <button
+            type="button"
+            class="tu-btn tu-btn-discreto tu-btn-chico ml-2"
+            @click="cargar"
+          >
             {{ $t("comun.reintentar") }}
           </button>
         </p>
@@ -736,9 +787,6 @@ onMounted(cargar);
             class="tu-card p-5 flex flex-col gap-4"
           >
             <div class="flex items-start gap-3">
-              <span class="ff-icono" aria-hidden="true"
-                ><IconoNav nombre="formularios" :tam="22"
-              /></span>
               <div class="min-w-0 flex-1">
                 <h2 class="font-semibold break-words">{{ f.nombre }}</h2>
                 <p
@@ -750,8 +798,14 @@ onMounted(cargar);
                 </p>
               </div>
               <span
-                class="tu-badge"
-                :class="f.activo ? 'tu-badge-exito' : ''"
+                class="tu-estado shrink-0 text-sm"
+                :style="{
+                  '--tono': f.archivado
+                    ? 'var(--texto-suave)'
+                    : f.activo
+                      ? 'var(--exito)'
+                      : 'var(--aviso)',
+                }"
                 >{{
                   f.archivado
                     ? $t("operacion.fichas.archivada")
@@ -809,7 +863,7 @@ onMounted(cargar);
           @cerrar="cerrarNuevaFicha"
         >
           <form
-            v-if="puedeGestionar && !soloRespuestas"
+            id="ff-nueva"
             class="space-y-4"
             @submit.prevent="crearFormulario"
           >
@@ -845,24 +899,26 @@ onMounted(cargar);
               </option>
               <option value="todos">{{ $t("formularios.todos") }}</option>
             </select>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="tu-btn tu-btn-secundario"
-                :disabled="creando"
-                @click="cerrarNuevaFicha"
-              >
-                {{ $t("comun.cancelar") }}
-              </button>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="creando || nuevo.nombre.trim() === ''"
-              >
-                {{ $t("formularios.crear") }}
-              </button>
-            </div>
           </form>
+          <template #pie>
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario"
+              :disabled="creando"
+              @click="cerrarNuevaFicha"
+            >
+              {{ $t("comun.cancelar") }}
+            </button>
+            <button
+              type="submit"
+              form="ff-nueva"
+              class="tu-btn tu-btn-primario"
+              :disabled="creando || nuevo.nombre.trim() === ''"
+              :aria-busy="creando || undefined"
+            >
+              {{ $t("formularios.crear") }}
+            </button>
+          </template>
         </ModalDialogo>
       </div>
 
@@ -870,41 +926,9 @@ onMounted(cargar);
       <div v-if="seleccionado" class="space-y-6">
         <!-- Constructor de campos (diseño) -->
         <div v-if="!soloRespuestas" class="tu-card p-6">
-          <button
-            type="button"
-            class="tu-enlace mb-5"
-            @click="
-              seleccionadoId = null;
-              nuevaPregunta = false;
-            "
-          >
-            <IconoNav nombre="atras" :tam="16" />
-            {{ $t("adminUsabilidad.fichas.volver") }}
-          </button>
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="min-w-0">
-              <h2 class="font-semibold text-xl break-words">
-                {{
-                  $t(
-                    puedeGestionar
-                      ? "adminUsabilidad.fichas.gestionando"
-                      : "adminUsabilidad.fichas.consultando",
-                    {
-                      nombre: seleccionado.nombre,
-                    },
-                  )
-                }}
-              </h2>
-              <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-                {{
-                  $t(
-                    puedeGestionar
-                      ? "adminUsabilidad.fichas.editorAyuda"
-                      : "adminUsabilidad.fichas.lecturaAyuda",
-                  )
-                }}
-              </p>
-              <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
                 {{ $t(`formularios.${seleccionado.aplica_a}`) }} ·
                 {{ cantidadCampos(seleccionado.campos.length)
                 }}<template v-if="conRespuestas">
@@ -1039,7 +1063,7 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-enlace text-sm ml-2"
+                  class="tu-btn tu-btn-secundario tu-btn-chico ml-2"
                   :data-prueba="`editar-${c.id}`"
                   @click="editarPregunta(c)"
                 >
@@ -1047,8 +1071,7 @@ onMounted(cargar);
                 </button>
                 <button
                   type="button"
-                  class="tu-enlace text-sm ml-2"
-                  :style="{ color: 'var(--error)' }"
+                  class="tu-btn tu-btn-peligro tu-btn-chico ml-1"
                   :disabled="guardandoFicha"
                   :data-prueba="`quitar-${c.id}`"
                   @click="quitarPregunta(c)"
@@ -1084,7 +1107,7 @@ onMounted(cargar);
             @cerrar="cerrarPregunta"
           >
             <form
-              v-if="puedeGestionar"
+              id="ff-pregunta"
               class="grid sm:grid-cols-2 gap-4"
               @submit.prevent="agregarCampo"
             >
@@ -1162,33 +1185,35 @@ onMounted(cargar);
               >
                 {{ $t("operacion.fichas.cambiaTipo") }}
               </p>
-              <div class="sm:col-span-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  class="tu-btn tu-btn-secundario"
-                  :disabled="agregandoCampo"
-                  @click="cerrarPregunta"
-                >
-                  {{ $t("comun.cancelar") }}
-                </button>
-                <button
-                  class="tu-btn tu-btn-primario"
-                  type="submit"
-                  :disabled="
-                    agregandoCampo ||
-                    guardandoFicha ||
-                    nuevoCampo.etiqueta.trim() === '' ||
-                    faltanOpciones
-                  "
-                >
-                  {{
-                    editandoPregunta
-                      ? $t("comun.guardar")
-                      : $t("formularios.campos.agregar")
-                  }}
-                </button>
-              </div>
             </form>
+            <template #pie>
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario"
+                :disabled="agregandoCampo || guardandoFicha"
+                @click="cerrarPregunta"
+              >
+                {{ $t("comun.cancelar") }}
+              </button>
+              <button
+                type="submit"
+                form="ff-pregunta"
+                class="tu-btn tu-btn-primario"
+                :disabled="
+                  agregandoCampo ||
+                  guardandoFicha ||
+                  nuevoCampo.etiqueta.trim() === '' ||
+                  faltanOpciones
+                "
+                :aria-busy="agregandoCampo || guardandoFicha || undefined"
+              >
+                {{
+                  editandoPregunta
+                    ? $t("comun.guardar")
+                    : $t("formularios.campos.agregar")
+                }}
+              </button>
+            </template>
           </ModalDialogo>
 
           <!-- Nombre, descripción y a quién aplica -->
@@ -1250,24 +1275,26 @@ onMounted(cargar);
                   <option value="todos">{{ $t("formularios.todos") }}</option>
                 </select>
               </label>
-              <div class="flex justify-end gap-2">
-                <button
-                  type="button"
-                  class="tu-btn tu-btn-secundario"
-                  :disabled="guardandoFicha"
-                  @click="cerrarDatos"
-                >
-                  {{ $t("comun.cancelar") }}
-                </button>
-                <button
-                  class="tu-btn tu-btn-primario"
-                  type="submit"
-                  :disabled="guardandoFicha || datosFicha.nombre.trim() === ''"
-                >
-                  {{ $t("comun.guardar") }}
-                </button>
-              </div>
             </form>
+            <template #pie>
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario"
+                :disabled="guardandoFicha"
+                @click="cerrarDatos"
+              >
+                {{ $t("comun.cancelar") }}
+              </button>
+              <button
+                type="submit"
+                form="ff-datos"
+                class="tu-btn tu-btn-primario"
+                :disabled="guardandoFicha || datosFicha.nombre.trim() === ''"
+                :aria-busy="guardandoFicha || undefined"
+              >
+                {{ $t("comun.guardar") }}
+              </button>
+            </template>
           </ModalDialogo>
 
           <!-- Vista previa: como la ve quien la llena -->
@@ -1348,8 +1375,8 @@ onMounted(cargar);
 
         <!-- Respuestas: se llenan desde el expediente de cada persona -->
         <div v-if="soloRespuestas" class="tu-card p-6">
-          <h2 class="font-medium text-lg">
-            {{ $t("formularios.respuestas.titulo") }}
+          <h2 class="tu-titulo-seccion break-words">
+            {{ seleccionado.nombre }}
             <span
               v-if="puedeGestionar && respuestas.length > 0"
               class="ml-1 font-normal tabular-nums"
@@ -1388,7 +1415,7 @@ onMounted(cargar);
               }}</span>
               <button
                 type="button"
-                class="tu-enlace ml-2"
+                class="tu-btn tu-btn-discreto tu-btn-chico ml-2"
                 @click="cargarRespuestas"
               >
                 {{ $t("comun.reintentar") }}
@@ -1496,16 +1523,6 @@ onMounted(cargar);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
   gap: 1rem;
-}
-.ff-icono {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 0.75rem;
-  color: var(--primario-fuerte);
-  background: var(--primario-suave);
 }
 .ff-pregunta {
   padding: 0.85rem 1rem;

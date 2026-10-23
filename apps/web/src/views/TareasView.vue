@@ -13,10 +13,15 @@ import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { whatsappDe } from "@/lib/captacion";
 import { confirmar } from "@/lib/confirmar";
-import { fechaEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import {
+  fechaEnUrl,
+  useFiltrosEnUrl,
+  usePestanaEnUrl,
+} from "@/lib/filtrosEnUrl";
 import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -71,7 +76,12 @@ const puedeEliminarReglas = computed(() =>
 );
 const puedeGestionar = computed(() => sesion.puede("tareas.gestionar"));
 
-const tab = ref<"pendientes" | "reglas">("pendientes");
+// Pendientes | Automatización, en la dirección (`?pestana=reglas`): recargar o un
+// enlace abre la misma. Sin permiso para las reglas, solo las pendientes.
+type PestanaTareas = "pendientes" | "reglas";
+const tab = usePestanaEnUrl<PestanaTareas>(() =>
+  puedeReglas.value ? ["pendientes", "reglas"] : ["pendientes"],
+);
 const error = ref<string | null>(null);
 
 // ---- Tareas ----
@@ -829,12 +839,26 @@ async function eliminarRegla(r: Regla): Promise<void> {
   }
 }
 
-function cambiarTab(t: "pendientes" | "reglas"): void {
-  tab.value = t;
-  if (t === "reglas" && reglas.value.length === 0) {
-    void cargarReglas();
-  }
-}
+// Las reglas se piden al abrir su pestaña (también al entrar por un enlace o recargar).
+watch(
+  tab,
+  (actual) => {
+    if (actual === "reglas" && reglas.value.length === 0) {
+      void cargarReglas();
+    }
+  },
+  { immediate: true },
+);
+const opcionesPestana = computed(() => [
+  {
+    clave: "pendientes" as const,
+    texto: t("operacion.bandeja.tab"),
+    cuenta: pendientes.value > 0 ? pendientes.value : undefined,
+  },
+  ...(puedeReglas.value
+    ? [{ clave: "reglas" as const, texto: t("tareas.tabReglas") }]
+    : []),
+]);
 
 onMounted(() => {
   void cargarTareas();
@@ -851,31 +875,12 @@ onMounted(() => {
       "
     />
 
-    <!-- Pestañas (las del sistema) -->
-    <div class="tu-pestanas mt-6" role="tablist">
-      <button
-        type="button"
-        role="tab"
-        :aria-selected="tab === 'pendientes'"
-        :aria-pressed="tab === 'pendientes'"
-        @click="cambiarTab('pendientes')"
-      >
-        {{ $t("operacion.bandeja.tab")
-        }}<span v-if="pendientes > 0" class="tu-badge ml-2">{{
-          pendientes
-        }}</span>
-      </button>
-      <button
-        v-if="puedeReglas"
-        type="button"
-        role="tab"
-        :aria-selected="tab === 'reglas'"
-        :aria-pressed="tab === 'reglas'"
-        @click="cambiarTab('reglas')"
-      >
-        {{ $t("tareas.tabReglas") }}
-      </button>
-    </div>
+    <!-- Pendientes | Automatización (en la dirección) -->
+    <PestanasSeccion
+      v-model="tab"
+      :opciones="opcionesPestana"
+      :etiqueta="$t('tareas.titulo')"
+    />
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
@@ -986,7 +991,7 @@ onMounted(() => {
         :ocupado="accionando"
         @cerrar="cerrarTarea"
       >
-        <form class="grid gap-4" @submit.prevent="crearTarea">
+        <form id="form-tarea" class="grid gap-4" @submit.prevent="crearTarea">
           <AvisoTono
             v-if="errorTarea"
             tono="peligro"
@@ -1045,15 +1050,17 @@ onMounted(() => {
             />
             <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("operacion.bandeja.personaAyuda") }}
-              <button
-                v-if="nueva.persona_id !== ''"
-                type="button"
-                class="tu-enlace ml-1"
-                @click="quitarPersona"
-              >
-                {{ $t("operacion.bandeja.quitarPersona") }}
-              </button>
             </p>
+            <!-- Vaciar el campo (aún no se guarda): discreto. -->
+            <button
+              v-if="nueva.persona_id !== ''"
+              type="button"
+              class="tu-btn tu-btn-discreto tu-btn-chico mt-1"
+              data-prueba="quitar-persona"
+              @click="quitarPersona"
+            >
+              {{ $t("operacion.bandeja.quitarPersona") }}
+            </button>
           </div>
           <div v-if="puedeEquipo && responsables.length > 0">
             <label class="tu-label" for="t-responsable">{{
@@ -1091,9 +1098,10 @@ onMounted(() => {
             </button>
             <button
               class="tu-btn tu-btn-primario"
-              type="button"
+              type="submit"
+              form="form-tarea"
               :disabled="accionando || nueva.titulo.trim() === ''"
-              @click="crearTarea"
+              :aria-busy="accionando || undefined"
             >
               {{ $t("tareas.guardar") }}
             </button>
@@ -1126,7 +1134,7 @@ onMounted(() => {
           <span style="color: var(--error)">{{ $t("tareas.errorCarga") }}</span>
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-discreto"
             @click="cargarTareas"
           >
             {{ $t("comun.reintentar") }}
@@ -1140,7 +1148,7 @@ onMounted(() => {
         >
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-discreto"
             @click="limpiarFiltros"
           >
             {{ $t("operacion.bandeja.quitarFiltros") }}
@@ -1321,7 +1329,7 @@ onMounted(() => {
 
                 <button
                   v-if="puedeGestionar && tarea.estado === 'pendiente'"
-                  class="tu-enlace shrink-0 text-sm"
+                  class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                   type="button"
                   :aria-label="
                     $t('operacion.bandeja.editarDe', { titulo: tarea.titulo })
@@ -1337,7 +1345,7 @@ onMounted(() => {
                     tarea.estado === 'pendiente' &&
                     tarea.motivo
                   "
-                  class="tu-btn tu-btn-secundario shrink-0"
+                  class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                   type="button"
                   :disabled="accionando"
                   @click="abrirResultado(tarea)"
@@ -1368,6 +1376,7 @@ onMounted(() => {
       >
         <form
           v-if="conResultado"
+          id="form-resultado"
           class="grid gap-4"
           @submit.prevent="guardarResultado"
         >
@@ -1431,9 +1440,10 @@ onMounted(() => {
             </button>
             <button
               class="tu-btn tu-btn-primario"
-              type="button"
+              type="submit"
+              form="form-resultado"
               :disabled="accionando"
-              @click="guardarResultado"
+              :aria-busy="accionando || undefined"
             >
               {{ $t("operacion.seguimiento.guardar") }}
             </button>
@@ -1468,7 +1478,7 @@ onMounted(() => {
         :ocupado="accionando"
         @cerrar="cerrarRegla"
       >
-        <form class="grid gap-4" @submit.prevent="guardarRegla">
+        <form id="form-regla" class="grid gap-4" @submit.prevent="guardarRegla">
           <AvisoTono
             v-if="errorRegla"
             tono="peligro"
@@ -1582,9 +1592,14 @@ onMounted(() => {
             </button>
             <button
               class="tu-btn tu-btn-primario"
-              type="button"
-              :disabled="accionando"
-              @click="guardarRegla"
+              type="submit"
+              form="form-regla"
+              :disabled="
+                accionando ||
+                regla.nombre.trim() === '' ||
+                regla.titulo_plantilla.trim() === ''
+              "
+              :aria-busy="accionando || undefined"
             >
               {{ $t("tareas.reglas.guardar") }}
             </button>
@@ -1624,13 +1639,15 @@ onMounted(() => {
       />
       <ul v-else class="mt-4 space-y-2">
         <li v-for="r in reglas" :key="r.id" class="tu-card p-3">
-          <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-semibold">{{ r.nombre }}</span>
                 <span
-                  class="tu-badge"
-                  :class="r.activa ? 'tu-badge-exito' : ''"
+                  class="tu-estado text-xs"
+                  :style="{
+                    '--tono': r.activa ? 'var(--exito)' : 'var(--texto-suave)',
+                  }"
                   >{{
                     r.activa
                       ? $t("tareas.reglas.activa")
@@ -1642,33 +1659,37 @@ onMounted(() => {
                 {{ etiquetaEvento(r.evento) }} → {{ r.titulo_plantilla }}
               </p>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
+            <!-- Editar primero; activar o desactivar, y eliminar (destructiva). -->
+            <div class="flex flex-wrap items-center gap-2">
               <button
-                class="tu-enlace"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 type="button"
                 :disabled="accionando"
-                @click="alternarActiva(r)"
-              >
-                {{
-                  r.activa
-                    ? $t("tareas.reglas.inactiva")
-                    : $t("tareas.reglas.activa")
-                }}
-              </button>
-              <button
-                class="tu-enlace"
-                type="button"
-                :disabled="accionando"
+                data-prueba="editar-regla"
                 @click="editarRegla(r)"
               >
                 {{ $t("tareas.reglas.editar") }}
               </button>
               <button
-                v-if="puedeEliminarReglas"
-                class="tu-enlace"
-                style="color: var(--error)"
+                class="tu-btn tu-btn-chico"
+                :class="r.activa ? 'tu-btn-peligro' : 'tu-btn-secundario'"
                 type="button"
                 :disabled="accionando"
+                data-prueba="alternar-regla"
+                @click="alternarActiva(r)"
+              >
+                {{
+                  r.activa
+                    ? $t("tareas.reglas.desactivar")
+                    : $t("tareas.reglas.activar")
+                }}
+              </button>
+              <button
+                v-if="puedeEliminarReglas"
+                class="tu-btn tu-btn-peligro tu-btn-chico"
+                type="button"
+                :disabled="accionando"
+                data-prueba="eliminar-regla"
                 @click="eliminarRegla(r)"
               >
                 {{ $t("tareas.reglas.eliminar") }}

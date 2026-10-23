@@ -350,7 +350,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
       <button
         v-if="!agregando"
         type="button"
-        class="tu-btn tu-btn-secundario px-3 py-1.5 tu-btn-chico"
+        class="tu-btn tu-btn-secundario tu-btn-chico"
         @click="agregando = true"
       >
         {{ $t("recepcion.panel.agregar") }}
@@ -368,17 +368,23 @@ watch(() => props.sesion.id, cargar, { immediate: true });
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p
+    <AvisoTono
       v-else-if="errorCarga"
-      class="text-sm"
+      tono="peligro"
       role="alert"
       data-prueba="error-carga-clase"
     >
-      <span style="color: var(--error)">{{ errorCarga }}</span>
-      <button type="button" class="tu-enlace ml-2" @click="cargar">
-        {{ $t("comun.reintentar") }}
-      </button>
-    </p>
+      {{ errorCarga }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
 
     <template v-else>
       <p
@@ -441,10 +447,11 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             v-if="puedeGestionar || (r.orden && puedeCobrar)"
             class="mt-2 flex flex-wrap items-center gap-2"
           >
+            <!-- Cobrar y aceptar abren su confirmación (ahí está el primario). -->
             <button
               v-if="r.orden && puedeCobrar"
               type="button"
-              class="tu-btn tu-btn-primario px-3 py-1.5 tu-btn-chico"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               data-prueba="cobrar-reserva"
               :disabled="accionando"
               @click="abrirCobro(r)"
@@ -454,7 +461,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             <button
               v-if="r.estado === 'ofrecida' && puedeGestionar"
               type="button"
-              class="tu-btn tu-btn-primario px-3 py-1.5 tu-btn-chico"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               :disabled="accionando"
               @click="aceptar(r)"
             >
@@ -468,7 +475,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
                 sesion.oferta_id
               "
               type="button"
-              class="tu-enlace text-xs"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               :aria-expanded="moviendo === r.id"
               @click="moviendo = moviendo === r.id ? null : r.id"
             >
@@ -478,8 +485,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             <button
               v-if="puedeGestionar && !r.asistencia"
               type="button"
-              class="tu-enlace text-xs ml-auto"
-              style="color: var(--error)"
+              class="tu-btn tu-btn-peligro tu-btn-chico ml-auto"
               :disabled="accionando"
               :aria-expanded="cancelando === r.id"
               @click="cancelando = cancelando === r.id ? null : r.id"
@@ -520,8 +526,9 @@ watch(() => props.sesion.id, cargar, { immediate: true });
           <button
             v-if="puedeGestionar && (libres ?? 0) > 0"
             type="button"
-            class="tu-btn tu-btn-secundario px-3 py-1.5 tu-btn-chico"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             :disabled="accionando"
+            :aria-busy="accionando || undefined"
             @click="promover"
           >
             {{ $t("recepcion.panel.promover") }}
@@ -537,8 +544,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             <button
               v-if="puedeGestionar"
               type="button"
-              class="tu-enlace text-xs shrink-0"
-              style="color: var(--error)"
+              class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
               :disabled="accionando"
               @click="quitarDeEspera(r)"
             >

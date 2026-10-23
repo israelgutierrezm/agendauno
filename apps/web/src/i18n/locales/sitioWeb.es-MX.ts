@@ -18,9 +18,8 @@ export default {
     sinGuardar: "Cambios sin guardar",
     publicadoEl: "Última publicación: {fecha}",
     nuncaPublicado:
-      "Aún no publicas cambios: tus clientes ven la página de siempre.",
-    paginaOculta:
-      "Tu página no está abierta al público: tus clientes no la ven.",
+      "Aún no publicas cambios: quien visita tu página ve la de siempre.",
+    paginaOculta: "Tu página no está abierta al público: nadie puede verla.",
     abrirPagina: "Abrirla en Dominio y SEO",
   },
   acciones: {
@@ -40,7 +39,7 @@ export default {
   },
   confirmar: {
     publicar:
-      "¿Publicar estos cambios? Tus clientes los verán en tu página de inmediato.",
+      "¿Publicar estos cambios? Quien visite tu página los verá de inmediato.",
     descartar:
       "¿Descartar los cambios sin publicar? Tu borrador vuelve a lo que está publicado.",
     plantilla:
@@ -192,11 +191,11 @@ export default {
     deTuMarca: "El mismo de tu app",
     usarMarca: "Usar el color de tu app",
     colorAyuda:
-      "Solo cambia tus páginas públicas, las que ven tus clientes en internet. No cambia la app de tu negocio.",
+      "Solo cambia tus páginas públicas, las que se ven en internet. No cambia la app de tu negocio.",
     colorApp: "Color de la app de tu negocio",
     colorAppSin: "El de la plataforma",
     colorAppAyuda:
-      "Lo usa la app que tus clientes instalan en su teléfono; tu página lo toma si no eliges otro. Se cambia en",
+      "Lo usa la app que tus alumnos instalan en su teléfono; tu página lo toma si no eliges otro. Se cambia en",
     colorAppDonde: "Perfil público, arriba",
     tipografia: "Tipografía",
     tipografias: {
@@ -277,7 +276,7 @@ export default {
       texto_imagen: "Un texto con una foto al lado y, si quieres, un botón.",
       galeria: "Hasta 12 fotos de tu espacio, tus clases o tus trabajos.",
       preguntas: "Las dudas de siempre, con su respuesta.",
-      testimonios: "Lo que dicen tus clientes, con su nombre.",
+      testimonios: "Lo que dicen tus alumnos, con su nombre.",
       llamado: "Una invitación con un botón: agendar, comprar, escribir.",
       video: "Un video de YouTube o Vimeo; se carga cuando le dan clic.",
       beneficios: "Por qué elegirte, en puntos cortos.",
@@ -392,7 +391,7 @@ export default {
       "Lo que se muestra sale de tu negocio: aquí decides qué se ve en tu sitio (lo que ocultes sigue a la venta y se agenda igual); cada cosa se edita en su lugar, así tu página y tu agenda dicen lo mismo. Se publica con tus demás cambios.",
     visitante: "Qué puede hacer quien visita tu página",
     agendar: "Agendar en línea",
-    // Quien visita ve las clases y pide lugar; reservar es de quien ya es cliente.
+    // Quien visita ve las clases y pide lugar; reservar es de quien ya es alumno.
     agendarClases: "Ver tus clases y pedir lugar en línea",
     agendarCitas: "Agendar su cita en línea",
     dejarDatos: "Dejar sus datos para que lo contactes",

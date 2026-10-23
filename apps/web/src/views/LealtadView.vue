@@ -19,6 +19,7 @@ import {
   useDescartarCambios,
   useEditorFormulario,
 } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Programa {
@@ -84,6 +85,18 @@ interface MetaCanjes {
 }
 const vistaCanjes = ref<"pendientes" | "historial">("pendientes");
 const buscarCanjes = ref("");
+// Qué canjes se ven y la búsqueda, en la dirección (los pendientes no se escriben):
+// recargar o compartir el enlace conserva lo que se veía. Antes de vigilarlos, para
+// que lo leído no pida los canjes dos veces.
+useFiltrosEnUrl({
+  canjes: computed<string>({
+    get: () => (vistaCanjes.value === "historial" ? "historial" : ""),
+    set: (v: string) => {
+      vistaCanjes.value = v === "historial" ? "historial" : "pendientes";
+    },
+  }),
+  q: buscarCanjes,
+});
 const paginaCanjes = ref(1);
 const metaCanjes = ref<MetaCanjes | null>(null);
 async function cargarCanjes(): Promise<void> {
@@ -184,7 +197,7 @@ function cerrarRecompensa(): void {
 const miembroSel = ref("");
 const saldo = ref<number | null>(null);
 const movimientos = ref<Movimiento[]>([]);
-// Por páginas: un cliente frecuente junta decenas de movimientos al mes.
+// Por páginas: un alumno frecuente junta decenas de movimientos al mes.
 const metaMovimientos = ref<{
   page: number;
   ultima_pagina: number;
@@ -509,7 +522,7 @@ const indicadores = computed<Indicador[]>(() => {
         data-prueba="seccion-programa"
       >
         <header class="le-cabeza">
-          <h2 id="le-sec-programa">
+          <h2 id="le-sec-programa" class="tu-titulo-seccion">
             {{ $t("lealtadVisual.secciones.programa") }}
           </h2>
           <p>{{ $t("lealtadVisual.secciones.programaAyuda") }}</p>
@@ -605,19 +618,21 @@ const indicadores = computed<Indicador[]>(() => {
                 >
                 <span
                   v-if="puedeGestionar"
-                  class="inline-flex gap-3 text-sm whitespace-nowrap"
+                  class="inline-flex flex-wrap gap-2 whitespace-nowrap"
                 >
                   <button
                     type="button"
-                    class="tu-enlace"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     :data-prueba="`editar-recompensa-${r.id}`"
                     @click="abrirRecompensa(r)"
                   >
                     {{ $t("lealtadVisual.recompensas.editar") }}
                   </button>
+                  <!-- Desactivar la retira del catálogo (peligro); activarla, no. -->
                   <button
                     type="button"
-                    class="tu-enlace"
+                    class="tu-btn tu-btn-chico"
+                    :class="r.activa ? 'tu-btn-peligro' : 'tu-btn-secundario'"
                     :data-prueba="`alternar-recompensa-${r.id}`"
                     @click="toggleRecompensa(r)"
                   >
@@ -638,11 +653,12 @@ const indicadores = computed<Indicador[]>(() => {
         v-if="puedeGestionar"
         :abierto="editorPrograma"
         :titulo="$t('adminUsabilidad.configurarPrograma')"
+        tam="md"
         icono="lealtad"
         :ocupado="guardandoPrograma"
         @cerrar="cerrarPrograma"
       >
-        <form @submit.prevent="guardarPrograma">
+        <form id="form-programa" @submit.prevent="guardarPrograma">
           <AvisoTono v-if="error" tono="peligro" class="mb-4" role="alert">
             {{ error }}
           </AvisoTono>
@@ -691,25 +707,27 @@ const indicadores = computed<Indicador[]>(() => {
           >
             {{ $t("operacion.lealtad.sinPuntos") }}
           </AvisoTono>
-          <div class="mt-4 flex justify-end gap-2">
-            <button
-              type="button"
-              class="tu-btn tu-btn-secundario"
-              :disabled="guardandoPrograma"
-              @click="cerrarPrograma"
-            >
-              {{ $t("comun.cancelar") }}
-            </button>
-            <button
-              v-if="puedeGestionar"
-              type="submit"
-              class="tu-btn tu-btn-primario"
-              :disabled="guardandoPrograma || programaSinPuntos"
-            >
-              {{ $t("comun.guardar") }}
-            </button>
-          </div>
         </form>
+        <template #pie>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            :disabled="guardandoPrograma"
+            @click="cerrarPrograma"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            v-if="puedeGestionar"
+            type="submit"
+            form="form-programa"
+            class="tu-btn tu-btn-primario"
+            :disabled="guardandoPrograma || programaSinPuntos"
+            :aria-busy="guardandoPrograma || undefined"
+          >
+            {{ $t("comun.guardar") }}
+          </button>
+        </template>
       </ModalDialogo>
 
       <!-- Alta y edición de una recompensa -->
@@ -806,28 +824,30 @@ const indicadores = computed<Indicador[]>(() => {
               {{ $t("lealtadVisual.recompensas.historial") }}
             </p>
           </template>
-          <div class="flex justify-end gap-2">
-            <button
-              type="button"
-              class="tu-btn tu-btn-secundario"
-              :disabled="guardandoRecompensa"
-              @click="cerrarRecompensa"
-            >
-              {{ $t("comun.cancelar") }}
-            </button>
-            <button
-              type="submit"
-              class="tu-btn tu-btn-primario whitespace-nowrap"
-              :disabled="guardandoRecompensa || !formRecompensa.nombre.trim()"
-            >
-              {{
-                editandoRecompensa
-                  ? $t("comun.guardar")
-                  : $t("lealtad.recompensas.crear")
-              }}
-            </button>
-          </div>
         </form>
+        <template #pie>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            :disabled="guardandoRecompensa"
+            @click="cerrarRecompensa"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            type="submit"
+            form="form-recompensa"
+            class="tu-btn tu-btn-primario whitespace-nowrap"
+            :disabled="guardandoRecompensa || !formRecompensa.nombre.trim()"
+            :aria-busy="guardandoRecompensa || undefined"
+          >
+            {{
+              editandoRecompensa
+                ? $t("comun.guardar")
+                : $t("lealtad.recompensas.crear")
+            }}
+          </button>
+        </template>
       </ModalDialogo>
 
       <!-- 2. Canjes y puntos: la operación del día con el programa -->
@@ -837,7 +857,7 @@ const indicadores = computed<Indicador[]>(() => {
         data-prueba="seccion-canjes"
       >
         <header class="le-cabeza">
-          <h2 id="le-sec-canjes">
+          <h2 id="le-sec-canjes" class="tu-titulo-seccion">
             {{ $t("lealtadVisual.secciones.canjes") }}
           </h2>
           <p>{{ $t("lealtadVisual.secciones.canjesAyuda") }}</p>
@@ -1000,72 +1020,92 @@ const indicadores = computed<Indicador[]>(() => {
                 : $t('operacion.canjes.sinHistorial')
           "
         />
-        <div v-else class="mt-3 tu-card overflow-x-auto">
-          <table class="tu-tabla">
-            <thead>
-              <tr>
-                <th>
-                  {{ $t("lealtad.canjes.colMiembro") }}
-                </th>
-                <th>
-                  {{ $t("lealtad.canjes.colRecompensa") }}
-                </th>
-                <th class="text-right">
-                  {{ $t("lealtad.canjes.colPuntos") }}
-                </th>
-                <th>
-                  {{ $t("lealtad.canjes.colEstado") }}
-                </th>
-                <th class="text-right">
-                  {{ $t("lealtad.canjes.colAccion") }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="c in canjes" :key="c.id">
-                <td class="font-semibold">{{ c.persona }}</td>
-                <td>{{ c.recompensa }}</td>
-                <td class="text-right">{{ c.puntos }}</td>
-                <td>
-                  <span
-                    class="tu-estado"
-                    :style="{
-                      '--tono':
-                        c.estado === 'entregado'
-                          ? 'var(--exito)'
-                          : c.estado === 'cancelado'
-                            ? 'var(--texto-suave)'
-                            : 'var(--aviso)',
-                    }"
+        <div v-else class="mt-3 tu-card">
+          <div class="relative overflow-x-auto tu-tabla-adaptable">
+            <table class="tu-tabla">
+              <thead>
+                <tr>
+                  <th>
+                    {{ $t("lealtad.canjes.colMiembro") }}
+                  </th>
+                  <th class="text-right">
+                    {{ $t("lealtad.canjes.colPuntos") }}
+                  </th>
+                  <th>
+                    {{ $t("lealtad.canjes.colRecompensa") }}
+                  </th>
+                  <th>
+                    {{ $t("lealtad.canjes.colEstado") }}
+                  </th>
+                  <th class="text-right">
+                    {{ $t("lealtad.canjes.colAccion") }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in canjes" :key="c.id" data-prueba="canje">
+                  <td
+                    class="font-semibold"
+                    :data-etiqueta="$t('lealtad.canjes.colMiembro')"
                   >
-                    {{ $t(`lealtad.estados.${c.estado}`) }}
-                  </span>
-                </td>
-                <td class="text-right">
-                  <span
-                    v-if="puedeGestionar && c.estado === 'pendiente'"
-                    class="inline-flex gap-2 justify-end"
+                    {{ c.persona }}
+                  </td>
+                  <td
+                    class="text-right tabular-nums"
+                    :data-etiqueta="$t('lealtad.canjes.colPuntos')"
                   >
-                    <button
-                      type="button"
-                      class="tu-btn tu-btn-secundario tu-btn-chico whitespace-nowrap"
-                      @click="accionCanje(c, 'entregar')"
+                    {{ c.puntos }}
+                  </td>
+                  <td :data-etiqueta="$t('lealtad.canjes.colRecompensa')">
+                    {{ c.recompensa }}
+                  </td>
+                  <td :data-etiqueta="$t('lealtad.canjes.colEstado')">
+                    <span
+                      class="tu-estado"
+                      :style="{
+                        '--tono':
+                          c.estado === 'entregado'
+                            ? 'var(--exito)'
+                            : c.estado === 'cancelado'
+                              ? 'var(--texto-suave)'
+                              : 'var(--aviso)',
+                      }"
                     >
-                      {{ $t("lealtad.canjes.entregar") }}
-                    </button>
-                    <button
-                      type="button"
-                      class="tu-btn tu-btn-peligro tu-btn-chico whitespace-nowrap"
-                      @click="accionCanje(c, 'cancelar')"
+                      {{ $t(`lealtad.estados.${c.estado}`) }}
+                    </span>
+                  </td>
+                  <td class="tu-celda-acciones">
+                    <span
+                      v-if="puedeGestionar && c.estado === 'pendiente'"
+                      class="inline-flex flex-wrap justify-end gap-2"
                     >
-                      {{ $t("lealtad.canjes.cancelar") }}
-                    </button>
-                  </span>
-                  <span v-else :style="{ color: 'var(--texto-suave)' }">—</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                      <button
+                        type="button"
+                        class="tu-btn tu-btn-secundario tu-btn-chico"
+                        @click="accionCanje(c, 'entregar')"
+                      >
+                        {{ $t("lealtad.canjes.entregar") }}
+                      </button>
+                      <button
+                        type="button"
+                        class="tu-btn tu-btn-peligro tu-btn-chico"
+                        @click="accionCanje(c, 'cancelar')"
+                      >
+                        {{ $t("lealtad.canjes.cancelar") }}
+                      </button>
+                    </span>
+                    <!-- Sin acción: la raya solo en la tabla (en la ficha sobra). -->
+                    <span
+                      v-else
+                      class="hidden sm:inline"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >—</span
+                    >
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <PaginacionListado
             v-if="metaCanjes && metaCanjes.ultima_pagina > 1"
             :page="metaCanjes.page"
@@ -1088,10 +1128,6 @@ const indicadores = computed<Indicador[]>(() => {
 .le-separada {
   border-top: 1px solid var(--borde);
   padding-top: 2rem;
-}
-.le-cabeza h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
 }
 .le-cabeza p {
   margin-top: 0.15rem;

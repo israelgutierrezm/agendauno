@@ -87,7 +87,7 @@ export default {
     zona: "Zona horaria",
     impuesto: "IVA",
     formulario:
-      "Completa los datos de la sucursal y cómo la verán tus clientes.",
+      "Completa los datos de la sucursal y cómo la verán tus alumnos.",
     sinResultados: "No hay sucursales que coincidan con tu búsqueda.",
   },
   integraciones: {

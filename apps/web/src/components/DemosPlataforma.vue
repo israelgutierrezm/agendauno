@@ -88,7 +88,7 @@ onMounted(cargar);
 
 <template>
   <section class="tu-card p-5" data-prueba="demos-plataforma">
-    <h2 class="text-lg font-medium">{{ t("demosPlataforma.titulo") }}</h2>
+    <h2 class="tu-titulo-seccion">{{ t("demosPlataforma.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ t("demosPlataforma.ayuda") }}
     </p>
@@ -102,12 +102,14 @@ onMounted(cargar);
     >
       {{ t("demosPlataforma.vacio") }}
     </p>
-    <div v-else class="mt-4 overflow-x-auto">
+    <!-- Tabla en la computadora, ficha en el teléfono: quién arriba y las acciones
+         al pie, siempre a la vista. -->
+    <div v-else class="mt-4 relative overflow-x-auto tu-tabla-adaptable">
       <table class="tu-tabla text-sm">
         <thead>
           <tr>
-            <th>{{ t("demosPlataforma.cuando") }}</th>
             <th>{{ t("demosPlataforma.quien") }}</th>
+            <th>{{ t("demosPlataforma.cuando") }}</th>
             <th>{{ t("demosPlataforma.contacto") }}</th>
             <th>{{ t("demosPlataforma.estado") }}</th>
             <th></th>
@@ -115,25 +117,26 @@ onMounted(cargar);
         </thead>
         <tbody>
           <tr v-for="d in demos" :key="d.id" :data-demo="d.id">
-            <td class="whitespace-nowrap">{{ cuando(d.inicia_en) }}</td>
-            <td>
+            <td :data-etiqueta="t('demosPlataforma.quien')">
               {{ d.nombre }}
-              <span class="block" :style="{ color: 'var(--texto-suave)' }"
-                >{{ d.negocio }} · {{ d.producto }}</span
-              >
+              <span class="tu-sub">{{ d.negocio }} · {{ d.producto }}</span>
             </td>
-            <td>
+            <td
+              class="whitespace-nowrap"
+              :data-etiqueta="t('demosPlataforma.cuando')"
+            >
+              {{ cuando(d.inicia_en) }}
+            </td>
+            <td :data-etiqueta="t('demosPlataforma.contacto')">
               {{ d.telefono }}
-              <span class="block" :style="{ color: 'var(--texto-suave)' }">{{
-                d.correo
-              }}</span>
+              <span class="tu-sub">{{ d.correo }}</span>
             </td>
-            <td>
+            <td :data-etiqueta="t('demosPlataforma.estado')">
               <span class="tu-estado" :style="{ '--tono': TONOS[d.estado] }">{{
                 t(`demosPlataforma.estados.${d.estado}`)
               }}</span>
             </td>
-            <td class="whitespace-nowrap text-right">
+            <td class="tu-celda-acciones">
               <template v-if="d.estado === 'agendada'">
                 <button
                   type="button"
@@ -151,9 +154,10 @@ onMounted(cargar);
                 >
                   {{ t("demosPlataforma.noAsistio") }}
                 </button>
+                <!-- Cancelar la demo: destructiva. -->
                 <button
                   type="button"
-                  class="tu-btn tu-btn-secundario tu-btn-chico"
+                  class="tu-btn tu-btn-peligro tu-btn-chico"
                   :disabled="cambiando === d.id"
                   @click="marcar(d, 'cancelada')"
                 >

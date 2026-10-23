@@ -14,6 +14,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSucursalOperativa, useSucursales } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -362,6 +363,31 @@ watch([sucursalId, proveedorId], async (_nuevo, [sucAntes, provAntes]) => {
 
 // ---- Vista semanal, editor de un día, copiar y restablecer ----
 const vista = ref<"semana" | "lista">("semana");
+
+// La sede, la persona y el modo quedan en la dirección (`?persona=…`): recargar
+// o compartir el enlace abre el mismo horario. Va después de vigilar la
+// selección, para que lo leído de la dirección cargue su horario. La sede, solo
+// si se elige aquí (si no, manda la de la barra). La clave `modo`, no `vista`
+// (esa es la del menú).
+useFiltrosEnUrl({
+  sucursal: computed<string>({
+    get: () => (elegirSucursal.value ? sucursalId.value : ""),
+    set: (v: string) => {
+      if (elegirSucursal.value) {
+        sucursalId.value = v;
+      }
+    },
+  }),
+  persona: proveedorId,
+  modo: computed<string>({
+    get: () => (vista.value === "semana" ? "" : vista.value),
+    set: (v: string) => {
+      if (v === "semana" || v === "lista") {
+        vista.value = v;
+      }
+    },
+  }),
+});
 const diaEditando = ref<number | null>(null);
 function editarDia(dia: number): void {
   if (puedeGestionar.value) {
@@ -677,7 +703,7 @@ onMounted(cargarReferencias);
             <div class="tu-card min-w-0 p-5">
               <header class="flex flex-wrap items-start justify-between gap-3">
                 <span>
-                  <h2 class="font-semibold">
+                  <h2 class="tu-titulo-seccion">
                     {{ $t("horariosVisual.semanal") }}
                   </h2>
                   <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -690,7 +716,6 @@ onMounted(cargarReferencias);
                     :aria-pressed="vista === 'semana'"
                     @click="vista = 'semana'"
                   >
-                    <IconoNav nombre="cuadricula" :tam="15" />
                     {{ $t("horariosVisual.vistaSemana") }}
                   </button>
                   <button
@@ -698,7 +723,6 @@ onMounted(cargarReferencias);
                     :aria-pressed="vista === 'lista'"
                     @click="vista = 'lista'"
                   >
-                    <IconoNav nombre="lista" :tam="15" />
                     {{ $t("horariosVisual.vistaLista") }}
                   </button>
                 </div>
@@ -724,11 +748,11 @@ onMounted(cargarReferencias);
                 >
                   <div class="flex items-center justify-between gap-3">
                     <h3 class="font-medium">{{ $t(`horarios.dias.${d}`) }}</h3>
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-wrap items-center justify-end gap-2">
                       <button
                         v-if="puedeGestionar && semana[d].length > 0"
                         type="button"
-                        class="tu-enlace text-xs"
+                        class="tu-btn tu-btn-secundario tu-btn-chico"
                         @click="copiarASemana(d)"
                       >
                         {{ $t("horarios.copiar") }}
@@ -736,7 +760,7 @@ onMounted(cargarReferencias);
                       <button
                         v-if="puedeGestionar"
                         type="button"
-                        class="tu-enlace text-sm"
+                        class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
                         @click="agregarFranja(d)"
                       >
                         {{ $t("horarios.agregarFranja") }}
@@ -882,6 +906,7 @@ onMounted(cargarReferencias);
                     !horarioListo ||
                     !sinGuardar
                   "
+                  :aria-busy="guardando || undefined"
                   @click="guardar"
                 >
                   {{
@@ -937,7 +962,7 @@ onMounted(cargarReferencias);
 
         <!-- Vista previa de huecos -->
         <div class="mt-8 tu-card p-6">
-          <h2 class="font-semibold">
+          <h2 class="tu-titulo-seccion">
             {{ $t("horarios.preview.titulo") }}
           </h2>
           <p class="text-sm mt-1" :style="{ color: 'var(--texto-suave)' }">
@@ -976,6 +1001,7 @@ onMounted(cargarReferencias);
               class="tu-btn tu-btn-secundario"
               type="submit"
               :disabled="previewCargando || preview.fecha === ''"
+              :aria-busy="previewCargando || undefined"
             >
               {{
                 previewCargando
@@ -1026,6 +1052,7 @@ onMounted(cargarReferencias);
             })
           : ''
       "
+      tam="md"
       :ocupado="guardando"
       @cerrar="cerrarDia"
     >
@@ -1085,10 +1112,10 @@ onMounted(cargarReferencias);
             {{ errorFranja(diaEditando, i) }}
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+        <div class="flex flex-wrap items-center gap-2 pt-1">
           <button
             type="button"
-            class="tu-enlace text-sm"
+            class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
             @click="agregarFranja(diaEditando)"
           >
             {{ $t("horarios.agregarFranja") }}
@@ -1096,32 +1123,34 @@ onMounted(cargarReferencias);
           <button
             v-if="semana[diaEditando].length > 0"
             type="button"
-            class="tu-enlace text-sm"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             @click="copiarASemana(diaEditando)"
           >
             {{ $t("horarios.copiar") }}
           </button>
         </div>
-        <div class="flex justify-end pt-2">
-          <button
-            type="button"
-            class="tu-btn tu-btn-primario"
-            @click="cerrarDia"
-          >
-            {{ $t("horariosVisual.listo") }}
-          </button>
-        </div>
       </div>
+      <!-- «Listo» solo cierra: lo del día se guarda con «Guardar cambios». -->
+      <template #pie>
+        <button type="button" class="tu-btn tu-btn-primario" @click="cerrarDia">
+          {{ $t("horariosVisual.listo") }}
+        </button>
+      </template>
     </ModalDialogo>
 
     <!-- Copiar el horario de otra persona (en esta sucursal) -->
     <ModalDialogo
       :abierto="copiando"
       :titulo="$t('horariosVisual.copiarTitulo')"
+      tam="md"
       :ocupado="copiandoCarga"
       @cerrar="copiando = false"
     >
-      <form class="space-y-3" @submit.prevent="copiarHorario">
+      <form
+        id="form-copiar-horario"
+        class="space-y-3"
+        @submit.prevent="copiarHorario"
+      >
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("horariosVisual.copiarAyuda") }}
         </p>
@@ -1143,23 +1172,26 @@ onMounted(cargarReferencias);
         >
           {{ avisoCopia }}
         </p>
-        <div class="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            class="tu-btn tu-btn-secundario"
-            @click="copiando = false"
-          >
-            {{ $t("comun.cancelar") }}
-          </button>
-          <button
-            type="submit"
-            class="tu-btn tu-btn-primario"
-            :disabled="copiarDe === '' || copiandoCarga"
-          >
-            {{ $t("horariosVisual.copiarAplicar") }}
-          </button>
-        </div>
       </form>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="copiandoCarga"
+          @click="copiando = false"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="submit"
+          form="form-copiar-horario"
+          class="tu-btn tu-btn-primario"
+          :disabled="copiarDe === '' || copiandoCarga"
+          :aria-busy="copiandoCarga || undefined"
+        >
+          {{ $t("horariosVisual.copiarAplicar") }}
+        </button>
+      </template>
     </ModalDialogo>
   </section>
 </template>

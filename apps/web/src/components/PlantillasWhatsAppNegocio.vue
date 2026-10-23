@@ -2,8 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -62,6 +64,21 @@ const editando = ref<{
   cuerpo: string;
   pie: string;
 } | null>(null);
+// El editor va en un diálogo: con cambios sin guardar, cerrarlo pregunta antes.
+const editorAbierto = computed({
+  get: () => editando.value !== null,
+  set: (v: boolean) => {
+    if (!v) {
+      editando.value = null;
+    }
+  },
+});
+const guardandoPlantilla = computed(() => trabajando.value === "guardar");
+const descarte = useDescartarCambios({
+  abierto: editorAbierto,
+  valor: () => editando.value,
+  guardando: guardandoPlantilla,
+});
 
 const TONOS: Record<PlantillaWhatsApp["estado"], string> = {
   borrador: "var(--texto-suave)",
@@ -118,6 +135,7 @@ async function cargar(): Promise<void> {
 
 function nueva(): void {
   errores.value = {};
+  error.value = null;
   editando.value = {
     id: null,
     titulo: "",
@@ -125,9 +143,11 @@ function nueva(): void {
     cuerpo: "",
     pie: "",
   };
+  descarte.fijar();
 }
 function editar(p: PlantillaWhatsApp): void {
   errores.value = {};
+  error.value = null;
   editando.value = {
     id: p.id,
     titulo: p.titulo,
@@ -135,6 +155,7 @@ function editar(p: PlantillaWhatsApp): void {
     cuerpo: p.cuerpo,
     pie: p.pie ?? "",
   };
+  descarte.fijar();
 }
 
 async function hacer(clave: string, accion: () => Promise<unknown>) {
@@ -175,6 +196,7 @@ function guardar(): Promise<void> {
     await (e.id === null
       ? api.post(base.value, cuerpo)
       : api.put(`${base.value}/${e.id}`, cuerpo));
+    descarte.fijar();
     editando.value = null;
     errores.value = {};
   });
@@ -205,12 +227,10 @@ onMounted(cargar);
   <div class="mt-6 space-y-4" data-prueba="plantillas-whatsapp">
     <div class="tu-card p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 class="font-semibold">{{ $t("plantillasWhatsApp.titulo") }}</h3>
-          <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plantillasWhatsApp.ayuda") }}
-          </p>
-        </div>
+        <!-- La pestaña «Plantillas de WhatsApp» ya la nombra: sin título propio. -->
+        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("plantillasWhatsApp.ayuda") }}
+        </p>
         <button
           v-if="puedeGestionar && meta?.disponible && editando === null"
           type="button"
@@ -248,119 +268,138 @@ onMounted(cargar);
     </div>
 
     <!-- Editor -->
-    <form
-      v-if="editando"
-      class="tu-card p-5 grid gap-4"
-      data-prueba="editor-plantilla-whatsapp"
-      @submit.prevent="guardar"
+    <ModalDialogo
+      :abierto="editando !== null"
+      :titulo="
+        editando?.id
+          ? $t('plantillasWhatsApp.editarTitulo')
+          : $t('plantillasWhatsApp.nueva')
+      "
+      tam="md"
+      :ocupado="guardandoPlantilla"
+      @cerrar="descarte.cerrar"
     >
-      <label class="grid gap-1">
-        <span class="tu-label">{{ $t("plantillasWhatsApp.nombre") }}</span>
-        <input
-          v-model="editando.titulo"
-          class="tu-input"
-          maxlength="80"
-          required
-          data-prueba="plantilla-titulo"
-        />
-        <span v-if="errores.titulo" class="tu-error-campo">{{
-          errores.titulo[0]
-        }}</span>
-      </label>
-      <fieldset>
-        <legend class="tu-label">
-          {{ $t("plantillasWhatsApp.categoriaLabel") }}
-        </legend>
-        <div class="mt-2 space-y-2">
-          <label
-            v-for="c in ['marketing', 'utilidad'] as const"
-            :key="c"
-            class="flex items-start gap-3 text-sm"
-          >
-            <input
-              v-model="editando.categoria"
-              type="radio"
-              name="categoria-plantilla"
-              :value="c"
-              class="mt-1"
-            />
-            <span>
-              <span class="font-medium">{{
-                $t(`plantillasWhatsApp.categoria.${c}`)
-              }}</span>
-              · {{ costo(c) }}
-              <span class="block" :style="{ color: 'var(--texto-suave)' }">{{
-                $t(`plantillasWhatsApp.categoriaAyuda.${c}`)
-              }}</span>
-            </span>
-          </label>
-        </div>
-      </fieldset>
-      <label class="grid gap-1">
-        <span class="tu-label">{{ $t("plantillasWhatsApp.texto") }}</span>
-        <textarea
-          v-model="editando.cuerpo"
-          class="tu-input"
-          rows="5"
-          :maxlength="meta?.max_cuerpo ?? 1024"
-          required
-          data-prueba="plantilla-cuerpo"
-        ></textarea>
-        <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ ayudaMarcadores }} · {{ editando.cuerpo.length }}/{{
-            meta?.max_cuerpo ?? 1024
-          }}
-        </span>
-        <span
-          v-for="m in errores.cuerpo ?? []"
-          :key="m"
-          class="tu-error-campo"
-          >{{ m }}</span
-        >
-      </label>
-      <label class="grid gap-1">
-        <span class="tu-label">{{ $t("plantillasWhatsApp.pie") }}</span>
-        <input
-          v-model="editando.pie"
-          class="tu-input"
-          maxlength="60"
-          :placeholder="$t('plantillasWhatsApp.piePh')"
-        />
-      </label>
-      <div
-        v-if="editando.cuerpo.trim() !== ''"
-        class="rounded-xl border p-4 text-sm whitespace-pre-line"
-        :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
-        data-prueba="plantilla-vista-previa"
+      <form
+        v-if="editando"
+        id="form-plantilla-whatsapp"
+        class="grid gap-4"
+        data-prueba="editor-plantilla-whatsapp"
+        @submit.prevent="guardar"
       >
-        {{ ejemplo(editando.cuerpo) }}
-        <span
-          v-if="editando.pie.trim() !== ''"
-          class="block mt-2 text-xs"
-          :style="{ color: 'var(--texto-suave)' }"
-          >{{ editando.pie }}</span
+        <p v-if="error" class="tu-error-campo" role="alert">{{ error }}</p>
+        <label class="grid gap-1">
+          <span class="tu-label">{{ $t("plantillasWhatsApp.nombre") }}</span>
+          <input
+            v-model="editando.titulo"
+            class="tu-input"
+            maxlength="80"
+            required
+            data-prueba="plantilla-titulo"
+          />
+          <span v-if="errores.titulo" class="tu-error-campo">{{
+            errores.titulo[0]
+          }}</span>
+        </label>
+        <fieldset>
+          <legend class="tu-label">
+            {{ $t("plantillasWhatsApp.categoriaLabel") }}
+          </legend>
+          <div class="mt-2 space-y-2">
+            <label
+              v-for="c in ['marketing', 'utilidad'] as const"
+              :key="c"
+              class="flex items-start gap-3 text-sm"
+            >
+              <input
+                v-model="editando.categoria"
+                type="radio"
+                name="categoria-plantilla"
+                :value="c"
+                class="mt-1"
+              />
+              <span>
+                <span class="font-medium">{{
+                  $t(`plantillasWhatsApp.categoria.${c}`)
+                }}</span>
+                · {{ costo(c) }}
+                <span class="block" :style="{ color: 'var(--texto-suave)' }">{{
+                  $t(`plantillasWhatsApp.categoriaAyuda.${c}`)
+                }}</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        <label class="grid gap-1">
+          <span class="tu-label">{{ $t("plantillasWhatsApp.texto") }}</span>
+          <textarea
+            v-model="editando.cuerpo"
+            class="tu-input"
+            rows="5"
+            :maxlength="meta?.max_cuerpo ?? 1024"
+            required
+            data-prueba="plantilla-cuerpo"
+          ></textarea>
+          <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ ayudaMarcadores }} · {{ editando.cuerpo.length }}/{{
+              meta?.max_cuerpo ?? 1024
+            }}
+          </span>
+          <span
+            v-for="m in errores.cuerpo ?? []"
+            :key="m"
+            class="tu-error-campo"
+            >{{ m }}</span
+          >
+        </label>
+        <label class="grid gap-1">
+          <span class="tu-label">{{ $t("plantillasWhatsApp.pie") }}</span>
+          <input
+            v-model="editando.pie"
+            class="tu-input"
+            maxlength="60"
+            :placeholder="$t('plantillasWhatsApp.piePh')"
+          />
+        </label>
+        <div
+          v-if="editando.cuerpo.trim() !== ''"
+          class="rounded-xl border p-4 text-sm whitespace-pre-line"
+          :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
+          data-prueba="plantilla-vista-previa"
         >
-      </div>
-      <div class="flex justify-end gap-2">
+          {{ ejemplo(editando.cuerpo) }}
+          <span
+            v-if="editando.pie.trim() !== ''"
+            class="block mt-2 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ editando.pie }}</span
+          >
+        </div>
+      </form>
+      <template #pie>
         <button
           type="button"
           class="tu-btn tu-btn-secundario"
-          @click="editando = null"
+          :disabled="guardandoPlantilla"
+          @click="descarte.cerrar"
         >
           {{ $t("comun.cancelar") }}
         </button>
         <button
           type="submit"
+          form="form-plantilla-whatsapp"
           class="tu-btn tu-btn-primario"
           :disabled="trabajando !== null"
+          :aria-busy="guardandoPlantilla || undefined"
           data-prueba="guardar-plantilla-whatsapp"
         >
           {{ $t("plantillasWhatsApp.guardar") }}
         </button>
-      </div>
-    </form>
+      </template>
+    </ModalDialogo>
 
-    <p v-if="error" class="tu-error-campo" role="alert">{{ error }}</p>
+    <p v-if="error && editando === null" class="tu-error-campo" role="alert">
+      {{ error }}
+    </p>
 
     <p
       v-if="meta && plantillas.length === 0 && editando === null"
@@ -406,7 +445,7 @@ onMounted(cargar);
         <button
           v-if="puedeArchivar"
           type="button"
-          class="tu-btn tu-btn-secundario tu-btn-chico"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           :disabled="trabajando !== null"
           @click="archivar(p)"
         >

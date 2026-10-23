@@ -54,11 +54,11 @@ export default {
   espera: {
     ayuda: "Si se libera un lugar, se ofrece en este orden.",
   },
-  // Invitados de los clientes con su pase del plan (ADR 0182).
+  // Invitados de los alumnos con su pase del plan (ADR 0182).
   invitados: {
     titulo: "Invitados",
     ayuda:
-      "Vienen con el pase de invitado de un cliente: ocupan lugar y no son clientes.",
+      "Vienen con el pase de invitado de un alumno: ocupan lugar y no son alumnos.",
     de: "invitado de {nombre}",
     estados: {
       reservado: "Por marcar",
@@ -70,7 +70,7 @@ export default {
   plataforma: {
     titulo: "Reservas de plataformas",
     ayuda:
-      "Reservaron desde la app de su plataforma: ocupan lugar y no son clientes del negocio.",
+      "Reservaron desde la app de su plataforma: ocupan lugar y no son alumnos del negocio.",
     sinNombre: "Visitante",
     enSuApp: "Hace check-in en su app",
     cancelar: "Cancelar reserva",

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\MotivoFalloCobro;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
@@ -193,7 +194,8 @@ class ConciliarSuscripcionTenant
         } elseif ($estado === 'fallido') {
             $motivo = $cobro->motivo ?? 'El banco rechazó el cargo.';
             $this->domiciliaciones->registrarCargo($domiciliacion, $motivo);
-            $this->dunning->registrarFallo($acuerdo, 'No pudimos cobrar tu pago automático: '.$motivo);
+            // El detalle es el motivo del banco tal cual (sin él, la clave basta).
+            $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::TarjetaRechazada, $cobro->motivo);
         }
 
         return $estado;

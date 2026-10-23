@@ -1431,7 +1431,11 @@ onMounted(cargar);
           </button>
         </template>
 
-        <button class="tu-enlace mt-4 text-sm" type="button" @click="otra">
+        <button
+          class="tu-btn tu-btn-secundario mt-4"
+          type="button"
+          @click="otra"
+        >
           {{ $t("reservar.otra") }}
         </button>
         <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
@@ -1598,7 +1602,7 @@ onMounted(cargar);
               {{ sucursalSel.nombre }} ·
               <button
                 type="button"
-                class="tu-enlace"
+                class="tu-btn tu-btn-discreto tu-btn-chico"
                 @click="volverA('sucursal')"
               >
                 {{ $t("perfilPublico.agendar.cambiar") }}
@@ -1647,7 +1651,7 @@ onMounted(cargar);
               <button
                 v-if="busquedaServicio || categoriaServicio"
                 type="button"
-                class="tu-enlace"
+                class="tu-btn tu-btn-discreto"
                 @click="
                   busquedaServicio = '';
                   categoriaServicio = '';
@@ -1739,7 +1743,7 @@ onMounted(cargar);
             <button
               v-if="variasSedes"
               type="button"
-              class="tu-enlace rc-atras-servicios"
+              class="tu-btn tu-btn-discreto rc-atras-servicios"
               @click="volverA('sucursal')"
             >
               {{ $t("perfilPublico.agendar.atras") }}
@@ -1780,7 +1784,7 @@ onMounted(cargar);
                 </span>
                 <button
                   type="button"
-                  class="tu-enlace"
+                  class="tu-btn tu-btn-discreto tu-btn-chico"
                   @click="volverA('servicio')"
                 >
                   {{ $t("perfilPublico.agendar.cambiar") }}
@@ -1964,7 +1968,7 @@ onMounted(cargar);
             <div class="rc-acciones">
               <button
                 type="button"
-                class="tu-enlace text-sm"
+                class="tu-btn tu-btn-discreto"
                 @click="volverA('servicio')"
               >
                 {{ $t("perfilPublico.agendar.atras") }}
@@ -2043,7 +2047,7 @@ onMounted(cargar);
                     </dd>
                     <button
                       type="button"
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-discreto tu-btn-chico"
                       :aria-label="$t('perfilPublico.agendar.cambiarServicio')"
                       @click="volverA('servicio')"
                     >
@@ -2067,7 +2071,7 @@ onMounted(cargar);
                     </dd>
                     <button
                       type="button"
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-discreto tu-btn-chico"
                       :aria-label="$t('perfilPublico.agendar.cambiarHorario')"
                       @click="volverA('horario')"
                     >
@@ -2095,7 +2099,7 @@ onMounted(cargar);
                     </dd>
                     <button
                       type="button"
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-discreto tu-btn-chico"
                       :aria-label="
                         $t('perfilPublico.agendar.cambiarProfesional')
                       "
@@ -2143,7 +2147,7 @@ onMounted(cargar);
                     <button
                       v-if="variasSedes"
                       type="button"
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-discreto tu-btn-chico"
                       :aria-label="$t('perfilPublico.agendar.cambiarSucursal')"
                       @click="volverA('sucursal')"
                     >
@@ -2258,7 +2262,7 @@ onMounted(cargar);
                   <button
                     v-if="sinCuentaPermitido"
                     type="button"
-                    class="tu-enlace mt-1 text-sm"
+                    class="tu-btn tu-btn-discreto tu-btn-chico mt-1"
                     @click="comoInvitado = true"
                   >
                     {{ $t("perfilPublico.agendar.usarOtrosDatos") }}
@@ -2500,7 +2504,7 @@ onMounted(cargar);
 
             <button
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-discreto"
               @click="volverA('horario')"
             >
               {{ $t("perfilPublico.agendar.atras") }}
@@ -2575,7 +2579,6 @@ onMounted(cargar);
   background: var(--fondo);
 }
 .rc-atras-servicios {
-  display: inline-block;
   margin-top: 1.25rem;
 }
 .rc-sede-elegir {

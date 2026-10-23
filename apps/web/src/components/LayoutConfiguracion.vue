@@ -273,8 +273,8 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
   margin-inline: 0;
   padding: 0 0 2.5rem;
 }
-/* Su encabezado, en una tarjeta compacta: el título y su icono, más chicos que en
-   las pantallas de operación (aquí el contenido es lo importante). */
+/* Su encabezado, en una tarjeta compacta: el título y su subtítulo, más chicos que
+   en las pantallas de operación (aquí el contenido es lo importante). */
 .lc-contenido :deep(.tu-encabezado) {
   gap: 0.75rem;
   padding: 0.7rem 1rem;

@@ -203,7 +203,12 @@ async function guardar(): Promise<void> {
 }
 
 async function eliminar(w: Widget): Promise<void> {
-  if (!(await confirmar(t("captacion.widgets.confirmarEliminar")))) {
+  if (
+    !(await confirmar(t("captacion.widgets.confirmarEliminar"), {
+      aceptar: t("captacion.widgets.eliminar"),
+      peligro: true,
+    }))
+  ) {
     return;
   }
   try {
@@ -264,7 +269,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
       class="flex flex-wrap items-start justify-between gap-3"
     >
       <div class="min-w-0">
-        <h2 class="font-semibold">{{ $t("captacion.widgets.titulo") }}</h2>
+        <h2 class="tu-titulo-seccion">{{ $t("captacion.widgets.titulo") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("captacion.widgets.descripcion") }}
         </p>
@@ -331,7 +336,11 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
       data-prueba="error-widgets"
       >{{ error }}
       <template #acciones>
-        <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
           {{ $t("comun.reintentar") }}
         </button>
       </template>
@@ -352,8 +361,10 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="font-medium">{{ w.nombre }}</h2>
           <span
-            class="tu-pastilla"
-            :class="w.activo ? 'tu-tono-exito' : 'tu-tono-neutral'"
+            class="tu-estado text-sm"
+            :style="{
+              '--tono': w.activo ? 'var(--exito)' : 'var(--texto-suave)',
+            }"
             >{{
               w.activo
                 ? $t("captacion.widgets.activo")
@@ -370,7 +381,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
         <div v-if="puedeGestionar" class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             data-prueba="editar-widget"
             @click="editar(w)"
           >
@@ -378,8 +389,8 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           </button>
           <button
             type="button"
-            class="tu-enlace"
-            style="color: var(--error)"
+            class="tu-btn tu-btn-peligro tu-btn-chico"
+            data-prueba="eliminar-widget"
             @click="eliminar(w)"
           >
             {{ $t("captacion.widgets.eliminar") }}
@@ -524,7 +535,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           <button
             v-if="form.acento"
             type="button"
-            class="tu-enlace text-sm"
+            class="tu-btn tu-btn-discreto tu-btn-chico"
             @click="form.acento = ''"
           >
             {{ $t("captacion.widgets.sinAcento") }}
@@ -550,12 +561,13 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
               :aria-label="$t('captacion.widgets.dominios')"
               data-prueba="dominio-widget"
             />
+            <!-- Aún no se guarda: quitar el renglón es discreto. -->
             <button
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-discreto tu-btn-chico shrink-0"
               @click="quitarDominio(i)"
             >
-              {{ $t("captacion.widgets.eliminar") }}
+              {{ $t("captacion.widgets.quitarDominio") }}
             </button>
           </div>
           <button
@@ -578,19 +590,8 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           :etiqueta="$t('captacion.widgets.activo')"
           prueba="widget-activo"
         />
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="submit"
-            class="tu-btn tu-btn-primario"
-            :disabled="guardando || form.nombre.trim() === ''"
-            data-prueba="guardar-widget"
-          >
-            {{
-              guardando
-                ? $t("captacion.widgets.guardando")
-                : $t("captacion.widgets.guardar")
-            }}
-          </button>
+        <!-- Formulario en página: Cerrar y Guardar siempre a la vista, al fondo. -->
+        <div class="tu-pie-acciones">
           <button
             type="button"
             class="tu-btn tu-btn-secundario"
@@ -599,6 +600,19 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
             @click="cerrar"
           >
             {{ $t("captacion.widgets.cerrar") }}
+          </button>
+          <button
+            type="submit"
+            class="tu-btn tu-btn-primario"
+            :disabled="guardando || form.nombre.trim() === ''"
+            :aria-busy="guardando || undefined"
+            data-prueba="guardar-widget"
+          >
+            {{
+              guardando
+                ? $t("captacion.widgets.guardando")
+                : $t("captacion.widgets.guardar")
+            }}
           </button>
         </div>
       </form>

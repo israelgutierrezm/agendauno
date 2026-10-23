@@ -63,17 +63,15 @@ const accionando = ref(false);
 // Cobrar al terminar: servicio, productos y propina en un solo cobro (CobroCita).
 const cobrando = ref(false);
 
+// Pestañas de un diálogo: en memoria y sin íconos (como en ModalMiembro).
 type Pestana = "asistencia" | "cobro" | "historial";
 const pestana = ref<Pestana>("asistencia");
-const PESTANAS: { clave: Pestana; icono: string }[] = [
-  { clave: "asistencia", icono: "agenda" },
-  { clave: "cobro", icono: "dinero" },
-  { clave: "historial", icono: "reloj" },
-];
+const PESTANAS: Pestana[] = ["asistencia", "cobro", "historial"];
 
 const cita = computed(() => props.sesion?.cita ?? null);
+// Quien toma la cita, con el término del negocio (alumno, cliente, paciente…).
 const cliente = computed(
-  () => cita.value?.cliente ?? t("agendaVisual.profesionales.sinCliente"),
+  () => cita.value?.cliente ?? t("detalleCita.sinAlumno"),
 );
 const verFicha = computed(
   () => cita.value?.cliente_id != null && sesionTenant.puede("miembros.ver"),
@@ -371,8 +369,9 @@ function tituloHecho(h: Hecho): string {
       return te(llave) ? t(llave) : "";
     }
     case "cancelada":
+      // El API dice «cliente»; el texto usa el término del negocio.
       return t(
-        `detalleCita.historial.cancelada.${d.por === "cliente" ? "cliente" : "negocio"}`,
+        `detalleCita.historial.cancelada.${d.por === "cliente" ? "alumno" : "negocio"}`,
       );
     default:
       return h.tipo;
@@ -521,7 +520,7 @@ watch(
             <RouterLink
               v-if="verFicha"
               :to="{ name: 'ficha-miembro', params: { id: cita?.cliente_id } }"
-              class="pc-enlace"
+              class="tu-enlace mt-0.5 inline-block"
               >{{ $t("detalleCita.verPerfil") }}
               <IconoNav
                 nombre="flecha"
@@ -643,19 +642,15 @@ watch(
       </section>
 
       <template v-else>
-        <div class="tu-pestanas" role="tablist">
-          <template v-for="p in PESTANAS" :key="p.clave">
+        <div class="tu-pestanas" role="group" data-prueba="pestanas-cita">
+          <template v-for="p in PESTANAS" :key="p">
             <button
-              v-if="p.clave === 'asistencia' || verHistorial"
+              v-if="p === 'asistencia' || verHistorial"
               type="button"
-              role="tab"
-              class="inline-flex items-center gap-2"
-              :aria-selected="pestana === p.clave"
-              :aria-pressed="pestana === p.clave"
-              @click="pestana = p.clave"
+              :aria-pressed="pestana === p"
+              @click="pestana = p"
             >
-              <IconoNav :nombre="p.icono" :tam="18" />
-              {{ $t(`detalleCita.pestanas.${p.clave}`) }}
+              {{ $t(`detalleCita.pestanas.${p}`) }}
             </button>
           </template>
         </div>
@@ -773,7 +768,7 @@ watch(
                 <dd data-prueba="asiste">{{ cita.asiste }}</dd>
               </template>
               <template v-if="cita?.nota">
-                <dt>{{ $t("detalleCita.notaCliente") }}</dt>
+                <dt>{{ $t("detalleCita.notaAlumno") }}</dt>
                 <dd data-prueba="nota-cliente">{{ cita.nota }}</dd>
               </template>
             </dl>
@@ -998,16 +993,6 @@ watch(
   font-size: 1.3rem;
   font-weight: 600;
   line-height: 1.25;
-}
-.pc-enlace {
-  display: inline-block;
-  margin-top: 0.15rem;
-  color: var(--primario);
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-.pc-enlace:hover {
-  text-decoration: underline;
 }
 .pc-cuando {
   display: flex;

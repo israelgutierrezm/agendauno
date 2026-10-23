@@ -455,7 +455,7 @@ const aparienciaAbierta = ref(false);
           <button
             v-if="usuario.foto_url && !zonaFotoAbierta && !arrastrandoFoto"
             type="button"
-            class="tu-btn tu-btn-secundario mp-quitar-foto"
+            class="tu-btn tu-btn-peligro mp-quitar-foto"
             :disabled="subiendoFoto"
             @click="quitarFoto"
           >
@@ -489,11 +489,8 @@ const aparienciaAbierta = ref(false);
         aria-labelledby="mp-datos-titulo"
       >
         <header class="mp-cabecera">
-          <span class="mp-icono" aria-hidden="true"
-            ><IconoNav nombre="miembros" :tam="22"
-          /></span>
           <div>
-            <h2 id="mp-datos-titulo" class="mp-seccion">
+            <h2 id="mp-datos-titulo" class="tu-titulo-seccion">
               {{ $t("miPerfil.seccionDatos") }}
             </h2>
             <p class="mp-ayuda">{{ $t("miPerfil.datosDescripcion") }}</p>
@@ -604,11 +601,8 @@ const aparienciaAbierta = ref(false);
         aria-labelledby="mp-acceso-titulo"
       >
         <header class="mp-cabecera">
-          <span class="mp-icono" aria-hidden="true"
-            ><IconoNav nombre="usuarios" :tam="22"
-          /></span>
           <div>
-            <h2 id="mp-acceso-titulo" class="mp-seccion">
+            <h2 id="mp-acceso-titulo" class="tu-titulo-seccion">
               {{ $t("miPerfil.seccionAcceso") }}
             </h2>
             <p class="mp-ayuda">{{ $t("miPerfil.accesoDescripcion") }}</p>
@@ -820,7 +814,7 @@ const aparienciaAbierta = ref(false);
               </p>
               <button
                 type="button"
-                class="tu-btn tu-btn-secundario"
+                class="tu-btn tu-btn-peligro"
                 data-prueba="desconectar-google"
                 :disabled="conectandoGoogle"
                 @click="desconectarGoogle"
@@ -850,11 +844,8 @@ const aparienciaAbierta = ref(false);
         aria-labelledby="mp-preferencias-titulo"
       >
         <header class="mp-cabecera">
-          <span class="mp-icono" aria-hidden="true"
-            ><IconoNav nombre="ajustes" :tam="22"
-          /></span>
           <div>
-            <h2 id="mp-preferencias-titulo" class="mp-seccion">
+            <h2 id="mp-preferencias-titulo" class="tu-titulo-seccion">
               {{ tituloPreferencias }}
             </h2>
             <p class="mp-ayuda">{{ $t("miPerfil.preferenciasDescripcion") }}</p>
@@ -867,9 +858,6 @@ const aparienciaAbierta = ref(false);
             <p class="mp-ayuda">{{ $t("miPerfil.calendarioAyuda") }}</p>
           </div>
           <div class="mp-calendario space-y-3">
-            <span class="mp-icono mp-icono-calendario" aria-hidden="true"
-              ><IconoNav nombre="agenda" :tam="28"
-            /></span>
             <!-- Con qué calendarios funciona: cada uno con su miniatura. -->
             <ul
               class="mp-apps-calendario"
@@ -979,11 +967,8 @@ const aparienciaAbierta = ref(false);
         aria-labelledby="mp-facturar-titulo"
       >
         <header class="mp-cabecera">
-          <span class="mp-icono" aria-hidden="true"
-            ><IconoNav nombre="ventas" :tam="22"
-          /></span>
           <div>
-            <h2 id="mp-facturar-titulo" class="mp-seccion">
+            <h2 id="mp-facturar-titulo" class="tu-titulo-seccion">
               {{ $t("datosFacturacion.titulo") }}
             </h2>
           </div>
@@ -1158,17 +1143,6 @@ const aparienciaAbierta = ref(false);
   background: color-mix(in srgb, var(--fondo) 60%, var(--superficie));
   border-radius: var(--radio-tarjeta) var(--radio-tarjeta) 0 0;
 }
-.mp-icono {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 0.65rem;
-  color: var(--primario-fuerte);
-  background: var(--primario-suave);
-}
 .mp-fila {
   display: grid;
   gap: 1rem;
@@ -1198,12 +1172,6 @@ const aparienciaAbierta = ref(false);
   height: 0.5rem;
   border-radius: 999px;
   background: var(--exito);
-}
-.mp-seccion {
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: var(--texto);
 }
 .mp-titulo {
   font-weight: 500;
@@ -1301,10 +1269,6 @@ const aparienciaAbierta = ref(false);
 }
 .mp-hint-app svg {
   margin-top: 0.1rem;
-}
-.mp-icono-calendario {
-  width: 3rem;
-  height: 3rem;
 }
 @media (max-width: 639px) {
   .mp-identidad {

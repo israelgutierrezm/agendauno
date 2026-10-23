@@ -122,10 +122,8 @@ describe("asignar y editar tareas", () => {
       .map((o) => o.text());
     expect(opciones).toEqual(["A mí", "Leo", "Fernanda"]);
     await panel.get('[data-prueba="tarea-responsable"]').setValue("fer");
-    await panel
-      .findAll("button")
-      .find((b) => b.text() === "Guardar")!
-      .trigger("click");
+    // «Guardar» va en el pie del panel y envía su formulario.
+    await panel.get("#form-tarea").trigger("submit");
     await flushPromises();
 
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/tareas", {
@@ -152,10 +150,8 @@ describe("asignar y editar tareas", () => {
       "2026-10-02",
     );
     await panel.get("#t-titulo").setValue("Revisar los tubos 6 y 7");
-    await panel
-      .findAll("button")
-      .find((b) => b.text() === "Guardar")!
-      .trigger("click");
+    // «Guardar» va en el pie del panel y envía su formulario.
+    await panel.get("#form-tarea").trigger("submit");
     await flushPromises();
 
     expect(api.put).toHaveBeenCalledWith("/api/v1/app/demo/tareas/t1", {
@@ -180,10 +176,8 @@ describe("asignar y editar tareas", () => {
     expect(panel.get("#t-titulo").attributes("maxlength")).toBe("255");
     expect(panel.get("#t-detalle").attributes("maxlength")).toBe("2000");
     await panel.get("#t-titulo").setValue("Llamar a Bea");
-    await panel
-      .findAll("button")
-      .find((b) => b.text() === "Guardar")!
-      .trigger("click");
+    // «Guardar» va en el pie del panel y envía su formulario.
+    await panel.get("#form-tarea").trigger("submit");
     await flushPromises();
 
     const abierto = w.get('[data-prueba="panel"]');

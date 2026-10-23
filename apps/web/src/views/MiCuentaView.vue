@@ -6,6 +6,7 @@ import { RouterLink, useRoute } from "vue-router";
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import AvisoRetornoPago from "@/components/AvisoRetornoPago.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -255,8 +256,8 @@ interface Acceso {
   icono: string;
   tono: string;
   ruta?: string;
-  // La pestaña de Reservas a la que lleva (reservar, próximas o historial).
-  vista?: string;
+  // La pestaña de Reservas a la que lleva (próximas o historial; sin ella, reservar).
+  pestana?: string;
   alTocar?: () => void;
   atencion?: boolean;
 }
@@ -291,7 +292,6 @@ const accesos = computed<Acceso[]>(() => {
     icono: "agenda",
     tono: TONO.reservar,
     ruta: "mis-reservas",
-    vista: "reservar",
   };
   const reservas: Acceso = {
     clave: "reservas",
@@ -307,7 +307,7 @@ const accesos = computed<Acceso[]>(() => {
     icono: "lista",
     tono: TONO.reservas,
     ruta: "mis-reservas",
-    vista: "proximas",
+    pestana: "proximas",
   };
   // Su bono o su plan: solo si lo tiene, o si el negocio vende planes (clases).
   const tienePlan = c !== null || otro !== null;
@@ -371,7 +371,7 @@ const accesos = computed<Acceso[]>(() => {
         icono: "hecho",
         tono: TONO.asistencia,
         ruta: "mis-reservas",
-        vista: "historial",
+        pestana: "historial",
       };
   // El pase y el expediente, solo si el negocio los usa (o hay algo por firmar).
   const pase: Acceso | null =
@@ -455,26 +455,25 @@ onMounted(() => {
 
 <template>
   <section class="tu-pagina">
-    <h1 class="text-2xl font-semibold">
-      {{
+    <!-- El saludo es el título; en la cuenta de una persona a su cargo, el subtítulo
+         dice de quién es el resumen (ADR 0123). -->
+    <EncabezadoSeccion
+      :titulo="
         nombre
-          ? $t("portal.inicio.saludo", { nombre })
-          : $t("portal.inicio.saludoSinNombre")
-      }}
-    </h1>
-    <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-      <!-- En la cuenta de una persona a su cargo, de quién es el resumen (ADR 0123). -->
-      {{
+          ? $t('portal.inicio.saludo', { nombre })
+          : $t('portal.inicio.saludoSinNombre')
+      "
+      :subtitulo="
         participantes.nombreActual
-          ? $t("familias.resumenDe", {
+          ? $t('familias.resumenDe', {
               nombre: participantes.nombreActual,
-              estudio: sesion.estudio?.nombre ?? "",
+              estudio: sesion.estudio?.nombre ?? '',
             })
-          : $t("portal.inicio.resumen", {
-              estudio: sesion.estudio?.nombre ?? "",
+          : $t('portal.inicio.resumen', {
+              estudio: sesion.estudio?.nombre ?? '',
             })
-      }}
-    </p>
+      "
+    />
     <InstalarApp
       v-if="sesion.estudio"
       class="mt-4"
@@ -483,7 +482,11 @@ onMounted(() => {
 
     <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-4">
       {{ cuenta.error.value }}
-      <button type="button" class="tu-enlace ml-2" @click="cuenta.cargar(true)">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario tu-btn-chico ml-2"
+        @click="cuenta.cargar(true)"
+      >
         {{ $t("comun.reintentar") }}
       </button>
     </AvisoTono>
@@ -493,7 +496,7 @@ onMounted(() => {
         <RouterLink
           :to="{
             name: 'mis-reservas',
-            query: { vista: 'reservar', incluidas: '1' },
+            query: { incluidas: '1' },
           }"
           class="tu-enlace ml-1"
           data-prueba="reservar-tras-pago"
@@ -583,7 +586,7 @@ onMounted(() => {
             >{{ $t("portal.inicio.comoLlegar") }}</a
           >
           <RouterLink
-            :to="{ name: 'mis-reservas', query: { vista: 'proximas' } }"
+            :to="{ name: 'mis-reservas', query: { pestana: 'proximas' } }"
             class="tu-btn tu-btn-primario order-first"
             data-prueba="ver-detalle"
           >
@@ -638,7 +641,7 @@ onMounted(() => {
       >
         <RouterLink
           v-if="ofrecida"
-          :to="{ name: 'mis-reservas', query: { vista: 'proximas' } }"
+          :to="{ name: 'mis-reservas', query: { pestana: 'proximas' } }"
           class="pi-aviso"
           >{{
             $t("portal.inicio.atencion.lugar", { clase: ofrecida.oferta ?? "" })
@@ -655,7 +658,7 @@ onMounted(() => {
         <!-- Lo que le interesó antes de tener cuenta: continuar sin buscarlo. -->
         <RouterLink
           v-if="interes?.clase"
-          :to="{ name: 'mis-reservas', query: { vista: 'reservar' } }"
+          :to="{ name: 'mis-reservas' }"
           class="pi-aviso"
           data-prueba="interes-clase"
           >{{
@@ -690,8 +693,8 @@ onMounted(() => {
           <TarjetaOperacion
             :to="
               a.ruta
-                ? a.vista
-                  ? { name: a.ruta, query: { vista: a.vista } }
+                ? a.pestana
+                  ? { name: a.ruta, query: { pestana: a.pestana } }
                   : { name: a.ruta }
                 : undefined
             "

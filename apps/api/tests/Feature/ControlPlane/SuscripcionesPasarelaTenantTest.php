@@ -112,7 +112,7 @@ function renovacionHoy(array $m): void
 
 /**
  * @param  array{slug: string, acuerdo: string}  $m
- * @return array{proxima: string|null, mora: string|null, motivo: string|null, pagos: int}
+ * @return array{proxima: string|null, mora: string|null, motivo: string|null, clave: string|null, detalle: string|null, pagos: int}
  */
 function estadoRenovacion(array $m): array
 {
@@ -124,6 +124,8 @@ function estadoRenovacion(array $m): array
             'proxima' => $acuerdo->proxima_cobro_en?->toDateString(),
             'mora' => $mora?->estado->value,
             'motivo' => $mora?->ultimo_motivo,
+            'clave' => $mora?->ultimo_motivo_clave?->value,
+            'detalle' => $mora?->ultimo_motivo_detalle,
             'pagos' => PagoTenant::query()->whereNotNull('domiciliacion_id')->where('estado', 'aprobado')->count(),
         ];
     });
@@ -214,6 +216,8 @@ it('cada cuota que cobra Mercado Pago paga la renovación una sola vez; un recha
     $estado = estadoRenovacion($m);
     expect($estado['mora'])->toBe('en_mora')
         ->and($estado['motivo'])->toContain('no tiene fondos suficientes')
+        ->and($estado['clave'])->toBe('tarjeta_rechazada')
+        ->and($estado['detalle'])->toBe('La tarjeta no tiene fondos suficientes.')
         ->and($estado['proxima'])->toBe(now()->toDateString());
 });
 

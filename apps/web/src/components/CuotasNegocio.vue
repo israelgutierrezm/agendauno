@@ -30,8 +30,9 @@ interface Cuotas {
 
 const emit = defineEmits<{
   guardado: [];
-  cerrar: [];
-  // Para su contenedor: no cerrarse a medio guardar ni descartar sin preguntar.
+  // Para su contenedor (PlanesView, que lleva Guardar y Cancelar en el pie del
+  // diálogo): no cerrarse a medio guardar, no descartar sin preguntar y desactivar
+  // «Guardar» mientras carga o hay un monto que no se puede leer.
   estado: [e: EstadoEditor];
 }>();
 const { t } = useI18n();
@@ -69,11 +70,6 @@ const form = ref({
 });
 // Lo capturado contra lo guardado (se fija al cargar y al guardar).
 const foto = instantanea(() => form.value);
-watch(
-  () => ({ guardando: guardando.value, sucio: foto.cambio() }),
-  (e) => emit("estado", e),
-  { immediate: true },
-);
 
 // Como se escribe en el país del negocio («12,50» en España), para que `aMinor` lo lea.
 function aTexto(minor: number): string {
@@ -87,6 +83,15 @@ const ilegible = computed(
   () =>
     monto(form.value.inscripcion) === null ||
     monto(form.value.anualidad) === null,
+);
+watch(
+  () => ({
+    guardando: guardando.value,
+    sucio: foto.cambio(),
+    valido: !cargando.value && !ilegible.value,
+  }),
+  (e) => emit("estado", e),
+  { immediate: true },
 );
 const MESES = Array.from({ length: 12 }, (_, i) => i + 1);
 function nombreMes(m: number): string {
@@ -117,7 +122,8 @@ onMounted(async () => {
 });
 
 async function guardar(): Promise<void> {
-  if (ilegible.value) {
+  // El botón está en el pie del contenedor: un Enter en un campo también llega aquí.
+  if (ilegible.value || guardando.value) {
     return;
   }
   guardando.value = true;
@@ -155,6 +161,7 @@ async function guardar(): Promise<void> {
   </p>
   <form
     v-else
+    id="form-cuotas"
     class="space-y-5"
     data-prueba="cuotas-negocio"
     @submit.prevent="guardar"
@@ -302,26 +309,6 @@ async function guardar(): Promise<void> {
     <AvisoTono v-if="error" tono="peligro" role="alert">
       {{ error }}
     </AvisoTono>
-    <div class="flex justify-end gap-2">
-      <button
-        type="button"
-        class="tu-btn tu-btn-secundario"
-        @click="emit('cerrar')"
-      >
-        {{ $t("planes.editor.cancelar") }}
-      </button>
-      <button
-        type="submit"
-        class="tu-btn tu-btn-primario"
-        :disabled="guardando || ilegible"
-      >
-        {{
-          guardando
-            ? $t("planes.editor.guardando")
-            : $t("planes.editor.guardar")
-        }}
-      </button>
-    </div>
   </form>
 </template>
 

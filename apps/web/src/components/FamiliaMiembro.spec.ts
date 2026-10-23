@@ -113,10 +113,14 @@ describe("la familia en la ficha", () => {
     await w.get('[data-prueba="agregar-familiar"]').trigger("click");
     const panel = w.get('[data-prueba="panel"]');
     await panel.get('[data-prueba="elegir"]').trigger("click");
-    await panel
-      .findAll("button")
-      .find((b) => b.text() === "Poner a su cargo")!
-      .trigger("click");
+    // «Poner a su cargo» (en el pie) envía el formulario del panel.
+    expect(
+      panel
+        .findAll("button")
+        .find((b) => b.text() === "Poner a su cargo")!
+        .attributes("form"),
+    ).toBe("form-familiar");
+    await panel.get("form#form-familiar").trigger("submit");
     await flushPromises();
 
     expect(w.get('[data-prueba="error-vincular"]').text()).toContain(

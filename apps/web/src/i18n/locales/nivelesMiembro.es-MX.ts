@@ -1,4 +1,4 @@
-// Nivel del cliente por actividad y lo que pide cada clase (ADR 0187).
+// Nivel del alumno por actividad y lo que pide cada clase (ADR 0187).
 export default {
   titulo: "Nivel por actividad",
   ayuda:
@@ -8,8 +8,8 @@ export default {
   clase: {
     nivel: "Nivel que pide (opcional)",
     cualquiera: "Cualquier nivel",
-    nivelAyuda:
-      "Desde su cuenta solo la reservan quienes tienen este nivel o uno más alto. El nivel de cada cliente se asigna en su ficha.",
+    nivelAyudaAlumno:
+      "Desde su cuenta solo la reservan quienes tienen este nivel o uno más alto. El nivel de cada alumno se asigna en su ficha.",
     practicaLibre: "Práctica libre",
     practicaLibreAyuda:
       "Sin instructor (Open Pole, Open Gym). Si le asignas un espacio con equipo, su cupo es el equipo disponible.",

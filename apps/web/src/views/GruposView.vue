@@ -16,6 +16,7 @@ import TarjetasIndicadores, {
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useDescartarCambios } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -94,6 +95,27 @@ const POR_PAGINA = 20;
 const buscar = ref("");
 const filtroEstado = ref<"activos" | "inactivos" | "">("activos");
 const pagina = ref(1);
+// La búsqueda y el estado quedan en la dirección (`?q=…&estado=todos`):
+// recargar o volver atrás conserva lo que se buscaba. «Activos», el de
+// siempre, no se escribe.
+useFiltrosEnUrl({
+  q: buscar,
+  estado: computed<string>({
+    get: () =>
+      filtroEstado.value === "activos"
+        ? ""
+        : filtroEstado.value === ""
+          ? "todos"
+          : filtroEstado.value,
+    set: (v: string) => {
+      if (v === "inactivos") {
+        filtroEstado.value = "inactivos";
+      } else if (v === "todos") {
+        filtroEstado.value = "";
+      }
+    },
+  }),
+});
 const visibles = computed(() => {
   const q = buscar.value.trim().toLowerCase();
   return grupos.value.filter(
@@ -219,6 +241,10 @@ async function cargar(): Promise<void> {
 }
 
 async function crear(): Promise<void> {
+  // Con Enter mientras guarda no se manda dos veces.
+  if (creando.value) {
+    return;
+  }
   creando.value = true;
   errorCrear.value = null;
   try {
@@ -637,8 +663,12 @@ const indicadores = computed<Indicador[]>(() => {
                   <td>
                     <!-- Estado: punto + texto. -->
                     <span
-                      class="tu-badge"
-                      :class="{ 'tu-badge-exito': g.activo }"
+                      class="tu-estado"
+                      :style="{
+                        '--tono': g.activo
+                          ? 'var(--exito)'
+                          : 'var(--texto-suave)',
+                      }"
                       >{{
                         g.activo
                           ? $t("gruposVisual.activo")
@@ -678,7 +708,7 @@ const indicadores = computed<Indicador[]>(() => {
                   <button
                     v-if="seleccionado.activo"
                     type="button"
-                    class="tu-enlace text-sm"
+                    class="tu-btn tu-btn-peligro tu-btn-chico"
                     data-prueba="cerrar-grupo"
                     @click="abrirCierre"
                   >
@@ -687,7 +717,7 @@ const indicadores = computed<Indicador[]>(() => {
                   <button
                     v-else
                     type="button"
-                    class="tu-enlace text-sm"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     data-prueba="reabrir-grupo"
                     @click="reabrir"
                   >
@@ -743,6 +773,7 @@ const indicadores = computed<Indicador[]>(() => {
                   class="tu-btn tu-btn-primario"
                   type="submit"
                   :disabled="inscribiendo || miembroId === ''"
+                  :aria-busy="inscribiendo || undefined"
                 >
                   {{
                     inscribiendo
@@ -826,7 +857,7 @@ const indicadores = computed<Indicador[]>(() => {
                         i.baja_desde > hoy
                       "
                       type="button"
-                      class="tu-enlace text-xs"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       data-prueba="adelantar-baja"
                       @click="abrirSalida(i)"
                     >
@@ -845,7 +876,7 @@ const indicadores = computed<Indicador[]>(() => {
                   <button
                     v-else-if="puedeGestionar && seleccionado.activo"
                     type="button"
-                    class="tu-enlace text-xs"
+                    class="tu-btn tu-btn-peligro tu-btn-chico"
                     data-prueba="dar-de-baja"
                     @click="abrirSalida(i)"
                   >
@@ -853,23 +884,24 @@ const indicadores = computed<Indicador[]>(() => {
                   </button>
                 </li>
               </ul>
-              <p
+              <AvisoTono
                 v-else-if="errorInscritos && !cargandoInscritos"
-                class="mt-4 text-sm"
+                tono="peligro"
+                class="mt-4"
                 role="alert"
                 data-prueba="error-inscritos"
               >
-                <span style="color: var(--error)">{{
-                  $t("cursos.errorInscritos")
-                }}</span>
-                <button
-                  type="button"
-                  class="tu-enlace ml-2"
-                  @click="cargarInscritos(1)"
-                >
-                  {{ $t("comun.reintentar") }}
-                </button>
-              </p>
+                {{ $t("cursos.errorInscritos") }}
+                <template #acciones>
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
+                    @click="cargarInscritos(1)"
+                  >
+                    {{ $t("comun.reintentar") }}
+                  </button>
+                </template>
+              </AvisoTono>
               <p
                 v-else-if="!cargandoInscritos"
                 class="mt-4 text-sm"
@@ -924,10 +956,12 @@ const indicadores = computed<Indicador[]>(() => {
               <td class="whitespace-nowrap">{{ fechaHora(f.inicia_en) }}</td>
               <td class="whitespace-nowrap">
                 <span
-                  class="tu-badge"
-                  :class="{
-                    'tu-badge-exito': f.estado === 'reservada',
-                    'tu-badge-aviso': f.estado !== 'reservada',
+                  class="tu-estado"
+                  :style="{
+                    '--tono':
+                      f.estado === 'reservada'
+                        ? 'var(--exito)'
+                        : 'var(--aviso)',
                   }"
                   >{{ $t(`cursos.estadoFecha.${f.estado}`) }}</span
                 >
@@ -1069,15 +1103,22 @@ const indicadores = computed<Indicador[]>(() => {
         >
           {{ $t("comun.cancelar") }}
         </button>
+        <!-- Cambiar de grupo es la principal; la baja, una destructiva. -->
         <button
           type="button"
-          class="tu-btn tu-btn-primario"
+          class="tu-btn"
+          :class="
+            salida?.destino
+              ? 'tu-btn-primario'
+              : 'tu-btn-solido tu-tono-peligro'
+          "
           :disabled="
             saliendo ||
             !salida?.desde ||
             (salida?.destino !== '' &&
               (cargandoPrevia || faltaConfirmarParcial))
           "
+          :aria-busy="saliendo || undefined"
           data-prueba="confirmar-salida"
           @click="confirmarSalida"
         >
@@ -1133,8 +1174,9 @@ const indicadores = computed<Indicador[]>(() => {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro"
+          class="tu-btn tu-btn-solido tu-tono-peligro"
           :disabled="cerrando || !cierre?.desde"
+          :aria-busy="cerrando || undefined"
           data-prueba="confirmar-cierre"
           @click="confirmarCierre"
         >
@@ -1150,7 +1192,7 @@ const indicadores = computed<Indicador[]>(() => {
       :ocupado="creando"
       @cerrar="cerrar"
     >
-      <form class="space-y-4" @submit.prevent="crear">
+      <form id="form-nuevo-grupo" class="space-y-4" @submit.prevent="crear">
         <AvisoTono
           v-if="errorCrear"
           tono="peligro"
@@ -1186,11 +1228,12 @@ const indicadores = computed<Indicador[]>(() => {
           </button>
           <button
             class="tu-btn tu-btn-primario"
-            type="button"
+            type="submit"
+            form="form-nuevo-grupo"
             :disabled="
               creando || nuevo.nombre === '' || nuevo.plantillaId === ''
             "
-            @click="crear"
+            :aria-busy="creando || undefined"
           >
             {{ creando ? $t("cursos.creando") : $t("cursos.crear") }}
           </button>

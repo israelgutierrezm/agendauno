@@ -50,6 +50,7 @@ import { intentoUnico } from "@/lib/intento";
 import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { hoyComoFecha, hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
+import { fechaEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { colorEstado, estadoEnLista } from "@/lib/paseLista";
 import { confirmar } from "@/lib/confirmar";
 import { trackEvent } from "@/lib/analytics";
@@ -280,6 +281,52 @@ function quitarFiltros(): void {
   instructorFiltro.value = "";
   ofertaFiltro.value = "";
 }
+
+// El modo, el día a la vista y los filtros de quién y qué quedan en la
+// dirección (`?modo=dia&fecha=…`): recargar o compartir el enlace abre lo mismo.
+// La clave es `modo`: `vista` es la del menú (lib/menu.ts). Lo de siempre (su
+// modo, hoy) no se escribe; la sucursal la manda la barra. Va antes de vigilar
+// el rango: lo leído de la dirección no pide de más.
+const vistaPredeterminada: Vista = sesion.esCitas ? "profesionales" : "semana";
+useFiltrosEnUrl({
+  modo: computed<string>({
+    get: () => (vista.value === vistaPredeterminada ? "" : vista.value),
+    set: (v: string) => {
+      const op = opcionesVista.value.find((x) => x === v);
+      if (op !== undefined) {
+        vista.value = op;
+      }
+    },
+  }),
+  // En el mes, su primer día; si no, el día elegido.
+  fecha: fechaEnUrl(
+    computed<string>({
+      get: () => {
+        const hoy = hoyEnNegocio(sesion.zonaHoraria);
+        if (vista.value === "mes") {
+          const mes = isoDe(mesInicio.value);
+          return mes === `${hoy.slice(0, 7)}-01` ? "" : mes;
+        }
+        return diaSel.value === hoy ? "" : diaSel.value;
+      },
+      set: (v: string) => {
+        if (v !== "") {
+          irAFecha(v);
+        }
+      },
+    }),
+  ),
+  // Quien solo ve lo suyo no elige a otro profesional.
+  instructor: computed<string>({
+    get: () => instructorFiltro.value,
+    set: (v: string) => {
+      if (!soloLoSuyo.value) {
+        instructorFiltro.value = v;
+      }
+    },
+  }),
+  oferta: ofertaFiltro,
+});
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -813,6 +860,13 @@ function irHoy(): void {
   diaSel.value = isoDe(hoy);
   mesInicio.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 }
+// A un día (AAAA-MM-DD, p. ej. el de la dirección): su semana, su mes y ese día.
+function irAFecha(iso: string): void {
+  const dia = new Date(`${iso}T12:00:00`);
+  semanaInicio.value = lunesDe(dia);
+  mesInicio.value = new Date(dia.getFullYear(), dia.getMonth(), 1);
+  diaSel.value = iso;
+}
 function irMes(delta: number): void {
   mesInicio.value = new Date(
     mesInicio.value.getFullYear(),
@@ -956,9 +1010,11 @@ const profesionalesVisibles = computed(() =>
         (i) => i.id === instructorFiltro.value,
       ),
 );
-// Al cambiar de sucursal, si el profesional elegido no atiende ahí, se ven todos.
+// Al cambiar de sucursal, si el profesional elegido no atiende ahí, se ven todos
+// (no antes de tener al equipo: el de la dirección se conserva mientras carga).
 watch(instructoresDeSucursal, (lista) => {
   if (
+    instructores.value.length > 0 &&
     instructorFiltro.value !== "" &&
     !lista.some((i) => i.id === instructorFiltro.value)
   ) {
@@ -1171,12 +1227,6 @@ const pestanasClase = computed<PestanaClase[]>(() => {
   }
   return lista;
 });
-const ICONO_PESTANA_CLASE: Record<PestanaClase, string> = {
-  asistentes: "personas",
-  lugares: "cuadricula",
-  equipo: "instructores",
-  checkins: "hecho",
-};
 const fechaClase = computed(() => {
   const d = detalle.value;
   return d === null
@@ -1985,17 +2035,12 @@ onMounted(async () => {
       <template #acciones>
         <div class="flex flex-wrap items-center gap-2">
           <!-- En el teléfono, solo la acción principal: lo demás está en el menú. -->
-          <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
-          <RouterLink
-            v-if="puedeEntrar('horarios', sesion)"
-            :to="{ name: 'horarios' }"
-            class="tu-btn tu-btn-secundario max-sm:hidden"
-            >{{ $t("agenda.disponibilidadEquipo") }}</RouterLink
-          >
+          <!-- La disponibilidad ya es una pestaña del área; las reglas viven en
+               Configuración: un enlace, no una acción. -->
           <RouterLink
             v-if="puedeEntrar('reglas-agenda', sesion)"
             :to="{ name: 'reglas-agenda', hash: '#politicas' }"
-            class="tu-btn tu-btn-secundario max-sm:hidden"
+            class="tu-enlace text-sm max-sm:hidden"
             >{{ $t("agenda.reglasReserva") }}</RouterLink
           >
           <!-- Importar es secundaria: la principal es crear (al final). -->
@@ -2218,7 +2263,7 @@ onMounted(async () => {
         <button
           v-if="filtrosActivos"
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-discreto tu-btn-chico"
           data-prueba="quitar-filtros"
           @click="quitarFiltros"
         >
@@ -2700,23 +2745,24 @@ onMounted(async () => {
         <template
           v-if="sesionesDe(diaSelInfo.iso).length === 0 && !cargandoSesiones"
         >
-          <p
+          <AvisoTono
             v-if="errorSesiones"
-            class="mt-6 text-center text-sm"
+            tono="peligro"
+            class="mt-6"
             role="alert"
             data-prueba="dia-error"
           >
-            <span style="color: var(--error)">{{
-              $t("agenda.errorCarga")
-            }}</span>
-            <button
-              type="button"
-              class="tu-enlace ml-2"
-              @click="cargarSesiones"
-            >
-              {{ $t("comun.reintentar") }}
-            </button>
-          </p>
+            {{ $t("agenda.errorCarga") }}
+            <template #acciones>
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
+                @click="cargarSesiones"
+              >
+                {{ $t("comun.reintentar") }}
+              </button>
+            </template>
+          </AvisoTono>
           <EstadoVacio
             v-else-if="filtrosActivos > 0"
             class="mt-4"
@@ -2931,22 +2977,20 @@ onMounted(async () => {
         </section>
 
         <template v-else>
+          <!-- Pestañas de un diálogo: en memoria y sin íconos (como ModalMiembro). -->
           <div
             v-if="pestanasClase.length > 1"
             class="tu-pestanas"
-            role="tablist"
+            role="group"
+            data-prueba="pestanas-clase"
           >
             <button
               v-for="p in pestanasClase"
               :key="p"
               type="button"
-              role="tab"
-              class="inline-flex items-center gap-2"
-              :aria-selected="pestanaClase === p"
               :aria-pressed="pestanaClase === p"
               @click="pestanaClase = p"
             >
-              <IconoNav :nombre="ICONO_PESTANA_CLASE[p]" :tam="18" />
               {{ $t(`detalleClase.pestanas.${p}`) }}
             </button>
           </div>
@@ -3037,6 +3081,7 @@ onMounted(async () => {
                   class="tu-btn tu-btn-primario"
                   type="submit"
                   :disabled="accionando || reservarModel.miembroId === ''"
+                  :aria-busy="accionando || undefined"
                 >
                   {{ $t("agenda.reservar.reservar") }}
                 </button>
@@ -3080,23 +3125,24 @@ onMounted(async () => {
               >
                 {{ $t("comun.cargando") }}
               </p>
-              <p
+              <AvisoTono
                 v-else-if="errorRoster"
-                class="mt-2 text-sm"
+                tono="peligro"
+                class="mt-2"
                 role="alert"
                 data-prueba="roster-error"
               >
-                <span style="color: var(--error)">{{
-                  $t("agenda.roster.errorCarga")
-                }}</span>
-                <button
-                  type="button"
-                  class="tu-enlace ml-2"
-                  @click="cargarRoster(detalle.id)"
-                >
-                  {{ $t("comun.reintentar") }}
-                </button>
-              </p>
+                {{ $t("agenda.roster.errorCarga") }}
+                <template #acciones>
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
+                    @click="cargarRoster(detalle.id)"
+                  >
+                    {{ $t("comun.reintentar") }}
+                  </button>
+                </template>
+              </AvisoTono>
               <p
                 v-else-if="roster.length === 0"
                 class="mt-2 text-sm"
@@ -3106,7 +3152,9 @@ onMounted(async () => {
               </p>
               <ul v-else class="dcl-roster">
                 <li v-for="r in roster" :key="r.id" class="text-sm">
-                  <div class="flex items-center justify-between gap-2">
+                  <div
+                    class="flex flex-wrap items-center justify-between gap-2"
+                  >
                     <span class="flex min-w-0 items-center gap-3">
                       <AvatarIniciales :nombre="r.persona" tam="md" />
                       <span class="min-w-0">
@@ -3153,10 +3201,13 @@ onMounted(async () => {
                         </span>
                       </span>
                     </span>
-                    <span class="flex items-center gap-2 shrink-0">
+                    <!-- Cobrar y aceptar abren su confirmación (ahí está el
+                         primario); cancelar es la destructiva. -->
+                    <span class="flex flex-wrap items-center gap-2">
                       <button
                         v-if="r.orden && puedeCobrar"
-                        class="tu-enlace"
+                        type="button"
+                        class="tu-btn tu-btn-secundario tu-btn-chico"
                         data-prueba="cobrar-reserva"
                         :disabled="accionando"
                         @click="abrirCobroReserva(r, detalle.id)"
@@ -3165,7 +3216,8 @@ onMounted(async () => {
                       </button>
                       <button
                         v-if="r.estado === 'ofrecida' && puedeReservar"
-                        class="tu-enlace"
+                        type="button"
+                        class="tu-btn tu-btn-secundario tu-btn-chico"
                         :disabled="accionando"
                         @click="aceptar(r.id, detalle.id)"
                       >
@@ -3179,7 +3231,8 @@ onMounted(async () => {
                             r.estado === 'ofrecida') &&
                           puedeVerMiembros
                         "
-                        class="tu-enlace"
+                        type="button"
+                        class="tu-btn tu-btn-secundario tu-btn-chico"
                         :disabled="accionando"
                         @click="abrirTransferir(r.id)"
                       >
@@ -3191,8 +3244,8 @@ onMounted(async () => {
                           r.estado !== 'cancelada' &&
                           !r.asistencia
                         "
-                        class="tu-enlace"
-                        style="color: var(--error)"
+                        type="button"
+                        class="tu-btn tu-btn-peligro tu-btn-chico"
                         :disabled="accionando"
                         :aria-expanded="cancelandoReserva === r.id"
                         @click="
@@ -3223,14 +3276,15 @@ onMounted(async () => {
                       />
                     </div>
                     <button
-                      class="tu-btn tu-btn-primario"
+                      class="tu-btn tu-btn-primario tu-btn-chico"
                       type="submit"
                       :disabled="accionando || transferirModel.personaId === ''"
+                      :aria-busy="accionando || undefined"
                     >
                       {{ $t("agenda.roster.confirmarTransfer") }}
                     </button>
                     <button
-                      class="tu-btn tu-btn-secundario"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       type="button"
                       :disabled="accionando"
                       @click="
@@ -3293,8 +3347,7 @@ onMounted(async () => {
                   </span>
                   <button
                     v-if="puedeEliminar"
-                    class="tu-enlace"
-                    style="color: var(--error)"
+                    class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
                     type="button"
                     :disabled="guardandoCanal"
                     @click="eliminarReglaCanal(rc)"
@@ -3367,6 +3420,7 @@ onMounted(async () => {
                   class="tu-btn tu-btn-secundario"
                   type="submit"
                   :disabled="guardandoCanal"
+                  :aria-busy="guardandoCanal || undefined"
                 >
                   {{ $t("agenda.cuposCanal.guardar") }}
                 </button>
@@ -3418,6 +3472,7 @@ onMounted(async () => {
                   class="tu-btn tu-btn-secundario"
                   type="submit"
                   :disabled="guardandoLugares"
+                  :aria-busy="guardandoLugares || undefined"
                 >
                   {{ $t("agenda.lugares.guardar") }}
                 </button>
@@ -3527,6 +3582,7 @@ onMounted(async () => {
                   class="tu-btn tu-btn-secundario"
                   type="submit"
                   :disabled="asignandoStaff || staffModel.usuarioId === ''"
+                  :aria-busy="asignandoStaff || undefined"
                 >
                   {{ $t("agenda.staff.asignar") }}
                 </button>
@@ -3576,8 +3632,7 @@ onMounted(async () => {
           </button>
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
-            style="color: var(--error)"
+            class="tu-btn tu-btn-peligro"
             :disabled="accionando"
             :aria-expanded="cancelandoSesion"
             @click="
@@ -3609,19 +3664,23 @@ onMounted(async () => {
       :ocupado="creando"
       @cerrar="cerrarNuevaClase"
     >
-      <p
+      <AvisoTono
         v-if="errorOfertasSucursales"
-        class="text-sm"
+        tono="peligro"
         role="alert"
         data-prueba="nueva-error-carga"
       >
-        <span style="color: var(--error)">{{
-          $t("agenda.nueva.errorCarga")
-        }}</span>
-        <button type="button" class="tu-enlace ml-2" @click="cargarReferencias">
-          {{ $t("comun.reintentar") }}
-        </button>
-      </p>
+        {{ $t("agenda.nueva.errorCarga") }}
+        <template #acciones>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
+            @click="cargarReferencias"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </template>
+      </AvisoTono>
       <p
         v-else-if="ofertas.length === 0"
         class="text-sm"
@@ -3826,10 +3885,11 @@ onMounted(async () => {
                 required
                 :aria-label="$t('nuevaClase.hora')"
               />
+              <!-- Un renglón que aún no se guarda: se quita sin más. -->
               <button
                 v-if="form.horarios.length > 1"
                 type="button"
-                class="tu-enlace text-sm"
+                class="tu-btn tu-btn-discreto tu-btn-chico"
                 @click="quitarHorario(i)"
               >
                 {{ $t("nuevaClase.quitar") }}
@@ -3838,7 +3898,7 @@ onMounted(async () => {
           </ul>
           <button
             type="button"
-            class="tu-btn tu-btn-secundario mt-2"
+            class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear mt-2"
             @click="agregarHorario"
           >
             {{ $t("nuevaClase.agregarDia") }}
@@ -3895,6 +3955,7 @@ onMounted(async () => {
           type="submit"
           form="form-nueva-clase"
           :disabled="creando || !listoParaCrear || conflictos.length > 0"
+          :aria-busy="creando || undefined"
         >
           {{ creando ? $t("agenda.nueva.creando") : $t("agenda.nueva.crear") }}
         </button>

@@ -27,6 +27,8 @@ function sesion(
     conEquipo?: boolean;
     plataformas?: boolean;
     facturaPosible?: boolean;
+    // Funciones que su plan no incluye (ADR 0107).
+    planSin?: string[];
   } = {},
 ): Sesion {
   return {
@@ -39,6 +41,7 @@ function sesion(
       perfil_config: { flags: { grupos: extra.grupos ?? false } },
       plataformas_bienestar: extra.plataformas ?? false,
       factura_posible: extra.facturaPosible ?? true,
+      plan: { nivel: null, sin: extra.planSin ?? [] },
     },
     terminologia: { sesion: "Clase", miembro: "Alumno", instructor: "Coach" },
   } as unknown as Sesion;
@@ -426,6 +429,35 @@ describe("ubicación de la pantalla actual", () => {
     expect(vistas(sesion(["*"], { plataformas: true }), "reportes")).toContain(
       "plataformas",
     );
+    // Reportes: cada reporte es una vista del área; los avanzados, si el plan los
+    // incluye. Quien trabaja solo ve su agenda, no la del equipo.
+    expect(vistas(sesion(["*"]), "reportes")).toEqual([
+      "reportes",
+      "ingresos",
+      "ocupacion",
+      "clientes",
+      "embudo",
+      "sucursales",
+    ]);
+    expect(
+      vistas(
+        sesion(["*"], { modalidad: "citas", planSin: ["reportes_avanzados"] }),
+        "reportes",
+      ),
+    ).toEqual(["reportes", "sucursales"]);
+    const reportes = MENU_NEGOCIO.flatMap((g) => g.areas).find(
+      (a) => a.clave === "reportes",
+    )!;
+    const etiqueta = (s: Sesion) =>
+      vistasDeArea(reportes, s).find((x) => x.clave === "sucursales")?.etiqueta;
+    expect(etiqueta(sesion(["*"]))).toBe("operacion.reportes.pestanas.equipo");
+    expect(etiqueta(sesion(["*"], { conEquipo: false }))).toBe(
+      "operacion.reportes.pestanas.equipoSolo",
+    );
+    expect(
+      ubicacion({ name: "reportes", query: { vista: "sucursales" } })?.vista
+        .clave,
+    ).toBe("sucursales");
     // Facturas: solo donde se puede facturar.
     expect(
       vistas(sesion(["*"], { facturaPosible: false }), "cobros"),

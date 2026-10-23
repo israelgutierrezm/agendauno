@@ -50,7 +50,7 @@ function montar(s: SesionAgenda = sesion) {
       stubs: {
         ModalDialogo: {
           props: ["abierto", "titulo"],
-          template: '<div v-if="abierto"><slot /></div>',
+          template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
         },
       },
     },

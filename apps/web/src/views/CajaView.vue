@@ -7,8 +7,15 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
+import {
+  fechaEnUrl,
+  useFiltrosEnUrl,
+  usePestanaEnUrl,
+} from "@/lib/filtrosEnUrl";
 import { aMinor, dinero as dineroDelPais } from "@/lib/formato";
 import { useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -70,7 +77,19 @@ const toast = useToastStore();
 const sucursales = useSucursales();
 const supervisa = computed(() => sesion.puede("caja.supervisar"));
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
-const pestana = ref<"caja" | "cierres">("caja");
+// «Caja | Cierres» en la dirección (`?pestana=cierres`): recargar o compartir el
+// enlace abre la misma. Los cierres solo los ve quien supervisa.
+type PestanaCaja = "caja" | "cierres";
+const pestanas = computed<PestanaCaja[]>(() =>
+  supervisa.value ? ["caja", "cierres"] : ["caja"],
+);
+const pestana = usePestanaEnUrl(pestanas);
+const opcionesPestana = computed(() =>
+  pestanas.value.map((clave) => ({
+    clave,
+    texto: clave === "caja" ? t("caja.pestanaCaja") : t("caja.pestanaCierres"),
+  })),
+);
 
 function dinero(minor: number): string {
   return dineroDelPais(minor, sesion.moneda, sesion.pais);
@@ -169,12 +188,28 @@ const claveMovimiento = ref("");
 function nuevaClave(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
+// Con lo escrito sin registrar, cerrar o salir pregunta antes (patrón de formularios).
+const conMovimiento = computed({
+  get: () => movimiento.value !== null,
+  set: (v: boolean) => {
+    if (!v) movimiento.value = null;
+  },
+});
+const descartarMovimiento = useDescartarCambios({
+  abierto: conMovimiento,
+  valor: () => [montoMovimiento.value, motivoMovimiento.value],
+  guardando: guardandoMovimiento,
+});
 function abrirMovimiento(tipo: "retiro" | "ingreso"): void {
-  movimiento.value = tipo;
   montoMovimiento.value = "";
   motivoMovimiento.value = "";
   errorMovimiento.value = null;
   claveMovimiento.value = nuevaClave();
+  descartarMovimiento.fijar();
+  movimiento.value = tipo;
+}
+function cerrarMovimiento(): void {
+  void descartarMovimiento.cerrar();
 }
 async function registrarMovimiento(): Promise<void> {
   const monto = aMinor(montoMovimiento.value, sesion.pais);
@@ -223,6 +258,12 @@ const contado = ref<Record<Metodo, string>>({
 });
 const guardandoConteo = ref(false);
 const errorConteo = ref<string | null>(null);
+// Lo contado sin registrar no se pierde sin preguntar.
+const descartarConteo = useDescartarCambios({
+  abierto: contando,
+  valor: () => contado.value,
+  guardando: guardandoConteo,
+});
 function abrirConteo(): void {
   contado.value = {
     efectivo: "",
@@ -231,7 +272,11 @@ function abrirConteo(): void {
     ventanilla: "",
   };
   errorConteo.value = null;
+  descartarConteo.fijar();
   contando.value = true;
+}
+function cerrarConteo(): void {
+  void descartarConteo.cerrar();
 }
 async function registrarConteo(): Promise<void> {
   const montos: Record<string, number> = {};
@@ -302,6 +347,19 @@ const filtroSede = ref<string>(sucursales.fija.value ?? "");
 const desde = ref("");
 const hasta = ref("");
 const porRevisar = ref(false);
+// Los filtros de los cierres van en la dirección (un enlace o recargar los conserva).
+// Antes de vigilarlos, para no cargar dos veces.
+useFiltrosEnUrl({
+  sucursal: filtroSede,
+  desde: fechaEnUrl(desde),
+  hasta: fechaEnUrl(hasta),
+  revisar: computed({
+    get: () => (porRevisar.value ? "si" : ""),
+    set: (v: string) => {
+      porRevisar.value = v === "si";
+    },
+  }),
+});
 const cierres = ref<Turno[]>([]);
 const meta = ref({ page: 1, ultima_pagina: 1, total: 0, per_page: 20 });
 const cargandoCierres = ref(false);
@@ -331,18 +389,24 @@ async function cargarCierres(pagina = 1): Promise<void> {
   }
 }
 watch([filtroSede, desde, hasta, porRevisar], () => void cargarCierres(1));
-watch(pestana, (p) => {
-  if (p === "cierres") void cargarCierres(meta.value.page);
-});
+// Al abrir con `?pestana=cierres` también se cargan (no solo al tocar la pestaña).
+watch(
+  pestana,
+  (p) => {
+    if (p === "cierres") void cargarCierres(meta.value.page);
+  },
+  { immediate: true },
+);
 
-function estadoDe(c: Turno): { texto: string; tono: string | null } {
+// Punto y texto: en ámbar lo que falta (abierta, sin motivo o por revisar).
+function estadoDe(c: Turno): { texto: string; tono: string | undefined } {
   if (c.estado !== "cerrada")
-    return { texto: t(`caja.estados.${c.estado}`), tono: "aviso" };
+    return { texto: t(`caja.estados.${c.estado}`), tono: "var(--aviso)" };
   if (c.requiere_revision && c.revisada_en === null)
-    return { texto: t("caja.estados.porRevisar"), tono: "aviso" };
+    return { texto: t("caja.estados.porRevisar"), tono: "var(--aviso)" };
   if (c.revisada_en !== null)
-    return { texto: t("caja.estados.revisada"), tono: null };
-  return { texto: t("caja.estados.cerrada"), tono: null };
+    return { texto: t("caja.estados.revisada"), tono: "var(--exito)" };
+  return { texto: t("caja.estados.cerrada"), tono: undefined };
 }
 
 // Detalle y revisión.
@@ -350,9 +414,29 @@ const detalle = ref<Turno | null>(null);
 const notaRevision = ref("");
 const revisando = ref(false);
 const errorRevision = ref<string | null>(null);
+// Con la nota de revisión escrita y sin guardar, cerrar pregunta antes.
+const conDetalle = computed({
+  get: () => detalle.value !== null,
+  set: (v: boolean) => {
+    if (!v) detalle.value = null;
+  },
+});
+const descartarRevision = useDescartarCambios({
+  abierto: conDetalle,
+  valor: () => notaRevision.value,
+  guardando: revisando,
+});
+// ¿El detalle trae la revisión por hacer? Entonces su pie es el de un formulario.
+const porRevisarDetalle = computed(
+  () =>
+    detalle.value !== null &&
+    detalle.value.requiere_revision &&
+    !detalle.value.revisada_en,
+);
 async function verCierre(id: string): Promise<void> {
   notaRevision.value = "";
   errorRevision.value = null;
+  descartarRevision.fijar();
   try {
     const { data } = await api.get<{ data: Turno }>(
       `${base.value}/caja/turnos/${id}`,
@@ -361,6 +445,9 @@ async function verCierre(id: string): Promise<void> {
   } catch (e) {
     toast.error(mensajeDeError(e));
   }
+}
+function cerrarDetalle(): void {
+  void descartarRevision.cerrar();
 }
 async function revisar(): Promise<void> {
   if (detalle.value === null) return;
@@ -372,6 +459,8 @@ async function revisar(): Promise<void> {
       { nota: notaRevision.value.trim() },
     );
     detalle.value = data.data;
+    // La nota ya quedó guardada: cerrar ya no pregunta.
+    descartarRevision.fijar();
     toast.exito(t("caja.okRevisada"));
     void cargarCierres(meta.value.page);
   } catch (e) {
@@ -386,28 +475,13 @@ onMounted(() => void cargar());
 
 <template>
   <div class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('caja.titulo')">
-      <template #acciones>
-        <div v-if="supervisa" class="tu-segmentado" role="group">
-          <button
-            type="button"
-            :aria-pressed="pestana === 'caja'"
-            data-prueba="pestana-caja"
-            @click="pestana = 'caja'"
-          >
-            {{ $t("caja.pestanaCaja") }}
-          </button>
-          <button
-            type="button"
-            :aria-pressed="pestana === 'cierres'"
-            data-prueba="pestana-cierres"
-            @click="pestana = 'cierres'"
-          >
-            {{ $t("caja.pestanaCierres") }}
-          </button>
-        </div>
-      </template>
-    </EncabezadoSeccion>
+    <EncabezadoSeccion :titulo="$t('caja.titulo')" />
+    <!-- Segundo nivel (solo quien supervisa ve «Cierres»; con una sola, no se muestra). -->
+    <PestanasSeccion
+      v-model="pestana"
+      :opciones="opcionesPestana"
+      :etiqueta="$t('caja.pestanas')"
+    />
 
     <!-- ===================== LA CAJA DE LA SEDE ===================== -->
     <section v-if="pestana === 'caja'" class="mt-6 grid gap-6">
@@ -434,7 +508,7 @@ onMounted(() => void cargar());
         <p>{{ $t("caja.errorCarga") }}</p>
         <button
           type="button"
-          class="tu-btn tu-btn-secundario mt-3"
+          class="tu-btn tu-btn-discreto mt-3"
           @click="cargar"
         >
           {{ $t("caja.reintentar") }}
@@ -498,6 +572,7 @@ onMounted(() => void cargar());
               type="submit"
               class="tu-btn tu-btn-primario"
               :disabled="abriendo"
+              :aria-busy="abriendo || undefined"
               data-prueba="abrir"
             >
               {{ abriendo ? $t("caja.abriendo") : $t("caja.abrir") }}
@@ -568,6 +643,7 @@ onMounted(() => void cargar());
               type="button"
               class="tu-btn tu-btn-primario"
               :disabled="cerrando || motivoDiferencia.trim().length < 3"
+              :aria-busy="cerrando || undefined"
               data-prueba="cerrar-con-motivo"
               @click="cerrarConMotivo"
             >
@@ -647,7 +723,7 @@ onMounted(() => void cargar());
         </p>
 
         <div>
-          <h2 class="text-base font-semibold">{{ $t("caja.movimientos") }}</h2>
+          <h2 class="tu-titulo-seccion">{{ $t("caja.movimientos") }}</h2>
           <p
             v-if="turno.movimientos.length === 0"
             class="mt-2 text-sm"
@@ -688,8 +764,9 @@ onMounted(() => void cargar());
     </section>
 
     <!-- ===================== CIERRES (supervisa) ===================== -->
-    <section v-else class="mt-6 grid gap-4">
-      <div class="flex flex-wrap items-end gap-3">
+    <section v-else class="tu-card mt-6">
+      <!-- Los filtros, dentro de la tarjeta de lo que filtran. -->
+      <div class="tu-filtros items-end">
         <label v-if="sucursales.varias.value" class="block">
           <span class="tu-label">{{ $t("caja.sucursal") }}</span>
           <select v-model="filtroSede" class="tu-input">
@@ -721,14 +798,18 @@ onMounted(() => void cargar());
         </label>
       </div>
 
-      <p v-if="cargandoCierres && cierres.length === 0" role="status">
+      <p
+        v-if="cargandoCierres && cierres.length === 0"
+        class="p-5"
+        role="status"
+      >
         {{ $t("caja.cargando") }}
       </p>
-      <div v-else-if="errorCierres" role="alert">
+      <div v-else-if="errorCierres" class="p-5" role="alert">
         <p>{{ $t("caja.errorCarga") }}</p>
         <button
           type="button"
-          class="tu-btn tu-btn-secundario mt-3"
+          class="tu-btn tu-btn-discreto mt-3"
           @click="cargarCierres(meta.page)"
         >
           {{ $t("caja.reintentar") }}
@@ -736,54 +817,53 @@ onMounted(() => void cargar());
       </div>
       <p
         v-else-if="cierres.length === 0"
+        class="p-5"
         :style="{ color: 'var(--texto-suave)' }"
       >
         {{ $t("caja.sinCierres") }}
       </p>
       <template v-else>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm" data-prueba="cierres">
+        <!-- En el teléfono, una ficha por cierre: la fecha (que lo abre) y la diferencia. -->
+        <div class="relative overflow-x-auto tu-tabla-adaptable">
+          <table class="tu-tabla" data-prueba="cierres">
             <thead>
-              <tr :style="{ color: 'var(--texto-suave)' }">
-                <th class="text-left font-medium py-2">
+              <tr>
+                <th>
                   {{ $t("caja.columnas.abierta") }}
                 </th>
-                <th class="text-left font-medium py-2">
-                  {{ $t("caja.columnas.sucursal") }}
-                </th>
-                <th class="text-left font-medium py-2">
-                  {{ $t("caja.columnas.quien") }}
-                </th>
-                <th class="text-right font-medium py-2">
+                <th class="text-right">
                   {{ $t("caja.columnas.diferencia") }}
                 </th>
-                <th class="text-left font-medium py-2 pl-4">
+                <th>
+                  {{ $t("caja.columnas.sucursal") }}
+                </th>
+                <th>
+                  {{ $t("caja.columnas.quien") }}
+                </th>
+                <th>
                   {{ $t("caja.columnas.estado") }}
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-[var(--borde)]">
+            <tbody>
               <tr
                 v-for="c in cierres"
                 :key="c.id"
                 class="cursor-pointer"
                 @click="verCierre(c.id)"
               >
-                <td class="py-2">
+                <td :data-etiqueta="$t('caja.columnas.abierta')">
                   <button
                     type="button"
-                    class="tu-enlace"
+                    class="cj-abrir"
                     @click.stop="verCierre(c.id)"
                   >
                     {{ fechaHora(c.abierta_en) }}
                   </button>
                 </td>
-                <td class="py-2">{{ c.sucursal.nombre }}</td>
-                <td class="py-2">
-                  {{ c.abierta_por ?? "—" }} · {{ c.cerrada_por ?? "—" }}
-                </td>
                 <td
-                  class="py-2 text-right tabular-nums"
+                  :data-etiqueta="$t('caja.columnas.diferencia')"
+                  class="text-right tabular-nums"
                   :style="{
                     color:
                       (c.diferencia_minor ?? 0) !== 0
@@ -797,11 +877,16 @@ onMounted(() => void cargar());
                       : conSigno(c.diferencia_minor)
                   }}
                 </td>
-                <td class="py-2 pl-4">
+                <td :data-etiqueta="$t('caja.columnas.sucursal')">
+                  {{ c.sucursal.nombre }}
+                </td>
+                <td :data-etiqueta="$t('caja.columnas.quien')">
+                  {{ c.abierta_por ?? "—" }} · {{ c.cerrada_por ?? "—" }}
+                </td>
+                <td :data-etiqueta="$t('caja.columnas.estado')">
                   <span
-                    :class="
-                      estadoDe(c).tono === 'aviso' ? 'tu-badge-aviso' : ''
-                    "
+                    class="tu-estado"
+                    :style="{ '--tono': estadoDe(c).tono }"
                     >{{ estadoDe(c).texto }}</span
                   >
                 </td>
@@ -827,7 +912,7 @@ onMounted(() => void cargar());
       "
       tam="md"
       :ocupado="guardandoMovimiento"
-      @cerrar="movimiento = null"
+      @cerrar="cerrarMovimiento"
     >
       <form
         id="caja-movimiento"
@@ -877,15 +962,16 @@ onMounted(() => void cargar());
           type="button"
           class="tu-btn tu-btn-secundario"
           :disabled="guardandoMovimiento"
-          @click="movimiento = null"
+          @click="cerrarMovimiento"
         >
-          {{ $t("caja.cerrar") }}
+          {{ $t("comun.cancelar") }}
         </button>
         <button
           type="submit"
           form="caja-movimiento"
           class="tu-btn tu-btn-primario"
           :disabled="guardandoMovimiento"
+          :aria-busy="guardandoMovimiento || undefined"
           data-prueba="registrar-movimiento"
         >
           {{ $t("caja.registrar") }}
@@ -899,7 +985,7 @@ onMounted(() => void cargar());
       :titulo="$t('caja.contarTitulo')"
       tam="md"
       :ocupado="guardandoConteo"
-      @cerrar="contando = false"
+      @cerrar="cerrarConteo"
     >
       <form
         id="caja-conteo"
@@ -929,15 +1015,16 @@ onMounted(() => void cargar());
           type="button"
           class="tu-btn tu-btn-secundario"
           :disabled="guardandoConteo"
-          @click="contando = false"
+          @click="cerrarConteo"
         >
-          {{ $t("caja.cerrar") }}
+          {{ $t("comun.cancelar") }}
         </button>
         <button
           type="submit"
           form="caja-conteo"
           class="tu-btn tu-btn-primario"
           :disabled="guardandoConteo"
+          :aria-busy="guardandoConteo || undefined"
           data-prueba="registrar-conteo"
         >
           {{
@@ -957,7 +1044,7 @@ onMounted(() => void cargar());
       "
       tam="lg"
       :ocupado="revisando"
-      @cerrar="detalle = null"
+      @cerrar="cerrarDetalle"
     >
       <div v-if="detalle" class="grid gap-5" data-prueba="detalle-cierre">
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1078,20 +1165,22 @@ onMounted(() => void cargar());
         </form>
       </div>
       <template #pie>
+        <!-- Solo para leer: «Cerrar»; con la revisión por hacer, es un formulario. -->
         <button
           type="button"
           class="tu-btn tu-btn-secundario"
           :disabled="revisando"
-          @click="detalle = null"
+          @click="cerrarDetalle"
         >
-          {{ $t("caja.cerrar") }}
+          {{ porRevisarDetalle ? $t("comun.cancelar") : $t("caja.cerrar") }}
         </button>
         <button
-          v-if="detalle && detalle.requiere_revision && !detalle.revisada_en"
+          v-if="porRevisarDetalle"
           type="submit"
           form="caja-revision"
           class="tu-btn tu-btn-primario"
           :disabled="revisando"
+          :aria-busy="revisando || undefined"
           data-prueba="revisar"
         >
           {{ $t("caja.revisar") }}
@@ -1100,3 +1189,19 @@ onMounted(() => void cargar());
     </ModalDialogo>
   </div>
 </template>
+
+<style scoped>
+/* La fecha abre el cierre: un botón con aspecto de título de la fila (no un enlace). */
+.cj-abrir {
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.cj-abrir:hover {
+  text-decoration: underline;
+}
+.cj-abrir:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+</style>

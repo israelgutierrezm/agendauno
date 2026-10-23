@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ParametrosNegocio from "@/components/ParametrosNegocio.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import ProgramacionSemanal from "@/components/ProgramacionSemanal.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
@@ -57,6 +58,7 @@ interface FormPolitica {
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const route = useRoute();
+const router = useRouter();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedePoliticas = computed(() => sesion.puede("estudio.gestionar"));
 // Quitar un día o dejar de repetir un horario es borrarlo (ADR 0077).
@@ -103,19 +105,23 @@ const pestanas = computed<Pestana[]>(() =>
       (p !== "parametros" || puedePoliticas.value),
   ),
 );
-const elegida = ref<Pestana>(desdeAncla(route.hash) ?? "politicas");
-const pestana = computed<Pestana>(() =>
-  pestanas.value.includes(elegida.value) ? elegida.value : "politicas",
-);
-// Desde el menú se llega a otra sección sin salir de la página.
-watch(
-  () => route.hash,
-  (h) => {
-    const p = desdeAncla(h);
-    if (p !== null) {
-      elegida.value = p;
-    }
+// La pestaña es el ancla de la dirección (#politicas, #cierres…), la misma con
+// la que entra el menú de Configuración: el lateral marca la que se ve, desde el
+// menú se cambia sin salir de la página y recargar abre la misma.
+const pestana = computed<Pestana>({
+  get: () => {
+    const p = desdeAncla(route.hash);
+    return p !== null && pestanas.value.includes(p) ? p : "politicas";
   },
+  set: (p) => {
+    void router.replace({ query: route.query, hash: `#${p}` });
+  },
+});
+const opcionesPestana = computed(() =>
+  pestanas.value.map((p) => ({
+    clave: p,
+    texto: t(`reglasAgenda.pestanas.${p}`),
+  })),
 );
 
 function desdeAncla(hash: string): Pestana | null {
@@ -316,17 +322,12 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('reglasAgenda.titulo')" />
 
-    <div class="tu-pestanas mt-6" role="group" data-prueba="pestanas">
-      <button
-        v-for="p in pestanas"
-        :key="p"
-        type="button"
-        :aria-pressed="pestana === p"
-        @click="elegida = p"
-      >
-        {{ $t(`reglasAgenda.pestanas.${p}`) }}
-      </button>
-    </div>
+    <!-- Con el lateral plegado (menos de 1280 px) es la única forma de cambiar. -->
+    <PestanasSeccion
+      v-model="pestana"
+      :opciones="opcionesPestana"
+      :etiqueta="$t('reglasAgenda.titulo')"
+    />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -336,7 +337,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           data-prueba="reintentar-reglas"
           @click="cargar"
         >
@@ -350,7 +351,9 @@ onMounted(cargar);
     <template v-if="!cargando && !error">
       <!-- Cancelaciones (Configuración › Agenda y reservas › Políticas) -->
       <div v-if="pestana === 'politicas'" class="mt-5 tu-card p-5">
-        <h2 class="font-medium">{{ $t("reglasAgenda.cancelaciones") }}</h2>
+        <h2 class="tu-titulo-seccion">
+          {{ $t("reglasAgenda.cancelaciones") }}
+        </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reglasAgenda.cancelacionesAyuda") }}
         </p>
@@ -432,6 +435,7 @@ onMounted(cargar);
             type="submit"
             class="tu-btn tu-btn-primario"
             :disabled="guardando"
+            :aria-busy="guardando || undefined"
           >
             {{ $t("reglasAgenda.guardar") }}
           </button>
@@ -455,7 +459,7 @@ onMounted(cargar);
               <button
                 v-if="puedePoliticas"
                 type="button"
-                class="tu-enlace shrink-0"
+                class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                 @click="editarExcepcion(p)"
               >
                 {{ $t("documentosTabs.editar") }}
@@ -550,6 +554,7 @@ onMounted(cargar);
                 type="submit"
                 class="tu-btn tu-btn-primario"
                 :disabled="guardando"
+                :aria-busy="guardando || undefined"
               >
                 {{ $t("reglasAgenda.guardar") }}
               </button>
@@ -568,10 +573,9 @@ onMounted(cargar);
         </template>
       </div>
 
-      <!-- Días de cierre -->
+      <!-- Días de cierre (la pestaña ya los nombra: sin título propio) -->
       <div v-if="pestana === 'cierres'" class="mt-5 tu-card p-5">
-        <h2 class="font-medium">{{ $t("reglasAgenda.cerrados") }}</h2>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{
             $t(
               sesion.esCitas
@@ -641,8 +645,7 @@ onMounted(cargar);
             <button
               v-if="puedeEliminar"
               type="button"
-              class="tu-enlace shrink-0"
-              style="color: var(--error)"
+              class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
               data-prueba="quitar-dia"
               :disabled="quitandoDiaId !== null"
               @click="quitarDia(d)"

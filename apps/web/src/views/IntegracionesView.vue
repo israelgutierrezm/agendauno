@@ -12,11 +12,13 @@ import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import ReservasBienestar from "@/components/ReservasBienestar.vue";
 import FitpassOperacion from "@/components/FitpassOperacion.vue";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -109,7 +111,26 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const conBienestar = computed(
   () => !sesion.esCitas && sesion.estudio?.bienestar_posible === true,
 );
-const pestana = ref<Pestana>(conBienestar.value ? "bienestar" : "llaves");
+// La pestaña va en la dirección (`?pestana=webhooks`): recargar o compartir el enlace
+// abre la misma. Sin bienestar, la primera es Llaves; el kiosco, solo con permiso.
+const pestanas = computed<Pestana[]>(() => [
+  ...(conBienestar.value ? (["bienestar"] as const) : []),
+  "llaves",
+  "webhooks",
+  "medicion",
+  ...(sesion.puede("estudio.gestionar") ? (["kiosco"] as const) : []),
+]);
+const pestana = usePestanaEnUrl(pestanas);
+const TEXTO_PESTANA: Record<Pestana, string> = {
+  bienestar: "conexiones.bienestar",
+  llaves: "conexiones.llaves",
+  webhooks: "conexiones.webhooks",
+  medicion: "medicion.negocio.pestana",
+  kiosco: "kiosco.panel.titulo",
+};
+const opcionesPestana = computed(() =>
+  pestanas.value.map((clave) => ({ clave, texto: t(TEXTO_PESTANA[clave]) })),
+);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -536,76 +557,18 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
+    <!-- El título no cambia con la pestaña: «Nueva llave» y «Nuevo webhook» van en
+         la barra de su panel. -->
     <EncabezadoSeccion
       :titulo="$t('conexiones.titulo')"
       :subtitulo="$t('adminUsabilidad.integraciones.ayuda')"
-    >
-      <template
-        v-if="!cargando && (pestana === 'llaves' || pestana === 'webhooks')"
-        #acciones
-      >
-        <button
-          v-if="pestana === 'llaves'"
-          class="tu-btn tu-btn-primario tu-btn-crear"
-          type="button"
-          data-prueba="nueva-llave"
-          @click="abrirLlave"
-        >
-          {{ $t("conexiones.llave.nueva") }}
-        </button>
-        <button
-          v-else
-          class="tu-btn tu-btn-primario tu-btn-crear"
-          type="button"
-          data-prueba="nuevo-webhook"
-          @click="abrirWebhook"
-        >
-          {{ $t("conexiones.webhook.nuevo") }}
-        </button>
-      </template>
-    </EncabezadoSeccion>
+    />
 
-    <div class="tu-pestanas mt-6" role="group">
-      <button
-        v-if="conBienestar"
-        type="button"
-        :aria-pressed="pestana === 'bienestar'"
-        @click="pestana = 'bienestar'"
-      >
-        {{ $t("conexiones.bienestar") }}
-      </button>
-      <button
-        type="button"
-        :aria-pressed="pestana === 'llaves'"
-        @click="pestana = 'llaves'"
-      >
-        {{ $t("conexiones.llaves") }}
-      </button>
-      <button
-        type="button"
-        :aria-pressed="pestana === 'webhooks'"
-        @click="pestana = 'webhooks'"
-      >
-        {{ $t("conexiones.webhooks") }}
-      </button>
-      <button
-        type="button"
-        :aria-pressed="pestana === 'medicion'"
-        data-prueba="pestana-medicion"
-        @click="pestana = 'medicion'"
-      >
-        {{ $t("medicion.negocio.pestana") }}
-      </button>
-      <button
-        v-if="sesion.puede('estudio.gestionar')"
-        type="button"
-        :aria-pressed="pestana === 'kiosco'"
-        data-prueba="pestana-kiosco"
-        @click="pestana = 'kiosco'"
-      >
-        {{ $t("kiosco.panel.titulo") }}
-      </button>
-    </div>
+    <PestanasSeccion
+      v-model="pestana"
+      :opciones="opcionesPestana"
+      :etiqueta="$t('conexiones.titulo')"
+    />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -617,7 +580,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="cargando"
           data-prueba="reintentar-integraciones"
           @click="cargar"
@@ -792,8 +755,10 @@ onMounted(cargar);
         </p>
 
         <button
+          type="button"
           class="tu-btn tu-btn-primario mt-4"
           :disabled="guardando === i.proveedor"
+          :aria-busy="guardando === i.proveedor || undefined"
           @click="guardar(i.proveedor)"
         >
           {{
@@ -817,9 +782,23 @@ onMounted(cargar);
     <!-- Llaves de API -->
     <div v-if="!cargando && pestana === 'llaves'" class="mt-5 space-y-5">
       <div class="tu-card p-5 min-w-0">
-        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("conexiones.llave.ayuda") }}
-        </p>
+        <!-- La barra del panel: qué es y su acción. -->
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <p
+            class="min-w-0 flex-1 basis-64 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("conexiones.llave.ayuda") }}
+          </p>
+          <button
+            class="tu-btn tu-btn-primario tu-btn-crear"
+            type="button"
+            data-prueba="nueva-llave"
+            @click="abrirLlave"
+          >
+            {{ $t("conexiones.llave.nueva") }}
+          </button>
+        </div>
         <div
           v-if="secretoLlave"
           class="mt-4 rounded-xl border p-4"
@@ -885,8 +864,7 @@ onMounted(cargar);
             <button
               v-if="l.activa"
               type="button"
-              class="tu-enlace shrink-0"
-              style="color: var(--error)"
+              class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
               @click="revocar(l)"
             >
               {{ $t("conexiones.llave.revocar") }}
@@ -975,9 +953,22 @@ onMounted(cargar);
     <!-- Webhooks -->
     <div v-if="!cargando && pestana === 'webhooks'" class="mt-5 space-y-5">
       <div class="tu-card p-5 min-w-0">
-        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("conexiones.webhook.ayuda") }}
-        </p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <p
+            class="min-w-0 flex-1 basis-64 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("conexiones.webhook.ayuda") }}
+          </p>
+          <button
+            class="tu-btn tu-btn-primario tu-btn-crear"
+            type="button"
+            data-prueba="nuevo-webhook"
+            @click="abrirWebhook"
+          >
+            {{ $t("conexiones.webhook.nuevo") }}
+          </button>
+        </div>
         <div
           v-if="secretoWebhook"
           class="mt-4 rounded-xl border p-4"
@@ -1046,8 +1037,7 @@ onMounted(cargar);
               </button>
               <button
                 type="button"
-                class="tu-enlace"
-                style="color: var(--error)"
+                class="tu-btn tu-btn-peligro tu-btn-chico"
                 @click="eliminarWebhook(w)"
               >
                 {{ $t("conexiones.webhook.eliminar") }}
@@ -1109,7 +1099,7 @@ onMounted(cargar);
               >
                 <button
                   type="button"
-                  class="tu-btn tu-btn-secundario"
+                  class="tu-btn tu-btn-discreto"
                   @click="filtrarEntregas('')"
                 >
                   {{ $t("tabla.restablecer") }}
@@ -1174,6 +1164,7 @@ onMounted(cargar);
         :abierto="modalWebhook"
         :titulo="$t('conexiones.webhook.nuevo')"
         icono="integraciones"
+        tam="md"
         :descripcion="$t('adminUsabilidad.integraciones.webhook')"
         :ocupado="creandoWebhook"
         @cerrar="editorWebhook.cerrar"

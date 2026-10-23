@@ -362,7 +362,7 @@ class ResumenDelDiaTenant
      * que se pagan al atenderlas no cuentan todavía), y quién está en mora.
      *
      * @param  list<int>|null  $permitidas
-     * @return array{ordenes_pendientes: int, por_cobrar: list<array{moneda: string, total_minor: int}>, proximas: int, en_mora: int}
+     * @return array{ordenes_pendientes: int, por_cobrar: list<array{moneda: string, total_minor: int}>, proximas: int, renovaciones_por_vencer: int, en_mora: int}
      */
     private function cobros(?array $permitidas): array
     {

@@ -48,6 +48,7 @@ export default {
     cargando: "Cargando…",
     cancelar: "Cancelar",
     guardar: "Guardar",
+    guardando: "Guardando…",
     cerrar: "Cerrar",
     detalle: "Detalle",
     eliminar: "Eliminar",
@@ -234,7 +235,7 @@ export default {
       fiscales: "Datos fiscales",
       terminologia: "Terminología",
       planes: "Planes y paquetes",
-      videos: "Videos para tus clientes",
+      videos: "Videos para tus alumnos",
       planesCitas: "Bonos",
       recursos: "Espacios y recursos",
       politicas: "Políticas de reserva y cancelación",
@@ -1861,6 +1862,7 @@ export default {
       conErrores: "Con errores (1) | Con errores ({n})",
     },
     titulo: "Importar miembros",
+    subtitulo: "Trae a tus alumnos desde otro sistema con un archivo CSV.",
     instrucciones:
       "Sube un archivo CSV con una fila por alumno. Primero lo revisamos sin guardar: te decimos qué filas están listas, cuáles ya estaban (no se repiten) y cuáles hay que corregir.",
     columnas: "Columnas",
@@ -1893,6 +1895,8 @@ export default {
     colNombre: "Nombre",
     colCorreo: "Correo",
     colEstado: "Estado",
+    // Título de la ficha de cada fila en el teléfono.
+    filaN: "Fila {n}",
     ok: "OK",
     importar: "Importar {n} miembros",
     importando: "Importando…",
@@ -1913,7 +1917,7 @@ export default {
       "Después de cargar los saldos, importa las reservas futuras de tus alumnos en «Importar reservas», sin avisarles nada.",
     // En citas, la agenda futura se importa con su archivo (ADR 0160); en clases, no (ADR 0125).
     pasoReservasCitas:
-      "Las citas que ya tenías agendadas se importan en Agenda › Importar citas, sin avisarle nada a tus clientes.",
+      "Las citas que ya tenías agendadas se importan en Agenda › Importar citas, sin avisarle nada a tus alumnos.",
     corte: "Fecha de corte",
     evidencia: "De dónde salen los saldos",
     evidenciaEjemplo:
@@ -1971,6 +1975,56 @@ export default {
     colTotal: "Destinatarios",
     // B08: controlar una campaña sin tocar los avisos de operación.
     colEstado: "Estado",
+    colAcciones: "Acciones",
+    // Segmentos rotulados por su clave (`comunicaciones.segmentos.${clave}.etiqueta`);
+    // el texto del API queda de respaldo.
+    segmentos: {
+      todos: {
+        etiqueta: "Todos los alumnos",
+        descripcion: "Todos los alumnos activos del padrón.",
+      },
+      por_vencer: {
+        etiqueta: "Membresía por vencer",
+        descripcion: "Alumnos cuya membresía vence en los próximos 14 días.",
+      },
+      vencidos: {
+        etiqueta: "Membresía vencida",
+        descripcion:
+          "Alumnos cuya membresía venció hace 14 días o menos (se pueden recuperar).",
+      },
+      primerizos: {
+        etiqueta: "Primerizos (sin asistir aún)",
+        descripcion: "Alumnos que aún no registran ninguna asistencia.",
+      },
+      sin_asistir: {
+        etiqueta: "Con plan y sin venir",
+        descripcion:
+          "Tienen un plan en vigor y no vienen desde hace los días que fija tu negocio en Seguimiento.",
+      },
+      sin_iniciar: {
+        etiqueta: "Compró y no ha iniciado",
+        descripcion:
+          "Tienen un plan en vigor, nunca han venido y no tienen nada reservado.",
+      },
+      saldo_por_vencer: {
+        etiqueta: "Paquete por vencer con saldo",
+        descripcion: "Su paquete vence pronto y aún les queda saldo sin usar.",
+      },
+      vino_sin_comprar: {
+        etiqueta: "Vino y no ha comprado",
+        descripcion: "Vinieron hace poco y nunca han comprado un plan.",
+      },
+      pago_fallido: {
+        etiqueta: "Su pago automático falló",
+        descripcion:
+          "Un cobro automático de su plan falló (en mora o suspendida).",
+      },
+      debe_regresar: {
+        etiqueta: "Ya debería regresar",
+        descripcion:
+          "Ya pasó el tiempo en que suelen repetir su servicio y no tienen otra cita.",
+      },
+    },
     estados: {
       enviando: "Enviando · faltan {n}",
       enviada: "Enviada",
@@ -2092,6 +2146,8 @@ export default {
       colConcepto: "Concepto",
       con: "Con {nombre}",
       comprada: "Comprada el {fecha}",
+      // Orden de una renovación: va con su vencimiento (EstadoVencimiento).
+      renovacion: "Renovación",
       registrar: "Registrar pago",
       registrarTitulo: "Registrar pago",
       // Precio por forma de pago (ADR 0191).
@@ -2108,16 +2164,39 @@ export default {
     },
     pagos: "Pagos",
     sinPagos: "Aún no hay pagos con pasarela.",
-    renovaciones: "Próximas renovaciones",
+    renovaciones: "Renovaciones",
     sinRenovaciones: "No hay membresías con cobro recurrente.",
     colAlumno: "Alumno",
     colEstado: "Estado",
     colIntentos: "Intentos",
     colGracia: "Gracia hasta",
+    graciaVencida: "Gracia vencida",
     colFecha: "Fecha",
     colMembresia: "Membresía",
-    colProxima: "Próximo cobro",
+    colProxima: "Renueva",
     colMonto: "Monto",
+    // Filtro de Renovaciones por su vencimiento (`cobranza.situacion.${f || "todas"}`).
+    situacion: {
+      etiqueta: "Vencimiento de la renovación",
+      todas: "Todas",
+      proximas: "Próximas",
+      vencidas: "Vencidas sin cobrar",
+    },
+    // Por qué no se cobró, dicho a quien administra (`motivo_clave` de En mora). El
+    // detalle del banco va aparte, debajo. Nunca la frase que recibe el alumno.
+    motivosMora: {
+      sin_cobro_en_linea:
+        "No se pudo intentar el cobro en línea. Regístralo en caja o invita al alumno a pagar desde su cuenta.",
+      pago_sin_completar:
+        "El pago en línea quedó sin completar. Si ya pagó, regístralo en caja; si no, invita al alumno a terminarlo desde su cuenta.",
+      rechazado:
+        "La pasarela rechazó el cobro. Regístralo en caja o invita al alumno a pagar con otra tarjeta.",
+      tarjeta_rechazada:
+        "El banco rechazó el cobro automático a su tarjeta. Pide al alumno que la actualice o registra el pago en caja.",
+      suscripcion_sin_cobro:
+        "La pasarela no ha confirmado el cobro automático de la suscripción. Revísalo en su panel o registra el pago en caja.",
+      sinClave: "Cobro no realizado",
+    },
     regularizar: "Regularizar",
     regularizando: "Regularizando…",
     reembolsar: "Reembolsar",
@@ -2140,11 +2219,11 @@ export default {
     },
     // Aparte del estado del pago (ADR 0166).
     porConciliar: "Por conciliar",
-    // El banco del cliente lo disputó (ADR 0168).
+    // El banco del alumno lo disputó (ADR 0168).
     contracargo: {
       abierto: "Contracargo abierto: responde en la pasarela",
       ganado: "Contracargo ganado",
-      perdido: "Contracargo perdido: se devolvió al cliente",
+      perdido: "Contracargo perdido: se devolvió al alumno",
     },
     comprobante: {
       enviado: "Recibo enviado",
@@ -2168,6 +2247,8 @@ export default {
   },
   ficha: {
     volver: "Volver a {grupo}",
+    // aria-label de las pestañas de la ficha.
+    secciones: "Secciones de la ficha",
     editar: "Editar",
     vender: "Vender / cobrar",
     alta: "Alta",
@@ -2256,7 +2337,7 @@ export default {
       inscripcion: "Inscripción (no da clases)",
       exentarInscripcion: "Exentar la inscripción",
       motivoExencion: "Por qué se exenta",
-      aceptaCondiciones: "El cliente leyó y aceptó estas condiciones",
+      aceptaCondiciones: "El alumno leyó y aceptó estas condiciones",
       promoTotal: "Total {monto}",
     },
     metodos: {
@@ -2367,9 +2448,9 @@ export default {
       entitlement: "Con créditos o membresía",
       pago: "Pago por clase",
       entitlementAyuda:
-        "El cliente reserva con su membresía o su paquete de créditos.",
+        "El alumno reserva con su membresía o su paquete de créditos.",
       pagoAyuda:
-        "El cliente paga la clase en línea al reservarla, sin paquete ni membresía.",
+        "El alumno paga la clase en línea al reservarla, sin paquete ni membresía.",
     },
     precio: "Precio por cita",
     precioClases: "Precio por clase",
@@ -2760,6 +2841,8 @@ export default {
       retraso: "Vencimiento (minutos después)",
       activa: "Activa",
       inactiva: "Inactiva",
+      activar: "Activar",
+      desactivar: "Desactivar",
       guardar: "Guardar regla",
       editar: "Editar",
       eliminar: "Eliminar",
@@ -2862,7 +2945,7 @@ export default {
     // Lo opcional; los pasos llevan los nombres de la configuración guiada.
     tareas: {
       cobro: "Cobrar en línea",
-      miembros: "Registra a tu primer cliente",
+      miembros: "Registra a tu primer alumno",
     },
     // La lista para empezar, comprobada con los datos (H).
     // Se usa con llave dinámica (`quickstart.comprobaciones.${clave}`).
@@ -2873,7 +2956,7 @@ export default {
       precios: "Tienen precio (o hay un plan para entrar)",
       cobro: "Ya se registró un cobro (en caja o aprobado en línea)",
       prueba:
-        "Un cliente ya reservó desde tu página o su cuenta (haz una prueba con «Ver como cliente»)",
+        "Un alumno ya reservó desde tu página o su cuenta (haz una prueba con «Ver como alumno»)",
       publicar: "Tu página está publicada",
     },
   },
@@ -2983,6 +3066,21 @@ export default {
   reportes: {
     noSeConsulto: "No se pudo consultar este reporte. {error}",
     titulo: "Reportes",
+    // Subtítulo de cada vista de Reportes (la del menú, `?vista=`).
+    subtitulos: {
+      resumen: "Las cifras principales del negocio en el periodo elegido.",
+      ingresos:
+        "Lo que se vendió y se cobró en el periodo, y cuánto deja lo que ofreces.",
+      ocupacion:
+        "Qué horarios se llenan y qué actividades tienen más demanda en el periodo.",
+      clientes:
+        "Cuántos alumnos nuevos compran y cuántos siguen asistiendo mes con mes.",
+      embudo:
+        "Cuántos avanzan en cada paso, desde que se interesan hasta que vuelven.",
+      equipo:
+        "La agenda de cada instructor en el periodo y cómo está hoy cada sucursal.",
+      equipoSolo: "Tu agenda en el periodo y cómo está hoy cada sucursal.",
+    },
     desde: "Desde",
     hasta: "Hasta",
     esteMes: "Este mes",
@@ -3046,7 +3144,7 @@ export default {
       vacioCitas: "No hay citas atendidas en el periodo.",
       colClaseCitas: "Servicio",
       colSesionesCitas: "Citas",
-      colAsistentesCitas: "Clientes atendidos",
+      colAsistentesCitas: "Alumnos atendidos",
       colIngreso: "Ingreso",
       colCosto: "Costo instructor",
       colMargen: "Margen",
@@ -3711,7 +3809,7 @@ export default {
     soloMexico: "Disponible para negocios en México.",
     // Lo que hace y lo que no (M10): validar la visita, no sincronizar todo.
     alcance:
-      "Lo que hace: valida el check-in de cada visita, sola cuando la plataforma avisa que la persona lo hizo en su app (check-in automático) o con el código que captura recepción, y la visita ocupa su lugar en la clase. Con Wellhub y TotalPass también publicas tus clases para que sus usuarios las reserven desde su app. Quien viene así es cliente de la plataforma: lo ves en Reportes → Plataformas, no en tu directorio. Aún no sincroniza membresías ni pagos. Si la plataforma no responde, la visita queda «sin verificar»: se reintenta o quien tiene permiso la registra como excepción, con su motivo y quién la autorizó.",
+      "Lo que hace: valida el check-in de cada visita, sola cuando la plataforma avisa que la persona lo hizo en su app (check-in automático) o con el código que captura recepción, y la visita ocupa su lugar en la clase. Con Wellhub y TotalPass también publicas tus clases para que sus usuarios las reserven desde su app. Quien viene así es usuario de la plataforma: lo ves en Reportes → Plataformas, no en tu directorio. Aún no sincroniza membresías ni pagos. Si la plataforma no responde, la visita queda «sin verificar»: se reintenta o quien tiene permiso la registra como excepción, con su motivo y quién la autorizó.",
     proveedores: {
       wellhub: "Wellhub",
       totalpass: "TotalPass",

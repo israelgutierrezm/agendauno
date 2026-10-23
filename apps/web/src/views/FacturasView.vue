@@ -399,8 +399,21 @@ const columnas = computed(() => [
   },
   { clave: "estado", etiqueta: t("facturas.colEstado") },
   { clave: "uuid", etiqueta: t("facturas.colFolio") },
-  { clave: "acciones", etiqueta: t("cancelarFactura.colAcciones") },
+  // En el teléfono, al pie de la ficha y sin etiqueta (TablaDatos).
+  {
+    clave: "acciones",
+    etiqueta: t("cancelarFactura.colAcciones"),
+    acciones: true,
+  },
 ]);
+// El estado de la factura: punto y texto (timbrada en verde, con error en ámbar,
+// cancelada en gris).
+function tonoFactura(estado: unknown): string | undefined {
+  if (estado === "timbrada") {
+    return "var(--exito)";
+  }
+  return estado === "error" ? "var(--aviso)" : undefined;
+}
 
 function dinero(minor: number, moneda: string): string {
   return dineroDelPais(minor, moneda, sesion.pais);
@@ -587,7 +600,7 @@ onMounted(async () => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="cargando"
           @click="cargar"
         >
@@ -664,7 +677,7 @@ onMounted(async () => {
         <button
           v-if="conFiltros"
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-discreto"
           data-prueba="limpiar-facturas"
           @click="limpiarFiltros"
         >
@@ -696,88 +709,83 @@ onMounted(async () => {
           {{ dinero((fila as Factura).total_minor, (fila as Factura).moneda) }}
         </template>
         <template #col-estado="{ valor, fila }">
-          <span
-            class="tu-badge"
-            :class="
-              valor === 'timbrada'
-                ? 'tu-badge-exito'
-                : valor === 'error'
-                  ? 'tu-badge-aviso'
-                  : ''
-            "
-          >
-            {{
-              valor === "timbrada"
-                ? $t("facturas.estado.timbrada")
-                : valor === "error"
-                  ? $t("facturas.estado.error")
-                  : $t("cancelarFactura.cancelada")
-            }}
-          </span>
-          <!-- Nota de crédito o sustituta: con cuál se relaciona (ADR 0180). -->
-          <span
-            v-if="(fila as Factura).relacionada"
-            class="block text-xs mt-1"
-            :style="{ color: 'var(--texto-suave)' }"
-            data-prueba="factura-relacionada"
-            >{{
-              $t(
-                (fila as Factura).tipo === "nota_de_credito"
-                  ? "cancelarFactura.esNota"
-                  : "cancelarFactura.sustituye",
-                { folio: folioCorto((fila as Factura).relacionada?.uuid) },
-              )
-            }}</span
-          >
-          <span
-            v-if="
-              valor === 'timbrada' &&
-              (fila as Factura).cancelacion?.estado === 'pendiente'
-            "
-            class="block text-xs mt-1"
-            :style="{ color: 'var(--aviso)' }"
-            data-prueba="cancelacion-en-espera"
-            >{{ $t("cancelarFactura.enEspera") }}</span
-          >
-          <span
-            v-else-if="
-              valor === 'timbrada' && (fila as Factura).cancelacion?.detalle
-            "
-            class="block text-xs mt-1"
-            :style="{ color: 'var(--texto-suave)' }"
-            data-prueba="cancelacion-detalle"
-            >{{ (fila as Factura).cancelacion?.detalle }}</span
-          >
-          <span
-            v-if="(fila as Factura).anticipo"
-            class="block text-xs mt-1"
-            :style="{ color: 'var(--texto-suave)' }"
-            data-prueba="factura-anticipo"
-            >{{
-              (fila as Factura).anticipo_aplicado
-                ? $t("facturas.anticipo.aplicado")
-                : $t("facturas.anticipo.porAplicar")
-            }}</span
-          >
+          <!-- Un solo bloque: en el teléfono la celda es «etiqueta | contenido». -->
+          <div>
+            <span class="tu-estado" :style="{ '--tono': tonoFactura(valor) }">
+              {{
+                valor === "timbrada"
+                  ? $t("facturas.estado.timbrada")
+                  : valor === "error"
+                    ? $t("facturas.estado.error")
+                    : $t("cancelarFactura.cancelada")
+              }}
+            </span>
+            <!-- Nota de crédito o sustituta: con cuál se relaciona (ADR 0180). -->
+            <span
+              v-if="(fila as Factura).relacionada"
+              class="block text-xs mt-1"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="factura-relacionada"
+              >{{
+                $t(
+                  (fila as Factura).tipo === "nota_de_credito"
+                    ? "cancelarFactura.esNota"
+                    : "cancelarFactura.sustituye",
+                  { folio: folioCorto((fila as Factura).relacionada?.uuid) },
+                )
+              }}</span
+            >
+            <span
+              v-if="
+                valor === 'timbrada' &&
+                (fila as Factura).cancelacion?.estado === 'pendiente'
+              "
+              class="block text-xs mt-1"
+              :style="{ color: 'var(--aviso)' }"
+              data-prueba="cancelacion-en-espera"
+              >{{ $t("cancelarFactura.enEspera") }}</span
+            >
+            <span
+              v-else-if="
+                valor === 'timbrada' && (fila as Factura).cancelacion?.detalle
+              "
+              class="block text-xs mt-1"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="cancelacion-detalle"
+              >{{ (fila as Factura).cancelacion?.detalle }}</span
+            >
+            <span
+              v-if="(fila as Factura).anticipo"
+              class="block text-xs mt-1"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="factura-anticipo"
+              >{{
+                (fila as Factura).anticipo_aplicado
+                  ? $t("facturas.anticipo.aplicado")
+                  : $t("facturas.anticipo.porAplicar")
+              }}</span
+            >
+          </div>
         </template>
         <template #col-acciones="{ fila }">
           <span
             v-if="puedeCancelar"
-            class="inline-flex flex-wrap justify-end gap-x-3"
+            class="inline-flex flex-wrap justify-end gap-2"
           >
             <button
               v-if="((fila as Factura).acreditable_minor ?? 0) > 0"
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               data-prueba="nota-credito"
               @click="acreditando = fila as Factura"
             >
               {{ $t("cancelarFactura.notaDeCredito") }}
             </button>
+            <!-- Cancelar ante el SAT: irreversible (el diálogo lo confirma). -->
             <button
               v-if="(fila as Factura).cancelable"
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
               data-prueba="cancelar-factura"
               @click="cancelando = fila as Factura"
             >
@@ -792,7 +800,7 @@ onMounted(async () => {
             }}</span>
             <a
               v-if="(fila as Factura).pdf_url"
-              class="tu-badge"
+              class="tu-enlace text-xs whitespace-nowrap"
               :href="(fila as Factura).pdf_url ?? '#'"
               target="_blank"
               rel="noopener"
@@ -830,7 +838,7 @@ onMounted(async () => {
         ref="formulario"
         class="mt-6 tu-card p-6 scroll-mt-4"
       >
-        <h2 class="font-medium text-lg">{{ $t("facturas.nueva.titulo") }}</h2>
+        <h2 class="tu-titulo-seccion">{{ $t("facturas.nueva.titulo") }}</h2>
 
         <AvisoTono v-if="ventaLigada" class="mt-4" data-prueba="venta-ligada">
           {{
@@ -1136,9 +1144,10 @@ onMounted(async () => {
                   required
                 />
               </div>
+              <!-- Un renglón que aún no se timbra: quitarlo no borra nada guardado. -->
               <button
                 type="button"
-                class="tu-btn tu-btn-secundario sm:col-span-1"
+                class="tu-icono-btn sm:col-span-1"
                 :disabled="conceptos.length === 1"
                 :aria-label="$t('facturas.nueva.quitar')"
                 @click="quitarConcepto(i)"
@@ -1148,24 +1157,13 @@ onMounted(async () => {
             </div>
             <button
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-secundario tu-btn-crear"
               @click="agregarConcepto"
             >
               {{ $t("facturas.nueva.agregarConcepto") }}
             </button>
           </div>
 
-          <!-- El total que se timbra (precios sin IVA, como el CFDI). -->
-          <p class="text-sm tabular-nums" data-prueba="totales-factura">
-            {{
-              $t("cancelarFactura.totales", {
-                subtotal: dinero(totales.subtotal, sesion.moneda),
-                iva: ivaNegocio,
-                impuesto: dinero(totales.impuesto, sesion.moneda),
-                total: dinero(totales.total, sesion.moneda),
-              })
-            }}
-          </p>
           <AvisoTono
             v-if="totalDistinto && ventaLigada"
             tono="aviso"
@@ -1191,17 +1189,36 @@ onMounted(async () => {
             {{ errorEmision }}
           </AvisoTono>
 
-          <button
-            class="tu-btn tu-btn-primario"
-            type="submit"
-            :disabled="emitiendo"
-          >
-            {{
-              emitiendo
-                ? $t("facturas.nueva.emitiendo")
-                : $t("facturas.nueva.emitir")
-            }}
-          </button>
+          <!-- Barra fija: el total que se timbra y «Emitir» siempre a la vista, aunque
+               el formulario sea largo. -->
+          <div class="tu-pie-acciones">
+            <!-- El total que se timbra (precios sin IVA, como el CFDI). -->
+            <p
+              class="mr-auto text-sm tabular-nums"
+              data-prueba="totales-factura"
+            >
+              {{
+                $t("cancelarFactura.totales", {
+                  subtotal: dinero(totales.subtotal, sesion.moneda),
+                  iva: ivaNegocio,
+                  impuesto: dinero(totales.impuesto, sesion.moneda),
+                  total: dinero(totales.total, sesion.moneda),
+                })
+              }}
+            </p>
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="emitiendo"
+              :aria-busy="emitiendo || undefined"
+            >
+              {{
+                emitiendo
+                  ? $t("facturas.nueva.emitiendo")
+                  : $t("facturas.nueva.emitir")
+              }}
+            </button>
+          </div>
         </form>
       </div>
     </template>

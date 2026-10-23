@@ -14,7 +14,7 @@ export default {
   panel: {
     titulo: "Kiosco de llegada",
     ayuda:
-      "Una tableta en recepción donde tus clientes muestran el QR de su pase: queda su llegada y su asistencia a la clase. Solo muestra su primer nombre.",
+      "Una tableta en recepción donde tus alumnos muestran el QR de su pase: queda su llegada y su asistencia a la clase. Solo muestra su primer nombre.",
     nombre: "Nombre de la tableta",
     nombrePh: "Recepción",
     sucursal: "Sede",

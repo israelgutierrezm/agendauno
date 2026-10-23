@@ -9,6 +9,7 @@ use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
+use App\Modules\Tenancy\MotivoFalloCobro;
 use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,9 @@ use Illuminate\Support\Facades\DB;
  */
 class GestionarDunningTenant
 {
+    /** Lo que le llega al alumno si el equipo registra el fallo sin escribir el motivo. */
+    private const MOTIVO_MANUAL = 'Cobro rechazado';
+
     public function __construct(
         private readonly RegistrarEventoTenant $eventos,
         private readonly GestorDeConexionTenant $gestor,
@@ -34,10 +38,23 @@ class GestionarDunningTenant
 
     /**
      * Registra un fallo de cobro de la membresía: abre o avanza su proceso de dunning.
+     *
+     * Guarda por qué, para quien administra: la clave del motivo (null si el equipo lo
+     * registra a mano) y el detalle (el motivo del banco, lo interno de por qué no se
+     * pudo intentar o el texto que escribió el equipo). Al alumno le llega la frase de
+     * siempre ({@see MotivoFalloCobro::paraCliente()}); a mano, el texto del equipo.
+     * `$tarjeta` (marca y terminación) solo la usa el rechazo del pago automático.
      */
-    public function registrarFallo(AcuerdoTenant $acuerdo, string $motivo): ProcesoDunningTenant
+    public function registrarFallo(AcuerdoTenant $acuerdo, ?MotivoFalloCobro $motivo, ?string $detalle = null, ?string $tarjeta = null): ProcesoDunningTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($acuerdo, $motivo): ProcesoDunningTenant {
+        $detalle = self::recortar($detalle);
+        $porQue = [
+            'ultimo_motivo' => self::recortar($motivo?->paraCliente($detalle, $tarjeta) ?? $detalle) ?? self::MOTIVO_MANUAL,
+            'ultimo_motivo_clave' => $motivo?->value,
+            'ultimo_motivo_detalle' => $detalle,
+        ];
+
+        return DB::connection('tenant')->transaction(function () use ($acuerdo, $porQue): ProcesoDunningTenant {
             $proceso = $this->procesoAbierto($acuerdo, bloquear: true);
 
             if ($proceso === null) {
@@ -47,7 +64,7 @@ class GestionarDunningTenant
                     'intentos' => 1,
                     'gracia_hasta' => Carbon::now()->addDays($this->parametros->entero('cobranza.dias_gracia_adeudo')),
                     'proximo_intento_en' => $this->proximoIntento(1),
-                    'ultimo_motivo' => $motivo,
+                    ...$porQue,
                 ]);
 
                 $this->emitir('cobro.fallido', $acuerdo, $proceso);
@@ -56,7 +73,7 @@ class GestionarDunningTenant
             }
 
             $proceso->intentos++;
-            $proceso->ultimo_motivo = $motivo;
+            $proceso->fill($porQue);
             $proceso->proximo_intento_en = $this->proximoIntento($proceso->intentos);
 
             $suspendeAhora = $proceso->estado === EstadoDunning::EnMora && $proceso->gracia_hasta->isPast();
@@ -166,6 +183,14 @@ class GestionarDunningTenant
         $dias = $reintentos[max(1, min($intento, count($reintentos))) - 1];
 
         return Carbon::now()->addDays($dias);
+    }
+
+    /** Un texto sin espacios de más y que cabe en su columna (null si viene vacío). */
+    private static function recortar(?string $texto): ?string
+    {
+        $texto = trim((string) $texto);
+
+        return $texto !== '' ? mb_substr($texto, 0, 255) : null;
     }
 
     private function procesoAbierto(AcuerdoTenant $acuerdo, bool $bloquear = false): ?ProcesoDunningTenant

@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from "vue";
+import { computed, onMounted, onUnmounted } from "vue";
 
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { estadoConfirmar, responderConfirmar } from "@/lib/confirmar";
 
 /**
- * El diálogo de `confirmar()` (ver lib/confirmar.ts): una pregunta, "Cancelar" y el
- * botón que confirma: con el color principal del tema o, si la acción lo pide, con su
- * tono (verde para completar, ámbar para regresar, rojo si es destructiva). Se monta
- * una sola vez.
+ * El diálogo de `confirmar()` (ver lib/confirmar.ts): una pregunta y, en el pie,
+ * "Cancelar" y el botón que confirma. Con el contrato de botones (style.css) solo hay
+ * dos formas de confirmar: el primario del tema o, si la acción es destructiva, el
+ * sólido de peligro. Los demás tonos (completar, regresar) confirman con el primario.
+ * Se monta una sola vez.
  */
+const destructiva = computed(
+  () => estadoConfirmar.peligro || estadoConfirmar.tono === "peligro",
+);
 onMounted(() => (estadoConfirmar.montado = true));
 onUnmounted(() => {
   estadoConfirmar.montado = false;
@@ -25,7 +29,7 @@ onUnmounted(() => {
     @cerrar="responderConfirmar(false)"
   >
     <p class="whitespace-pre-line">{{ estadoConfirmar.mensaje }}</p>
-    <div class="mt-6 flex justify-end gap-2">
+    <template #pie>
       <button
         type="button"
         class="tu-btn tu-btn-secundario"
@@ -37,15 +41,13 @@ onUnmounted(() => {
         type="button"
         class="tu-btn"
         :class="
-          estadoConfirmar.tono
-            ? ['tu-btn-solido', `tu-tono-${estadoConfirmar.tono}`]
-            : 'tu-btn-primario'
+          destructiva ? 'tu-btn-solido tu-tono-peligro' : 'tu-btn-primario'
         "
         data-prueba="confirmar-aceptar"
         @click="responderConfirmar(true)"
       >
         {{ estadoConfirmar.aceptar ?? $t("operacion.confirmar.aceptar") }}
       </button>
-    </div>
+    </template>
   </ModalDialogo>
 </template>

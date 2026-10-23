@@ -154,10 +154,8 @@ describe("seguimiento en tareas", () => {
     await w.get('input[value="no_desea_contacto"]').setValue(true);
     expect(w.text()).toContain("Deja de recibir promociones");
     await w.get("#s-nota").setValue("Pidió no recibir mensajes");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "Guardar resultado")!
-      .trigger("click");
+    // «Guardar resultado» va en el pie del panel y envía su formulario.
+    await w.get("#form-resultado").trigger("submit");
     await flushPromises();
 
     expect(api.post).toHaveBeenCalledWith(
@@ -176,10 +174,8 @@ describe("seguimiento en tareas", () => {
       .findAll("button")
       .find((b) => b.text() === "Registrar resultado")!
       .trigger("click");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "Guardar resultado")!
-      .trigger("click");
+    // «Guardar resultado» va en el pie del panel y envía su formulario.
+    await w.get("#form-resultado").trigger("submit");
     await flushPromises();
 
     expect(w.get('[data-prueba="error-resultado"]').text()).toContain(

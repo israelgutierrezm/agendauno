@@ -197,7 +197,7 @@ async function retirar(
       <button
         v-if="puedeGestionar && familia?.activo && familia.tiene_cuenta"
         type="button"
-        class="tu-enlace text-sm"
+        class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
         data-prueba="agregar-familiar"
         @click="abrirAgregar"
       >
@@ -247,15 +247,13 @@ async function retirar(
               >
                 <span>{{ $t(`familias.parentescos.${v.parentesco}`) }}</span>
                 <span aria-hidden="true">·</span>
-                <span class="inline-flex items-center gap-1.5">
-                  <span
-                    class="inline-block size-1.5 rounded-full"
-                    :style="{
-                      background:
-                        v.estado === 'activa' ? 'var(--exito)' : 'var(--aviso)',
-                    }"
-                    aria-hidden="true"
-                  />
+                <span
+                  class="tu-estado"
+                  :style="{
+                    '--tono':
+                      v.estado === 'activa' ? 'var(--exito)' : 'var(--aviso)',
+                  }"
+                >
                   {{
                     v.estado === "activa" && v.autorizacion
                       ? $t("familias.ficha.autorizadaEl", {
@@ -269,11 +267,14 @@ async function retirar(
                 </span>
               </div>
             </div>
-            <div v-if="puedeGestionar" class="flex items-center gap-3 text-sm">
+            <div
+              v-if="puedeGestionar"
+              class="flex flex-wrap items-center gap-2"
+            >
               <button
                 v-if="v.estado === 'pendiente'"
                 type="button"
-                class="tu-enlace"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 @click="
                   abrirMostrador(
                     v,
@@ -285,8 +286,7 @@ async function retirar(
               </button>
               <button
                 type="button"
-                class="tu-enlace"
-                :style="{ color: 'var(--error)' }"
+                class="tu-btn tu-btn-peligro tu-btn-chico"
                 @click="
                   grupo.clave === 'aSuCargo'
                     ? retirar(v, nombre, v.persona.nombre)
@@ -315,7 +315,7 @@ async function retirar(
       :ocupado="guardando"
       @cerrar="cerrarAgregar"
     >
-      <form class="grid gap-4" @submit.prevent="vincular">
+      <form id="form-familiar" class="grid gap-4" @submit.prevent="vincular">
         <AvisoTono
           v-if="errorVincular"
           tono="peligro"
@@ -365,10 +365,11 @@ async function retirar(
             {{ $t("comun.cancelar") }}
           </button>
           <button
-            type="button"
+            type="submit"
+            form="form-familiar"
             class="tu-btn tu-btn-primario"
             :disabled="guardando || nuevo.participante === ''"
-            @click="vincular"
+            :aria-busy="guardando || undefined"
           >
             {{ $t("familias.ficha.guardar") }}
           </button>
@@ -419,6 +420,7 @@ async function retirar(
             type="button"
             class="tu-btn tu-btn-primario"
             :disabled="guardando"
+            :aria-busy="guardando || undefined"
             @click="registrarEnMostrador"
           >
             {{ $t("familias.ficha.confirmarAceptacion") }}

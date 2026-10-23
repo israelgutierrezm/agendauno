@@ -143,7 +143,7 @@ describe("perfil unificado", () => {
 
   it("se ordena en Datos personales, Acceso y Preferencias y privacidad", () => {
     const w = montar();
-    expect(w.findAll("h2.mp-seccion").map((h) => h.text())).toEqual([
+    expect(w.findAll(".mp-cabecera h2").map((h) => h.text())).toEqual([
       "Datos personales",
       "Acceso",
       "Preferencias y privacidad",

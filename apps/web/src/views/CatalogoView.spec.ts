@@ -103,10 +103,8 @@ describe("catálogo", () => {
     expect(incluye.findAll('input[type="checkbox"]')).toHaveLength(2);
     await incluye.get('input[value="o3"]').setValue(true);
     await incluye.get('input[value="o2"]').setValue(true);
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "catalogo.guardar")!
-      .trigger("click");
+    // «Guardar» va en el pie y envía el formulario del diálogo.
+    await w.get("#form-servicio").trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/app/a/ofertas/o1",
@@ -132,10 +130,8 @@ describe("catálogo", () => {
     );
     await w.get('[data-prueba="para-principiantes"] input').setValue(true);
     await w.get("#c-llevar-o1").setValue("  Short y top  ");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "catalogo.guardar")!
-      .trigger("click");
+    // «Guardar» va en el pie y envía el formulario del diálogo.
+    await w.get("#form-servicio").trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenLastCalledWith(
       "/api/v1/app/a/ofertas/o1",
@@ -183,7 +179,7 @@ describe("catálogo", () => {
     );
     await fila.get("input").setValue("Corte de cabello");
     await fila.get(".ct-precio input").setValue("250");
-    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await w.get("#ct-alta").trigger("submit");
     await flushPromises();
 
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
@@ -209,7 +205,7 @@ describe("catálogo", () => {
     expect(fila.get(".ct-precio span").text()).toBe("$");
     await fila.get("input").setValue("Corte de cabello");
     await fila.get('[data-prueba="precio-alta"]').setValue("25.000");
-    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await w.get("#ct-alta").trigger("submit");
     await flushPromises();
 
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
@@ -241,7 +237,7 @@ describe("catálogo", () => {
 
     await fila.get('[data-prueba="precio-alta"]').setValue("12.50");
     expect(w.find('[data-prueba="precio-ilegible"]').exists()).toBe(false);
-    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await w.get("#ct-alta").trigger("submit");
     await flushPromises();
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
       items: [expect.objectContaining({ precio_minor: 1250 })],
@@ -292,7 +288,7 @@ describe("catálogo", () => {
     expect(guardar().attributes("disabled")).toBeDefined();
 
     await precio.setValue("12,50");
-    await guardar().trigger("click");
+    await w.get("#form-servicio").trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/app/a/ofertas/o1",
@@ -319,7 +315,7 @@ describe("catálogo", () => {
     await filas[0]!.get('[data-prueba="precio-alta"]').setValue("250");
     await filas[1]!.get("input").setValue("Barba");
 
-    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await w.get("#ct-alta").trigger("submit");
     await flushPromises();
     expect(api.post).not.toHaveBeenCalled();
     expect(w.get('[data-prueba="error-alta"]').exists()).toBe(true);
@@ -329,7 +325,7 @@ describe("catálogo", () => {
     ).toBe("true");
 
     await w.findAll('[data-prueba="precio-alta"]')[1]!.setValue("150");
-    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await w.get("#ct-alta").trigger("submit");
     await flushPromises();
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
       items: [
@@ -377,7 +373,7 @@ describe("catálogo", () => {
     expect(guardar().attributes("disabled")).toBeDefined();
 
     await w.get('[data-prueba="cupo-base"]').setValue("15");
-    await guardar().trigger("click");
+    await w.get("#form-servicio").trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/app/a/ofertas/o1",
@@ -396,7 +392,7 @@ describe("catálogo", () => {
     await w.get('[data-prueba="nombre-servicio"]').setValue("  ");
     expect(guardar().attributes("disabled")).toBeDefined();
     await w.get('[data-prueba="nombre-servicio"]').setValue("Masaje relajante");
-    await guardar().trigger("click");
+    await w.get("#form-servicio").trigger("submit");
     await flushPromises();
     const carga = api.put.mock.calls.at(-1)![1] as Record<string, unknown>;
     expect(carga.nombre).toBe("Masaje relajante");
@@ -424,7 +420,7 @@ describe("catálogo", () => {
     expect(guardar().attributes("disabled")).toBeDefined();
 
     await w.get('[data-prueba="anticipo-valor"]').setValue("200");
-    await guardar().trigger("click");
+    await w.get("#form-servicio").trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenLastCalledWith(
       "/api/v1/app/a/ofertas/o1",

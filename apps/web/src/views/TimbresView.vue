@@ -5,7 +5,6 @@ import { useI18n } from "vue-i18n";
 import AvisoRetornoPago from "@/components/AvisoRetornoPago.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
-import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
@@ -406,29 +405,27 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- Sin acceso: un aviso neutro como título de la página (el único h1). -->
   <section v-if="!veTimbres" class="tu-pagina" data-prueba="no-disponible">
-    <EstadoVacio
-      class="tu-card mt-6"
-      icono="renta"
+    <EncabezadoSeccion
       :titulo="$t('renta.noDisponibleTitulo')"
-      :texto="$t('renta.noDisponibleAyuda')"
+      :subtitulo="$t('renta.noDisponibleAyuda')"
     />
   </section>
 
   <section v-else class="tu-pagina" data-prueba="pantalla-timbres">
     <RouterLink
       :to="{ name: 'renta' }"
-      class="tu-enlace text-sm inline-flex items-center gap-1"
+      class="tu-volver"
       data-prueba="volver-renta"
+      ><IconoNav nombre="atras" :tam="16" />
+      {{ $t("suscripcion.timbres.pantalla.volver") }}</RouterLink
     >
-      <IconoNav nombre="atras" :tam="14" />
-      {{ $t("suscripcion.timbres.pantalla.volver") }}
-    </RouterLink>
     <EncabezadoSeccion
-      class="mt-2"
+      class="mt-4"
       :titulo="$t('suscripcion.timbres.titulo')"
+      :subtitulo="$t('suscripcion.timbres.ayuda')"
     />
-    <p class="mt-1 text-sm ti-suave">{{ $t("suscripcion.timbres.ayuda") }}</p>
     <AvisoRetornoPago v-if="retornoPago" class="mt-3" :estado="retornoPago" />
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
@@ -436,7 +433,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -616,7 +613,7 @@ onMounted(() => {
 
     <!-- Movimientos -->
     <div class="mt-8 flex flex-wrap items-baseline justify-between gap-2">
-      <h2 class="font-medium text-lg">
+      <h2 class="tu-titulo-seccion">
         {{ $t("suscripcion.timbres.pantalla.movimientos") }}
         <span
           v-if="meta"
@@ -635,154 +632,172 @@ onMounted(() => {
         {{ $t("suscripcion.timbres.pantalla.exportar") }}
       </button>
     </div>
-    <div class="ti-filtros mt-3" data-prueba="filtros-timbres">
-      <input
-        v-model="buscar"
-        type="search"
-        class="tu-input ti-buscar"
-        :placeholder="$t('suscripcion.timbres.pantalla.buscar')"
-        :aria-label="$t('suscripcion.timbres.pantalla.buscar')"
-        data-prueba="buscar-timbres"
-      />
-      <div
-        class="tu-segmentado"
-        role="group"
-        :aria-label="$t('suscripcion.timbres.pantalla.tipo')"
-      >
-        <button
-          v-for="x in TIPOS"
-          :key="x"
-          type="button"
-          :aria-pressed="tipo === x"
-          :data-prueba="`timbres-${x || 'todos'}`"
-          @click="tipo = x"
+    <!-- Los filtros, dentro de la tarjeta de lo que filtran (y en la dirección). El libro
+         de movimientos es comparativo (cantidad y saldo): se queda como tabla. -->
+    <div class="tu-card mt-3">
+      <div class="tu-filtros" data-prueba="filtros-timbres">
+        <label class="tu-buscar">
+          <IconoNav nombre="buscar" :tam="16" />
+          <input
+            v-model="buscar"
+            type="search"
+            class="tu-input"
+            :placeholder="$t('suscripcion.timbres.pantalla.buscar')"
+            :aria-label="$t('suscripcion.timbres.pantalla.buscar')"
+            data-prueba="buscar-timbres"
+          />
+        </label>
+        <div
+          class="tu-segmentado"
+          role="group"
+          :aria-label="$t('suscripcion.timbres.pantalla.tipo')"
         >
-          {{ etiquetaTipo(x) }}
+          <button
+            v-for="x in TIPOS"
+            :key="x"
+            type="button"
+            :aria-pressed="tipo === x"
+            :data-prueba="`timbres-${x || 'todos'}`"
+            @click="tipo = x"
+          >
+            {{ etiquetaTipo(x) }}
+          </button>
+        </div>
+        <RangoFechas
+          v-model:desde="desde"
+          v-model:hasta="hasta"
+          :etiqueta="$t('suscripcion.timbres.pantalla.fechas')"
+          prueba="timbres"
+          atajos
+          :zona="sesion.zonaHoraria"
+        />
+        <button
+          v-if="conFiltros"
+          type="button"
+          class="tu-btn tu-btn-discreto"
+          data-prueba="limpiar-timbres"
+          @click="limpiarFiltros"
+        >
+          {{ $t("suscripcion.timbres.pantalla.limpiar") }}
         </button>
       </div>
-      <RangoFechas
-        v-model:desde="desde"
-        v-model:hasta="hasta"
-        :etiqueta="$t('suscripcion.timbres.pantalla.fechas')"
-        prueba="timbres"
-        atajos
-        :zona="sesion.zonaHoraria"
-      />
-      <button
-        v-if="conFiltros"
-        type="button"
-        class="tu-enlace text-sm"
-        data-prueba="limpiar-timbres"
-        @click="limpiarFiltros"
-      >
-        {{ $t("suscripcion.timbres.pantalla.limpiar") }}
-      </button>
-    </div>
 
-    <AvisoTono v-if="errorMovimientos" tono="peligro" class="mt-3" role="alert">
-      {{ errorMovimientos }}
-      <template #acciones>
-        <button
-          type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
-          @click="cargarMovimientos"
-        >
-          {{ $t("comun.reintentar") }}
-        </button>
-      </template>
-    </AvisoTono>
-    <p
-      v-else-if="cargandoMovimientos && movimientos.length === 0"
-      class="mt-4 text-sm ti-suave"
-    >
-      {{ $t("comun.cargando") }}
-    </p>
-    <p
-      v-else-if="movimientos.length === 0"
-      class="tu-card mt-3 p-6 text-sm ti-suave"
-      data-prueba="timbres-vacio"
-    >
-      {{
-        conFiltros
-          ? $t("suscripcion.timbres.pantalla.sinResultados")
-          : $t("suscripcion.timbres.pantalla.vacio")
-      }}
-    </p>
-    <div
-      v-else
-      class="tu-card mt-3 overflow-x-auto"
-      :class="{ 'opacity-60': cargandoMovimientos }"
-    >
-      <table class="tu-tabla w-full text-sm" data-prueba="tabla-timbres">
-        <thead>
-          <tr>
-            <th scope="col">
-              {{ $t("suscripcion.timbres.pantalla.colMovimiento") }}
-            </th>
-            <th scope="col">
-              {{ $t("suscripcion.timbres.pantalla.colFecha") }}
-            </th>
-            <th scope="col">
-              {{ $t("suscripcion.timbres.pantalla.colDetalle") }}
-            </th>
-            <th scope="col" class="text-right">
-              {{ $t("suscripcion.timbres.pantalla.colCantidad") }}
-            </th>
-            <th scope="col" class="text-right">
-              {{ $t("suscripcion.timbres.pantalla.colSaldo") }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in movimientos" :key="m.id" data-prueba="fila-timbre">
-            <td>
-              <span class="inline-flex items-center gap-2 font-medium">
-                <IconoNav :nombre="ICONO[m.tipo]" :tam="16" class="ti-icono" />
-                {{ $t(`suscripcion.timbres.${m.tipo}`) }}
-              </span>
-            </td>
-            <td class="whitespace-nowrap ti-suave">{{ fechaHora(m.fecha) }}</td>
-            <td class="min-w-0">
-              <template v-if="m.factura">
-                <div class="font-medium truncate">
-                  {{
-                    m.factura.cliente ??
-                    $t("suscripcion.timbres.pantalla.facturaSinCliente")
-                  }}
-                </div>
-                <div class="text-xs ti-suave">
-                  <span v-if="m.factura.rfc">{{ m.factura.rfc }} · </span>
-                  {{ dinero(m.factura.total_minor, m.factura.moneda) }}
-                  <RouterLink
-                    v-if="m.factura.uuid && sesion.puede('ordenes.ver')"
-                    :to="{ name: 'facturas', query: { q: m.factura.uuid } }"
-                    class="tu-enlace ml-1 whitespace-nowrap"
-                    >{{
-                      $t("suscripcion.timbres.pantalla.verFactura")
-                    }}</RouterLink
-                  >
-                </div>
-              </template>
-              <template v-else-if="m.compra">
-                <div class="font-medium">{{ m.detalle }}</div>
-                <div class="text-xs ti-suave">
-                  {{ dinero(m.compra.monto_minor, m.compra.moneda) }}
-                </div>
-              </template>
-              <span v-else class="ti-suave">{{ m.detalle ?? "—" }}</span>
-            </td>
-            <td
-              class="text-right tabular-nums font-medium"
-              :class="{ 'ti-suma': m.cantidad > 0 }"
-            >
-              {{ cantidad(m.cantidad) }}
-            </td>
-            <td class="text-right tabular-nums ti-suave">
-              {{ m.saldo_despues }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <AvisoTono
+        v-if="errorMovimientos"
+        tono="peligro"
+        class="m-4"
+        role="alert"
+      >
+        {{ errorMovimientos }}
+        <template #acciones>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
+            @click="cargarMovimientos"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </template>
+      </AvisoTono>
+      <p
+        v-else-if="cargandoMovimientos && movimientos.length === 0"
+        class="p-5 text-sm ti-suave"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
+      <p
+        v-else-if="movimientos.length === 0"
+        class="tu-sin-resultados"
+        data-prueba="timbres-vacio"
+      >
+        {{
+          conFiltros
+            ? $t("suscripcion.timbres.pantalla.sinResultados")
+            : $t("suscripcion.timbres.pantalla.vacio")
+        }}
+      </p>
+      <div
+        v-else
+        class="overflow-x-auto"
+        :class="{ 'opacity-60': cargandoMovimientos }"
+      >
+        <table class="tu-tabla w-full text-sm" data-prueba="tabla-timbres">
+          <thead>
+            <tr>
+              <th scope="col">
+                {{ $t("suscripcion.timbres.pantalla.colMovimiento") }}
+              </th>
+              <th scope="col">
+                {{ $t("suscripcion.timbres.pantalla.colFecha") }}
+              </th>
+              <th scope="col">
+                {{ $t("suscripcion.timbres.pantalla.colDetalle") }}
+              </th>
+              <th scope="col" class="text-right">
+                {{ $t("suscripcion.timbres.pantalla.colCantidad") }}
+              </th>
+              <th scope="col" class="text-right">
+                {{ $t("suscripcion.timbres.pantalla.colSaldo") }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in movimientos" :key="m.id" data-prueba="fila-timbre">
+              <td>
+                <span class="inline-flex items-center gap-2 font-medium">
+                  <IconoNav
+                    :nombre="ICONO[m.tipo]"
+                    :tam="16"
+                    class="ti-icono"
+                  />
+                  {{ $t(`suscripcion.timbres.${m.tipo}`) }}
+                </span>
+              </td>
+              <td class="whitespace-nowrap ti-suave">
+                {{ fechaHora(m.fecha) }}
+              </td>
+              <td class="min-w-0">
+                <template v-if="m.factura">
+                  <div class="font-medium truncate">
+                    {{
+                      m.factura.cliente ??
+                      $t("suscripcion.timbres.pantalla.facturaSinCliente")
+                    }}
+                  </div>
+                  <div class="text-xs ti-suave">
+                    <span v-if="m.factura.rfc">{{ m.factura.rfc }} · </span>
+                    {{ dinero(m.factura.total_minor, m.factura.moneda) }}
+                    <RouterLink
+                      v-if="m.factura.uuid && sesion.puede('ordenes.ver')"
+                      :to="{ name: 'facturas', query: { q: m.factura.uuid } }"
+                      class="tu-enlace ml-1 whitespace-nowrap"
+                      >{{
+                        $t("suscripcion.timbres.pantalla.verFactura")
+                      }}</RouterLink
+                    >
+                  </div>
+                </template>
+                <template v-else-if="m.compra">
+                  <div class="font-medium">{{ m.detalle }}</div>
+                  <div class="text-xs ti-suave">
+                    {{ dinero(m.compra.monto_minor, m.compra.moneda) }}
+                  </div>
+                </template>
+                <span v-else class="ti-suave">{{ m.detalle ?? "—" }}</span>
+              </td>
+              <td
+                class="text-right tabular-nums font-medium"
+                :class="{ 'ti-suma': m.cantidad > 0 }"
+              >
+                {{ cantidad(m.cantidad) }}
+              </td>
+              <td class="text-right tabular-nums ti-suave">
+                {{ m.saldo_despues }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <PaginacionListado
       v-if="meta && meta.total > 0"
@@ -809,16 +824,6 @@ onMounted(() => {
   .ti-fila {
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   }
-}
-.ti-filtros {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-}
-.ti-buscar {
-  flex: 1 1 16rem;
-  min-width: 0;
 }
 .ti-icono {
   color: var(--texto-suave);

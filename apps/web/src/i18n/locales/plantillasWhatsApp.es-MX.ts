@@ -4,6 +4,7 @@ export default {
   ayuda:
     "Para mandar campañas por WhatsApp. Meta revisa cada plantilla antes de que se pueda usar (suele tardar minutos, a veces un día). Solo llegan a quien aceptó tus avisos por WhatsApp.",
   nueva: "Nueva plantilla",
+  editarTitulo: "Editar plantilla",
   nombre: "Nombre (solo lo ves tú)",
   categoriaLabel: "Tipo de mensaje",
   categoria: {
@@ -12,7 +13,7 @@ export default {
   },
   categoriaAyuda: {
     utilidad:
-      "Avisos sobre algo que el cliente ya tiene: un cambio de horario, una clase cancelada. Si es una promoción, Meta la pasa a marketing.",
+      "Avisos sobre algo que el alumno ya tiene: un cambio de horario, una clase cancelada. Si es una promoción, Meta la pasa a marketing.",
     marketing:
       "Promociones, descuentos, eventos o invitaciones a volver. Meta los cobra más caros.",
   },

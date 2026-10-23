@@ -289,7 +289,7 @@ async function cerrar(): Promise<void> {
   <ModalDialogo
     :abierto="abierto"
     :titulo="$t('cobroCita.titulo', { cliente: cita?.cliente ?? '' })"
-    tam="md"
+    tam="lg"
     :ocupado="editor.guardando.value"
     @cerrar="cerrar"
   >
@@ -353,8 +353,9 @@ async function cerrar(): Promise<void> {
       >
         <button
           type="button"
-          class="tu-enlace"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="reenviando"
+          :aria-busy="reenviando || undefined"
           data-prueba="mandar-ticket"
           @click="reenviarTicket"
         >
@@ -373,8 +374,9 @@ async function cerrar(): Promise<void> {
         <template #acciones>
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             :disabled="reenviando"
+            :aria-busy="reenviando || undefined"
             data-prueba="reenviar-ticket"
             @click="reenviarTicket"
           >
@@ -382,11 +384,6 @@ async function cerrar(): Promise<void> {
           </button>
         </template>
       </AvisoTono>
-      <div class="flex justify-end">
-        <button type="button" class="tu-btn tu-btn-primario" @click="cerrar">
-          {{ $t("cobroCita.listo") }}
-        </button>
-      </div>
     </div>
 
     <form
@@ -426,7 +423,12 @@ async function cerrar(): Promise<void> {
               :data-prueba="`excede-${l.articulo.id}`"
               >{{ $t("cobroCita.soloHay", { n: stockAqui(l.articulo) }) }}</span
             >
-            <button type="button" class="tu-enlace text-sm" @click="quitar(i)">
+            <!-- Un renglón que aún no se cobra: quitarlo no borra nada guardado. -->
+            <button
+              type="button"
+              class="tu-btn tu-btn-discreto tu-btn-chico"
+              @click="quitar(i)"
+            >
               {{ $t("cobroCita.quitar") }}
             </button>
           </dt>
@@ -602,18 +604,39 @@ async function cerrar(): Promise<void> {
         <input v-model="enviarTicket" type="checkbox" />
         {{ $t("cobroCita.enviarTicket", { correo: cita.email }) }}
       </label>
+    </form>
 
-      <div class="flex items-center justify-between gap-3">
+    <!-- El total y Cobrar siempre a la vista, aunque el cobro sea largo. -->
+    <template #pie>
+      <button
+        v-if="resultado"
+        type="button"
+        class="tu-btn tu-btn-primario"
+        @click="cerrar"
+      >
+        {{ $t("cobroCita.listo") }}
+      </button>
+      <template v-else>
         <span
-          class="text-lg font-semibold tabular-nums"
+          class="mr-auto text-lg font-semibold tabular-nums"
           data-prueba="total-cita"
         >
           {{ dinero(total) }}
         </span>
         <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="editor.guardando.value"
+          @click="cerrar"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
           type="submit"
+          form="form-cobro-cita"
           class="tu-btn tu-btn-primario"
           :disabled="!puedeCobrar"
+          :aria-busy="editor.guardando.value || undefined"
           data-prueba="cobrar-cita"
         >
           {{
@@ -622,8 +645,8 @@ async function cerrar(): Promise<void> {
               : $t("cobroCita.cobrar", { monto: dinero(total) })
           }}
         </button>
-      </div>
-    </form>
+      </template>
+    </template>
   </ModalDialogo>
 </template>
 

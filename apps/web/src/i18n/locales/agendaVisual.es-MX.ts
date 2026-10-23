@@ -48,7 +48,7 @@ export default {
     noTrabaja: "No atiende este día",
     fueraHorario: "Fuera de horario",
     ahora: "Ahora",
-    sinCliente: "Sin cliente",
+    sinCliente: "Sin alumno",
     lugares: "{ocupados}/{capacidad} lugares",
     vacioTitulo: "No hay citas en este día",
     vacioTexto: "Haz clic en un horario para agendar una nueva cita.",
@@ -67,10 +67,11 @@ export default {
   nuevaCita: {
     boton: "Nueva cita",
     titulo: "Nueva cita",
-    cliente: "Cliente",
-    buscarCliente: "Buscar cliente por nombre",
+    cliente: "Alumno",
+    buscarCliente: "Buscar alumno por nombre",
+    // Pendiente: «Alumno nuevo» junto con PanelNuevaCita.spec.ts, que busca este texto.
     nuevoCliente: "Cliente nuevo",
-    buscarExistente: "Buscar un cliente existente",
+    buscarExistente: "Buscar un alumno existente",
     cambiar: "Cambiar",
     nombre: "Nombre",
     celular: "Celular (opcional)",
@@ -144,7 +145,7 @@ export default {
   },
   onboarding: {
     horariosAyuda:
-      "Define qué días y a qué horas atiende cada profesional: con eso tus clientes ven los huecos libres para agendar.",
+      "Define qué días y a qué horas atiende cada profesional: con eso quien agenda en línea ve los huecos libres.",
     abrirHorarios: "Definir horarios de atención",
   },
   todosLos: "Todos los {grupo}",

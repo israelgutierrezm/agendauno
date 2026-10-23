@@ -26,7 +26,7 @@ export default {
   desc: {
     negocio: "Dónde atiendes y tu logo, para tu página y tus avisos.",
     servicios:
-      "Lo que ofreces, cuánto dura y cuánto cuesta. Tus clientes lo verán al agendar.",
+      "Lo que ofreces, cuánto dura y cuánto cuesta. Tus alumnos lo verán al agendar.",
     equipo:
       "Quién atiende las citas y en qué horario. Con esto se calculan los espacios libres.",
     clases: "Las clases que das, cuánto duran y cuántas personas caben.",
@@ -35,7 +35,7 @@ export default {
     reglas:
       "Hasta cuándo se puede cancelar y qué pasa si alguien no llega. Puedes aceptarlas como están.",
     publicacion:
-      "Revisa cómo va tu negocio, mira tu página como la verán tus clientes y publícala.",
+      "Revisa cómo va tu negocio, mira tu página como la verán tus alumnos y publícala.",
   },
   negocio: {
     logo: "Logo",
@@ -118,7 +118,7 @@ export default {
     configuradoSi: "Todos los pasos están completos.",
     faltan: "Falta un paso. | Faltan {n} pasos.",
     publicado: "Página publicada",
-    publicadoSi: "Tus clientes pueden abrir tu página y reservar.",
+    publicadoSi: "Tus alumnos pueden abrir tu página y reservar.",
     publicadoNo: "Tu página está cerrada.",
     reservable: "Recibe reservas",
     primera: "Primera fecha disponible: {fecha} · {que} · {sucursal}.",
@@ -136,7 +136,7 @@ export default {
   },
   publicacion: {
     tuPagina: "Tu página para reservar",
-    vistaPrevia: "Ver como cliente",
+    vistaPrevia: "Ver como alumno",
     como: "¿Cómo la publicas?",
     vis: {
       publica: "En el directorio y con tu enlace",

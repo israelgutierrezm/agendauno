@@ -41,13 +41,19 @@ it('el primer fallo abre el dunning en gracia; reintenta y se regulariza', funct
         ->assertCreated()
         ->assertJsonPath('data.estado', 'en_mora')
         ->assertJsonPath('data.intentos', 1)
-        ->assertJsonPath('data.ultimo_motivo', 'Tarjeta rechazada');
+        ->assertJsonPath('data.ultimo_motivo', 'Tarjeta rechazada')
+        // A mano no lleva clave: lo que escribió el equipo es el detalle.
+        ->assertJsonPath('data.motivo_clave', null)
+        ->assertJsonPath('data.motivo_detalle', 'Tarjeta rechazada');
 
     // Segundo fallo dentro de la gracia: reintenta, sigue en mora.
     test()->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$v['acuerdo']}/cobro-fallido", [], conBearer($e['bearer']))
         ->assertCreated()
         ->assertJsonPath('data.estado', 'en_mora')
-        ->assertJsonPath('data.intentos', 2);
+        ->assertJsonPath('data.intentos', 2)
+        ->assertJsonPath('data.motivo_clave', null)
+        ->assertJsonPath('data.motivo_detalle', null)
+        ->assertJsonPath('data.ultimo_motivo', 'Cobro rechazado');
 
     test()->getJson("/api/v1/app/{$e['slug']}/dunning", conBearer($e['bearer']))
         ->assertOk()->assertJsonCount(1, 'data');

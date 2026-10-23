@@ -106,9 +106,10 @@ onMounted(cargar);
 </script>
 
 <template>
+  <!-- Sin título propio: la pestaña «Kiosco de llegada» de Integraciones ya lo
+       nombra. -->
   <div class="tu-card p-5 min-w-0" data-prueba="kioscos">
-    <h2 class="text-base font-semibold">{{ $t("kiosco.panel.titulo") }}</h2>
-    <p class="mt-0.5 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("kiosco.panel.ayuda") }}
     </p>
 
@@ -193,7 +194,7 @@ onMounted(cargar);
         <button
           v-if="k.activo"
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           @click="darDeBaja(k)"
         >
           {{ $t("kiosco.panel.darDeBaja") }}

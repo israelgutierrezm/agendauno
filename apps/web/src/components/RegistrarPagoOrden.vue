@@ -180,7 +180,13 @@ async function registrar(): Promise<void> {
     :ocupado="procesando || exentando !== null"
     @cerrar="cerrar"
   >
-    <form v-if="orden" class="space-y-4" @submit.prevent="registrar">
+    <form
+      v-if="orden"
+      id="form-registrar-pago"
+      class="space-y-4"
+      data-prueba="confirmar-pago"
+      @submit.prevent="registrar"
+    >
       <p class="text-sm">
         <span v-if="orden.persona" class="font-medium"
           >{{ orden.persona }} ·
@@ -228,7 +234,7 @@ async function registrar(): Promise<void> {
             <button
               v-if="puedeExentar && exentando !== c.id"
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               data-prueba="exentar-cuota"
               @click="
                 exentando = c.id;
@@ -247,10 +253,12 @@ async function registrar(): Promise<void> {
               :aria-label="$t('ventas.vender.motivoExencion')"
               data-prueba="motivo-cuota"
             />
+            <!-- La acción principal del diálogo es «Registrar pago» (en el pie). -->
             <button
               type="button"
-              class="tu-btn tu-btn-primario"
+              class="tu-btn tu-btn-secundario"
               :disabled="procesando || motivo.trim() === ''"
+              :aria-busy="procesando || undefined"
               data-prueba="confirmar-exencion"
               @click="exentar(c)"
             >
@@ -299,24 +307,26 @@ async function registrar(): Promise<void> {
       <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
       </AvisoTono>
-      <div class="flex justify-end gap-2">
-        <button
-          type="button"
-          class="tu-btn tu-btn-secundario"
-          :disabled="procesando"
-          @click="cerrar"
-        >
-          {{ $t("comun.cancelar") }}
-        </button>
-        <button
-          type="submit"
-          class="tu-btn tu-btn-primario"
-          :disabled="procesando || !partesOk"
-          data-prueba="confirmar-pago"
-        >
-          {{ $t("cobranza.pendientes.registrar") }}
-        </button>
-      </div>
     </form>
+    <template #pie>
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario"
+        :disabled="procesando"
+        @click="cerrar"
+      >
+        {{ $t("comun.cancelar") }}
+      </button>
+      <button
+        type="submit"
+        form="form-registrar-pago"
+        class="tu-btn tu-btn-primario"
+        :disabled="procesando || !partesOk"
+        :aria-busy="procesando || undefined"
+        data-prueba="boton-confirmar-pago"
+      >
+        {{ $t("cobranza.pendientes.registrar") }}
+      </button>
+    </template>
   </ModalDialogo>
 </template>

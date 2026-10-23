@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 
+import IconoNav from "@/components/IconoNav.vue";
 import { aMinor, dinero as dineroDelPais } from "@/lib/formato";
 import type { ParteCobro } from "@/lib/formasDePago";
 
@@ -122,7 +123,7 @@ function quitar(i: number): void {
     <button
       v-if="!dividido"
       type="button"
-      class="tu-enlace text-sm"
+      class="tu-btn tu-btn-secundario tu-btn-chico"
       data-prueba="dividir-pago"
       @click="dividir"
     >
@@ -174,11 +175,11 @@ function quitar(i: number): void {
         <button
           v-if="renglones.length > 2 && i !== ultimo"
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-icono-btn"
           :aria-label="$t('formasDePago.quitar')"
           @click="quitar(i)"
         >
-          ×
+          <IconoNav nombre="cerrar" :tam="16" />
         </button>
       </div>
       <p
@@ -191,11 +192,11 @@ function quitar(i: number): void {
       >
         {{ $t(`formasDePago.${estado}`) }}
       </p>
-      <div class="flex flex-wrap gap-3">
+      <div class="flex flex-wrap gap-2">
         <button
           v-if="renglones.length < maximo"
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
           data-prueba="agregar-forma"
           @click="agregar"
         >
@@ -203,7 +204,7 @@ function quitar(i: number): void {
         </button>
         <button
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-discreto tu-btn-chico"
           data-prueba="una-forma"
           @click="unaSola"
         >

@@ -3,7 +3,7 @@ export default {
   titulo: "Presupuestos",
   nuevo: "Nuevo presupuesto",
   ajustes: "Ajustes",
-  buscar: "Buscar por cliente o folio",
+  buscar: "Buscar por nombre o folio",
   vacio: "Todavía no hay presupuestos.",
   sinResultados: "No hay presupuestos con ese filtro.",
   filtros: {
@@ -25,7 +25,8 @@ export default {
   },
   col: {
     folio: "Folio",
-    cliente: "Cliente",
+    // Para quién es: un alumno o un contacto que aún no lo es.
+    cliente: "Para",
     estado: "Estado",
     vigencia: "Vale hasta",
     total: "Total",
@@ -33,8 +34,8 @@ export default {
   editor: {
     tituloNuevo: "Nuevo presupuesto",
     titulo: "Presupuesto {folio}",
-    cliente: "Cliente",
-    esContacto: "Aún no es cliente",
+    cliente: "Alumno",
+    esContacto: "Aún no es alumno",
     contactoNombre: "Nombre",
     contactoCorreo: "Correo (opcional)",
     contactoCelular: "Celular (opcional)",
@@ -56,7 +57,7 @@ export default {
     descuentoLinea: "Descuento",
     quitar: "Quitar",
     descuentoGeneral: "Descuento general",
-    notas: "Notas para el cliente",
+    notas: "Notas para el alumno",
     subtotal: "Subtotal",
     descuento: "Descuento",
     impuestos: "Impuestos ({tasa})",
@@ -85,7 +86,7 @@ export default {
     verCobro: "Ver en Por cobrar",
     eliminar: "Eliminar borrador",
     confirmarAceptar:
-      "¿Marcar el presupuesto {folio} por {total} como aceptado por el cliente?",
+      "¿Marcar el presupuesto {folio} por {total} como aceptado por el alumno?",
     confirmarConvertir:
       "Se creará un cobro de {total} para {cliente} con los conceptos del presupuesto. ¿Continuar?",
     confirmarEliminar: "¿Eliminar el borrador {folio}? No se puede deshacer.",
@@ -95,7 +96,7 @@ export default {
     impuestos: "Impuestos",
     incluidos: "Precios con impuestos incluidos",
     incluidosAyuda:
-      "El total es lo que paga el cliente; el presupuesto dice cuánto de impuestos contiene.",
+      "El total es lo que paga el alumno; el presupuesto dice cuánto de impuestos contiene.",
     desglosados: "Impuestos desglosados",
     desglosadosAyuda: "Subtotal más impuestos igual al total.",
     tasa: "Tasa de impuestos (%)",
@@ -120,9 +121,9 @@ export default {
     imprimir: "Imprimir o guardar como PDF",
     volver: "Volver a presupuestos",
   },
-  // En línea: el cliente lo responde y lo paga desde su correo o su cuenta.
+  // En línea: el alumno lo responde y lo paga desde su correo o su cuenta.
   enLinea: {
-    porElCliente: "respondido por el cliente en línea",
+    porElCliente: "respondido por el alumno en línea",
     motivoDelCliente: "Su motivo: {motivo}",
     misTitulo: "Mis presupuestos",
     valeHasta: "Vale hasta el {fecha}",

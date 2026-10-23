@@ -6,7 +6,6 @@ namespace App\Console\Commands\Demos;
 
 use App\Modules\Tenancy\Application\AsistenciaTenant;
 use App\Modules\Tenancy\Application\BajaDeMembresiaTenant;
-use App\Modules\Tenancy\Application\CobroRecurrenteTenant;
 use App\Modules\Tenancy\Application\DeudaDeRenovacionTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
@@ -57,6 +56,7 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VideoTenant;
+use App\Modules\Tenancy\MotivoFalloCobro;
 use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -1215,7 +1215,7 @@ final class DemoGrecon extends DemoBase
         }
         $this->en($vence);
         app(DeudaDeRenovacionTenant::class)->de($acuerdo);
-        app(GestionarDunningTenant::class)->registrarFallo($acuerdo->refresh(), CobroRecurrenteTenant::MOTIVO_SIN_COBRO);
+        app(GestionarDunningTenant::class)->registrarFallo($acuerdo->refresh(), MotivoFalloCobro::SinCobroEnLinea, 'La pasarela no está activa en este negocio.');
         $this->sumar('membresías en mora');
     }
 

@@ -86,9 +86,12 @@ describe("cuotas del negocio", () => {
     await flushPromises();
     await w.get("#cu-inscripcion").setValue("1.2.3");
     expect(w.find('[role="alert"]').exists()).toBe(true);
-    expect(
-      (w.get('button[type="submit"]').element as HTMLButtonElement).disabled,
-    ).toBe(true);
+    // «Guardar» va en el pie del diálogo (PlanesView): el editor le avisa que no se
+    // puede guardar, y un Enter en un campo tampoco lo guarda.
+    expect(w.emitted("estado")?.at(-1)?.[0]).toMatchObject({ valido: false });
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.put).not.toHaveBeenCalled();
   });
 
   it("con coma decimal, lo guardado se muestra como en el país y se vuelve a leer igual", async () => {

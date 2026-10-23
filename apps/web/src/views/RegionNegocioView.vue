@@ -132,17 +132,17 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('region.titulo')" />
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("region.subtitulo") }}
-    </p>
+    <EncabezadoSeccion
+      :titulo="$t('region.titulo')"
+      :subtitulo="$t('region.subtitulo')"
+    />
 
     <AvisoTono v-if="error" tono="peligro" class="mt-6" role="alert">
       {{ error }}
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -300,11 +300,13 @@ onMounted(cargar);
         </p>
       </section>
 
-      <div class="flex justify-end lg:col-span-2">
+      <!-- Guardar siempre a la vista, al fondo de la pantalla. -->
+      <div class="tu-pie-acciones lg:col-span-2">
         <button
           type="submit"
           class="tu-btn tu-btn-primario"
           :disabled="guardando || !cambios"
+          :aria-busy="guardando || undefined"
           data-prueba="guardar-region"
         >
           {{ guardando ? $t("region.guardando") : $t("region.guardar") }}

@@ -4,7 +4,6 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
-import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -308,11 +307,10 @@ defineExpose({ cargar });
 <template>
   <div class="tu-card mt-5 p-5" data-prueba="cortes-nomina">
     <header class="nm-cabeza flex-wrap">
-      <span class="tu-icono-tono tu-tono-verde">
-        <IconoNav nombre="cobrar" :tam="20" />
-      </span>
-      <span class="min-w-0 flex-1">
-        <h2 class="font-semibold">{{ $t("nominaVisual.cortes.titulo") }}</h2>
+      <span class="min-w-0 flex-1 basis-64">
+        <h2 class="tu-titulo-seccion">
+          {{ $t("nominaVisual.cortes.titulo") }}
+        </h2>
         <p class="nm-sub">{{ $t("nominaVisual.cortes.ayuda") }}</p>
       </span>
       <span class="flex flex-col items-end gap-1">
@@ -350,12 +348,16 @@ defineExpose({ cargar });
       role="alert"
       data-prueba="error-cortes"
     >
-      <span class="flex flex-wrap items-center justify-between gap-3">
-        {{ $t("nominaVisual.cortes.errorCarga") }}
-        <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
+      {{ $t("nominaVisual.cortes.errorCarga") }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
           {{ $t("comun.reintentar") }}
         </button>
-      </span>
+      </template>
     </AvisoTono>
     <EstadoVacio
       v-else-if="cortes.length === 0"
@@ -364,13 +366,14 @@ defineExpose({ cargar });
       compacto
       :titulo="$t('nominaVisual.cortes.vacio')"
     />
-    <div v-else class="relative mt-4 overflow-x-auto">
+    <!-- En el teléfono, una ficha por periodo: el periodo abre su detalle. -->
+    <div v-else class="relative mt-4 overflow-x-auto tu-tabla-adaptable">
       <table class="tu-tabla">
         <thead>
           <tr>
             <th>{{ $t("nominaVisual.cortes.colPeriodo") }}</th>
-            <th>{{ $t("nominaVisual.cortes.colEstado") }}</th>
             <th class="text-right">{{ $t("nominaVisual.cortes.colTotal") }}</th>
+            <th>{{ $t("nominaVisual.cortes.colEstado") }}</th>
             <th>{{ $t("nominaVisual.cortes.colCerrado") }}</th>
             <th>{{ $t("nominaVisual.cortes.colPago") }}</th>
             <th>
@@ -380,46 +383,58 @@ defineExpose({ cargar });
         </thead>
         <tbody>
           <tr v-for="c in cortes" :key="c.id">
-            <td class="tabular-nums">
-              {{
-                $t("nominaVisual.cortes.del", {
-                  desde: fecha(c.desde),
-                  hasta: fecha(c.hasta),
-                })
-              }}
+            <td
+              class="tabular-nums"
+              :data-etiqueta="$t('nominaVisual.cortes.colPeriodo')"
+            >
+              <button type="button" class="cn-periodo" @click="verCorte(c.id)">
+                {{
+                  $t("nominaVisual.cortes.del", {
+                    desde: fecha(c.desde),
+                    hasta: fecha(c.hasta),
+                  })
+                }}
+              </button>
             </td>
-            <td>
+            <td
+              class="text-right tabular-nums"
+              :data-etiqueta="$t('nominaVisual.cortes.colTotal')"
+            >
+              <span>
+                {{ dinero(c.total_minor, c.moneda) }}
+                <span v-if="c.ajustes_minor !== 0" class="block nm-sub">{{
+                  $t("nominaVisual.cortes.conAjustes", {
+                    total: dinero(c.total_con_ajustes_minor, c.moneda),
+                  })
+                }}</span>
+              </span>
+            </td>
+            <td :data-etiqueta="$t('nominaVisual.cortes.colEstado')">
               <span
                 class="tu-estado"
                 :style="{ '--tono': tonoEstado(c.estado) }"
                 >{{ $t(`nominaVisual.cortes.estados.${c.estado}`) }}</span
               >
             </td>
-            <td class="text-right tabular-nums">
-              {{ dinero(c.total_minor, c.moneda) }}
-              <span v-if="c.ajustes_minor !== 0" class="block nm-sub">{{
-                $t("nominaVisual.cortes.conAjustes", {
-                  total: dinero(c.total_con_ajustes_minor, c.moneda),
-                })
-              }}</span>
+            <td :data-etiqueta="$t('nominaVisual.cortes.colCerrado')">
+              <span>
+                {{ c.cerrado_por ?? "—" }}
+                <span class="block nm-sub">{{ fecha(c.cerrado_en) }}</span>
+              </span>
             </td>
-            <td>
-              {{ c.cerrado_por ?? "—" }}
-              <span class="block nm-sub">{{ fecha(c.cerrado_en) }}</span>
-            </td>
-            <td>
-              <template v-if="c.estado === 'pagado'">
+            <td :data-etiqueta="$t('nominaVisual.cortes.colPago')">
+              <span v-if="c.estado === 'pagado'">
                 {{ c.referencia_pago }}
                 <span v-if="c.pagado_en" class="block nm-sub">{{
                   fecha(c.pagado_en)
                 }}</span>
-              </template>
+              </span>
               <span v-else class="nm-sub">—</span>
             </td>
-            <td class="text-right">
+            <td class="tu-celda-acciones">
               <button
                 type="button"
-                class="tu-btn tu-btn-secundario"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 :data-prueba="`ver-corte-${c.id}`"
                 @click="verCorte(c.id)"
               >
@@ -566,7 +581,7 @@ defineExpose({ cargar });
                   d.diferencia_minor !== 0
                 "
                 type="button"
-                class="tu-btn tu-btn-secundario"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 @click="usarDiferencia(d)"
               >
                 {{ $t("nominaVisual.cortes.usarDiferencia") }}
@@ -615,25 +630,6 @@ defineExpose({ cargar });
             <p v-else class="nm-sub mt-1">
               {{ $t("nominaVisual.cortes.pago.ayuda") }}
             </p>
-          </div>
-          <div class="flex flex-wrap justify-between gap-2">
-            <button
-              type="button"
-              class="tu-btn tu-btn-secundario"
-              data-prueba="reabrir-corte"
-              @click="reabrir"
-            >
-              {{ $t("nominaVisual.cortes.reabrir") }}
-            </button>
-            <button
-              type="submit"
-              class="tu-btn tu-btn-primario"
-              :disabled="
-                editorPago.guardando.value || pago.referencia.trim() === ''
-              "
-            >
-              {{ $t("nominaVisual.cortes.pago.guardar") }}
-            </button>
           </div>
         </form>
 
@@ -764,19 +760,59 @@ defineExpose({ cargar });
               />
               {{ $t("nominaVisual.cortes.ajuste.compensa") }}
             </label>
-            <div class="flex justify-end">
-              <button
-                type="submit"
-                class="tu-btn tu-btn-primario"
-                :disabled="editorAjuste.guardando.value"
-                data-prueba="guardar-ajuste"
-              >
-                {{ $t("nominaVisual.cortes.ajuste.guardar") }}
-              </button>
-            </div>
           </form>
         </template>
       </div>
+
+      <!-- Las acciones del formulario a la vista, en el pie: cerrado, registrar su
+           pago (o reabrirlo); pagado, agregar un ajuste. -->
+      <template v-if="detalle && !cargandoDetalle && !errorDetalle" #pie>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <button
+            v-if="detalle.estado === 'cerrado'"
+            type="button"
+            class="tu-btn tu-btn-secundario mr-auto"
+            data-prueba="reabrir-corte"
+            :disabled="editorPago.guardando.value"
+            @click="reabrir"
+          >
+            {{ $t("nominaVisual.cortes.reabrir") }}
+          </button>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            :disabled="
+              editorPago.guardando.value || editorAjuste.guardando.value
+            "
+            @click="cerrarDetalle"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            v-if="detalle.estado === 'cerrado'"
+            type="submit"
+            form="form-pago-nomina"
+            class="tu-btn tu-btn-primario"
+            :disabled="
+              editorPago.guardando.value || pago.referencia.trim() === ''
+            "
+            :aria-busy="editorPago.guardando.value || undefined"
+          >
+            {{ $t("nominaVisual.cortes.pago.guardar") }}
+          </button>
+          <button
+            v-else
+            type="submit"
+            form="form-ajuste-nomina"
+            class="tu-btn tu-btn-primario"
+            :disabled="editorAjuste.guardando.value"
+            :aria-busy="editorAjuste.guardando.value || undefined"
+            data-prueba="guardar-ajuste"
+          >
+            {{ $t("nominaVisual.cortes.ajuste.guardar") }}
+          </button>
+        </div>
+      </template>
     </PanelLateral>
   </div>
 </template>
@@ -790,5 +826,24 @@ defineExpose({ cargar });
 .nm-sub {
   color: var(--texto-suave);
   font-size: 0.85rem;
+}
+/* El periodo abre su detalle: se lee como el nombre de la fila, no como enlace. */
+.cn-periodo {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.cn-periodo:hover {
+  text-decoration: underline;
+}
+.cn-periodo:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
 }
 </style>

@@ -16,6 +16,7 @@ import TarjetasIndicadores, {
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useDescartarCambios } from "@/lib/editorFormulario";
@@ -240,6 +241,19 @@ const filtroVenta = ref<"" | "activo" | "inactivo">("");
 const filtroStock = ref<"" | EstadoStock>("");
 // Una categoría, «sin categoría» (`-`) o todas ("").
 const filtroCategoria = ref("");
+// La búsqueda y los filtros en la dirección: recargar o volver atrás los conserva.
+// Antes de vigilarlos, para que lo leído de la dirección no cargue de más.
+useFiltrosEnUrl({
+  q: busqueda,
+  venta: opcionEnUrl(filtroVenta, ["", "activo", "inactivo"] as const),
+  stock: opcionEnUrl(filtroStock, [
+    "",
+    "con_stock",
+    "bajo",
+    "sin_stock",
+  ] as const),
+  categoria: filtroCategoria,
+});
 // El servidor ya los trae buscados y filtrados.
 const visibles = computed(() => articulos.value);
 let esperaBusqueda: ReturnType<typeof setTimeout> | undefined;
@@ -772,7 +786,7 @@ onMounted(cargar);
         <div class="tu-card mt-5">
           <!-- Búsqueda y filtros -->
           <div class="iv-filtros">
-            <label class="iv-buscar">
+            <label class="tu-buscar">
               <IconoNav nombre="buscar" :tam="16" />
               <input
                 v-model="busqueda"
@@ -832,14 +846,13 @@ onMounted(cargar);
             </label>
           </div>
 
-          <div class="relative overflow-x-auto">
-            <table class="iv-tabla">
+          <!-- En el teléfono, una ficha por producto: su nombre, precio, stock y sus
+               acciones a la vista. -->
+          <div class="relative overflow-x-auto tu-tabla-adaptable">
+            <table class="tu-tabla">
               <thead>
                 <tr>
                   <th>{{ $t("inventarioVisual.col.producto") }}</th>
-                  <th class="hidden sm:table-cell">
-                    {{ $t("inventarioVisual.col.sku") }}
-                  </th>
                   <th class="text-right">
                     {{ $t("inventarioVisual.col.precio") }}
                   </th>
@@ -847,6 +860,9 @@ onMounted(cargar);
                     {{ $t("inventarioVisual.col.stock") }}
                   </th>
                   <th>{{ $t("inventarioVisual.col.estado") }}</th>
+                  <th class="hidden sm:table-cell">
+                    {{ $t("inventarioVisual.col.sku") }}
+                  </th>
                   <th>
                     <span class="sr-only">{{
                       $t("inventarioVisual.col.acciones")
@@ -861,7 +877,7 @@ onMounted(cargar);
                   :class="{ 'iv-inactivo': !a.activo }"
                   data-prueba="producto"
                 >
-                  <td>
+                  <td :data-etiqueta="$t('inventarioVisual.col.producto')">
                     <div class="flex items-center gap-3">
                       <img
                         v-if="a.foto_url"
@@ -873,67 +889,82 @@ onMounted(cargar);
                         iniciales(a.nombre)
                       }}</span>
                       <div class="min-w-0">
-                        <p class="font-medium truncate">{{ a.nombre }}</p>
+                        <p class="font-medium">{{ a.nombre }}</p>
                         <p
                           v-if="a.categoria"
-                          class="iv-sub"
+                          class="tu-sub font-normal"
                           data-prueba="categoria-producto"
                         >
                           {{ a.categoria.nombre }}
                         </p>
-                        <p v-if="!a.activo" class="iv-sub">
+                        <p v-if="!a.activo" class="tu-sub font-normal">
                           {{ $t("inventarioExtra.inactivo") }}
                         </p>
-                        <p v-else-if="desglose(a)" class="iv-sub">
+                        <p v-else-if="desglose(a)" class="tu-sub font-normal">
                           {{ desglose(a) }}
                         </p>
                       </div>
                     </div>
                   </td>
-                  <td class="hidden sm:table-cell iv-suave">
-                    {{ a.sku ?? "—" }}
-                  </td>
-                  <td class="text-right tabular-nums font-medium">
+                  <td
+                    :data-etiqueta="$t('inventarioVisual.col.precio')"
+                    class="text-right tabular-nums font-medium"
+                  >
                     {{ dinero(a.precio_minor, a.moneda) }}
                   </td>
-                  <td class="text-right tabular-nums" data-prueba="stock">
+                  <td
+                    :data-etiqueta="$t('inventarioVisual.col.stock')"
+                    class="text-right tabular-nums"
+                    data-prueba="stock"
+                  >
                     {{ stockDe(a) }}
                   </td>
-                  <td>
+                  <td :data-etiqueta="$t('inventarioVisual.col.estado')">
                     <span
-                      class="tu-pildora"
+                      class="tu-estado"
                       :style="{ '--tono': TONOS[estadoDe(a)] }"
                       :data-estado="estadoDe(a)"
                       >{{ $t(`inventarioVisual.estado.${estadoDe(a)}`) }}</span
                     >
                   </td>
-                  <td class="text-right whitespace-nowrap">
-                    <template v-if="puedeGestionar">
+                  <td
+                    :data-etiqueta="$t('inventarioVisual.col.sku')"
+                    class="hidden sm:table-cell iv-suave"
+                  >
+                    {{ a.sku ?? "—" }}
+                  </td>
+                  <td class="tu-celda-acciones">
+                    <span
+                      class="inline-flex flex-wrap items-center justify-end gap-2"
+                    >
+                      <template v-if="puedeGestionar">
+                        <button
+                          type="button"
+                          class="tu-btn tu-btn-secundario tu-btn-chico"
+                          data-prueba="movimiento"
+                          @click="abrirMovimiento(a)"
+                        >
+                          {{ $t("inventarioVisual.movimiento") }}
+                        </button>
+                        <button
+                          type="button"
+                          class="tu-btn tu-btn-secundario tu-btn-chico"
+                          data-prueba="editar"
+                          @click="editar(a)"
+                        >
+                          {{ $t("inventarioExtra.editar") }}
+                        </button>
+                      </template>
+                      <!-- Solo consulta: entradas, ajustes y ventas. -->
                       <button
                         type="button"
                         class="tu-enlace text-sm"
-                        data-prueba="movimiento"
-                        @click="abrirMovimiento(a)"
+                        data-prueba="historial"
+                        @click="abrirHistorial(a)"
                       >
-                        {{ $t("inventarioVisual.movimiento") }}
+                        {{ $t("inventarioVisual.historial.ver") }}
                       </button>
-                      <button
-                        type="button"
-                        class="tu-enlace text-sm ml-4"
-                        data-prueba="editar"
-                        @click="editar(a)"
-                      >
-                        {{ $t("inventarioExtra.editar") }}
-                      </button>
-                    </template>
-                    <button
-                      type="button"
-                      class="tu-enlace text-sm ml-4"
-                      data-prueba="historial"
-                      @click="abrirHistorial(a)"
-                    >
-                      {{ $t("inventarioVisual.historial.ver") }}
-                    </button>
+                    </span>
                   </td>
                 </tr>
               </tbody>
@@ -943,7 +974,7 @@ onMounted(cargar);
               <button
                 v-if="hayFiltros"
                 type="button"
-                class="tu-enlace"
+                class="tu-btn tu-btn-discreto"
                 @click="limpiar"
               >
                 {{ $t("inventarioVisual.limpiar") }}
@@ -1100,9 +1131,10 @@ onMounted(cargar);
               <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
                 $t("operacion.productos.fotoAlGuardar")
               }}</span>
+              <!-- Aún no se sube: solo se deja de elegir. -->
               <button
                 type="button"
-                class="tu-btn tu-btn-peligro tu-btn-chico"
+                class="tu-btn tu-btn-discreto tu-btn-chico"
                 @click="olvidarFotoNueva"
               >
                 {{ $t("operacion.productos.fotoQuitar") }}
@@ -1225,6 +1257,7 @@ onMounted(cargar);
           class="tu-btn tu-btn-primario"
           data-prueba="guardar-producto"
           :disabled="guardando || !formValido"
+          :aria-busy="guardando || undefined"
         >
           {{ $t("pos.inventario.guardar") }}
         </button>
@@ -1236,6 +1269,7 @@ onMounted(cargar);
       :abierto="dialogoCategorias"
       :titulo="$t('operacion.productos.categoriasTitulo')"
       icono="pos"
+      tam="md"
       :ocupado="guardando"
       @cerrar="dialogoCategorias = false"
     >
@@ -1441,6 +1475,7 @@ onMounted(cargar);
           class="tu-btn tu-btn-primario"
           data-prueba="guardar-movimiento"
           :disabled="guardando || !movimientoValido"
+          :aria-busy="guardando || undefined"
         >
           {{ $t("inventarioVisual.registrar") }}
         </button>
@@ -1570,46 +1605,12 @@ onMounted(cargar);
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--borde);
 }
-.iv-buscar {
-  position: relative;
-  flex: 1 1 16rem;
-  color: var(--texto-suave);
-}
-.iv-buscar > :first-child {
-  position: absolute;
-  top: 50%;
-  left: 0.75rem;
-  transform: translateY(-50%);
-}
-.iv-buscar > input {
-  padding-left: 2.25rem;
-}
 .iv-filtro {
   display: grid;
   gap: 0.25rem;
   min-width: 9.5rem;
   color: var(--texto-suave);
   font-size: 0.78rem;
-}
-.iv-tabla {
-  width: 100%;
-  font-size: 0.9rem;
-  border-collapse: collapse;
-}
-.iv-tabla th {
-  padding: 0.7rem 1rem;
-  color: var(--texto-suave);
-  font-size: 0.78rem;
-  font-weight: 500;
-  text-align: left;
-}
-.iv-tabla th.text-right {
-  text-align: right;
-}
-.iv-tabla td {
-  padding: 0.7rem 1rem;
-  border-top: 1px solid var(--borde);
-  vertical-align: middle;
 }
 .iv-inactivo td {
   color: var(--texto-suave);
@@ -1626,18 +1627,18 @@ onMounted(cargar);
   font-size: 0.8rem;
   font-weight: 600;
 }
+/* Sublíneas de los diálogos: bajan de renglón en vez de ensanchar. */
 .iv-sub {
-  overflow: hidden;
   color: var(--texto-suave);
   font-size: 0.78rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .iv-suave {
   color: var(--texto-suave);
 }
 .iv-sin-resultados {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 0.75rem;
   padding: 2rem 1rem;

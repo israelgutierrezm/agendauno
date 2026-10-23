@@ -186,7 +186,7 @@ onMounted(() => void cargar());
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ t("plataformaAdmin.equipo.reintentar") }}
@@ -195,7 +195,7 @@ onMounted(() => void cargar());
     </AvisoTono>
 
     <section class="tu-card p-5">
-      <h2 class="font-medium text-lg">
+      <h2 class="tu-titulo-seccion">
         {{ t("plataformaAdmin.equipo.titulo") }}
       </h2>
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -249,22 +249,23 @@ onMounted(() => void cargar());
                 :placeholder="t('plataformaAdmin.equipo.nuevaContrasena')"
               />
               <button
-                type="submit"
-                class="tu-btn tu-btn-primario"
-                :disabled="nuevaContrasena.length < 12 || accionando !== null"
-              >
-                {{ t("plataformaAdmin.equipo.guardar") }}
-              </button>
-              <button
                 type="button"
-                class="tu-enlace text-sm"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
                 @click="cambiando = null"
               >
                 {{ t("plataformaAdmin.equipo.cancelar") }}
               </button>
+              <button
+                type="submit"
+                class="tu-btn tu-btn-primario tu-btn-chico"
+                :disabled="nuevaContrasena.length < 12 || accionando !== null"
+                :aria-busy="accionando === o.id || undefined"
+              >
+                {{ t("plataformaAdmin.equipo.guardar") }}
+              </button>
             </form>
           </div>
-          <div class="flex items-center gap-3 shrink-0">
+          <div class="flex flex-wrap items-center gap-2">
             <span
               class="tu-estado text-sm"
               :style="{
@@ -278,7 +279,7 @@ onMounted(() => void cargar());
             >
             <button
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               :disabled="accionando !== null"
               @click="
                 cambiando = o.id;
@@ -287,10 +288,12 @@ onMounted(() => void cargar());
             >
               {{ t("plataformaAdmin.equipo.cambiarContrasena") }}
             </button>
+            <!-- Desactivar es destructiva (pide confirmación); activar, no. -->
             <button
               v-if="!o.soy_yo"
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-chico"
+              :class="o.activo ? 'tu-btn-peligro' : 'tu-btn-secundario'"
               :disabled="accionando !== null"
               @click="cambiarActivo(o)"
             >
@@ -361,7 +364,7 @@ onMounted(() => void cargar());
     </section>
 
     <section class="tu-card p-5">
-      <h2 class="font-medium text-lg">
+      <h2 class="tu-titulo-seccion">
         {{ t("plataformaAdmin.equipo.sesionesTitulo") }}
       </h2>
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -397,9 +400,10 @@ onMounted(() => void cargar());
               }}
             </p>
           </div>
+          <!-- Revoca la sesión: destructiva. -->
           <button
             type="button"
-            class="tu-enlace text-sm shrink-0"
+            class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
             :disabled="accionando !== null"
             @click="cerrarSesion(s)"
           >

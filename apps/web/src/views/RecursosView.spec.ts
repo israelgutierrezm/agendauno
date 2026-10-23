@@ -129,10 +129,14 @@ describe("salas y equipos", () => {
     expect(w.text()).toContain("Sucursal: Roma Norte");
     await w.get("#rn").setValue("Cabina principal");
     await w.get("#rt").setValue("Masaje");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "Guardar cambios")!
-      .trigger("click");
+    // «Guardar cambios» va en el pie y envía el formulario del panel.
+    expect(
+      w
+        .findAll("button")
+        .find((b) => b.text() === "Guardar cambios")!
+        .attributes("form"),
+    ).toBe("form-recurso");
+    await w.get("#form-recurso").trigger("submit");
     await flushPromises();
     expect(mocks.put).toHaveBeenCalledWith("/api/v1/app/demo/recursos/1", {
       nombre: "Cabina principal",

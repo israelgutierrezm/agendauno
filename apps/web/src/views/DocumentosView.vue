@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
@@ -13,6 +13,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { conMarca, productoDeModalidad } from "@/lib/producto";
 import plantillaAvisoNegocio from "@/marketing/legales/aviso-negocio.txt?raw";
 import { useDescartarCambios } from "@/lib/editorFormulario";
@@ -61,27 +62,19 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("documentos.gestionar"));
 const puedeSubir = computed(() => sesion.puede("documentos.subir"));
 
-// La vista va en la dirección (`?vista=`): Clientes › Expedientes es la de
-// documentos; Configuración › Documentos y privacidad abre requisitos o
-// consentimientos. Recargar o volver conserva la vista.
+// La vista la decide la navegación (`?vista=`) y la página solo la lee: Alumnos ›
+// Expedientes es la de documentos; Configuración › Documentos y privacidad abre
+// requisitos o consentimientos. Recargar o volver conserva la vista.
 const route = useRoute();
-const router = useRouter();
-const pestana = computed<Pestana>({
-  get: () => {
-    const v = route.query.vista;
-    if (v === "requisitos") {
-      return "requisitos";
-    }
-    // Sin permiso de gestión no hay consentimientos: se queda en documentos.
-    return v === "consentimientos" && puedeGestionar.value
-      ? "consentimientos"
-      : "documentos";
-  },
-  set: (p) => {
-    void router.push({
-      query: { ...route.query, vista: p === "documentos" ? undefined : p },
-    });
-  },
+const pestana = computed<Pestana>(() => {
+  const v = route.query.vista;
+  if (v === "requisitos") {
+    return "requisitos";
+  }
+  // Sin permiso de gestión no hay consentimientos: se queda en documentos.
+  return v === "consentimientos" && puedeGestionar.value
+    ? "consentimientos"
+    : "documentos";
 });
 const TITULOS: Record<Pestana, string> = {
   documentos: "nav.vistas.expedientes",
@@ -97,6 +90,9 @@ const error = ref<string | null>(null);
 // Las listas no se pudieron consultar: ninguna pestaña dice «aún no hay».
 const errorCarga = ref(false);
 const filtroEstado = ref("");
+const ESTADOS_DOC = ["", "pendiente", "aprobado", "rechazado"];
+// El estado elegido va en la dirección: recargar o compartir el enlace lo conserva.
+useFiltrosEnUrl({ estado: opcionEnUrl(filtroEstado, ESTADOS_DOC) });
 // El listado va por páginas: ningún documento se queda fuera (antes, solo los
 // últimos 200).
 interface MetaPaginas {
@@ -397,7 +393,7 @@ function nuevoConsentimiento(): void {
   abrirEditor(null);
 }
 
-// El aviso de privacidad del negocio para sus clientes (clave reservada): se firma
+// El aviso de privacidad del negocio para sus alumnos (clave reservada): se firma
 // en su cuenta y además se publica en su página y al agendar sin cuenta.
 const CLAVE_AVISO = "aviso-privacidad";
 const tieneAviso = computed(() =>
@@ -501,11 +497,17 @@ onMounted(cargar);
 <template>
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t(TITULOS[pestana])">
-      <template
-        v-if="pestana === 'consentimientos' && puedeGestionar"
-        #acciones
-      >
+      <template v-if="puedeGestionar && pestana !== 'documentos'" #acciones>
         <button
+          v-if="pestana === 'requisitos'"
+          type="button"
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          @click="abrirNuevoRequisito"
+        >
+          {{ $t("adminUsabilidad.documentos.nuevo") }}
+        </button>
+        <button
+          v-else
           type="button"
           class="tu-btn tu-btn-primario tu-btn-crear"
           @click="nuevoConsentimiento"
@@ -523,7 +525,7 @@ onMounted(cargar);
       <button
         v-if="errorCarga"
         type="button"
-        class="tu-enlace ml-2"
+        class="tu-btn tu-btn-discreto tu-btn-chico ml-2"
         data-prueba="reintentar-documentos"
         @click="cargar"
       >
@@ -533,14 +535,18 @@ onMounted(cargar);
 
     <!-- Documentos cargados -->
     <div v-if="!cargando && pestana === 'documentos'" class="mt-5 space-y-5">
-      <div class="relative tu-card min-w-0 overflow-x-auto">
+      <div class="relative tu-card min-w-0 overflow-x-auto tu-tabla-adaptable">
         <div class="tu-filtros">
           <h2 class="font-medium mr-auto">
             {{ $t("documentos.docs.titulo") }}
           </h2>
-          <div class="tu-segmentado" role="group">
+          <div
+            class="tu-segmentado"
+            role="group"
+            :aria-label="$t('documentos.docs.filtro')"
+          >
             <button
-              v-for="f in ['', 'pendiente', 'aprobado', 'rechazado']"
+              v-for="f in ESTADOS_DOC"
               :key="f"
               type="button"
               :aria-pressed="filtroEstado === f"
@@ -605,20 +611,25 @@ onMounted(cargar);
           </thead>
           <tbody>
             <tr v-for="d in docs" :key="d.id" data-prueba="documento">
-              <td>
+              <td :data-etiqueta="$t('documentosVisual.col.persona')">
                 <span class="font-medium">{{ d.persona ?? "—" }}</span>
-                <span class="tu-sub sm:hidden">{{ d.tipo ?? d.nombre }}</span>
               </td>
-              <td class="hidden sm:table-cell">{{ d.tipo ?? d.nombre }}</td>
+              <td
+                class="hidden sm:table-cell"
+                :data-etiqueta="$t('documentosVisual.col.documento')"
+              >
+                {{ d.tipo ?? d.nombre }}
+              </td>
               <td
                 class="hidden md:table-cell whitespace-nowrap"
                 :style="{ color: 'var(--texto-suave)' }"
+                :data-etiqueta="$t('documentosVisual.col.subido')"
               >
                 {{ fecha(d.subido_en) }}
               </td>
-              <td>
+              <td :data-etiqueta="$t('documentosVisual.col.estado')">
                 <span
-                  class="tu-pildora"
+                  class="tu-estado"
                   :style="{
                     '--tono':
                       d.estado === 'aprobado'
@@ -630,27 +641,30 @@ onMounted(cargar);
                   >{{ $t(`documentos.docs.${d.estado}`) }}</span
                 >
               </td>
-              <td class="text-right whitespace-nowrap">
-                <template v-if="puedeGestionar && d.estado === 'pendiente'">
-                  <button
-                    class="tu-enlace text-sm"
-                    :disabled="accionando"
-                    @click="validar(d, 'aprobado')"
-                  >
-                    {{ $t("documentos.docs.aprobar") }}
+              <td class="tu-celda-acciones">
+                <div class="inline-flex flex-wrap items-center gap-2">
+                  <template v-if="puedeGestionar && d.estado === 'pendiente'">
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
+                      :disabled="accionando"
+                      @click="validar(d, 'aprobado')"
+                    >
+                      {{ $t("documentos.docs.aprobar") }}
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-peligro tu-btn-chico"
+                      :disabled="accionando"
+                      @click="pedirRechazo(d)"
+                    >
+                      {{ $t("documentos.docs.rechazar") }}
+                    </button>
+                  </template>
+                  <button type="button" class="tu-enlace" @click="ver(d)">
+                    {{ $t("documentos.docs.ver") }}
                   </button>
-                  <button
-                    class="tu-enlace text-sm ml-3"
-                    style="color: var(--error)"
-                    :disabled="accionando"
-                    @click="pedirRechazo(d)"
-                  >
-                    {{ $t("documentos.docs.rechazar") }}
-                  </button>
-                </template>
-                <button class="tu-enlace text-sm ml-3" @click="ver(d)">
-                  {{ $t("documentos.docs.ver") }}
-                </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -732,25 +746,14 @@ onMounted(cargar);
       class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
     >
       <div class="tu-card p-5 min-w-0">
-        <div class="flex flex-wrap justify-between items-center gap-3">
-          <h2 class="font-semibold">{{ $t("documentos.tipos.titulo") }}</h2>
-          <button
-            v-if="puedeGestionar"
-            type="button"
-            class="tu-btn tu-btn-primario tu-btn-crear"
-            @click="abrirNuevoRequisito"
-          >
-            {{ $t("adminUsabilidad.documentos.nuevo") }}
-          </button>
-        </div>
         <EstadoVacio
           v-if="tipos.length === 0 && !errorCarga"
-          class="mt-4 py-6"
+          class="py-6"
           icono="documentos"
           compacto
           :titulo="$t('documentos.tipos.vacio')"
         />
-        <ul v-else-if="tipos.length > 0" class="mt-2">
+        <ul v-else-if="tipos.length > 0">
           <li v-for="t2 in tipos" :key="t2.id" class="doc-fila text-sm">
             <ModalDialogo
               v-if="puedeGestionar && editandoTipo === t2.id"
@@ -763,7 +766,11 @@ onMounted(cargar);
               :ocupado="accionando"
               @cerrar="cerrarTipo"
             >
-              <form class="w-full space-y-3 py-1" @submit.prevent="guardarTipo">
+              <form
+                id="form-requisito-editar"
+                class="w-full space-y-3 py-1"
+                @submit.prevent="guardarTipo"
+              >
                 <AvisoTono v-if="errorTipo" tono="peligro" role="alert">
                   {{ errorTipo }}
                 </AvisoTono>
@@ -816,24 +823,26 @@ onMounted(cargar);
                     {{ $t("documentosTabs.activo") }}
                   </label>
                 </div>
-                <div class="flex gap-2">
-                  <button
-                    type="submit"
-                    class="tu-btn tu-btn-primario"
-                    :disabled="accionando"
-                  >
-                    {{ $t("documentosTabs.guardar") }}
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-secundario"
-                    :disabled="accionando"
-                    @click="cerrarTipo"
-                  >
-                    {{ $t("comun.cancelar") }}
-                  </button>
-                </div>
               </form>
+              <template #pie>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-secundario"
+                  :disabled="accionando"
+                  @click="cerrarTipo"
+                >
+                  {{ $t("comun.cancelar") }}
+                </button>
+                <button
+                  type="submit"
+                  form="form-requisito-editar"
+                  class="tu-btn tu-btn-primario"
+                  :disabled="accionando || tipoEditado.nombre.trim() === ''"
+                  :aria-busy="accionando || undefined"
+                >
+                  {{ $t("documentosTabs.guardar") }}
+                </button>
+              </template>
             </ModalDialogo>
             <div class="contents">
               <div class="min-w-0">
@@ -852,8 +861,12 @@ onMounted(cargar);
                     >· {{ $t("documentos.tipos.obligatorio") }}</span
                   >
                   <span
-                    class="tu-badge"
-                    :class="t2.activo ? 'tu-badge-exito' : ''"
+                    class="tu-estado"
+                    :style="{
+                      '--tono': t2.activo
+                        ? 'var(--exito)'
+                        : 'var(--texto-suave)',
+                    }"
                     >{{
                       $t(
                         t2.activo
@@ -867,7 +880,7 @@ onMounted(cargar);
               <button
                 v-if="puedeGestionar"
                 type="button"
-                class="tu-enlace shrink-0"
+                class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
                 @click="editarTipo(t2)"
               >
                 {{ $t("documentosTabs.editar") }}
@@ -883,11 +896,12 @@ onMounted(cargar);
         :titulo="$t('adminUsabilidad.documentos.nuevo')"
         :descripcion="$t('adminUsabilidad.documentos.ayuda')"
         icono="documentos"
+        tam="md"
         :ocupado="creandoTipo"
         @cerrar="cerrarNuevoRequisito"
       >
         <form
-          v-if="puedeGestionar"
+          id="form-requisito-nuevo"
           class="space-y-4"
           @submit.prevent="crearTipo"
         >
@@ -932,28 +946,30 @@ onMounted(cargar);
             <input v-model="nuevoTipo.obligatorio" type="checkbox" />
             {{ $t("documentos.tipos.obligatorio") }}
           </label>
-          <div class="flex justify-end gap-2">
-            <button
-              type="button"
-              class="tu-btn tu-btn-secundario"
-              :disabled="creandoTipo"
-              @click="cerrarNuevoRequisito"
-            >
-              {{ $t("comun.cancelar") }}
-            </button>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="creandoTipo || nuevoTipo.nombre.trim() === ''"
-            >
-              {{ $t("documentos.tipos.crear") }}
-            </button>
-          </div>
         </form>
+        <template #pie>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            :disabled="creandoTipo"
+            @click="cerrarNuevoRequisito"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            type="submit"
+            form="form-requisito-nuevo"
+            class="tu-btn tu-btn-primario"
+            :disabled="creandoTipo || nuevoTipo.nombre.trim() === ''"
+            :aria-busy="creandoTipo || undefined"
+          >
+            {{ $t("documentos.tipos.crear") }}
+          </button>
+        </template>
       </ModalDialogo>
     </div>
 
-    <!-- Aviso de privacidad para los clientes: lo pide la ley antes de sus datos -->
+    <!-- Aviso de privacidad para los alumnos: lo pide la ley antes de sus datos -->
     <div
       v-if="
         !cargando &&
@@ -1020,13 +1036,16 @@ onMounted(cargar);
             >
               {{ $t("consentimientos.verTexto") }}
             </button>
-            <button type="button" class="tu-enlace" @click="nuevaVersion(c)">
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
+              @click="nuevaVersion(c)"
+            >
               {{ $t("consentimientos.nuevaVersion") }}
             </button>
             <button
               type="button"
-              class="tu-enlace"
-              style="color: var(--error)"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
               :disabled="accionando"
               @click="retirar(c)"
             >
@@ -1111,6 +1130,7 @@ onMounted(cargar);
             form="form-consentimiento"
             class="tu-btn tu-btn-primario"
             :disabled="publicando"
+            :aria-busy="publicando || undefined"
           >
             {{ $t("consentimientos.publicar") }}
           </button>
@@ -1165,6 +1185,7 @@ onMounted(cargar);
         <button
           type="button"
           class="tu-btn tu-btn-secundario"
+          :disabled="accionando"
           @click="rechazando = null"
         >
           {{ $t("comun.cancelar") }}
@@ -1172,9 +1193,9 @@ onMounted(cargar);
         <button
           type="submit"
           form="form-rechazo"
-          class="tu-btn tu-btn-primario"
-          :style="{ background: 'var(--error)', borderColor: 'var(--error)' }"
+          class="tu-btn tu-btn-solido tu-tono-peligro"
           :disabled="accionando"
+          :aria-busy="accionando || undefined"
         >
           {{ $t("documentos.docs.rechazar") }}
         </button>

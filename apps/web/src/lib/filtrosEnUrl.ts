@@ -51,7 +51,7 @@ export function fechaEnUrl(campo: Ref<string>): WritableComputedRef<string> {
 export function useFiltrosEnUrl(campos: Record<string, Campo>): void {
   const route = useRoute();
   const router = useRouter();
-  if (!route || !router) {
+  if (!route?.query || !router) {
     return;
   }
   for (const [clave, campo] of Object.entries(campos)) {
@@ -71,7 +71,8 @@ export function useFiltrosEnUrl(campos: Record<string, Campo>): void {
           query[clave] = campo.value;
         }
       }
-      void router.replace({ query });
+      // Con su ancla: Reglas de agenda vive en `#programacion`, `#politicas`…
+      void router.replace({ query, hash: route.hash });
     },
   );
 }

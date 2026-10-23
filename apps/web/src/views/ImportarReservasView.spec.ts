@@ -16,6 +16,7 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     zonaHoraria: "America/Mexico_City",
+    terminologia: { sesion: "Clase", miembro: "Alumno", instructor: "Coach" },
   }),
 }));
 const confirmar = vi.hoisted(() =>

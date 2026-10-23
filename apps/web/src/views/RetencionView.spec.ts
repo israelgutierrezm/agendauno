@@ -14,6 +14,8 @@ vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("vue-router", () => ({
   RouterLink: { template: "<a><slot /></a>" },
   useRoute: () => ({ query: {} }),
+  // Sin router, la pestaña y los filtros viven en memoria (lib/filtrosEnUrl).
+  useRouter: () => undefined,
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({

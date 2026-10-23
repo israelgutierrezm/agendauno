@@ -11,6 +11,7 @@ import DevolverVenta, {
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { fechaEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import {
   puedeFacturarVentas,
   rutaFacturaDeVenta,
@@ -115,6 +116,12 @@ const error = ref<string | null>(null);
 const desde = ref("");
 const hasta = ref("");
 const filtrando = computed(() => desde.value !== "" || hasta.value !== "");
+// Las fechas en la dirección (recargar o volver atrás las conserva), con claves
+// propias para no chocar con los filtros de la pantalla que lo muestra.
+useFiltrosEnUrl({
+  ventas_desde: fechaEnUrl(desde),
+  ventas_hasta: fechaEnUrl(hasta),
+});
 const corrigiendo = ref<string | null>(null);
 // La venta de la que se devuelven productos (ADR 0178).
 const devolviendo = ref<string | null>(null);
@@ -211,7 +218,8 @@ onMounted(cargar);
 <template>
   <section data-prueba="ventas-mostrador">
     <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-      <h2 :class="personaId ? 'text-sm font-semibold' : 'font-medium'">
+      <!-- En la ficha es un apartado más; en el mostrador, una sección de la página. -->
+      <h2 :class="personaId ? 'text-sm font-semibold' : 'tu-titulo-seccion'">
         {{ titulo ?? $t("pos.ventas.titulo") }}
       </h2>
       <p
@@ -256,7 +264,7 @@ onMounted(cargar);
         <button
           v-if="filtrando"
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-discreto"
           data-prueba="ventas-quitar-filtro"
           @click="quitarFiltro"
         >
@@ -284,14 +292,18 @@ onMounted(cargar);
             : $t('pos.ventas.vacio')
         "
       />
-      <div v-else class="relative overflow-x-auto">
-        <table class="mo-tabla">
+      <!-- En el teléfono, una ficha por venta: a quién (o cuándo, en la ficha de la
+           persona), cuánto y sus acciones a la vista. -->
+      <div v-else class="relative overflow-x-auto tu-tabla-adaptable">
+        <table class="tu-tabla">
           <thead>
             <tr>
-              <th>{{ $t("mostradorVisual.col.cuando") }}</th>
               <th v-if="!personaId">
                 {{ $t("mostradorVisual.col.ventaA") }}
               </th>
+              <th v-else>{{ $t("mostradorVisual.col.cuando") }}</th>
+              <th class="text-right">{{ $t("pos.ventas.colTotal") }}</th>
+              <th v-if="!personaId">{{ $t("mostradorVisual.col.cuando") }}</th>
               <th>{{ $t("mostradorVisual.col.productos") }}</th>
               <th v-if="mostrarSucursal" class="hidden md:table-cell">
                 {{ $t("pos.ventas.colSucursal") }}
@@ -299,7 +311,6 @@ onMounted(cargar);
               <th class="hidden sm:table-cell">
                 {{ $t("pos.ventas.colMetodo") }}
               </th>
-              <th class="text-right">{{ $t("pos.ventas.colTotal") }}</th>
               <th v-if="corregir">
                 <span class="sr-only">{{
                   $t("mostradorVisual.col.acciones")
@@ -310,22 +321,26 @@ onMounted(cargar);
           <tbody>
             <template v-for="v in ventas" :key="v.id">
               <tr data-prueba="venta">
-                <td class="whitespace-nowrap mo-suave">
-                  {{ cuando(v.creado_en) }}
-                </td>
-                <td v-if="!personaId" data-prueba="venta-comprador">
+                <td
+                  v-if="!personaId"
+                  :data-etiqueta="$t('mostradorVisual.col.ventaA')"
+                  data-prueba="venta-comprador"
+                >
                   <template v-if="v.comprador">
                     <span class="block font-medium">{{
                       v.comprador.nombre
                     }}</span>
-                    <span class="block text-xs mo-suave">{{
+                    <span class="tu-sub font-normal">{{
                       tipoComprador(v.comprador)
                     }}</span>
                   </template>
                   <span v-else class="mo-suave">{{
                     $t("mostradorVisual.comprador.publico")
                   }}</span>
-                  <span v-if="v.ticket_enviado_en" class="mt-1 block text-xs">
+                  <span
+                    v-if="v.ticket_enviado_en"
+                    class="mt-1 block text-xs font-normal"
+                  >
                     <span
                       class="tu-estado"
                       :style="{ '--tono': 'var(--exito)' }"
@@ -334,26 +349,80 @@ onMounted(cargar);
                     >
                   </span>
                 </td>
-                <td>
+                <td
+                  v-else
+                  :data-etiqueta="$t('mostradorVisual.col.cuando')"
+                  class="whitespace-nowrap"
+                >
+                  {{ cuando(v.creado_en) }}
+                </td>
+                <td
+                  :data-etiqueta="$t('pos.ventas.colTotal')"
+                  class="text-right tabular-nums"
+                >
+                  <div>
+                    <span
+                      class="font-medium"
+                      :class="{ 'line-through mo-suave': v.anulada_en }"
+                      >{{ dinero(v.total_minor, v.moneda) }}</span
+                    >
+                    <!-- Anulada: a la vista también en el teléfono (ADR 0089). -->
+                    <span v-if="v.anulada_en" class="block text-xs">
+                      <span
+                        class="tu-estado"
+                        :style="{ '--tono': 'var(--error)' }"
+                        :title="v.motivo_anulacion ?? undefined"
+                        data-prueba="venta-anulada"
+                        >{{ $t("corregirCobro.anulada") }}</span
+                      >
+                    </span>
+                    <span
+                      v-if="(v.propina_minor ?? 0) > 0"
+                      class="block text-xs mo-suave"
+                      >{{
+                        $t("mostradorVisual.conPropina", {
+                          monto: dinero(v.propina_minor ?? 0, v.moneda),
+                        })
+                      }}</span
+                    >
+                    <span
+                      v-if="(v.devuelto_minor ?? 0) > 0"
+                      class="block text-xs mo-suave"
+                      data-prueba="devuelto-venta"
+                      >{{
+                        $t("devolverVenta.devuelto", {
+                          monto: dinero(v.devuelto_minor ?? 0, v.moneda),
+                        })
+                      }}</span
+                    >
+                  </div>
+                </td>
+                <td
+                  v-if="!personaId"
+                  :data-etiqueta="$t('mostradorVisual.col.cuando')"
+                  class="whitespace-nowrap mo-suave"
+                >
+                  {{ cuando(v.creado_en) }}
+                </td>
+                <td :data-etiqueta="$t('mostradorVisual.col.productos')">
                   {{
                     (v.lineas ?? [])
                       .map((l) => `${l.cantidad} × ${l.articulo ?? ""}`)
                       .join(", ") || "—"
                   }}
                 </td>
-                <td v-if="mostrarSucursal" class="hidden md:table-cell">
+                <td
+                  v-if="mostrarSucursal"
+                  :data-etiqueta="$t('pos.ventas.colSucursal')"
+                  class="hidden md:table-cell"
+                >
                   {{ v.sucursal ?? "—" }}
                 </td>
-                <td class="hidden sm:table-cell">
-                  <span
-                    v-if="v.anulada_en"
-                    class="tu-pildora"
-                    :style="{ '--tono': 'var(--error)' }"
-                    :title="v.motivo_anulacion ?? undefined"
-                    data-prueba="venta-anulada"
-                    >{{ $t("corregirCobro.anulada") }}</span
-                  >
-                  <template v-else>
+                <td
+                  :data-etiqueta="$t('pos.ventas.colMetodo')"
+                  class="hidden sm:table-cell"
+                >
+                  <div>
                     {{ nombreMetodo(v.metodo_pago) }}
                     <span
                       v-if="v.partes && v.partes.length > 1"
@@ -370,35 +439,12 @@ onMounted(cargar);
                           .join(" · ")
                       }}</span
                     >
-                  </template>
+                  </div>
                 </td>
-                <td
-                  class="text-right font-medium tabular-nums"
-                  :class="{ 'line-through mo-suave': v.anulada_en }"
-                >
-                  {{ dinero(v.total_minor, v.moneda) }}
+                <td v-if="corregir" class="tu-celda-acciones">
                   <span
-                    v-if="(v.propina_minor ?? 0) > 0"
-                    class="block text-xs font-normal mo-suave"
-                    >{{
-                      $t("mostradorVisual.conPropina", {
-                        monto: dinero(v.propina_minor ?? 0, v.moneda),
-                      })
-                    }}</span
+                    class="inline-flex flex-wrap items-center justify-end gap-2"
                   >
-                  <span
-                    v-if="(v.devuelto_minor ?? 0) > 0"
-                    class="block text-xs font-normal mo-suave"
-                    data-prueba="devuelto-venta"
-                    >{{
-                      $t("devolverVenta.devuelto", {
-                        monto: dinero(v.devuelto_minor ?? 0, v.moneda),
-                      })
-                    }}</span
-                  >
-                </td>
-                <td v-if="corregir" class="text-right">
-                  <span class="inline-flex flex-wrap justify-end gap-3">
                     <RouterLink
                       v-if="v.factura"
                       class="tu-enlace text-sm"
@@ -413,26 +459,14 @@ onMounted(cargar);
                       data-prueba="venta-facturar"
                       >{{ $t("facturarVenta.facturar") }}</RouterLink
                     >
-                    <button
-                      v-if="v.devolvible && puedeDevolver"
-                      class="tu-enlace text-sm"
-                      type="button"
-                      data-prueba="devolver-venta-abrir"
-                      :aria-expanded="devolviendo === v.id"
-                      @click="
-                        devolviendo = devolviendo === v.id ? null : v.id;
-                        corrigiendo = null;
-                      "
-                    >
-                      {{ $t("devolverVenta.accion") }}
-                    </button>
+                    <!-- Corregir la forma de pago o anular la venta (ADR 0089). -->
                     <button
                       v-if="
                         !v.anulada_en &&
                         ((v.corregible && sesion.puede('pos.vender')) ||
                           (v.anulable && puedeDevolver))
                       "
-                      class="tu-enlace text-sm"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       type="button"
                       data-prueba="corregir-venta"
                       :aria-expanded="corrigiendo === v.id"
@@ -443,14 +477,25 @@ onMounted(cargar);
                     >
                       {{ $t("corregirCobro.corregir") }}
                     </button>
+                    <!-- Devolver productos: sale dinero (ADR 0178). -->
+                    <button
+                      v-if="v.devolvible && puedeDevolver"
+                      class="tu-btn tu-btn-peligro tu-btn-chico"
+                      type="button"
+                      data-prueba="devolver-venta-abrir"
+                      :aria-expanded="devolviendo === v.id"
+                      @click="
+                        devolviendo = devolviendo === v.id ? null : v.id;
+                        corrigiendo = null;
+                      "
+                    >
+                      {{ $t("devolverVenta.accion") }}
+                    </button>
                   </span>
                 </td>
               </tr>
-              <tr
-                v-if="corregir && devolviendo === v.id && v.lineas"
-                class="mo-correccion"
-              >
-                <td :colspan="columnas">
+              <tr v-if="corregir && devolviendo === v.id && v.lineas">
+                <td :colspan="columnas" class="tu-celda-detalle">
                   <DevolverVenta
                     :base="base"
                     :venta="{
@@ -465,8 +510,8 @@ onMounted(cargar);
                   />
                 </td>
               </tr>
-              <tr v-if="corregir && corrigiendo === v.id" class="mo-correccion">
-                <td :colspan="columnas">
+              <tr v-if="corregir && corrigiendo === v.id">
+                <td :colspan="columnas" class="tu-celda-detalle">
                   <CorregirCobro
                     :base="base"
                     :pago="{
@@ -501,30 +546,6 @@ onMounted(cargar);
 </template>
 
 <style scoped>
-.mo-tabla {
-  width: 100%;
-  font-size: 0.9rem;
-  border-collapse: collapse;
-}
-.mo-tabla th {
-  padding: 0.7rem 1rem;
-  color: var(--texto-suave);
-  font-size: 0.78rem;
-  font-weight: 500;
-  text-align: left;
-}
-.mo-tabla th.text-right {
-  text-align: right;
-}
-.mo-tabla td {
-  padding: 0.7rem 1rem;
-  border-top: 1px solid var(--borde);
-  vertical-align: middle;
-}
-.mo-correccion td {
-  border-top: 0;
-  padding-top: 0;
-}
 .mo-suave {
   color: var(--texto-suave);
 }

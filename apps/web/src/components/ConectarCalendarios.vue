@@ -230,7 +230,7 @@ onMounted(async () => {
         <button
           v-if="o.conexion"
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-peligro"
           :disabled="ocupado !== null"
           @click="desconectar(o.proveedor)"
         >

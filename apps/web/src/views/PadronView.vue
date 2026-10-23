@@ -6,6 +6,8 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import { conTerminosActuales } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Fila {
@@ -35,6 +37,8 @@ function irPagina(n: number): void {
   pagina.value = n;
   void cargar();
 }
+// La búsqueda en la dirección: recargar o volver conserva lo que se buscaba.
+useFiltrosEnUrl({ q: buscar });
 let espera: ReturnType<typeof setTimeout> | undefined;
 watch(buscar, () => {
   clearTimeout(espera);
@@ -116,37 +120,35 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('padron.titulo')" />
-
-    <div class="mt-6 flex flex-wrap items-center gap-3">
-      <div class="tu-card px-5 py-3">
-        <div class="text-2xl font-semibold">{{ total }}</div>
-        <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("padron.alumnosFacturables") }}
-        </div>
-      </div>
-      <button
-        class="tu-btn tu-btn-primario ml-auto"
-        type="button"
-        :disabled="exportando || total === 0"
-        @click="exportar"
-      >
-        {{ exportando ? $t("padron.exportando") : $t("padron.exportar") }}
-      </button>
-    </div>
-
-    <p
-      v-if="regla"
-      class="mt-3 text-xs"
-      :style="{ color: 'var(--texto-suave)' }"
+    <!-- El total es el padrón completo (no lo que coincide con la búsqueda) y la
+         regla de quién cuenta va de subtítulo. -->
+    <EncabezadoSeccion
+      :titulo="$t('padron.titulo')"
+      :total="total"
+      :subtitulo="
+        regla
+          ? $t('padron.regla', { regla: conTerminosActuales(regla) })
+          : undefined
+      "
     >
-      {{ $t("padron.regla", { regla }) }}
-    </p>
+      <template #acciones>
+        <button
+          class="tu-btn tu-btn-primario"
+          type="button"
+          :disabled="exportando || total === 0"
+          :aria-busy="exportando || undefined"
+          @click="exportar"
+        >
+          {{ exportando ? $t("padron.exportando") : $t("padron.exportar") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
+
     <input
       v-if="total > 0"
       v-model="buscar"
       type="search"
-      class="tu-input mt-4 max-w-sm"
+      class="tu-input mt-6 max-w-sm"
       :placeholder="$t('operacion.listadosTres.buscarPadron')"
       :aria-label="$t('operacion.listadosTres.buscarPadron')"
       data-prueba="buscar-padron"
@@ -173,7 +175,12 @@ onMounted(cargar);
             : $t('padron.vacio')
         "
       />
-      <div v-else-if="filas.length > 0" class="mt-4 tu-card overflow-x-auto">
+      <!-- Solo lectura: en el teléfono, una ficha por persona con su sucursal, alta
+           y la razón por la que cuenta como facturable. -->
+      <div
+        v-else-if="filas.length > 0"
+        class="mt-4 tu-card relative overflow-x-auto tu-tabla-adaptable"
+      >
         <table class="tu-tabla">
           <thead>
             <tr>
@@ -191,27 +198,26 @@ onMounted(cargar);
           </thead>
           <tbody>
             <tr v-for="f in filas" :key="f.id">
-              <td>
+              <td :data-etiqueta="$t('padron.colAlumno')">
                 <span class="font-semibold">{{ f.nombre_completo }}</span>
-                <span
-                  v-if="f.email"
-                  class="block text-xs"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ f.email }}</span
-                >
+                <span v-if="f.email" class="tu-sub">{{ f.email }}</span>
               </td>
               <td
                 class="hidden sm:table-cell"
+                :data-etiqueta="$t('padron.colSucursal')"
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ f.sucursal ?? "—" }}
               </td>
-              <td>{{ f.alta ?? "—" }}</td>
+              <td :data-etiqueta="$t('padron.colAlta')">
+                {{ f.alta ?? "—" }}
+              </td>
               <td
                 class="hidden sm:table-cell"
+                :data-etiqueta="$t('padron.colRazon')"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ f.razon }}
+                {{ conTerminosActuales(f.razon) }}
               </td>
             </tr>
           </tbody>

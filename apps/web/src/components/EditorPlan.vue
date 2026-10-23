@@ -30,13 +30,18 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * sin membresías ni planes que se renuevan. Un servicio suelto o un combo se dan de
  * alta en Catálogo. Un bono sirve para los servicios que se toman «con bono», que son
  * los que se pueden elegir aquí.
+ *
+ * Lo básico va a la vista y las condiciones (página, reglas de reserva, permanencia,
+ * cuotas y acumulación) plegadas en «Más condiciones», abiertas si el plan ya trae
+ * alguna. Guardar y Cancelar van en el pie del diálogo que lo contiene (PlanesView),
+ * con `form="form-plan"`: por eso el editor avisa si se puede guardar (`valido`).
  */
 const props = defineProps<{ plan: Plan | null }>();
 const emit = defineEmits<{
   // Con los avisos de coherencia del plan guardado (no impiden guardarlo).
   guardado: [nombre: string, avisos: string[]];
-  cerrar: [];
-  // Para su contenedor: no cerrarse a medio guardar ni descartar sin preguntar.
+  // Para su contenedor: no cerrarse a medio guardar, no descartar sin preguntar y
+  // desactivar «Guardar» mientras falte algo.
   estado: [e: EstadoEditor];
 }>();
 
@@ -133,11 +138,6 @@ const foto = instantanea(() => ({
   ofertas: [...form.ofertas].sort(),
   sucursalIds: [...form.sucursalIds].sort(),
 }));
-watch(
-  () => ({ guardando: guardando.value, sucio: foto.cambio() }),
-  (e) => emit("estado", e),
-  { immediate: true },
-);
 
 const esCitas = computed(() => sesion.esCitas === true);
 const TIPOS_PRINCIPALES = computed<TipoPlan[]>(() =>
@@ -172,6 +172,31 @@ const sinVigencia = computed(
 );
 // Una clase de prueba es un paquete o una clase suelta, no una cuota ni extras.
 const admitePrimeraVez = computed(() => !esMembresia.value && !esExtra.value);
+// Topes, acceso anticipado, invitados y cuotas: con clases y sin ser extras.
+const admiteReglasSocio = computed(() => !esCitas.value && !esExtra.value);
+
+// Cuántas condiciones avanzadas tiene puestas (solo las que aplican a su tipo): se
+// cuentan en «Más condiciones · N activas».
+const condicionesActivas = computed(
+  () =>
+    [
+      form.destacado,
+      admitePrimeraVez.value && form.primeraVez,
+      admiteReglasSocio.value && entero(form.topeDia) !== null,
+      admiteReglasSocio.value && entero(form.topeSemana) !== null,
+      admiteReglasSocio.value && entero(form.anticipado) !== null,
+      admiteReglasSocio.value && entero(form.invitados) !== null,
+      esMembresia.value &&
+        !esCitas.value &&
+        (numero(form.permanencia) ?? 0) > 0,
+      admiteReglasSocio.value && form.cobraInscripcion,
+      admiteReglasSocio.value && form.cobraAnualidad,
+      esMembresia.value && !form.ilimitado && form.rollover !== "ninguno",
+    ].filter(Boolean).length,
+);
+// Abiertas al abrir si el plan ya trae alguna (o está archivado, para reactivarlo).
+// Se fija una vez: marcar o desmarcar algo no pliega lo que se está editando.
+const abrirAvanzado = condicionesActivas.value > 0 || form.archivado;
 
 function numero(valor: string): number | null {
   const n = Number(String(valor).trim());
@@ -291,6 +316,30 @@ const resumen = computed<FilaResumen[]>(() => {
           : "";
     condiciones.push(`${ra("permanencia", meses)} · ${modo}${detalle}`);
   }
+  // Las reglas de reserva (ADR 0182) y la acumulación: plegadas en el formulario, el
+  // resumen es donde se ven todas juntas.
+  if (admiteReglasSocio.value) {
+    const reglas: [string, string][] = [
+      ["topeDia", form.topeDia],
+      ["topeSemana", form.topeSemana],
+      ["anticipado", form.anticipado],
+      ["invitados", form.invitados],
+    ];
+    for (const [clave, valor] of reglas) {
+      const n = entero(valor);
+      if (n !== null) {
+        condiciones.push(ra(clave, n));
+      }
+    }
+  }
+  if (esMembresia.value && !form.ilimitado) {
+    const tope = Math.round(numero(form.rolloverMax) ?? 0);
+    if (form.rollover === "completo") {
+      condiciones.push(ra("acumula"));
+    } else if (form.rollover === "limitado" && tope > 0) {
+      condiciones.push(ra("acumulaHasta", tope));
+    }
+  }
   if (!esCitas.value && !esExtra.value && form.cobraInscripcion) {
     condiciones.push(ra("inscripcion"));
   }
@@ -332,8 +381,21 @@ const valido = computed(
     numero(form.precio) !== null &&
     (esExtra.value || form.todas || form.ofertas.size > 0),
 );
+watch(
+  () => ({
+    guardando: guardando.value,
+    sucio: foto.cambio(),
+    valido: valido.value,
+  }),
+  (e) => emit("estado", e),
+  { immediate: true },
+);
 
 async function guardar(): Promise<void> {
+  // El botón está en el pie del contenedor: un Enter en un campo también llega aquí.
+  if (!valido.value || guardando.value) {
+    return;
+  }
   // Archivar es la baja del plan: se confirma aparte (ADR 0166), no pasa con «Guardar».
   if (
     p &&
@@ -431,9 +493,17 @@ async function guardar(): Promise<void> {
         ? t("comun.revisaCampos")
         : mensajeDeError(e);
     await nextTick();
-    document
-      .querySelector<HTMLElement>('#form-plan [aria-invalid="true"]')
-      ?.focus();
+    const campo = document.querySelector<HTMLElement>(
+      '#form-plan [aria-invalid="true"]',
+    );
+    if (campo) {
+      campo.focus();
+    } else {
+      // Sin campo marcado, el aviso a la vista (en el teléfono va al final).
+      document
+        .getElementById("ep-error")
+        ?.scrollIntoView?.({ block: "nearest" });
+    }
   } finally {
     guardando.value = false;
   }
@@ -454,622 +524,660 @@ onMounted(async () => {
 </script>
 
 <template>
-  <form id="form-plan" class="space-y-5" @submit.prevent="guardar">
-    <!-- ¿Qué es? -->
-    <fieldset>
-      <legend class="tu-label">{{ $t("planes.editor.queEs") }}</legend>
-      <div class="mt-1 grid gap-2 sm:grid-cols-2">
-        <button
-          v-for="tipo in TIPOS_PRINCIPALES"
-          :key="tipo"
-          type="button"
-          class="ep-tipo"
-          :aria-pressed="form.tipo === tipo"
-          :data-prueba="`tipo-${tipo}`"
-          @click="form.tipo = tipo"
-        >
-          <span class="font-medium">{{ nombreTipo(tipo) }}</span>
-          <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
-            ayudaTipo(tipo)
-          }}</span>
-        </button>
-      </div>
-      <p
-        v-if="esCitas"
-        class="mt-2 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-        data-prueba="servicio-o-combo"
-      >
-        {{ $t("planes.editorCitas.servicioOCombo") }}
-        <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace">{{
-          $t("planes.editorCitas.irCatalogo")
-        }}</RouterLink>
-      </p>
-      <label v-else class="mt-2 flex items-center gap-2 text-sm">
-        <span :style="{ color: 'var(--texto-suave)' }">{{
-          $t("planes.editor.otro")
-        }}</span>
-        <select
-          class="tu-input w-auto"
-          :value="esOtro ? form.tipo : ''"
-          @change="
-            form.tipo =
-              (($event.target as HTMLSelectElement).value as TipoPlan) ||
-              form.tipo
-          "
-        >
-          <option value="">—</option>
-          <option value="pase_dia">{{ $t("planes.tipos.pase_dia") }}</option>
-          <option value="taller">{{ $t("planes.tipos.taller") }}</option>
-        </select>
-      </label>
-    </fieldset>
-
-    <div class="grid gap-3 sm:grid-cols-2">
-      <div>
-        <label class="tu-label" for="ep-nombre">{{
-          $t("planes.editor.nombre")
-        }}</label>
-        <input
-          id="ep-nombre"
-          v-bind="marcar('nombre', 'ep-nombre-error')"
-          v-model="form.nombre"
-          class="tu-input"
-          :placeholder="tx('nombrePh')"
-          required
-          maxlength="255"
-        />
-        <span
-          v-if="errores.nombre"
-          id="ep-nombre-error"
-          class="tu-error-campo"
-          >{{ errores.nombre }}</span
-        >
-      </div>
-      <div>
-        <label class="tu-label" for="ep-precio">{{
-          $t("planes.editor.precio")
-        }}</label>
-        <input
-          id="ep-precio"
-          v-bind="marcar('precio_minor', 'ep-precio-error')"
-          v-model="form.precio"
-          class="tu-input"
-          type="number"
-          min="0"
-          step="0.01"
-          inputmode="decimal"
-          required
-        />
-        <span
-          v-if="errores.precio_minor"
-          id="ep-precio-error"
-          class="tu-error-campo"
-          >{{ errores.precio_minor }}</span
-        >
-      </div>
-      <div class="sm:col-span-2">
-        <label class="tu-label" for="ep-descripcion">{{
-          $t("planes.editor.descripcion")
-        }}</label>
-        <input
-          id="ep-descripcion"
-          v-bind="marcar('descripcion', 'ep-descripcion-error')"
-          v-model="form.descripcion"
-          class="tu-input"
-          maxlength="300"
-          :placeholder="tx('descripcionPh')"
-        />
-        <span
-          v-if="errores.descripcion"
-          id="ep-descripcion-error"
-          class="tu-error-campo"
-          >{{ errores.descripcion }}</span
-        >
-      </div>
-    </div>
-
-    <!-- Cuántas clases -->
-    <div v-if="esMembresia" class="grid gap-3 sm:grid-cols-2">
-      <label class="flex items-center gap-2 text-sm sm:col-span-2">
-        <input v-model="form.ilimitado" type="checkbox" />
-        {{ $t("planes.editor.ilimitada") }}
-      </label>
-      <div v-if="!form.ilimitado">
-        <label class="tu-label" for="ep-pormes">{{ tx("clasesPorMes") }}</label>
-        <input
-          id="ep-pormes"
-          v-model="form.clasesPorMes"
-          class="tu-input"
-          type="number"
-          min="1"
-        />
-      </div>
-      <div>
-        <label class="tu-label" for="ep-ciclo">{{
-          $t("planes.editor.ciclo")
-        }}</label>
-        <select id="ep-ciclo" v-model="form.ciclo" class="tu-input">
-          <option value="calendario">
-            {{ $t("planes.editor.cicloCalendario") }}
-          </option>
-          <option value="aniversario">
-            {{ $t("planes.editor.cicloAniversario") }}
-          </option>
-        </select>
-      </div>
-    </div>
-    <p
-      v-else-if="esSuelta"
-      class="text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("planes.editor.unaClase") }}
-    </p>
-    <div v-else class="sm:w-1/2">
-      <label class="tu-label" for="ep-clases">{{
-        esExtra ? $t("planes.editor.clasesExtra") : tx("clases")
-      }}</label>
-      <input
-        id="ep-clases"
-        v-model="form.clases"
-        class="tu-input"
-        type="number"
-        min="1"
-        required
-      />
-    </div>
-
-    <!-- Cuánto dura -->
-    <p
-      v-if="esExtra"
-      class="rounded-lg p-3 text-sm"
-      :style="{ background: 'var(--superficie-2)' }"
-    >
-      {{ $t("planes.editor.extraVence") }}
-    </p>
-    <fieldset v-else-if="!esMembresia">
-      <legend class="tu-label">{{ $t("planes.editor.vigencia") }}</legend>
-      <div class="mt-1 flex flex-wrap gap-2">
-        <label
-          v-for="v in ['ninguna', 'dias', 'meses', 'fin_de_mes'] as const"
-          :key="v"
-          class="ep-opcion"
-        >
-          <input v-model="form.vigencia" type="radio" :value="v" />
-          {{ $t(`planes.editor.vigencias.${v}`) }}
-        </label>
-      </div>
-      <div v-if="form.vigencia !== 'ninguna'" class="mt-3 sm:w-1/2">
-        <template v-if="form.vigencia === 'fin_de_mes'">
-          <label class="tu-label" for="ep-cant">{{
-            $t("planes.editor.cantidadFinDeMes")
-          }}</label>
-          <select id="ep-cant" v-model="form.cantidad" class="tu-input">
-            <option value="1">{{ $t("planes.editor.finDeEsteMes") }}</option>
-            <option value="2">
-              {{ $t("planes.editor.finDelSiguiente") }}
-            </option>
-            <option v-for="n in [3, 6, 12]" :key="n" :value="String(n)">
-              {{ $t("planes.editor.finDeMasMeses", { n }) }}
-            </option>
-          </select>
-        </template>
-        <template v-else>
-          <label class="tu-label" for="ep-cant">{{
-            form.vigencia === "dias"
-              ? $t("planes.editor.cantidadDias")
-              : $t("planes.editor.cantidadMeses")
-          }}</label>
-          <input
-            id="ep-cant"
-            v-model="form.cantidad"
-            class="tu-input"
-            type="number"
-            min="1"
-            :max="form.vigencia === 'dias' ? 366 : 24"
-          />
-        </template>
-      </div>
-      <p
-        v-if="ejemplo"
-        class="mt-2 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-        role="status"
-      >
-        {{ ejemplo }}
-      </p>
-    </fieldset>
-
-    <!-- Para qué clases -->
-    <fieldset v-if="!esExtra">
-      <legend class="tu-label">{{ tx("aplicaA") }}</legend>
-      <div class="mt-1 flex flex-wrap gap-2">
-        <label class="ep-opcion">
-          <input v-model="form.todas" type="radio" :value="true" />
-          {{ tx("todas") }}
-        </label>
-        <label class="ep-opcion">
-          <input v-model="form.todas" type="radio" :value="false" />
-          {{ tx("algunas") }}
-        </label>
-      </div>
-      <AvisoTono
-        v-if="esCitas && ofertasElegibles.length === 0"
-        tono="aviso"
-        class="mt-2"
-        data-prueba="sin-servicios-con-bono"
-      >
-        {{ $t("planes.editorCitas.sinServiciosConBono") }}
-        <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace">{{
-          $t("planes.editorCitas.irCatalogo")
-        }}</RouterLink>
-      </AvisoTono>
-      <div v-if="!form.todas" class="mt-3 space-y-3">
-        <p
-          v-if="ofertasElegibles.length === 0 && !esCitas"
-          class="text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ tx("sinClases") }}
-        </p>
-        <!-- En filas por actividad, con búsqueda: el catálogo crece. -->
-        <SelectorOpciones
-          v-if="ofertasElegibles.length > 0"
-          :opciones="opcionesOfertas"
-          :model-value="[...form.ofertas]"
-          @update:model-value="form.ofertas = new Set($event)"
-        />
-        <AvisoTono
-          v-if="ofertasElegibles.length > 0 && form.ofertas.size === 0"
-          tono="aviso"
-        >
-          {{ tx("eligeClases") }}
-        </AvisoTono>
-      </div>
-    </fieldset>
-
-    <fieldset v-if="sucursales.length > 1 && !esExtra" class="space-y-3">
-      <legend class="font-medium">
-        {{ $t("planes.editor.cobertura") }}
-      </legend>
-      <select
-        v-model="form.cobertura"
-        class="tu-input"
-        data-prueba="cobertura-sucursal"
-        :aria-label="$t('planes.editor.cobertura')"
-      >
-        <option value="todas">{{ $t("sucursalOperativa.todas") }}</option>
-        <option value="seleccionadas">
-          {{ $t("planes.editor.coberturaAlgunas") }}
-        </option>
-      </select>
-      <div
-        v-if="form.cobertura === 'seleccionadas'"
-        class="grid gap-2 sm:grid-cols-2"
-      >
-        <label
-          v-for="s in sucursales"
-          :key="s.id"
-          class="flex items-center gap-2"
-        >
-          <input v-model="form.sucursalIds" type="checkbox" :value="s.id" />{{
-            s.nombre
-          }}
-        </label>
-      </div>
-      <p class="text-sm" style="color: var(--texto-suave)">
-        {{
-          form.cobertura === "todas"
-            ? $t("planes.editor.coberturaTodasAyuda")
-            : $t("planes.editor.coberturaAlgunasAyuda")
-        }}
-        {{ $t("planes.editor.coberturaCompras") }}
-      </p>
-    </fieldset>
-    <!-- En la página del negocio -->
-    <fieldset class="space-y-2">
-      <legend class="tu-label">{{ $t("planes.editor.enTuPagina") }}</legend>
-      <label class="flex items-start gap-2 text-sm">
-        <input v-model="form.destacado" type="checkbox" class="mt-1" />
-        <span>
-          {{ $t("planes.editor.destacado") }}
-          <span
-            class="block text-xs"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{ $t("planes.editor.destacadoAyuda") }}</span
+  <form id="form-plan" class="ep-rejilla" @submit.prevent="guardar">
+    <div class="min-w-0 space-y-5">
+      <!-- ¿Qué es? -->
+      <fieldset>
+        <legend class="tu-label">{{ $t("planes.editor.queEs") }}</legend>
+        <div class="mt-1 grid gap-2 sm:grid-cols-2">
+          <button
+            v-for="tipo in TIPOS_PRINCIPALES"
+            :key="tipo"
+            type="button"
+            class="ep-tipo"
+            :aria-pressed="form.tipo === tipo"
+            :data-prueba="`tipo-${tipo}`"
+            @click="form.tipo = tipo"
           >
-        </span>
-      </label>
-      <label
-        v-if="admitePrimeraVez"
-        class="flex items-start gap-2 text-sm"
-        data-prueba="primera-vez"
-      >
-        <input v-model="form.primeraVez" type="checkbox" class="mt-1" />
-        <span>
-          {{ tx("primeraVez") }}
-          <span
-            class="block text-xs"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{ tx("primeraVezAyuda") }}</span
-          >
-        </span>
-      </label>
-    </fieldset>
-
-    <!-- Planes «socio» (ADR 0182): topes, acceso anticipado e invitados. -->
-    <fieldset
-      v-if="!esCitas && !esExtra"
-      class="space-y-3"
-      data-prueba="reglas-socio"
-    >
-      <legend class="tu-label">{{ $t("planes.socio.titulo") }}</legend>
-      <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("planes.socio.ayuda") }}
-      </p>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <label>
-          <span class="tu-label">{{ $t("planes.socio.topeDia") }}</span>
-          <input
-            v-model="form.topeDia"
-            class="tu-input"
-            type="number"
-            min="1"
-            max="20"
-            :placeholder="$t('planes.socio.sinTope')"
-            data-prueba="tope-dia"
-          />
-        </label>
-        <label>
-          <span class="tu-label">{{ $t("planes.socio.topeSemana") }}</span>
-          <input
-            v-model="form.topeSemana"
-            class="tu-input"
-            type="number"
-            min="1"
-            max="100"
-            :placeholder="$t('planes.socio.sinTope')"
-          />
-        </label>
-        <label>
-          <span class="tu-label">{{ $t("planes.socio.anticipado") }}</span>
-          <input
-            v-model="form.anticipado"
-            class="tu-input"
-            type="number"
-            min="1"
-            max="720"
-            :placeholder="$t('planes.socio.sinAnticipado')"
-          />
-        </label>
-        <label>
-          <span class="tu-label">{{ $t("planes.socio.invitados") }}</span>
-          <input
-            v-model="form.invitados"
-            class="tu-input"
-            type="number"
-            min="1"
-            max="20"
-            :placeholder="$t('planes.socio.sinInvitados')"
-            data-prueba="invitados-mes"
-          />
-        </label>
-      </div>
-    </fieldset>
-
-    <!-- Permanencia (B04): solo en membresías. -->
-    <fieldset
-      v-if="esMembresia && !esCitas"
-      class="space-y-3"
-      data-prueba="permanencia-plan"
-    >
-      <legend class="tu-label">{{ $t("planes.permanencia.titulo") }}</legend>
-      <div class="sm:w-1/2">
-        <label class="tu-label" for="ep-permanencia">{{
-          $t("planes.permanencia.meses")
-        }}</label>
-        <input
-          id="ep-permanencia"
-          v-model="form.permanencia"
-          class="tu-input"
-          type="number"
-          min="0"
-          max="60"
-          :placeholder="$t('planes.permanencia.sin')"
-        />
-      </div>
-      <template v-if="(numero(form.permanencia) ?? 0) > 0">
-        <p class="text-sm">{{ $t("planes.permanencia.siDaDeBaja") }}</p>
-        <div class="flex flex-wrap gap-2" role="radiogroup">
-          <label
-            v-for="m in [
-              'sin_penalizacion',
-              'monto_fijo',
-              'meses_restantes',
-            ] as const"
-            :key="m"
-            class="ep-opcion"
-          >
-            <input v-model="form.bajaAnticipada" type="radio" :value="m" />
-            {{ $t(`planes.permanencia.modos.${m}`) }}
-          </label>
+            <span class="font-medium">{{ nombreTipo(tipo) }}</span>
+            <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
+              ayudaTipo(tipo)
+            }}</span>
+          </button>
         </div>
-        <div v-if="form.bajaAnticipada === 'monto_fijo'" class="sm:w-1/2">
-          <label class="tu-label" for="ep-penalizacion">{{
-            $t("planes.permanencia.monto")
+        <p
+          v-if="esCitas"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="servicio-o-combo"
+        >
+          {{ $t("planes.editorCitas.servicioOCombo") }}
+          <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace">{{
+            $t("planes.editorCitas.irCatalogo")
+          }}</RouterLink>
+        </p>
+        <label v-else class="mt-2 flex items-center gap-2 text-sm">
+          <span :style="{ color: 'var(--texto-suave)' }">{{
+            $t("planes.editor.otro")
+          }}</span>
+          <select
+            class="tu-input w-auto"
+            :value="esOtro ? form.tipo : ''"
+            @change="
+              form.tipo =
+                (($event.target as HTMLSelectElement).value as TipoPlan) ||
+                form.tipo
+            "
+          >
+            <option value="">—</option>
+            <option value="pase_dia">{{ $t("planes.tipos.pase_dia") }}</option>
+            <option value="taller">{{ $t("planes.tipos.taller") }}</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="tu-label" for="ep-nombre">{{
+            $t("planes.editor.nombre")
           }}</label>
           <input
-            id="ep-penalizacion"
-            v-model="form.penalizacion"
+            id="ep-nombre"
+            v-bind="marcar('nombre', 'ep-nombre-error')"
+            v-model="form.nombre"
+            class="tu-input"
+            :placeholder="tx('nombrePh')"
+            required
+            maxlength="255"
+          />
+          <span
+            v-if="errores.nombre"
+            id="ep-nombre-error"
+            class="tu-error-campo"
+            >{{ errores.nombre }}</span
+          >
+        </div>
+        <div>
+          <label class="tu-label" for="ep-precio">{{
+            $t("planes.editor.precio")
+          }}</label>
+          <input
+            id="ep-precio"
+            v-bind="marcar('precio_minor', 'ep-precio-error')"
+            v-model="form.precio"
             class="tu-input"
             type="number"
             min="0"
             step="0.01"
             inputmode="decimal"
+            required
           />
+          <span
+            v-if="errores.precio_minor"
+            id="ep-precio-error"
+            class="tu-error-campo"
+            >{{ errores.precio_minor }}</span
+          >
         </div>
-        <div v-if="form.bajaAnticipada === 'meses_restantes'" class="sm:w-1/2">
-          <label class="tu-label" for="ep-porcentaje">{{
-            $t("planes.permanencia.porcentaje")
+        <div class="sm:col-span-2">
+          <label class="tu-label" for="ep-descripcion">{{
+            $t("planes.editor.descripcion")
           }}</label>
           <input
-            id="ep-porcentaje"
-            v-model="form.porcentaje"
+            id="ep-descripcion"
+            v-bind="marcar('descripcion', 'ep-descripcion-error')"
+            v-model="form.descripcion"
+            class="tu-input"
+            maxlength="300"
+            :placeholder="tx('descripcionPh')"
+          />
+          <span
+            v-if="errores.descripcion"
+            id="ep-descripcion-error"
+            class="tu-error-campo"
+            >{{ errores.descripcion }}</span
+          >
+        </div>
+      </div>
+
+      <!-- Cuántas clases -->
+      <div v-if="esMembresia" class="grid gap-3 sm:grid-cols-2">
+        <label class="flex items-center gap-2 text-sm sm:col-span-2">
+          <input v-model="form.ilimitado" type="checkbox" />
+          {{ $t("planes.editor.ilimitada") }}
+        </label>
+        <div v-if="!form.ilimitado">
+          <label class="tu-label" for="ep-pormes">{{
+            tx("clasesPorMes")
+          }}</label>
+          <input
+            id="ep-pormes"
+            v-model="form.clasesPorMes"
             class="tu-input"
             type="number"
             min="1"
-            max="100"
-            step="1"
-            inputmode="numeric"
           />
-          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("planes.permanencia.porcentajeAyuda") }}
-          </p>
         </div>
-        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("planes.permanencia.ayuda") }}
-        </p>
-      </template>
-    </fieldset>
+        <div>
+          <label class="tu-label" for="ep-ciclo">{{
+            $t("planes.editor.ciclo")
+          }}</label>
+          <select id="ep-ciclo" v-model="form.ciclo" class="tu-input">
+            <option value="calendario">
+              {{ $t("planes.editor.cicloCalendario") }}
+            </option>
+            <option value="aniversario">
+              {{ $t("planes.editor.cicloAniversario") }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <p
+        v-else-if="esSuelta"
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("planes.editor.unaClase") }}
+      </p>
+      <div v-else class="sm:w-1/2">
+        <label class="tu-label" for="ep-clases">{{
+          esExtra ? $t("planes.editor.clasesExtra") : tx("clases")
+        }}</label>
+        <input
+          id="ep-clases"
+          v-model="form.clases"
+          class="tu-input"
+          type="number"
+          min="1"
+          required
+        />
+      </div>
 
-    <!-- Cuotas del negocio (B04): el monto se configura en «Cuotas». -->
-    <fieldset
-      v-if="!esCitas && !esExtra"
-      class="space-y-2"
-      data-prueba="cuotas-plan"
-    >
-      <legend class="tu-label">{{ $t("planes.cuotas.enElPlan") }}</legend>
-      <label class="flex items-start gap-2 text-sm">
-        <input v-model="form.cobraInscripcion" type="checkbox" class="mt-1" />
-        <span>
-          {{ $t("planes.cuotas.cobraInscripcion") }}
-          <span
-            class="block text-xs"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{ $t("planes.cuotas.cobraInscripcionAyuda") }}</span
+      <!-- Cuánto dura -->
+      <p
+        v-if="esExtra"
+        class="rounded-lg p-3 text-sm"
+        :style="{ background: 'var(--superficie-2)' }"
+      >
+        {{ $t("planes.editor.extraVence") }}
+      </p>
+      <fieldset v-else-if="!esMembresia">
+        <legend class="tu-label">{{ $t("planes.editor.vigencia") }}</legend>
+        <div class="mt-1 flex flex-wrap gap-2">
+          <label
+            v-for="v in ['ninguna', 'dias', 'meses', 'fin_de_mes'] as const"
+            :key="v"
+            class="ep-opcion"
           >
-        </span>
-      </label>
-      <label class="flex items-start gap-2 text-sm">
-        <input v-model="form.cobraAnualidad" type="checkbox" class="mt-1" />
-        <span>
-          {{ $t("planes.cuotas.cobraAnualidad") }}
-          <span
-            class="block text-xs"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{ $t("planes.cuotas.cobraAnualidadAyuda") }}</span
-          >
-        </span>
-      </label>
-    </fieldset>
-
-    <!-- Más opciones -->
-    <details class="text-sm">
-      <summary class="cursor-pointer" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("planes.editor.avanzado") }}
-      </summary>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        <template v-if="esMembresia && !form.ilimitado">
-          <div>
-            <label class="tu-label" for="ep-acumula">{{
-              $t("planes.editor.acumula")
+            <input v-model="form.vigencia" type="radio" :value="v" />
+            {{ $t(`planes.editor.vigencias.${v}`) }}
+          </label>
+        </div>
+        <div v-if="form.vigencia !== 'ninguna'" class="mt-3 sm:w-1/2">
+          <template v-if="form.vigencia === 'fin_de_mes'">
+            <label class="tu-label" for="ep-cant">{{
+              $t("planes.editor.cantidadFinDeMes")
             }}</label>
-            <select id="ep-acumula" v-model="form.rollover" class="tu-input">
-              <option value="ninguno">
-                {{ $t("planes.editor.acumulaNinguno") }}
+            <select id="ep-cant" v-model="form.cantidad" class="tu-input">
+              <option value="1">{{ $t("planes.editor.finDeEsteMes") }}</option>
+              <option value="2">
+                {{ $t("planes.editor.finDelSiguiente") }}
               </option>
-              <option value="completo">
-                {{ $t("planes.editor.acumulaTodo") }}
-              </option>
-              <option value="limitado">
-                {{ $t("planes.editor.acumulaLimitado") }}
+              <option v-for="n in [3, 6, 12]" :key="n" :value="String(n)">
+                {{ $t("planes.editor.finDeMasMeses", { n }) }}
               </option>
             </select>
-          </div>
-          <div v-if="form.rollover === 'limitado'">
-            <label class="tu-label" for="ep-acmax">{{
-              $t("planes.editor.acumulaMax")
+          </template>
+          <template v-else>
+            <label class="tu-label" for="ep-cant">{{
+              form.vigencia === "dias"
+                ? $t("planes.editor.cantidadDias")
+                : $t("planes.editor.cantidadMeses")
             }}</label>
             <input
-              id="ep-acmax"
-              v-model="form.rolloverMax"
+              id="ep-cant"
+              v-model="form.cantidad"
               class="tu-input"
               type="number"
               min="1"
+              :max="form.vigencia === 'dias' ? 366 : 24"
             />
-          </div>
-        </template>
-        <!-- Archivar es la baja del plan (ADR 0077); reactivarlo es editar. -->
-        <label
-          v-if="plan && (plan.archivado || sesion.puede('productos.eliminar'))"
-          class="flex items-center gap-2 sm:col-span-2"
-        >
-          <input v-model="form.archivado" type="checkbox" />
-          {{ $t("planes.editor.archivar") }}
-        </label>
-      </div>
-    </details>
-
-    <!-- Así quedará: lo que se guarda, revisado antes de guardar -->
-    <section
-      class="ep-resumen"
-      aria-labelledby="ep-resumen-titulo"
-      data-prueba="resumen-plan"
-    >
-      <header>
-        <h3 id="ep-resumen-titulo">
-          {{ $t("planes.antesDeGuardar.titulo") }}
-        </h3>
-        <p>{{ $t("planes.antesDeGuardar.ayuda") }}</p>
-      </header>
-      <dl>
-        <div
-          v-for="f in resumen"
-          :key="f.clave"
-          :data-prueba="`resumen-${f.clave}`"
-        >
-          <dt>{{ f.etiqueta }}</dt>
-          <dd
-            :class="{ 'tu-estado': f.falta }"
-            :style="f.falta ? { '--tono': 'var(--aviso)' } : undefined"
-          >
-            {{ f.valor }}
-          </dd>
+          </template>
         </div>
-      </dl>
-    </section>
+        <p
+          v-if="ejemplo"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          role="status"
+        >
+          {{ ejemplo }}
+        </p>
+      </fieldset>
 
-    <p v-if="plan" class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("planes.editor.soloFuturo") }}
-    </p>
-    <AvisoTono v-if="error" tono="peligro" role="alert">
-      {{ error }}
-    </AvisoTono>
-    <div class="flex justify-end gap-2">
-      <button
-        type="button"
-        class="tu-btn tu-btn-secundario"
-        @click="emit('cerrar')"
+      <!-- Para qué clases -->
+      <fieldset v-if="!esExtra">
+        <legend class="tu-label">{{ tx("aplicaA") }}</legend>
+        <div class="mt-1 flex flex-wrap gap-2">
+          <label class="ep-opcion">
+            <input v-model="form.todas" type="radio" :value="true" />
+            {{ tx("todas") }}
+          </label>
+          <label class="ep-opcion">
+            <input v-model="form.todas" type="radio" :value="false" />
+            {{ tx("algunas") }}
+          </label>
+        </div>
+        <AvisoTono
+          v-if="esCitas && ofertasElegibles.length === 0"
+          tono="aviso"
+          class="mt-2"
+          data-prueba="sin-servicios-con-bono"
+        >
+          {{ $t("planes.editorCitas.sinServiciosConBono") }}
+          <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace">{{
+            $t("planes.editorCitas.irCatalogo")
+          }}</RouterLink>
+        </AvisoTono>
+        <div v-if="!form.todas" class="mt-3 space-y-3">
+          <p
+            v-if="ofertasElegibles.length === 0 && !esCitas"
+            class="text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ tx("sinClases") }}
+          </p>
+          <!-- En filas por actividad, con búsqueda: el catálogo crece. -->
+          <SelectorOpciones
+            v-if="ofertasElegibles.length > 0"
+            :opciones="opcionesOfertas"
+            :model-value="[...form.ofertas]"
+            @update:model-value="form.ofertas = new Set($event)"
+          />
+          <AvisoTono
+            v-if="ofertasElegibles.length > 0 && form.ofertas.size === 0"
+            tono="aviso"
+          >
+            {{ tx("eligeClases") }}
+          </AvisoTono>
+        </div>
+      </fieldset>
+
+      <fieldset v-if="sucursales.length > 1 && !esExtra" class="space-y-3">
+        <legend class="font-medium">
+          {{ $t("planes.editor.cobertura") }}
+        </legend>
+        <select
+          v-model="form.cobertura"
+          class="tu-input"
+          data-prueba="cobertura-sucursal"
+          :aria-label="$t('planes.editor.cobertura')"
+        >
+          <option value="todas">{{ $t("sucursalOperativa.todas") }}</option>
+          <option value="seleccionadas">
+            {{ $t("planes.editor.coberturaAlgunas") }}
+          </option>
+        </select>
+        <div
+          v-if="form.cobertura === 'seleccionadas'"
+          class="grid gap-2 sm:grid-cols-2"
+        >
+          <label
+            v-for="s in sucursales"
+            :key="s.id"
+            class="flex items-center gap-2"
+          >
+            <input v-model="form.sucursalIds" type="checkbox" :value="s.id" />{{
+              s.nombre
+            }}
+          </label>
+        </div>
+        <p class="text-sm" style="color: var(--texto-suave)">
+          {{
+            form.cobertura === "todas"
+              ? $t("planes.editor.coberturaTodasAyuda")
+              : $t("planes.editor.coberturaAlgunasAyuda")
+          }}
+          {{ $t("planes.editor.coberturaCompras") }}
+        </p>
+      </fieldset>
+
+      <!-- Condiciones avanzadas: plegadas; abiertas si el plan ya trae alguna. -->
+      <details
+        class="tu-avanzado"
+        :open="abrirAvanzado"
+        data-prueba="mas-condiciones"
       >
-        {{ $t("planes.editor.cancelar") }}
-      </button>
-      <button
-        type="submit"
-        class="tu-btn tu-btn-primario"
-        :disabled="guardando || !valido"
-      >
-        {{
-          guardando
-            ? $t("planes.editor.guardando")
-            : $t("planes.editor.guardar")
-        }}
-      </button>
+        <summary>
+          {{
+            condicionesActivas > 0
+              ? $t(
+                  "planes.editor.avanzadoActivas",
+                  { n: condicionesActivas },
+                  condicionesActivas,
+                )
+              : $t("planes.editor.avanzado")
+          }}
+        </summary>
+        <div class="space-y-5">
+          <!-- En la página del negocio -->
+          <fieldset class="space-y-2">
+            <legend class="tu-label">
+              {{ $t("planes.editor.enTuPagina") }}
+            </legend>
+            <label class="flex items-start gap-2 text-sm">
+              <input v-model="form.destacado" type="checkbox" class="mt-1" />
+              <span>
+                {{ $t("planes.editor.destacado") }}
+                <span
+                  class="block text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ $t("planes.editor.destacadoAyuda") }}</span
+                >
+              </span>
+            </label>
+            <label
+              v-if="admitePrimeraVez"
+              class="flex items-start gap-2 text-sm"
+              data-prueba="primera-vez"
+            >
+              <input v-model="form.primeraVez" type="checkbox" class="mt-1" />
+              <span>
+                {{ tx("primeraVez") }}
+                <span
+                  class="block text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ tx("primeraVezAyuda") }}</span
+                >
+              </span>
+            </label>
+          </fieldset>
+
+          <!-- Planes «socio» (ADR 0182): topes, acceso anticipado e invitados. -->
+          <fieldset
+            v-if="!esCitas && !esExtra"
+            class="space-y-3"
+            data-prueba="reglas-socio"
+          >
+            <legend class="tu-label">{{ $t("planes.socio.titulo") }}</legend>
+            <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("planes.socio.ayuda") }}
+            </p>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label>
+                <span class="tu-label">{{ $t("planes.socio.topeDia") }}</span>
+                <input
+                  v-model="form.topeDia"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  max="20"
+                  :placeholder="$t('planes.socio.sinTope')"
+                  data-prueba="tope-dia"
+                />
+              </label>
+              <label>
+                <span class="tu-label">{{
+                  $t("planes.socio.topeSemana")
+                }}</span>
+                <input
+                  v-model="form.topeSemana"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  max="100"
+                  :placeholder="$t('planes.socio.sinTope')"
+                />
+              </label>
+              <label>
+                <span class="tu-label">{{
+                  $t("planes.socio.anticipado")
+                }}</span>
+                <input
+                  v-model="form.anticipado"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  max="720"
+                  :placeholder="$t('planes.socio.sinAnticipado')"
+                />
+              </label>
+              <label>
+                <span class="tu-label">{{ $t("planes.socio.invitados") }}</span>
+                <input
+                  v-model="form.invitados"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  max="20"
+                  :placeholder="$t('planes.socio.sinInvitados')"
+                  data-prueba="invitados-mes"
+                />
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Permanencia (B04): solo en membresías. -->
+          <fieldset
+            v-if="esMembresia && !esCitas"
+            class="space-y-3"
+            data-prueba="permanencia-plan"
+          >
+            <legend class="tu-label">
+              {{ $t("planes.permanencia.titulo") }}
+            </legend>
+            <div class="sm:w-1/2">
+              <label class="tu-label" for="ep-permanencia">{{
+                $t("planes.permanencia.meses")
+              }}</label>
+              <input
+                id="ep-permanencia"
+                v-model="form.permanencia"
+                class="tu-input"
+                type="number"
+                min="0"
+                max="60"
+                :placeholder="$t('planes.permanencia.sin')"
+              />
+            </div>
+            <template v-if="(numero(form.permanencia) ?? 0) > 0">
+              <p class="text-sm">{{ $t("planes.permanencia.siDaDeBaja") }}</p>
+              <div class="flex flex-wrap gap-2" role="radiogroup">
+                <label
+                  v-for="m in [
+                    'sin_penalizacion',
+                    'monto_fijo',
+                    'meses_restantes',
+                  ] as const"
+                  :key="m"
+                  class="ep-opcion"
+                >
+                  <input
+                    v-model="form.bajaAnticipada"
+                    type="radio"
+                    :value="m"
+                  />
+                  {{ $t(`planes.permanencia.modos.${m}`) }}
+                </label>
+              </div>
+              <div v-if="form.bajaAnticipada === 'monto_fijo'" class="sm:w-1/2">
+                <label class="tu-label" for="ep-penalizacion">{{
+                  $t("planes.permanencia.monto")
+                }}</label>
+                <input
+                  id="ep-penalizacion"
+                  v-model="form.penalizacion"
+                  class="tu-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                />
+              </div>
+              <div
+                v-if="form.bajaAnticipada === 'meses_restantes'"
+                class="sm:w-1/2"
+              >
+                <label class="tu-label" for="ep-porcentaje">{{
+                  $t("planes.permanencia.porcentaje")
+                }}</label>
+                <input
+                  id="ep-porcentaje"
+                  v-model="form.porcentaje"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  inputmode="numeric"
+                />
+                <p
+                  class="mt-1 text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("planes.permanencia.porcentajeAyuda") }}
+                </p>
+              </div>
+              <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("planes.permanencia.ayuda") }}
+              </p>
+            </template>
+          </fieldset>
+
+          <!-- Cuotas del negocio (B04): el monto se configura en «Cuotas». -->
+          <fieldset
+            v-if="!esCitas && !esExtra"
+            class="space-y-2"
+            data-prueba="cuotas-plan"
+          >
+            <legend class="tu-label">{{ $t("planes.cuotas.enElPlan") }}</legend>
+            <label class="flex items-start gap-2 text-sm">
+              <input
+                v-model="form.cobraInscripcion"
+                type="checkbox"
+                class="mt-1"
+              />
+              <span>
+                {{ $t("planes.cuotas.cobraInscripcion") }}
+                <span
+                  class="block text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ $t("planes.cuotas.cobraInscripcionAyuda") }}</span
+                >
+              </span>
+            </label>
+            <label class="flex items-start gap-2 text-sm">
+              <input
+                v-model="form.cobraAnualidad"
+                type="checkbox"
+                class="mt-1"
+              />
+              <span>
+                {{ $t("planes.cuotas.cobraAnualidad") }}
+                <span
+                  class="block text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ $t("planes.cuotas.cobraAnualidadAyuda") }}</span
+                >
+              </span>
+            </label>
+          </fieldset>
+
+          <!-- Acumulación: lo que no se usa en el mes (membresías con clases). -->
+          <div
+            v-if="esMembresia && !form.ilimitado"
+            class="grid gap-3 sm:grid-cols-2"
+          >
+            <div>
+              <label class="tu-label" for="ep-acumula">{{
+                $t("planes.editor.acumula")
+              }}</label>
+              <select id="ep-acumula" v-model="form.rollover" class="tu-input">
+                <option value="ninguno">
+                  {{ $t("planes.editor.acumulaNinguno") }}
+                </option>
+                <option value="completo">
+                  {{ $t("planes.editor.acumulaTodo") }}
+                </option>
+                <option value="limitado">
+                  {{ $t("planes.editor.acumulaLimitado") }}
+                </option>
+              </select>
+            </div>
+            <div v-if="form.rollover === 'limitado'">
+              <label class="tu-label" for="ep-acmax">{{
+                $t("planes.editor.acumulaMax")
+              }}</label>
+              <input
+                id="ep-acmax"
+                v-model="form.rolloverMax"
+                class="tu-input"
+                type="number"
+                min="1"
+              />
+            </div>
+          </div>
+          <!-- Archivar es la baja del plan (ADR 0077); reactivarlo es editar. -->
+          <label
+            v-if="
+              plan && (plan.archivado || sesion.puede('productos.eliminar'))
+            "
+            class="flex items-center gap-2 text-sm"
+          >
+            <input v-model="form.archivado" type="checkbox" />
+            {{ $t("planes.editor.archivar") }}
+          </label>
+        </div>
+      </details>
     </div>
+
+    <!-- Al lado de los campos en pantallas anchas (siempre a la vista); al final
+         en el teléfono, justo arriba del pie con Guardar. -->
+    <aside class="ep-lateral space-y-3">
+      <AvisoTono v-if="error" id="ep-error" tono="peligro" role="alert">
+        {{ error }}
+      </AvisoTono>
+      <!-- Así quedará: lo que se guarda, revisado antes de guardar -->
+      <section
+        class="ep-resumen"
+        aria-labelledby="ep-resumen-titulo"
+        data-prueba="resumen-plan"
+      >
+        <header>
+          <h3 id="ep-resumen-titulo">
+            {{ $t("planes.antesDeGuardar.titulo") }}
+          </h3>
+          <p>{{ $t("planes.antesDeGuardar.ayuda") }}</p>
+        </header>
+        <dl>
+          <div
+            v-for="f in resumen"
+            :key="f.clave"
+            :data-prueba="`resumen-${f.clave}`"
+          >
+            <dt>{{ f.etiqueta }}</dt>
+            <dd
+              :class="{ 'tu-estado': f.falta }"
+              :style="f.falta ? { '--tono': 'var(--aviso)' } : undefined"
+            >
+              {{ f.valor }}
+            </dd>
+          </div>
+        </dl>
+      </section>
+      <p v-if="plan" class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("planes.editor.soloFuturo") }}
+      </p>
+    </aside>
   </form>
 </template>
 
 <style scoped>
+/* Los campos y, al lado, «Así quedará»: fijo arriba mientras se baja por el
+   formulario (en el diálogo amplio); en el teléfono, al final. */
+.ep-rejilla {
+  display: grid;
+  gap: 1.25rem;
+}
 .ep-tipo {
   display: flex;
   flex-direction: column;
@@ -1131,5 +1239,18 @@ onMounted(async () => {
 .ep-resumen dd {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+@media (min-width: 1024px) {
+  .ep-rejilla {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    align-items: start;
+  }
+  .ep-lateral {
+    position: sticky;
+    top: 0;
+  }
+  .ep-resumen dl > div {
+    grid-template-columns: minmax(5.5rem, 7.5rem) 1fr;
+  }
 }
 </style>

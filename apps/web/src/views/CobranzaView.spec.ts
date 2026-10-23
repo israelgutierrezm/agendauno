@@ -34,6 +34,8 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.ruta,
   useRouter: () => ({ replace: mocks.replace }),
+  // El aviso de cambios sin guardar (diálogo de reembolso) lo registra.
+  onBeforeRouteLeave: vi.fn(),
   RouterLink: {
     props: ["to"],
     template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
@@ -411,7 +413,7 @@ describe("cobros: por cobrar", () => {
     await flushPromises();
     expect(w.text()).toContain("Pendientes de pago");
     expect(w.text()).toContain("3 citas próximas");
-    expect(w.text()).not.toContain("Próximas renovaciones");
+    expect(w.find('[data-prueba="titulo-renovaciones"]').exists()).toBe(false);
     expect(w.text()).not.toContain("No hay membresías con cobro recurrente");
   });
 

@@ -5,6 +5,7 @@ import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelClase from "@/components/PanelClase.vue";
@@ -286,32 +287,29 @@ onUnmounted(() => clearInterval(reloj));
 
 <template>
   <section class="tu-pagina">
-    <h1 class="text-2xl font-semibold">
-      {{
+    <!-- El saludo es el título; de qué va su día, el subtítulo. -->
+    <EncabezadoSeccion
+      :titulo="
         nombre
-          ? $t("portal.inicio.saludo", { nombre })
-          : $t("portal.inicio.saludoSinNombre")
-      }}
-    </h1>
-    <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-      {{
+          ? $t('portal.inicio.saludo', { nombre })
+          : $t('portal.inicio.saludoSinNombre')
+      "
+      :subtitulo="
         $t(
           sesion.esCitas
-            ? "portal.instructor.inicio.resumenCitas"
-            : "portal.instructor.inicio.resumenClases",
-          {
-            estudio: sesion.estudio?.nombre ?? "",
-          },
+            ? 'portal.instructor.inicio.resumenCitas'
+            : 'portal.instructor.inicio.resumenClases',
+          { estudio: sesion.estudio?.nombre ?? '' },
         )
-      }}
-    </p>
+      "
+    />
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="actualizar"
         >
           {{ $t("comun.reintentar") }}
@@ -458,14 +456,14 @@ onUnmounted(() => clearInterval(reloj));
         data-prueba="hoy-instructor"
       >
         <header class="pi-hoy-cabecera">
-          <h2 class="font-medium">
-            <IconoNav nombre="agenda" :tam="20" class="inline-block mr-2" />
+          <h2 class="tu-titulo-seccion">
             {{ $t("portal.instructor.inicio.tarjetas.hoy") }}
           </h2>
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             :disabled="actualizando"
+            :aria-busy="actualizando || undefined"
             data-prueba="actualizar"
             @click="actualizar"
           >
@@ -491,9 +489,11 @@ onUnmounted(() => clearInterval(reloj));
                   >{{ lineaHoy(c).detalle }}</span
                 >
               </span>
+              <!-- Lo que falta: punto y texto, como los demás estados. -->
               <span
                 v-if="faltaLista(c)"
-                class="tu-badge tu-badge-aviso shrink-0 text-xs"
+                class="tu-estado pi-falta shrink-0 text-xs"
+                :style="{ '--tono': 'var(--aviso)' }"
                 >{{
                   c.tipo === "cita"
                     ? $t("portal.instructor.inicio.faltaLlegada")
@@ -656,7 +656,7 @@ onUnmounted(() => clearInterval(reloj));
     flex-wrap: wrap;
     gap: 0.6rem;
   }
-  .pi-hoy-fila .tu-badge {
+  .pi-hoy-fila .pi-falta {
     margin-left: 4.1rem;
     white-space: normal;
   }

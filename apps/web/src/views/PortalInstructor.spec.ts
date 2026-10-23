@@ -90,10 +90,11 @@ function montar(
             "<div class='panel-clase'>{{ sesion.oferta }}<slot name='acciones' /></div>",
         },
         PanelCita: true,
+        // El saludo es el título y el resumen del día, el subtítulo.
         EncabezadoSeccion: {
-          props: ["titulo"],
+          props: ["titulo", "subtitulo"],
           template:
-            "<header><h1>{{ titulo }}</h1><slot name='acciones' /></header>",
+            "<header><h1>{{ titulo }}</h1><p v-if='subtitulo'>{{ subtitulo }}</p><slot name='acciones' /></header>",
         },
       },
     },

@@ -10,6 +10,7 @@ import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -144,6 +145,14 @@ const meta = ref<Meta | null>(null);
 const busqueda = ref("");
 const pagina = ref(1);
 const cargandoLista = ref(true);
+// El periodo, la plataforma y la búsqueda, en la dirección: recargar o compartir el
+// enlace abre lo mismo. Antes de vigilarlos, para no pedir de más.
+useFiltrosEnUrl({
+  desde: fechaEnUrl(desde),
+  hasta: fechaEnUrl(hasta),
+  proveedor: opcionEnUrl(proveedor, ["", "wellhub", "totalpass", "fitpass"]),
+  q: busqueda,
+});
 let peticion = 0;
 async function cargarVisitantes(): Promise<void> {
   const mia = ++peticion;

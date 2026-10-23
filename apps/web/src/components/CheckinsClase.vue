@@ -209,6 +209,7 @@ watch(
           modelo.codigo === '' ||
           (esFitpass && !modelo.identificacionRevisada)
         "
+        :aria-busy="registrando || undefined"
       >
         {{
           registrando ? $t("checkins.registrando") : $t("checkins.registrar")
@@ -254,15 +255,12 @@ watch(
               · {{ $t("operacion.plataformas.origen.automatico") }}</span
             >
           </span>
+          <!-- Estado: punto + texto. -->
           <span
-            class="inline-flex items-center gap-1.5 shrink-0"
+            class="tu-estado shrink-0"
+            :style="{ '--tono': COLOR[c.estado] }"
             data-prueba="estado-checkin"
           >
-            <span
-              class="inline-block size-1.5 rounded-full"
-              :style="{ background: COLOR[c.estado] }"
-              aria-hidden="true"
-            />
             {{ etiqueta(c) }}
           </span>
         </div>
@@ -284,7 +282,7 @@ watch(
         <button
           v-if="c.estado === 'no_verificable' && puedeExcepcion"
           type="button"
-          class="tu-enlace text-xs mt-1"
+          class="tu-btn tu-btn-secundario tu-btn-chico mt-1"
           :aria-expanded="abierta === c.id"
           @click="abrirExcepcion(c.id)"
         >
@@ -334,6 +332,7 @@ watch(
                 excepcion.motivo.trim() === '' ||
                 excepcion.evidencia.trim() === ''
               "
+              :aria-busy="autorizando || undefined"
             >
               {{ $t("checkins.autorizar") }}
             </button>

@@ -4,8 +4,8 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 
 import AccesosOperativos from "@/components/AccesosOperativos.vue";
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
-import IconoNav from "@/components/IconoNav.vue";
 import PonEnMarcha, { type Quickstart } from "@/components/PonEnMarcha.vue";
 import ResumenDelDia from "@/components/ResumenDelDia.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -121,33 +121,26 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
-    <div class="pa-cabecera">
-      <div>
-        <h1 class="text-2xl font-semibold">
-          {{
-            nombre
-              ? $t("portal.inicio.saludo", { nombre })
-              : $t("portal.inicio.saludoSinNombre")
-          }}
-        </h1>
-        <p
-          class="mt-1"
-          :style="{ color: 'var(--texto-suave)' }"
-          data-prueba="fecha-hoy"
-        >
-          {{ hoyTexto }}
-        </p>
-      </div>
-      <span class="pa-modalidad"
-        ><IconoNav nombre="agenda" :tam="18" />{{
+    <!-- El saludo es el título y la fecha de hoy, el subtítulo; a la derecha, de qué
+         es la jornada (un indicador, sin ícono). -->
+    <EncabezadoSeccion
+      :titulo="
+        nombre
+          ? $t('portal.inicio.saludo', { nombre })
+          : $t('portal.inicio.saludoSinNombre')
+      "
+      :subtitulo="hoyTexto"
+    >
+      <template #acciones>
+        <span class="pa-modalidad" data-prueba="jornada">{{
           $t(
             sesion.esCitas
               ? "operacion.admin.jornadaCitas"
               : "operacion.admin.jornadaClases",
           )
-        }}</span
-      >
-    </div>
+        }}</span>
+      </template>
+    </EncabezadoSeccion>
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->
     <PonEnMarcha
@@ -163,9 +156,13 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <div v-else-if="error" class="mt-8 tu-card p-5" style="color: var(--error)">
-      {{ error }}
-      <button class="tu-enlace ml-2" @click="cargar">
+    <div
+      v-else-if="error"
+      class="mt-8 tu-card p-5 flex flex-wrap items-center justify-between gap-3"
+      role="alert"
+    >
+      <span style="color: var(--error)">{{ error }}</span>
+      <button type="button" class="tu-btn tu-btn-discreto" @click="cargar">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -173,10 +170,8 @@ onMounted(cargar);
     <!-- Suscripción a AgendaUno: estado y lo que va del mes -->
     <div v-else-if="facturacion" class="mt-6 tu-card p-5">
       <div class="flex items-baseline justify-between gap-3">
-        <h2 class="pa-seccion">
-          <IconoNav nombre="facturas" :tam="20" />{{
-            $t("operacion.admin.suscripcion")
-          }}
+        <h2 class="tu-titulo-seccion">
+          {{ $t("operacion.admin.suscripcion") }}
         </h2>
         <RouterLink :to="{ name: 'renta' }" class="tu-enlace text-sm">
           {{ $t("panel.verDetalle") }}
@@ -231,33 +226,16 @@ onMounted(cargar);
 </template>
 
 <style scoped>
-.pa-cabecera {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
+/* De qué es la jornada: un indicador discreto, no un botón. */
 .pa-modalidad {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 0.8rem;
+  padding: 0.45rem 0.8rem;
   border: 1px solid var(--borde);
   border-radius: 0.65rem;
   color: var(--texto-suave);
   background: var(--superficie);
   font-size: 0.8rem;
-}
-.pa-modalidad > svg,
-.pa-seccion > svg {
-  color: var(--primario);
-}
-.pa-seccion {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-weight: 600;
 }
 .pa-suscripcion {
   display: grid;

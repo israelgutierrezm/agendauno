@@ -734,15 +734,15 @@ describe("portal del alumno", () => {
     const w = montar(MisReservasView);
     await flushPromises();
 
-    await w.get('[data-prueba="pestana-proximas"]').trigger("click");
+    await w.get('[data-pestana="proximas"]').trigger("click");
     expect(w.get('[data-prueba="reserva-proxima"]').text()).toContain(
       "Pole Nivel 1",
     );
     expect(router.replace).toHaveBeenLastCalledWith({
-      query: { vista: "proximas" },
+      query: { pestana: "proximas" },
     });
 
-    await w.get('[data-prueba="pestana-historial"]').trigger("click");
+    await w.get('[data-pestana="historial"]').trigger("click");
     await flushPromises();
     const fila = w.get('[data-prueba="historial-fila"]');
     expect(fila.text()).toContain("Asististe");
@@ -784,7 +784,7 @@ describe("portal del alumno", () => {
   });
 
   it("al cancelar, el aviso dice que se canceló (no se queda el de un cambio anterior)", async () => {
-    ruta.query = { vista: "proximas" };
+    ruta.query = { pestana: "proximas" };
     api.post.mockResolvedValue({ data: { data: {} } });
     api.get.mockImplementation((url: string) => {
       const r = url.replace("/api/v1/app/demo", "");
@@ -831,7 +831,7 @@ describe("portal del alumno", () => {
   });
 
   it("en próximas muestra fecha visual y abre el detalle sin reservar de nuevo", async () => {
-    ruta.query = { vista: "proximas" };
+    ruta.query = { pestana: "proximas" };
     const w = montar(MisReservasView);
     await flushPromises();
     expect(w.find(".mr-proxima-fecha").exists()).toBe(true);

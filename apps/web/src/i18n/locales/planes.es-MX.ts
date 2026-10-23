@@ -34,7 +34,7 @@ export default {
   coherencia: {
     titulo: "Revisa tu catálogo",
     ayuda:
-      "No impide vender: son detalles que tus clientes notan al comparar planes.",
+      "No impide vender: son detalles que tus alumnos notan al comparar planes.",
   },
   subtitulo:
     "Lo que tus alumnos compran para reservar: cuántas clases incluye, cuánto dura y para qué clases sirve.",
@@ -145,7 +145,10 @@ export default {
     algunas: "Solo algunas",
     eligeClases: "Elige al menos una clase.",
     sinClases: "Aún no hay clases en el catálogo.",
-    avanzado: "Más opciones",
+    // <summary> de `tu-avanzado`; con alguna configurada, cuántas.
+    avanzado: "Más condiciones",
+    avanzadoActivas:
+      "Más condiciones · {n} activa | Más condiciones · {n} activas",
     // Dónde se puede usar (ADR 0017): todas las sucursales o las marcadas.
     cobertura: "Dónde se puede usar",
     coberturaAlgunas: "Una o varias sucursales",
@@ -204,6 +207,15 @@ export default {
     anualidad: "Cobra anualidad",
     destacado: "Destacado en tu página",
     archivado: "Archivado: ya no se vende",
+    // Las condiciones avanzadas que se configuraron.
+    topeDia: "Máximo 1 reserva al día | Máximo {n} reservas al día",
+    topeSemana:
+      "Máximo 1 reserva a la semana | Máximo {n} reservas a la semana",
+    anticipado:
+      "Reserva 1 hora antes que los demás | Reserva {n} horas antes que los demás",
+    invitados: "1 invitado al mes | {n} invitados al mes",
+    acumula: "Acumula lo no usado",
+    acumulaHasta: "Acumula hasta 1 clase | Acumula hasta {n} clases",
   },
   // Permanencia de una membresía (B04).
   permanencia: {

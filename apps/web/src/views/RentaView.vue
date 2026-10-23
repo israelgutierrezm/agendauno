@@ -9,6 +9,7 @@ import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import ComplementosNegocio from "@/components/ComplementosNegocio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import EstadoVencimiento from "@/components/EstadoVencimiento.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PlanCitasRenta from "@/components/PlanCitasRenta.vue";
 import QuienCuentaRenta from "@/components/QuienCuentaRenta.vue";
@@ -231,6 +232,14 @@ function cubre(c: Cargo): string {
   }
   return mes(c.periodo);
 }
+// El estado de un cargo: punto y texto (pagado en verde, pendiente en ámbar; lo demás,
+// sin cargo o cancelado, en gris).
+function tonoCargo(estado: string): string | undefined {
+  if (estado === "pagado") {
+    return "var(--exito)";
+  }
+  return estado === "pendiente" ? "var(--aviso)" : undefined;
+}
 // Un cobro automático que no pasó: cuándo se reintenta o que hay que pagarlo.
 function notaCobro(c: Cargo): string | null {
   if (c.estado !== "pendiente" || !c.error_cobro) {
@@ -416,12 +425,11 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- Sin acceso: un aviso neutro como título de la página (el único h1). -->
   <section v-if="!veRenta" class="tu-pagina" data-prueba="no-disponible">
-    <EstadoVacio
-      class="tu-card mt-6"
-      icono="renta"
+    <EncabezadoSeccion
       :titulo="$t('renta.noDisponibleTitulo')"
-      :texto="$t('renta.noDisponibleAyuda')"
+      :subtitulo="$t('renta.noDisponibleAyuda')"
     />
   </section>
   <section v-else class="tu-pagina">
@@ -444,7 +452,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}
@@ -524,7 +532,11 @@ onMounted(() => {
             }}</a>
           </p>
           <p v-if="enPrueba && renta.trial_termina_en" class="mt-3">
-            <span class="tu-badge tu-badge-exito" data-prueba="en-prueba">
+            <span
+              class="tu-estado"
+              :style="{ '--tono': 'var(--exito)' }"
+              data-prueba="en-prueba"
+            >
               {{
                 $t("cobro.modo.pruebaHasta", {
                   fecha: fecha(renta.trial_termina_en),
@@ -719,7 +731,7 @@ onMounted(() => {
       <!-- Complementos que se piden (ADR 0140): p. ej. Familias. -->
       <ComplementosNegocio />
 
-      <h2 class="mt-8 font-medium text-lg">{{ $t("renta.historial") }}</h2>
+      <h2 class="tu-titulo-seccion mt-8">{{ $t("renta.historial") }}</h2>
       <!-- Con qué se paga, si la plataforma tiene más de una pasarela (ADR 0192). -->
       <div
         v-if="
@@ -749,20 +761,24 @@ onMounted(() => {
         compacto
         :titulo="$t('renta.sinCargos')"
       />
-      <div v-else class="mt-3 tu-card overflow-x-auto">
+      <!-- Tabla en escritorio; en el teléfono, una ficha por cargo con «Pagar» a la vista. -->
+      <div
+        v-else
+        class="mt-3 tu-card relative overflow-x-auto tu-tabla-adaptable"
+      >
         <table class="tu-tabla">
           <thead>
             <tr>
               <th>
                 {{ $t("renta.colPeriodo") }}
               </th>
-              <th class="text-right hidden sm:table-cell">
-                {{ $t("cobro.historial.uso") }}
-              </th>
               <th class="text-right">
                 {{ $t("renta.colMonto") }}
               </th>
-              <th class="hidden sm:table-cell">
+              <th class="text-right hidden sm:table-cell">
+                {{ $t("cobro.historial.uso") }}
+              </th>
+              <th>
                 {{ $t("renta.colEstado") }}
               </th>
               <th class="hidden sm:table-cell">
@@ -776,10 +792,13 @@ onMounted(() => {
           <tbody>
             <template v-for="c in renta.cargos" :key="c.id">
               <tr>
-                <td class="font-semibold">
+                <td
+                  :data-etiqueta="$t('renta.colPeriodo')"
+                  class="font-semibold"
+                >
                   <span
                     v-if="c.concepto && c.concepto !== 'renta'"
-                    class="block text-xs font-normal rt-suave"
+                    class="tu-sub font-normal"
                     >{{ $t(`suscripcion.cobro.concepto.${c.concepto}`) }}</span
                   >
                   {{ cubre(c) }}
@@ -797,71 +816,64 @@ onMounted(() => {
                     }}
                   </button>
                 </td>
-                <td class="text-right hidden sm:table-cell">
+                <td
+                  :data-etiqueta="$t('renta.colMonto')"
+                  class="text-right font-semibold tabular-nums"
+                >
+                  {{ dinero(c.monto_minor, c.moneda) }}
+                </td>
+                <td
+                  :data-etiqueta="$t('cobro.historial.uso')"
+                  class="text-right hidden sm:table-cell"
+                >
                   {{
                     c.modo_cobro === "fijo"
                       ? "—"
                       : `${c.cantidad} ${$t(`cobro.actual.${c.metrica}`)}`
                   }}
                 </td>
-                <td class="text-right font-semibold">
-                  {{ dinero(c.monto_minor, c.moneda) }}
-                  <!-- En el teléfono, el estado va bajo el monto (sin su columna). -->
-                  <span class="sm:hidden block font-normal">
+                <td :data-etiqueta="$t('renta.colEstado')">
+                  <div>
                     <span
-                      class="tu-badge"
-                      :class="{
-                        'tu-badge-exito': c.estado === 'pagado',
-                        'tu-badge-aviso': c.estado === 'pendiente',
-                      }"
+                      class="tu-estado"
+                      :style="{ '--tono': tonoCargo(c.estado) }"
+                      >{{ $t(`cobro.estados.${c.estado}`) }}</span
                     >
-                      {{ $t(`cobro.estados.${c.estado}`) }}
-                    </span>
                     <span
                       v-if="notaCobro(c)"
-                      class="block text-xs mt-1 text-left"
+                      class="block text-xs mt-1"
                       style="color: var(--aviso)"
+                      data-prueba="nota-cobro"
                       >{{ notaCobro(c) }}</span
                     >
-                  </span>
-                </td>
-                <td class="hidden sm:table-cell">
-                  <span
-                    class="tu-badge"
-                    :class="{
-                      'tu-badge-exito': c.estado === 'pagado',
-                      'tu-badge-aviso': c.estado === 'pendiente',
-                    }"
-                  >
-                    {{ $t(`cobro.estados.${c.estado}`) }}
-                  </span>
-                  <span
-                    v-if="notaCobro(c)"
-                    class="block text-xs mt-1"
-                    style="color: var(--aviso)"
-                    data-prueba="nota-cobro"
-                    >{{ notaCobro(c) }}</span
-                  >
+                  </div>
                 </td>
                 <td
+                  :data-etiqueta="$t('renta.colVence')"
                   class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
-                  {{
+                  <!-- Lo que falta pagar: cuánto falta o cuánto lleva vencido. -->
+                  <EstadoVencimiento
+                    v-if="c.estado === 'pendiente' && c.vence_en"
+                    :fecha="c.vence_en"
+                  />
+                  <template v-else>{{
                     c.estado === "sin_cargo" ||
                     c.estado === "cancelado" ||
                     !c.vence_en
                       ? "—"
                       : fecha(c.vence_en, "medium")
-                  }}
+                  }}</template>
                 </td>
-                <td class="text-right">
+                <td class="tu-celda-acciones">
                   <!-- Pendiente: pagar la renta -->
                   <button
                     v-if="c.estado === 'pendiente'"
                     type="button"
-                    class="tu-btn tu-btn-primario whitespace-nowrap"
+                    class="tu-btn tu-btn-primario tu-btn-chico"
                     :disabled="pagando === c.id"
+                    :aria-busy="pagando === c.id || undefined"
                     @click="pagar(c)"
                   >
                     {{
@@ -883,14 +895,14 @@ onMounted(() => {
                   >
                     <button
                       type="button"
-                      class="tu-btn tu-btn-secundario whitespace-nowrap"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       @click="descargarFactura(c, 'pdf')"
                     >
                       {{ $t("renta.factura.pdf") }}
                     </button>
                     <button
                       type="button"
-                      class="tu-btn tu-btn-secundario whitespace-nowrap"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
                       @click="descargarFactura(c, 'xml')"
                     >
                       {{ $t("renta.factura.xml") }}
@@ -900,7 +912,7 @@ onMounted(() => {
                   <button
                     v-else-if="!facturaPosible || c.moneda !== 'MXN'"
                     type="button"
-                    class="tu-btn tu-btn-secundario whitespace-nowrap"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     data-prueba="recibo"
                     @click="descargarRecibo(c)"
                   >
@@ -910,9 +922,10 @@ onMounted(() => {
                   <button
                     v-else-if="puedeGestionar"
                     type="button"
-                    class="tu-btn tu-btn-secundario whitespace-nowrap"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     data-prueba="facturar"
                     :disabled="facturando === c.id"
+                    :aria-busy="facturando === c.id || undefined"
                     @click="facturar(c)"
                   >
                     {{
@@ -926,7 +939,7 @@ onMounted(() => {
                 </td>
               </tr>
               <tr v-if="expandido === c.id && c.desglose">
-                <td colspan="6" class="px-4 pb-4">
+                <td colspan="6" class="tu-celda-detalle pb-4">
                   <dl class="rt-desglose">
                     <template v-for="(l, i) in c.desglose.lineas" :key="i">
                       <dt>

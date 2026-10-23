@@ -61,14 +61,15 @@ class DunningTenantController
     }
 
     /**
-     * Registra un fallo de cobro de la membresía (abre/avanza el dunning).
+     * Registra un fallo de cobro de la membresía (abre/avanza el dunning). A mano no
+     * lleva clave de motivo: lo que escribió el equipo queda como detalle.
      */
     public function registrarFallo(Request $request): JsonResponse
     {
         $acuerdo = $this->acuerdoDe($request);
         $validado = $request->validate(['motivo' => ['nullable', 'string', 'max:255']]);
 
-        $proceso = $this->dunning->registrarFallo($acuerdo, (string) ($validado['motivo'] ?? 'Cobro rechazado'));
+        $proceso = $this->dunning->registrarFallo($acuerdo, null, isset($validado['motivo']) ? (string) $validado['motivo'] : null);
 
         return response()->json(['data' => $this->presentar($proceso->load('acuerdo.persona'))], 201);
     }
@@ -112,7 +113,12 @@ class DunningTenantController
             'gracia_hasta' => $proceso->gracia_hasta->toIso8601String(),
             'proximo_intento_en' => $proceso->proximo_intento_en?->toIso8601String(),
             'suspendido_en' => $proceso->suspendido_en?->toIso8601String(),
+            // La frase que se le mandó al alumno (en segunda persona): el panel no la muestra.
             'ultimo_motivo' => $proceso->ultimo_motivo,
+            // Por qué no se cobró, para quien administra: la clave (null si se registró a
+            // mano) y el detalle (el motivo del banco o lo que escribió el equipo).
+            'motivo_clave' => $proceso->ultimo_motivo_clave?->value,
+            'motivo_detalle' => $proceso->ultimo_motivo_detalle,
         ];
     }
 }

@@ -18,10 +18,12 @@ import BuscarPersona, {
 } from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PlantillaBandeja from "@/components/PlantillaBandeja.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import {
   registrarWhatsApp,
   type DatosRegistroWhatsApp,
@@ -33,7 +35,7 @@ import { useToastStore } from "@/stores/toast";
  * La bandeja de WhatsApp e Instagram (ADR 0200): las conversaciones del negocio a la
  * izquierda y la elegida a la derecha (en el teléfono, una a la vez). Se contesta en
  * las 24 horas que da Meta desde el último mensaje de esa persona; se archiva y se
- * vincula con la ficha de un cliente. Quien configura las integraciones conecta aquí
+ * vincula con la ficha de un alumno. Quien configura las integraciones conecta aquí
  * el número de WhatsApp y la cuenta de Instagram. Se refresca sola cada 20 segundos.
  */
 type Canal = "whatsapp" | "instagram" | "messenger";
@@ -108,6 +110,13 @@ const lista = ref<Conversacion[]>([]);
 const meta = ref({ page: 1, ultima_pagina: 1, total: 0, per_page: 30 });
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Abiertas o archivadas, el canal y la búsqueda, en la dirección: recargar o compartir
+// el enlace conserva la vista. `ver` y no `estado`: esa la usa la vuelta de Instagram.
+useFiltrosEnUrl({
+  ver: opcionEnUrl(estado, ["abierta", "archivada"]),
+  canal: opcionEnUrl(canal, ["", "whatsapp", "instagram", "messenger"]),
+  q,
+});
 
 async function cargarLista(silencioso = false): Promise<void> {
   if (!silencioso) {
@@ -607,7 +616,9 @@ onBeforeUnmount(() => {
       data-prueba="canales"
     >
       <div>
-        <h2 class="bm-subtitulo">{{ $t("bandejaMensajes.canales.titulo") }}</h2>
+        <h2 class="tu-titulo-seccion">
+          {{ $t("bandejaMensajes.canales.titulo") }}
+        </h2>
         <p class="tu-hint">{{ $t("bandejaMensajes.canales.ayuda") }}</p>
       </div>
       <ul class="bm-lista-canales">
@@ -642,7 +653,7 @@ onBeforeUnmount(() => {
                 (!fila.conexion || fila.conexion.estado === 'reconectar')
               "
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
               :disabled="conectando !== null"
               @click="conectar(fila.clave)"
             >
@@ -655,7 +666,7 @@ onBeforeUnmount(() => {
             <button
               v-if="fila.conexion"
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
               @click="desconectar(fila.conexion)"
             >
               {{ $t("bandejaMensajes.canales.desconectar") }}
@@ -701,12 +712,15 @@ onBeforeUnmount(() => {
     <div class="bm-cuerpo" :class="{ 'bm-con-detalle': seleccion !== null }">
       <aside class="tu-tarjeta bm-columna-lista">
         <div class="bm-filtros">
-          <div class="bm-segmentos" role="group">
+          <div
+            class="tu-segmentado"
+            role="group"
+            :aria-label="$t('bandejaMensajes.filtroEstado')"
+          >
             <button
               v-for="opcion in ['abierta', 'archivada'] as const"
               :key="opcion"
               type="button"
-              class="bm-segmento"
               :aria-pressed="estado === opcion"
               @click="estado = opcion"
             >
@@ -811,9 +825,10 @@ onBeforeUnmount(() => {
         <header class="bm-cabecera">
           <button
             type="button"
-            class="tu-enlace text-sm bm-volver"
+            class="tu-volver bm-volver"
             @click="seleccion = null"
           >
+            <IconoNav nombre="atras" :tam="16" />
             {{ $t("bandejaMensajes.volver") }}
           </button>
           <div class="bm-quien">
@@ -849,7 +864,12 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn"
+              :class="
+                seleccion.estado === 'abierta'
+                  ? 'tu-btn-peligro'
+                  : 'tu-btn-secundario'
+              "
               @click="
                 seleccion.estado === 'abierta'
                   ? actualizar(
@@ -878,7 +898,7 @@ onBeforeUnmount(() => {
             <button
               v-if="seleccion.persona"
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
               @click="
                 eligiendoFicha = false;
                 actualizar(
@@ -1042,9 +1062,6 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
-.bm-subtitulo {
-  font-weight: 600;
-}
 .bm-lista-canales {
   display: grid;
   gap: 0.5rem;
@@ -1099,21 +1116,8 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 0.5rem;
 }
-.bm-segmentos {
-  display: flex;
-  gap: 0.25rem;
-}
-.bm-segmento {
-  flex: 1;
-  padding: 0.375rem 0.5rem;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-boton, 0.5rem);
-  font-size: 0.875rem;
-}
-.bm-segmento[aria-pressed="true"] {
-  border-color: var(--primario);
-  color: var(--primario-fuerte, var(--primario));
-  font-weight: 600;
+.bm-filtros > .tu-segmentado {
+  justify-self: start;
 }
 .bm-conversaciones {
   display: grid;
@@ -1245,9 +1249,7 @@ onBeforeUnmount(() => {
     display: none;
   }
   .bm-volver {
-    display: inline;
-    flex-basis: 100%;
-    text-align: left;
+    display: inline-flex;
   }
   .bm-acciones {
     margin-left: 0;

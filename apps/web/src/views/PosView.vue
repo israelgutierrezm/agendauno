@@ -20,6 +20,7 @@ import VentasMostrador, {
 } from "@/components/VentasMostrador.vue";
 import { api, camposConError, codigoDeError, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { efectivoDe, partesListas, type ParteCobro } from "@/lib/formasDePago";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoComprador } from "@/lib/mostrador";
@@ -149,6 +150,8 @@ const busqueda = ref("");
 // Las categorías de los productos a la venta, en su orden; «sin categoría» (`-`) al
 // final si hay productos sin ella. Sin categorías, no hay filtro.
 const categoria = ref("");
+// La búsqueda y la categoría en la dirección: recargar no las pierde.
+useFiltrosEnUrl({ q: busqueda, categoria });
 const categorias = computed(() => {
   const vistas = new Map<
     string,
@@ -649,6 +652,13 @@ function precargarApartados(): void {
 
 onMounted(async () => {
   await cargar();
+  // Una categoría de la dirección que ya no existe no deja la lista vacía.
+  if (
+    categoria.value !== "" &&
+    !categorias.value.some((c) => c.id === categoria.value)
+  ) {
+    categoria.value = "";
+  }
   precargarApartados();
 });
 </script>
@@ -719,7 +729,7 @@ onMounted(async () => {
           <!-- Productos -->
           <div class="tu-card lg:col-span-2">
             <div class="mo-barra">
-              <label class="mo-buscar">
+              <label class="tu-buscar">
                 <IconoNav nombre="buscar" :tam="16" />
                 <input
                   v-model="busqueda"
@@ -746,33 +756,33 @@ onMounted(async () => {
               </label>
               <LeyendaSucursal v-else />
             </div>
-            <!-- Filtrar por categoría (solo si el negocio tiene categorías) -->
-            <div
-              v-if="categorias.length > 0"
-              class="mo-categorias"
-              role="group"
-              :aria-label="$t('operacion.productos.filtrar')"
-              data-prueba="categorias-mostrador"
-            >
-              <button
-                type="button"
-                class="mo-categoria"
-                :aria-pressed="categoria === ''"
-                @click="categoria = ''"
+            <!-- Filtrar por categoría (solo si el negocio tiene categorías): el
+                 segmentado de los filtros; las que no caben se desplazan dentro. -->
+            <div v-if="categorias.length > 0" class="mo-categorias">
+              <div
+                class="tu-segmentado"
+                role="group"
+                :aria-label="$t('operacion.productos.filtrar')"
+                data-prueba="categorias-mostrador"
               >
-                {{ $t("operacion.productos.todas") }}
-              </button>
-              <button
-                v-for="c in categorias"
-                :key="c.id"
-                type="button"
-                class="mo-categoria"
-                :aria-pressed="categoria === c.id"
-                :data-prueba="`categoria-${c.id}`"
-                @click="categoria = c.id"
-              >
-                {{ c.nombre }}
-              </button>
+                <button
+                  type="button"
+                  :aria-pressed="categoria === ''"
+                  @click="categoria = ''"
+                >
+                  {{ $t("operacion.productos.todas") }}
+                </button>
+                <button
+                  v-for="c in categorias"
+                  :key="c.id"
+                  type="button"
+                  :aria-pressed="categoria === c.id"
+                  :data-prueba="`categoria-${c.id}`"
+                  @click="categoria = c.id"
+                >
+                  {{ c.nombre }}
+                </button>
+              </div>
             </div>
 
             <p
@@ -1110,6 +1120,7 @@ onMounted(async () => {
               class="tu-btn tu-btn-primario mt-3 w-full"
               type="button"
               data-prueba="cobrar"
+              :aria-busy="cobrando || undefined"
               :disabled="
                 !puedeVender ||
                 cobrando ||
@@ -1187,6 +1198,14 @@ onMounted(async () => {
       <template #pie>
         <button
           type="button"
+          class="tu-btn tu-btn-secundario"
+          data-prueba="extras-cancelar"
+          @click="eligiendoExtras = null"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="button"
           class="tu-btn tu-btn-primario"
           data-prueba="extras-agregar"
           @click="confirmarExtras"
@@ -1212,50 +1231,8 @@ onMounted(async () => {
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--borde);
 }
-.mo-buscar {
-  position: relative;
-  flex: 1 1 14rem;
-  color: var(--texto-suave);
-}
-.mo-buscar > :first-child {
-  position: absolute;
-  top: 50%;
-  left: 0.75rem;
-  transform: translateY(-50%);
-}
-.mo-buscar > input {
-  padding-left: 2.25rem;
-}
 .mo-categorias {
-  display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
   padding: 0.75rem 1rem 0;
-  scrollbar-width: thin;
-}
-.mo-categoria {
-  flex-shrink: 0;
-  padding: 0.35rem 0.85rem;
-  border: 1px solid var(--borde);
-  border-radius: 999px;
-  background: var(--superficie);
-  color: var(--texto-suave);
-  font-size: 0.82rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.mo-categoria:hover {
-  color: var(--texto);
-  border-color: color-mix(in srgb, var(--primario) 35%, var(--borde));
-}
-.mo-categoria[aria-pressed="true"] {
-  border-color: var(--primario);
-  background: var(--primario-suave);
-  color: var(--primario-fuerte, var(--primario));
-}
-.mo-categoria:focus-visible {
-  outline: 2px solid var(--primario);
-  outline-offset: 2px;
 }
 .mo-foto {
   width: 3rem;

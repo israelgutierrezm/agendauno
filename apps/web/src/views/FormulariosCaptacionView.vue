@@ -23,7 +23,7 @@ import { useToastStore } from "@/stores/toast";
 /**
  * Formularios de captación (ADR 0117): el de «Pedir acceso» de la página del negocio y
  * los que comparte por enlace o QR o pone en su propio sitio. Lo que envían llega a
- * Prospectos. Aparte de las fichas de datos que llenan sus miembros.
+ * Prospectos. Aparte de las fichas de datos que llenan sus alumnos.
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -248,7 +248,18 @@ function descargarQr(): void {
     <EncabezadoSeccion
       :titulo="$t('captacion.formularios.titulo')"
       :subtitulo="$t('captacion.formularios.descripcion')"
-    />
+    >
+      <template v-if="puedeGestionar" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          data-prueba="nuevo-formulario-captacion"
+          @click="editar(null)"
+        >
+          {{ $t("captacion.formularios.nuevo") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <div
       class="tu-card mt-5 p-4 flex flex-wrap items-center justify-between gap-3"
@@ -290,12 +301,11 @@ function descargarQr(): void {
       {{ $t("captacion.formularios.compartirPanel.captacionApagada") }}
     </AvisoTono>
 
-    <div class="mt-4 flex flex-wrap items-center justify-end gap-3">
-      <label
-        v-if="formularios.length > 3"
-        class="tu-buscar min-w-0"
-        data-prueba="buscar-formulario"
-      >
+    <div
+      v-if="formularios.length > 3"
+      class="mt-4 flex flex-wrap items-center justify-end gap-3"
+    >
+      <label class="tu-buscar min-w-0" data-prueba="buscar-formulario">
         <IconoNav nombre="buscar" :tam="16" />
         <input
           v-model="busqueda"
@@ -305,14 +315,6 @@ function descargarQr(): void {
           :aria-label="$t('captacion.formularios.buscar')"
         />
       </label>
-      <button
-        v-if="puedeGestionar"
-        type="button"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        @click="editar(null)"
-      >
-        {{ $t("captacion.formularios.nuevo") }}
-      </button>
     </div>
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
@@ -372,7 +374,7 @@ function descargarQr(): void {
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             data-prueba="compartir-tarjeta"
             @click="compartir(f)"
           >
@@ -382,7 +384,7 @@ function descargarQr(): void {
           <button
             v-if="puedeGestionar"
             type="button"
-            class="tu-btn tu-btn-secundario inline-flex items-center gap-1.5"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             data-prueba="editar-tarjeta"
             @click="editar(f)"
           >
@@ -404,7 +406,12 @@ function descargarQr(): void {
       :ocupado="guardando"
       @cerrar="descartar.cerrar()"
     >
-      <form v-if="editor" class="grid gap-4 text-sm" @submit.prevent="guardar">
+      <form
+        v-if="editor"
+        id="form-captacion"
+        class="grid gap-4 text-sm"
+        @submit.prevent="guardar"
+      >
         <label class="block">
           <span class="tu-label">{{
             $t("captacion.formularios.editor.nombre")
@@ -520,26 +527,29 @@ function descargarQr(): void {
               }}</span>
               <textarea v-model="c.opcionesTexto" class="tu-input" rows="3" />
             </label>
-            <div class="flex flex-wrap gap-3">
+            <!-- Mover como en las fichas de datos; quitar se guarda con el formulario. -->
+            <div class="flex flex-wrap items-center gap-1">
               <button
                 type="button"
-                class="tu-enlace"
+                class="tu-icono-btn"
+                :aria-label="$t('captacion.formularios.editor.subir')"
                 :disabled="i === 0"
                 @click="mover(i, -1)"
               >
-                {{ $t("captacion.formularios.editor.subir") }}
+                <IconoNav nombre="arriba" :tam="14" />
               </button>
               <button
                 type="button"
-                class="tu-enlace"
+                class="tu-icono-btn"
+                :aria-label="$t('captacion.formularios.editor.bajar')"
                 :disabled="i === editor.campos.length - 1"
                 @click="mover(i, 1)"
               >
-                {{ $t("captacion.formularios.editor.bajar") }}
+                <IconoNav nombre="abajo" :tam="14" />
               </button>
               <button
                 type="button"
-                class="tu-enlace"
+                class="tu-btn tu-btn-discreto tu-btn-chico ml-auto"
                 @click="editor.campos.splice(i, 1)"
               >
                 {{ $t("captacion.formularios.editor.quitar") }}
@@ -556,9 +566,18 @@ function descargarQr(): void {
         </fieldset>
       </form>
       <template #pie>
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
           <button
             type="button"
+            class="tu-btn tu-btn-secundario"
+            :disabled="guardando"
+            @click="descartar.cerrar()"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            type="submit"
+            form="form-captacion"
             class="tu-btn tu-btn-primario"
             :disabled="
               guardando ||
@@ -566,7 +585,7 @@ function descargarQr(): void {
               editor.nombre.trim() === '' ||
               editor.titulo.trim() === ''
             "
-            @click="guardar"
+            :aria-busy="guardando || undefined"
           >
             {{ $t("captacion.formularios.editor.guardar") }}
           </button>

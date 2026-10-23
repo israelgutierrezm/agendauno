@@ -2,11 +2,13 @@
 export default {
   titulo: "Videos",
   subtitulo:
-    "Enlaces de YouTube, Vimeo u otro sitio para tus clientes con plan vigente: todos los planes o solo algunos.",
+    "Enlaces de YouTube, Vimeo u otro sitio para tus alumnos con plan vigente: todos los planes o solo algunos.",
   nuevo: "Agregar video",
   editar: "Editar",
+  // Título del diálogo al editar uno.
+  editarVideo: "Editar video",
   borrar: "Borrar",
-  borrarConfirmar: "¿Borrar «{titulo}»? Tus clientes dejarán de verlo.",
+  borrarConfirmar: "¿Borrar «{titulo}»? Tus alumnos dejarán de verlo.",
   guardado: "Video guardado.",
   vacio:
     "Aún no tienes videos. Agrega el enlace de una clase grabada o una rutina.",
@@ -22,8 +24,8 @@ export default {
     descripcion: "Descripción (opcional)",
     planes: "Planes que lo incluyen",
     planesAyuda:
-      "Sin elegir ninguno, lo ve cualquier cliente con un plan vigente.",
-    publicado: "Visible para los clientes",
+      "Sin elegir ninguno, lo ve cualquier alumno con un plan vigente.",
+    publicado: "Visible para los alumnos",
   },
   mios: {
     titulo: "Videos",

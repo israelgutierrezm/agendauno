@@ -8,6 +8,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoFilaImportacion from "@/components/EstadoFilaImportacion.vue";
 import FiltroFilasImportacion from "@/components/FiltroFilasImportacion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import ResumenImportacion from "@/components/ResumenImportacion.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
@@ -15,6 +16,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useFilasImportacion } from "@/lib/filasImportacion";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -257,11 +259,28 @@ function descargarPlantilla(): void {
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('importarReservas.titulo')" />
+    <!-- «Volver» a la lista de origen, encima del encabezado (como en las fichas). -->
+    <RouterLink :to="{ name: 'miembros' }" class="tu-volver"
+      ><IconoNav nombre="atras" :tam="16" />
+      {{
+        $t("ficha.volver", {
+          grupo: plural(sesion.terminologia.miembro).toLowerCase(),
+        })
+      }}</RouterLink
+    >
+    <EncabezadoSeccion
+      class="mt-4"
+      :titulo="$t('importarReservas.titulo')"
+      :subtitulo="$t('importarReservas.subtitulo')"
+    />
 
     <!-- Éxito -->
-    <div v-if="importadas !== null" class="mt-6 tu-card p-6 text-center">
-      <p class="text-2xl font-semibold" :style="{ color: 'var(--exito)' }">
+    <div
+      v-if="importadas !== null"
+      class="mt-6 tu-card p-6 text-center"
+      role="status"
+    >
+      <p class="text-lg font-semibold" :style="{ color: 'var(--exito)' }">
         {{ $t("importarReservas.importadas", { n: importadas }, importadas) }}
       </p>
       <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -280,7 +299,7 @@ function descargarPlantilla(): void {
       </p>
       <RouterLink
         :to="{ name: 'agenda' }"
-        class="tu-btn tu-btn-primario mt-4 inline-block"
+        class="tu-btn tu-btn-primario mt-4"
         >{{ $t("importarReservas.verAgenda") }}</RouterLink
       >
     </div>
@@ -448,11 +467,12 @@ function descargarPlantilla(): void {
           :todas="todasFilas"
           :con-errores="filasConErrores"
         />
-        <div class="mt-4 tu-card overflow-x-auto relative">
+        <!-- En el teléfono, una ficha por fila: quién (con su n.º de fila) como
+             título y el estado a la vista, sin desplazar. -->
+        <div class="mt-4 tu-card relative overflow-x-auto tu-tabla-adaptable">
           <table class="tu-tabla">
             <thead>
               <tr>
-                <th>#</th>
                 <th>{{ $t("importarReservas.colAlumno") }}</th>
                 <th>{{ $t("importarReservas.colClase") }}</th>
                 <th class="hidden sm:table-cell">
@@ -466,47 +486,58 @@ function descargarPlantilla(): void {
             </thead>
             <tbody>
               <tr v-for="f in filasEnPagina" :key="f.fila">
-                <td :style="{ color: 'var(--texto-suave)' }">{{ f.fila }}</td>
-                <td>
+                <td :data-etiqueta="$t('importarReservas.colAlumno')">
                   <span class="font-medium">{{
                     f.alumno ?? texto(f.datos.email)
                   }}</span>
-                  <span
-                    v-if="f.alumno"
-                    class="block text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ texto(f.datos.email) }}</span
+                  <span class="tu-sub"
+                    >{{ $t("importar.filaN", { n: f.fila })
+                    }}<template v-if="f.alumno">
+                      · {{ texto(f.datos.email) }}</template
+                    ></span
                   >
                 </td>
-                <td>
-                  {{ f.clase ?? texto(f.datos.clase) }}
-                  <span
-                    v-if="f.datos.sucursal"
-                    class="block text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ texto(f.datos.sucursal) }}</span
-                  >
+                <td :data-etiqueta="$t('importarReservas.colClase')">
+                  <div>
+                    {{ f.clase ?? texto(f.datos.clase) }}
+                    <span
+                      v-if="f.datos.sucursal"
+                      class="block text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{ texto(f.datos.sucursal) }}</span
+                    >
+                  </div>
                 </td>
-                <td class="hidden sm:table-cell">{{ cuando(f) }}</td>
-                <td class="hidden sm:table-cell">
+                <td
+                  class="hidden sm:table-cell"
+                  :data-etiqueta="$t('importarReservas.colCuando')"
+                >
+                  {{ cuando(f) }}
+                </td>
+                <td
+                  class="hidden sm:table-cell"
+                  :data-etiqueta="$t('importarReservas.colQueda')"
+                >
                   {{
                     f.queda === "confirmada" || f.queda === "en_espera"
                       ? $t(`importarReservas.queda.${f.queda}`)
                       : "—"
                   }}
                 </td>
-                <td>
-                  <EstadoFilaImportacion
-                    :estado="f.estado"
-                    :errores="f.errores"
-                  />
-                  <ul
-                    v-if="f.avisos.length > 0"
-                    class="mt-1 space-y-0.5 text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
-                    <li v-for="(a, i) in f.avisos" :key="i">{{ a }}</li>
-                  </ul>
+                <td :data-etiqueta="$t('importar.colEstado')">
+                  <div>
+                    <EstadoFilaImportacion
+                      :estado="f.estado"
+                      :errores="f.errores"
+                    />
+                    <ul
+                      v-if="f.avisos.length > 0"
+                      class="mt-1 space-y-0.5 text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      <li v-for="(a, i) in f.avisos" :key="i">{{ a }}</li>
+                    </ul>
+                  </div>
                 </td>
               </tr>
             </tbody>

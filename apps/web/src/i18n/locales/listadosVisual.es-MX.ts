@@ -2,7 +2,7 @@
 export default {
   resenas: {
     subtitulo:
-      "Lo que opinan tus clientes de cada servicio y de cada profesional.",
+      "Lo que opinan tus alumnos de cada servicio y de cada profesional.",
     subtituloClases:
       "Lo que opinan tus {miembros} de cada clase y de cada {instructor}.",
     promedio: "Calificación promedio",
@@ -18,7 +18,7 @@ export default {
     },
     profesional: "Profesional",
     todosProfesionales: "Todos",
-    buscar: "Buscar cliente o comentario",
+    buscar: "Buscar alumno o comentario",
     oculta: "Oculta del público",
     sinProfesionales: "Aún no hay reseñas de un instructor.",
     deCinco: "{n} de 5",
@@ -66,6 +66,9 @@ export default {
       "Se archivó «{nombre}». Sigue en pie 1 fecha ya agendada. | Se archivó «{nombre}». Siguen en pie {n} fechas ya agendadas.",
     restaurar: "Volver a ofrecer",
     restaurado: "«{nombre}» se ofrece de nuevo.",
+    // <summary> de las opciones avanzadas del editor (`tu-avanzado`), con cuántas hay.
+    masCondiciones:
+      "Más condiciones | Más condiciones · 1 activa | Más condiciones · {n} activas",
     kpi: {
       servicios: "Servicios",
       clases: "Clases",

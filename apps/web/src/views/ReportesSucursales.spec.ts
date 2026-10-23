@@ -14,6 +14,11 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
 }));
+// Reportes › Equipo y sucursales: una vista del menú (`?vista=sucursales`).
+vi.mock("vue-router", async (original) => ({
+  ...(await original<typeof import("vue-router")>()),
+  useRoute: () => ({ query: { vista: "sucursales" } }),
+}));
 
 describe("reporte por sucursal", () => {
   it("lee las sucursales, quienes no tienen una y los totales", async () => {
@@ -66,15 +71,10 @@ describe("reporte por sucursal", () => {
         stubs: { EncabezadoSeccion: true },
       },
     });
+    // La vista pide lo suyo al abrirse.
     await flushPromises();
 
     // El periodo aplica a la agenda del equipo; las sucursales son el estado actual.
-    await w
-      .findAll(".tu-pestanas button")
-      .find((b) => b.text() === "Equipo y sucursales")!
-      .trigger("click");
-    // La pestaña pide lo suyo al abrirse.
-    await flushPromises();
     expect(w.find('input[type="date"]').exists()).toBe(true);
     expect(w.text()).toContain("Estado actual");
 

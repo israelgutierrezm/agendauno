@@ -1,14 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import SegmentosRetencion from "@/components/SegmentosRetencion.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import {
+  opcionEnUrl,
+  useFiltrosEnUrl,
+  usePestanaEnUrl,
+} from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
@@ -34,26 +40,38 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const miembros = ref<Miembro[]>([]);
 const resumen = ref<Resumen | null>(null);
-// El inicio abre la lista ya filtrada (M08): `?estado=por_vencer|vencida&dias=`.
-const rutaActual = useRoute();
-const diasPedidos = Number(rutaActual?.query.dias);
-const dias = ref(
-  Number.isInteger(diasPedidos) && diasPedidos > 0 ? diasPedidos : 14,
-);
+const DIAS_POR_OMISION = 14;
+const dias = ref(DIAS_POR_OMISION);
 const VENTANAS = [7, 14, 30, 90];
-// Dos vistas: vencimientos (la tabla) y grupos para recuperar (`?vista=recuperar`).
-const vista = ref<"renovaciones" | "recuperar">(
-  rutaActual?.query.vista === "recuperar" ? "recuperar" : "renovaciones",
+// Dos pestañas: vencimientos (la tabla) y grupos para recuperar (`?pestana=recuperar`).
+const PESTANAS = ["renovaciones", "recuperar"] as const;
+const pestana = usePestanaEnUrl(PESTANAS);
+const opcionesPestana = computed(() =>
+  PESTANAS.map((clave) => ({
+    clave,
+    texto: t(`retencion.vistas.${clave}`),
+  })),
 );
-const estado = ref<"" | "por_vencer" | "vencida">(
-  rutaActual?.query.estado === "por_vencer" ||
-    rutaActual?.query.estado === "vencida"
-    ? rutaActual.query.estado
-    : "",
-);
+const estado = ref<"" | "por_vencer" | "vencida">("");
 // El estado, la búsqueda y las páginas los resuelve el API (antes, todo en pantalla).
 const visibles = computed(() => miembros.value);
 const buscar = ref("");
+// Los filtros en la dirección: el inicio abre la lista ya filtrada (M08,
+// `?estado=por_vencer|vencida&dias=`) y recargar o volver conserva lo que se veía.
+// La ventana por omisión no se escribe.
+useFiltrosEnUrl({
+  dias: computed({
+    get: () => (dias.value === DIAS_POR_OMISION ? "" : String(dias.value)),
+    set: (valor: string) => {
+      const n = Number(valor);
+      if (Number.isInteger(n) && n > 0) {
+        dias.value = n;
+      }
+    },
+  }),
+  estado: opcionEnUrl(estado, ["", "por_vencer", "vencida"] as const),
+  q: buscar,
+});
 // «Nadie coincide» no es lo mismo que «no hay nadie por renovar».
 const filtrado = computed(
   () => estado.value !== "" || buscar.value.trim() !== "",
@@ -124,6 +142,9 @@ function asistTexto(m: Miembro): string {
     ? t("retencion.hoy")
     : t("retencion.haceDias", { n: m.dias_sin_asistir });
 }
+const columnaActividad = computed(() =>
+  t(sesion.esCitas ? "retencion.colActividadCitas" : "retencion.colActividad"),
+);
 
 // Los mismos filtros para la tabla y la descarga: se exporta lo que se ve.
 function filtros(): Record<string, string | number> {
@@ -217,46 +238,34 @@ watch(dias, () => {
 // La tabla se pide al verla: abrir directo «Para recuperar» no la carga de más.
 let tablaCargada = false;
 function cargarTabla(): void {
-  if (vista.value === "renovaciones" && !tablaCargada) {
+  if (pestana.value === "renovaciones" && !tablaCargada) {
     tablaCargada = true;
     void cargar();
   }
 }
-watch(vista, cargarTabla);
-onMounted(cargarTabla);
+watch(pestana, cargarTabla, { immediate: true });
 </script>
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('operacion.renovaciones.titulo')" />
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{
+    <EncabezadoSeccion
+      :titulo="$t('operacion.renovaciones.titulo')"
+      :subtitulo="
         $t(
           sesion.esCitas
-            ? "operacion.renovaciones.subtituloCitas"
-            : "operacion.renovaciones.subtitulo",
+            ? 'operacion.renovaciones.subtituloCitas'
+            : 'operacion.renovaciones.subtitulo',
         )
-      }}
-    </p>
+      "
+    />
 
-    <div
-      class="tu-segmentado mt-4"
-      role="group"
-      :aria-label="$t('retencion.titulo')"
-    >
-      <button
-        v-for="v in ['renovaciones', 'recuperar'] as const"
-        :key="v"
-        type="button"
-        :aria-pressed="vista === v"
-        :data-prueba="`vista-${v}`"
-        @click="vista = v"
-      >
-        {{ $t(`retencion.vistas.${v}`) }}
-      </button>
-    </div>
+    <PestanasSeccion
+      v-model="pestana"
+      :opciones="opcionesPestana"
+      :etiqueta="$t('retencion.titulo')"
+    />
 
-    <SegmentosRetencion v-if="vista === 'recuperar'" />
+    <SegmentosRetencion v-if="pestana === 'recuperar'" />
     <template v-else>
       <div class="mt-6 flex flex-wrap items-center gap-3">
         <div class="tu-card px-5 py-3">
@@ -389,7 +398,10 @@ onMounted(cargarTabla);
             )
           "
         />
-        <div v-else class="mt-4 tu-card overflow-x-auto">
+        <div
+          v-else
+          class="mt-4 tu-card relative overflow-x-auto tu-tabla-adaptable"
+        >
           <table class="tu-tabla">
             <thead>
               <tr>
@@ -400,61 +412,51 @@ onMounted(cargarTabla);
                   {{ $t("retencion.colVence") }}
                 </th>
                 <th class="hidden sm:table-cell">
-                  {{
-                    $t(
-                      sesion.esCitas
-                        ? "retencion.colActividadCitas"
-                        : "retencion.colActividad",
-                    )
-                  }}
+                  {{ columnaActividad }}
                 </th>
                 <th class="text-right"></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="m in visibles" :key="m.id">
-                <td>
+                <td :data-etiqueta="$t('retencion.colAlumno')">
                   <RouterLink
                     :to="{ name: 'ficha-miembro', params: { id: m.id } }"
                     class="font-semibold tu-enlace"
                     >{{ m.nombre_completo }}</RouterLink
                   >
-                  <span
-                    v-if="m.email"
-                    class="block text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ m.email }}</span
-                  >
+                  <span v-if="m.email" class="tu-sub">{{ m.email }}</span>
                 </td>
-                <td>
-                  <span
-                    class="tu-badge"
-                    :style="
-                      m.estado === 'vencida'
-                        ? {
-                            background: 'var(--error-suave)',
-                            color: 'var(--error)',
-                          }
-                        : {
-                            background: 'var(--aviso-suave)',
-                            color: 'var(--aviso)',
-                          }
-                    "
-                    >{{ $t(`retencion.estados.${m.estado}`) }}</span
-                  >
-                  <span
-                    class="block text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ fechaCorta(m.vence) }} · {{ venceTexto(m) }}</span
-                  >
+                <!-- Punto y texto (por vencer en aviso, vencida en error) y debajo la
+                     fecha y cuánto falta o pasó, como las demás fechas de cobro. -->
+                <td :data-etiqueta="$t('retencion.colVence')">
+                  <span class="inline-flex flex-col">
+                    <span
+                      class="tu-estado"
+                      :style="{
+                        '--tono':
+                          m.estado === 'vencida'
+                            ? 'var(--error)'
+                            : 'var(--aviso)',
+                      }"
+                      data-prueba="estado-retencion"
+                      >{{ $t(`retencion.estados.${m.estado}`) }}</span
+                    >
+                    <span
+                      class="text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{ fechaCorta(m.vence) }} · {{ venceTexto(m) }}</span
+                    >
+                  </span>
                 </td>
                 <td
                   class="hidden sm:table-cell"
+                  :data-etiqueta="columnaActividad"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ asistTexto(m) }}
                 </td>
-                <td class="text-right whitespace-nowrap">
+                <td class="tu-celda-acciones">
                   <!-- Contactar deja registro: su seguimiento (una tarea donde se
                        anota con qué terminó), no solo un enlace de correo. -->
                   <template v-if="seguimientos[m.id]">
@@ -463,7 +465,7 @@ onMounted(cargarTabla);
                         name: 'tareas',
                         query: { tipo: 'seguimiento', q: m.nombre_completo },
                       }"
-                      class="tu-enlace text-sm mr-3"
+                      class="tu-enlace mr-3"
                       :data-prueba="`seguimiento-de-${m.id}`"
                       >{{
                         $t(`retencion.seguimiento.${seguimientos[m.id]}`)
@@ -473,8 +475,9 @@ onMounted(cargarTabla);
                   <button
                     v-else-if="puedeSeguir"
                     type="button"
-                    class="tu-enlace text-sm mr-3"
+                    class="tu-btn tu-btn-secundario tu-btn-chico mr-3"
                     :disabled="dandoSeguimiento === m.id"
+                    :aria-busy="dandoSeguimiento === m.id || undefined"
                     :data-prueba="`dar-seguimiento-${m.id}`"
                     @click="darSeguimiento(m)"
                   >
@@ -482,7 +485,7 @@ onMounted(cargarTabla);
                   </button>
                   <RouterLink
                     :to="{ name: 'ficha-miembro', params: { id: m.id } }"
-                    class="tu-enlace text-sm"
+                    class="tu-enlace"
                     >{{ $t("retencion.verFicha") }}</RouterLink
                   >
                 </td>

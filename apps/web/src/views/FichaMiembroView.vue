@@ -3,7 +3,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
@@ -16,6 +16,7 @@ import PanelEditarMiembro, {
 } from "@/components/PanelEditarMiembro.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import RegistrarPagoOrden, {
   type CuotaPorCobrar,
   type OrdenPorCobrar,
@@ -26,6 +27,7 @@ import { confirmar } from "@/lib/confirmar";
 import { textoAlcance } from "@/lib/cobertura";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
+import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
 import { useRegreso } from "@/lib/regreso";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -156,28 +158,23 @@ interface Ficha {
 
 const { t } = useI18n();
 const route = useRoute();
-const router = useRouter();
-// Actividad (membresías, reservas, compras), Planes (el corte de cada paquete o
-// membresía: qué incluía y cómo lo usó) o Expediente (documentos, formularios,
-// consentimientos). Va en la URL (?seccion=planes) para poder enlazarla.
-type Seccion = "actividad" | "planes" | "expediente";
-const seccion = computed<Seccion>(() =>
-  route.query.seccion === "expediente" ||
-  (route.query.seccion === "planes" && puedeVerDerechos.value)
-    ? route.query.seccion
-    : "actividad",
-);
-function irSeccion(s: Seccion): void {
-  void router.replace({
-    query: { ...route.query, seccion: s === "actividad" ? undefined : s },
-  });
-}
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const personaId = computed(() => String(route.params.id));
 const puedeGestionar = computed(() => sesion.puede("miembros.gestionar"));
 // El corte de cada plan y los movimientos de créditos piden ver derechos.
 const puedeVerDerechos = computed(() => sesion.puede("derechos.ver"));
+// Actividad (membresías, reservas, compras), Planes (el corte de cada paquete o
+// membresía: qué incluía y cómo lo usó) o Expediente (documentos, formularios,
+// consentimientos). Va en la URL (?seccion=planes) para poder enlazarla.
+type Seccion = "actividad" | "planes" | "expediente";
+const seccion = usePestanaEnUrl<Seccion>(
+  () =>
+    puedeVerDerechos.value
+      ? ["actividad", "planes", "expediente"]
+      : ["actividad", "expediente"],
+  { clave: "seccion", predeterminada: "actividad" },
+);
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
 // Lo que compró en el mostrador (ADR 0145): a quien ve el inventario, si su plan lo trae.
 const verComprasMostrador = computed(
@@ -193,6 +190,14 @@ const puedeRecargar = computed(() => sesion.puede("membresias.gestionar"));
 const esCitas = computed(() => sesion.esCitas === true);
 const conPlanes = computed(() => (ficha.value?.derechos.length ?? 0) > 0);
 const mostrarPlanes = computed(() => !esCitas.value || conPlanes.value);
+// Las secciones de la ficha (pestañas en la dirección, como la de su detalle).
+const opcionesSeccion = computed(() => [
+  { clave: "actividad" as const, texto: t("expediente.actividad") },
+  ...(puedeVerDerechos.value && mostrarPlanes.value
+    ? [{ clave: "planes" as const, texto: t("planes.corte.tituloEquipo") }]
+    : []),
+  { clave: "expediente" as const, texto: t("expediente.titulo") },
+]);
 const pendientes = computed(() => ficha.value?.pendientes ?? []);
 function masFrecuente(valores: (string | null | undefined)[]): string | null {
   const cuenta = new Map<string, number>();
@@ -725,31 +730,13 @@ const regreso = useRegreso({
              los historiales (la columna se «abre» para ordenar sus secciones). -->
         <div class="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div class="min-w-0 max-lg:contents">
-            <div class="px-5 pt-5">
-              <div class="tu-segmentado" role="group">
-                <button
-                  type="button"
-                  :aria-pressed="seccion === 'actividad'"
-                  @click="irSeccion('actividad')"
-                >
-                  {{ $t("expediente.actividad") }}
-                </button>
-                <button
-                  v-if="puedeVerDerechos && mostrarPlanes"
-                  type="button"
-                  :aria-pressed="seccion === 'planes'"
-                  @click="irSeccion('planes')"
-                >
-                  {{ $t("planes.corte.tituloEquipo") }}
-                </button>
-                <button
-                  type="button"
-                  :aria-pressed="seccion === 'expediente'"
-                  @click="irSeccion('expediente')"
-                >
-                  {{ $t("expediente.titulo") }}
-                </button>
-              </div>
+            <!-- PestanasSeccion trae su margen superior. -->
+            <div class="px-5">
+              <PestanasSeccion
+                v-model="seccion"
+                :opciones="opcionesSeccion"
+                :etiqueta="$t('ficha.secciones')"
+              />
             </div>
 
             <div v-if="seccion === 'planes'" class="px-5 py-5">
@@ -806,7 +793,7 @@ const regreso = useRegreso({
                       <button
                         v-if="puedeVender"
                         type="button"
-                        class="tu-btn tu-btn-primario"
+                        class="tu-btn tu-btn-primario tu-btn-chico"
                         data-prueba="cobrar-pendiente"
                         @click="abrirCobro(o)"
                       >
@@ -1011,7 +998,7 @@ const regreso = useRegreso({
                               d.acuerdo_id &&
                               (d.estado === 'activo' || d.estado === 'pausado'))
                           "
-                          class="flex w-full items-center gap-4 text-sm"
+                          class="flex w-full flex-wrap items-center gap-3 text-sm"
                         >
                           <template v-if="!d.ilimitado">
                             <button
@@ -1030,7 +1017,8 @@ const regreso = useRegreso({
                             <button
                               v-if="puedeRecargar"
                               type="button"
-                              class="tu-enlace"
+                              class="tu-btn tu-btn-secundario tu-btn-chico"
+                              :aria-expanded="recargando === d.id"
                               @click="abrirRecarga(d)"
                             >
                               {{ $t("creditosFicha.agregar") }}
@@ -1040,7 +1028,7 @@ const regreso = useRegreso({
                             <button
                               v-if="d.estado === 'activo'"
                               type="button"
-                              class="tu-enlace"
+                              class="tu-btn tu-btn-secundario tu-btn-chico"
                               :aria-expanded="pausando === d.id"
                               @click="abrirPausa(d)"
                             >
@@ -1049,8 +1037,9 @@ const regreso = useRegreso({
                             <button
                               v-else-if="d.estado === 'pausado'"
                               type="button"
-                              class="tu-enlace"
+                              class="tu-btn tu-btn-secundario tu-btn-chico"
                               :disabled="guardandoPausa"
+                              :aria-busy="guardandoPausa || undefined"
                               @click="reanudar(d)"
                             >
                               {{ $t("pausaMembresia.reanudar") }}
@@ -1098,10 +1087,21 @@ const regreso = useRegreso({
                                 :placeholder="$t('pausaMembresia.motivoPh')"
                               />
                             </div>
+                          </div>
+                          <div class="flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              class="tu-btn tu-btn-secundario"
+                              :disabled="guardandoPausa"
+                              @click="pausando = null"
+                            >
+                              {{ $t("comun.cancelar") }}
+                            </button>
                             <button
                               type="submit"
                               class="tu-btn tu-btn-primario"
                               :disabled="guardandoPausa || pausa.hasta === ''"
+                              :aria-busy="guardandoPausa || undefined"
                             >
                               {{ $t("pausaMembresia.confirmar") }}
                             </button>
@@ -1123,7 +1123,7 @@ const regreso = useRegreso({
                         <button
                           v-else-if="puedeDarDeBaja(d) && dandoDeBaja !== d.id"
                           type="button"
-                          class="tu-enlace text-sm"
+                          class="tu-btn tu-btn-peligro tu-btn-chico"
                           data-prueba="dar-de-baja-abrir"
                           @click="dandoDeBaja = d.id"
                         >
@@ -1173,15 +1173,26 @@ const regreso = useRegreso({
                               required
                             />
                           </div>
-                          <button
-                            type="submit"
-                            class="tu-btn tu-btn-primario"
-                            :disabled="
-                              guardandoRecarga || recarga.creditos <= 0
-                            "
-                          >
-                            {{ $t("creditosFicha.confirmar") }}
-                          </button>
+                          <div class="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              class="tu-btn tu-btn-secundario"
+                              :disabled="guardandoRecarga"
+                              @click="recargando = null"
+                            >
+                              {{ $t("comun.cancelar") }}
+                            </button>
+                            <button
+                              type="submit"
+                              class="tu-btn tu-btn-primario"
+                              :disabled="
+                                guardandoRecarga || recarga.creditos <= 0
+                              "
+                              :aria-busy="guardandoRecarga || undefined"
+                            >
+                              {{ $t("creditosFicha.confirmar") }}
+                            </button>
+                          </div>
                         </form>
                         <div
                           v-if="movimientosDe === d.id"

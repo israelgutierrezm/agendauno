@@ -241,7 +241,7 @@ export const planesVisual = {
 
 // Cobros (views/CobranzaView.vue) con el patrón de los listados.
 export const cobranzaVisual = {
-  buscar: "Buscar por cliente",
+  buscar: "Buscar por alumno",
   sinResultados: "Ningún movimiento coincide con los filtros.",
   fechas: "Fechas del cobro",
   desde: "Desde",
@@ -261,6 +261,7 @@ export const cobranzaVisual = {
     enMora: "En mora",
     suspendidos: "Suspendidos",
     renovaciones: "Renovaciones próximas",
+    vencidas: "Vencidas sin cobrar",
     automatico: "Con pago automático",
   },
 };
@@ -442,5 +443,5 @@ export const sucursalesVisual = {
 };
 export const comunicacionesVisual = {
   subtitulo:
-    "Avisos a tus clientes por correo, WhatsApp o en su cuenta, y lo que ya se envió.",
+    "Avisos a tus alumnos por correo, WhatsApp o en su cuenta, y lo que ya se envió.",
 };

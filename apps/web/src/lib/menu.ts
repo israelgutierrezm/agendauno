@@ -1,5 +1,6 @@
 import { puedeEntrar } from "@/lib/acceso";
 import { facetaActiva, type Faceta } from "@/lib/roles";
+import type { FuncionPlan } from "@/lib/suscripcion";
 import type {
   ModalidadServicio,
   useSesionTenantStore,
@@ -50,6 +51,11 @@ export interface Vista {
   permiso?: string | string[];
   // Lo que el negocio debe tener para ofrecerla (ver `ContextoVista`).
   contexto?: ContextoVista;
+  // Solo si el plan del negocio incluye esta función (ADR 0107; el servidor ya la
+  // niega): p. ej. los reportes avanzados.
+  funcion?: FuncionPlan;
+  // La etiqueta para quien trabaja solo (sin equipo): «Tu agenda y sucursales».
+  etiquetaSolo?: string;
 }
 
 export interface Area {
@@ -444,8 +450,33 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
         clave: "reportes",
         etiqueta: "nav.reportes",
         icono: "reportes",
+        // Cada reporte es una vista del área (`?vista=`) en la misma pantalla. La del
+        // equipo no es `vista=equipo`: esa es Equipo › Rendimiento. Ingresos,
+        // ocupación, alumnos y el embudo son reportes avanzados (en citas, del plan
+        // Pro, ADR 0107).
         vistas: [
-          v("reportes", "reportes", "nav.reportes"),
+          v("reportes", "reportes", "nav.vistas.resumen"),
+          v("ingresos", "reportes", "operacion.reportes.pestanas.ingresos", {
+            query: { vista: "ingresos" },
+            funcion: "reportes_avanzados",
+          }),
+          v("ocupacion", "reportes", "operacion.reportes.pestanas.ocupacion", {
+            query: { vista: "ocupacion" },
+            funcion: "reportes_avanzados",
+          }),
+          v("clientes", "reportes", "operacion.reportes.pestanas.clientes", {
+            query: { vista: "clientes" },
+            termino: "miembro",
+            funcion: "reportes_avanzados",
+          }),
+          v("embudo", "reportes", "operacion.reportes.pestanas.embudo", {
+            query: { vista: "embudo" },
+            funcion: "reportes_avanzados",
+          }),
+          v("sucursales", "reportes", "operacion.reportes.pestanas.equipo", {
+            query: { vista: "sucursales" },
+            etiquetaSolo: "operacion.reportes.pestanas.equipoSolo",
+          }),
           // Visitantes de Wellhub y TotalPass (ADR 0148): solo negocios de clases.
           v(
             "plataformas",
@@ -608,18 +639,29 @@ export function claveSegunModalidad(
   return existe(variante) ? variante : clave;
 }
 
-/** Las vistas de un área que esta sesión puede abrir, en su orden. */
+/**
+ * Las vistas de un área que esta sesión puede abrir, en su orden (con la etiqueta de
+ * quien trabaja solo, si la vista tiene una).
+ */
 export function vistasVisibles(area: Area, sesion: Sesion): Vista[] {
-  return area.vistas.filter(
-    (x) =>
-      (x.modalidad === undefined || x.modalidad === sesion.modalidad) &&
-      (x.contexto === undefined || CONTEXTOS[x.contexto](sesion)) &&
-      (x.permiso === undefined ||
-        (Array.isArray(x.permiso) ? x.permiso : [x.permiso]).every((p) =>
-          sesion.puede(p),
-        )) &&
-      puedeEntrar(x.ruta, sesion),
-  );
+  return area.vistas
+    .filter(
+      (x) =>
+        (x.modalidad === undefined || x.modalidad === sesion.modalidad) &&
+        (x.contexto === undefined || CONTEXTOS[x.contexto](sesion)) &&
+        (x.funcion === undefined ||
+          sesion.estudio?.plan?.sin.includes(x.funcion) !== true) &&
+        (x.permiso === undefined ||
+          (Array.isArray(x.permiso) ? x.permiso : [x.permiso]).every((p) =>
+            sesion.puede(p),
+          )) &&
+        puedeEntrar(x.ruta, sesion),
+    )
+    .map((x) =>
+      x.etiquetaSolo !== undefined && !CONTEXTOS.equipo(sesion)
+        ? { ...x, etiqueta: x.etiquetaSolo }
+        : x,
+    );
 }
 
 /**

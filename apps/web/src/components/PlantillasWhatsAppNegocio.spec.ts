@@ -45,7 +45,8 @@ const BORRADOR = {
   motivo: null,
   editable: true,
 };
-const global = { plugins: [i18n] };
+// El editor es un diálogo: se pinta en su lugar para poder llenarlo.
+const global = { plugins: [i18n], stubs: { teleport: true } };
 
 beforeEach(() => {
   vi.clearAllMocks();

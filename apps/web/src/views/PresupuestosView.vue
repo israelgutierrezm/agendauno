@@ -6,6 +6,8 @@ import { RouterLink } from "vue-router";
 import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { isAxiosError } from "axios";
@@ -13,6 +15,8 @@ import { isAxiosError } from "axios";
 import { api, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
+import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import {
   aMinor as leerMinor,
   aTexto as textoMinor,
@@ -208,6 +212,21 @@ async function cargarApoyos(): Promise<void> {
   }
 }
 
+// El estado y la búsqueda en la dirección: recargar o volver atrás los conserva.
+// Antes de vigilarlos, para que lo leído de la dirección no cargue de más.
+useFiltrosEnUrl({
+  estado: computed({
+    get: (): string => (filtro.value === "todos" ? "" : filtro.value),
+    set: (v: string) => {
+      const elegido = FILTROS.find((f) => f === (v === "" ? "todos" : v));
+      if (elegido !== undefined) {
+        filtro.value = elegido;
+      }
+    },
+  }),
+  q: buscar,
+});
+
 let espera: ReturnType<typeof setTimeout> | undefined;
 watch(filtro, () => {
   pagina.value = 1;
@@ -294,6 +313,8 @@ const hayIlegibles = computed(
       (l) => ilegible(l.precio) || ilegible(l.descuento),
     ),
 );
+// Con un monto ilegible no se puede guardar (cada uno ya está marcado en su campo).
+const editorValido = computed(() => !hayIlegibles.value);
 async function enfocarInvalido(formulario: string): Promise<void> {
   await nextTick();
   document
@@ -665,6 +686,15 @@ const tasaBp = computed<number | null>(() => {
   return bp <= 10000 ? bp : null;
 });
 const errorTasa = ref(false);
+// Con cambios sin guardar, cerrar o salir pregunta antes (patrón de formularios).
+const descartarAjustes = useDescartarCambios({
+  abierto: ajustesAbiertos,
+  valor: () => ajustes.value,
+  guardando,
+});
+function cerrarAjustes(): void {
+  void descartarAjustes.cerrar();
+}
 function abrirAjustes(): void {
   errorTasa.value = false;
   ajustes.value = {
@@ -673,6 +703,7 @@ function abrirAjustes(): void {
     vigencia: config.value.vigencia_dias,
     notas: config.value.notas ?? "",
   };
+  descartarAjustes.fijar();
   ajustesAbiertos.value = true;
 }
 async function guardarAjustes(): Promise<void> {
@@ -694,6 +725,7 @@ async function guardarAjustes(): Promise<void> {
       },
     );
     config.value = data.data;
+    descartarAjustes.fijar();
     ajustesAbiertos.value = false;
     toast.exito(t("presupuestos.config.guardado"));
   } catch (e) {
@@ -726,7 +758,7 @@ onMounted(() => {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-primario tu-btn-crear"
           data-prueba="nuevo-presupuesto"
           @click="abrirNuevo"
         >
@@ -735,98 +767,123 @@ onMounted(() => {
       </template>
     </EncabezadoSeccion>
 
-    <div class="mt-5 flex flex-wrap items-center gap-3">
-      <div class="tu-segmentado" role="group">
-        <button
-          v-for="f in FILTROS"
-          :key="f"
-          type="button"
-          :aria-pressed="filtro === f"
-          @click="filtro = f"
+    <div class="mt-5 tu-card">
+      <!-- El estado y la búsqueda, dentro de la tarjeta que filtran. -->
+      <div class="tu-filtros">
+        <div
+          class="tu-segmentado"
+          role="group"
+          :aria-label="$t('presupuestos.col.estado')"
+          data-prueba="filtro-estado"
         >
-          {{ $t(`presupuestos.filtros.${f}`) }}
-        </button>
-      </div>
-      <input
-        v-model="buscar"
-        type="search"
-        class="tu-input sm:max-w-xs"
-        :placeholder="$t('presupuestos.buscar')"
-        :aria-label="$t('presupuestos.buscar')"
-      />
-    </div>
-
-    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
-      {{ error }}
-    </AvisoTono>
-    <p
-      v-else-if="cargando"
-      class="mt-6 text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("comun.cargando") }}
-    </p>
-    <p
-      v-else-if="lista.length === 0"
-      class="mt-6 text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{
-        filtro === "todos" && buscar === ""
-          ? $t("presupuestos.vacio")
-          : $t("presupuestos.sinResultados")
-      }}
-    </p>
-    <div v-else class="mt-5 tu-card overflow-x-auto relative">
-      <table class="tu-tabla">
-        <thead>
-          <tr>
-            <th>{{ $t("presupuestos.col.folio") }}</th>
-            <th>{{ $t("presupuestos.col.cliente") }}</th>
-            <th>{{ $t("presupuestos.col.estado") }}</th>
-            <th class="hidden sm:table-cell">
-              {{ $t("presupuestos.col.vigencia") }}
-            </th>
-            <th class="text-right">{{ $t("presupuestos.col.total") }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="p in lista"
-            :key="p.id"
-            class="cursor-pointer"
-            data-prueba="fila-presupuesto"
-            @click="abrir(p.id)"
+          <button
+            v-for="f in FILTROS"
+            :key="f"
+            type="button"
+            :aria-pressed="filtro === f"
+            @click="filtro = f"
           >
-            <td class="font-medium tabular-nums">{{ p.folio }}</td>
-            <td>{{ p.cliente ?? "—" }}</td>
-            <td>
-              <span class="inline-flex items-center gap-1.5 text-sm">
-                <span
-                  class="inline-block size-1.5 rounded-full"
-                  :style="{ background: COLOR[estadoVisible(p)] }"
-                  aria-hidden="true"
-                />
-                {{ $t(`presupuestos.estados.${estadoVisible(p)}`) }}
-              </span>
-            </td>
-            <td class="hidden sm:table-cell tabular-nums">
-              {{ p.valido_hasta }}
-            </td>
-            <td class="text-right tabular-nums">
-              {{ plata(p.total_minor, p.moneda) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <PaginacionListado
-        v-if="meta && meta.ultima_pagina > 1"
-        :page="meta.page"
-        :ultima-pagina="meta.ultima_pagina"
-        :total="meta.total"
-        :per-page="meta.per_page"
-        @ir="irPagina"
-      />
+            {{ $t(`presupuestos.filtros.${f}`) }}
+          </button>
+        </div>
+        <label class="tu-buscar">
+          <IconoNav nombre="buscar" :tam="16" />
+          <input
+            v-model="buscar"
+            type="search"
+            class="tu-input"
+            :placeholder="$t('presupuestos.buscar')"
+            :aria-label="$t('presupuestos.buscar')"
+          />
+        </label>
+      </div>
+
+      <AvisoTono v-if="error" tono="peligro" class="mx-4 mb-4" role="alert">
+        {{ error }}
+      </AvisoTono>
+      <p v-else-if="cargando" class="tu-sin-resultados">
+        {{ $t("comun.cargando") }}
+      </p>
+      <p v-else-if="lista.length === 0" class="tu-sin-resultados">
+        {{
+          filtro === "todos" && buscar === ""
+            ? $t("presupuestos.vacio")
+            : $t("presupuestos.sinResultados")
+        }}
+      </p>
+      <template v-else>
+        <!-- En el teléfono, una ficha por presupuesto: su folio (que lo abre), el
+             total y para quién. -->
+        <div class="relative overflow-x-auto tu-tabla-adaptable">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("presupuestos.col.folio") }}</th>
+                <th class="text-right">{{ $t("presupuestos.col.total") }}</th>
+                <th>{{ $t("presupuestos.col.cliente") }}</th>
+                <th>{{ $t("presupuestos.col.estado") }}</th>
+                <th class="hidden sm:table-cell">
+                  {{ $t("presupuestos.col.vigencia") }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="p in lista"
+                :key="p.id"
+                class="cursor-pointer"
+                data-prueba="fila-presupuesto"
+                @click="abrir(p.id)"
+              >
+                <td
+                  :data-etiqueta="$t('presupuestos.col.folio')"
+                  class="font-medium tabular-nums"
+                >
+                  <!-- Con el teclado se abre desde el folio; con el mouse, toda la fila. -->
+                  <button
+                    type="button"
+                    class="pr-folio"
+                    data-prueba="abrir-presupuesto"
+                    @click.stop="abrir(p.id)"
+                  >
+                    {{ p.folio }}
+                  </button>
+                </td>
+                <td
+                  :data-etiqueta="$t('presupuestos.col.total')"
+                  class="text-right tabular-nums"
+                >
+                  {{ plata(p.total_minor, p.moneda) }}
+                </td>
+                <td :data-etiqueta="$t('presupuestos.col.cliente')">
+                  {{ p.cliente ?? "—" }}
+                </td>
+                <td :data-etiqueta="$t('presupuestos.col.estado')">
+                  <span
+                    class="tu-estado"
+                    :style="{ '--tono': COLOR[estadoVisible(p)] }"
+                    >{{ $t(`presupuestos.estados.${estadoVisible(p)}`) }}</span
+                  >
+                </td>
+                <td
+                  :data-etiqueta="$t('presupuestos.col.vigencia')"
+                  class="hidden sm:table-cell tabular-nums"
+                >
+                  {{ p.valido_hasta }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <PaginacionListado
+          v-if="meta && meta.ultima_pagina > 1"
+          :page="meta.page"
+          :ultima-pagina="meta.ultima_pagina"
+          :total="meta.total"
+          :per-page="meta.per_page"
+          @ir="irPagina"
+        />
+      </template>
     </div>
 
     <!-- Editor / detalle -->
@@ -841,11 +898,7 @@ onMounted(() => {
       :ocupado="guardando"
       @cerrar="cerrarEditor"
     >
-      <form
-        id="form-presupuesto"
-        class="space-y-4 p-5"
-        @submit.prevent="guardar()"
-      >
+      <form id="form-presupuesto" class="space-y-4" @submit.prevent="guardar()">
         <p
           v-if="actual && !actual.editable"
           class="text-sm"
@@ -853,13 +906,12 @@ onMounted(() => {
         >
           {{ $t("presupuestos.editor.soloLectura") }}
         </p>
-        <div v-if="actual" class="inline-flex items-center gap-1.5 text-sm">
+        <div v-if="actual" class="flex flex-wrap items-center gap-1.5 text-sm">
           <span
-            class="inline-block size-1.5 rounded-full"
-            :style="{ background: COLOR[estadoVisible(actual)] }"
-            aria-hidden="true"
-          />
-          {{ $t(`presupuestos.estados.${estadoVisible(actual)}`) }}
+            class="tu-estado"
+            :style="{ '--tono': COLOR[estadoVisible(actual)] }"
+            >{{ $t(`presupuestos.estados.${estadoVisible(actual)}`) }}</span
+          >
           <span
             v-if="actual.respondido_por === 'cliente'"
             :style="{ color: 'var(--texto-suave)' }"
@@ -1047,11 +1099,11 @@ onMounted(() => {
                 >{{ errorMonto }}</span
               >
               <div class="flex items-center justify-between text-sm">
+                <!-- Se quita del borrador: no se guarda hasta «Guardar». -->
                 <button
                   v-if="!soloLectura && borrador.lineas.length > 1"
                   type="button"
-                  class="tu-enlace text-xs"
-                  :style="{ color: 'var(--error)' }"
+                  class="tu-btn tu-btn-discreto tu-btn-chico"
                   @click="borrador.lineas.splice(i, 1)"
                 >
                   {{ $t("presupuestos.editor.quitar") }}
@@ -1156,15 +1208,17 @@ onMounted(() => {
         </AvisoTono>
 
         <!-- Rechazo con motivo -->
-        <div v-if="rechazando" class="space-y-2">
+        <div v-if="rechazando" id="pr-rechazo" class="space-y-2">
           <label class="tu-label" for="pr-motivo">{{
             $t("presupuestos.acciones.motivoRechazo")
           }}</label>
           <input id="pr-motivo" v-model="motivoRechazo" class="tu-input" />
+          <!-- La confirmación final del rechazo. -->
           <button
             type="button"
-            class="tu-btn tu-btn-secundario"
+            class="tu-btn tu-btn-solido tu-tono-peligro"
             :disabled="guardando"
+            data-prueba="confirmar-rechazo"
             @click="rechazar"
           >
             {{ $t("presupuestos.acciones.rechazar") }}
@@ -1173,16 +1227,25 @@ onMounted(() => {
       </form>
 
       <template #pie>
-        <div class="flex flex-wrap items-center justify-end gap-2 p-4">
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <button
             v-if="actual?.estado === 'borrador' && puedeGestionar"
             type="button"
-            class="tu-enlace text-sm mr-auto"
-            :style="{ color: 'var(--error)' }"
+            class="tu-btn tu-btn-peligro mr-auto"
+            :disabled="guardando"
+            data-prueba="eliminar-presupuesto"
             @click="eliminar"
           >
             {{ $t("presupuestos.acciones.eliminar") }}
           </button>
+          <!-- El cobro vive en otra sección: se llega con un enlace. -->
+          <RouterLink
+            v-if="actual?.orden"
+            :to="{ name: 'cobranza' }"
+            class="tu-enlace text-sm"
+          >
+            {{ $t("presupuestos.acciones.verCobro") }}
+          </RouterLink>
           <!-- Imprime lo guardado: con cambios pendientes, primero se guarda. -->
           <RouterLink
             v-if="actual && !hayCambios"
@@ -1206,10 +1269,14 @@ onMounted(() => {
                   : $t("presupuestos.acciones.enviar")
               }}
             </button>
+            <!-- Pide el motivo arriba; ahí se confirma. -->
             <button
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-peligro"
               :disabled="guardando || hayCambios"
+              :aria-expanded="rechazando"
+              aria-controls="pr-rechazo"
+              data-prueba="rechazar-presupuesto"
               @click="rechazando = !rechazando"
             >
               {{ $t("presupuestos.acciones.rechazar") }}
@@ -1233,24 +1300,29 @@ onMounted(() => {
             type="button"
             class="tu-btn tu-btn-primario"
             :disabled="guardando"
+            :aria-busy="guardando || undefined"
             data-prueba="convertir-presupuesto"
             @click="convertir"
           >
             {{ $t("presupuestos.acciones.convertir") }}
           </button>
-          <RouterLink
-            v-if="actual?.orden"
-            :to="{ name: 'cobranza' }"
+          <button
+            v-if="!soloLectura"
+            type="button"
             class="tu-btn tu-btn-secundario"
+            :disabled="guardando"
+            data-prueba="cancelar-presupuesto"
+            @click="cerrarEditor"
           >
-            {{ $t("presupuestos.acciones.verCobro") }}
-          </RouterLink>
+            {{ $t("comun.cancelar") }}
+          </button>
           <button
             v-if="!soloLectura"
             type="submit"
             form="form-presupuesto"
             class="tu-btn tu-btn-primario"
-            :disabled="guardando"
+            :disabled="guardando || !editorValido"
+            :aria-busy="guardando || undefined"
             data-prueba="guardar-presupuesto"
           >
             {{ $t("presupuestos.editor.guardar") }}
@@ -1259,15 +1331,17 @@ onMounted(() => {
       </template>
     </PanelLateral>
 
-    <!-- Ajustes -->
-    <PanelLateral
+    <!-- Ajustes: cuatro campos, en un diálogo mediano -->
+    <ModalDialogo
       :abierto="ajustesAbiertos"
       :titulo="$t('presupuestos.config.titulo')"
-      @cerrar="ajustesAbiertos = false"
+      tam="md"
+      :ocupado="guardando"
+      @cerrar="cerrarAjustes"
     >
       <form
         id="form-ajustes-presupuestos"
-        class="space-y-4 p-5"
+        class="space-y-4"
         @submit.prevent="guardarAjustes"
       >
         <fieldset class="space-y-2">
@@ -1361,17 +1435,36 @@ onMounted(() => {
         </p>
       </form>
       <template #pie>
-        <div class="flex justify-end p-4">
-          <button
-            type="submit"
-            form="form-ajustes-presupuestos"
-            class="tu-btn tu-btn-primario"
-            :disabled="guardando"
-          >
-            {{ $t("presupuestos.config.guardar") }}
-          </button>
-        </div>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="guardando"
+          data-prueba="cancelar-ajustes"
+          @click="cerrarAjustes"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="submit"
+          form="form-ajustes-presupuestos"
+          class="tu-btn tu-btn-primario"
+          :disabled="guardando"
+          :aria-busy="guardando || undefined"
+        >
+          {{ $t("presupuestos.config.guardar") }}
+        </button>
       </template>
-    </PanelLateral>
+    </ModalDialogo>
   </section>
 </template>
+
+<style scoped>
+/* El folio abre el presupuesto: se ve como texto y se subraya al pasar. */
+.pr-folio {
+  font: inherit;
+  text-align: left;
+}
+.pr-folio:hover {
+  text-decoration: underline;
+}
+</style>

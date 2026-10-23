@@ -220,12 +220,15 @@ it('si el banco rechaza el cargo automático, entra la mora con el motivo y el r
     expect(renovarHoy($m))->toBe('fallido');
 
     $estado = enEstudioPago($m, fn (): array => [
-        'mora' => ProcesoDunningTenant::query()->firstOrFail()->only(['estado', 'ultimo_motivo']),
+        'mora' => ProcesoDunningTenant::query()->firstOrFail()->only(['estado', 'ultimo_motivo', 'ultimo_motivo_clave', 'ultimo_motivo_detalle']),
         'proxima' => AcuerdoTenant::query()->where('ulid', $m['acuerdo'])->firstOrFail()->proxima_cobro_en?->toDateString(),
         'aviso' => EventoOutboxTenant::query()->where('tipo', 'cobro.fallido')->count(),
     ]);
     expect($estado['mora']['estado']->value)->toBe('en_mora')
         ->and($estado['mora']['ultimo_motivo'])->toContain('Visa terminación 4242')->toContain('no tiene fondos suficientes')
+        // Para quien administra: la clave y el motivo del banco tal cual.
+        ->and($estado['mora']['ultimo_motivo_clave']?->value)->toBe('tarjeta_rechazada')
+        ->and($estado['mora']['ultimo_motivo_detalle'])->toBe('La tarjeta no tiene fondos suficientes.')
         ->and($estado['proxima'])->toBe(now()->toDateString())
         ->and($estado['aviso'])->toBe(1);
     $this->getJson("/api/v1/app/{$m['slug']}/mi/pago-automatico", conBearer($m['alumno']))

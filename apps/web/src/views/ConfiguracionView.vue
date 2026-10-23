@@ -96,7 +96,7 @@ onMounted(cargar);
         class="mt-6 tu-card p-6 scroll-mt-24"
       >
         <!-- Sola, el encabezado de la página ya lo nombra. -->
-        <h2 v-if="seccion !== 'datos'" class="font-medium text-lg">
+        <h2 v-if="seccion !== 'datos'" class="tu-titulo-seccion">
           {{ $t("configuracion.logoTitulo") }}
         </h2>
         <p

@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import BitacoraPlataforma from "@/components/BitacoraPlataforma.vue";
 import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EquipoPlataforma from "@/components/EquipoPlataforma.vue";
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
 import InteresadosPlataforma from "@/components/InteresadosPlataforma.vue";
@@ -16,6 +17,7 @@ import PaisPlataforma from "@/components/PaisPlataforma.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
@@ -39,6 +41,7 @@ import {
   PRODUCTOS_LISTA,
   productoDeModalidad,
 } from "@/lib/producto";
+import { useFiltrosEnUrl, usePestanaEnUrl } from "@/lib/filtrosEnUrl";
 import { urlCanonicaEstudio } from "@/lib/tenant";
 import type { DatosTerminologia } from "@/lib/terminologia";
 import { useToastStore } from "@/stores/toast";
@@ -227,7 +230,22 @@ const cargando = ref(false);
 // Con un token guardado no se pinta la puerta mientras se comprueba (sin parpadeo).
 const comprobando = ref(token.value !== "");
 const error = ref<string | null>(null);
-const pestana = ref<Pestana>("estudios");
+// La pestaña, en la dirección (`?pestana=cobros`): recargar o un enlace abre la misma.
+const PESTANAS: Pestana[] = [
+  "estudios",
+  "cobros",
+  "tarifas",
+  "parametros",
+  "configuracion",
+  "operacion",
+  "errores",
+  "interesados",
+  "embudo",
+  "medicion",
+  "equipo",
+  "bitacora",
+];
+const pestana = usePestanaEnUrl<Pestana>(PESTANAS);
 
 function encabezados(): { headers: Record<string, string> } {
   return { headers: { Authorization: `Bearer ${token.value}` } };
@@ -294,7 +312,7 @@ const columnas = computed(() => [
   { clave: "cobro", etiqueta: t("plataformaAdmin.estudios.colCobro") },
   { clave: "uso", etiqueta: t("plataformaAdmin.estudios.colUso") },
   { clave: "adeudo", etiqueta: t("plataformaAdmin.estudios.colAdeudo") },
-  { clave: "acciones", etiqueta: "" },
+  { clave: "acciones", etiqueta: "", acciones: true },
 ]);
 // Por producto, estado y adeudo (ADR 0132), buscando y por páginas en el servidor:
 // la plataforma puede tener miles de negocios.
@@ -318,6 +336,33 @@ function irPaginaEstudios(n: number): void {
 function filtrarEstudios(): void {
   irPaginaEstudios(1);
 }
+// La búsqueda y los filtros de Negocios, en la dirección (un enlace o recargar los
+// conserva). Antes de vigilarlos: lo leído de la dirección no pide de más.
+useFiltrosEnUrl({
+  buscar: buscarEstudios,
+  producto: computed({
+    get: () => filtroEstudios.value.producto,
+    set: (v: string) => {
+      if (v === "" || (PRODUCTOS_LISTA as readonly string[]).includes(v)) {
+        filtroEstudios.value.producto = v;
+      }
+    },
+  }),
+  estado: computed({
+    get: () => filtroEstudios.value.estado,
+    set: (v: string) => {
+      if (v === "" || ESTADOS_ESTUDIO.includes(v)) {
+        filtroEstudios.value.estado = v;
+      }
+    },
+  }),
+  adeudo: computed({
+    get: () => (filtroEstudios.value.adeudo ? "1" : ""),
+    set: (v: string) => {
+      filtroEstudios.value.adeudo = v === "1";
+    },
+  }),
+});
 let esperaEstudios: ReturnType<typeof setTimeout> | undefined;
 watch(buscarEstudios, () => {
   clearTimeout(esperaEstudios);
@@ -625,6 +670,43 @@ function filtrarCobros(): void {
   paginaCobros.value = 1;
   void cargarCobros();
 }
+// Los de Cobros también, con sus propias claves (no chocan con las de Negocios).
+const ESTADOS_COBRO = [
+  "",
+  "pendiente",
+  "pagado",
+  "sin_cargo",
+  "cancelado",
+  "vencidos",
+];
+const CONCEPTOS_COBRO = ["", "renta", "plan", "ajuste", "timbres"];
+useFiltrosEnUrl({
+  buscarCobro: buscarCobros,
+  estadoCobro: computed({
+    get: () => filtro.value.estado,
+    set: (v: string) => {
+      if (ESTADOS_COBRO.includes(v)) {
+        filtro.value.estado = v;
+      }
+    },
+  }),
+  concepto: computed({
+    get: () => filtro.value.concepto,
+    set: (v: string) => {
+      if (CONCEPTOS_COBRO.includes(v)) {
+        filtro.value.concepto = v;
+      }
+    },
+  }),
+  periodo: computed({
+    get: () => filtro.value.periodo,
+    set: (v: string) => {
+      if (v === "" || /^\d{4}-\d{2}$/.test(v)) {
+        filtro.value.periodo = v;
+      }
+    },
+  }),
+});
 let esperaCobros: ReturnType<typeof setTimeout> | undefined;
 watch(buscarCobros, () => {
   clearTimeout(esperaCobros);
@@ -1016,12 +1098,30 @@ async function cargar(): Promise<void> {
   }
 }
 
-function irPestana(p: Pestana): void {
-  pestana.value = p;
-  if (p === "cobros") {
-    void cargarCobros();
-  }
-}
+// Los cobros se piden al abrir su pestaña, ya con la sesión (también al entrar por un
+// enlace o recargar); las demás pestañas cargan lo suyo al montarse.
+watch(
+  [pestana, autenticado],
+  ([actual, dentro]) => {
+    if (actual === "cobros" && dentro) {
+      void cargarCobros();
+    }
+  },
+  { immediate: true },
+);
+const opcionesPestana = computed(() =>
+  PESTANAS.map((p) => ({
+    clave: p,
+    texto:
+      p === "medicion"
+        ? t("medicion.plataforma.pestana")
+        : t(`plataformaAdmin.pestanas.${p}`),
+    cuenta:
+      p === "estudios"
+        ? (metaEstudios.value?.total_negocios ?? estudios.value.length)
+        : undefined,
+  })),
+);
 
 // Paso 1: correo, contraseña y token. Si coinciden, llega un código por correo.
 async function entrar(): Promise<void> {
@@ -1158,7 +1258,7 @@ function borrar(): void {
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-10">
+  <section class="tu-pagina max-w-6xl">
     <!-- Con un token guardado: se comprueba sin enseñar la puerta. -->
     <p
       v-if="comprobando"
@@ -1281,7 +1381,7 @@ function borrar(): void {
         <!-- Falló la red, no el token: se puede volver a intentar con el guardado. -->
         <button
           v-if="token !== ''"
-          class="tu-btn tu-btn-secundario w-full"
+          class="tu-btn tu-btn-discreto w-full"
           type="button"
           :disabled="cargando"
           @click="cargar"
@@ -1292,57 +1392,28 @@ function borrar(): void {
     </div>
 
     <template v-else>
-      <div class="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight">
-            {{ $t("plataforma.titulo") }}
-          </h1>
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataforma.subtitulo") }}
-            <template v-if="operador">
-              · {{ $t("plataforma.operador", { nombre: operador }) }}</template
-            >
-          </p>
-        </div>
-        <button class="tu-btn tu-btn-secundario" type="button" @click="salir">
-          {{ $t("plataforma.salir") }}
-        </button>
-      </div>
+      <!-- El mismo encabezado que el panel: título, quién opera y «Salir». -->
+      <EncabezadoSeccion
+        :titulo="$t('plataforma.titulo')"
+        :subtitulo="
+          operador
+            ? `${$t('plataforma.subtitulo')} · ${$t('plataforma.operador', { nombre: operador })}`
+            : $t('plataforma.subtitulo')
+        "
+      >
+        <template #acciones>
+          <button class="tu-btn tu-btn-secundario" type="button" @click="salir">
+            {{ $t("plataforma.salir") }}
+          </button>
+        </template>
+      </EncabezadoSeccion>
 
-      <div class="tu-pestanas mt-6" role="group">
-        <button
-          v-for="p in [
-            'estudios',
-            'cobros',
-            'tarifas',
-            'parametros',
-            'configuracion',
-            'operacion',
-            'errores',
-            'interesados',
-            'embudo',
-            'medicion',
-            'equipo',
-            'bitacora',
-          ] as const"
-          :key="p"
-          type="button"
-          :aria-pressed="pestana === p"
-          @click="irPestana(p)"
-        >
-          {{
-            p === "medicion"
-              ? $t("medicion.plataforma.pestana")
-              : $t(`plataformaAdmin.pestanas.${p}`)
-          }}
-          <span
-            v-if="p === 'estudios'"
-            class="ml-1 tabular-nums"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{ metaEstudios?.total_negocios ?? estudios.length }}</span
-          >
-        </button>
-      </div>
+      <!-- Las pestañas, en la dirección; en el teléfono, una lista. -->
+      <PestanasSeccion
+        v-model="pestana"
+        :opciones="opcionesPestana"
+        :etiqueta="$t('plataforma.titulo')"
+      />
 
       <!-- Estudios -->
       <div
@@ -1621,7 +1692,7 @@ function borrar(): void {
             <span style="color: var(--error)">{{ errorCobros }}</span>
             <button
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-discreto"
               :disabled="cargandoCobros"
               @click="cargarCobros"
             >
@@ -1813,7 +1884,7 @@ function borrar(): void {
         <div class="tu-card p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h2 class="font-medium text-lg">
+              <h2 class="tu-titulo-seccion">
                 {{ $t("plataforma.facturapi.titulo") }}
               </h2>
               <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1860,9 +1931,10 @@ function borrar(): void {
             >
               {{ $t("plataforma.facturapi.guardar") }}
             </button>
+            <!-- Quita la llave ya guardada: destructiva. -->
             <button
               v-if="facturapiConfigurada"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-peligro"
               type="button"
               data-prueba="quitar-facturapi"
               :disabled="guardando === 'facturapi'"
@@ -1882,7 +1954,7 @@ function borrar(): void {
           data-prueba="correo-alertas"
           @submit.prevent="guardarCorreoAlertas"
         >
-          <h2 class="font-medium text-lg">
+          <h2 class="tu-titulo-seccion">
             {{ $t("plataformaAdmin.correoAlertas.titulo") }}
           </h2>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1917,7 +1989,7 @@ function borrar(): void {
           data-prueba="paises-bienestar"
           @submit.prevent="guardarPaisesBienestar"
         >
-          <h2 class="font-medium text-lg">
+          <h2 class="tu-titulo-seccion">
             {{ $t("plataformaAdmin.paisesBienestar.titulo") }}
           </h2>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1965,7 +2037,7 @@ function borrar(): void {
         <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
 
         <div>
-          <h2 class="font-medium text-lg">
+          <h2 class="tu-titulo-seccion">
             {{ $t("plataforma.pasarelas.titulo") }}
           </h2>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -2088,7 +2160,7 @@ function borrar(): void {
 
         <form class="tu-card p-5 grid gap-4" @submit.prevent="guardarLegales()">
           <div>
-            <h2 class="font-medium text-lg">
+            <h2 class="tu-titulo-seccion">
               {{ $t("plataforma.legales.titulo") }}
             </h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">

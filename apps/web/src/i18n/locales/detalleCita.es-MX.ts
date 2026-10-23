@@ -1,5 +1,7 @@
 // Detalle de una cita para recepción (components/PanelCita.vue).
 export default {
+  // La cita sin nadie asignado (un hueco apartado).
+  sinAlumno: "Sin alumno",
   verPerfil: "Ver perfil",
   minutos: "{n} min",
   servicio: "Servicio",
@@ -27,7 +29,7 @@ export default {
     cancelada: "Cancelada",
     canceladaAyuda: "Libera el horario",
   },
-  notaCliente: "Nota del cliente",
+  notaAlumno: "Nota del alumno",
   asiste: "Asiste",
   cobro: {
     titulo: "Cobro y pago",
@@ -70,8 +72,9 @@ export default {
       presente: "Asistencia corregida: llegó",
       ausente: "Asistencia corregida: no asistió",
     },
+    // El API dice `por: "cliente"`; la web lo rotula con la clave `alumno`.
     cancelada: {
-      cliente: "Cancelada por el cliente",
+      alumno: "Cancelada por el alumno",
       negocio: "Cancelada por el negocio",
     },
     motivo: "Motivo: {motivo}",

@@ -262,6 +262,13 @@ describe("configurar el programa, aparte de operar los canjes", () => {
     expect(w.get('[data-prueba="estado-programa"]').classes()).toContain(
       "tu-estado",
     );
+    // Editar y desactivar una recompensa son botones (desactivar, de peligro).
+    expect(w.get('[data-prueba="editar-recompensa-r1"]').classes()).toContain(
+      "tu-btn-secundario",
+    );
+    expect(w.get('[data-prueba="alternar-recompensa-r1"]').classes()).toContain(
+      "tu-btn-peligro",
+    );
     w.unmount();
   });
 

@@ -1157,7 +1157,7 @@ onBeforeUnmount(() => {
                 <RouterLink
                   v-if="usaCitas"
                   :to="{ name: 'agendar-cita', params: { slug } }"
-                  class="tu-btn tu-btn-primario px-6"
+                  class="tu-btn tu-btn-primario"
                   @click="
                     trackEvent('book_appointment_clicked', { source: 'hero' })
                   "
@@ -1167,14 +1167,14 @@ onBeforeUnmount(() => {
                 <button
                   v-if="!usaCitas"
                   type="button"
-                  class="tu-btn tu-btn-primario px-6"
+                  class="tu-btn tu-btn-primario"
                   @click="abrirAcceso('hero')"
                 >
                   {{ tn("escaparate.reservar") }}
                 </button>
                 <RouterLink
                   :to="{ name: 'entrar', query: { estudio: slug } }"
-                  class="tu-btn tu-btn-secundario px-6"
+                  class="tu-btn tu-btn-secundario"
                   @click="
                     trackEvent('student_login_clicked', {
                       source: 'public_studio',
@@ -1226,7 +1226,7 @@ onBeforeUnmount(() => {
                 <a
                   v-if="b.enlace_url && b.enlace_texto"
                   :href="enlaceDelSitio(b.enlace_url)"
-                  class="tu-btn tu-btn-primario mt-4 px-5"
+                  class="tu-btn tu-btn-primario mt-4"
                   :target="esEnlaceExterno(b.enlace_url) ? '_blank' : undefined"
                   :rel="
                     esEnlaceExterno(b.enlace_url)
@@ -1290,7 +1290,7 @@ onBeforeUnmount(() => {
                 </div>
                 <RouterLink
                   :to="{ name: 'agendar-cita', params: { slug } }"
-                  class="tu-btn tu-btn-primario shrink-0 px-6"
+                  class="tu-btn tu-btn-primario shrink-0"
                   @click="
                     trackEvent('book_appointment_clicked', { source: 'steps' })
                   "
@@ -1358,7 +1358,7 @@ onBeforeUnmount(() => {
                 <button
                   v-if="formularioAcceso && s.id && s.lugares_libres !== 0"
                   type="button"
-                  class="tu-enlace mt-3 mr-3 text-sm"
+                  class="tu-btn tu-btn-secundario tu-btn-chico mt-3 mr-3"
                   data-prueba="pedir-lugar"
                   @click="
                     abrirAcceso('session', {
@@ -2089,7 +2089,7 @@ onBeforeUnmount(() => {
             <RouterLink
               v-if="usaCitas"
               :to="{ name: 'agendar-cita', params: { slug } }"
-              class="tu-btn tu-btn-primario mt-5 px-8"
+              class="tu-btn tu-btn-primario mt-5"
               @click="
                 trackEvent('book_appointment_clicked', { source: 'final' })
               "
@@ -2099,7 +2099,7 @@ onBeforeUnmount(() => {
             <button
               v-else
               type="button"
-              class="tu-btn tu-btn-primario mt-5 px-8"
+              class="tu-btn tu-btn-primario mt-5"
               @click="abrirAcceso('final')"
             >
               {{ tn("escaparate.reservar") }}

@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
+use App\Modules\Tenancy\MotivoFalloCobro;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
@@ -50,9 +51,6 @@ use Throwable;
  */
 class CobroRecurrenteTenant
 {
-    /** Lo que se le dice al cliente cuando el cargo no se pudo intentar. */
-    public const MOTIVO_SIN_COBRO = 'No pudimos cobrar en línea. Puedes pagar desde tu cuenta o en el negocio.';
-
     /**
      * Días de espera, tras la fecha de renovación, al cobro de una suscripción.
      */
@@ -107,9 +105,10 @@ class CobroRecurrenteTenant
 
         try {
             $pago = $this->cobrar->ejecutar($orden, $proveedor);
-        } catch (PasarelaNoDisponible|OrdenNoLiquidable) {
-            // Al cliente le llega este motivo: en sus palabras, no el detalle interno (M07).
-            $this->dunning->registrarFallo($acuerdo, self::MOTIVO_SIN_COBRO);
+        } catch (PasarelaNoDisponible|OrdenNoLiquidable $e) {
+            // Al cliente le llega la frase de siempre, en sus palabras (M07); el detalle
+            // interno, solo a quien administra.
+            $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::SinCobroEnLinea, $e->getMessage());
 
             return 'fallido';
         }
@@ -122,12 +121,12 @@ class CobroRecurrenteTenant
         if ($pago->estado === EstadoPago::Pendiente) {
             // Falta que el cliente complete el pago: la fecha NO avanza, la deuda queda
             // y la mora da seguimiento (aviso, reintentos, suspensión si no paga).
-            $this->dunning->registrarFallo($acuerdo, 'Falta completar el pago en línea.');
+            $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::PagoSinCompletar);
 
             return 'pendiente';
         }
 
-        $this->dunning->registrarFallo($acuerdo, 'El cobro fue rechazado.');
+        $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::Rechazado, $pago->motivo);
 
         return 'fallido';
     }
@@ -153,9 +152,10 @@ class CobroRecurrenteTenant
             $pago = $this->cobrar->domiciliado($orden, $domiciliacion);
         } catch (CobroNoConcluyente) {
             return 'fallido';
-        } catch (PasarelaNoDisponible|OrdenNoLiquidable) {
-            // Al cliente le llega este motivo: en sus palabras, no el detalle interno (M07).
-            $this->dunning->registrarFallo($acuerdo, self::MOTIVO_SIN_COBRO);
+        } catch (PasarelaNoDisponible|OrdenNoLiquidable $e) {
+            // Al cliente le llega la frase de siempre, en sus palabras (M07); el detalle
+            // interno, solo a quien administra.
+            $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::SinCobroEnLinea, $e->getMessage());
 
             return 'fallido';
         }
@@ -172,7 +172,8 @@ class CobroRecurrenteTenant
         $motivo = $pago->motivo ?? 'El banco rechazó el cargo.';
         $this->domiciliaciones->registrarCargo($domiciliacion, $motivo);
         $tarjeta = trim(ucfirst((string) $domiciliacion->marca).' terminación '.$domiciliacion->ultimos4);
-        $this->dunning->registrarFallo($acuerdo, "No pudimos cobrar tu pago automático a la tarjeta {$tarjeta}: {$motivo}");
+        // El detalle es el motivo del banco tal cual (sin él, la clave basta).
+        $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::TarjetaRechazada, $pago->motivo, $tarjeta);
 
         return 'fallido';
     }
@@ -202,7 +203,7 @@ class CobroRecurrenteTenant
 
         $limite = Carbon::parse(app(FechasNegocioTenant::class)->hoy())->subDays($this->parametros->entero('cobranza.dias_gracia_pago_automatico'));
         if ($acuerdo->proxima_cobro_en !== null && $acuerdo->proxima_cobro_en->lt($limite)) {
-            $this->dunning->registrarFallo($acuerdo, 'No hemos recibido el cobro automático de tu suscripción.');
+            $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::SuscripcionSinCobro);
 
             return 'fallido';
         }

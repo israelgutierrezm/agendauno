@@ -21,13 +21,15 @@ import {
   type Plan,
 } from "@/lib/planes";
 import { useContenedorEditor } from "@/lib/editorFormulario";
+import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
  * Planes y paquetes (ADR 0050) con el patrón de los listados: indicadores, búsqueda
- * y filtro por tipo, y la tabla con precio, qué incluye, cuánto dura, para qué sirve
- * y si está a la venta. Se crean y editan en un diálogo (EditorPlan).
+ * y filtro por tipo (en la dirección), y la tabla con precio, qué incluye, cuánto
+ * dura, para qué sirve y si está a la venta; en el teléfono, una ficha por plan. Se
+ * crean y editan en un diálogo (EditorPlan) con Guardar y Cancelar en su pie.
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -45,6 +47,18 @@ const cuotasAbiertas = ref(false);
 
 const busqueda = ref("");
 const seccion = ref<string>("");
+// La búsqueda, el tipo y si se ven los archivados, en la dirección: recargar o
+// compartir el enlace conserva lo que se veía.
+useFiltrosEnUrl({
+  q: busqueda,
+  tipo: opcionEnUrl(seccion, ["", ...SECCIONES]),
+  archivados: computed<string>({
+    get: () => (verArchivados.value ? "1" : ""),
+    set: (v: string) => {
+      verArchivados.value = v === "1";
+    },
+  }),
+});
 const seccionesConPlanes = computed(() =>
   SECCIONES.filter((s) => planes.value.some((p) => seccionDe(p.tipo) === s)),
 );
@@ -217,6 +231,14 @@ async function cargar(): Promise<void> {
       meta?: { truncado: boolean; limite: number };
     }>(`${base.value}/productos`, { params: { incluir: "todos" } });
     planes.value = data.data;
+    // Un tipo de la dirección del que ya no hay planes no deja la lista vacía sin
+    // un filtro a la vista para quitarlo.
+    if (
+      seccion.value !== "" &&
+      !(seccionesConPlanes.value as readonly string[]).includes(seccion.value)
+    ) {
+      seccion.value = "";
+    }
     // Nada se corta en silencio: si hay más de los que caben, se dice.
     truncado.value = data.meta?.truncado ? data.meta.limite : null;
   } catch (e) {
@@ -329,8 +351,8 @@ onMounted(cargar);
       </AvisoTono>
 
       <div class="tu-card mt-5">
-        <div class="pv-filtros">
-          <label class="pv-buscar">
+        <div class="tu-filtros">
+          <label class="tu-buscar">
             <IconoNav nombre="buscar" :tam="16" />
             <input
               v-model="busqueda"
@@ -373,11 +395,12 @@ onMounted(cargar);
           </label>
         </div>
 
-        <div class="relative overflow-x-auto">
-          <table class="pv-tabla">
+        <div class="relative overflow-x-auto tu-tabla-adaptable">
+          <table class="tu-tabla">
             <thead>
               <tr>
                 <th>{{ $t("planesVisual.col.plan") }}</th>
+                <th class="text-right">{{ $t("planesVisual.col.precio") }}</th>
                 <th class="hidden sm:table-cell">
                   {{ $t("planesVisual.col.incluye") }}
                 </th>
@@ -387,7 +410,6 @@ onMounted(cargar);
                 <th class="hidden lg:table-cell">
                   {{ $t("planesVisual.col.sirve") }}
                 </th>
-                <th class="text-right">{{ $t("planesVisual.col.precio") }}</th>
                 <th>{{ $t("planesVisual.col.estado") }}</th>
                 <th>
                   <span class="sr-only">{{
@@ -403,35 +425,65 @@ onMounted(cargar);
                 :class="{ 'pv-archivado': p.archivado }"
                 data-prueba="plan"
               >
-                <td>
-                  <p class="font-medium">{{ p.nombre }}</p>
-                  <p v-if="p.todas_sucursales !== undefined" class="pv-sub">
+                <td :data-etiqueta="$t('planesVisual.col.plan')">
+                  <!-- Tocar el nombre abre el plan, igual que «Editar». -->
+                  <button
+                    v-if="puedeEditar"
+                    type="button"
+                    class="pv-nombre"
+                    @click="abrir(p)"
+                  >
+                    {{ p.nombre }}
+                  </button>
+                  <span v-else class="font-medium">{{ p.nombre }}</span>
+                  <span v-if="p.todas_sucursales !== undefined" class="tu-sub">
                     {{
                       p.todas_sucursales
                         ? $t("sucursalOperativa.todas")
                         : p.sucursales?.map((s) => s.nombre).join(" · ")
                     }}
-                  </p>
-                  <p class="pv-sub">{{ nombreSeccion(seccionDe(p.tipo)) }}</p>
-                  <p
+                  </span>
+                  <span class="tu-sub">{{
+                    nombreSeccion(seccionDe(p.tipo))
+                  }}</span>
+                  <span
                     v-if="restricciones(p).length > 0"
-                    class="pv-sub"
+                    class="tu-sub"
                     data-prueba="restricciones-plan"
                   >
                     {{ restricciones(p).join(" · ") }}
-                  </p>
+                  </span>
                 </td>
-                <td class="hidden sm:table-cell">{{ clases(p) }}</td>
-                <td class="hidden md:table-cell pv-suave">
-                  {{ vigencia(p) }}
-                  <span
-                    v-if="renovacion(p)"
-                    class="pv-sub block"
-                    data-prueba="renovacion-plan"
-                    >{{ renovacion(p) }}</span
-                  >
+                <td
+                  class="text-right font-medium tabular-nums"
+                  :data-etiqueta="$t('planesVisual.col.precio')"
+                >
+                  {{ dinero(p.precio_minor, p.moneda, sesion.pais) }}
                 </td>
-                <td class="hidden lg:table-cell pv-suave pv-corta">
+                <td
+                  class="hidden sm:table-cell"
+                  :data-etiqueta="$t('planesVisual.col.incluye')"
+                >
+                  {{ clases(p) }}
+                </td>
+                <td
+                  class="hidden md:table-cell pv-suave"
+                  :data-etiqueta="$t('planesVisual.col.dura')"
+                >
+                  <span>
+                    {{ vigencia(p) }}
+                    <span
+                      v-if="renovacion(p)"
+                      class="tu-sub"
+                      data-prueba="renovacion-plan"
+                      >{{ renovacion(p) }}</span
+                    >
+                  </span>
+                </td>
+                <td
+                  class="hidden lg:table-cell pv-suave pv-corta"
+                  :data-etiqueta="$t('planesVisual.col.sirve')"
+                >
                   <details
                     v-if="p.tipo !== 'add_on' && p.ofertas.length > 2"
                     class="pv-incluidas"
@@ -451,14 +503,11 @@ onMounted(cargar);
                       </li>
                     </ul>
                   </details>
-                  <template v-else>{{ aplicaA(p) }}</template>
+                  <span v-else>{{ aplicaA(p) }}</span>
                 </td>
-                <td class="text-right font-medium tabular-nums">
-                  {{ dinero(p.precio_minor, p.moneda, sesion.pais) }}
-                </td>
-                <td>
+                <td :data-etiqueta="$t('planesVisual.col.estado')">
                   <span
-                    class="tu-pildora"
+                    class="tu-estado"
                     :style="{
                       '--tono': p.archivado
                         ? 'var(--texto-suave)'
@@ -471,11 +520,11 @@ onMounted(cargar);
                     }}</span
                   >
                 </td>
-                <td class="text-right">
+                <td class="tu-celda-acciones">
                   <button
                     v-if="puedeEditar"
                     type="button"
-                    class="tu-enlace text-sm"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
                     data-prueba="editar-plan"
                     @click="abrir(p)"
                   >
@@ -485,7 +534,7 @@ onMounted(cargar);
               </tr>
             </tbody>
           </table>
-          <p v-if="visibles.length === 0" class="pv-sin-resultados">
+          <p v-if="visibles.length === 0" class="tu-sin-resultados">
             {{ $t("planesVisual.sinResultados") }}
           </p>
         </div>
@@ -499,6 +548,7 @@ onMounted(cargar);
           ? $t('planes.editor.tituloEditar')
           : $t('planes.editor.tituloNuevo')
       "
+      tam="xl"
       icono="etiqueta"
       :ocupado="editorPlan.ocupado.value"
       @cerrar="editorPlan.cerrar"
@@ -508,9 +558,33 @@ onMounted(cargar);
         :key="editando?.id ?? 'nuevo'"
         :plan="editando"
         @guardado="guardado"
-        @cerrar="editorPlan.cerrar"
         @estado="editorPlan.alEstado"
       />
+      <!-- Guardar y Cancelar siempre a la vista, sin bajar todo el formulario. -->
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="editorPlan.ocupado.value"
+          @click="editorPlan.cerrar"
+        >
+          {{ $t("planes.editor.cancelar") }}
+        </button>
+        <button
+          type="submit"
+          form="form-plan"
+          class="tu-btn tu-btn-primario"
+          data-prueba="guardar-plan"
+          :disabled="editorPlan.ocupado.value || !editorPlan.valido.value"
+          :aria-busy="editorPlan.ocupado.value || undefined"
+        >
+          {{
+            editorPlan.ocupado.value
+              ? $t("planes.editor.guardando")
+              : $t("planes.editor.guardar")
+          }}
+        </button>
+      </template>
     </ModalDialogo>
 
     <ModalDialogo
@@ -523,9 +597,32 @@ onMounted(cargar);
       <CuotasNegocio
         v-if="cuotasAbiertas"
         @guardado="cuotasGuardadas"
-        @cerrar="editorCuotas.cerrar"
         @estado="editorCuotas.alEstado"
       />
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="editorCuotas.ocupado.value"
+          @click="editorCuotas.cerrar"
+        >
+          {{ $t("planes.editor.cancelar") }}
+        </button>
+        <button
+          type="submit"
+          form="form-cuotas"
+          class="tu-btn tu-btn-primario"
+          data-prueba="guardar-cuotas"
+          :disabled="editorCuotas.ocupado.value || !editorCuotas.valido.value"
+          :aria-busy="editorCuotas.ocupado.value || undefined"
+        >
+          {{
+            editorCuotas.ocupado.value
+              ? $t("planes.editor.guardando")
+              : $t("planes.editor.guardar")
+          }}
+        </button>
+      </template>
     </ModalDialogo>
   </section>
 </template>
@@ -546,69 +643,27 @@ onMounted(cargar);
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.pv-filtros {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.9rem 1rem;
-  border-bottom: 1px solid var(--borde);
-}
-.pv-buscar {
-  position: relative;
-  flex: 1 1 14rem;
-  color: var(--texto-suave);
-}
-.pv-buscar > :first-child {
-  position: absolute;
-  top: 50%;
-  left: 0.75rem;
-  transform: translateY(-50%);
-}
-.pv-buscar > input {
-  padding-left: 2.25rem;
-}
-.pv-tabla {
-  width: 100%;
-  font-size: 0.9rem;
-  border-collapse: collapse;
-}
-.pv-tabla th {
-  padding: 0.7rem 1rem;
-  color: var(--texto-suave);
-  font-size: 0.78rem;
-  font-weight: 500;
-  text-align: left;
-}
-.pv-tabla th.text-right {
-  text-align: right;
-}
-.pv-tabla td {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--borde);
-  vertical-align: middle;
-}
 .pv-archivado td {
   color: var(--texto-suave);
-}
-.pv-sub {
-  color: var(--texto-suave);
-  font-size: 0.78rem;
 }
 .pv-suave {
   color: var(--texto-suave);
 }
-.pv-corta {
-  max-width: 16rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* El nombre abre el plan: se lee como el título de la fila, no como un enlace. */
+.pv-nombre {
+  font-weight: 500;
+  text-align: left;
 }
-.pv-sin-resultados {
-  padding: 2rem 1rem;
-  border-top: 1px solid var(--borde);
-  color: var(--texto-suave);
-  font-size: 0.9rem;
-  text-align: center;
+.pv-nombre:hover {
+  text-decoration: underline;
+}
+/* En la tabla, «Válido para» en una línea; en la ficha del teléfono, completo. */
+@media (min-width: 640px) {
+  .pv-corta {
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 </style>

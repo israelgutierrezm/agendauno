@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink } from "vue-router";
 
 import BarraListado from "@/components/BarraListado.vue";
 import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
@@ -25,6 +25,8 @@ import {
   type Prospecto,
 } from "@/lib/captacion";
 import { confirmar } from "@/lib/confirmar";
+import { useDescartarCambios } from "@/lib/editorFormulario";
+import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -118,14 +120,9 @@ function iniciales(nombre: string): string {
     .map((x) => x[0]?.toUpperCase() ?? "")
     .join("");
 }
-// El inicio abre las solicitudes nuevas ya filtradas (`?estado=nuevo`; M08).
-const estadoInicial = useRoute()?.query.estado;
 // `estado` vacío: los abiertos (lo de siempre).
 const filtros = reactive({
-  estado:
-    typeof estadoInicial === "string" && estadoInicial !== "abiertos"
-      ? estadoInicial
-      : "",
+  estado: "",
   responsable: "",
   // `sin_atender`: su responsable no lo atendió a tiempo.
   atencion: "",
@@ -155,6 +152,21 @@ const ESTADOS: EstadoProspecto[] = [
   "convertido",
   "descartado",
 ];
+// Los filtros en la dirección: el inicio abre las solicitudes nuevas ya filtradas
+// (`?estado=nuevo`; M08) y recargar o volver conserva lo que se veía. Lo que llegue
+// sin ser una opción (p. ej. `?estado=abiertos`) se ignora: quedan los abiertos.
+useFiltrosEnUrl({
+  q: toRef(filtros, "q"),
+  estado: opcionEnUrl(toRef(filtros, "estado"), ["", "todos", ...ESTADOS]),
+  responsable: toRef(filtros, "responsable"),
+  atencion: opcionEnUrl(toRef(filtros, "atencion"), ["", "sin_atender"]),
+  seguimiento: opcionEnUrl(toRef(filtros, "seguimiento"), ["", "vencido"]),
+  periodo: opcionEnUrl(toRef(filtros, "periodo"), ["", "hoy", "7", "30"]),
+  origen: opcionEnUrl(toRef(filtros, "origen"), ["", "formulario", "manual"]),
+  formulario: toRef(filtros, "formulario"),
+  campana: opcionEnUrl(toRef(filtros, "campana"), ["", "con", "sin"]),
+  sucursal: toRef(filtros, "sucursal"),
+});
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -796,6 +808,24 @@ async function eliminar(): Promise<void> {
 
 // ---------------------------------------------------------------- alta manual
 const alta = reactive({ abierto: false, nombre: "", email: "", telefono: "" });
+// Con lo capturado sin guardar, cerrar el alta o salir de la pantalla pregunta antes.
+const descartarAlta = useDescartarCambios({
+  abierto: toRef(alta, "abierto"),
+  valor: () => ({
+    nombre: alta.nombre,
+    email: alta.email,
+    telefono: alta.telefono,
+  }),
+  guardando: accionando,
+});
+function abrirAlta(): void {
+  Object.assign(alta, { nombre: "", email: "", telefono: "" });
+  descartarAlta.fijar();
+  alta.abierto = true;
+}
+function cerrarAlta(): void {
+  void descartarAlta.cerrar();
+}
 async function crear(): Promise<void> {
   if (
     alta.nombre.trim() === "" ||
@@ -855,7 +885,7 @@ async function crear(): Promise<void> {
       :nuevo-texto="$t('captacion.prospectos.nuevo')"
       @cambio-filtro="cambioFiltro"
       @limpiar="limpiarFiltros"
-      @nuevo="alta.abierto = true"
+      @nuevo="abrirAlta"
     />
 
     <div class="tu-card mt-4">
@@ -884,7 +914,9 @@ async function crear(): Promise<void> {
         "
         compacto
       />
-      <div v-else class="overflow-x-auto">
+      <!-- En el teléfono, cada prospecto es una ficha: su seguimiento (o «Vencido»)
+           como campo y «Ver» al pie. -->
+      <div v-else class="relative overflow-x-auto tu-tabla-adaptable">
         <table class="tu-tabla" data-prueba="tabla-prospectos">
           <thead>
             <tr>
@@ -914,42 +946,57 @@ async function crear(): Promise<void> {
               data-prueba="prospecto"
               @click="abrir(p)"
             >
-              <td>
+              <td :data-etiqueta="$t('captacion.prospectos.tabla.contacto')">
                 <span class="flex items-center gap-3 min-w-0">
                   <span class="prospecto-avatar" aria-hidden="true">{{
                     iniciales(p.nombre)
                   }}</span>
-                  <span class="min-w-0">
-                    <span class="block font-medium truncate">{{
-                      p.nombre
-                    }}</span>
+                  <!-- El ancho acotado deja que el nombre y el correo se recorten. -->
+                  <span class="min-w-0 max-w-[16rem]">
+                    <button
+                      type="button"
+                      class="pr-nombre"
+                      @click.stop="abrir(p)"
+                    >
+                      {{ p.nombre }}
+                    </button>
                     <span class="tu-sub truncate">{{
                       p.email ?? p.telefono ?? "—"
                     }}</span>
                   </span>
                 </span>
               </td>
-              <td class="hidden md:table-cell">
-                <span class="block truncate">{{ p.telefono ?? "—" }}</span>
-                <span class="tu-sub truncate">{{ interes(p) || "—" }}</span>
-              </td>
-              <td>
-                <span
-                  class="tu-estado text-sm"
-                  :style="{ '--tono': tono(p.estado) }"
-                >
-                  {{ $t(`captacion.prospectos.estados.${p.estado}`) }}
-                </span>
-                <span
-                  v-if="p.sin_atender_desde"
-                  class="tu-sub"
-                  style="color: var(--aviso)"
-                  data-prueba="fila-sin-atender"
-                >
-                  {{ $t("captacion.prospectos.resumen.sinAtender") }}
+              <td
+                class="hidden md:table-cell"
+                :data-etiqueta="$t('captacion.prospectos.tabla.informacion')"
+              >
+                <span class="block max-w-[16rem]">
+                  <span class="block truncate">{{ p.telefono ?? "—" }}</span>
+                  <span class="tu-sub truncate">{{ interes(p) || "—" }}</span>
                 </span>
               </td>
-              <td class="hidden sm:table-cell">
+              <td :data-etiqueta="$t('captacion.prospectos.tabla.estado')">
+                <span class="block">
+                  <span
+                    class="tu-estado text-sm"
+                    :style="{ '--tono': tono(p.estado) }"
+                  >
+                    {{ $t(`captacion.prospectos.estados.${p.estado}`) }}
+                  </span>
+                  <span
+                    v-if="p.sin_atender_desde"
+                    class="tu-sub"
+                    style="color: var(--aviso)"
+                    data-prueba="fila-sin-atender"
+                  >
+                    {{ $t("captacion.prospectos.resumen.sinAtender") }}
+                  </span>
+                </span>
+              </td>
+              <td
+                class="hidden sm:table-cell"
+                :data-etiqueta="$t('captacion.prospectos.tabla.seguimiento')"
+              >
                 <span
                   v-if="vencido(p)"
                   class="tu-estado text-sm"
@@ -962,12 +1009,15 @@ async function crear(): Promise<void> {
                 }}</span>
                 <span v-else :style="{ color: 'var(--texto-suave)' }">—</span>
               </td>
-              <td class="hidden lg:table-cell">
+              <td
+                class="hidden lg:table-cell"
+                :data-etiqueta="$t('captacion.prospectos.tabla.creado')"
+              >
                 <span :style="{ color: 'var(--texto-suave)' }">{{
                   fecha(p.creado_en)
                 }}</span>
               </td>
-              <td class="text-right">
+              <td class="tu-celda-acciones">
                 <button
                   type="button"
                   class="tu-enlace text-sm"
@@ -1210,7 +1260,7 @@ async function crear(): Promise<void> {
               <button
                 v-if="actual.responsable"
                 type="button"
-                class="tu-enlace self-center"
+                class="tu-btn tu-btn-discreto tu-btn-chico self-center justify-self-start"
                 :disabled="accionando"
                 @click="asignarA(null)"
               >
@@ -1241,7 +1291,7 @@ async function crear(): Promise<void> {
               <button
                 v-if="actual.proximo_seguimiento_en"
                 type="button"
-                class="tu-enlace"
+                class="tu-btn tu-btn-discreto tu-btn-chico"
                 :disabled="accionando"
                 @click="guardarSeguimiento(true)"
               >
@@ -1283,8 +1333,9 @@ async function crear(): Promise<void> {
             </button>
             <button
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-peligro"
               :disabled="accionando"
+              :aria-expanded="descartando.abierto"
               @click="descartando.abierto = !descartando.abierto"
             >
               {{ $t("captacion.prospectos.acciones.descartar") }}
@@ -1317,13 +1368,26 @@ async function crear(): Promise<void> {
                 maxlength="300"
               />
             </label>
-            <button
-              type="submit"
-              class="tu-btn tu-btn-primario justify-self-start"
-              :disabled="accionando || descartando.motivo === ''"
-            >
-              {{ $t("captacion.prospectos.descartar.confirmar") }}
-            </button>
+            <!-- Cancelar y confirmar, en el orden de siempre. Descartar es cerrarlo
+                 como perdido (se puede reabrir): peligro, no sólido. -->
+            <div class="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario"
+                :disabled="accionando"
+                @click="descartando.abierto = false"
+              >
+                {{ $t("comun.cancelar") }}
+              </button>
+              <button
+                type="submit"
+                class="tu-btn tu-btn-peligro"
+                :disabled="accionando || descartando.motivo === ''"
+                :aria-busy="accionando || undefined"
+              >
+                {{ $t("captacion.prospectos.descartar.confirmar") }}
+              </button>
+            </div>
           </form>
 
           <form
@@ -1358,7 +1422,7 @@ async function crear(): Promise<void> {
             </label>
             <div v-if="acceso.fichas.length > 0" class="grid gap-1">
               <span class="tu-label">{{
-                $t("captacion.prospectos.acceso.fichaExistente")
+                $t("captacion.prospectos.acceso.fichaExistenteAlumno")
               }}</span>
               <label
                 v-for="f in acceso.fichas"
@@ -1378,13 +1442,24 @@ async function crear(): Promise<void> {
                 <span>{{ $t("captacion.prospectos.acceso.fichaNueva") }}</span>
               </label>
             </div>
-            <button
-              type="submit"
-              class="tu-btn tu-btn-primario justify-self-start"
-              :disabled="accionando"
-            >
-              {{ $t("captacion.prospectos.acceso.confirmar") }}
-            </button>
+            <div class="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario"
+                :disabled="accionando"
+                @click="acceso.abierto = false"
+              >
+                {{ $t("comun.cancelar") }}
+              </button>
+              <button
+                type="submit"
+                class="tu-btn tu-btn-primario"
+                :disabled="accionando"
+                :aria-busy="accionando || undefined"
+              >
+                {{ $t("captacion.prospectos.acceso.confirmar") }}
+              </button>
+            </div>
           </form>
 
           <form class="grid gap-2" @submit.prevent="anotar">
@@ -1477,8 +1552,8 @@ async function crear(): Promise<void> {
         <button
           v-if="puedeEliminar"
           type="button"
-          class="tu-enlace justify-self-start"
-          style="color: var(--error)"
+          class="tu-btn tu-btn-peligro justify-self-start"
+          :disabled="accionando"
           @click="eliminar"
         >
           {{ $t("captacion.prospectos.acciones.eliminar") }}
@@ -1491,9 +1566,9 @@ async function crear(): Promise<void> {
       :abierto="alta.abierto"
       :titulo="$t('captacion.prospectos.alta.titulo')"
       :ocupado="accionando"
-      @cerrar="alta.abierto = false"
+      @cerrar="cerrarAlta"
     >
-      <form class="grid gap-4" @submit.prevent="crear">
+      <form id="form-prospecto" class="grid gap-4" @submit.prevent="crear">
         <label class="block">
           <span class="tu-label">{{
             $t("captacion.prospectos.alta.nombre")
@@ -1529,12 +1604,21 @@ async function crear(): Promise<void> {
         </label>
       </form>
       <template #pie>
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
           <button
             type="button"
+            class="tu-btn tu-btn-secundario"
+            :disabled="accionando"
+            @click="cerrarAlta"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            type="submit"
+            form="form-prospecto"
             class="tu-btn tu-btn-primario"
             :disabled="accionando"
-            @click="crear"
+            :aria-busy="accionando || undefined"
           >
             {{ $t("captacion.prospectos.alta.guardar") }}
           </button>
@@ -1550,6 +1634,19 @@ async function crear(): Promise<void> {
 }
 .prospecto-fila:hover {
   background: var(--fondo);
+}
+/* El nombre abre su detalle: se ve como texto y se recorta si no cabe. */
+.pr-nombre {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 500;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pr-nombre:hover {
+  text-decoration: underline;
 }
 /* Las iniciales de la persona, neutras (sin colores por persona). */
 .prospecto-avatar {

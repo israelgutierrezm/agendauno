@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import planes from "@/i18n/locales/planes.es-MX";
+import type { Plan } from "@/lib/planes";
 import EditorPlan from "./EditorPlan.vue";
 
 /*
@@ -13,7 +14,11 @@ import EditorPlan from "./EditorPlan.vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: String }));
-const sesion = vi.hoisted(() => ({ slug: "demo", esCitas: true }));
+const sesion = vi.hoisted(() => ({
+  slug: "demo",
+  esCitas: true,
+  puede: () => true,
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));
@@ -38,9 +43,9 @@ beforeEach(() => {
   );
 });
 
-function montar() {
+function montar(plan: Plan | null = null) {
   return mount(EditorPlan, {
-    props: { plan: null },
+    props: { plan },
     global: {
       plugins: [
         createI18n({
@@ -139,10 +144,14 @@ describe("planes de un negocio de citas", () => {
     await w.get("#ep-nombre").setValue("Bono Roma");
     await w.get("#ep-precio").setValue("500");
     await w.get('[data-prueba="cobertura-sucursal"]').setValue("seleccionadas");
-    expect(
-      (w.get('button[type="submit"]').element as HTMLButtonElement).disabled,
-    ).toBe(true);
+    // «Guardar» va en el pie del diálogo (PlanesView): el editor le avisa que no se
+    // puede guardar, y un Enter en un campo tampoco lo guarda.
+    expect(w.emitted("estado")?.at(-1)?.[0]).toMatchObject({ valido: false });
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
     await w.get('input[type="checkbox"][value="roma"]').setValue(true);
+    expect(w.emitted("estado")?.at(-1)?.[0]).toMatchObject({ valido: true });
     await w.get("form").trigger("submit");
     await flushPromises();
     expect(api.post).toHaveBeenLastCalledWith(
@@ -323,6 +332,56 @@ describe("antes de guardar, el resumen del plan", () => {
     expect(fila(w, "condiciones").text()).toBe(
       "Solo para quien nunca ha venido",
     );
+    sesion.esCitas = true;
+  });
+});
+
+describe("las condiciones, plegadas en «Más condiciones»", () => {
+  const membresia: Plan = {
+    id: "m1",
+    nombre: "Mensualidad",
+    tipo: "membresia",
+    precio_minor: 120000,
+    moneda: "MXN",
+    ilimitado: false,
+    creditos_incluidos: null,
+    vigencia_tipo: null,
+    vigencia_cantidad: null,
+    politica_reset: "calendario",
+    unidades_por_ciclo: 8000,
+    politica_rollover: "limitado",
+    rollover_max: 2000,
+    sucursal_id: null,
+    archivado: false,
+    ofertas: [],
+    max_reservas_dia: 1,
+  };
+
+  it("un plan nuevo las trae plegadas y sin ninguna activa", async () => {
+    sesion.esCitas = false;
+    const w = montar();
+    await flushPromises();
+    const mas = w.get('[data-prueba="mas-condiciones"]');
+    expect((mas.element as HTMLDetailsElement).open).toBe(false);
+    expect(mas.get("summary").text()).toBe("Más condiciones");
+    sesion.esCitas = true;
+  });
+
+  it("si el plan ya trae alguna, se abren con cuántas y el resumen las junta", async () => {
+    sesion.esCitas = false;
+    const w = montar(membresia);
+    await flushPromises();
+    const mas = w.get('[data-prueba="mas-condiciones"]');
+    expect((mas.element as HTMLDetailsElement).open).toBe(true);
+    expect(mas.get("summary").text()).toBe("Más condiciones · 2 activas");
+    expect(w.get('[data-prueba="resumen-condiciones"] dd').text()).toBe(
+      "Máximo 1 reserva al día · Acumula hasta 2 clases",
+    );
+
+    // Quitar una no pliega lo que se está editando; solo cambia la cuenta.
+    await w.get('[data-prueba="tope-dia"]').setValue("");
+    expect((mas.element as HTMLDetailsElement).open).toBe(true);
+    expect(mas.get("summary").text()).toBe("Más condiciones · 1 activa");
     sesion.esCitas = true;
   });
 });

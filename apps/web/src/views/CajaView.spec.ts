@@ -241,7 +241,8 @@ describe("caja de la sucursal", () => {
     await flushPromises();
 
     expect(w.get('[data-prueba="esperado"]').text()).toContain("$910.00");
-    await w.get('[data-prueba="pestana-cierres"]').trigger("click");
+    // «Cierres» es una pestaña de la sección (PestanasSeccion), no una acción.
+    await w.get('[data-pestana="cierres"]').trigger("click");
     await flushPromises();
     expect(w.get('[data-prueba="cierres"]').text()).toContain("Por revisar");
 

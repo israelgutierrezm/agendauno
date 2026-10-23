@@ -30,6 +30,10 @@ vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
 vi.mock("vue-router", () => ({
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
   useRoute: () => ({ query: {} }),
+  // Sin router, los filtros viven en memoria (lib/filtrosEnUrl).
+  useRouter: () => undefined,
+  // El alta pregunta antes de descartar lo capturado (lib/cambiosPendientes).
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 const prospecto = {

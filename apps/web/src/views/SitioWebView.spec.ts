@@ -405,9 +405,10 @@ describe("páginas del sitio (ADR 0146, fase 2)", () => {
         plugins: [i18n],
         stubs: {
           CargadorImagen: true,
+          // Con su pie: ahí van «Cancelar» y «Crear página».
           ModalDialogo: {
             props: ["abierto", "titulo"],
-            template: '<div v-if="abierto"><slot /></div>',
+            template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
           },
         },
       },
@@ -416,7 +417,8 @@ describe("páginas del sitio (ADR 0146, fase 2)", () => {
   async function crear(w: ReturnType<typeof montarPaginas>, titulo: string) {
     await w.get('[data-prueba="agregar-pagina"]').trigger("click");
     await w.get('[data-prueba="titulo-pagina-nueva"]').setValue(titulo);
-    await w.get('[data-prueba="crear-pagina"]').trigger("submit");
+    expect(w.find('[data-prueba="crear-pagina"]').exists()).toBe(true);
+    await w.get('[data-prueba="form-pagina-nueva"]').trigger("submit");
   }
 
   it("crea una página, le pone secciones del negocio y bloques, y la guarda", async () => {

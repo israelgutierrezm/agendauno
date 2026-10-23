@@ -112,6 +112,11 @@ function montar() {
           props: ["abierto", "titulo"],
           template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
         },
+        // Los ajustes van en un diálogo mediano (en línea, sin teleport).
+        ModalDialogo: {
+          props: ["abierto", "titulo"],
+          template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
+        },
       },
     },
   });

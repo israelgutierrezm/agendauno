@@ -230,9 +230,10 @@ const id = computed(() => bloque.value.id ?? bloque.value.tipo);
             :value="f.pie ?? ''"
             @input="f.pie = valor($event)"
           />
+          <!-- Se guarda con la página: quitarla aquí es discreto. -->
           <button
             type="button"
-            class="tu-enlace text-sm"
+            class="tu-btn tu-btn-discreto tu-btn-chico"
             @click="datos.fotos?.splice(i, 1)"
           >
             {{ t("sitioWeb.bloques.campos.quitarFoto") }}
@@ -316,7 +317,7 @@ const id = computed(() => bloque.value.id ?? bloque.value.tipo);
           </template>
           <button
             type="button"
-            class="tu-enlace mt-1 text-sm"
+            class="tu-btn tu-btn-discreto tu-btn-chico mt-2"
             @click="quitarItem(i)"
           >
             {{ t("sitioWeb.bloques.campos.quitar") }}

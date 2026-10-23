@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -12,6 +11,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { fechaEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
@@ -46,16 +46,38 @@ const sucursal = ref("");
 const instructor = ref("");
 // Desde el Inicio, «en espera» abre solo las clases con gente esperando (`?espera=1`)
 // y «mañana, a menos de la mitad» las de ese día (`?fecha=AAAA-MM-DD`).
-const consultaRuta = useRoute()?.query ?? {};
-const soloEspera = ref(consultaRuta.espera === "1");
+const soloEspera = ref(false);
 // «A menos de la mitad» (`?poca=1`): las mismas que contó el Inicio (ADR 0166).
-const soloPoca = ref(consultaRuta.poca === "1");
-const fecha = ref(
-  typeof consultaRuta.fecha === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(consultaRuta.fecha)
-    ? consultaRuta.fecha
-    : "",
-);
+const soloPoca = ref(false);
+const fecha = ref("");
+// Todos los filtros y el horizonte quedan en la dirección: recargar, volver
+// atrás o compartir el enlace abre lo mismo. Va antes de vigilarlos: lo leído
+// de la dirección no pide de más.
+function casillaEnUrl(campo: Ref<boolean>) {
+  return computed<string>({
+    get: () => (campo.value ? "1" : ""),
+    set: (v: string) => {
+      campo.value = v === "1";
+    },
+  });
+}
+useFiltrosEnUrl({
+  q: busqueda,
+  sucursal,
+  instructor,
+  espera: casillaEnUrl(soloEspera),
+  poca: casillaEnUrl(soloPoca),
+  fecha: fechaEnUrl(fecha),
+  // 14 días es el de siempre: no se escribe.
+  dias: computed<string>({
+    get: () => (dias.value === 14 ? "" : String(dias.value)),
+    set: (v: string) => {
+      if (["7", "14", "30"].includes(v)) {
+        dias.value = Number(v);
+      }
+    },
+  }),
+});
 // El día de una clase en su zona (AAAA-MM-DD).
 function diaDe(o: Oportunidad): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -254,7 +276,8 @@ onMounted(cargar);
     <template v-else>
       <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-      <div class="relative tu-card mt-5 overflow-x-auto">
+      <!-- En el teléfono, cada clase en ficha, con su espera a la vista. -->
+      <div class="relative tu-card mt-5 overflow-x-auto tu-tabla-adaptable">
         <div class="tu-filtros">
           <input
             v-model="busqueda"
@@ -349,11 +372,11 @@ onMounted(cargar);
           <thead>
             <tr>
               <th>{{ $t("oportunidadesVisual.col.clase") }}</th>
-              <th class="hidden sm:table-cell">
-                {{ $t("oportunidadesVisual.col.ocupacion") }}
-              </th>
               <th class="text-right">
                 {{ $t("oportunidadesVisual.col.libres") }}
+              </th>
+              <th class="hidden sm:table-cell">
+                {{ $t("oportunidadesVisual.col.ocupacion") }}
               </th>
               <th class="text-right hidden md:table-cell">
                 {{ $t("oportunidadesVisual.col.espera") }}
@@ -367,7 +390,7 @@ onMounted(cargar);
           </thead>
           <tbody>
             <tr v-for="o in visibles" :key="o.id" data-prueba="oportunidad">
-              <td>
+              <td :data-etiqueta="$t('oportunidadesVisual.col.clase')">
                 <span class="font-medium">{{
                   o.oferta ?? o.actividad ?? "—"
                 }}</span>
@@ -379,7 +402,16 @@ onMounted(cargar);
                   ></span
                 >
               </td>
-              <td class="hidden sm:table-cell">
+              <td
+                class="text-right tabular-nums font-medium"
+                :data-etiqueta="$t('oportunidadesVisual.col.libres')"
+              >
+                {{ o.libres }}
+              </td>
+              <td
+                class="hidden sm:table-cell"
+                :data-etiqueta="$t('oportunidadesVisual.col.ocupacion')"
+              >
                 <div class="op-ocupacion">
                   <span class="op-barra" aria-hidden="true"
                     ><span
@@ -389,21 +421,22 @@ onMounted(cargar);
                   >
                 </div>
               </td>
-              <td class="text-right tabular-nums font-medium">
-                {{ o.libres }}
-              </td>
-              <td class="text-right hidden md:table-cell tabular-nums">
+              <td
+                class="text-right hidden md:table-cell tabular-nums"
+                :data-etiqueta="$t('oportunidadesVisual.col.espera')"
+              >
                 <span v-if="o.en_espera > 0" class="tu-badge tu-badge-aviso">{{
                   o.en_espera
                 }}</span>
                 <template v-else>—</template>
               </td>
-              <td class="text-right whitespace-nowrap">
+              <td class="tu-celda-acciones">
                 <button
                   v-if="puedePromover && o.en_espera > 0"
                   type="button"
-                  class="tu-enlace text-sm"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
                   :disabled="promoviendo === o.id"
+                  :aria-busy="promoviendo === o.id || undefined"
                   @click="promover(o)"
                 >
                   {{

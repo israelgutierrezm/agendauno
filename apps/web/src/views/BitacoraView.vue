@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -7,8 +7,15 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import {
+  fechaEnUrl,
+  opcionEnUrl,
+  useFiltrosEnUrl,
+  usePestanaEnUrl,
+} from "@/lib/filtrosEnUrl";
 import { desfaseZona, etiquetaZona } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -57,7 +64,15 @@ const puedeAccesos = computed(
   () => sesion.accesoAbierto && sesion.puede("checkins.registrar"),
 );
 
-const pestana = ref<Pestana>(puedeCambios.value ? "cambios" : "accesos");
+// Cambios | Entradas, en la dirección (`?pestana=accesos`): recargar o un enlace abre
+// la misma. Sin la bitácora de cambios, directo en las entradas.
+const pestana = usePestanaEnUrl<Pestana>(() =>
+  puedeCambios.value
+    ? puedeAccesos.value
+      ? ["cambios", "accesos"]
+      : ["cambios"]
+    : ["accesos"],
+);
 const cambios = ref<Cambio[]>([]);
 const accesos = ref<Acceso[]>([]);
 const abierto = ref<string | null>(null);
@@ -74,6 +89,8 @@ const categoria = ref("");
 const texto = ref("");
 const pagina = ref(1);
 const ultimaPagina = ref(1);
+const totalCambios = ref(0);
+const porPaginaCambios = ref(50);
 const actores = ref<{ id: string; nombre: string }[]>([]);
 const categorias = ref<string[]>([]);
 const descargando = ref(false);
@@ -114,6 +131,19 @@ function limpiarFiltrosEntradas(): void {
   desdeEntradas.value = "";
   hastaEntradas.value = "";
 }
+// Los filtros de cada pestaña, en la dirección (cada una con sus claves). Antes de
+// vigilarlos: lo leído de la dirección no pide de más.
+useFiltrosEnUrl({
+  desde: fechaEnUrl(desde),
+  hasta: fechaEnUrl(hasta),
+  usuario,
+  categoria,
+  q: texto,
+  buscar: buscarEntradas,
+  resultado: opcionEnUrl(resultadoEntradas, ["", "permitido", "denegado"]),
+  entradasDesde: fechaEnUrl(desdeEntradas),
+  entradasHasta: fechaEnUrl(hastaEntradas),
+});
 
 function filtros(): Record<string, string | number | undefined> {
   return {
@@ -183,6 +213,8 @@ async function cargar(): Promise<void> {
       const { data } = await api.get<{
         data: Cambio[];
         meta?: {
+          total?: number;
+          per_page?: number;
           ultima_pagina: number;
           actores: { id: string; nombre: string }[];
           categorias: string[];
@@ -192,6 +224,8 @@ async function cargar(): Promise<void> {
       });
       cambios.value = data.data;
       ultimaPagina.value = data.meta?.ultima_pagina ?? 1;
+      totalCambios.value = data.meta?.total ?? data.data.length;
+      porPaginaCambios.value = data.meta?.per_page ?? 50;
       actores.value = data.meta?.actores ?? [];
       categorias.value = data.meta?.categorias ?? [];
     } else {
@@ -222,11 +256,6 @@ async function cargar(): Promise<void> {
   } finally {
     cargando.value = false;
   }
-}
-
-function irPestana(p: Pestana): void {
-  pestana.value = p;
-  void cargar();
 }
 
 function irPagina(n: number): void {
@@ -290,33 +319,28 @@ async function descargar(): Promise<void> {
   }
 }
 
-onMounted(cargar);
+// Cada pestaña pide lo suyo al abrirse (también al entrar por un enlace o recargar).
+watch(pestana, () => void cargar(), { immediate: true });
+const opcionesPestana = computed(() => [
+  ...(puedeCambios.value
+    ? [{ clave: "cambios" as const, texto: t("bitacora.cambios") }]
+    : []),
+  ...(puedeAccesos.value
+    ? [{ clave: "accesos" as const, texto: t("bitacora.accesos") }]
+    : []),
+]);
 </script>
 
 <template>
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('bitacora.titulo')" />
 
-    <div
-      v-if="puedeCambios && puedeAccesos"
-      class="tu-pestanas mt-6"
-      role="group"
-    >
-      <button
-        type="button"
-        :aria-pressed="pestana === 'cambios'"
-        @click="irPestana('cambios')"
-      >
-        {{ $t("bitacora.cambios") }}
-      </button>
-      <button
-        type="button"
-        :aria-pressed="pestana === 'accesos'"
-        @click="irPestana('accesos')"
-      >
-        {{ $t("bitacora.accesos") }}
-      </button>
-    </div>
+    <!-- Cambios | Entradas (en la dirección); con una sola, no se muestran. -->
+    <PestanasSeccion
+      v-model="pestana"
+      :opciones="opcionesPestana"
+      :etiqueta="$t('bitacora.titulo')"
+    />
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
@@ -424,7 +448,8 @@ onMounted(cargar);
         <button
           v-if="conFiltrosEntradas"
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-discreto"
+          data-prueba="quitar-filtros-entradas"
           @click="limpiarFiltrosEntradas"
         >
           {{ $t("operacion.listados.quitarFiltros") }}
@@ -446,11 +471,7 @@ onMounted(cargar);
           data-prueba="error-carga-bitacora"
         >
           <span style="color: var(--error)">{{ errorCarga }}</span>
-          <button
-            type="button"
-            class="tu-btn tu-btn-secundario"
-            @click="cargar"
-          >
+          <button type="button" class="tu-btn tu-btn-discreto" @click="cargar">
             {{ $t("comun.reintentar") }}
           </button>
         </div>
@@ -468,7 +489,7 @@ onMounted(cargar);
           >
             <button
               type="button"
-              class="tu-btn tu-btn-secundario"
+              class="tu-btn tu-btn-discreto"
               @click="limpiarFiltrosCambios"
             >
               {{ $t("tabla.restablecer") }}
@@ -527,40 +548,6 @@ onMounted(cargar);
               </table>
             </li>
           </ul>
-          <div
-            v-if="ultimaPagina > 1"
-            class="mt-3 flex items-center justify-between gap-3 text-sm"
-          >
-            <button
-              type="button"
-              class="tu-enlace"
-              :disabled="pagina <= 1"
-              @click="irPagina(pagina - 1)"
-            >
-              <IconoNav
-                nombre="atras"
-                :tam="14"
-                class="inline align-[-0.15em]"
-              />
-              {{ $t("bitacora.anterior") }}
-            </button>
-            <span :style="{ color: 'var(--texto-suave)' }">{{
-              $t("bitacora.pagina", { page: pagina, total: ultimaPagina })
-            }}</span>
-            <button
-              type="button"
-              class="tu-enlace"
-              :disabled="pagina >= ultimaPagina"
-              @click="irPagina(pagina + 1)"
-            >
-              {{ $t("bitacora.siguiente") }}
-              <IconoNav
-                nombre="flecha"
-                :tam="14"
-                class="inline align-[-0.15em]"
-              />
-            </button>
-          </div>
         </template>
 
         <!-- Accesos -->
@@ -590,7 +577,7 @@ onMounted(cargar);
                 </p>
               </div>
               <span
-                class="tu-pildora shrink-0"
+                class="tu-estado shrink-0"
                 :style="{
                   '--tono': a.permitido ? 'var(--exito)' : 'var(--error)',
                 }"
@@ -604,6 +591,15 @@ onMounted(cargar);
           </ul>
         </template>
       </div>
+      <!-- Las dos pestañas paginan igual que los demás listados. -->
+      <PaginacionListado
+        v-if="pestana === 'cambios' && !cargando && ultimaPagina > 1"
+        :page="pagina"
+        :ultima-pagina="ultimaPagina"
+        :total="totalCambios"
+        :per-page="porPaginaCambios"
+        @ir="irPagina"
+      />
       <PaginacionListado
         v-if="
           pestana === 'accesos' &&

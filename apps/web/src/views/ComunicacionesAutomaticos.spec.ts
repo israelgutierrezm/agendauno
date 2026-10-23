@@ -94,16 +94,14 @@ describe("comunicación: tres cosas distintas y avisos en palabras", () => {
     await flushPromises();
     const ayuda = () => w.get('[data-prueba="ayuda-pestana"]').text();
 
-    expect(w.get('[data-prueba="pestana-difusion"]').text()).toBe("Difusiones");
-    expect(w.get('[data-prueba="pestana-automaticos"]').text()).toBe(
+    expect(w.get('[data-pestana="difusion"]').text()).toBe("Difusiones");
+    expect(w.get('[data-pestana="automaticos"]').text()).toBe(
       "Mensajes automáticos",
     );
-    expect(w.get('[data-prueba="pestana-salida"]').text()).toBe(
-      "Bandeja de salida",
-    );
+    expect(w.get('[data-pestana="salida"]').text()).toBe("Bandeja de salida");
     expect(ayuda()).toContain("una sola vez");
 
-    await w.get('[data-prueba="pestana-automaticos"]').trigger("click");
+    await w.get('[data-pestana="automaticos"]').trigger("click");
     await flushPromises();
     expect(ayuda()).toContain("se envían solas");
     // Las reglas que crean tareas no están aquí: se dice dónde.
@@ -111,7 +109,7 @@ describe("comunicación: tres cosas distintas y avisos en palabras", () => {
       "Tareas › Automatización",
     );
 
-    await w.get('[data-prueba="pestana-salida"]').trigger("click");
+    await w.get('[data-pestana="salida"]').trigger("click");
     await flushPromises();
     expect(ayuda()).toContain("ya salió");
   });
@@ -128,7 +126,7 @@ describe("comunicación: tres cosas distintas y avisos en palabras", () => {
 
     const w = montar();
     await flushPromises();
-    await w.get('[data-prueba="pestana-automaticos"]').trigger("click");
+    await w.get('[data-pestana="automaticos"]').trigger("click");
     await flushPromises();
 
     const nombres = w
@@ -170,7 +168,7 @@ describe("comunicación: tres cosas distintas y avisos en palabras", () => {
     fallaAutomaticos = true;
     const w = montar();
     await flushPromises();
-    await w.get('[data-prueba="pestana-automaticos"]').trigger("click");
+    await w.get('[data-pestana="automaticos"]').trigger("click");
     await flushPromises();
     const aviso = w.get('[data-prueba="error-automaticos"]');
     expect(aviso.text()).toContain(

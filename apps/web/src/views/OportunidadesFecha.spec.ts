@@ -20,8 +20,11 @@ vi.mock("@/stores/sesionTenant", () => ({
 const consulta = vi.hoisted(() => ({
   valor: { fecha: "2026-10-02" } as Record<string, string>,
 }));
+// Los filtros se leen de la dirección y cada cambio la reemplaza.
+const replace = vi.hoisted(() => vi.fn());
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: consulta.valor }),
+  useRouter: () => ({ replace }),
 }));
 
 const clase = (id: string, inicia_en: string) => ({
@@ -56,6 +59,8 @@ it("abre solo las clases de ese día y deja quitar el filtro", async () => {
   expect(w.findAll('[data-prueba="oportunidad"]')).toHaveLength(2);
   await w.get('[data-prueba="filtro-fecha"]').trigger("click");
   expect(w.findAll('[data-prueba="oportunidad"]')).toHaveLength(3);
+  // Quitarlo también lo quita de la dirección.
+  expect(replace).toHaveBeenLastCalledWith({ query: {} });
 });
 
 it("con «a menos de la mitad» (`?poca=1`) abre solo las que contó el Inicio", async () => {

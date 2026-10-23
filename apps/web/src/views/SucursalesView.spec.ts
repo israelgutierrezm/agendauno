@@ -103,10 +103,7 @@ describe("sedes: foto y enlace de Google Maps", () => {
     expect(w.find('input[placeholder="@tu_negocio"]').exists()).toBe(true);
 
     await w.get("#s-mapa").setValue("maps.app.goo.gl/otra");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "comun.guardar")!
-      .trigger("click");
+    await w.get("#s-form").trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/app/demo/sucursales/roma",
@@ -145,10 +142,7 @@ describe("sedes: foto y enlace de Google Maps", () => {
       .find((b) => b.text() === "sedes.editar")!
       .trigger("click");
     await w.get("#s-mapa").setValue("https://maps.ejemplo.com/x");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "comun.guardar")!
-      .trigger("click");
+    await w.get("#s-form").trigger("submit");
     await flushPromises();
     expect(w.text()).toContain(
       "Pega el enlace que da Google Maps al compartir la ubicación de la sede.",
@@ -166,10 +160,7 @@ describe("sedes: foto y enlace de Google Maps", () => {
       .find((b) => b.text() === "sedes.agregar")!
       .trigger("click");
     await w.get("#s-nombre").setValue("Polanco");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "comun.guardar")!
-      .trigger("click");
+    await w.get("#s-form").trigger("submit");
     await flushPromises();
     const aviso = w.get('[data-prueba="error-sucursal"]');
     expect(aviso.text()).toContain("Tu plan no incluye más sucursales.");
@@ -189,10 +180,7 @@ describe("sedes: foto y enlace de Google Maps", () => {
         },
       },
     });
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "comun.guardar")!
-      .trigger("click");
+    await w.get("#s-form").trigger("submit");
     await flushPromises();
     expect(w.get("#s-nombre-error").text()).toBe(
       "Ya hay una sede con ese nombre.",
@@ -294,10 +282,7 @@ describe("sedes: teléfono con lada y zona horaria", () => {
     await zona.trigger("keydown", { key: "Enter" });
 
     await w.get("#s-telefono").setValue("55 8888 9999");
-    await w
-      .findAll("button")
-      .find((b) => b.text() === "comun.guardar")!
-      .trigger("click");
+    await w.get("#s-form").trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/app/demo/sucursales/roma",
