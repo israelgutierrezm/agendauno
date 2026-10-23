@@ -30,6 +30,7 @@ use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
+use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
@@ -54,6 +55,7 @@ use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\Support\RedesSociales;
 use App\Modules\Tenancy\TipoCampo;
 use Carbon\CarbonImmutable;
+use DomainException;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -80,6 +82,7 @@ final class DemoBarberia extends DemoBase
 {
     use ApartadosDemo;
     use CompletarDemo;
+    use NovedadesDemo;
 
     /** clave => [nombre, actividad, minutos, precio (centavos), descripción] */
     private const SERVICIOS = [
@@ -970,7 +973,9 @@ final class DemoBarberia extends DemoBase
         $this->porConciliar();
         $this->webhookPausado('https://hooks.example.test/lanavaja', ['orden.pagada', 'reserva.confirmada']);
         $this->presupuestos();
+        $this->presupuestosEnLinea();
         $this->bonosApartados();
+        $this->loNuevo();
         // El plan más completo de TurnoUno (Pro): lealtad, reportes avanzados y venta en
         // línea a la vista. Elegido, así que la renta lo respeta.
         $this->estudio->forceFill(['plan_nivel' => 'pro', 'plan_periodicidad' => 'mensual'])->save();
@@ -1038,6 +1043,78 @@ final class DemoBarberia extends DemoBase
         } catch (RuntimeException|ValidationException) {
             return;
         }
+    }
+
+    /**
+     * Presupuestos en línea (ADR 0127): un cliente aceptó el suyo desde el enlace del
+     * correo (quedó por cobrar) y otro lo rechazó con su motivo.
+     */
+    private function presupuestosEnLinea(): void
+    {
+        $servicio = app(PresupuestosTenant::class);
+        $e = $this->equipo;
+        $roma = (int) $this->sedes['roma']->getKey();
+        $linea = fn (string $clave, int $cantidad): array => ['tipo' => 'servicio', 'referencia' => $this->servicios[$clave]->ulid, 'cantidad' => $cantidad];
+        try {
+            $this->en($this->hoy->subDays(6)->setTime(11, 30));
+            $acepta = $servicio->crear([
+                'persona_id' => $this->clientes[7]['persona']->getKey(), 'sucursal_id' => $roma,
+                'lineas' => [$linea('corte_barba', 4)], 'notas' => 'Cuatro visitas de corte y barba para la temporada de bodas.',
+            ], $e['karla']);
+            $servicio->marcarEnviado($acepta);
+            $servicio->nuevoEnlace($acepta);
+            $this->en($this->hoy->subDays(5)->setTime(21, 10));
+            $servicio->aceptarEnLinea($acepta->refresh(), $acepta->revision);
+
+            $this->en($this->hoy->subDays(4)->setTime(12, 0));
+            $rechaza = $servicio->crear([
+                'persona_id' => $this->clientes[8]['persona']->getKey(), 'sucursal_id' => $roma,
+                'lineas' => [$linea('afeitado', 2), $linea('corte', 2)],
+            ], $e['lupita']);
+            $servicio->marcarEnviado($rechaza);
+            $servicio->nuevoEnlace($rechaza);
+            $this->en($this->hoy->subDays(3)->setTime(9, 40));
+            $servicio->rechazar($rechaza->refresh(), 'Por ahora se me sale del presupuesto; les escribo en diciembre.', null, 'cliente');
+            $this->sumar('presupuestos en línea', 2);
+        } catch (RuntimeException|ValidationException|DomainException) {
+            return;
+        }
+    }
+
+    /**
+     * Lo más nuevo de TurnoUno con datos: la caja de cada sede, la bandeja de mensajes,
+     * calendarios conectados, el kiosco, los widgets para su web, un servicio con
+     * anticipo y los datos para facturar de algunos clientes.
+     */
+    private function loNuevo(): void
+    {
+        $e = $this->equipo;
+        $this->cajasDeLasSedes([$this->sedes['roma'], $this->sedes['valle']], [$e['lupita'], $e['daniel']]);
+        $this->bandejaDeMensajes([
+            ['whatsapp', '5215512340001', $this->clientes[2]['persona']->nombreCompleto(), $this->clientes[2]['persona'], [
+                [MensajeConversacionTenant::ENTRANTE, '¿Tienen lugar el sábado temprano con Toño?', 95],
+                [MensajeConversacionTenant::SALIENTE, 'Sí, a las 10:00 con Toño. ¿Te la aparto?', 80],
+                [MensajeConversacionTenant::ENTRANTE, 'Va, gracias. Corte y barba, por favor.', 70],
+                [MensajeConversacionTenant::SALIENTE, 'Listo, te llega la confirmación al correo.', 65],
+            ]],
+            ['instagram', 'ig-demo-77812', '@mau.cortes', null, [
+                [MensajeConversacionTenant::ENTRANTE, '¿Cuánto cuesta el bono de 5 cortes?', 40],
+                [MensajeConversacionTenant::ENTRANTE, '¿Y sirve en las dos sucursales?', 38],
+            ]],
+            ['whatsapp', '5215512340003', 'Alejandro Ruiz', null, [
+                [MensajeConversacionTenant::ENTRANTE, 'Buen día, ¿hacen cortes a domicilio?', 300],
+                [MensajeConversacionTenant::SALIENTE, 'Por ahora solo en Roma Norte y Del Valle. ¡Te esperamos!', 280],
+            ]],
+        ], $e['lupita']);
+        $this->calendariosConectados($e['tono'], $e['ivan']);
+        $this->kioscoDeLlegada('Tableta de recepción Roma Norte', $this->sedes['roma'], $e['karla']);
+        $this->widgetsEnSuWeb([
+            ['agendar', 'Agenda en mi web', '#182136'],
+            ['planes', 'Bonos en mi web', null],
+        ]);
+        // El afeitado clásico se aparta con un anticipo del 30 % al agendar en línea (ADR 0161).
+        $this->servicios['afeitado']->forceFill(['anticipo_pct' => 30, 'anticipo_minor' => null])->save();
+        $this->datosParaFacturar(array_map(fn (int $i): PersonaTenant => $this->clientes[$i]['persona'], [4, 5, 6]), true);
     }
 
     /** Dos clientes apartaron su bono y lo pagan en su siguiente visita: quedan por cobrar. */

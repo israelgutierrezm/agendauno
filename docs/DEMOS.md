@@ -85,6 +85,18 @@ su nombre dice «(demo)».
   - aviso de privacidad del negocio (aceptado por la mayoría);
   - dos cobros por conciliar, días cerrados (feriados), un bloqueo de la sala y otro de
     una coach, y un webhook pausado con sus entregas.
+- **Lo más nuevo** (octubre de 2026):
+  - caja de la sede: ayer contada a ciegas (faltaron $50 y se cerró con su motivo) y hoy
+    abierta (ADR 0175);
+  - bandeja con una conversación de Instagram y otra de WhatsApp ligada a su alumna
+    (ADR 0200);
+  - dos calendarios de coaches: uno conectado a Google y otro de Outlook por reconectar,
+    sin llaves reales (ADR 0199);
+  - el kiosco de la entrada (ADR 0183), los widgets «Horario» y «Precios» para su web
+    (ADR 0141) y cuatro videos para sus alumnas (ADR 0184);
+  - Wellhub y TotalPass configurados sin conectar (no llaman a nadie) y Fitpass activo,
+    con tres lugares apartados en las próximas clases y dos visitas registradas
+    (ADR 0202).
 - **Fuera del demo:** entradas por QR (en un estudio, entrar es tomar la clase; ADR
   0105), grupos (el giro de pole no los usa) y Familias (un módulo que se pide aparte:
   apagado, para el negocio no existe).
@@ -127,3 +139,15 @@ su nombre dice «(demo)».
   privacidad, presupuestos (enviado, convertido en orden por cobrar y borrador), dos
   bonos apartados por cobrar, dos cobros por conciliar y un webhook pausado. Sin
   membresías ni permanencia: en citas se venden bonos (ADR 0130). Familias, apagado.
+- **Lo más nuevo** (octubre de 2026):
+  - presupuestos en línea: uno que el cliente aceptó desde su correo (quedó por cobrar)
+    y otro que rechazó con su motivo (ADR 0127);
+  - la caja de cada sede: ayer contada (en Roma Norte faltaron $50 y se cerró con su
+    motivo) y hoy abierta (ADR 0175);
+  - bandeja con conversaciones de WhatsApp e Instagram (ADR 0200), dos calendarios de
+    barberos (uno por reconectar, ADR 0199) y la tableta de llegada de Roma Norte;
+  - los widgets «Agenda en mi web» (agendar cita) y «Bonos en mi web» (ADR 0141);
+  - el afeitado clásico se aparta con un anticipo del 30 % al agendar en línea
+    (ADR 0161);
+  - tres clientes con sus datos para facturar, dos con factura automática pedida (el
+    negocio la tiene apagada, ADR 0163).

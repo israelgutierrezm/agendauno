@@ -76,11 +76,23 @@ it('siembra la barbería con citas, bonos que se descuentan y datos en cada apar
             ->and($tablas->table('waivers')->where('clave', 'aviso-privacidad')->where('activo', true)->exists())->toBeTrue()
             ->and($tablas->table('webhooks_salientes')->where('activo', false)->count())->toBe(1)
             ->and($tablas->table('tutelas')->count())->toBe(0)
-            ->and($tablas->table('presupuestos')->pluck('estado')->sort()->values()->all())->toBe(['borrador', 'convertido', 'enviado'])
+            ->and($tablas->table('presupuestos')->pluck('estado')->sort()->values()->all())->toBe(['borrador', 'convertido', 'convertido', 'enviado', 'rechazado'])
+            // En línea: uno aceptado y otro rechazado por el cliente.
+            ->and($tablas->table('presupuestos')->where('respondido_por', 'cliente')->count())->toBe(2)
             // Por cobrar: lo que ya venció sin pagarse (el presupuesto convertido y bonos apartados).
             ->and($tablas->table('ordenes')->where('estado', 'pendiente')->whereNull('sesion_id')->count())->toBeGreaterThanOrEqual(2)
             // En citas no hay membresías ni permanencia (ADR 0130).
-            ->and(AcuerdoTenant::query()->whereNotNull('proxima_cobro_en')->count())->toBe(0);
+            ->and(AcuerdoTenant::query()->whereNotNull('proxima_cobro_en')->count())->toBe(0)
+            // Lo más nuevo: caja de cada sede (ayer cerrada, hoy abierta), bandeja,
+            // calendarios, kiosco, widgets, anticipo y datos para facturar.
+            ->and($tablas->table('turnos_caja')->where('estado', 'abierta')->count())->toBe(2)
+            ->and($tablas->table('turnos_caja')->where('estado', 'cerrada')->count())->toBe(2)
+            ->and($tablas->table('conversaciones')->count())->toBe(3)
+            ->and($tablas->table('calendarios_externos')->count())->toBe(2)
+            ->and($tablas->table('kioscos')->count())->toBe(1)
+            ->and($tablas->table('widgets')->pluck('tipo')->sort()->values()->all())->toBe(['agendar', 'planes'])
+            ->and($tablas->table('ofertas')->where('anticipo_pct', 30)->count())->toBe(1)
+            ->and($tablas->table('datos_fiscales_personas')->count())->toBe(3);
     });
 
     // El plan más completo de TurnoUno: lealtad y reportes avanzados a la vista.

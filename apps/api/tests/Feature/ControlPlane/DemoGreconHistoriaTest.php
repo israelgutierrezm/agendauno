@@ -153,7 +153,18 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
             ->and($tablas->table('excepciones_horario')->count())->toBe(4)
             ->and($tablas->table('bloqueos_agenda')->count())->toBe(2)
             ->and($tablas->table('webhooks_salientes')->where('activo', false)->count())->toBe(1)
-            ->and($tablas->table('tutelas')->count())->toBe(0);
+            ->and($tablas->table('tutelas')->count())->toBe(0)
+            // Lo más nuevo: caja (ayer cerrada, hoy abierta), bandeja, calendarios,
+            // kiosco, widgets, videos y las plataformas de bienestar.
+            ->and($tablas->table('turnos_caja')->pluck('estado')->sort()->values()->all())->toBe(['abierta', 'cerrada'])
+            ->and($tablas->table('conversaciones')->count())->toBe(2)
+            ->and($tablas->table('calendarios_externos')->count())->toBe(2)
+            ->and($tablas->table('kioscos')->count())->toBe(1)
+            ->and($tablas->table('widgets')->pluck('tipo')->sort()->values()->all())->toBe(['calendario', 'planes'])
+            ->and($tablas->table('videos')->where('publicado', true)->count())->toBe(4)
+            ->and($tablas->table('integraciones')->pluck('proveedor')->sort()->values()->all())->toBe(['fitpass', 'totalpass', 'wellhub'])
+            ->and($tablas->table('lugares_plataforma')->where('proveedor', 'fitpass')->where('estado', 'reservado')->count())->toBe(3)
+            ->and($tablas->table('checkins')->where('proveedor', 'fitpass')->count())->toBe(2);
     });
     expect(Estudio::query()->where('slug', 'demo')->sole()->modulosHabilitados())->toBe([]);
 

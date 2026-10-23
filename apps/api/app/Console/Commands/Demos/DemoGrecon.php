@@ -16,12 +16,15 @@ use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\PausarMembresiaTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
+use App\Modules\Tenancy\Application\RegistrarCheckin;
+use App\Modules\Tenancy\Application\ReservasPlataformaTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
 use App\Modules\Tenancy\Captacion\MotivoCierreProspecto;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
+use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Membresias\BajaAnticipada;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
@@ -37,6 +40,8 @@ use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\ConfiguracionCuotasTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
+use App\Modules\Tenancy\Models\IntegracionTenant;
+use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\NivelTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
@@ -51,6 +56,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Models\VideoTenant;
 use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -67,6 +73,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 /**
  * Grecon Art House (demo): estudio de pole y exotic con los profesores, las clases,
@@ -101,6 +108,7 @@ final class DemoGrecon extends DemoBase
 {
     use ApartadosDemo;
     use CompletarDemo;
+    use NovedadesDemo;
 
     /** La agenda pública de octubre (instantánea). */
     private const AGENDA = 'demo/grecon-octubre-2026.json';
@@ -1032,6 +1040,104 @@ final class DemoGrecon extends DemoBase
         $this->prospectosSinAtender();
         $this->porConciliar();
         $this->webhookPausado('https://hooks.example.test/grecon', ['orden.pagada', 'reserva.confirmada']);
+        $this->loNuevo();
+    }
+
+    /**
+     * Lo más nuevo de AgendaUno con datos: la caja, la bandeja de mensajes, calendarios
+     * conectados, el kiosco, los widgets para su web, videos para sus alumnas y las
+     * plataformas de bienestar.
+     */
+    private function loNuevo(): void
+    {
+        $profes = array_values(array_filter($this->profes, fn (Usuario $u): bool => ! $u->is($this->dueno)));
+        $this->cajasDeLasSedes([$this->sede], [$this->recepcion]);
+        $alumna = $this->alumnas[3]['persona'];
+        $this->bandejaDeMensajes([
+            ['instagram', 'ig-demo-55120', '@vale.pole', null, [
+                [MensajeConversacionTenant::ENTRANTE, 'Hola, ¿tienen clase muestra de pole para principiantes?', 120],
+                [MensajeConversacionTenant::SALIENTE, '¡Hola! Sí: Pole Level 1, lunes y miércoles a las 19:00. ¿Te apartamos lugar?', 105],
+                [MensajeConversacionTenant::ENTRANTE, 'Sí, el miércoles porfa.', 90],
+            ]],
+            ['whatsapp', '5215598760002', $alumna->nombreCompleto(), $alumna, [
+                [MensajeConversacionTenant::ENTRANTE, '¿Mi paquete de 8 todavía alcanza para el sábado?', 30],
+            ]],
+        ], $this->recepcion);
+        if (count($profes) >= 2) {
+            $this->calendariosConectados($profes[0], $profes[1]);
+        }
+        $this->kioscoDeLlegada('Tableta de la entrada', $this->sede, $this->admin);
+        $this->widgetsEnSuWeb([
+            ['calendario', 'Horario en mi web', '#c2185b'],
+            ['planes', 'Precios en mi web', null],
+        ]);
+        $this->videosDelEstudio();
+        $this->plataformasDeBienestar();
+    }
+
+    /** Videos para sus alumnas (ADR 0184): calentamiento, técnica y flexibilidad. */
+    private function videosDelEstudio(): void
+    {
+        $videos = [
+            ['Calentamiento de 10 minutos para pole', 'Antes de cualquier clase de pole.', 10, 'Calentamiento'],
+            ['Spin básico paso a paso', 'Técnica de Pole Level 1.', 14, 'Técnica'],
+            ['Climb y sentada en el tubo', 'Para pasar a Level 2 con seguridad.', 18, 'Técnica'],
+            ['Flexibilidad: espalda y hombros', 'Rutina para hacer en casa entre clases.', 25, 'Flexibilidad'],
+        ];
+        foreach ($videos as $i => [$titulo, $descripcion, $minutos, $categoria]) {
+            VideoTenant::query()->create([
+                'titulo' => $titulo, 'descripcion' => $descripcion, 'url' => 'https://videos.grecon.test/'.Str::slug($titulo),
+                'duracion_minutos' => $minutos, 'categoria' => $categoria, 'publicado' => true, 'orden' => $i + 1,
+            ]);
+        }
+        $this->sumar('videos', count($videos));
+    }
+
+    /**
+     * Wellhub y TotalPass configurados pero sin conectar (sin llaves: no llaman a nadie)
+     * y Fitpass activo, con lugares apartados en las próximas clases y visitas de hoy y
+     * de días anteriores (ADR 0148, 0202).
+     */
+    private function plataformasDeBienestar(): void
+    {
+        IntegracionTenant::query()->create(['proveedor' => 'wellhub', 'activa' => false, 'reservas_activas' => false]);
+        IntegracionTenant::query()->create(['proveedor' => 'totalpass', 'activa' => false, 'reservas_activas' => false]);
+        IntegracionTenant::query()->create(['proveedor' => 'fitpass', 'activa' => true, 'reservas_activas' => false, 'configurada_en' => $this->ahora->subDays(18)]);
+
+        $plataformas = app(ReservasPlataformaTenant::class);
+        // Tres lugares apartados en las próximas clases que aún tienen lugar.
+        $proximas = SesionTenant::query()->where('inicia_en', '>', $this->ahora->addHours(2))->where('estado', EstadoSesionTenant::Programada->value)->orderBy('inicia_en')->limit(40)->get();
+        $nombres = [['Daniela Ríos', 'daniela.rios@fitpass.test'], ['Paola Méndez', null], ['Karen Ochoa', 'karen.ochoa@fitpass.test']];
+        $apartados = 0;
+        foreach ($proximas as $sesion) {
+            if ($apartados >= count($nombres)) {
+                break;
+            }
+            try {
+                $plataformas->apartarFitpass($sesion, 'FP-'.(48210 + $apartados), $nombres[$apartados][0], $nombres[$apartados][1]);
+                $apartados++;
+            } catch (Throwable) {
+                continue;
+            }
+        }
+        // Dos visitas de días anteriores, registradas en recepción con su folio.
+        $checkins = app(RegistrarCheckin::class);
+        $pasadas = SesionTenant::query()->where('inicia_en', '<', $this->ahora->subHours(3))->where('estado', EstadoSesionTenant::Programada->value)->orderByDesc('inicia_en')->limit(40)->get();
+        $visitas = 0;
+        foreach ($pasadas as $sesion) {
+            if ($visitas >= 2) {
+                break;
+            }
+            try {
+                $this->en(CarbonImmutable::parse($sesion->inicia_en)->subMinutes(8));
+                $checkins->ejecutar($sesion, 'fitpass', 'FPV-'.(9120 + $visitas), $this->recepcion);
+                $visitas++;
+            } catch (Throwable) {
+                continue;
+            }
+        }
+        $this->en($this->ahora);
+        $this->sumar('plataformas de bienestar', 3);
     }
 
     /**
