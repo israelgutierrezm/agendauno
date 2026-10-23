@@ -101,3 +101,13 @@ opción elegida.
   elegir la opción antes de revisar el archivo.
 - No se importa el historial de clases pasadas ni de pagos. El historial sigue en el
   otro sistema y el dinero entra como saldo de apertura (ADR 0125).
+
+## Ajuste (2026-10-23): no avisar al importar ≠ sin recordatorios
+
+- Importar nunca avisa: los eventos de cada reserva importada quedan publicados sin
+  consumidores (ni correo, ni push, ni webhooks).
+- Los recordatorios antes de la clase son otra opción, «Mandarles su recordatorio antes
+  de cada clase» (`recordatorios`, apagada por omisión, como en la importación de citas
+  de la ADR 0160). Encendida, la reserva queda con `sin_avisos = false` y el generador
+  de recordatorios la toma como a cualquier otra. La confirmación del archivo incluye la
+  opción y la bitácora la registra.

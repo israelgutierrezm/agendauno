@@ -16,9 +16,13 @@ vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
-vi.mock("@/lib/retornoPago", () => ({
-  useRetornoPago: () => ({ value: null }),
-}));
+vi.mock("@/lib/retornoPago", async (original) => {
+  const { ref } = await import("vue");
+  return {
+    ...(await original<typeof import("@/lib/retornoPago")>()),
+    useConfirmacionPago: () => ref(null),
+  };
+});
 vi.mock("vue-router", () => ({
   useRoute: () => undefined,
   useRouter: () => undefined,

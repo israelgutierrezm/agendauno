@@ -149,3 +149,13 @@ negocio (ADR 0190) y la bandeja después.
 - WhatsApp no tiene esa etiqueta: fuera de las 24 horas sigue con plantillas.
 - Apagado por omisión. El formato de la etiqueta en la API de Instagram no se probó
   con Meta; está documentado para Messenger.
+
+## Ajuste (2026-10-23): mensajes anteriores por tandas
+
+- Una conversación abre con sus 100 mensajes más recientes y `hay_anteriores`. Antes se
+  mostraban los últimos 200 y lo anterior no se podía ver.
+- «Cargar mensajes anteriores» pide la tanda que va antes del primero que se ve, por
+  fecha y luego por id (dos mensajes del mismo segundo no se saltan ni se repiten).
+  Usa el índice `(conversacion_id, enviado_en)`.
+- El refresco de cada 20 segundos trae solo la tanda reciente: lo que ya se cargó hacia
+  atrás se conserva y la lectura no salta al cargar más.

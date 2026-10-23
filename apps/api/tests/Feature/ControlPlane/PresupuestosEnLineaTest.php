@@ -101,7 +101,7 @@ it('el cliente lo ve desde su correo, lo acepta y lo paga en línea; el negocio 
     // Lo paga en línea y vuelve a la página del presupuesto.
     $this->postJson("{$url}/pagar", ['t' => $p['token']])->assertCreated()
         ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_p_1');
-    Http::assertSent(fn (Request $r): bool => str_ends_with((string) $r['success_url'], "/presupuesto/barberia-pl/{$p['id']}?pago=exito"));
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r['success_url'], "/presupuesto/barberia-pl/{$p['id']}?pago=exito&ref_pago="));
 });
 
 it('desde su cuenta: sus presupuestos, rechazar con motivo; uno vencido no se responde y un enlace nuevo invalida el anterior', function (): void {

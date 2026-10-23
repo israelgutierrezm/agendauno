@@ -6,6 +6,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CanalMensajeria;
 use App\Modules\Tenancy\Models\ConversacionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use Illuminate\Http\Client\Request as PeticionHttp;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -667,4 +668,44 @@ it('sin encender Messenger en la plataforma no se ofrece', function (): void {
     $this->getJson("/api/v1/app/{$e['slug']}/bandeja/canales", conBearer($e['bearer']))->assertJsonPath('data.messenger.disponible', false);
     $this->postJson("/api/v1/app/{$e['slug']}/bandeja/canales/messenger/conectar", [], conBearer($e['bearer']))
         ->assertUnprocessable()->assertJsonValidationErrors(['canal'], 'meta.errors');
+});
+
+it('una conversación larga abre con sus mensajes más recientes y carga los anteriores por tandas', function (): void {
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    conectarWhatsAppDeBandeja($e);
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.larga0', 'Hola'))->assertOk();
+    $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones", conBearer($e['bearer']))->json('data.0.id');
+    // 250 mensajes más; los últimos 20 en el mismo segundo (se desempatan por id).
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->sole(), function () use ($id): void {
+        $conversacion = ConversacionTenant::query()->where('ulid', $id)->sole();
+        for ($i = 1; $i <= 250; $i++) {
+            MensajeConversacionTenant::query()->create([
+                'conversacion_id' => $conversacion->getKey(), 'direccion' => 'entrante', 'tipo' => 'texto', 'texto' => "Mensaje {$i}",
+                'estado' => 'recibido', 'enviado_en' => now()->addMinutes(min($i, 230)),
+            ]);
+        }
+    });
+    $ruta = "/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$id}";
+
+    $recientes = $this->getJson($ruta, conBearer($e['bearer']))->assertOk()->assertJsonPath('data.hay_anteriores', true)->json('data.mensajes');
+    expect($recientes)->toHaveCount(100)
+        ->and($recientes[0]['texto'])->toBe('Mensaje 151')
+        ->and($recientes[99]['texto'])->toBe('Mensaje 250');
+
+    $segunda = $this->getJson("{$ruta}/mensajes?antes={$recientes[0]['id']}", conBearer($e['bearer']))->assertOk()->assertJsonPath('meta.hay_anteriores', true)->json('data');
+    expect(array_column($segunda, 'texto'))->toBe(array_map(fn (int $i): string => "Mensaje {$i}", range(51, 150)));
+
+    $ultima = $this->getJson("{$ruta}/mensajes?antes={$segunda[0]['id']}", conBearer($e['bearer']))->assertOk()->assertJsonPath('meta.hay_anteriores', false)->json('data');
+    expect($ultima)->toHaveCount(51)
+        ->and($ultima[0]['texto'])->toBe('Hola')
+        ->and($ultima[50]['texto'])->toBe('Mensaje 50');
+
+    // Un mensaje de otra conversación no sirve de referencia, y sin la referencia no se adivina.
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215533334444', 'wamid.otra', 'Otra'))->assertOk();
+    $otra = (string) collect($this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones", conBearer($e['bearer']))->json('data'))->firstWhere('id', '!=', $id)['id'];
+    $deOtra = (string) $this->getJson("/api/v1/app/{$e['slug']}/bandeja/conversaciones/{$otra}", conBearer($e['bearer']))->json('data.mensajes.0.id');
+    $this->getJson("{$ruta}/mensajes?antes={$deOtra}", conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['antes'], 'meta.errors');
+    $this->getJson("{$ruta}/mensajes", conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['antes'], 'meta.errors');
 });

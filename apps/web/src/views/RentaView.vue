@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoRetornoPago from "@/components/AvisoRetornoPago.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import ComplementosNegocio from "@/components/ComplementosNegocio.vue";
@@ -17,7 +18,7 @@ import WhatsAppRenta from "@/components/WhatsAppRenta.vue";
 import ReferidosRenta from "@/components/ReferidosRenta.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
-import { useRetornoPago } from "@/lib/retornoPago";
+import { useConfirmacionPago } from "@/lib/retornoPago";
 import {
   fechaTarifa,
   type PlanCitas,
@@ -391,8 +392,12 @@ async function descargarRecibo(cargo: Cargo): Promise<void> {
   );
 }
 
-// Al volver de la página de pago de la renta: aviso y recarga tras la confirmación.
-const retornoPago = useRetornoPago();
+// Al volver de la página de pago de la renta: «confirmando» hasta que el servidor lo
+// confirma; entonces se recarga.
+const retornoPago = useConfirmacionPago(
+  (ref) => `${base.value}/renta/cargos/${encodeURIComponent(ref)}/confirmacion`,
+  () => void cargar(),
+);
 
 // La renta (y la deuda del negocio) solo la ve quien ve la facturación. Con el negocio
 // suspendido, el resto (alumnos, quien imparte, recepción) llega aquí y ve un aviso
@@ -404,11 +409,8 @@ onMounted(() => {
     return;
   }
   void cargar();
-  if (retornoPago.value === "exito") {
-    toast.exito(t("pagoEnLinea.rentaExito"));
+  if (retornoPago.value === "en_proceso" || retornoPago.value === "pendiente") {
     window.setTimeout(() => void cargar(), 4000);
-  } else if (retornoPago.value === "cancelado") {
-    toast.error(t("pagoEnLinea.cancelado"));
   }
 });
 </script>
@@ -424,6 +426,7 @@ onMounted(() => {
   </section>
   <section v-else class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('renta.titulo')" />
+    <AvisoRetornoPago v-if="retornoPago" class="mt-3" :estado="retornoPago" />
 
     <!-- Suspendido por renta vencida: qué pasa y cómo reactivarlo (ADR 0073). -->
     <div
@@ -698,7 +701,7 @@ onMounted(() => {
           v-if="conTimbres"
           :base="base"
           :puede-gestionar="puedeGestionar"
-          :pagado="retornoPago === 'exito'"
+          :pagado="retornoPago !== null && retornoPago !== 'cancelado'"
         />
       </div>
 

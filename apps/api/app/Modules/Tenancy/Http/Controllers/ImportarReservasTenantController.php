@@ -37,12 +37,12 @@ class ImportarReservasTenantController
     public function preview(Request $request): JsonResponse
     {
         $actor = $this->actor($request);
-        [$corte, $yaDescontadas] = $this->opciones($request, $actor);
+        [$corte, $yaDescontadas, $recordar] = $this->opciones($request, $actor);
         $filas = $this->parsear($request);
 
-        $resultado = $this->importador->ejecutar($filas, $actor, $corte, $yaDescontadas);
+        $resultado = $this->importador->ejecutar($filas, $actor, $corte, $yaDescontadas, recordar: $recordar);
         $resultado['confirmacion'] = Crypt::encryptString(json_encode([
-            'contexto' => $this->contexto($request, $actor, $filas, $corte, $yaDescontadas),
+            'contexto' => $this->contexto($request, $actor, $filas, $corte, $yaDescontadas, $recordar),
             'expira' => now()->addMinutes(30)->timestamp,
         ], JSON_THROW_ON_ERROR));
 
@@ -52,7 +52,7 @@ class ImportarReservasTenantController
     public function importar(Request $request): JsonResponse
     {
         $actor = $this->actor($request);
-        [$corte, $yaDescontadas] = $this->opciones($request, $actor);
+        [$corte, $yaDescontadas, $recordar] = $this->opciones($request, $actor);
         $filas = $this->parsear($request);
         $request->validate(['confirmacion' => ['required', 'string'], 'parcial' => ['nullable', 'boolean']]);
         try {
@@ -60,11 +60,11 @@ class ImportarReservasTenantController
         } catch (\Exception) {
             $confirmacion = [];
         }
-        if (($confirmacion['contexto'] ?? '') !== $this->contexto($request, $actor, $filas, $corte, $yaDescontadas) || ($confirmacion['expira'] ?? 0) < now()->timestamp) {
+        if (($confirmacion['contexto'] ?? '') !== $this->contexto($request, $actor, $filas, $corte, $yaDescontadas, $recordar) || ($confirmacion['expira'] ?? 0) < now()->timestamp) {
             throw ValidationException::withMessages(['archivo' => ['Vuelve a revisar el archivo: la confirmación expiró o cambió el contenido.']]);
         }
 
-        $resultado = $this->importador->ejecutar($filas, $actor, $corte, $yaDescontadas, true, $request->boolean('parcial'));
+        $resultado = $this->importador->ejecutar($filas, $actor, $corte, $yaDescontadas, true, $request->boolean('parcial'), $recordar);
 
         return response()->json(['data' => $resultado], $resultado['importadas'] > 0 || $resultado['ok'] ? 201 : 422);
     }
@@ -79,16 +79,18 @@ class ImportarReservasTenantController
     }
 
     /**
-     * El corte acordado y si los saldos de apertura ya descontaron estas reservas.
-     * Reintegrar créditos es concederlos: pide además gestionar créditos.
+     * El corte acordado, si los saldos de apertura ya descontaron estas reservas y si
+     * se mandan los recordatorios de siempre antes de cada clase (importar en sí no
+     * avisa). Reintegrar créditos es concederlos: pide además gestionar créditos.
      *
-     * @return array{0: string, 1: bool}
+     * @return array{0: string, 1: bool, 2: bool}
      */
     private function opciones(Request $request, Usuario $actor): array
     {
         $validado = $request->validate([
             'corte' => ['required', 'date_format:Y-m-d'],
             'ya_descontadas' => ['required', 'boolean'],
+            'recordatorios' => ['nullable', 'boolean'],
         ], [
             'corte.required' => 'Indica la fecha de corte acordada.',
             'corte.date_format' => 'Escribe la fecha de corte como AAAA-MM-DD.',
@@ -97,15 +99,15 @@ class ImportarReservasTenantController
         $yaDescontadas = $request->boolean('ya_descontadas');
         abort_if($yaDescontadas && ! $actor->puede('creditos.gestionar'), 403);
 
-        return [(string) $validado['corte'], $yaDescontadas];
+        return [(string) $validado['corte'], $yaDescontadas, $request->boolean('recordatorios')];
     }
 
     /**
      * @param  list<array<string, string|int|null>>  $filas
      */
-    private function contexto(Request $request, Usuario $actor, array $filas, string $corte, bool $yaDescontadas): string
+    private function contexto(Request $request, Usuario $actor, array $filas, string $corte, bool $yaDescontadas, bool $recordar): string
     {
-        return hash('sha256', json_encode([$request->attributes->get('estudio')->ulid, $actor->ulid, $filas, $corte, $yaDescontadas], JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode([$request->attributes->get('estudio')->ulid, $actor->ulid, $filas, $corte, $yaDescontadas, $recordar], JSON_THROW_ON_ERROR));
     }
 
     /** @return list<array<string, string|int|null>> */

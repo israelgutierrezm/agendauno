@@ -58,7 +58,7 @@ it('regresa del pago al subdominio desde el que se pagó y a url_app si el orige
         ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_retorno_1');
 
     Http::assertSent(fn (PeticionSaliente $r): bool => str_ends_with($r->url(), '/checkout/sessions')
-        && $r['success_url'] === $sitio.'/mi-cuenta/pagos?pago=exito'
+        && str_starts_with((string) $r['success_url'], $sitio.'/mi-cuenta/pagos?pago=exito&ref_pago=')
         && $r['cancel_url'] === $sitio.'/mi-cuenta/pagos?pago=cancelado');
 })->with([
     'desde el subdominio del negocio' => [['Origin' => 'https://estudio-a.agendauno.mx'], 'https://estudio-a.agendauno.mx'],
@@ -79,7 +79,7 @@ it('regresa al dueño a su subdominio después de pagar la renta', function (): 
     ])->assertCreated();
 
     Http::assertSent(fn (PeticionSaliente $r): bool => str_ends_with($r->url(), '/checkout/sessions')
-        && $r['success_url'] === 'https://estudio-a.agendauno.mx/renta?pago=exito');
+        && $r['success_url'] === "https://estudio-a.agendauno.mx/renta?pago=exito&ref_pago={$cargo}");
 });
 
 it('en producción solo admite los sitios del negocio con https y en el puerto de siempre', function (string $origen, string $sitio): void {

@@ -71,7 +71,7 @@ it('un cliente sin cuenta agenda una cita y paga en línea; el webhook la confir
         'orden_id' => $r['orden_id'], 'proveedor' => 'stripe', 'metodo' => 'tarjeta',
     ])->assertCreated()->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_cita_1');
     // Al terminar regresa a la página pública de citas del negocio.
-    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], "/agendar/{$e['slug']}?pago=exito"));
+    Http::assertSent(fn ($r): bool => str_contains($r['success_url'], "/agendar/{$e['slug']}?pago=exito&ref_pago="));
 
     // El webhook de Stripe confirma el pago → la reserva pasa a confirmada.
     $this->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [

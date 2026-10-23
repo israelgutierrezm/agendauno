@@ -44,7 +44,7 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultab
     public function cobrar(PagoTenant $pago, array $llaves): ResultadoPago
     {
         $orden = $pago->orden()->with(['lineas.producto', 'persona'])->first();
-        $retorno = RetornoPago::urls($pago->retorno);
+        $retorno = RetornoPago::urls($pago->retorno, referencia: (string) $pago->ulid);
 
         $preferencia = self::api($llaves)->crearPreferencia(
             $pago->monto_minor,

@@ -147,7 +147,7 @@ export default {
     sinCheckout: "No se pudo abrir el pago en línea: inténtalo de nuevo.",
     agendarTitulo: "Agenda tus citas",
     agendar: "Agendar {servicio}",
-    pagoExito: "Recibimos tu pago. Gracias.",
+    pagoExito: "Pago confirmado. Gracias.",
     pagoPendiente: "Tu pago está en proceso: te avisamos cuando se confirme.",
     pagoCancelado: "No se completó el pago. Puedes intentarlo de nuevo.",
     invalido: "Este enlace ya no es válido",

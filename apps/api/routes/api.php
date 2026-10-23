@@ -35,6 +35,7 @@ use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CobroDeCitaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ComplementosNegocioController;
 use App\Modules\Tenancy\Http\Controllers\ConciliacionPlataformasTenantController;
+use App\Modules\Tenancy\Http\Controllers\ConfirmacionPagoController;
 use App\Modules\Tenancy\Http\Controllers\CortesNominaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\CuotasTenantController;
@@ -460,6 +461,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
         // La cita por pagar del enlace del correo de apartado (el ULID de la orden es la capacidad).
         Route::get('/citas/orden/{orden}', [PublicoCitasController::class, 'orden'])->middleware('throttle:negocio-publico')->name('citas.orden');
+        // Al volver de la pasarela: si el pago ya se confirmó (el ULID va en la URL de regreso).
+        Route::get('/pagos/{pago}/confirmacion', ConfirmacionPagoController::class)->middleware('throttle:negocio-publico')->name('pagos.confirmacion');
 
         // Calendario personal (iCal) que leen Google Calendar, Apple u Outlook con el
         // enlace privado de cada quien (sin sesión).
@@ -752,6 +755,7 @@ Route::prefix('v1')->group(function (): void {
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente
             // + checkout; el webhook de la plataforma confirma). El dueño paga su suscripcion.
             Route::post('/renta/cargos/{cargo}/pagar', [PagoRentaController::class, 'pagar'])->middleware('puede:facturacion.ver')->name('renta.pagar');
+            Route::get('/renta/cargos/{cargo}/confirmacion', [PagoRentaController::class, 'confirmacion'])->middleware('puede:facturacion.ver')->name('renta.confirmacion');
             // Plan de un negocio de citas (ADR 0107): nivel, profesionales y mensual o anual.
             Route::put('/renta/plan', [PlanRentaController::class, 'cambiar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.plan');
             // Domiciliación: la tarjeta con que se cobra sola la renta (ADR 0107).
@@ -1245,6 +1249,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/bandeja/resumen', [BandejaTenantController::class, 'resumen'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.resumen');
             Route::get('/bandeja/conversaciones', [BandejaTenantController::class, 'index'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.index');
             Route::get('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'show'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.show');
+            Route::get('/bandeja/conversaciones/{conversacion}/mensajes', [BandejaTenantController::class, 'anteriores'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.anteriores');
             Route::post('/bandeja/conversaciones/{conversacion}/mensajes', [BandejaTenantController::class, 'enviar'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:60,1,bandeja-enviar'])->name('bandeja.enviar');
             Route::get('/bandeja/plantillas', [BandejaTenantController::class, 'plantillas'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.plantillas');
             Route::post('/bandeja/conversaciones/{conversacion}/plantilla', [BandejaTenantController::class, 'enviarPlantilla'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:30,1,bandeja-plantillas'])->name('bandeja.plantilla');

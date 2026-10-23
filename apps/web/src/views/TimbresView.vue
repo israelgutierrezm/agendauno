@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoRetornoPago from "@/components/AvisoRetornoPago.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -13,7 +14,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
-import { useRetornoPago } from "@/lib/retornoPago";
+import { useConfirmacionPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -386,20 +387,21 @@ function cantidad(n: number): string {
 }
 
 // Al volver de pagar, el aviso de la pasarela llega en unos segundos.
-const retornoPago = useRetornoPago();
+// Se dicen comprados solo cuando el servidor confirma el pago.
+const retornoPago = useConfirmacionPago(
+  (ref) => `${base.value}/renta/cargos/${encodeURIComponent(ref)}/confirmacion`,
+  () => {
+    toast.exito(t("suscripcion.timbres.comprados"));
+    void cargar();
+    void cargarMovimientos();
+  },
+);
 onMounted(() => {
   if (!veTimbres.value) {
     return;
   }
   void cargar();
   void cargarMovimientos();
-  if (retornoPago.value === "exito") {
-    toast.exito(t("suscripcion.timbres.comprados"));
-    window.setTimeout(() => {
-      void cargar();
-      void cargarMovimientos();
-    }, 4000);
-  }
 });
 </script>
 
@@ -427,6 +429,7 @@ onMounted(() => {
       :titulo="$t('suscripcion.timbres.titulo')"
     />
     <p class="mt-1 text-sm ti-suave">{{ $t("suscripcion.timbres.ayuda") }}</p>
+    <AvisoRetornoPago v-if="retornoPago" class="mt-3" :estado="retornoPago" />
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}

@@ -63,7 +63,9 @@ interface Mensaje {
   archivo?: ArchivoMensaje | null;
 }
 interface Detalle extends Conversacion {
+  // Los más recientes; los anteriores se piden por tandas.
   mensajes: Mensaje[];
+  hay_anteriores?: boolean;
 }
 interface ConexionCanal {
   id: string;
@@ -163,9 +165,20 @@ async function abrir(id: string, silencioso = false): Promise<void> {
     const { data } = await api.get<{ data: Detalle }>(
       `${base.value}/bandeja/conversaciones/${id}`,
     );
-    const nuevos =
-      seleccion.value?.id !== id ||
-      seleccion.value.mensajes.length !== data.data.mensajes.length;
+    const previa = seleccion.value?.id === id ? seleccion.value : null;
+    const ultimo = previa?.mensajes.at(-1)?.id;
+    // Al refrescar, los anteriores que ya se cargaron se quedan.
+    const desde =
+      previa?.mensajes.findIndex((m) => m.id === data.data.mensajes[0]?.id) ??
+      -1;
+    if (previa !== null && desde > 0) {
+      data.data.mensajes = [
+        ...previa.mensajes.slice(0, desde),
+        ...data.data.mensajes,
+      ];
+      data.data.hay_anteriores = previa.hay_anteriores;
+    }
+    const nuevos = previa === null || ultimo !== data.data.mensajes.at(-1)?.id;
     seleccion.value = data.data;
     const enLista = lista.value.find((c) => c.id === id);
     if (enLista) {
@@ -179,6 +192,48 @@ async function abrir(id: string, silencioso = false): Promise<void> {
     if (!silencioso) {
       toast.error(mensajeDeError(err, t("bandejaMensajes.error")));
     }
+  }
+}
+
+// «Cargar mensajes anteriores»: la tanda antes del primero, sin mover lo que se lee.
+const cargandoAnteriores = ref(false);
+async function cargarAnteriores(): Promise<void> {
+  const conversacion = seleccion.value;
+  const primero = conversacion?.mensajes[0];
+  if (
+    conversacion === null ||
+    primero === undefined ||
+    cargandoAnteriores.value
+  ) {
+    return;
+  }
+  cargandoAnteriores.value = true;
+  try {
+    const { data } = await api.get<{
+      data: Mensaje[];
+      meta: { hay_anteriores: boolean };
+    }>(`${base.value}/bandeja/conversaciones/${conversacion.id}/mensajes`, {
+      params: { antes: primero.id },
+    });
+    const actual = seleccion.value;
+    if (
+      actual?.id !== conversacion.id ||
+      actual.mensajes[0]?.id !== primero.id
+    ) {
+      return;
+    }
+    const alto = hilo.value?.scrollHeight ?? 0;
+    const arriba = hilo.value?.scrollTop ?? 0;
+    actual.mensajes = [...data.data, ...actual.mensajes];
+    actual.hay_anteriores = data.meta.hay_anteriores;
+    await nextTick();
+    if (hilo.value) {
+      hilo.value.scrollTop = hilo.value.scrollHeight - alto + arriba;
+    }
+  } catch (err) {
+    toast.error(mensajeDeError(err, t("bandejaMensajes.error")));
+  } finally {
+    cargandoAnteriores.value = false;
   }
 }
 
@@ -838,6 +893,21 @@ onBeforeUnmount(() => {
         </header>
 
         <ol ref="hilo" class="bm-hilo" aria-live="polite">
+          <li v-if="seleccion.hay_anteriores" class="bm-anteriores">
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              :disabled="cargandoAnteriores"
+              data-prueba="anteriores"
+              @click="cargarAnteriores"
+            >
+              {{
+                cargandoAnteriores
+                  ? $t("bandejaMensajes.cargandoAnteriores")
+                  : $t("bandejaMensajes.cargarAnteriores")
+              }}
+            </button>
+          </li>
           <li
             v-for="m in seleccion.mensajes"
             :key="m.id"
@@ -1124,6 +1194,9 @@ onBeforeUnmount(() => {
   max-height: 55vh;
   overflow-y: auto;
   padding: 0.25rem;
+}
+.bm-anteriores {
+  align-self: center;
 }
 .bm-burbuja {
   display: grid;

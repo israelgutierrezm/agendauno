@@ -30,10 +30,15 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
-const retorno = vi.hoisted(() => ({ valor: null as "exito" | null }));
-vi.mock("@/lib/retornoPago", async () => {
+const retorno = vi.hoisted(() => ({
+  valor: null as "confirmado" | "confirmando" | null,
+}));
+vi.mock("@/lib/retornoPago", async (original) => {
   const { ref } = await import("vue");
-  return { useRetornoPago: () => ref(retorno.valor) };
+  return {
+    ...(await original<typeof import("@/lib/retornoPago")>()),
+    useConfirmacionPago: () => ref(retorno.valor),
+  };
 });
 const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -1008,10 +1013,24 @@ describe("portal del alumno", () => {
     w.unmount();
   });
 
-  it("al volver de pagar, el siguiente paso es reservar con su plan", async () => {
-    retorno.valor = "exito";
+  it("al volver de pagar, solo con el pago confirmado sigue reservar con su plan", async () => {
+    retorno.valor = "confirmando";
+    const confirmando = montar(MisPagosView);
+    await flushPromises();
+    expect(
+      confirmando.get('[data-prueba="retorno-pago"]').attributes("style"),
+    ).not.toContain("--exito");
+    expect(
+      confirmando.find('[data-prueba="reservar-tras-pago"]').exists(),
+    ).toBe(false);
+    confirmando.unmount();
+
+    retorno.valor = "confirmado";
     const w = montar(MisPagosView);
     await flushPromises();
+    expect(w.get('[data-prueba="retorno-pago"]').attributes("style")).toContain(
+      "--exito",
+    );
     expect(w.get('[data-prueba="reservar-tras-pago"]').text()).toBe(
       portal.miReserva.reservarConPlan,
     );

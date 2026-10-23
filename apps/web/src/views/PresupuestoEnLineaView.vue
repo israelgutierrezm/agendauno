@@ -9,7 +9,7 @@ import DetallePresupuesto, {
 } from "@/components/DetallePresupuesto.vue";
 import RespuestaPresupuesto from "@/components/RespuestaPresupuesto.vue";
 import { api } from "@/lib/api";
-import { useRetornoPago } from "@/lib/retornoPago";
+import { claveDeRetorno, useConfirmacionPago } from "@/lib/retornoPago";
 
 /**
  * Un presupuesto en línea, desde el enlace del correo (`/presupuesto/{negocio}/{id}?t=`),
@@ -18,8 +18,13 @@ import { useRetornoPago } from "@/lib/retornoPago";
  */
 const { t } = useI18n();
 const route = useRoute();
-const retornoPago = useRetornoPago();
 const slug = String(route.params.slug ?? "");
+// Al confirmarse el pago, el presupuesto se vuelve a leer (ya pagado).
+const retornoPago = useConfirmacionPago(
+  (ref) =>
+    `/api/v1/app/${encodeURIComponent(slug)}/pagos/${encodeURIComponent(ref)}/confirmacion`,
+  () => void cargar(),
+);
 const id = String(route.params.id ?? "");
 const CLAVE = `presupuesto:${id}`;
 
@@ -128,24 +133,33 @@ onMounted(cargar);
       </header>
 
       <AvisoTono
-        v-if="retornoPago === 'exito' || retornoPago === 'pendiente'"
+        v-if="retornoPago === 'confirmado'"
         tono="exito"
         class="mt-4"
+        data-prueba="retorno-pago"
       >
-        {{
-          t(
-            retornoPago === "exito"
-              ? "presupuestos.enLinea.pagoExito"
-              : "presupuestos.enLinea.pagoPendiente",
-          )
-        }}
+        {{ t("presupuestos.enLinea.pagoExito") }}
       </AvisoTono>
       <AvisoTono
         v-else-if="retornoPago === 'cancelado'"
         tono="aviso"
         class="mt-4"
+        data-prueba="retorno-pago"
       >
         {{ t("presupuestos.enLinea.pagoCancelado") }}
+      </AvisoTono>
+      <AvisoTono
+        v-else-if="retornoPago"
+        tono="neutral"
+        class="mt-4"
+        role="status"
+        data-prueba="retorno-pago"
+      >
+        {{
+          retornoPago === "pendiente"
+            ? t("presupuestos.enLinea.pagoPendiente")
+            : t(claveDeRetorno(retornoPago))
+        }}
       </AvisoTono>
 
       <p v-if="presupuesto.cliente" class="mt-5 text-sm">

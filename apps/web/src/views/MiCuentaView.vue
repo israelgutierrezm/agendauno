@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
+import AvisoRetornoPago from "@/components/AvisoRetornoPago.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
@@ -25,7 +26,7 @@ import {
 } from "@/lib/miCuenta";
 import { marcarPwa } from "@/lib/pwa";
 import { useParticipantes } from "@/lib/participantes";
-import { useRetornoPago } from "@/lib/retornoPago";
+import { useConfirmacionPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -43,7 +44,11 @@ const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const cuenta = useMiCuenta();
 const participantes = useParticipantes();
-const retornoPago = useRetornoPago();
+const retornoPago = useConfirmacionPago(
+  (ref) =>
+    `/api/v1/app/${sesion.slug}/pagos/${encodeURIComponent(ref)}/confirmacion`,
+  () => void cuenta.cargar(true),
+);
 const verPase = ref(false);
 
 const nombre = computed(() => {
@@ -482,27 +487,20 @@ onMounted(() => {
         {{ $t("comun.reintentar") }}
       </button>
     </AvisoTono>
-    <p
-      v-if="retornoPago"
-      class="mt-4 text-sm"
-      role="status"
-      :style="{
-        color: retornoPago === 'exito' ? 'var(--exito)' : 'var(--aviso)',
-      }"
-    >
-      {{ $t(`pagoEnLinea.${retornoPago}`) }}
+    <AvisoRetornoPago v-if="retornoPago" class="mt-4" :estado="retornoPago">
       <!-- Pagó: el siguiente paso es reservar con su plan (C05). -->
-      <RouterLink
-        v-if="retornoPago === 'exito' && !sesion.esCitas"
-        :to="{
-          name: 'mis-reservas',
-          query: { vista: 'reservar', incluidas: '1' },
-        }"
-        class="tu-enlace ml-1"
-        data-prueba="reservar-tras-pago"
-        >{{ $t("portal.miReserva.reservarConPlan") }}</RouterLink
-      >
-    </p>
+      <template v-if="!sesion.esCitas" #confirmado>
+        <RouterLink
+          :to="{
+            name: 'mis-reservas',
+            query: { vista: 'reservar', incluidas: '1' },
+          }"
+          class="tu-enlace ml-1"
+          data-prueba="reservar-tras-pago"
+          >{{ $t("portal.miReserva.reservarConPlan") }}</RouterLink
+        >
+      </template>
+    </AvisoRetornoPago>
 
     <!-- La tarjeta principal: siempre, con o sin reserva. -->
     <TarjetaPrincipal

@@ -75,6 +75,8 @@ export default {
       authentication: "Autenticación",
     },
   },
+  cargarAnteriores: "Cargar mensajes anteriores",
+  cargandoAnteriores: "Cargando…",
   archivar: "Archivar",
   reabrir: "Reabrir",
   archivada: "Conversación archivada.",

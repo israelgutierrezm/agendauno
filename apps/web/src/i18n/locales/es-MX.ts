@@ -480,7 +480,8 @@ export default {
               "Tu equipo escanea el pase con la cámara, pasa lista y lleva la caja desde la app. Tus alumnos reservan, pagan y ven sus videos y sus documentos.",
             puntos: {
               p1: "Con lugares numerados, cada quien elige o cambia el suyo",
-              p2: "Su próxima clase en la pantalla de inicio",
+              // El widget de inicio solo está en Android (en iPhone falta compilarlo: ios/WIDGET.md).
+              p2: "En Android, su próxima clase en la pantalla de inicio",
               p3: "Tu página se instala como app, con tu logo",
             },
           },
@@ -851,7 +852,8 @@ export default {
             texto:
               "Tu equipo agenda, reprograma y cobra desde la app. Tus clientes agendan, pagan, responden sus presupuestos y llevan su pase en Apple Wallet o Google Wallet.",
             puntos: {
-              p1: "Su próxima cita en la pantalla de inicio",
+              // El widget de inicio solo está en Android (en iPhone falta compilarlo: ios/WIDGET.md).
+              p1: "En Android, su próxima cita en la pantalla de inicio",
               p2: "Reprograman o cancelan según tu política",
               p3: "Tu página se instala como app, con tu logo",
             },

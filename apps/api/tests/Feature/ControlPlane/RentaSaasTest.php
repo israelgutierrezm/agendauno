@@ -91,10 +91,14 @@ it('el dueño paga su renta con Stripe y el webhook de la plataforma lo confirma
         ->assertJsonPath('data.estado', 'pendiente')
         ->assertJsonPath('data.checkout.tipo', 'redirect')
         ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_renta_123');
-    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], '/renta?pago=exito'));
+    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], "/renta?pago=exito&ref_pago={$cargo}"));
 
     $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.cargos.0.estado', 'pendiente');
+    // Al volver, la web no dice «pagado» hasta que el servidor lo confirma.
+    $confirmacion = "/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/confirmacion";
+    $this->getJson($confirmacion, conBearer($e['bearer']))->assertOk()->assertExactJson(['data' => ['estado' => 'en_proceso']]);
+    $this->getJson($confirmacion)->assertUnauthorized();
 
     // El webhook de la plataforma confirma el intento -> pagado.
     $this->postJson('/api/v1/webhooks/plataforma/stripe', [
@@ -106,6 +110,7 @@ it('el dueño paga su renta con Stripe y el webhook de la plataforma lo confirma
         ->assertOk()
         ->assertJsonPath('data.cargos.0.estado', 'pagado')
         ->assertJsonPath('data.cargos.0.pagado_en', fn (?string $v): bool => $v !== null);
+    $this->getJson($confirmacion, conBearer($e['bearer']))->assertExactJson(['data' => ['estado' => 'confirmado']]);
 });
 
 it('si el aviso de Stripe no llega, la conciliación confirma la renta y el reintento no cobra de nuevo', function (): void {
@@ -285,7 +290,7 @@ it('pagar una compra de timbres desde Timbres vuelve a Timbres, no al aviso de l
 
     $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'stripe', 'retorno' => '/renta/timbres'], conBearer($e['bearer']))
         ->assertCreated();
-    Http::assertSent(fn ($r): bool => str_ends_with((string) $r['success_url'], '/renta/timbres?pago=exito'));
+    Http::assertSent(fn ($r): bool => str_ends_with((string) $r['success_url'], "/renta/timbres?pago=exito&ref_pago={$cargo}"));
 
     // A otro lado, no.
     $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'stripe', 'retorno' => 'https://otro.mx'], conBearer($e['bearer']))

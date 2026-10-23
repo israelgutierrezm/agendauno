@@ -81,7 +81,16 @@ it('el alumno paga en línea; el webhook confirma, otorga créditos y ya puede r
         ->assertCreated()
         ->assertJsonPath('data.estado', 'pendiente')
         ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_alumno_1');
-    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], '/mi-cuenta/pagos?pago=exito'));
+    // Vuelve con su pago en la URL: la web pregunta si ya se confirmó (sin sesión, solo
+    // el estado) y no dice «Pago confirmado» antes.
+    $exito = (string) Http::recorded(fn ($r): bool => str_ends_with($r->url(), '/checkout/sessions'))->first()[0]['success_url'];
+    expect($exito)->toContain('/mi-cuenta/pagos?pago=exito&ref_pago=');
+    parse_str((string) parse_url($exito, PHP_URL_QUERY), $consulta);
+    $confirmacion = "/api/v1/app/{$e['slug']}/pagos/{$consulta['ref_pago']}/confirmacion";
+    $this->getJson($confirmacion)->assertOk()->assertExactJson(['data' => ['estado' => 'en_proceso']]);
+    $this->getJson("/api/v1/app/{$e['slug']}/pagos/01J0000000000000000000000Z/confirmacion")->assertNotFound();
+    $otro = estudioConSesion('estudio-b', 'b@correo.mx');
+    $this->getJson("/api/v1/app/{$otro['slug']}/pagos/{$consulta['ref_pago']}/confirmacion")->assertNotFound();
 
     // Antes de reservar no hay derecho.
     $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($a['bearer']))
@@ -95,6 +104,7 @@ it('el alumno paga en línea; el webhook confirma, otorga créditos y ya puede r
 
     $perfil = $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($a['bearer']))->assertOk()->json('data');
     expect($perfil['derechos'][0]['disponible'])->toBe(8000);
+    $this->getJson($confirmacion)->assertOk()->assertExactJson(['data' => ['estado' => 'confirmado']]);
 
     // Con créditos, ya reserva: cierra el ciclo (embudo -> compra -> reserva).
     $reserva = $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($a['bearer']))

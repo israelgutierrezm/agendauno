@@ -170,6 +170,69 @@ describe("bandeja de WhatsApp e Instagram", () => {
     );
   });
 
+  it("una conversación larga carga sus mensajes anteriores y el refresco no los quita", async () => {
+    const mensaje = (id: string, texto: string) => ({
+      ...detalle.mensajes[0],
+      id,
+      texto,
+    });
+    let recientes = [mensaje("m3", "Tercero"), mensaje("m4", "Cuarto")];
+    api.get.mockImplementation(async (url: string, opciones?: unknown) => {
+      if (url.endsWith("/bandeja/conversaciones")) {
+        return {
+          data: {
+            data: [conversacion],
+            meta: { page: 1, ultima_pagina: 1, total: 1, per_page: 30 },
+          },
+        };
+      }
+      if (url.endsWith("/bandeja/conversaciones/c1")) {
+        return {
+          data: {
+            data: { ...detalle, mensajes: recientes, hay_anteriores: true },
+          },
+        };
+      }
+      if (url.endsWith("/bandeja/conversaciones/c1/mensajes")) {
+        expect(opciones).toEqual({ params: { antes: "m3" } });
+        return {
+          data: {
+            data: [mensaje("m1", "Primero"), mensaje("m2", "Segundo")],
+            meta: { hay_anteriores: false },
+          },
+        };
+      }
+      if (url.endsWith("/bandeja/canales")) {
+        return { data: { data: canales } };
+      }
+      throw new Error(url);
+    });
+    const { w } = await montar();
+    await w.find(".bm-conversacion").trigger("click");
+    await flushPromises();
+    const textos = () =>
+      w.findAll(".bm-burbuja .bm-texto").map((p) => p.text());
+    expect(textos()).toEqual(["Tercero", "Cuarto"]);
+
+    await w.find('[data-prueba="anteriores"]').trigger("click");
+    await flushPromises();
+    expect(textos()).toEqual(["Primero", "Segundo", "Tercero", "Cuarto"]);
+    expect(w.find('[data-prueba="anteriores"]').exists()).toBe(false);
+
+    // Llega uno nuevo: la tanda reciente se corre, lo cargado se queda.
+    recientes = [mensaje("m4", "Cuarto"), mensaje("m5", "Quinto")];
+    await w.find(".bm-conversacion").trigger("click");
+    await flushPromises();
+    expect(textos()).toEqual([
+      "Primero",
+      "Segundo",
+      "Tercero",
+      "Cuarto",
+      "Quinto",
+    ]);
+    expect(w.find('[data-prueba="anteriores"]').exists()).toBe(false);
+  });
+
   it("los archivos: una imagen se muestra (pedida con la sesión) y un documento se descarga", async () => {
     globalThis.URL.createObjectURL = vi.fn(() => "blob:foto");
     globalThis.URL.revokeObjectURL = vi.fn();

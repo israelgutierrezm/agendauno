@@ -20,7 +20,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Las reservas futuras de clases que los alumnos traen de otro sistema (ADR 0176):
  * confirmadas o en lista de espera, al corte acordado. Antes de revisar se elige si los
- * saldos de apertura ya las descontaron, para no descontar dos veces.
+ * saldos de apertura ya las descontaron, para no descontar dos veces. Importar no avisa;
+ * los recordatorios antes de cada clase van aparte, solo si se marcan.
  */
 interface FilaPreview {
   fila: number;
@@ -57,6 +58,8 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const corte = ref(hoyEnNegocio(sesion.zonaHoraria));
 // Sin respuesta por omisión: es la regla contra el doble descuento y se elige.
 const yaDescontadas = ref<boolean | null>(null);
+// Importar nunca avisa; esto es solo el recordatorio de siempre antes de la clase.
+const recordatorios = ref(false);
 const archivo = ref<File | null>(null);
 const nombreArchivo = ref("");
 const preview = ref<Resultado | null>(null);
@@ -112,7 +115,7 @@ const puedeImportarListas = computed(
 );
 
 // Otro corte u otra regla cambian qué entra: hay que revisar de nuevo.
-watch([corte, yaDescontadas], () => {
+watch([corte, yaDescontadas, recordatorios], () => {
   preview.value = null;
 });
 
@@ -139,6 +142,7 @@ function formulario(extra: Record<string, string> = {}): FormData {
   }
   fd.append("corte", corte.value);
   fd.append("ya_descontadas", yaDescontadas.value ? "1" : "0");
+  fd.append("recordatorios", recordatorios.value ? "1" : "0");
   for (const [clave, valor] of Object.entries(extra)) {
     fd.append(clave, valor);
   }
@@ -193,6 +197,7 @@ async function importar(parcial = false): Promise<void> {
           creditos_reintegrados / 1000,
         )
       : "",
+    recordatorios.value ? t("importarReservas.confirmarRecordatorios") : "",
     parcial
       ? t("importar.confirmarListas", { n: validas, m: porResolver.value })
       : "",
@@ -258,6 +263,13 @@ function descargarPlantilla(): void {
     <div v-if="importadas !== null" class="mt-6 tu-card p-6 text-center">
       <p class="text-2xl font-semibold" :style="{ color: 'var(--exito)' }">
         {{ $t("importarReservas.importadas", { n: importadas }, importadas) }}
+      </p>
+      <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{
+          recordatorios
+            ? $t("importarReservas.conRecordatorios")
+            : $t("importarReservas.sinAvisos")
+        }}
       </p>
       <p
         v-if="porCorregir > 0"
@@ -350,6 +362,23 @@ function descargarPlantilla(): void {
             </span>
           </label>
         </fieldset>
+
+        <label class="mt-4 flex items-start gap-2 text-sm">
+          <input
+            v-model="recordatorios"
+            type="checkbox"
+            class="mt-0.5"
+            data-prueba="recordatorios-reservas"
+          />
+          <span>
+            <span class="font-medium">{{
+              $t("importarReservas.recordatorios")
+            }}</span>
+            <span class="block" :style="{ color: 'var(--texto-suave)' }">{{
+              $t("importarReservas.recordatoriosAyuda")
+            }}</span>
+          </span>
+        </label>
 
         <ZonaArchivo
           fija

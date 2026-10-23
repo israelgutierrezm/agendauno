@@ -127,12 +127,14 @@ describe("importar reservas", () => {
       });
     const w = montar();
     await w.get('[data-prueba="descontadas-si"]').setValue(true);
+    await w.get('[data-prueba="recordatorios-reservas"]').setValue(true);
     await w.get('[data-prueba="zona"]').trigger("click");
     await flushPromises();
 
     const previa = api.post.mock.calls[0]!;
     expect(previa[0]).toBe("/api/v1/app/demo/importaciones/reservas/preview");
     expect((previa[1] as FormData).get("ya_descontadas")).toBe("1");
+    expect((previa[1] as FormData).get("recordatorios")).toBe("1");
     expect(w.get('[data-prueba="resumen-reservas"]').text()).toContain(
       "Pendientes (sin plan con saldo o clase llena): 1",
     );
@@ -148,10 +150,14 @@ describe("importar reservas", () => {
     expect(confirmar.mock.calls[0]![0]).toContain(
       "se reintegrará 1 crédito como apertura",
     );
+    expect(confirmar.mock.calls[0]![0]).toContain(
+      "Recibirán su recordatorio antes de cada clase.",
+    );
     const final = api.post.mock.calls[1]!;
     expect(final[0]).toBe("/api/v1/app/demo/importaciones/reservas");
     expect((final[1] as FormData).get("confirmacion")).toBe("c1");
     expect((final[1] as FormData).get("parcial")).toBe("1");
     expect(w.text()).toContain("1 reserva importada");
+    expect(w.text()).toContain("recibirán su recordatorio antes de cada clase");
   });
 });

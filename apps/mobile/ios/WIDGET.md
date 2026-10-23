@@ -6,6 +6,12 @@ cuándo y dónde) y su saldo o plan. En Android ya está completo
 la Widget Extension en una Mac: aquí no hay Xcode y editar `project.pbxproj` a mano
 es riesgoso.
 
+Puede quedar fuera de la V1, pero mientras no se compile y se pruebe en un iPhone no
+se anuncia para iPhone: la landing dice «En Android, su próxima clase (o cita) en la
+pantalla de inicio» (`landing.{clases,citas}.novedades.items.app` en
+`apps/web/src/i18n/locales/es-MX.ts`).
+Al terminar los pasos de abajo y la prueba, se quita «En Android».
+
 ## Lo que ya está listo
 
 - **Dart** (`lib/features/widget_inicio/`):

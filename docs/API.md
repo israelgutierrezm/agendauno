@@ -515,12 +515,14 @@ Solo negocios de clases, con `reservas.gestionar`. Con `ya_descontadas` = 1, tam
 - `GET /importaciones/reservas/plantilla`: el CSV con `referencia`, `email`, `clase`,
   `sucursal`, `fecha` (AAAA-MM-DD), `hora` (HH:MM), `estado` (`confirmada` o
   `en_espera`) y `posicion` (orden en la lista de espera).
-- `POST /importaciones/reservas/preview` (multipart): `archivo`, `corte` (AAAA-MM-DD) y
-  `ya_descontadas` (0/1: si los saldos de apertura ya descontaron estas reservas).
+- `POST /importaciones/reservas/preview` (multipart): `archivo`, `corte` (AAAA-MM-DD),
+  `ya_descontadas` (0/1: si los saldos de apertura ya descontaron estas reservas) y
+  `recordatorios` (0/1, opcional: el recordatorio de siempre antes de cada clase;
+  importar nunca avisa).
   - Responde `ok` (sin pendientes ni inválidas), `resumen` (`total`, `validas`,
     `existentes`, `pendientes`, `invalidas`, `en_espera`, `creditos_reintegrados`),
     `filas` (`estado`, `errores`, `avisos`, `alumno`, `clase`, `inicia_en`, `queda`) y
-    `confirmacion` (30 minutos, para ese archivo, corte y opción).
+    `confirmacion` (30 minutos, para ese archivo, corte y opciones).
 - `POST /importaciones/reservas`: lo mismo, `confirmacion` y `parcial` (0/1).
   - Sin `parcial`, todo o nada (422 si hay pendientes o inválidas).
   - Con `parcial`, entran las válidas; 201 con `importadas`.
@@ -1598,7 +1600,11 @@ en el negocio.
     `ultimo_mensaje_en`, `puede_contestar`, `contestar_hasta`}] por páginas.
   - `GET /bandeja/conversaciones/{id}` suma `mensajes` [{`id`, `direccion`
     (`entrante`|`saliente`), `tipo`, `texto`, `estado`, `enviado_en`, `enviado_por`,
-    `archivo` {`nombre`, `mime`, `bytes`, `listo`, `en_linea`}|null}] y la deja leída.
+    `archivo` {`nombre`, `mime`, `bytes`, `listo`, `en_linea`}|null}] (los 100 más
+    recientes, en orden de lectura), `hay_anteriores` y la deja leída.
+  - `GET /bandeja/conversaciones/{id}/mensajes?antes={mensaje}` «Cargar mensajes
+    anteriores»: los 100 que van antes de ese mensaje (por fecha y luego por id) y
+    `meta.hay_anteriores`. 422 si el mensaje no es de esa conversación.
   - `POST /bandeja/conversaciones/{id}/mensajes` {`texto`} contesta (201). Responde
     422 fuera de las 24 horas o sin el canal conectado.
   - `POST /bandeja/conversaciones/{id}/archivos` (multipart: `archivo` JPG, PNG, WebP o
@@ -1754,6 +1760,8 @@ en el negocio.
 - `GET /renta` suma `pasarelas`: las de la plataforma que pueden cobrar la renta, en
   orden (`stripe`, `mercadopago`, `openpay`). `POST /renta/cargos/{cargo}/pagar` acepta
   `proveedor` con cualquiera de ellas; sin él, la primera.
+- Al volver de pagar, `GET /renta/cargos/{cargo}/confirmacion` (`facturacion.ver`)
+  responde `estado`: `confirmado` (pagado), `en_proceso` o `no_completado`.
 - Mercado Pago abre una preferencia (redirect) con el cargo como `external_reference`.
   OpenPay abre un cargo con tarjeta en su página (redirect).
 - Avisos de la plataforma:
@@ -1892,3 +1900,15 @@ en el negocio.
   lo revisa con las mismas reglas (422 con `meta.errors`) y devuelve lo mismo que
   `GET /sitio/vista-previa` con ese borrador, sin guardarlo.
 
+## Regreso de la pasarela (ajuste del 2026-10-23)
+
+- La URL de regreso de un pago en línea trae `?pago=exito|pendiente|cancelado` y, en
+  `exito` y `pendiente`, `ref_pago` con el ULID del pago (o del cargo de renta). Volver
+  con `exito` no es estar pagado: OpenPay vuelve siempre así.
+- `GET /pagos/{pago}/confirmacion` (sin sesión, como la cita y el presupuesto sin
+  cuenta): responde solo `estado`: `confirmado` (aprobado, aunque luego se devuelva),
+  `en_proceso` (sin aviso de la pasarela todavía) o `no_completado` (rechazado o
+  anulado). Nada de montos ni datos de la persona. 404 si el pago no es de ese negocio.
+- La web dice «Estamos confirmando tu pago» (neutro) y pregunta cada 3 segundos hasta un
+  minuto; solo con `confirmado` dice «Pago confirmado», en verde. Sin confirmación,
+  «sigue en confirmación; no hace falta pagar de nuevo».

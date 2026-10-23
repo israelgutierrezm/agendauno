@@ -29,7 +29,7 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
             throw new PasarelaNoDisponible('Stripe no tiene llaves configuradas.');
         }
 
-        $retorno = RetornoPago::urls($cargo->retorno ?? '/renta');
+        $retorno = RetornoPago::urls($cargo->retorno ?? '/renta', referencia: (string) $cargo->ulid);
         $cargo->loadMissing('estudio');
 
         $sesion = (new ClienteStripe($secretKey))->crearSesionCheckout(

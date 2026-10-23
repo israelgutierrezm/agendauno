@@ -15,6 +15,10 @@ use Illuminate\Http\Request;
  * o `?pago=cancelado`, para que avise cómo quedó el pago. Al autorizar una tarjeta
  * para pagos automáticos el parámetro es `tarjeta`.
  *
+ * Volver con `exito` no es estar pagado (OpenPay vuelve siempre así, y la URL se puede
+ * escribir a mano): con el pago o el cargo en `ref_pago`, la web le pregunta al servidor
+ * y solo dice «Pago confirmado» cuando el aviso de la pasarela ya lo aprobó.
+ *
  * Se vuelve al mismo sitio desde el que se inició el pago ({@see origen}): quien entró
  * por el subdominio de su negocio (`{slug}.dominio`, el del enlace y el QR) tiene ahí
  * su sesión, que no existe en el dominio raíz.
@@ -22,17 +26,19 @@ use Illuminate\Http\Request;
 final class RetornoPago
 {
     /**
+     * @param  string|null  $referencia  el ULID del pago (o del cargo de renta) que se confirma al volver
      * @return array{exito: string, pendiente: string, cancelado: string}
      */
-    public static function urls(?string $retorno, string $parametro = 'pago'): array
+    public static function urls(?string $retorno, string $parametro = 'pago', ?string $referencia = null): array
     {
         $ruta = '/'.ltrim($retorno ?? '/', '/');
         $base = self::origen().$ruta;
         $union = str_contains($base, '?') ? '&' : '?';
+        $ref = $referencia !== null && $referencia !== '' ? '&ref_pago='.rawurlencode($referencia) : '';
 
         return [
-            'exito' => $base.$union.$parametro.'=exito',
-            'pendiente' => $base.$union.$parametro.'=pendiente',
+            'exito' => $base.$union.$parametro.'=exito'.$ref,
+            'pendiente' => $base.$union.$parametro.'=pendiente'.$ref,
             'cancelado' => $base.$union.$parametro.'=cancelado',
         ];
     }

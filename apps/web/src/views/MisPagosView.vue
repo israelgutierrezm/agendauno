@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AvisoRetornoPago from "@/components/AvisoRetornoPago.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import ComprasMostrador from "@/components/ComprasMostrador.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
@@ -22,7 +23,7 @@ import {
   type Orden,
   type Voucher,
 } from "@/lib/miCuenta";
-import { useRetornoPago } from "@/lib/retornoPago";
+import { useConfirmacionPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -36,16 +37,21 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const cuenta = useMiCuenta();
-const retornoPago = useRetornoPago();
 const corte = ref<InstanceType<typeof CortePlanes> | null>(null);
 const historial = ref<InstanceType<typeof HistorialCompras> | null>(null);
-if (retornoPago.value === "exito" || retornoPago.value === "pendiente") {
-  // El webhook de la pasarela confirma el pago en segundos.
-  window.setTimeout(() => {
-    void cuenta.cargar(true);
-    void corte.value?.cargar();
-    void historial.value?.cargar();
-  }, 4000);
+function recargar(): void {
+  void cuenta.cargar(true);
+  void corte.value?.cargar();
+  void historial.value?.cargar();
+}
+// El aviso de la pasarela confirma el pago en segundos: al confirmarse, se recarga.
+const retornoPago = useConfirmacionPago(
+  (ref) =>
+    `/api/v1/app/${sesion.slug}/pagos/${encodeURIComponent(ref)}/confirmacion`,
+  recargar,
+);
+if (retornoPago.value === "en_proceso" || retornoPago.value === "pendiente") {
+  window.setTimeout(recargar, 4000);
 }
 
 const citas = computed(() => sesion.esCitas === true);
@@ -280,27 +286,20 @@ onMounted(() => void cuenta.asegurar());
         {{ $t("comun.reintentar") }}
       </button>
     </AvisoTono>
-    <p
-      v-if="retornoPago"
-      class="mt-3 text-sm"
-      role="status"
-      :style="{
-        color: retornoPago === 'exito' ? 'var(--exito)' : 'var(--aviso)',
-      }"
-    >
-      {{ $t(`pagoEnLinea.${retornoPago}`) }}
+    <AvisoRetornoPago v-if="retornoPago" class="mt-3" :estado="retornoPago">
       <!-- Pagó: el siguiente paso es reservar con su plan (C05). -->
-      <RouterLink
-        v-if="retornoPago === 'exito' && !sesion.esCitas"
-        :to="{
-          name: 'mis-reservas',
-          query: { vista: 'reservar', incluidas: '1' },
-        }"
-        class="tu-enlace ml-1"
-        data-prueba="reservar-tras-pago"
-        >{{ $t("portal.miReserva.reservarConPlan") }}</RouterLink
-      >
-    </p>
+      <template v-if="!sesion.esCitas" #confirmado>
+        <RouterLink
+          :to="{
+            name: 'mis-reservas',
+            query: { vista: 'reservar', incluidas: '1' },
+          }"
+          class="tu-enlace ml-1"
+          data-prueba="reservar-tras-pago"
+          >{{ $t("portal.miReserva.reservarConPlan") }}</RouterLink
+        >
+      </template>
+    </AvisoRetornoPago>
     <AvisoTono
       v-if="mensaje === 'pago'"
       tono="exito"

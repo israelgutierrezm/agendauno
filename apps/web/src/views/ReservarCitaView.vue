@@ -17,7 +17,7 @@ import { camposDeMedicion, eventoComercio } from "@/lib/etiquetas";
 import { separarTelefono } from "@/lib/ladas";
 import { intentoUnico } from "@/lib/intento";
 import { esDeOtraModalidad } from "@/lib/modalidad";
-import { useRetornoPago } from "@/lib/retornoPago";
+import { claveDeRetorno, useConfirmacionPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { PRODUCTOS } from "@/lib/producto";
 import { updateSeo } from "@/lib/seo";
@@ -139,8 +139,11 @@ const router = useRouter();
 const sesion = useSesionTenantStore();
 const { t, te } = useI18n();
 // Al volver de la página de pago: avisa cómo quedó.
-const retornoPago = useRetornoPago();
 const slug = computed(() => String(route.params.slug));
+const retornoPago = useConfirmacionPago(
+  (ref) =>
+    `/api/v1/app/${slug.value}/pagos/${encodeURIComponent(ref)}/confirmacion`,
+);
 
 const opciones = ref<Opciones | null>(null);
 const cargando = ref(true);
@@ -1119,23 +1122,25 @@ onMounted(cargar);
         v-if="retornoPago"
         class="mb-4 rounded-xl p-3 text-sm"
         role="status"
+        :data-estado="retornoPago"
         :style="{
           background:
-            retornoPago === 'exito'
+            retornoPago === 'confirmado'
               ? 'var(--exito-suave)'
               : 'var(--superficie-2)',
           color:
-            retornoPago === 'exito' ? 'var(--exito-texto)' : 'var(--texto)',
+            retornoPago === 'confirmado'
+              ? 'var(--exito-texto)'
+              : 'var(--texto)',
         }"
       >
         {{
-          retornoPago === "pendiente"
-            ? $t("pagoEnLinea.pendiente")
-            : retornoPago !== "exito"
-              ? $t("pagoEnLinea.cancelado")
-              : soloPago
-                ? $t("pagoEnLinea.exito")
-                : $t("pagoEnLinea.citaExito")
+          soloPago ||
+          (retornoPago !== "confirmando" && retornoPago !== "confirmado")
+            ? $t(claveDeRetorno(retornoPago))
+            : retornoPago === "confirmado"
+              ? $t("pagoEnLinea.citaConfirmado")
+              : $t("pagoEnLinea.citaConfirmando")
         }}
       </p>
       <!-- Encabezado con marca del estudio -->

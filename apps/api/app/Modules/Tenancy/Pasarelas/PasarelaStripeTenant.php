@@ -35,7 +35,7 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConsultable, P
         $api = self::api($llaves);
 
         $orden = $pago->orden()->with(['lineas.producto', 'persona'])->first();
-        $retorno = RetornoPago::urls($pago->retorno);
+        $retorno = RetornoPago::urls($pago->retorno, referencia: (string) $pago->ulid);
 
         // Compra con pago automático: la tarjeta queda autorizada para las renovaciones, a
         // nombre de quien paga (el comprador o su responsable, ADR 0129).

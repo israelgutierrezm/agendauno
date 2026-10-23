@@ -131,7 +131,7 @@ it('cobro Stripe con llaves abre la página de pago de Stripe y el webhook confi
     // La sesión cobra el total y regresa a Ventas con el resultado.
     Http::assertSent(fn ($r): bool => str_ends_with($r->url(), '/checkout/sessions')
         && $r['line_items'][0]['price_data']['unit_amount'] === 89900
-        && str_ends_with($r['success_url'], '/ventas?pago=exito')
+        && str_contains($r['success_url'], '/ventas?pago=exito&ref_pago=')
         && str_ends_with($r['cancel_url'], '/ventas?pago=cancelado'));
 
     expect(saldoComprador($e, $o['comprador']))->toBe(0); // aun sin fulfillment

@@ -146,7 +146,7 @@ export default {
     comprar: "Comprar",
     comprando: "Abriendo…",
     agotados: "Ya no tienes timbres: compra un paquete para seguir facturando.",
-    comprados: "Pago recibido: tus timbres se suman en un momento.",
+    comprados: "Pago confirmado: tus timbres ya están en tu saldo.",
     movimientos: "Movimientos",
     compra: "Compra",
     consumo: "Factura",

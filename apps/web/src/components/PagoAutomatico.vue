@@ -238,12 +238,12 @@ onMounted(async () => {
       class="mt-2 text-sm"
       role="status"
       :style="{
-        color: retorno === 'exito' ? 'var(--exito)' : 'var(--aviso)',
+        color: retorno === 'exito' ? 'var(--texto-suave)' : 'var(--aviso)',
       }"
     >
       {{
         retorno === "exito"
-          ? $t("pagoAutomatico.tarjetaExito")
+          ? $t("pagoAutomatico.tarjetaConfirmando")
           : $t("pagoAutomatico.tarjetaCancelado")
       }}
     </p>

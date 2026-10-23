@@ -1039,18 +1039,20 @@ export const recuperarContrasena = {
     "Este enlace está incompleto. Pide uno nuevo desde la pantalla de inicio de sesión.",
 };
 
-// Al volver de pagar no se afirma lo que la pasarela aún no confirma: un pago en
-// tienda (OXXO) o en revisión se aprueba después.
+// Al volver de pagar no se afirma lo que la pasarela aún no confirma (lib/retornoPago.ts):
+// «confirmando» hasta que el servidor lo confirma; un pago en tienda (OXXO) o en revisión
+// se aprueba después.
 export const pagoEnLinea = {
-  exito:
-    "¡Gracias! Estamos confirmando tu pago con la pasarela; en unos segundos lo verás aquí.",
+  confirmando: "Estamos confirmando tu pago con la pasarela…",
+  confirmado: "Pago confirmado. ¡Gracias!",
+  enProceso:
+    "Tu pago sigue en confirmación con la pasarela: lo verás aquí en cuanto se apruebe. No hace falta pagar de nuevo.",
   pendiente:
     "Tu pago quedó en proceso: se confirma cuando la pasarela lo apruebe (si elegiste pagar en tienda, cuando pagues).",
   cancelado: "El pago no se completó. Puedes intentarlo de nuevo.",
-  citaExito:
-    "¡Gracias! Estamos confirmando tu pago; tu cita se confirma en cuanto la pasarela lo apruebe.",
-  rentaExito:
-    "¡Gracias! Recibimos el pago de tu renta. Se confirma en unos segundos.",
+  citaConfirmando:
+    "Estamos confirmando tu pago; tu cita se confirma en cuanto la pasarela lo apruebe.",
+  citaConfirmado: "Pago confirmado: tu cita quedó confirmada.",
 };
 
 export const pausaMembresia = {
@@ -1270,8 +1272,8 @@ export const pagoAutomatico = {
   quitar: "Quitar",
   confirmarQuitar:
     "¿Quitar el pago automático? Cada renovación te avisaremos para que la pagues.",
-  tarjetaExito:
-    "Tarjeta autorizada. En unos segundos verás el pago automático activo.",
+  tarjetaConfirmando:
+    "Estamos confirmando tu tarjeta con la pasarela; en unos segundos verás aquí el pago automático activo.",
   tarjetaCancelado: "No se autorizó la tarjeta; puedes intentarlo de nuevo.",
   alPagar: "Cobrar automáticamente cada renovación",
   // Familias (ADR 0129): el responsable paga con su tarjeta.

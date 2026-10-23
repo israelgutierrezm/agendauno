@@ -17,7 +17,9 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -29,8 +31,8 @@ class BandejaTenantController
 {
     private const POR_PAGINA = 30;
 
-    /** Los mensajes que se muestran de una conversación (los más recientes). */
-    private const MENSAJES = 200;
+    /** Los mensajes de una conversación por tanda: al abrirla, los más recientes; los anteriores, a pedido. */
+    private const MENSAJES = 100;
 
     public function __construct(
         private readonly BandejaTenant $bandeja,
@@ -76,27 +78,40 @@ class BandejaTenantController
         ]);
     }
 
-    /** Una conversación con sus mensajes; abrirla la deja leída. */
+    /** Una conversación con sus mensajes más recientes; abrirla la deja leída. */
     public function show(Request $request): JsonResponse
     {
         $conversacion = $this->conversacion($request);
         if ($conversacion->no_leidos > 0) {
             $conversacion->forceFill(['no_leidos' => 0])->save();
         }
-        $mensajes = MensajeConversacionTenant::query()
-            ->where('conversacion_id', $conversacion->getKey())
-            ->with('autor')
-            ->orderByDesc('enviado_en')
-            ->orderByDesc('id')
-            ->limit(self::MENSAJES)
-            ->get()
-            ->reverse()
-            ->values();
+        [$mensajes, $hayAnteriores] = $this->tanda($conversacion);
 
         return response()->json(['data' => [
             ...$this->presentar($conversacion),
             'mensajes' => $mensajes->map(fn (MensajeConversacionTenant $m): array => $this->presentarMensaje($m))->all(),
+            'hay_anteriores' => $hayAnteriores,
         ]]);
+    }
+
+    /** «Cargar mensajes anteriores»: la tanda que va antes de un mensaje de la conversación. */
+    public function anteriores(Request $request): JsonResponse
+    {
+        $conversacion = $this->conversacion($request);
+        $validado = $request->validate(['antes' => ['required', 'string', 'max:26']]);
+        $referencia = MensajeConversacionTenant::query()
+            ->where('conversacion_id', $conversacion->getKey())
+            ->where('ulid', (string) $validado['antes'])
+            ->first();
+        if ($referencia === null) {
+            throw ValidationException::withMessages(['antes' => ['Ese mensaje no es de esta conversación.']]);
+        }
+        [$mensajes, $hayAnteriores] = $this->tanda($conversacion, $referencia);
+
+        return response()->json([
+            'data' => $mensajes->map(fn (MensajeConversacionTenant $m): array => $this->presentarMensaje($m))->all(),
+            'meta' => ['hay_anteriores' => $hayAnteriores],
+        ]);
     }
 
     public function enviar(Request $request): JsonResponse
@@ -265,6 +280,28 @@ class BandejaTenantController
                 'en_linea' => AdjuntosBandejaTenant::enLinea($m->adjunto_mime),
             ],
         ];
+    }
+
+    /**
+     * Una tanda de mensajes en orden de lectura, los más recientes (o los que van antes
+     * de `$antesDe`, por fecha y luego por id), y si quedan más atrás.
+     *
+     * @return array{0: Collection<int, MensajeConversacionTenant>, 1: bool}
+     */
+    private function tanda(ConversacionTenant $conversacion, ?MensajeConversacionTenant $antesDe = null): array
+    {
+        $mensajes = MensajeConversacionTenant::query()
+            ->where('conversacion_id', $conversacion->getKey())
+            ->when($antesDe !== null, fn ($q) => $q->where(fn ($w) => $w
+                ->where('enviado_en', '<', $antesDe?->enviado_en)
+                ->orWhere(fn ($mismo) => $mismo->where('enviado_en', $antesDe?->enviado_en)->where('id', '<', $antesDe?->getKey()))))
+            ->with('autor')
+            ->orderByDesc('enviado_en')
+            ->orderByDesc('id')
+            ->limit(self::MENSAJES + 1)
+            ->get();
+
+        return [$mensajes->take(self::MENSAJES)->reverse()->values(), $mensajes->count() > self::MENSAJES];
     }
 
     private function conversacion(Request $request): ConversacionTenant

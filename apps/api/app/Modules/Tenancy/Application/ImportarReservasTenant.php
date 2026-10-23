@@ -77,7 +77,7 @@ class ImportarReservasTenant
      * @param  list<array<string, string|int|null>>  $filas
      * @return array{ok: bool, importadas: int, lote: string|null, resumen: array{total: int, validas: int, existentes: int, pendientes: int, invalidas: int, en_espera: int, creditos_reintegrados: int}, filas: list<array<string, mixed>>}
      */
-    public function ejecutar(array $filas, Usuario $actor, string $corte, bool $yaDescontadas, bool $guardar = false, bool $parcial = false): array
+    public function ejecutar(array $filas, Usuario $actor, string $corte, bool $yaDescontadas, bool $guardar = false, bool $parcial = false, bool $recordar = false): array
     {
         $max = $this->parametros->entero('importaciones.max_filas');
         if (count($filas) > $max) {
@@ -148,7 +148,7 @@ class ImportarReservasTenant
                     if ($datos['referencia'] !== '') {
                         $reserva->forceFill(['referencia_externa' => $datos['referencia']])->save();
                     }
-                    $this->sinAvisos($reserva);
+                    $this->sinAvisos($reserva, $recordar);
                     $reintegradas += $reintegro;
                     if ($reintegro > 0) {
                         $resultado['avisos'][] = 'Su crédito ya se había descontado en el otro sistema: se reintegra y se aparta para esta clase.';
@@ -202,7 +202,7 @@ class ImportarReservasTenant
             }
 
             $this->auditoria->registrar($actor, 'importacion.reservas', 'importacion', $lote, null, [
-                'resumen' => $resumen, 'corte' => $corte, 'ya_descontadas' => $yaDescontadas, 'parcial' => $parcial,
+                'resumen' => $resumen, 'corte' => $corte, 'ya_descontadas' => $yaDescontadas, 'parcial' => $parcial, 'recordatorios' => $recordar,
             ]);
             $db->commit();
 
@@ -357,15 +357,16 @@ class ImportarReservasTenant
 
     /**
      * Importar no avisa: los eventos de esta reserva quedan publicados sin consumidores
-     * (ni correos, ni webhooks) y no lleva recordatorios.
+     * (ni correos, ni webhooks). Los recordatorios antes de la clase son aparte: solo
+     * si se pidieron al importar.
      */
-    private function sinAvisos(ReservaTenant $reserva): void
+    private function sinAvisos(ReservaTenant $reserva, bool $recordar): void
     {
         EventoOutboxTenant::query()
             ->where('agregado_id', (string) $reserva->ulid)
             ->whereNull('publicado_en')
             ->update(['publicado_en' => now(), 'ultimo_error' => 'Importada: sin avisos.']);
-        $reserva->forceFill(['sin_avisos' => true])->save();
+        $reserva->forceFill(['sin_avisos' => ! $recordar])->save();
     }
 
     private static function clave(string $nombre): string

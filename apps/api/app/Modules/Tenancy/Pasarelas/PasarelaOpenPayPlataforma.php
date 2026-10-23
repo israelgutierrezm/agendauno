@@ -26,7 +26,7 @@ class PasarelaOpenPayPlataforma implements PasarelaPlataforma
 
     public function cobrar(CargoRenta $cargo, array $llaves): ResultadoPago
     {
-        $retorno = RetornoPago::urls($cargo->retorno ?? '/renta');
+        $retorno = RetornoPago::urls($cargo->retorno ?? '/renta', referencia: (string) $cargo->ulid);
         $cargo->loadMissing('estudio');
         $estudio = $cargo->estudio;
 

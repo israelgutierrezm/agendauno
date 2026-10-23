@@ -73,7 +73,7 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, 
             $concepto,
             (string) $pago->ulid,
             $cliente,
-            RetornoPago::urls($pago->retorno)['exito'],
+            RetornoPago::urls($pago->retorno, referencia: (string) $pago->ulid)['exito'],
         );
 
         return ResultadoPago::pendiente($cargo['id'], ['tipo' => 'redirect', 'url' => $cargo['url']]);

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\GenerarRecordatoriosTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
@@ -11,6 +12,8 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Reservas\Recordatorio;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Testing\TestResponse;
@@ -68,11 +71,11 @@ function estudioParaImportarReservas(array $conPaquete, int $creditos = 8000): a
  * @param  list<string>  $filas  sin encabezado: email,clase,sucursal,fecha,hora,estado,posicion
  * @return array{previa: array<string, mixed>, importacion: TestResponse|null}
  */
-function importarReservasCsv(array $e, array $filas, bool $yaDescontadas = false, ?bool $parcial = null, string $corte = '2026-10-01'): array
+function importarReservasCsv(array $e, array $filas, bool $yaDescontadas = false, ?bool $parcial = null, string $corte = '2026-10-01', bool $recordatorios = false): array
 {
     $csv = "email,clase,sucursal,fecha,hora,estado,posicion\n".implode("\n", $filas)."\n";
     $archivo = fn (): UploadedFile => UploadedFile::fake()->createWithContent('reservas.csv', $csv);
-    $opciones = ['corte' => $corte, 'ya_descontadas' => $yaDescontadas ? '1' : '0'];
+    $opciones = ['corte' => $corte, 'ya_descontadas' => $yaDescontadas ? '1' : '0', 'recordatorios' => $recordatorios ? '1' : '0'];
     $previa = test()->post("/api/v1/app/{$e['slug']}/importaciones/reservas/preview", [...$opciones, 'archivo' => $archivo()], conBearer($e['bearer']))
         ->assertOk()->json('data');
     $importacion = $parcial === null ? null : test()->post("/api/v1/app/{$e['slug']}/importaciones/reservas", [
@@ -210,4 +213,41 @@ it('la confirmación vale solo para el archivo revisado', function (): void {
         'corte' => '2026-10-01', 'ya_descontadas' => '0', 'archivo' => $otro, 'confirmacion' => $r['previa']['confirmacion'],
     ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonPath('meta.errors.archivo.0', 'Vuelve a revisar el archivo: la confirmación expiró o cambió el contenido.');
     expect(reservasDeClasesImportadas($e['slug'])['reservas'])->toBe([]);
+});
+
+it('importar no avisa, pero con recordatorios la clase pendiente sí lleva el suyo antes', function (): void {
+    $e = estudioParaImportarReservas(['ana', 'beto']);
+    $recordatorioDe = fn (): array => app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), function (): array {
+        $reserva = ReservaTenant::query()->with('sesion')->sole();
+        app(GenerarRecordatoriosTenant::class)->ejecutar(CarbonImmutable::instance($reserva->sesion->inicia_en)->subHours(23));
+
+        return ['sin_avisos' => (bool) $reserva->sin_avisos, 'enviado' => $reserva->refresh()->{Recordatorio::UnDia->columna()} !== null];
+    });
+
+    importarReservasCsv($e, ['ana@correo.mx,Nivel 1,Roma Norte,2026-10-05,19:00,confirmada,'], parcial: false, recordatorios: true)['importacion']->assertCreated();
+    expect(reservasDeClasesImportadas($e['slug'])['avisos_pendientes'])->toBe(0)
+        ->and($recordatorioDe())->toBe(['sin_avisos' => false, 'enviado' => true]);
+    $bitacora = $this->getJson("/api/v1/app/{$e['slug']}/auditorias?accion=importacion.reservas", conBearer($e['bearer']))->json('data.0');
+    expect($bitacora['despues']['recordatorios'])->toBeTrue();
+
+    // Lo confirmado es lo que se revisó: con otras opciones, se pide revisar de nuevo.
+    $csv = "email,clase,sucursal,fecha,hora,estado,posicion\nbeto@correo.mx,Nivel 1,Roma Norte,2026-10-05,19:00,confirmada,\n";
+    $archivo = fn (): UploadedFile => UploadedFile::fake()->createWithContent('reservas.csv', $csv);
+    $previa = $this->post("/api/v1/app/{$e['slug']}/importaciones/reservas/preview", ['corte' => '2026-10-01', 'ya_descontadas' => '0', 'recordatorios' => '1', 'archivo' => $archivo()], conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    $this->post("/api/v1/app/{$e['slug']}/importaciones/reservas", ['corte' => '2026-10-01', 'ya_descontadas' => '0', 'archivo' => $archivo(), 'confirmacion' => $previa['confirmacion'], 'parcial' => '0'], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors(['archivo'], 'meta.errors');
+});
+
+it('sin recordatorios, la clase importada no lleva ninguno', function (): void {
+    $e = estudioParaImportarReservas(['ana']);
+    importarReservasCsv($e, ['ana@correo.mx,Nivel 1,Roma Norte,2026-10-05,19:00,confirmada,'], parcial: false)['importacion']->assertCreated();
+
+    $enviado = app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), function (): bool {
+        $reserva = ReservaTenant::query()->with('sesion')->sole();
+        app(GenerarRecordatoriosTenant::class)->ejecutar(CarbonImmutable::instance($reserva->sesion->inicia_en)->subHours(23));
+
+        return $reserva->refresh()->{Recordatorio::UnDia->columna()} !== null;
+    });
+    expect($enviado)->toBeFalse()->and(reservasDeClasesImportadas($e['slug'])['sin_avisos'])->toBeTrue();
 });
