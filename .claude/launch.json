@@ -65,6 +65,26 @@
         "apps/web/dist/agendauno"
       ],
       "port": 5178
+    },
+    {
+      "name": "api-8020",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location apps/api; $env:XDEBUG_MODE='off'; $env:APP_URL='http://localhost:8020'; php -d opcache.enable=1 -d opcache.enable_cli=1 artisan serve --port=8020"
+      ],
+      "port": 8020
+    },
+    {
+      "name": "web-8020",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location apps/web; $env:VITE_API_URL='http://localhost:8020'; npx vite --host 127.0.0.1 --port 5176 --strictPort"
+      ],
+      "port": 5176
     }
   ]
 }
