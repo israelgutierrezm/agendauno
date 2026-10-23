@@ -3,7 +3,6 @@ import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
-import ReservaConGoogleNegocio from "@/components/ReservaConGoogleNegocio.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -71,9 +70,6 @@ async function copiar(): Promise<void> {
         >{{ $t("sitioWeb.compartir.irFormularios") }}</RouterLink
       >
     </div>
-
-    <!-- Reserva con Google (ADR 0198), si la plataforma ya es socia -->
-    <ReservaConGoogleNegocio />
 
     <!-- Widgets para otra web (ADR 0141) -->
     <IntegrarWebView

@@ -12,7 +12,6 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { tokenRecaptcha } from "@/lib/recaptcha";
-import { avisarConversionGoogle } from "@/lib/reservaConGoogle";
 import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import { camposDeMedicion, eventoComercio } from "@/lib/etiquetas";
 import { separarTelefono } from "@/lib/ladas";
@@ -950,8 +949,6 @@ async function agendar(): Promise<void> {
   } finally {
     agendando.value = false;
   }
-  // Si llegó desde Reserva con Google, se le avisa a Google (ADR 0198).
-  avisarConversionGoogle(slug.value);
   // «Agendar y pagar» hace las dos cosas: apartada la cita, pasa directo al pago en
   // línea. Si el pago no arranca, queda apartada con «Pagar ahora» para reintentar.
   if (

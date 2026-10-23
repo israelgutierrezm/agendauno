@@ -4,13 +4,12 @@ import { createI18n } from "vue-i18n";
 
 import es from "@/i18n/locales/es-MX";
 import { MODALIDADES, MODOS, type Modo } from "@/marketing/modalidades";
-import { soluciones } from "@/marketing/soluciones";
 import NovedadesLanding from "./NovedadesLanding.vue";
 
 /*
 | «Lo nuevo» de /clases y /citas: seis novedades por modalidad, con su ejemplo, sus
 | tres puntos y la nota de México donde algo lleva «*». Cada página habla solo de su
-| modalidad y nada promete lo que se retiró (Reserva con Google).
+| modalidad.
 */
 
 function montar(modo: Modo, slot?: string) {
@@ -119,12 +118,5 @@ describe("«Lo nuevo» de cada modalidad", () => {
     );
     vista.unmount();
     expect(montar("citas").find(".novedades-pie").exists()).toBe(false);
-  });
-
-  it("la parte comercial no menciona Reserva con Google (se retira del producto)", () => {
-    const comercial = JSON.stringify([es.landing, soluciones]);
-    expect(comercial).not.toMatch(
-      /reserva(r)? con google|reserve with google/i,
-    );
   });
 });

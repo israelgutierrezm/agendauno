@@ -43,7 +43,6 @@ use Illuminate\Support\Carbon;
  * @property string $cuota_fija_moneda
  * @property string|null $codigo_referido su código para invitar a otros negocios (ADR 0188)
  * @property int|null $referido_por_id el negocio que lo invitó (ADR 0188)
- * @property Carbon|null $en_reserva_google_desde aparece en Reserva con Google (ADR 0198)
  * @property string|null $stripe_cliente_id
  * @property string|null $domiciliacion_metodo la tarjeta domiciliada (`pm_…` en la cuenta de la plataforma)
  */
@@ -143,7 +142,6 @@ class Estudio extends Model
         'plan_cubierto_hasta' => 'date',
         'plan_siguiente' => 'array',
         'domiciliada_en' => 'datetime',
-        'en_reserva_google_desde' => 'datetime',
         'onboarding_pasos' => 'array',
         'onboarding_completo' => 'boolean',
         'contacto_whatsapp_verificado_en' => 'datetime',

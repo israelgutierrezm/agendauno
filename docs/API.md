@@ -1539,8 +1539,10 @@ en el negocio.
   `pagos_sin_visita`, `montos_distintos`.
 - **WhatsApp por mensaje (0186).** `GET /whatsapp/saldo` (`activo`, `cobra`,
   `precio_minor`, `disponibles`, `usados_mes`, `tope_mensual`, `paquetes`, `plantillas`,
-  `movimientos`); `POST /whatsapp/comprar` {`cantidad`} → `checkout`. Sin saldo o en el
-  tope, el aviso se descarta con el motivo.
+  `movimientos`, `moneda`); `POST /whatsapp/comprar` {`cantidad`} → `checkout`. Sin saldo
+  o en el tope, el aviso se descarta con el motivo. En México, en pesos más IVA; fuera de
+  México, en dólares sin IVA (`moneda: USD`). El alcance de una campaña por WhatsApp suma
+  `costo_moneda`.
 - **Niveles y práctica libre (0187).** `PUT /ofertas/{oferta}` acepta `nivel_id` (de su
   actividad) y `practica_libre`; responde `nivel`, `niveles_actividad` y
   `practica_libre`. `GET/PUT /miembros/{persona}/niveles` {`actividad_id`, `nivel_id`}.
@@ -1667,17 +1669,6 @@ en el negocio.
   devuelve en texto; los cambios llegan en `value` con `subscriptionId` y
   `clientState`). Si el canal y su secreto son de una conexión activa, la sincronizan
   en cola. Responden 200 o 202 siempre.
-
-### Reserva con Google (ADR 0198)
-
-- `GET /reserva-con-google` (`integraciones.configurar`) devuelve {`disponible` (la
-  plataforma es socia), `activo`, `faltantes` (`pagina`, `ubicacion`)}.
-- `PUT /reserva-con-google` {`activo`} lo enciende o lo apaga. Responde 422 si no está
-  disponible o le falta algo.
-- `POST /reserva-con-google/conversion` (sin sesión) {`rwg_token`} avisa a Google de
-  una reserva que llegó desde ahí. Devuelve {`enviada`}.
-- `agendauno:reserva-con-google` (diario) escribe los feeds `entity_*.json` y
-  `action_*.json`.
 
 ### Fitpass (ADR 0197)
 

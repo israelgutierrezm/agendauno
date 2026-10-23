@@ -14,7 +14,6 @@ import {
 } from "@/lib/atribucion";
 import { volverSeguro } from "@/lib/destinoSeguro";
 import { navegar } from "@/lib/etiquetas";
-import { capturarRwgToken } from "@/lib/reservaConGoogle";
 import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
 import { preciosPublicos } from "@/marketing/preciosPublicos";
@@ -691,13 +690,6 @@ const router = createRouter({
 let referrerDeLaCarga =
   typeof document === "undefined" ? "" : document.referrer;
 router.beforeEach((to) => {
-  // Quien llega desde Reserva con Google (ADR 0198): su token, por negocio.
-  if (typeof to.query.rwg_token === "string") {
-    capturarRwgToken(
-      typeof to.params.slug === "string" ? to.params.slug : slugDeContexto(),
-      to.query.rwg_token,
-    );
-  }
   const ambito = ambitoDeRuta(to);
   if (ambito !== null) {
     capturarAtribucion(

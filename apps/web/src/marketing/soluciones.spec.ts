@@ -73,8 +73,6 @@ describe("textos veraces de las páginas por giro", () => {
         expect(texto, s.slug).toMatch(/en México/);
       }
       expect(texto, s.slug).not.toMatch(/en preparaci[oó]n/i);
-      // Reserva con Google se retira del producto: ninguna página la anuncia.
-      expect(texto, s.slug).not.toMatch(/reserva(r)? con google/i);
       expect(texto, s.slug).not.toMatch(/todav[ií]a no publicada/i);
       // Los recordatorios solo van por correo.
       expect(texto, s.slug).not.toMatch(/whatsapp|notificaci[oó]n push/i);

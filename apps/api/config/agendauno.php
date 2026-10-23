@@ -92,18 +92,6 @@ return [
     ],
 
     /*
-    | Reserva con Google (ADR 0198), integración «redirect» del Actions Center. Sin el id
-    | de socio que da Google al aprobar a la plataforma no se genera ni se avisa nada.
-    | Los feeds se escriben en `disco`/`carpeta`; la plataforma los sube al SFTP de Google.
-    */
-    'reserva_google' => [
-        'partner_id' => env('RESERVA_GOOGLE_PARTNER_ID', ''),
-        'disco' => env('RESERVA_GOOGLE_DISCO', 'local'),
-        'carpeta' => env('RESERVA_GOOGLE_CARPETA', 'reserva-google'),
-        'url_conversion' => env('RESERVA_GOOGLE_URL_CONVERSION', 'https://www.google.com/maps/conversion/collect'),
-    ],
-
-    /*
     | La bandeja de WhatsApp e Instagram de cada negocio (ADR 0200). WhatsApp: la app de
     | Meta de la plataforma como Tech Provider y la configuración de su registro
     | insertado (`whatsapp_config_id`). Instagram: el id y el secreto de Instagram de la
