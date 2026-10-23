@@ -292,6 +292,12 @@ export interface ContenidoModalidad {
    * Solo lo que el producto hace hoy (ver la tabla de incongruencias del análisis).
    */
   funciones: readonly string[];
+  /**
+   * «Lo nuevo», alto en la página (NovedadesLanding): seis claves de
+   * `landing.{modo}.novedades.items.{clave}`, cada una con título, texto y tres puntos
+   * (`p1`–`p3`). Solo lo que el producto ya hace, sin mezclar clases con citas.
+   */
+  novedades: readonly string[];
   /** Preguntas frecuentes propias: claves de `landing.{modo}.faq.{clave}`. */
   preguntas: readonly string[];
   /** Hero de la página: el texto animado y las tres fotos del collage. */
@@ -322,7 +328,7 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     seo: {
       title: "Software de reservas para estudios y gimnasios | AgendaUno",
       description:
-        "Gestiona reservas de clases, cupos, membresías y cobros para tu estudio o academia.",
+        "Reservas de clases, cupos, membresías, cobros y Wellhub o TotalPass para tu estudio o gimnasio.",
       imagen: "/assets/landing/disciplinas/pilates-v1.jpg",
       imagenAlt: "Alumna practicando Pilates Reformer en un estudio moderno",
       miga: ETIQUETA_MENU.clases,
@@ -330,8 +336,24 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     perfiles: PERFILES_POR_MODO.clases,
     negocios: NEGOCIOS_POR_MODO.clases,
     // Cupos por clase, lista de espera, membresías y créditos, pase de lista con
-    // retardos (ADR 0101) y el QR como pase de entrada (no registra la asistencia).
-    funciones: ["cupos", "listaEspera", "membresias", "asistencia", "paseQr"],
+    // retardos (ADR 0101), el QR como pase de entrada (no registra la asistencia),
+    // kiosco de llegada (ADR 0183), videos y clases en línea (ADR 0184), productos
+    // apartados al reservar (ADR 0194) y Google Calendar u Outlook (ADR 0199).
+    funciones: [
+      "cupos",
+      "listaEspera",
+      "membresias",
+      "asistencia",
+      "paseQr",
+      "kiosco",
+      "videos",
+      "apartados",
+      "calendarios",
+    ],
+    // Wellhub, TotalPass y Fitpass (ADR 0148, 0149, 0197 y 0202), el pase en Apple y
+    // Google Wallet (ADR 0195), los widgets para la web del negocio (ADR 0141), las
+    // apps, la bandeja de WhatsApp e Instagram (ADR 0200) y la caja (ADR 0175/0177).
+    novedades: ["plataformas", "wallet", "widgets", "app", "bandeja", "caja"],
     // Sin autorregistro de alumnos (ADR 0093) y el QR como pase de entrada. Quién
     // cambia la modalidad (ADR 0104) va aquí, no en el registro.
     preguntas: [
@@ -340,6 +362,9 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
       "listaEspera",
       "asistencia",
       "paseQr",
+      "wallet",
+      "plataformas",
+      "web",
       "sucursales",
       // Objeciones de quien ya opera con otro sistema (plan de mejoras C01).
       "migracion",
@@ -368,8 +393,9 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     },
     pasos: ["preparar", "invitar", "operar"],
     operacion: ["lista", "paseQr", "ventas"],
-    // La página pública de clases termina en «Pedir acceso / Ya soy alumno».
-    pagina: ["compartir", "lugares", "directorio"],
+    // La página pública de clases termina en «Pedir acceso / Ya soy alumno». Se
+    // instala como app con el logo del negocio (ADR 0110) y va en su dominio (ADR 0189).
+    pagina: ["compartir", "lugares", "app", "dominio", "directorio"],
     notaSalud: false,
     otra: "citas",
   },
@@ -381,7 +407,7 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     seo: {
       title: "Agenda de citas: barberías, spas y consultorios | AgendaUno",
       description:
-        "Agenda de citas para barberías, estéticas y consultorios: profesionales, reservas y cobros.",
+        "Agenda de citas para barberías, estéticas y consultorios: reservas en línea, anticipos y cobros.",
       imagen: "/assets/landing/disciplinas/barberia-v1.jpg",
       imagenAlt: "Barbero atendiendo a un cliente en una barbería moderna",
       miga: ETIQUETA_MENU.citas,
@@ -389,21 +415,42 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     perfiles: PERFILES_POR_MODO.citas,
     negocios: NEGOCIOS_POR_MODO.citas,
     // Agenda por profesional, «cualquier profesional disponible» (ADR 0062),
-    // paquetes de servicios (ADR 0063), cobro en línea al agendar* (ADR 0065; solo
-    // México) y recordatorios por correo (sin WhatsApp, push ni app).
+    // paquetes de servicios (ADR 0063), cobro en línea al agendar* (ADR 0065 y el
+    // anticipo, ADR 0161; solo México), recordatorios por correo (sin WhatsApp, push
+    // ni app), Google Calendar u Outlook (ADR 0199), caja con arqueo y cobro mixto
+    // (ADR 0175/0177), comisiones y nómina (ADR 0153) y el mostrador con inventario.
     funciones: [
       "agendaProfesional",
       "cualquierProfesional",
       "paquetes",
       "cobroAlAgendar",
       "recordatorios",
+      "calendarios",
+      "caja",
+      "comisiones",
+      "inventario",
+    ],
+    // Anticipo al agendar* (ADR 0161), presupuestos en línea (ADR 0127), facturas
+    // automáticas con su CFDI de egreso* (ADR 0163), el widget «Agendar cita» (ADR
+    // 0141), la bandeja de WhatsApp e Instagram (ADR 0200) y las apps.
+    novedades: [
+      "anticipo",
+      "presupuestos",
+      "factura",
+      "widget",
+      "bandeja",
+      "app",
     ],
     // Agendar sin cuenta (ADR 0093), cobro al agendar* (ADR 0065), espacios (ADR 0039)
-    // y quién cambia la modalidad (ADR 0104).
+    // y quién cambia la modalidad (ADR 0104). Agendar desde la web del negocio (ADR
+    // 0141), presupuestos en línea (ADR 0127) y facturas automáticas* (ADR 0163).
     preguntas: [
       "cuenta",
       "cualquierProfesional",
       "cobro",
+      "web",
+      "presupuestos",
+      "factura",
       "recordatorios",
       "paquetes",
       "espacios",
@@ -431,8 +478,9 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     },
     pasos: ["preparar", "compartir", "operar"],
     operacion: ["llegada", "cobro", "pos"],
-    // Servicio → profesional («Cualquier profesional») → hora, sin cuenta.
-    pagina: ["compartir", "cualquiera", "cobro"],
+    // Servicio → profesional («Cualquier profesional») → hora, sin cuenta. Se instala
+    // como app con el logo del negocio (ADR 0110) y va en su dominio (ADR 0189).
+    pagina: ["compartir", "cualquiera", "cobro", "app", "dominio"],
     notaSalud: true,
     otra: "clases",
   },

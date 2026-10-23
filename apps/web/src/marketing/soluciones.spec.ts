@@ -67,9 +67,14 @@ describe("textos veraces de las páginas por giro", () => {
   it("no anuncian lo que no existe", () => {
     for (const s of soluciones) {
       const texto = textoDe(s);
-      // Solo hay cobro completo al agendar, no anticipos.
-      expect(texto, s.slug).not.toMatch(/anticipo/i);
+      // El anticipo existe (ADR 0161), pero solo en citas y con pasarela (México).
+      if (/anticipo/i.test(texto)) {
+        expect(s.modo, s.slug).toBe("citas");
+        expect(texto, s.slug).toMatch(/en México/);
+      }
       expect(texto, s.slug).not.toMatch(/en preparaci[oó]n/i);
+      // Reserva con Google se retira del producto: ninguna página la anuncia.
+      expect(texto, s.slug).not.toMatch(/reserva(r)? con google/i);
       expect(texto, s.slug).not.toMatch(/todav[ií]a no publicada/i);
       // Los recordatorios solo van por correo.
       expect(texto, s.slug).not.toMatch(/whatsapp|notificaci[oó]n push/i);
@@ -114,6 +119,32 @@ describe("textos veraces de las páginas por giro", () => {
     const cabinas = spas.preguntas.find((p) => /cabinas/i.test(p.pregunta))!;
     expect(cabinas.respuesta).toMatch(/^Sí, en los planes Premium y Pro\./);
     expect(cabinas.respuesta).toContain("profesional y un espacio libres");
+  });
+
+  it("Wellhub, TotalPass y Fitpass en los giros de clases que más los usan, con Fitpass solo en México", () => {
+    for (const slug of ["crossfit-hyrox", "pilates", "yoga"]) {
+      const s = soluciones.find((x) => x.slug === slug)!;
+      const pregunta = s.preguntas.find((p) => /Wellhub/.test(p.pregunta));
+      expect(pregunta, slug).toBeDefined();
+      expect(pregunta!.respuesta).toMatch(/^Sí\./);
+      expect(pregunta!.respuesta).toContain("Fitpass, solo en México");
+      // Sin «*»: estas páginas no llevan la nota de México.
+      expect(pregunta!.respuesta).not.toContain("*");
+    }
+    // En citas no se habla de plataformas de bienestar.
+    for (const s of soluciones.filter((x) => x.modo === "citas")) {
+      expect(textoDe(s), s.slug).not.toMatch(/Wellhub|TotalPass|Fitpass/);
+    }
+  });
+
+  it("los presupuestos en línea de spas y dentistas dicen que el pago en línea es en México (ADR 0127)", () => {
+    for (const slug of ["spas", "dentistas"]) {
+      const s = soluciones.find((x) => x.slug === slug)!;
+      const pregunta = s.preguntas.find((p) => /presupuesto/i.test(p.pregunta));
+      expect(pregunta, slug).toBeDefined();
+      expect(pregunta!.respuesta).toMatch(/^Sí\./);
+      expect(pregunta!.respuesta).toContain("en México, en línea");
+    }
   });
 
   it("el cobro de citas es por plan y profesionales contratados (ADR 0107)", () => {

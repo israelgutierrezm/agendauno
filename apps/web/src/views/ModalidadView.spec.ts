@@ -203,6 +203,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
         await flushPromises();
         for (const cta of [
           "hero",
+          "whats_new",
           "product_demo",
           "business_carousel",
           "public_page",
@@ -274,8 +275,9 @@ describe("landing de una modalidad (/clases y /citas)", () => {
     expect(texto).not.toMatch(/\bcupos?\b/i);
     expect(texto).not.toMatch(/lista de espera/i);
     expect(texto).not.toMatch(/alumno/i);
-    // Lo veraz de citas: sin anticipos, recordatorios solo por correo.
-    expect(texto).not.toMatch(/anticipos?\b/i);
+    // Lo veraz de citas: el anticipo ya existe (ADR 0161); recordatorios solo por
+    // correo.
+    expect(texto).toMatch(/anticipo/i);
     expect(texto).not.toMatch(
       /recordatorios? (por|en) (whatsapp|push|notificaci|la app)/i,
     );
@@ -297,6 +299,57 @@ describe("landing de una modalidad (/clases y /citas)", () => {
     expect(texto).toMatch(/retardo/i);
     vista.unmount();
   });
+
+  it.each(MODOS_PRUEBA)(
+    "%s: «Lo nuevo» va después de los sellos y antes de la agenda, en la banda gris del hero",
+    (modo) => {
+      const vista = montar(modo);
+      const novedades = vista.get("#novedades");
+      // No es una banda: continúa la gris del hero, como los sellos de confianza.
+      expect(novedades.classes()).not.toContain("tu-banda");
+      expect(novedades.classes()).toContain("tu-ancla");
+      const raiz = vista.get(".tu-landing").element;
+      const hijos = Array.from(raiz.children);
+      expect(
+        [".tu-hero", ".tu-confianza", "#novedades", "#producto"].map(
+          (selector) => hijos.indexOf(raiz.querySelector(selector)!),
+        ),
+      ).toEqual([0, 1, 2, 3]);
+      // Sus seis novedades, en el orden declarado.
+      expect(
+        novedades
+          .findAll("[data-novedad]")
+          .map((n) => n.attributes("data-novedad")),
+      ).toEqual([...MODALIDADES[modo].novedades]);
+      expect(novedades.get("h2").text()).toBe(
+        es.landing[modo].novedades.titulo,
+      );
+      // Las dos llevan algo que solo opera en México (Fitpass; anticipo y CFDI).
+      expect(novedades.find(".tu-nota-mexico").exists()).toBe(true);
+      vista.unmount();
+    },
+  );
+
+  it.each(MODOS_PRUEBA)(
+    "%s: el botón de «Lo nuevo» lleva al registro con su modalidad y se mide",
+    async (modo) => {
+      const vista = montar(modo);
+      await flushPromises();
+      const boton = vista.get('#novedades [data-cta="whats_new"]');
+      expect(boton.attributes("href")).toBe(`/registro?modo=${modo}`);
+      expect(boton.text()).toBe(es.landing[modo].novedades.cta);
+      expect(boton.classes()).toEqual(
+        expect.arrayContaining(["tu-btn", "tu-btn-primario"]),
+      );
+      await boton.trigger("click");
+      expect(trackEvent).toHaveBeenCalledWith("marketing_cta_clicked", {
+        placement: "whats_new",
+        destination: "register",
+        mode: modo,
+      });
+      vista.unmount();
+    },
+  );
 
   it("la página pública de clases termina en «Pedir acceso / Ya soy alumno»", () => {
     const vista = montar("clases");

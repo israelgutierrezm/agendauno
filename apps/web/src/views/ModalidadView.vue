@@ -16,6 +16,7 @@ import FuncionesLanding from "@/components/FuncionesLanding.vue";
 import HeroCollage, { type FotoCollage } from "@/components/HeroCollage.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import NegociosAnimados from "@/components/NegociosAnimados.vue";
+import NovedadesLanding from "@/components/NovedadesLanding.vue";
 import PreciosLanding from "@/components/PreciosLanding.vue";
 import PreguntasFrecuentes from "@/components/PreguntasFrecuentes.vue";
 import ProductoDemo from "@/components/ProductoDemo.vue";
@@ -50,7 +51,8 @@ import "@/marketing/landing.css";
 | /citas aunque se reutilice la vista.
 |
 | Bandas: alternan gris (`--fondo`) y blanco (`--superficie`); las de componentes con
-| tarjetas blancas (funciones, precios, carrusel) van en gris.
+| tarjetas blancas (funciones, precios, carrusel) van en gris. Los sellos de confianza
+| y «Lo nuevo» (NovedadesLanding) continúan la banda gris del hero: no son bandas.
 */
 const props = defineProps<{ modo: Modo }>();
 const { t } = useI18n();
@@ -300,6 +302,19 @@ function medirOtra(): void {
 
     <!-- ===================== CONFIANZA ===================== -->
     <SellosConfianza :modo="modo" />
+
+    <!-- ===================== LO NUEVO ===================== -->
+    <!-- Seis novedades de su modalidad, alto en la página (el primer gancho). -->
+    <NovedadesLanding :modo="modo">
+      <RouterLink
+        class="tu-btn tu-btn-primario px-7 py-3"
+        :to="registro"
+        data-cta="whats_new"
+        @click="medirRegistro('whats_new')"
+      >
+        {{ alRegistro("novedades.cta") }}
+      </RouterLink>
+    </NovedadesLanding>
 
     <!-- ===================== PRODUCTO ===================== -->
     <section id="producto" class="tu-banda tu-ancla" :style="BANDA_SUPERFICIE">

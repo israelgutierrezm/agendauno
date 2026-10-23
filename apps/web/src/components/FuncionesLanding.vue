@@ -106,6 +106,20 @@ const ICONOS_MODO: Record<string, readonly string[]> = {
   paquetes: ["m12 3 9 5-9 5-9-5z", "m3 13 9 5 9-5"],
   cobroAlAgendar: ICONO_COBRO,
   recordatorios: ["M3 6h18v12H3z", "m3 7 9 6 9-6"],
+  kiosco: ["M5 3h14v18H5z", "M11 18h2", "M9 7h6v6H9z"],
+  videos: ["M3 5h18v14H3z", "m10 9 5 3-5 3z"],
+  apartados: ["M4 8h16l-1 12H5z", "M8 8V6a4 4 0 0 1 8 0v2", "m9 14 2 2 4-4"],
+  calendarios: ["M4 6h16v14H4z", "M4 10h16M8 3v5M16 3v5", "m9 15 2 2 4-4"],
+  caja: [
+    "M3 7h18v10H3z",
+    "M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
+    "M6 10v4M18 10v4",
+  ],
+  comisiones: [
+    "M5 19 19 5",
+    "M7 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  ],
+  inventario: ["m12 3 8 4v10l-8 4-8-4V7z", "m4 7 8 4 8-4M12 11v10"],
 };
 
 const funciones = computed<Funcion[]>(() => {
@@ -347,6 +361,40 @@ function medirRegistro(): void {
             </div>
             <span class="mini-confirmacion">Entrada registrada · 08:52</span>
           </template>
+          <template v-else-if="f.clave === 'kiosco'">
+            <div class="mini-reserva">
+              <span>Kiosco · Recepción</span><strong>Bienvenida, Ana</strong>
+              <div>
+                <span>Pilates 18:00</span
+                ><span class="hora-elegida">Sala 2</span>
+              </div>
+            </div>
+            <span class="mini-confirmacion">Asistencia registrada</span>
+          </template>
+          <template v-else-if="f.clave === 'videos'">
+            <div class="mini-cobro">
+              <span>Videos para socios</span>
+              <div><span>Movilidad de cadera · 20 min</span><b>Ver</b></div>
+              <div><span>Core en casa · 15 min</span><b>Plan Socio</b></div>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'apartados'">
+            <div class="mini-cobro">
+              <span>Pilates 18:00 · Para recoger en el mostrador</span>
+              <div><span>Agua natural × 1</span><b>Apartado</b></div>
+              <div>
+                <span>Calcetines antiderrapantes × 1</span><b>Apartado</b>
+              </div>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'calendarios' && modo === 'clases'">
+            <div class="mini-reserva">
+              <span>Google Calendar · Andrea</span
+              ><strong>Pilates Reformer · 18:00</strong>
+              <div><span>Estudio Alma</span><span>Sala 2</span></div>
+            </div>
+            <span class="mini-confirmacion">Ocupada a las 20:00</span>
+          </template>
 
           <!-- Citas (/citas) -->
           <template v-else-if="f.clave === 'agendaProfesional'">
@@ -396,6 +444,54 @@ function medirRegistro(): void {
               <div><span>Vie 18:00</span><span>Con Marco</span></div>
             </div>
             <span class="mini-confirmacion">Otro aviso 2 h antes</span>
+          </template>
+          <template v-else-if="f.clave === 'calendarios'">
+            <div class="mini-reserva">
+              <span>Google Calendar · Marco</span
+              ><strong>Corte y barba · 17:30</strong>
+              <div><span>Barbería Norte</span><span>Sucursal Centro</span></div>
+            </div>
+            <span class="mini-confirmacion">Ocupado a las 19:00</span>
+          </template>
+          <template v-else-if="f.clave === 'caja'">
+            <div class="mini-cobro">
+              <span>Corte y barba · Marco</span
+              ><strong>Cobro mixto <span>$450</span></strong>
+              <div><span>Efectivo $200 · Tarjeta $250</span><b>Pagado</b></div>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'comisiones'">
+            <div class="mini-cobro">
+              <span>Nómina · 1 al 15 de octubre</span>
+              <div><span>Marco · devengado</span><b>$6,840</b></div>
+              <div><span>Marco · por venir</span><b>$2,300</b></div>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'inventario'">
+            <div class="mini-producto">
+              <svg
+                viewBox="0 0 32 44"
+                width="26"
+                height="40"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M9 9h14v5H9zM8 14h16v26H8zM12 22h8M12 27h8M12 32h5" />
+              </svg>
+              <div>
+                <strong>Cera para cabello</strong
+                ><small>Producto · Sucursal Centro</small>
+              </div>
+              <span>+1</span>
+            </div>
+            <div class="mini-stock">
+              <span>Existencias</span>
+              <div>
+                <i v-for="n in 10" :key="n" :class="{ libre: n > 6 }"></i>
+              </div>
+              <strong>6 disponibles</strong>
+            </div>
           </template>
         </div>
         <button

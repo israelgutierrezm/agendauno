@@ -101,9 +101,21 @@ describe("tarjetas de funcionalidades", () => {
       "Membresías y créditos",
       "Pase de lista con retardos",
       "Pase QR de entrada en gimnasios",
+      "Kiosco de llegada",
+      "Videos y clases en línea",
+      "Productos apartados al reservar",
+      "Google Calendar y Outlook",
     ]);
-    expect(vista.findAll(".funcion-visual")).toHaveLength(5);
-    expect(vista.findAll(".funcion-icono svg")).toHaveLength(5);
+    expect(vista.findAll(".funcion-visual")).toHaveLength(9);
+    expect(vista.findAll(".funcion-icono svg")).toHaveLength(9);
+    // Cada función nueva con su propio ejemplo (no el de otra ni vacío).
+    for (const clave of ["kiosco", "videos", "apartados", "calendarios"]) {
+      expect(
+        vista.get(`.visual-${clave}`).text().length,
+        clave,
+      ).toBeGreaterThan(15);
+    }
+    expect(vista.get(".visual-calendarios").text()).toContain("Pilates");
     expect(vista.text()).not.toMatch(/profesional|corte|barba|cita/i);
     expect(vista.text()).not.toContain("✓");
     // Sin cobros en línea, sin nota de México.
@@ -165,9 +177,23 @@ describe("tarjetas de funcionalidades", () => {
       "Paquetes de servicios",
       "Cobro en línea al agendar*",
       "Recordatorios por correo",
+      "Google Calendar y Outlook, sin choques",
+      "Caja con arqueo y cobro mixto",
+      "Comisiones y nómina",
+      "Punto de venta e inventario",
     ]);
+    expect(vista.findAll(".funcion-visual")).toHaveLength(9);
+    for (const clave of ["calendarios", "caja", "comisiones", "inventario"]) {
+      expect(
+        vista.get(`.visual-${clave}`).text().length,
+        clave,
+      ).toBeGreaterThan(15);
+    }
+    // El mismo `calendarios` que en clases, con su ejemplo de citas.
+    expect(vista.get(".visual-calendarios").text()).toContain("Corte y barba");
+    // El anticipo ya existe (ADR 0161); los recordatorios siguen por correo.
     expect(vista.text()).not.toMatch(
-      /pilates|pole|yoga|cupo|lista de espera|alumno|anticipo|whatsapp/i,
+      /pilates|pole|yoga|cupo|lista de espera|alumno|whatsapp/i,
     );
     expect(vista.get(".tu-nota-mexico").text()).toBe(
       "* Solo para negocios en México (cobros en pesos).",

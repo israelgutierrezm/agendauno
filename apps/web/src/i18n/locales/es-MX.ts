@@ -398,6 +398,113 @@ export default {
           detalle:
             "Recepción escanea el pase y ve si la persona tiene una membresía de acceso libre o una reserva para esa hora. En los estudios de clases la entrada es la clase misma: basta con el pase de lista.",
         },
+        // Kiosco de llegada (ADR 0183): en iPad, Safari no lee códigos con la cámara.
+        kiosco: {
+          titulo: "Kiosco de llegada",
+          descripcion:
+            "Una tableta en recepción donde tus alumnos escanean su pase al llegar, sin que alguien del equipo tenga la sesión abierta.",
+          detalle:
+            "Si tiene clase a esa hora, queda su asistencia, con retardo si ya empezó; si llega antes de que abra la lista, la pantalla le dice desde qué hora. Solo muestra su primer nombre y su clase. Sirve cualquier tableta con navegador: con su cámara o, en iPad, con un lector de códigos.",
+        },
+        // Videos y clases en línea (ADR 0184): enlaces, no se aloja video.
+        videos: {
+          titulo: "Videos y clases en línea",
+          descripcion:
+            "Comparte tus videos de YouTube o Vimeo con los planes que elijas, y el enlace de tu clase en línea solo con quien reservó.",
+          detalle:
+            "Tus alumnos ven los videos de su plan en su cuenta y en la app; de los demás ven el título y qué plan los incluye, para animarlos a cambiar. No subes archivos: pones el enlace de tu YouTube, Vimeo o Zoom.",
+        },
+        // Productos al reservar (ADR 0194): se apartan y se pagan en el mostrador.
+        apartados: {
+          titulo: "Productos apartados al reservar",
+          descripcion:
+            "Al reservar, tus alumnos apartan agua, calcetines antiderrapantes o lo que ofrezcas, y lo pagan al recogerlo en el mostrador.",
+          detalle:
+            "Nunca se aparta más de lo que hay en la sede de la clase. Recepción ve lo apartado en la lista de la clase y lo cobra en el mostrador; el inventario se mueve con la venta, no al apartar.",
+        },
+        // Google Calendar y Outlook (ADR 0199): un calendario aparte, sin datos de
+        // alumnos; de su calendario solo se lee si está ocupado.
+        calendarios: {
+          titulo: "Google Calendar y Outlook",
+          descripcion:
+            "Cada instructor ve sus clases en su Google Calendar u Outlook, en un calendario aparte con el nombre de tu estudio.",
+          detalle:
+            "Lo que tiene ocupado en su calendario se marca en su agenda de AgendaUno, al momento. De su calendario solo se lee si está ocupado, no qué tiene, y ningún dato de tus alumnos sale de aquí.",
+        },
+      },
+      // «Lo nuevo» (NovedadesLanding): claves de MODALIDADES.clases.novedades, cada
+      // una con tres puntos. Wellhub y TotalPass, en los países que habilita la
+      // plataforma (México por omisión); Fitpass, solo en México («*», ADR 0202). Fitpass
+      // no tiene API: sus reservas las registra recepción (ADR 0197).
+      novedades: {
+        etiqueta: "Lo nuevo en AgendaUno",
+        titulo: "Más reservas desde más lugares, en tu misma agenda.",
+        enfasis: "desde más lugares",
+        subtitulo:
+          "Las apps de bienestar, tu propia web, tu WhatsApp y tu Instagram ya llegan al mismo lugar, y tus alumnos entran con el pase de su teléfono.",
+        cta: "Quiero esto en mi estudio",
+        items: {
+          plataformas: {
+            titulo: "Wellhub, TotalPass y Fitpass*, en tu misma agenda",
+            texto:
+              "Quien reserva desde la app de Wellhub o TotalPass ocupa su lugar en tu clase, sin sobrecupo, y su check-in se valida solo. Con Fitpass apartas sus lugares y recepción registra sus reservas.",
+            puntos: {
+              p1: "Sus visitantes no cuentan como alumnos activos",
+              p2: "Cada sede, como su propio gimnasio",
+              p3: "Concilias sus pagos con su reporte (Excel o CSV)",
+            },
+          },
+          wallet: {
+            titulo: "Su pase de entrada en Apple Wallet y Google Wallet",
+            texto:
+              "Tus alumnos guardan su pase en la cartera del teléfono y ahí ven su plan, hasta cuándo vale y su saldo. Cuando compran o usan un crédito, se actualiza solo.",
+            puntos: {
+              p1: "Recepción o el kiosco de llegada lo escanean",
+              p2: "Además del QR de la app",
+              p3: "Tú decides si lo ofreces",
+            },
+          },
+          widgets: {
+            titulo: "Tus horarios y tus planes, dentro de tu propia web",
+            texto:
+              "Pega tu calendario de clases y tus planes en tu sitio. Quien ya es tu alumno reserva o compra con su cuenta; quien todavía no, te deja sus datos ahí mismo.",
+            puntos: {
+              p1: "Con tu color, en tema claro u oscuro",
+              p2: "Se ajusta solo al ancho de tu web",
+              p3: "Los interesados llegan a tus prospectos",
+            },
+          },
+          app: {
+            titulo: "Tu estudio, en el celular de tu equipo y de tus alumnos",
+            texto:
+              "Tu equipo escanea el pase con la cámara, pasa lista y lleva la caja desde la app. Tus alumnos reservan, pagan y ven sus videos y sus documentos.",
+            puntos: {
+              p1: "Con lugares numerados, cada quien elige o cambia el suyo",
+              p2: "Su próxima clase en la pantalla de inicio",
+              p3: "Tu página se instala como app, con tu logo",
+            },
+          },
+          bandeja: {
+            titulo: "WhatsApp e Instagram, en una sola bandeja",
+            texto:
+              "Lee y contesta los mensajes de tu WhatsApp Business y de tu Instagram desde el panel o la app, con todo tu equipo, y liga cada conversación con la ficha del alumno.",
+            puntos: {
+              p1: "Aviso en el celular cuando alguien escribe",
+              p2: "Fotos y PDF dentro de la conversación",
+              p3: "Fuera de las 24 horas, con tus plantillas de WhatsApp",
+            },
+          },
+          caja: {
+            titulo: "Una caja que cuadra al final del día",
+            texto:
+              "Abre con fondo, cobra en efectivo y con tarjeta en un mismo cobro y cierra con conteo a ciegas. Si algo no cuadra, queda el motivo para que lo revise quien administra.",
+            puntos: {
+              p1: "Una caja por sucursal, con sus turnos",
+              p2: "Retiros e ingresos de efectivo con su motivo",
+              p3: "Lo cerrado no cambia: los ajustes van a la caja abierta",
+            },
+          },
+        },
       },
       // ModalidadView /clases: claves de MODALIDADES.clases (pasos, operacion,
       // pagina, preguntas). Sin autorregistro de alumnos ni pago por cuenta propia
@@ -477,6 +584,8 @@ export default {
           compartir: "Compártela por Instagram, WhatsApp o un código QR",
           lugares:
             "Tus alumnos ven los lugares libres y reservan con su membresía o sus créditos",
+          app: "Tus alumnos la instalan como app, con tu logo",
+          dominio: "Con SEO y, si quieres, en tu propio dominio",
           directorio: "Tú decides si también apareces en el directorio público",
         },
         // Ejemplo estático (DemoPaginaPublicaClases); los datos ficticios (estudio,
@@ -521,7 +630,24 @@ export default {
         },
         paseQr: {
           q: "¿Para qué sirve el código QR?",
-          a: "En gimnasios, CrossFit y HYROX es el pase de entrada de cada miembro: en recepción lo escaneas y ves si puede entrar. En los estudios de clases (pilates, pole, yoga, danza) no hace falta: la asistencia se registra en el pase de lista.",
+          a: "En gimnasios, CrossFit y HYROX es el pase de entrada de cada miembro: en recepción lo escaneas y ves si puede entrar. En los estudios de clases (pilates, pole, yoga, danza) no hace falta: la asistencia se registra en el pase de lista o, si pones un kiosco de llegada, cuando el alumno escanea su pase.",
+        },
+        // Pase en Apple y Google Wallet (ADR 0195): se actualiza solo y el negocio
+        // decide si lo ofrece.
+        wallet: {
+          q: "¿Mis alumnos pueden llevar su pase en Apple Wallet o Google Wallet?",
+          a: "Sí. Desde su cuenta o la app guardan su pase de entrada en la cartera de su teléfono. Muestra su plan, hasta cuándo vale y su saldo, y se actualiza solo cuando cambian. Recepción y el kiosco de llegada lo escanean igual que el QR de la app. Si pierde su teléfono, lo renueva y el anterior deja de servir; y si prefieres no ofrecerlo, lo apagas.",
+        },
+        // Wellhub, TotalPass y Fitpass (ADR 0148, 0149, 0197 y 0202), sin «*»: esta
+        // sección no lleva la nota de México y lo dice con palabras.
+        plataformas: {
+          q: "¿Puedo recibir usuarios de Wellhub, TotalPass o Fitpass?",
+          a: "Sí. Con Wellhub y TotalPass publicas tus clases en su app: sus reservas ocupan su lugar en tu misma agenda, sin sobrecupo, y el check-in se valida solo. Fitpass no tiene una conexión abierta: apartas sus lugares, recepción registra sus reservas y ves qué asistencias faltan por marcar en su portal. Cada sede puede ser su propio gimnasio y concilias lo que te pagan con su reporte en Excel o CSV. Sus visitantes no cuentan como tus alumnos activos. Wellhub y TotalPass están en los países donde AgendaUno los ofrece; Fitpass, solo en México.",
+        },
+        // Widgets para la web del negocio (ADR 0141): reservar o comprar con su cuenta.
+        web: {
+          q: "¿Mis alumnos pueden reservar desde mi propia página web?",
+          a: "Sí. Desde Captación copias el código de tu calendario de clases o de tus planes y lo pegas en tu web. Quien ya es tu alumno reserva o compra con su cuenta; quien todavía no, te deja sus datos y llega a tus prospectos. Tú eliges el color, el tema y las webs donde se muestra.",
         },
         sucursales: {
           q: "¿Sirve para varias sucursales?",
@@ -614,7 +740,7 @@ export default {
           descripcion:
             "Con una pasarela conectada, tu cliente paga su cita al agendarla o la paga después en tu negocio.",
           detalle:
-            "Tú decides si el pago en línea es obligatorio: la cita se aparta hasta pagarla y se libera si no se paga a tiempo. Si no lo es, la cita queda confirmada y se cobra en recepción.",
+            "Tú decides si el pago en línea es obligatorio: la cita se aparta hasta pagarla y se libera si no se paga a tiempo. Si no lo es, la cita queda confirmada y se cobra en recepción. También puedes pedir solo un anticipo y cobrar el resto al terminar.",
         },
         recordatorios: {
           titulo: "Recordatorios por correo",
@@ -622,6 +748,114 @@ export default {
             "Tus clientes reciben un correo antes de su cita: 24 y 2 horas antes, o con la anticipación que tú configures.",
           detalle:
             "También reciben la confirmación al agendar. Tú editas el texto de cada correo desde Comunicación.",
+        },
+        // Google Calendar y Outlook (ADR 0199): un calendario aparte, sin datos de
+        // clientes; lo ocupado allá se vuelve bloqueo aquí.
+        calendarios: {
+          titulo: "Google Calendar y Outlook, sin choques",
+          descripcion:
+            "Cada profesional conecta su Google Calendar u Outlook: sus citas aparecen allá y lo que tiene ocupado allá ya no se ofrece aquí.",
+          detalle:
+            "Las citas van a un calendario aparte con el nombre de tu negocio, sin datos de tus clientes. De su calendario personal solo se lee si está ocupado, no qué tiene, y los cambios llegan al momento.",
+        },
+        // Caja (ADR 0175) y cobro mixto (ADR 0177).
+        caja: {
+          titulo: "Caja con arqueo y cobro mixto",
+          descripcion:
+            "Cobra una cita con efectivo y tarjeta a la vez, con sus productos y la propina, y cierra cada turno con conteo a ciegas.",
+          detalle:
+            "Cada sucursal tiene su caja con fondo, y retiros e ingresos con su motivo. Si al contar no cuadra, queda el motivo y lo revisa quien administra; lo ya cerrado no cambia.",
+        },
+        // Nómina (ADR 0153); «Comisiones y nómina» abre en Premium (ADR 0107).
+        comisiones: {
+          titulo: "Comisiones y nómina",
+          descripcion:
+            "Calcula lo que le toca a cada profesional con su esquema de pago: lo ya atendido y lo que viene en el periodo. En los planes Premium y Pro.",
+          detalle:
+            "Cada tarifa guarda su historial: cambiarla no altera lo que ya se trabajó. Los periodos usan los días y la zona horaria de tu negocio.",
+        },
+        // Mostrador e inventario (ADR 0139); abre en Premium (ADR 0107).
+        inventario: {
+          titulo: "Punto de venta e inventario",
+          descripcion:
+            "Vende productos en el mostrador o junto con la cita, con existencias por sucursal. En los planes Premium y Pro.",
+          detalle:
+            "Cada venta descuenta su inventario y entra a la caja de su sucursal con su forma de pago, aunque se pague con efectivo y tarjeta a la vez.",
+        },
+      },
+      // «Lo nuevo» (NovedadesLanding): claves de MODALIDADES.citas.novedades, cada una
+      // con tres puntos. Anticipo (ADR 0161), presupuestos en línea (ADR 0127),
+      // facturas automáticas con CFDI de egreso (ADR 0163; facturación abre en Pro),
+      // widget «Agendar cita» (ADR 0141), bandeja (ADR 0200; «mensajes» abre en Pro) y
+      // las apps. Cobrar en línea y facturar, solo en México («*»).
+      novedades: {
+        etiqueta: "Lo nuevo en AgendaUno",
+        titulo: "Menos plantones, más citas pagadas y menos trabajo a mano.",
+        enfasis: "más citas pagadas",
+        subtitulo:
+          "Lo último para que tus clientes aparten, paguen y vuelvan, mientras tu equipo atiende todo desde un solo lugar.",
+        cta: "Quiero esto en mi negocio",
+        items: {
+          anticipo: {
+            titulo: "Un anticipo al agendar, para que no te dejen plantado*",
+            texto:
+              "Pide un monto fijo o un porcentaje del servicio para apartar la hora. Tu cliente elige pagar el anticipo o todo, y el resto se cobra al terminar.",
+            puntos: {
+              p1: "Si cancela a tiempo, se le devuelve solo",
+              p2: "Si cancela tarde o no llega, lo conservas",
+              p3: "Tu equipo ve lo pagado y lo que falta",
+            },
+          },
+          presupuestos: {
+            titulo: "Presupuestos que tu cliente acepta y paga en línea*",
+            texto:
+              "Mándalo por correo con tu marca. Tu cliente lo abre sin cuenta, lo acepta y lo paga con tu pasarela o en tu negocio, y desde ahí agenda cada servicio.",
+            puntos: {
+              p1: "Servicios, bonos, productos o conceptos libres",
+              p2: "Impuestos incluidos o desglosados",
+              p3: "También en su cuenta y en la app",
+            },
+          },
+          factura: {
+            titulo: "Facturas que se hacen solas*",
+            texto:
+              "Al pagarse el anticipo o la cita se timbra su CFDI con los datos fiscales que tu cliente guardó en su cuenta. Al pagar el resto, sale la factura del servicio con el CFDI de egreso que aplica el anticipo.",
+            puntos: {
+              p1: "Tú la enciendes y tu cliente la pide",
+              p2: "Si un timbrado falla, se reintenta solo",
+              p3: "En el plan Pro, con tus paquetes de timbres",
+            },
+          },
+          widget: {
+            titulo: "Que te agenden desde tu propia web",
+            texto:
+              "Pon en tu sitio tus servicios con su precio, su duración y su anticipo. Quien visita elige el suyo y agenda, y paga si tú lo pides, sin crear una cuenta.",
+            puntos: {
+              p1: "Abre tu página con el servicio y la sede ya elegidos",
+              p2: "Con tu color, en tema claro u oscuro",
+              p3: "Tus bonos también, para captar interesados",
+            },
+          },
+          bandeja: {
+            titulo: "WhatsApp e Instagram, en una sola bandeja",
+            texto:
+              "Lee y contesta los mensajes de tu WhatsApp Business y de tu Instagram desde el panel o la app, con todo tu equipo, y liga cada conversación con la ficha del cliente. En el plan Pro.",
+            puntos: {
+              p1: "Aviso en el celular cuando alguien escribe",
+              p2: "Fotos y PDF dentro de la conversación",
+              p3: "Fuera de las 24 horas, con tus plantillas de WhatsApp",
+            },
+          },
+          app: {
+            titulo: "Tu negocio, en el celular de tu equipo y de tus clientes",
+            texto:
+              "Tu equipo agenda, reprograma y cobra desde la app. Tus clientes agendan, pagan, responden sus presupuestos y llevan su pase en Apple Wallet o Google Wallet.",
+            puntos: {
+              p1: "Su próxima cita en la pantalla de inicio",
+              p2: "Reprograman o cancelan según tu política",
+              p3: "Tu página se instala como app, con tu logo",
+            },
+          },
         },
       },
       // ModalidadView /citas: claves de MODALIDADES.citas. Agendar sin cuenta (ADR
@@ -703,6 +937,9 @@ export default {
           cualquiera:
             "«Cualquier profesional» muestra las horas libres de todo tu equipo",
           cobro: "Si conectas tu pasarela, puedes pedir el pago al agendar*",
+          app: "Tus clientes la instalan como app, con tu logo",
+          // El dominio propio es del sitio avanzado («Plus», ADR 0167 y 0189).
+          dominio: "Con SEO y, en Premium y Pro, en tu propio dominio",
         },
         // Ejemplo interactivo (DemoPaginaPublicaCitas): servicio → profesional →
         // hora. Los datos ficticios (negocio, servicios, equipo y horas) van en el
@@ -743,7 +980,23 @@ export default {
         },
         cobro: {
           q: "¿Puedo cobrar al agendar?",
-          a: "Sí*. Conecta tu pasarela y decide si pides el pago en línea al agendar: la cita se aparta hasta que se paga. Si no lo pides, queda confirmada y se cobra en tu negocio.",
+          a: "Sí*. Conecta tu pasarela y decide si pides el pago en línea al agendar: la cita se aparta hasta que se paga. Si no lo pides, queda confirmada y se cobra en tu negocio. También puedes pedir solo un anticipo, un monto fijo o un porcentaje del servicio: si tu cliente cancela a tiempo se le devuelve solo, y si cancela tarde o no llega, lo conservas.",
+        },
+        // El widget «Agendar cita» (ADR 0141): abre la página para agendar con el
+        // servicio y la sede ya elegidos.
+        web: {
+          q: "¿Mis clientes pueden agendar desde mi propia página web?",
+          a: "Sí. Desde Captación copias el código de «Agendar cita» y lo pegas en tu web: muestra tus servicios con su precio, su duración y su anticipo, y cada uno abre tu página para agendar con ese servicio ya elegido. Tu cliente agenda y, si lo pides, paga*, sin crear una cuenta.",
+        },
+        // Presupuestos en línea (ADR 0127, ajuste del 2026-10-21).
+        presupuestos: {
+          q: "¿Puedo mandar presupuestos y cobrarlos en línea?",
+          a: "Sí. Armas el presupuesto con tus servicios, bonos, productos o conceptos libres, con impuestos incluidos o desglosados, y lo mandas por correo con tu marca. Tu cliente lo abre sin cuenta, o desde su cuenta y la app, y lo acepta o lo rechaza. Al aceptarlo se vuelve su cobro: lo paga en línea con tu pasarela* o en tu negocio, y desde ahí agenda cada servicio.",
+        },
+        // Facturas automáticas de citas (ADR 0163): facturación abre en Pro (ADR 0107).
+        factura: {
+          q: "¿Puedo facturar las citas y los anticipos en automático?",
+          a: "Sí*, en el plan Pro. Tú enciendes la factura automática y tu cliente la pide con los datos para facturar que guarda en su cuenta. Al pagarse el anticipo o la cita se timbra su CFDI; al pagar el resto, la factura del servicio y el CFDI de egreso que aplica el anticipo, como pide el SAT. Cada CFDI usa un timbre de tus paquetes.",
         },
         recordatorios: {
           q: "¿Mis clientes reciben recordatorios?",
@@ -866,7 +1119,8 @@ export default {
     // Lo que reemplaza y lo que nadie más da (comparativo del 2026-10-20).
     porQue: {
       etiqueta: "Por qué AgendaUno",
-      titulo: "Un solo sistema en lugar de seis.",
+      // Las filas de ReemplazaHerramientas: si cambian, cambia el número.
+      titulo: "Un solo sistema en lugar de ocho.",
       subtitulo:
         "Lo que hoy resuelves con hojas de cálculo, mensajes a mano y servicios por separado, en un solo lugar y con un solo pago al mes.",
       aparte: "Si quieres más ayuda",

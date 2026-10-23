@@ -36,7 +36,7 @@ export default {
   agendando: "Agendando…",
   listo: "¡Listo! Tu demo quedó agendada",
   listoTexto:
-    "{cuando} (hora del centro de México). Te mandamos la confirmación a tu correo, con el enlace para cancelarla si no puedes.",
+    "{cuando} (hora del centro de México). Te mandamos la confirmación a tu correo, con el enlace para cancelarla si no puedes, y te la recordamos antes por correo.",
   cancelar: {
     cancelando: "Cancelando tu demo…",
     cancelada: "Cancelamos tu demo",

@@ -6,7 +6,8 @@ import type { Modo } from "@/marketing/modalidades";
 /**
  * «Reemplaza estas herramientas» y lo que nadie más te da (comparativo del
  * 2026-10-20): lo que un negocio paga hoy por separado contra un solo pago, y lo que ya
- * hacemos y la competencia no. Sin cifras inventadas ni nombres de competidores.
+ * hacemos y la competencia no. Sin cifras inventadas ni nombres de competidores. El
+ * título de la sección (`landing.porQue.titulo`) dice cuántas filas hay.
  */
 const props = defineProps<{ modo: Modo }>();
 
@@ -32,6 +33,11 @@ const HERRAMIENTAS = [
     con: "Campañas y segmentos con tus propios clientes",
   },
   { hoy: "Facturación por fuera", con: "CFDI a tus clientes desde la venta*" },
+  {
+    hoy: "WhatsApp e Instagram en el celular de alguien",
+    con: "Una bandeja de mensajes para todo tu equipo",
+  },
+  { hoy: "EXTRA_HOY", con: "EXTRA_CON" },
 ];
 
 // Las palabras de cada modalidad (la página de clases no habla de profesionales; la
@@ -40,10 +46,16 @@ const POR_MODO: Record<Modo, Record<string, string>> = {
   clases: {
     AGENDA_SALDOS: "Agenda, cupos y créditos con su historial",
     CALENDARIOS: "Un calendario por instructor o por sala",
+    // Wellhub, TotalPass y Fitpass (ADR 0202); Fitpass, solo en México.
+    EXTRA_HOY: "El portal de cada app de bienestar, por separado",
+    EXTRA_CON: "Wellhub, TotalPass y Fitpass* en tu misma agenda",
   },
   citas: {
     AGENDA_SALDOS: "Agenda, bonos y saldos con su historial",
     CALENDARIOS: "Un calendario por profesional o por cabina",
+    // Presupuestos en línea (ADR 0127).
+    EXTRA_HOY: "Cotizaciones en un documento aparte",
+    EXTRA_CON: "Presupuestos que se aceptan y pagan en línea*",
   },
 };
 const herramientas = computed(() =>

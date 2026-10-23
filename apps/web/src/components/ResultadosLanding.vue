@@ -3,9 +3,11 @@ import type { Modo } from "@/marketing/modalidades";
 
 /**
  * La landing ordenada por resultados (comparativo del 2026-10-20): atraer, convertir,
- * retener y operar. Cada bloque abre con la pregunta del dueño y cuatro cosas que ya
- * hace el sistema (nada que no exista). Lo que solo aplica en México lleva «*» (la
- * nota la pone la página).
+ * retener y operar. Cada bloque abre con la pregunta del dueño y cinco cosas que ya
+ * hace el sistema (nada que no exista), con lo nuevo de su modalidad: Wellhub,
+ * TotalPass y Fitpass, widgets, Wallet, bandeja, kiosco y apartados en clases;
+ * anticipo, presupuestos, factura automática, «Agendar cita» y calendarios en citas.
+ * Lo que solo aplica en México lleva «*» (la nota la pone la página).
  */
 defineProps<{ modo: Modo }>();
 
@@ -23,10 +25,11 @@ const BLOQUES: Record<Modo, Bloque[]> = {
       titulo: "Atraer",
       pregunta: "¿Cómo consigo más alumnos sin vivir en Instagram?",
       beneficios: [
-        "Tu página y tu sitio con SEO, listos para compartir",
+        "Tu sitio con SEO y, si quieres, tu propio dominio",
+        "Tu calendario y tus planes dentro de tu propia web",
+        "Wellhub, TotalPass y Fitpass* en tu misma agenda",
         "Clase muestra para quien viene por primera vez",
         "Formularios y prospectos con seguimiento",
-        "Wellhub y TotalPass en tu misma agenda*",
       ],
     },
     {
@@ -34,8 +37,9 @@ const BLOQUES: Record<Modo, Bloque[]> = {
       titulo: "Convertir",
       pregunta: "¿Cómo hago que quien vino una vez se quede?",
       beneficios: [
-        "Paquetes, membresías y cobro automático",
+        "Paquetes, membresías y cobro automático*",
         "Pago en línea con tu pasarela, OXXO y SPEI*",
+        "WhatsApp e Instagram en una sola bandeja",
         "Antes de reservar ve tu política y su plan",
         "Planes «socio» con acceso anticipado e invitados",
       ],
@@ -46,6 +50,7 @@ const BLOQUES: Record<Modo, Bloque[]> = {
       pregunta: "¿Cómo sé quién está por irse antes de que se vaya?",
       beneficios: [
         "Avisos de quien dejó de venir y de planes por vencer",
+        "Su pase en Apple Wallet y Google Wallet, siempre al día",
         "Lealtad, cupones y promociones",
         "Recordatorios automáticos de cada clase",
         "Videos y clases en línea para tus socios",
@@ -60,6 +65,7 @@ const BLOQUES: Record<Modo, Bloque[]> = {
         "Facturas CFDI a tus alumnos*",
         "Pago a coaches con cortes cerrados",
         "Kiosco de llegada y pase de lista desde el celular",
+        "Productos apartados al reservar, listos en el mostrador",
       ],
     },
   ],
@@ -70,7 +76,8 @@ const BLOQUES: Record<Modo, Bloque[]> = {
       pregunta: "¿Cómo lleno mi agenda sin contestar mensajes todo el día?",
       beneficios: [
         "Tu página para agendar en línea, sin crear cuenta",
-        "Sitio con SEO y enlaces para tus redes",
+        "Tus servicios para agendar, dentro de tu propia web",
+        "Sitio con SEO, enlaces para tus redes y tu dominio",
         "Formularios y prospectos con seguimiento",
         "Cualquier profesional disponible, en un clic",
       ],
@@ -80,10 +87,11 @@ const BLOQUES: Record<Modo, Bloque[]> = {
       titulo: "Convertir",
       pregunta: "¿Cómo evito que me dejen plantado?",
       beneficios: [
-        "Cobro al agendar, con tu pasarela*",
+        "Anticipo o pago completo al agendar*",
+        "Presupuestos que se aceptan y pagan en línea*",
+        "WhatsApp e Instagram en una sola bandeja",
         "Recordatorios automáticos de cada cita",
         "Política de cancelación visible al agendar",
-        "Bonos de sesiones y paquetes de servicios",
       ],
     },
     {
@@ -92,6 +100,7 @@ const BLOQUES: Record<Modo, Bloque[]> = {
       pregunta: "¿Cómo hago que regresen?",
       beneficios: [
         "Avisos de quien ya debería haber regresado",
+        "Bonos de sesiones y paquetes de servicios",
         "Lealtad, cupones y promociones",
         "Reseñas después de cada cita",
         "Historial y notas de cada cliente",
@@ -103,9 +112,10 @@ const BLOQUES: Record<Modo, Bloque[]> = {
       pregunta: "¿Cómo cuadro la caja y pago comisiones sin pelearme?",
       beneficios: [
         "Caja con arqueo, cobro mixto y devoluciones",
-        "Facturas CFDI a tus clientes*",
+        "Factura automática de anticipos y citas*",
         "Comisiones y nómina por profesional",
         "Punto de venta e inventario",
+        "Google Calendar y Outlook, sin choques de horario",
       ],
     },
   ],

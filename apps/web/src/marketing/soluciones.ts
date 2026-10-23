@@ -19,6 +19,31 @@ export interface Solucion {
   preguntas: { pregunta: string; respuesta: string }[];
 }
 
+/**
+ * Wellhub, TotalPass y Fitpass (ADR 0148, 0149, 0197 y 0202), para los giros de clases
+ * donde más se usan. Sin «*»: estas páginas no llevan la nota de México y lo dicen con
+ * palabras (Wellhub y TotalPass, en los países que habilita la plataforma).
+ */
+const PREGUNTA_PLATAFORMAS = {
+  pregunta: "¿Puedo recibir usuarios de Wellhub, TotalPass o Fitpass?",
+  respuesta:
+    "Sí. Con Wellhub y TotalPass publicas tus clases en su app: sus reservas ocupan su lugar en tu misma agenda y el check-in se valida solo. Con Fitpass apartas sus lugares y recepción registra sus reservas. Sus visitantes no cuentan como alumnos activos. Wellhub y TotalPass están en los países donde AgendaUno los ofrece; Fitpass, solo en México.",
+};
+
+/** Presupuestos en línea en los negocios de citas (ADR 0127). */
+function preguntaPresupuestos(
+  pregunta: string,
+  para: string,
+): {
+  pregunta: string;
+  respuesta: string;
+} {
+  return {
+    pregunta,
+    respuesta: `Sí. Lo armas con tus servicios, bonos, productos o conceptos libres, con impuestos incluidos o desglosados, y lo mandas por correo con tu marca. ${para} lo acepta desde el enlace, sin cuenta, y lo paga en tu negocio o, en México, en línea con tu pasarela; desde ahí agenda cada servicio.`,
+  };
+}
+
 export const soluciones: readonly Solucion[] = [
   {
     slug: "crossfit-hyrox",
@@ -63,6 +88,7 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "AgendaUno se enfoca en reservas y operación del negocio. No sustituye una herramienta de programación de WOD, seguimiento de marcas deportivas o gestión de competencias, ni implica afiliación con estas marcas.",
       },
+      PREGUNTA_PLATAFORMAS,
     ],
   },
   {
@@ -152,6 +178,7 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "En Clases con cupo, la suscripción se cobra por rango de alumnos activos al mes. Consulta qué cuenta como alumno activo y las tarifas vigentes en la sección de precios; los importes son en dólares, más impuestos.",
       },
+      PREGUNTA_PLATAFORMAS,
     ],
   },
   {
@@ -284,6 +311,11 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "Sí. En Citas 1 a 1 eliges tu plan (Individual, Premium o Pro) y pagas por los profesionales que contratas, cada mes o cada año. Consulta las tarifas vigentes en la sección de precios; los importes son en dólares, más impuestos.",
       },
+      {
+        pregunta: "¿Puedo pedir un anticipo para apartar la cita?",
+        respuesta:
+          "Sí, en México, con tu pasarela conectada. Cada servicio pide un monto fijo o un porcentaje de su precio; tu cliente elige pagar el anticipo o todo y el resto se cobra al terminar. Si cancela a tiempo, el anticipo se le devuelve solo; si cancela tarde o no llega, lo conservas.",
+      },
     ],
   },
   {
@@ -329,6 +361,10 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "Sí, en los planes Premium y Pro. Das de alta tus cabinas, camillas o equipos por sucursal y eliges qué servicios los usan: una hora solo se ofrece si hay un profesional y un espacio libres, también en tu página pública.",
       },
+      preguntaPresupuestos(
+        "¿Puedo mandar un presupuesto antes de un tratamiento?",
+        "Tu cliente",
+      ),
     ],
   },
   {
@@ -418,6 +454,7 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "Das de alta a tus alumnos y los invitas a activar su cuenta. Con tu enlace consultan las clases disponibles y reservan según el paquete o la membresía que tienen.",
       },
+      PREGUNTA_PLATAFORMAS,
     ],
   },
   {
@@ -550,6 +587,10 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "No. Se enfoca en citas, disponibilidad y gestión operativa. No sustituye un odontograma, un expediente clínico ni un sistema especializado de tratamientos dentales.",
       },
+      preguntaPresupuestos(
+        "¿Puedo enviar presupuestos de tratamiento?",
+        "Tu paciente",
+      ),
     ],
   },
 ];
