@@ -44,6 +44,9 @@ class CondonarCargoRenta
                 'estado' => EstadoCargoRenta::Cancelado->value,
                 'referencia_pago' => null,
                 'proximo_intento_en' => null,
+                // OpenPay no deja cerrar su página de pago: el intento se vigila por si
+                // se paga después (la conciliación avisa del cobro doble).
+                'referencia_condonada' => $referencia !== '' && $bloqueado->metodo_pago === 'openpay' ? $referencia : null,
             ]);
 
             return $bloqueado;

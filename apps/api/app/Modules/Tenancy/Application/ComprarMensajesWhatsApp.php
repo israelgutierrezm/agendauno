@@ -18,9 +18,10 @@ use Throwable;
 
 /**
  * La compra de un paquete de mensajes de WhatsApp (ADR 0186), como la de timbres: un
- * cargo `whatsapp` en pesos (con IVA) que se paga en la página de Stripe; al
- * confirmarse el pago los mensajes se suman al saldo del negocio
- * ({@see AcreditarMensajesWhatsAppPagados}).
+ * cargo `whatsapp` que se paga en la página de Stripe; al confirmarse el pago los
+ * mensajes se suman al saldo del negocio ({@see AcreditarMensajesWhatsAppPagados}).
+ * En México, en pesos con el IVA de la tarifa; fuera de México, como la renta, en
+ * dólares y sin IVA (exportación de servicios).
  */
 class ComprarMensajesWhatsApp
 {
@@ -40,11 +41,12 @@ class ComprarMensajesWhatsApp
             throw new PasarelaNoDisponible('La plataforma no tiene una pasarela de cobro activa.');
         }
 
-        $precio = $this->mensajes->precioMinor();
+        $moneda = $this->mensajes->moneda($estudio);
+        $precio = $this->mensajes->precioMinor($estudio);
         $subtotal = $cantidad * $precio;
-        // Como la renta: el IVA del país del negocio (ADR 0107).
-        $definicion = MonedaDeCobroSaas::conIvaDelPais((array) (TarifaSaas::vigente($estudio->modalidad())->definicion ?? []), $estudio);
-        $ivaPorcentaje = (int) ($definicion['iva_porcentaje'] ?? 16);
+        // En México, el IVA de la tarifa; fuera, ninguno (exportación, ADR 0107).
+        $definicion = (array) (TarifaSaas::vigente($estudio->modalidad())->definicion ?? []);
+        $ivaPorcentaje = $estudio->enMexico() ? (int) ($definicion['iva_porcentaje'] ?? 16) : 0;
         $iva = intdiv($subtotal * $ivaPorcentaje + 50, 100);
         $hoy = CarbonImmutable::now((string) ($estudio->zona_horaria ?: 'UTC'));
 
@@ -59,20 +61,20 @@ class ComprarMensajesWhatsApp
             'desglose' => [
                 'lineas' => [[
                     'concepto' => "Paquete de {$cantidad} mensajes de WhatsApp",
-                    'detalle' => '$'.number_format($precio / 100, 2).' por mensaje',
+                    'detalle' => '$'.number_format($precio / 100, 2).' '.$moneda.' por mensaje',
                     'importe_minor' => $subtotal,
                 ]],
                 'subtotal_minor' => $subtotal,
                 'iva_porcentaje' => $ivaPorcentaje,
                 'iva_minor' => $iva,
                 'total_minor' => $subtotal + $iva,
-                'moneda' => 'MXN',
+                'moneda' => $moneda,
                 'conversion' => null,
             ],
             'monto_minor' => $subtotal + $iva,
-            'moneda' => 'MXN',
+            'moneda' => $moneda,
             'monto_tarifa_minor' => $subtotal + $iva,
-            'moneda_tarifa' => 'MXN',
+            'moneda_tarifa' => $moneda,
             'estado' => EstadoCargoRenta::Pendiente->value,
             'vence_en' => null,
             'emitido_en' => now(),

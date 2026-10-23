@@ -83,6 +83,31 @@ class AvisosRentaPlataforma
         return $cargo->refresh()->estado->value === 'pagado';
     }
 
+    /**
+     * Un cargo condonado con su intento de OpenPay abierto: si se pagó, se avisa del
+     * cobro doble (el cargo sigue condonado); si ya no se puede pagar, se deja de vigilar.
+     */
+    public function vigilarCondonado(CargoRenta $cargo): void
+    {
+        $id = (string) $cargo->referencia_condonada;
+        if ($id === '' || ! $this->registro->activa('openpay')) {
+            return;
+        }
+        try {
+            $intento = $this->openPay->cargo($id, $this->registro->llaves('openpay'));
+        } catch (Throwable $e) {
+            Log::warning('No se pudo revisar el intento de OpenPay de un cargo condonado.', ['cargo' => $cargo->ulid, 'error' => $e->getMessage()]);
+
+            return;
+        }
+        if ($intento['estado'] === 'completed') {
+            $this->confirmar->porReferencia($id, 'openpay', (string) $cargo->ulid, $intento['monto_minor']);
+        }
+        if (in_array($intento['estado'], ['completed', 'failed', 'cancelled'], true)) {
+            $cargo->forceFill(['referencia_condonada' => null])->save();
+        }
+    }
+
     private function aplicarOpenPay(string $id): void
     {
         $cargo = $this->openPay->cargo($id, $this->registro->llaves('openpay'));

@@ -32,8 +32,8 @@ class WhatsAppSaldoTenantController
         return response()->json(['data' => [
             'activo' => $this->whatsapp->activoPara($estudio),
             'cobra' => $this->mensajes->cobra(),
-            'precio_minor' => $this->mensajes->precioMinor(),
-            'moneda' => 'MXN',
+            'precio_minor' => $this->mensajes->precioMinor($estudio),
+            'moneda' => $this->mensajes->moneda($estudio),
             'disponibles' => $this->mensajes->disponibles(),
             'usados_mes' => $this->mensajes->usadosEsteMes(),
             'tope_mensual' => $this->mensajes->tope(),

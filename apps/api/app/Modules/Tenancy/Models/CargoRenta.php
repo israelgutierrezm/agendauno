@@ -33,6 +33,8 @@ class CargoRenta extends Model
     protected $fillable = [
         'estudio_id', 'periodo', 'modo_cobro', 'metrica', 'alumnos_activos', 'tarifa_version', 'desglose', 'monto_minor',
         'moneda', 'estado', 'vence_en', 'pagado_en', 'metodo_pago', 'referencia_pago',
+        // El intento de OpenPay que seguía abierto al condonarlo (se vigila un tiempo).
+        'referencia_condonada',
         'medicion_id', 'regla_version', 'emitido_en',
         'clave', 'concepto', 'cubre_desde', 'cubre_hasta', 'monto_tarifa_minor', 'moneda_tarifa',
         'tipo_cambio_diezmilesimas', 'tipo_cambio_fecha', 'tipo_cambio_fuente',

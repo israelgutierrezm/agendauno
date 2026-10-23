@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\PlantillasWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MovimientoWhatsAppTenant;
 use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
 use App\Modules\Tenancy\Models\SaldoWhatsAppTenant;
@@ -38,10 +39,23 @@ class MensajesWhatsAppTenant
         return $this->parametros->siNo('whatsapp.cobro_por_mensaje');
     }
 
-    /** Precio de un mensaje en centavos de peso, sin IVA. */
-    public function precioMinor(): int
+    /**
+     * Precio de un mensaje, sin IVA: en México en centavos de peso; fuera de México en
+     * centavos de dólar, como la renta (ADR 0107).
+     */
+    public function precioMinor(?Estudio $estudio = null): int
     {
-        return $this->parametros->entero('whatsapp.precio_mensaje_centavos');
+        return $this->moneda($estudio) === 'USD'
+            ? $this->parametros->entero('whatsapp.precio_mensaje_usd_centavos')
+            : $this->parametros->entero('whatsapp.precio_mensaje_centavos');
+    }
+
+    /** La moneda en que se venden los mensajes al negocio: pesos en México, dólares fuera. */
+    public function moneda(?Estudio $estudio = null): string
+    {
+        $estudio ??= $this->gestor->actual();
+
+        return $estudio instanceof Estudio && ! $estudio->enMexico() ? 'USD' : 'MXN';
     }
 
     /**
@@ -54,7 +68,7 @@ class MensajesWhatsAppTenant
     }
 
     /**
-     * Los paquetes a la venta con su precio (sin IVA, en pesos).
+     * Los paquetes a la venta con su precio (sin IVA, en la moneda del negocio).
      *
      * @return list<array{cantidad: int, precio_minor: int}>
      */

@@ -64,6 +64,8 @@ interface Alcance {
   sin_whatsapp?: number;
   mensajes?: number;
   costo_minor?: number | null;
+  // Pesos en México (más IVA); fuera de México, dólares sin IVA (ADR 0186).
+  costo_moneda?: string;
 }
 
 type Canal = "interno" | "email" | "push" | "whatsapp";
@@ -200,10 +202,11 @@ async function cargarPlantillasWhatsApp(): Promise<void> {
     plantillasWhatsApp.value = [];
   }
 }
-const dineroMxn = (minor: number): string =>
-  new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
-    minor / 100,
-  );
+const dineroEn = (minor: number, moneda = "MXN"): string =>
+  new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: moneda,
+  }).format(minor / 100);
 
 const segmentoSel = computed(() =>
   segmentos.value.find((s) => s.clave === form.value.segmento),
@@ -309,10 +312,15 @@ const gastoWhatsApp = computed(() => {
     ? t("comunicacionPantalla.whatsapp.gastoSinCosto", {
         mensajes: a.mensajes,
       })
-    : t("comunicacionPantalla.whatsapp.gasto", {
-        mensajes: a.mensajes,
-        costo: dineroMxn(a.costo_minor),
-      });
+    : t(
+        (a.costo_moneda ?? "MXN") === "MXN"
+          ? "comunicacionPantalla.whatsapp.gasto"
+          : "comunicacionPantalla.whatsapp.gastoSinIva",
+        {
+          mensajes: a.mensajes,
+          costo: dineroEn(a.costo_minor, a.costo_moneda ?? "MXN"),
+        },
+      );
 });
 
 // Ayuda de marcadores: se arma en el script para no meter `{{ }}` en el template

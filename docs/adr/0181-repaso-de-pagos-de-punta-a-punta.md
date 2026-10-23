@@ -181,3 +181,16 @@ encontró un candado muerto posible:
 Ahora la devolución bloquea la orden del pago y luego el pago, igual que cobrar,
 confirmar, anular y corregir. La regla queda así para todo lo que toca un cobro:
 **primero la orden, después el pago**.
+
+## Ajuste: cuota fija después de lo pagado por adelantado (2026-10-22)
+
+Decisión del dueño: un plan anual (o mensual) de citas que empezó a medio mes y pasa a
+cuota fija no cobra dos veces el mes de transición: ese mes se **prorratea** y solo se
+cobra por los días que el plan no cubría. Lo mismo con un mes gratis por referido que
+alargó lo cubierto (`estudios.plan_cubierto_hasta`): la cuota fija rige desde el mes
+siguiente y ese mes no se cobra. `CondicionesDeCobroSaas::cubiertoHasta` da lo cubierto
+(cargos del plan y meses gratis) y lo usan `primerPeriodoAbierto` y el prorrateo de
+`GenerarCargoRenta`.
+
+También quedan con prueba directa: el mes gratis del referido cuando su primer mes se
+cobra por domiciliación (al momento o con el aviso de Stripe, una sola vez).

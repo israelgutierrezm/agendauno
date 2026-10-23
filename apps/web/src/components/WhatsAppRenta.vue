@@ -92,7 +92,12 @@ onMounted(cargar);
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{
         saldo.cobra
-          ? $t("whatsappRenta.cobra", { precio: dinero(saldo.precio_minor) })
+          ? $t(
+              saldo.moneda === "MXN"
+                ? "whatsappRenta.cobra"
+                : "whatsappRenta.cobraSinIva",
+              { precio: dinero(saldo.precio_minor) },
+            )
           : $t("whatsappRenta.incluido")
       }}
     </p>

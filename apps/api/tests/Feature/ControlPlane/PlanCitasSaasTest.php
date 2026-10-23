@@ -334,3 +334,56 @@ it('subir de nivel en un plan anual con un mes gratis cobra la diferencia sobre 
     // La diferencia de 394 de 395 días de un año: menos que el año completo de 3.
     expect($ajuste->monto_tarifa_minor)->toBeLessThan((int) $anual->monto_tarifa_minor);
 });
+
+it('un anual que empezó a medio mes y pasa a cuota fija: el mes en que termina se cobra solo por los días que no cubría', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    Estudio::query()->where('slug', $e['slug'])->update(['trial_termina_en' => '2026-10-15']);
+    cambiarPlanCitas($e, 'premium', 3, 'anual')->assertOk();
+    emitirRentaEl('2026-10-16 12:00');
+    $anual = cargoDelPlan('2026-10');
+    expect($anual->cubre_hasta?->toDateString())->toBe('2027-10-15');
+    $anual->update(['estado' => EstadoCargoRenta::Pagado->value, 'pagado_en' => now()]);
+
+    // La cuota fija puede regir desde el mes en que termina el anual.
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}", ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900, 'vigente_desde' => '2027-09'], conPlataforma())
+        ->assertUnprocessable()->assertJsonValidationErrors(['vigente_desde'], 'meta.errors');
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}", ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900], conPlataforma())
+        ->assertOk()->assertJsonPath('data.cobro.proximo.desde', '2027-10');
+
+    emitirRentaEl('2027-10-01 09:00');
+    emitirRentaEl('2027-11-01 09:00');
+    // Ya no se renueva el plan; octubre se cobra del 16 al 31 (16 de 31 días), no completo.
+    expect(CargoRenta::query()->where('concepto', 'plan')->count())->toBe(1);
+    $octubre = CargoRenta::query()->where('concepto', 'renta')->where('periodo', '2027-10')->sole();
+    expect($octubre->modo_cobro->value)->toBe('fijo')
+        ->and($octubre->desglose['prorrateo'])->toEqual(['dias_cobrables' => 16, 'dias_periodo' => 31])
+        // 149 900 × 16/31, prorrateada como la cuota (IVA incluido).
+        ->and($octubre->monto_minor)->toBe(77367)
+        // Los meses que cubría el anual no se cobran.
+        ->and(CargoRenta::query()->where('concepto', 'renta')->whereBetween('periodo', ['2026-11', '2027-09'])->exists())->toBeFalse();
+});
+
+it('el mes gratis por referido de un anual no se cobra al pasar a cuota fija', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    terminarPrueba($e);
+    cambiarPlanCitas($e, 'premium', 3, 'anual')->assertOk();
+    emitirRentaEl('2026-11-01 09:00');
+    cargoDelPlan('2026-11')->update(['estado' => EstadoCargoRenta::Pagado->value, 'pagado_en' => now()]);
+    // Un mes gratis por referido alarga lo cubierto sin un cargo propio.
+    Estudio::query()->where('slug', $e['slug'])->update(['plan_cubierto_hasta' => '2027-11-30']);
+
+    // Lo pactado rige a lo más 12 meses adelante: se pacta a mediados de 2027.
+    $this->travelTo(CarbonImmutable::parse('2027-06-10 10:00', 'America/Mexico_City'));
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}", ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900, 'vigente_desde' => '2027-11'], conPlataforma())
+        ->assertUnprocessable()->assertJsonValidationErrors(['vigente_desde'], 'meta.errors');
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}", ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900], conPlataforma())
+        ->assertOk()->assertJsonPath('data.cobro.proximo.desde', '2027-12');
+
+    emitirRentaEl('2027-12-01 09:00');
+    emitirRentaEl('2028-01-01 09:00');
+    $rentas = CargoRenta::query()->where('concepto', 'renta')->orderBy('periodo')->get();
+    expect($rentas->pluck('periodo')->all())->toBe(['2027-12'])
+        ->and($rentas[0]->monto_minor)->toBe(149900);
+});

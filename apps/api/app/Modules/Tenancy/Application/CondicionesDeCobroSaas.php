@@ -84,6 +84,24 @@ class CondicionesDeCobroSaas
     }
 
     /**
+     * Hasta qué día cubre lo cobrado por adelantado (un plan de citas mensual o anual) y
+     * sus meses gratis por referidos (`estudios.plan_cubierto_hasta`); null sin nada.
+     */
+    public function cubiertoHasta(Estudio $estudio): ?string
+    {
+        $cubre = CargoRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('clave', 'periodo')
+            ->max('cubre_hasta');
+        $fechas = array_filter([
+            is_string($cubre) && $cubre !== '' ? substr($cubre, 0, 10) : null,
+            $estudio->plan_cubierto_hasta?->toDateString(),
+        ]);
+
+        return $fechas === [] ? null : max($fechas);
+    }
+
+    /**
      * El primer mes que todavía se puede cambiar: el siguiente al último cargo de renta
      * emitido (un cargo emitido no se recalcula), o el del alta.
      */
@@ -93,13 +111,11 @@ class CondicionesDeCobroSaas
             ->where('estudio_id', $estudio->getKey())
             ->where('clave', 'periodo')
             ->max('periodo');
-        // Un plan anual pagado cubre meses después de su periodo: tampoco se cambian.
-        $cubre = CargoRenta::query()
-            ->where('estudio_id', $estudio->getKey())
-            ->where('clave', 'periodo')
-            ->max('cubre_hasta');
-        $despuesDeCubierto = is_string($cubre) && $cubre !== ''
-            ? CarbonImmutable::parse(substr($cubre, 0, 10))->addDay()->format('Y-m')
+        // Lo pagado por adelantado (y sus meses gratis) cubre meses después de su
+        // periodo: tampoco se cambian. El mes en que termina sí, prorrateado.
+        $cubierto = $this->cubiertoHasta($estudio);
+        $despuesDeCubierto = $cubierto !== null
+            ? CarbonImmutable::parse($cubierto)->addDay()->format('Y-m')
             : null;
         if (is_string($ultimo) && $ultimo !== '') {
             $siguiente = CarbonImmutable::createFromFormat('Y-m-d', $ultimo.'-01')?->addMonthNoOverflow()->format('Y-m') ?? $ultimo;

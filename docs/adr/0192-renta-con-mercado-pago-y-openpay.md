@@ -47,3 +47,14 @@ clientes de API existen.
 - Las alertas de devolución o disputa de un cobro de la renta siguen solo con Stripe.
   En Mercado Pago y OpenPay se ven en su panel.
 - Sin validar con llaves reales: probado con respuestas simuladas de las dos API.
+
+## Condonar con un pago en curso (2026-10-22)
+
+- **Mercado Pago**: al condonar se cancelan sus cobros pendientes (un ticket de OXXO) y se
+  vence la preferencia; con un cobro ya aprobado, no se condona (422) y la conciliación
+  lo da por pagado. Si aun así llega un pago aprobado, el cargo sigue condonado y se
+  avisa del cobro doble (`renta_cobrada_dos_veces`) para devolverlo.
+- **OpenPay no deja cerrar su página de pago**: el intento que seguía abierto se guarda
+  (`cargos_renta.referencia_condonada`, migración de la plataforma 000410) y la
+  conciliación lo vigila 30 días. Si se paga, avisa del cobro doble aunque el aviso de
+  OpenPay se pierda; si se cancela o falla, deja de vigilarlo.

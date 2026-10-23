@@ -214,7 +214,10 @@ class GenerarCargoRenta
     }
 
     /**
-     * Días del periodo que ya no cubre la prueba gratis, y días totales del periodo.
+     * Días del periodo que ya no cubren la prueba gratis ni lo pagado por adelantado (un
+     * plan anual o mensual de citas y sus meses gratis), y días totales del periodo. Así
+     * el mes en que se pasa de un plan que empezó a medio mes a la cuota fija se cobra
+     * solo por los días que el plan no cubría.
      *
      * @return array{0: int, 1: int}
      */
@@ -223,20 +226,23 @@ class GenerarCargoRenta
         $inicio = CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->startOfDay() ?? CarbonImmutable::now()->startOfMonth();
         $fin = $inicio->endOfMonth()->startOfDay();
         $dias = $inicio->daysInMonth;
+        $cubierto = $this->condiciones->cubiertoHasta($estudio);
 
-        if ($estudio->trial_termina_en === null) {
+        if ($estudio->trial_termina_en === null && $cubierto === null) {
             return [$dias, $dias];
         }
 
         // Se cobra desde el día siguiente al fin de la prueba, y también el hueco entre
-        // una prueba que terminó y su extensión (excluidos ambos extremos).
-        $tras = $estudio->trial_termina_en->toDateString();
+        // una prueba que terminó y su extensión (excluidos ambos extremos); nunca un día
+        // que ya cubre lo pagado por adelantado.
+        $tras = $estudio->trial_termina_en?->toDateString();
         $huecoDesde = $estudio->prueba_termino_antes?->toDateString();
         $huecoHasta = $estudio->prueba_extendida_desde?->toDateString();
         $cobrables = 0;
         for ($dia = $inicio; $dia->lessThanOrEqualTo($fin); $dia = $dia->addDay()) {
             $fecha = $dia->toDateString();
-            if ($fecha > $tras || ($huecoDesde !== null && $huecoHasta !== null && $fecha > $huecoDesde && $fecha < $huecoHasta)) {
+            $trasLaPrueba = $tras === null || $fecha > $tras || ($huecoDesde !== null && $huecoHasta !== null && $fecha > $huecoDesde && $fecha < $huecoHasta);
+            if ($trasLaPrueba && ($cubierto === null || $fecha > $cubierto)) {
                 $cobrables++;
             }
         }

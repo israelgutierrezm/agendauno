@@ -36,3 +36,11 @@ propia cuenta.
 - Mientras el cobro esté apagado no cambia nada para los negocios.
 - La tarifa de Meta para México (utilidad) ronda 0.0085 USD por mensaje, según fuentes de
   terceros. Antes de encender el cobro, hay que confirmarla con la tabla oficial de Meta.
+
+## Fuera de México (2026-10-22)
+
+Decisión del dueño: como la renta (ADR 0107), un negocio de otro país compra sus mensajes
+**en dólares y sin IVA** (exportación de servicios). El precio por mensaje lo fija el
+superadmin aparte (`whatsapp.precio_mensaje_usd_centavos`, 3 centavos de dólar por
+omisión). En México sigue en pesos con el IVA de la tarifa. El saldo, sus paquetes y el
+costo de una campaña dicen su moneda; «más IVA» solo aparece en pesos.

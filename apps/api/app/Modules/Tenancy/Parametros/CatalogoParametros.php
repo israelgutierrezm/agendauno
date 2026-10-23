@@ -268,6 +268,9 @@ final class CatalogoParametros
                 'Encendido, cada aviso por WhatsApp gasta un mensaje del saldo que el negocio compra en paquetes. Apagado, la plataforma los paga.', $sn, 0, porNegocio: false),
             new DefinicionParametro('whatsapp.precio_mensaje_centavos', 'Renta', 'Precio de cada mensaje de WhatsApp',
                 'En centavos de peso, sin IVA: la tarifa de Meta por mensaje de utilidad más el margen de la plataforma.', $e, 45, 1, 10000, '¢', porNegocio: false),
+            // Fuera de México, como la renta: en dólares y sin IVA (exportación de servicios).
+            new DefinicionParametro('whatsapp.precio_mensaje_usd_centavos', 'Renta', 'Precio de cada mensaje de WhatsApp fuera de México',
+                'En centavos de dólar, sin IVA (exportación de servicios): lo que pagan los negocios de otros países.', $e, 3, 1, 1000, '¢ USD', porNegocio: false),
             // Las plantillas de marketing de cada negocio cuestan más en Meta (ADR 0190).
             new DefinicionParametro('whatsapp.mensajes_por_marketing', 'Renta', 'Mensajes del saldo que gasta uno de marketing',
                 'Meta cobra los de marketing varias veces más caros que los de utilidad: cada uno gasta estos mensajes del saldo del negocio.', $e, 5, 1, 20, 'mensajes', porNegocio: false),

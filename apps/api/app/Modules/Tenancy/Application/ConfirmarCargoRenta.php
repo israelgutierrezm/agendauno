@@ -72,6 +72,10 @@ class ConfirmarCargoRenta
                         "La renta {$cargo->periodo} se cobró dos veces (ya estaba {$cargo->estado->value}; el otro cobro es {$referencia}). Devuélvelo desde el panel de {$proveedor}.",
                         $cargo->estudio?->slug,
                     );
+                    // Si era el intento de OpenPay que se vigilaba al condonar, ya se avisó.
+                    if ((string) $cargo->referencia_condonada === $referencia) {
+                        $cargo->forceFill(['referencia_condonada' => null])->save();
+                    }
                 }
             }
 

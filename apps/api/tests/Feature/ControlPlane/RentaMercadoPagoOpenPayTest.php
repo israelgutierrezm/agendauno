@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Platform\Operacion\AlertaPlataforma;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
 use Illuminate\Http\Client\Request;
@@ -143,4 +144,94 @@ it('el dueño paga con OpenPay; el aviso necesita el usuario y la contraseña de
         ->assertOk();
     expect(CargoRenta::query()->where('ulid', $cargo)->first(['estado', 'metodo_pago'])?->toArray())
         ->toMatchArray(['estado' => 'pagado', 'metodo_pago' => 'openpay']);
+});
+
+it('condonar con un ticket de Mercado Pago pendiente lo cancela; si aun así se paga, avisa del cobro doble', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $cargo = cargoRentaPendiente($e);
+    activarPasarelaDeRenta('mercadopago', ['access_token' => 'TEST-token-plataforma']);
+    $monto = (int) $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))->json('data.cargos.0.monto_minor');
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'mercadopago'], conBearer($e['bearer']))->assertCreated();
+    $this->pasarela->pagos = [['id' => 777, 'status' => 'pending', 'transaction_amount' => $monto / 100]];
+
+    $this->postJson("/api/v1/plataforma/cargos/{$cargo}/condonar", ['motivo' => 'Cortesía por la falla del mes'], conPlataforma())
+        ->assertOk()->assertJsonPath('data.estado', 'cancelado');
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'PUT' && str_contains($r->url(), 'v1/payments/777') && $r['status'] === 'cancelled');
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'PUT' && str_contains($r->url(), 'checkout/preferences/123-pref'));
+    expect(CargoRenta::query()->where('ulid', $cargo)->value('referencia_pago'))->toBeNull();
+
+    // Aun así llega un pago aprobado: el cargo sigue condonado y se avisa para devolverlo.
+    $this->pasarela->cargo = $cargo;
+    $this->pasarela->monto = $monto / 100;
+    $this->pasarela->estado = 'approved';
+    $this->postJson('/api/v1/webhooks/plataforma/mercadopago?type=payment&data.id=987')->assertOk();
+    expect(CargoRenta::query()->where('ulid', $cargo)->value('estado')?->value)->toBe('cancelado')
+        ->and(AlertaPlataforma::query()->where('tipo', 'renta_cobrada_dos_veces')->where('estudio', 'estudio-a')->exists())->toBeTrue();
+});
+
+it('un cargo con un pago de Mercado Pago ya aprobado no se condona: la conciliación lo da por pagado', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $cargo = cargoRentaPendiente($e);
+    activarPasarelaDeRenta('mercadopago', ['access_token' => 'TEST-token-plataforma']);
+    $monto = (int) $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))->json('data.cargos.0.monto_minor');
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'mercadopago'], conBearer($e['bearer']))->assertCreated();
+    $this->pasarela->pagos = [['id' => 555, 'status' => 'approved', 'transaction_amount' => $monto / 100]];
+
+    $this->postJson("/api/v1/plataforma/cargos/{$cargo}/condonar", ['motivo' => 'Cortesía'], conPlataforma())
+        ->assertUnprocessable()->assertJsonPath('meta.errors.cargo.0', 'Este cargo tiene un pago en curso; espera su confirmación.');
+    $this->travel(11)->minutes();
+    $this->artisan('agendauno:conciliar-renta')->expectsOutputToContain('confirmados: 1')->assertSuccessful();
+    expect(CargoRenta::query()->where('ulid', $cargo)->value('estado')?->value)->toBe('pagado');
+});
+
+it('OpenPay no cierra su página: condonado, se vigila su intento y si se paga se avisa aunque el aviso se pierda', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $cargo = cargoRentaPendiente($e);
+    activarPasarelaDeRenta('openpay', ['merchant_id' => 'm1', 'private_key' => 'sk_openpay', 'webhook_user' => 'agendauno', 'webhook_password' => 'clave-del-aviso']);
+    $monto = (int) $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))->json('data.cargos.0.monto_minor');
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'openpay'], conBearer($e['bearer']))->assertCreated();
+    $this->pasarela->cargo = $cargo;
+    $this->pasarela->monto = $monto / 100;
+
+    // Con el pago en proceso, no.
+    $this->pasarela->openpay = 'in_progress';
+    $this->postJson("/api/v1/plataforma/cargos/{$cargo}/condonar", ['motivo' => 'Cortesía'], conPlataforma())->assertUnprocessable();
+
+    // Sin pagar aún, sí; el intento queda vigilado.
+    $this->pasarela->openpay = 'charge_pending';
+    $this->postJson("/api/v1/plataforma/cargos/{$cargo}/condonar", ['motivo' => 'Cortesía'], conPlataforma())
+        ->assertOk()->assertJsonPath('data.estado', 'cancelado');
+    expect(CargoRenta::query()->where('ulid', $cargo)->value('referencia_condonada'))->toBe('tr_renta');
+
+    // Lo paga después y su aviso se pierde: la conciliación lo encuentra.
+    $this->pasarela->openpay = 'completed';
+    $this->travel(11)->minutes();
+    $this->artisan('agendauno:conciliar-renta')->assertSuccessful();
+    expect(CargoRenta::query()->where('ulid', $cargo)->first(['estado', 'referencia_condonada'])?->toArray())
+        ->toMatchArray(['estado' => 'cancelado', 'referencia_condonada' => null])
+        ->and(AlertaPlataforma::query()->where('tipo', 'renta_cobrada_dos_veces')->count())->toBe(1);
+
+    // Ya no se vigila: otra vuelta no repite el aviso.
+    $this->artisan('agendauno:conciliar-renta')->assertSuccessful();
+    expect(AlertaPlataforma::query()->where('tipo', 'renta_cobrada_dos_veces')->value('veces'))->toBe(1);
+});
+
+it('si el aviso de OpenPay de un cargo condonado sí llega, avisa una vez y deja de vigilarlo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $cargo = cargoRentaPendiente($e);
+    activarPasarelaDeRenta('openpay', ['merchant_id' => 'm1', 'private_key' => 'sk_openpay', 'webhook_user' => 'agendauno', 'webhook_password' => 'clave-del-aviso']);
+    $monto = (int) $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))->json('data.cargos.0.monto_minor');
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'openpay'], conBearer($e['bearer']))->assertCreated();
+    $this->pasarela->cargo = $cargo;
+    $this->pasarela->monto = $monto / 100;
+    $this->pasarela->openpay = 'charge_pending';
+    $this->postJson("/api/v1/plataforma/cargos/{$cargo}/condonar", ['motivo' => 'Cortesía'], conPlataforma())->assertOk();
+
+    $this->pasarela->openpay = 'completed';
+    $this->postJson('/api/v1/webhooks/plataforma/openpay', ['type' => 'charge.succeeded', 'transaction' => ['id' => 'tr_renta']], ['Authorization' => 'Basic '.base64_encode('agendauno:clave-del-aviso')])
+        ->assertOk();
+    expect(CargoRenta::query()->where('ulid', $cargo)->value('referencia_condonada'))->toBeNull();
+    $this->travel(11)->minutes();
+    $this->artisan('agendauno:conciliar-renta')->assertSuccessful();
+    expect(AlertaPlataforma::query()->where('tipo', 'renta_cobrada_dos_veces')->sole()->veces)->toBe(1);
 });

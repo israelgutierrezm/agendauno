@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\ReferidosSaas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\BeneficioRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\Client\Request as PeticionHttp;
@@ -294,4 +296,48 @@ it('si el cobro a la tarjeta quedó sin respuesta pero Stripe sí cobró, pagar 
 
     expect($cargo->refresh())->estado->value->toBe('pagado')->referencia_pago->toBe('pi_sin_respuesta');
     Http::assertNotSent(fn (PeticionHttp $r): bool => str_ends_with($r->url(), '/checkout/sessions'));
+});
+
+it('el primer mes de un invitado cobrado por domiciliación da el mes gratis a los dos, una sola vez', function (): void {
+    $anfitrion = estudioConSesion('estudio-a', 'a@correo.mx');
+    $codigo = (string) $this->getJson("/api/v1/app/{$anfitrion['slug']}/renta/referidos", conBearer($anfitrion['bearer']))->assertOk()->json('data.codigo');
+    ['e' => $e, 'cargo' => $cargo] = rentaConTarjeta();
+    app(ReferidosSaas::class)->vincular(Estudio::query()->where('slug', $e['slug'])->sole(), $codigo);
+    Http::fake(['api.stripe.com/v1/payment_intents' => Http::response(['id' => 'pi_renta', 'status' => 'succeeded'])]);
+
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    expect($cargo->refresh()->estado->value)->toBe('pagado');
+    $beneficios = BeneficioRenta::query()->where('tipo', 'mes_gratis')->get();
+    $ids = Estudio::query()->whereIn('slug', ['estudio-a', $e['slug']])->pluck('id', 'slug');
+    expect($beneficios)->toHaveCount(2)
+        ->and($beneficios->firstWhere('estudio_id', $ids['estudio-a'])?->origen_estudio_id)->toBe($ids[$e['slug']])
+        ->and($beneficios->firstWhere('estudio_id', $ids[$e['slug']])?->origen_estudio_id)->toBe($ids['estudio-a']);
+    $this->getJson("/api/v1/app/{$anfitrion['slug']}/renta/referidos", conBearer($anfitrion['bearer']))->assertOk()
+        ->assertJsonPath('data.beneficios.0.aplicado', false);
+
+    // Correr otra vez no cobra de nuevo ni duplica el beneficio.
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    Http::assertSentCount(1);
+    expect(BeneficioRenta::query()->where('tipo', 'mes_gratis')->count())->toBe(2);
+});
+
+it('si la domiciliación queda en proceso, el mes gratis llega con el aviso de Stripe, una sola vez', function (): void {
+    $anfitrion = estudioConSesion('estudio-a', 'a@correo.mx');
+    $codigo = (string) $this->getJson("/api/v1/app/{$anfitrion['slug']}/renta/referidos", conBearer($anfitrion['bearer']))->assertOk()->json('data.codigo');
+    ['e' => $e, 'cargo' => $cargo] = rentaConTarjeta();
+    app(ReferidosSaas::class)->vincular(Estudio::query()->where('slug', $e['slug'])->sole(), $codigo);
+    Http::fake(['api.stripe.com/v1/payment_intents' => Http::response(['id' => 'pi_proceso', 'status' => 'processing'])]);
+
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    expect($cargo->refresh()->estado->value)->toBe('pendiente')
+        ->and(BeneficioRenta::query()->count())->toBe(0);
+
+    foreach ([1, 2] as $vez) {
+        $this->postJson('/api/v1/webhooks/plataforma/stripe', [
+            'type' => 'payment_intent.succeeded',
+            'data' => ['object' => ['id' => 'pi_proceso', 'amount_received' => 149900, 'metadata' => ['cargo_renta' => $cargo->ulid]]],
+        ])->assertOk();
+    }
+    expect($cargo->refresh()->estado->value)->toBe('pagado')
+        ->and(BeneficioRenta::query()->where('tipo', 'mes_gratis')->count())->toBe(2);
 });

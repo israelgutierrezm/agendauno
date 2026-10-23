@@ -117,7 +117,7 @@ class DifundirComunicacionTenant
      * Por WhatsApp, con la plantilla, también cuántos mensajes del saldo gasta y su costo
      * (si la plataforma los cobra).
      *
-     * @return array{elegibles: int, sin_consentimiento: int, sin_email: int, sin_app: int, sin_whatsapp: int, mensajes?: int, costo_minor?: int|null}
+     * @return array{elegibles: int, sin_consentimiento: int, sin_email: int, sin_app: int, sin_whatsapp: int, mensajes?: int, costo_minor?: int|null, costo_moneda?: string}
      */
     public function alcance(SegmentoComunicacion $segmento, CanalComunicacion $canal, ?PlantillaWhatsAppNegocio $plantilla = null): array
     {
@@ -133,6 +133,8 @@ class DifundirComunicacionTenant
             $mensajes = $alcance['elegibles'] * $this->saldoWhatsApp->unidadesPor($plantilla->categoria);
             $alcance['mensajes'] = $mensajes;
             $alcance['costo_minor'] = $this->saldoWhatsApp->cobra() ? $mensajes * $this->saldoWhatsApp->precioMinor() : null;
+            // Pesos en México (más IVA); dólares sin IVA fuera (ADR 0186).
+            $alcance['costo_moneda'] = $this->saldoWhatsApp->moneda();
         }
 
         return $alcance;

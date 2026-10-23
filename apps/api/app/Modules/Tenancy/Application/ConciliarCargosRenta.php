@@ -23,6 +23,9 @@ class ConciliarCargosRenta
     /** Minutos que se le dan al aviso antes de preguntar. */
     private const MINUTOS_DE_GRACIA = 10;
 
+    /** Cuántos días se vigila un intento de OpenPay que quedó abierto al condonar. */
+    private const DIAS_VIGILAR_CONDONADOS = 30;
+
     public function __construct(
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly PasarelaStripePlataforma $stripe,
@@ -40,7 +43,7 @@ class ConciliarCargosRenta
             return 0;
         }
 
-        return CargoRenta::query()
+        $confirmados = CargoRenta::query()
             ->where('estado', EstadoCargoRenta::Pendiente->value)
             ->whereIn('metodo_pago', $activas)
             ->whereNotNull('referencia_pago')
@@ -49,6 +52,18 @@ class ConciliarCargosRenta
             ->get()
             ->filter(fn (CargoRenta $cargo): bool => $this->conciliar($cargo))
             ->count();
+
+        // Los condonados con su página de OpenPay abierta: si se pagó, el cobro doble se
+        // avisa aunque su aviso se haya perdido.
+        CargoRenta::query()
+            ->where('estado', EstadoCargoRenta::Cancelado->value)
+            ->whereNotNull('referencia_condonada')
+            ->where('updated_at', '>=', Carbon::now()->subDays(self::DIAS_VIGILAR_CONDONADOS))
+            ->orderBy('id')
+            ->get()
+            ->each(fn (CargoRenta $cargo) => $this->avisos->vigilarCondonado($cargo));
+
+        return $confirmados;
     }
 
     /**

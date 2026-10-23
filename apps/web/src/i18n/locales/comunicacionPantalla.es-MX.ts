@@ -37,6 +37,7 @@ export default {
     sinWhatsApp:
       "{n} no aceptó tus avisos por WhatsApp o no tiene celular | {n} no aceptaron tus avisos por WhatsApp o no tienen celular",
     gasto: "Gasta {mensajes} mensajes de tu saldo de WhatsApp ({costo} + IVA).",
+    gastoSinIva: "Gasta {mensajes} mensajes de tu saldo de WhatsApp ({costo}).",
     gastoSinCosto: "Gasta {mensajes} mensajes de tu saldo de WhatsApp.",
   },
   reglasTareas:
