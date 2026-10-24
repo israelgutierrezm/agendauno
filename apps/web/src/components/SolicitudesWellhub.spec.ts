@@ -10,6 +10,8 @@ vi.mock("@/lib/api", () => ({ mensajeDeError: () => "Error" }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
+const confirmar = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -51,6 +53,32 @@ describe("gimnasios que eligieron a AgendaUno en Wellhub", () => {
     expect(http.post).toHaveBeenCalledWith(
       "/api/v1/plataforma/wellhub/solicitudes/s1/asignar",
       { estudio: "fluo" },
+    );
+  });
+
+  it("descartar es una acción de peligro: se confirma antes", async () => {
+    const w = mount(SolicitudesWellhub, {
+      props: { apiUrl: "https://api", token: "t" },
+      global: { plugins: [i18n] },
+    });
+    await flushPromises();
+    const boton = w.get('[data-prueba="descartar-s1"]');
+    expect(boton.classes()).toContain("tu-btn-peligro");
+
+    confirmar.mockResolvedValue(false);
+    await boton.trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalledWith(
+      expect.stringContaining("Fluo Roma"),
+      expect.objectContaining({ peligro: true }),
+    );
+    expect(http.post).not.toHaveBeenCalled();
+
+    confirmar.mockResolvedValue(true);
+    await boton.trigger("click");
+    await flushPromises();
+    expect(http.post).toHaveBeenCalledWith(
+      "/api/v1/plataforma/wellhub/solicitudes/s1/descartar",
     );
   });
 });

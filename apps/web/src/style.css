@@ -1121,6 +1121,25 @@
   .tu-tabla-adaptable .tu-tabla td.tu-solo-tabla {
     display: none;
   }
+  /* Fichas compactas (`tu-fichas-compactas` junto a `tu-tabla-adaptable`), para
+     listados largos de pocos datos cortos: los datos en dos columnas, cada uno con su
+     etiqueta encima; el título y las acciones, a todo el ancho. */
+  .tu-tabla-adaptable.tu-fichas-compactas .tu-tabla tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 1rem;
+  }
+  .tu-tabla-adaptable.tu-fichas-compactas .tu-tabla td[data-etiqueta] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
+    padding: 0.3rem 0;
+  }
+  .tu-tabla-adaptable.tu-fichas-compactas
+    .tu-tabla
+    td[data-etiqueta]:first-child,
+  .tu-tabla-adaptable.tu-fichas-compactas .tu-tabla td.tu-celda-acciones {
+    grid-column: 1 / -1;
+  }
   .tu-tabla-adaptable .tu-tabla tfoot td {
     display: flex;
     justify-content: space-between;

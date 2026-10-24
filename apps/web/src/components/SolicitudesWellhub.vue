@@ -4,12 +4,13 @@ import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useToastStore } from "@/stores/toast";
 
 /**
  * Superadmin (ADR 0202): los gimnasios que eligieron a AgendaUno en Wellhub y no se supo
  * de qué negocio son (no traían su código). Se asignan a un negocio por su código (se
- * le pone el Gym ID) o se descartan.
+ * le pone el Gym ID) o se descartan (acción de peligro: se confirma).
  */
 interface Solicitud {
   id: string;
@@ -25,7 +26,16 @@ const { t } = useI18n();
 const toast = useToastStore();
 const solicitudes = ref<Solicitud[]>([]);
 const codigos = ref<Record<string, string>>({});
-const ocupado = ref<string | null>(null);
+// Qué solicitud se está guardando y con qué acción (su botón muestra el aro).
+const ocupado = ref<{ id: string; accion: "asignar" | "descartar" } | null>(
+  null,
+);
+function ocupadoCon(s: Solicitud, accion?: "asignar" | "descartar"): boolean {
+  return (
+    ocupado.value?.id === s.id &&
+    (accion === undefined || ocupado.value.accion === accion)
+  );
+}
 
 function cliente() {
   return axios.create({
@@ -49,7 +59,7 @@ async function cargar(): Promise<void> {
 }
 
 async function asignar(s: Solicitud): Promise<void> {
-  ocupado.value = s.id;
+  ocupado.value = { id: s.id, accion: "asignar" };
   try {
     await cliente().post(
       `/api/v1/plataforma/wellhub/solicitudes/${s.id}/asignar`,
@@ -65,11 +75,22 @@ async function asignar(s: Solicitud): Promise<void> {
 }
 
 async function descartar(s: Solicitud): Promise<void> {
-  ocupado.value = s.id;
+  if (
+    !(await confirmar(
+      t("plataformaAdmin.wellhub.confirmarDescartar", {
+        gimnasio: s.gimnasio ?? t("plataformaAdmin.wellhub.sinNombre"),
+      }),
+      { aceptar: t("plataformaAdmin.wellhub.descartar"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  ocupado.value = { id: s.id, accion: "descartar" };
   try {
     await cliente().post(
       `/api/v1/plataforma/wellhub/solicitudes/${s.id}/descartar`,
     );
+    toast.exito(t("plataformaAdmin.wellhub.descartada"));
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e));
@@ -127,15 +148,20 @@ onMounted(cargar);
         <button
           type="button"
           class="tu-btn tu-btn-primario"
-          :disabled="ocupado === s.id || !(codigos[s.id] ?? '').trim()"
+          :disabled="ocupadoCon(s) || !(codigos[s.id] ?? '').trim()"
+          :aria-busy="ocupadoCon(s, 'asignar') || undefined"
+          :data-prueba="`asignar-${s.id}`"
           @click="asignar(s)"
         >
           {{ $t("plataformaAdmin.wellhub.asignar") }}
         </button>
+        <!-- Descartar la quita de aquí: acción de peligro, con confirmación. -->
         <button
           type="button"
-          class="tu-btn tu-btn-secundario"
-          :disabled="ocupado === s.id"
+          class="tu-btn tu-btn-peligro"
+          :disabled="ocupadoCon(s)"
+          :aria-busy="ocupadoCon(s, 'descartar') || undefined"
+          :data-prueba="`descartar-${s.id}`"
           @click="descartar(s)"
         >
           {{ $t("plataformaAdmin.wellhub.descartar") }}

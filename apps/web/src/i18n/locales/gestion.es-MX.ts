@@ -979,6 +979,9 @@ export const plataformaAdmin = {
     asignar: "Asignar",
     descartar: "Descartar",
     asignada: "Gym ID asignado al negocio.",
+    confirmarDescartar:
+      "¿Descartar el aviso de {gimnasio}? Deja de aparecer aquí y su Gym ID no se asigna a ningún negocio.",
+    descartada: "Aviso descartado.",
   },
   paisesBienestar: {
     titulo: "Wellhub y TotalPass por país",
@@ -1527,7 +1530,6 @@ export const agendaOperacion = {
 
 // Parámetros configurables del negocio y de la plataforma (ADR 0042).
 export const parametrosConfig = {
-  tituloNegocio: "Límites y tiempos",
   ayudaNegocio:
     "Ajusta los tiempos y límites de tu negocio. Lo que dejes vacío usa el valor de la plataforma.",
   ayudaPlataforma:

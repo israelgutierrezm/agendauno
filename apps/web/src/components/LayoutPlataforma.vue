@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import IconoNav from "@/components/IconoNav.vue";
+import { confirmarSinGuardar } from "@/lib/cambiosPendientes";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 
 /**
@@ -12,7 +13,8 @@ import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
  * no en la barra). No lleva enlaces a la parte pública (ni «Inicio» ni
  * «Iniciar sesión»): de aquí solo se sale con «Cerrar sesión», para que la sesión de
  * la plataforma no se quede abierta por un clic. La sección elegida es el v-model
- * (va en la dirección, `?pestana=`).
+ * (va en la dirección, `?pestana=`). Cambiar de sección no cambia de ruta: si la
+ * sección abierta tiene cambios sin guardar, se pregunta antes (y antes de salir).
  */
 export interface SeccionPlataforma {
   clave: string;
@@ -55,9 +57,23 @@ onMounted(() => {
   }
 });
 
-function elegir(clave: string): void {
-  seccion.value = clave;
+async function sinPerderCambios(): Promise<boolean> {
+  return confirmarSinGuardar(
+    t("comun.cambiosSinGuardar"),
+    t("comun.salirSinGuardar"),
+  );
+}
+async function elegir(clave: string): Promise<void> {
   menuLateral.value = false;
+  if (clave === seccion.value || !(await sinPerderCambios())) {
+    return;
+  }
+  seccion.value = clave;
+}
+async function salir(): Promise<void> {
+  if (await sinPerderCambios()) {
+    emit("salir");
+  }
 }
 </script>
 
@@ -194,7 +210,7 @@ function elegir(clave: string): void {
             type="button"
             class="tu-btn tu-btn-secundario tu-btn-chico"
             data-prueba="salir-plataforma"
-            @click="emit('salir')"
+            @click="salir"
           >
             <IconoNav nombre="salir" :tam="16" />
             {{ t("plataformaAdmin.cerrarSesion") }}

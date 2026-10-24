@@ -58,9 +58,9 @@ onMounted(cargar);
 </script>
 
 <template>
+  <!-- La pestaña «Límites y tiempos» ya la nombra: sin título propio (ADR 0203). -->
   <div class="mt-5 tu-card p-5">
-    <h2 class="font-medium">{{ $t("parametrosConfig.tituloNegocio") }}</h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("parametrosConfig.ayudaNegocio") }}
     </p>
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">

@@ -396,13 +396,10 @@ export default {
     area: "Persona o área designada",
     marcadores:
       "Usa {'{'}responsable{'}'}, {'{'}domicilio{'}'}, {'{'}contacto{'}'} y {'{'}area{'}'} en el texto: se llenan con estos datos al publicar. No se publica mientras queden campos entre corchetes del borrador.",
-    nombreDoc: {
-      aviso_privacidad: "Aviso de privacidad",
-      terminos: "Términos y condiciones",
-    },
-    version: "publicado, versión {version} desde el {fecha}",
+    // Junto a cada documento, con su «Publicar».
+    version: "Publicado: versión {version} desde el {fecha}",
     sinPublicar:
-      "sin publicar (el registro de negocios queda cerrado en producción)",
+      "Sin publicar (el registro de negocios queda cerrado en producción)",
     guardarBorrador: "Guardar borrador",
     borradorGuardado:
       "Borrador guardado. Los usuarios siguen viendo lo publicado.",

@@ -823,6 +823,20 @@ interface Publicado {
   version: number;
   vigente_desde: string;
 }
+const DOCUMENTOS_LEGALES = [
+  {
+    tipo: "aviso_privacidad",
+    id: "lg-aviso",
+    etiqueta: "plataforma.legales.aviso",
+    publicar: "operacion.legales.publicarAviso",
+  },
+  {
+    tipo: "terminos",
+    id: "lg-terminos",
+    etiqueta: "plataforma.legales.terminos",
+    publicar: "operacion.legales.publicarTerminos",
+  },
+] as const;
 const legales = ref({
   aviso_privacidad: "",
   terminos: "",
@@ -1442,7 +1456,10 @@ function borrar(): void {
           </label>
         </div>
         <!-- En el teléfono, cada negocio es una ficha (su nombre, el título). -->
-        <div class="relative overflow-x-auto tu-tabla-adaptable">
+        <!-- En el teléfono, fichas compactas: 15 negocios sin bajar pantallas de más. -->
+        <div
+          class="relative overflow-x-auto tu-tabla-adaptable tu-fichas-compactas"
+        >
           <table class="tu-tabla">
             <thead>
               <tr>
@@ -2136,26 +2153,6 @@ function borrar(): void {
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("operacion.legales.ayuda") }}
             </p>
-            <ul class="text-sm grid gap-1">
-              <li
-                v-for="tipo in ['aviso_privacidad', 'terminos'] as const"
-                :key="tipo"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ $t(`operacion.legales.nombreDoc.${tipo}`) }}:
-                <template v-if="publicados[tipo]">
-                  {{
-                    $t("operacion.legales.version", {
-                      version: publicados[tipo]!.version,
-                      fecha: fechaPublicado(publicados[tipo]!),
-                    })
-                  }}
-                </template>
-                <span v-else :style="{ color: 'var(--aviso)' }">{{
-                  $t("operacion.legales.sinPublicar")
-                }}</span>
-              </li>
-            </ul>
             <details
               class="tu-avanzado"
               :open="responsableAbierto"
@@ -2217,32 +2214,61 @@ function borrar(): void {
                 </div>
               </fieldset>
             </details>
-            <div>
-              <label class="tu-label" for="lg-aviso">{{
-                $t("plataforma.legales.aviso")
+            <!-- Cada documento con su versión publicada y su «Publicar» (un botón
+                 principal por zona); el pie guarda el borrador de los dos. -->
+            <div
+              v-for="doc in DOCUMENTOS_LEGALES"
+              :key="doc.tipo"
+              :data-prueba="`legales-doc-${doc.tipo}`"
+            >
+              <label class="tu-label" :for="doc.id">{{
+                $t(doc.etiqueta)
               }}</label>
-              <p class="text-xs mb-1" :style="{ color: 'var(--texto-suave)' }">
+              <p
+                v-if="doc.tipo === 'aviso_privacidad'"
+                class="text-xs mb-1"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
                 {{ $t("operacion.legales.marcadores") }}
               </p>
               <textarea
-                id="lg-aviso"
-                v-model="legales.aviso_privacidad"
+                :id="doc.id"
+                v-model="legales[doc.tipo]"
                 class="tu-input"
                 rows="6"
               />
+              <div
+                class="mt-2 flex flex-wrap items-center justify-between gap-3"
+              >
+                <span
+                  class="tu-estado text-sm"
+                  :style="{
+                    '--tono': publicados[doc.tipo]
+                      ? 'var(--exito)'
+                      : 'var(--aviso)',
+                  }"
+                  >{{
+                    publicados[doc.tipo]
+                      ? $t("operacion.legales.version", {
+                          version: publicados[doc.tipo]!.version,
+                          fecha: fechaPublicado(publicados[doc.tipo]!),
+                        })
+                      : $t("operacion.legales.sinPublicar")
+                  }}</span
+                >
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="button"
+                  :disabled="guardando !== null"
+                  :aria-busy="guardando === `publicar-${doc.tipo}` || undefined"
+                  :data-prueba="`legales-publicar-${doc.tipo}`"
+                  @click="publicarLegal(doc.tipo)"
+                >
+                  {{ $t(doc.publicar) }}
+                </button>
+              </div>
             </div>
-            <div>
-              <label class="tu-label" for="lg-terminos">{{
-                $t("plataforma.legales.terminos")
-              }}</label>
-              <textarea
-                id="lg-terminos"
-                v-model="legales.terminos"
-                class="tu-input"
-                rows="6"
-              />
-            </div>
-            <!-- Guardar y publicar siempre a la vista al bajar por los textos. -->
+            <!-- Guardar el borrador siempre a la vista al bajar por los textos. -->
             <div class="tu-pie-acciones">
               <button
                 class="tu-btn tu-btn-secundario"
@@ -2252,28 +2278,6 @@ function borrar(): void {
                 data-prueba="legales-guardar"
               >
                 {{ $t("operacion.legales.guardarBorrador") }}
-              </button>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="button"
-                :disabled="guardando !== null"
-                :aria-busy="
-                  guardando === 'publicar-aviso_privacidad' || undefined
-                "
-                data-prueba="legales-publicar-aviso_privacidad"
-                @click="publicarLegal('aviso_privacidad')"
-              >
-                {{ $t("operacion.legales.publicarAviso") }}
-              </button>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="button"
-                :disabled="guardando !== null"
-                :aria-busy="guardando === 'publicar-terminos' || undefined"
-                data-prueba="legales-publicar-terminos"
-                @click="publicarLegal('terminos')"
-              >
-                {{ $t("operacion.legales.publicarTerminos") }}
               </button>
             </div>
           </form>

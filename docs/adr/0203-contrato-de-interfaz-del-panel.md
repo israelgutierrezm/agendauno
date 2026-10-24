@@ -136,3 +136,12 @@ Un contrato por tema, con piezas compartidas y pruebas que lo vigilan.
     todas; como las otras categorías no están en pantalla, el editor revisa los
     valores antes de guardar, abre la categoría del primer error y marca las que
     tienen errores.
+  - en el superadmin, cambiar de sección no cambia de ruta: el menú lateral y «Cerrar
+    sesión» preguntan antes si la sección abierta tiene cambios sin guardar. Tarifas
+    avisa de un borrador sin publicar y muestra plegadas sus versiones publicadas.
+  - un formulario con varios documentos que se publican por separado (Documentos
+    legales) lleva cada «Publicar» junto a su documento, con su versión publicada; el
+    pie guarda el borrador. Un botón principal por zona.
+  - `TablaDatos` acepta la paginación del servidor (`paginacion` + `@ir`) y pinta una
+    sola; `tu-fichas-compactas` pone los datos de la ficha del teléfono en dos
+    columnas para listados largos de datos cortos.

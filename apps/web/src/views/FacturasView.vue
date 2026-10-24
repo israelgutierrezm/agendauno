@@ -10,7 +10,6 @@ import CancelarFactura from "@/components/CancelarFactura.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import NotaDeCredito from "@/components/NotaDeCredito.vue";
-import PaginacionListado from "@/components/PaginacionListado.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
@@ -690,12 +689,14 @@ onMounted(async () => {
         :filas="facturas"
         :buscar="false"
         :por-pagina="meta?.per_page ?? 20"
+        :paginacion="meta"
         :vacio="
           conFiltros
             ? $t('operacion.listadosDos.sinResultados')
             : $t('facturas.vacio')
         "
         clave-vista="facturas"
+        @ir="irPagina"
       >
         <template #col-receptor="{ fila }">
           <div class="font-semibold">
@@ -812,14 +813,6 @@ onMounted(async () => {
           }}</span>
         </template>
       </TablaDatos>
-      <PaginacionListado
-        v-if="meta && meta.ultima_pagina > 1"
-        :page="meta.page"
-        :ultima-pagina="meta.ultima_pagina"
-        :total="meta.total"
-        :per-page="meta.per_page"
-        @ir="irPagina"
-      />
 
       <!-- La plataforma aún no factura (sin proveedor en producción). -->
       <AvisoRegion

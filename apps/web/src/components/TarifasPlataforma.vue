@@ -6,8 +6,10 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import { mensajeDeError } from "@/lib/api";
+import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
 import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
+import { dinero } from "@/lib/formato";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { ETIQUETAS_FUNCION, NIVELES_PLAN } from "@/lib/suscripcion";
 import { useToastStore } from "@/stores/toast";
@@ -23,7 +25,9 @@ import { useToastStore } from "@/stores/toast";
  * - Citas: precio al mes por nivel y profesionales contratados, por adelantado.
  *
  * Una tarifa a la vez, en pestañas (`?tarifa=citas`); las escaleras van en columnas y
- * el reparto de funciones, plegado, para que la sección no baje varias pantallas.
+ * el reparto de funciones, plegado, para que la sección no baje varias pantallas. Las
+ * versiones publicadas de cada tarifa (las últimas 10) van plegadas al final. Un
+ * borrador editado sin publicar pregunta antes de salir.
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
 
@@ -84,6 +88,8 @@ const opcionesModalidad = computed(() =>
 );
 
 const vigentes = ref<Partial<Record<Modalidad, Tarifa | null>>>({});
+// Las últimas versiones publicadas de cada tarifa (la más nueva primero).
+const historiales = ref<Partial<Record<Modalidad, Tarifa[]>>>({});
 const borradores = ref<Partial<Record<Modalidad, Borrador>>>({});
 const publicando = ref<Modalidad | null>(null);
 // Tras intentar publicar con campos vacíos: se marcan y se explica dentro de su tarjeta.
@@ -218,10 +224,11 @@ async function cargar(conservar?: Modalidad): Promise<void> {
   errorCarga.value = null;
   try {
     const { data } = await cliente().get<{
-      data: Record<Modalidad, { vigente: Tarifa | null }>;
+      data: Record<Modalidad, { vigente: Tarifa | null; historial?: Tarifa[] }>;
     }>("/api/v1/plataforma/tarifas");
     for (const m of MODALIDADES) {
       vigentes.value[m] = data.data[m]?.vigente ?? null;
+      historiales.value[m] = data.data[m]?.historial ?? [];
       if (m !== conservar || borradores.value[m] === undefined) {
         borradores.value[m] = borradorDe(vigentes.value[m] ?? null);
       }
@@ -365,6 +372,75 @@ function fecha(iso: string): string {
     new Date(a, m - 1, d),
   );
 }
+
+// Un borrador es distinto de su versión vigente (los campos numéricos pueden volver
+// como número o como texto: se comparan escritos).
+function escrito(b: Borrador): string {
+  return JSON.stringify(b, (_clave, v: unknown) =>
+    typeof v === "number" ? String(v) : v,
+  );
+}
+function sucio(m: Modalidad): boolean {
+  const b = borradores.value[m];
+  return (
+    b !== undefined &&
+    escrito(b) !== escrito(borradorDe(vigentes.value[m] ?? null))
+  );
+}
+// Salir con un borrador sin publicar (o un tipo de cambio escrito sin guardar)
+// pregunta antes (ADR 0166). Cambiar entre Clases y Citas no: los dos se conservan.
+useCambiosPendientes(
+  () =>
+    !cargando.value &&
+    (MODALIDADES.some(sucio) || String(nuevoCambio.value).trim() !== ""),
+);
+
+// Una versión publicada, en una línea: sus precios principales.
+function resumenVersion(v: Tarifa): string {
+  const moneda = v.definicion.moneda ?? "USD";
+  const precio = (minor: number): string => dinero(minor, moneda);
+  if (v.modalidad === "clases") {
+    const montos = (v.definicion.bandas ?? []).map((b) => b.monto_minor);
+    if (montos.length === 0) {
+      return "";
+    }
+    return t(
+      "cobro.tarifas.resumenClases",
+      {
+        n: montos.length,
+        desde: precio(Math.min(...montos)),
+        hasta: precio(Math.max(...montos)),
+      },
+      montos.length,
+    );
+  }
+  const desde = (nivel: Nivel): string => {
+    const montos = Object.values(v.definicion.niveles?.[nivel] ?? {});
+    return montos.length > 0 ? precio(Math.min(...montos)) : "—";
+  };
+  return t("cobro.tarifas.resumenCitas", {
+    individual: desde("individual"),
+    premium: desde("premium"),
+    pro: desde("pro"),
+  });
+}
+// Vigente, programada (empieza más adelante) o anterior.
+function estadoVersion(
+  m: Modalidad,
+  v: Tarifa,
+): "vigente" | "programada" | "anterior" {
+  if (v.id === vigentes.value[m]?.id) {
+    return "vigente";
+  }
+  return new Date(v.vigente_desde).getTime() > Date.now()
+    ? "programada"
+    : "anterior";
+}
+const TONO_VERSION = {
+  vigente: "var(--exito)",
+  programada: "var(--aviso)",
+  anterior: "var(--texto-suave)",
+} as const;
 
 function reintentar(): void {
   void cargar();
@@ -713,6 +789,41 @@ onMounted(reintentar);
             </div>
           </template>
         </form>
+        <!-- Las versiones publicadas: de consulta, plegadas. -->
+        <details
+          v-if="m === modalidad && (historiales[m]?.length ?? 0) > 0"
+          class="tu-avanzado mt-4"
+          :data-prueba="`historial-${m}`"
+        >
+          <summary>
+            {{
+              $t("cobro.tarifas.historial", { n: historiales[m]?.length ?? 0 })
+            }}
+          </summary>
+          <ul class="tp-historial mt-2">
+            <li
+              v-for="v in historiales[m]"
+              :key="v.id"
+              class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 text-sm"
+              :data-version="v.version"
+            >
+              <span class="min-w-0">
+                <span class="block font-medium">{{
+                  $t("cobro.tarifas.version", {
+                    n: v.version,
+                    fecha: fecha(v.vigente_desde),
+                  })
+                }}</span>
+                <span class="tu-sub block">{{ resumenVersion(v) }}</span>
+              </span>
+              <span
+                class="tu-estado text-xs"
+                :style="{ '--tono': TONO_VERSION[estadoVersion(m, v)] }"
+                >{{ $t(`cobro.tarifas.estados.${estadoVersion(m, v)}`) }}</span
+              >
+            </li>
+          </ul>
+        </details>
       </template>
     </template>
 
@@ -827,5 +938,9 @@ onMounted(reintentar);
 .tp-compacto .tu-input {
   padding-top: 0.35rem;
   padding-bottom: 0.35rem;
+}
+/* Versiones publicadas: una por renglón, separadas por una línea. */
+.tp-historial > li + li {
+  border-top: 1px solid var(--borde-fila);
 }
 </style>

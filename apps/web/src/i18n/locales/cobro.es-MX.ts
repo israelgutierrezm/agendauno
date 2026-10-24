@@ -108,6 +108,17 @@ export default {
       "Completa los campos marcados: un precio vacío no se publica como 0.",
     publicada:
       "Se publicó la versión {n}. Las landings la muestran al cargar; su HTML para buscadores, al publicar las landings de nuevo.",
+    // Las versiones publicadas (plegadas al final de cada tarifa).
+    historial: "Versiones publicadas · {n}",
+    resumenClases:
+      "{n} escalón · {desde} al mes | {n} escalones · de {desde} a {hasta} al mes",
+    resumenCitas:
+      "Individual {individual} · Premium desde {premium} · Pro desde {pro} al mes",
+    estados: {
+      vigente: "Vigente",
+      programada: "Programada",
+      anterior: "Anterior",
+    },
     confirmarPublicar:
       "¿Publicar una versión nueva de la tarifa de {modalidad}? No se puede editar ni deshacer: los cobros siguientes, la contratación y la landing usarán estos precios (el HTML para buscadores, al publicar las landings de nuevo).",
   },

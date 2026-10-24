@@ -13,6 +13,13 @@ interface Columna {
   // Las acciones de la fila: en el teléfono, al pie de la ficha y sin etiqueta.
   acciones?: boolean;
 }
+// La paginación del servidor (el `meta` del API).
+interface PaginacionServidor {
+  page: number;
+  ultima_pagina: number;
+  total: number;
+  per_page: number;
+}
 interface DefinicionFiltro {
   clave: string;
   etiqueta: string;
@@ -40,6 +47,9 @@ const props = withDefaults(
     // En teléfonos, una fila se lee como ficha con campos etiquetados. Una matriz
     // comparativa puede optar por conservar la tabla horizontal.
     adaptarMovil?: boolean;
+    // Con la paginación del servidor, la tabla no pagina por su cuenta: muestra las
+    // filas que llegan y su paginación dice el total real (emite `ir` con la página).
+    paginacion?: PaginacionServidor | null;
   }>(),
   {
     buscar: true,
@@ -51,8 +61,10 @@ const props = withDefaults(
     filtrarFila: undefined,
     claveVista: undefined,
     adaptarMovil: true,
+    paginacion: undefined,
   },
 );
+const emit = defineEmits<{ ir: [pagina: number] }>();
 
 const vista =
   props.claveVista !== undefined ? useVistaListado(props.claveVista) : null;
@@ -109,12 +121,40 @@ const totalPaginas = computed(() =>
 
 const paginaSegura = computed(() => Math.min(pagina.value, totalPaginas.value));
 
+const delServidor = computed(() => props.paginacion != null);
+
 const paginadas = computed(() =>
-  filtradas.value.slice(
-    (paginaSegura.value - 1) * props.porPagina,
-    paginaSegura.value * props.porPagina,
-  ),
+  delServidor.value
+    ? filtradas.value
+    : filtradas.value.slice(
+        (paginaSegura.value - 1) * props.porPagina,
+        paginaSegura.value * props.porPagina,
+      ),
 );
+
+// El pie: la paginación del servidor o la de la tabla (una sola, nunca las dos).
+const pie = computed(() =>
+  props.paginacion != null
+    ? {
+        page: props.paginacion.page,
+        ultima: props.paginacion.ultima_pagina,
+        total: props.paginacion.total,
+        porPagina: props.paginacion.per_page,
+      }
+    : {
+        page: paginaSegura.value,
+        ultima: totalPaginas.value,
+        total: filtradas.value.length,
+        porPagina: props.porPagina,
+      },
+);
+function irA(n: number): void {
+  if (delServidor.value) {
+    emit("ir", n);
+    return;
+  }
+  pagina.value = n;
+}
 
 // Al cambiar el buscador, los filtros o los datos, vuelve a la primera pagina.
 watch([q, valores, () => props.filas], () => {
@@ -196,13 +236,13 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
           </slot>
         </li>
       </ul>
-      <div v-if="filtradas.length" class="mt-3 tu-card overflow-hidden">
+      <div v-if="pie.total" class="mt-3 tu-card overflow-hidden">
         <PaginacionListado
-          :page="paginaSegura"
-          :ultima-pagina="totalPaginas"
-          :total="filtradas.length"
-          :per-page="porPagina"
-          @ir="(n) => (pagina = n)"
+          :page="pie.page"
+          :ultima-pagina="pie.ultima"
+          :total="pie.total"
+          :per-page="pie.porPagina"
+          @ir="irA"
         />
       </div>
     </div>
@@ -264,11 +304,11 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
       </div>
 
       <PaginacionListado
-        :page="paginaSegura"
-        :ultima-pagina="totalPaginas"
-        :total="filtradas.length"
-        :per-page="porPagina"
-        @ir="(n) => (pagina = n)"
+        :page="pie.page"
+        :ultima-pagina="pie.ultima"
+        :total="pie.total"
+        :per-page="pie.porPagina"
+        @ir="irA"
       />
     </div>
   </div>

@@ -1,7 +1,8 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
+import { hayCambiosPendientes } from "@/lib/cambiosPendientes";
 import TarifasPlataforma from "./TarifasPlataforma.vue";
 
 /*
@@ -74,6 +75,9 @@ function montar() {
     global: { plugins: [i18n] },
   });
 }
+
+// Cada prueba desmonta lo suyo: un borrador editado no se queda como «cambio sin guardar».
+enableAutoUnmount(afterEach);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -152,5 +156,76 @@ describe("TarifasPlataforma", () => {
       '[data-prueba="tarifa-clases"] input[aria-label="Precio mensual"]',
     ).element as HTMLInputElement;
     expect(precio.value).toBe("25");
+  });
+});
+
+describe("versiones publicadas y cambios sin guardar", () => {
+  it("las versiones publicadas van plegadas, con su estado y sus precios", async () => {
+    const vigente = tarifas.clases.vigente;
+    const anterior = {
+      ...vigente,
+      id: "01CLASES2",
+      version: 2,
+      vigente_desde: "2026-09-01T00:00:00-06:00",
+    };
+    const programada = {
+      ...vigente,
+      id: "01CLASES4",
+      version: 4,
+      vigente_desde: "2099-01-01T00:00:00-06:00",
+    };
+    http.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/tipo-cambio")
+            ? { banxico_configurado: false, ultimo: null }
+            : {
+                ...tarifas,
+                clases: {
+                  vigente,
+                  historial: [programada, vigente, anterior],
+                },
+              },
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    const historial = w.get('[data-prueba="historial-clases"]');
+    expect(historial.element.tagName).toBe("DETAILS");
+    expect((historial.element as HTMLDetailsElement).open).toBe(false);
+    expect(historial.get("summary").text()).toBe("Versiones publicadas · 3");
+    const estado = (v: number): string =>
+      historial.get(`[data-version="${v}"] .tu-estado`).text();
+    expect(estado(4)).toBe("Programada");
+    expect(estado(3)).toBe("Vigente");
+    expect(estado(2)).toBe("Anterior");
+    expect(historial.get('[data-version="3"]').text()).toContain(
+      "10 escalones",
+    );
+    // Sin versiones en Citas: no hay plegable.
+    expect(w.find('[data-prueba="historial-citas"]').exists()).toBe(false);
+  });
+
+  it("un borrador editado sin publicar pregunta antes de salir", async () => {
+    const w = montar();
+    await flushPromises();
+    expect(hayCambiosPendientes()).toBe(false);
+
+    const precio = w.findAll(
+      '[data-prueba="tarifa-clases"] input[aria-label="Precio mensual"]',
+    )[0];
+    await precio.setValue("99");
+    expect(hayCambiosPendientes()).toBe(true);
+    // Volver al valor publicado ya no cuenta como cambio.
+    await precio.setValue("21");
+    expect(hayCambiosPendientes()).toBe(false);
+
+    // El tipo de cambio escrito sin guardar también.
+    await w.get('[data-prueba="tipo-cambio"] input').setValue("18.1");
+    expect(hayCambiosPendientes()).toBe(true);
+    w.unmount();
+    expect(hayCambiosPendientes()).toBe(false);
   });
 });
