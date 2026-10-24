@@ -52,7 +52,12 @@ const props = defineProps<{
   sucursal?: string;
   // Símbolo de la moneda del negocio: marca la cita que falta cobrar.
   simboloCobro?: string;
+  // Mientras carga, o si no se pudo consultar, no se afirma «No hay citas» ni se
+  // cuentan ceros: aún no se sabe.
+  cargando?: boolean;
+  sinConsultar?: boolean;
 }>();
+const sinDatos = computed(() => props.cargando || props.sinConsultar);
 
 // Estado y pago en texto (para quien no distingue el punto de color): va en el
 // título y en la etiqueta accesible de cada tarjeta.
@@ -430,7 +435,21 @@ watch(() => props.fecha, enfocar);
             <span class="block font-semibold text-sm truncate">{{
               c.nombre
             }}</span>
-            <span class="block text-xs" :style="{ color: 'var(--texto-suave)' }"
+            <span
+              v-if="sinDatos"
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="columna-sin-datos"
+              >{{
+                cargando
+                  ? $t("agendaVisual.profesionales.actualizando")
+                  : $t("agendaVisual.profesionales.sinConsultar")
+              }}</span
+            >
+            <span
+              v-else
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
               >{{ c.resumen
               }}<template v-if="c.ocupacion !== null">
                 ·
@@ -442,7 +461,7 @@ watch(() => props.fecha, enfocar);
               ></span
             >
             <span
-              v-if="c.ocupacion !== null"
+              v-if="c.ocupacion !== null && !sinDatos"
               class="ag-barra"
               aria-hidden="true"
             >
@@ -544,7 +563,11 @@ watch(() => props.fecha, enfocar);
 
           <!-- Nada en el día: qué hacer, sin tapar los huecos (los clics pasan). -->
           <EstadoVacio
-            v-if="c.tarjetas.length === 0 && posicionVacio(c.fuera) !== null"
+            v-if="
+              !sinDatos &&
+              c.tarjetas.length === 0 &&
+              posicionVacio(c.fuera) !== null
+            "
             class="ag-vacio"
             :style="{ top: `${posicionVacio(c.fuera)}px` }"
             icono="agenda"

@@ -1003,13 +1003,29 @@ const instructoresDeSucursal = computed(() =>
     ),
   ),
 );
-const profesionalesVisibles = computed(() =>
-  instructorFiltro.value === ""
+// Quien solo ve lo suyo (el profesional) ve «Mi agenda»: su columna y nada más. Las
+// columnas de los demás saldrían vacías (el servidor no le manda sus citas) y se
+// leerían como horarios libres. El equipo completo, solo para quien lo puede ver.
+const miColumna = computed<ProfesionalAgenda[]>(() => {
+  const yo = sesion.usuario;
+  if (yo === null) {
+    return [];
+  }
+  const propia =
+    instructoresDeSucursal.value.find((i) => i.id === yo.ulid) ??
+    instructores.value.find((i) => i.id === yo.ulid);
+  return [propia ?? { id: yo.ulid, nombre: yo.nombre }];
+});
+const profesionalesVisibles = computed(() => {
+  if (soloLoSuyo.value) {
+    return miColumna.value;
+  }
+  return instructorFiltro.value === ""
     ? instructoresDeSucursal.value
     : instructoresDeSucursal.value.filter(
         (i) => i.id === instructorFiltro.value,
-      ),
-);
+      );
+});
 // Al cambiar de sucursal, si el profesional elegido no atiende ahí, se ven todos
 // (no antes de tener al equipo: el de la dirección se conserva mientras carga).
 watch(instructoresDeSucursal, (lista) => {
@@ -1058,7 +1074,18 @@ function tendencia(
   };
 }
 
-const tarjetasKpi = computed<Indicador[]>(() => {
+// Mientras la agenda carga (o si no se pudo consultar), las cifras no se dan por
+// definitivas: «—» en lugar de ceros.
+const tarjetasKpi = computed<Indicador[]>(() =>
+  cargandoSesiones.value || errorSesiones.value
+    ? cifrasDeLaAgenda.value.map((k) => ({
+        ...k,
+        valor: "—",
+        tendencia: undefined,
+      }))
+    : cifrasDeLaAgenda.value,
+);
+const cifrasDeLaAgenda = computed<Indicador[]>(() => {
   const ahora = new Date();
   if (sesion.esCitas) {
     const delDia = (lista: Sesion[], iso: string): Sesion[] =>
@@ -2029,8 +2056,14 @@ onMounted(async () => {
 <template>
   <section class="tu-pagina">
     <EncabezadoSeccion
-      :titulo="$t('agenda.titulo')"
-      :subtitulo="$t('agenda.subtitulo')"
+      :titulo="
+        soloLoSuyo ? $t('agendaVisual.miAgenda.titulo') : $t('agenda.titulo')
+      "
+      :subtitulo="
+        soloLoSuyo
+          ? $t('agendaVisual.miAgenda.subtitulo')
+          : $t('agenda.subtitulo')
+      "
     >
       <template #acciones>
         <div class="flex flex-wrap items-center gap-2">
@@ -2399,6 +2432,8 @@ onMounted(async () => {
         :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
         :puede-crear="puedeReservar"
         :simbolo-cobro="simboloCobro"
+        :cargando="cargandoSesiones"
+        :sin-consultar="errorSesiones"
         @abrir="abrirDesdeAgenda"
         @crear="abrirNuevaCita"
       />

@@ -12,9 +12,13 @@ import AgendaProfesionales from "./AgendaProfesionales.vue";
 // Jueves 10 de enero de 2030, 9:00 en CDMX.
 const AHORA = new Date("2030-01-10T15:00:00Z");
 
-function montar(ventanas: { ini: string; fin: string }[]) {
+function montar(
+  ventanas: { ini: string; fin: string }[],
+  extra: { cargando?: boolean; sinConsultar?: boolean } = {},
+) {
   return mount(AgendaProfesionales, {
     props: {
+      ...extra,
       fecha: "2030-01-10",
       zona: "America/Mexico_City",
       sesiones: [],
@@ -76,6 +80,23 @@ describe("columna sin citas", () => {
       const seEncima = aviso.top < f.fin && f.top < aviso.fin;
       expect(seEncima).toBe(false);
     }
+  });
+
+  it("mientras carga no afirma que no hay citas ni cuenta ceros", () => {
+    const w = montar([{ ini: "09:00", fin: "18:00" }], { cargando: true });
+    expect(w.find(".ag-vacio").exists()).toBe(false);
+    expect(w.text()).not.toContain("0 citas");
+    expect(w.get('[data-prueba="columna-sin-datos"]').text()).toBe(
+      "Actualizando agenda…",
+    );
+  });
+
+  it("si no se pudo consultar, lo dice en lugar de mostrarla libre", () => {
+    const w = montar([{ ini: "09:00", fin: "18:00" }], { sinConsultar: true });
+    expect(w.find(".ag-vacio").exists()).toBe(false);
+    expect(w.get('[data-prueba="columna-sin-datos"]').text()).toBe(
+      "No se pudo consultar",
+    );
   });
 
   it("si ese día no atiende, no invita a agendar", () => {

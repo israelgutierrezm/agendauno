@@ -52,6 +52,14 @@ export default {
     lugares: "{ocupados}/{capacidad} lugares",
     vacioTitulo: "No hay citas en este día",
     vacioTexto: "Haz clic en un horario para agendar una nueva cita.",
+    actualizando: "Actualizando agenda…",
+    sinConsultar: "No se pudo consultar",
+  },
+  // La agenda de quien solo ve lo suyo (el profesional): su columna y sus cifras.
+  miAgenda: {
+    titulo: "Mi agenda",
+    // En la palabra base (clase): el adaptador la lee como cita en una barbería.
+    subtitulo: "Tus clases y tu horario.",
   },
   semana: {
     resumenDia: "{n} clase · {pct}% lleno | {n} clases · {pct}% lleno",
