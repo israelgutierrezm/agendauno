@@ -302,17 +302,34 @@ export const SIN_ADAPTAR: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Secciones de pantallas que solo existen en los negocios de clases (ADR 0104): en un
+ * negocio de citas no se adaptan. Si alguna llegara a verse, dice «clases», que es lo
+ * cierto, y no inventa «citas grabadas». En uno de clases sí se adaptan («Sesiones
+ * grabadas» si su término es «sesión»).
+ */
+export const SOLO_CLASES: ReadonlySet<string> = new Set([
+  "videos",
+  "importarClases",
+  "importarReservas",
+]);
+
+/**
  * Pone los textos en la terminología del negocio en sesión (ADR 0049): en una
  * barbería, "Próximas clases" se lee "Próximas citas". Sin negocio, los textos base.
  */
-export function aplicarTerminologia(terminos: TerminosNegocio | null): void {
+export function aplicarTerminologia(
+  terminos: TerminosNegocio | null,
+  modalidad: "clases" | "citas" = "clases",
+): void {
   terminosDeSesion = terminos;
+  modalidadDeSesion = modalidad;
   pintarTerminologia();
 }
 
 // Fuera del panel (páginas públicas con sesión) rigen los textos base: la página de
 // otro negocio no habla con las palabras del negocio en sesión.
 let terminosDeSesion: TerminosNegocio | null = null;
+let modalidadDeSesion: "clases" | "citas" = "clases";
 let terminologiaEnPausa = false;
 let marca: Producto = "agendauno";
 
@@ -322,7 +339,13 @@ function pintarTerminologia(): void {
   const adaptados =
     terminos === null
       ? mensajesBase
-      : adaptarMensajes(mensajesBase, terminos, SIN_ADAPTAR);
+      : adaptarMensajes(
+          mensajesBase,
+          terminos,
+          modalidadDeSesion === "citas"
+            ? new Set([...SIN_ADAPTAR, ...SOLO_CLASES])
+            : SIN_ADAPTAR,
+        );
   i18n.global.setLocaleMessage("es-MX", conMarca(adaptados, marca));
 }
 

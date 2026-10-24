@@ -204,7 +204,10 @@ export function esAlumno(sesion: Sesion): boolean {
 
 /**
  * ¿Puede entrar a esta pantalla? Sin regla registrada, no. Suspendido por renta
- * vencida, solo a la renta, para pagarla (ADR 0073).
+ * vencida, solo a la renta, para pagarla (ADR 0073). Todo se evalúa junto: el rol
+ * activo (alumno, instructor), la modalidad del negocio, las funciones de su perfil,
+ * lo que incluye su plan y los permisos. El rol no basta: un cliente de citas no entra
+ * a «Mis videos» aunque sea un portal de alumno.
  */
 export function puedeEntrar(
   nombreRuta: string,
@@ -225,14 +228,12 @@ export function puedeEntrar(
       (r) => !siguiente.has(r) && puedeEntrar(r, sesion, siguiente),
     );
   }
-  if (politica.personal === true) {
-    return true;
+  // El rol activo es una condición más, no un pase: luego se revisa lo demás.
+  if (politica.soloMiembro === true && !esAlumno(sesion)) {
+    return false;
   }
-  if (politica.soloMiembro === true) {
-    return esAlumno(sesion);
-  }
-  if (politica.soloInstructor === true) {
-    return esInstructor(sesion.usuario);
+  if (politica.soloInstructor === true && !esInstructor(sesion.usuario)) {
+    return false;
   }
   if (
     politica.modalidad !== undefined &&

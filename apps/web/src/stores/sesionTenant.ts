@@ -295,10 +295,15 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     () => estudio.value?.perfil_config?.terminologia ?? TERMINOLOGIA_DEFAULT,
   );
   // Los textos de las pantallas hablan como el negocio: en una barbería, "citas" y
-  // "clientes" en lugar de "clases" y "alumnos" (ADR 0049).
+  // "clientes" en lugar de "clases" y "alumnos" (ADR 0049). Con su modalidad: en citas
+  // no se adaptan los textos de pantallas que solo existen en clases.
   watch(
-    () => estudio.value?.perfil_config?.terminologia ?? null,
-    (terminos) => aplicarTerminologia(terminos),
+    () =>
+      [
+        estudio.value?.perfil_config?.terminologia ?? null,
+        modalidad.value,
+      ] as const,
+    ([terminos, m]) => aplicarTerminologia(terminos, m),
     { immediate: true, deep: true },
   );
   // Y con la marca de su producto (ADR 0108): en producción la del dominio; en
