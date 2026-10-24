@@ -7,10 +7,18 @@ import { formatoFechaHora, type EnvioMedicion } from "@/lib/medicion";
  * Los últimos envíos a GA4 y Meta (ADR 0143): qué conversión, a qué destino, cuándo
  * pasó y en qué estado quedó (pendiente, aceptado por el proveedor, con error u omitido
  * con su motivo). «Aceptado» no quiere decir atribuido.
+ *
+ * Con `integrado` (dentro de una pestaña que ya se llama «Últimos envíos») no pinta su
+ * título. `#pie` va dentro de la tarjeta, debajo de la lista (p. ej. la paginación).
  */
-withDefaults(defineProps<{ envios: EnvioMedicion[]; conNegocio?: boolean }>(), {
-  conNegocio: false,
-});
+withDefaults(
+  defineProps<{
+    envios: EnvioMedicion[];
+    conNegocio?: boolean;
+    integrado?: boolean;
+  }>(),
+  { conNegocio: false, integrado: false },
+);
 const { t, te } = useI18n();
 
 const TONOS: Record<EnvioMedicion["estado"], string> = {
@@ -39,8 +47,14 @@ function detalle(e: EnvioMedicion): string {
 
 <template>
   <section class="tu-card p-4 sm:p-5" data-prueba="envios-medicion">
-    <h3 class="font-medium">{{ t("medicion.envios.titulo") }}</h3>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <h3 v-if="!integrado" class="font-medium">
+      {{ t("medicion.envios.titulo") }}
+    </h3>
+    <p
+      class="text-sm"
+      :class="{ 'mt-1': !integrado }"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
       {{ t("medicion.envios.aceptadoNoAtribuido") }}
     </p>
     <p
@@ -80,5 +94,6 @@ function detalle(e: EnvioMedicion): string {
         </span>
       </li>
     </ul>
+    <slot name="pie" />
   </section>
 </template>

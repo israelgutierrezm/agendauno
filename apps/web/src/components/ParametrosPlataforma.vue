@@ -12,7 +12,8 @@ import { useToastStore } from "@/stores/toast";
 /**
  * Parámetros de plataforma (ADR 0042), para el superadmin: el valor que aplica a
  * todos los negocios que no ajustaron el suyo, y los que solo fija la plataforma
- * (vigencia de enlaces, política de cancelación de quien no tiene una).
+ * (vigencia de enlaces, política de cancelación de quien no tiene una). El editor los
+ * muestra por categoría, una a la vez, con buscador (ParametrosEditor).
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
 
@@ -68,11 +69,9 @@ onMounted(cargar);
 </script>
 
 <template>
+  <!-- Sin título propio: el de la sección («Parámetros») ya lo nombra. -->
   <div class="tu-card p-5">
-    <h2 class="font-medium text-lg">
-      {{ $t("parametrosConfig.tituloPlataforma") }}
-    </h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("parametrosConfig.ayudaPlataforma") }}
     </p>
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">

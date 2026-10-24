@@ -593,7 +593,12 @@ El superadmin (pestaña **Operación**) muestra lo mismo que la consola y los co
 versión en marcha, si el servicio está abierto o en mantenimiento, el programador y
 la cola, la verificación de producción completa, los últimos respaldos con el detalle
 del último simulacro y las alertas de los últimos 30 días
-(`GET /api/v1/plataforma/operacion`, solo lectura).
+(`GET /api/v1/plataforma/operacion`, solo lectura). Arriba va una franja con el estado
+de cada cosa; abajo, Verificación (lo que falta, por sección; lo que está en orden,
+plegado), Respaldos y Alertas (10 por página). El estado de los respaldos
+(`respaldos.estado`) es el peor de los puntos de la sección «Respaldos» de la
+verificación, y `alertas_total` / `alertas_por_avisar` cuentan todo el historial aunque
+la lista llegue recortada a las 50 más recientes.
 
 - `ALERTAS_CORREO` (en `api.env`) recibe cada 10 minutos, en un solo correo, lo que
   falló en la operación: errores de la aplicación (incluidos cobros, domiciliaciones y

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import axios from "axios";
-import { nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { ETIQUETAS_FUNCION, NIVELES_PLAN } from "@/lib/suscripcion";
 import { useToastStore } from "@/stores/toast";
@@ -19,6 +21,9 @@ import { useToastStore } from "@/stores/toast";
  *
  * - Clases: escalera por alumnos activos, mes vencido.
  * - Citas: precio al mes por nivel y profesionales contratados, por adelantado.
+ *
+ * Una tarifa a la vez, en pestañas (`?tarifa=citas`); las escaleras van en columnas y
+ * el reparto de funciones, plegado, para que la sección no baje varias pantallas.
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
 
@@ -65,6 +70,18 @@ interface TipoCambio {
 
 const MODALIDADES = ["clases", "citas"] as const;
 type Modalidad = (typeof MODALIDADES)[number];
+
+// La tarifa a la vista, en la dirección. Clave propia: `pestana` es la sección del
+// superadmin y `vista`, la del menú.
+const modalidad = usePestanaEnUrl<Modalidad>(MODALIDADES, { clave: "tarifa" });
+function textoModalidad(m: Modalidad): string {
+  return t(`cobro.tarifas.${m}`, {
+    marca: PRODUCTOS[productoDeModalidad(m)].nombre,
+  });
+}
+const opcionesModalidad = computed(() =>
+  MODALIDADES.map((m) => ({ clave: m, texto: textoModalidad(m) })),
+);
 
 const vigentes = ref<Partial<Record<Modalidad, Tarifa | null>>>({});
 const borradores = ref<Partial<Record<Modalidad, Borrador>>>({});
@@ -160,7 +177,43 @@ function borradorDe(tarifa: Tarifa | null): Borrador {
   };
 }
 
-async function cargar(): Promise<void> {
+/**
+ * Las filas de una escalera en columnas (hasta tres, de al menos cinco filas): en
+ * escritorio caben a lo ancho en vez de bajar varias pantallas; en el teléfono quedan
+ * una debajo de otra. Cada fila conserva su índice real.
+ */
+function columnas<T>(filas: T[]): { fila: T; i: number }[][] {
+  const porColumna = Math.max(5, Math.ceil(filas.length / 3));
+  const trozos: { fila: T; i: number }[][] = [];
+  for (let inicio = 0; inicio < filas.length; inicio += porColumna) {
+    trozos.push(
+      filas
+        .slice(inicio, inicio + porColumna)
+        .map((fila, j) => ({ fila, i: inicio + j })),
+    );
+  }
+  return trozos;
+}
+
+// El reparto plegado, en una línea: cuántas funciones abre cada nivel.
+function resumenFunciones(b: Borrador): string {
+  const elegidos = Object.values(b.funciones);
+  const reparto = NIVELES_PLAN.map((n) => ({
+    n,
+    cuantas: elegidos.filter((v) => v === n).length,
+  }))
+    .filter((r) => r.cuantas > 0)
+    .map((r) => `${t(`suscripcion.niveles.${r.n}`)} ${r.cuantas}`);
+  return [t("suscripcion.plataforma.tarifas.funciones"), ...reparto].join(
+    " · ",
+  );
+}
+
+/**
+ * `conservar`: la modalidad cuyo borrador se queda como está (tras publicar la otra,
+ * no se pierde lo que se editaba en su pestaña).
+ */
+async function cargar(conservar?: Modalidad): Promise<void> {
   cargando.value = true;
   errorCarga.value = null;
   try {
@@ -169,7 +222,9 @@ async function cargar(): Promise<void> {
     }>("/api/v1/plataforma/tarifas");
     for (const m of MODALIDADES) {
       vigentes.value[m] = data.data[m]?.vigente ?? null;
-      borradores.value[m] = borradorDe(vigentes.value[m] ?? null);
+      if (m !== conservar || borradores.value[m] === undefined) {
+        borradores.value[m] = borradorDe(vigentes.value[m] ?? null);
+      }
     }
   } catch (e) {
     errorCarga.value = mensajeDeError(e);
@@ -279,7 +334,7 @@ async function publicar(m: Modalidad): Promise<void> {
       cuerpoDe(m, b),
     );
     toast.exito(t("cobro.tarifas.publicada", { n: data.data.version }));
-    await cargar();
+    await cargar(MODALIDADES.find((otra) => otra !== m));
   } catch (e) {
     toast.error(mensajeDeError(e));
   } finally {
@@ -321,13 +376,21 @@ onMounted(reintentar);
 
 <template>
   <div>
-    <!-- La pestaña «Tarifas» ya la nombra: sin título propio, solo su ayuda. -->
+    <!-- La sección «Tarifas» ya la nombra: sin título propio, solo su ayuda. -->
     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("cobro.tarifas.ayuda") }}
     </p>
+
+    <!-- Una tarifa a la vez (en la dirección): antes iban las dos seguidas. -->
+    <PestanasSeccion
+      v-model="modalidad"
+      :opciones="opcionesModalidad"
+      :etiqueta="$t('cobro.tarifas.titulo')"
+    />
+
     <p
       v-if="cargando && !vigentes.clases && !vigentes.citas"
-      class="mt-3 text-sm"
+      class="mt-4 text-sm"
       role="status"
       :style="{ color: 'var(--texto-suave)' }"
     >
@@ -335,7 +398,7 @@ onMounted(reintentar);
     </p>
     <div
       v-else-if="errorCarga"
-      class="mt-3 flex flex-wrap items-center gap-3 text-sm"
+      class="mt-4 flex flex-wrap items-center gap-3 text-sm"
       role="alert"
       data-prueba="tarifas-error"
     >
@@ -344,25 +407,19 @@ onMounted(reintentar);
         {{ $t("comun.reintentar") }}
       </button>
     </div>
-    <div v-else class="mt-3 grid gap-4 lg:grid-cols-2">
-      <form
-        v-for="m in MODALIDADES"
-        :key="m"
-        class="tu-card p-4 space-y-3"
-        :data-prueba="`tarifa-${m}`"
-        @submit.prevent="publicar(m)"
-      >
-        <div>
-          <h3 class="font-medium">
-            {{
-              $t(`cobro.tarifas.${m}`, {
-                marca: PRODUCTOS[productoDeModalidad(m)].nombre,
-              })
-            }}
-          </h3>
+    <template v-else>
+      <template v-for="m in MODALIDADES" :key="m">
+        <form
+          v-if="m === modalidad"
+          class="tu-card p-4 mt-4 space-y-4"
+          :data-prueba="`tarifa-${m}`"
+          :aria-label="textoModalidad(m)"
+          @submit.prevent="publicar(m)"
+        >
+          <!-- La pestaña nombra la tarifa: aquí solo la versión vigente. -->
           <p
             v-if="vigentes[m]"
-            class="text-xs"
+            class="text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >
             {{
@@ -372,333 +429,368 @@ onMounted(reintentar);
               })
             }}
           </p>
-        </div>
 
-        <template v-if="borradores[m]">
-          <!-- Clases: escalera por alumnos activos -->
-          <template v-if="m === 'clases'">
-            <table class="tu-tabla">
-              <thead>
-                <tr>
-                  <th>{{ $t("cobro.tarifas.hasta") }}</th>
-                  <th>{{ $t("cobro.tarifas.monto") }}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(e, i) in borradores[m]!.escalones" :key="i">
-                  <td class="pr-2">
-                    <span
-                      v-if="i === borradores[m]!.escalones.length - 1"
-                      class="text-xs"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{ $t("cobro.tarifas.sinTope") }}</span
-                    >
-                    <input
-                      v-else
-                      v-model="e.hasta"
-                      class="tu-input"
-                      type="number"
-                      min="1"
-                      required
-                      :aria-label="$t('cobro.tarifas.hasta')"
-                      :aria-invalid="marcar(m, e.hasta)"
-                    />
-                  </td>
-                  <td class="pr-2">
-                    <input
-                      v-model="e.precio"
-                      class="tu-input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      :aria-label="$t('cobro.tarifas.monto')"
-                      :aria-invalid="marcar(m, e.precio)"
-                    />
-                  </td>
-                  <td class="text-right">
-                    <!-- Un renglón que aún no se publica: discreto. -->
-                    <button
-                      v-if="borradores[m]!.escalones.length > 1"
-                      type="button"
-                      class="tu-btn tu-btn-discreto tu-btn-chico"
-                      @click="quitar(m, i)"
-                    >
-                      {{ $t("cobro.tarifas.quitar") }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <button
-              type="button"
-              class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
-              @click="agregar(m)"
-            >
-              {{ $t("cobro.tarifas.agregar") }}
-            </button>
-          </template>
-
-          <!-- Citas: precio al mes por nivel y profesionales -->
-          <template v-else>
-            <label class="block">
-              <span class="tu-label">
-                {{ $t("suscripcion.niveles.individual") }} ·
-                {{ $t("suscripcion.plataforma.tarifas.precioMensual") }}
-              </span>
-              <input
-                v-model="borradores[m]!.individual"
-                class="tu-input"
-                type="number"
-                min="0"
-                step="0.01"
-                required
-                :aria-invalid="marcar(m, borradores[m]!.individual)"
-              />
-            </label>
-            <table class="tu-tabla">
-              <thead>
-                <tr>
-                  <th>
-                    {{ $t("suscripcion.plataforma.tarifas.profesionales") }}
-                  </th>
-                  <th>{{ $t("suscripcion.niveles.premium") }}</th>
-                  <th>{{ $t("suscripcion.niveles.pro") }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(f, i) in borradores[m]!.filas" :key="i">
-                  <td class="pr-2 font-semibold">{{ i + 2 }}</td>
-                  <td class="pr-2">
-                    <input
-                      v-model="f.premium"
-                      class="tu-input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      :aria-label="`${$t('suscripcion.niveles.premium')} ${i + 2}`"
-                      :aria-invalid="marcar(m, f.premium)"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      v-model="f.pro"
-                      class="tu-input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      :aria-label="`${$t('suscripcion.niveles.pro')} ${i + 2}`"
-                      :aria-invalid="marcar(m, f.pro)"
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="flex flex-wrap gap-2">
+          <template v-if="borradores[m]">
+            <!-- Clases: escalera por alumnos activos, en columnas. -->
+            <template v-if="m === 'clases'">
+              <div class="tp-columnas tp-compacto">
+                <table
+                  v-for="(trozo, c) in columnas(borradores[m]!.escalones)"
+                  :key="c"
+                  class="tu-tabla tp-tabla"
+                >
+                  <thead>
+                    <tr>
+                      <th>{{ $t("cobro.tarifas.hasta") }}</th>
+                      <th>{{ $t("cobro.tarifas.monto") }}</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="e in trozo" :key="e.i">
+                      <td>
+                        <span
+                          v-if="e.i === borradores[m]!.escalones.length - 1"
+                          class="text-xs"
+                          :style="{ color: 'var(--texto-suave)' }"
+                          >{{ $t("cobro.tarifas.sinTope") }}</span
+                        >
+                        <input
+                          v-else
+                          v-model="e.fila.hasta"
+                          class="tu-input"
+                          type="number"
+                          min="1"
+                          required
+                          :aria-label="$t('cobro.tarifas.hasta')"
+                          :aria-invalid="marcar(m, e.fila.hasta)"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="e.fila.precio"
+                          class="tu-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          required
+                          :aria-label="$t('cobro.tarifas.monto')"
+                          :aria-invalid="marcar(m, e.fila.precio)"
+                        />
+                      </td>
+                      <td class="text-right">
+                        <!-- Un renglón que aún no se publica: discreto. -->
+                        <button
+                          v-if="borradores[m]!.escalones.length > 1"
+                          type="button"
+                          class="tu-btn tu-btn-discreto tu-btn-chico"
+                          @click="quitar(m, e.i)"
+                        >
+                          {{ $t("cobro.tarifas.quitar") }}
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <button
                 type="button"
                 class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
                 @click="agregar(m)"
               >
-                {{ $t("suscripcion.plataforma.tarifas.agregarFila") }}
+                {{ $t("cobro.tarifas.agregar") }}
               </button>
-              <button
-                v-if="borradores[m]!.filas.length > 1"
-                type="button"
-                class="tu-btn tu-btn-discreto tu-btn-chico"
-                @click="quitar(m, 0)"
-              >
-                {{ $t("suscripcion.plataforma.tarifas.quitarFila") }}
-              </button>
-            </div>
-            <fieldset class="space-y-2" data-prueba="funciones-por-nivel">
-              <legend class="font-medium text-sm">
-                {{ $t("suscripcion.plataforma.tarifas.funciones") }}
-              </legend>
-              <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                {{ $t("suscripcion.plataforma.tarifas.funcionesAyuda") }}
-              </p>
-              <label
-                v-for="(etiqueta, funcion) in ETIQUETAS_FUNCION"
-                :key="funcion"
-                class="flex items-center justify-between gap-3 text-sm"
-              >
-                <span>{{ etiqueta.replace("*", "") }}</span>
-                <select
-                  v-model="borradores[m]!.funciones[funcion]"
-                  class="tu-input w-auto"
+            </template>
+
+            <!-- Citas: precio al mes por nivel y profesionales, en columnas. -->
+            <template v-else>
+              <label class="block sm:max-w-xs">
+                <span class="tu-label">
+                  {{ $t("suscripcion.niveles.individual") }} ·
+                  {{ $t("suscripcion.plataforma.tarifas.precioMensual") }}
+                </span>
+                <input
+                  v-model="borradores[m]!.individual"
+                  class="tu-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  :aria-invalid="marcar(m, borradores[m]!.individual)"
+                />
+              </label>
+              <div class="tp-columnas tp-compacto">
+                <table
+                  v-for="(trozo, c) in columnas(borradores[m]!.filas)"
+                  :key="c"
+                  class="tu-tabla tp-tabla"
                 >
-                  <option v-for="n in NIVELES_PLAN" :key="n" :value="n">
-                    {{ $t(`suscripcion.niveles.${n}`) }}
-                  </option>
+                  <thead>
+                    <tr>
+                      <th>
+                        {{ $t("suscripcion.plataforma.tarifas.profesionales") }}
+                      </th>
+                      <th>{{ $t("suscripcion.niveles.premium") }}</th>
+                      <th>{{ $t("suscripcion.niveles.pro") }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="f in trozo" :key="f.i">
+                      <td class="font-semibold">{{ f.i + 2 }}</td>
+                      <td>
+                        <input
+                          v-model="f.fila.premium"
+                          class="tu-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          required
+                          :aria-label="`${$t('suscripcion.niveles.premium')} ${f.i + 2}`"
+                          :aria-invalid="marcar(m, f.fila.premium)"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          v-model="f.fila.pro"
+                          class="tu-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          required
+                          :aria-label="`${$t('suscripcion.niveles.pro')} ${f.i + 2}`"
+                          :aria-invalid="marcar(m, f.fila.pro)"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-secundario tu-btn-chico tu-btn-crear"
+                  @click="agregar(m)"
+                >
+                  {{ $t("suscripcion.plataforma.tarifas.agregarFila") }}
+                </button>
+                <button
+                  v-if="borradores[m]!.filas.length > 1"
+                  type="button"
+                  class="tu-btn tu-btn-discreto tu-btn-chico"
+                  @click="quitar(m, 0)"
+                >
+                  {{ $t("suscripcion.plataforma.tarifas.quitarFila") }}
+                </button>
+              </div>
+            </template>
+
+            <!-- Lo común, en una fila: moneda, prueba, IVA (y el anual en citas). -->
+            <div
+              class="grid grid-cols-2 items-end gap-3 sm:grid-cols-3"
+              :class="m === 'citas' ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+            >
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("suscripcion.plataforma.tarifas.moneda")
+                }}</span>
+                <select v-model="borradores[m]!.moneda" class="tu-input">
+                  <option value="USD">USD</option>
+                  <option value="MXN">MXN</option>
                 </select>
               </label>
-            </fieldset>
-          </template>
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("cobro.tarifas.diasPrueba")
+                }}</span>
+                <input
+                  v-model.number="borradores[m]!.dias_prueba"
+                  class="tu-input"
+                  type="number"
+                  min="0"
+                  required
+                  :aria-invalid="marcar(m, borradores[m]!.dias_prueba)"
+                />
+              </label>
+              <label class="block">
+                <span class="tu-label">{{ $t("cobro.tarifas.iva") }}</span>
+                <input
+                  v-model.number="borradores[m]!.iva_porcentaje"
+                  class="tu-input"
+                  type="number"
+                  min="0"
+                  required
+                  :aria-invalid="marcar(m, borradores[m]!.iva_porcentaje)"
+                />
+              </label>
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("suscripcion.plataforma.tarifas.ivaExtranjero")
+                }}</span>
+                <input
+                  v-model.number="borradores[m]!.iva_porcentaje_extranjero"
+                  class="tu-input"
+                  type="number"
+                  min="0"
+                  required
+                  :aria-invalid="
+                    marcar(m, borradores[m]!.iva_porcentaje_extranjero)
+                  "
+                />
+              </label>
+              <label v-if="m === 'citas'" class="block">
+                <span class="tu-label">{{
+                  $t("suscripcion.plataforma.tarifas.mesesAnual")
+                }}</span>
+                <input
+                  v-model.number="borradores[m]!.meses_anual"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  max="12"
+                  required
+                  :aria-invalid="marcar(m, borradores[m]!.meses_anual)"
+                />
+              </label>
+            </div>
 
-          <div class="grid gap-2 grid-cols-2">
-            <label class="block">
-              <span class="tu-label">{{
-                $t("suscripcion.plataforma.tarifas.moneda")
-              }}</span>
-              <select v-model="borradores[m]!.moneda" class="tu-input">
-                <option value="USD">USD</option>
-                <option value="MXN">MXN</option>
-              </select>
-            </label>
-            <label class="block">
-              <span class="tu-label">{{ $t("cobro.tarifas.diasPrueba") }}</span>
-              <input
-                v-model.number="borradores[m]!.dias_prueba"
-                class="tu-input"
-                type="number"
-                min="0"
-                required
-                :aria-invalid="marcar(m, borradores[m]!.dias_prueba)"
-              />
-            </label>
-            <label class="block">
-              <span class="tu-label">{{ $t("cobro.tarifas.iva") }}</span>
-              <input
-                v-model.number="borradores[m]!.iva_porcentaje"
-                class="tu-input"
-                type="number"
-                min="0"
-                required
-                :aria-invalid="marcar(m, borradores[m]!.iva_porcentaje)"
-              />
-            </label>
-            <label class="block">
-              <span class="tu-label">{{
-                $t("suscripcion.plataforma.tarifas.ivaExtranjero")
-              }}</span>
-              <input
-                v-model.number="borradores[m]!.iva_porcentaje_extranjero"
-                class="tu-input"
-                type="number"
-                min="0"
-                required
-                :aria-invalid="
-                  marcar(m, borradores[m]!.iva_porcentaje_extranjero)
-                "
-              />
-            </label>
-            <label v-if="m === 'citas'" class="block">
-              <span class="tu-label">{{
-                $t("suscripcion.plataforma.tarifas.mesesAnual")
-              }}</span>
-              <input
-                v-model.number="borradores[m]!.meses_anual"
-                class="tu-input"
-                type="number"
-                min="1"
-                max="12"
-                required
-                :aria-invalid="marcar(m, borradores[m]!.meses_anual)"
-              />
-            </label>
-          </div>
+            <!-- Qué nivel abre cada función: se cambia poco, va plegado con su
+                 reparto a la vista. -->
+            <details v-if="m === 'citas'" class="tu-avanzado">
+              <summary>{{ resumenFunciones(borradores[m]!) }}</summary>
+              <fieldset
+                class="space-y-3"
+                data-prueba="funciones-por-nivel"
+                :aria-label="$t('suscripcion.plataforma.tarifas.funciones')"
+              >
+                <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                  {{ $t("suscripcion.plataforma.tarifas.funcionesAyuda") }}
+                </p>
+                <div
+                  class="tp-compacto grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3"
+                >
+                  <label
+                    v-for="(etiqueta, funcion) in ETIQUETAS_FUNCION"
+                    :key="funcion"
+                    class="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span>{{ etiqueta.replace("*", "") }}</span>
+                    <select
+                      v-model="borradores[m]!.funciones[funcion]"
+                      class="tu-input w-auto"
+                    >
+                      <option v-for="n in NIVELES_PLAN" :key="n" :value="n">
+                        {{ $t(`suscripcion.niveles.${n}`) }}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+              </fieldset>
+            </details>
 
-          <AvisoTono
-            v-if="incompleta[m] && faltantes(m, borradores[m]!)"
-            tono="peligro"
-            role="alert"
-            :data-prueba="`tarifa-${m}-incompleta`"
-          >
-            {{ $t("cobro.tarifas.incompleta") }}
-          </AvisoTono>
-
-          <!-- «Publicar» siempre a la vista al bajar por la tarjeta. -->
-          <div class="tu-pie-acciones">
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="publicando === m"
-              :aria-busy="publicando === m || undefined"
+            <AvisoTono
+              v-if="incompleta[m] && faltantes(m, borradores[m]!)"
+              tono="peligro"
+              role="alert"
+              :data-prueba="`tarifa-${m}-incompleta`"
             >
-              {{
-                publicando === m
-                  ? $t("cobro.tarifas.publicando")
-                  : $t("cobro.tarifas.publicar")
-              }}
-            </button>
-          </div>
-        </template>
-      </form>
-    </div>
+              {{ $t("cobro.tarifas.incompleta") }}
+            </AvisoTono>
 
-    <!-- Tipo de cambio para cobrar en pesos la renta en dólares (ADR 0107) -->
+            <!-- «Publicar» siempre a la vista al bajar por la tarjeta. -->
+            <div class="tu-pie-acciones">
+              <button
+                class="tu-btn tu-btn-primario"
+                type="submit"
+                :disabled="publicando === m"
+                :aria-busy="publicando === m || undefined"
+              >
+                {{
+                  publicando === m
+                    ? $t("cobro.tarifas.publicando")
+                    : $t("cobro.tarifas.publicar")
+                }}
+              </button>
+            </div>
+          </template>
+        </form>
+      </template>
+    </template>
+
+    <!-- Tipo de cambio para cobrar en pesos la renta en dólares (ADR 0107): vale para
+         las dos tarifas; compacto, con el valor vigente y su captura en una fila. -->
     <form
-      class="tu-card p-4 mt-4 space-y-2"
+      class="tu-card p-4 mt-4"
       data-prueba="tipo-cambio"
       @submit.prevent="guardarCambio"
     >
-      <h2 class="tu-titulo-seccion">
-        {{ $t("suscripcion.plataforma.tipoCambio.titulo") }}
-      </h2>
-      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div class="min-w-0 flex-1 space-y-1">
+          <h2 class="tu-titulo-seccion">
+            {{ $t("suscripcion.plataforma.tipoCambio.titulo") }}
+          </h2>
+          <p class="font-semibold">
+            <template v-if="ultimoCambio">
+              {{
+                $t("suscripcion.plataforma.tipoCambio.ultimo", {
+                  valor: ultimoCambio.valor,
+                  fecha: fecha(ultimoCambio.fecha),
+                })
+              }}
+              <span
+                class="text-sm font-normal"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                ·
+                {{
+                  ultimoCambio.fuente === "banxico"
+                    ? $t("suscripcion.plataforma.tipoCambio.fuenteBanxico")
+                    : $t("suscripcion.plataforma.tipoCambio.fuenteManual")
+                }}
+              </span>
+            </template>
+            <template v-else>{{
+              $t("suscripcion.plataforma.tipoCambio.sinValor")
+            }}</template>
+          </p>
+          <p class="text-sm">
+            {{
+              banxico
+                ? $t("suscripcion.plataforma.tipoCambio.banxico")
+                : $t("suscripcion.plataforma.tipoCambio.sinBanxico")
+            }}
+          </p>
+        </div>
+        <div class="flex items-end gap-2">
+          <label class="block">
+            <span class="tu-label">{{
+              $t("suscripcion.plataforma.tipoCambio.valor")
+            }}</span>
+            <input
+              v-model="nuevoCambio"
+              class="tu-input w-36"
+              inputmode="decimal"
+              placeholder="17.2345"
+              :aria-invalid="errorCambio ? 'true' : undefined"
+              aria-describedby="tipo-cambio-error"
+            />
+          </label>
+          <button
+            type="submit"
+            class="tu-btn tu-btn-primario"
+            :disabled="guardandoCambio || nuevoCambio.trim() === ''"
+            :aria-busy="guardandoCambio || undefined"
+          >
+            {{ $t("suscripcion.plataforma.tipoCambio.guardar") }}
+          </button>
+        </div>
+      </div>
+      <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("suscripcion.plataforma.tipoCambio.ayuda") }}
       </p>
-      <p class="text-sm">
-        {{
-          banxico
-            ? $t("suscripcion.plataforma.tipoCambio.banxico")
-            : $t("suscripcion.plataforma.tipoCambio.sinBanxico")
-        }}
-      </p>
-      <p class="font-semibold">
-        <template v-if="ultimoCambio">
-          {{
-            $t("suscripcion.plataforma.tipoCambio.ultimo", {
-              valor: ultimoCambio.valor,
-              fecha: fecha(ultimoCambio.fecha),
-            })
-          }}
-          <span
-            class="text-sm font-normal"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            ·
-            {{
-              ultimoCambio.fuente === "banxico"
-                ? $t("suscripcion.plataforma.tipoCambio.fuenteBanxico")
-                : $t("suscripcion.plataforma.tipoCambio.fuenteManual")
-            }}
-          </span>
-        </template>
-        <template v-else>{{
-          $t("suscripcion.plataforma.tipoCambio.sinValor")
-        }}</template>
-      </p>
-      <div class="flex items-end gap-2 flex-wrap">
-        <label class="block">
-          <span class="tu-label">{{
-            $t("suscripcion.plataforma.tipoCambio.valor")
-          }}</span>
-          <input
-            v-model="nuevoCambio"
-            class="tu-input"
-            inputmode="decimal"
-            placeholder="17.2345"
-            :aria-invalid="errorCambio ? 'true' : undefined"
-            aria-describedby="tipo-cambio-error"
-          />
-        </label>
-        <button
-          type="submit"
-          class="tu-btn tu-btn-primario"
-          :disabled="guardandoCambio || nuevoCambio.trim() === ''"
-          :aria-busy="guardandoCambio || undefined"
-        >
-          {{ $t("suscripcion.plataforma.tipoCambio.guardar") }}
-        </button>
-      </div>
       <AvisoTono
         v-if="errorCambio"
         id="tipo-cambio-error"
+        class="mt-3"
         tono="peligro"
         role="alert"
       >
@@ -707,3 +799,33 @@ onMounted(reintentar);
     </form>
   </div>
 </template>
+
+<style scoped>
+/* Escaleras en columnas: hasta tres a lo ancho; en el teléfono, una debajo de otra. */
+.tp-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  column-gap: 1.5rem;
+  row-gap: 0.75rem;
+  align-items: start;
+}
+/* Filas más bajas que las de un listado: son muchas y solo llevan campos. */
+.tp-tabla th {
+  padding: 0.35rem 0.5rem;
+}
+.tp-tabla td {
+  padding: 0.3rem 0.5rem;
+}
+.tp-tabla th:first-child,
+.tp-tabla td:first-child {
+  padding-left: 0;
+}
+.tp-tabla th:last-child,
+.tp-tabla td:last-child {
+  padding-right: 0;
+}
+.tp-compacto .tu-input {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+</style>

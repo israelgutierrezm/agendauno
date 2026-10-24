@@ -121,3 +121,12 @@ Un contrato por tema, con piezas compartidas y pruebas que lo vigilan.
   - en un formulario que se queda abierto después de guardar (el editor de widgets,
     con su vista previa y su código), el botón dice «Cancelar» mientras hay cambios sin
     guardar y «Cerrar» cuando ya no los hay.
+  - ninguna sección del superadmin pide desplazarse más de unas dos pantallas en
+    escritorio. Las largas tienen un segundo nivel con su propia clave en la dirección
+    (Configuración `?config=`, Tarifas `?tarifa=`, Operación `?operacion_ver=`,
+    Medición `?medicion=`), sus listas van por páginas (Negocios 15, Errores 15,
+    Alertas 10, envíos 15) y lo de consulta rara va plegado. Los parámetros (de la
+    plataforma y del negocio) se ven por categoría (`?categoria=`), con un buscador en
+    todas; como las otras categorías no están en pantalla, el editor revisa los
+    valores antes de guardar, abre la categoría del primer error y marca las que
+    tienen errores.

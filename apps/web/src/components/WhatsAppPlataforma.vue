@@ -15,7 +15,8 @@ import { useToastStore } from "@/stores/toast";
  * - con los dueños: verifican su número al registrarse y aceptan avisos (ADR 0070);
  * - de los negocios a sus clientes (ADR 0069); apagado, ningún negocio lo ve, y
  *   encendido solo lo usan los negocios activados en su ficha (ADR 0083).
- * Debajo de cada uso, las plantillas que hay que registrar en Meta.
+ * Debajo de cada uso, las plantillas que hay que registrar en Meta. Va en la pestaña
+ * «WhatsApp» de Configuración, que ya lo nombra (por eso no pinta título).
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
 
@@ -73,6 +74,9 @@ const borrador = ref({
 const telefono = ref("");
 const ocupado = ref<"guardar" | "prueba" | null>(null);
 const error = ref<string | null>(null);
+// El webhook se registra una vez en Meta: se abre solo si al cargar falta el App
+// Secret (no se pliega al guardar).
+const webhookAbierto = ref(false);
 
 const conexion = computed<{ texto: string; tono: string }>(() =>
   config.value?.conectado
@@ -102,6 +106,7 @@ async function cargar(): Promise<void> {
       auth(),
     );
     aplicar(data.data);
+    webhookAbierto.value = data.data.webhook?.app_secret_configurado === false;
   } catch (e) {
     error.value = mensajeDeError(e);
   }
@@ -152,15 +157,11 @@ onMounted(cargar);
 
 <template>
   <div class="tu-card p-5">
+    <!-- Sin título propio: la pestaña «WhatsApp» de Configuración ya lo nombra. -->
     <div class="flex items-start justify-between gap-3">
-      <div>
-        <h2 class="font-medium text-lg">
-          {{ $t("plataformaAdmin.whatsapp.titulo") }}
-        </h2>
-        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("plataformaAdmin.whatsapp.subtitulo") }}
-        </p>
-      </div>
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("plataformaAdmin.whatsapp.subtitulo") }}
+      </p>
       <span
         v-if="config"
         class="tu-estado text-sm shrink-0"
@@ -227,58 +228,64 @@ onMounted(cargar);
         {{ $t("plataformaAdmin.whatsapp.tokenAyuda") }}
       </p>
 
-      <!-- Webhook de estados: entregado, leído o fallido (ADR 0074). -->
-      <section v-if="config.webhook" class="wa-uso" data-prueba="webhook">
-        <h3 class="text-sm font-medium">
-          {{ $t("plataformaAdmin.whatsapp.webhook") }}
-        </h3>
-        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("plataformaAdmin.whatsapp.webhookAyuda") }}
-        </p>
-        <div class="mt-2 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label class="tu-label" for="wa-webhook-url">{{
-              $t("plataformaAdmin.whatsapp.webhookUrl")
-            }}</label>
-            <input
-              id="wa-webhook-url"
-              class="tu-input"
-              :value="config.webhook.url"
-              readonly
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-          </div>
-          <div>
-            <label class="tu-label" for="wa-webhook-token">{{
-              $t("plataformaAdmin.whatsapp.webhookToken")
-            }}</label>
-            <input
-              id="wa-webhook-token"
-              class="tu-input font-mono"
-              :value="config.webhook.token_verificacion"
-              readonly
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-          </div>
-          <div>
-            <label class="tu-label" for="wa-app-secret">{{
-              $t("plataformaAdmin.whatsapp.appSecret")
-            }}</label>
-            <input
-              id="wa-app-secret"
-              v-model="borrador.app_secret"
-              class="tu-input"
-              type="password"
-              autocomplete="off"
-              :placeholder="
-                config.webhook.app_secret_configurado
-                  ? $t('plataformaAdmin.whatsapp.tokenGuardado')
-                  : ''
-              "
-            />
+      <!-- Webhook de estados: entregado, leído o fallido (ADR 0074). Se registra una
+           vez en Meta: plegado, salvo que al cargar falte el App Secret. -->
+      <details
+        v-if="config.webhook"
+        class="tu-avanzado"
+        :open="webhookAbierto"
+        data-prueba="webhook"
+      >
+        <summary>{{ $t("plataformaAdmin.whatsapp.webhook") }}</summary>
+        <div class="space-y-3">
+          <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("plataformaAdmin.whatsapp.webhookAyuda") }}
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="tu-label" for="wa-webhook-url">{{
+                $t("plataformaAdmin.whatsapp.webhookUrl")
+              }}</label>
+              <input
+                id="wa-webhook-url"
+                class="tu-input"
+                :value="config.webhook.url"
+                readonly
+                @focus="($event.target as HTMLInputElement).select()"
+              />
+            </div>
+            <div>
+              <label class="tu-label" for="wa-webhook-token">{{
+                $t("plataformaAdmin.whatsapp.webhookToken")
+              }}</label>
+              <input
+                id="wa-webhook-token"
+                class="tu-input font-mono"
+                :value="config.webhook.token_verificacion"
+                readonly
+                @focus="($event.target as HTMLInputElement).select()"
+              />
+            </div>
+            <div>
+              <label class="tu-label" for="wa-app-secret">{{
+                $t("plataformaAdmin.whatsapp.appSecret")
+              }}</label>
+              <input
+                id="wa-app-secret"
+                v-model="borrador.app_secret"
+                class="tu-input"
+                type="password"
+                autocomplete="off"
+                :placeholder="
+                  config.webhook.app_secret_configurado
+                    ? $t('plataformaAdmin.whatsapp.tokenGuardado')
+                    : ''
+                "
+              />
+            </div>
           </div>
         </div>
-      </section>
+      </details>
 
       <!-- Cada uso se enciende aparte; debajo, lo que hay que registrar en Meta. -->
       <section

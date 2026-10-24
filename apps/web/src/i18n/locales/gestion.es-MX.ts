@@ -577,6 +577,12 @@ export const plataformaAdmin = {
     plataforma: "Plataforma",
     acceso: "Acceso",
   },
+  // Apartados de Configuración (?config=).
+  configuracion: {
+    etiqueta: "Apartados de la configuración",
+    facturacion: "Facturación y alertas",
+    bienestar: "Wellhub y TotalPass",
+  },
   pestanas: {
     estudios: "Negocios",
     cobros: "Cobros",
@@ -685,7 +691,6 @@ export const plataformaAdmin = {
   },
   // Monitoreo de errores (ADR 0080).
   errores: {
-    titulo: "Errores",
     subtitulo:
       "Lo que falló en la API, la web y la app, agrupado. Los datos sensibles llegan tachados.",
     actualizar: "Actualizar",
@@ -710,7 +715,6 @@ export const plataformaAdmin = {
     veces: "1 vez | {n} veces",
     volvio:
       "Volvió después de resolverse | Volvió {n} veces después de resolverse",
-    verMas: "Ver más",
     clase: "Tipo",
     lugar: "Dónde",
     cuantas: "Cuántas",
@@ -730,6 +734,22 @@ export const plataformaAdmin = {
     },
   },
   operacion: {
+    // Segundo nivel (?operacion_ver=).
+    pestanas: {
+      etiqueta: "Partes de la operación",
+      verificacion: "Verificación",
+      respaldos: "Respaldos",
+      alertas: "Alertas",
+    },
+    enOrden: "En orden",
+    faltaRespaldo: "Falta un respaldo",
+    simulacroCorto: "Simulacro: {estado}",
+    sinSimulacroCorto: "Sin simulacro",
+    alertasCuenta: "Sin alertas | 1 alerta | {n} alertas",
+    ultimaAlerta: "Última: {cuando}",
+    puntosEnOrden: "Puntos en orden · {n}",
+    pruebasOk: "Respaldos que pasaron · {n}",
+    alertasRecortadas: "Se muestran las {n} más recientes de {total}",
     actualizar: "Actualizar",
     revisado: "Revisado a las {hora}",
     cargando: "Revisando la operación…",
@@ -757,7 +777,6 @@ export const plataformaAdmin = {
     },
     ultimoLatido: "Último latido: {cuando}",
     nunca: "nunca",
-    verificacion: "Verificación de producción",
     todoEnOrden: "Todo en orden.",
     porResolver: "{n} punto por resolver | {n} puntos por resolver",
     avisos: "{n} aviso | {n} avisos",
@@ -831,7 +850,7 @@ export const plataformaAdmin = {
     suspended: "Suspendido",
     cancelled: "Cancelado",
   },
-  pruebaHasta: "Prueba hasta el {fecha}",
+  pruebaHasta: "hasta el {fecha}",
   ficha: {
     whatsappVerificado: "WhatsApp verificado",
     avisos: "Avisos al dueño",
@@ -1511,7 +1530,6 @@ export const parametrosConfig = {
   tituloNegocio: "Límites y tiempos",
   ayudaNegocio:
     "Ajusta los tiempos y límites de tu negocio. Lo que dejes vacío usa el valor de la plataforma.",
-  tituloPlataforma: "Parámetros de la plataforma",
   ayudaPlataforma:
     "Valor que aplica a todos los negocios que no ajustaron el suyo. Vacío = el valor inicial.",
   dePlataforma: "Plataforma: {valor}.",
@@ -1522,6 +1540,20 @@ export const parametrosConfig = {
   guardar: "Guardar",
   descartar: "Descartar cambios",
   guardado: "Parámetros guardados.",
+  // Una categoría a la vez, con un buscador en todas.
+  categorias: "Categorías de parámetros",
+  buscar: "Buscar un parámetro",
+  resultadosBusqueda: "Resultados de la búsqueda",
+  resultados:
+    "{n} parámetro coincide con «{q}» | {n} parámetros coinciden con «{q}»",
+  sinResultados: "Ningún parámetro coincide con «{q}».",
+  limpiarBusqueda: "Limpiar búsqueda",
+  sinGuardar: "{n} cambio sin guardar | {n} cambios sin guardar",
+  // Revisión antes de guardar (las categorías ocultas no las valida el navegador).
+  conErrores: "con errores",
+  errorEntero: "Debe ser un número entero.",
+  errorOpcion: "Elige una de las opciones de la lista.",
+  errorRango: "Debe estar entre {minimo} y {maximo}.",
 };
 
 // Cambiar el horario desde la cuenta del cliente (ADR 0044).

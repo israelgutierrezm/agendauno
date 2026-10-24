@@ -16,7 +16,8 @@ import { useToastStore } from "@/stores/toast";
  * se venden. Nada de esto vive fijo en el código.
  *
  * El formulario no se puede guardar hasta que cargó bien: guardarlo vacío borraría
- * las ventas y los paquetes que ya había.
+ * las ventas y los paquetes que ya había. Va en su pestaña de Configuración, que ya
+ * lo nombra (por eso no pinta título).
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
 
@@ -174,14 +175,10 @@ onMounted(cargar);
     data-prueba="comercial-plataforma"
     @submit.prevent="guardar"
   >
-    <div>
-      <h2 class="tu-titulo-seccion">
-        {{ $t("suscripcion.plataforma.comercial.titulo") }}
-      </h2>
-      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("suscripcion.plataforma.comercial.ayuda") }}
-      </p>
-    </div>
+    <!-- Sin título propio: la pestaña «Datos comerciales» ya lo nombra. -->
+    <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+      {{ $t("suscripcion.plataforma.comercial.ayuda") }}
+    </p>
 
     <p
       v-if="cargando"

@@ -104,7 +104,7 @@ export default {
   },
   plataforma: {
     pestana: "Medición",
-    titulo: "Medición del SaaS",
+    secciones: "Secciones de medición",
     descripcion:
       "Los destinos de GA4 y Meta de cada producto, para medir cómo llegan los negocios que contratan. Son distintos de los que configura cada negocio para su propia página.",
     embudo:

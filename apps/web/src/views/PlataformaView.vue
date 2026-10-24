@@ -7,6 +7,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import BitacoraPlataforma from "@/components/BitacoraPlataforma.vue";
 import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacioListado from "@/components/EstadoVacioListado.vue";
 import LayoutPlataforma, {
   type GrupoPlataforma,
 } from "@/components/LayoutPlataforma.vue";
@@ -21,7 +22,7 @@ import PaisPlataforma from "@/components/PaisPlataforma.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
-import TablaDatos from "@/components/TablaDatos.vue";
+import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import WhatsAppNegocio, {
@@ -321,9 +322,18 @@ const columnas = computed(() => [
 // Por producto, estado y adeudo (ADR 0132), buscando y por páginas en el servidor:
 // la plataforma puede tener miles de negocios.
 const ESTADOS_ESTUDIO = ["trialing", "active", "suspended", "cancelled"];
+// 15 por página: la lista cabe en la pantalla sin un desplazamiento largo.
+const POR_PAGINA_ESTUDIOS = 15;
 const filtroEstudios = ref({ producto: "", estado: "", adeudo: false });
 const buscarEstudios = ref("");
 const paginaEstudios = ref(1);
+const hayFiltrosEstudios = computed(
+  () =>
+    buscarEstudios.value.trim() !== "" ||
+    filtroEstudios.value.producto !== "" ||
+    filtroEstudios.value.estado !== "" ||
+    filtroEstudios.value.adeudo,
+);
 const metaEstudios = ref<{
   total: number;
   page: number;
@@ -339,6 +349,16 @@ function irPaginaEstudios(n: number): void {
 }
 function filtrarEstudios(): void {
   irPaginaEstudios(1);
+}
+// «Restablecer» del listado vacío: sin búsqueda ni filtros.
+function limpiarFiltrosEstudios(): void {
+  filtroEstudios.value = { producto: "", estado: "", adeudo: false };
+  if (buscarEstudios.value !== "") {
+    // Su vigilante vuelve a pedir la lista (una sola vez).
+    buscarEstudios.value = "";
+  } else {
+    filtrarEstudios();
+  }
 }
 // La búsqueda y los filtros de Negocios, en la dirección (un enlace o recargar los
 // conserva). Antes de vigilarlos: lo leído de la dirección no pide de más.
@@ -385,6 +405,7 @@ async function cargarEstudios(): Promise<void> {
       estado: filtroEstudios.value.estado || undefined,
       adeudo: filtroEstudios.value.adeudo ? 1 : undefined,
       page: paginaEstudios.value,
+      per_page: POR_PAGINA_ESTUDIOS,
     },
   });
   estudios.value = data.data;
@@ -766,6 +787,30 @@ function colorCargo(c: Cargo): string {
 }
 
 // ---- Configuración: FacturAPI, pasarelas y legales ----
+// Un apartado a la vez, en la dirección (`?config=pasarelas`; no `pestana`, que es la
+// sección). Se ocultan sin desmontarse: lo escrito en uno no se pierde al ir a otro.
+type ApartadoConfig =
+  | "facturacion"
+  | "pasarelas"
+  | "whatsapp"
+  | "legales"
+  | "comercial"
+  | "bienestar";
+const APARTADOS_CONFIG: [ApartadoConfig, string][] = [
+  ["facturacion", "plataformaAdmin.configuracion.facturacion"],
+  ["pasarelas", "plataforma.pasarelas.titulo"],
+  ["whatsapp", "plataformaAdmin.whatsapp.titulo"],
+  ["legales", "plataforma.legales.titulo"],
+  ["comercial", "suscripcion.plataforma.comercial.titulo"],
+  ["bienestar", "plataformaAdmin.configuracion.bienestar"],
+];
+const apartadoConfig = usePestanaEnUrl<ApartadoConfig>(
+  APARTADOS_CONFIG.map(([clave]) => clave),
+  { clave: "config" },
+);
+const opcionesConfig = computed(() =>
+  APARTADOS_CONFIG.map(([clave, texto]) => ({ clave, texto: t(texto) })),
+);
 const facturapiConfigurada = ref(false);
 const llaveInput = ref("");
 // A dónde llegan las alertas y las rentas vencidas (ADR 0072).
@@ -787,6 +832,9 @@ const publicados = ref<{
   aviso_privacidad: Publicado | null;
   terminos: Publicado | null;
 }>({ aviso_privacidad: null, terminos: null });
+// El responsable se escribe una vez: plegado, salvo que le falte algún dato al cargar
+// (no se pliega mientras se escribe).
+const responsableAbierto = ref(true);
 function fechaPublicado(p: Publicado): string {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
     new Date(p.vigente_desde),
@@ -851,6 +899,9 @@ async function cargarConfiguracion(): Promise<void> {
       area: leg.data.data.responsable?.area ?? "",
     },
   };
+  responsableAbierto.value = Object.values(legales.value.responsable).some(
+    (v) => v.trim() === "",
+  );
   publicados.value = leg.data.data.publicados ?? {
     aviso_privacidad: null,
     terminos: null,
@@ -955,8 +1006,13 @@ async function guardarPaisesBienestar(): Promise<void> {
   }
 }
 
-async function guardarLegales(avisar = true): Promise<boolean> {
-  guardando.value = "legales";
+// `estado` es la clave de «guardando» mientras se guarda: al publicar, el aro va en
+// el botón de publicar desde el inicio, no en «Guardar borrador».
+async function guardarLegales(
+  avisar = true,
+  estado = "legales",
+): Promise<boolean> {
+  guardando.value = estado;
   try {
     const r = legales.value.responsable;
     await cliente.put(
@@ -991,7 +1047,7 @@ async function publicarLegal(
 ): Promise<void> {
   if (
     !(await confirmar(t(`operacion.legales.confirmar.${tipo}`))) ||
-    !(await guardarLegales(false))
+    !(await guardarLegales(false, `publicar-${tipo}`))
   ) {
     return;
   }
@@ -1328,162 +1384,178 @@ function borrar(): void {
         <EncabezadoSeccion :titulo="textoPestana(pestana)" class="flex-1" />
       </div>
 
-      <!-- Estudios -->
+      <!-- Negocios: la búsqueda y los filtros arriba, en la misma tarjeta; 15 por
+           página en el servidor, con una sola paginación al pie. -->
       <div
         v-if="pestana === 'estudios'"
-        class="mt-5 flex flex-wrap items-end gap-3"
+        class="mt-5 tu-card overflow-hidden"
+        data-prueba="lista-estudios"
       >
-        <input
-          v-model="buscarEstudios"
-          type="search"
-          class="tu-input w-64"
-          :placeholder="$t('operacion.listadosTres.buscarNegocio')"
-          :aria-label="$t('operacion.listadosTres.buscarNegocio')"
-          data-prueba="buscar-estudios"
-        />
-        <select
-          v-model="filtroEstudios.producto"
-          class="tu-input max-w-[12rem]"
-          :aria-label="$t('plataformaAdmin.estudios.filtroProducto')"
-          data-prueba="producto-estudios"
-          @change="filtrarEstudios"
-        >
-          <option value="">
-            {{ $t("plataformaAdmin.estudios.filtroProducto") }}
-          </option>
-          <option v-for="p in PRODUCTOS_LISTA" :key="p" :value="p">
-            {{ PRODUCTOS[p].nombre }}
-          </option>
-        </select>
-        <select
-          v-model="filtroEstudios.estado"
-          class="tu-input max-w-[12rem]"
-          :aria-label="$t('plataformaAdmin.estudios.filtroEstado')"
-          data-prueba="estado-estudios"
-          @change="filtrarEstudios"
-        >
-          <option value="">
-            {{ $t("plataformaAdmin.estudios.filtroEstado") }}
-          </option>
-          <option v-for="e in ESTADOS_ESTUDIO" :key="e" :value="e">
-            {{ $t(`plataformaAdmin.estados.${e}`) }}
-          </option>
-        </select>
-        <label class="flex items-center gap-2 text-sm">
-          <input
-            v-model="filtroEstudios.adeudo"
-            type="checkbox"
-            data-prueba="adeudo-estudios"
+        <div class="tu-filtros">
+          <label class="tu-buscar">
+            <IconoNav nombre="buscar" :tam="16" />
+            <input
+              v-model="buscarEstudios"
+              type="search"
+              class="tu-input"
+              :placeholder="$t('operacion.listadosTres.buscarNegocio')"
+              :aria-label="$t('operacion.listadosTres.buscarNegocio')"
+              data-prueba="buscar-estudios"
+            />
+          </label>
+          <select
+            v-model="filtroEstudios.producto"
+            class="tu-input max-w-[12rem]"
+            :aria-label="$t('plataformaAdmin.estudios.filtroProducto')"
+            data-prueba="producto-estudios"
             @change="filtrarEstudios"
-          />
-          {{ $t("plataformaAdmin.estudios.filtroAdeudo") }}
-        </label>
+          >
+            <option value="">
+              {{ $t("plataformaAdmin.estudios.filtroProducto") }}
+            </option>
+            <option v-for="p in PRODUCTOS_LISTA" :key="p" :value="p">
+              {{ PRODUCTOS[p].nombre }}
+            </option>
+          </select>
+          <select
+            v-model="filtroEstudios.estado"
+            class="tu-input max-w-[12rem]"
+            :aria-label="$t('plataformaAdmin.estudios.filtroEstado')"
+            data-prueba="estado-estudios"
+            @change="filtrarEstudios"
+          >
+            <option value="">
+              {{ $t("plataformaAdmin.estudios.filtroEstado") }}
+            </option>
+            <option v-for="e in ESTADOS_ESTUDIO" :key="e" :value="e">
+              {{ $t(`plataformaAdmin.estados.${e}`) }}
+            </option>
+          </select>
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              v-model="filtroEstudios.adeudo"
+              type="checkbox"
+              data-prueba="adeudo-estudios"
+              @change="filtrarEstudios"
+            />
+            {{ $t("plataformaAdmin.estudios.filtroAdeudo") }}
+          </label>
+        </div>
+        <!-- En el teléfono, cada negocio es una ficha (su nombre, el título). -->
+        <div class="relative overflow-x-auto tu-tabla-adaptable">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th
+                  v-for="c in columnas"
+                  :key="c.clave"
+                  scope="col"
+                  class="whitespace-nowrap"
+                >
+                  {{ c.etiqueta }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="estudios.length === 0">
+                <td :colspan="columnas.length" class="text-center">
+                  <EstadoVacioListado
+                    :filtrado="hayFiltrosEstudios"
+                    :mensaje="$t('plataforma.estudios.vacio')"
+                    @restablecer="limpiarFiltrosEstudios"
+                  />
+                </td>
+              </tr>
+              <tr v-for="e in estudios" :key="e.slug">
+                <!-- En la tabla cada fila mide dos renglones: el nombre y el slug no se
+                     parten (uno largo se corta con «…» y se lee completo al pasar el
+                     puntero o en su ficha); el estado y su fecha, tampoco. -->
+                <td :data-etiqueta="$t('plataformaAdmin.estudios.colEstudio')">
+                  <span
+                    class="block font-medium sm:truncate sm:max-w-[12rem]"
+                    :title="e.nombre"
+                    >{{ e.nombre }}</span
+                  >
+                  <span
+                    class="tu-sub font-mono sm:truncate sm:max-w-[12rem]"
+                    :title="e.slug"
+                    >{{ e.slug }}</span
+                  >
+                </td>
+                <td :data-etiqueta="$t('plataformaAdmin.estudios.colProducto')">
+                  {{ PRODUCTOS[productoDeModalidad(e.modalidad)].nombre }}
+                </td>
+                <td :data-etiqueta="$t('plataformaAdmin.estudios.colEstado')">
+                  <!-- Un solo bloque: en la ficha del teléfono, todo junto al valor. -->
+                  <div class="sm:whitespace-nowrap">
+                    <span
+                      class="tu-estado"
+                      :style="{ '--tono': colorEstado(e.estado) }"
+                    >
+                      {{ $t(`plataformaAdmin.estados.${e.estado}`) }}
+                    </span>
+                    <span
+                      v-if="e.estado === 'trialing' && e.trial_termina_en"
+                      class="tu-sub"
+                      >{{
+                        $t("plataformaAdmin.pruebaHasta", {
+                          fecha: fecha(e.trial_termina_en),
+                        })
+                      }}</span
+                    >
+                  </div>
+                </td>
+                <td :data-etiqueta="$t('plataformaAdmin.estudios.colCobro')">
+                  {{ cobroLegible(e) }}
+                </td>
+                <td :data-etiqueta="$t('plataformaAdmin.estudios.colUso')">
+                  <span v-if="e.uso" class="tabular-nums">
+                    {{ e.uso?.cantidad }}
+                    <span :style="{ color: 'var(--texto-suave)' }">{{
+                      $t(`cobro.actual.${e.uso?.metrica}`)
+                    }}</span>
+                  </span>
+                  <span v-else :style="{ color: 'var(--texto-suave)' }">
+                    {{ $t("plataformaAdmin.estudios.sinUso") }}
+                  </span>
+                </td>
+                <td :data-etiqueta="$t('plataformaAdmin.estudios.colAdeudo')">
+                  <span
+                    v-if="(e.adeudos ?? []).some((a) => a.minor > 0)"
+                    class="font-medium tabular-nums"
+                    :style="{ color: 'var(--error)' }"
+                    >{{
+                      (e.adeudos ?? [])
+                        .map((a) => dinero(a.minor, a.moneda))
+                        .join(" · ")
+                    }}</span
+                  >
+                  <span v-else :style="{ color: 'var(--texto-suave)' }">
+                    {{ $t("plataformaAdmin.estudios.alCorriente") }}
+                  </span>
+                </td>
+                <td class="tu-celda-acciones">
+                  <button
+                    class="tu-enlace"
+                    type="button"
+                    @click="abrirFicha(e)"
+                  >
+                    {{ $t("plataformaAdmin.estudios.ver") }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <PaginacionListado
+          v-if="metaEstudios"
+          :page="metaEstudios.page"
+          :ultima-pagina="metaEstudios.ultima_pagina"
+          :total="metaEstudios.total"
+          :per-page="metaEstudios.per_page"
+          @ir="irPaginaEstudios"
+        />
       </div>
-      <TablaDatos
-        v-if="pestana === 'estudios'"
-        class="mt-3"
-        :columnas="columnas"
-        :filas="estudios"
-        :buscar="false"
-        :por-pagina="metaEstudios?.per_page ?? 50"
-        :vacio="
-          buscarEstudios.trim() !== '' ||
-          filtroEstudios.producto !== '' ||
-          filtroEstudios.estado !== '' ||
-          filtroEstudios.adeudo
-            ? $t('tabla.sinCoincidencias')
-            : $t('plataforma.estudios.vacio')
-        "
-        clave-vista="plataforma-estudios"
-      >
-        <template #col-nombre="{ fila }">
-          <span class="block font-medium">{{ (fila as Estudio).nombre }}</span>
-          <span
-            class="block font-mono text-xs"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{ (fila as Estudio).slug }}</span
-          >
-        </template>
-        <template #col-producto="{ fila }">
-          <span class="text-sm">{{
-            PRODUCTOS[productoDeModalidad((fila as Estudio).modalidad)].nombre
-          }}</span>
-        </template>
-        <template #col-estado="{ fila }">
-          <!-- Un solo bloque: en la ficha del teléfono, todo junto al valor. -->
-          <div>
-            <span
-              class="tu-estado text-sm"
-              :style="{ '--tono': colorEstado((fila as Estudio).estado) }"
-            >
-              {{ $t(`plataformaAdmin.estados.${(fila as Estudio).estado}`) }}
-            </span>
-            <span
-              v-if="
-                (fila as Estudio).estado === 'trialing' &&
-                (fila as Estudio).trial_termina_en
-              "
-              class="block text-xs"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{
-                $t("plataformaAdmin.pruebaHasta", {
-                  fecha: fecha((fila as Estudio).trial_termina_en),
-                })
-              }}</span
-            >
-          </div>
-        </template>
-        <template #col-cobro="{ fila }">
-          <span class="text-sm">{{ cobroLegible(fila as Estudio) }}</span>
-        </template>
-        <template #col-uso="{ fila }">
-          <span v-if="(fila as Estudio).uso" class="text-sm tabular-nums">
-            {{ (fila as Estudio).uso?.cantidad }}
-            <span :style="{ color: 'var(--texto-suave)' }">{{
-              $t(`cobro.actual.${(fila as Estudio).uso?.metrica}`)
-            }}</span>
-          </span>
-          <span v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataformaAdmin.estudios.sinUso") }}
-          </span>
-        </template>
-        <template #col-adeudo="{ fila }">
-          <span
-            v-if="((fila as Estudio).adeudos ?? []).some((a) => a.minor > 0)"
-            class="text-sm font-medium tabular-nums"
-            :style="{ color: 'var(--error)' }"
-            >{{
-              ((fila as Estudio).adeudos ?? [])
-                .map((a) => dinero(a.minor, a.moneda))
-                .join(" · ")
-            }}</span
-          >
-          <span v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataformaAdmin.estudios.alCorriente") }}
-          </span>
-        </template>
-        <template #col-acciones="{ fila }">
-          <button
-            class="tu-enlace"
-            type="button"
-            @click="abrirFicha(fila as Estudio)"
-          >
-            {{ $t("plataformaAdmin.estudios.ver") }}
-          </button>
-        </template>
-      </TablaDatos>
-      <PaginacionListado
-        v-if="
-          pestana === 'estudios' &&
-          metaEstudios &&
-          metaEstudios.ultima_pagina > 1
-        "
-        :page="metaEstudios.page"
-        :ultima-pagina="metaEstudios.ultima_pagina"
-        :total="metaEstudios.total"
-        :per-page="metaEstudios.per_page"
-        @ir="irPaginaEstudios"
-      />
 
       <!-- Cobros -->
       <div v-if="pestana === 'cobros'" class="mt-5">
@@ -1795,167 +1867,134 @@ function borrar(): void {
         :token="token"
       />
 
-      <!-- Configuración -->
-      <div v-if="pestana === 'configuracion'" class="mt-5 space-y-5">
-        <div class="tu-card p-5">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h2 class="tu-titulo-seccion">
-                {{ $t("plataforma.facturapi.titulo") }}
-              </h2>
-              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                {{ $t("plataforma.facturapi.subtitulo") }}
-              </p>
+      <!-- Configuración: un apartado a la vez (`?config=`), cada formulario con su
+           Guardar a la vista. Se ocultan sin desmontarse: lo escrito se conserva. -->
+      <div v-if="pestana === 'configuracion'">
+        <PestanasSeccion
+          v-model="apartadoConfig"
+          :opciones="opcionesConfig"
+          :etiqueta="$t('plataformaAdmin.configuracion.etiqueta')"
+        />
+
+        <!-- Facturación: la cuenta de FacturAPI y a dónde llegan las alertas. -->
+        <div
+          v-show="apartadoConfig === 'facturacion'"
+          class="mt-5 space-y-5"
+          data-prueba="config-facturacion"
+        >
+          <div class="tu-card p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="tu-titulo-seccion">
+                  {{ $t("plataforma.facturapi.titulo") }}
+                </h2>
+                <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                  {{ $t("plataforma.facturapi.subtitulo") }}
+                </p>
+              </div>
+              <span
+                class="tu-estado text-sm shrink-0"
+                :style="{
+                  '--tono': facturapiConfigurada
+                    ? 'var(--exito)'
+                    : 'var(--texto-suave)',
+                }"
+                data-prueba="facturapi-estado"
+              >
+                {{
+                  facturapiConfigurada
+                    ? $t("plataforma.facturapi.configurada")
+                    : $t("plataforma.facturapi.noConfigurada")
+                }}
+              </span>
             </div>
-            <span
-              class="tu-estado text-sm shrink-0"
-              :style="{
-                '--tono': facturapiConfigurada
-                  ? 'var(--exito)'
-                  : 'var(--texto-suave)',
-              }"
-              data-prueba="facturapi-estado"
+            <form
+              class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end"
+              @submit.prevent="guardarLlave()"
             >
-              {{
-                facturapiConfigurada
-                  ? $t("plataforma.facturapi.configurada")
-                  : $t("plataforma.facturapi.noConfigurada")
-              }}
-            </span>
+              <div class="flex-1">
+                <label class="tu-label" for="lk">{{
+                  $t("plataforma.facturapi.llave")
+                }}</label>
+                <input
+                  id="lk"
+                  v-model="llaveInput"
+                  class="tu-input"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="sk_live_…"
+                />
+              </div>
+              <button
+                class="tu-btn tu-btn-primario"
+                type="submit"
+                :disabled="
+                  guardando === 'facturapi' || llaveInput.trim() === ''
+                "
+                :aria-busy="guardando === 'facturapi' || undefined"
+              >
+                {{ $t("plataforma.facturapi.guardar") }}
+              </button>
+              <!-- Quita la llave ya guardada: destructiva. -->
+              <button
+                v-if="facturapiConfigurada"
+                class="tu-btn tu-btn-peligro"
+                type="button"
+                data-prueba="quitar-facturapi"
+                :disabled="guardando === 'facturapi'"
+                @click="guardarLlave(true)"
+              >
+                {{ $t("plataforma.facturapi.quitar") }}
+              </button>
+            </form>
+            <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("plataforma.facturapi.ayuda") }}
+            </p>
           </div>
+
+          <!-- Correo del superadministrador: alertas y rentas vencidas. -->
           <form
-            class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end"
-            @submit.prevent="guardarLlave()"
+            class="tu-card p-5"
+            data-prueba="correo-alertas"
+            @submit.prevent="guardarCorreoAlertas"
           >
-            <div class="flex-1">
-              <label class="tu-label" for="lk">{{
-                $t("plataforma.facturapi.llave")
-              }}</label>
-              <input
-                id="lk"
-                v-model="llaveInput"
-                class="tu-input"
-                type="password"
-                autocomplete="off"
-                placeholder="sk_live_…"
-              />
+            <h2 class="tu-titulo-seccion">
+              {{ $t("plataformaAdmin.correoAlertas.titulo") }}
+            </h2>
+            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("plataformaAdmin.correoAlertas.ayuda") }}
+            </p>
+            <div class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div class="flex-1">
+                <label class="tu-label" for="correo-alertas">{{
+                  $t("plataformaAdmin.correoAlertas.correo")
+                }}</label>
+                <input
+                  id="correo-alertas"
+                  v-model="correoAlertas"
+                  class="tu-input"
+                  type="email"
+                  autocomplete="email"
+                />
+              </div>
+              <button
+                class="tu-btn tu-btn-primario"
+                type="submit"
+                :disabled="guardando === 'correo'"
+                :aria-busy="guardando === 'correo' || undefined"
+              >
+                {{ $t("plataformaAdmin.correoAlertas.guardar") }}
+              </button>
             </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="guardando === 'facturapi' || llaveInput.trim() === ''"
-            >
-              {{ $t("plataforma.facturapi.guardar") }}
-            </button>
-            <!-- Quita la llave ya guardada: destructiva. -->
-            <button
-              v-if="facturapiConfigurada"
-              class="tu-btn tu-btn-peligro"
-              type="button"
-              data-prueba="quitar-facturapi"
-              :disabled="guardando === 'facturapi'"
-              @click="guardarLlave(true)"
-            >
-              {{ $t("plataforma.facturapi.quitar") }}
-            </button>
           </form>
-          <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataforma.facturapi.ayuda") }}
-          </p>
         </div>
 
-        <!-- Correo del superadministrador: alertas y rentas vencidas. -->
-        <form
-          class="tu-card p-5"
-          data-prueba="correo-alertas"
-          @submit.prevent="guardarCorreoAlertas"
+        <!-- Pasarelas con que se cobra la renta del SaaS: cada una con su Guardar. -->
+        <div
+          v-show="apartadoConfig === 'pasarelas'"
+          class="mt-5"
+          data-prueba="config-pasarelas"
         >
-          <h2 class="tu-titulo-seccion">
-            {{ $t("plataformaAdmin.correoAlertas.titulo") }}
-          </h2>
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataformaAdmin.correoAlertas.ayuda") }}
-          </p>
-          <div class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-            <div class="flex-1">
-              <label class="tu-label" for="correo-alertas">{{
-                $t("plataformaAdmin.correoAlertas.correo")
-              }}</label>
-              <input
-                id="correo-alertas"
-                v-model="correoAlertas"
-                class="tu-input"
-                type="email"
-                autocomplete="email"
-              />
-            </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="guardando === 'correo'"
-            >
-              {{ $t("plataformaAdmin.correoAlertas.guardar") }}
-            </button>
-          </div>
-        </form>
-
-        <!-- Países donde se ofrecen Wellhub y TotalPass (ADR 0202). -->
-        <form
-          class="tu-card p-5"
-          data-prueba="paises-bienestar"
-          @submit.prevent="guardarPaisesBienestar"
-        >
-          <h2 class="tu-titulo-seccion">
-            {{ $t("plataformaAdmin.paisesBienestar.titulo") }}
-          </h2>
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataformaAdmin.paisesBienestar.ayuda") }}
-          </p>
-          <div class="mt-4 grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="tu-label" for="paises-wellhub">Wellhub</label>
-              <input
-                id="paises-wellhub"
-                v-model="paisesBienestar.wellhub"
-                class="tu-input"
-                autocomplete="off"
-                placeholder="MX, CO"
-              />
-            </div>
-            <div>
-              <label class="tu-label" for="paises-totalpass">TotalPass</label>
-              <input
-                id="paises-totalpass"
-                v-model="paisesBienestar.totalpass"
-                class="tu-input"
-                autocomplete="off"
-                placeholder="MX"
-              />
-            </div>
-          </div>
-          <div class="mt-3 flex justify-end">
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="guardando === 'paises'"
-            >
-              {{ $t("plataformaAdmin.paisesBienestar.guardar") }}
-            </button>
-          </div>
-        </form>
-
-        <!-- Gimnasios que eligieron a AgendaUno en Wellhub (ADR 0202). -->
-        <SolicitudesWellhub :api-url="apiUrl" :token="token" />
-
-        <!-- Ventas, Banco de México y timbres (ADR 0107). -->
-        <ComercialPlataforma :api-url="apiUrl" :token="token" />
-
-        <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
-
-        <div>
-          <h2 class="tu-titulo-seccion">
-            {{ $t("plataforma.pasarelas.titulo") }}
-          </h2>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("plataforma.pasarelas.subtitulo") }}
           </p>
@@ -2065,6 +2104,7 @@ function borrar(): void {
                   class="tu-btn tu-btn-primario w-full mt-3"
                   type="button"
                   :disabled="guardando === p.proveedor"
+                  :aria-busy="guardando === p.proveedor || undefined"
                   @click="guardarPasarela(p.proveedor)"
                 >
                   {{ $t("plataforma.pasarelas.guardar") }}
@@ -2074,132 +2114,234 @@ function borrar(): void {
           </div>
         </div>
 
-        <form class="tu-card p-5 grid gap-4" @submit.prevent="guardarLegales()">
-          <div>
-            <h2 class="tu-titulo-seccion">
-              {{ $t("plataforma.legales.titulo") }}
-            </h2>
+        <div
+          v-show="apartadoConfig === 'whatsapp'"
+          class="mt-5"
+          data-prueba="config-whatsapp"
+        >
+          <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
+        </div>
+
+        <!-- Documentos legales: lo publicado arriba; el responsable, plegado (se
+             escribe una vez); Guardar y Publicar, fijos al pie. -->
+        <div
+          v-show="apartadoConfig === 'legales'"
+          class="mt-5"
+          data-prueba="config-legales"
+        >
+          <form
+            class="tu-card p-5 grid gap-4"
+            @submit.prevent="guardarLegales()"
+          >
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("operacion.legales.ayuda") }}
             </p>
-          </div>
-          <fieldset class="grid gap-3 sm:grid-cols-2">
-            <legend class="tu-label">
-              {{ $t("operacion.legales.responsable") }}
-            </legend>
+            <ul class="text-sm grid gap-1">
+              <li
+                v-for="tipo in ['aviso_privacidad', 'terminos'] as const"
+                :key="tipo"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t(`operacion.legales.nombreDoc.${tipo}`) }}:
+                <template v-if="publicados[tipo]">
+                  {{
+                    $t("operacion.legales.version", {
+                      version: publicados[tipo]!.version,
+                      fecha: fechaPublicado(publicados[tipo]!),
+                    })
+                  }}
+                </template>
+                <span v-else :style="{ color: 'var(--aviso)' }">{{
+                  $t("operacion.legales.sinPublicar")
+                }}</span>
+              </li>
+            </ul>
+            <details
+              class="tu-avanzado"
+              :open="responsableAbierto"
+              data-prueba="legales-responsable"
+            >
+              <summary>
+                {{ $t("operacion.legales.responsable") }}
+                <span
+                  v-if="legales.responsable.nombre.trim() !== ''"
+                  class="font-normal"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >· {{ legales.responsable.nombre }}</span
+                >
+              </summary>
+              <fieldset class="grid gap-3 sm:grid-cols-2">
+                <legend class="sr-only">
+                  {{ $t("operacion.legales.responsable") }}
+                </legend>
+                <div>
+                  <label class="tu-label" for="lg-resp-nombre">{{
+                    $t("operacion.legales.nombre")
+                  }}</label>
+                  <input
+                    id="lg-resp-nombre"
+                    v-model="legales.responsable.nombre"
+                    class="tu-input"
+                  />
+                </div>
+                <div>
+                  <label class="tu-label" for="lg-resp-contacto">{{
+                    $t("operacion.legales.contacto")
+                  }}</label>
+                  <input
+                    id="lg-resp-contacto"
+                    v-model="legales.responsable.contacto"
+                    type="email"
+                    class="tu-input"
+                  />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="tu-label" for="lg-resp-domicilio">{{
+                    $t("operacion.legales.domicilio")
+                  }}</label>
+                  <input
+                    id="lg-resp-domicilio"
+                    v-model="legales.responsable.domicilio"
+                    class="tu-input"
+                  />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="tu-label" for="lg-resp-area">{{
+                    $t("operacion.legales.area")
+                  }}</label>
+                  <input
+                    id="lg-resp-area"
+                    v-model="legales.responsable.area"
+                    class="tu-input"
+                  />
+                </div>
+              </fieldset>
+            </details>
             <div>
-              <label class="tu-label" for="lg-resp-nombre">{{
-                $t("operacion.legales.nombre")
+              <label class="tu-label" for="lg-aviso">{{
+                $t("plataforma.legales.aviso")
               }}</label>
-              <input
-                id="lg-resp-nombre"
-                v-model="legales.responsable.nombre"
+              <p class="text-xs mb-1" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("operacion.legales.marcadores") }}
+              </p>
+              <textarea
+                id="lg-aviso"
+                v-model="legales.aviso_privacidad"
                 class="tu-input"
+                rows="6"
               />
             </div>
             <div>
-              <label class="tu-label" for="lg-resp-contacto">{{
-                $t("operacion.legales.contacto")
+              <label class="tu-label" for="lg-terminos">{{
+                $t("plataforma.legales.terminos")
               }}</label>
-              <input
-                id="lg-resp-contacto"
-                v-model="legales.responsable.contacto"
-                type="email"
+              <textarea
+                id="lg-terminos"
+                v-model="legales.terminos"
                 class="tu-input"
+                rows="6"
               />
             </div>
-            <div class="sm:col-span-2">
-              <label class="tu-label" for="lg-resp-domicilio">{{
-                $t("operacion.legales.domicilio")
-              }}</label>
-              <input
-                id="lg-resp-domicilio"
-                v-model="legales.responsable.domicilio"
-                class="tu-input"
-              />
+            <!-- Guardar y publicar siempre a la vista al bajar por los textos. -->
+            <div class="tu-pie-acciones">
+              <button
+                class="tu-btn tu-btn-secundario"
+                type="submit"
+                :disabled="guardando !== null"
+                :aria-busy="guardando === 'legales' || undefined"
+                data-prueba="legales-guardar"
+              >
+                {{ $t("operacion.legales.guardarBorrador") }}
+              </button>
+              <button
+                class="tu-btn tu-btn-primario"
+                type="button"
+                :disabled="guardando !== null"
+                :aria-busy="
+                  guardando === 'publicar-aviso_privacidad' || undefined
+                "
+                data-prueba="legales-publicar-aviso_privacidad"
+                @click="publicarLegal('aviso_privacidad')"
+              >
+                {{ $t("operacion.legales.publicarAviso") }}
+              </button>
+              <button
+                class="tu-btn tu-btn-primario"
+                type="button"
+                :disabled="guardando !== null"
+                :aria-busy="guardando === 'publicar-terminos' || undefined"
+                data-prueba="legales-publicar-terminos"
+                @click="publicarLegal('terminos')"
+              >
+                {{ $t("operacion.legales.publicarTerminos") }}
+              </button>
             </div>
-            <div class="sm:col-span-2">
-              <label class="tu-label" for="lg-resp-area">{{
-                $t("operacion.legales.area")
-              }}</label>
-              <input
-                id="lg-resp-area"
-                v-model="legales.responsable.area"
-                class="tu-input"
-              />
-            </div>
-          </fieldset>
-          <div>
-            <label class="tu-label" for="lg-aviso">{{
-              $t("plataforma.legales.aviso")
-            }}</label>
-            <p class="text-xs mb-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("operacion.legales.marcadores") }}
+          </form>
+        </div>
+
+        <!-- Ventas, Banco de México y timbres (ADR 0107). -->
+        <div
+          v-show="apartadoConfig === 'comercial'"
+          class="mt-5"
+          data-prueba="config-comercial"
+        >
+          <ComercialPlataforma :api-url="apiUrl" :token="token" />
+        </div>
+
+        <!-- Wellhub y TotalPass: en qué países se ofrecen y los gimnasios que eligieron
+             a AgendaUno en Wellhub sin traer el código del negocio (ADR 0202). -->
+        <div
+          v-show="apartadoConfig === 'bienestar'"
+          class="mt-5 space-y-5"
+          data-prueba="config-bienestar"
+        >
+          <form
+            class="tu-card p-5"
+            data-prueba="paises-bienestar"
+            @submit.prevent="guardarPaisesBienestar"
+          >
+            <h2 class="tu-titulo-seccion">
+              {{ $t("plataformaAdmin.paisesBienestar.titulo") }}
+            </h2>
+            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("plataformaAdmin.paisesBienestar.ayuda") }}
             </p>
-            <textarea
-              id="lg-aviso"
-              v-model="legales.aviso_privacidad"
-              class="tu-input"
-              rows="6"
-            />
-          </div>
-          <div>
-            <label class="tu-label" for="lg-terminos">{{
-              $t("plataforma.legales.terminos")
-            }}</label>
-            <textarea
-              id="lg-terminos"
-              v-model="legales.terminos"
-              class="tu-input"
-              rows="6"
-            />
-          </div>
-          <ul class="text-sm grid gap-1">
-            <li
-              v-for="tipo in ['aviso_privacidad', 'terminos'] as const"
-              :key="tipo"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t(`operacion.legales.nombreDoc.${tipo}`) }}:
-              <template v-if="publicados[tipo]">
-                {{
-                  $t("operacion.legales.version", {
-                    version: publicados[tipo]!.version,
-                    fecha: fechaPublicado(publicados[tipo]!),
-                  })
-                }}
-              </template>
-              <span v-else :style="{ color: 'var(--aviso)' }">{{
-                $t("operacion.legales.sinPublicar")
-              }}</span>
-            </li>
-          </ul>
-          <div class="flex flex-wrap gap-2">
-            <button
-              class="tu-btn tu-btn-secundario"
-              type="submit"
-              :disabled="guardando !== null"
-            >
-              {{ $t("operacion.legales.guardarBorrador") }}
-            </button>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="button"
-              :disabled="guardando !== null"
-              @click="publicarLegal('aviso_privacidad')"
-            >
-              {{ $t("operacion.legales.publicarAviso") }}
-            </button>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="button"
-              :disabled="guardando !== null"
-              @click="publicarLegal('terminos')"
-            >
-              {{ $t("operacion.legales.publicarTerminos") }}
-            </button>
-          </div>
-        </form>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label class="tu-label" for="paises-wellhub">Wellhub</label>
+                <input
+                  id="paises-wellhub"
+                  v-model="paisesBienestar.wellhub"
+                  class="tu-input"
+                  autocomplete="off"
+                  placeholder="MX, CO"
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="paises-totalpass">TotalPass</label>
+                <input
+                  id="paises-totalpass"
+                  v-model="paisesBienestar.totalpass"
+                  class="tu-input"
+                  autocomplete="off"
+                  placeholder="MX"
+                />
+              </div>
+            </div>
+            <div class="mt-3 flex justify-end">
+              <button
+                class="tu-btn tu-btn-primario"
+                type="submit"
+                :disabled="guardando === 'paises'"
+                :aria-busy="guardando === 'paises' || undefined"
+              >
+                {{ $t("plataformaAdmin.paisesBienestar.guardar") }}
+              </button>
+            </div>
+          </form>
+
+          <SolicitudesWellhub :api-url="apiUrl" :token="token" />
+        </div>
       </div>
 
       <!-- Ficha del estudio -->

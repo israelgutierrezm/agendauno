@@ -40,6 +40,8 @@ describe("gimnasios que eligieron a AgendaUno en Wellhub", () => {
     await flushPromises();
 
     expect(w.text()).toContain("Fluo Roma");
+    // Dentro de Configuración, un título de sección (contrato del panel).
+    expect(w.get("h2").classes()).toContain("tu-titulo-seccion");
     await w.get("#negocio-s1").setValue("fluo");
     await w
       .findAll("button")

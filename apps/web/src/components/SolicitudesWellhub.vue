@@ -87,7 +87,9 @@ onMounted(cargar);
     class="tu-card p-5"
     data-prueba="solicitudes-wellhub"
   >
-    <h2 class="font-medium text-lg">
+    <!-- Va en Configuración › «Wellhub y TotalPass», debajo de los países: un
+         título de sección como el de su hermana, no el nombre de la pestaña. -->
+    <h2 class="tu-titulo-seccion">
       {{ $t("plataformaAdmin.wellhub.titulo") }}
     </h2>
     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">

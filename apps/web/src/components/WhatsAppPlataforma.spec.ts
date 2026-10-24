@@ -174,4 +174,30 @@ describe("WhatsApp de la plataforma", () => {
       "Guardado",
     );
   });
+
+  it("el webhook ya registrado va plegado; abierto si al cargar falta el App Secret", async () => {
+    http.get.mockResolvedValue(
+      config({
+        webhook: {
+          url: "http://api/api/v1/webhooks/whatsapp",
+          token_verificacion: "token-de-verificacion",
+          app_secret_configurado: true,
+        },
+      }),
+    );
+    const plegado = montar();
+    await flushPromises();
+    expect(
+      plegado.get('[data-prueba="webhook"]').attributes("open"),
+    ).toBeUndefined();
+    // Sin título propio: la pestaña «WhatsApp» de Configuración ya lo nombra.
+    expect(plegado.find("h2").exists()).toBe(false);
+
+    http.get.mockResolvedValue(config());
+    const abierto = montar();
+    await flushPromises();
+    expect(
+      abierto.get('[data-prueba="webhook"]').attributes("open"),
+    ).toBeDefined();
+  });
 });
