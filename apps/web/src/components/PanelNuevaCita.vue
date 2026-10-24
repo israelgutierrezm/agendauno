@@ -224,10 +224,12 @@ const avisoHorario = computed<{ texto: string; grave: boolean } | null>(() => {
       };
 });
 
+// Según el modo elegido: el alumno buscado o el nombre del que se da de alta.
 const listo = computed(
   () =>
-    (form.value.clienteId !== "" ||
-      (nuevo.value && nuevoCliente.value.nombre.trim() !== "")) &&
+    (nuevo.value
+      ? nuevoCliente.value.nombre.trim() !== ""
+      : form.value.clienteId !== "") &&
     form.value.ofertaId !== "" &&
     form.value.instructorId !== "" &&
     form.value.sucursalId !== "" &&
@@ -307,29 +309,38 @@ async function agendar(): Promise<void> {
     :ocupado="guardando"
     @cerrar="cerrar"
   >
-    <form class="space-y-4 p-5" @submit.prevent="agendar">
-      <!-- Cliente: buscar o dar de alta al vuelo -->
+    <form id="form-nueva-cita" class="space-y-4 p-5" @submit.prevent="agendar">
+      <!-- Cliente: buscar o dar de alta al vuelo (dos modos del mismo campo). -->
       <div>
-        <span class="tu-label">{{ $t("agendaVisual.nuevaCita.cliente") }}</span>
-        <template v-if="!nuevo">
-          <BuscarPersona
-            v-model="form.clienteId"
-            :personas="clienteSel ? [clienteSel] : []"
-            :buscar-en="`${base}/miembros`"
-            :parametros="{ tipo: 'miembro' }"
-            :placeholder="$t('agendaVisual.nuevaCita.buscarCliente')"
-            data-prueba="buscar-cliente"
-            @elegir="clienteSel = $event"
-          />
-          <button
-            v-if="puedeCrearCliente && form.clienteId === ''"
-            type="button"
-            class="tu-enlace text-sm mt-2"
-            @click="nuevo = true"
+        <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <span class="tu-label mb-0">{{
+            $t("agendaVisual.nuevaCita.cliente")
+          }}</span>
+          <div
+            v-if="puedeCrearCliente"
+            class="tu-segmentado"
+            role="group"
+            :aria-label="$t('agendaVisual.nuevaCita.cliente')"
+            data-prueba="modo-cliente"
           >
-            {{ $t("agendaVisual.nuevaCita.nuevoCliente") }}
-          </button>
-        </template>
+            <button type="button" :aria-pressed="!nuevo" @click="nuevo = false">
+              {{ $t("agendaVisual.nuevaCita.existente") }}
+            </button>
+            <button type="button" :aria-pressed="nuevo" @click="nuevo = true">
+              {{ $t("agendaVisual.nuevaCita.nuevoCliente") }}
+            </button>
+          </div>
+        </div>
+        <BuscarPersona
+          v-if="!nuevo"
+          v-model="form.clienteId"
+          :personas="clienteSel ? [clienteSel] : []"
+          :buscar-en="`${base}/miembros`"
+          :parametros="{ tipo: 'miembro' }"
+          :placeholder="$t('agendaVisual.nuevaCita.buscarCliente')"
+          data-prueba="buscar-cliente"
+          @elegir="clienteSel = $event"
+        />
         <div v-else class="space-y-2 tu-card p-3">
           <label class="block">
             <span class="tu-label">{{
@@ -365,13 +376,6 @@ async function agendar(): Promise<void> {
               >
             </span>
           </label>
-          <button
-            type="button"
-            class="tu-enlace text-sm"
-            @click="nuevo = false"
-          >
-            {{ $t("agendaVisual.nuevaCita.buscarExistente") }}
-          </button>
         </div>
       </div>
 
@@ -494,10 +498,11 @@ async function agendar(): Promise<void> {
         {{ $t("comun.cancelar") }}
       </button>
       <button
-        type="button"
+        type="submit"
+        form="form-nueva-cita"
         class="tu-btn tu-btn-primario"
         :disabled="!listo || guardando"
-        @click="agendar"
+        :aria-busy="guardando || undefined"
       >
         {{
           guardando

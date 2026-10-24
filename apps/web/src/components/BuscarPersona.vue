@@ -185,6 +185,9 @@ function teclado(e: KeyboardEvent): void {
     if (p) {
       elegir(p);
     }
+  } else if (e.key === "Enter" && busqueda.value.trim() !== "") {
+    // Buscar nunca envía el formulario que lo contiene (aún sin resultados).
+    e.preventDefault();
   } else if (e.key === "Escape") {
     abierta.value = false;
   }
@@ -203,7 +206,7 @@ function teclado(e: KeyboardEvent): void {
       <button
         v-if="!deshabilitado"
         type="button"
-        class="tu-enlace shrink-0 text-sm"
+        class="tu-btn tu-btn-discreto tu-btn-chico shrink-0"
         @click="cambiar"
       >
         {{ t("buscarPersona.cambiar") }}

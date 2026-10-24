@@ -188,7 +188,7 @@ onMounted(cargar);
           <button
             v-if="colorMarca && puedeGestionar"
             type="button"
-            class="tu-enlace text-sm"
+            class="tu-btn tu-btn-discreto tu-btn-chico"
             @click="colorMarca = null"
           >
             {{ $t("perfilPublico.config.colorQuitar") }}

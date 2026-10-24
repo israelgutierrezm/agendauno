@@ -18,6 +18,7 @@ import {
 } from "@/lib/filtrosEnUrl";
 import { desfaseZona, etiquetaZona } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { conTerminosActuales } from "@/lib/terminologia";
 
 /**
  * Bitácora del estudio: los cambios sensibles (quién, qué y el antes/después) y
@@ -179,7 +180,8 @@ const zonaNegocio = computed(() => {
 
 function accion(c: Cambio): string {
   if (c.descripcion && c.descripcion !== c.accion) {
-    return c.descripcion;
+    // Del servidor: con el término del negocio (alumno, socio, paciente…).
+    return conTerminosActuales(c.descripcion);
   }
   const clave = `bitacora.acciones.${c.accion}`;
   return te(clave) ? t(clave) : c.accion;

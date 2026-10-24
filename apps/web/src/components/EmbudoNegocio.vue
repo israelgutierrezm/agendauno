@@ -7,7 +7,8 @@ import CampanasNegocio from "@/components/CampanasNegocio.vue";
 /**
  * El embudo del negocio (plan de mejoras C08): de la visita a su página hasta que su
  * cliente renueva. Cada paso dice la cantidad y su denominador («3 de 40»), no solo un
- * porcentaje; el servidor lo calcula sin datos personales.
+ * porcentaje; el servidor lo calcula sin datos personales. El título lo pone Reportes
+ * (su vista «Embudo»): aquí no se repite.
  */
 export interface Embudo {
   desde: string;
@@ -185,14 +186,7 @@ const mediana = computed(() => {
 
 <template>
   <div data-prueba="embudo">
-    <h2 class="mt-4 font-medium text-lg">
-      {{
-        citas && embudo.citas
-          ? $t("operacion.reportes.embudo.tituloCitas")
-          : $t("operacion.reportes.embudo.titulo")
-      }}
-    </h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <p class="mt-4 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("operacion.reportes.embudo.subtitulo") }}
     </p>
 
@@ -256,9 +250,9 @@ const mediana = computed(() => {
       </li>
     </ol>
 
-    <h3 class="mt-6 font-semibold">
+    <h2 class="tu-titulo-seccion mt-6">
       {{ $t("operacion.reportes.embudo.respuesta.titulo") }}
-    </h3>
+    </h2>
     <div class="mt-3 tu-card px-5 py-4 grid grid-cols-2 gap-4">
       <div>
         <div

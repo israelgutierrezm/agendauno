@@ -91,7 +91,8 @@ function marca(m: string | null): string {
   return m ? m.charAt(0).toUpperCase() + m.slice(1) : "";
 }
 // Cuándo se renueva y por cuánto; si la fecha ya pasó (con hoy del negocio), se dice
-// que venció y dónde pagarla, en vez de mostrarla como si fuera a venir.
+// que venció y dónde pagarla, en vez de mostrarla como si fuera a venir. Con el pago
+// automático, la pasarela puede cobrar días después: está en proceso, no por pagar.
 function renovacion(m: Membresia): string {
   const datos = {
     fecha: fecha(m.proxima_cobro_en),
@@ -101,9 +102,12 @@ function renovacion(m: Membresia): string {
     m.proxima_cobro_en !== null &&
     situacionDeFecha(m.proxima_cobro_en, hoyEnNegocio(sesion.zonaHoraria))
       .situacion === "vencida";
-  return vencida
-    ? t("pagoAutomatico.vencio", datos)
-    : t("pagoAutomatico.renueva", datos);
+  if (!vencida) {
+    return t("pagoAutomatico.renueva", datos);
+  }
+  return m.automatico
+    ? t("pagoAutomatico.enProceso", datos)
+    : t("pagoAutomatico.vencio", datos);
 }
 
 async function cargar(): Promise<void> {

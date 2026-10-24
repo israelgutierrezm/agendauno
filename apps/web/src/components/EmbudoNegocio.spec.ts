@@ -86,7 +86,8 @@ describe("el embudo del negocio", () => {
       true,
     );
 
-    expect(w.text()).toContain("Del interés a la siguiente visita");
+    // El título lo pone Reportes (su vista «Embudo»): el embudo no repite el suyo.
+    expect(w.text()).not.toContain("Del interés a la siguiente visita");
     expect(w.get('[data-paso="interes"]').text()).toContain("5 de 12");
     expect(w.get('[data-paso="confirmadas"]').text()).toContain("18 de 20");
     expect(w.get('[data-paso="asistenciaCita"]').text()).toContain("14 de 16");

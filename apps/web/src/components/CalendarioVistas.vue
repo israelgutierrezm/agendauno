@@ -10,7 +10,9 @@ import { hoyEnNegocio } from "@/lib/hoyNegocio";
  * Calendario personal en lista, día, semana o mes (portal del alumno y del
  * instructor). Recuerda la vista, se mueve por periodos y avisa el rango visible
  * (`rango`) para que quien lo usa cargue esas fechas. La lista la pone quien lo
- * usa (slot `lista`); tocar un evento emite `abrir`.
+ * usa (slot `lista`); tocar un evento emite `abrir`. Al cambiar de modo emite `vista`:
+ * la pantalla lo guarda en la dirección (`?modo=`, nunca `vista`, que es la del menú)
+ * y lo devuelve en `vistaInicial`; el de este navegador queda de respaldo.
  */
 export interface EventoPeriodo {
   id: string;
@@ -40,7 +42,10 @@ const props = defineProps<{
    * los días (un error nunca se ve como un periodo vacío).
    */
   error?: string | null;
-  /** Vista con la que abre (p. ej. desde un acceso directo); si no, la recordada. */
+  /**
+   * Vista con la que abre (el `?modo=` de la dirección, p. ej. desde un acceso
+   * directo); si no, la que recordó este navegador.
+   */
   vistaInicial?: Vista | null;
   /** Cuántos días ve la lista desde hoy (30 si no se dice). */
   diasLista?: number;
@@ -53,6 +58,7 @@ const emit = defineEmits<{
   abrir: [id: string];
   rango: [rango: { desde: string; hasta: string; vista: Vista }];
   reintentar: [];
+  vista: [vista: Vista];
 }>();
 
 function vistaGuardada(): Vista {
@@ -69,6 +75,7 @@ const vista = ref<Vista>(
     : vistaGuardada(),
 );
 watch(vista, (v) => {
+  emit("vista", v);
   try {
     localStorage.setItem(props.clave, v);
   } catch {
@@ -277,7 +284,7 @@ defineExpose({ irDia });
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-secundario px-3 py-1.5"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="fecha = hoy()"
         >
           {{ $t("portal.periodo.hoy") }}

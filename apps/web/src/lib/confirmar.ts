@@ -9,11 +9,13 @@ import { reactive } from "vue";
 export interface OpcionesConfirmar {
   /** Texto del botón que confirma (por defecto, "Confirmar"). */
   aceptar?: string;
-  /** Acción destructiva: el botón va en rojo. */
+  /** Acción destructiva: confirma con el sólido de peligro. */
   peligro?: boolean;
   /**
-   * El tono del botón que confirma (paleta del sistema): `exito` para completar o
-   * aprobar, `aviso` para regresar o deshacer. `peligro` equivale a `peligro: true`.
+   * Solo `peligro` cambia el botón (equivale a `peligro: true`). Con el contrato de
+   * botones (style.css) se confirma con el primario o, si es destructiva, con el
+   * sólido de peligro: `exito` (completar, aprobar), `aviso` (regresar, reabrir) e
+   * `info` dicen la intención y confirman con el primario; no esperes otro color.
    */
   tono?: "exito" | "aviso" | "info" | "peligro";
 }
@@ -23,8 +25,8 @@ export const estadoConfirmar = reactive({
   abierto: false,
   mensaje: "",
   aceptar: null as string | null,
+  // Destructiva (`peligro: true` o `tono: "peligro"`): el sólido de peligro.
   peligro: false,
-  tono: null as OpcionesConfirmar["tono"] | null,
   resolver: null as ((si: boolean) => void) | null,
 });
 
@@ -42,8 +44,7 @@ export function confirmar(
       abierto: true,
       mensaje,
       aceptar: opciones.aceptar ?? null,
-      peligro: opciones.peligro ?? false,
-      tono: opciones.tono ?? (opciones.peligro ? "peligro" : null),
+      peligro: opciones.peligro === true || opciones.tono === "peligro",
       resolver,
     });
   });

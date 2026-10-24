@@ -23,7 +23,11 @@ import PaginacionListado from "@/components/PaginacionListado.vue";
 import PlantillaBandeja from "@/components/PlantillaBandeja.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
-import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import {
+  opcionEnUrl,
+  sinValorPorOmision,
+  useFiltrosEnUrl,
+} from "@/lib/filtrosEnUrl";
 import {
   registrarWhatsApp,
   type DatosRegistroWhatsApp,
@@ -113,7 +117,11 @@ const error = ref<string | null>(null);
 // Abiertas o archivadas, el canal y la búsqueda, en la dirección: recargar o compartir
 // el enlace conserva la vista. `ver` y no `estado`: esa la usa la vuelta de Instagram.
 useFiltrosEnUrl({
-  ver: opcionEnUrl(estado, ["abierta", "archivada"]),
+  // «Abiertas» es lo de siempre: no se escribe en la dirección.
+  ver: sinValorPorOmision(
+    opcionEnUrl(estado, ["abierta", "archivada"]),
+    () => "abierta",
+  ),
   canal: opcionEnUrl(canal, ["", "whatsapp", "instagram", "messenger"]),
   q,
 });

@@ -29,6 +29,23 @@ export function opcionEnUrl<T extends string>(
   });
 }
 
+/**
+ * Un filtro con un valor por omisión que cambia con el tiempo (el mes en curso, hoy) o
+ * que no hace falta escribir: en la dirección va vacío. Así un enlace guardado sigue
+ * mostrando «este mes», no el día en que se guardó.
+ */
+export function sinValorPorOmision(
+  campo: Ref<string> | WritableComputedRef<string>,
+  omision: () => string,
+): WritableComputedRef<string> {
+  return computed({
+    get: () => (campo.value === omision() ? "" : campo.value),
+    set: (valor: string) => {
+      campo.value = valor === "" ? omision() : valor;
+    },
+  });
+}
+
 /** Una fecha (AAAA-MM-DD): otra cosa en la dirección se ignora. */
 export function fechaEnUrl(campo: Ref<string>): WritableComputedRef<string> {
   return computed({
@@ -60,19 +77,42 @@ export function useFiltrosEnUrl(campos: Record<string, Campo>): void {
       campo.value = valor;
     }
   }
+  function escribir(): void {
+    const query: LocationQueryRaw = { ...route.query };
+    for (const [clave, campo] of Object.entries(campos)) {
+      if (campo.value === "") {
+        delete query[clave];
+      } else {
+        query[clave] = campo.value;
+      }
+    }
+    // Con su ancla: Reglas de agenda vive en `#programacion`, `#politicas`…
+    void router.replace({ query, hash: route.hash });
+  }
+  watch(() => Object.values(campos).map((c) => c.value), escribir);
+  // La misma pantalla con otra dirección: otra vista del menú (PestanasArea llega sin
+  // los filtros: se vuelven a escribir) o «Atrás» (sus valores pasan a los filtros).
+  const pantalla = route.name;
   watch(
-    () => Object.values(campos).map((c) => c.value),
-    () => {
-      const query: LocationQueryRaw = { ...route.query };
+    () => route.query,
+    (query) => {
+      if (route.name !== pantalla) {
+        return;
+      }
+      let faltan = false;
       for (const [clave, campo] of Object.entries(campos)) {
-        if (campo.value === "") {
-          delete query[clave];
-        } else {
-          query[clave] = campo.value;
+        const valor = query[clave];
+        if (typeof valor === "string") {
+          if (valor !== campo.value) {
+            campo.value = valor;
+          }
+        } else if (campo.value !== "") {
+          faltan = true;
         }
       }
-      // Con su ancla: Reglas de agenda vive en `#programacion`, `#politicas`…
-      void router.replace({ query, hash: route.hash });
+      if (faltan) {
+        escribir();
+      }
     },
   );
 }

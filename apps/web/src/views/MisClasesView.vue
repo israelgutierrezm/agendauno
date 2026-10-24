@@ -14,6 +14,7 @@ import PanelCita from "@/components/PanelCita.vue";
 import PanelClase from "@/components/PanelClase.vue";
 import { useRecargarAlVolver } from "@/lib/alVolver";
 import { estadoCita } from "@/lib/agenda";
+import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useMisClases, type ClaseMia } from "@/lib/misClases";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -54,9 +55,19 @@ const filtradas = computed(() =>
   ),
 );
 
-const vistaInicial = computed(() =>
-  typeof route.query.vista === "string" ? (route.query.vista as Vista) : null,
+// El modo del calendario va en la dirección (`?modo=dia`), nunca en `vista` (la del
+// menú): los accesos del Inicio abren el suyo y recargar lo conserva. Sin él, el que
+// recordó este navegador.
+const MODOS: Vista[] = ["lista", "dia", "semana", "mes"];
+const legado = route.query.vista;
+const modo = ref<Vista | "">(
+  // Un enlace guardado de antes (`?vista=dia`) todavía abre su modo.
+  typeof legado === "string" && MODOS.includes(legado as Vista)
+    ? (legado as Vista)
+    : "",
 );
+useFiltrosEnUrl({ modo: opcionEnUrl(modo, MODOS) });
+const vistaInicial = computed(() => modo.value || null);
 // «Próximos 7 días» abre la lista de 7 días (`?dias=7`); si no, 30.
 const diasLista = computed(() => {
   const n = Number(route.query.dias);
@@ -257,7 +268,7 @@ const eventoCalendario = computed(() =>
       <button
         v-if="busqueda || sucursal"
         type="button"
-        class="tu-enlace text-sm"
+        class="tu-btn tu-btn-discreto tu-btn-chico"
         @click="
           busqueda = '';
           sucursal = '';
@@ -280,6 +291,7 @@ const eventoCalendario = computed(() =>
       @abrir="abrir"
       @rango="alCambiarRango"
       @reintentar="recargar"
+      @vista="modo = $event"
     >
       <template #barra>
         <span class="text-sm" style="color: var(--texto-suave)">{{

@@ -11,6 +11,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Pase de entrada del alumno: un QR firmado que vence en minutos. Mientras se
  * muestra se renueva solo cada minuto, así una captura de pantalla no sirve después.
+ * Solo vive en el diálogo del Inicio del portal (MiCuentaView), que pone el título.
  */
 const RENOVAR_MS = 60_000;
 
@@ -56,9 +57,10 @@ onBeforeUnmount(() => clearInterval(temporizador));
 </script>
 
 <template>
-  <div class="tu-card p-6">
-    <h2 class="font-medium text-lg">{{ $t("paseEntrada.titulo") }}</h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+  <div>
+    <!-- Dentro del diálogo «Pase de entrada»: el título lo da el diálogo (sin tarjeta
+         ni h2 propios). -->
+    <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("paseEntrada.ayuda") }}
     </p>
 

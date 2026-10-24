@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FamiliasTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\MembresiasPorModalidadTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoDunning;
@@ -46,6 +47,7 @@ class SuscripcionesTenantController
         private readonly GestorDeConexionTenant $gestor,
         private readonly FamiliasTenant $familias,
         private readonly FechasNegocioTenant $fechas,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -65,6 +67,9 @@ class SuscripcionesTenantController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $hoy = $this->fechas->hoy();
+        // Con pago automático, la pasarela cobra hasta estos días después de la fecha
+        // (CobroRecurrenteTenant): mientras, está en proceso, no vencida.
+        $gracia = max(0, $this->parametros->entero('cobranza.dias_gracia_pago_automatico'));
         // Quien está acotado a sedes (R19) ve solo las de sus clientes.
         $base = app(AlcancePersonaTenant::class)->acotada(AcuerdoTenant::query()
             ->whereNotNull('proxima_cobro_en')
@@ -74,8 +79,8 @@ class SuscripcionesTenantController
             'automaticos' => (clone $base)->whereHas('domiciliacion')->count(),
             // Las que aún no vencen, las vencidas sin cobrar (fuera de mora) y las que
             // están en mora o suspendidas: no se cuentan dos veces.
-            'proximas' => self::conSituacion(clone $base, 'proximas', $hoy)->count(),
-            'vencidas' => self::conSituacion(clone $base, 'vencidas', $hoy)->count(),
+            'proximas' => self::conSituacion(clone $base, 'proximas', $hoy, $gracia)->count(),
+            'vencidas' => self::conSituacion(clone $base, 'vencidas', $hoy, $gracia)->count(),
             'en_mora' => self::enMora(clone $base)->count(),
         ];
         $buscar = trim((string) ($filtros['q'] ?? ''));
@@ -83,7 +88,7 @@ class SuscripcionesTenantController
             ->when($buscar !== '', fn ($q) => $q->whereHas('persona', fn ($p) => $p->buscar($buscar)))
             ->when(($filtros['automatico'] ?? null) === 'si', fn ($q) => $q->whereHas('domiciliacion'))
             ->when(($filtros['automatico'] ?? null) === 'no', fn ($q) => $q->whereDoesntHave('domiciliacion'))
-            ->when(isset($filtros['situacion']), fn ($q) => self::conSituacion($q, (string) $filtros['situacion'], $hoy))
+            ->when(isset($filtros['situacion']), fn ($q) => self::conSituacion($q, (string) $filtros['situacion'], $hoy, $gracia))
             ->with(['persona', 'producto', 'domiciliacion.persona'])
             ->orderBy('proxima_cobro_en')
             ->orderBy('id')
@@ -115,7 +120,7 @@ class SuscripcionesTenantController
                 'moneda' => $a->producto?->moneda,
                 'proxima_cobro_en' => $a->proxima_cobro_en?->toDateString(),
                 'estado' => $a->estado->value,
-                ...self::situacion($a, $mora[(int) $a->getKey()] ?? null, $dia),
+                ...self::situacion($a, $mora[(int) $a->getKey()] ?? null, $dia, $gracia),
                 'cancelando_pago_automatico' => in_array($a->getKey(), $cancelando, false),
                 'pago_automatico' => $a->domiciliacion instanceof DomiciliacionTenant
                     ? [
@@ -198,11 +203,12 @@ class SuscripcionesTenantController
     /**
      * Cómo va la renovación con hoy del negocio: suspendida o en mora (el acuerdo
      * suspendido o su proceso de mora abierto) antes que en pausa y, si no, por su fecha
-     * (próxima, hoy o vencida). `dias`: los que faltan o los que pasaron.
+     * (próxima, hoy o vencida). Con pago automático y dentro de la espera de la pasarela,
+     * `pendiente` (el cobro está en proceso). `dias`: los que faltan o los que pasaron.
      *
      * @return array{situacion: string, dias: int}
      */
-    private static function situacion(AcuerdoTenant $acuerdo, ?string $estadoMora, CarbonImmutable $hoy): array
+    private static function situacion(AcuerdoTenant $acuerdo, ?string $estadoMora, CarbonImmutable $hoy, int $gracia): array
     {
         // El listado solo trae las que tienen fecha (sin ella contaría como hoy).
         $fecha = $acuerdo->proxima_cobro_en !== null ? CarbonImmutable::parse($acuerdo->proxima_cobro_en->toDateString()) : $hoy;
@@ -212,6 +218,7 @@ class SuscripcionesTenantController
             $acuerdo->estado === EstadoAcuerdo::Pausado => 'pausada',
             $fecha->greaterThan($hoy) => 'proxima',
             $fecha->equalTo($hoy) => 'hoy',
+            $acuerdo->domiciliacion instanceof DomiciliacionTenant && $fecha->greaterThanOrEqualTo($hoy->subDays($gracia)) => 'pendiente',
             default => 'vencida',
         };
 
@@ -221,17 +228,25 @@ class SuscripcionesTenantController
     /**
      * Las que aún no vencen (`proximas`, hoy incluido) o ya pasaron su fecha sin
      * cobrarse (`vencidas`), sin las suspendidas, en mora o en pausa (tienen su propia
-     * situación).
+     * situación). Una con pago automático aún en la espera de la pasarela no es vencida.
      *
      * @param  Builder<AcuerdoTenant>  $consulta
      * @return Builder<AcuerdoTenant>
      */
-    private static function conSituacion(Builder $consulta, string $situacion, string $hoy): Builder
+    private static function conSituacion(Builder $consulta, string $situacion, string $hoy, int $gracia): Builder
     {
-        return $consulta
+        $consulta = $consulta
             ->whereNotIn('estado', [EstadoAcuerdo::Pausado->value, EstadoAcuerdo::Suspendido->value])
             ->whereNotIn('id', self::conMoraAbierta())
             ->whereDate('proxima_cobro_en', $situacion === 'vencidas' ? '<' : '>=', $hoy);
+        if ($situacion !== 'vencidas') {
+            return $consulta;
+        }
+        $limite = CarbonImmutable::parse($hoy)->subDays($gracia)->toDateString();
+
+        return $consulta->where(fn (Builder $q) => $q
+            ->whereDoesntHave('domiciliacion')
+            ->orWhereDate('proxima_cobro_en', '<', $limite));
     }
 
     /**

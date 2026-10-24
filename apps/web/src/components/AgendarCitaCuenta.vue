@@ -626,13 +626,25 @@ onMounted(async () => {
         />
         {{ $t("perfilPublico.agendar.aceptaWhatsApp") }}
       </label>
-      <button
-        type="submit"
-        class="tu-btn tu-btn-primario"
-        :disabled="agendando || slotSel === ''"
-      >
-        {{ $t("citaCuenta.agendar") }}
-      </button>
+      <!-- Formulario en página y largo (servicio, día, hora, anticipo): «Agendar»
+           siempre a la vista, al fondo, con la hora elegida. -->
+      <div class="tu-pie-acciones">
+        <p
+          v-if="servicio && slotSel"
+          class="mr-auto text-sm first-letter:uppercase"
+          data-prueba="cita-elegida"
+        >
+          {{ servicio.nombre }} · {{ cuando(slotSel) }}
+        </p>
+        <button
+          type="submit"
+          class="tu-btn tu-btn-primario"
+          :disabled="agendando || slotSel === ''"
+          :aria-busy="agendando || undefined"
+        >
+          {{ $t("citaCuenta.agendar") }}
+        </button>
+      </div>
     </form>
   </div>
 </template>

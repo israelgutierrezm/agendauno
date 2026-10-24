@@ -11,7 +11,16 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    puede: () => true,
+    // «Volver a alumnos / instructores», con el término del negocio.
+    terminologia: {
+      sesion: "Clase",
+      miembro: "Alumno",
+      instructor: "Instructor",
+    },
+  }),
 }));
 const confirmar = vi.hoisted(() => vi.fn(async () => true));
 vi.mock("@/lib/confirmar", () => ({ confirmar }));

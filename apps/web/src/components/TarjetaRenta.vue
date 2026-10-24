@@ -148,7 +148,7 @@ onMounted(async () => {
       <button
         v-if="tarjeta"
         type="button"
-        class="tu-btn tu-btn-secundario"
+        class="tu-btn tu-btn-peligro"
         :disabled="ocupado"
         data-prueba="quitar-tarjeta"
         @click="quitar"

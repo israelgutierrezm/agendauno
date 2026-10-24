@@ -4,6 +4,8 @@ import { RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoFilaImportacion from "@/components/EstadoFilaImportacion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -201,23 +203,23 @@ async function descargar() {
 
 <template>
   <section class="tu-pagina" :aria-busy="ocupado">
+    <!-- «Volver» a la agenda, encima del encabezado (como en los demás importadores). -->
+    <RouterLink :to="{ name: 'agenda' }" class="tu-volver"
+      ><IconoNav nombre="atras" :tam="16" />
+      {{ t("importarClases.volver") }}</RouterLink
+    >
     <EncabezadoSeccion
+      class="mt-4"
       :titulo="t('importarClases.titulo')"
       :subtitulo="t('importarClases.subtitulo')"
-    >
-      <template #acciones>
-        <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-secundario">{{
-          t("importarClases.volver")
-        }}</RouterLink>
-      </template>
-    </EncabezadoSeccion>
+    />
     <AvisoTono v-if="error" tono="peligro" role="alert" class="mt-4">
       {{ error }}
     </AvisoTono>
-    <div v-if="exito" class="tu-card mt-6 p-8 text-center" role="status">
-      <h2 class="text-2xl font-semibold" style="color: var(--exito)">
+    <div v-if="exito" class="tu-card mt-6 p-6 text-center" role="status">
+      <p class="text-lg font-semibold" :style="{ color: 'var(--exito)' }">
         {{ t("importarClases.creada", { n: exito.creados }) }}
-      </h2>
+      </p>
       <p class="mt-2 text-sm" style="color: var(--texto-suave)">
         {{ t("importarClases.lote", { id: exito.lote }) }}
       </p>
@@ -225,7 +227,7 @@ async function descargar() {
         <RouterLink :to="{ name: 'agenda' }" class="tu-btn tu-btn-primario">{{
           t("importarClases.volver")
         }}</RouterLink>
-        <button class="tu-btn tu-btn-secundario" @click="limpiar">
+        <button type="button" class="tu-btn tu-btn-secundario" @click="limpiar">
           {{ t("importarClases.otra") }}
         </button>
       </div>
@@ -257,10 +259,11 @@ async function descargar() {
       </div>
       <div class="tu-card mt-5 p-5 sm:p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold">
+          <h2 class="tu-titulo-seccion">
             {{ t("importarClases.preparar") }}
           </h2>
           <button
+            type="button"
             class="tu-btn tu-btn-secundario"
             :disabled="ocupado"
             @click="descargar"
@@ -338,7 +341,7 @@ async function descargar() {
         </details>
       </div>
       <div class="tu-card mt-5 p-5 sm:p-6">
-        <h2 class="text-lg font-semibold">{{ t("importarClases.subir") }}</h2>
+        <h2 class="tu-titulo-seccion">{{ t("importarClases.subir") }}</h2>
         <p
           v-if="catalogos"
           class="mt-2 text-sm"
@@ -389,7 +392,7 @@ async function descargar() {
         </p>
       </div>
       <div v-if="preview" class="mt-6">
-        <h2 class="text-lg font-semibold">
+        <h2 class="tu-titulo-seccion">
           {{ t("importarClases.resultado") }}
         </h2>
         <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -434,11 +437,12 @@ async function descargar() {
           :todas="todasFilas"
           :con-errores="filasConErrores"
         />
-        <div class="tu-card mt-4 overflow-x-auto">
-          <table class="w-full text-left text-sm tabla-preview">
+        <!-- En el teléfono, una ficha por fila: la clase (con su n.º de fila) como
+             título y la revisión a la vista, sin desplazar. -->
+        <div class="tu-card mt-4 relative overflow-x-auto tu-tabla-adaptable">
+          <table class="tu-tabla tabla-preview">
             <thead>
               <tr>
-                <th>{{ t("importarClases.fila") }}</th>
                 <th>{{ t("importarClases.clase") }}</th>
                 <th>{{ t("importarClases.horario") }}</th>
                 <th>{{ t("importarClases.revision") }}</th>
@@ -446,75 +450,80 @@ async function descargar() {
             </thead>
             <tbody>
               <tr v-for="fila in filasEnPagina" :key="fila.fila">
-                <td>
-                  {{ fila.fila
-                  }}<small class="block">{{ fila.datos.referencia }}</small>
-                </td>
-                <td>
-                  <strong>{{ fila.datos.clase }}</strong
-                  ><span class="block"
+                <td :data-etiqueta="t('importarClases.clase')">
+                  <span class="font-medium">{{ fila.datos.clase }}</span>
+                  <span class="tu-sub"
+                    >{{ $t("importar.filaN", { n: fila.fila })
+                    }}<template v-if="fila.datos.referencia">
+                      · {{ fila.datos.referencia }}</template
+                    ></span
+                  >
+                  <span class="tu-sub"
                     >{{ fila.datos.sucursal
                     }}<template v-if="fila.datos.sala">
                       · {{ fila.datos.sala }}</template
                     ></span
-                  ><span class="block" style="color: var(--texto-suave)">{{
+                  >
+                  <span class="tu-sub">{{
                     fila.datos.instructor || t("importarClases.sinInstructor")
                   }}</span>
                 </td>
-                <td>
-                  <span class="whitespace-nowrap"
-                    >{{ fila.datos.inicio }}–{{ fila.datos.fin }}</span
-                  ><span class="block">{{
-                    fila.datos.fecha ||
-                    `${fila.datos.dia}: ${fila.datos.desde} — ${fila.datos.hasta}`
-                  }}</span
-                  ><small>{{ fila.datos.zona_horaria }}</small>
-                  <details v-if="fila.sesiones.length" class="mt-2">
-                    <summary class="cursor-pointer">
-                      {{
-                        t("importarClases.fechasGeneradas", {
-                          n: fila.sesiones.length,
-                        })
-                      }}
-                    </summary>
-                    <ul class="mt-1 tu-lista-acotada">
-                      <li v-for="fecha in fila.sesiones" :key="fecha.fecha">
-                        {{ fecha.fecha }}
-                        <span v-if="fecha.estado === 'cancelada'"
-                          >· {{ t("importarClases.cancelada") }}</span
-                        >
-                      </li>
-                    </ul>
-                  </details>
-                </td>
-                <td>
-                  <span
-                    v-if="!fila.errores.length"
-                    class="tu-badge"
-                    :class="{ 'tu-badge-exito': !fila.omitida }"
-                    >{{
-                      t(
-                        fila.omitida
-                          ? "importarClases.omitida"
-                          : "importarClases.lista",
-                      )
+                <td :data-etiqueta="t('importarClases.horario')">
+                  <div>
+                    <span class="whitespace-nowrap"
+                      >{{ fila.datos.inicio }}–{{ fila.datos.fin }}</span
+                    ><span class="block">{{
+                      fila.datos.fecha ||
+                      `${fila.datos.dia}: ${fila.datos.desde} — ${fila.datos.hasta}`
                     }}</span
-                  >
-                  <p
-                    v-for="mensaje in fila.errores"
-                    :key="mensaje"
-                    style="color: var(--error)"
-                  >
-                    {{ mensaje }}
-                  </p>
-                  <p
-                    v-for="aviso in fila.avisos"
-                    :key="aviso"
-                    class="mt-1"
-                    style="color: var(--texto-suave)"
-                  >
-                    {{ aviso }}
-                  </p>
+                    ><span
+                      v-if="fila.datos.zona_horaria"
+                      class="block text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{ fila.datos.zona_horaria }}</span
+                    >
+                    <details v-if="fila.sesiones.length" class="mt-2">
+                      <summary class="cursor-pointer">
+                        {{
+                          t("importarClases.fechasGeneradas", {
+                            n: fila.sesiones.length,
+                          })
+                        }}
+                      </summary>
+                      <ul class="mt-1 tu-lista-acotada">
+                        <li v-for="fecha in fila.sesiones" :key="fecha.fecha">
+                          {{ fecha.fecha }}
+                          <span v-if="fecha.estado === 'cancelada'"
+                            >· {{ t("importarClases.cancelada") }}</span
+                          >
+                        </li>
+                      </ul>
+                    </details>
+                  </div>
+                </td>
+                <td :data-etiqueta="t('importarClases.revision')">
+                  <!-- Punto y texto, como en los demás importadores: lista, ya
+                       importada (se conserva la existente) o con errores. -->
+                  <div>
+                    <EstadoFilaImportacion
+                      :estado="
+                        fila.errores.length
+                          ? 'invalida'
+                          : fila.omitida
+                            ? 'existente'
+                            : 'valida'
+                      "
+                      :errores="fila.errores"
+                    />
+                    <p
+                      v-for="aviso in fila.avisos"
+                      :key="aviso"
+                      class="mt-1 text-xs"
+                      style="color: var(--texto-suave)"
+                    >
+                      {{ aviso }}
+                    </p>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -582,16 +591,8 @@ async function descargar() {
   list-style-type: disc;
   color: var(--texto-suave);
 }
-.tabla-preview th,
+/* Lo de cada fila arriba (la lista de fechas generadas puede ser larga). */
 .tabla-preview td {
-  padding: 1rem;
   vertical-align: top;
-}
-.tabla-preview tbody tr {
-  border-top: 1px solid var(--borde);
-}
-.tabla-preview th {
-  color: var(--texto-suave);
-  font-weight: 500;
 }
 </style>

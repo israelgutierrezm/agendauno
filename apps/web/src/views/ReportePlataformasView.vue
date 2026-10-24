@@ -10,7 +10,12 @@ import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import {
+  fechaEnUrl,
+  opcionEnUrl,
+  sinValorPorOmision,
+  useFiltrosEnUrl,
+} from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -148,8 +153,9 @@ const cargandoLista = ref(true);
 // El periodo, la plataforma y la búsqueda, en la dirección: recargar o compartir el
 // enlace abre lo mismo. Antes de vigilarlos, para no pedir de más.
 useFiltrosEnUrl({
-  desde: fechaEnUrl(desde),
-  hasta: fechaEnUrl(hasta),
+  // Este mes no se escribe: un enlace guardado sigue mostrando el mes en curso.
+  desde: sinValorPorOmision(fechaEnUrl(desde), () => `${hoy.slice(0, 8)}01`),
+  hasta: sinValorPorOmision(fechaEnUrl(hasta), () => hoy),
   proveedor: opcionEnUrl(proveedor, ["", "wellhub", "totalpass", "fitpass"]),
   q: busqueda,
 });

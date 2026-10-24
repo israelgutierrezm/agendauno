@@ -55,18 +55,16 @@ const texto = computed(() => {
       :data-prueba="fallo ? 'desactualizado' : undefined"
       >{{ texto }}</span
     >
+    <!-- Actualizando: el aro de `aria-busy` toma el lugar del ícono. -->
     <button
       type="button"
-      class="ah-boton"
+      class="tu-btn tu-btn-discreto tu-btn-chico"
       :disabled="actualizando"
+      :aria-busy="actualizando || undefined"
       data-prueba="actualizar"
       @click="emit('actualizar')"
     >
-      <IconoNav
-        nombre="actualizar"
-        :tam="14"
-        :class="{ 'ah-girando': actualizando }"
-      />
+      <IconoNav v-if="!actualizando" nombre="actualizar" :tam="14" />
       {{
         actualizando ? $t("actualizado.actualizando") : $t("actualizado.boton")
       }}
@@ -87,32 +85,5 @@ const texto = computed(() => {
   gap: 0.25rem 0.75rem;
   color: var(--texto-suave);
   font-size: 0.8rem;
-}
-.ah-boton {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.1rem;
-  color: var(--texto-suave);
-  font-weight: 500;
-}
-.ah-boton:hover:not(:disabled) {
-  color: var(--texto);
-}
-.ah-boton:disabled {
-  cursor: progress;
-}
-.ah-girando {
-  animation: ah-girar 0.9s linear infinite;
-}
-@keyframes ah-girar {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ah-girando {
-    animation: none;
-  }
 }
 </style>

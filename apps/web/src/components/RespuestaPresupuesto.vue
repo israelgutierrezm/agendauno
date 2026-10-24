@@ -177,11 +177,13 @@ function agendar(servicio: string): string {
         rows="3"
         maxlength="500"
       />
+      <!-- En línea, bajo el motivo: «Cancelar» solo descarta lo escrito. -->
       <div class="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
-          class="tu-btn tu-btn-peligro"
+          class="tu-btn tu-btn-peligro tu-btn-chico"
           :disabled="ocupado !== null"
+          :aria-busy="ocupado === 'rechazar' || undefined"
           data-prueba="presupuesto-confirmar-rechazo"
           @click="rechazar"
         >
@@ -189,7 +191,7 @@ function agendar(servicio: string): string {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-secundario"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="ocupado !== null"
           @click="rechazando = false"
         >

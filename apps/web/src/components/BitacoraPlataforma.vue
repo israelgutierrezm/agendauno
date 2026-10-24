@@ -4,6 +4,7 @@ import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import { mensajeDeError } from "@/lib/api";
 import { PRODUCTOS, type Producto } from "@/lib/producto";
 
@@ -46,6 +47,8 @@ const filtros = ref({ operador: "", estudio: "", accion: "" });
 const pagina = ref(1);
 const ultimaPagina = ref(1);
 const total = ref(0);
+// Renglones por página: los del servidor (50) mientras no mande `per_page`.
+const porPagina = ref(50);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const abierto = ref<string | null>(null);
@@ -56,7 +59,12 @@ async function cargar(): Promise<void> {
   try {
     const { data } = await cliente.get<{
       data: Registro[];
-      meta: { pagina: number; ultima_pagina: number; total: number };
+      meta: {
+        pagina: number;
+        ultima_pagina: number;
+        total: number;
+        per_page?: number;
+      };
     }>("/api/v1/plataforma/bitacora", {
       ...encabezados(),
       params: {
@@ -67,8 +75,10 @@ async function cargar(): Promise<void> {
       },
     });
     registros.value = data.data;
+    pagina.value = data.meta.pagina;
     ultimaPagina.value = data.meta.ultima_pagina;
     total.value = data.meta.total;
+    porPagina.value = data.meta.per_page ?? porPagina.value;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -178,7 +188,7 @@ onMounted(() => {
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ t("plataformaAdmin.bitacora.reintentar") }}
@@ -245,30 +255,16 @@ onMounted(() => {
       </li>
     </ul>
 
-    <div
-      v-if="ultimaPagina > 1"
-      class="mt-4 flex items-center justify-between gap-3 text-sm"
-    >
-      <button
-        type="button"
-        class="tu-enlace"
-        :disabled="pagina <= 1 || cargando"
-        @click="irA(pagina - 1)"
-      >
-        {{ t("plataformaAdmin.bitacora.anterior") }}
-      </button>
-      <span :style="{ color: 'var(--texto-suave)' }">{{
-        t("plataformaAdmin.bitacora.pagina", { pagina, de: ultimaPagina })
-      }}</span>
-      <button
-        type="button"
-        class="tu-enlace"
-        :disabled="pagina >= ultimaPagina || cargando"
-        @click="irA(pagina + 1)"
-      >
-        {{ t("plataformaAdmin.bitacora.siguiente") }}
-      </button>
-    </div>
+    <!-- Pagina igual que los demás listados (como la Bitácora del negocio). -->
+    <PaginacionListado
+      v-if="!cargando && ultimaPagina > 1"
+      class="mt-4"
+      :page="pagina"
+      :ultima-pagina="ultimaPagina"
+      :total="total"
+      :per-page="porPagina"
+      @ir="irA"
+    />
   </section>
 </template>
 

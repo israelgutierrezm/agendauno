@@ -201,7 +201,7 @@ async function subir(): Promise<void> {
           <button
             v-if="puedeSubir && !abiertoSubir"
             type="button"
-            class="tu-btn tu-btn-secundario px-3 py-1.5"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
             @click="abrirSubir"
           >
             {{ $t("expediente.subir") }}
@@ -307,15 +307,14 @@ async function subir(): Promise<void> {
               <template v-if="puedeValidar && d.estado === 'pendiente'">
                 <button
                   type="button"
-                  class="tu-enlace"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
                   @click="validar(d, 'aprobado')"
                 >
                   {{ $t("expediente.aprobar") }}
                 </button>
                 <button
                   type="button"
-                  class="tu-enlace"
-                  :style="{ color: 'var(--error)' }"
+                  class="tu-btn tu-btn-peligro tu-btn-chico"
                   @click="validar(d, 'rechazado')"
                 >
                   {{ $t("expediente.rechazar") }}

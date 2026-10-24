@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\GestionarDunningTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
@@ -255,4 +256,36 @@ it('por cobrar dice cuándo vence cada renovación sin sacarla de la lista y cue
         ->assertOk()
         ->assertJsonPath('data.cobros.ordenes_pendientes', 4)
         ->assertJsonPath('data.cobros.renovaciones_por_vencer', 2);
+});
+
+it('con pago automático, una renovación que la pasarela aún puede cobrar está pendiente, no vencida', function (): void {
+    $e = negocioConMensualidades(['Caro', 'Gina', 'Hugo']);
+    renovacionDeCobranzaEl($e, $e['acuerdos']['Caro'], '2026-09-28');
+    // La pasarela cobra hasta 3 días después (cobranza.dias_gracia_pago_automatico).
+    renovacionDeCobranzaEl($e, $e['acuerdos']['Gina'], '2026-09-29');
+    renovacionDeCobranzaEl($e, $e['acuerdos']['Hugo'], '2026-09-25');
+    enNegocioDeCobranza($e, function () use ($e): void {
+        foreach (['Gina', 'Hugo'] as $nombre) {
+            $acuerdo = AcuerdoTenant::query()->where('ulid', $e['acuerdos'][$nombre])->firstOrFail();
+            DomiciliacionTenant::query()->create([
+                'acuerdo_id' => $acuerdo->getKey(), 'persona_id' => $acuerdo->persona_id,
+                'proveedor' => 'stripe', 'estado' => DomiciliacionTenant::ACTIVA,
+                'metodo_externo' => 'pm_'.$nombre, 'marca' => 'visa', 'ultimos4' => '4242',
+            ]);
+        }
+    });
+
+    $todas = $this->getJson("/api/v1/app/{$e['slug']}/suscripciones", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('meta.resumen.automaticos', 2)
+        ->assertJsonPath('meta.resumen.vencidas', 2)
+        ->json('data');
+    expect(filasPorPersonaCobranza($todas)->map(fn (array $f): string => $f['situacion'])->all())->toBe([
+        'Hugo' => 'vencida',
+        'Caro' => 'vencida',
+        'Gina' => 'pendiente',
+    ]);
+    $vencidas = $this->getJson("/api/v1/app/{$e['slug']}/suscripciones?situacion=vencidas", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect(array_column($vencidas, 'persona'))->toBe(['Hugo', 'Caro']);
 });

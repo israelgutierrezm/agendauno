@@ -315,6 +315,9 @@ describe("agendar desde la cuenta", () => {
       .findAll("button")
       .find((b) => b.text().includes("10:00") || b.text().includes("16:00"))
       ?.trigger("click");
+    // Lo elegido va en la barra fija de «Agendar», a la vista aunque el formulario
+    // sea largo.
+    expect(w.get('[data-prueba="cita-elegida"]').text()).toContain("Corte");
     await w.get("form").trigger("submit");
     await flushPromises();
 

@@ -128,12 +128,12 @@ class BitacoraTenant
             'usuario.roles' => 'Cambió los roles'.($nombre !== '' ? " de {$nombre}" : '').(isset($despues['roles']) && is_array($despues['roles']) ? ': '.implode(', ', $despues['roles']) : ''),
             'pago.registrado' => 'Registró un cobro de '.self::dinero($despues),
             'pago.reembolso' => 'Devolvió '.self::dinero($despues),
-            // Contracargos (ADR 0168): los registra la pasarela. Con «alumno», la palabra
-            // canónica del público: la web la cambia por el término del negocio.
+            // Contracargos (ADR 0168): los registra la pasarela. Sin nombrar al público:
+            // el CSV de la bitácora sale del servidor, que no adapta la terminología.
             'pago.contracargo' => match ((string) ($despues['estado'] ?? '')) {
                 'ganado' => 'Se ganó el contracargo de '.self::dinero($despues),
-                'perdido' => 'Se perdió el contracargo de '.self::dinero($despues).': se devolvió al alumno',
-                default => 'El banco del alumno disputa un pago de '.self::dinero($despues),
+                'perdido' => 'Se perdió el contracargo de '.self::dinero($despues).': se devolvió el dinero a quien pagó',
+                default => 'El banco de quien pagó disputa un pago de '.self::dinero($despues),
             },
             'credito.top_up' => 'Agregó créditos'.(isset($despues['unidades']) ? ' ('.((int) $despues['unidades'] / 1000).')' : ''),
             'producto.actualizado' => 'Editó el producto'.($nombre !== '' ? " {$nombre}" : ''),

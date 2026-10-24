@@ -1099,6 +1099,11 @@
   .tu-tabla-adaptable .tu-tabla td[data-etiqueta]:first-child::before {
     display: none;
   }
+  /* El título de la ficha va en negritas; sus sublíneas y las etiquetas, no. */
+  .tu-tabla-adaptable .tu-tabla td[data-etiqueta]:first-child .tu-sub,
+  .tu-tabla-adaptable .tu-tabla td[data-etiqueta]::before {
+    font-weight: 400;
+  }
   .tu-tabla-adaptable .tu-tabla td.tu-celda-acciones {
     display: flex;
     flex-wrap: wrap;

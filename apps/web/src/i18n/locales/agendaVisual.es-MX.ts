@@ -69,8 +69,9 @@ export default {
     titulo: "Nueva cita",
     cliente: "Alumno",
     buscarCliente: "Buscar alumno por nombre",
-    // Pendiente: «Alumno nuevo» junto con PanelNuevaCita.spec.ts, que busca este texto.
-    nuevoCliente: "Cliente nuevo",
+    // «Alumno» se adapta al término del negocio (Cliente, Paciente, Socio…).
+    nuevoCliente: "Alumno nuevo",
+    existente: "Alumno existente",
     buscarExistente: "Buscar un alumno existente",
     cambiar: "Cambiar",
     nombre: "Nombre",

@@ -136,14 +136,14 @@ const accesos = computed<Acceso[]>(() => {
       titulo: t("portal.instructor.inicio.tarjetas.hoy"),
       valor: n("hoyValor", deHoy.value.length),
       icono: "agenda",
-      to: { name: "mis-clases", query: { vista: "dia" } },
+      to: { name: "mis-clases", query: { modo: "dia" } },
     },
     {
       clave: "alumnos",
       titulo: t("portal.instructor.inicio.tarjetas.alumnos"),
       valor: n("alumnosValor", alumnosHoy.value),
       icono: "miembros",
-      to: { name: "mis-clases", query: { vista: "dia" } },
+      to: { name: "mis-clases", query: { modo: "dia" } },
     },
     {
       clave: "semana",
@@ -151,14 +151,14 @@ const accesos = computed<Acceso[]>(() => {
       valor: n("semanaValor", clases.value.length),
       icono: "lista",
       // Los próximos 7 días, no la lista de un mes.
-      to: { name: "mis-clases", query: { vista: "lista", dias: "7" } },
+      to: { name: "mis-clases", query: { modo: "lista", dias: "7" } },
     },
     {
       clave: "calendario",
       titulo: t("portal.instructor.inicio.tarjetas.calendario"),
       valor: t("portal.instructor.inicio.tarjetas.calendarioValor"),
       icono: "cuadricula",
-      to: { name: "mis-clases", query: { vista: "mes" } },
+      to: { name: "mis-clases", query: { modo: "mes" } },
     },
     ...(sesion.puede("agenda.ver")
       ? [
@@ -513,7 +513,7 @@ onUnmounted(() => clearInterval(reloj));
         </p>
         <footer v-if="deHoy.length" class="pi-hoy-pie">
           <RouterLink
-            :to="{ name: 'mis-clases', query: { vista: 'dia' } }"
+            :to="{ name: 'mis-clases', query: { modo: 'dia' } }"
             class="tu-enlace text-sm"
             >{{ $t("portal.instructor.inicio.diaCompleto") }} →</RouterLink
           >

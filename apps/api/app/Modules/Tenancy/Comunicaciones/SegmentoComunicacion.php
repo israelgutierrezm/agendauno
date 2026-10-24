@@ -39,7 +39,7 @@ enum SegmentoComunicacion: string
     public function etiqueta(): string
     {
         return match ($this) {
-            self::Todos => 'Todos los miembros',
+            self::Todos => 'Todos los alumnos',
             self::PorVencer => 'Membresía por vencer',
             self::Vencidos => 'Membresía vencida',
             self::Primerizos => 'Primerizos (sin asistir aún)',
@@ -55,10 +55,10 @@ enum SegmentoComunicacion: string
     public function descripcion(): string
     {
         return match ($this) {
-            self::Todos => 'Todas las personas con perfil de miembro, activas en el padrón.',
-            self::PorVencer => 'Miembros cuya membresía vence en los próximos 14 días.',
-            self::Vencidos => 'Miembros cuya membresía venció hace 14 días o menos (recuperables).',
-            self::Primerizos => 'Miembros que aún no registran ninguna asistencia.',
+            self::Todos => 'Todos los alumnos activos en el padrón.',
+            self::PorVencer => 'Alumnos cuya membresía vence en los próximos 14 días.',
+            self::Vencidos => 'Alumnos cuya membresía venció hace 14 días o menos (recuperables).',
+            self::Primerizos => 'Alumnos que aún no registran ninguna asistencia.',
             self::SinAsistir => 'Tienen un plan en vigor y no vienen desde hace los días que fija tu negocio en Seguimiento.',
             self::SinIniciar => 'Tienen un plan en vigor, nunca han venido y no tienen nada reservado.',
             self::SaldoPorVencer => 'Su paquete vence pronto y aún les queda saldo sin usar.',

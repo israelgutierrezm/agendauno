@@ -1912,3 +1912,20 @@ en el negocio.
 - La web dice «Estamos confirmando tu pago» (neutro) y pregunta cada 3 segundos hasta un
   minuto; solo con `confirmado` dice «Pago confirmado», en verde. Sin confirmación,
   «sigue en confirmación; no hace falta pagar de nuevo».
+
+## Cobranza: motivo de mora y vencimientos (ADR 0203)
+
+- `GET /dunning`: cada proceso trae `motivo_clave` (`sin_cobro_en_linea`,
+  `pago_sin_completar`, `rechazado`, `tarjeta_rechazada`, `suscripcion_sin_cobro` o
+  `null`) y `motivo_detalle` (el motivo del banco, o el texto del equipo si se registró a
+  mano con `POST /acuerdos/{acuerdo}/cobro-fallido`, que va sin clave). `ultimo_motivo`
+  sigue siendo la frase que recibe el alumno; el panel no la muestra.
+- `GET /suscripciones`: cada fila trae `situacion` (`proxima`, `hoy`, `vencida`,
+  `pendiente`, `en_mora`, `suspendida` o `pausada`, con hoy del negocio) y `dias`.
+  `pendiente`: con pago automático, la fecha pasó pero la pasarela aún puede cobrar
+  (`cobranza.dias_gracia_pago_automatico`); no cuenta como vencida. Acepta
+  `?situacion=proximas|vencidas` (sin él, todas). `meta.resumen` suma `proximas`,
+  `vencidas` y `en_mora`.
+- `GET /cobranza/pendientes`: cada orden trae `renovacion: {vence_el, situacion}` o
+  `null`; la lista no cambia (se puede cobrar antes). `resumen.renovaciones_por_vencer`
+  cuenta las que aún no vencen (también en `data.cobros` de `GET /inicio/hoy`).

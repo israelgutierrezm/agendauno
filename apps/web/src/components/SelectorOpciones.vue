@@ -86,6 +86,7 @@ function alternarGrupo(lista: Opcion[]): void {
         :placeholder="$t('comun.selector.buscar')"
         :aria-label="$t('comun.selector.buscar')"
         data-prueba="selector-buscar"
+        @keydown.enter.prevent
       />
       <span class="so-cuenta" data-prueba="selector-cuenta">{{
         $t("comun.selector.elegidas", {

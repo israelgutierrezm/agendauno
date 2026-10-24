@@ -26,8 +26,10 @@ const props = withDefaults(
       valores: Record<Termino, string | null>,
     ) => Promise<DatosTerminologia>;
     puedeGestionar?: boolean;
+    // La página ya lo nombra en su encabezado (Configuración): sin título propio.
+    integrado?: boolean;
   }>(),
-  { puedeGestionar: true },
+  { puedeGestionar: true, integrado: false },
 );
 
 const emit = defineEmits<{ guardado: [vigente: TerminosNegocio] }>();
@@ -96,8 +98,14 @@ onMounted(async () => {
 
 <template>
   <div class="tu-card p-6">
-    <h2 class="font-medium text-lg">{{ $t("terminologiaNegocio.titulo") }}</h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <h2 v-if="!integrado" class="font-medium text-lg">
+      {{ $t("terminologiaNegocio.titulo") }}
+    </h2>
+    <p
+      class="text-sm"
+      :class="{ 'mt-1': !integrado }"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
       {{ $t("terminologiaNegocio.ayuda") }}
     </p>
 

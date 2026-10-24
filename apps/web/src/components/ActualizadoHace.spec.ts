@@ -37,5 +37,8 @@ describe("actualizado hace…", () => {
     const boton = w.get('[data-prueba="actualizar"]');
     expect(boton.text()).toBe("Actualizando…");
     expect(boton.attributes("disabled")).toBeDefined();
+    // El botón discreto del contrato, con su aro de «ocupado».
+    expect(boton.classes()).toContain("tu-btn-discreto");
+    expect(boton.attributes("aria-busy")).toBe("true");
   });
 });

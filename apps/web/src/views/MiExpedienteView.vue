@@ -46,7 +46,11 @@ onMounted(() => void cuenta.asegurar());
 
     <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-3">
       {{ cuenta.error.value }}
-      <button type="button" class="tu-enlace ml-2" @click="cuenta.cargar(true)">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario tu-btn-chico ml-2"
+        @click="cuenta.cargar(true)"
+      >
         {{ $t("comun.reintentar") }}
       </button>
     </AvisoTono>
@@ -103,10 +107,8 @@ onMounted(() => void cuenta.asegurar());
         class="mt-5 tu-card p-5"
         :style="{ borderLeft: '3px solid var(--aviso)' }"
       >
-        <h2 class="me-seccion">
-          <IconoNav nombre="expediente" :tam="22" />{{
-            $t("portal.expediente.firmar")
-          }}
+        <h2 class="tu-titulo-seccion">
+          {{ $t("portal.expediente.firmar") }}
         </h2>
         <ul class="mt-3 space-y-4">
           <li v-for="w in cuenta.waivers.value" :key="w.id" class="text-sm">
@@ -152,10 +154,8 @@ onMounted(() => void cuenta.asegurar());
         id="me-fichas"
         class="mt-5 tu-card p-5"
       >
-        <h2 class="me-seccion">
-          <IconoNav nombre="lista" :tam="22" />{{
-            $t("portal.expediente.formularios")
-          }}
+        <h2 class="tu-titulo-seccion">
+          {{ $t("portal.expediente.formularios") }}
         </h2>
         <ListaFormularios
           class="mt-2"
@@ -204,15 +204,6 @@ onMounted(() => void cuenta.asegurar());
   margin-top: 0.2rem;
   color: var(--texto-suave);
   font-size: 0.8rem;
-}
-.me-seccion {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-weight: 600;
-}
-.me-seccion > svg {
-  color: var(--primario);
 }
 .me-vacio {
   display: grid;

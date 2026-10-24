@@ -7,6 +7,7 @@ import { RouterLink } from "vue-router";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoFilaImportacion from "@/components/EstadoFilaImportacion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ResumenImportacion, {
   type ResumenCarga,
 } from "@/components/ResumenImportacion.vue";
@@ -14,6 +15,7 @@ import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import FiltroFilasImportacion from "@/components/FiltroFilasImportacion.vue";
@@ -206,11 +208,28 @@ function descargarPlantilla(): void {
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('importarSaldos.titulo')" />
+    <!-- «Volver» a la lista de origen, encima del encabezado (como en las fichas). -->
+    <RouterLink :to="{ name: 'miembros' }" class="tu-volver"
+      ><IconoNav nombre="atras" :tam="16" />
+      {{
+        $t("ficha.volver", {
+          grupo: plural(sesion.terminologia.miembro).toLowerCase(),
+        })
+      }}</RouterLink
+    >
+    <EncabezadoSeccion
+      class="mt-4"
+      :titulo="$t('importarSaldos.titulo')"
+      :subtitulo="$t('importarSaldos.subtitulo')"
+    />
 
     <!-- Éxito -->
-    <div v-if="cargados !== null" class="mt-6 tu-card p-6 text-center">
-      <p class="text-2xl font-semibold" :style="{ color: 'var(--exito)' }">
+    <div
+      v-if="cargados !== null"
+      class="mt-6 tu-card p-6 text-center"
+      role="status"
+    >
+      <p class="text-lg font-semibold" :style="{ color: 'var(--exito)' }">
         {{ $t("importarSaldos.cargados", { n: cargados }) }}
       </p>
       <p
@@ -222,7 +241,7 @@ function descargarPlantilla(): void {
       </p>
       <RouterLink
         :to="{ name: 'miembros' }"
-        class="tu-btn tu-btn-primario mt-4 inline-block"
+        class="tu-btn tu-btn-primario mt-4"
         >{{ $t("importar.verMiembros") }}</RouterLink
       >
     </div>
@@ -352,11 +371,12 @@ function descargarPlantilla(): void {
           :todas="todasFilas"
           :con-errores="filasConErrores"
         />
-        <div class="mt-4 tu-card overflow-x-auto relative">
+        <!-- En el teléfono, una ficha por fila: el alumno (con su n.º de fila) como
+             título y el estado a la vista, sin desplazar. -->
+        <div class="mt-4 tu-card relative overflow-x-auto tu-tabla-adaptable">
           <table class="tu-tabla">
             <thead>
               <tr>
-                <th>#</th>
                 <th>{{ $t("importarSaldos.colAlumno") }}</th>
                 <th>{{ $t("importarSaldos.colPlan") }}</th>
                 <th class="hidden sm:table-cell text-right">
@@ -370,20 +390,34 @@ function descargarPlantilla(): void {
             </thead>
             <tbody>
               <tr v-for="f in filasEnPagina" :key="f.fila">
-                <td :style="{ color: 'var(--texto-suave)' }">{{ f.fila }}</td>
-                <td class="font-medium">{{ texto(f.datos.email) }}</td>
-                <td>{{ texto(f.datos.plan) }}</td>
-                <td class="hidden sm:table-cell text-right">
+                <td :data-etiqueta="$t('importarSaldos.colAlumno')">
+                  <span class="font-medium">{{ texto(f.datos.email) }}</span>
+                  <span class="tu-sub">{{
+                    $t("importar.filaN", { n: f.fila })
+                  }}</span>
+                </td>
+                <td :data-etiqueta="$t('importarSaldos.colPlan')">
+                  {{ texto(f.datos.plan) }}
+                </td>
+                <td
+                  class="hidden sm:table-cell text-right"
+                  :data-etiqueta="$t('importarSaldos.colCreditos')"
+                >
                   {{ texto(f.datos.creditos) }}
                 </td>
-                <td class="hidden sm:table-cell">
+                <td
+                  class="hidden sm:table-cell"
+                  :data-etiqueta="$t('importarSaldos.colVence')"
+                >
                   {{ texto(f.datos.vence) }}
                 </td>
-                <td>
-                  <EstadoFilaImportacion
-                    :estado="f.estado"
-                    :errores="f.errores"
-                  />
+                <td :data-etiqueta="$t('importar.colEstado')">
+                  <div>
+                    <EstadoFilaImportacion
+                      :estado="f.estado"
+                      :errores="f.errores"
+                    />
+                  </div>
                 </td>
               </tr>
             </tbody>

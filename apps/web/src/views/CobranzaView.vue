@@ -27,6 +27,7 @@ import TarjetasIndicadores, {
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { fechaLocal } from "@/lib/agenda";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { situacionDeFecha } from "@/lib/vencimiento";
 import { confirmar } from "@/lib/confirmar";
@@ -69,6 +70,8 @@ interface MetaPendientes {
   per_page: number;
   por_cobrar: { moneda: string; total_minor: number }[];
   proximas: number;
+  // Renovaciones avisadas que aún no vencen: se pueden cobrar, pero no son un atraso.
+  renovaciones_por_vencer?: number;
 }
 interface Moroso {
   id: string;
@@ -524,9 +527,13 @@ function detalleMora(m: Moroso): string | null {
 // La gracia ya pasó: se dice así (la suspensión llega en el siguiente intento).
 function graciaVencida(fecha: string): boolean {
   return (
-    situacionDeFecha(fecha, hoyEnNegocio(sesion.zonaHoraria)).situacion ===
-    "vencida"
+    situacionDeFecha(diaDeGracia(fecha), hoyEnNegocio(sesion.zonaHoraria))
+      .situacion === "vencida"
   );
+}
+// `gracia_hasta` es un instante (UTC): su día es el del negocio, no el de UTC.
+function diaDeGracia(instante: string): string {
+  return fechaLocal(instante, sesion.zonaHoraria);
 }
 
 // Cómo va una renovación (próxima, hoy, vencida, en mora, suspendida o en pausa). Si
@@ -887,7 +894,7 @@ const indicadores = computed<Indicador[]>(() => {
                 .join(" + ")
             : dinero(0, sesion.moneda),
         icono: "dinero",
-        aviso: (debe?.total ?? 0) > 0,
+        aviso: (debe?.total ?? 0) - (debe?.renovaciones_por_vencer ?? 0) > 0,
       },
       {
         clave: "mora",
@@ -1206,7 +1213,7 @@ watch(vista, cargar, { immediate: true });
                     <!-- El plazo antes de suspender: cuánto falta o desde cuándo venció. -->
                     <EstadoVencimiento
                       v-if="m.gracia_hasta"
-                      :fecha="m.gracia_hasta"
+                      :fecha="diaDeGracia(m.gracia_hasta)"
                       :etiqueta="
                         graciaVencida(m.gracia_hasta)
                           ? $t('cobranza.graciaVencida')

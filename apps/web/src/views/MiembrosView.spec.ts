@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
   esCitas: false,
+  modulos: [] as string[],
   erroresPorCampo: vi.fn((): Record<string, string> => ({})),
 }));
 vi.mock("@/lib/api", () => ({
@@ -20,6 +21,7 @@ vi.mock("@/stores/sesionTenant", () => ({
     slug: "estudio-a",
     esCitas: mocks.esCitas,
     puede: () => true,
+    estudio: { modulos: mocks.modulos },
     terminologia: { sesion: "Clase", miembro: "Alumno", instructor: "Coach" },
   }),
 }));
@@ -45,11 +47,12 @@ const resumen = {
   dias_por_vencer: 7,
 };
 
-function montar() {
+function montar(otros: Record<string, unknown> = {}) {
   return mount(MiembrosView, {
     global: {
       plugins: [i18n],
       stubs: {
+        ...otros,
         teleport: true,
         BotonImportar: true,
         PaginacionListado: true,
@@ -93,6 +96,7 @@ describe("directorio de clientes", () => {
     vi.clearAllMocks();
     localStorage.clear();
     mocks.esCitas = false;
+    mocks.modulos = [];
     mocks.erroresPorCampo.mockReturnValue({});
     miembro = miembroBase;
     mocks.post.mockResolvedValue({ data: {} });
@@ -179,6 +183,47 @@ describe("directorio de clientes", () => {
     await ordenar.trigger("click");
     await flushPromises();
     expect(ultimaConsulta().orden).toBeUndefined();
+  });
+
+  it("en el teléfono se ordena con su lista (el encabezado de la tabla no se ve)", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="orden-movil"]').setValue("-nombre");
+    await flushPromises();
+    expect(ultimaConsulta().orden).toBe("-nombre");
+  });
+
+  it("Familias: Guardar y Cancelar van en el pie del diálogo, no en el editor", async () => {
+    mocks.modulos = ["familias"];
+    const w = montar({
+      FamiliasNegocio: {
+        name: "FamiliasNegocio",
+        template: '<form id="form-familias" />',
+        emits: ["guardado", "estado"],
+      },
+    });
+    await flushPromises();
+    await w.get('[data-prueba="abrir-familias"]').trigger("click");
+    await flushPromises();
+    const guardar = w.get('[data-prueba="guardar-familias"]');
+    expect(guardar.attributes("type")).toBe("submit");
+    expect(guardar.attributes("form")).toBe("form-familias");
+
+    // Mientras no se puede guardar (cargando o sin leer lo guardado), se apaga.
+    const editor = w.findComponent({ name: "FamiliasNegocio" });
+    editor.vm.$emit("estado", {
+      guardando: false,
+      sucio: false,
+      valido: false,
+    });
+    await flushPromises();
+    expect(
+      w.get('[data-prueba="guardar-familias"]').attributes("disabled"),
+    ).toBeDefined();
+
+    editor.vm.$emit("guardado");
+    await flushPromises();
+    expect(w.find('[data-prueba="guardar-familias"]').exists()).toBe(false);
   });
 
   it("elige qué columnas ver y lo recuerda", async () => {

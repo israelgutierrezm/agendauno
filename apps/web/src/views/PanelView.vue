@@ -9,6 +9,7 @@ import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
 import PonEnMarcha, { type Quickstart } from "@/components/PonEnMarcha.vue";
 import ResumenDelDia from "@/components/ResumenDelDia.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { conTerminosActuales } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Facturacion {
@@ -203,7 +204,11 @@ onMounted(cargar);
             <span
               class="text-sm font-normal"
               :style="{ color: 'var(--texto-suave)' }"
-              >{{ $t(`cobro.actual.${facturacion.uso.metrica}`) }}</span
+              >{{
+                conTerminosActuales(
+                  $t(`cobro.actual.${facturacion.uso.metrica}`),
+                )
+              }}</span
             >
           </dd>
         </div>

@@ -7,6 +7,7 @@ import {
   destinoDe,
   ubicacion,
   vistasDeArea,
+  vistasVisibles,
   type Area,
   type Vista,
 } from "@/lib/menu";
@@ -64,6 +65,13 @@ export function useUbicacionActual(): {
       : t(y.etiqueta);
   };
 
+  // La vista como la ve esta sesión: con su `etiquetaSolo` para quien trabaja solo
+  // («Tu agenda y sucursales»), como en el menú, las pestañas y la búsqueda.
+  const vistaParaSesion = (area: Area, vista: Vista): Vista =>
+    vistasVisibles(area, sesion).find(
+      (x) => x.clave === vista.clave && x.ruta === vista.ruta,
+    ) ?? vista;
+
   const titulo = computed(() => {
     if (actual.value !== null) {
       return nombre(actual.value.area);
@@ -87,7 +95,7 @@ export function useUbicacionActual(): {
       lista.push({ texto: t(u.categoria.etiqueta) });
     }
     const paso = PASO[String(route.name)];
-    const vista = nombre(u.vista);
+    const vista = nombre(vistaParaSesion(u.area, u.vista));
     // «Reportes › Reportes» no dice nada: la vista va si se llama distinto.
     if (vista !== area) {
       lista.push({

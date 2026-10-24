@@ -29,6 +29,8 @@ vi.mock("vue-router", () => ({
   // Los filtros van en la dirección (useFiltrosEnUrl).
   useRoute: () => ({ query: {}, hash: "" }),
   useRouter: () => ({ replace: vi.fn() }),
+  // Cerrar la invitación con algo capturado pregunta antes (useDescartarCambios).
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 const equipo = [

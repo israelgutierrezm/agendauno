@@ -13,6 +13,7 @@ import ApartarParaClase from "@/components/ApartarParaClase.vue";
 import CambiarMiLugar from "@/components/CambiarMiLugar.vue";
 import CalendarioVistas, {
   type EventoPeriodo,
+  type Vista,
 } from "@/components/CalendarioVistas.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -25,7 +26,11 @@ import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import ReprogramarMiReserva from "@/components/ReprogramarMiReserva.vue";
 import { libresDeSesion } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
-import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
+import {
+  opcionEnUrl,
+  useFiltrosEnUrl,
+  usePestanaEnUrl,
+} from "@/lib/filtrosEnUrl";
 import {
   cuandoCorto,
   dinero,
@@ -82,6 +87,12 @@ const pestana = usePestanaEnUrl(PESTANAS, { predeterminada: "reservar" });
 function irA(p: Pestana): void {
   pestana.value = p;
 }
+// El modo del calendario de Reservar (lista, día, semana o mes), también en la
+// dirección (`?modo=semana`), como en el calendario del instructor. Sin él, el que
+// recordó este navegador.
+const MODOS: Vista[] = ["lista", "dia", "semana", "mes"];
+const modo = ref<Vista | "">("");
+useFiltrosEnUrl({ modo: opcionEnUrl(modo, MODOS) });
 
 /**
  * Las clases se piden por el periodo que se ve (GET /mi/agenda con desde/hasta y,
@@ -696,6 +707,7 @@ onMounted(() => void cuenta.asegurar());
         class="mt-4"
         clave="tu.portal.vista"
         :zona="sesion.zonaHoraria"
+        :vista-inicial="modo || null"
         :eventos="enCalendario"
         :cargando="cuenta.cargando.value || cargandoClases"
         :error="errorClases"
@@ -703,6 +715,7 @@ onMounted(() => void cuenta.asegurar());
         @abrir="abrirPorId"
         @rango="alCambiarPeriodo"
         @reintentar="cargarClases"
+        @vista="modo = $event"
       >
         <template #filtros>
           <div class="mr-filtros tu-card">

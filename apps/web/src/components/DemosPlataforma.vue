@@ -128,8 +128,11 @@ onMounted(cargar);
               {{ cuando(d.inicia_en) }}
             </td>
             <td :data-etiqueta="t('demosPlataforma.contacto')">
-              {{ d.telefono }}
-              <span class="tu-sub">{{ d.correo }}</span>
+              <!-- Un solo bloque: en la ficha del teléfono, todo junto al valor. -->
+              <div>
+                {{ d.telefono }}
+                <span class="tu-sub">{{ d.correo }}</span>
+              </div>
             </td>
             <td :data-etiqueta="t('demosPlataforma.estado')">
               <span class="tu-estado" :style="{ '--tono': TONOS[d.estado] }">{{

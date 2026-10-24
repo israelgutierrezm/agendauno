@@ -141,7 +141,7 @@ it('Stripe: la disputa abre el contracargo en «por conciliar»; perdido, cuenta
         ->and($estado['incidencias'][0]['tipo'])->toBe('contracargo')
         ->and($estado['incidencias'][0]['detalle'])->toContain('Responde en Stripe');
     $bitacora = $this->getJson("/api/v1/app/{$c['slug']}/auditorias?accion=pago.contracargo", conBearer($c['bearer']))->json('data.0.descripcion');
-    expect($bitacora)->toBe('El banco del alumno disputa un pago de $899.00 MXN');
+    expect($bitacora)->toBe('El banco de quien pagó disputa un pago de $899.00 MXN');
 
     // Perdido: el dinero se devolvió al cliente (cuenta en caja), una sola vez.
     $cerrada = ['type' => 'charge.dispute.closed', 'data' => ['object' => [...$disputa, 'status' => 'lost']]];

@@ -218,7 +218,7 @@ function alSoltar(e: DragEvent): void {
       <button
         v-if="abierta && !fija && cargado === null && !ocupado"
         type="button"
-        class="tu-zona-archivo-cancelar tu-enlace text-xs"
+        class="tu-zona-archivo-cancelar tu-btn tu-btn-secundario tu-btn-chico"
         data-prueba="plegar-zona"
         @click="plegar"
       >

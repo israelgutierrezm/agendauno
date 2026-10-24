@@ -123,7 +123,8 @@ onMounted(cargar);
         id="tipo-negocio"
         class="mt-6 scroll-mt-24"
       >
-        <GiroNegocio />
+        <!-- Sola, el encabezado de la página ya lo nombra. -->
+        <GiroNegocio :integrado="seccion === 'tipo-negocio'" />
       </div>
       <!-- Cómo se llaman las cosas en el negocio (otro giro trae otros términos) -->
       <div
@@ -134,6 +135,7 @@ onMounted(cargar);
       >
         <TerminologiaNegocio
           :key="sesion.estudio?.perfil"
+          :integrado="seccion === 'terminologia'"
           :cargar="cargarTerminologia"
           :guardar="guardarTerminologia"
           @guardado="terminologiaGuardada"

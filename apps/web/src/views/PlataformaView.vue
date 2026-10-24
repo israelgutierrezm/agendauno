@@ -1497,25 +1497,28 @@ function borrar(): void {
           }}</span>
         </template>
         <template #col-estado="{ fila }">
-          <span
-            class="tu-estado text-sm"
-            :style="{ '--tono': colorEstado((fila as Estudio).estado) }"
-          >
-            {{ $t(`plataformaAdmin.estados.${(fila as Estudio).estado}`) }}
-          </span>
-          <span
-            v-if="
-              (fila as Estudio).estado === 'trialing' &&
-              (fila as Estudio).trial_termina_en
-            "
-            class="block text-xs"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{
-              $t("plataformaAdmin.pruebaHasta", {
-                fecha: fecha((fila as Estudio).trial_termina_en),
-              })
-            }}</span
-          >
+          <!-- Un solo bloque: en la ficha del teléfono, todo junto al valor. -->
+          <div>
+            <span
+              class="tu-estado text-sm"
+              :style="{ '--tono': colorEstado((fila as Estudio).estado) }"
+            >
+              {{ $t(`plataformaAdmin.estados.${(fila as Estudio).estado}`) }}
+            </span>
+            <span
+              v-if="
+                (fila as Estudio).estado === 'trialing' &&
+                (fila as Estudio).trial_termina_en
+              "
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{
+                $t("plataformaAdmin.pruebaHasta", {
+                  fecha: fecha((fila as Estudio).trial_termina_en),
+                })
+              }}</span
+            >
+          </div>
         </template>
         <template #col-cobro="{ fila }">
           <span class="text-sm">{{ cobroLegible(fila as Estudio) }}</span>

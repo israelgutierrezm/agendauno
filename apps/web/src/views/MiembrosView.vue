@@ -31,7 +31,10 @@ import SelectorColumnas from "@/components/SelectorColumnas.vue";
 import TarjetaMiembro from "@/components/TarjetaMiembro.vue";
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { useColumnasVisibles } from "@/lib/columnasListado";
-import { useDescartarCambios } from "@/lib/editorFormulario";
+import {
+  useContenedorEditor,
+  useDescartarCambios,
+} from "@/lib/editorFormulario";
 import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import {
@@ -95,7 +98,8 @@ const puedeFamilias = computed(
     sesion.estudio?.modulos?.includes("familias") === true,
 );
 const familiasAbiertas = ref(false);
-const guardandoFamilias = ref(false);
+// Familias es un editor aparte (FamiliasNegocio): Guardar y Cancelar van en el pie.
+const editorFamilias = useContenedorEditor(familiasAbiertas);
 const puedeInvitar = computed(() => sesion.puede("usuarios.invitar"));
 
 const tipo = ref<"miembro" | "instructor">("miembro");
@@ -866,6 +870,24 @@ onMounted(() => {
           @nuevo="abrirAlta"
         >
           <template #acciones>
+            <!-- En el teléfono la tabla es de fichas y su encabezado (donde se ordena)
+                 no se ve: el orden va aquí, también para la cuadrícula. -->
+            <select
+              v-model="orden"
+              class="tu-input mb-orden-movil"
+              :aria-label="$t('detalleMiembro.tabla.ordenar')"
+              data-prueba="orden-movil"
+            >
+              <option value="">
+                {{ $t("detalleMiembro.tabla.recientes") }}
+              </option>
+              <option value="nombre">
+                {{ $t("detalleMiembro.tabla.az") }}
+              </option>
+              <option value="-nombre">
+                {{ $t("detalleMiembro.tabla.za") }}
+              </option>
+            </select>
             <SelectorColumnas
               v-if="vista !== 'cuadricula'"
               v-model="columnas"
@@ -1629,15 +1651,36 @@ onMounted(() => {
       :abierto="familiasAbiertas"
       :titulo="$t('familias.config.titulo')"
       tam="md"
-      :ocupado="guardandoFamilias"
-      @cerrar="familiasAbiertas = false"
+      :ocupado="editorFamilias.ocupado.value"
+      @cerrar="editorFamilias.cerrar"
     >
       <FamiliasNegocio
         v-if="familiasAbiertas"
-        @ocupado="guardandoFamilias = $event"
-        @guardado="familiasAbiertas = false"
-        @cerrar="familiasAbiertas = false"
+        @guardado="editorFamilias.cerrado()"
+        @estado="editorFamilias.alEstado"
       />
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="editorFamilias.ocupado.value"
+          @click="editorFamilias.cerrar"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="submit"
+          form="form-familias"
+          class="tu-btn tu-btn-primario"
+          data-prueba="guardar-familias"
+          :disabled="
+            editorFamilias.ocupado.value || !editorFamilias.valido.value
+          "
+          :aria-busy="editorFamilias.ocupado.value || undefined"
+        >
+          {{ $t("familias.config.guardar") }}
+        </button>
+      </template>
     </ModalDialogo>
   </section>
 </template>
@@ -1721,6 +1764,14 @@ onMounted(() => {
   text-decoration: underline;
 }
 /* Encabezado que ordena: el texto y la flecha, sin aspecto de botón. */
+.mb-orden-movil {
+  width: auto;
+}
+@media (min-width: 640px) {
+  .mb-orden-movil {
+    display: none;
+  }
+}
 .mb-ordenar {
   display: inline-flex;
   align-items: center;

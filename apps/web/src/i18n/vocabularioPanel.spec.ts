@@ -33,8 +33,6 @@ const PERMITIDAS = new Set([
   "perfilPublico.agendar.sesionEquipo",
   // «cliente_ref» es el nombre de una columna del archivo que se importa.
   "importarCitas.reglaAlumnos",
-  // Pendiente: «Alumno nuevo», junto con PanelNuevaCita.spec.ts, que busca este texto.
-  "agendaVisual.nuevaCita.nuevoCliente",
 ]);
 
 const PROHIBIDO = /(?<!\p{L})client[ea]s?(?!\p{L})|personas? con perfil/iu;

@@ -870,27 +870,29 @@ onMounted(cargarReferencias);
                   {{ $t("horariosVisual.sinBloqueos") }}
                 </p>
                 <ul v-else class="mt-2 space-y-2">
+                  <!-- Punto y texto (sin ícono tintado): el día bloqueado y,
+                       debajo, sus horas y el motivo. -->
                   <li
                     v-for="b in bloqueosProximos.slice(0, 3)"
                     :key="b.id"
-                    class="flex items-start gap-3"
+                    class="min-w-0 text-sm"
+                    data-prueba="bloqueo-proximo"
                   >
-                    <span class="tu-icono-tono tu-tono-naranja">
-                      <IconoNav nombre="agenda" :tam="16" />
-                    </span>
-                    <span class="min-w-0 text-sm">
-                      <span class="block font-medium first-letter:uppercase">{{
+                    <span
+                      class="tu-estado font-medium"
+                      :style="{ '--tono': 'var(--aviso)' }"
+                      ><span class="first-letter:uppercase">{{
                         fechaBloqueo(b).dia
-                      }}</span>
-                      <span
-                        class="block"
-                        :style="{ color: 'var(--texto-suave)' }"
-                        >{{ fechaBloqueo(b).horas
-                        }}<template v-if="b.motivo">
-                          · {{ b.motivo }}</template
-                        ></span
-                      >
-                    </span>
+                      }}</span></span
+                    >
+                    <span
+                      class="block pl-[0.9rem]"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{ fechaBloqueo(b).horas
+                      }}<template v-if="b.motivo">
+                        · {{ b.motivo }}</template
+                      ></span
+                    >
                   </li>
                 </ul>
               </div>

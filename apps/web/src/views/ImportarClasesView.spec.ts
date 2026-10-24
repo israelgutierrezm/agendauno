@@ -1,6 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
+import esMX from "@/i18n/locales/es-MX";
 import importarClases from "@/i18n/locales/importarClases.es-MX";
 import ImportarClasesView from "./ImportarClasesView.vue";
 
@@ -19,7 +20,8 @@ function montar() {
         createI18n({
           legacy: false,
           locale: "es",
-          messages: { es: { importarClases } },
+          // Con los textos comunes de los importadores (estado de cada fila).
+          messages: { es: { ...esMX, importarClases } },
         }),
       ],
       stubs: {
@@ -109,6 +111,10 @@ describe("importación de clases", () => {
       "/api/v1/app/demo/importaciones/clases/preview",
     );
     expect(w.text()).toContain("2026-10-05");
+    // La clase primero (con su n.º de fila) y su revisión con punto y texto.
+    expect(w.get(".tabla-preview tbody td").text()).toContain("Pole");
+    expect(w.get(".tabla-preview tbody td").text()).toContain("Fila 2");
+    expect(w.get('[data-prueba="estado-fila"]').text()).toBe("Lista");
     api.post.mockResolvedValueOnce({
       data: { data: { ...resultado(), creados: 1, lote: "lote-1" } },
     });

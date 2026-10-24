@@ -1271,6 +1271,8 @@ export const pagoAutomatico = {
   renueva: "Se renueva el {fecha} · {monto}",
   // La renovación ya venció y no se ha pagado (MisPagos).
   vencio: "Venció el {fecha} · {monto}: págala en Por pagar.",
+  enProceso:
+    "Tocaba el {fecha} · {monto}: tu tarjeta se cobra en estos días, no tienes que hacer nada.",
   automatico: "Cobro automático",
   manual: "Te avisamos para pagar",
   activar: "Activar",

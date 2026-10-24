@@ -1901,10 +1901,12 @@ export default {
     importar: "Importar {n} miembros",
     importando: "Importando…",
     creados: "{n} miembros importados",
-    verMiembros: "Ver miembros",
+    verMiembros: "Ver alumnos",
   },
   importarSaldos: {
     titulo: "Saldos de apertura",
+    subtitulo:
+      "El plan, los créditos y la vigencia con que cada alumno llega de tu sistema anterior.",
     ir: "Cargar saldos de apertura",
     instrucciones:
       "Si vienes de otro sistema, carga aquí el plan, los créditos y la vigencia que cada alumno trae al corte acordado. No se registran ventas ni pagos: el saldo aparece en su estado de cuenta como «Saldo de apertura», con la evidencia que indiques.",
@@ -1936,6 +1938,7 @@ export default {
   },
   importarInstructores: {
     titulo: "Importar instructores",
+    subtitulo: "Trae a tus instructores desde otro sistema con un archivo CSV.",
     instrucciones:
       "Sube un archivo CSV con una fila por instructor (nombre y correo). Primero lo revisamos sin guardar; después eliges si les enviamos ya la invitación para activar su acceso o si los invitas más tarde desde Equipo.",
     importar: "Importar {n} instructores",
@@ -3074,7 +3077,7 @@ export default {
       ocupacion:
         "Qué horarios se llenan y qué actividades tienen más demanda en el periodo.",
       clientes:
-        "Cuántos alumnos nuevos compran y cuántos siguen asistiendo mes con mes.",
+        "Cuántos alumnos nuevos compran y cuántos alumnos siguen asistiendo mes con mes.",
       embudo:
         "Cuántos avanzan en cada paso, desde que se interesan hasta que vuelven.",
       equipo:

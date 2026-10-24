@@ -196,7 +196,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
             <button
               v-if="puedeCambiar && !cambiando"
               type="button"
-              class="tu-enlace ml-2 text-xs font-normal"
+              class="tu-btn tu-btn-discreto tu-btn-chico ml-2"
               data-prueba="cambiar-whatsapp"
               @click="abrirCambio"
             >
@@ -318,26 +318,31 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
           autocomplete="one-time-code"
           maxlength="6"
         />
-        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-          <span v-if="esperaReenvio > 0">{{
-            $t("avisosAgendaUno.reenviarEn", { s: esperaReenvio })
-          }}</span>
-          <button
-            v-else
-            type="button"
-            class="tu-enlace"
-            :disabled="ocupado"
-            @click="enviarCodigo(modo ?? 'verificar')"
-          >
-            {{ $t("avisosAgendaUno.reenviar") }}
-          </button>
-          <template v-if="modo === 'cambiar'">
-            ·
-            <button type="button" class="tu-enlace" @click="cerrarCambio">
-              {{ $t("avisosAgendaUno.cancelar") }}
+        <div class="mt-1 flex flex-wrap items-center gap-3">
+          <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            <span v-if="esperaReenvio > 0">{{
+              $t("avisosAgendaUno.reenviarEn", { s: esperaReenvio })
+            }}</span>
+            <button
+              v-else
+              type="button"
+              class="tu-enlace"
+              :disabled="ocupado"
+              @click="enviarCodigo(modo ?? 'verificar')"
+            >
+              {{ $t("avisosAgendaUno.reenviar") }}
             </button>
-          </template>
-        </p>
+          </p>
+          <!-- Solo descarta: el número no cambia sin el código. -->
+          <button
+            v-if="modo === 'cambiar'"
+            type="button"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
+            @click="cerrarCambio"
+          >
+            {{ $t("avisosAgendaUno.cancelar") }}
+          </button>
+        </div>
       </div>
       <AvisoTono v-if="error" tono="peligro" class="mt-2" role="alert">
         {{ error }}

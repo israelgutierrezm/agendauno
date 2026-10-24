@@ -117,7 +117,7 @@ describe("cliente nuevo desde la agenda", () => {
     const w = await abrir("10:00");
     await w
       .findAll("button")
-      .find((b) => b.text() === "Cliente nuevo")!
+      .find((b) => b.text() === "Alumno nuevo")!
       .trigger("click");
 
     expect(w.get('[data-prueba="lada-celular"]').text()).toBe("CO +57");

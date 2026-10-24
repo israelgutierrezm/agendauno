@@ -67,9 +67,9 @@ async function desconectar(d: Destino) {
 
 <template>
   <section class="space-y-5" data-prueba="medicion-negocio">
+    <!-- Sin título propio: la pestaña «Medición» ya lo nombra. -->
     <div>
-      <h2 class="font-semibold">{{ t("medicion.negocio.titulo") }}</h2>
-      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ t("medicion.negocio.descripcion") }}
       </p>
       <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">

@@ -582,6 +582,26 @@ const acceso = reactive({
   fichas: [] as { id: string; nombre: string; email: string | null }[],
   ficha: "" as string,
 });
+// Con una nota o un motivo de descarte escritos sin guardar, cerrar el detalle (la X,
+// Escape, el fondo) o salir de la pantalla pregunta antes.
+const detalleAbierto = computed<boolean>({
+  get: () => actual.value !== null,
+  set: (v) => {
+    if (!v) actual.value = null;
+  },
+});
+const descartarDetalle = useDescartarCambios({
+  abierto: detalleAbierto,
+  valor: () => ({
+    nota: nota.value.trim(),
+    motivo: descartando.abierto ? descartando.motivo : "",
+    comentario: descartando.abierto ? descartando.comentario.trim() : "",
+  }),
+  guardando: accionando,
+});
+function cerrarDetalle(): void {
+  void descartarDetalle.cerrar();
+}
 
 // Lo demás de su historial, de 30 en 30 (el detalle trae lo más reciente).
 const cargandoEventos = ref(false);
@@ -605,9 +625,10 @@ async function masEventos(): Promise<void> {
 }
 async function abrir(p: Prospecto): Promise<void> {
   actual.value = p;
-  descartando.abierto = false;
+  Object.assign(descartando, { abierto: false, motivo: "", comentario: "" });
   acceso.abierto = false;
   nota.value = "";
+  descartarDetalle.fijar();
   try {
     const { data } = await api.get<{ data: Prospecto }>(
       `${base.value}/prospectos/${p.id}`,
@@ -665,7 +686,7 @@ async function descartar(): Promise<void> {
     }),
   );
   if (listo) {
-    descartando.abierto = false;
+    Object.assign(descartando, { abierto: false, motivo: "", comentario: "" });
   }
 }
 function asignarA(id: string | null): Promise<boolean> {
@@ -1045,7 +1066,7 @@ async function crear(): Promise<void> {
       :abierto="actual !== null"
       :titulo="actual?.nombre ?? ''"
       :ocupado="accionando"
-      @cerrar="actual = null"
+      @cerrar="cerrarDetalle"
     >
       <div
         v-if="actual"

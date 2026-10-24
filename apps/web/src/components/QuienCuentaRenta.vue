@@ -6,6 +6,7 @@ import EstadoVacio from "@/components/EstadoVacio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { conTerminosActuales } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -101,17 +102,19 @@ function cambiarPorPagina(n: number): void {
 const regla = computed(() =>
   porProfesional.value
     ? t("cobro.quien.reglaProfesionales")
-    : t("cobro.quien.reglaAlumnos"),
+    : conTerminosActuales(t("cobro.quien.reglaAlumnos")),
 );
 const resumen = computed(() =>
   cantidad.value === null
     ? ""
-    : t(
-        porProfesional.value
-          ? "cobro.quien.cuentanProfesionales"
-          : "cobro.quien.cuentanAlumnos",
-        { n: cantidad.value },
-        cantidad.value,
+    : conTerminosActuales(
+        t(
+          porProfesional.value
+            ? "cobro.quien.cuentanProfesionales"
+            : "cobro.quien.cuentanAlumnos",
+          { n: cantidad.value },
+          cantidad.value,
+        ),
       ),
 );
 
@@ -184,7 +187,7 @@ function numero(n: number | undefined): string {
               {{
                 porProfesional
                   ? $t("cobro.quien.colProfesional")
-                  : $t("cobro.quien.colAlumno")
+                  : conTerminosActuales($t("cobro.quien.colAlumno"))
               }}
             </th>
             <th v-if="porProfesional" scope="col" class="text-right">
@@ -192,7 +195,7 @@ function numero(n: number | undefined): string {
             </th>
             <template v-else>
               <th scope="col" class="text-right">
-                {{ $t("cobro.quien.colReservas") }}
+                {{ conTerminosActuales($t("cobro.quien.colReservas")) }}
               </th>
               <th scope="col" class="text-right">
                 {{ $t("cobro.quien.colCompras") }}

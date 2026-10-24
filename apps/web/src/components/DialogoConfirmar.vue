@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { estadoConfirmar, responderConfirmar } from "@/lib/confirmar";
@@ -11,9 +11,6 @@ import { estadoConfirmar, responderConfirmar } from "@/lib/confirmar";
  * sólido de peligro. Los demás tonos (completar, regresar) confirman con el primario.
  * Se monta una sola vez.
  */
-const destructiva = computed(
-  () => estadoConfirmar.peligro || estadoConfirmar.tono === "peligro",
-);
 onMounted(() => (estadoConfirmar.montado = true));
 onUnmounted(() => {
   estadoConfirmar.montado = false;
@@ -41,7 +38,9 @@ onUnmounted(() => {
         type="button"
         class="tu-btn"
         :class="
-          destructiva ? 'tu-btn-solido tu-tono-peligro' : 'tu-btn-primario'
+          estadoConfirmar.peligro
+            ? 'tu-btn-solido tu-tono-peligro'
+            : 'tu-btn-primario'
         "
         data-prueba="confirmar-aceptar"
         @click="responderConfirmar(true)"

@@ -27,6 +27,8 @@ vi.mock("@/stores/sesionTenant", () => ({
 }));
 const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
 vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
+const confirmar = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
 vi.mock("vue-router", () => ({
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
   useRoute: () => ({ query: {} }),
@@ -123,7 +125,8 @@ function montar(paginas: Record<string, number> = {}) {
         EncabezadoSeccion: true,
         PanelLateral: {
           props: ["abierto", "titulo"],
-          template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
+          template:
+            '<div v-if="abierto"><button type="button" data-prueba="cerrar-panel" @click="$emit(\'cerrar\')" /><slot /><slot name="pie" /></div>',
         },
       },
     },
@@ -252,6 +255,23 @@ describe("prospectos: responsable, contacto e historia", () => {
     await w.get("#p-nota").element.form!.dispatchEvent(new Event("submit"));
     await flushPromises();
     expect((w.get("#p-nota").element as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("cerrar el detalle con una nota sin guardar pregunta antes de descartarla", async () => {
+    const w = montar();
+    await abrirDetalle(w);
+    await w.get("#p-nota").setValue("Llamar el lunes");
+
+    confirmar.mockResolvedValueOnce(false);
+    await w.get('[data-prueba="cerrar-panel"]').trigger("click");
+    await flushPromises();
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(w.find('[data-prueba="detalle-prospecto"]').exists()).toBe(true);
+
+    confirmar.mockResolvedValueOnce(true);
+    await w.get('[data-prueba="cerrar-panel"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-prueba="detalle-prospecto"]').exists()).toBe(false);
   });
 
   it("escribirle por WhatsApp (botón verde) queda en su historia", async () => {

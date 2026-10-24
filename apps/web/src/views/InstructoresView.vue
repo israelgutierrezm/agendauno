@@ -15,6 +15,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
@@ -173,15 +174,22 @@ const form = ref({ nombre: "", email: "", sucursalId: "" });
 const invitando = ref(false);
 const activacion = ref<Activacion | null>(null);
 const abierto = ref(false);
+// Con lo capturado sin enviar, cerrar («Cancelar», la X, Escape) o salir pregunta antes.
+const descartarInvitar = useDescartarCambios({
+  abierto,
+  valor: () => form.value,
+  guardando: invitando,
+});
 
 function abrir(): void {
   form.value = { nombre: "", email: "", sucursalId: "" };
   activacion.value = null;
   error.value = null;
+  descartarInvitar.fijar();
   abierto.value = true;
 }
 function cerrar(): void {
-  abierto.value = false;
+  void descartarInvitar.cerrar();
 }
 
 function cuando(iso: string, zona: string | null): string {
@@ -246,11 +254,12 @@ async function invitar(): Promise<void> {
     });
     activacion.value = data.data.activacion;
     form.value = { nombre: "", email: "", sucursalId: "" };
+    descartarInvitar.fijar();
     // En producción el enlace llega por correo (no hay token que mostrar): se avisa
-    // y se cierra el panel.
+    // y se cierra el panel (ya enviada, sin nada que descartar).
     if (activacion.value === null) {
       useToastStore().exito(t("instructores.invitar.enviada", { email }));
-      cerrar();
+      abierto.value = false;
     }
     await cargar();
   } catch (e) {

@@ -381,13 +381,18 @@ onMounted(cargar);
         </details>
       </section>
 
-      <button
-        class="tu-btn tu-btn-primario"
-        type="submit"
-        :disabled="ocupado === 'guardar'"
-      >
-        {{ $t("plataformaAdmin.whatsapp.guardar") }}
-      </button>
+      <!-- «Guardar» siempre a la vista al bajar por el formulario. -->
+      <div class="tu-pie-acciones">
+        <button
+          class="tu-btn tu-btn-primario"
+          type="submit"
+          data-prueba="guardar-whatsapp"
+          :disabled="ocupado === 'guardar'"
+          :aria-busy="ocupado === 'guardar' || undefined"
+        >
+          {{ $t("plataformaAdmin.whatsapp.guardar") }}
+        </button>
+      </div>
     </form>
 
     <template v-if="config?.conectado">
@@ -414,6 +419,7 @@ onMounted(cargar);
           class="tu-btn tu-btn-secundario"
           type="submit"
           :disabled="ocupado === 'prueba'"
+          :aria-busy="ocupado === 'prueba' || undefined"
         >
           {{ $t("plataformaAdmin.whatsapp.prueba") }}
         </button>

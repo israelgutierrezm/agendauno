@@ -20,6 +20,7 @@ import ReferidosRenta from "@/components/ReferidosRenta.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useConfirmacionPago } from "@/lib/retornoPago";
+import { conTerminosActuales } from "@/lib/terminologia";
 import {
   fechaTarifa,
   type PlanCitas,
@@ -198,10 +199,11 @@ const ayudaModo = computed(() => {
       monto: dinero(r.cuota_fija_minor, r.cuota_fija_moneda ?? r.moneda),
     });
   }
-  // Por profesional o por alumno: según la modalidad del negocio (ADR 0104).
+  // Por profesional o por alumno: según la modalidad del negocio (ADR 0104). Con la
+  // palabra del negocio (Miembro, Socio…), como en el resto del panel.
   return sesion.esCitas
     ? t("cobro.modo.ayudaCitas")
-    : t("cobro.modo.ayudaClases");
+    : conTerminosActuales(t("cobro.modo.ayudaClases"));
 });
 
 // El estimado viene en la moneda de cobro (pesos en México) o, sin tipo de cambio,
@@ -487,7 +489,7 @@ onMounted(() => {
             {{
               renta.modo_cobro === "fijo"
                 ? $t("cobro.modo.fijo")
-                : $t(`cobro.modo.${sesion.modalidad}`)
+                : conTerminosActuales($t(`cobro.modo.${sesion.modalidad}`))
             }}
           </p>
           <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -586,7 +588,11 @@ onMounted(() => {
                 {{ renta.actual.cantidad }}
               </div>
               <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                {{ $t(`cobro.actual.${renta.actual.metrica}`) }}
+                {{
+                  conTerminosActuales(
+                    $t(`cobro.actual.${renta.actual.metrica}`),
+                  )
+                }}
               </div>
               <div
                 v-if="(renta.actual.detalle.personas_fuera_de_cita ?? 0) > 0"
@@ -594,9 +600,11 @@ onMounted(() => {
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{
-                  $t("cobro.actual.fueraDeCita", {
-                    n: renta.actual.detalle.personas_fuera_de_cita,
-                  })
+                  conTerminosActuales(
+                    $t("cobro.actual.fueraDeCita", {
+                      n: renta.actual.detalle.personas_fuera_de_cita,
+                    }),
+                  )
                 }}
               </div>
             </div>
@@ -608,8 +616,12 @@ onMounted(() => {
           >
             <template v-for="(l, i) in renta.actual.desglose.lineas" :key="i">
               <dt>
-                <span class="font-semibold">{{ l.concepto }}</span>
-                <span class="block text-xs rt-suave">{{ l.detalle }}</span>
+                <span class="font-semibold">{{
+                  conTerminosActuales(l.concepto)
+                }}</span>
+                <span class="block text-xs rt-suave">{{
+                  conTerminosActuales(l.detalle)
+                }}</span>
               </dt>
               <dd>{{ dinero(l.importe_minor, monedaActual) }}</dd>
             </template>
@@ -943,9 +955,11 @@ onMounted(() => {
                   <dl class="rt-desglose">
                     <template v-for="(l, i) in c.desglose.lineas" :key="i">
                       <dt>
-                        <span class="font-semibold">{{ l.concepto }}</span>
+                        <span class="font-semibold">{{
+                          conTerminosActuales(l.concepto)
+                        }}</span>
                         <span class="block text-xs rt-suave">{{
-                          l.detalle
+                          conTerminosActuales(l.detalle)
                         }}</span>
                       </dt>
                       <dd>{{ dinero(l.importe_minor, c.moneda) }}</dd>

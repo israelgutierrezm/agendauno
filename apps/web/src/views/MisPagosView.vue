@@ -282,7 +282,11 @@ onMounted(() => void cuenta.asegurar());
 
     <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-3">
       {{ cuenta.error.value }}
-      <button type="button" class="tu-enlace ml-2" @click="cuenta.cargar(true)">
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario tu-btn-chico ml-2"
+        @click="cuenta.cargar(true)"
+      >
         {{ $t("comun.reintentar") }}
       </button>
     </AvisoTono>
@@ -292,7 +296,7 @@ onMounted(() => void cuenta.asegurar());
         <RouterLink
           :to="{
             name: 'mis-reservas',
-            query: { vista: 'reservar', incluidas: '1' },
+            query: { incluidas: '1' },
           }"
           class="tu-enlace ml-1"
           data-prueba="reservar-tras-pago"
@@ -361,10 +365,9 @@ onMounted(() => void cuenta.asegurar());
       <div id="mp-pendientes" class="order-2">
         <!-- Por pagar -->
         <div class="tu-card p-5" data-prueba="por-pagar">
-          <h2 class="mp-seccion">
-            <IconoNav nombre="ventas" :tam="22" />{{
-              $t("portal.pagos.porPagar")
-            }}<span v-if="cuenta.porPagar.value.length" class="tu-badge">{{
+          <h2 class="tu-titulo-seccion">
+            {{ $t("portal.pagos.porPagar") }}
+            <span v-if="cuenta.porPagar.value.length" class="tu-badge ml-1">{{
               cuenta.porPagar.value.length
             }}</span>
           </h2>
@@ -430,7 +433,7 @@ onMounted(() => void cuenta.asegurar());
                 </button>
                 <button
                   type="button"
-                  class="tu-enlace text-xs"
+                  class="tu-btn tu-btn-secundario"
                   :disabled="pagando !== null"
                   @click="pagar(o.id, 'oxxo')"
                 >
@@ -476,10 +479,8 @@ onMounted(() => void cuenta.asegurar());
         id="mp-comprar"
         class="order-4 tu-card p-5"
       >
-        <h2 class="mp-seccion">
-          <IconoNav nombre="etiqueta" :tam="22" />{{
-            $t("miCuenta.comprar.titulo")
-          }}
+        <h2 class="tu-titulo-seccion">
+          {{ $t("miCuenta.comprar.titulo") }}
         </h2>
         <AvisoTono v-if="mensaje === 'comprado'" tono="exito" class="mt-2">
           {{ $t("miCuenta.comprar.creada") }}
@@ -691,16 +692,6 @@ onMounted(() => void cuenta.asegurar());
 }
 .mp-atencion .mp-icono {
   color: var(--aviso);
-}
-.mp-seccion {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  font-weight: 600;
-}
-.mp-seccion > svg {
-  color: var(--primario);
 }
 .mp-al-corriente {
   display: flex;

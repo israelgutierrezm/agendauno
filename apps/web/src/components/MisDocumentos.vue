@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
-import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -97,13 +96,7 @@ onMounted(cargar);
 
 <template>
   <div class="tu-card p-6">
-    <h2 class="flex items-center gap-2 font-semibold">
-      <IconoNav
-        nombre="expediente"
-        :tam="22"
-        class="text-[var(--primario)]"
-      />{{ $t("misDocumentos.titulo") }}
-    </h2>
+    <h2 class="tu-titulo-seccion">{{ $t("misDocumentos.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("misDocumentos.ayuda") }}
     </p>

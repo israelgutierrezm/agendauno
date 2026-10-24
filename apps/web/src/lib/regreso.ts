@@ -64,10 +64,15 @@ export function useRegreso(lista: {
       return lista.etiqueta();
     }
     const x = origen.value.vista;
+    // Quien trabaja solo la ve con su `etiquetaSolo` («Tu agenda y sucursales»).
+    const etiqueta =
+      x.etiquetaSolo !== undefined && sesion.conEquipo === false
+        ? x.etiquetaSolo
+        : x.etiqueta;
     const nombre =
       x.termino !== undefined
         ? plural(sesion.terminologia[x.termino])
-        : t(x.etiqueta);
+        : t(etiqueta);
     return t("comun.volverA", {
       destino: nombre.charAt(0).toLowerCase() + nombre.slice(1),
     });

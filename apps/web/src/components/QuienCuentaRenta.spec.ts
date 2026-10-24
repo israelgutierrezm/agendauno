@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
+import { fijarTerminosActuales } from "@/lib/terminologia";
 import QuienCuentaRenta from "./QuienCuentaRenta.vue";
 
 /*
@@ -41,6 +42,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  fijarTerminosActuales(null);
   vi.useRealTimers();
   document.body.style.overflow = "";
 });
@@ -56,6 +58,22 @@ function montar() {
 }
 
 describe("quién cuenta en la renta", () => {
+  it("con la palabra del negocio: un gimnasio de socios ve «socios», no «alumnos»", async () => {
+    fijarTerminosActuales({
+      sesion: "Clase",
+      miembro: "Socio",
+      instructor: "Coach",
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="resumen-quien"]').text()).toBe(
+      "Cuentan 3 socios",
+    );
+    expect(w.get('[data-prueba="tabla-quien"] th').text()).toBe("Socio");
+    expect(w.text()).not.toMatch(/alumno/i);
+  });
+
   it("muestra una tabla con por qué cuenta cada quien, por páginas", async () => {
     const w = montar();
     await flushPromises();

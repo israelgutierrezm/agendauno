@@ -183,7 +183,7 @@ const avance = computed(() =>
         <RouterLink
           v-if="!t.hecho"
           :to="destino(t)"
-          class="pm-ir"
+          class="tu-enlace shrink-0"
           data-prueba="ir"
           >{{ $t("quickstart.ir") }}</RouterLink
         >
@@ -218,7 +218,7 @@ const avance = computed(() =>
                 ? { name: 'onboarding', query: { paso: 'publicacion' } }
                 : { name: c.ruta }
             "
-            class="pm-opcional-enlace"
+            class="tu-enlace"
             >{{ $t(`quickstart.comprobaciones.${c.clave}`) }}</RouterLink
           >
           <span class="sr-only">{{
@@ -262,7 +262,7 @@ const avance = computed(() =>
             >{{ $t(`quickstart.tareas.${t.clave}`) }}
             <span class="sr-only">{{ $t("quickstart.hecho") }}</span></span
           >
-          <RouterLink v-else :to="destino(t)" class="pm-opcional-enlace">{{
+          <RouterLink v-else :to="destino(t)" class="tu-enlace">{{
             $t(`quickstart.tareas.${t.clave}`)
           }}</RouterLink>
         </li>
@@ -390,16 +390,6 @@ const avance = computed(() =>
   opacity: 0.6;
 }
 
-.pm-ir {
-  flex-shrink: 0;
-  color: var(--primario);
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.pm-ir:hover {
-  text-decoration: underline;
-}
-
 .pm-opcionales {
   margin-top: 1.1rem;
   padding-top: 0.9rem;
@@ -429,14 +419,6 @@ const avance = computed(() =>
   padding-left: 0;
   border-left: 0;
 }
-.pm-opcional-enlace {
-  color: var(--texto-suave);
-}
-.pm-opcional-enlace:hover {
-  color: var(--texto);
-  text-decoration: underline;
-}
-
 /* Angosto: los pasos uno bajo otro y lo opcional en lista. */
 @media (max-width: 899px) {
   .pm {

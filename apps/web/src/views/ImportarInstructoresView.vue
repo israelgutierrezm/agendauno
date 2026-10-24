@@ -7,12 +7,14 @@ import { RouterLink } from "vue-router";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoFilaImportacion from "@/components/EstadoFilaImportacion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ResumenImportacion, {
   type ResumenCarga,
 } from "@/components/ResumenImportacion.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import FiltroFilasImportacion from "@/components/FiltroFilasImportacion.vue";
@@ -178,11 +180,28 @@ function descargarPlantilla(): void {
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('importarInstructores.titulo')" />
+    <!-- «Volver» a la lista de origen, encima del encabezado (como en las fichas). -->
+    <RouterLink :to="{ name: 'instructores' }" class="tu-volver"
+      ><IconoNav nombre="atras" :tam="16" />
+      {{
+        $t("ficha.volver", {
+          grupo: plural(sesion.terminologia.instructor).toLowerCase(),
+        })
+      }}</RouterLink
+    >
+    <EncabezadoSeccion
+      class="mt-4"
+      :titulo="$t('importarInstructores.titulo')"
+      :subtitulo="$t('importarInstructores.subtitulo')"
+    />
 
     <!-- Éxito -->
-    <div v-if="creados !== null" class="mt-6 tu-card p-6 text-center">
-      <p class="text-2xl font-semibold" :style="{ color: 'var(--exito)' }">
+    <div
+      v-if="creados !== null"
+      class="mt-6 tu-card p-6 text-center"
+      role="status"
+    >
+      <p class="text-lg font-semibold" :style="{ color: 'var(--exito)' }">
         {{ $t("importarInstructores.creados", { n: creados }) }}
       </p>
       <p
@@ -205,7 +224,7 @@ function descargarPlantilla(): void {
       </p>
       <RouterLink
         :to="{ name: 'instructores' }"
-        class="tu-btn tu-btn-primario mt-4 inline-block"
+        class="tu-btn tu-btn-primario mt-4"
         >{{ $t("importarInstructores.verInstructores") }}</RouterLink
       >
     </div>
@@ -273,11 +292,12 @@ function descargarPlantilla(): void {
           :todas="todasFilas"
           :con-errores="filasConErrores"
         />
-        <div class="mt-4 tu-card overflow-x-auto relative">
+        <!-- En el teléfono, una ficha por fila: el nombre (con su n.º de fila) como
+             título y el estado a la vista, sin desplazar. -->
+        <div class="mt-4 tu-card relative overflow-x-auto tu-tabla-adaptable">
           <table class="tu-tabla">
             <thead>
               <tr>
-                <th>#</th>
                 <th>{{ $t("importar.colNombre") }}</th>
                 <th class="hidden sm:table-cell">
                   {{ $t("importar.colCorreo") }}
@@ -287,21 +307,26 @@ function descargarPlantilla(): void {
             </thead>
             <tbody>
               <tr v-for="f in filasEnPagina" :key="f.fila">
-                <td :style="{ color: 'var(--texto-suave)' }">
-                  {{ f.fila }}
+                <td :data-etiqueta="$t('importar.colNombre')">
+                  <span class="font-medium">{{ texto(f.datos.nombre) }}</span>
+                  <span class="tu-sub">{{
+                    $t("importar.filaN", { n: f.fila })
+                  }}</span>
                 </td>
-                <td class="font-medium">{{ texto(f.datos.nombre) }}</td>
                 <td
                   class="hidden sm:table-cell"
+                  :data-etiqueta="$t('importar.colCorreo')"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ texto(f.datos.email) }}
                 </td>
-                <td>
-                  <EstadoFilaImportacion
-                    :estado="f.estado"
-                    :errores="f.errores"
-                  />
+                <td :data-etiqueta="$t('importar.colEstado')">
+                  <div>
+                    <EstadoFilaImportacion
+                      :estado="f.estado"
+                      :errores="f.errores"
+                    />
+                  </div>
                 </td>
               </tr>
             </tbody>

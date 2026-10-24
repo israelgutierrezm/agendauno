@@ -70,6 +70,8 @@ const form = ref({
 });
 // Lo capturado contra lo guardado (se fija al cargar y al guardar).
 const foto = instantanea(() => form.value);
+// Sin las cuotas guardadas no se guarda: se mandarían los valores por omisión (en 0).
+const cargaFallida = ref(false);
 
 // Como se escribe en el país del negocio («12,50» en España), para que `aMinor` lo lea.
 function aTexto(minor: number): string {
@@ -88,7 +90,7 @@ watch(
   () => ({
     guardando: guardando.value,
     sucio: foto.cambio(),
-    valido: !cargando.value && !ilegible.value,
+    valido: !cargando.value && !cargaFallida.value && !ilegible.value,
   }),
   (e) => emit("estado", e),
   { immediate: true },
@@ -101,7 +103,10 @@ function nombreMes(m: number): string {
   }).format(new Date(Date.UTC(2024, m - 1, 1)));
 }
 
-onMounted(async () => {
+async function cargar(): Promise<void> {
+  cargando.value = true;
+  cargaFallida.value = false;
+  error.value = null;
   try {
     const { data } = await api.get<{ data: Cuotas }>(`${base.value}/cuotas`);
     const c = data.data;
@@ -116,14 +121,16 @@ onMounted(async () => {
     foto.fijar();
   } catch (e) {
     error.value = mensajeDeError(e);
+    cargaFallida.value = true;
   } finally {
     cargando.value = false;
   }
-});
+}
+onMounted(cargar);
 
 async function guardar(): Promise<void> {
   // El botón está en el pie del contenedor: un Enter en un campo también llega aquí.
-  if (ilegible.value || guardando.value) {
+  if (ilegible.value || guardando.value || cargaFallida.value) {
     return;
   }
   guardando.value = true;
@@ -159,6 +166,23 @@ async function guardar(): Promise<void> {
   <p v-if="cargando" :style="{ color: 'var(--texto-suave)' }">
     {{ $t("comun.cargando") }}
   </p>
+  <AvisoTono
+    v-else-if="cargaFallida"
+    tono="peligro"
+    role="alert"
+    data-prueba="cuotas-error-carga"
+  >
+    {{ error }}
+    <template #acciones>
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario tu-btn-chico"
+        @click="cargar"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
+    </template>
+  </AvisoTono>
   <form
     v-else
     id="form-cuotas"

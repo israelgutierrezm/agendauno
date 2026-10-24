@@ -10,7 +10,7 @@ export default {
     ingresos: "¿Cuánto cobré el mes pasado y cómo va este mes?",
     ocupacion: "¿Qué horarios se llenan más y cuáles casi no?",
     retencion:
-      "¿Cuántos alumnos siguen activos de los que empezaron hace tres meses?",
+      "De los alumnos que empezaron hace tres meses, ¿cuántos alumnos activos quedan?",
   },
   placeholder: "Escribe tu pregunta",
   preguntar: "Preguntar",

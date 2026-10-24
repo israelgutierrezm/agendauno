@@ -26,9 +26,11 @@ vi.mock("@/stores/sesionTenant", () => ({
   }),
 }));
 const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
+const router = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("vue-router", () => ({
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
   useRoute: () => ruta,
+  useRouter: () => router,
 }));
 
 // Miércoles 9 de enero de 2030, 12:00 en CDMX.
@@ -141,7 +143,7 @@ describe("portal del instructor", () => {
   });
 
   it("«Próximos 7 días» abre 7 días, y lo que ya terminó hoy no es «próximo»", async () => {
-    ruta.query = { vista: "lista", dias: "7" };
+    ruta.query = { modo: "lista", dias: "7" };
     api.get.mockResolvedValue({
       data: {
         data: [
@@ -163,6 +165,30 @@ describe("portal del instructor", () => {
     expect(w.text()).toContain("Próximos 7 días");
     expect(w.text()).not.toContain("Mañanera");
     expect(w.text()).toContain("Exotic");
+  });
+
+  it("el modo del calendario va en ?modo= (no en ?vista=, la del menú) y se recuerda", async () => {
+    ruta.query = { modo: "dia" };
+    const w = montar(MisClasesView);
+    await flushPromises();
+    const modoBtn = (texto: string) =>
+      w.findAll(".tu-segmentado button").find((b) => b.text() === texto)!;
+    expect(modoBtn("Día").attributes("aria-pressed")).toBe("true");
+
+    await modoBtn("Mes").trigger("click");
+    await flushPromises();
+    expect(router.replace).toHaveBeenLastCalledWith({ query: { modo: "mes" } });
+    // Sin `modo` en la dirección, abre con el que recordó este navegador.
+    w.unmount();
+    ruta.query = {};
+    const otra = montar(MisClasesView);
+    await flushPromises();
+    expect(
+      otra
+        .findAll(".tu-segmentado button")
+        .find((b) => b.text() === "Mes")!
+        .attributes("aria-pressed"),
+    ).toBe("true");
   });
   afterEach(() => {
     vi.useRealTimers();

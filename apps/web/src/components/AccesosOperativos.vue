@@ -75,8 +75,8 @@ const accesos = computed(() =>
 
 <template>
   <section v-if="accesos.length" class="mt-8" aria-labelledby="accesos-titulo">
-    <span class="ao-etiqueta">{{ $t("accesos.etiqueta") }}</span>
-    <h2 id="accesos-titulo" class="mt-2 text-2xl font-bold">
+    <!-- Un título de sección, por debajo del saludo (el h1 de Inicio). -->
+    <h2 id="accesos-titulo" class="tu-titulo-seccion">
       {{ $t("accesos.titulo") }}
     </h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -101,15 +101,3 @@ const accesos = computed(() =>
     </ul>
   </section>
 </template>
-
-<style scoped>
-.ao-etiqueta {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  border-radius: 0.5rem;
-  background: var(--primario-suave);
-  color: var(--primario);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-</style>

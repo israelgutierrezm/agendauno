@@ -823,7 +823,7 @@ watch(
             <button
               v-if="corrigiendo === r.id"
               type="button"
-              class="tu-enlace pl-dejar text-sm"
+              class="tu-btn tu-btn-discreto tu-btn-chico pl-dejar"
               @click="corrigiendo = null"
             >
               {{ $t("paseLista.acciones.dejar") }}
@@ -839,7 +839,7 @@ watch(
             <button
               v-if="puedeMarcar && r.estado === 'confirmada' && r.asistencia"
               type="button"
-              class="tu-enlace text-sm"
+              class="tu-btn tu-btn-discreto tu-btn-chico"
               :aria-label="`${$t('paseLista.acciones.cambiar')}: ${r.persona ?? ''}`"
               data-prueba="cambiar"
               @click="corrigiendo = r.id"
@@ -1360,7 +1360,6 @@ watch(
 .pl-dejar {
   grid-column: 1 / -1;
   justify-self: start;
-  min-height: 32px;
 }
 .pl-registro {
   display: flex;

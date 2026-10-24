@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import EmbudoNegocio, { type Embudo } from "@/components/EmbudoNegocio.vue";
@@ -14,7 +14,12 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
-import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import {
+  fechaEnUrl,
+  opcionEnUrl,
+  sinValorPorOmision,
+  useFiltrosEnUrl,
+} from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio, inicioDeMesEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -190,6 +195,7 @@ interface Cohortes {
 
 const sesion = useSesionTenantStore();
 const route = useRoute();
+const router = useRouter() as ReturnType<typeof useRouter> | undefined;
 // Desde Equipo › Rendimiento (`?vista=equipo`): solo el reporte del equipo.
 const soloRendimiento = computed(() => route?.query.vista === "equipo");
 // Quien trabaja solo: el reporte del equipo es su propia agenda (sin pago ni margen).
@@ -246,11 +252,21 @@ const error = computed(() => errores.value[pestana.value] ?? null);
 const metrica = ref<"neto" | "ventas">("neto");
 // El periodo, la agrupación y la métrica, en la dirección: recargar o compartir el
 // enlace abre el mismo reporte. Antes de vigilarlos, para no pedir de más.
+// Lo de siempre (este mes, por día, neto) no se escribe: un enlace guardado sigue
+// mostrando el mes en curso.
 useFiltrosEnUrl({
-  desde: fechaEnUrl(desde),
-  hasta: fechaEnUrl(hasta),
-  agrupar: opcionEnUrl(agrupacion, ["dia", "semana", "mes"]),
-  metrica: opcionEnUrl(metrica, ["neto", "ventas"]),
+  desde: sinValorPorOmision(fechaEnUrl(desde), inicioMes),
+  hasta: sinValorPorOmision(fechaEnUrl(hasta), () =>
+    hoyEnNegocio(sesion.zonaHoraria),
+  ),
+  agrupar: sinValorPorOmision(
+    opcionEnUrl(agrupacion, ["dia", "semana", "mes"]),
+    () => "dia",
+  ),
+  metrica: sinValorPorOmision(
+    opcionEnUrl(metrica, ["neto", "ventas"]),
+    () => "neto",
+  ),
 });
 function valorDe(p: PuntoSerie): number {
   return metrica.value === "neto" ? p.neto_minor : p.ventas_minor;
@@ -588,6 +604,21 @@ const pestana = computed<Pestana>(() => {
     ? elegida
     : "resumen";
 });
+// Una sección que el plan ya no incluye (un enlace de antes): la dirección dice lo que
+// se ve (Resumen), para que el menú y las migas no marquen otra cosa.
+watch(
+  [() => route?.query.vista, pestanas],
+  ([vista]) => {
+    const elegida =
+      typeof vista === "string" ? VISTA_A_PESTANA[vista] : undefined;
+    if (elegida !== undefined && !pestanas.value.includes(elegida)) {
+      const query = { ...route.query };
+      delete query.vista;
+      void router?.replace({ query, hash: route.hash });
+    }
+  },
+  { immediate: true },
+);
 // Título y subtítulo de cada vista (Rendimiento, el suyo).
 const titulo = computed(() => {
   if (soloRendimiento.value) {

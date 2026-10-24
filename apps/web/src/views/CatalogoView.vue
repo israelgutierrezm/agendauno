@@ -933,12 +933,17 @@ onMounted(cargar);
                     </div>
                   </div>
                 </td>
+                <!-- La etiqueta de la ficha dice lo que muestra esta fila: precio o lugares. -->
                 <td
                   class="text-right whitespace-nowrap tabular-nums"
                   :data-etiqueta="
-                    esCitas
+                    o.politica_reserva === 'pago'
                       ? $t('listadosVisual.catalogo.precio')
-                      : $t('listadosVisual.catalogo.cupo')
+                      : o.capacidad
+                        ? $t('listadosVisual.catalogo.cupo')
+                        : esCitas
+                          ? $t('listadosVisual.catalogo.precio')
+                          : $t('listadosVisual.catalogo.cupo')
                   "
                 >
                   <template v-if="o.politica_reserva === 'pago'">{{

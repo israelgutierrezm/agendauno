@@ -12,6 +12,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * giro cambia cómo se llaman las cosas; pasar de clases a citas (o al revés) lo hace
  * AgendaUno y el servidor lo niega (MODALITY_LOCKED), con su mensaje.
  */
+// Integrado: la página ya lo nombra en su encabezado; sin título propio.
+defineProps<{ integrado?: boolean }>();
 const emit = defineEmits<{ guardado: [perfil: string] }>();
 
 const sesion = useSesionTenantStore();
@@ -53,10 +55,14 @@ async function enviar(): Promise<void> {
 
 <template>
   <div class="tu-card p-6" data-prueba="giro-negocio">
-    <h2 class="font-medium text-lg">
+    <h2 v-if="!integrado" class="font-medium text-lg">
       {{ $t("modalidadNegocio.giro.titulo") }}
     </h2>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+    <p
+      class="text-sm"
+      :class="{ 'mt-1': !integrado }"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
       {{ $t(`modalidadNegocio.giro.ayuda.${sesion.modalidad}`) }}
     </p>
 

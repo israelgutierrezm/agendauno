@@ -4,12 +4,17 @@ import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { instantanea } from "@/lib/cambiosPendientes";
+import type { EstadoEditor } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
  * Familias del negocio (ADR 0123): si se usan y el texto de autorización que acepta el
  * responsable. Vacío = el texto base de la plataforma; cambiarlo sube la versión.
+ *
+ * Guardar y Cancelar van en el pie del diálogo que lo abre (`form="form-familias"`):
+ * por eso avisa su `estado` (guardando, cambios sin guardar y si se puede guardar).
  */
 interface ConfiguracionFamilias {
   activo: boolean;
@@ -20,9 +25,9 @@ interface ConfiguracionFamilias {
 
 const emit = defineEmits<{
   guardado: [];
-  cerrar: [];
-  // Guardando: quien lo abre no deja cerrar su diálogo hasta que termine.
-  ocupado: [valor: boolean];
+  // Para su contenedor: no cerrarse a medio guardar, no descartar sin preguntar y
+  // desactivar «Guardar» mientras carga o si no se pudo leer lo guardado.
+  estado: [e: EstadoEditor];
 }>();
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -37,7 +42,17 @@ const activo = ref(false);
 const texto = ref("");
 const version = ref(1);
 const textoBase = ref("");
-watch(guardando, (valor) => emit("ocupado", valor));
+// Lo capturado contra lo guardado (se fija al cargar y al guardar).
+const foto = instantanea(() => ({ activo: activo.value, texto: texto.value }));
+watch(
+  () => ({
+    guardando: guardando.value,
+    sucio: foto.cambio(),
+    valido: !cargando.value && !cargaFallida.value,
+  }),
+  (e) => emit("estado", e),
+  { immediate: true },
+);
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -52,6 +67,7 @@ async function cargar(): Promise<void> {
     version.value = data.data.version;
     textoBase.value =
       data.data.texto_autorizacion === null ? data.data.texto_vigente : "";
+    foto.fijar();
   } catch (e) {
     error.value = mensajeDeError(e);
     cargaFallida.value = true;
@@ -62,7 +78,7 @@ async function cargar(): Promise<void> {
 onMounted(cargar);
 
 async function guardar(): Promise<void> {
-  if (cargaFallida.value) {
+  if (cargando.value || cargaFallida.value || guardando.value) {
     return;
   }
   guardando.value = true;
@@ -72,6 +88,7 @@ async function guardar(): Promise<void> {
       activo: activo.value,
       texto_autorizacion: texto.value.trim() !== "" ? texto.value : null,
     });
+    foto.fijar();
     toast.exito(t("familias.config.guardado"));
     emit("guardado");
   } catch (e) {
@@ -83,7 +100,12 @@ async function guardar(): Promise<void> {
 </script>
 
 <template>
-  <div class="grid gap-4" data-prueba="familias-negocio">
+  <form
+    id="form-familias"
+    class="grid gap-4"
+    data-prueba="familias-negocio"
+    @submit.prevent="guardar"
+  >
     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("familias.config.texto") }}
     </p>
@@ -118,7 +140,7 @@ async function guardar(): Promise<void> {
       <template v-if="cargaFallida" #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           data-prueba="reintentar-familias"
           @click="cargar"
         >
@@ -126,24 +148,5 @@ async function guardar(): Promise<void> {
         </button>
       </template>
     </AvisoTono>
-    <div class="flex justify-end gap-2">
-      <button
-        type="button"
-        class="tu-btn tu-btn-secundario"
-        :disabled="guardando"
-        @click="emit('cerrar')"
-      >
-        {{ $t("comun.cancelar") }}
-      </button>
-      <button
-        type="button"
-        class="tu-btn tu-btn-primario"
-        :disabled="cargando || guardando || cargaFallida"
-        data-prueba="guardar-familias"
-        @click="guardar"
-      >
-        {{ $t("familias.config.guardar") }}
-      </button>
-    </div>
-  </div>
+  </form>
 </template>
