@@ -21,10 +21,15 @@ function preguntar(): Promise<boolean> {
   return consulta;
 }
 
-export function useDemosActivas(): Ref<boolean> {
+/** `cuando`: si se pregunta (p. ej. no en la página de un negocio). */
+export function useDemosActivas(
+  cuando: () => boolean = () => true,
+): Ref<boolean> {
   const activas = ref(false);
   onMounted(async () => {
-    activas.value = await preguntar();
+    if (cuando()) {
+      activas.value = await preguntar();
+    }
   });
   return activas;
 }

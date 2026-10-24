@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 import HechoCon from "@/components/HechoCon.vue";
 import LogoProducto from "@/components/LogoProducto.vue";
 import { trackEvent } from "@/lib/analytics";
+import { useDemosActivas } from "@/lib/demos";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -63,6 +64,20 @@ function medirRegistro(): void {
     ...(giro.value !== null ? { business_profile: giro.value } : {}),
   });
 }
+// «Agendar una demo» (ADR 0204), como en la competencia: en el menú comercial y en el
+// pie, solo si la plataforma agenda demos (no se pregunta en la página de un negocio).
+const demosActivas = useDemosActivas(() => !props.esRutaPublicaDeNegocio);
+const destinoDemo = computed(() => ({
+  name: "demo",
+  query: giro.value === null ? { producto } : { producto, giro: giro.value },
+}));
+function medirDemo(): void {
+  trackEvent("marketing_cta_clicked", {
+    placement: "navigation",
+    destination: "demo",
+    ...(modo.value !== null ? { mode: modo.value } : {}),
+  });
+}
 const mostrarAcceso = computed(
   () => !props.esAcceso && props.pagina !== "entrar",
 );
@@ -119,6 +134,13 @@ defineEmits<{ alternarTema: [] }>();
           >
             <a :href="href" @click="navigate">{{ $t(`nav.${s.clave}`) }}</a>
           </RouterLink>
+          <RouterLink
+            v-if="demosActivas"
+            :to="destinoDemo"
+            data-cta="nav_demo"
+            @click="medirDemo"
+            >{{ $t("demoAgendable.cta") }}</RouterLink
+          >
         </nav>
 
         <nav
@@ -201,6 +223,9 @@ defineEmits<{ alternarTema: [] }>();
       >
         <a :href="href" @click="navigate">{{ $t(`nav.${s.clave}`) }}</a>
       </RouterLink>
+      <RouterLink v-if="demosActivas" :to="destinoDemo" @click="medirDemo">{{
+        $t("demoAgendable.cta")
+      }}</RouterLink>
     </nav>
 
     <main class="flex-1">
@@ -243,6 +268,14 @@ defineEmits<{ alternarTema: [] }>();
           >
             Soporte
           </a>
+          <RouterLink
+            v-if="!esRutaPublicaDeNegocio && demosActivas"
+            class="tu-public-footer-link"
+            :to="destinoDemo"
+            data-prueba="pie-demo"
+          >
+            {{ $t("demoAgendable.cta") }}
+          </RouterLink>
           <RouterLink
             v-if="!esRutaPublicaDeNegocio"
             class="tu-public-footer-link"
