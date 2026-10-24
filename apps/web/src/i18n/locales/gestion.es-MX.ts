@@ -567,6 +567,16 @@ export const plataformaAdmin = {
     encendido: "{modulo}: encendido",
     apagado: "{modulo}: apagado",
   },
+  // El armazón del superadmin (components/LayoutPlataforma.vue).
+  marca: "Superadmin",
+  menu: "Secciones del superadmin",
+  cerrarSesion: "Cerrar sesión",
+  grupos: {
+    negocios: "Negocios",
+    dinero: "Dinero",
+    plataforma: "Plataforma",
+    acceso: "Acceso",
+  },
   pestanas: {
     estudios: "Negocios",
     cobros: "Cobros",

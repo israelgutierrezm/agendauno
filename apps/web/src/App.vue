@@ -516,6 +516,9 @@ onMounted(() => {
     <RouterView />
   </main>
 
+  <!-- Superadmin (ADR 0126): su propia puerta y su armazón, sin la cara pública. -->
+  <RouterView v-else-if="route.name === 'plataforma'" />
+
   <!-- ===================== APP PÚBLICA ===================== -->
   <PublicShell
     v-else
@@ -548,7 +551,7 @@ onMounted(() => {
   <!-- Notificaciones flotantes (toasts), montadas una sola vez para toda la app. -->
   <AppToaster />
   <!-- Preferencias de medición de las páginas públicas (ADR 0143). -->
-  <AvisoMedicion v-if="!esEmbebido" />
+  <AvisoMedicion v-if="!esEmbebido && route.name !== 'plataforma'" />
   <!-- Confirmaciones dentro de la app (lib/confirmar.ts). -->
   <DialogoConfirmar />
   <PanelApariencia :abierto="menuApariencia" @cerrar="menuApariencia = false" />

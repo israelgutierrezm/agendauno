@@ -7,6 +7,9 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import BitacoraPlataforma from "@/components/BitacoraPlataforma.vue";
 import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import LayoutPlataforma, {
+  type GrupoPlataforma,
+} from "@/components/LayoutPlataforma.vue";
 import EquipoPlataforma from "@/components/EquipoPlataforma.vue";
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
 import InteresadosPlataforma from "@/components/InteresadosPlataforma.vue";
@@ -17,7 +20,6 @@ import PaisPlataforma from "@/components/PaisPlataforma.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
-import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
@@ -35,6 +37,7 @@ import type { PlanCitas } from "@/lib/suscripcion";
 import PlanEstudioPlataforma from "@/components/PlanEstudioPlataforma.vue";
 import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
+import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 import { confirmar } from "@/lib/confirmar";
 import {
   PRODUCTOS,
@@ -1109,17 +1112,59 @@ watch(
   },
   { immediate: true },
 );
-const opcionesPestana = computed(() =>
-  PESTANAS.map((p) => ({
-    clave: p,
-    texto:
-      p === "medicion"
-        ? t("medicion.plataforma.pestana")
-        : t(`plataformaAdmin.pestanas.${p}`),
-    cuenta:
-      p === "estudios"
-        ? (metaEstudios.value?.total_negocios ?? estudios.value.length)
-        : undefined,
+// El menú lateral del superadmin: las secciones agrupadas por tema, con su ícono.
+const GRUPOS: { clave: string; secciones: [Pestana, string][] }[] = [
+  {
+    clave: "negocios",
+    secciones: [
+      ["estudios", "comercio"],
+      ["interesados", "captacion"],
+      ["embudo", "oportunidades"],
+    ],
+  },
+  {
+    clave: "dinero",
+    secciones: [
+      ["cobros", "dinero"],
+      ["tarifas", "etiqueta"],
+    ],
+  },
+  {
+    clave: "plataforma",
+    secciones: [
+      ["parametros", "ajustes"],
+      ["configuracion", "pasarelas"],
+      ["operacion", "operacion"],
+      ["errores", "pulso"],
+      ["medicion", "reportes"],
+    ],
+  },
+  {
+    clave: "acceso",
+    secciones: [
+      ["equipo", "usuarios"],
+      ["bitacora", "lista"],
+    ],
+  },
+];
+function textoPestana(p: Pestana): string {
+  return p === "medicion"
+    ? t("medicion.plataforma.pestana")
+    : t(`plataformaAdmin.pestanas.${p}`);
+}
+const gruposSecciones = computed<GrupoPlataforma[]>(() =>
+  GRUPOS.map((g) => ({
+    clave: g.clave,
+    texto: t(`plataformaAdmin.grupos.${g.clave}`),
+    secciones: g.secciones.map(([clave, icono]) => ({
+      clave,
+      icono,
+      texto: textoPestana(clave),
+      cuenta:
+        clave === "estudios"
+          ? (metaEstudios.value?.total_negocios ?? estudios.value.length)
+          : undefined,
+    })),
   })),
 );
 
@@ -1258,162 +1303,17 @@ function borrar(): void {
 </script>
 
 <template>
-  <section class="tu-pagina max-w-6xl">
-    <!-- Con un token guardado: se comprueba sin enseñar la puerta. -->
-    <p
-      v-if="comprobando"
-      class="text-center text-sm"
-      role="status"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("comun.cargando") }}
-    </p>
-
-    <!-- Paso 2: el código que llegó por correo -->
-    <div
-      v-else-if="!autenticado && desafio !== null"
-      class="mx-auto max-w-sm tu-card p-6"
-      data-prueba="paso-codigo"
-    >
-      <h1 class="font-semibold text-xl">{{ $t("plataforma.codigoTitulo") }}</h1>
-      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("plataforma.codigoAyuda", { correo: correoDestino }) }}
-      </p>
-      <AvisoTono
-        v-if="codigoDesarrollo"
-        tono="aviso"
-        class="mt-2"
-        data-prueba="codigo-desarrollo"
-      >
-        {{ $t("plataforma.codigoDesarrollo", { codigo: codigoDesarrollo }) }}
-      </AvisoTono>
-      <form class="mt-4 space-y-3" @submit.prevent="verificar">
-        <div>
-          <label class="tu-label" for="pl-codigo">{{
-            $t("plataforma.codigo")
-          }}</label>
-          <input
-            id="pl-codigo"
-            v-model="codigoInput"
-            class="tu-input tracking-[0.3em] text-lg"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="6"
-            pattern="[0-9]{6}"
-            required
-          />
-        </div>
-        <AvisoTono v-if="error" tono="peligro" role="alert">
-          {{ error }}
-        </AvisoTono>
-        <button
-          class="tu-btn tu-btn-primario w-full"
-          type="submit"
-          :disabled="cargando || codigoInput.trim().length !== 6"
-        >
-          {{ $t("plataforma.verificar") }}
-        </button>
-        <button
-          class="tu-btn tu-btn-secundario w-full"
-          type="button"
-          :disabled="cargando"
-          @click="empezarDeNuevo"
-        >
-          {{ $t("plataforma.empezarDeNuevo") }}
-        </button>
-      </form>
-    </div>
-
-    <!-- Paso 1: correo, contraseña y token de la plataforma -->
-    <div v-else-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
-      <h1 class="font-semibold text-xl">{{ $t("plataforma.titulo") }}</h1>
-      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("plataforma.accesoAyuda") }}
-      </p>
-      <form class="mt-4 space-y-3" @submit.prevent="entrar">
-        <div>
-          <label class="tu-label" for="pl-correo">{{
-            $t("plataforma.correo")
-          }}</label>
-          <input
-            id="pl-correo"
-            v-model="emailInput"
-            class="tu-input"
-            type="email"
-            autocomplete="username"
-            required
-          />
-        </div>
-        <div>
-          <label class="tu-label" for="pl-contrasena">{{
-            $t("plataforma.contrasena")
-          }}</label>
-          <input
-            id="pl-contrasena"
-            v-model="passwordInput"
-            class="tu-input"
-            type="password"
-            autocomplete="current-password"
-            required
-          />
-        </div>
-        <div>
-          <label class="tu-label" for="tk">{{ $t("plataforma.token") }}</label>
-          <input
-            id="tk"
-            v-model="tokenInput"
-            class="tu-input"
-            type="password"
-            autocomplete="off"
-            required
-          />
-        </div>
-        <AvisoTono v-if="error" tono="peligro" role="alert">
-          {{ error }}
-        </AvisoTono>
-        <button
-          class="tu-btn tu-btn-primario w-full"
-          type="submit"
-          :disabled="cargando"
-        >
-          {{ $t("plataforma.entrar") }}
-        </button>
-        <!-- Falló la red, no el token: se puede volver a intentar con el guardado. -->
-        <button
-          v-if="token !== ''"
-          class="tu-btn tu-btn-discreto w-full"
-          type="button"
-          :disabled="cargando"
-          @click="cargar"
-        >
-          {{ $t("comun.reintentar") }}
-        </button>
-      </form>
-    </div>
-
-    <template v-else>
-      <!-- El mismo encabezado que el panel: título, quién opera y «Salir». -->
-      <EncabezadoSeccion
-        :titulo="$t('plataforma.titulo')"
-        :subtitulo="
-          operador
-            ? `${$t('plataforma.subtitulo')} · ${$t('plataforma.operador', { nombre: operador })}`
-            : $t('plataforma.subtitulo')
-        "
-      >
-        <template #acciones>
-          <button class="tu-btn tu-btn-secundario" type="button" @click="salir">
-            {{ $t("plataforma.salir") }}
-          </button>
-        </template>
-      </EncabezadoSeccion>
-
-      <!-- Las pestañas, en la dirección; en el teléfono, una lista. -->
-      <PestanasSeccion
-        v-model="pestana"
-        :opciones="opcionesPestana"
-        :etiqueta="$t('plataforma.titulo')"
-      />
+  <!-- Dentro: el armazón del panel (menú lateral con las secciones, barra superior y
+       la tarjeta), sin la cara pública. Salir es solo «Cerrar sesión». -->
+  <LayoutPlataforma
+    v-if="autenticado && !comprobando"
+    v-model="pestana"
+    :grupos="gruposSecciones"
+    :operador="operador"
+    @salir="salir"
+  >
+    <section class="tu-pagina max-w-6xl">
+      <EncabezadoSeccion :titulo="textoPestana(pestana)" />
 
       <!-- Estudios -->
       <div
@@ -2807,11 +2707,174 @@ function borrar(): void {
           />
         </div>
       </PanelLateral>
-    </template>
-  </section>
+    </section>
+  </LayoutPlataforma>
+
+  <!-- La puerta: sin el encabezado público (ni «Inicio» ni «Iniciar sesión»), para no
+       salir por error con la sesión de la plataforma a medias. -->
+  <main v-else class="pl-acceso">
+    <p class="pl-marca">
+      <img :src="ISOTIPO_AGENDAUNO" alt="" class="h-9 w-9 object-contain" />
+      <span>{{ $t("plataformaAdmin.marca") }}</span>
+    </p>
+    <div class="w-full max-w-sm">
+      <!-- Con un token guardado: se comprueba sin enseñar la puerta. -->
+      <p
+        v-if="comprobando"
+        class="text-center text-sm"
+        role="status"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
+
+      <!-- Paso 2: el código que llegó por correo -->
+      <div
+        v-else-if="!autenticado && desafio !== null"
+        class="mx-auto max-w-sm tu-card p-6"
+        data-prueba="paso-codigo"
+      >
+        <h1 class="font-semibold text-xl">
+          {{ $t("plataforma.codigoTitulo") }}
+        </h1>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("plataforma.codigoAyuda", { correo: correoDestino }) }}
+        </p>
+        <AvisoTono
+          v-if="codigoDesarrollo"
+          tono="aviso"
+          class="mt-2"
+          data-prueba="codigo-desarrollo"
+        >
+          {{ $t("plataforma.codigoDesarrollo", { codigo: codigoDesarrollo }) }}
+        </AvisoTono>
+        <form class="mt-4 space-y-3" @submit.prevent="verificar">
+          <div>
+            <label class="tu-label" for="pl-codigo">{{
+              $t("plataforma.codigo")
+            }}</label>
+            <input
+              id="pl-codigo"
+              v-model="codigoInput"
+              class="tu-input tracking-[0.3em] text-lg"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              pattern="[0-9]{6}"
+              required
+            />
+          </div>
+          <AvisoTono v-if="error" tono="peligro" role="alert">
+            {{ error }}
+          </AvisoTono>
+          <button
+            class="tu-btn tu-btn-primario w-full"
+            type="submit"
+            :disabled="cargando || codigoInput.trim().length !== 6"
+          >
+            {{ $t("plataforma.verificar") }}
+          </button>
+          <button
+            class="tu-btn tu-btn-secundario w-full"
+            type="button"
+            :disabled="cargando"
+            @click="empezarDeNuevo"
+          >
+            {{ $t("plataforma.empezarDeNuevo") }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Paso 1: correo, contraseña y token de la plataforma -->
+      <div v-else-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
+        <h1 class="font-semibold text-xl">{{ $t("plataforma.titulo") }}</h1>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("plataforma.accesoAyuda") }}
+        </p>
+        <form class="mt-4 space-y-3" @submit.prevent="entrar">
+          <div>
+            <label class="tu-label" for="pl-correo">{{
+              $t("plataforma.correo")
+            }}</label>
+            <input
+              id="pl-correo"
+              v-model="emailInput"
+              class="tu-input"
+              type="email"
+              autocomplete="username"
+              required
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="pl-contrasena">{{
+              $t("plataforma.contrasena")
+            }}</label>
+            <input
+              id="pl-contrasena"
+              v-model="passwordInput"
+              class="tu-input"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="tk">{{
+              $t("plataforma.token")
+            }}</label>
+            <input
+              id="tk"
+              v-model="tokenInput"
+              class="tu-input"
+              type="password"
+              autocomplete="off"
+              required
+            />
+          </div>
+          <AvisoTono v-if="error" tono="peligro" role="alert">
+            {{ error }}
+          </AvisoTono>
+          <button
+            class="tu-btn tu-btn-primario w-full"
+            type="submit"
+            :disabled="cargando"
+          >
+            {{ $t("plataforma.entrar") }}
+          </button>
+          <!-- Falló la red, no el token: se puede volver a intentar con el guardado. -->
+          <button
+            v-if="token !== ''"
+            class="tu-btn tu-btn-discreto w-full"
+            type="button"
+            :disabled="cargando"
+            @click="cargar"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
 </template>
 
 <style scoped>
+/* La puerta del superadmin: centrada, sin encabezado ni pie públicos. */
+.pl-acceso {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem 1rem;
+  background: var(--fondo);
+}
+.pl-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
 .pl-fila {
   display: flex;
   flex-wrap: wrap;

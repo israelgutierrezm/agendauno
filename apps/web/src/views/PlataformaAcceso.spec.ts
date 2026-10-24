@@ -62,6 +62,8 @@ describe("entrada del superadmin en dos pasos", () => {
       global: { plugins: [i18n], stubs: { TablaDatos: true } },
     });
     await flushPromises();
+    // La puerta no lleva a la parte pública (ni «Inicio» ni «Iniciar sesión»).
+    expect(w.findAll("a")).toHaveLength(0);
 
     await w.get("#pl-correo").setValue("ana@agendauno.mx");
     await w.get("#pl-contrasena").setValue("contraseña-segura-1");
@@ -87,6 +89,46 @@ describe("entrada del superadmin en dos pasos", () => {
       { desafio: "d1", codigo: "123456" },
     );
     expect(sessionStorage.getItem("tu.plataforma.token")).toBe("sesion-123");
-    expect(w.text()).toContain("Operador: Ana Operadora");
+    expect(w.get('[data-prueba="operador-plataforma"]').text()).toBe(
+      "Ana Operadora",
+    );
+  });
+
+  it("dentro, el armazón del panel: menú lateral por grupos, sin enlaces públicos, y solo «Cerrar sesión» sale", async () => {
+    sessionStorage.setItem("tu.plataforma.token", "sesion-123");
+    cliente.post.mockResolvedValue({ data: {} });
+    const w = mount(PlataformaView, {
+      global: { plugins: [i18n], stubs: { TablaDatos: true } },
+    });
+    await flushPromises();
+
+    const layout = w.get('[data-prueba="layout-plataforma"]');
+    expect(layout.findAll(".lp-titulo").map((g) => g.text())).toEqual([
+      "Negocios",
+      "Dinero",
+      "Plataforma",
+      "Acceso",
+    ]);
+    expect(layout.findAll("a")).toHaveLength(0);
+    expect(w.get('[data-prueba="titulo-plataforma"]').text()).toBe("Negocios");
+    expect(w.get("h1").text()).toBe("Negocios");
+
+    await w.get('[data-pestana="tarifas"]').trigger("click");
+    await flushPromises();
+    expect(w.get('[data-prueba="titulo-plataforma"]').text()).toBe("Tarifas");
+    expect(w.get('[data-pestana="tarifas"]').attributes("aria-current")).toBe(
+      "page",
+    );
+
+    await w.get('[data-prueba="salir-plataforma"]').trigger("click");
+    await flushPromises();
+    expect(cliente.post).toHaveBeenCalledWith(
+      "/api/v1/plataforma/salir",
+      {},
+      expect.anything(),
+    );
+    expect(sessionStorage.getItem("tu.plataforma.token")).toBeNull();
+    expect(w.find('[data-prueba="layout-plataforma"]').exists()).toBe(false);
+    expect(w.find("#pl-correo").exists()).toBe(true);
   });
 });
