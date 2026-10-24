@@ -251,7 +251,8 @@ async function reabrir(): Promise<void> {
       desde: fecha(corte.desde),
       hasta: fecha(corte.hasta),
     }),
-    { aceptar: t("nominaVisual.cortes.reabrir"), tono: "aviso" },
+    // Reabrir deshace el cierre del periodo: acción de peligro (decisión del dueño).
+    { aceptar: t("nominaVisual.cortes.reabrir"), peligro: true },
   );
   if (!si) return;
   try {
@@ -771,7 +772,7 @@ defineExpose({ cargar });
           <button
             v-if="detalle.estado === 'cerrado'"
             type="button"
-            class="tu-btn tu-btn-secundario mr-auto"
+            class="tu-btn tu-btn-peligro mr-auto"
             data-prueba="reabrir-corte"
             :disabled="editorPago.guardando.value"
             @click="reabrir"

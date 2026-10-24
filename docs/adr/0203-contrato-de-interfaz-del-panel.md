@@ -107,9 +107,10 @@ Un contrato por tema, con piezas compartidas y pruebas que lo vigilan.
 
 - Recargar o compartir un enlace abre la misma pestaña y los mismos filtros.
 - Una pantalla nueva sigue el contrato o falla una prueba.
-- Decidido después: los cierres de caja pasan al área de Cobros (ADR 0175, ajuste del
-  2026-10-23) y la renta del SaaS usa la palabra del negocio.
-- Las decisiones abiertas quedan para el dueño:
-  - si el superadmin agrupa sus 12 pestañas en una navegación lateral;
-  - el encabezado compacto de Configuración;
-  - si «Reabrir periodo» de nómina es de peligro.
+- Decidido después por el dueño:
+  - los cierres de caja son una entrada aparte del área de Cobros (ADR 0175, ajuste del
+    2026-10-23);
+  - la renta del SaaS usa la palabra del negocio;
+  - Configuración conserva su encabezado compacto;
+  - «Reabrir periodo» de nómina es una acción de peligro.
+- Queda abierto: si el superadmin agrupa sus 12 pestañas en una navegación lateral.
