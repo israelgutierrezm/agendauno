@@ -15,6 +15,12 @@ defineEmits<{ (e: "update:modelValue", value: string): void }>();
 const visible = ref(false);
 </script>
 
+<!--
+  Contraseña con «ver / ocultar». El botón está en el recorrido de foco (Tab después
+  del campo) y se activa con Enter o Espacio, como cualquier botón: quien usa solo el
+  teclado también puede revisar lo que escribió.
+-->
+
 <template>
   <div class="relative">
     <input
@@ -32,14 +38,15 @@ const visible = ref(false);
     />
     <button
       type="button"
-      class="absolute inset-y-0 right-0 flex items-center px-3"
+      class="cc-ojo absolute inset-y-0 right-0 flex items-center px-3"
       :style="{ color: 'var(--texto-suave)' }"
+      :aria-controls="id"
       :aria-label="
         visible ? $t('comun.ocultarPassword') : $t('comun.verPassword')
       "
       :aria-pressed="visible"
       :title="visible ? $t('comun.ocultarPassword') : $t('comun.verPassword')"
-      tabindex="-1"
+      data-prueba="ver-contrasena"
       @click="visible = !visible"
     >
       <svg
@@ -78,3 +85,14 @@ const visible = ref(false);
     </button>
   </div>
 </template>
+
+<style scoped>
+/* El foco del teclado se ve, dentro del campo, sin tapar el texto. */
+.cc-ojo {
+  border-radius: 0.5rem;
+}
+.cc-ojo:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: -4px;
+}
+</style>
