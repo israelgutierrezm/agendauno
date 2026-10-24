@@ -297,7 +297,7 @@ describe("detalle de un cliente en un modal", () => {
     const borrar = w
       .get('[data-prueba="notas-miembro"]')
       .findAll("button")
-      .find((b) => b.text() === "Eliminar")!;
+      .find((b) => b.text() === "Eliminar nota")!;
     await borrar.trigger("click");
     await flushPromises();
 

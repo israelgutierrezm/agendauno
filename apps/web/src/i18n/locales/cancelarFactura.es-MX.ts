@@ -2,7 +2,7 @@
 // components/NotaDeCredito.vue, views/FacturasView.vue; ADR 0180).
 export default {
   colAcciones: "Acciones",
-  cancelar: "Cancelar",
+  cancelar: "Cancelar factura",
   notaDeCredito: "Nota de crédito",
   // Estados en la lista.
   cancelada: "Cancelada",

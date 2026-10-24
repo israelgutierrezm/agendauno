@@ -81,7 +81,7 @@ describe("pago automático del alumno", () => {
     expect(vista.text()).toContain("vence 08/30");
     expect(vista.text()).toContain("Cobro automático");
     expect(vista.text()).toContain("La tarjeta no tiene fondos suficientes.");
-    expect(vista.text()).toContain("Quitar");
+    expect(vista.text()).toContain("Desactivar pago automático");
   });
 
   it("con tarjeta ya autorizada, activar no sale de la página y recarga", async () => {

@@ -412,8 +412,8 @@ export const lealtadVisual = {
     descripcion: "Descripción (opcional)",
     descripcionPh: "Ej. Válida en cualquier clase grupal",
     seCanjea: "Se puede canjear",
-    activar: "Activar",
-    desactivar: "Desactivar",
+    activar: "Activar recompensa",
+    desactivar: "Desactivar recompensa",
     guardada: "Recompensa «{nombre}» guardada.",
     historial:
       "Los canjes ya hechos conservan el nombre y los puntos con que se canjearon.",

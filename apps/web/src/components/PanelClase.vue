@@ -548,7 +548,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
               :disabled="accionando"
               @click="quitarDeEspera(r)"
             >
-              {{ $t("agenda.roster.cancelarReserva") }}
+              {{ $t("confirmaciones.quitarDeEsperaAceptar") }}
             </button>
           </li>
         </ul>

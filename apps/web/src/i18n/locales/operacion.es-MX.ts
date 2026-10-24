@@ -50,7 +50,7 @@ export default {
     ver: "Ver permisos",
     ocultar: "Ocultar permisos",
     editar: "Editar",
-    eliminar: "Eliminar",
+    eliminar: "Eliminar rol",
     confirmarEliminar: "¿Eliminar el rol «{nombre}»? No se puede deshacer.",
     noCambiar:
       "Tiene permisos que tú no tienes, o es tu propio rol: no puedes cambiarlo.",
@@ -937,7 +937,7 @@ export default {
     descripcion: "Descripción (opcional)",
     vistaPrevia: "Vista previa",
     vistaPreviaDe: "Así se ve: {nombre}",
-    archivar: "Archivar",
+    archivar: "Archivar ficha",
     archivada: "Archivada",
     restaurar: "Restaurar",
     verArchivadas: "Ver archivadas",
@@ -945,7 +945,7 @@ export default {
     archivarConfirmar:
       "¿Archivar «{nombre}»? Deja de pedirse y nadie la podrá llenar; sus respuestas se conservan y puedes restaurarla.",
     editar: "Editar",
-    quitar: "Quitar",
+    quitar: "Quitar pregunta",
     editarPregunta: "Editar pregunta",
     subir: "Subir «{pregunta}»",
     bajar: "Bajar «{pregunta}»",
@@ -1037,7 +1037,7 @@ export default {
     nueva: "Nueva categoría",
     agregar: "Agregar",
     guardar: "Guardar",
-    quitar: "Quitar",
+    quitar: "Quitar categoría",
     vacio: "Aún no tienes categorías.",
     cuantos: "Sin productos | 1 producto | {n} productos",
     confirmarQuitar:

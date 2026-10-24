@@ -2,7 +2,7 @@ import { computed, type ComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
-import { ubicacion, type Vista } from "@/lib/menu";
+import { claveSegunModalidad, ubicacion, type Vista } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -29,7 +29,7 @@ export function useRegreso(lista: {
 }): Regreso {
   const route = useRoute();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, te } = useI18n();
   const sesion = useSesionTenantStore();
 
   const origen = computed<{ ruta: string; vista: Vista } | null>(() => {
@@ -72,7 +72,7 @@ export function useRegreso(lista: {
     const nombre =
       x.termino !== undefined
         ? plural(sesion.terminologia[x.termino])
-        : t(etiqueta);
+        : t(claveSegunModalidad(etiqueta, sesion.esCitas, te));
     return t("comun.volverA", {
       destino: nombre.charAt(0).toLowerCase() + nombre.slice(1),
     });

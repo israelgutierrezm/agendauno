@@ -422,8 +422,9 @@ async function darDeBaja(): Promise<void> {
   const objetivo = editando.value;
   if (
     objetivo === null ||
-    !(await confirmar(`${t("bajas.darDeBaja")}: ${objetivo.nombre}?`, {
+    !(await confirmar(t("bajas.confirmar", { nombre: objetivo.nombre }), {
       peligro: true,
+      aceptar: t("bajas.darDeBajaUsuario"),
     }))
   ) {
     return;
@@ -840,7 +841,7 @@ onMounted(cargar);
           :aria-busy="dandoDeBaja || undefined"
           @click="darDeBaja"
         >
-          {{ $t("bajas.darDeBaja") }}
+          {{ $t("bajas.darDeBajaUsuario") }}
         </button>
       </div>
 

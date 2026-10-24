@@ -124,7 +124,7 @@ export default {
       "Guarda una tarjeta y cada cobro de tu suscripción se paga solo. Si no pasa, lo reintentamos a los 3 y a los 7 días.",
     guardar: "Guardar tarjeta",
     cambiar: "Cambiar tarjeta",
-    quitar: "Quitar",
+    quitar: "Quitar tarjeta",
     abriendo: "Abriendo…",
     activa: "{marca} terminada en {ultimos4}",
     vence: "Vence {fecha}",
@@ -256,7 +256,7 @@ export default {
       banxicoGuardado: "Guardado (escribe otro para cambiarlo)",
       banxicoAyuda:
         "Sin token, el tipo de cambio se captura a mano en Tarifas. Se pide gratis en banxico.org.mx.",
-      quitar: "Quitar",
+      quitar: "Quitar token de Banxico",
       confirmarQuitar:
         "¿Quitar el token del Banco de México? El tipo de cambio tendrá que capturarse a mano en Tarifas.",
       banxicoQuitado: "Token del Banco de México quitado.",

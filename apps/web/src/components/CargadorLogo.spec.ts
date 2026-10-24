@@ -49,6 +49,6 @@ describe("cargador del logo", () => {
       "/storage/logo.png",
     );
     const botones = w.findAll("button").map((b) => b.text());
-    expect(botones).toEqual(["Cambiar logo", "Quitar"]);
+    expect(botones).toEqual(["Cambiar logo", "Quitar logo"]);
   });
 });

@@ -3408,7 +3408,7 @@ onMounted(async () => {
                     :disabled="guardandoCanal"
                     @click="eliminarReglaCanal(rc)"
                   >
-                    {{ $t("comun.eliminar") }}
+                    {{ $t("agenda.cuposCanal.quitar") }}
                   </button>
                 </li>
               </ul>

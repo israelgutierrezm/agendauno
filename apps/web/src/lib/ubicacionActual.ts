@@ -4,6 +4,7 @@ import { useRoute, type RouteLocationRaw } from "vue-router";
 
 import {
   areaParaSesion,
+  claveSegunModalidad,
   destinoDe,
   ubicacion,
   vistasDeArea,
@@ -49,8 +50,11 @@ export function useUbicacionActual(): {
   migas: ComputedRef<Miga[]>;
 } {
   const route = useRoute();
-  const { t } = useI18n();
+  const { t, te } = useI18n();
   const sesion = useSesionTenantStore();
+  // «Citas» en lugar de «Reservas» en un negocio de citas, como en el menú.
+  const rotulo = (clave: string): string =>
+    t(claveSegunModalidad(clave, sesion.esCitas, te));
 
   const actual = computed(() => ubicacion(route));
   const nombre = (x: Area | Vista): string => {
@@ -62,7 +66,7 @@ export function useUbicacionActual(): {
     }
     return y.termino !== undefined
       ? plural(sesion.terminologia[y.termino])
-      : t(y.etiqueta);
+      : rotulo(y.etiqueta);
   };
 
   // La vista como la ve esta sesión: con su `etiquetaSolo` para quien trabaja solo
@@ -92,7 +96,7 @@ export function useUbicacionActual(): {
       { texto: area, destino: primera ? destinoDe(primera) : undefined },
     ];
     if (u.categoria !== null) {
-      lista.push({ texto: t(u.categoria.etiqueta) });
+      lista.push({ texto: rotulo(u.categoria.etiqueta) });
     }
     const paso = PASO[String(route.name)];
     const vista = nombre(vistaParaSesion(u.area, u.vista));

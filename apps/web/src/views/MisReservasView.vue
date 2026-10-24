@@ -1178,7 +1178,11 @@ onMounted(() => void cuenta.asegurar());
               :aria-expanded="accion === 'cancelar'"
               @click="accion = accion === 'cancelar' ? null : 'cancelar'"
             >
-              {{ $t("miCuenta.cancelar") }}
+              {{
+                sesion.esCitas
+                  ? $t("miCuenta.cancelarCita")
+                  : $t("miCuenta.cancelar")
+              }}
             </button>
           </div>
           <ReprogramarMiReserva

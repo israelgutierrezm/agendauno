@@ -134,7 +134,7 @@ describe("Google Calendar y Outlook en Mi perfil", () => {
     });
     api.delete.mockResolvedValue({});
     const { w } = await montar();
-    await boton(w, "Desconectar")!.trigger("click");
+    await boton(w, "Desconectar calendario")!.trigger("click");
     await flushPromises();
     expect(confirmar).toHaveBeenCalled();
     expect(api.delete).toHaveBeenCalledWith(

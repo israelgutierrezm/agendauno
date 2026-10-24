@@ -86,13 +86,13 @@ describe("equipo del superadmin", () => {
     const filas = w.findAll('[data-prueba="operador"]');
     expect(filas).toHaveLength(2);
     expect(filas[0]!.text()).toContain("tú");
-    expect(filas[0]!.text()).not.toContain("Desactivar");
+    expect(filas[0]!.text()).not.toContain("Desactivar cuenta");
     expect(w.find('[data-prueba="sesion"]').text()).toContain("esta sesión");
 
     // Desactivar a otro pide confirmarlo.
     await filas[1]!
       .findAll("button")
-      .find((b) => b.text() === "Desactivar")!
+      .find((b) => b.text() === "Desactivar cuenta")!
       .trigger("click");
     await flushPromises();
     expect(confirmar).toHaveBeenCalled();

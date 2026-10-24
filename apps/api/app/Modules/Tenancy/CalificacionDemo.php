@@ -26,6 +26,9 @@ final class CalificacionDemo
 
     public const MAXIMO_OBJETIVOS = 2;
 
+    /** Las respuestas en el orden de las preguntas. */
+    private const CAMPOS = ['operando', 'tamano', 'apertura', 'sucursales', 'objetivos', 'giro_otro', 'redes'];
+
     private const TEXTOS = [
         'menos_1_mes' => 'En menos de un mes',
         '1_3_meses' => 'En 1 a 3 meses',
@@ -61,6 +64,20 @@ final class CalificacionDemo
         ], fn (mixed $v): bool => $v !== null);
 
         return $datos === [] ? null : $datos;
+    }
+
+    /**
+     * Lo guardado, con sus respuestas en el orden de las preguntas: MySQL reordena las
+     * claves de una columna JSON y el superadmin las lee en el orden del formulario.
+     *
+     * @param  array<string, mixed>|null  $calificacion
+     * @return array<string, mixed>|null
+     */
+    public static function enOrden(?array $calificacion): ?array
+    {
+        return $calificacion === null
+            ? null
+            : array_replace(array_intersect_key(array_flip(self::CAMPOS), $calificacion), $calificacion);
     }
 
     /**

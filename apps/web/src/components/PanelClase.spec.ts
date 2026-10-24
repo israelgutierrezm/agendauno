@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
+import confirmaciones from "@/i18n/locales/confirmaciones.es-MX";
 import esMX from "@/i18n/locales/es-MX";
 import paseLista from "@/i18n/locales/paseLista.es-MX";
 import portal from "@/i18n/locales/portal.es-MX";
@@ -54,7 +55,9 @@ function montar() {
           locale: "es",
           missingWarn: false,
           fallbackWarn: false,
-          messages: { es: { ...esMX, paseLista, portal, recepcionVisual } },
+          messages: {
+            es: { ...esMX, confirmaciones, paseLista, portal, recepcionVisual },
+          },
         }),
       ],
       stubs: {
@@ -114,7 +117,10 @@ describe("detalle de la clase", () => {
     });
     const w = montar();
     await flushPromises();
-    const cancelar = w.findAll("button").find((b) => b.text() === "Cancelar");
+    // En espera no hay reserva que cancelar: se le quita de la lista.
+    const cancelar = w
+      .findAll("button")
+      .find((b) => b.text() === "Quitar de la espera");
     await cancelar!.trigger("click");
     await flushPromises();
 

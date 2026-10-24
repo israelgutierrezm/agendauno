@@ -42,7 +42,7 @@ export default {
   editar: "Editar",
   enviar: "Mandar a revisión",
   revisar: "Ver si ya la aprobaron",
-  archivar: "Archivar",
+  archivar: "Archivar plantilla",
   archivarConfirmar:
     "La plantilla ya no se podrá usar en campañas y se borra de Meta.",
 };

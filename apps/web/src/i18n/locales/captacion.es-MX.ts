@@ -50,7 +50,7 @@ export default {
     opcionesCargando: "Cargando las sucursales y clases para filtrar…",
     opcionesError:
       "No se pudieron cargar las sucursales y clases para filtrar. Mientras, el widget muestra todas.",
-    eliminar: "Eliminar",
+    eliminar: "Eliminar widget",
     confirmarEliminar: "¿Eliminar este widget? Dejará de verse en tu web.",
     vistaPrevia: "Vista previa",
     codigo: "Código para tu web",
@@ -190,7 +190,7 @@ export default {
       seguimiento: "Pasar a seguimiento",
       aprobar: "Aprobar",
       darAcceso: "Darle acceso",
-      descartar: "Descartar",
+      descartar: "Descartar prospecto",
       reabrir: "Reabrir",
       anotar: "Agregar nota",
       guardarFecha: "Guardar fecha",
@@ -207,7 +207,7 @@ export default {
       titulo: "Descartar prospecto",
       motivo: "¿Por qué?",
       comentario: "Comentario (opcional)",
-      confirmar: "Descartar",
+      confirmar: "Descartar prospecto",
     },
     acceso: {
       titulo: "Darle acceso",

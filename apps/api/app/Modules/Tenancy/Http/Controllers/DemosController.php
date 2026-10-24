@@ -362,7 +362,7 @@ class DemosController
             'telefono' => $d->telefono,
             'acepta_whatsapp' => $d->acepta_whatsapp,
             'estado' => $d->estado,
-            'calificacion' => $d->calificacion,
+            'calificacion' => CalificacionDemo::enOrden($d->calificacion),
         ];
     }
 

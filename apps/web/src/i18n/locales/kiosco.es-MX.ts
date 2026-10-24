@@ -26,7 +26,7 @@ export default {
     copiado: "Enlace copiado.",
     activa: "Activa",
     baja: "Dada de baja",
-    darDeBaja: "Dar de baja",
+    darDeBaja: "Dar de baja la tableta",
     darDeBajaConfirmar:
       "¿Dar de baja «{nombre}»? La tableta dejará de registrar llegadas.",
     ultimoUso: "Último uso: {cuando}",

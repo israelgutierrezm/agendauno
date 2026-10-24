@@ -17,7 +17,7 @@ export default {
     reconectar:
       "Vuelve a conectarlo para que los cambios lleguen al momento (hoy se revisa cada 10 minutos).",
   },
-  desconectar: "Desconectar",
+  desconectar: "Desconectar calendario",
   desconectarConfirmar:
     "Se quita de tu cuenta el calendario del negocio y dejan de bloquearse tus horas ocupadas.",
   listo: "Listo: tu calendario quedó conectado.",

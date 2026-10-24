@@ -7,7 +7,7 @@ export default {
   editar: "Editar",
   // Título del diálogo al editar uno.
   editarVideo: "Editar video",
-  borrar: "Borrar",
+  borrar: "Borrar video",
   borrarConfirmar: "¿Borrar «{titulo}»? Tus alumnos dejarán de verlo.",
   guardado: "Video guardado.",
   vacio:

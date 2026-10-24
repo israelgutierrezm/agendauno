@@ -73,7 +73,7 @@ export const conexiones = {
     permisos: "Qué puede leer",
     crear: "Crear llave",
     creada: "Llave creada",
-    revocar: "Revocar",
+    revocar: "Revocar llave",
     confirmarRevocar:
       "¿Revocar esta llave? Los sistemas que la usan dejarán de tener acceso.",
     revocada: "Revocada",
@@ -102,7 +102,7 @@ export const conexiones = {
     creado: "Endpoint agregado",
     secreto: "Secreto para verificar la firma",
     unaVez: "Cópialo ahora: no se volverá a mostrar.",
-    eliminar: "Eliminar",
+    eliminar: "Eliminar endpoint",
     confirmarEliminar: "¿Eliminar este endpoint? Dejará de recibir avisos.",
     entregas: "Entregas",
     ocultarEntregas: "Ocultar entregas",
@@ -257,7 +257,7 @@ export const reglasAgenda = {
   motivoPh: "Día festivo",
   agregarDia: "Agregar día",
   sinCerrados: "No hay días cerrados próximos.",
-  quitar: "Quitar",
+  quitar: "Quitar cierre",
   confirmarQuitarDia:
     "¿Quitar el cierre del {fecha}? Ese día vuelve a quedar abierto en la agenda.",
   series: "Clases que se repiten",
@@ -610,8 +610,8 @@ export const plataformaAdmin = {
       "sin sesiones abiertas | 1 sesión abierta | {n} sesiones abiertas",
     activo: "Activo",
     inactivo: "Desactivado",
-    activar: "Activar",
-    desactivar: "Desactivar",
+    activar: "Activar cuenta",
+    desactivar: "Desactivar cuenta",
     confirmarDesactivar:
       "¿Desactivar a {nombre}? Ya no podrá entrar y sus sesiones abiertas se cierran.",
     cambiarContrasena: "Cambiar contraseña",
@@ -980,7 +980,7 @@ export const plataformaAdmin = {
     sinNombre: "Sin nombre",
     codigo: "Código del negocio",
     asignar: "Asignar",
-    descartar: "Descartar",
+    descartar: "Descartar aviso",
     asignada: "Gym ID asignado al negocio.",
     confirmarDescartar:
       "¿Descartar el aviso de {gimnasio}? Deja de aparecer aquí y su Gym ID no se asigna a ningún negocio.",
@@ -1109,7 +1109,7 @@ export const pausaMembresia = {
 
 // Dar de baja una membresía (B04): lo que pasará, antes de confirmar.
 export const bajaMembresia = {
-  dar: "Dar de baja",
+  dar: "Dar de baja la membresía",
   termina: "Termina el {fecha} (al acabar lo que ya pagó).",
   enPermanencia:
     "Tiene permanencia hasta el {fecha}: falta 1 mes. | Tiene permanencia hasta el {fecha}: faltan {n} meses.",
@@ -1311,9 +1311,9 @@ export const pagoAutomatico = {
   automatico: "Cobro automático",
   manual: "Te avisamos para pagar",
   activar: "Activar",
-  quitar: "Quitar",
+  quitar: "Desactivar pago automático",
   confirmarQuitar:
-    "¿Quitar el pago automático? Cada renovación te avisaremos para que la pagues.",
+    "¿Desactivar el pago automático? Cada renovación te avisaremos para que la pagues.",
   tarjetaConfirmando:
     "Estamos confirmando tu tarjeta con la pasarela; en unos segundos verás aquí el pago automático activo.",
   tarjetaCancelado: "No se autorizó la tarjeta; puedes intentarlo de nuevo.",
@@ -1330,9 +1330,9 @@ export const pagoAutomatico = {
   invitar: "Invitar a activarlo",
   invitado: "Le enviamos el correo para activar el pago automático.",
   confirmarQuitarNegocio:
-    "¿Quitar el pago automático de esta membresía? La renovación se le avisará para que la pague.",
+    "¿Desactivar el pago automático de esta membresía? La renovación se le avisará para que la pague.",
   porAutorizar: "Falta autorizarlo en la pasarela",
-  // Se quitó y la pasarela aún no confirma que dejó de cobrar (ADR 0134).
+  // Se desactivó y la pasarela aún no confirma que dejó de cobrar (ADR 0134).
   cancelando: "Cancelando en la pasarela",
   cancelandoAyuda:
     "Pedimos a la pasarela que deje de cobrarlo; puede tardar unos minutos en confirmarlo.",
@@ -1354,6 +1354,10 @@ export const pagoAutomatico = {
 
 export const bajas = {
   darDeBaja: "Dar de baja",
+  // El botón dice a quién: un miembro del negocio o una cuenta del personal.
+  darDeBajaMiembro: "Dar de baja al alumno",
+  darDeBajaUsuario: "Dar de baja al usuario",
+  confirmar: "¿Dar de baja a {nombre}?",
   ayudaMiembro:
     "Deja de operar: se cancelan sus reservas por venir, sus membresías y sus pagos automáticos. Su historial (compras, pagos, asistencias) se conserva y se puede reactivar.",
   ayudaUsuario:
@@ -1456,7 +1460,7 @@ export const bloqueosAgenda = {
   motivoEjemplo: "Comida, vacaciones, mantenimiento…",
   bloquear: "Bloquear",
   bloquearIgual: "Bloquear de todos modos",
-  quitar: "Quitar",
+  quitar: "Quitar bloqueo",
   confirmarQuitar:
     "¿Quitar el bloqueo «{motivo}» ({cuando})? Ese horario vuelve a quedar libre para agendar.",
   afectadas:

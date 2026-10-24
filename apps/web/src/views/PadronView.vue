@@ -133,7 +133,7 @@ onMounted(cargar);
     >
       <template #acciones>
         <button
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-secundario"
           type="button"
           :disabled="exportando || total === 0"
           :aria-busy="exportando || undefined"

@@ -49,7 +49,7 @@ const nombreArea = computed(() => {
   }
   return a.termino !== undefined
     ? plural(sesion.terminologia[a.termino])
-    : t(a.etiqueta);
+    : t(claveSegunModalidad(a.etiqueta, sesion.esCitas, te));
 });
 
 function irA(clave: string): void {

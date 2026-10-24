@@ -58,7 +58,7 @@ export default {
     cupoBaseInvalido: "Un número entero de 1 a {max}, o déjalo vacío.",
     enCatalogo: "En catálogo ({n})",
     archivados: "Archivados ({n})",
-    archivar: "Archivar",
+    archivar: "Archivar del catálogo",
     confirmarArchivar:
       "¿Archivar «{nombre}»? Ya no se podrá agendar, vender ni aparecerá en tu página. Lo ya agendado sigue y su historial se conserva.",
     archivadoListo: "Se archivó «{nombre}».",

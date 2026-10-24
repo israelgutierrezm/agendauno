@@ -85,7 +85,10 @@ const dandoDeBaja = ref(false);
 async function darDeBaja(): Promise<void> {
   const nombre = [form.nombre, form.primer_apellido].filter(Boolean).join(" ");
   if (
-    !(await confirmar(`${t("bajas.darDeBaja")}: ${nombre}?`, { peligro: true }))
+    !(await confirmar(t("bajas.confirmar", { nombre }), {
+      peligro: true,
+      aceptar: t("bajas.darDeBajaMiembro"),
+    }))
   ) {
     return;
   }
@@ -275,7 +278,7 @@ async function guardar(): Promise<void> {
           :disabled="dandoDeBaja"
           @click="darDeBaja"
         >
-          {{ $t("bajas.darDeBaja") }}
+          {{ $t("bajas.darDeBajaMiembro") }}
         </button>
       </div>
     </form>

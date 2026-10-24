@@ -333,7 +333,7 @@ watch(pestana, cargarTabla, { immediate: true });
           data-prueba="buscar-retencion"
         />
         <button
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-secundario"
           type="button"
           :disabled="exportando || cargando || (meta?.total ?? 0) === 0"
           data-prueba="exportar-retencion"

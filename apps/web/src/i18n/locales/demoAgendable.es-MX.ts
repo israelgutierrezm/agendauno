@@ -87,7 +87,7 @@ export const demosPlataforma = {
   },
   atendida: "Atendida",
   noAsistio: "No contestó",
-  cancelar: "Cancelar",
+  cancelar: "Cancelar demo",
 };
 
 export default {

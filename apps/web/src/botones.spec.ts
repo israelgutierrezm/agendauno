@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { mensajesBase } from "@/i18n";
+
 /**
  * El contrato de botones (style.css): `tu-btn` con una de cinco variantes
  * (primario, secundario, discreto, peligro y el sólido de peligro para confirmar),
@@ -16,6 +18,31 @@ const archivos = readdirSync(raiz, { recursive: true, encoding: "utf8" })
 // Acciones que cambian datos: nunca con aspecto de enlace.
 const ACCION =
   /^(editar|eliminar|borrar|quitar|configurar|archivar|desarchivar|revocar|desconectar|dividir|reprogramar|reembolsar|anular)/i;
+
+// Una acción de riesgo dice sobre qué actúa: «Desactivar pago automático», no «Quitar».
+const GENERICAS = new Set([
+  "quitar",
+  "eliminar",
+  "borrar",
+  "cancelar",
+  "desactivar",
+  "archivar",
+  "revocar",
+  "devolver",
+  "descartar",
+  "dar de baja",
+  "anular",
+  "desconectar",
+]);
+
+function texto(clave: string): unknown {
+  return clave
+    .split(".")
+    .reduce<unknown>(
+      (valor, parte) => (valor as Record<string, unknown> | undefined)?.[parte],
+      mensajesBase,
+    );
+}
 
 describe("contrato de botones", () => {
   it("no quedan las variantes retiradas", () => {
@@ -69,6 +96,40 @@ describe("contrato de botones", () => {
           .trim();
         if (claves.length > 0 || ACCION.test(texto)) {
           malos.push(`${ruta}: ${(claves[0] ?? texto).slice(0, 60)}`);
+        }
+      }
+    }
+    expect(malos).toEqual([]);
+  });
+
+  it("una acción de riesgo nombra lo que cancela, quita o elimina", () => {
+    const malos: string[] = [];
+    for (const { ruta, fuente } of archivos.filter((a) =>
+      a.ruta.endsWith(".vue"),
+    )) {
+      for (const m of fuente.matchAll(
+        /<button\b([^>]*?)>([\s\S]*?)<\/button>/g,
+      )) {
+        if (!/\btu-btn-peligro\b/.test(m[1] ?? "")) {
+          continue;
+        }
+        const cuerpo = m[2] ?? "";
+        for (const c of cuerpo.matchAll(/\$?t\(\s*["'`]([\w.]+)["'`]/g)) {
+          const valor = texto(c[1]!);
+          if (
+            typeof valor === "string" &&
+            GENERICAS.has(valor.trim().toLowerCase())
+          ) {
+            malos.push(`${ruta}: ${c[1]} «${valor}»`);
+          }
+        }
+        const literal = cuerpo
+          .replace(/{{[\s\S]*?}}/g, " ")
+          .replace(/<[^>]*>/g, " ")
+          .trim()
+          .toLowerCase();
+        if (GENERICAS.has(literal)) {
+          malos.push(`${ruta}: «${literal}»`);
         }
       }
     }
