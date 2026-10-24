@@ -2,7 +2,7 @@
 import { esInstructor } from "@/lib/roles";
 import { computed, nextTick, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
@@ -2044,12 +2044,31 @@ async function crearRecurrente(): Promise<void> {
   }
 }
 
+// «Agendar» desde el panel llega con `?nueva=1`: abre la cita (o la clase) nueva y
+// quita la marca de la dirección (recargar no la vuelve a abrir).
+const rutaActual = useRoute();
+const enrutador = useRouter();
+function abrirNuevaPedida(): void {
+  if (rutaActual?.query.nueva !== "1") {
+    return;
+  }
+  const query = { ...rutaActual.query };
+  delete query.nueva;
+  void enrutador?.replace({ query, hash: rutaActual.hash });
+  if (sesion.esCitas && puedeReservar.value) {
+    abrirNuevaCita();
+  } else if (!sesion.esCitas && puedeGestionar.value) {
+    abrirNuevaClase();
+  }
+}
+
 onMounted(async () => {
   await cargarReferencias();
   // Si mientras tanto ya se cargó (al fijarse la sucursal de la barra), no se repite.
   if (ultimaCargada !== claveDeCarga()) {
     await cargarSesiones();
   }
+  abrirNuevaPedida();
 });
 </script>
 

@@ -7,7 +7,6 @@ import ActualizadoHace from "@/components/ActualizadoHace.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
-import ProporcionCircular from "@/components/ProporcionCircular.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -163,25 +162,6 @@ const agendaPaginada = computed(() =>
 watch([busqueda, filtro], () => {
   paginaAgenda.value = 1;
 });
-const metricaDia = computed(() => {
-  const tot = hoy.value?.agenda?.totales;
-  if (!tot) return null;
-  if (esCitas.value)
-    return tot.sesiones > 0 && tot.por_atender !== undefined
-      ? {
-          valor: tot.por_atender,
-          total: tot.sesiones,
-          etiqueta: t("operacion.hoy.citas.kpi.porAtender"),
-        }
-      : null;
-  return (tot.capacidad ?? 0) > 0
-    ? {
-        valor: tot.esperados,
-        total: tot.capacidad!,
-        etiqueta: t("adminUsabilidad.panel.ocupacion"),
-      }
-    : null;
-});
 function ocupacion(s: SesionHoy): number {
   return s.capacidad && s.capacidad > 0
     ? Math.max(0, Math.min(100, (s.esperados / s.capacidad) * 100))
@@ -313,6 +293,58 @@ function hora(s: SesionHoy): string {
 // Cada pendiente lleva a SU clase o cita (la agenda la abre en ese día), no a una
 // pantalla general donde hay que volver a buscarla.
 const veAgenda = computed(() => puedeEntrar("agenda", sesion));
+// Las acciones principales del día, con su permiso: agendar (abre la cita o la clase
+// nueva en la agenda), cobrar lo pendiente y recepción.
+const accionesDelDia = computed(() => {
+  const acciones: {
+    clave: string;
+    texto: string;
+    to: RouteLocationRaw;
+    principal?: boolean;
+  }[] = [];
+  const agendar = esCitas.value
+    ? sesion.puede("reservas.gestionar")
+    : sesion.puede("agenda.gestionar");
+  if (veAgenda.value) {
+    acciones.push(
+      agendar
+        ? {
+            clave: "agendar",
+            texto: esCitas.value
+              ? t("operacion.hoy.acciones.agendar")
+              : t("operacion.hoy.acciones.programar"),
+            to: { name: "agenda", query: { nueva: "1" } },
+            principal: true,
+          }
+        : {
+            clave: "agenda",
+            texto: t("operacion.hoy.abrirAgenda"),
+            to: { name: "agenda" },
+            principal: true,
+          },
+    );
+  }
+  const cobrar = puedeEntrar("cobranza", sesion)
+    ? "cobranza"
+    : puedeEntrar("ventas", sesion)
+      ? "ventas"
+      : null;
+  if (cobrar !== null) {
+    acciones.push({
+      clave: "cobrar",
+      texto: t("operacion.hoy.acciones.cobrar"),
+      to: { name: cobrar },
+    });
+  }
+  if (puedeEntrar("recepcion", sesion)) {
+    acciones.push({
+      clave: "recepcion",
+      texto: t("operacion.hoy.acciones.recepcion"),
+      to: { name: "recepcion" },
+    });
+  }
+  return acciones;
+});
 function enAgenda(s: SesionHoy): RouteLocationRaw {
   return {
     name: "agenda",
@@ -598,10 +630,9 @@ onMounted(() => {
       @actualizar="cargar(true)"
     />
     <!-- La tarjeta principal: lo que sigue hoy y los indicadores del día -->
-    <div
-      class="hoy-destacado"
-      :class="{ 'hoy-con-metrica': metricaDia !== null }"
-    >
+    <!-- Lo que sigue hoy, en una franja: la agenda y lo pendiente, sin bajar. La
+         proporción del día ya está en los indicadores. -->
+    <div class="hoy-destacado">
       <TarjetaPrincipal
         v-if="hoy.agenda"
         class="min-w-0"
@@ -610,9 +641,9 @@ onMounted(() => {
         :foto="foto"
         :clima="clima"
         :clima-lugar="climaLugar"
-        compacta
+        franja
       >
-        <p class="mt-2 text-2xl font-semibold sm:text-3xl">{{ tituloDia }}</p>
+        <p class="mt-2 text-xl font-semibold sm:text-2xl">{{ tituloDia }}</p>
         <p v-if="siguiente" class="mt-2" data-prueba="detalle-siguiente">
           {{ hora(siguiente) }}
           <span
@@ -635,12 +666,23 @@ onMounted(() => {
             )
           }}
         </p>
-        <div class="mt-6 flex flex-wrap items-center gap-4">
-          <!-- Lo que sigue se abre directo; la agenda completa queda a un lado. -->
+        <!-- Las acciones del día, a la vista: agendar, cobrar y recepción. Lo que
+             sigue se abre desde su línea. -->
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <RouterLink
+            v-for="a in accionesDelDia"
+            :key="a.clave"
+            :to="a.to"
+            class="tu-btn"
+            :class="a.principal ? 'tu-btn-primario' : 'tu-btn-secundario'"
+            :data-prueba="`accion-${a.clave}`"
+          >
+            {{ a.texto }}
+          </RouterLink>
           <RouterLink
             v-if="siguiente && veAgenda"
             :to="enAgenda(siguiente)"
-            class="tu-btn tu-btn-primario inline-flex"
+            class="tu-enlace text-sm ml-1"
             data-prueba="abrir-siguiente"
           >
             {{
@@ -649,56 +691,15 @@ onMounted(() => {
               })
             }}
           </RouterLink>
-          <RouterLink
-            v-if="veAgenda"
-            :to="{ name: 'agenda' }"
-            :class="
-              siguiente
-                ? 'tu-enlace text-sm'
-                : 'tu-btn tu-btn-primario inline-flex'
-            "
-          >
-            {{ $t("operacion.hoy.abrirAgenda") }}
-          </RouterLink>
-          <RouterLink
-            v-if="puedeEntrar('recepcion', sesion)"
-            :to="{ name: 'recepcion' }"
-            class="tu-enlace text-sm"
-          >
-            {{ $t("operacion.hoy.irRecepcion") }}
-            <IconoNav
-              nombre="flecha"
-              :tam="14"
-              class="inline align-[-0.15em]"
-            />
-          </RouterLink>
         </div>
       </TarjetaPrincipal>
-      <aside v-if="metricaDia" class="hoy-metrica tu-card">
-        <p class="hoy-metrica-etiqueta">
-          {{ $t("adminUsabilidad.panel.resumen") }}
-        </p>
-        <h2 class="font-semibold">{{ metricaDia.etiqueta }}</h2>
-        <ProporcionCircular
-          :valor="metricaDia.valor"
-          :total="metricaDia.total"
-          :etiqueta="metricaDia.etiqueta"
-        />
-        <p class="hoy-metrica-dato">
-          {{
-            $t("adminUsabilidad.panel.proporcion", {
-              n: metricaDia.valor,
-              total: metricaDia.total,
-            })
-          }}
-        </p>
-      </aside>
     </div>
 
     <TarjetasIndicadores
       v-if="indicadores.length > 0"
-      class="mt-4"
+      class="mt-3"
       :tarjetas="indicadores"
+      compacta
     />
 
     <div class="mt-6 grid gap-6 lg:grid-cols-3">
@@ -1160,52 +1161,6 @@ onMounted(() => {
   display: grid;
   gap: 1rem;
   margin-top: 0.75rem;
-}
-.hoy-metrica {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.65rem;
-  padding: 1.35rem;
-  text-align: center;
-  background: linear-gradient(
-    150deg,
-    color-mix(in srgb, var(--primario) 9%, var(--superficie)),
-    var(--superficie)
-  );
-}
-.hoy-metrica-etiqueta {
-  color: var(--texto-suave);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.hoy-metrica-dato {
-  font-size: 0.85rem;
-  color: var(--texto-suave);
-  font-variant-numeric: tabular-nums;
-}
-@media (min-width: 1280px) {
-  .hoy-con-metrica {
-    grid-template-columns: minmax(0, 2.5fr) minmax(13rem, 1fr);
-  }
-}
-@media (max-width: 1279px) {
-  .hoy-metrica {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    text-align: left;
-    gap: 0.3rem 1rem;
-  }
-  .hoy-metrica :deep(.pc) {
-    grid-column: 2;
-    grid-row: 1 / span 3;
-    width: 5.5rem;
-  }
-  .hoy-metrica :deep(.pc span) {
-    font-size: 1.25rem;
-  }
 }
 .hoy-filtros {
   display: flex;

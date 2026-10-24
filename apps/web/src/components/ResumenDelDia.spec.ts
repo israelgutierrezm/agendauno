@@ -103,9 +103,9 @@ describe("el día de hoy en el Inicio", () => {
     const w = montar();
     await flushPromises();
     expect(w.findAll(".hoy-agenda-lista>li")).toHaveLength(6);
-    expect(w.get('[role="img"]').attributes("aria-label")).toBe(
-      "Ocupación de tus clases: 20%",
-    );
+    // La ocupación va en los indicadores (sin el círculo que empujaba la agenda).
+    expect(w.find('[role="img"]').exists()).toBe(false);
+    expect(w.text()).toContain("Lugares ocupados");
     await w
       .findAll("button")
       .find((b) => b.text() === "2")!
@@ -173,7 +173,15 @@ describe("el día de hoy en el Inicio", () => {
     // La tarjeta principal: lo que está en curso y los indicadores del día.
     expect(texto).toContain("En curso");
     expect(texto).toContain("Corte · Dana");
-    expect(texto).toContain("Abrir agenda");
+    // Las acciones del día: programar, cobrar y recepción.
+    expect(w.findAll('[data-prueba^="accion-"]').map((a) => a.text())).toEqual([
+      "Programar clase",
+      "Cobrar",
+      "Recepción",
+    ]);
+    expect(w.get('[data-prueba="accion-agendar"]').attributes("data-to")).toBe(
+      JSON.stringify({ name: "agenda", query: { nueva: "1" } }),
+    );
     // Clases: ocupación, listas por registrar, espera y planes por vencer.
     expect(texto).toContain("Lugares ocupados");
     expect(texto).toContain("5 de 20");
@@ -617,6 +625,7 @@ describe("el día de hoy en el Inicio", () => {
     expect(
       w.findAll("a").some((a) => a.text().includes("Ir a recepción")),
     ).toBe(false);
+    expect(w.find('[data-prueba="abrir-siguiente"]').exists()).toBe(false);
   });
 
   it("cada pendiente abre su clase o cita; en citas, sin registrar no es por atender", async () => {

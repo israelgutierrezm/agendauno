@@ -287,6 +287,13 @@ export default {
     // Abre directo lo que sigue (la clase o la cita), con el término del negocio.
     verSesion: "Ver {sesion}",
     irRecepcion: "Ir a recepción",
+    // Las acciones principales del día en el panel (Inicio).
+    acciones: {
+      agendar: "Agendar",
+      programar: "Programar clase",
+      cobrar: "Cobrar",
+      recepcion: "Recepción",
+    },
     agenda: "Agenda de hoy",
     verAgenda: "Ver agenda",
     sinSesiones: "No hay clases hoy.",

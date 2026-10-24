@@ -17,19 +17,44 @@ defineProps<{
   // "En curso" y similares resaltan la etiqueta con el color de marca.
   etiquetaViva?: boolean;
   compacta?: boolean;
+  // Tableros operativos (el panel del dueño): una franja sin foto, con el clima en una
+  // línea, para que la agenda y lo pendiente se vean sin bajar.
+  franja?: boolean;
 }>();
 </script>
 
 <template>
-  <article class="tp tu-card" :class="{ 'tp-compacta': compacta }">
+  <article
+    class="tp tu-card"
+    :class="{ 'tp-compacta': compacta, 'tp-franja': franja }"
+  >
     <div class="tp-texto">
-      <p class="tp-etiqueta" :class="{ 'tp-viva': etiquetaViva }">
-        {{ etiqueta }}
-      </p>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="tp-etiqueta" :class="{ 'tp-viva': etiquetaViva }">
+          {{ etiqueta }}
+        </p>
+        <p
+          v-if="franja && clima"
+          class="tp-clima-linea"
+          role="status"
+          data-prueba="clima-linea"
+        >
+          <IconoClima
+            :icono="clima.icono"
+            :de-dia="clima.es_de_dia"
+            :tam="20"
+          />
+          <span class="font-semibold">{{ clima.temperatura }}°</span>
+          <span>{{ clima.condicion }}</span>
+          <span v-if="climaLugar" class="truncate opacity-80"
+            >· {{ climaLugar }}</span
+          >
+        </p>
+      </div>
       <slot />
     </div>
 
-    <div class="tp-foto">
+    <div v-if="!franja" class="tp-foto">
       <img :src="foto" alt="" loading="lazy" />
       <div v-if="clima" class="tp-clima" role="status">
         <IconoClima :icono="clima.icono" :de-dia="clima.es_de_dia" :tam="30" />
@@ -142,6 +167,21 @@ defineProps<{
 }
 .tp-compacta .tp-texto {
   padding: 1.5rem;
+}
+/* En franja: una sola columna, sin foto y con menos aire. */
+.tp-franja {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.tp-franja .tp-texto {
+  padding: 1.1rem 1.35rem;
+}
+.tp-clima-linea {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
 }
 .tp-compacta .tp-foto {
   min-height: 6rem;
