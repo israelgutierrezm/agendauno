@@ -103,6 +103,17 @@ export default {
       "{profesional} no atiende ese día en esta sucursal. Puedes agendarla de todos modos.",
     conBloqueo:
       "Choca con un bloqueo de la agenda ({motivo}): no se podrá agendar a esa hora.",
+    // Los horarios libres (guía antes de guardar).
+    horariosLibres: "Horarios libres",
+    buscandoHorarios: "Buscando horarios libres…",
+    errorHorarios: "No se pudieron consultar los horarios libres.",
+    sinHorarios:
+      "{profesional} no tiene horarios libres ese día. Prueba otro día u otra persona.",
+    noAtiendeDia: "{nombre} · no atiende este día",
+    otraHora: "Agendar a otra hora",
+    volverALibres: "Elegir un horario libre",
+    fueraDeLibres:
+      "No es uno de los horarios libres: revisa que no choque con otra cita.",
   },
   cita: {
     titulo: "Cita",
