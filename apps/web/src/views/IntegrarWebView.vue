@@ -105,6 +105,7 @@ const {
   guardando,
   errores,
   error: errorEditor,
+  sucio,
   empezar,
   cerrar,
   marcar,
@@ -590,7 +591,9 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
           :etiqueta="$t('captacion.widgets.activo')"
           prueba="widget-activo"
         />
-        <!-- Formulario en página: Cerrar y Guardar siempre a la vista, al fondo. -->
+        <!-- Formulario en página: Cancelar/Cerrar y Guardar siempre a la vista, al
+             fondo. Con cambios sin guardar, «Cancelar» (los descarta); guardado, se
+             queda abierto con su vista previa y su código, y «Cerrar» solo cierra. -->
         <div class="tu-pie-acciones">
           <button
             type="button"
@@ -599,7 +602,7 @@ onBeforeUnmount(() => window.removeEventListener("message", alMensaje));
             data-prueba="cerrar-widget"
             @click="cerrar"
           >
-            {{ $t("captacion.widgets.cerrar") }}
+            {{ sucio ? $t("comun.cancelar") : $t("captacion.widgets.cerrar") }}
           </button>
           <button
             type="submit"

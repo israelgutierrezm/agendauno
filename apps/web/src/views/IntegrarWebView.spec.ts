@@ -84,6 +84,8 @@ describe("integrar en mi web", () => {
 
     await w.get('[data-prueba="nuevo-widget"]').trigger("click");
     await w.get('[data-prueba="nombre-widget"]').setValue("Horario");
+    // Con cambios sin guardar, el botón descarta: «Cancelar».
+    expect(w.get('[data-prueba="cerrar-widget"]').text()).toBe("Cancelar");
     const [sede, actividad] = w.findAll('[data-prueba="editor-widget"] select');
     await sede!.setValue("s1");
     await actividad!.setValue("a1");
@@ -117,6 +119,8 @@ describe("integrar en mi web", () => {
     ).value;
     expect(codigo).toContain('<iframe src="');
     expect(codigo).toContain("/w/demo/w1");
+    // Guardado, se queda abierto con su código: el botón solo cierra.
+    expect(w.get('[data-prueba="cerrar-widget"]').text()).toBe("Cerrar");
   });
 
   it("en citas se ofrece agendar cita y planes, no el calendario", async () => {

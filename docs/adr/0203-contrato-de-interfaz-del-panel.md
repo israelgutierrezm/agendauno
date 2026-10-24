@@ -113,4 +113,8 @@ Un contrato por tema, con piezas compartidas y pruebas que lo vigilan.
   - la renta del SaaS usa la palabra del negocio;
   - Configuración conserva su encabezado compacto;
   - «Reabrir periodo» de nómina es una acción de peligro.
-- Queda abierto: si el superadmin agrupa sus 12 pestañas en una navegación lateral.
+  - el superadmin conserva su fila de 12 pestañas (la elegida va en la dirección; en el
+    teléfono, una lista): solo lo usa el equipo de AgendaUno;
+  - en un formulario que se queda abierto después de guardar (el editor de widgets,
+    con su vista previa y su código), el botón dice «Cancelar» mientras hay cambios sin
+    guardar y «Cerrar» cuando ya no los hay.
