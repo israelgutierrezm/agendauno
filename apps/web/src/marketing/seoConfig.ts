@@ -246,6 +246,14 @@ function seoBase(path: string, registroAbierto: boolean): SeoOptions {
       index: false,
     };
   }
+  if (ruta === "/cookies") {
+    return {
+      title: "Política de cookies | AgendaUno",
+      description:
+        "Qué cookies usa AgendaUno, para qué sirven, cuánto duran y cómo eliges cuáles aceptar.",
+      index: false,
+    };
+  }
   if (ruta === "/") {
     return seoDeModalidad(MODO_COMERCIAL, registroAbierto);
   }

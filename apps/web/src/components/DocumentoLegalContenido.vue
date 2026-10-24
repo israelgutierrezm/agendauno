@@ -4,22 +4,28 @@ import { computed } from "vue";
 import { bloquesLegales } from "@/lib/documentoLegal";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
 import borradorAviso from "@/marketing/legales/aviso-privacidad.txt?raw";
+import borradorCookies from "@/marketing/legales/cookies.txt?raw";
 import borradorTerminos from "@/marketing/legales/terminos.txt?raw";
 
 /**
- * El aviso de privacidad o los términos publicados, con sus apartados numerados, sus
+ * El aviso de privacidad, los términos o la política de cookies publicados, con sus
+ * apartados numerados, sus
  * párrafos y sus listas. Sin documento publicado, en desarrollo se ve el texto base
  * (marcado como borrador); en producción, nunca.
  */
 const props = withDefaults(
-  defineProps<{ contenido: string | null; tipo?: "aviso" | "terminos" }>(),
+  defineProps<{
+    contenido: string | null;
+    tipo?: "aviso" | "terminos" | "cookies";
+  }>(),
   { tipo: "aviso" },
 );
-const vistaPrevia = import.meta.env.DEV
-  ? props.tipo === "aviso"
-    ? borradorAviso
-    : borradorTerminos
-  : null;
+const BORRADORES = {
+  aviso: borradorAviso,
+  terminos: borradorTerminos,
+  cookies: borradorCookies,
+};
+const vistaPrevia = import.meta.env.DEV ? BORRADORES[props.tipo] : null;
 const publicado = computed(() => Boolean(props.contenido?.trim()));
 const bloques = computed(() =>
   bloquesLegales(publicado.value ? props.contenido! : (vistaPrevia ?? "")),
@@ -55,7 +61,9 @@ const soporte = PRODUCTOS[productoActual()].soporte.correo;
       {{
         tipo === "aviso"
           ? "El aviso de privacidad aún no está disponible. No proporciones datos personales hasta poder consultarlo."
-          : "Los términos y condiciones aún no están publicados."
+          : tipo === "cookies"
+            ? "La política de cookies aún no está publicada. Mientras, solo usamos las cookies necesarias, salvo que aceptes las demás en el aviso de cookies."
+            : "Los términos y condiciones aún no están publicados."
       }}
       Si tienes dudas, escríbenos a
       <a class="tu-enlace" :href="`mailto:${soporte}`">{{ soporte }}</a

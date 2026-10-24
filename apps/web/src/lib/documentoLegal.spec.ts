@@ -24,7 +24,11 @@ describe("documento legal en bloques", () => {
   });
 
   it("el borrador de desarrollo es el mismo texto base del servidor", () => {
-    for (const archivo of ["aviso-privacidad.txt", "terminos.txt"]) {
+    for (const archivo of [
+      "aviso-privacidad.txt",
+      "terminos.txt",
+      "cookies.txt",
+    ]) {
       const web = readFileSync(
         resolve(__dirname, "../marketing/legales", archivo),
         "utf8",

@@ -180,6 +180,29 @@ describe("etiquetas", () => {
     ).toBe(true);
   });
 
+  it("elegir desde la política de cookies (una página que no se mide) guarda y se aplica al volver", async () => {
+    destinos("G-PLATAFORMA1", null);
+    await navegar("plataforma:agendauno", "/", "AgendaUno");
+    await navegar(null, null, "Política de cookies");
+
+    elegir({ analitica: true, publicidad: false }, "plataforma:agendauno");
+    expect(scripts()).toEqual([]);
+    expect(
+      JSON.parse(
+        window.localStorage.getItem("tu.preferencias.plataforma:agendauno")!,
+      ),
+    ).toMatchObject({ analitica: true, publicidad: false });
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/medicion/consentimiento",
+      expect.objectContaining({ analitica: true, publicidad: false }),
+    );
+
+    await navegar("plataforma:agendauno", "/", "AgendaUno");
+    expect(scripts()).toEqual([
+      "https://www.googletagmanager.com/gtag/js?id=G-PLATAFORMA1",
+    ]);
+  });
+
   it("retirar la autorización apaga GA4, borra sus cookies y lo avisa", async () => {
     destinos("G-PLATAFORMA1", null);
     await navegar("plataforma:agendauno", "/", "AgendaUno");

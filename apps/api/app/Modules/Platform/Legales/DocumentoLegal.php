@@ -23,6 +23,9 @@ class DocumentoLegal extends Model
 
     public const TERMINOS = 'terminos';
 
+    /** Informativa: no se acepta al registrarse; la elección se pide en el aviso de cookies. */
+    public const COOKIES = 'cookies';
+
     protected $table = 'documentos_legales';
 
     protected $fillable = ['tipo', 'version', 'contenido', 'responsable', 'vigente_desde'];

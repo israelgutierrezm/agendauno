@@ -395,12 +395,15 @@ class VerificacionProduccion
     {
         $aviso = $this->legales->vigente(DocumentoLegal::AVISO);
         $terminos = $this->legales->vigente(DocumentoLegal::TERMINOS);
+        $cookies = $this->legales->vigente(DocumentoLegal::COOKIES);
         $responsable = $aviso !== null ? ($aviso->responsable ?? []) : [];
 
         return [
             $this->punto('Legales', 'Aviso de privacidad publicado', $aviso !== null, 'Publícalo desde Plataforma → Legales (con los datos del responsable).'),
             $this->punto('Legales', 'Aviso con los datos del responsable', ($responsable['nombre'] ?? '') !== '' && ($responsable['contacto'] ?? '') !== '', 'El aviso publicado no trae el responsable y su contacto de privacidad.'),
             $this->punto('Legales', 'Términos y condiciones publicados', $terminos !== null, 'Publícalos desde Plataforma → Legales.'),
+            // El aviso de cookies de las páginas públicas enlaza a ella.
+            $this->punto('Legales', 'Política de cookies publicada', $cookies !== null, 'Publícala desde Plataforma → Legales.'),
         ];
     }
 

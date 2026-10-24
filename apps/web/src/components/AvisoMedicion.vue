@@ -6,25 +6,26 @@ import { RouterLink } from "vue-router";
 import { elegir, hayDestinos, medicion } from "@/lib/etiquetas";
 
 /**
- * El aviso de privacidad de las páginas públicas (ADR 0143): solo donde hay destinos de
- * medición (del producto o del negocio) y mientras no se haya elegido. Aceptar, solo
- * lo necesario o elegir por separado analítica y publicidad. Después queda el botón
- * «Privacidad» para cambiarlo cuando se quiera.
+ * El aviso de cookies de las páginas públicas (ADR 0143 y 0206), mientras no se haya
+ * elegido: en las del producto, al entrar (con su política de cookies); en la de un
+ * negocio, solo si mide con sus destinos. Aceptar todas, solo las necesarias o
+ * configurar analítica y publicidad por separado. Después queda el botón «Cookies»
+ * para cambiarlo cuando se quiera.
  */
 const { t } = useI18n();
 
-const visible = computed(
+const pide = computed(
   () =>
     !medicion.pausada &&
-    hayDestinos(medicion.destinos) &&
-    (medicion.preferencias === null || medicion.eligiendo),
+    medicion.ambito !== null &&
+    (medicion.ambito.startsWith("plataforma:") ||
+      hayDestinos(medicion.destinos)),
+);
+const visible = computed(
+  () => pide.value && (medicion.preferencias === null || medicion.eligiendo),
 );
 const conBoton = computed(
-  () =>
-    !medicion.pausada &&
-    hayDestinos(medicion.destinos) &&
-    medicion.preferencias !== null &&
-    !medicion.eligiendo,
+  () => pide.value && medicion.preferencias !== null && !medicion.eligiendo,
 );
 const detalle = ref(false);
 const analitica = ref(false);
@@ -130,9 +131,17 @@ const enlaceAviso = computed(() =>
       </template>
     </div>
     <div class="am-pie">
-      <RouterLink :to="enlaceAviso" class="tu-enlace">{{
-        t("medicion.aviso.avisoPrivacidad")
-      }}</RouterLink>
+      <span class="am-enlaces">
+        <RouterLink
+          :to="{ name: 'politica-cookies' }"
+          class="tu-enlace"
+          data-prueba="am-politica"
+          >{{ t("medicion.aviso.politicaCookies") }}</RouterLink
+        >
+        <RouterLink :to="enlaceAviso" class="tu-enlace">{{
+          t("medicion.aviso.avisoPrivacidad")
+        }}</RouterLink>
+      </span>
       <button
         v-if="medicion.eligiendo"
         type="button"
@@ -214,9 +223,16 @@ const enlaceAviso = computed(() =>
 }
 .am-pie {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 0.5rem;
   margin-top: 0.6rem;
   font-size: 0.8rem;
+}
+.am-enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
 }
 .am-privacidad {
   position: fixed;

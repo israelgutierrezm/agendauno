@@ -4,15 +4,15 @@
  */
 export default {
   aviso: {
-    titulo: "Tu privacidad",
+    titulo: "Cookies y privacidad",
     textoPlataforma:
-      "Usamos medición opcional para saber cómo nos encuentras y mejorar nuestras campañas. Solo se activa si la aceptas y puedes cambiarla cuando quieras.",
+      "Usamos cookies necesarias para que el sitio funcione. Con tu permiso, también de analítica y publicidad para saber cómo nos encuentras y mejorar nuestras campañas. Puedes cambiar tu elección cuando quieras.",
     textoNegocio:
-      "{negocio} usa medición opcional para saber cómo lo encuentras y mejorar sus campañas. Solo se activa si la aceptas y puedes cambiarla cuando quieras.",
+      "{negocio} usa cookies necesarias para que su página funcione y, con tu permiso, de medición para saber cómo lo encuentras y mejorar sus campañas. Puedes cambiar tu elección cuando quieras.",
     esteNegocio: "Este negocio",
-    aceptar: "Aceptar",
-    rechazar: "Solo lo necesario",
-    elegir: "Elegir",
+    aceptar: "Aceptar todas",
+    rechazar: "Solo necesarias",
+    elegir: "Configurar",
     guardar: "Guardar mi elección",
     analitica: "Analítica",
     analiticaTexto:
@@ -21,9 +21,10 @@ export default {
     publicidadTexto:
       "Medir los resultados de los anuncios (Meta y Google) y mejorar las campañas.",
     necesarias:
-      "Lo necesario para que la página funcione siempre está activo y no mide nada.",
+      "Las cookies necesarias siempre están activas: mantienen tu sesión, tu elección y la seguridad del sitio, y no miden nada.",
     avisoPrivacidad: "Aviso de privacidad",
-    privacidad: "Privacidad",
+    politicaCookies: "Política de cookies",
+    privacidad: "Cookies",
     cerrar: "Cerrar",
   },
   destinos: {

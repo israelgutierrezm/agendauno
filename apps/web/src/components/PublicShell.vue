@@ -261,6 +261,13 @@ defineEmits<{ alternarTema: [] }>();
           <RouterLink class="tu-public-footer-link" to="/terminos">
             Términos y condiciones
           </RouterLink>
+          <RouterLink
+            class="tu-public-footer-link"
+            to="/cookies"
+            data-prueba="pie-cookies"
+          >
+            Política de cookies
+          </RouterLink>
           <a
             class="tu-public-footer-link"
             :href="`mailto:${PRODUCTOS[producto].soporte.correo}`"

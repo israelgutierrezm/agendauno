@@ -21,9 +21,13 @@ negocio desde el servidor.
 
 ## Consentimiento
 
-- Las páginas con destinos muestran «Tu privacidad»: aceptar, solo lo necesario o
-  elegir **analítica** (GA4) y **publicidad** (Meta y las señales de anuncios de Google).
-- Sin elegir no se carga nada. Después queda el botón **Privacidad** para cambiarlo.
+- El aviso «Cookies y privacidad» (ADR 0206) sale al entrar a las páginas del producto,
+  aunque aún no haya destinos, y en la página de un negocio solo si ese negocio mide:
+  aceptar todas, solo las necesarias o configurar **analítica** (GA4) y **publicidad**
+  (Meta y las señales de anuncios de Google). Enlaza la política de cookies (`/cookies`),
+  que se publica desde Plataforma → Legales.
+- Sin elegir no se carga nada. Después queda el botón **Cookies** para cambiarlo; la
+  elección también se cambia en `/cookies`.
 - Retirar el permiso:
   - apaga GA4, revoca el píxel y borra sus cookies;
   - lo avisa al servidor, que borra los identificadores de lo ya registrado con ese
@@ -103,9 +107,10 @@ Lo que **no** se manda:
 
 ## Aviso de privacidad (antes de encender)
 
-El borrador del aviso de la plataforma dice que no se usan cookies de publicidad: hay que
-actualizarlo y publicar una versión nueva en el superadmin → Legales antes de encender un
-destino. Encender pide confirmarlo. Debe informar:
+El texto base del aviso ya remite a la política de cookies (ADR 0206), que detalla cada
+cookie de analítica y publicidad. Antes de encender un destino hay que publicar la
+política y una versión nueva del aviso en el superadmin → Legales. Encender pide
+confirmarlo. Deben informar:
 
 - qué terceros reciben datos (Google, Meta) y para qué (analítica, medición de
   campañas);

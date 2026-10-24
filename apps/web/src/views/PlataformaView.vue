@@ -831,23 +831,36 @@ const DOCUMENTOS_LEGALES = [
     id: "lg-aviso",
     etiqueta: "plataforma.legales.aviso",
     publicar: "operacion.legales.publicarAviso",
+    sinPublicar: "operacion.legales.sinPublicar",
   },
   {
     tipo: "terminos",
     id: "lg-terminos",
     etiqueta: "plataforma.legales.terminos",
     publicar: "operacion.legales.publicarTerminos",
+    sinPublicar: "operacion.legales.sinPublicar",
+  },
+  {
+    // Informativa (ADR 0206): no se acepta al registrarse.
+    tipo: "cookies",
+    id: "lg-cookies",
+    etiqueta: "operacion.legales.cookies",
+    publicar: "operacion.legales.publicarCookies",
+    sinPublicar: "operacion.legales.sinPublicarCookies",
   },
 ] as const;
+type TipoLegal = (typeof DOCUMENTOS_LEGALES)[number]["tipo"];
 const legales = ref({
   aviso_privacidad: "",
   terminos: "",
+  cookies: "",
   responsable: { nombre: "", domicilio: "", contacto: "", area: "" },
 });
-const publicados = ref<{
-  aviso_privacidad: Publicado | null;
-  terminos: Publicado | null;
-}>({ aviso_privacidad: null, terminos: null });
+const publicados = ref<Record<TipoLegal, Publicado | null>>({
+  aviso_privacidad: null,
+  terminos: null,
+  cookies: null,
+});
 // El responsable se escribe una vez: plegado, salvo que le falte algún dato al cargar
 // (no se pliega mientras se escribe).
 const responsableAbierto = ref(true);
@@ -882,16 +895,14 @@ async function cargarConfiguracion(): Promise<void> {
       data: {
         aviso_privacidad: string | null;
         terminos: string | null;
+        cookies?: string | null;
         responsable?: {
           nombre: string;
           domicilio: string;
           contacto: string;
           area: string;
         };
-        publicados?: {
-          aviso_privacidad: Publicado | null;
-          terminos: Publicado | null;
-        };
+        publicados?: Partial<Record<TipoLegal, Publicado | null>>;
       };
     }>("/api/v1/plataforma/legales", encabezados()),
   ]);
@@ -908,6 +919,7 @@ async function cargarConfiguracion(): Promise<void> {
   legales.value = {
     aviso_privacidad: leg.data.data.aviso_privacidad ?? "",
     terminos: leg.data.data.terminos ?? "",
+    cookies: leg.data.data.cookies ?? "",
     responsable: {
       nombre: leg.data.data.responsable?.nombre ?? "",
       domicilio: leg.data.data.responsable?.domicilio ?? "",
@@ -918,9 +930,11 @@ async function cargarConfiguracion(): Promise<void> {
   responsableAbierto.value = Object.values(legales.value.responsable).some(
     (v) => v.trim() === "",
   );
-  publicados.value = leg.data.data.publicados ?? {
+  publicados.value = {
     aviso_privacidad: null,
     terminos: null,
+    cookies: null,
+    ...leg.data.data.publicados,
   };
   for (const p of pasarelas.value) {
     pasarelaDraft.value[p.proveedor] = {
@@ -1036,6 +1050,7 @@ async function guardarLegales(
       {
         aviso_privacidad: legales.value.aviso_privacidad || null,
         terminos: legales.value.terminos || null,
+        cookies: legales.value.cookies || null,
         responsable: {
           nombre: r.nombre || null,
           domicilio: r.domicilio || null,
@@ -1058,9 +1073,7 @@ async function guardarLegales(
 }
 
 // Publicar guarda antes el borrador (se publica lo que se ve) y crea la versión.
-async function publicarLegal(
-  tipo: "aviso_privacidad" | "terminos",
-): Promise<void> {
+async function publicarLegal(tipo: TipoLegal): Promise<void> {
   if (
     !(await confirmar(t(`operacion.legales.confirmar.${tipo}`))) ||
     !(await guardarLegales(false, `publicar-${tipo}`))
@@ -2274,7 +2287,7 @@ function borrar(): void {
                           version: publicados[doc.tipo]!.version,
                           fecha: fechaPublicado(publicados[doc.tipo]!),
                         })
-                      : $t("operacion.legales.sinPublicar")
+                      : $t(doc.sinPublicar)
                   }}</span
                 >
                 <button

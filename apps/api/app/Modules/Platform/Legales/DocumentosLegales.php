@@ -13,7 +13,8 @@ use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
- * Aviso de privacidad y términos de la plataforma: borrador y versiones publicadas.
+ * Aviso de privacidad, términos y política de cookies de la plataforma: borrador y
+ * versiones publicadas.
  *
  * - El superadmin edita el BORRADOR (texto y datos del responsable). Guardar el
  *   borrador no cambia lo que ven los usuarios. Mientras no haya uno guardado, el
@@ -33,6 +34,14 @@ class DocumentosLegales
     private const BORRADOR = [
         DocumentoLegal::AVISO => 'aviso_privacidad',
         DocumentoLegal::TERMINOS => 'terminos',
+        DocumentoLegal::COOKIES => 'politica_cookies',
+    ];
+
+    /** Cómo se nombra cada documento en los mensajes. */
+    private const NOMBRE = [
+        DocumentoLegal::AVISO => 'el aviso',
+        DocumentoLegal::TERMINOS => 'los términos',
+        DocumentoLegal::COOKIES => 'la política de cookies',
     ];
 
     private const RESPONSABLE = 'aviso_responsable';
@@ -41,6 +50,7 @@ class DocumentosLegales
     private const TEXTO_BASE = [
         DocumentoLegal::AVISO => 'legales/aviso-privacidad.txt',
         DocumentoLegal::TERMINOS => 'legales/terminos.txt',
+        DocumentoLegal::COOKIES => 'legales/cookies.txt',
     ];
 
     /** Correo de AgendaUno para privacidad y contacto, si no se captura otro. */
@@ -50,7 +60,7 @@ class DocumentosLegales
     private const MARCADOR = '/\[[A-ZÁÉÍÓÚÑÜ0-9 ,.;:()\/\-]{4,}\]/u';
 
     /**
-     * @return array{aviso_privacidad: string, terminos: string, responsable: array{nombre: string, domicilio: string, contacto: string, area: string}}
+     * @return array{aviso_privacidad: string, terminos: string, cookies: string, responsable: array{nombre: string, domicilio: string, contacto: string, area: string}}
      */
     public function borrador(): array
     {
@@ -60,6 +70,7 @@ class DocumentosLegales
         return [
             'aviso_privacidad' => $this->textoDe(DocumentoLegal::AVISO),
             'terminos' => $this->textoDe(DocumentoLegal::TERMINOS),
+            'cookies' => $this->textoDe(DocumentoLegal::COOKIES),
             'responsable' => [
                 'nombre' => (string) ($responsable['nombre'] ?? ''),
                 'domicilio' => (string) ($responsable['domicilio'] ?? ''),
@@ -82,7 +93,7 @@ class DocumentosLegales
     }
 
     /**
-     * @param  array{aviso_privacidad?: string|null, terminos?: string|null, responsable?: array<string, string|null>|null}  $datos
+     * @param  array{aviso_privacidad?: string|null, terminos?: string|null, cookies?: string|null, responsable?: array<string, string|null>|null}  $datos
      */
     public function guardarBorrador(array $datos): void
     {
@@ -91,6 +102,9 @@ class DocumentosLegales
         }
         if (array_key_exists('terminos', $datos)) {
             ConfiguracionPlataforma::establecer(self::BORRADOR[DocumentoLegal::TERMINOS], $datos['terminos']);
+        }
+        if (array_key_exists('cookies', $datos)) {
+            ConfiguracionPlataforma::establecer(self::BORRADOR[DocumentoLegal::COOKIES], $datos['cookies']);
         }
         if (array_key_exists('responsable', $datos)) {
             $r = $datos['responsable'] ?? [];
@@ -115,7 +129,7 @@ class DocumentosLegales
         $texto = trim($borrador[$tipo]);
         $responsable = null;
 
-        // El aviso siempre lleva al responsable; los términos, si lo mencionan.
+        // El aviso siempre lleva al responsable; los términos y las cookies, si lo mencionan.
         if ($tipo === DocumentoLegal::AVISO || preg_match('/\{(responsable|domicilio|contacto|area)\}/', $texto) === 1) {
             $responsable = $borrador['responsable'];
             $faltan = [];
@@ -129,7 +143,7 @@ class DocumentosLegales
                 $faltan[] = 'un correo válido para privacidad y derechos ARCO';
             }
             if ($faltan !== []) {
-                $documento = $tipo === DocumentoLegal::AVISO ? 'el aviso' : 'los términos';
+                $documento = self::NOMBRE[$tipo];
                 throw ValidationException::withMessages(['responsable' => "Para publicar {$documento} falta ".implode(', ', $faltan).'.']);
             }
             $texto = strtr($texto, [

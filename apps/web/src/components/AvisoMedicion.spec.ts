@@ -6,9 +6,9 @@ import { i18n } from "@/i18n";
 import AvisoMedicion from "./AvisoMedicion.vue";
 
 /*
-| El aviso de privacidad de las páginas públicas (ADR 0143): solo donde hay destinos y
-| mientras no se haya elegido; aceptar, solo lo necesario o elegir cada cosa; después,
-| «Privacidad» para cambiarlo.
+| El aviso de cookies de las páginas públicas (ADR 0143 y 0206): en las del producto, al
+| entrar; en la de un negocio, solo si mide. Mientras no se haya elegido: aceptar todas,
+| solo las necesarias o configurar cada cosa; después, «Cookies» para cambiarlo.
 */
 
 const etiquetas = vi.hoisted(() => ({
@@ -57,9 +57,13 @@ beforeEach(() => {
 });
 
 describe("aviso de medición", () => {
-  it("pregunta solo donde hay destinos: aceptar, solo lo necesario o elegir", async () => {
+  it("pregunta al entrar: aceptar todas, solo las necesarias o configurar, con su política", async () => {
     const w = montar();
     expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(true);
+    expect(w.get('[data-prueba="am-politica"]').text()).toBe(
+      "Política de cookies",
+    );
+    expect(w.get('[data-prueba="am-rechazar"]').text()).toBe("Solo necesarias");
 
     await w.get('[data-prueba="am-rechazar"]').trigger("click");
     expect(etiquetas.elegir).toHaveBeenLastCalledWith({
@@ -81,10 +85,21 @@ describe("aviso de medición", () => {
     });
   });
 
-  it("sin destinos o en una página que no se mide, no aparece", async () => {
+  it("en las páginas del producto aparece aunque aún no mida; en un negocio, solo si mide", async () => {
     etiquetas.medicion.destinos = { ga4: null, meta: null };
     const w = montar();
+    expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(true);
+
+    etiquetas.medicion.ambito = "negocio:fluo";
+    await nextTick();
     expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(false);
+    etiquetas.medicion.destinos = { ga4: "G-X1234", meta: null };
+    await nextTick();
+    expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(true);
+  });
+
+  it("en una página que no se mide, no aparece", async () => {
+    const w = montar();
 
     etiquetas.medicion.destinos = { ga4: "G-X1234", meta: null };
     etiquetas.medicion.pausada = true;
@@ -93,10 +108,11 @@ describe("aviso de medición", () => {
     expect(w.find('[data-prueba="am-privacidad"]').exists()).toBe(false);
   });
 
-  it("ya elegido, queda «Privacidad» para cambiarlo con lo que había elegido", async () => {
+  it("ya elegido, queda «Cookies» para cambiarlo con lo que había elegido", async () => {
     etiquetas.medicion.preferencias = { analitica: true, publicidad: false };
     const w = montar();
     expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(false);
+    expect(w.get('[data-prueba="am-privacidad"]').text()).toBe("Cookies");
 
     await w.get('[data-prueba="am-privacidad"]').trigger("click");
     expect(

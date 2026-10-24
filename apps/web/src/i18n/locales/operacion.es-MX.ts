@@ -395,7 +395,7 @@ export default {
   // Documentos legales de la plataforma (superadmin): borrador y publicar.
   legales: {
     ayuda:
-      "Edita el borrador y publícalo cuando esté listo: los usuarios solo ven lo publicado, con su número de versión y fecha, y cada negocio acepta la versión vigente al registrarse.",
+      "Edita el borrador y publícalo cuando esté listo: los usuarios solo ven lo publicado, con su número de versión y fecha. Cada negocio acepta el aviso y los términos vigentes al registrarse; la política de cookies es informativa y la enlaza el aviso de cookies de las páginas públicas.",
     responsable: "Responsable del tratamiento (aparece en el aviso)",
     nombre: "Nombre o razón social",
     domicilio: "Domicilio completo",
@@ -407,16 +407,22 @@ export default {
     version: "Publicado: versión {version} desde el {fecha}",
     sinPublicar:
       "Sin publicar (el registro de negocios queda cerrado en producción)",
+    sinPublicarCookies:
+      "Sin publicar (la página de cookies dice que aún no está disponible)",
+    cookies: "Política de cookies",
     guardarBorrador: "Guardar borrador",
     borradorGuardado:
       "Borrador guardado. Los usuarios siguen viendo lo publicado.",
     publicarAviso: "Publicar aviso",
     publicarTerminos: "Publicar términos",
+    publicarCookies: "Publicar política de cookies",
     confirmar: {
       aviso_privacidad:
         "¿Publicar el aviso de privacidad? Será la versión vigente para todos y los negocios nuevos la aceptarán al registrarse.",
       terminos:
         "¿Publicar los términos y condiciones? Serán la versión vigente para todos y los negocios nuevos la aceptarán al registrarse.",
+      cookies:
+        "¿Publicar la política de cookies? Será la versión vigente que enlaza el aviso de cookies de las páginas públicas.",
     },
     publicado: "Publicado: versión {version}.",
     versionPublica: "Versión {version} · vigente desde el {fecha}",

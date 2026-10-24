@@ -278,7 +278,7 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/registro/whatsapp/codigo', [RegistroWhatsAppController::class, 'codigo'])->middleware('throttle:5,10,whatsapp-codigo')->name('api.v1.registro.whatsapp.codigo');
     Route::post('/registro/whatsapp/verificar', [RegistroWhatsAppController::class, 'verificar'])->middleware('throttle:20,10,whatsapp-verificar')->name('api.v1.registro.whatsapp.verificar');
     Route::get('/directorio', [DirectorioController::class, 'index'])->middleware('throttle:publico')->name('api.v1.directorio');
-    // Documentos legales públicos (aviso de privacidad y términos) para el registro.
+    // Documentos legales públicos (aviso de privacidad, términos y cookies).
     Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:publico')->name('api.v1.legales');
     // Precios de la suscripción para la landing (ADR 0107): lo que publica el superadmin.
     Route::get('/precios', PreciosPublicosController::class)->middleware('throttle:publico')->name('api.v1.precios');
@@ -380,7 +380,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/legales', [PlataformaController::class, 'legales'])->name('legales');
         Route::put('/legales', [PlataformaController::class, 'guardarLegales'])->name('legales.guardar');
         Route::post('/legales/{tipo}/publicar', [PlataformaController::class, 'publicarLegal'])
-            ->whereIn('tipo', ['aviso_privacidad', 'terminos'])->name('legales.publicar');
+            ->whereIn('tipo', ['aviso_privacidad', 'terminos', 'cookies'])->name('legales.publicar');
         // Pasarelas de la plataforma (para cobrar la renta del SaaS): on/off + llaves test/prod.
         Route::get('/pasarelas', [PlataformaController::class, 'pasarelas'])->name('pasarelas');
         Route::put('/pasarelas/{proveedor}', [PlataformaController::class, 'guardarPasarela'])->name('pasarelas.guardar');

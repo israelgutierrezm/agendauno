@@ -1,0 +1,59 @@
+POLÍTICA DE COOKIES DE AGENDAUNO Y TURNOUNO
+
+1. Qué cubre esta política
+
+{responsable} opera las marcas AgendaUno (agendauno.mx) y TurnoUno (turnouno.mx). Esta política explica qué cookies y tecnologías similares (almacenamiento local y de sesión del navegador) usan nuestros sitios, la página pública de cada negocio en su subdominio, su agenda en línea, el registro, el panel de los negocios y el portal de sus clientes; para qué sirven, cuánto duran y cómo eliges cuáles aceptar. Complementa nuestro Aviso de privacidad.
+
+Una cookie es un archivo pequeño que un sitio guarda en tu navegador. El almacenamiento local y el de sesión funcionan igual, pero no se envían solos al servidor: el de sesión se borra al cerrar la pestaña.
+
+2. Cómo eliges
+
+La primera vez que entras a nuestros sitios te mostramos el aviso «Cookies y privacidad» con tres opciones: aceptar todas, usar solo las necesarias o configurar por separado la analítica y la publicidad. Mientras no elijas, solo funcionan las necesarias: no se carga ninguna herramienta de medición ni de publicidad.
+
+Puedes cambiar tu elección cuando quieras con el botón «Cookies» que queda en la esquina de la página. Si retiras un permiso, apagamos esa herramienta, borramos sus cookies de este navegador y pedimos que se borren los identificadores ya registrados con él.
+
+Cada marca y la página de cada negocio piden y guardan su propia elección: aceptar en AgendaUno no autoriza nada en TurnoUno ni en la página de un negocio.
+
+3. Cookies necesarias (siempre activas)
+
+Sin ellas el servicio no funciona, por eso no se pueden desactivar desde el aviso. No se usan para medir ni para publicidad.
+• Sesión iniciada: el acceso al panel o al portal de clientes se guarda en el almacenamiento local, con el negocio y el rol con el que entraste. Dura hasta que cierras sesión o vence el acceso.
+• Tu elección de cookies: recordamos lo que elegiste, junto con un identificador aleatorio del navegador que no te identifica, para respetarlo en tus siguientes visitas. Dura hasta que la cambies o borres los datos del navegador.
+• Origen de la visita: de qué campaña o sitio llegaste (por ejemplo, los parámetros «utm» de un enlace). Sin permiso de analítica solo se guarda en esta pestaña y se borra al cerrarla.
+• Seguridad: el registro de negocios, las solicitudes de demostración, los formularios públicos y agendar sin cuenta usan reCAPTCHA de Google para distinguir personas de envíos automatizados; Google puede guardar sus propias cookies para ese fin.
+• Pagos: al pagar en línea, la pasarela que elija el negocio (Stripe, Mercado Pago u OpenPay) carga sus propios componentes, que pueden usar cookies para prevenir fraudes. Los datos de tu tarjeta los recibe directamente la pasarela; nosotros no los vemos ni los guardamos.
+• Inicio de sesión con Google: si eliges entrar con Google, Google puede usar sus propias cookies durante ese proceso.
+
+4. Preferencias (siempre activas)
+
+Recuerdan cómo prefieres ver la plataforma: tema claro u oscuro, color de acento, densidad, columnas de las listas, la barra lateral compacta, los negocios a los que entraste recientemente y si ya cerraste la invitación a instalar la aplicación. Se guardan solo en tu navegador y no salen de él.
+
+5. Analítica (solo con tu permiso)
+
+Nos dice qué páginas se visitan y cómo se llega a ellas, para mejorar el sitio.
+• Google Analytics 4 en los sitios de AgendaUno y TurnoUno: cookies «_ga» y «_ga_<identificador>», hasta 2 años.
+• Google Analytics 4 en la página de un negocio que lo active: cookies propias de ese negocio («n_<negocio>_ga…»), solo en su dominio; las de un negocio no se comparten con otro ni con nuestros sitios.
+• Con este permiso, el origen de la visita se conserva en el navegador (no solo en la pestaña), hasta 90 días.
+
+6. Publicidad (solo con tu permiso)
+
+Mide los resultados de nuestros anuncios y nos ayuda a mejorar las campañas.
+• Píxel de Meta en los sitios de AgendaUno y TurnoUno: cookies «_fbp» y «_fbc», hasta 90 días. No se carga en la página de ningún negocio.
+• Señales de anuncios de Google en nuestros sitios: cookies como «_gcl_au», hasta 90 días.
+• Con este permiso también enviamos desde nuestro servidor, a Meta y a Google, la confirmación de un resultado (por ejemplo, que se registró un negocio) con identificadores del navegador. Nunca enviamos tu nombre, correo, teléfono ni datos de salud en estos eventos.
+
+7. Videos y contenido de terceros
+
+Los videos que un negocio inserta en su página se cargan solo cuando los reproduces, desde YouTube en su modo sin cookies o desde Vimeo sin rastreo.
+
+8. Cómo borrarlas desde tu navegador
+
+Además del botón «Cookies», puedes bloquear o borrar las cookies y el almacenamiento desde la configuración de tu navegador. Si borras las necesarias tendrás que volver a iniciar sesión y es posible que algunas funciones no estén disponibles.
+
+9. Cambios a esta política
+
+Publicamos cada cambio como una versión nueva, con su número y fecha, en esta misma página. Si agregamos una herramienta opcional o cambiamos para qué sirve una, volveremos a pedirte tu elección.
+
+10. Contacto
+
+Para cualquier duda sobre esta política o sobre tus datos, escríbenos a {contacto}.

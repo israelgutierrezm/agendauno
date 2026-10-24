@@ -372,20 +372,28 @@ async function medirNavegacion(
   pendientes.forEach((mandar) => mandar());
 }
 
-/** Lo que eligió en el aviso: se guarda, se aplica y se avisa al servidor. */
-export function elegir(eleccion: {
-  analitica: boolean;
-  publicidad: boolean;
-}): void {
-  const ambito = medicion.ambito;
+/**
+ * Lo que eligió en el aviso (o en la política de cookies, para el producto del
+ * dominio): se guarda, se aplica si es la página que se mide y se avisa al servidor.
+ */
+export function elegir(
+  eleccion: {
+    analitica: boolean;
+    publicidad: boolean;
+  },
+  ambito: Ambito | null = medicion.ambito,
+): void {
   if (ambito === null) return;
   const { preferencias, visitante } = guardarPreferencias(ambito, eleccion);
-  medicion.preferencias = preferencias;
-  medicion.eligiendo = false;
   moverAtribucionSegunPreferencias(ambito);
-  if (medicion.destinos !== null) {
-    aplicar(ambito, medicion.destinos, preferencias);
-    enviarVista();
+  if (ambito === medicion.ambito) {
+    medicion.preferencias = preferencias;
+    medicion.eligiendo = false;
+    // En una página que no se mide (la política misma) se aplica al volver.
+    if (medicion.destinos !== null && !medicion.pausada) {
+      aplicar(ambito, medicion.destinos, preferencias);
+      enviarVista();
+    }
   }
   if (visitante !== null) {
     const [tipo, clave] = ambito.split(":") as [string, string];

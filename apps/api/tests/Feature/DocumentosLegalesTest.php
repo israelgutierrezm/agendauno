@@ -133,3 +133,35 @@ it('en producción no se registra nadie sin aviso y términos publicados', funct
         'recaptcha_token' => 'token-cliente',
     ])->assertUnprocessable()->assertJsonValidationErrors(['acepta_terminos'], 'meta.errors');
 });
+
+it('la política de cookies parte del texto base, se publica con su contacto y no se acepta al registrarse', function (): void {
+    $borrador = $this->getJson('/api/v1/plataforma/legales', conPlataforma())->assertOk()
+        ->assertJsonPath('data.publicados.cookies', null);
+    expect($borrador->json('data.cookies'))->toContain('POLÍTICA DE COOKIES')
+        ->toContain('{contacto}');
+
+    // Menciona al responsable: sin sus datos no se publica.
+    publicarLegal('cookies')->assertUnprocessable()->assertJsonValidationErrors(['responsable'], 'meta.errors');
+
+    guardarBorradorLegal([
+        'aviso_privacidad' => 'Aviso de {responsable}.',
+        'terminos' => 'Términos.',
+        'responsable' => ['nombre' => 'AgendaUno', 'domicilio' => 'CDMX', 'contacto' => 'privacidad@agendauno.mx'],
+    ]);
+    publicarLegal('cookies')->assertCreated()->assertJsonPath('data.version', 1);
+    $this->getJson('/api/v1/legales')->assertOk()
+        ->assertJsonPath('data.versiones.cookies.version', 1);
+    expect($this->getJson('/api/v1/legales')->json('data.cookies'))
+        ->toContain('privacidad@agendauno.mx')
+        ->not->toContain('{contacto}');
+
+    publicarLegal('aviso_privacidad')->assertCreated();
+    publicarLegal('terminos')->assertCreated();
+    $this->postJson('/api/v1/registro', [
+        'nombre' => 'Estudio A', 'slug' => 'estudio-a', 'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'Ruiz',
+        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true,
+        'aviso_version' => 1, 'terminos_version' => 1,
+    ])->assertCreated();
+    expect(DB::table('aceptaciones_legales')->pluck('tipo')->sort()->values()->all())
+        ->toBe(['aviso_privacidad', 'terminos']);
+});

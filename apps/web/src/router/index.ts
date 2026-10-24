@@ -82,6 +82,12 @@ const router = createRouter({
       component: () => import("@/views/TerminosView.vue"),
     },
     {
+      // Política de cookies (ADR 0206): la publica el superadmin, como el aviso.
+      path: "/cookies",
+      name: "politica-cookies",
+      component: () => import("@/views/PoliticaCookiesView.vue"),
+    },
+    {
       // Un widget en la web del negocio (calendario o planes; ADR 0141): sin encabezado.
       path: "/w/:slug/:widget",
       name: "widget",

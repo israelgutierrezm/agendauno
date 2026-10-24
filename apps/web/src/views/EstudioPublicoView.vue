@@ -2170,6 +2170,12 @@ onBeforeUnmount(() => {
             class="tu-enlace mt-3 inline-block"
             >{{ tn("escaparate.avisoPrivacidad") }}</RouterLink
           >
+          <RouterLink
+            :to="{ name: 'politica-cookies' }"
+            class="tu-enlace mt-3 ml-4 inline-block"
+            data-prueba="politica-cookies"
+            >{{ tn("medicion.aviso.politicaCookies") }}</RouterLink
+          >
         </div>
       </footer>
 

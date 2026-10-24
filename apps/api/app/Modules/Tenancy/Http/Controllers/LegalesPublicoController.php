@@ -9,7 +9,8 @@ use App\Modules\Platform\Legales\DocumentosLegales;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Documentos legales públicos de la plataforma (aviso de privacidad y términos):
+ * Documentos legales públicos de la plataforma (aviso de privacidad, términos y
+ * política de cookies):
  * solo las versiones PUBLICADAS por el superadministrador, con su número y fecha
  * (el registro las manda de vuelta al aceptarlas). Sin autenticación. Si aún no se
  * publican, vienen en null.
@@ -20,6 +21,7 @@ class LegalesPublicoController
     {
         $aviso = $legales->vigente(DocumentoLegal::AVISO);
         $terminos = $legales->vigente(DocumentoLegal::TERMINOS);
+        $cookies = $legales->vigente(DocumentoLegal::COOKIES);
         $version = static fn (?DocumentoLegal $d): ?array => $d === null ? null : [
             'version' => $d->version,
             'vigente_desde' => $d->vigente_desde->toIso8601String(),
@@ -28,9 +30,11 @@ class LegalesPublicoController
         return response()->json(['data' => [
             'aviso_privacidad' => $aviso?->contenido,
             'terminos' => $terminos?->contenido,
+            'cookies' => $cookies?->contenido,
             'versiones' => [
                 'aviso_privacidad' => $version($aviso),
                 'terminos' => $version($terminos),
+                'cookies' => $version($cookies),
             ],
             'responsable' => $aviso?->responsable,
         ]]);

@@ -90,10 +90,12 @@ it('reconoce lo que sí está listo, incluido el aviso publicado con su responsa
     $legales->guardarBorrador([
         'aviso_privacidad' => 'Aviso de {responsable}.',
         'terminos' => 'Términos de uso de AgendaUno.',
+        'cookies' => 'Cookies de AgendaUno; dudas a {contacto}.',
         'responsable' => ['nombre' => 'AgendaUno', 'domicilio' => 'CDMX', 'contacto' => 'privacidad@agendauno.mx'],
     ]);
     $legales->publicar('aviso_privacidad');
     $legales->publicar('terminos');
+    $legales->publicar('cookies');
 
     $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('OK    reCAPTCHA en el registro')
@@ -104,6 +106,7 @@ it('reconoce lo que sí está listo, incluido el aviso publicado con su responsa
         ->expectsOutputToContain('OK    Aviso de privacidad publicado')
         ->expectsOutputToContain('OK    Aviso con los datos del responsable')
         ->expectsOutputToContain('OK    Términos y condiciones publicados')
+        ->expectsOutputToContain('OK    Política de cookies publicada')
         ->assertFailed();
 });
 

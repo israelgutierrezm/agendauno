@@ -447,6 +447,7 @@ class PlataformaController
             'publicados' => [
                 'aviso_privacidad' => $publicado($legales->vigente(DocumentoLegal::AVISO)),
                 'terminos' => $publicado($legales->vigente(DocumentoLegal::TERMINOS)),
+                'cookies' => $publicado($legales->vigente(DocumentoLegal::COOKIES)),
             ],
         ]]);
     }
@@ -457,6 +458,7 @@ class PlataformaController
         $validado = $request->validate([
             'aviso_privacidad' => ['nullable', 'string', 'max:50000'],
             'terminos' => ['nullable', 'string', 'max:50000'],
+            'cookies' => ['nullable', 'string', 'max:50000'],
             'responsable' => ['nullable', 'array'],
             'responsable.nombre' => ['nullable', 'string', 'max:200'],
             'responsable.domicilio' => ['nullable', 'string', 'max:400'],
