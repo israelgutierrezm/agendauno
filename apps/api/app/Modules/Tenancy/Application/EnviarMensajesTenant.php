@@ -6,12 +6,12 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\ColaDeMensajes;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use App\Modules\Tenancy\Models\DifusionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
@@ -31,12 +31,19 @@ use Throwable;
  * mientras estaba en cola, se descarta (no se cobra ni se reintenta). Un fallo deja
  * el mensaje `fallido` para reintento (no rompe el lote). Debe correr con la conexion
  * del tenant ya activa (ver el comando que lo orquesta).
+ *
+ * Corre en la cola (ADR 0205), por tipo: los avisos (sin campaña) y las campañas, cada
+ * uno con su tope de mensajes y de segundos por pasada. Lo que no alcanza sale en la
+ * siguiente: una campaña grande no retiene al trabajador ni a los avisos.
  */
 class EnviarMensajesTenant
 {
     public const MAX_INTENTOS = 6;
 
-    private const LOTE = 500;
+    /** Mensajes por pasada y segundos que puede durar, por tipo. */
+    private const LOTE = [ColaDeMensajes::AVISOS => 200, ColaDeMensajes::CAMPANAS => 100];
+
+    private const SEGUNDOS = [ColaDeMensajes::AVISOS => 45, ColaDeMensajes::CAMPANAS => 30];
 
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
@@ -46,20 +53,24 @@ class EnviarMensajesTenant
         private readonly MensajesWhatsAppTenant $saldoWhatsApp,
     ) {}
 
-    public function ejecutar(): int
+    /**
+     * Una pasada: los avisos (`avisos`) o las campañas (`campanas`) del negocio en sesión.
+     * Una campaña en pausa espera; los avisos de operación siguen (B08).
+     */
+    public function ejecutar(string $tipo = ColaDeMensajes::AVISOS): int
     {
         $enviados = 0;
+        $hasta = microtime(true) + self::SEGUNDOS[$tipo];
 
-        MensajeTenant::query()
-            ->whereIn('estado', [EstadoMensaje::Encolado->value, EstadoMensaje::Fallido->value])
-            ->where('intentos', '<', self::MAX_INTENTOS)
-            // Una campaña en pausa espera; los avisos de operación siguen (B08).
-            ->where(fn ($q) => $q->whereNull('difusion_id')
-                ->orWhereNotIn('difusion_id', DifusionTenant::query()->where('estado', DifusionTenant::PAUSADA)->select('id')))
+        ColaDeMensajes::pendientes($tipo)
             ->orderBy('id')
-            ->limit(self::LOTE)
+            ->limit(self::LOTE[$tipo])
             ->get()
-            ->each(function (MensajeTenant $mensaje) use (&$enviados): void {
+            ->each(function (MensajeTenant $mensaje) use (&$enviados, $hasta): ?bool {
+                // Se acabó el tiempo de esta pasada: lo demás sale en la siguiente.
+                if (microtime(true) > $hasta) {
+                    return false;
+                }
                 // Una campaña no le llega a quien pidió no recibir promociones, aunque
                 // lo pidiera después de encolarla (B08).
                 if ($mensaje->esPromocional() && $mensaje->persona_id !== null
@@ -68,7 +79,7 @@ class EnviarMensajesTenant
                     $mensaje->ultimo_error = 'No desea recibir promociones.';
                     $mensaje->save();
 
-                    return;
+                    return null;
                 }
                 if ($mensaje->canal === CanalComunicacion::WhatsApp && ! $this->whatsapp->activoPara($this->gestor->actual())) {
                     $mensaje->estado = EstadoMensaje::Descartado;
@@ -77,7 +88,7 @@ class EnviarMensajesTenant
                         : 'WhatsApp se apagó en la plataforma.';
                     $mensaje->save();
 
-                    return;
+                    return null;
                 }
                 // Sin saldo o en el tope del mes, el aviso no sale (ADR 0186). Uno de
                 // marketing gasta más de un mensaje (ADR 0190).
@@ -87,7 +98,7 @@ class EnviarMensajesTenant
                     $mensaje->ultimo_error = $motivo;
                     $mensaje->save();
 
-                    return;
+                    return null;
                 }
                 $mensaje->intentos++;
 
@@ -114,6 +125,8 @@ class EnviarMensajesTenant
                 }
 
                 $mensaje->save();
+
+                return null;
             });
 
         return $enviados;

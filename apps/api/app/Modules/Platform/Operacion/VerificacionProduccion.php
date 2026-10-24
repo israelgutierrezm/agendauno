@@ -10,6 +10,7 @@ use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\Application\TiposDeCambio;
+use App\Modules\Tenancy\Comunicaciones\ColaDeMensajes;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
@@ -57,7 +58,13 @@ class VerificacionProduccion
         private readonly DocumentosLegales $legales,
         private readonly TiposDeCambio $tipos,
         private readonly ParametrosTenant $parametros,
+        private readonly ColaDeMensajes $mensajes,
     ) {}
+
+    /** Minutos que puede esperar el aviso más antiguo y la campaña más antigua. */
+    private const MINUTOS_AVISOS = 15;
+
+    private const MINUTOS_CAMPANAS = 120;
 
     /**
      * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
@@ -204,9 +211,18 @@ class VerificacionProduccion
             ? DB::table('failed_jobs')->where('failed_at', '>=', CarbonImmutable::now()->subDay())->count()
             : 0;
 
+        // El envío de mensajes corre en la cola (ADR 0205): un aviso que lleva mucho
+        // esperando es un envío atascado (worker sin la cola, correo caído…).
+        $cola = $this->mensajes->resumen();
+        $atascado = fn (string $tipo, int $limite): bool => ($cola[$tipo]['minutos'] ?? null) !== null && $cola[$tipo]['minutos'] > $limite;
+        $detalle = fn (string $tipo): string => "{$cola[$tipo]['pendientes']} pendiente(s); el más antiguo espera desde hace {$cola[$tipo]['minutos']} min. "
+            .'Revisa que el worker atienda las colas default, mensajes y campanas, y el servidor de correo.';
+
         return [
             ...$this->procesosEnMarcha('Procesos'),
             $this->punto('Procesos', 'Sin trabajos fallidos en 24 h', $fallidos === 0, "{$fallidos} trabajo(s) fallido(s): php artisan queue:failed.", critico: false),
+            $this->punto('Procesos', 'Avisos y recordatorios saliendo a tiempo', ! $atascado(ColaDeMensajes::AVISOS, self::MINUTOS_AVISOS), $detalle(ColaDeMensajes::AVISOS)),
+            $this->punto('Procesos', 'Campañas saliendo a tiempo', ! $atascado(ColaDeMensajes::CAMPANAS, self::MINUTOS_CAMPANAS), $detalle(ColaDeMensajes::CAMPANAS), critico: false),
         ];
     }
 

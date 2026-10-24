@@ -79,10 +79,11 @@ services:
       retries: 3
       start_period: 1m
 
-  # Correos y trabajos en cola.
+  # Correos y trabajos en cola. Atiende primero `default` (el latido, los correos),
+  # luego `mensajes` (avisos y recordatorios) y al final `campanas` (ADR 0205).
   worker:
     <<: *api
-    command: ["php", "artisan", "queue:work", "redis", "--sleep=1", "--tries=3", "--max-time=3600"]
+    command: ["php", "artisan", "queue:work", "redis", "--queue=default,mensajes,campanas", "--sleep=1", "--tries=3", "--max-time=3600"]
     # Al detenerse (actualizar.sh, docker compose stop) termina el trabajo en curso
     # antes de salir; Docker lo mataría a los 10 s por defecto.
     stop_grace_period: 5m
