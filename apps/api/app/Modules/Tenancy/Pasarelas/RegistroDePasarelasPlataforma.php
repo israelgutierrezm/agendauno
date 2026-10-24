@@ -97,6 +97,18 @@ class RegistroDePasarelasPlataforma
     }
 
     /**
+     * Anota que llegó un aviso verificado de la pasarela (lo lee la verificación de
+     * producción). A lo más una escritura cada 10 minutos por pasarela.
+     */
+    public function anotarAviso(string $proveedor): void
+    {
+        ConfiguracionPasarelaPlataforma::query()
+            ->where('proveedor', $proveedor)
+            ->where(fn ($q) => $q->whereNull('ultimo_aviso_en')->orWhere('ultimo_aviso_en', '<', now()->subMinutes(10)))
+            ->update(['ultimo_aviso_en' => now()]);
+    }
+
+    /**
      * Primera pasarela activa por orden de preferencia (para elegir automaticamente
      * cuando el dueño no especifica proveedor), o `null` si ninguna esta activa.
      */

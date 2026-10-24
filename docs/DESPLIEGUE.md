@@ -634,9 +634,12 @@ la lista llegue recortada a las 50 más recientes.
   latidos, respaldos fuera del servidor y recientes, alertas, aviso de privacidad,
   pasarela de la plataforma). Córrelo tras instalar y tras cada actualización (el
   script de actualizar lo hace). Distingue una instalación de prueba de la **apertura
-  comercial**: con `APERTURA_COMERCIAL=true` en `api.env` (o `--apertura`) exige Stripe
-  de la plataforma en modo live para cobrar la renta con dinero real; sin ella lo marca
-  como aviso y termina en «Lista como instalación sin cobro real de la renta».
+  comercial**: con `APERTURA_COMERCIAL=true` en `api.env` (o `--apertura`) exige que las
+  pasarelas habilitadas para la renta (Stripe, Mercado Pago u OpenPay) estén en modo
+  real con sus llaves de producción; sin ella lo marca como aviso y termina en «Lista
+  como instalación sin cobro real de la renta». Basta una pasarela lista; de cada una
+  habilitada revisa sus llaves, el secreto o usuario de su webhook y si ya llegó algún
+  aviso de pago. Stripe no es obligatorio: sin él, la renta no se domicilia y se avisa.
 
 ## Operación
 

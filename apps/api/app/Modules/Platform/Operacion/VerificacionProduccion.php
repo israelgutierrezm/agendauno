@@ -14,6 +14,8 @@ use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -35,9 +37,10 @@ use Throwable;
  * - {@see disponibilidad()}: lo mínimo para que la versión en marcha atienda (base,
  *   caché, cola, programador y esquema al día). Lo usa actualizar.sh antes de quitar
  *   el mantenimiento.
- * - Apertura comercial (`APERTURA_COMERCIAL=true` o `$apertura`): además exige Stripe
- *   en producción para la renta del SaaS y la llave de FacturAPI. Sin ella, una
- *   instalación de prueba puede quedar lista con Stripe en modo de prueba, y así lo dice.
+ * - Apertura comercial (`APERTURA_COMERCIAL=true` o `$apertura`): además exige que las
+ *   pasarelas habilitadas para la renta del SaaS estén en producción y la llave de
+ *   FacturAPI. Sin ella, una instalación de prueba puede quedar lista en modo de prueba,
+ *   y así lo dice.
  */
 class VerificacionProduccion
 {
@@ -385,34 +388,104 @@ class VerificacionProduccion
         ];
     }
 
+    /** Cómo se llama cada pasarela de la plataforma en los avisos. */
+    private const PASARELAS = ['stripe' => 'Stripe', 'mercadopago' => 'Mercado Pago', 'openpay' => 'OpenPay'];
+
     /**
+     * La renta del SaaS se cobra con Stripe, Mercado Pago u OpenPay (ADR 0192): basta
+     * una lista para cobrar. De cada pasarela HABILITADA se revisa lo suyo: sus llaves,
+     * que esté en modo producción (para abrir, bloquea), que pueda verificar los avisos
+     * de pago y que ya haya llegado alguno. Stripe no es obligatorio: sin él, la renta
+     * no se domicilia (cada dueño paga sus cargos en línea), y así se avisa.
+     *
      * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
      */
     private function pagos(bool $apertura): array
     {
         try {
-            $stripe = ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->first();
+            $configuraciones = ConfiguracionPasarelaPlataforma::query()->get()->keyBy('proveedor');
         } catch (Throwable) {
-            $stripe = null;
+            $configuraciones = collect();
         }
-        $llaves = $stripe?->llaves() ?? [];
-        $secretoWebhook = (string) ($llaves['webhook_secret'] ?? '');
+        $listas = [];
+        $puntos = [];
+        foreach (self::PASARELAS as $proveedor => $nombre) {
+            $config = $configuraciones->get($proveedor);
+            if (! $config instanceof ConfiguracionPasarelaPlataforma || ! $config->activa) {
+                continue;
+            }
+            $llaves = $config->llaves();
+            $faltan = RegistroDePasarelasPlataforma::llavesFaltantes($proveedor, $llaves);
+            if ($faltan === []) {
+                $listas[] = $proveedor;
+            }
+            $puntos[] = $this->punto('Pagos', "Llaves de {$nombre} para cobrar la renta", $faltan === [], 'Faltan: '.implode(', ', $faltan).'. Captúralas en Configuración → Pasarelas de cobro.');
+            $modoLlaves = RegistroDePasarelasTenant::modoDeLlaves($proveedor, $llaves);
+            // Para cobrar la renta con dinero real bloquea; en una instalación de prueba, no.
+            $puntos[] = $this->punto(
+                'Pagos',
+                "{$nombre} en modo producción",
+                $config->modo === 'live' && $modoLlaves !== 'test' && ($proveedor !== 'stripe' || $modoLlaves === 'live'),
+                $apertura
+                    ? "Usa el modo real y las llaves de producción de {$nombre}: con las de prueba la renta no cobra dinero real."
+                    : 'Modo de prueba: la renta del SaaS no cobra dinero real. Para abrir y cobrar, usa el modo real con las llaves de producción y APERTURA_COMERCIAL=true.',
+                critico: $apertura,
+            );
+            $puntos[] = $this->avisosConfigurados($proveedor, $nombre, $llaves);
+            $puntos[] = $this->punto(
+                'Pagos',
+                "Ya llegó un aviso de pago de {$nombre}",
+                $config->ultimo_aviso_en !== null,
+                "Aún no llega ninguno: haz un cobro de prueba y revisa que el webhook de {$nombre} apunte a "
+                    .route('api.v1.webhooks.plataforma', ['proveedor' => $proveedor]).'.',
+                critico: false,
+            );
+        }
 
         return [
-            $this->punto('Pagos', 'Stripe de la plataforma activo (renta del SaaS)', $stripe !== null && $stripe->activa, 'Configúralo en Plataforma → Pasarelas.'),
-            // Para cobrar la renta con dinero real bloquea; en una instalación de prueba, no.
+            $this->punto('Pagos', 'Una pasarela lista para cobrar la renta', $listas !== [], 'Habilita Stripe, Mercado Pago u OpenPay con sus llaves en Configuración → Pasarelas de cobro: sin ninguna, los dueños no pueden pagar la renta.'),
+            ...$puntos,
             $this->punto(
                 'Pagos',
-                'Stripe en modo producción',
-                $stripe !== null && $stripe->modo === 'live' && str_starts_with((string) ($llaves['secret_key'] ?? ''), 'sk_live_'),
-                $apertura ? 'Usa llaves sk_live_ y modo live: sin ellas la renta no cobra dinero real.' : 'Modo de prueba: la renta del SaaS no cobra dinero real. Para abrir y cobrar, usa llaves sk_live_ y APERTURA_COMERCIAL=true.',
-                critico: $apertura,
+                'Domiciliación de la renta (Stripe)',
+                in_array('stripe', $listas, true),
+                'Sin Stripe, la renta no se cobra sola con la tarjeta guardada: cada dueño paga sus cargos en línea con la pasarela habilitada.',
+                critico: false,
             ),
-            // El que da Stripe al crear el endpoint empieza con whsec_; otro valor (p. ej. la
-            // llave secreta pegada ahí) no valida ningún aviso.
-            $this->punto('Pagos', 'Secreto del webhook de Stripe', str_starts_with($secretoWebhook, 'whsec_'), $secretoWebhook === '' ? 'Sin él no se confirman los pagos de la renta.' : 'No empieza con whsec_: copia el «Signing secret» del endpoint en Stripe. Con otro valor no se confirman los pagos de la renta.'),
             $this->tipoDeCambio(),
         ];
+    }
+
+    /**
+     * ¿Puede verificar los avisos de pago? Stripe, con el «Signing secret» (whsec_);
+     * Mercado Pago, con su clave secreta; OpenPay, con el usuario y la contraseña que se
+     * le dieron. Sin eso, en producción el aviso se rechaza y el pago no se confirma
+     * (hasta que la conciliación lo encuentre).
+     *
+     * @param  array<string, string>  $llaves
+     * @return array{seccion: string, punto: string, estado: string, detalle: string}
+     */
+    private function avisosConfigurados(string $proveedor, string $nombre, array $llaves): array
+    {
+        if ($proveedor === 'stripe') {
+            // El que da Stripe al crear el endpoint empieza con whsec_; otro valor (p. ej.
+            // la llave secreta pegada ahí) no valida ningún aviso.
+            $secreto = (string) ($llaves['webhook_secret'] ?? '');
+
+            return $this->punto('Pagos', 'Secreto del webhook de Stripe', str_starts_with($secreto, 'whsec_'), $secreto === ''
+                ? 'Sin él no se confirman los pagos de la renta.'
+                : 'No empieza con whsec_: copia el «Signing secret» del endpoint en Stripe. Con otro valor no se confirman los pagos de la renta.');
+        }
+        if ($proveedor === 'mercadopago') {
+            return $this->punto('Pagos', 'Clave secreta del webhook de Mercado Pago', trim((string) ($llaves['webhook_secret'] ?? '')) !== '', 'Sin ella no se verifican los avisos de pago y no se confirman los pagos de la renta.');
+        }
+
+        return $this->punto(
+            'Pagos',
+            "Usuario y contraseña del webhook de {$nombre}",
+            trim((string) ($llaves['webhook_user'] ?? '')) !== '' && trim((string) ($llaves['webhook_password'] ?? '')) !== '',
+            'Sin ellos no se verifican los avisos de pago y no se confirman los pagos de la renta.',
+        );
     }
 
     /**

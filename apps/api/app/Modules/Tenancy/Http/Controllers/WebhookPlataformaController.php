@@ -77,6 +77,7 @@ class WebhookPlataformaController
             abort(401, 'Firma inválida.');
         }
 
+        $this->registro->anotarAviso('mercadopago');
         $tipo = (string) ($request->query('type') ?? $request->json('type') ?? $request->query('topic') ?? '');
         $id = $dataId !== '' ? $dataId : (string) ($request->json('data.id') ?? $request->query('id') ?? '');
         $this->avisos->mercadoPago($tipo, $id);
@@ -106,6 +107,7 @@ class WebhookPlataformaController
             }
         }
 
+        $this->registro->anotarAviso('openpay');
         /** @var array<string, mixed> $evento */
         $evento = $request->json()->all();
         $this->avisos->openPay($evento);
@@ -127,6 +129,7 @@ class WebhookPlataformaController
             abort(400, 'Firma invalida.');
         }
 
+        $this->registro->anotarAviso('stripe');
         /** @var array<string, mixed> $payload */
         $payload = $request->json()->all();
         $tipo = isset($payload['type']) ? (string) $payload['type'] : '';

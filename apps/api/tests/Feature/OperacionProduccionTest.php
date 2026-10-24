@@ -265,3 +265,41 @@ it('los respaldos, el simulacro, la agenda y la mora corren de madrugada en la C
         ->and($hora('agendauno:escalar-dunning')[1])->toBe('01:15')
         ->and($hora('agendauno:cobrar-suscripciones')[1])->toBe('00:45');
 });
+
+it('revisa las pasarelas habilitadas para la renta, no solo Stripe', function (): void {
+    // Solo Mercado Pago, en producción, sin la clave del webhook todavía.
+    ConfiguracionPasarelaPlataforma::query()->create([
+        'proveedor' => 'mercadopago', 'activa' => true, 'modo' => 'live',
+        'credenciales' => ['access_token' => 'APP_USR-123'],
+    ]);
+    // OpenPay habilitada sin sus llaves: no cuenta como lista.
+    ConfiguracionPasarelaPlataforma::query()->create([
+        'proveedor' => 'openpay', 'activa' => true, 'modo' => 'test',
+        'credenciales' => ['merchant_id' => 'm123'],
+    ]);
+
+    $this->artisan('agendauno:verificar-produccion --apertura')
+        ->expectsOutputToContain('OK    Una pasarela lista para cobrar la renta')
+        ->expectsOutputToContain('OK    Llaves de Mercado Pago para cobrar la renta')
+        ->expectsOutputToContain('OK    Mercado Pago en modo producción')
+        ->expectsOutputToContain('FALTA Clave secreta del webhook de Mercado Pago')
+        ->expectsOutputToContain('AVISO Ya llegó un aviso de pago de Mercado Pago')
+        ->expectsOutputToContain('FALTA Llaves de OpenPay para cobrar la renta — Faltan: private_key.')
+        ->expectsOutputToContain('FALTA OpenPay en modo producción')
+        ->expectsOutputToContain('AVISO Domiciliación de la renta (Stripe)')
+        ->doesntExpectOutputToContain('Stripe en modo producción')
+        ->doesntExpectOutputToContain('Secreto del webhook de Stripe')
+        ->assertFailed();
+
+    // Un aviso verificado de la pasarela queda anotado.
+    // (De un tipo que no consulta el cobro en Mercado Pago: aquí no sale a internet.)
+    $this->postJson('/api/v1/webhooks/plataforma/mercadopago?data_id=1&type=merchant_order')->assertOk();
+    $this->artisan('agendauno:verificar-produccion')
+        ->expectsOutputToContain('OK    Ya llegó un aviso de pago de Mercado Pago');
+});
+
+it('sin ninguna pasarela lista, la renta no se puede cobrar', function (): void {
+    $this->artisan('agendauno:verificar-produccion')
+        ->expectsOutputToContain('FALTA Una pasarela lista para cobrar la renta')
+        ->assertFailed();
+});
