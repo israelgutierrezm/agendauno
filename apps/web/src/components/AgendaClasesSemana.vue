@@ -26,6 +26,10 @@ const props = defineProps<{
   sesiones: SesionAgenda[];
   catalogo: string[];
   seleccionada: string | null;
+  // Mientras carga (o si no se pudo consultar) no se afirma «Sin clases»: aún no se
+  // sabe.
+  cargando?: boolean;
+  sinConsultar?: boolean;
 }>();
 
 const emit = defineEmits<{ abrir: [sesion: SesionAgenda] }>();
@@ -198,17 +202,20 @@ const columnas = computed(() =>
     const ocup = programadas.reduce((a, s) => a + s.ocupados, 0);
     return {
       ...d,
-      resumen:
-        delDia.length === 0
-          ? t("agendaVisual.semana.sinClasesDia")
-          : t(
-              "agendaVisual.semana.resumenDia",
-              {
-                n: programadas.length,
-                pct: cap > 0 ? Math.round((ocup / cap) * 100) : 0,
-              },
-              programadas.length,
-            ),
+      resumen: props.cargando
+        ? t("agendaVisual.profesionales.actualizando")
+        : props.sinConsultar
+          ? t("agendaVisual.profesionales.sinConsultar")
+          : delDia.length === 0
+            ? t("agendaVisual.semana.sinClasesDia")
+            : t(
+                "agendaVisual.semana.resumenDia",
+                {
+                  n: programadas.length,
+                  pct: cap > 0 ? Math.round((ocup / cap) * 100) : 0,
+                },
+                programadas.length,
+              ),
       tarjetas: colocar(delDia.map(tarjeta)),
     };
   }),

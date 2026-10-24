@@ -2466,6 +2466,8 @@ onMounted(async () => {
           :dias="dias"
           :sesiones="sesionesVisibles"
           :catalogo="catalogo"
+          :cargando="cargandoSesiones"
+          :sin-consultar="errorSesiones"
           :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
           @abrir="abrirDesdeAgenda"
         />
