@@ -110,12 +110,13 @@ describe("entrada del superadmin en dos pasos", () => {
       "Acceso",
     ]);
     expect(layout.findAll("a")).toHaveLength(0);
-    expect(w.get('[data-prueba="titulo-plataforma"]').text()).toBe("Negocios");
+    // El título de la sección va en el contenido (con su ícono), no en la barra.
+    expect(w.find('[data-prueba="titulo-plataforma"]').exists()).toBe(false);
     expect(w.get("h1").text()).toBe("Negocios");
 
     await w.get('[data-pestana="tarifas"]').trigger("click");
     await flushPromises();
-    expect(w.get('[data-prueba="titulo-plataforma"]').text()).toBe("Tarifas");
+    expect(w.get("h1").text()).toBe("Tarifas");
     expect(w.get('[data-pestana="tarifas"]').attributes("aria-current")).toBe(
       "page",
     );

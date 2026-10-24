@@ -12,6 +12,7 @@ import LayoutPlataforma, {
 } from "@/components/LayoutPlataforma.vue";
 import EquipoPlataforma from "@/components/EquipoPlataforma.vue";
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import InteresadosPlataforma from "@/components/InteresadosPlataforma.vue";
 import DemosPlataforma from "@/components/DemosPlataforma.vue";
 import ModalidadPlataforma from "@/components/ModalidadPlataforma.vue";
@@ -1147,6 +1148,12 @@ const GRUPOS: { clave: string; secciones: [Pestana, string][] }[] = [
     ],
   },
 ];
+function iconoPestana(p: Pestana): string {
+  return (
+    GRUPOS.flatMap((g) => g.secciones).find(([clave]) => clave === p)?.[1] ??
+    "panel"
+  );
+}
 function textoPestana(p: Pestana): string {
   return p === "medicion"
     ? t("medicion.plataforma.pestana")
@@ -1313,7 +1320,13 @@ function borrar(): void {
     @salir="salir"
   >
     <section class="tu-pagina max-w-6xl">
-      <EncabezadoSeccion :titulo="textoPestana(pestana)" />
+      <!-- El ícono y el título de la sección, dentro del contenido (no en la barra). -->
+      <div class="pl-encabezado">
+        <span class="pl-icono" aria-hidden="true">
+          <IconoNav :nombre="iconoPestana(pestana)" :tam="22" />
+        </span>
+        <EncabezadoSeccion :titulo="textoPestana(pestana)" class="flex-1" />
+      </div>
 
       <!-- Estudios -->
       <div
@@ -2858,6 +2871,23 @@ function borrar(): void {
 </template>
 
 <style scoped>
+/* El título de cada sección, con su ícono a la izquierda (neutro, sin tinta). */
+.pl-encabezado {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.pl-icono {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+  background: var(--superficie);
+  color: var(--texto-suave);
+}
 /* La puerta del superadmin: centrada, sin encabezado ni pie públicos. */
 .pl-acceso {
   display: flex;

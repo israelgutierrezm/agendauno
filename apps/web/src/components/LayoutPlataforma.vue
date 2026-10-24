@@ -8,7 +8,8 @@ import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 /**
  * El armazón del superadmin (ADR 0126, 0203): el mismo marco que el panel de un
  * negocio, con el menú lateral de sus secciones agrupadas, la barra superior y el
- * contenido en una tarjeta. No lleva enlaces a la parte pública (ni «Inicio» ni
+ * contenido en una tarjeta (el ícono y el título de la sección van dentro del contenido,
+ * no en la barra). No lleva enlaces a la parte pública (ni «Inicio» ni
  * «Iniciar sesión»): de aquí solo se sale con «Cerrar sesión», para que la sesión de
  * la plataforma no se quede abierta por un clic. La sección elegida es el v-model
  * (va en la dirección, `?pestana=`).
@@ -25,20 +26,13 @@ export interface GrupoPlataforma {
   secciones: SeccionPlataforma[];
 }
 
-const props = defineProps<{
+defineProps<{
   grupos: GrupoPlataforma[];
   operador: string | null;
 }>();
 const seccion = defineModel<string>({ required: true });
 const emit = defineEmits<{ salir: [] }>();
 const { t } = useI18n();
-
-const actual = computed(
-  () =>
-    props.grupos
-      .flatMap((g) => g.secciones)
-      .find((s) => s.clave === seccion.value) ?? null,
-);
 
 // Cajón en el teléfono y barra contraída (solo íconos) en escritorio, como el panel.
 const menuLateral = ref(false);
@@ -188,14 +182,6 @@ function elegir(clave: string): void {
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
-          <div class="tu-barra-titulo" data-prueba="titulo-plataforma">
-            <span v-if="actual" class="tu-barra-icono">
-              <IconoNav :nombre="actual.icono" :tam="18" />
-            </span>
-            <span class="truncate">{{
-              actual?.texto ?? t("plataformaAdmin.marca")
-            }}</span>
-          </div>
         </div>
         <div class="flex items-center gap-3 shrink-0">
           <span
