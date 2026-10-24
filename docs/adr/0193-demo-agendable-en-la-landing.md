@@ -1,6 +1,7 @@
 # ADR 0193 — Demo de 15 minutos agendable en la landing
 
-Estado: Aceptado (2026-10-20).
+Estado: Aceptado (2026-10-20). Ajustado por el ADR 0204: página propia, formulario en
+tres pasos, antiabuso y horario semanal en Superadmin › Demos.
 
 ## Contexto
 

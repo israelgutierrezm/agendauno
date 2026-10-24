@@ -8,6 +8,7 @@ import { NOMBRE_MODALIDAD, perfilDeSolucion } from "@/marketing/modalidades";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { soluciones } from "@/marketing/soluciones";
 import { trackEvent } from "@/lib/analytics";
+import { useDemosActivas } from "@/lib/demos";
 import { conMarcaProfunda, productoDeModalidad } from "@/lib/producto";
 const props = defineProps<{ slug: string }>();
 // Lo fijo de la página, en `landing.solucion.*`; lo del giro, en soluciones.ts.
@@ -35,6 +36,16 @@ const registro = computed(() => ({
     giro.value === null
       ? { modo: modo.value }
       : { modo: modo.value, giro: giro.value },
+}));
+// «Agendar una demo» (ADR 0204), si la plataforma agenda demos: con su producto y su
+// giro ya elegido.
+const demosActivas = useDemosActivas();
+const demo = computed(() => ({
+  name: "demo",
+  query:
+    giro.value === null
+      ? { producto: productoDeModalidad(modo.value) }
+      : { producto: productoDeModalidad(modo.value), giro: giro.value },
 }));
 // Sin registro abierto, el botón lleva a la lista de interesados (el registro la
 // muestra): se mide como `waitlist`.
@@ -95,6 +106,14 @@ function medir(placement: string): void {
               : t("landing.prelanzamiento.proximamente")
           }}
         </p>
+        <RouterLink
+          v-if="demosActivas"
+          class="tu-btn tu-btn-secundario px-7 py-3"
+          :to="demo"
+          data-cta="hero_demo"
+          @click="medir('solution_demo')"
+          >{{ t("demoAgendable.cta") }}</RouterLink
+        >
         <RouterLink class="tu-enlace text-sm" to="/#producto">{{
           t("landing.solucion.verAgenda")
         }}</RouterLink>

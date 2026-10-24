@@ -1738,22 +1738,41 @@ en el negocio.
 - `POST /pos/ventas` acepta `apartados` (ids): los de su comprador y su sede quedan
   entregados con la venta.
 
-### Demo agendable en la landing (ADR 0193)
+### Demo agendable en la landing (ADR 0193 y 0204)
 
 - `GET /api/v1/demos` (público) devuelve `activas`, `minutos`, `zona`, `whatsapp` (si se
-  puede confirmar por WhatsApp) y `dias`: [{`fecha`, `horas`: ["10:00", …]}], solo los
-  horarios libres.
-- `POST /api/v1/demos` {`producto`, `fecha`, `hora`, `nombre`, `negocio`, `giro`?,
-  `correo`, `telefono`, `acepta_whatsapp`?, `acepta_aviso`, `aviso_version`?,
-  `recaptcha_token`?} responde 201 {`id`, `inicia_en`, `whatsapp`}.
+  puede confirmar por WhatsApp), `dias`: [{`fecha`, `horas`: ["10:00", …]}] (solo los
+  horarios libres, según el horario semanal del superadmin) y `sello` (cuándo se abrió
+  la página, cifrado).
+- `POST /api/v1/demos` (`throttle:demos`: 5 por IP en 10 min y 15 al día; 5 al día por
+  correo y por teléfono) {`producto`, `fecha`, `hora`, `nombre`, `negocio`, `giro`?,
+  `correo`, `telefono` (con lada: «+57 300…»; sin «+», México), `acepta_whatsapp`?,
+  `acepta_aviso`, `aviso_version`?, `recaptcha_token`?, `sello`, y lo que cuenta de su
+  negocio, opcional: `operando`, `tamano` (1-20 … 500+), `apertura`, `sucursales`,
+  `objetivos` (hasta 2), `giro_otro`, `redes`} responde 201 {`id`, `inicia_en`,
+  `whatsapp`}.
   - 422 en `meta.errors.hora` si el horario ya no está libre;
-  - 422 en `telefono` si no tiene 10 dígitos;
+  - 422 en `sello` si falta, no es válido, llega en menos de 3 s o con la página abierta
+    más de 6 h;
+  - 422 en `correo` si es de usar y tirar (`DEMOS_DOMINIOS_DESECHABLES` amplía la lista)
+    o si ya hay una demo próxima con ese correo o teléfono;
+  - 422 en `nombre`, `negocio` o `giro_otro` si traen enlaces;
+  - 422 en `telefono` si no es un número válido;
   - `sitio_web` es un campo trampa y debe llegar vacío.
 - `POST /api/v1/demos/{id}/cancelar` {`token`} la cancela (404 con otro token).
 - Recordatorios por correo un día y una hora antes (`agendauno:recordar-demos`).
-- Superadmin:
-  - `GET /plataforma/demos`, las próximas primero;
-  - `PUT /plataforma/demos/{id}` {`estado`: `atendida`, `no_asistio` o `cancelada`}.
+- Superadmin (Demos):
+  - `GET /plataforma/demos` {`ver`: `proximas` (por omisión), `pasadas`, `canceladas` o
+    `todas`; `producto`?; `q`?; `page`?}, 15 por página, con `calificacion` de cada una y
+    `meta.resumen`: `hoy`, `semana` (próximos 7 días), `proximas`, y de los últimos 30
+    días `atendidas`, `no_asistio` y `canceladas`;
+  - `PUT /plataforma/demos/{id}` {`estado`: `atendida`, `no_asistio` o `cancelada`};
+  - `GET /plataforma/demos/horario` devuelve `activas`, `minutos`, `por_horario`,
+    `dias_adelante`, `horas_anticipacion`, `zona`, `rangos` [{`dia` (1 = lunes … 7),
+    `desde`, `hasta`}], `bloqueos` [{`fecha`, `motivo`}] y `limites` de cada número;
+  - `PUT /plataforma/demos/horario` con lo mismo (sin `zona` ni `limites`): 422 si dos
+    rangos de un día se enciman, si uno termina antes de empezar, si un bloqueo es de un
+    día pasado o si se encienden sin ningún rango. «24:00» termina a la medianoche.
 
 ### Renta con Mercado Pago y OpenPay (ADR 0192)
 

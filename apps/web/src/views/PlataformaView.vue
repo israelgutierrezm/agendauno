@@ -192,6 +192,7 @@ type Pestana =
   | "operacion"
   | "errores"
   | "interesados"
+  | "demos"
   | "embudo"
   | "medicion"
   | "equipo"
@@ -245,6 +246,7 @@ const PESTANAS: Pestana[] = [
   "operacion",
   "errores",
   "interesados",
+  "demos",
   "embudo",
   "medicion",
   "equipo",
@@ -1137,6 +1139,19 @@ async function guardarPasarela(proveedor: string): Promise<void> {
 }
 
 // ---- Acceso ----
+// Cuántas demos vienen (se ve junto a «Demos» en el menú); la sección la actualiza.
+const demosProximas = ref<number | null>(null);
+async function cargarDemosProximas(): Promise<void> {
+  try {
+    const { data } = await cliente.get<{
+      meta: { resumen: { proximas: number } };
+    }>("/api/v1/plataforma/demos", encabezados());
+    demosProximas.value = data.meta.resumen.proximas;
+  } catch {
+    // Sin la cuenta: la sección la muestra al abrirla.
+  }
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
@@ -1150,6 +1165,7 @@ async function cargar(): Promise<void> {
     ]);
     operador.value = yo.data.data.administrador?.nombre ?? null;
     autenticado.value = true;
+    void cargarDemosProximas();
     // La configuración no impide entrar: si falla, se ve en su pestaña (ADR 0132).
     void cargarConfiguracion().catch((err: unknown) => {
       toast.error(mensajeDeError(err));
@@ -1190,6 +1206,7 @@ const GRUPOS: { clave: string; secciones: [Pestana, string][] }[] = [
     secciones: [
       ["estudios", "comercio"],
       ["interesados", "captacion"],
+      ["demos", "agenda"],
       ["embudo", "oportunidades"],
     ],
   },
@@ -1240,7 +1257,9 @@ const gruposSecciones = computed<GrupoPlataforma[]>(() =>
       cuenta:
         clave === "estudios"
           ? (metaEstudios.value?.total_negocios ?? estudios.value.length)
-          : undefined,
+          : clave === "demos" && (demosProximas.value ?? 0) > 0
+            ? (demosProximas.value ?? undefined)
+            : undefined,
     })),
   })),
 );
@@ -1846,12 +1865,14 @@ function borrar(): void {
         :api-url="apiUrl"
         :token="token"
       />
-      <!-- Las demos agendadas desde la landing (ADR 0193) -->
+      <!-- Las demos de la landing: cuántas hay, quién las agendó y su horario
+           (ADR 0193 y 0204). -->
       <DemosPlataforma
-        v-if="pestana === 'interesados'"
-        class="mt-8"
+        v-if="pestana === 'demos'"
+        class="mt-5"
         :api-url="apiUrl"
         :token="token"
+        @proximas="(n) => (demosProximas = n)"
       />
 
       <!-- Equipo de operadores y bitácora (ADR 0132) -->

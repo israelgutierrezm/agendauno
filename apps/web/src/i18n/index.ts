@@ -294,6 +294,9 @@ export const SIN_ADAPTAR: ReadonlySet<string> = new Set([
   "renta",
   "plataforma",
   "plataformaAdmin",
+  // La demo de la landing (pública) y su lista en el superadmin (ADR 0204).
+  "demoAgendable",
+  "demosPlataforma",
   "terminologiaNegocio",
   "modalidadNegocio",
 ]);

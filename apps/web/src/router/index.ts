@@ -65,6 +65,12 @@ const router = createRouter({
       component: () => import("@/views/AvisoPrivacidadView.vue"),
     },
     {
+      // Agendar una demo (ADR 0204): a ella llevan los botones de la landing.
+      path: "/demo",
+      name: "demo",
+      component: () => import("@/views/DemoView.vue"),
+    },
+    {
       // Cancelar la demo agendada desde el enlace del correo (ADR 0193).
       path: "/demo/cancelar",
       name: "demo-cancelar",

@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $acepto_aviso_en
  * @property Carbon|null $recordatorio_dia_en
  * @property Carbon|null $recordatorio_hora_en
+ * @property array<string, mixed>|null $calificacion
  * @property Carbon $created_at
  */
 class DemoAgendada extends Model
@@ -38,7 +39,7 @@ class DemoAgendada extends Model
 
     protected $table = 'demos_agendadas';
 
-    protected $fillable = ['producto', 'inicia_en', 'ranura', 'nombre', 'negocio', 'giro', 'correo', 'telefono', 'acepta_whatsapp', 'estado', 'token', 'aviso_version', 'acepto_aviso_en'];
+    protected $fillable = ['producto', 'inicia_en', 'ranura', 'nombre', 'negocio', 'giro', 'correo', 'telefono', 'acepta_whatsapp', 'estado', 'token', 'aviso_version', 'acepto_aviso_en', 'calificacion'];
 
     /**
      * @var array<string, string>
@@ -49,5 +50,6 @@ class DemoAgendada extends Model
         'acepto_aviso_en' => 'datetime',
         'recordatorio_dia_en' => 'datetime',
         'recordatorio_hora_en' => 'datetime',
+        'calificacion' => 'array',
     ];
 }

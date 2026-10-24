@@ -229,6 +229,17 @@ return [
         'whatsapp' => env('VENTAS_WHATSAPP'),
         // La zona de los horarios de las demos (ADR 0193).
         'zona' => env('VENTAS_ZONA', 'America/Mexico_City'),
+        // Correos de usar y tirar que no agendan una demo (ADR 0204): se puede ampliar
+        // con DEMOS_DOMINIOS_DESECHABLES (separados por comas).
+        'dominios_desechables' => array_values(array_filter(array_map('trim', array_merge([
+            'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'sharklasers.com',
+            'grr.la', '10minutemail.com', '10minutemail.net', 'tempmail.com', 'temp-mail.org',
+            'tempmailo.com', 'tempail.com', 'yopmail.com', 'yopmail.net', 'trashmail.com',
+            'getnada.com', 'nada.email', 'dispostable.com', 'maildrop.cc', 'throwawaymail.com',
+            'fakeinbox.com', 'mintemail.com', 'emailondeck.com', 'mohmal.com', 'burnermail.io',
+            'mailnesia.com', 'mytemp.email', 'tmpmail.org', 'moakt.com', 'spamgourmet.com',
+            'mailcatch.com', 'inboxkitten.com', 'discard.email', 'luxusmail.org',
+        ], explode(',', (string) env('DEMOS_DOMINIOS_DESECHABLES', '')))))),
     ],
 
     /*

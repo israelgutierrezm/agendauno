@@ -260,7 +260,7 @@ Route::prefix('v1')->group(function (): void {
     // La demo de 15 minutos desde la landing (ADR 0193): sus horarios, agendarla y
     // cancelarla con el enlace de su correo.
     Route::get('/demos', [DemosController::class, 'horarios'])->middleware('throttle:publico')->name('api.v1.demos.horarios');
-    Route::post('/demos', [DemosController::class, 'agendar'])->middleware('throttle:login')->name('api.v1.demos.agendar');
+    Route::post('/demos', [DemosController::class, 'agendar'])->middleware('throttle:demos')->name('api.v1.demos.agendar');
     Route::post('/demos/{demo}/cancelar', [DemosController::class, 'cancelar'])->middleware('throttle:login')->name('api.v1.demos.cancelar');
     // Servicio web de los pases de Apple Wallet (ADR 0195): el teléfono registra el pase,
     // pregunta qué cambió y pide el pase nuevo (con el token del pase, sin sesión).
@@ -348,6 +348,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/interesados', [InteresadosController::class, 'index'])->name('interesados');
         // Las demos agendadas desde la landing (ADR 0193).
         Route::get('/demos', [DemosController::class, 'index'])->name('demos');
+        // Su horario semanal, días bloqueados, duración y cupo (ADR 0204).
+        Route::get('/demos/horario', [DemosController::class, 'horario'])->name('demos.horario');
+        Route::put('/demos/horario', [DemosController::class, 'guardarHorario'])->name('demos.horario.guardar');
         Route::put('/demos/{demo}', [DemosController::class, 'actualizar'])->name('demos.actualizar');
         // Embudo de la plataforma: de la landing al primer pago (C08).
         Route::get('/embudo', [EmbudoPlataformaController::class, 'reporte'])->name('embudo');

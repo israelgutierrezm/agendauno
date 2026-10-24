@@ -104,7 +104,19 @@ class ParametrosTenant
             ...$d->toArray(),
             'defecto' => $d->defecto,
             'valor' => $plataforma[$d->clave] ?? null,
-        ], CatalogoParametros::todos()));
+        ], array_filter(
+            CatalogoParametros::todos(),
+            fn (DefinicionParametro $d): bool => ! self::enOtraSeccion($d->clave),
+        )));
+    }
+
+    /**
+     * Los que el superadmin edita en otra sección y no en Parámetros: los de las demos,
+     * en Demos › Horario junto con su horario semanal (ADR 0204). Se guardan igual.
+     */
+    public static function enOtraSeccion(string $clave): bool
+    {
+        return str_starts_with($clave, 'demos.');
     }
 
     /**

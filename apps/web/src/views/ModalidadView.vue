@@ -6,7 +6,6 @@ import { RouterLink } from "vue-router";
 
 import ArranqueYReferidos from "@/components/ArranqueYReferidos.vue";
 import AyudaParaEmpezar from "@/components/AyudaParaEmpezar.vue";
-import DemoAgendable from "@/components/DemoAgendable.vue";
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
 import CasosPiloto from "@/components/CasosPiloto.vue";
 import FondoHero from "@/components/FondoHero.vue";
@@ -27,6 +26,7 @@ import SellosConfianza from "@/components/SellosConfianza.vue";
 import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
 import TextoDestacado from "@/components/TextoDestacado.vue";
 import { trackEvent } from "@/lib/analytics";
+import { useDemosActivas } from "@/lib/demos";
 import { CASOS } from "@/marketing/casos";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { contarVisitaLanding } from "@/lib/visitaLanding";
@@ -214,6 +214,20 @@ function medirRegistro(placement: string, giro: string | null = null): void {
     ...(giro === null ? {} : { business_profile: giro }),
   });
 }
+// «Agendar una demo» (ADR 0204): solo si la plataforma agenda demos; lleva a su
+// página con el producto de esta portada.
+const demosActivas = useDemosActivas();
+const demo = computed(() => ({
+  name: "demo",
+  query: { producto: productoDeModalidad(props.modo) },
+}));
+function medirDemo(placement: string): void {
+  trackEvent("marketing_cta_clicked", {
+    placement,
+    destination: "demo",
+    mode: props.modo,
+  });
+}
 function medirProducto(): void {
   trackEvent("marketing_cta_clicked", {
     placement: "hero",
@@ -267,7 +281,19 @@ function medirOtra(): void {
             >
               {{ textoRegistro }}
             </RouterLink>
+            <!-- Con demos, la segunda acción es agendar una (como la competencia);
+                 sin ellas, ver el producto. -->
+            <RouterLink
+              v-if="demosActivas"
+              class="tu-btn tu-btn-secundario text-base px-7 py-3"
+              :to="demo"
+              data-cta="hero_demo"
+              @click="medirDemo('hero')"
+            >
+              {{ t("demoAgendable.cta") }}
+            </RouterLink>
             <a
+              v-else
               class="tu-btn tu-btn-secundario text-base px-7 py-3"
               href="#producto"
               @click="medirProducto"
@@ -690,11 +716,16 @@ function medirOtra(): void {
         >
           {{ textoRegistro }}
         </RouterLink>
-        <!-- La demo de 15 minutos, si la plataforma agenda demos (ADR 0193). -->
-        <DemoAgendable
-          :producto="productoDeModalidad(modo)"
-          class="mt-10 mx-auto max-w-2xl"
-        />
+        <!-- La demo, si la plataforma agenda demos: en su página (ADR 0204). -->
+        <RouterLink
+          v-if="demosActivas"
+          class="tu-btn tu-btn-secundario text-base px-7 py-3 mt-8 ml-3"
+          :to="demo"
+          data-cta="final_demo"
+          @click="medirDemo('final')"
+        >
+          {{ t("demoAgendable.cta") }}
+        </RouterLink>
         <!-- Enlace discreto a la otra modalidad: cada negocio es de una sola. -->
         <p class="tu-modalidad-otra">
           {{ t(k("final.otra")) }}

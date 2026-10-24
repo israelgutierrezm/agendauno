@@ -130,6 +130,24 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('calendario', fn (Request $request): Limit => Limit::perMinute(60)
             ->by(self::negocioDe($request).'|'.self::textoDeRuta($request, 'token')));
 
+        // Agendar una demo desde la landing (ADR 0204): pocas por IP (en 10 minutos y en
+        // el día) y pocas por correo y por teléfono en el día, para que nadie llene la
+        // agenda de ventas con envíos en masa. Cuentan también los intentos rechazados:
+        // hay margen para corregir un dato. El captcha y el sello de tiempo filtran el
+        // resto.
+        RateLimiter::for('demos', function (Request $request): array {
+            $ip = (string) $request->ip();
+            $correo = Str::lower(trim((string) $request->input('correo')));
+            $telefono = (string) preg_replace('/\D/', '', (string) $request->input('telefono'));
+
+            return [
+                Limit::perMinutes(10, 5)->by('demos|'.$ip),
+                Limit::perDay(15)->by('demos-dia|'.$ip),
+                Limit::perDay(5)->by('demos-correo|'.hash('sha256', $correo)),
+                Limit::perDay(5)->by('demos-telefono|'.hash('sha256', $telefono)),
+            ];
+        });
+
         // Páginas públicas de AgendaUno sin negocio (registro, directorio, legales).
         RateLimiter::for('publico', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
         // El servicio web de Apple Wallet: muchos teléfonos detrás de una IP de Apple no,

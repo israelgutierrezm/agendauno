@@ -16,9 +16,10 @@ use Throwable;
 /**
  * La demo de 15 minutos que se agenda desde la landing (ADR 0193).
  *
- * - El horario lo fija el superadmin: de qué hora a qué hora, de lunes a viernes (y
- *   sábados, si quiere), cuántos días hacia adelante, con cuánta anticipación y cuántas
- *   demos caben a la misma hora (cuántas personas atienden). Todo en la zona de ventas.
+ * - El horario lo fija el superadmin en Demos › Horario ({@see HorarioDemos}): rangos
+ *   por día de la semana y días bloqueados, cuántos días hacia adelante, con cuánta
+ *   anticipación y cuántas demos caben a la misma hora (cuántas personas atienden).
+ *   Todo en la zona de ventas.
  * - Cada demo ocupa un lugar de su horario (`ranura`, único): dos personas no toman el
  *   mismo aunque agenden a la vez. Cancelarla lo libera.
  * - Apagadas (`demos.activas`), la landing no las ofrece y no se agenda.
@@ -26,7 +27,10 @@ use Throwable;
  */
 class DemosAgendables
 {
-    public function __construct(private readonly ParametrosTenant $parametros) {}
+    public function __construct(
+        private readonly ParametrosTenant $parametros,
+        private readonly HorarioDemos $horario,
+    ) {}
 
     public function activas(): bool
     {
@@ -57,11 +61,9 @@ class DemosAgendables
         $ahora = CarbonImmutable::now($zona);
         $desde = $ahora->addHours($this->parametros->entero('demos.horas_anticipacion'));
         $minutos = $this->minutos();
-        $inicio = $this->parametros->entero('demos.hora_inicio') * 60;
-        $fin = $this->parametros->entero('demos.hora_fin') * 60;
         $porHorario = max(1, $this->parametros->entero('demos.por_horario'));
         $dias = max(1, $this->parametros->entero('demos.dias_adelante'));
-        $sabados = $this->parametros->siNo('demos.sabados');
+        $horario = $this->horario->leer($zona);
 
         $ocupadas = DemoAgendada::query()
             ->where('estado', 'agendada')
@@ -72,11 +74,8 @@ class DemosAgendables
         $libres = [];
         for ($d = 0; $d < $dias; $d++) {
             $dia = $ahora->startOfDay()->addDays($d);
-            if ($dia->isSunday() || ($dia->isSaturday() && ! $sabados)) {
-                continue;
-            }
             $horas = [];
-            for ($m = $inicio; $m + $minutos <= $fin; $m += $minutos) {
+            foreach (HorarioDemos::iniciosDelDia($horario, $dia, $minutos) as $m) {
                 $hora = $dia->addMinutes($m);
                 if ($hora->lessThan($desde) || ($ocupadas[$hora->utc()->format('Y-m-d H:i')] ?? 0) >= $porHorario) {
                     continue;
@@ -94,7 +93,7 @@ class DemosAgendables
     /**
      * Agenda una demo en un horario libre. 422 si ya no lo está.
      *
-     * @param  array{producto: string, fecha: string, hora: string, nombre: string, negocio: string, giro?: string|null, correo: string, telefono: string, acepta_whatsapp: bool, aviso_version?: int|null}  $datos
+     * @param  array{producto: string, fecha: string, hora: string, nombre: string, negocio: string, giro?: string|null, correo: string, telefono: string, acepta_whatsapp: bool, aviso_version?: int|null, calificacion?: array<string, mixed>|null}  $datos
      */
     public function agendar(array $datos): DemoAgendada
     {
@@ -124,6 +123,7 @@ class DemosAgendables
                     'token' => bin2hex(random_bytes(20)),
                     'aviso_version' => $datos['aviso_version'] ?? null,
                     'acepto_aviso_en' => now(),
+                    'calificacion' => $datos['calificacion'] ?? null,
                 ]);
             } catch (UniqueConstraintViolationException) {
                 // Otro tomó ese lugar al mismo tiempo: el siguiente del horario.

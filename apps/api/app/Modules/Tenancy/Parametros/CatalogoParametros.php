@@ -291,17 +291,12 @@ final class CatalogoParametros
             new DefinicionParametro('asistente.preguntas_por_dia', 'Asistente', 'Preguntas al asistente por día',
                 'Por negocio. 0 = sin asistente.', $e, 40, 0, 500, 'preguntas'),
 
-            // La demo de 15 minutos que se agenda desde la landing (ADR 0193).
+            // La demo de 15 minutos que se agenda desde la landing (ADR 0193). Se editan
+            // en Demos › Horario, junto con el horario semanal (ADR 0204).
             new DefinicionParametro('demos.activas', 'Demos', 'Agendar demos desde la landing',
-                'Encendido, la landing ofrece agendar una demo en los horarios de abajo (hora del centro de México).', $sn, 0, porNegocio: false),
+                'Encendido, la landing ofrece agendar una demo en el horario de Demos › Horario (en la zona de ventas).', $sn, 0, porNegocio: false),
             new DefinicionParametro('demos.minutos', 'Demos', 'Duración de cada demo',
                 'También es cada cuánto empieza una.', $e, 15, 10, 60, 'min', porNegocio: false),
-            new DefinicionParametro('demos.hora_inicio', 'Demos', 'Primera hora para una demo',
-                'De lunes a viernes (y sábado, si se enciende abajo).', $e, 10, 0, 23, 'h', porNegocio: false),
-            new DefinicionParametro('demos.hora_fin', 'Demos', 'Las demos terminan a más tardar a las',
-                'La última empieza para terminar a esta hora.', $e, 18, 1, 24, 'h', porNegocio: false),
-            new DefinicionParametro('demos.sabados', 'Demos', 'También los sábados',
-                'Con el mismo horario.', $sn, 0, porNegocio: false),
             new DefinicionParametro('demos.dias_adelante', 'Demos', 'Días hacia adelante que se ofrecen',
                 'Cuántos días se pueden elegir, desde hoy.', $e, 10, 1, 30, 'días', porNegocio: false),
             new DefinicionParametro('demos.horas_anticipacion', 'Demos', 'Anticipación mínima',
