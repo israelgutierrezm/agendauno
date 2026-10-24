@@ -96,3 +96,13 @@ El dueño eligió (2026-10-20):
   de la cita y, sin caja abierta, muestra el mensaje del API.
 - Pendientes que siguen siendo del dueño: el cobro mixto (dos formas en una venta) y la
   devolución parcial en el mostrador.
+
+## Ajuste (2026-10-23): los cierres pasan a Cobros
+
+- El historial de cierres y su revisión dejan de ser una pestaña de Ventas › Caja y son
+  una vista del área de Cobros, «Cierres de caja» (`/cierres-caja`), junto a «Corte de
+  caja». Decisión del dueño: lo que se revisa del dinero vive en Cobros; Caja queda
+  para la operación del día (abrir, mover efectivo, contar y cerrar).
+- La pide `caja.supervisar` (no `facturacion.ver`): quien supervisa la caja sin ver la
+  facturación la sigue teniendo. En Caja, quien supervisa ve un enlace a los cierres.
+- Un enlace viejo (`/caja?pestana=cierres`) lleva a la vista nueva.

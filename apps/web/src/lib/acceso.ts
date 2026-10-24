@@ -84,6 +84,8 @@ export const POLITICAS: Record<string, Politica> = {
   pos: { permiso: ["inventario.ver", "pos.vender"], funcion: "inventario" },
   // La caja de la sucursal (ADR 0175): quien la opera; lo esperado y los cierres, quien supervisa.
   caja: { permiso: "caja.operar" },
+  // Los cierres de caja, en Cobros: solo quien supervisa (sin pedir ver la facturación).
+  "cierres-caja": { permiso: "caja.supervisar" },
   inventario: { permiso: "inventario.gestionar", funcion: "inventario" },
   // Presupuestos (ADR 0127): de los negocios de citas.
   presupuestos: { permiso: "presupuestos.ver", modalidad: "citas" },

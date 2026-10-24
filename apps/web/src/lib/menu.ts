@@ -385,6 +385,7 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
           v("caja", "cobranza", "nav.vistas.caja", {
             query: { vista: "caja" },
           }),
+          v("cierres-caja", "cierres-caja", "caja.cierresTitulo"),
           v("facturas", "facturas", "nav.facturas", { contexto: "factura" }),
         ],
       },

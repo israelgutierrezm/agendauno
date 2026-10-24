@@ -467,6 +467,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Cobros › Cierres de caja: el historial de cada caja al cerrarse y su revisión.
+      path: "/cierres-caja",
+      name: "cierres-caja",
+      component: () => import("@/views/CierresCajaView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Inventario: los productos del mostrador y su stock por sucursal.
       path: "/inventario",
       name: "inventario",

@@ -2,10 +2,11 @@
 // cierres y su revisión (views/CajaView.vue; ADR 0175).
 export default {
   titulo: "Caja",
-  pestanaCaja: "Caja",
-  pestanaCierres: "Cierres",
-  // aria-label de las pestañas «Caja | Cierres».
-  pestanas: "Secciones de la caja",
+  // Cobros › Cierres de caja (views/CierresCajaView.vue).
+  cierresTitulo: "Cierres de caja",
+  cierresSubtitulo:
+    "Cómo cerró cada caja: su diferencia, el motivo y lo que falta revisar.",
+  verCierres: "Ver los cierres de caja",
   eligeSucursal: "Elige la sucursal de la caja",
   sucursal: "Sucursal",
   cargando: "Cargando la caja…",

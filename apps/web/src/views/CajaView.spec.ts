@@ -87,6 +87,10 @@ function montar() {
             "<div v-if='abierto'><h2>{{ titulo }}</h2><slot /><slot name='pie' /></div>",
         },
         PaginacionListado: true,
+        RouterLink: {
+          props: ["to"],
+          template: "<a :data-to='JSON.stringify(to)'><slot /></a>",
+        },
       },
     },
   });
@@ -193,47 +197,21 @@ describe("caja de la sucursal", () => {
     expect(w.get('[data-prueba="ultimo-cierre"]').text()).toContain("-$50.00");
   });
 
-  it("quien supervisa ve lo esperado y revisa los cierres con diferencia", async () => {
+  it("quien supervisa ve lo esperado y, para los cierres, un enlace a Cobros", async () => {
     mocks.permisos = new Set(["caja.operar", "caja.supervisar"]);
-    const cierre = {
-      ...TURNO,
-      id: "T0",
-      estado: "cerrada",
-      diferencia_minor: -5000,
-      requiere_revision: true,
-      motivo_diferencia: "Di mal un cambio",
-    };
-    mocks.get
-      .mockResolvedValueOnce({
-        data: {
-          data: {
-            usa_caja: true,
-            turno: {
-              ...TURNO,
-              esperado: {
-                efectivo: 91000,
-                tarjeta: 0,
-                transferencia: 89900,
-                ventanilla: 0,
-              },
-            },
-          },
-        },
-      })
-      .mockResolvedValueOnce({
-        data: {
-          data: [cierre],
-          meta: { page: 1, ultima_pagina: 1, total: 1, per_page: 20 },
-        },
-      })
-      .mockResolvedValueOnce({ data: { data: cierre } });
-    mocks.post.mockResolvedValueOnce({
+    mocks.get.mockResolvedValueOnce({
       data: {
         data: {
-          ...cierre,
-          revisada_por: "Dueña",
-          revisada_en: "2026-10-01T20:00:00Z",
-          nota_revision: "Se habló con recepción",
+          usa_caja: true,
+          turno: {
+            ...TURNO,
+            esperado: {
+              efectivo: 91000,
+              tarjeta: 0,
+              transferencia: 89900,
+              ventanilla: 0,
+            },
+          },
         },
       },
     });
@@ -241,31 +219,20 @@ describe("caja de la sucursal", () => {
     await flushPromises();
 
     expect(w.get('[data-prueba="esperado"]').text()).toContain("$910.00");
-    // «Cierres» es una pestaña de la sección (PestanasSeccion), no una acción.
-    await w.get('[data-pestana="cierres"]').trigger("click");
-    await flushPromises();
-    expect(w.get('[data-prueba="cierres"]').text()).toContain("Por revisar");
+    // Los cierres viven en Cobros › Cierres de caja: aquí no hay pestañas.
+    expect(w.find('[data-prueba="pestanas-seccion"]').exists()).toBe(false);
+    expect(w.get('[data-prueba="ver-cierres"]').text()).toBe(
+      "Ver los cierres de caja",
+    );
+  });
 
-    await w.get('[data-prueba="cierres"] tbody tr').trigger("click");
+  it("quien solo opera la caja no ve el enlace a los cierres", async () => {
+    mocks.get.mockResolvedValueOnce({
+      data: { data: { usa_caja: true, turno: TURNO } },
+    });
+    const w = montar();
     await flushPromises();
-    expect(w.get('[data-prueba="detalle-cierre"]').text()).toContain(
-      "Di mal un cambio",
-    );
-    await w
-      .get('[data-prueba="nota-revision"]')
-      .setValue("Se habló con recepción");
-    await w.get("#caja-revision").trigger("submit");
-    await flushPromises();
-
-    expect(mocks.post).toHaveBeenCalledWith(
-      "/api/v1/app/barberia/caja/turnos/T0/revision",
-      {
-        nota: "Se habló con recepción",
-      },
-    );
-    expect(w.get('[data-prueba="detalle-cierre"]').text()).toContain(
-      "Revisada por Dueña",
-    );
+    expect(w.find('[data-prueba="ver-cierres"]').exists()).toBe(false);
   });
 
   it("reintentar un retiro que no tuvo respuesta lleva la misma clave (no lo registra dos veces)", async () => {
