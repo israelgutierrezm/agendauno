@@ -83,6 +83,12 @@ Un contrato por tema, con piezas compartidas y pruebas que lo vigilan.
 
 - En el panel, el público se escribe «alumno»: el adaptador de terminología lo
   convierte al término del negocio.
+- Los textos de los parámetros configurables vienen del API (`CatalogoParametros`) y
+  siguen la misma regla: «alumno» y «clase», sin «cliente», «él» ni «clase o cita»
+  (cada negocio es de una sola modalidad). El editor los adapta: en el negocio, con sus
+  términos; en el superadmin, según a qué negocios aplica cada parámetro («cliente» y
+  «cita» en los de citas, «clase o cita» en los de ambos) y sin tocar los que son solo
+  de la plataforma. Lo vigila `tests/Unit/CatalogoParametrosTextosTest.php`.
 - Cada mensaje le habla a quien lo lee.
 - Las fechas de cobro usan `EstadoVencimiento`: próxima, hoy, vencida, en mora,
   suspendida o en pausa.

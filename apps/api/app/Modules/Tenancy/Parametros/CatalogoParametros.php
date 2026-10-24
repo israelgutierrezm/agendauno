@@ -11,6 +11,12 @@ use App\Modules\Tenancy\Application\ActivacionPropietario;
  * Todos los límites y datos de negocio que se pueden configurar (ADR 0042). Nada de
  * esto vive fijo en el código: el valor que aplica sale del negocio, si lo ajustó; si
  * no, de la plataforma; y si tampoco, del `defecto` de aquí.
+ *
+ * Los textos que ve un negocio hablan con las palabras base del panel (ADR 0203):
+ * «alumno» por su público y «clase» por lo que se reserva. El panel los lee con los
+ * términos de cada negocio (socio, cliente, paciente…; cita, sesión…) y el superadmin,
+ * con «cliente» y «clase o cita». Por eso no dicen «cliente» ni «clase o cita», ni
+ * usan «él» por esa persona (no concuerda con «socia» o «alumna»).
  */
 final class CatalogoParametros
 {
@@ -22,70 +28,70 @@ final class CatalogoParametros
         $e = DefinicionParametro::ENTERO;
         $sn = DefinicionParametro::SI_NO;
         $lista = [
-            // Reservas y lista de espera.
-            new DefinicionParametro('reservas.minutos_para_pagar', 'Reservas y lista de espera', 'Tiempo para pagar una reserva apartada',
+            // Reservas (y la lista de espera de las clases).
+            new DefinicionParametro('reservas.minutos_para_pagar', 'Reservas', 'Tiempo para pagar una reserva apartada',
                 'Si no se paga en este tiempo, el lugar se libera.', $e, 30, 5, 1440, 'min'),
-            // Cuándo reserva el cliente una clase desde su cuenta o la app (el negocio, siempre).
-            new DefinicionParametro('reservas.dias_apertura', 'Reservas y lista de espera', 'El cliente reserva una clase desde',
+            // Cuándo reserva el alumno una clase desde su cuenta o la app (el negocio, siempre).
+            new DefinicionParametro('reservas.dias_apertura', 'Reservas', 'El alumno reserva una clase desde',
                 'Días antes de la clase. 0 = en cuanto se programa.', $e, 0, 0, 365, 'días', modalidad: 'clases'),
-            new DefinicionParametro('reservas.minutos_cierre', 'Reservas y lista de espera', 'Las reservas de una clase cierran',
+            new DefinicionParametro('reservas.minutos_cierre', 'Reservas', 'Las reservas de una clase cierran',
                 'Minutos antes de que empiece. 0 = hasta que empieza.', $e, 0, 0, 1440, 'min', modalidad: 'clases'),
-            new DefinicionParametro('reservas.minutos_para_aceptar_lugar', 'Reservas y lista de espera', 'Tiempo para aceptar un lugar de la lista de espera',
-                'Si no lo acepta a tiempo, se ofrece al siguiente.', $e, 30, 5, 1440, 'min', modalidad: 'clases'),
+            new DefinicionParametro('reservas.minutos_para_aceptar_lugar', 'Reservas', 'Tiempo para aceptar un lugar de la lista de espera',
+                'Si no lo acepta a tiempo, se ofrece a quien sigue en la lista.', $e, 30, 5, 1440, 'min', modalidad: 'clases'),
 
             // Recordatorios.
             new DefinicionParametro('recordatorios.primero_horas', 'Recordatorios', 'Primer recordatorio',
-                'Horas antes de la clase o cita.', $e, 24, 1, 168, 'h'),
+                'Horas antes de la clase.', $e, 24, 1, 168, 'h'),
             new DefinicionParametro('recordatorios.segundo_horas', 'Recordatorios', 'Segundo recordatorio',
-                'Horas antes de la clase o cita. 0 = no se envía.', $e, 2, 0, 48, 'h'),
+                'Horas antes de la clase. 0 = no se envía.', $e, 2, 0, 48, 'h'),
 
-            // Reprogramar desde la cuenta del cliente (ADR 0044).
-            new DefinicionParametro('reprogramar.horas_limite_cliente', 'Cambios de horario desde la cuenta', 'El cliente puede cambiar su horario hasta',
+            // Reprogramar desde la cuenta del alumno (ADR 0044).
+            new DefinicionParametro('reprogramar.horas_limite_cliente', 'Cambios de horario desde la cuenta', 'El alumno puede cambiar su horario hasta',
                 'Horas antes del inicio. Después, solo el negocio.', $e, 12, 0, 720, 'h'),
-            new DefinicionParametro('cancelacion.cliente_cancela_tarde', 'Cambios de horario desde la cuenta', 'El cliente puede cancelar después del límite sin costo',
-                'Si lo apagas, pasado ese límite solo el negocio cancela (el cliente le escribe). Si lo dejas, él cancela y se aplica el cobro por cancelar tarde.', $sn, 1),
+            new DefinicionParametro('cancelacion.cliente_cancela_tarde', 'Cambios de horario desde la cuenta', 'El alumno puede cancelar pasado el límite para cancelar sin costo',
+                'Si lo apagas, pasado ese límite solo el negocio cancela (el alumno le escribe). Si lo dejas, el alumno cancela desde su cuenta y se aplica el cobro por cancelar tarde.', $sn, 1),
             new DefinicionParametro('reprogramar.maximo_cliente', 'Cambios de horario desde la cuenta', 'Cambios por reserva',
-                'Cuántas veces puede cambiar él mismo el horario de una reserva. 0 = solo el negocio.', $e, 1, 0, 20),
+                'Cuántas veces el alumno puede cambiar desde su cuenta el horario de una reserva. 0 = solo el negocio.', $e, 1, 0, 20),
 
             // Citas.
             new DefinicionParametro('citas.duracion_defecto', 'Citas', 'Duración de una cita si el servicio no la define',
                 'Minutos.', $e, 30, 5, 480, 'min', modalidad: 'citas'),
             // ADR 0065.
             new DefinicionParametro('citas.pago_en_linea_obligatorio', 'Citas', 'Pedir el pago en línea para confirmar una cita',
-                'Si lo apagas, la cita queda confirmada al agendar y el cliente paga en línea o en la sucursal. Sin cobro en línea activo, siempre se paga en la sucursal.', $sn, 1, modalidad: 'citas'),
+                'Si lo apagas, la cita queda confirmada al agendar y el alumno paga en línea o en la sucursal. Sin cobro en línea activo, siempre se paga en la sucursal.', $sn, 1, modalidad: 'citas'),
             new DefinicionParametro('citas.minutos_anticipacion_minima', 'Citas', 'Anticipación mínima para agendar en línea',
                 'Minutos antes de la cita. 0 = cualquier horario libre que aún no empiece. El negocio agenda sin este límite.', $e, 0, 0, 10080, 'min', modalidad: 'citas'),
             new DefinicionParametro('citas.dias_maximos_adelante', 'Citas', 'Se agenda en línea hasta',
-                'Días adelante que el cliente ve y puede agendar.', $e, 60, 1, 365, 'días', modalidad: 'citas'),
+                'Días adelante que el alumno ve y puede agendar.', $e, 60, 1, 365, 'días', modalidad: 'citas'),
             new DefinicionParametro('citas.agendar_sin_cuenta', 'Citas', 'Se puede agendar sin cuenta',
-                'Si lo apagas, en tu página solo agendan clientes con cuenta (los que tú invitas).', $sn, 1, modalidad: 'citas'),
-            new DefinicionParametro('citas.maximo_por_pagar', 'Citas', 'Citas por pagar que puede tener un cliente',
-                'Con estas citas próximas sin pagar, el cliente ya no puede agendar otra en línea ni desde su cuenta (el negocio sí puede agendarle). 0 = sin límite.', $e, 5, 0, 50, 'citas', modalidad: 'citas'),
+                'Si lo apagas, en tu página solo agendan los alumnos que invitaste y ya tienen cuenta.', $sn, 1, modalidad: 'citas'),
+            new DefinicionParametro('citas.maximo_por_pagar', 'Citas', 'Citas por pagar que puede tener un alumno',
+                'Con estas citas próximas sin pagar, el alumno ya no puede agendar otra en línea ni desde su cuenta (el negocio sí puede agendarle). 0 = sin límite.', $e, 5, 0, 50, 'citas', modalidad: 'citas'),
 
             // Clases recurrentes (ADR 0045).
             new DefinicionParametro('agenda.dias_a_generar', 'Clases recurrentes', 'Fechas creadas por adelantado',
                 'Días hacia adelante con fechas de las clases recurrentes listas para reservar.', $e, 30, 7, 365, 'días', modalidad: 'clases'),
 
             // Lugares apartados para un canal (Wellhub, TotalPass, ClassPass…): sin
-            // devolverlos antes de la clase, los clientes directos la verían llena.
+            // devolverlos antes de la clase, los alumnos directos la verían llena.
             new DefinicionParametro('canales.liberar_horas_antes', 'Lugares por canal', 'Los lugares apartados se liberan',
-                'Horas antes de la clase en que los lugares apartados para un canal que no se usaron vuelven a estar disponibles para todos. Es el valor que se propone al apartar lugares.', $e, 2, 0, 168, 'h', modalidad: 'clases'),
+                'Horas antes de la clase en que los lugares apartados para un canal que no se usaron vuelven a quedar libres para cualquier reserva. Es el valor que se propone al apartar lugares.', $e, 2, 0, 168, 'h', modalidad: 'clases'),
 
             // Wellhub y TotalPass: reservas desde su app (ADR 0149).
             new DefinicionParametro('plataformas.dias_publicados', 'Wellhub y TotalPass', 'Clases publicadas por adelantado',
                 'Días hacia adelante con las clases que se pueden reservar desde la app de Wellhub o TotalPass.', $e, 14, 1, 60, 'días', modalidad: 'clases'),
-            new DefinicionParametro('plataformas.lugares_sin_tope', 'Wellhub y TotalPass', 'Lugares en clases sin cupo',
-                'Cuántos lugares se ofrecen en la app de Wellhub o TotalPass cuando la clase no tiene cupo.', $e, 20, 1, 500, 'lugares', modalidad: 'clases'),
+            new DefinicionParametro('plataformas.lugares_sin_tope', 'Wellhub y TotalPass', 'Lugares en clases sin límite de cupo',
+                'Cuántos lugares se ofrecen en la app de Wellhub o TotalPass cuando la clase no tiene límite de cupo.', $e, 20, 1, 500, 'lugares', modalidad: 'clases'),
 
             // Tope de mensajes de WhatsApp del negocio (ADR 0186).
             new DefinicionParametro('whatsapp.tope_mensual', 'WhatsApp', 'Máximo de mensajes de WhatsApp al mes',
                 'Al llegar, los avisos por WhatsApp de ese mes ya no salen (sí por correo y en la app). 0 = sin tope. Solo cuenta si la plataforma cobra los mensajes.', $e, 0, 0, 100000, 'mensajes'),
 
             // Asistencia (ADR 0101).
-            new DefinicionParametro('asistencia.minutos_antes', 'Asistencia', 'Se puede pasar lista desde',
-                'Minutos antes de que empiece la clase o cita. Antes no se registra la asistencia.', $e, 30, 0, 240, 'min'),
+            new DefinicionParametro('asistencia.minutos_antes', 'Asistencia', 'Se puede registrar la asistencia desde',
+                'Minutos antes de que empiece la clase. Antes no se registra la asistencia.', $e, 30, 0, 240, 'min'),
             new DefinicionParametro('asistencia.no_asistio_al_terminar', 'Asistencia', 'Al terminar, quien no tiene registro «no se presentó»',
-                'Si nadie registró la asistencia de alguien, al terminar la clase o cita queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
+                'Si nadie registró la asistencia de alguien, al terminar la clase queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
 
             // Familias y responsables (ADR 0123).
             new DefinicionParametro('familias.max_participantes', 'Familias', 'Participantes por responsable',
@@ -103,14 +109,14 @@ final class CatalogoParametros
 
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',
-                'Minutos antes de que empiece su clase o cita.', $e, 30, 0, 240, 'min', modalidad: 'clases'),
+                'Minutos antes de que empiece su clase.', $e, 30, 0, 240, 'min', modalidad: 'clases'),
 
             // Membresías (ADR 0047).
             new DefinicionParametro('membresias.dias_aviso_renovacion', 'Membresías', 'Avisar la renovación',
                 'Días antes de que se renueve una membresía.', $e, 3, 1, 30, 'días', modalidad: 'clases'),
-            new DefinicionParametro('membresias.dias_por_vencer', 'Membresías', 'Una membresía está por vencer desde',
+            new DefinicionParametro('membresias.dias_por_vencer', 'Vencimientos', 'Un plan está por vencer desde',
                 'Días antes de su vencimiento. Aplica en la ficha del alumno, el radar de retención y las difusiones.', $e, 14, 1, 90, 'días'),
-            new DefinicionParametro('membresias.dias_vencida_recuperable', 'Membresías', 'Una membresía vencida se sigue buscando durante',
+            new DefinicionParametro('membresias.dias_vencida_recuperable', 'Vencimientos', 'Un plan vencido se sigue buscando durante',
                 'Días después de vencer, en el radar de retención y las difusiones.', $e, 14, 1, 365, 'días'),
 
             // Seguimiento (plan de mejoras M09/C06/C05): tareas para el equipo por señales
@@ -127,28 +133,28 @@ final class CatalogoParametros
             new DefinicionParametro('seguimiento.dias_entre_contactos', 'Seguimiento', 'No repetir un seguimiento por el mismo motivo antes de',
                 'Días desde el anterior con esa persona.', $e, 30, 1, 365, 'días'),
             new DefinicionParametro('membresias.max_dias_pausa', 'Membresías', 'Una pausa puede durar hasta',
-                'Días.', $e, 180, 1, 365, 'días'),
+                'Días.', $e, 180, 1, 365, 'días', modalidad: 'clases'),
 
             // Cobranza.
             new DefinicionParametro('cobranza.dias_gracia_pago_automatico', 'Cobranza', 'Espera antes de dar por fallido un pago automático',
                 'Días después de la fecha de cobro sin recibirlo.', $e, 3, 0, 30, 'días', modalidad: 'clases'),
             new DefinicionParametro('cobranza.dias_gracia_adeudo', 'Cobranza', 'Días de gracia con un adeudo',
-                'Antes de suspender la membresía por falta de pago.', $e, 7, 0, 60, 'días'),
+                'Antes de suspender la membresía por falta de pago.', $e, 7, 0, 60, 'días', modalidad: 'clases'),
             new DefinicionParametro('cobranza.dias_pagar_en_tienda', 'Cobranza', 'Días para pagar en tienda (OXXO)',
                 'Vigencia de la referencia de pago en efectivo de Mercado Pago u OpenPay.', $e, 3, 1, 30, 'días'),
             // Reintentos de un adeudo en mora (cobranza): días desde el fallo.
             new DefinicionParametro('cobranza.reintento_1_dias', 'Cobranza', 'Primer reintento de un pago en mora',
-                'Días después del fallo.', $e, 1, 1, 30, 'días'),
+                'Días después del fallo.', $e, 1, 1, 30, 'días', modalidad: 'clases'),
             new DefinicionParametro('cobranza.reintento_2_dias', 'Cobranza', 'Segundo reintento de un pago en mora',
-                'Días después del fallo.', $e, 3, 1, 60, 'días'),
+                'Días después del fallo.', $e, 3, 1, 60, 'días', modalidad: 'clases'),
             new DefinicionParametro('cobranza.reintento_3_dias', 'Cobranza', 'Tercer reintento y los siguientes',
-                'Días después del fallo.', $e, 7, 1, 90, 'días'),
+                'Días después del fallo.', $e, 7, 1, 90, 'días', modalidad: 'clases'),
 
             // Facturación (ADR 0047).
             new DefinicionParametro('facturacion.iva_porcentaje', 'Facturación', 'Tasa de IVA de las facturas',
                 '8 % solo si el negocio aplica el estímulo de la región fronteriza.', $e, 16, 8, 16, '%', opciones: [16, 8]),
             new DefinicionParametro('facturacion.automatica_citas', 'Facturación', 'Facturar las citas en automático',
-                'A los clientes que guardaron sus datos fiscales y pidieron factura automática: el anticipo al pagarlo y la cita al pagar el resto, con el CFDI de egreso que aplica el anticipo. Solo negocios de citas.', $sn, 0),
+                'A los alumnos que guardaron sus datos fiscales y pidieron factura automática: el anticipo al pagarlo y la cita al pagar el resto, con el CFDI de egreso que aplica el anticipo.', $sn, 0, modalidad: 'citas'),
 
             // Devoluciones (ADR 0046).
             // Cobros en caja (ADR 0086): corregir la forma de pago de un cobro.
@@ -161,7 +167,7 @@ final class CatalogoParametros
                 'Horas después del cobro. 0 = sin límite.', $e, 48, 0, 720, 'h'),
             // ADR 0087: anular un cobro en caja registrado por error.
             new DefinicionParametro('pagos.permitir_anular_cobro', 'Cobros en caja', 'Permitir anular un cobro registrado por error',
-                'El cobro queda anulado y la venta vuelve a quedar por cobrar; si dio créditos o una membresía sin usar, se retiran. Queda en la bitácora. No aplica a pagos en línea, renovaciones, ventas facturadas ni créditos ya usados.', $sn, 0),
+                'El cobro queda anulado y la venta vuelve a quedar por cobrar; si dio un plan o créditos sin usar, se retiran. Queda en la bitácora. No aplica a pagos en línea, renovaciones, ventas facturadas ni créditos ya usados.', $sn, 0),
             new DefinicionParametro('pagos.horas_para_anular', 'Cobros en caja', 'Un cobro se puede anular hasta',
                 'Horas después del cobro. 0 = sin límite.', $e, 24, 0, 720, 'h'),
 
@@ -172,20 +178,20 @@ final class CatalogoParametros
                 'Se devuelve solo, por la misma pasarela. Lo pagado en efectivo se devuelve en caja.', $sn, 0),
 
             // Reseñas.
-            new DefinicionParametro('resenas.dias_para_calificar', 'Reseñas', 'Días para calificar una clase o cita',
+            new DefinicionParametro('resenas.dias_para_calificar', 'Reseñas', 'Días para calificar una clase',
                 'Después ya no se pide la reseña.', $e, 30, 1, 365, 'días'),
             new DefinicionParametro('resenas.publicar_sin_revisar', 'Reseñas', 'Publicar las reseñas sin revisarlas',
                 'Si lo apagas, cada reseña nueva queda oculta en tu página hasta que la apruebes en Reseñas.', $sn, 1),
 
             // Captación (plan de mejoras B01, ADR 0117).
             new DefinicionParametro('captacion.activa', 'Captación', 'Recibir prospectos',
-                'Quien todavía no es cliente puede dejar sus datos en tus formularios (tu página, un enlace, un QR o tu propio sitio) y llega a Prospectos. Apagado, «Pedir acceso» te contacta por WhatsApp o teléfono.', $sn, 1),
+                'Quien todavía no es alumno puede dejar sus datos en tus formularios (tu página, un enlace, un QR o tu propio sitio) y llega a Prospectos. Apagado, «Pedir acceso» te contacta por WhatsApp o teléfono.', $sn, 1),
             // ADR 0138.
             new DefinicionParametro('captacion.horas_para_atender', 'Captación', 'Horas para atender un prospecto',
                 'Si en este tiempo nadie le escribe ni le da seguimiento, se marca «sin atender», su responsable recibe una tarea y se avisa al equipo para reasignarlo. 0 = no se revisa.', $e, 24, 0, 168, 'h'),
             // Atribución de campañas (ADR 0142). En la plataforma, la del registro de negocios.
             new DefinicionParametro('medicion.dias_ultimo_toque', 'Captación', 'Una campaña cuenta durante',
-                'Días desde que alguien llega por una campaña (un enlace con UTM, un anuncio u otro sitio) en que su solicitud, su compra o su cita se le atribuyen. Pasado ese tiempo sin volver por otra, queda «sin atribución».', $e, 30, 1, 90, 'días'),
+                'Días desde que alguien llega por una campaña (un enlace con UTM, un anuncio u otro sitio) en que su solicitud, su compra o su primera reserva se le atribuyen. Pasado ese tiempo sin volver por otra, queda «sin atribución».', $e, 30, 1, 90, 'días'),
             new DefinicionParametro('medicion.dias_primer_toque', 'Captación', 'El primer origen se recuerda durante',
                 'Días en que se guarda por dónde llegó alguien la primera vez, aunque después vuelva por otra campaña.', $e, 90, 1, 365, 'días'),
 
@@ -210,7 +216,7 @@ final class CatalogoParametros
             // pantalla del alumno: menos de 90 s lo dejaría vencer antes.
             // Pase en Apple Wallet y Google Wallet (ADR 0195): su código no caduca.
             new DefinicionParametro('acceso.pase_en_wallet', 'Acceso', 'Pase de entrada en la cartera del teléfono',
-                'El cliente agrega su pase a Apple Wallet o Google Wallet. Su código no cambia cada pocos minutos como el de la app: si lo apagas, esos pases dejan de servir y se usa el QR de la app.', $sn, 1),
+                'El alumno agrega su pase a Apple Wallet o Google Wallet. Su código no cambia cada pocos minutos como el de la app: si lo apagas, esos pases dejan de servir y se usa el QR de la app.', $sn, 1),
             new DefinicionParametro('acceso.segundos_pase_qr', 'Acceso', 'Vigencia del pase QR de entrada',
                 'Segundos. Una captura de pantalla deja de servir después.', $e, 180, 90, 900, 's', porNegocio: false),
             new DefinicionParametro('importaciones.max_filas', 'Importaciones', 'Filas por archivo al importar miembros o personal',
@@ -320,8 +326,8 @@ final class CatalogoParametros
                 'A quien le escribe al número de AgendaUno se le contesta solo, una vez en este plazo aunque escriba varias veces. BAJA siempre se contesta.', $e, 12, 1, 168, 'h', porNegocio: false),
 
             // Una sesión que no se usa vence (en el negocio, puede ser menos).
-            new DefinicionParametro('sesion.dias_inactividad', 'Sesiones', 'Días sin usarse para que una sesión venza',
-                'Quien no entra en ese plazo vuelve a poner su contraseña. Protege si alguien deja la sesión abierta en una computadora prestada.', $e, 60, 1, 365, 'días'),
+            new DefinicionParametro('sesion.dias_inactividad', 'Cuentas', 'Días sin entrar para volver a pedir la contraseña',
+                'Quien no entra a su cuenta en ese plazo vuelve a poner su contraseña. Protege si alguien deja su cuenta abierta en una computadora prestada.', $e, 60, 1, 365, 'días'),
 
             // Limpieza de registros técnicos (ADR 0079, solo la plataforma).
             new DefinicionParametro('limpieza.dias_envios_whatsapp', 'Limpieza de registros', 'Días que se guarda el registro de cada WhatsApp enviado',

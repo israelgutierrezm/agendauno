@@ -7,6 +7,11 @@ import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
 import { coincideBusqueda, normalizar } from "@/lib/menu";
 import type { Parametro } from "@/lib/parametros";
+import {
+  adaptarTexto,
+  conTerminosActuales,
+  type TerminosNegocio,
+} from "@/lib/terminologia";
 
 /**
  * Editor de parámetros configurables (ADR 0042), por categoría (el `grupo` de cada
@@ -35,6 +40,34 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
+// Los textos del catálogo (API) usan las palabras base del panel (ADR 0203): «alumno»
+// por el público y «clase» por lo que se reserva. En el negocio se leen con sus
+// términos (socio, cliente, paciente…; cita, sesión…). En la plataforma, según a qué
+// negocios aplica cada parámetro: los de clases como están, los de citas con «cliente»
+// y «cita», y los de ambos con «cliente» y «clase o cita». Los que son solo de la
+// plataforma ya están escritos para el superadmin: no se tocan.
+const TERMINOS_PLATAFORMA: Record<
+  "clases" | "citas" | "ambas",
+  TerminosNegocio
+> = {
+  clases: { sesion: "Clase", miembro: "Alumno", instructor: "Instructor" },
+  citas: { sesion: "Cita", miembro: "Cliente", instructor: "Profesional" },
+  ambas: {
+    sesion: "Clase o cita",
+    sesiones: "Clases o citas",
+    miembro: "Cliente",
+    instructor: "Instructor",
+  },
+};
+function adaptar(texto: string, p: Parametro): string {
+  if (props.modo === "negocio") {
+    return conTerminosActuales(texto);
+  }
+  return p.por_negocio === false
+    ? texto
+    : adaptarTexto(texto, TERMINOS_PLATAFORMA[p.modalidad ?? "ambas"]);
+}
+
 // Lo que hay en cada campo ("" = usa el de referencia). Un campo numérico puede traer
 // número: v-model en un `type="number"` lo convierte.
 const campos = ref<Record<string, string>>({});
@@ -57,7 +90,8 @@ interface Categoria {
   parametros: Parametro[];
 }
 
-// La clave de una categoría en la dirección: su nombre sin acentos ni signos.
+// La clave de una categoría en la dirección: su nombre (el del catálogo, igual en todos
+// los negocios) sin acentos ni signos.
 function claveDe(grupo: string): string {
   return normalizar(grupo)
     .replace(/[^a-z0-9]+/g, "-")
@@ -69,7 +103,11 @@ const categorias = computed<Categoria[]>(() => {
   const mapa = new Map<string, Categoria>();
   for (const p of props.parametros) {
     const clave = claveDe(p.grupo);
-    const c = mapa.get(clave) ?? { clave, nombre: p.grupo, parametros: [] };
+    const c = mapa.get(clave) ?? {
+      clave,
+      nombre: adaptar(p.grupo, p),
+      parametros: [],
+    };
     c.parametros.push(p);
     mapa.set(clave, c);
   }
@@ -97,7 +135,7 @@ const visibles = computed<Categoria[]>(() => {
       parametros: coincideBusqueda(c.nombre, busqueda.value)
         ? c.parametros
         : c.parametros.filter((p) =>
-            coincideBusqueda(p.etiqueta, busqueda.value),
+            coincideBusqueda(adaptar(p.etiqueta, p), busqueda.value),
           ),
     }))
     .filter((c) => c.parametros.length > 0);
@@ -117,12 +155,12 @@ function referencia(p: Parametro): number {
 function texto(p: Parametro, valor: number): string {
   const etiqueta = p.etiquetas?.[String(valor)];
   if (etiqueta) {
-    return etiqueta;
+    return adaptar(etiqueta, p);
   }
   if (p.tipo === "si_no") {
     return valor === 1 ? t("parametrosConfig.si") : t("parametrosConfig.no");
   }
-  return p.unidad ? `${valor} ${p.unidad}` : String(valor);
+  return p.unidad ? `${valor} ${adaptar(p.unidad, p)}` : String(valor);
 }
 
 const cambios = computed(() => {
@@ -415,11 +453,13 @@ watch(
                 class="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"
               >
                 <label :for="`par-${p.clave}`" class="min-w-0 flex-1">
-                  <span class="block font-medium">{{ p.etiqueta }}</span>
+                  <span class="block font-medium">{{
+                    adaptar(p.etiqueta, p)
+                  }}</span>
                   <span
                     class="block text-xs"
                     :style="{ color: 'var(--texto-suave)' }"
-                    >{{ p.ayuda ? `${p.ayuda} ` : ""
+                    >{{ p.ayuda ? `${adaptar(p.ayuda, p)} ` : ""
                     }}{{
                       modo === "negocio"
                         ? $t("parametrosConfig.dePlataforma", {
@@ -473,7 +513,7 @@ watch(
                   <span
                     class="w-10 text-xs"
                     :style="{ color: 'var(--texto-suave)' }"
-                    >{{ p.unidad }}</span
+                    >{{ adaptar(p.unidad, p) }}</span
                   >
                 </span>
                 <p

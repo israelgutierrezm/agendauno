@@ -1,9 +1,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import { parametrosConfig } from "@/i18n/locales/gestion.es-MX";
 import type { Parametro } from "@/lib/parametros";
+import { fijarTerminosActuales } from "@/lib/terminologia";
 import ParametrosEditor from "./ParametrosEditor.vue";
 
 const parametros: Parametro[] = [
@@ -429,5 +430,147 @@ describe("revisión antes de guardar (solo se monta una categoría)", () => {
     expect(textoEnLista(w, "recordatorios")).toBe(
       "Recordatorios · 1 cambio sin guardar",
     );
+  });
+});
+
+// Los textos del catálogo dicen «alumno» y «clase» (ADR 0203): el editor los lee con
+// los términos del negocio y, en la plataforma, según a qué negocios aplica cada uno.
+describe("textos del catálogo con el término de cada negocio", () => {
+  afterEach(() => fijarTerminosActuales(null));
+
+  const delCatalogo: Parametro[] = [
+    {
+      clave: "reservas.dias_apertura",
+      grupo: "Clases recurrentes",
+      etiqueta: "El alumno reserva una clase desde",
+      ayuda: "Días antes de la clase. 0 = en cuanto se programa.",
+      tipo: "entero",
+      minimo: 0,
+      maximo: 365,
+      unidad: "días",
+      modalidad: "clases",
+      valor: null,
+      plataforma: 0,
+    },
+    {
+      clave: "citas.maximo_por_pagar",
+      grupo: "Citas",
+      etiqueta: "Citas por pagar que puede tener un alumno",
+      ayuda:
+        "Con estas citas próximas sin pagar, el alumno ya no puede agendar otra.",
+      tipo: "entero",
+      minimo: 0,
+      maximo: 50,
+      unidad: "citas",
+      modalidad: "citas",
+      valor: null,
+      plataforma: 5,
+    },
+    {
+      clave: "recordatorios.primero_horas",
+      grupo: "Recordatorios",
+      etiqueta: "Primer recordatorio",
+      ayuda: "Horas antes de la clase.",
+      tipo: "entero",
+      minimo: 1,
+      maximo: 168,
+      unidad: "h",
+      modalidad: null,
+      valor: null,
+      plataforma: 24,
+    },
+  ];
+
+  function montarCon(modo: "negocio" | "plataforma") {
+    return mount(ParametrosEditor, {
+      props: { parametros: delCatalogo, modo },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { parametrosConfig } },
+          }),
+        ],
+      },
+    });
+  }
+
+  it("en el negocio, con su término (una socia, sesiones)", async () => {
+    fijarTerminosActuales({
+      sesion: "Sesión",
+      miembro: "Socia",
+      instructor: "Coach",
+    });
+    const w = montarCon("negocio");
+    expect(w.text()).toContain("La socia reserva una sesión desde");
+    expect(w.text()).toContain("Días antes de la sesión.");
+    // La categoría también, pero su clave en la dirección es la del catálogo.
+    expect(textoEnLista(w, "clases-recurrentes")).toBe("Sesiones recurrentes");
+    // El buscador encuentra lo que se lee («sesión» no está en el texto del catálogo).
+    await w.get('[data-prueba="buscar-parametro"]').setValue("sesion");
+    expect(w.get('[data-prueba="resultados-parametros"]').text()).toContain(
+      "1 parámetro",
+    );
+  });
+
+  it("en una barbería, cliente; sin «él» ni términos sueltos", async () => {
+    fijarTerminosActuales({
+      sesion: "Cita",
+      miembro: "Cliente",
+      instructor: "Barbero",
+    });
+    const w = montarCon("negocio");
+    await w.get('[data-categoria="citas"]').trigger("click");
+    expect(w.text()).toContain("Citas por pagar que puede tener un cliente");
+    expect(w.text()).toContain("el cliente ya no puede agendar otra");
+    expect(w.text()).not.toContain("alumno");
+  });
+
+  it("en la plataforma, según a qué negocios aplica cada parámetro", async () => {
+    const w = montarCon("plataforma");
+    // Solo de clases: como está.
+    expect(w.text()).toContain("El alumno reserva una clase desde");
+    // Solo de citas: «cliente».
+    await w.get('[data-categoria="citas"]').trigger("click");
+    expect(w.text()).toContain("Citas por pagar que puede tener un cliente");
+    // De ambos: «clase o cita».
+    await w.get('[data-categoria="recordatorios"]').trigger("click");
+    expect(w.text()).toContain("Horas antes de la clase o cita.");
+  });
+
+  it("en la plataforma, los que son solo suyos quedan como están", async () => {
+    const w = mount(ParametrosEditor, {
+      props: {
+        modo: "plataforma",
+        parametros: [
+          {
+            clave: "registro.abierto_agendauno",
+            grupo: "Registro de negocios",
+            etiqueta: "Registro abierto en AgendaUno",
+            ayuda: "Negocios de clases.",
+            tipo: "si_no",
+            minimo: 0,
+            maximo: 1,
+            unidad: "",
+            modalidad: null,
+            por_negocio: false,
+            valor: null,
+            defecto: 1,
+          },
+        ],
+      },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { parametrosConfig } },
+          }),
+        ],
+      },
+    });
+    expect(w.text()).toContain("Negocios de clases.");
+    expect(w.text()).not.toContain("clases o citas");
   });
 });

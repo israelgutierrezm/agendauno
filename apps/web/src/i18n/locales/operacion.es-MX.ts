@@ -728,7 +728,7 @@ export default {
           "No se pudieron consultar los planes de TotalPass. Escribe el ID del plan (está en el portal de TotalPass).",
       },
       alcance:
-        "Se publican {dias} días por adelantado; una clase sin cupo ofrece {lugares} lugares. Lo ajustas en Configuración → Parámetros.",
+        "Se publican {dias} días por adelantado; una clase sin límite de cupo ofrece {lugares} lugares. Lo ajustas en Configuración → Parámetros.",
       publicados: "{n} horarios publicados",
       porVenir: "{n} reservas por venir",
       conError: "{n} con error",

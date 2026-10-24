@@ -16,6 +16,10 @@ export interface Parametro {
   opciones?: number[];
   /** Nombre de cada opción por valor (p. ej. 484 → «MXN · Peso mexicano»). */
   etiquetas?: Record<string, string>;
+  /** Solo para los negocios de esa modalidad (ADR 0131); null = ambas. */
+  modalidad?: "clases" | "citas" | null;
+  /** false = solo de la plataforma (el negocio no lo ve ni lo ajusta). */
+  por_negocio?: boolean;
   valor: number | null;
   plataforma?: number;
   defecto?: number;

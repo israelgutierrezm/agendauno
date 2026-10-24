@@ -65,8 +65,11 @@ it('límites y tiempos y los permisos de los roles: solo los de su modalidad', f
 
     $deCitas = collect($this->getJson("/api/v1/app/{$citas['slug']}/parametros", conBearer($citas['bearer']))->assertOk()->json('data'))->pluck('clave');
     $deClases = collect($this->getJson("/api/v1/app/{$clases['slug']}/parametros", conBearer($clases['bearer']))->assertOk()->json('data'))->pluck('clave');
-    expect($deCitas)->toContain('citas.duracion_defecto', 'recordatorios.primero_horas')
-        ->not->toContain('reservas.minutos_para_aceptar_lugar', 'agenda.dias_a_generar', 'membresias.dias_aviso_renovacion')
+    // En citas no hay membresías ni cobro recurrente: ni su pausa ni su cobranza; los
+    // vencimientos de sus bonos, sí.
+    expect($deCitas)->toContain('citas.duracion_defecto', 'recordatorios.primero_horas', 'membresias.dias_por_vencer')
+        ->not->toContain('reservas.minutos_para_aceptar_lugar', 'agenda.dias_a_generar', 'membresias.dias_aviso_renovacion',
+            'membresias.max_dias_pausa', 'cobranza.dias_gracia_adeudo', 'cobranza.reintento_1_dias')
         ->and($deClases)->toContain('reservas.minutos_para_aceptar_lugar', 'recordatorios.primero_horas')
         ->not->toContain('citas.duracion_defecto');
 
