@@ -15,7 +15,9 @@ use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PlantillaWhatsAppNegocio;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Difusión de una comunicación a un SEGMENTO (comunicaciones segmentadas). Resuelve la
@@ -39,6 +41,43 @@ class DifundirComunicacionTenant
         private PlantillasWhatsAppNegocio $plantillas,
         private MensajesWhatsAppTenant $saldoWhatsApp,
     ) {}
+
+    /**
+     * La difusión, una sola vez (B08): la misma campaña no se manda dos veces en 24 horas.
+     * Con el candado, dos envíos a la vez (un doble clic, un reintento, el asistente) no
+     * pasan los dos la revisión. Es el único camino para mandar una campaña.
+     */
+    public function unaVez(
+        SegmentoComunicacion $segmento,
+        CanalComunicacion $canal,
+        string $asunto,
+        string $cuerpo,
+        ?PlantillaWhatsAppNegocio $plantilla = null,
+    ): DifusionTenant {
+        $huella = self::huella($segmento, $canal, $asunto, $cuerpo);
+
+        return Cache::lock($this->llaveDelCandado($huella), 30)->block(10, function () use ($huella, $segmento, $canal, $asunto, $cuerpo, $plantilla): DifusionTenant {
+            $repetida = DifusionTenant::query()
+                ->where('huella', $huella)
+                ->where('estado', '!=', DifusionTenant::CANCELADA)
+                ->where('created_at', '>=', now()->subDay())
+                ->exists();
+            if ($repetida) {
+                throw ValidationException::withMessages(['cuerpo' => ['Ya mandaste esta misma difusión en las últimas 24 horas.']]);
+            }
+
+            return $this->ejecutar($segmento, $canal, $asunto, $cuerpo, $plantilla);
+        });
+    }
+
+    /**
+     * El candado de una campaña es de su negocio: otro negocio que manda el mismo texto
+     * al mismo segmento no espera a este.
+     */
+    public function llaveDelCandado(string $huella): string
+    {
+        return 'difusion:'.($this->gestor->actual()->ulid ?? 'local').':'.$huella;
+    }
 
     public function ejecutar(
         SegmentoComunicacion $segmento,

@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PaseWallet;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
@@ -78,6 +79,41 @@ class ActualizarPasesWallet
         return $cambiados;
     }
 
+    /**
+     * Renueva el pase (perdió el teléfono, alguien copió su pase): un código nuevo y un
+     * número de serie nuevo, así que el pase anterior deja de servir del todo. Recepción
+     * y el kiosco ya no aceptan su código; Apple Wallet ya no lo actualiza (su token es
+     * de la serie vieja y sus teléfonos registrados se olvidan) y su objeto de Google
+     * Wallet queda inactivo. El pase nuevo se agrega otra vez desde su cuenta.
+     */
+    public function renovar(Estudio $estudio, PersonaTenant $persona): void
+    {
+        app(PaseAccesoTenant::class)->codigoDeWallet($persona, renovar: true);
+
+        $pase = PaseWallet::query()->where('estudio_id', $estudio->getKey())->where('persona_ulid', $persona->ulid)->first();
+        if (! $pase instanceof PaseWallet) {
+            return;
+        }
+        $objetoAnterior = $pase->en_google ? PasesWalletTenant::objetoDeLaSerie($pase->serie) : null;
+        DB::connection($pase->getConnectionName())->transaction(function () use ($pase, $estudio, $persona): void {
+            $pase->dispositivos()->delete();
+            $pase->forceFill([
+                'serie' => PasesWalletTenant::serie($estudio, $persona).'-'.bin2hex(random_bytes(4)),
+                'huella' => null,
+                'cambio_en' => now(),
+                'en_google' => false,
+            ])->save();
+        });
+
+        if ($objetoAnterior !== null && $this->wallet->googleDisponible()) {
+            try {
+                $this->desactivarGoogle($objetoAnterior);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+    }
+
     /** Avisa del cambio a sus teléfonos (Apple) y actualiza su objeto (Google). */
     public function avisar(Estudio $estudio, PersonaTenant $persona, PaseWallet $pase): void
     {
@@ -140,6 +176,22 @@ class ActualizarPasesWallet
         }
         if (! $respuesta->successful()) {
             throw new RuntimeException('Google Wallet no aceptó el cambio del pase ('.$respuesta->status().').');
+        }
+    }
+
+    /** El objeto de un pase renovado queda inactivo en Google Wallet: ya no se usa. */
+    private function desactivarGoogle(string $objeto): void
+    {
+        $respuesta = Http::withToken($this->tokenGoogle())
+            ->timeout(10)
+            ->patch('https://walletobjects.googleapis.com/walletobjects/v1/genericObject/'.rawurlencode($objeto), ['state' => 'INACTIVE']);
+
+        // Nunca lo guardó en su cartera: no hay nada que desactivar.
+        if ($respuesta->status() === 404) {
+            return;
+        }
+        if (! $respuesta->successful()) {
+            throw new RuntimeException('Google Wallet no desactivó el pase anterior ('.$respuesta->status().').');
         }
     }
 

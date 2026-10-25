@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\PresupuestosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Exceptions\PresupuestoNoPermitido;
 use App\Modules\Tenancy\Mail\CorreoPresupuesto;
 use App\Modules\Tenancy\Mail\CorreoPresupuestoRespondido;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\PresupuestoTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
@@ -147,4 +151,23 @@ it('solo en negocios de citas', function (): void {
     $alumno = alumnoConSesion($clases);
     $this->getJson("/api/v1/app/{$clases['slug']}/mi/presupuestos", conBearer($alumno['bearer']))
         ->assertJsonPath('code', 'MODALITY_NOT_AVAILABLE');
+});
+
+it('si el cliente lo acepta mientras el negocio lo rechaza, no se rechaza encima de su orden', function (): void {
+    $e = estudioConSesion('barberia-pl', 'b@correo.mx', 'barberia');
+    $sede = agendaSemilla($e);
+    $cliente = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Lalo', 'email' => 'lalo@correo.mx'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $p = presupuestoEnLineaEnviado($e, $cliente, $sede['oferta']);
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    // El negocio lo tiene abierto (leído antes) y va a rechazarlo...
+    $leido = app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn (): PresupuestoTenant => PresupuestoTenant::query()->where('ulid', $p['id'])->firstOrFail());
+
+    // ...cuando el cliente lo acepta desde su correo: ya es su orden de cobro.
+    $this->postJson("/api/v1/app/{$e['slug']}/presupuestos-en-linea/{$p['id']}/aceptar", ['t' => $p['token'], 'revision' => 1])
+        ->assertOk()->assertJsonPath('data.estado', 'convertido');
+
+    expect(fn () => app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => app(PresupuestosTenant::class)->rechazar($leido, 'No', null)))
+        ->toThrow(PresupuestoNoPermitido::class);
+    $this->getJson("/api/v1/app/{$e['slug']}/presupuestos/{$p['id']}", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.estado', 'convertido');
 });

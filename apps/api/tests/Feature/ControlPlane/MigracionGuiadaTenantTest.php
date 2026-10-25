@@ -183,3 +183,41 @@ it('cargar saldos exige gestionar planes y créditos', function (): void {
 
     subirCsvMigracion($e, 'saldos/preview', $csv, ['corte' => '2026-09-30', 'evidencia' => 'Reporte anterior'], $instructor)->assertForbidden();
 });
+
+it('cargar saldos pide dar cortesías, solo toca a los clientes de las sedes de quien carga y topa corte y vencimiento', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sedeA = agendaSemilla($e)['sucursal'];
+    $sedeB = agendaSemilla($e)['sucursal'];
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Ana', 'email' => 'ana@correo.mx', 'tipo' => 'miembro', 'sucursal_id' => $sedeA], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Beto', 'email' => 'beto@correo.mx', 'tipo' => 'miembro', 'sucursal_id' => $sedeB], conBearer($e['bearer']))->assertCreated();
+    crearPackTenant($e);
+    $csv = "email,plan,creditos,vence\nana@correo.mx,Pack 8 clases,2,2026-10-30\nbeto@correo.mx,Pack 8 clases,2,2026-10-30\n";
+    $campos = ['corte' => '2026-09-30', 'evidencia' => 'Reporte anterior'];
+
+    // Recepción gestiona planes y créditos, pero no da cortesías: tampoco carga saldos.
+    $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
+    subirCsvMigracion($e, 'saldos/preview', $csv, $campos, $recep)->assertForbidden();
+    subirCsvMigracion($e, 'saldos', $csv, [...$campos, 'parcial' => '1'], $recep)->assertForbidden();
+
+    // Con cortesías pero acotado a la sede A: Beto (de la B) es como si no existiera.
+    $rol = (string) $this->postJson("/api/v1/app/{$e['slug']}/roles", [
+        'nombre' => 'Migración', 'permisos' => ['membresias.gestionar', 'membresias.cortesia', 'creditos.gestionar', 'miembros.ver', 'productos.ver', 'derechos.ver'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.clave');
+    $migra = personalConSesion($e['slug'], $e['bearer'], 'migra@correo.mx', $rol);
+    asignarSucursal($e, usuarioIdPorEmail($e, 'migra@correo.mx'), $sedeA);
+    subirCsvMigracion($e, 'saldos/preview', $csv, $campos, $migra)->assertOk()
+        ->assertJsonPath('data.resumen.validas', 1)
+        ->assertJsonPath('data.filas.1.errores.0', 'No hay un alumno con el correo beto@correo.mx: impórtalo primero en Miembros.');
+    subirCsvMigracion($e, 'saldos', $csv, [...$campos, 'parcial' => '1'], $migra)->assertCreated()->assertJsonPath('data.cargados', 1);
+    expect(enNegocioMigracion(fn () => AcuerdoTenant::query()->where('origen', 'apertura')->with('persona')->get()->pluck('persona.email')->all()))
+        ->toBe(['ana@correo.mx']);
+
+    // Topes: el corte es de hoy o de hasta un año atrás; lo cargado vence a lo más dos años después.
+    subirCsvMigracion($e, 'saldos/preview', $csv, ['corte' => '2026-10-02', 'evidencia' => 'Reporte anterior'])
+        ->assertUnprocessable()->assertJsonValidationErrors(['corte'], 'meta.errors');
+    subirCsvMigracion($e, 'saldos/preview', $csv, ['corte' => '2025-09-30', 'evidencia' => 'Reporte anterior'])
+        ->assertUnprocessable()->assertJsonValidationErrors(['corte'], 'meta.errors');
+    subirCsvMigracion($e, 'saldos/preview', "email,plan,creditos,vence\nana@correo.mx,Pack 8 clases,2,2030-12-31\n", $campos)->assertOk()
+        ->assertJsonPath('data.filas.0.estado', 'invalida')
+        ->assertJsonPath('data.filas.0.errores.0', 'Vence más de 24 meses después del corte (2028-09-30): revisa la fecha.');
+});

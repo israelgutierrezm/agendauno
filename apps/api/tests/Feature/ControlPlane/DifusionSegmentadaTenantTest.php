@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\DifundirComunicacionTenant;
+use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
@@ -125,4 +129,24 @@ it('exige el permiso comunicaciones.gestionar para difundir', function (): void 
     // ...pero NO comunicaciones.gestionar (no puede difundir).
     $this->postJson("/api/v1/app/{$e['slug']}/comunicaciones/difusiones", $envio, conBearer($recepcion))
         ->assertForbidden();
+});
+
+it('el candado de una campaña es de su negocio: otro que manda el mismo texto no la frena', function (): void {
+    $a = estudioConSesion('estudio-a', 'a@correo.mx');
+    estudioConSesion('estudio-b', 'b@correo.mx');
+    $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Ana', 'email' => 'ana@correo.mx', 'tipo' => 'miembro'], conBearer($a['bearer']))->assertCreated();
+    $huella = DifundirComunicacionTenant::huella(SegmentoComunicacion::Todos, CanalComunicacion::Email, 'Promo de octubre', 'Dos clases gratis.');
+
+    // El negocio B está mandando esa misma campaña: tiene tomado su candado.
+    $llaveDeB = app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-b')->firstOrFail(),
+        fn (): string => app(DifundirComunicacionTenant::class)->llaveDelCandado($huella));
+    $candadoDeB = Cache::lock($llaveDeB, 30);
+    expect($candadoDeB->get())->toBeTrue();
+
+    // A la manda sin esperar a B.
+    $this->postJson("/api/v1/app/{$a['slug']}/comunicaciones/difusiones", [
+        'segmento' => 'todos', 'canal' => 'email', 'asunto' => 'Promo de octubre', 'cuerpo' => 'Dos clases gratis.',
+    ], conBearer($a['bearer']))->assertCreated()->assertJsonPath('data.total', 1);
+    expect($llaveDeB)->toContain(Estudio::query()->where('slug', 'estudio-b')->value('ulid'));
+    $candadoDeB->release();
 });

@@ -46,14 +46,39 @@ class CargarSaldosAperturaTenant
 
     private const UNIDADES_POR_CREDITO = 1000;
 
-    public function __construct(private readonly LibroMayorTenant $libro) {}
+    public function __construct(
+        private readonly LibroMayorTenant $libro,
+        private readonly AlcancePersonaTenant $alcance,
+        private readonly ParametrosTenant $parametros,
+    ) {}
 
     /**
+     * Topes de una migración real (parámetros de la plataforma, ADR 0042 y 0207): el
+     * corte es de hoy o de hasta un año atrás, y lo que se carga vence a más tardar dos
+     * años después del corte (un plan anual con margen), por omisión. Lo de más no es un
+     * saldo que se traiga de otro sistema: es regalar un plan.
+     */
+    public function diasMaximosCorte(): int
+    {
+        return $this->parametros->entero('importaciones.dias_maximos_corte_saldos');
+    }
+
+    public function mesesMaximosVigencia(): int
+    {
+        return $this->parametros->entero('importaciones.meses_maximos_vigencia_saldos');
+    }
+
+    /**
+     * Con `$actor` acotado por sucursal (R19, ADR 0098), quien no es de sus sedes se trata
+     * como si no existiera: ni se le carga nada ni se revela que su correo está aquí.
+     *
      * @param  list<array<string, string>>  $filas
      * @return array{resumen: array{total: int, validas: int, invalidas: int, rechazadas: int, conflictos: int, existentes: int}, filas: list<array{fila: int, datos: array<string, mixed>, errores: list<string>, estado: string}>}
      */
-    public function analizar(array $filas, string $corte): array
+    public function analizar(array $filas, string $corte, ?Usuario $actor = null): array
     {
+        $meses = $this->mesesMaximosVigencia();
+        $venceMaximo = CarbonImmutable::parse($corte)->addMonthsNoOverflow($meses)->toDateString();
         $productos = ProductoTenant::query()->get()
             ->groupBy(static fn (ProductoTenant $p): string => self::clave((string) $p->nombre));
         $vistos = [];
@@ -68,6 +93,9 @@ class CargarSaldosAperturaTenant
                 ->whereRaw('lower(email) = ?', [mb_strtolower($datos['email'])])
                 ->where('tipo', TipoPersonaTenant::Miembro->value)
                 ->first();
+            if ($persona instanceof PersonaTenant && ! $this->alcance->puedeVer($actor, $persona)) {
+                $persona = null;
+            }
             $candidatos = $productos->get(self::clave($datos['plan']));
             $producto = $candidatos !== null && $candidatos->count() === 1 ? $candidatos->first() : null;
 
@@ -94,6 +122,8 @@ class CargarSaldosAperturaTenant
                 $errores[] = 'Escribe la fecha de vencimiento (vence) como AAAA-MM-DD.';
             } elseif ($datos['vence'] < $corte) {
                 $errores[] = 'Ya había vencido al corte: no hay saldo que cargar.';
+            } elseif ($datos['vence'] > $venceMaximo) {
+                $errores[] = 'Vence más de '.$meses." meses después del corte ({$venceMaximo}): revisa la fecha.";
             }
             if ($producto instanceof ProductoTenant && ! $producto->ilimitado) {
                 if ($datos['unidades'] === null) {
@@ -135,7 +165,7 @@ class CargarSaldosAperturaTenant
      */
     public function importar(array $filas, string $corte, string $evidencia, ?Usuario $actor, bool $parcial = false): array
     {
-        $analisis = $this->analizar($filas, $corte);
+        $analisis = $this->analizar($filas, $corte, $actor);
         if ($analisis['resumen']['total'] === 0 || (! $parcial && $analisis['resumen']['invalidas'] > 0)) {
             return ['ok' => false] + $analisis;
         }

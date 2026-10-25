@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Http\Controllers\ReporteTendenciasTenantController;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
@@ -56,6 +57,7 @@ class AsistenteNegocioTenant
         private readonly GenerarAgendaTenant $agenda,
         private readonly DifundirComunicacionTenant $difundir,
         private readonly ModalidadNegocioTenant $modalidad,
+        private readonly AccesoSesionTenant $acceso,
     ) {}
 
     /** ¿Se ofrece a esta persona en este negocio? */
@@ -127,14 +129,16 @@ class AsistenteNegocioTenant
 
     /**
      * Aplica una acción propuesta que la persona revisó. Se vuelve a revisar que sea suya,
-     * de este negocio, vigente y que aún tenga el permiso.
+     * de este negocio, vigente y que aún tenga el permiso. Cada propuesta se aplica una
+     * sola vez: un doble clic o un reintento no la repiten (si falla, se puede volver a
+     * intentar).
      *
      * @return array{tipo: string, resultado: array<string, mixed>}
      */
     public function aplicar(Estudio $estudio, Usuario $usuario, string $token): array
     {
         try {
-            /** @var array{tipo: string, datos: array<string, mixed>, usuario: int, estudio: int, vence: int} $propuesta */
+            /** @var array{tipo: string, datos: array<string, mixed>, usuario: int, estudio: int, vence: int, id?: string} $propuesta */
             $propuesta = Crypt::decrypt($token);
         } catch (DecryptException) {
             throw ValidationException::withMessages(['token' => ['Esa propuesta no es válida.']]);
@@ -145,13 +149,42 @@ class AsistenteNegocioTenant
         if ((int) $propuesta['vence'] < now()->getTimestamp()) {
             throw ValidationException::withMessages(['token' => ['La propuesta venció: vuelve a pedirla.']]);
         }
-        $datos = $propuesta['datos'];
+        $id = (string) ($propuesta['id'] ?? '');
+        if ($id === '') {
+            throw ValidationException::withMessages(['token' => ['Esa propuesta no es válida: vuelve a pedirla.']]);
+        }
+        $usada = 'asistente:propuesta:'.$estudio->getKey().':'.$id;
+        if (! Cache::add($usada, true, now()->addMinutes(self::MINUTOS_PROPUESTA + 5))) {
+            throw ValidationException::withMessages(['token' => ['Esa propuesta ya se aplicó.']]);
+        }
 
-        if ($propuesta['tipo'] === 'generar_agenda') {
+        try {
+            return $this->aplicarPropuesta($estudio, $usuario, $propuesta['tipo'], $propuesta['datos']);
+        } catch (Throwable $e) {
+            // No se aplicó: la misma propuesta se puede volver a intentar.
+            Cache::forget($usada);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $datos
+     * @return array{tipo: string, resultado: array<string, mixed>}
+     */
+    private function aplicarPropuesta(Estudio $estudio, Usuario $usuario, string $tipo, array $datos): array
+    {
+        if ($tipo === 'generar_agenda') {
             abort_unless($usuario->puede('agenda.gestionar') && $this->modalidad->esClases(), 403);
             $creadas = 0;
             $omitidas = 0;
+            // Con el alcance de quien la aplica, como el endpoint de cada serie: solo las
+            // de sus sedes (y, si imparte, las suyas).
             foreach (PlantillaHorarioTenant::query()->where('activo', true)->get() as $plantilla) {
+                $instructor = $plantilla->instructor_id !== null ? (int) $plantilla->instructor_id : null;
+                if (! $this->acceso->puedeOperarEn((int) $plantilla->sucursal_id, $instructor, $usuario)) {
+                    continue;
+                }
                 $generacion = $this->agenda->ejecutar($plantilla, (string) $datos['desde'], (string) $datos['hasta']);
                 $creadas += $generacion->creadas;
                 $omitidas += count($generacion->omitidas);
@@ -159,9 +192,11 @@ class AsistenteNegocioTenant
 
             return ['tipo' => 'generar_agenda', 'resultado' => ['creadas' => $creadas, 'omitidas' => $omitidas]];
         }
-        if ($propuesta['tipo'] === 'campana') {
+        if ($tipo === 'campana') {
             abort_unless($usuario->puede('comunicaciones.gestionar') && $this->funciones->tiene($estudio, 'mensajes'), 403);
-            $difusion = $this->difundir->ejecutar(
+            // El mismo camino que una campaña desde Comunicaciones: candado y la regla de
+            // no repetirla en 24 horas.
+            $difusion = $this->difundir->unaVez(
                 SegmentoComunicacion::from((string) $datos['segmento']),
                 CanalComunicacion::from((string) $datos['canal']),
                 (string) $datos['asunto'],
@@ -312,6 +347,8 @@ class AsistenteNegocioTenant
             'resumen' => mb_substr(trim((string) ($entrada['resumen'] ?? '')), 0, 300),
             'datos' => $datos,
             'token' => Crypt::encrypt([
+                // Para aplicarla una sola vez.
+                'id' => bin2hex(random_bytes(16)),
                 'tipo' => $tipo,
                 'datos' => $datos,
                 'usuario' => (int) $usuario->getKey(),

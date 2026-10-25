@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\BajaDePersonaTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
@@ -17,6 +18,10 @@ use Illuminate\Validation\Rule;
 /**
  * Solicitudes de baja de datos (ARCO) que el negocio atiende o rechaza con motivo.
  * La ley pide responder en un plazo de 20 días hábiles.
+ *
+ * Con el alcance de la ficha del cliente (R19, ADR 0098): quien está acotado a unas
+ * sedes solo ve y responde las de sus clientes. Responder (atender borra los datos sin
+ * vuelta atrás) pide `miembros.eliminar` en la ruta.
  */
 class SolicitudesPrivacidadTenantController
 {
@@ -29,6 +34,7 @@ class SolicitudesPrivacidadTenantController
     public function __construct(
         private readonly BajaDePersonaTenant $baja,
         private readonly FechasNegocioTenant $fechas,
+        private readonly AlcancePersonaTenant $alcance,
     ) {}
 
     /**
@@ -46,8 +52,8 @@ class SolicitudesPrivacidadTenantController
             'estado' => ['nullable', Rule::in([SolicitudPrivacidadTenant::PENDIENTE, SolicitudPrivacidadTenant::ATENDIDA, SolicitudPrivacidadTenant::RECHAZADA])],
             'vencimiento' => ['nullable', Rule::in(['vencidas', 'por_vencer'])],
         ]);
-        $plazos = $this->plazosPendientes();
-        $consulta = SolicitudPrivacidadTenant::query()->with('persona')
+        $plazos = $this->plazosPendientes($request);
+        $consulta = $this->alcance->acotada(SolicitudPrivacidadTenant::query(), $request)->with('persona')
             ->when($validado['q'] ?? null, fn (Builder $q, string $texto) => $q->whereHas('persona', fn (Builder $p) => $p->buscar($texto)))
             ->when($validado['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('estado', $estado))
             ->when($validado['vencimiento'] ?? null, fn (Builder $q, string $cual) => $q->whereIn('id', $plazos[$cual]))
@@ -66,7 +72,7 @@ class SolicitudesPrivacidadTenantController
                 'page' => $pagina->currentPage(),
                 'per_page' => $pagina->perPage(),
                 'ultima_pagina' => $pagina->lastPage(),
-                'pendientes' => SolicitudPrivacidadTenant::query()->where('estado', SolicitudPrivacidadTenant::PENDIENTE)->count(),
+                'pendientes' => $this->alcance->acotada(SolicitudPrivacidadTenant::query(), $request)->where('estado', SolicitudPrivacidadTenant::PENDIENTE)->count(),
                 'vencidas' => count($plazos['vencidas']),
                 'por_vencer' => count($plazos['por_vencer']),
             ],
@@ -94,12 +100,12 @@ class SolicitudesPrivacidadTenantController
      *
      * @return array{vencidas: list<int>, por_vencer: list<int>}
      */
-    private function plazosPendientes(): array
+    private function plazosPendientes(Request $request): array
     {
         $hoy = $this->fechas->hoy();
         $aviso = CarbonImmutable::parse($hoy)->addWeekdays(self::AVISO_DIAS_HABILES)->toDateString();
         $plazos = ['vencidas' => [], 'por_vencer' => []];
-        SolicitudPrivacidadTenant::query()->where('estado', SolicitudPrivacidadTenant::PENDIENTE)->get(['id', 'created_at'])
+        $this->alcance->acotada(SolicitudPrivacidadTenant::query(), $request)->where('estado', SolicitudPrivacidadTenant::PENDIENTE)->get(['id', 'created_at'])
             ->each(function (SolicitudPrivacidadTenant $s) use ($hoy, $aviso, &$plazos): void {
                 $vence = $this->venceEn($s);
                 if ($vence === null) {
@@ -127,7 +133,10 @@ class SolicitudesPrivacidadTenantController
 
     private function solicitud(Request $request): SolicitudPrivacidadTenant
     {
-        return SolicitudPrivacidadTenant::query()->where('ulid', (string) $request->route('solicitud'))->with('persona')->firstOrFail();
+        $solicitud = SolicitudPrivacidadTenant::query()->where('ulid', (string) $request->route('solicitud'))->with('persona')->firstOrFail();
+        $this->alcance->exigirPersona($request, $solicitud->persona);
+
+        return $solicitud;
     }
 
     private function actor(Request $request): ?Usuario

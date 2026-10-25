@@ -186,7 +186,7 @@ class LealtadTenantController
 
     public function entregarCanje(Request $request): JsonResponse
     {
-        $modelo = CanjeLealtadTenant::query()->where('ulid', (string) $request->route('canje'))->firstOrFail();
+        $modelo = $this->canjeDeSuAlcance($request);
         $this->puntos->entregarCanje($modelo);
 
         return response()->json(['data' => $this->presentarCanje($modelo->loadMissing('persona'))]);
@@ -194,7 +194,7 @@ class LealtadTenantController
 
     public function cancelarCanje(Request $request): JsonResponse
     {
-        $modelo = CanjeLealtadTenant::query()->where('ulid', (string) $request->route('canje'))->firstOrFail();
+        $modelo = $this->canjeDeSuAlcance($request);
         $actualizado = $this->puntos->cancelarCanje($modelo, $this->actor($request));
 
         return response()->json(['data' => $this->presentarCanje($actualizado->loadMissing('persona'))]);
@@ -263,6 +263,14 @@ class LealtadTenantController
         $actor = $request->attributes->get('usuario_tenant');
 
         return $actor instanceof Usuario ? $actor : null;
+    }
+
+    /** El canje con el mismo alcance que su listado: el de un cliente de otra sede no se toca. */
+    private function canjeDeSuAlcance(Request $request): CanjeLealtadTenant
+    {
+        return app(AlcancePersonaTenant::class)->acotada(CanjeLealtadTenant::query(), $request)
+            ->where('ulid', (string) $request->route('canje'))
+            ->firstOrFail();
     }
 
     /**

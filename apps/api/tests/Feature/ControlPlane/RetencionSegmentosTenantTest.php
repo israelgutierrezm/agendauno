@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\TareaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 
@@ -204,4 +205,36 @@ it('el seguimiento automático, el radar y el embudo también cuentan la fecha d
     // Embudo: compró hoy y esa clase fue antes de comprar; no cuenta como que vino.
     expect($this->getJson("/api/v1/app/{$e['slug']}/reportes/embudo", conBearer($e['bearer']))->assertOk()->json('data.compra_a_asistencia'))
         ->toBe(['compradores_nuevos' => 1, 'asistieron' => 0]);
+});
+
+it('quien está acotado a una sede solo ve, cuenta y sigue a los clientes de la suya', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sedeA = agendaSemilla($e);
+    $sedeB = agendaSemilla($e);
+    $sesion = crearSesionTenant($e, $sedeA, cuando: '2026-10-01 08:00:00');
+    // Las dos vinieron hace poco sin comprar un plan: Carla es de la sede A y Dani de la B.
+    $carla = crearMiembroEnSucursal($e, 'Carla', $sedeA['sucursal']);
+    $dani = crearMiembroEnSucursal($e, 'Dani', $sedeB['sucursal']);
+    vinoEnSegmentos($e, $carla, $sesion, '2026-09-20 14:00:00');
+    vinoEnSegmentos($e, $dani, $sesion, '2026-09-21 14:00:00');
+    $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
+    asignarSucursal($e, usuarioIdPorEmail($e, 'recep@correo.mx'), $sedeA['sucursal']);
+
+    // El dueño ve a las dos; recepción de la sede A, solo a Carla (en el grupo y en su cuenta).
+    $todos = collect($this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos", conBearer($e['bearer']))->assertOk()->json('data'))->keyBy('clave');
+    expect($todos['vino_sin_comprar']['total'])->toBe(2);
+    $suyos = collect($this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos", conBearer($recep))->assertOk()->json('data'))->keyBy('clave');
+    expect($suyos['vino_sin_comprar']['total'])->toBe(1);
+    $lista = $this->getJson("/api/v1/app/{$e['slug']}/retencion/segmentos/vino_sin_comprar", conBearer($recep))->assertOk();
+    expect(collect($lista->json('data'))->pluck('id')->all())->toBe([$carla])
+        ->and($lista->json('meta.total'))->toBe(1);
+
+    // Sus seguimientos son solo para los suyos; a Dani no le crea uno.
+    $this->postJson("/api/v1/app/{$e['slug']}/retencion/segmentos/vino_sin_comprar/seguimientos", [], conBearer($recep))
+        ->assertCreated()->assertJsonPath('data.creadas', 1)->assertJsonPath('data.omitidas', 0);
+    $this->postJson("/api/v1/app/{$e['slug']}/retencion/seguimiento/{$dani}", ['estado' => 'vencida'], conBearer($recep))->assertForbidden();
+    $daniId = (int) enNegocioDeSegmentos($e, fn () => PersonaTenant::query()->where('ulid', $dani)->value('id'));
+    expect(enNegocioDeSegmentos($e, fn () => TareaTenant::query()->where('persona_id', $daniId)->count()))->toBe(0);
+    // El dueño sí puede darle su seguimiento.
+    $this->postJson("/api/v1/app/{$e['slug']}/retencion/seguimiento/{$dani}", ['estado' => 'vencida'], conBearer($e['bearer']))->assertSuccessful();
 });

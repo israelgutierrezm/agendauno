@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\PagoTenant;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -48,6 +50,12 @@ it('el alumno no puede auto-cobrarse en efectivo/ventanilla (sin créditos grati
     $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes/{$orden}/cobrar", [
         'proveedor' => 'manual',
     ], conBearer($a['bearer']))->assertStatus(422)->assertJsonPath('meta.errors.proveedor.0', 'El pago en efectivo o ventanilla se registra en el negocio.');
+    // Tampoco abre un depósito en ventanilla, aunque el negocio la tenga activa.
+    $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/ventanilla", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))->assertOk();
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes/{$orden}/cobrar", [
+        'proveedor' => 'ventanilla',
+    ], conBearer($a['bearer']))->assertStatus(422)->assertJsonPath('meta.errors.proveedor.0', 'El pago en efectivo o ventanilla se registra en el negocio.');
+    expect(app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), fn (): int => PagoTenant::query()->count()))->toBe(0);
 
     // Sigue sin créditos.
     $perfil = $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($a['bearer']))->assertOk()->json('data');

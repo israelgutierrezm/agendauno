@@ -136,6 +136,18 @@ class CobrarOrdenTenant
             throw new PasarelaNoDisponible('La pasarela no admite pagos automáticos.');
         }
 
+        // Ya hay un cargo automático cobrado de esta orden (p. ej. con otro importe, que
+        // espera revisión): no se le cobra otra vez, aunque la pasarela no conteste.
+        $cobrado = $orden->estado !== EstadoOrden::Pendiente ? null : PagoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->whereNotNull('domiciliacion_id')
+            ->where('estado', EstadoPago::Aprobado->value)
+            ->latest('id')
+            ->first();
+        if ($cobrado instanceof PagoTenant) {
+            return $cobrado;
+        }
+
         // Un cargo anterior de esta orden que sí se hizo pero no quedó registrado (la
         // pasarela no respondió y su aviso no llegó; su llave pudo ya caducar): se registra
         // en lugar de cobrar otra vez. Si la pasarela no responde, se sigue.

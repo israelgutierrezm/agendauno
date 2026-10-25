@@ -38,6 +38,12 @@ use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /** Intentos de entrar a una cuenta (negocio y correo) en una hora, desde cualquier IP. */
+    public const INTENTOS_POR_CUENTA_HORA = 30;
+
+    /** Enlaces para restablecer la contraseña de una cuenta en una hora, desde cualquier IP. */
+    public const RECUPERACIONES_POR_CUENTA_HORA = 10;
+
     /**
      * Register any application services.
      */
@@ -58,25 +64,29 @@ class AppServiceProvider extends ServiceProvider
     {
         // Rate limit de autenticación (SEC-03): combina identidad+IP e IP sola para
         // frenar fuerza bruta y credential stuffing sin castigar a un tenant entero.
+        // Además, un tope por cuenta (el negocio y el correo) en la hora, venga de la IP que
+        // venga: una red de muchas IP no prueba contraseñas sin fin contra un correo.
         RateLimiter::for('login', function (Request $request): array {
-            $email = Str::lower((string) $request->input('email'));
+            $email = Str::lower(trim((string) $request->input('email')));
             $ip = (string) $request->ip();
 
             return [
                 Limit::perMinute(5)->by($email.'|'.$ip),
                 Limit::perMinute(20)->by($ip),
+                ...self::porCuenta($request, $email, self::INTENTOS_POR_CUENTA_HORA),
             ];
         });
 
         // Recuperación de contraseña: aparte del login (no gasta sus intentos) y más
-        // estricta por correo, para que no sirva para inundar un buzón.
+        // estricta por correo, para que no sirva para inundar un buzón (ni desde muchas IP).
         RateLimiter::for('recuperacion', function (Request $request): array {
-            $email = Str::lower((string) $request->input('email'));
+            $email = Str::lower(trim((string) $request->input('email')));
             $ip = (string) $request->ip();
 
             return [
                 Limit::perMinute(3)->by($email.'|'.$ip),
                 Limit::perMinute(10)->by($ip),
+                ...self::porCuenta($request, $email, self::RECUPERACIONES_POR_CUENTA_HORA),
             ];
         });
 
@@ -94,9 +104,11 @@ class AppServiceProvider extends ServiceProvider
         // negocio, para frenar abuso/enumeración sin castigar a todo el estudio ni a
         // quienes comparten la red (wifi del estudio, datos móviles).
         // Los avisos de Wellhub y TotalPass llegan de sus servidores (las mismas IP para
-        // todos los negocios): el límite es de cada negocio, no compartido (ADR 0202).
-        RateLimiter::for('bienestar-webhook', fn (Request $request): Limit => Limit::perMinute(600)
-            ->by('bienestar:'.(string) $request->route('estudio')));
+        // todos los negocios): el límite es de cada negocio, no compartido (ADR 0202), y
+        // de cada token de su dirección, que se revisa después: quien manda avisos con un
+        // token falso gasta su propio cupo, no el de los avisos de verdad.
+        RateLimiter::for('bienestar-webhook', fn (Request $request): Limit => Limit::perMinute(max(1, (int) config('agendauno.integraciones.avisos_bienestar_por_minuto', 600)))
+            ->by('bienestar:'.self::negocioDe($request).':'.hash('sha256', self::textoDeRuta($request, 'token'))));
 
         RateLimiter::for('tenant', fn (Request $request): Limit => Limit::perMinute(120)
             ->by(self::quienEnElNegocio($request)));
@@ -230,6 +242,17 @@ class AppServiceProvider extends ServiceProvider
     private static function negocioDe(Request $request): string
     {
         return Str::lower(self::textoDeRuta($request, 'estudio'));
+    }
+
+    /**
+     * El tope por cuenta (negocio y correo) en la hora; sin correo en la petición no hay
+     * cuenta que cuidar (no se juntan en un mismo cupo todas las que no lo traen).
+     *
+     * @return list<Limit>
+     */
+    private static function porCuenta(Request $request, string $email, int $porHora): array
+    {
+        return $email === '' ? [] : [Limit::perHour($porHora)->by('cuenta|'.self::negocioDe($request).'|'.$email)];
     }
 
     /**

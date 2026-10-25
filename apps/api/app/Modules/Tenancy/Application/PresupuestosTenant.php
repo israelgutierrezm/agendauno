@@ -178,13 +178,20 @@ class PresupuestosTenant
         });
     }
 
+    /**
+     * Lo marca rechazado, bajo candado como al aceptarlo: si a la vez el cliente lo
+     * aceptó (y ya es su orden de cobro), no se rechaza encima.
+     */
     public function rechazar(PresupuestoTenant $presupuesto, ?string $motivo, ?Usuario $actor, string $por = 'negocio'): PresupuestoTenant
     {
-        $this->exigirEditable($presupuesto);
-        $presupuesto->fill(['estado' => EstadoPresupuesto::Rechazado->value, 'respondido_en' => now(), 'motivo_rechazo' => $motivo, 'respondido_por' => $por])->save();
-        $this->auditoria->registrar($actor, 'presupuesto.rechazado', 'presupuesto', (string) $presupuesto->ulid, null, null, $motivo);
+        return DB::connection('tenant')->transaction(function () use ($presupuesto, $motivo, $actor, $por): PresupuestoTenant {
+            $bloqueado = PresupuestoTenant::query()->whereKey($presupuesto->getKey())->lockForUpdate()->firstOrFail();
+            $this->exigirEditable($bloqueado);
+            $bloqueado->fill(['estado' => EstadoPresupuesto::Rechazado->value, 'respondido_en' => now(), 'motivo_rechazo' => $motivo, 'respondido_por' => $por])->save();
+            $this->auditoria->registrar($actor, 'presupuesto.rechazado', 'presupuesto', (string) $bloqueado->ulid, null, null, $motivo);
 
-        return $presupuesto;
+            return $bloqueado;
+        });
     }
 
     /**

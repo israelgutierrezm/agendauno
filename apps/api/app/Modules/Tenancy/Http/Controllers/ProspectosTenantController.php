@@ -378,7 +378,8 @@ class ProspectosTenantController
      */
     public function eventos(Request $request): JsonResponse
     {
-        $prospecto = ProspectoTenant::query()->where('ulid', (string) $request->route('prospecto'))->firstOrFail();
+        // Con el alcance del prospecto (el mismo que su ficha).
+        $prospecto = $this->prospecto($request);
         $validado = $request->validate([
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],

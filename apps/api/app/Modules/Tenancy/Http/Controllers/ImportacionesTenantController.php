@@ -6,12 +6,14 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CargarSaldosAperturaTenant;
 use App\Modules\Tenancy\Application\CupoProfesionales;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ImportarInstructoresTenant;
 use App\Modules\Tenancy\Application\ImportarMiembrosTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -90,11 +92,11 @@ class ImportacionesTenantController
      */
     public function previewSaldos(Request $request): JsonResponse
     {
-        $this->exigirCreditos($request);
+        $this->exigirApertura($request);
         $datos = $this->datosDeApertura($request);
         $filas = $this->parsear($request, ['email', 'plan'], $this->parametros->entero('importaciones.max_filas'));
 
-        return response()->json(['data' => $this->saldos->analizar($filas, $datos['corte'])]);
+        return response()->json(['data' => $this->saldos->analizar($filas, $datos['corte'], $this->usuario($request))]);
     }
 
     /**
@@ -104,7 +106,7 @@ class ImportacionesTenantController
     public function importarSaldos(Request $request): JsonResponse
     {
         $inicio = hrtime(true);
-        $this->exigirCreditos($request);
+        $this->exigirApertura($request);
         $datos = $this->datosDeApertura($request);
         $parcial = $request->boolean('parcial');
         $filas = $this->parsear($request, ['email', 'plan'], $this->parametros->entero('importaciones.max_filas'));
@@ -122,24 +124,39 @@ class ImportacionesTenantController
      */
     private function datosDeApertura(Request $request): array
     {
+        // El corte es el de una migración real: hoy o antes, y no más atrás de lo que
+        // permite la plataforma (`importaciones.dias_maximos_corte_saldos`).
+        $hoy = app(FechasNegocioTenant::class)->hoy();
+        $dias = app(CargarSaldosAperturaTenant::class)->diasMaximosCorte();
+        $minimo = CarbonImmutable::parse($hoy)->subDays($dias)->toDateString();
         $validado = $request->validate([
             // El momento acordado para dejar de operar saldos en el otro sistema.
-            'corte' => ['required', 'date_format:Y-m-d'],
+            'corte' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$hoy, 'after_or_equal:'.$minimo],
             // De dónde salen los saldos (p. ej. «reporte de saldos exportado el 30/09»).
             'evidencia' => ['required', 'string', 'min:5', 'max:500'],
         ], [
             'corte.required' => 'Indica la fecha de corte acordada.',
             'corte.date_format' => 'Escribe la fecha de corte como AAAA-MM-DD.',
+            'corte.before_or_equal' => 'El corte no puede ser después de hoy.',
+            'corte.after_or_equal' => "El corte no puede ser de hace más de {$dias} días.",
             'evidencia.required' => 'Indica de dónde salen los saldos (el reporte del otro sistema).',
         ]);
 
         return ['corte' => (string) $validado['corte'], 'evidencia' => trim((string) $validado['evidencia'])];
     }
 
-    /** Cargar saldos concede créditos: además de gestionar planes, exige gestionar créditos. */
-    private function exigirCreditos(Request $request): void
+    /**
+     * Cargar saldos da planes y créditos sin venta ni pago: además de gestionar planes,
+     * exige gestionar créditos y dar cortesías (es dar un plan sin cobrarlo).
+     */
+    private function exigirApertura(Request $request): void
     {
-        abort_unless($this->usuario($request)?->puede('creditos.gestionar') === true, 403);
+        $usuario = $this->usuario($request);
+        abort_unless(
+            $usuario?->puede('creditos.gestionar') === true && $usuario->puede('membresias.cortesia'),
+            403,
+            'Cargar saldos de apertura da planes sin cobrarlos: hace falta el permiso de cortesías.',
+        );
     }
 
     private function usuario(Request $request): ?Usuario

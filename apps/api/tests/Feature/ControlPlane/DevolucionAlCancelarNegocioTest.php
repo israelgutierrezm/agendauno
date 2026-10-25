@@ -132,3 +132,24 @@ it('si cancela el cliente se aplica su política, no la devolución automática'
 
     expect(devolucionesDelPago($c))->toBe([]);
 });
+
+it('devolver todo lo cobrado de una cita que sigue en pie pide cancelarla primero; una parte sí se devuelve', function (): void {
+    $c = citaPagadaEnLinea();
+    $e = $c['e'];
+    $url = "/api/v1/app/{$e['slug']}/pagos/{$c['pago']}/reembolsos";
+
+    // Todo, con la cita confirmada y por venir: la cita quedaría sin cobro ocupando el horario.
+    $this->postJson($url, ['motivo' => 'No vendrá'], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_REFUNDABLE')
+        ->assertJsonPath('message', 'Cancela la cita primero; después devuelve el pago.');
+    expect(devolucionesDelPago($c))->toBe([]);
+
+    // Una parte sí (la cita sigue cobrada); el resto, tampoco mientras la cita siga en pie.
+    $this->postJson($url, ['motivo' => 'Descuento', 'monto_minor' => 10000, 'revertir_creditos' => false], conBearer($e['bearer']))->assertCreated();
+    $this->postJson($url, ['motivo' => 'No vendrá'], conBearer($e['bearer']))->assertStatus(422);
+
+    // Cancelada la cita, el resto se devuelve.
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$c['reserva']}/cancelar", [], conBearer($e['bearer']))->assertOk();
+    $this->postJson($url, ['motivo' => 'No vendrá'], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.monto_minor', 40000);
+    expect(devolucionesDelPago($c))->toBe(['aprobado', 'aprobado']);
+});

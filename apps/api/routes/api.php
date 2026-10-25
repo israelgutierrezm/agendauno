@@ -437,7 +437,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/medicion', [MedicionNegocioTenantController::class, 'publico'])->middleware('throttle:negocio-publico')->name('medicion.publico');
         Route::post('/medicion/consentimiento', [MedicionNegocioTenantController::class, 'consentimiento'])->middleware('throttle:negocio-publico')->name('medicion.consentimiento');
         // Dejar de recibir promociones desde el enlace firmado de una campaña (B08).
-        Route::get('/promociones/baja/{persona}', BajaPromocionesController::class)->middleware(['signed', 'throttle:negocio-publico'])->name('promociones.baja');
+        // GET muestra la confirmación (abrir el enlace no da de baja: los filtros de correo
+        // los abren solos); POST da de baja, también en un clic desde el cliente de correo
+        // (List-Unsubscribe-Post, RFC 8058).
+        Route::match(['get', 'post'], '/promociones/baja/{persona}', BajaPromocionesController::class)->middleware(['signed', 'throttle:negocio-publico'])->name('promociones.baja');
         // Calendario público de clases (plan de mejoras M02): sesiones reales por fecha,
         // con sus lugares (regla única de cupo, ADR 0116).
         Route::get('/calendario', CalendarioPublicoController::class)->middleware(['throttle:negocio-publico', 'modalidad:clases'])->name('calendario');
@@ -635,10 +638,11 @@ Route::prefix('v1')->group(function (): void {
             // Reseñas de los alumnos (con promedios); el negocio puede ocultar una.
             Route::get('/resenas', [ResenasTenantController::class, 'index'])->middleware('puede:miembros.ver')->name('resenas.index');
             Route::put('/resenas/{resena}/visible', [ResenasTenantController::class, 'visibilidad'])->middleware('puede:miembros.gestionar')->name('resenas.visible');
-            // Solicitudes de baja de datos (ARCO): el negocio las atiende o rechaza.
+            // Solicitudes de baja de datos (ARCO): el negocio las atiende o rechaza. Atender
+            // borra sus datos sin vuelta atrás: responder pide dar de baja (miembros.eliminar).
             Route::get('/solicitudes-privacidad', [SolicitudesPrivacidadTenantController::class, 'index'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.index');
-            Route::post('/solicitudes-privacidad/{solicitud}/atender', [SolicitudesPrivacidadTenantController::class, 'atender'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.atender');
-            Route::post('/solicitudes-privacidad/{solicitud}/rechazar', [SolicitudesPrivacidadTenantController::class, 'rechazar'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.rechazar');
+            Route::post('/solicitudes-privacidad/{solicitud}/atender', [SolicitudesPrivacidadTenantController::class, 'atender'])->middleware('puede:miembros.eliminar')->name('solicitudes-privacidad.atender');
+            Route::post('/solicitudes-privacidad/{solicitud}/rechazar', [SolicitudesPrivacidadTenantController::class, 'rechazar'])->middleware('puede:miembros.eliminar')->name('solicitudes-privacidad.rechazar');
             // Padrón facturable (P0): base de la renta SaaS; `?formato=csv` para exportar. Ruta literal antes de {persona}.
             // El nivel del cliente en cada actividad (ADR 0187).
             Route::get('/miembros/{persona}/niveles', [NivelesMiembroTenantController::class, 'index'])->middleware(['puede:miembros.ver', 'modalidad:clases'])->name('miembros.niveles.index');

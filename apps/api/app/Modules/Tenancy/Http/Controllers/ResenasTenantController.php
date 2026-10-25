@@ -215,7 +215,13 @@ class ResenasTenantController
     public function visibilidad(Request $request): JsonResponse
     {
         $validado = $request->validate(['visible' => ['required', 'boolean']]);
-        $resena = ResenaTenant::query()->where('ulid', (string) $request->route('resena'))->firstOrFail();
+        // Con el mismo alcance que el listado: la reseña de un cliente de otra sede (o de
+        // la clase de otro, para quien imparte) no se oculta desde aquí.
+        $actor = $request->attributes->get('usuario_tenant');
+        $propias = $actor instanceof Usuario && app(AlcanceClientesTenant::class)->esAcotado($actor) ? (int) $actor->getKey() : null;
+        $resena = app(AlcancePersonaTenant::class)->acotada(ResenaTenant::query(), $request)
+            ->when($propias !== null, fn ($q) => $q->where('instructor_id', $propias))
+            ->where('ulid', (string) $request->route('resena'))->firstOrFail();
         $resena->update(['visible' => (bool) $validado['visible']]);
 
         return response()->json(['data' => $this->presentar($resena->load(['oferta', 'instructor', 'persona']))]);

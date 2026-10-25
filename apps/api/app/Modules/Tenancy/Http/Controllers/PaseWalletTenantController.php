@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\ActualizarPasesWallet;
 use App\Modules\Tenancy\Application\CuentaEnUsoTenant;
 use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PasesWalletTenant;
@@ -62,11 +63,14 @@ class PaseWalletTenantController
         return response()->json(['data' => ['url' => $this->wallet->google($estudio, $persona)]]);
     }
 
-    /** Lo renueva: los pases que ya estaban en la cartera dejan de servir. */
-    public function renovar(Request $request): JsonResponse
+    /**
+     * Lo renueva: los pases que ya estaban en la cartera dejan de servir (otro código y
+     * otra serie: el teléfono perdido ya no recibe el pase nuevo).
+     */
+    public function renovar(Request $request, ActualizarPasesWallet $pasesGuardados): JsonResponse
     {
         $persona = $this->personaDe($request);
-        $this->pases->codigoDeWallet($persona, renovar: true);
+        $pasesGuardados->renovar($this->estudio($request), $persona);
 
         return response()->json(['data' => ['renovado' => true]]);
     }

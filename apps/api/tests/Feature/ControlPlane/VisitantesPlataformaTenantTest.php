@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
@@ -290,4 +291,22 @@ it('la visita de la plataforma ocupa lugar: con cupo de uno, la clase queda sin 
         ->firstWhere('id', $sesion);
     expect($fila['ocupados'])->toBe(1)
         ->and($fila['clase']['libres'] ?? $fila['libres'] ?? null)->toBe(0);
+});
+
+it('quien manda avisos con un token falso gasta su propio cupo, no el de los avisos de verdad', function (): void {
+    Config::set('agendauno.integraciones.avisos_bienestar_por_minuto', 3);
+    $e = estudioConSesion('fluo-wh', 'f@correo.mx');
+    $sesion = crearSesionTenant($e, agendaSemilla($e), 10, '2026-10-01 06:10:00');
+    Http::fake(['*/access/v1/validate' => Http::response(['metadata' => ['total' => 1]], 200)]);
+    $url = avisosDeWellhub($e);
+    $falsa = preg_replace('#/[^/]+$#', '/token-falso', $url) ?? '';
+
+    for ($i = 0; $i < 3; $i++) {
+        avisoWellhub($falsa)->assertNotFound();
+    }
+    avisoWellhub($falsa)->assertStatus(429);
+
+    // El aviso con el token del negocio sigue entrando y la visita se valida.
+    avisoWellhub($url)->assertOk();
+    expect($this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/checkins", conBearer($e['bearer']))->assertOk()->json('data'))->toHaveCount(1);
 });

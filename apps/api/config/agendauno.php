@@ -346,6 +346,9 @@ return [
         'wellhub_setup_url' => env('WELLHUB_SETUP_API_URL', 'https://api.partners-integrations.gympass.com'),
         // La Booking API de TotalPass: misma llave de integrador y la de cada sede.
         'totalpass_booking_url' => env('TOTALPASS_BOOKING_API_URL', 'https://booking-api.totalpass.com'),
+        // Avisos por minuto que recibe cada negocio de Wellhub y TotalPass, por cada token
+        // de su dirección (uno falso gasta su propio cupo, no el del token de verdad).
+        'avisos_bienestar_por_minuto' => (int) env('AVISOS_BIENESTAR_POR_MINUTO', 600),
     ],
 
     'operacion' => [

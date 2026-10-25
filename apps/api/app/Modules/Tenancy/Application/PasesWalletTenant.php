@@ -35,22 +35,42 @@ class PasesWalletTenant
         private readonly ResumenMembresiasTenant $membresias,
     ) {}
 
-    /** El número de serie del pase: el negocio y la persona (no cambia con el slug). */
+    /**
+     * El primer número de serie del pase: el negocio y la persona (no cambia con el slug).
+     * Al renovarlo se le agrega una marca nueva ({@see ActualizarPasesWallet::renovar()}).
+     */
     public static function serie(Estudio $estudio, PersonaTenant $persona): string
     {
         return $estudio->ulid.'-'.$persona->ulid;
     }
 
-    /** El token con el que Apple Wallet se identifica ante el servicio web del pase. */
+    /** El número de serie con que se emite hoy su pase: el guardado (el de la última renovación). */
+    public static function serieActual(Estudio $estudio, PersonaTenant $persona): string
+    {
+        $guardada = PaseWallet::query()->where('estudio_id', $estudio->getKey())->where('persona_ulid', $persona->ulid)->value('serie');
+
+        return is_string($guardada) && $guardada !== '' ? $guardada : self::serie($estudio, $persona);
+    }
+
+    /**
+     * El token con el que Apple Wallet se identifica ante el servicio web del pase: es del
+     * número de serie, así que un pase renovado (con otra serie) lleva otro.
+     */
     public static function tokenApple(string $serie): string
     {
         return hash_hmac('sha256', 'wallet-apple:'.$serie, (string) config('app.key'));
     }
 
-    /** El identificador del objeto del pase en Google Wallet. */
+    /** El identificador del objeto del pase en Google Wallet (cambia al renovarlo). */
     public static function objetoGoogle(Estudio $estudio, PersonaTenant $persona): string
     {
-        return (string) config('agendauno.wallet.google.issuer_id').'.'.$estudio->ulid.'_'.$persona->ulid;
+        return self::objetoDeLaSerie(self::serieActual($estudio, $persona));
+    }
+
+    /** El objeto de Google Wallet de un número de serie. */
+    public static function objetoDeLaSerie(string $serie): string
+    {
+        return (string) config('agendauno.wallet.google.issuer_id').'.'.str_replace('-', '_', $serie);
     }
 
     /**
@@ -106,7 +126,10 @@ class PasesWalletTenant
     {
         $huella = self::huella($this->contenido($estudio, $persona));
         $pase = PaseWallet::query()->firstOrNew(['estudio_id' => $estudio->getKey(), 'persona_ulid' => $persona->ulid]);
-        $pase->serie = self::serie($estudio, $persona);
+        // La serie es la del primer pase o la de su última renovación: no se regresa.
+        if (! $pase->exists) {
+            $pase->serie = self::serie($estudio, $persona);
+        }
         if ($pase->huella !== $huella) {
             $pase->huella = $huella;
             $pase->cambio_en = now();
@@ -148,7 +171,7 @@ class PasesWalletTenant
         $contenido = $this->contenido($estudio, $persona);
         $codigo = $contenido['codigo'];
         [$fondo, $texto] = self::colores($estudio);
-        $serie = self::serie($estudio, $persona);
+        $serie = self::serieActual($estudio, $persona);
 
         $pase = [
             'formatVersion' => 1,

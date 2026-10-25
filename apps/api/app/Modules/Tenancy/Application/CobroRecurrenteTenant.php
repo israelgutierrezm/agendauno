@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\MotivoFalloCobro;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
@@ -163,7 +164,9 @@ class CobroRecurrenteTenant
         if ($pago->estado === EstadoPago::Aprobado) {
             $this->domiciliaciones->registrarCargo($domiciliacion, null);
 
-            return 'cobrado';
+            // Cobró otro importe y la renovación sigue por pagar: espera que el negocio lo
+            // revise (incidencia MONTO_DISTINTO), como un cobro de la suscripción.
+            return $orden->refresh()->estado === EstadoOrden::Pendiente ? 'pendiente' : 'cobrado';
         }
         if ($pago->estado === EstadoPago::Pendiente) {
             return 'pendiente';

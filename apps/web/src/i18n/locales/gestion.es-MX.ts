@@ -1293,8 +1293,9 @@ export const privacidadNegocio = {
   vencidas: "Vencidas ({n})",
   porVencer: "Por vencer ({n})",
   sinResultados: "Ninguna solicitud coincide con los filtros.",
-  atender: "Dar de baja",
-  rechazar: "Rechazar",
+  // Borra sus datos (no se deshace): acción de riesgo con su objeto.
+  atender: "Borrar sus datos",
+  rechazar: "Rechazar solicitud",
   motivoRechazo: "Motivo del rechazo",
   confirmarRechazo: "Rechazar solicitud",
   confirmarAtender:

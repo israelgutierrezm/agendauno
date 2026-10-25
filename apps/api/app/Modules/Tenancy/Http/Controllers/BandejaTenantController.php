@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Bandeja\AdjuntosBandejaTenant;
 use App\Modules\Tenancy\Bandeja\BandejaTenant;
 use App\Modules\Tenancy\Models\CanalMensajeria;
@@ -13,6 +15,7 @@ use App\Modules\Tenancy\Models\MensajeConversacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Support\DiscosDeArchivos;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +40,8 @@ class BandejaTenantController
     public function __construct(
         private readonly BandejaTenant $bandeja,
         private readonly AdjuntosBandejaTenant $adjuntos,
+        private readonly AlcancePersonaTenant $alcance,
+        private readonly ResolverAccesoTenant $acceso,
     ) {}
 
     public function resumen(Request $request): JsonResponse
@@ -44,7 +49,7 @@ class BandejaTenantController
         $estudio = $this->estudio($request);
 
         return response()->json(['data' => [
-            'sin_leer' => ConversacionTenant::query()->where('estado', ConversacionTenant::ABIERTA)->where('no_leidos', '>', 0)->count(),
+            'sin_leer' => $this->visibles(ConversacionTenant::query(), $request)->where('estado', ConversacionTenant::ABIERTA)->where('no_leidos', '>', 0)->count(),
             'canales' => CanalMensajeria::query()->where('estudio_id', $estudio->getKey())->pluck('canal')->all(),
         ]]);
     }
@@ -59,7 +64,7 @@ class BandejaTenantController
         ]);
         $q = trim((string) ($filtros['q'] ?? ''));
         $digitos = (string) preg_replace('/\D/', '', $q);
-        $pagina = ConversacionTenant::query()
+        $pagina = $this->visibles(ConversacionTenant::query(), $request)
             ->where('estado', $filtros['estado'] ?? ConversacionTenant::ABIERTA)
             ->when(isset($filtros['canal']), fn ($c) => $c->where('canal', $filtros['canal']))
             ->when($q !== '', fn ($c) => $c->where(function ($w) use ($q, $digitos): void {
@@ -202,7 +207,10 @@ class BandejaTenantController
      */
     public function archivo(Request $request): StreamedResponse
     {
-        $mensaje = MensajeConversacionTenant::query()->where('ulid', (string) $request->route('mensaje'))->with('conversacion')->firstOrFail();
+        $mensaje = MensajeConversacionTenant::query()->where('ulid', (string) $request->route('mensaje'))->with('conversacion.persona')->firstOrFail();
+        if ($mensaje->conversacion instanceof ConversacionTenant) {
+            $this->exigirAlcance($request, $mensaje->conversacion);
+        }
         abort_if($mensaje->archivo_ruta === null && ! $this->adjuntos->bajar($mensaje), 404, 'Ese archivo ya no está en Meta o pesa más de lo que se guarda: ábrelo en el teléfono.');
         $mime = (string) ($mensaje->adjunto_mime ?? 'application/octet-stream');
         $enLinea = AdjuntosBandejaTenant::enLinea($mime);
@@ -225,9 +233,10 @@ class BandejaTenantController
             $conversacion->estado = (string) $validado['estado'];
         }
         if (array_key_exists('persona_id', $validado)) {
-            $conversacion->persona_id = $validado['persona_id'] === null
-                ? null
-                : (int) PersonaTenant::query()->where('ulid', (string) $validado['persona_id'])->firstOrFail()->getKey();
+            $persona = $validado['persona_id'] === null ? null : PersonaTenant::query()->where('ulid', (string) $validado['persona_id'])->firstOrFail();
+            // Solo con alguien que puede ver: ligarla no sirve para asomarse a otra ficha.
+            $this->alcance->exigirPersona($request, $persona);
+            $conversacion->persona_id = $persona instanceof PersonaTenant ? (int) $persona->getKey() : null;
         }
         $conversacion->save();
 
@@ -306,7 +315,38 @@ class BandejaTenantController
 
     private function conversacion(Request $request): ConversacionTenant
     {
-        return ConversacionTenant::query()->where('ulid', (string) $request->route('conversacion'))->with('persona')->firstOrFail();
+        $conversacion = ConversacionTenant::query()->where('ulid', (string) $request->route('conversacion'))->with('persona')->firstOrFail();
+        $this->exigirAlcance($request, $conversacion);
+
+        return $conversacion;
+    }
+
+    /**
+     * Las conversaciones que ve quien atiende: las que no están ligadas a nadie son de
+     * todo el equipo; las de un cliente, con el alcance de su ficha (R19). Personal sin
+     * sede en un negocio con varias no ve ninguna (ADR 0098).
+     *
+     * @param  Builder<ConversacionTenant>  $consulta
+     * @return Builder<ConversacionTenant>
+     */
+    private function visibles(Builder $consulta, Request $request): Builder
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+        if ($actor instanceof Usuario && $this->acceso->sinSucursal($actor)) {
+            return $consulta->whereRaw('1 = 0');
+        }
+
+        return $this->alcance->acotada($consulta, $request, 'persona_id', sinPersonaVisible: true);
+    }
+
+    /** Una conversación (o su archivo) solo con el mismo alcance que el listado. */
+    private function exigirAlcance(Request $request, ConversacionTenant $conversacion): void
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_if($actor instanceof Usuario && $this->acceso->sinSucursal($actor), 403, 'Aún no tienes una sucursal asignada.');
+        if ($conversacion->persona_id !== null) {
+            $this->alcance->exigirPersona($request, $conversacion->persona);
+        }
     }
 
     private function estudio(Request $request): Estudio

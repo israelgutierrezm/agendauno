@@ -181,7 +181,7 @@ class TareasTenantController
         $tarea = $this->tareas->crear([
             'titulo' => $validado['titulo'],
             'detalle' => $validado['detalle'] ?? null,
-            'persona_id' => $this->persona($validado['persona_id'] ?? null),
+            'persona_id' => $this->persona($request, $validado['persona_id'] ?? null),
             'responsable_id' => $this->responsable($request, $validado['responsable_id'] ?? null),
             'vence_en' => $this->vencimiento($validado['vence_en'] ?? null),
         ]);
@@ -217,7 +217,7 @@ class TareasTenantController
             $tarea->vence_en = $this->vencimiento($validado['vence_en']);
         }
         if (array_key_exists('persona_id', $validado)) {
-            $tarea->persona_id = $this->persona($validado['persona_id']);
+            $tarea->persona_id = $this->persona($request, $validado['persona_id']);
         }
         if (array_key_exists('responsable_id', $validado)) {
             $tarea->responsable_id = $this->responsable($request, $validado['responsable_id']);
@@ -244,18 +244,22 @@ class TareasTenantController
         return response()->json(['data' => $equipo]);
     }
 
-    /** El id de la persona del negocio con ese ULID; 422 si no existe. */
-    private function persona(?string $ulid): ?int
+    /**
+     * El id de la persona del negocio con ese ULID; 422 si no existe. Con el alcance de
+     * su ficha (R19): una tarea no se liga a un cliente de otra sede.
+     */
+    private function persona(Request $request, ?string $ulid): ?int
     {
         if ($ulid === null || $ulid === '') {
             return null;
         }
-        $id = PersonaTenant::query()->where('ulid', $ulid)->value('id');
-        if ($id === null) {
+        $persona = PersonaTenant::query()->where('ulid', $ulid)->first();
+        if (! $persona instanceof PersonaTenant) {
             throw ValidationException::withMessages(['persona_id' => ['La persona no existe.']]);
         }
+        app(AlcancePersonaTenant::class)->exigirPersona($request, $persona);
 
-        return (int) $id;
+        return (int) $persona->getKey();
     }
 
     /**
@@ -331,9 +335,14 @@ class TareasTenantController
             : Carbon::parse($valor);
     }
 
+    /**
+     * La tarea con el mismo alcance que el listado: la de un cliente de otra sede no se
+     * ve ni se resuelve (salvo que se la hayan dado a quien pide).
+     */
     private function resolver(Request $request): TareaTenant
     {
-        $tarea = TareaTenant::query()->where('ulid', (string) $request->route('tarea'))->firstOrFail();
+        $tarea = app(AlcancePersonaTenant::class)->acotadaSalvoLoSuyo(TareaTenant::query(), $request, 'responsable_id')
+            ->where('ulid', (string) $request->route('tarea'))->firstOrFail();
         $suyas = $this->soloDe($request);
         abort_if($suyas !== null && (int) $tarea->responsable_id !== $suyas, 403, 'Esta tarea es de otra persona del equipo.');
 

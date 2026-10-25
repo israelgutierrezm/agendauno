@@ -45,9 +45,16 @@ class MensajeMailable extends Mailable
         );
     }
 
+    /**
+     * Una campaña lleva cómo darse de baja en un clic desde el cliente de correo (RFC 8058):
+     * el cliente hace POST al enlace firmado.
+     */
     public function headers(): Headers
     {
-        return new Headers(text: $this->enlaceBaja !== null ? ['List-Unsubscribe' => "<{$this->enlaceBaja}>"] : []);
+        return new Headers(text: $this->enlaceBaja !== null ? [
+            'List-Unsubscribe' => "<{$this->enlaceBaja}>",
+            'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+        ] : []);
     }
 
     public function content(): Content

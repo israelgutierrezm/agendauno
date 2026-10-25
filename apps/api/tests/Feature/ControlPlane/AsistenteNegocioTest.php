@@ -111,6 +111,86 @@ it('propone una campaña que la persona aplica; nadie más puede aplicarla', fun
         ->assertUnprocessable();
 });
 
+/**
+ * El modelo simulado propone, una pregunta tras otra, cada una de estas acciones.
+ *
+ * @param  list<array<string, mixed>>  $acciones
+ */
+function modeloQuePropone(array $acciones): void
+{
+    $secuencia = Http::sequence();
+    foreach ($acciones as $i => $accion) {
+        $secuencia->push(['stop_reason' => 'tool_use', 'content' => [
+            ['type' => 'tool_use', 'id' => 'toolu_'.$i, 'name' => 'proponer_accion', 'input' => $accion],
+        ]])->push(['stop_reason' => 'end_turn', 'content' => [['type' => 'text', 'text' => 'Te la dejé lista: revísala y aplícala.']]]);
+    }
+    Http::fake(['api.anthropic.com/*' => $secuencia]);
+}
+
+/**
+ * Pide al asistente la siguiente propuesta y la devuelve.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ * @return array<string, mixed>
+ */
+function propuestaDelAsistente(array $e, ?string $bearer = null): array
+{
+    return test()->postJson("/api/v1/app/{$e['slug']}/asistente", ['mensajes' => [['rol' => 'usuario', 'texto' => 'Prepáralo']]], conBearer($bearer ?? $e['bearer']))
+        ->assertOk()->json('data.propuestas.0');
+}
+
+it('una propuesta se aplica una sola vez y la misma campaña no se repite en 24 horas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Ana', 'tipo' => 'miembro'], conBearer($e['bearer']))->assertCreated();
+    asistenteEncendido();
+    $campana = [
+        'tipo' => 'campana', 'resumen' => 'Aviso del puente', 'segmento' => 'todos', 'canal' => 'interno',
+        'asunto' => 'Horario del puente', 'cuerpo' => 'El lunes no hay clases.',
+    ];
+    $url = "/api/v1/app/{$e['slug']}/asistente/acciones";
+    modeloQuePropone([$campana, $campana]);
+
+    $propuesta = propuestaDelAsistente($e);
+    $this->postJson($url, ['token' => $propuesta['token']], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.resultado.enviados', 1);
+    // El mismo token otra vez (un doble clic, un reintento): no se repite.
+    $this->postJson($url, ['token' => $propuesta['token']], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonPath('meta.errors.token.0', 'Esa propuesta ya se aplicó.');
+    // Otra propuesta con la misma campaña: la regla de Comunicaciones, no dos veces en 24 horas.
+    $otra = propuestaDelAsistente($e);
+    $this->postJson($url, ['token' => $otra['token']], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['cuerpo'], 'meta.errors');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/comunicaciones/difusiones", conBearer($e['bearer']))->assertOk()->assertJsonCount(1, 'data');
+});
+
+it('generar la agenda desde el asistente respeta las sedes de quien la aplica', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sedeA = agendaSemilla($e);
+    $sedeB = agendaSemilla($e);
+    foreach ([$sedeA, $sedeB] as $sede) {
+        $this->postJson("/api/v1/app/{$e['slug']}/plantillas-horario", [
+            'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'],
+            'dias_semana' => [1], 'hora_local' => '08:00', 'duracion_minutos' => 60, 'vigente_desde' => '2030-01-07',
+        ], conBearer($e['bearer']))->assertCreated();
+    }
+    asistenteEncendido();
+    $rol = (string) $this->postJson("/api/v1/app/{$e['slug']}/roles", [
+        'nombre' => 'Coordinación', 'permisos' => ['facturacion.ver', 'agenda.ver', 'agenda.gestionar', 'catalogo.ver', 'sucursales.ver'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.clave');
+    $coordinaA = personalConSesion($e['slug'], $e['bearer'], 'coordina@correo.mx', $rol);
+    asignarSucursal($e, usuarioIdPorEmail($e, 'coordina@correo.mx'), $sedeA['sucursal']);
+
+    modeloQuePropone([['tipo' => 'generar_agenda', 'resumen' => 'La semana del 7', 'desde' => '2030-01-07', 'hasta' => '2030-01-13']]);
+    $propuesta = propuestaDelAsistente($e, $coordinaA);
+    $this->postJson("/api/v1/app/{$e['slug']}/asistente/acciones", ['token' => $propuesta['token']], conBearer($coordinaA))
+        ->assertOk()->assertJsonPath('data.resultado.creadas', 1);
+
+    // Solo la clase de su sede: la de la otra queda sin generar.
+    $sedes = collect($this->getJson("/api/v1/app/{$e['slug']}/sesiones?desde=2030-01-01&hasta=2030-01-31", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->pluck('sucursal_id')->all();
+    expect($sedes)->toBe([$sedeA['sucursal']]);
+});
+
 it('quien no ve las finanzas no le pregunta, y el negocio tiene un tope de preguntas al día', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     asistenteEncendido(1);

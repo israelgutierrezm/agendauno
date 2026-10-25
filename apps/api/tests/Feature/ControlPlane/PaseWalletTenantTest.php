@@ -113,6 +113,11 @@ it('sin las credenciales de la plataforma la cartera no se ofrece', function ():
 });
 
 it('el pase de Apple va firmado y el de Google en un JWT firmado, con el mismo código que recepción acepta', function (): void {
+    // Al renovar se desactiva el objeto anterior de Google Wallet.
+    Http::fake([
+        'oauth2.googleapis.com/token' => Http::response(['access_token' => 'tok-google', 'expires_in' => 3600]),
+        'walletobjects.googleapis.com/*' => Http::response(['id' => 'x']),
+    ]);
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $vale = alumnaParaWallet($e);
     $publicaGoogle = walletDePrueba($this->carpeta);
@@ -208,25 +213,74 @@ it('el pase muestra su plan y su saldo y se actualiza solo: Apple Wallet registr
     $this->artisan('agendauno:actualizar-pases-wallet')->assertSuccessful();
     Http::assertNothingSent();
 
-    // Renueva su pase (otro código): se avisa al teléfono y se actualiza Google.
+    // Cambia lo que muestra (su nombre): se avisa al teléfono y se actualiza Google.
+    $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
     $this->travel(5)->minutes();
-    $this->postJson("/api/v1/app/{$e['slug']}/mi/pase/wallet/renovar", [], conBearer($vale))->assertOk();
+    $this->putJson("/api/v1/app/{$e['slug']}/miembros/{$persona}", ['nombre' => 'Valeria'], conBearer($e['bearer']))->assertOk();
     $this->artisan('agendauno:actualizar-pases-wallet')->assertSuccessful();
     Http::assertSent(fn (Request $r): bool => str_ends_with($r->url(), '/3/device/push-1') && $r->hasHeader('apns-topic', $tipo));
     Http::assertSent(fn (Request $r): bool => $r->method() === 'PATCH' && str_contains($r->url(), 'genericObject/') && $r->hasHeader('Authorization', 'Bearer tok-google')
         && collect($r['textModulesData'])->firstWhere('id', 'plan')['body'] === 'Ilimitada');
 
-    // El teléfono pregunta qué cambió y pide el pase nuevo, con el código nuevo.
+    // El teléfono pregunta qué cambió y pide el pase nuevo, con el mismo código.
     $this->getJson("{$base}/devices/tel-1/registrations/{$tipo}?passesUpdatedSince={$antes}")->assertOk()->assertJsonPath('serialNumbers', [$serie]);
     $nuevo = json_decode(archivosDelPkpass((string) $this->get("{$base}/passes/{$tipo}/{$serie}", $apple)->assertOk()
         ->assertHeader('Content-Type', 'application/vnd.apple.pkpass')->getContent())['pass.json'], true);
-    expect($nuevo['barcodes'][0]['message'])->not->toBe($pase['barcodes'][0]['message']);
+    expect($nuevo['generic']['primaryFields'][0]['value'])->toBe('Valeria')
+        ->and($nuevo['barcodes'][0]['message'])->toBe($pase['barcodes'][0]['message']);
     $this->get("{$base}/passes/{$tipo}/{$serie}", [...$apple, 'If-Modified-Since' => now()->addMinute()->toRfc7231String()])->assertStatus(304);
     $this->get("{$base}/passes/{$tipo}/{$serie}")->assertUnauthorized();
 
     // Apple ya no reconoce el teléfono (410): se olvida.
     $this->travel(5)->minutes();
-    $this->postJson("/api/v1/app/{$e['slug']}/mi/pase/wallet/renovar", [], conBearer($vale))->assertOk();
+    $this->putJson("/api/v1/app/{$e['slug']}/miembros/{$persona}", ['nombre' => 'Vale'], conBearer($e['bearer']))->assertOk();
     $this->artisan('agendauno:actualizar-pases-wallet')->assertSuccessful();
     expect(DispositivoPaseWallet::query()->count())->toBe(0);
+});
+
+it('renovar el pase deja fuera al anterior: otro código, otra serie, sin sus teléfonos y su objeto de Google inactivo', function (): void {
+    Http::fake([
+        'api.push.apple.com/*' => Http::response('', 200),
+        'oauth2.googleapis.com/token' => Http::response(['access_token' => 'tok-google', 'expires_in' => 3600]),
+        'walletobjects.googleapis.com/*' => Http::response(['id' => 'x']),
+    ]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $vale = alumnaParaWallet($e);
+    walletDePrueba($this->carpeta);
+    $tipo = 'pass.mx.agendauno.prueba';
+    $base = '/api/v1/wallet/apple/v1';
+    $paseDeApple = fn (): array => json_decode(archivosDelPkpass((string) $this->get("/api/v1/app/{$e['slug']}/mi/pase/wallet/apple", conBearer($vale))
+        ->assertOk()->getContent())['pass.json'], true);
+
+    // El pase en el teléfono que se pierde: registrado en Apple Wallet y guardado en Google.
+    $viejo = $paseDeApple();
+    $apple = ['Authorization' => 'ApplePass '.$viejo['authenticationToken']];
+    $this->postJson("{$base}/devices/tel-perdido/registrations/{$tipo}/{$viejo['serialNumber']}", ['pushToken' => 'push-perdido'], $apple)->assertCreated();
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/pase/wallet/google", conBearer($vale))->assertOk();
+    $objetoViejo = '3388000000012345678.'.str_replace('-', '_', $viejo['serialNumber']);
+
+    $this->travel(5)->minutes();
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/pase/wallet/renovar", [], conBearer($vale))->assertOk();
+
+    // Su objeto de Google queda inactivo y el teléfono perdido ya no está registrado.
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'PATCH' && str_ends_with($r->url(), 'genericObject/'.rawurlencode($objetoViejo)) && $r['state'] === 'INACTIVE');
+    expect(DispositivoPaseWallet::query()->count())->toBe(0);
+    // Su pase ya no se descarga ni se le avisa nada, y recepción ya no acepta su código.
+    $this->get("{$base}/passes/{$tipo}/{$viejo['serialNumber']}", $apple)->assertNotFound();
+    $this->get("{$base}/devices/tel-perdido/registrations/{$tipo}")->assertNoContent();
+    $this->artisan('agendauno:actualizar-pases-wallet')->assertSuccessful();
+    Http::assertNotSent(fn (Request $r): bool => str_contains($r->url(), 'push-perdido'));
+    $this->postJson("/api/v1/app/{$e['slug']}/accesos", ['codigo' => $viejo['barcodes'][0]['message']], conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonPath('code', 'ACCESS_PASS_INVALID');
+
+    // El pase nuevo: otra serie, otro token y otro código, que sí sirve; en Google, otro objeto.
+    $nuevo = $paseDeApple();
+    expect($nuevo['serialNumber'])->not->toBe($viejo['serialNumber'])
+        ->and($nuevo['authenticationToken'])->not->toBe($viejo['authenticationToken'])
+        ->and($nuevo['barcodes'][0]['message'])->not->toBe($viejo['barcodes'][0]['message']);
+    $this->postJson("/api/v1/app/{$e['slug']}/accesos", ['codigo' => $nuevo['barcodes'][0]['message']], conBearer($e['bearer']))->assertCreated();
+    $url = (string) $this->getJson("/api/v1/app/{$e['slug']}/mi/pase/wallet/google", conBearer($vale))->assertOk()->json('data.url');
+    $cuerpo = explode('.', substr($url, strlen('https://pay.google.com/gp/v/save/')))[1];
+    $reclamos = json_decode((string) base64_decode(strtr($cuerpo, '-_', '+/')), true);
+    expect($reclamos['payload']['genericObjects'][0]['id'])->toBe('3388000000012345678.'.str_replace('-', '_', $nuevo['serialNumber']));
 });

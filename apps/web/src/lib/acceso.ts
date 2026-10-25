@@ -158,9 +158,14 @@ export const POLITICAS: Record<string, Politica> = {
   "ficha-miembro": { permiso: "miembros.ver" },
   "ficha-instructor": { permiso: "usuarios.gestionar" },
   importar: { permiso: "miembros.gestionar" },
-  // Concede planes y créditos: pide las dos cosas (C07).
+  // Concede planes y créditos sin cobro: pide las dos cosas y dar cortesías (C07,
+  // ADR 0207).
   "importar-saldos": {
-    permiso: ["membresias.gestionar", "creditos.gestionar"],
+    permiso: [
+      "membresias.gestionar",
+      "creditos.gestionar",
+      "membresias.cortesia",
+    ],
   },
   // Reservas futuras de clases de otro sistema (ADR 0176).
   "importar-reservas": { permiso: "reservas.gestionar", modalidad: "clases" },

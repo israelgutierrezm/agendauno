@@ -17,7 +17,6 @@ use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PlantillaWhatsAppNegocio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -117,21 +116,8 @@ class DifusionesTenantController
             $validado['asunto'] = $plantilla->titulo;
             $validado['cuerpo'] = $plantilla->cuerpo;
         }
-        $huella = DifundirComunicacionTenant::huella($segmento, $canal, $validado['asunto'], $validado['cuerpo']);
-        // La misma campaña no se manda dos veces el mismo día (B08). Con el candado, dos
-        // envíos a la vez (un doble clic, un reintento) no pasan los dos la revisión.
-        $difusion = Cache::lock('difusion:'.$huella, 30)->block(10, function () use ($huella, $difundir, $segmento, $canal, $validado, $plantilla): DifusionTenant {
-            $repetida = DifusionTenant::query()
-                ->where('huella', $huella)
-                ->where('estado', '!=', DifusionTenant::CANCELADA)
-                ->where('created_at', '>=', now()->subDay())
-                ->exists();
-            if ($repetida) {
-                throw ValidationException::withMessages(['cuerpo' => ['Ya mandaste esta misma difusión en las últimas 24 horas.']]);
-            }
-
-            return $difundir->ejecutar($segmento, $canal, $validado['asunto'], $validado['cuerpo'], $plantilla);
-        });
+        // La misma campaña no se manda dos veces el mismo día (B08), con candado del negocio.
+        $difusion = $difundir->unaVez($segmento, $canal, $validado['asunto'], $validado['cuerpo'], $plantilla);
 
         return response()->json(['data' => $this->presentar($difusion)], 201);
     }

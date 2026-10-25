@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\RadarRenovacionesTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -33,7 +34,28 @@ class RetencionTenantController
         private readonly ResolverAccesoTenant $acceso,
         private readonly RadarRenovacionesTenant $radar,
         private readonly SegmentosRetencionTenant $segmentos,
+        private readonly AlcancePersonaTenant $alcance,
     ) {}
+
+    /**
+     * Las personas de un segmento que ve quien consulta: con el alcance de la ficha del
+     * cliente (R19, ADR 0098), quien está acotado a unas sedes solo ve a los suyos, y sin
+     * sede asignada (con varias) a nadie.
+     *
+     * @return list<array{persona_id: int, dato: string|null, detalle: string}>
+     */
+    private function personasDelSegmento(Request $request, string $clave): array
+    {
+        $filas = $this->segmentos->personas($clave);
+        $actor = $request->attributes->get('usuario_tenant');
+        if ($filas === [] || ! $actor instanceof Usuario || $this->acceso->sucursalesPermitidas($actor) === null) {
+            return $filas;
+        }
+        $visibles = $this->alcance->acotada(PersonaTenant::query()->whereIn('id', array_column($filas, 'persona_id')), $request, 'id')
+            ->pluck('id')->map(static fn (mixed $id): int => (int) $id)->flip();
+
+        return array_values(array_filter($filas, static fn (array $fila): bool => $visibles->has((int) $fila['persona_id'])));
+    }
 
     /**
      * Retención por segmentos (ADR 0159): cada grupo con cuántos son y cuántos aceptan
@@ -45,7 +67,7 @@ class RetencionTenantController
         $citas = app(ModalidadNegocioTenant::class)->esCitas();
         $datos = [];
         foreach ($this->segmentos->disponibles() as $clave) {
-            $ids = array_column($this->segmentos->personas($clave), 'persona_id');
+            $ids = array_column($this->personasDelSegmento($request, $clave), 'persona_id');
             $motivo = SegmentosRetencionTenant::SEGMENTOS[$clave];
             $datos[] = [
                 'clave' => $clave,
@@ -68,7 +90,7 @@ class RetencionTenantController
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
-        $filas = collect($this->segmentos->personas($clave))->keyBy('persona_id');
+        $filas = collect($this->personasDelSegmento($request, $clave))->keyBy('persona_id');
         $motivo = SegmentosRetencionTenant::SEGMENTOS[$clave];
         $abiertas = TareaTenant::query()->whereIn('persona_id', $filas->keys())->where('motivo', $motivo->value)
             ->where('estado', EstadoTarea::Pendiente->value)->pluck('persona_id')->map(static fn (mixed $id): int => (int) $id)->flip();
@@ -104,7 +126,7 @@ class RetencionTenantController
         $clave = $this->clave($request);
         $motivo = SegmentosRetencionTenant::SEGMENTOS[$clave];
         $creadas = 0;
-        $filas = $this->segmentos->personas($clave);
+        $filas = $this->personasDelSegmento($request, $clave);
         foreach ($filas as $fila) {
             if ($seguimiento->crearPorSegmento($fila['persona_id'], $motivo, $fila['dato'])) {
                 $creadas++;
@@ -123,6 +145,7 @@ class RetencionTenantController
     {
         $this->exigirNegocioCompleto($request);
         $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        $this->alcance->exigirPersona($request, $persona);
         $validado = $request->validate([
             'estado' => ['required', 'in:por_vencer,vencida'],
             'vence' => ['nullable', 'date_format:Y-m-d'],

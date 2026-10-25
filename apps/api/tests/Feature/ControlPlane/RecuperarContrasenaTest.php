@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Mail\CorreoActivacion;
 use App\Modules\Tenancy\Mail\CorreoRestablecimiento;
+use App\Providers\AppServiceProvider;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 
@@ -112,4 +113,28 @@ it('pedir el enlace tiene su propio límite y no gasta los intentos de inicio de
     $this->postJson("/api/v1/app/{$e['slug']}/recuperar-contrasena", ['email' => 'a@correo.mx'])->assertStatus(429);
 
     $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'a@correo.mx', 'password' => 'secreto123'])->assertOk();
+});
+
+it('entrar y pedir el enlace tienen un tope por cuenta en la hora, venga de la IP que venga', function (): void {
+    Mail::fake();
+    // Activar la cuenta y entrar ya cuentan dos intentos de esta cuenta.
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $login = "/api/v1/app/{$e['slug']}/login";
+    $desde = fn (int $n) => $this->withServerVariables(['REMOTE_ADDR' => '10.20.'.intdiv($n, 200).'.'.($n % 200 + 1)]);
+
+    // Una red de muchas IP prueba contraseñas contra el mismo correo: ninguna llega a su
+    // tope por minuto, pero la cuenta tiene el suyo en la hora.
+    for ($n = 1; $n <= AppServiceProvider::INTENTOS_POR_CUENTA_HORA - 2; $n++) {
+        $desde($n)->postJson($login, ['email' => 'a@correo.mx', 'password' => 'adivinando'])->assertUnprocessable();
+    }
+    $desde(500)->postJson($login, ['email' => 'A@correo.mx', 'password' => 'secreto123'])->assertStatus(429);
+    // Otra cuenta del negocio no se afecta.
+    $desde(501)->postJson($login, ['email' => 'otra@correo.mx', 'password' => 'adivinando'])->assertUnprocessable();
+
+    // Igual pedir el enlace para restablecer la contraseña: no sirve para llenar un buzón.
+    $recuperar = "/api/v1/app/{$e['slug']}/recuperar-contrasena";
+    for ($n = 1; $n <= AppServiceProvider::RECUPERACIONES_POR_CUENTA_HORA; $n++) {
+        $desde(600 + $n)->postJson($recuperar, ['email' => 'a@correo.mx'])->assertOk();
+    }
+    $desde(700)->postJson($recuperar, ['email' => 'a@correo.mx'])->assertStatus(429);
 });

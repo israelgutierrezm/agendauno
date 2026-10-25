@@ -223,6 +223,11 @@ final class CatalogoParametros
                 '', $e, 1000, 100, 10000, 'filas', porNegocio: false),
             new DefinicionParametro('importaciones.max_sesiones_agenda', 'Importaciones', 'Sesiones por carga de agenda',
                 'Incluye las fechas que se expanden desde las filas semanales. Divide archivos mayores en varios lotes.', $e, 500, 10, 2000, 'sesiones', porNegocio: false),
+            // Saldos de apertura (ADR 0207): son de una migración real, no un regalo.
+            new DefinicionParametro('importaciones.dias_maximos_corte_saldos', 'Importaciones', 'Antigüedad máxima del corte de saldos de apertura',
+                'Días hacia atrás desde hoy en que puede estar el corte acordado con el otro sistema.', $e, 365, 1, 1095, 'días', porNegocio: false),
+            new DefinicionParametro('importaciones.meses_maximos_vigencia_saldos', 'Importaciones', 'Vigencia máxima de lo que se carga como saldo de apertura',
+                'Meses después del corte en que puede vencer un plan o un saldo que se trae del otro sistema.', $e, 24, 1, 60, 'meses', porNegocio: false),
 
             // Cuentas: vigencia de enlaces de seguridad (solo la plataforma).
             new DefinicionParametro('cuentas.horas_confirmar_correo', 'Cuentas', 'Vigencia del enlace para confirmar un cambio de correo',

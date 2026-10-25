@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -24,6 +25,7 @@ use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\PasarelaReembolsable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Support\ReporteDeErrores;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
@@ -160,6 +162,11 @@ class ReembolsarPagoTenant
             // revocar el entitlement).
             if ($esTotal && $revertirCreditos && $orden !== null) {
                 $this->exigirDerechosIntactos($orden);
+            }
+            // La que deja el pago devuelto por completo cancela la venta: si es de una cita
+            // (o de una clase de pago suelto) que sigue en pie, primero se cancela la cita.
+            if ($monto === $restante && $revertirCreditos && $orden !== null) {
+                $this->exigirCitaCancelada($orden);
             }
 
             $via = $this->via($bloqueado, $manual);
@@ -568,6 +575,26 @@ class ReembolsarPagoTenant
     {
         if ($this->derechos->algunoUsado($orden)) {
             throw new DerechoYaUsado('El derecho ya tuvo uso; no se puede reembolsar el pago completo.');
+        }
+    }
+
+    /**
+     * Devolver todo lo cobrado de una cita cancela su venta: si la cita sigue confirmada
+     * (o apartada) y no ha empezado, quedaría ocupando el horario sin cobro y al llegar
+     * no se podría cobrar. Se cancela primero la cita (con su política, que decide qué se
+     * devuelve) y después el pago. Una cita que ya pasó o ya se canceló no lo impide.
+     */
+    private function exigirCitaCancelada(OrdenTenant $orden): void
+    {
+        $vigente = ReservaTenant::query()
+            ->where(fn ($q) => $q->where('orden_id', $orden->getKey())->orWhere('saldo_orden_id', $orden->getKey()))
+            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
+            ->exists();
+        if ($vigente) {
+            throw new PagoNoReembolsable(app(ModalidadNegocioTenant::class)->esCitas()
+                ? 'Cancela la cita primero; después devuelve el pago.'
+                : 'Cancela la reserva de la clase primero; después devuelve el pago.');
         }
     }
 

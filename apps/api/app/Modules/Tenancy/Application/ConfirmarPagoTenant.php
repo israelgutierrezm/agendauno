@@ -150,13 +150,17 @@ class ConfirmarPagoTenant
     /**
      * El aviso de un cargo automático (pago domiciliado): si su pago no quedó registrado
      * porque la llamada a la pasarela no respondió (el intento se deshizo, pero el banco
-     * sí cobró), se registra con su orden: la misma domiciliación y el mismo importe y
-     * moneda que debe la compra. Si ya estaba pagada, queda como cobro doble por
-     * devolver. Idempotente: el segundo aviso encuentra el pago por su referencia.
+     * sí cobró), se registra con su orden y su domiciliación, con lo que el banco cobró.
+     * Si ya estaba pagada, queda como cobro doble por devolver. Si cobró otro importe u
+     * otra moneda (la compra cambió después del cargo), el dinero queda registrado y por
+     * revisar (incidencia MONTO_DISTINTO: darla por pagada o devolverlo), sin pagar la
+     * compra por sí solo: nunca se descarta en silencio, y como ya hay un cargo cobrado,
+     * no se vuelve a cobrar ({@see CobrarOrdenTenant::domiciliado()}). Idempotente: el
+     * segundo aviso encuentra el pago por su referencia.
      */
     public function porCargoDomiciliado(string $referencia, string $ordenUlid, string $domiciliacionUlid, int $montoMinor, string $moneda): void
     {
-        if ($referencia === '') {
+        if ($referencia === '' || $montoMinor <= 0 || $moneda === '') {
             return;
         }
 
@@ -170,21 +174,37 @@ class ConfirmarPagoTenant
                 return $registrado;
             }
             $domiciliacion = $domiciliacionUlid !== '' ? DomiciliacionTenant::query()->where('ulid', $domiciliacionUlid)->first() : null;
-            if (! $orden instanceof OrdenTenant || ! $domiciliacion instanceof DomiciliacionTenant
-                || (int) $orden->total_minor !== $montoMinor || strtoupper((string) $orden->moneda) !== strtoupper($moneda)) {
+            if (! $orden instanceof OrdenTenant || ! $domiciliacion instanceof DomiciliacionTenant) {
                 return null;
             }
-
-            return PagoTenant::query()->create([
+            $moneda = strtoupper($moneda);
+            $datos = [
                 'orden_id' => $orden->getKey(),
                 'proveedor' => $domiciliacion->proveedor,
                 'metodo' => MetodoPago::Tarjeta->value,
-                'estado' => EstadoPago::Pendiente->value,
                 'monto_minor' => $montoMinor,
-                'moneda' => strtoupper($moneda),
+                'moneda' => $moneda,
                 'domiciliacion_id' => $domiciliacion->getKey(),
                 'referencia_externa' => $referencia,
-            ]);
+            ];
+
+            // Cobró otro importe del que hoy debe la compra, o en otra moneda: el dinero
+            // entró, pero no paga la compra por sí solo. Queda registrado y por revisar.
+            if ($orden->estado === EstadoOrden::Pendiente
+                && ($moneda !== strtoupper((string) $orden->moneda) || $montoMinor !== (int) $orden->total_minor)) {
+                $pago = PagoTenant::query()->create([...$datos, 'estado' => EstadoPago::Aprobado->value, 'aprobado_en' => now()]);
+                $this->incidencias->porPago(
+                    IncidenciaCobroTenant::MONTO_DISTINTO,
+                    $pago,
+                    'El cargo automático cobró '.DatosDeOrden::dinero($montoMinor, $moneda).' y la compra es de '
+                        .DatosDeOrden::dinero((int) $orden->total_minor, (string) $orden->moneda).'. Da por pagada la renovación o devuelve el cobro.',
+                    ['esperado_minor' => (int) $orden->total_minor, 'moneda_esperada' => (string) $orden->moneda, 'cobrado_minor' => $montoMinor, 'moneda_cobrada' => $moneda],
+                );
+
+                return null;
+            }
+
+            return PagoTenant::query()->create([...$datos, 'estado' => EstadoPago::Pendiente->value]);
         });
 
         if ($pago instanceof PagoTenant) {

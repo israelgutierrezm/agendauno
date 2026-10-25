@@ -5,11 +5,14 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\DifusionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TareaTenant;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
@@ -103,15 +106,56 @@ it('quien pidió no recibir promociones después de encolada la campaña no la r
         return $m->enlaceBaja !== null && str_contains($m->cuerpoMensaje, $m->enlaceBaja);
     });
 
-    // Sin firma, no; con su enlace, sí (y queda en la bitácora).
+    // Sin firma, no. Abrir su enlace solo pregunta (los filtros del correo lo abren solos);
+    // confirmar (POST a la misma dirección firmada) la da de baja y queda en la bitácora.
     $ana = (string) enNegocioCampanas(fn () => PersonaTenant::query()->where('email', 'ana@correo.mx')->value('ulid'));
     $this->get("/api/v1/app/{$e['slug']}/promociones/baja/{$ana}")->assertForbidden();
-    $this->get((string) $enlace)->assertOk()->assertSee('ya no recibirás promociones');
+    $this->post("/api/v1/app/{$e['slug']}/promociones/baja/{$ana}")->assertForbidden();
+    $this->get((string) $enlace)->assertOk()->assertSee('¿Dejar de recibir promociones')->assertSee('method="post"', false);
+    expect(enNegocioCampanas(fn () => PersonaTenant::query()->where('ulid', $ana)->value('recibe_promociones')))->toBeTruthy();
+    $this->post((string) $enlace, ['List-Unsubscribe' => 'One-Click'])->assertOk()->assertSee('ya no recibirás promociones');
     expect(enNegocioCampanas(fn () => PersonaTenant::query()->where('ulid', $ana)->value('recibe_promociones')))->toBeFalsy();
+    $this->get((string) $enlace)->assertOk()->assertSee('Ya no recibes promociones');
     // Un enlace de otra persona no sirve para otra.
     $beto = (string) enNegocioCampanas(fn () => PersonaTenant::query()->where('email', 'beto@correo.mx')->value('ulid'));
-    $this->get(str_replace($ana, $beto, (string) $enlace))->assertForbidden();
+    $this->post(str_replace($ana, $beto, (string) $enlace))->assertForbidden();
     expect(URL::hasValidSignature(Request::create((string) $enlace)))->toBeTrue();
+});
+
+it('el correo de una campaña trae la baja en un clic para el cliente de correo', function (): void {
+    $enlace = 'https://api.agendauno.mx/api/v1/app/estudio-a/promociones/baja/01J?signature=x';
+    $cabeceras = (new MensajeMailable('Promo', 'Hola', 'Estudio A', enlaceBaja: $enlace))->headers()->text;
+
+    expect($cabeceras)->toBe(['List-Unsubscribe' => "<{$enlace}>", 'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click'])
+        ->and((new MensajeMailable('Tu reserva', 'Confirmada', 'Estudio A'))->headers()->text)->toBe([]);
+});
+
+it('cancelar una campaña a media tanda frena lo que faltaba por salir y no lo vuelve a marcar como enviado', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $difusion = campanaATodos($e);
+    $enviados = 0;
+    Event::listen(MessageSending::class, function (MessageSending $evento) use (&$enviados, $difusion): void {
+        if ($evento->message->getSubject() !== 'Promo de octubre') {
+            return;
+        }
+        $enviados++;
+        if ($enviados === 1) {
+            // Mientras sale el primero, alguien la cancela (como Comunicaciones › Cancelar).
+            enNegocioCampanas(function () use ($difusion): void {
+                $campana = DifusionTenant::query()->where('ulid', $difusion)->firstOrFail();
+                $campana->update(['estado' => DifusionTenant::CANCELADA, 'cancelada_en' => now()]);
+                MensajeTenant::query()->where('difusion_id', $campana->id)->whereIn('estado', ['encolado', 'fallido'])
+                    ->update(['estado' => 'descartado', 'ultimo_error' => 'Difusión cancelada.']);
+            });
+        }
+    });
+
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+
+    // Salió el que ya se estaba enviando; el otro ya no, y sigue descartado.
+    expect($enviados)->toBe(1)
+        ->and(enNegocioCampanas(fn (): array => MensajeTenant::query()->whereNotNull('difusion_id')->orderBy('id')->get()->map(fn (MensajeTenant $m): string => $m->estado->value)->all()))
+        ->toBe(['enviado', 'descartado']);
 });
 
 it('quien ya renovó sale solo del seguimiento de su vencimiento', function (): void {

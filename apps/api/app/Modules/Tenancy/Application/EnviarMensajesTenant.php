@@ -12,9 +12,11 @@ use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\DifusionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
@@ -100,7 +102,12 @@ class EnviarMensajesTenant
 
                     return null;
                 }
-                $mensaje->intentos++;
+                // Se reclama antes de entregarlo (con su intento): si después de leer la
+                // tanda pausaron o cancelaron su campaña, o alguien más ya lo tomó, no sale
+                // y su estado no se pisa.
+                if (! $this->reclamar($mensaje)) {
+                    return null;
+                }
 
                 try {
                     $this->entregar($mensaje);
@@ -130,6 +137,30 @@ class EnviarMensajesTenant
             });
 
         return $enviados;
+    }
+
+    /**
+     * Suma su intento solo si sigue como se leyó (mismo estado y mismos intentos) y su
+     * campaña no está en pausa ni cancelada. Devuelve si quedó reclamado.
+     */
+    private function reclamar(MensajeTenant $mensaje): bool
+    {
+        $reclamado = MensajeTenant::query()
+            ->whereKey($mensaje->getKey())
+            ->where('estado', $mensaje->estado->value)
+            ->where('intentos', $mensaje->intentos)
+            ->when($mensaje->difusion_id !== null, fn (Builder $q) => $q->whereNotIn(
+                'difusion_id',
+                DifusionTenant::query()->whereIn('estado', [DifusionTenant::PAUSADA, DifusionTenant::CANCELADA])->select('id'),
+            ))
+            ->update(['intentos' => $mensaje->intentos + 1]);
+        if ($reclamado === 0) {
+            return false;
+        }
+        $mensaje->intentos++;
+        $mensaje->syncOriginalAttribute('intentos');
+
+        return true;
     }
 
     private function entregar(MensajeTenant $mensaje): void

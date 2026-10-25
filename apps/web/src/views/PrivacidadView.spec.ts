@@ -12,8 +12,12 @@ import PrivacidadView from "./PrivacidadView.vue";
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: async () => true }));
+const permisos = vi.hoisted(() => ({ eliminar: true }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    puede: (p: string) => p !== "miembros.eliminar" || permisos.eliminar,
+  }),
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
@@ -31,6 +35,7 @@ const solicitud = (n: number) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  permisos.eliminar = true;
   api.get.mockImplementation(
     (_url: string, opciones: { params: { page: number } }) =>
       Promise.resolve({
@@ -52,6 +57,24 @@ beforeEach(() => {
 });
 
 describe("solicitudes de privacidad", () => {
+  it("borrar sus datos es una acción de riesgo y solo la ve quien puede eliminar", async () => {
+    let w = mount(PrivacidadView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    const borrar = w
+      .findAll("button")
+      .find((b) => b.text() === "Borrar sus datos")!;
+    expect(borrar.classes()).toContain("tu-btn-peligro");
+    w.unmount();
+
+    permisos.eliminar = false;
+    w = mount(PrivacidadView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    expect(
+      w.findAll("button").some((b) => b.text() === "Borrar sus datos"),
+    ).toBe(false);
+    w.unmount();
+  });
+
   it("van por páginas", async () => {
     const w = mount(PrivacidadView, {
       global: { plugins: [i18n], stubs: { EncabezadoSeccion: true } },

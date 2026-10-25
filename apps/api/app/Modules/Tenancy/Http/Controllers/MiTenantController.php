@@ -1167,8 +1167,9 @@ class MiTenantController
             ]);
         }
 
-        // El autoservicio solo admite pasarelas en línea (no ventanilla/manual/efectivo).
-        if (in_array($validado['proveedor'], ['manual', 'efectivo'], true)) {
+        // El autoservicio solo admite pasarelas en línea (no ventanilla/manual/efectivo):
+        // un depósito en ventanilla lo registra y lo valida el negocio.
+        if (in_array($validado['proveedor'], ['manual', 'efectivo', 'ventanilla'], true)) {
             throw ValidationException::withMessages([
                 'proveedor' => ['El pago en efectivo o ventanilla se registra en el negocio.'],
             ]);

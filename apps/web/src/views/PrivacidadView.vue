@@ -29,6 +29,9 @@ interface Solicitud {
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+// Atender una baja borra datos para siempre: el servidor pide `miembros.eliminar`
+// (ADR 0207); sin él, la solicitud se ve pero no se resuelve aquí.
+const puedeResolver = computed(() => sesion.puede("miembros.eliminar"));
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -130,6 +133,7 @@ async function atender(s: Solicitud): Promise<void> {
   if (
     !(await confirmar(t("privacidadNegocio.confirmarAtender"), {
       peligro: true,
+      aceptar: t("privacidadNegocio.atender"),
     }))
   ) {
     return;
@@ -292,10 +296,13 @@ onMounted(cargar);
                   <template v-if="s.respuesta"> · {{ s.respuesta }}</template>
                 </p>
               </div>
-              <div v-if="s.estado === 'pendiente'" class="flex gap-2">
+              <div
+                v-if="s.estado === 'pendiente' && puedeResolver"
+                class="flex gap-2"
+              >
                 <button
                   type="button"
-                  class="tu-btn tu-btn-primario"
+                  class="tu-btn tu-btn-peligro"
                   :disabled="ocupado === s.id"
                   @click="atender(s)"
                 >

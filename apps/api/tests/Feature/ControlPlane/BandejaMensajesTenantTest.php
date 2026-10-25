@@ -709,3 +709,36 @@ it('una conversación larga abre con sus mensajes más recientes y carga los ant
     $this->getJson("{$ruta}/mensajes?antes={$deOtra}", conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['antes'], 'meta.errors');
     $this->getJson("{$ruta}/mensajes", conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['antes'], 'meta.errors');
 });
+
+it('con varias sedes, quien está acotado no ve ni liga las conversaciones de clientes de otra; sin sede no ve ninguna', function (): void {
+    $llamadas = [];
+    fingirMetaBandeja($llamadas);
+    $e = estudioConSesion('estudio-bandeja', 'bandeja@correo.mx');
+    $sedeA = agendaSemilla($e)['sucursal'];
+    $sedeB = agendaSemilla($e)['sucursal'];
+    conectarWhatsAppDeBandeja($e);
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215511112222', 'wamid.s1', 'Hola'))->assertOk();
+    avisoDeBandeja('/api/v1/webhooks/whatsapp', whatsappAlNegocio('5215533334444', 'wamid.s2', 'Buenas'))->assertOk();
+    $base = "/api/v1/app/{$e['slug']}/bandeja/conversaciones";
+    $porTelefono = collect($this->getJson($base, conBearer($e['bearer']))->assertOk()->json('data'))->keyBy('telefono');
+    $sinLigar = (string) $porTelefono['+5215511112222']['id'];
+    $deBeto = (string) $porTelefono['+5215533334444']['id'];
+    $anaA = crearMiembroEnSucursal($e, 'AnaA', $sedeA);
+    $betoB = crearMiembroEnSucursal($e, 'BetoB', $sedeB);
+    // El dueño liga una con Beto, cliente de la sede B.
+    $this->putJson("{$base}/{$deBeto}", ['persona_id' => $betoB], conBearer($e['bearer']))->assertOk();
+
+    // Recepción sin sede asignada (con varias): no ve ninguna (ADR 0098).
+    $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
+    $this->getJson($base, conBearer($recep))->assertOk()->assertJsonCount(0, 'data');
+    $this->getJson("{$base}/{$sinLigar}", conBearer($recep))->assertForbidden();
+
+    // De la sede A: ve la que no es de nadie, no la de Beto.
+    asignarSucursal($e, usuarioIdPorEmail($e, 'recep@correo.mx'), $sedeA);
+    expect(collect($this->getJson($base, conBearer($recep))->assertOk()->json('data'))->pluck('id')->all())->toBe([$sinLigar]);
+    $this->getJson("{$base}/{$deBeto}", conBearer($recep))->assertForbidden();
+    $this->postJson("{$base}/{$deBeto}/mensajes", ['texto' => 'Hola'], conBearer($recep))->assertForbidden();
+    // No la liga con alguien de otra sede (ni se entera de su nombre); con alguien de la suya, sí.
+    $this->putJson("{$base}/{$sinLigar}", ['persona_id' => $betoB], conBearer($recep))->assertForbidden();
+    $this->putJson("{$base}/{$sinLigar}", ['persona_id' => $anaA], conBearer($recep))->assertOk()->assertJsonPath('data.persona.id', $anaA);
+});

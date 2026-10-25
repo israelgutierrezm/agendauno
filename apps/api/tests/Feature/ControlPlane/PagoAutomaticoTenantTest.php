@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
@@ -424,17 +425,22 @@ it('si Stripe cobró pero no respondió a tiempo, su aviso registra el pago y cu
         (string) DomiciliacionTenant::query()->value('ulid'),
         (int) OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('total_minor'),
     ]);
-    $aviso = fn (int $monto) => $this->postJson("/api/v1/webhooks/tenant/{$m['slug']}/stripe", [
+    $aviso = fn (int $monto, string $id = 'pi_tardio') => $this->postJson("/api/v1/webhooks/tenant/{$m['slug']}/stripe", [
         'type' => 'payment_intent.succeeded',
         'data' => ['object' => [
-            'id' => 'pi_tardio', 'amount_received' => $monto, 'currency' => 'mxn',
+            'id' => $id, 'amount_received' => $monto, 'currency' => 'mxn',
             'metadata' => ['orden' => $orden, 'domiciliacion' => $domiciliacion],
         ]],
     ])->assertOk();
 
-    // Con otro importe no se da por pagada.
-    $aviso($total + 100);
-    expect(enEstudioPago($m, fn () => OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value))->toBe('pendiente');
+    // Un cargo con otro importe no la da por pagada, pero tampoco se pierde: queda
+    // registrado con lo que cobró y por revisar.
+    $aviso($total + 100, 'pi_otro_importe');
+    expect(enEstudioPago($m, fn (): array => [
+        OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value,
+        PagoTenant::query()->where('referencia_externa', 'pi_otro_importe')->value('monto_minor'),
+        IncidenciaCobroTenant::query()->where('tipo', IncidenciaCobroTenant::MONTO_DISTINTO)->where('estado', IncidenciaCobroTenant::ABIERTA)->count(),
+    ]))->toBe(['pendiente', $total + 100, 1]);
 
     // El banco sí cobró: el aviso (aunque llegue dos veces) registra un solo pago.
     $aviso($total);
@@ -466,4 +472,33 @@ it('si un cargo anterior sí se hizo y no quedó registrado, el reintento lo reg
             OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value,
             PagoTenant::query()->where('referencia_externa', 'pi_ya_cobrado')->count(),
         ]))->toBe(['pagada', 1]);
+});
+
+it('un cargo automático que sí se hizo con otro importe queda registrado por revisar y la renovación no se cobra otra vez', function (): void {
+    $m = alumnoConMembresia();
+    autorizarTarjeta($m);
+    $this->stripe->cargo = 'caido';
+    expect(renovarHoy($m))->toBe('fallido');
+    [$orden, $total] = enEstudioPago($m, fn (): array => [
+        (string) OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('ulid'),
+        (int) OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('total_minor'),
+    ]);
+    // Stripe sí cobró, pero otro importe (la renovación cambió después), y su aviso no llegó.
+    $this->stripe->busqueda = ['id' => 'pi_otro_importe', 'status' => 'succeeded', 'amount_received' => $total - 10000, 'currency' => 'mxn', 'metadata' => ['orden' => $orden]];
+    $this->stripe->cargo = 'exito';
+    $cargos = $this->stripe->cargos;
+
+    // Se registra lo que cobró y espera revisión; no se le cobra de nuevo.
+    expect(renovarHoy($m))->toBe('pendiente');
+    // Tampoco en la siguiente corrida, aunque Stripe ya no encuentre ese cargo.
+    $this->stripe->busqueda = null;
+    expect(renovarHoy($m))->toBe('pendiente');
+
+    expect($this->stripe->cargos)->toBe($cargos)
+        ->and(enEstudioPago($m, fn (): array => [
+            OrdenTenant::query()->where('ulid', $orden)->firstOrFail()->estado->value,
+            PagoTenant::query()->where('referencia_externa', 'pi_otro_importe')->firstOrFail()->estado->value,
+            PagoTenant::query()->where('referencia_externa', 'pi_otro_importe')->value('monto_minor'),
+            IncidenciaCobroTenant::query()->where('tipo', IncidenciaCobroTenant::MONTO_DISTINTO)->where('estado', IncidenciaCobroTenant::ABIERTA)->count(),
+        ]))->toBe(['pendiente', 'aprobado', $total - 10000, 1]);
 });

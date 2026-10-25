@@ -209,3 +209,37 @@ it('las solicitudes se buscan y se filtran por estado y por vencimiento (días d
         ->assertJsonPath('meta.total', 1)->assertJsonPath('meta.vencidas', 1);
     $this->getJson("{$url}&vencimiento=por_vencer", conBearer($e['bearer']))->assertJsonPath('meta.total', 0);
 });
+
+it('las solicitudes de baja se ven y se responden con el alcance de la ficha, y responderlas pide dar de baja', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sedeA = agendaSemilla($e)['sucursal'];
+    $sedeB = agendaSemilla($e)['sucursal'];
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Vale', 'email' => 'vale@correo.mx', 'tipo' => 'miembro', 'sucursal_id' => $sedeB], conBearer($e['bearer']))->assertCreated();
+    $vale = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['password' => 'secreto123'], conBearer($vale['bearer']))->assertCreated();
+    $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))->json('data.0.id');
+    $url = "/api/v1/app/{$e['slug']}/solicitudes-privacidad";
+
+    // Recepción de la sede B la ve, pero no la responde: atender borra datos sin vuelta atrás.
+    $recepB = personalConSesion($e['slug'], $e['bearer'], 'recepb@correo.mx', 'recepcionista');
+    asignarSucursal($e, usuarioIdPorEmail($e, 'recepb@correo.mx'), $sedeB);
+    $this->getJson($url, conBearer($recepB))->assertOk()->assertJsonCount(1, 'data');
+    $this->postJson("{$url}/{$id}/atender", [], conBearer($recepB))->assertForbidden();
+    $this->postJson("{$url}/{$id}/rechazar", ['respuesta' => 'Tiene un adeudo'], conBearer($recepB))->assertForbidden();
+
+    // Con permiso para dar de baja pero acotado a la sede A: ni la ve ni la responde.
+    $rol = (string) $this->postJson("/api/v1/app/{$e['slug']}/roles", [
+        'nombre' => 'Bajas', 'permisos' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.clave');
+    $bajasA = personalConSesion($e['slug'], $e['bearer'], 'bajas@correo.mx', $rol);
+    asignarSucursal($e, usuarioIdPorEmail($e, 'bajas@correo.mx'), $sedeA);
+    $this->getJson("{$url}?page=1", conBearer($bajasA))->assertOk()
+        ->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0)->assertJsonPath('meta.pendientes', 0);
+    $this->postJson("{$url}/{$id}/atender", [], conBearer($bajasA))->assertForbidden();
+    $this->postJson("{$url}/{$id}/rechazar", ['respuesta' => 'Tiene un adeudo'], conBearer($bajasA))->assertForbidden();
+    expect(app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn (): ?string => PersonaTenant::query()->where('email', 'vale@correo.mx')->value('nombre')))->toBe('Vale');
+
+    // Quien la alcanza y puede dar de baja (el dueño) la atiende.
+    $this->postJson("{$url}/{$id}/atender", [], conBearer($e['bearer']))->assertOk();
+});
