@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Un periodo puede tener varios cargos (`clave`): el del periodo y, en un plan de
  * citas, los ajustes prorrateados al subir de nivel o de profesionales; `concepto`
- * dice qué se cobra (`renta`, `plan`, `ajuste`, `timbres`). En la moneda de cobro;
+ * dice qué se cobra (`renta`, `plan`, `ajuste`, `timbres`, `whatsapp` o `complemento`). En la moneda de cobro;
  * `monto_tarifa_minor`/`moneda_tarifa` y el tipo de cambio dicen de dónde salió
  * (ADR 0107).
  *

@@ -55,8 +55,8 @@ class HealthController
 
         return response()->json([
             'status' => $healthy ? 'ok' : 'degraded',
+            // Pública: sin el entorno (la versión sí, para saber qué está publicado).
             'app' => config('app.name'),
-            'environment' => config('app.env'),
             'version' => config('app.version'),
             'mantenimiento' => app()->isDownForMaintenance(),
             'time' => now()->toIso8601String(),

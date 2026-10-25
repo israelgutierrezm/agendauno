@@ -707,7 +707,15 @@ const ESTADOS_COBRO = [
   "cancelado",
   "vencidos",
 ];
-const CONCEPTOS_COBRO = ["", "renta", "plan", "ajuste", "timbres"];
+const CONCEPTOS_COBRO = [
+  "",
+  "renta",
+  "plan",
+  "ajuste",
+  "timbres",
+  "whatsapp",
+  "complemento",
+];
 useFiltrosEnUrl({
   buscarCobro: buscarCobros,
   estadoCobro: computed({
@@ -1732,7 +1740,7 @@ function borrar(): void {
                 {{ $t("operacion.listadosTres.todosConceptos") }}
               </option>
               <option
-                v-for="c in ['renta', 'plan', 'ajuste', 'timbres']"
+                v-for="c in CONCEPTOS_COBRO.filter(Boolean)"
                 :key="c"
                 :value="c"
               >

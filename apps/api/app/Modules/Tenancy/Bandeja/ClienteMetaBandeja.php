@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Bandeja;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -55,7 +57,7 @@ class ClienteMetaBandeja
      */
     public function conectarWhatsApp(string $codigo, string $wabaId, string $numeroId, string $pin): array
     {
-        $token = (string) Http::timeout(15)->get($this->graph('oauth/access_token'), [
+        $token = (string) $this->conSecretos($this->graph('oauth/access_token'), [
             'client_id' => $this->c('meta_app_id'),
             'client_secret' => $this->c('meta_app_secret'),
             'code' => $codigo,
@@ -244,7 +246,7 @@ class ClienteMetaBandeja
         if ($tokenCorto === '') {
             throw new RuntimeException('Instagram no dio la llave de la cuenta.');
         }
-        $larga = (array) Http::timeout(15)->get('https://graph.instagram.com/access_token', [
+        $larga = (array) $this->conSecretos('https://graph.instagram.com/access_token', [
             'grant_type' => 'ig_exchange_token',
             'client_secret' => $this->c('instagram_app_secret'),
             'access_token' => $tokenCorto,
@@ -268,7 +270,7 @@ class ClienteMetaBandeja
      */
     public function renovarInstagram(string $token): array
     {
-        $json = (array) Http::timeout(15)->get('https://graph.instagram.com/refresh_access_token', [
+        $json = (array) $this->conSecretos('https://graph.instagram.com/refresh_access_token', [
             'grant_type' => 'ig_refresh_token',
             'access_token' => $token,
         ])->throw()->json();
@@ -337,7 +339,7 @@ class ClienteMetaBandeja
      */
     public function paginasMessenger(string $codigo, string $vuelta): array
     {
-        $corta = (string) Http::timeout(15)->get($this->graph('oauth/access_token'), [
+        $corta = (string) $this->conSecretos($this->graph('oauth/access_token'), [
             'client_id' => $this->c('meta_app_id'),
             'client_secret' => $this->c('meta_app_secret'),
             'redirect_uri' => $vuelta,
@@ -346,7 +348,7 @@ class ClienteMetaBandeja
         if ($corta === '') {
             throw new RuntimeException('Facebook no dio la llave.');
         }
-        $larga = (string) Http::timeout(15)->get($this->graph('oauth/access_token'), [
+        $larga = (string) $this->conSecretos($this->graph('oauth/access_token'), [
             'grant_type' => 'fb_exchange_token',
             'client_id' => $this->c('meta_app_id'),
             'client_secret' => $this->c('meta_app_secret'),
@@ -442,6 +444,22 @@ class ClienteMetaBandeja
     private function api(string $token): PendingRequest
     {
         return Http::withToken($token)->acceptJson()->timeout(15);
+    }
+
+    /**
+     * Un GET de Meta que lleva secretos en la URL (`client_secret`, `access_token`):
+     * si no hay conexión, el error de Guzzle trae la URL completa y terminaría en los
+     * registros. Se relanza sin la consulta.
+     *
+     * @param  array<string, string>  $consulta
+     */
+    private function conSecretos(string $url, array $consulta): Response
+    {
+        try {
+            return Http::timeout(15)->get($url, $consulta);
+        } catch (ConnectionException) {
+            throw new RuntimeException('Sin conexión con Meta ('.$url.').');
+        }
     }
 
     private function graph(string $ruta): string

@@ -236,7 +236,11 @@ class BandejaTenant
         $canal->delete();
     }
 
-    /** Renueva la llave de Instagram; si ya no sirve, pide reconectar. */
+    /**
+     * Renueva la llave de Instagram. Solo si Meta la rechaza (4xx) se pide reconectar;
+     * sin conexión o con un error de Meta (5xx, límite) el canal sigue activo y se
+     * reintenta en la siguiente pasada.
+     */
     public function renovar(CanalMensajeria $canal): bool
     {
         try {
@@ -245,7 +249,11 @@ class BandejaTenant
 
             return true;
         } catch (Throwable $e) {
-            $canal->forceFill(['estado' => 'reconectar', 'ultimo_error' => 'La llave de Instagram venció: vuelve a conectar la cuenta.'])->save();
+            $status = $e instanceof RequestException ? $e->response->status() : null;
+            $rechazada = $status !== null && $status >= 400 && $status < 500 && $status !== 429;
+            $canal->forceFill($rechazada
+                ? ['estado' => 'reconectar', 'ultimo_error' => 'La llave de Instagram venció: vuelve a conectar la cuenta.']
+                : ['ultimo_error' => 'No se pudo renovar la llave de Instagram; se vuelve a intentar.'])->save();
             report($e);
 
             return false;

@@ -340,7 +340,7 @@ class UsuariosTenantController
         return response()->json(['data' => [
             'usuario' => $this->presentar($usuario),
             'reactivado' => $reactivado,
-            'activacion' => app()->environment('production') ? null : ['email' => $usuario->email, 'token' => $token],
+            'activacion' => ! app()->environment(['local', 'testing']) ? null : ['email' => $usuario->email, 'token' => $token],
         ]], 201);
     }
 
@@ -359,7 +359,7 @@ class UsuariosTenantController
 
         return response()->json(['data' => [
             'usuario' => $this->presentar($usuario),
-            'activacion' => app()->environment('production') ? null : ['email' => $usuario->email, 'token' => $token],
+            'activacion' => ! app()->environment(['local', 'testing']) ? null : ['email' => $usuario->email, 'token' => $token],
         ]]);
     }
 

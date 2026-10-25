@@ -56,11 +56,11 @@ class CorreoDemoAgendada extends Mailable implements ShouldQueue
     {
         $marca = e($this->producto->nombre());
         if ($this->recordatorio !== null) {
-            $html = '<p>Te recordamos tu demo de '.$this->minutos.' minutos de '.$marca.': <strong>'.e($this->cuando).'</strong> (hora del centro de México).</p>'
+            $html = '<p>Te recordamos tu demo de '.$this->minutos.' minutos de '.$marca.': <strong>'.e($this->cuando).'</strong> ('.e(self::zonaLegible()).').</p>'
                 .'<p>Te llamamos al número que nos dejaste. Ten a la mano cómo trabajas hoy (tus horarios, tus precios) para verlo con tu negocio en mente.</p>'
                 .($this->cancelar !== null ? '<p>¿Ya no puedes? <a href="'.e($this->cancelar).'">Cancélala aquí</a> y agenda otra cuando quieras.</p>' : '');
         } elseif ($this->datos === null) {
-            $html = '<p>Tu demo de '.$this->minutos.' minutos de '.$marca.' quedó para el <strong>'.e($this->cuando).'</strong> (hora del centro de México).</p>'
+            $html = '<p>Tu demo de '.$this->minutos.' minutos de '.$marca.' quedó para el <strong>'.e($this->cuando).'</strong> ('.e(self::zonaLegible()).').</p>'
                 .'<p>Ese día te llamamos al número que nos dejaste para mostrarte el sistema con tu negocio en mente.</p>'
                 .($this->cancelar !== null ? '<p>¿No puedes? <a href="'.e($this->cancelar).'">Cancélala aquí</a> y agenda otra cuando quieras.</p>' : '');
         } else {
@@ -72,5 +72,13 @@ class CorreoDemoAgendada extends Mailable implements ShouldQueue
         }
 
         return new Content(htmlString: DisenoCorreo::envolver($this->producto->nombre(), $html, $this->producto));
+    }
+
+    /** La zona de ventas en palabras: la del centro de México por omisión. */
+    private static function zonaLegible(): string
+    {
+        $zona = (string) config('agendauno.ventas.zona', 'America/Mexico_City');
+
+        return $zona === 'America/Mexico_City' ? 'hora del centro de México' : 'hora de '.str_replace('_', ' ', $zona);
     }
 }

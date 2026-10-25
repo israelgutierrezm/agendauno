@@ -125,7 +125,7 @@ class ImportarInstructoresTenant
             'ok' => true,
             'creados' => count($correos),
             'invitados' => count($activaciones),
-            'activaciones' => app()->environment('production') ? null : $activaciones,
+            'activaciones' => ! app()->environment(['local', 'testing']) ? null : $activaciones,
         ] + $analisis;
     }
 

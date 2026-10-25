@@ -124,7 +124,7 @@ class DemosController
         $correo = mb_strtolower(trim((string) $validado['correo']));
         $dominio = substr((string) strrchr($correo, '@'), 1);
         if (in_array($dominio, (array) config('agendauno.ventas.dominios_desechables', []), true)) {
-            throw ValidationException::withMessages(['correo' => ['Usa un correo que revises: ahí te llega la confirmación y el enlace de la llamada.']]);
+            throw ValidationException::withMessages(['correo' => ['Usa un correo que revises: ahí te llega la confirmación y el enlace para cancelarla.']]);
         }
         if (! $this->recaptcha->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip())) {
             throw ValidationException::withMessages(['recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.']]);

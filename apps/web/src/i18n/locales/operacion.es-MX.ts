@@ -997,6 +997,8 @@ export default {
       plan: "Plan por adelantado",
       ajuste: "Ajuste de plan",
       timbres: "Timbres",
+      whatsapp: "Mensajes de WhatsApp",
+      complemento: "App con tu marca",
     },
   },
   // Listados por páginas con búsqueda.

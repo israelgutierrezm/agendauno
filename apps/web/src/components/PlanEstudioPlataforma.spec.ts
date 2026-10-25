@@ -1,5 +1,4 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
@@ -13,10 +12,11 @@ import PlanEstudioPlataforma from "./PlanEstudioPlataforma.vue";
 | se recarga al cambiar).
 */
 
-vi.mock("axios", async (original) => {
-  const real = await original<typeof import("axios")>();
-  return { default: { ...real.default, put: vi.fn() } };
-});
+// El cliente del superadmin (crearClientePlataforma) sale de axios.create.
+const http = vi.hoisted(() => ({ put: vi.fn() }));
+vi.mock("@/lib/clientePlataforma", () => ({
+  crearClientePlataforma: () => http,
+}));
 const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
 vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
 const confirmar = vi.hoisted(() => vi.fn());
@@ -58,7 +58,7 @@ beforeEach(() => {
 
 describe("PlanEstudioPlataforma", () => {
   it("muestra el plan y lo cambia sin cobrar la diferencia si así se pide", async () => {
-    vi.mocked(axios.put).mockResolvedValueOnce({
+    http.put.mockResolvedValueOnce({
       data: { data: { aplica: "ahora", ajuste: null } },
     });
     const w = montar();
@@ -74,7 +74,7 @@ describe("PlanEstudioPlataforma", () => {
 
     // Sin cobro no hay nada que confirmar.
     expect(confirmar).not.toHaveBeenCalled();
-    expect(axios.put).toHaveBeenCalledWith(
+    expect(http.put).toHaveBeenCalledWith(
       "http://api/api/v1/plataforma/estudios/barberia/plan",
       {
         nivel: "pro",
@@ -102,10 +102,10 @@ describe("PlanEstudioPlataforma", () => {
     expect(confirmar.mock.calls[0]![0]).toContain(
       "tarjeta guardada del negocio",
     );
-    expect(axios.put).not.toHaveBeenCalled();
+    expect(http.put).not.toHaveBeenCalled();
 
     confirmar.mockResolvedValueOnce(true);
-    vi.mocked(axios.put).mockResolvedValueOnce({
+    http.put.mockResolvedValueOnce({
       data: {
         data: { aplica: "ahora", ajuste: { monto_minor: 1500, moneda: "USD" } },
       },
@@ -113,8 +113,8 @@ describe("PlanEstudioPlataforma", () => {
     await w.get("form").trigger("submit");
     await flushPromises();
 
-    expect(axios.put).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(axios.put).mock.calls[0]![1]).toMatchObject({
+    expect(http.put).toHaveBeenCalledTimes(1);
+    expect(http.put.mock.calls[0]![1]).toMatchObject({
       nivel: "pro",
       cobrar_diferencia: true,
     });
@@ -125,7 +125,7 @@ describe("PlanEstudioPlataforma", () => {
 
   it("bajar no cobra nada hoy: no pide confirmar; un error va en el aviso", async () => {
     const pagado = { ...plan, cubierto_hasta: "2099-12-31" };
-    vi.mocked(axios.put).mockRejectedValueOnce(new Error("sin red"));
+    http.put.mockRejectedValueOnce(new Error("sin red"));
     const w = montar(pagado);
 
     await w.get("select").setValue("individual");
@@ -133,7 +133,7 @@ describe("PlanEstudioPlataforma", () => {
     await flushPromises();
 
     expect(confirmar).not.toHaveBeenCalled();
-    expect(axios.put).toHaveBeenCalledTimes(1);
+    expect(http.put).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(w.emitted("cambiado")).toBeUndefined();
   });

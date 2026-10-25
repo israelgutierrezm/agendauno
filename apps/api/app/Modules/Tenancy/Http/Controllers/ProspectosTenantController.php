@@ -263,7 +263,7 @@ class ProspectosTenantController
 
         return response()->json(['data' => [
             ...$this->presentar($resultado['prospecto'], detalle: true),
-            'activacion' => app()->environment('production') || $resultado['token'] === null
+            'activacion' => ! app()->environment(['local', 'testing']) || $resultado['token'] === null
                 ? null
                 : ['email' => $resultado['persona']->email, 'token' => $resultado['token']],
         ]]);

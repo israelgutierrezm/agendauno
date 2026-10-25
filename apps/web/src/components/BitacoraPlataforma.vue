@@ -109,7 +109,8 @@ function irA(p: number): void {
 
 /** El nombre de la acción si lo conocemos; si no, la clave tal cual. */
 function accion(r: Registro): string {
-  const clave = `plataformaAdmin.bitacora.acciones.${r.accion.replaceAll(".", "_")}`;
+  // `estudios.extender-prueba` → `estudios_extender_prueba`.
+  const clave = `plataformaAdmin.bitacora.acciones.${r.accion.replace(/[.-]/g, "_")}`;
   return te(clave) ? t(clave) : r.accion;
 }
 

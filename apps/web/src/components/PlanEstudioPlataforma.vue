@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { mensajeDeError } from "@/lib/api";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { confirmar } from "@/lib/confirmar";
 import {
   type NivelPlan,
@@ -29,6 +29,8 @@ const props = defineProps<{
 const emit = defineEmits<{ cambiado: [] }>();
 
 const { t } = useI18n();
+// Con una sesión vencida (401) el superadmin vuelve a su entrada.
+const cliente = crearClientePlataforma({});
 const toast = useToastStore();
 
 const nivel = ref<NivelPlan>(props.plan.nivel);
@@ -129,7 +131,7 @@ async function guardar(): Promise<void> {
   }
   guardando.value = true;
   try {
-    const { data } = await axios.put<{
+    const { data } = await cliente.put<{
       data: {
         aplica: "ahora" | "siguiente";
         ajuste: { monto_minor: number; moneda: string } | null;

@@ -53,7 +53,7 @@ it('el superadmin pagina y busca los cobros por negocio y concepto', function ()
     $a = estudioConSesion('estudio-a', 'a@correo.mx');
     estudioConSesion('barberia-b', 'b@correo.mx', 'barberia');
     foreach (Estudio::query()->get() as $estudio) {
-        foreach (['renta', 'timbres'] as $i => $concepto) {
+        foreach (['renta', 'timbres', 'whatsapp'] as $i => $concepto) {
             CargoRenta::query()->create([
                 'estudio_id' => $estudio->getKey(), 'periodo' => '2026-09', 'clave' => "{$estudio->slug}-{$concepto}", 'concepto' => $concepto,
                 'modo_cobro' => 'fijo', 'monto_minor' => 50000 + $i, 'moneda' => 'MXN', 'estado' => 'pendiente',
@@ -61,12 +61,16 @@ it('el superadmin pagina y busca los cobros por negocio y concepto', function ()
         }
     }
 
-    $this->getJson('/api/v1/plataforma/cobros', conPlataforma())->assertOk()->assertJsonPath('meta.total', 4);
+    $this->getJson('/api/v1/plataforma/cobros', conPlataforma())->assertOk()->assertJsonPath('meta.total', 6);
     $this->getJson('/api/v1/plataforma/cobros?q=barberia', conPlataforma())->assertOk()
-        ->assertJsonPath('meta.total', 2)->assertJsonPath('data.0.estudio_slug', 'barberia-b');
+        ->assertJsonPath('meta.total', 3)->assertJsonPath('data.0.estudio_slug', 'barberia-b');
+    // Los paquetes de mensajes también se filtran (y la app con marca, «complemento»).
+    $this->getJson('/api/v1/plataforma/cobros?concepto=whatsapp', conPlataforma())->assertOk()
+        ->assertJsonPath('meta.total', 2)->assertJsonPath('data.0.concepto', 'whatsapp');
+    $this->getJson('/api/v1/plataforma/cobros?concepto=complemento', conPlataforma())->assertOk()->assertJsonPath('meta.total', 0);
     $this->getJson("/api/v1/plataforma/cobros?q={$a['slug']}&concepto=timbres", conPlataforma())->assertOk()
         ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.concepto', 'timbres');
-    $this->getJson('/api/v1/plataforma/cobros?per_page=3&page=2', conPlataforma())->assertOk()->assertJsonCount(1, 'data');
+    $this->getJson('/api/v1/plataforma/cobros?per_page=4&page=2', conPlataforma())->assertOk()->assertJsonCount(2, 'data');
 });
 
 it('renovaciones y morosos van por páginas y sus indicadores cuentan todo', function (): void {

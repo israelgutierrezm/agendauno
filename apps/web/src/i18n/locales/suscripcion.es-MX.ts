@@ -110,6 +110,8 @@ export default {
       plan: "Plan",
       ajuste: "Cambio de plan",
       timbres: "Timbres",
+      whatsapp: "Mensajes de WhatsApp",
+      complemento: "App con tu marca",
     },
     cubre: "Del {desde} al {hasta}",
     tipoCambio: "1 USD = {valor} MXN ({fecha})",

@@ -11,9 +11,10 @@ it('reporta estado saludable con verificaciones por dependencia', function (): v
         ->assertJsonStructure([
             'status',
             'app',
-            'environment',
             'version',
             'time',
             'checks' => ['database', 'cache', 'redis'],
-        ]);
+        ])
+        // Es pública: no dice en qué entorno corre.
+        ->assertJsonMissingPath('environment');
 });
