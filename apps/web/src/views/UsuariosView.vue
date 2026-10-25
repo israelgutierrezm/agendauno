@@ -5,12 +5,16 @@ import { useI18n } from "vue-i18n";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
-import { useEditorFormulario } from "@/lib/editorFormulario";
+import {
+  useDescartarCambios,
+  useEditorFormulario,
+} from "@/lib/editorFormulario";
 import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -358,6 +362,63 @@ function rolBloqueado(rol: string): boolean {
   return rol === "propietario" && !soyDueno.value;
 }
 
+// ---- Invitar a alguien del equipo (rol y, con varias sedes, su sucursal) ----
+const puedeInvitar = computed(() => sesion.puede("usuarios.invitar"));
+// Los roles que se pueden dar al invitar: el de dueño no, ni el de cliente.
+const rolesInvitables = computed(() =>
+  rolesDisponibles.value.filter((r) => r !== "propietario" && r !== "miembro"),
+);
+const formInvitar = ref({ nombre: "", email: "", rol: "", sucursalId: "" });
+const invitandoEquipo = ref(false);
+const errorInvitar = ref<string | null>(null);
+const tokenInvitacion = ref<{ email: string; token: string } | null>(null);
+const invitarAbierto = ref(false);
+const descartarInvitar = useDescartarCambios({
+  abierto: invitarAbierto,
+  valor: () => formInvitar.value,
+  guardando: invitandoEquipo,
+});
+function abrirInvitar(): void {
+  formInvitar.value = { nombre: "", email: "", rol: "", sucursalId: "" };
+  errorInvitar.value = null;
+  tokenInvitacion.value = null;
+  descartarInvitar.fijar();
+  invitarAbierto.value = true;
+}
+function cerrarInvitar(): void {
+  void descartarInvitar.cerrar();
+}
+async function invitarAlEquipo(): Promise<void> {
+  invitandoEquipo.value = true;
+  errorInvitar.value = null;
+  try {
+    const email = formInvitar.value.email;
+    const { data } = await api.post<{
+      data: { activacion: { email: string; token: string } | null };
+    }>(`${base.value}/usuarios/invitar`, {
+      nombre: formInvitar.value.nombre,
+      email,
+      rol: formInvitar.value.rol,
+      sucursal_id:
+        formInvitar.value.sucursalId !== ""
+          ? formInvitar.value.sucursalId
+          : null,
+    });
+    descartarInvitar.fijar();
+    tokenInvitacion.value = data.data.activacion;
+    // En producción el enlace llega por correo: se avisa y se cierra.
+    if (tokenInvitacion.value === null) {
+      toast.exito(t("instructores.invitar.enviada", { email }));
+      invitarAbierto.value = false;
+    }
+    await cargar();
+  } catch (e) {
+    errorInvitar.value = mensajeDeError(e);
+  } finally {
+    invitandoEquipo.value = false;
+  }
+}
+
 async function guardar(): Promise<void> {
   if (editando.value === null || seleccion.value.size === 0) {
     errorEdicion.value = t("usuarios.minimoUnRol");
@@ -470,7 +531,140 @@ onMounted(cargar);
           ? metaUsuarios.conteos.equipo + metaUsuarios.conteos.clientes
           : usuarios.length
       "
-    />
+    >
+      <template v-if="puedeInvitar" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-primario"
+          data-prueba="invitar-equipo"
+          @click="abrirInvitar"
+        >
+          {{ $t("invitarEquipo.boton") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
+
+    <ModalDialogo
+      :abierto="invitarAbierto"
+      :titulo="$t('invitarEquipo.titulo')"
+      tam="md"
+      :ocupado="invitandoEquipo"
+      @cerrar="cerrarInvitar"
+    >
+      <form
+        id="form-invitar-equipo"
+        class="space-y-4"
+        @submit.prevent="invitarAlEquipo"
+      >
+        <p
+          v-if="errorInvitar"
+          class="text-sm"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+        >
+          {{ errorInvitar }}
+        </p>
+        <div>
+          <label class="tu-label" for="ie-nombre">{{
+            $t("instructores.invitar.nombre")
+          }}</label>
+          <input
+            id="ie-nombre"
+            v-model="formInvitar.nombre"
+            class="tu-input"
+            required
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="ie-email">{{
+            $t("instructores.invitar.email")
+          }}</label>
+          <input
+            id="ie-email"
+            v-model="formInvitar.email"
+            class="tu-input"
+            type="email"
+            required
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="ie-rol">{{
+            $t("invitarEquipo.rol")
+          }}</label>
+          <select
+            id="ie-rol"
+            v-model="formInvitar.rol"
+            class="tu-input"
+            required
+            data-prueba="rol-invitar"
+          >
+            <option value="" disabled>
+              {{ $t("invitarEquipo.eligeRol") }}
+            </option>
+            <option v-for="r in rolesInvitables" :key="r" :value="r">
+              {{ nombreRol(r) }}
+            </option>
+          </select>
+          <p class="tu-hint mt-1">{{ $t("invitarEquipo.rolAyuda") }}</p>
+        </div>
+        <!-- Con varias sucursales, la suya es obligatoria (ADR 0098). -->
+        <div v-if="hayMultiSucursal">
+          <label class="tu-label" for="ie-sede">{{
+            $t("instructores.invitar.sede")
+          }}</label>
+          <select
+            id="ie-sede"
+            v-model="formInvitar.sucursalId"
+            class="tu-input"
+            required
+          >
+            <option value="" disabled>
+              {{ $t("instructores.invitar.eligeSede") }}
+            </option>
+            <option v-for="s in sucursales" :key="s.id" :value="s.id">
+              {{ s.nombre }}
+            </option>
+          </select>
+          <p class="tu-hint mt-1">{{ $t("invitarEquipo.sedeAyuda") }}</p>
+        </div>
+      </form>
+      <div v-if="tokenInvitacion" class="mt-4 text-sm">
+        {{
+          $t("instructores.invitar.creada", { email: tokenInvitacion.email })
+        }}
+        <code class="block mt-1 break-all">{{ tokenInvitacion.token }}</code>
+      </div>
+
+      <template #pie>
+        <button
+          class="tu-btn tu-btn-secundario"
+          type="button"
+          :disabled="invitandoEquipo"
+          @click="cerrarInvitar"
+        >
+          {{ tokenInvitacion ? $t("comun.cerrar") : $t("comun.cancelar") }}
+        </button>
+        <button
+          class="tu-btn tu-btn-primario"
+          type="submit"
+          form="form-invitar-equipo"
+          :disabled="
+            invitandoEquipo ||
+            formInvitar.nombre === '' ||
+            formInvitar.email === '' ||
+            formInvitar.rol === '' ||
+            (hayMultiSucursal && formInvitar.sucursalId === '')
+          "
+          :aria-busy="invitandoEquipo || undefined"
+        >
+          {{
+            invitandoEquipo
+              ? $t("instructores.invitar.enviando")
+              : $t("instructores.invitar.enviar")
+          }}
+        </button>
+      </template>
+    </ModalDialogo>
 
     <!-- Dos filtros de la misma lista: de quién (equipo o alumnos con cuenta) y si
          están activos o dados de baja. -->

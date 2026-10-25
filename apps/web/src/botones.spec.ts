@@ -33,6 +33,11 @@ const GENERICAS = new Set([
   "dar de baja",
   "anular",
   "desconectar",
+  "suspender",
+  "condonar",
+  "reembolsar",
+  // Reintentar no es de riesgo: si un botón de peligro lo dice, está mal pintado.
+  "reintentar",
 ]);
 
 function texto(clave: string): unknown {

@@ -416,7 +416,8 @@ export const citaCuenta = {
   confirmada: "Confirmada",
   pendientePago: "Pendiente de pago",
   pendientePagoAyuda:
-    "La encuentras en Mis reservas para pagarla. Si no se paga a tiempo, el horario se libera.",
+    "Págala en Pagos para confirmarla. Si no se paga a tiempo, el horario se libera.",
+  irAPagar: "Ir a pagar",
   otra: "Agendar otra",
   listo: "Listo",
 };
@@ -440,6 +441,8 @@ export const miCuentaExtra = {
 };
 
 export const reembolsosPago = {
+  // El botón de la fila: dice qué se reembolsa.
+  reembolsarPago: "Reembolsar pago",
   ver: "Ver reembolsos",
   ocultar: "Ocultar reembolsos",
   por: "por {actor}",
@@ -582,6 +585,11 @@ export const plataformaAdmin = {
     etiqueta: "Apartados de la configuración",
     facturacion: "Facturación y alertas",
     bienestar: "Wellhub y TotalPass",
+    // Sin los datos no se muestran formularios vacíos que, al guardar, borrarían lo
+    // que había (los documentos legales, las llaves).
+    cargando: "Cargando la configuración…",
+    error:
+      "No pudimos consultar la configuración. Reintenta antes de cambiar algo.",
   },
   pestanas: {
     estudios: "Negocios",
@@ -890,12 +898,12 @@ export const plataformaAdmin = {
     extender: "Extender prueba",
     dias: "{n} días",
     extendida: "Prueba extendida.",
-    suspender: "Suspender",
+    suspender: "Suspender negocio",
     confirmarSuspender:
       "¿Suspender {estudio}? Nadie podrá entrar a su cuenta ni a su página hasta que la reactives.",
     motivo: "Motivo (opcional)",
     suspendido: "Negocio suspendido.",
-    reactivar: "Reactivar",
+    reactivar: "Reactivar negocio",
     reactivado: "Negocio reactivado.",
     // La última suspensión hecha por la plataforma (ADR 0132).
     ultimaSuspension: "Última suspensión",
@@ -958,7 +966,7 @@ export const plataformaAdmin = {
     periodo: "Periodo",
     vacio: "No hay cargos con estos filtros.",
     colEstado: "Estado",
-    condonar: "Condonar",
+    condonar: "Condonar cargo",
     motivoCondonar: "Motivo (queda en la bitácora)",
     confirmarCondonar:
       "¿Condonar el cargo de {monto} de {estudio}? Queda cancelado y ya no se le cobra; si no debe otro vencido, se reactiva.",
@@ -1105,6 +1113,31 @@ export const pausaMembresia = {
   enPausa: "En pausa hasta el {fecha}",
   pausada: "Membresía en pausa hasta el {fecha}.",
   reanudada: "Membresía reanudada.",
+};
+
+// Cobranza en un negocio de clases: lo próximo por cobrar son clases de pago apartadas,
+// que se liberan si no se pagan a tiempo (en citas se cobran al atenderlas).
+export const cobranzaClases = {
+  proximas:
+    "1 clase próxima está apartada sin pagar: si no se paga a tiempo, se libera el lugar. | {n} clases próximas están apartadas sin pagar: si no se pagan a tiempo, se liberan los lugares.",
+};
+
+// Invitar al equipo desde Usuarios: recepción, administración, instructores o un rol
+// propio, con su sucursal si hay varias (el servidor revisa que se pueda dar).
+export const invitarEquipo = {
+  boton: "Invitar a alguien del equipo",
+  titulo: "Invitar a alguien del equipo",
+  rol: "Rol",
+  eligeRol: "Elige su rol",
+  rolAyuda: "Con qué rol entra. Después puedes darle más desde su ficha.",
+  sedeAyuda: "Solo verá lo de esa sucursal. Puedes asignarle más después.",
+};
+
+// La inscripción de una venta (B04), antes de cobrar: no se cobra sin saber el total.
+export const cuotasVenta = {
+  consultando: "Revisando si le toca inscripción…",
+  error:
+    "No pudimos consultar si le toca inscripción, así que aún no sabemos el total.",
 };
 
 // Dar de baja una membresía (B04): lo que pasará, antes de confirmar.

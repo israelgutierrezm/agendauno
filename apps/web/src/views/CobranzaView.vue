@@ -1022,7 +1022,9 @@ watch(vista, cargar, { immediate: true });
         >
           {{
             $t(
-              "cobranza.pendientes.proximas",
+              sesion.esCitas
+                ? "cobranza.pendientes.proximas"
+                : "cobranzaClases.proximas",
               { n: metaPendientes.proximas },
               metaPendientes.proximas,
             )
@@ -1491,7 +1493,7 @@ watch(vista, cargar, { immediate: true });
                           type="button"
                           @click="abrirReembolso(p)"
                         >
-                          {{ $t("cobranza.reembolsar") }}
+                          {{ $t("reembolsosPago.reembolsarPago") }}
                         </button>
                       </span>
                     </td>

@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, RouterLinkStub } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
@@ -99,6 +99,7 @@ function montar(props: Record<string, unknown> = {}) {
           messages: { es: { ...es, perfilPublico } },
         }),
       ],
+      stubs: { RouterLink: RouterLinkStub },
     },
   });
 }
@@ -326,6 +327,11 @@ describe("agendar desde la cuenta", () => {
     expect(confirmada.text()).toContain("Centro");
     expect(confirmada.text()).toContain("Ana");
     expect(confirmada.text()).toContain("citaCuenta.pendientePago");
+    // Apartada sin pagar: lleva a pagarla, y «Listo» sigue para cerrar.
+    expect(w.find('[data-prueba="cita-pagar"]').exists()).toBe(true);
+    expect(w.findComponent(RouterLinkStub).props("to")).toEqual({
+      name: "mis-pagos",
+    });
     // Avisa para recargar, pero no cierra: cierra quien la lee, con «Listo».
     expect(w.emitted("agendada")).toHaveLength(1);
     expect(w.emitted("cerrar")).toBeUndefined();

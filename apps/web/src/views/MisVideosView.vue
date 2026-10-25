@@ -20,7 +20,9 @@ const error = ref<string | null>(null);
 const viendo = ref<string | null>(null);
 const grupos = computed(() => porCategoria(videos.value));
 
-onMounted(async () => {
+async function cargar(): Promise<void> {
+  cargando.value = true;
+  error.value = null;
   try {
     const { data } = await api.get<{ data: Video[] }>(
       `${base.value}/mi/videos`,
@@ -31,7 +33,8 @@ onMounted(async () => {
   } finally {
     cargando.value = false;
   }
-});
+}
+onMounted(cargar);
 </script>
 
 <template>
@@ -46,6 +49,13 @@ onMounted(async () => {
     </p>
     <p v-else-if="error" class="mt-6" role="alert" style="color: var(--error)">
       {{ error }}
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario tu-btn-chico ml-2"
+        @click="cargar"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
     <p
       v-else-if="videos.length === 0"

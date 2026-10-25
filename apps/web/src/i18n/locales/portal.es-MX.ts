@@ -55,10 +55,14 @@ export default {
       reservas: "Mis reservas",
       proximas: "1 próxima | {n} próximas",
       sinReservas: "Sin reservas próximas",
+      sinCitas: "Sin citas próximas",
       creditos: "Mis créditos",
       ilimitado: "Ilimitado",
       creditosValor: "1 crédito | {n} créditos",
       sinPaquete: "Sin paquete activo",
+      // En citas lo que se compra es un bono de sesiones (ADR 0130).
+      sesionesValor: "1 sesión | {n} sesiones",
+      sinBono: "Sin bono activo",
       // Sin plan vigente: por qué (estado efectivo que da el servidor).
       enPausa: "En pausa",
       enPausaHasta: "En pausa hasta el {fecha}",
@@ -101,6 +105,8 @@ export default {
     disponibles: "Clases disponibles",
     reservada: "Reservada",
     sincronizar: "Ver mis reservas en el calendario del teléfono →",
+    sincronizarCitas: "Ver mis citas en el calendario del teléfono →",
+    canceladaCita: "Listo: cancelamos tu cita.",
     agendarCita: "Agendar una cita",
     detalle: "Detalle",
     con: "Con {nombre}",
@@ -127,6 +133,7 @@ export default {
     sinFiltradas: "No hay clases con estos filtros en estas fechas.",
     verMas: "Ver más clases",
     sinProximas: "No tienes reservas próximas.",
+    sinProximasCitas: "No tienes citas próximas.",
     irReservar: "Reservar una clase",
     irAgendar: "Agendar una cita",
     verPlanes: "Ver planes",
@@ -157,6 +164,10 @@ export default {
     conPlanIlimitado: "Usa {plan}: no se descuentan créditos.",
     dePago:
       "Se paga al reservar: {precio}. Tu lugar queda apartado mientras pagas.",
+    // El negocio no cobra en línea: se paga allá, y el lugar se libera si no a tiempo.
+    dePagoEnNegocio:
+      "Se paga en el negocio: {precio}. Tu lugar queda apartado mientras registran tu pago; si no se paga a tiempo, se libera.",
+    confirmarApartar: "Apartar mi lugar",
     listaEspera:
       "La clase está llena: te anotas en la lista de espera. No se descuenta nada hasta que te toque un lugar; te avisamos para que lo aceptes.",
     cancelaHasta: "Sin costo hasta el {cuando}.",
@@ -206,6 +217,11 @@ export default {
     // Clase en línea (ADR 0184).
     entrarEnLinea: "Entrar a la clase en línea",
     lista: "Listo: tu clase está reservada.",
+    // De pago por clase: apartada, falta pagarla para confirmarla.
+    porPagar:
+      "Apartamos tu lugar: págala para confirmarla. Si no se paga a tiempo, el lugar se libera.",
+    porPagarEnNegocio:
+      "Apartamos tu lugar: págala en el negocio para confirmarla. Si no se registra el pago a tiempo, el lugar se libera.",
     enEspera: "Estás en la lista de espera. Te avisamos si se libera un lugar.",
     conPlan: "Con {plan}",
     cancelaHasta: "Cancela sin costo hasta el {cuando}.",
@@ -253,6 +269,8 @@ export default {
       cancelada: "Cancelada",
       cancelaste: "Cancelaste",
       cancelada_negocio: "Cancelada por el negocio",
+      // La canceló el sistema: no se pagó a tiempo o se canceló la fecha en que esperaba.
+      cancelada_sistema: "Cancelada automáticamente",
       expirada: "Lugar sin aceptar",
       sin_lugar: "Te quedaste en lista de espera",
       sin_pagar: "Sin pagar",
@@ -383,6 +401,8 @@ export default {
     anulada: "Anulada",
   },
   expediente: {
+    errorCarga:
+      "No pudimos consultar tus documentos y fichas. Reintenta en un momento.",
     titulo: "Expediente",
     descripcion:
       "Revisa documentos por firmar, archivos y fichas de datos del negocio.",

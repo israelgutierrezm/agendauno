@@ -111,6 +111,47 @@ describe("sedes: foto y enlace de Google Maps", () => {
     );
   });
 
+  it("sin organización aún (se omitió la configuración inicial), la primera sede la crea", async () => {
+    api.get.mockResolvedValue({ data: { data: [] } });
+    api.post
+      .mockResolvedValueOnce({ data: { data: { id: "org-nueva" } } })
+      .mockResolvedValueOnce({ data: { data: {} } });
+    const w = mount(SucursalesView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { perfilPublico } },
+          }),
+        ],
+        stubs: {
+          EncabezadoSeccion: {
+            template: "<div><slot name='acciones' /></div>",
+          },
+          ModalDialogo: { template: "<div><slot /><slot name='pie' /></div>" },
+        },
+      },
+    });
+    await flushPromises();
+    expect(w.find('[data-prueba="sin-sucursales"]').exists()).toBe(true);
+
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "sedes.agregar")!
+      .trigger("click");
+    await w.get("#s-nombre").setValue("Centro");
+    await w.get("#s-form").trigger("submit");
+    await flushPromises();
+    expect(api.post.mock.calls[0]![0]).toBe("/api/v1/app/demo/organizaciones");
+    expect(api.post.mock.calls[0]![1]).toEqual({ nombre: "Centro" });
+    expect(api.post.mock.calls[1]![0]).toBe(
+      "/api/v1/app/demo/organizaciones/org-nueva/sucursales",
+    );
+  });
+
   it("una sede nueva pide guardarla antes de subir su foto", async () => {
     const w = await montar();
     await w

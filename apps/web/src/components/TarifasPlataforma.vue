@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import PestanasSeccion from "@/components/PestanasSeccion.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
@@ -105,7 +105,7 @@ const guardandoCambio = ref(false);
 const errorCambio = ref<string | null>(null);
 
 function cliente() {
-  return axios.create({
+  return crearClientePlataforma({
     baseURL: props.apiUrl,
     headers: {
       Accept: "application/json",

@@ -136,7 +136,14 @@ const vendibles = computed(() => productos.value.filter((p) => !p.archivado));
 const elegido = computed(
   () => productos.value.find((p) => p.id === productoSel.value) ?? null,
 );
-const { inscripcion, aceptaCondiciones, pideCondiciones } = useCuotasDeVenta(
+const {
+  inscripcion,
+  consultandoCuotas,
+  errorCuotas,
+  reintentarCuotas,
+  aceptaCondiciones,
+  pideCondiciones,
+} = useCuotasDeVenta(
   base,
   computed(() => props.personaId),
   elegido,
@@ -587,6 +594,32 @@ function cancelarVenta(): void {
               }}
             </p>
           </div>
+          <p
+            v-if="consultandoCuotas"
+            class="text-sm"
+            role="status"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="cuotas-consultando"
+          >
+            {{ $t("cuotasVenta.consultando") }}
+          </p>
+          <div
+            v-else-if="errorCuotas"
+            class="flex flex-wrap items-center gap-2 text-sm"
+            role="alert"
+            data-prueba="cuotas-error"
+          >
+            <span :style="{ color: 'var(--error)' }">{{
+              $t("cuotasVenta.error")
+            }}</span>
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
+              @click="reintentarCuotas"
+            >
+              {{ $t("comun.reintentar") }}
+            </button>
+          </div>
           <!-- Permanencia (B04): las condiciones que acepta el cliente. -->
           <div
             v-if="pideCondiciones && elegido?.condiciones"
@@ -618,6 +651,8 @@ function cancelarVenta(): void {
               :disabled="
                 procesando ||
                 productoSel === '' ||
+                consultandoCuotas ||
+                errorCuotas ||
                 (pideCondiciones && !aceptaCondiciones)
               "
               @click="vender"

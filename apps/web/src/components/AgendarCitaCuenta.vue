@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import CalendarioDias from "@/components/CalendarioDias.vue";
@@ -449,9 +450,19 @@ onMounted(async () => {
         >
           {{ $t("citaCuenta.otra") }}
         </button>
+        <RouterLink
+          v-if="confirmacion.pendientePago"
+          :to="{ name: 'mis-pagos' }"
+          class="tu-btn tu-btn-primario"
+          data-prueba="cita-pagar"
+          >{{ $t("citaCuenta.irAPagar") }}</RouterLink
+        >
         <button
           type="button"
-          class="tu-btn tu-btn-primario"
+          class="tu-btn"
+          :class="
+            confirmacion.pendientePago ? 'tu-btn-secundario' : 'tu-btn-primario'
+          "
           data-prueba="cita-listo"
           @click="emit('cerrar')"
         >

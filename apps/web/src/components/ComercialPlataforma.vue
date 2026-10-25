@@ -3,6 +3,7 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { PRODUCTOS } from "@/lib/producto";
@@ -55,7 +56,7 @@ const guardando = ref(false);
 const errores = ref<Partial<Record<Campo, string>>>({});
 
 function cliente() {
-  return axios.create({
+  return crearClientePlataforma({
     baseURL: props.apiUrl,
     headers: {
       Accept: "application/json",

@@ -585,7 +585,11 @@ onMounted(async () => {
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('facturas.titulo')"
-      :total="meta?.total ?? facturas.length"
+      :total="
+        cargando || (meta === null && error !== null)
+          ? undefined
+          : (meta?.total ?? facturas.length)
+      "
     />
 
     <AvisoTono

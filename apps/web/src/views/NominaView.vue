@@ -273,6 +273,10 @@ function cambioDeTarifa(x: FilaVista): string | null {
 const conEsquema = computed(
   () => filasVista.value.filter((x) => x.fila !== null).length,
 );
+// Los conteos valen solo con un cálculo vigente (no mientras recalcula ni si falló).
+const conteosListos = computed(
+  () => calculado.value && !calculando.value && !errorCalculo.value,
+);
 const sinEsquema = computed(
   () => filasVista.value.filter((x) => x.fila === null).length,
 );
@@ -288,20 +292,23 @@ const indicadores = computed<Indicador[]>(() => [
   {
     clave: "con",
     etiqueta: t("nominaVisual.kpi.conEsquema"),
-    valor: t("nominaVisual.kpi.conEsquemaValor", {
-      n: conEsquema.value,
-      total: filasVista.value.length,
-    }),
+    // Mientras calcula o si no se pudo, «—»: no un «0 de 0» que parezca definitivo.
+    valor: conteosListos.value
+      ? t("nominaVisual.kpi.conEsquemaValor", {
+          n: conEsquema.value,
+          total: filasVista.value.length,
+        })
+      : "—",
     icono: "personas",
     tono: "azul",
   },
   {
     clave: "sin",
     etiqueta: t("nominaVisual.kpi.sinEsquema"),
-    valor: String(sinEsquema.value),
+    valor: conteosListos.value ? String(sinEsquema.value) : "—",
     icono: "reloj",
     tono: "naranja",
-    aviso: sinEsquema.value > 0,
+    aviso: conteosListos.value && sinEsquema.value > 0,
   },
   {
     clave: "total",

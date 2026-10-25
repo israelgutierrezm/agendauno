@@ -191,7 +191,7 @@ defineExpose({ cargar });
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ $t("comun.reintentar") }}

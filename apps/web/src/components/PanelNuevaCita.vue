@@ -653,7 +653,12 @@ async function agendar(): Promise<void> {
             v-for="h in horasLibres"
             :key="h"
             type="button"
-            class="tu-btn tu-btn-secundario tu-btn-chico tabular-nums"
+            class="tu-btn tu-btn-chico tabular-nums"
+            :class="
+              !manual && form.hora === h
+                ? 'tu-btn-primario'
+                : 'tu-btn-secundario'
+            "
             :aria-pressed="!manual && form.hora === h"
             :data-hora="h"
             @click="elegirHora(h)"

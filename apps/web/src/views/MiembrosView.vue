@@ -818,7 +818,7 @@ onMounted(() => {
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="plural(sesion.terminologia.miembro)"
-      :total="meta?.total ?? 0"
+      :total="cargando || meta === null ? undefined : meta.total"
       :subtitulo="
         $t(
           sesion.esCitas

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -8,6 +7,7 @@ import DestinoMedicion from "@/components/DestinoMedicion.vue";
 import EnviosMedicion from "@/components/EnviosMedicion.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PestanasSeccion from "@/components/PestanasSeccion.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
 import type { DestinoMedicion as Destino, EnvioMedicion } from "@/lib/medicion";
@@ -47,7 +47,7 @@ const error = ref<string | null>(null);
 const paginaEnvios = ref(1);
 
 function cliente() {
-  return axios.create({
+  return crearClientePlataforma({
     baseURL: props.apiUrl,
     headers: {
       Accept: "application/json",

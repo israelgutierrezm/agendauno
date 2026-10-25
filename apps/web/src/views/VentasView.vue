@@ -102,7 +102,14 @@ const productoSel = computed(
 );
 // La inscripción que se sumaría (dicha antes de cobrar) y las condiciones que acepta
 // el cliente (permanencia), igual que en la venta rápida de la ficha.
-const { inscripcion, aceptaCondiciones, pideCondiciones } = useCuotasDeVenta(
+const {
+  inscripcion,
+  consultandoCuotas,
+  errorCuotas,
+  reintentarCuotas,
+  aceptaCondiciones,
+  pideCondiciones,
+} = useCuotasDeVenta(
   base,
   computed(() => venta.value.compradorId),
   productoSel,
@@ -159,8 +166,9 @@ function cuando(iso: string | null | undefined): string {
   ).format(d);
 }
 
-async function cargar(): Promise<void> {
-  cargando.value = true;
+// `enSegundoPlano`: tras una venta se actualiza sin desmontar el formulario.
+async function cargar(enSegundoPlano = false): Promise<void> {
+  cargando.value = !enSegundoPlano;
   error.value = null;
   errorCarga.value = false;
   try {
@@ -280,8 +288,11 @@ async function vender(): Promise<void> {
     return;
   }
 
-  // Ya se cobró: el formulario no queda listo para cobrar otra vez lo mismo.
+  // Ya se cobró: el formulario no queda listo para cobrar otra vez lo mismo ni a la
+  // misma persona (la siguiente venta se elige de nuevo).
   const nombre = persona.nombre;
+  venta.value.compradorId = "";
+  comprador.value = null;
   venta.value.productoId = "";
   venta.value.codigoPromo = "";
   promoPreview.value = null;
@@ -305,7 +316,7 @@ async function vender(): Promise<void> {
   }
   toast.exito(mensaje);
   try {
-    await cargar();
+    await cargar(true);
   } finally {
     vendiendo.value = false;
   }
@@ -384,7 +395,7 @@ onMounted(cargar);
       data-prueba="error-carga-ventas"
     >
       <span style="color: var(--error)">{{ $t("ventas.errorCarga") }}</span>
-      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar">
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar()">
         {{ $t("comun.reintentar") }}
       </button>
     </div>
@@ -404,7 +415,13 @@ onMounted(cargar);
           </p>
           <div v-else class="vv-planes">
             <section v-for="g in gruposVendibles" :key="g.clave">
-              <h2 class="vv-grupo">{{ $t(`planes.secciones.${g.clave}`) }}</h2>
+              <h2 class="vv-grupo">
+                {{
+                  sesion.esCitas && g.clave === "paquete"
+                    ? $t("planes.tiposCitas.paquete")
+                    : $t(`planes.secciones.${g.clave}`)
+                }}
+              </h2>
               <div class="vv-rejilla">
                 <button
                   v-for="p in g.productos"
@@ -527,6 +544,32 @@ onMounted(cargar);
             </div>
 
             <!-- Inscripción (B04): se suma si es su alta o regresa tras un tiempo. -->
+            <p
+              v-if="consultandoCuotas"
+              class="text-sm"
+              role="status"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="cuotas-consultando"
+            >
+              {{ $t("cuotasVenta.consultando") }}
+            </p>
+            <div
+              v-else-if="errorCuotas"
+              class="flex flex-wrap items-center gap-2 text-sm"
+              role="alert"
+              data-prueba="cuotas-error"
+            >
+              <span :style="{ color: 'var(--error)' }">{{
+                $t("cuotasVenta.error")
+              }}</span>
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
+                @click="reintentarCuotas"
+              >
+                {{ $t("comun.reintentar") }}
+              </button>
+            </div>
             <div
               v-if="inscripcion > 0"
               class="space-y-2 text-sm"
@@ -599,6 +642,8 @@ onMounted(cargar);
                 vendiendo ||
                 venta.compradorId === '' ||
                 venta.productoId === '' ||
+                consultandoCuotas ||
+                errorCuotas ||
                 (exentarInscripcion && motivoExencion.trim() === '') ||
                 (pideCondiciones && !aceptaCondiciones)
               "

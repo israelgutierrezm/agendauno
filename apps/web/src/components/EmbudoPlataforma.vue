@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import axios from "axios";
 import { onMounted, ref, watch } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { textoCampana } from "@/lib/captacion";
 import { PRODUCTOS, esProducto } from "@/lib/producto";
@@ -26,7 +26,7 @@ interface FilaEmbudo {
 }
 
 const props = defineProps<{ apiUrl: string; token: string }>();
-const cliente = axios.create({
+const cliente = crearClientePlataforma({
   baseURL: props.apiUrl,
   headers: { Accept: "application/json" },
 });

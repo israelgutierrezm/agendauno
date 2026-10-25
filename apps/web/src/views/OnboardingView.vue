@@ -7,6 +7,8 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import { puedeEntrar } from "@/lib/acceso";
+import { claveSegunModalidad } from "@/lib/menu";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -78,7 +80,11 @@ interface Profesional {
   nombre: string;
 }
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+// El texto de la modalidad (`…Citas`) si existe: en citas se agenda, no se reserva.
+function tc(clave: string): string {
+  return t(claveSegunModalidad(clave, esCitas.value, te));
+}
 const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
@@ -249,14 +255,26 @@ async function cargar(): Promise<void> {
   }
 }
 
+// Lo que ya tiene configurado (sedes, servicios, reglas…). Un error que no sea «sin
+// permiso» o «no existe» no se toma por «no hay nada»: se pide reintentar, porque
+// guardar sobre lo vacío duplicaría la sede o reemplazaría las reglas reales.
+const errorReferencias = ref(false);
+function sinPermisoOSinDatos(e: unknown): boolean {
+  const estado = (e as { response?: { status?: number } }).response?.status;
+  return estado === 403 || estado === 404;
+}
 async function cargarReferencias(): Promise<void> {
+  errorReferencias.value = false;
   const pedir = async <T,>(ruta: string, destino: { value: T }) => {
     try {
       destino.value = (
         await api.get<{ data: T }>(`${base.value}${ruta}`)
       ).data.data;
-    } catch {
+    } catch (e) {
       // Sin permiso o sin datos: el paso funciona igual.
+      if (!sinPermisoOSinDatos(e)) {
+        errorReferencias.value = true;
+      }
     }
   };
   await Promise.all([
@@ -303,8 +321,11 @@ async function cargarReglas(): Promise<void> {
         ventana_no_show_dias: g.ventana_no_show_dias ?? null,
       };
     }
-  } catch {
+  } catch (e) {
     // Sin permiso: el paso parte de lo razonable.
+    if (!sinPermisoOSinDatos(e)) {
+      errorReferencias.value = true;
+    }
   }
 }
 async function guardarReglas(): Promise<void> {
@@ -826,7 +847,7 @@ onMounted(cargar);
           {{ $t("configuracionInicial.titulo") }}
         </h1>
         <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("configuracionInicial.subtitulo") }}
+          {{ tc("configuracionInicial.subtitulo") }}
         </p>
       </div>
       <div v-if="!cargando && pasos.length > 0" class="ci-avance">
@@ -863,6 +884,19 @@ onMounted(cargar);
     <p v-else-if="pasos.length === 0" class="mt-8" style="color: var(--error)">
       {{ error }}
     </p>
+    <div
+      v-else-if="errorReferencias"
+      class="mt-8 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+      data-prueba="error-referencias"
+    >
+      <span style="color: var(--error)">{{
+        $t("configuracionInicial.errorReferencias")
+      }}</span>
+      <button type="button" class="tu-btn tu-btn-secundario" @click="cargar()">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
 
     <template v-else>
       <!-- Pasos numerados -->
@@ -899,7 +933,7 @@ onMounted(cargar);
 
       <div v-if="estado?.listo" class="ci-listo mt-6" data-prueba="listo">
         <span class="ci-punto ci-punto-si" aria-hidden="true" />
-        <span class="flex-1">{{ $t("configuracionInicial.completo") }}</span>
+        <span class="flex-1">{{ tc("configuracionInicial.completo") }}</span>
         <button
           class="tu-btn tu-btn-primario"
           @click="router.push({ name: 'panel' })"
@@ -1535,7 +1569,7 @@ onMounted(cargar);
                 }}</span>
                 <span class="ci-suave text-sm">{{
                   estado.publicado
-                    ? $t("configuracionInicial.estados.publicadoSi")
+                    ? tc("configuracionInicial.estados.publicadoSi")
                     : $t("configuracionInicial.estados.publicadoNo")
                 }}</span>
               </li>
@@ -1546,7 +1580,7 @@ onMounted(cargar);
                   aria-hidden="true"
                 />
                 <span class="font-medium">{{
-                  $t("configuracionInicial.estados.reservable")
+                  tc("configuracionInicial.estados.reservable")
                 }}</span>
                 <span v-if="estado.primera_fecha" class="ci-suave text-sm">{{
                   $t("configuracionInicial.estados.primera", {
@@ -1579,7 +1613,7 @@ onMounted(cargar);
 
             <div class="ci-existentes">
               <p class="text-sm font-medium">
-                {{ $t("configuracionInicial.publicacion.tuPagina") }}
+                {{ tc("configuracionInicial.publicacion.tuPagina") }}
               </p>
               <div class="flex flex-wrap items-center gap-3">
                 <code class="ci-enlace">{{ enlace }}</code>
@@ -1625,7 +1659,7 @@ onMounted(cargar);
                     $t(`configuracionInicial.publicacion.vis.${v}`)
                   }}</span>
                   <span class="ci-suave block text-sm">{{
-                    $t(`configuracionInicial.publicacion.vis.${v}Ayuda`)
+                    tc(`configuracionInicial.publicacion.vis.${v}Ayuda`)
                   }}</span>
                 </span>
               </label>
@@ -1636,15 +1670,16 @@ onMounted(cargar);
                 {{ $t("configuracionInicial.publicacion.despues") }}
               </p>
               <ul class="ci-despues">
-                <li v-if="esCitas">
+                <!-- Solo lo que su rol (y el plan) le deja abrir. -->
+                <li v-if="esCitas && puedeEntrar('pasarelas', sesion)">
                   <RouterLink :to="{ name: 'pasarelas' }" class="tu-enlace"
                     >{{
-                      $t("configuracionInicial.publicacion.tareas.pasarelas")
+                      tc("configuracionInicial.publicacion.tareas.pasarelas")
                     }}
                     →</RouterLink
                   >
                 </li>
-                <li>
+                <li v-if="puedeEntrar('usuarios', sesion)">
                   <RouterLink :to="{ name: 'usuarios' }" class="tu-enlace"
                     >{{
                       $t("configuracionInicial.publicacion.tareas.usuarios")
@@ -1652,7 +1687,7 @@ onMounted(cargar);
                     →</RouterLink
                   >
                 </li>
-                <li>
+                <li v-if="puedeEntrar('pos', sesion)">
                   <RouterLink :to="{ name: 'pos' }" class="tu-enlace"
                     >{{
                       $t("configuracionInicial.publicacion.tareas.pos")

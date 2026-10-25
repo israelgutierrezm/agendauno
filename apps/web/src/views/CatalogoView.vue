@@ -758,7 +758,7 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('catalogo.titulo')"
-      :total="ofertas.length"
+      :total="cargando || errorCarga ? undefined : ofertas.length"
       :subtitulo="
         esCitas
           ? $t('listadosVisual.catalogo.subtituloCitas')
@@ -853,8 +853,20 @@ onMounted(cargar);
                 v-model="buscarServicio"
                 type="search"
                 class="tu-input"
-                :placeholder="$t('listadosVisual.catalogo.buscar')"
-                :aria-label="$t('listadosVisual.catalogo.buscar')"
+                :placeholder="
+                  $t(
+                    esCitas
+                      ? 'listadosVisual.catalogo.buscar'
+                      : 'listadosVisual.catalogo.buscarClases',
+                  )
+                "
+                :aria-label="
+                  $t(
+                    esCitas
+                      ? 'listadosVisual.catalogo.buscar'
+                      : 'listadosVisual.catalogo.buscarClases',
+                  )
+                "
                 data-prueba="buscar-servicio"
               />
             </label>
@@ -862,7 +874,15 @@ onMounted(cargar);
           <table class="tu-tabla">
             <thead>
               <tr>
-                <th>{{ $t("listadosVisual.catalogo.servicio") }}</th>
+                <th>
+                  {{
+                    $t(
+                      esCitas
+                        ? "listadosVisual.catalogo.servicio"
+                        : "listadosVisual.catalogo.servicioClases",
+                    )
+                  }}
+                </th>
                 <th class="text-right">
                   {{
                     esCitas
@@ -885,7 +905,15 @@ onMounted(cargar);
                 :key="o.id"
                 data-prueba="servicio"
               >
-                <td :data-etiqueta="$t('listadosVisual.catalogo.servicio')">
+                <td
+                  :data-etiqueta="
+                    $t(
+                      esCitas
+                        ? 'listadosVisual.catalogo.servicio'
+                        : 'listadosVisual.catalogo.servicioClases',
+                    )
+                  "
+                >
                   <div class="flex items-center gap-3">
                     <img
                       v-if="o.foto_url"
@@ -1019,7 +1047,13 @@ onMounted(cargar);
             </tbody>
           </table>
           <p v-if="serviciosVisibles.length === 0" class="tu-sin-resultados">
-            {{ $t("listadosVisual.catalogo.sinResultados") }}
+            {{
+              $t(
+                esCitas
+                  ? "listadosVisual.catalogo.sinResultados"
+                  : "listadosVisual.catalogo.sinResultadosClases",
+              )
+            }}
           </p>
           <PaginacionListado
             v-if="ultimaPaginaServicios > 1"

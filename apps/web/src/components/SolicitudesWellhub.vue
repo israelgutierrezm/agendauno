@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useToastStore } from "@/stores/toast";
@@ -38,7 +38,7 @@ function ocupadoCon(s: Solicitud, accion?: "asignar" | "descartar"): boolean {
 }
 
 function cliente() {
-  return axios.create({
+  return crearClientePlataforma({
     baseURL: props.apiUrl,
     headers: {
       Accept: "application/json",

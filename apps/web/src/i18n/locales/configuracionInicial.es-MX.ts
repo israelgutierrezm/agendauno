@@ -3,7 +3,12 @@ export default {
   titulo: "Configura tu negocio",
   subtitulo:
     "Lo justo para empezar a recibir reservas. Lo demás, cuando lo necesites.",
+  // En un negocio de citas se agenda, no se reserva (variantes `…Citas`).
+  subtituloCitas:
+    "Lo justo para empezar a recibir citas. Lo demás, cuando lo necesites.",
   paso: "Paso {n} de {total}",
+  errorReferencias:
+    "No pudimos consultar lo que ya tienes configurado. Reintenta antes de seguir: así no se duplica ni se reemplaza nada.",
   hecho: "Hecho",
   omitir: "Omitir por ahora",
   anterior: "Anterior",
@@ -12,6 +17,7 @@ export default {
   terminar: "Publicar y terminar",
   guardarTerminar: "Guardar y terminar",
   completo: "Tu negocio ya está listo para recibir reservas.",
+  completoCitas: "Tu negocio ya está listo para recibir citas.",
   irPanel: "Ir a mi panel",
   pasos: {
     negocio: "Tu negocio",
@@ -119,8 +125,10 @@ export default {
     faltan: "Falta un paso. | Faltan {n} pasos.",
     publicado: "Página publicada",
     publicadoSi: "Tus alumnos pueden abrir tu página y reservar.",
+    publicadoSiCitas: "Tus alumnos pueden abrir tu página y agendar.",
     publicadoNo: "Tu página está cerrada.",
     reservable: "Recibe reservas",
+    reservableCitas: "Recibe citas",
     primera: "Primera fecha disponible: {fecha} · {que} · {sucursal}.",
     resolver: "Ir a {paso}",
     motivo: {
@@ -136,6 +144,7 @@ export default {
   },
   publicacion: {
     tuPagina: "Tu página para reservar",
+    tuPaginaCitas: "Tu página para agendar",
     vistaPrevia: "Ver como alumno",
     como: "¿Cómo la publicas?",
     vis: {
@@ -145,14 +154,18 @@ export default {
       enlace: "Solo con tu enlace",
       enlaceAyuda:
         "Tu página funciona y reciben reservas, pero no apareces en búsquedas.",
+      enlaceAyudaCitas:
+        "Tu página funciona y te agendan, pero no apareces en búsquedas.",
       cerrada: "Cerrada por ahora",
       cerradaAyuda: "Nadie puede abrir tu página ni reservar en línea.",
+      cerradaAyudaCitas: "Nadie puede abrir tu página ni agendar en línea.",
     },
     copiar: "Copiar enlace",
     copiado: "Enlace copiado.",
     despues: "Cuando lo necesites",
     tareas: {
       pasarelas: "Cobrar en línea al reservar",
+      pasarelasCitas: "Cobrar en línea al agendar",
       usuarios: "Invitar a recepción o administración",
       pos: "Vender productos de mostrador",
     },

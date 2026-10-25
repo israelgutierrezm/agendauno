@@ -194,11 +194,14 @@ function alternar(id: string): void {
 // recientes y las demás se piden por páginas, del mismo tamaño que las primeras.
 const USOS_POR_PAGINA = 10;
 const cargandoUsos = ref<string | null>(null);
+// Si falla «Ver más», el error va junto al botón: la lista que ya se ve se queda.
+const errorUsos = ref<{ plan: string; mensaje: string } | null>(null);
 function totalUsos(p: PlanCorte): number {
   return p.usos_total ?? p.usos.length;
 }
 async function verMasUsos(p: PlanCorte): Promise<void> {
   cargandoUsos.value = p.id;
+  errorUsos.value = null;
   try {
     const pagina = Math.floor(p.usos.length / USOS_POR_PAGINA) + 1;
     const { data } = await api.get<{ data: Uso[] }>(
@@ -207,7 +210,7 @@ async function verMasUsos(p: PlanCorte): Promise<void> {
     );
     p.usos = [...p.usos, ...data.data];
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorUsos.value = { plan: p.id, mensaje: mensajeDeError(e) };
   } finally {
     cargandoUsos.value = null;
   }
@@ -237,6 +240,15 @@ defineExpose({ cargar });
     </h2>
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <p
       v-else-if="cargando"
@@ -481,6 +493,14 @@ defineExpose({ cargar });
                   )
             }}
           </button>
+          <p
+            v-if="errorUsos?.plan === p.id"
+            class="mt-2 text-sm"
+            role="alert"
+            :style="{ color: 'var(--error)' }"
+          >
+            {{ errorUsos.mensaje }}
+          </p>
         </article>
       </template>
       <button

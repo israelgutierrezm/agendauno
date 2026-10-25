@@ -208,6 +208,8 @@ export interface Voucher {
 const derechos = ref<Derecho[]>([]);
 const reservas = ref<Reserva[]>([]);
 const clases = ref<Clase[]>([]);
+// Si las próximas clases se pudieron consultar (si no, el Inicio dice «—», no «0»).
+const clasesConsultadas = ref(true);
 const waivers = ref<Waiver[]>([]);
 const productos = ref<Producto[]>([]);
 // Todo lo que debe (GET /mi/ordenes/pendientes, completo): no sale de la primera
@@ -217,6 +219,9 @@ const pendientes = ref<Orden[]>([]);
 const politica = ref<Politica | null>(null);
 const formularios = ref<FormularioPersona[]>([]);
 const personaId = ref<string | null>(null);
+// El expediente se pide aparte: mientras llega, o si falla, no se dice «no hay nada».
+const cargandoFormularios = ref(false);
+const errorFormularios = ref(false);
 const portal = ref<PortalCuenta | null>(null);
 const asistencias = ref(0);
 export interface ResumenAsistencia {
@@ -247,12 +252,15 @@ export function reiniciarMiCuenta(): void {
   derechos.value = [];
   reservas.value = [];
   clases.value = [];
+  clasesConsultadas.value = true;
   waivers.value = [];
   productos.value = [];
   pendientes.value = [];
   politica.value = null;
   formularios.value = [];
   personaId.value = null;
+  cargandoFormularios.value = false;
+  errorFormularios.value = false;
   portal.value = null;
   asistencias.value = 0;
   pagoEnLinea.value = false;
@@ -296,6 +304,8 @@ export function useMiCuenta() {
 
   async function cargarFormularios(): Promise<void> {
     const mia = generacion;
+    cargandoFormularios.value = true;
+    errorFormularios.value = false;
     try {
       const { data } = await api.get<{
         data: { persona_id: string; formularios: FormularioPersona[] };
@@ -305,10 +315,18 @@ export function useMiCuenta() {
       }
       personaId.value = data.data.persona_id;
       formularios.value = data.data.formularios;
-    } catch {
-      // Sin perfil de alumno: no hay formularios que llenar.
+    } catch (e) {
+      // Sin perfil de alumno (403/404): no hay formularios que llenar. Otro error
+      // se dice, con «Reintentar».
       if (mia === generacion) {
         formularios.value = [];
+        const estado = (e as { response?: { status?: number } }).response
+          ?.status;
+        errorFormularios.value = estado !== 403 && estado !== 404;
+      }
+    } finally {
+      if (mia === generacion) {
+        cargandoFormularios.value = false;
       }
     }
   }
@@ -343,9 +361,7 @@ export function useMiCuenta() {
         }>(`${base.value}/mi/perfil`),
         // Las próximas clases (para el Inicio) no tumban la cuenta si fallan: el
         // calendario de Reservas pide su periodo aparte y muestra su propio error.
-        api
-          .get<{ data: Clase[] }>(`${base.value}/mi/agenda`)
-          .catch(() => ({ data: { data: [] as Clase[] } })),
+        api.get<{ data: Clase[] }>(`${base.value}/mi/agenda`).catch(() => null),
         api.get<{ data: Waiver[] }>(`${base.value}/mi/waivers`),
         api.get<{ data: Producto[] }>(`${base.value}/mi/productos`),
         api.get<{ data: Orden[] }>(`${base.value}/mi/ordenes/pendientes`),
@@ -363,7 +379,8 @@ export function useMiCuenta() {
       pagoEnLineaPrueba.value = p.data.data.pago_en_linea_prueba === true;
       pagoAutomatico.value = p.data.data.pago_automatico === true;
       domiciliarAlPagar.value = p.data.data.domiciliar_al_pagar === true;
-      clases.value = a.data.data;
+      clases.value = a?.data.data ?? [];
+      clasesConsultadas.value = a !== null;
       waivers.value = w.data.data;
       productos.value = pr.data.data;
       pendientes.value = o.data.data;
@@ -435,11 +452,14 @@ export function useMiCuenta() {
     derechos,
     reservas,
     clases,
+    clasesConsultadas,
     waivers,
     productos,
     politica,
     formularios,
     personaId,
+    cargandoFormularios,
+    errorFormularios,
     portal,
     asistencias,
     resumenAsistencia,

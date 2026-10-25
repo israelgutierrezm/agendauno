@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { PRODUCTOS, type Producto } from "@/lib/producto";
 
@@ -33,7 +33,7 @@ interface Operador {
 }
 
 const { t, te } = useI18n();
-const cliente = axios.create({
+const cliente = crearClientePlataforma({
   baseURL: props.apiUrl,
   headers: { Accept: "application/json" },
 });

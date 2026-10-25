@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import axios from "axios";
 import { onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -7,6 +6,7 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import HorarioDemosPlataforma from "@/components/HorarioDemosPlataforma.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PestanasSeccion from "@/components/PestanasSeccion.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import {
@@ -70,7 +70,7 @@ interface Meta {
 const { t } = useI18n();
 const toast = useToastStore();
 const cliente = () =>
-  axios.create({
+  crearClientePlataforma({
     baseURL: props.apiUrl,
     headers: {
       Accept: "application/json",

@@ -23,6 +23,8 @@ const sesion = vi.hoisted(() => ({
   terminologia: { sesion: "Cita", miembro: "Cliente", instructor: "Barbero" },
   cargarYo: vi.fn(),
   cambiarGiro: vi.fn(),
+  // Los enlaces de «Cuando lo necesites» se filtran por lo que su rol abre.
+  puede: vi.fn(() => true),
 }));
 function negocioDeClases(): void {
   sesion.modalidad = "clases";
@@ -407,6 +409,39 @@ describe("los mismos pasos que «Pon tu negocio en marcha» (ADR 0090)", () => {
       publicado: true,
       privado: true,
     });
+  });
+});
+
+describe("lo que ya tiene configurado", () => {
+  it("si no se pudo consultar, lo dice y no deja guardar sobre lo vacío", async () => {
+    responder(["negocio", "servicios", "equipo", "reglas", "publicacion"], []);
+    const base = api.get.getMockImplementation()!;
+    api.get.mockImplementation((url: string) =>
+      url.endsWith("/sucursales")
+        ? Promise.reject({ response: { status: 500 } })
+        : base(url),
+    );
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="error-referencias"]').text()).toContain(
+      "No pudimos consultar lo que ya tienes configurado",
+    );
+    // Sin el paso a la vista: no se puede crear otra sede encima de la real.
+    expect(w.find("article").exists()).toBe(false);
+  });
+
+  it("sin permiso para verlo (403), el paso funciona igual", async () => {
+    responder(["negocio", "servicios", "equipo", "reglas", "publicacion"], []);
+    const base = api.get.getMockImplementation()!;
+    api.get.mockImplementation((url: string) =>
+      url.endsWith("/sucursales")
+        ? Promise.reject({ response: { status: 403 } })
+        : base(url),
+    );
+    const w = montar();
+    await flushPromises();
+    expect(w.find('[data-prueba="error-referencias"]').exists()).toBe(false);
+    expect(w.find("article").exists()).toBe(true);
   });
 });
 

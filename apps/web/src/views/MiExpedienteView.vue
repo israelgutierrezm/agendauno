@@ -166,8 +166,38 @@ onMounted(() => void cuenta.asegurar());
           @guardado="cuenta.cargarFormularios()"
         />
       </div>
+      <p
+        v-if="
+          cuenta.cargandoFormularios.value && cuenta.personaId.value === null
+        "
+        class="mt-4 text-sm"
+        role="status"
+        :style="{ color: 'var(--texto-suave)' }"
+        data-prueba="expediente-cargando"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
       <div
-        v-if="!cuenta.waivers.value.length && cuenta.personaId.value === null"
+        v-else-if="cuenta.errorFormularios.value"
+        class="mt-4 tu-card flex flex-wrap items-center justify-between gap-3 p-5 text-sm"
+        role="alert"
+        data-prueba="expediente-error"
+      >
+        <span :style="{ color: 'var(--error)' }">{{
+          $t("portal.expediente.errorCarga")
+        }}</span>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          @click="cuenta.cargarFormularios()"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </div>
+      <div
+        v-else-if="
+          !cuenta.waivers.value.length && cuenta.personaId.value === null
+        "
         class="me-vacio tu-card"
       >
         <IconoNav nombre="expediente" :tam="36" />

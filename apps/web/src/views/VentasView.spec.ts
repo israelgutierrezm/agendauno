@@ -121,6 +121,12 @@ describe("vender un plan", () => {
       codigo_promo: undefined,
       liquidar: { metodo: "transferencia", clave: expect.any(String) },
     });
+    // La venta siguiente no queda a nombre de la anterior: se vuelve a elegir a
+    // quién (el formulario sigue a la vista mientras se actualiza).
+    expect(w.findComponent(BuscarPersona).props("modelValue")).toBe("");
+    expect(
+      w.get('[data-prueba="cobrar-plan"]').attributes("disabled"),
+    ).toBeDefined();
   });
 
   it("un código escrito pero no aplicado no se manda: se cobra lo que se confirmó", async () => {
@@ -138,6 +144,50 @@ describe("vender un plan", () => {
       "/api/v1/app/demo/ordenes",
       expect.objectContaining({ codigo_promo: undefined }),
     );
+  });
+
+  it("si no se pudo saber si le toca inscripción, no se cobra hasta reintentar", async () => {
+    const base = mocks.get.getMockImplementation()!;
+    let falla = true;
+    mocks.get.mockImplementation((url: string) =>
+      url.endsWith("/productos")
+        ? Promise.resolve({
+            data: {
+              data: [
+                {
+                  ...plan("p2", "Mensualidad", "membresia", 150000),
+                  cobra_inscripcion: true,
+                },
+              ],
+            },
+          })
+        : url.endsWith("/miembros/m1/cuotas")
+          ? falla
+            ? Promise.reject(new Error("sin red"))
+            : Promise.resolve({ data: { data: { inscripcion_minor: 50000 } } })
+          : base(url),
+    );
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    await w.findAll('[data-prueba="plan"]')[0]!.trigger("click");
+    const buscador = w.findComponent(BuscarPersona);
+    buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+    buscador.vm.$emit("update:modelValue", "m1");
+    await flushPromises();
+
+    expect(w.find('[data-prueba="cuotas-error"]').exists()).toBe(true);
+    expect(
+      w.get('[data-prueba="cobrar-plan"]').attributes("disabled"),
+    ).toBeDefined();
+
+    falla = false;
+    await w.get('[data-prueba="cuotas-error"]').get("button").trigger("click");
+    await flushPromises();
+    expect(w.find('[data-prueba="cuotas-error"]').exists()).toBe(false);
+    expect(w.get(".vv-total").text()).toContain("$2,000.00");
+    expect(
+      w.get('[data-prueba="cobrar-plan"]').attributes("disabled"),
+    ).toBeUndefined();
   });
 
   it("la inscripción se suma al total antes de cobrar; quien puede la exenta con motivo", async () => {

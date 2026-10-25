@@ -273,11 +273,15 @@ const accesos = computed<Acceso[]>(() => {
     c === null
       ? otro
         ? textoOtroEstado(otro)
-        : t("portal.inicio.tarjetas.sinPaquete")
+        : citas
+          ? t("portal.inicio.tarjetas.sinBono")
+          : t("portal.inicio.tarjetas.sinPaquete")
       : c.ilimitado
         ? t("portal.inicio.tarjetas.ilimitado")
         : t(
-            "portal.inicio.tarjetas.creditosValor",
+            citas
+              ? "portal.inicio.tarjetas.sesionesValor"
+              : "portal.inicio.tarjetas.creditosValor",
             { n: new Intl.NumberFormat("es-MX").format(c.n) },
             c.n === 1 ? 1 : 2,
           );
@@ -288,7 +292,9 @@ const accesos = computed<Acceso[]>(() => {
       : t("portal.inicio.tarjetas.reservar"),
     valor: citas
       ? t("portal.inicio.tarjetas.agendar")
-      : t("portal.inicio.tarjetas.disponibles", disponibles.value),
+      : cuenta.clasesConsultadas.value
+        ? t("portal.inicio.tarjetas.disponibles", disponibles.value)
+        : "—",
     icono: "agenda",
     tono: TONO.reservar,
     ruta: "mis-reservas",
@@ -303,7 +309,9 @@ const accesos = computed<Acceso[]>(() => {
         ? citas
           ? t("portal.inicio.tarjetas.cambiarCancelar")
           : t("portal.inicio.tarjetas.proximas", proximas)
-        : t("portal.inicio.tarjetas.sinReservas"),
+        : citas
+          ? t("portal.inicio.tarjetas.sinCitas")
+          : t("portal.inicio.tarjetas.sinReservas"),
     icono: "lista",
     tono: TONO.reservas,
     ruta: "mis-reservas",

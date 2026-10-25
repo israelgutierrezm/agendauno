@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useToastStore } from "@/stores/toast";
@@ -69,7 +69,7 @@ const POR_PAGINA = 15;
 
 const { t } = useI18n();
 const toast = useToastStore();
-const cliente = axios.create({
+const cliente = crearClientePlataforma({
   baseURL: props.apiUrl,
   headers: { Accept: "application/json" },
 });

@@ -248,7 +248,7 @@ onMounted(cargar);
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           :disabled="cargando"
           data-prueba="reintentar-resenas"
           @click="cargar"

@@ -99,11 +99,8 @@ const barraSucursal = useSucursales();
 
 // Las ventas recientes (con su paginación y fechas) y lo vendido hoy.
 const listaVentas = ref<InstanceType<typeof VentasMostrador> | null>(null);
-const hoy = ref<ResumenVentas>({
-  ventas: 0,
-  vendido_minor: 0,
-  propinas_minor: 0,
-});
+// Null hasta que llega (la lista de ventas lo manda): mientras, «—», no ceros.
+const hoy = ref<ResumenVentas | null>(null);
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -579,7 +576,7 @@ async function cobrar(): Promise<void> {
 
 // ---- Indicadores del día (del servidor: hoy en el negocio, sin anuladas) ----
 const indicadores = computed<Indicador[]>(() => {
-  const total = hoy.value.vendido_minor;
+  const r = hoy.value;
   const sinStock = articulos.value.filter(
     (a) => a.activo && stockEn(a) <= 0,
   ).length;
@@ -587,21 +584,21 @@ const indicadores = computed<Indicador[]>(() => {
     {
       clave: "ventas",
       etiqueta: t("mostradorVisual.kpi.ventasHoy"),
-      valor: String(hoy.value.ventas),
+      valor: r === null ? "—" : String(r.ventas),
       icono: "ventas",
     },
     {
       clave: "total",
       etiqueta: t("mostradorVisual.kpi.vendidoHoy"),
-      valor: dinero(total),
+      valor: r === null ? "—" : dinero(r.vendido_minor),
       icono: "dinero",
     },
     {
       clave: "ticket",
       etiqueta: t("mostradorVisual.kpi.ticket"),
       valor:
-        hoy.value.ventas > 0
-          ? dinero(Math.round(total / hoy.value.ventas))
+        r !== null && r.ventas > 0
+          ? dinero(Math.round(r.vendido_minor / r.ventas))
           : "—",
       icono: "etiqueta",
     },
@@ -709,6 +706,7 @@ onMounted(async () => {
           :tarjetas="indicadores"
         />
         <p
+          v-if="hoy !== null"
           class="mo-hoy sm:hidden"
           data-prueba="resumen-hoy"
           :style="{ color: 'var(--texto-suave)' }"

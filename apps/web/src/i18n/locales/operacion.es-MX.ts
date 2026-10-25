@@ -374,10 +374,10 @@ export default {
     app: "App",
     conApp: "Con acceso",
     sinApp: "Sin cuenta",
-    // Invitar a su cuenta: el correo para activarla y ver sus citas y pagos.
+    // Invitar a su cuenta: el correo para activarla y ver sus clases (o citas) y pagos.
     invitar: "Invitar a su cuenta",
     invitarAyuda:
-      "Le enviamos un correo para que active su cuenta y vea sus citas, pagos y bonos.",
+      "Le enviamos un correo para que active su cuenta y vea sus clases y sus pagos.",
     invitacionPendiente: "Invitación enviada",
     reenviar: "Reenviar invitación",
     reenviando: "Reenviando…",

@@ -459,8 +459,17 @@ async function reservar(
     intentoReserva.value++;
     return;
   }
-  aviso.value = esperar ? t("miCuenta.enListaEspera") : t("miCuenta.reservado");
   const nueva = mias.value.find((m) => m.reserva?.sesion_id === e.id);
+  // Una clase de pago queda apartada, no reservada, hasta que se pague.
+  aviso.value = esperar
+    ? t("miCuenta.enListaEspera")
+    : nueva?.estado === "pendiente_pago"
+      ? t(
+          cuenta.pagoEnLinea.value
+            ? "portal.miReserva.porPagar"
+            : "portal.miReserva.porPagarEnNegocio",
+        )
+      : t("miCuenta.reservado");
   if (nueva) {
     abrir(nueva);
     recienReservada.value = true;
@@ -565,7 +574,9 @@ function detallesMia(e: Evento): string[] {
 async function cancelar(e: Evento): Promise<void> {
   aviso.value = null;
   if (e.reserva && (await cuenta.cancelar(e.reserva))) {
-    aviso.value = t("miCuenta.cancelado");
+    aviso.value = sesion.esCitas
+      ? t("portal.reservas.canceladaCita")
+      : t("miCuenta.cancelado");
     cerrar();
     void cargarClases();
   }
@@ -969,7 +980,11 @@ onMounted(() => void cuenta.asegurar());
       <div v-else class="mr-vacio tu-card">
         <IconoNav nombre="agenda" :tam="36" />
         <p :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("portal.reservas.sinProximas") }}
+          {{
+            sesion.esCitas
+              ? $t("portal.reservas.sinProximasCitas")
+              : $t("portal.reservas.sinProximas")
+          }}
         </p>
         <button
           type="button"
@@ -996,7 +1011,9 @@ onMounted(() => void cuenta.asegurar());
           })
         }}</span>
         <RouterLink :to="{ name: 'mi-perfil' }" class="tu-enlace">{{
-          $t("portal.reservas.sincronizar")
+          sesion.esCitas
+            ? $t("portal.reservas.sincronizarCitas")
+            : $t("portal.reservas.sincronizar")
         }}</RouterLink>
       </div>
     </div>
@@ -1073,7 +1090,13 @@ onMounted(() => void cuenta.asegurar());
             {{
               abierto.estado === "en_espera"
                 ? $t("portal.miReserva.enEspera")
-                : $t("portal.miReserva.lista")
+                : abierto.estado === "pendiente_pago"
+                  ? $t(
+                      cuenta.pagoEnLinea.value
+                        ? "portal.miReserva.porPagar"
+                        : "portal.miReserva.porPagarEnNegocio",
+                    )
+                  : $t("portal.miReserva.lista")
             }}
           </p>
           <ul
@@ -1125,7 +1148,8 @@ onMounted(() => void cuenta.asegurar());
             <RouterLink
               v-if="
                 abierto.estado === 'pendiente_pago' &&
-                abierto.reserva.orden_id !== null
+                abierto.reserva.orden_id !== null &&
+                cuenta.pagoEnLinea.value
               "
               :to="{ name: 'mis-pagos' }"
               class="tu-btn tu-btn-primario"
@@ -1227,6 +1251,7 @@ onMounted(() => void cuenta.asegurar());
             :sesion-id="abierto.id"
             :ocupado="cuenta.accionando.value"
             :llena="llena(abierto)"
+            :pago-en-linea="cuenta.pagoEnLinea.value"
             @confirmar="(esperar, lugar) => reservar(abierto!, esperar, lugar)"
             @accion="(a) => alAccionAntes(a, abierto!)"
           />

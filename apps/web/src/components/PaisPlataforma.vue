@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { opcionesPais } from "@/lib/region";
@@ -26,7 +26,7 @@ const emit = defineEmits<{ cambiado: [] }>();
 
 const { t } = useI18n();
 const toast = useToastStore();
-const cliente = axios.create({
+const cliente = crearClientePlataforma({
   baseURL: props.apiUrl,
   headers: { Accept: "application/json" },
 });

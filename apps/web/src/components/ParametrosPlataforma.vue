@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import ParametrosEditor from "@/components/ParametrosEditor.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { erroresPorCampo, mensajeDeError } from "@/lib/api";
 import type { Parametro } from "@/lib/parametros";
 import { useToastStore } from "@/stores/toast";
@@ -19,7 +19,7 @@ const props = defineProps<{ apiUrl: string; token: string }>();
 
 const { t } = useI18n();
 const toast = useToastStore();
-const cliente = axios.create({
+const cliente = crearClientePlataforma({
   baseURL: props.apiUrl,
   headers: { Accept: "application/json" },
 });

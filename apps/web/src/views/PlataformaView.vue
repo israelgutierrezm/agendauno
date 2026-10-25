@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
@@ -39,6 +39,7 @@ import type { PlanCitas } from "@/lib/suscripcion";
 import PlanEstudioPlataforma from "@/components/PlanEstudioPlataforma.vue";
 import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
+import { SESION_PLATAFORMA_VENCIDA } from "@/lib/clientePlataforma";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 import { confirmar } from "@/lib/confirmar";
 import {
@@ -878,6 +879,23 @@ const pasarelaDraft = ref<
 >({});
 const guardando = ref<string | null>(null);
 
+// La configuración se carga al entrar; mientras tanto, o si falla, no se muestran sus
+// formularios (vacíos, guardarlos borraría lo que había).
+const cargandoConfig = ref(true);
+const errorConfig = ref(false);
+async function recargarConfiguracion(): Promise<void> {
+  cargandoConfig.value = true;
+  errorConfig.value = false;
+  try {
+    await cargarConfiguracion();
+  } catch (err) {
+    errorConfig.value = true;
+    toast.error(mensajeDeError(err));
+  } finally {
+    cargandoConfig.value = false;
+  }
+}
+
 async function cargarConfiguracion(): Promise<void> {
   const [cfg, pas, leg] = await Promise.all([
     cliente.get<{
@@ -1180,9 +1198,7 @@ async function cargar(): Promise<void> {
     autenticado.value = true;
     void cargarDemosProximas();
     // La configuración no impide entrar: si falla, se ve en su pestaña (ADR 0132).
-    void cargarConfiguracion().catch((err: unknown) => {
-      toast.error(mensajeDeError(err));
-    });
+    void recargarConfiguracion();
   } catch (err) {
     autenticado.value = false;
     const estado = axios.isAxiosError(err) ? err.response?.status : undefined;
@@ -1338,30 +1354,41 @@ async function salir(): Promise<void> {
   } catch {
     // sin red: el token vence solo
   }
+  olvidarSesion();
+}
+
+// Sale o se le vence la sesión: nada de lo que veía queda a la vista al volver a entrar.
+function olvidarSesion(): void {
   token.value = "";
   operador.value = null;
   autenticado.value = false;
   estudios.value = [];
   metaEstudios.value = null;
+  ficha.value = null;
+  fichaAbierta.value = false;
   borrar();
 }
 
 // Una sesión que vence a media tarea (12 h) vuelve a la entrada en lugar de dejar la
 // pantalla a medias (ADR 0132).
-cliente.interceptors.response.use(undefined, (err: unknown) => {
-  if (
-    axios.isAxiosError(err) &&
-    err.response?.status === 401 &&
-    autenticado.value
-  ) {
-    token.value = "";
-    operador.value = null;
-    autenticado.value = false;
+// Las secciones (Tarifas, Operación, Demos…) tienen su propio cliente y lo avisan con
+// un evento (lib/clientePlataforma.ts).
+function sesionVencida(): void {
+  if (autenticado.value) {
+    olvidarSesion();
     error.value = t("plataforma.tokenInvalido");
-    borrar();
+  }
+}
+cliente.interceptors.response.use(undefined, (err: unknown) => {
+  if (axios.isAxiosError(err) && err.response?.status === 401) {
+    sesionVencida();
   }
   return Promise.reject(err);
 });
+window.addEventListener(SESION_PLATAFORMA_VENCIDA, sesionVencida);
+onUnmounted(() =>
+  window.removeEventListener(SESION_PLATAFORMA_VENCIDA, sesionVencida),
+);
 
 onMounted(() => {
   if (token.value !== "") {
@@ -1926,460 +1953,497 @@ function borrar(): void {
           :opciones="opcionesConfig"
           :etiqueta="$t('plataformaAdmin.configuracion.etiqueta')"
         />
-
-        <!-- Facturación: la cuenta de FacturAPI y a dónde llegan las alertas. -->
-        <div
-          v-show="apartadoConfig === 'facturacion'"
-          class="mt-5 space-y-5"
-          data-prueba="config-facturacion"
+        <p
+          v-if="cargandoConfig"
+          class="mt-5 text-sm"
+          role="status"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="config-cargando"
         >
-          <div class="tu-card p-5">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <h2 class="tu-titulo-seccion">
-                  {{ $t("plataforma.facturapi.titulo") }}
-                </h2>
-                <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                  {{ $t("plataforma.facturapi.subtitulo") }}
-                </p>
-              </div>
-              <span
-                class="tu-estado text-sm shrink-0"
-                :style="{
-                  '--tono': facturapiConfigurada
-                    ? 'var(--exito)'
-                    : 'var(--texto-suave)',
-                }"
-                data-prueba="facturapi-estado"
-              >
-                {{
-                  facturapiConfigurada
-                    ? $t("plataforma.facturapi.configurada")
-                    : $t("plataforma.facturapi.noConfigurada")
-                }}
-              </span>
-            </div>
-            <form
-              class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end"
-              @submit.prevent="guardarLlave()"
-            >
-              <div class="flex-1">
-                <label class="tu-label" for="lk">{{
-                  $t("plataforma.facturapi.llave")
-                }}</label>
-                <input
-                  id="lk"
-                  v-model="llaveInput"
-                  class="tu-input"
-                  type="password"
-                  autocomplete="off"
-                  placeholder="sk_live_…"
-                />
-              </div>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="
-                  guardando === 'facturapi' || llaveInput.trim() === ''
-                "
-                :aria-busy="guardando === 'facturapi' || undefined"
-              >
-                {{ $t("plataforma.facturapi.guardar") }}
-              </button>
-              <!-- Quita la llave ya guardada: destructiva. -->
-              <button
-                v-if="facturapiConfigurada"
-                class="tu-btn tu-btn-peligro"
-                type="button"
-                data-prueba="quitar-facturapi"
-                :disabled="guardando === 'facturapi'"
-                @click="guardarLlave(true)"
-              >
-                {{ $t("plataforma.facturapi.quitar") }}
-              </button>
-            </form>
-            <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("plataforma.facturapi.ayuda") }}
-            </p>
-          </div>
-
-          <!-- Correo del superadministrador: alertas y rentas vencidas. -->
-          <form
-            class="tu-card p-5"
-            data-prueba="correo-alertas"
-            @submit.prevent="guardarCorreoAlertas"
+          {{ $t("plataformaAdmin.configuracion.cargando") }}
+        </p>
+        <div
+          v-else-if="errorConfig"
+          class="mt-5 tu-card flex flex-wrap items-center justify-between gap-3 p-5 text-sm"
+          role="alert"
+          data-prueba="config-error"
+        >
+          <span :style="{ color: 'var(--error)' }">{{
+            $t("plataformaAdmin.configuracion.error")
+          }}</span>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            @click="recargarConfiguracion"
           >
-            <h2 class="tu-titulo-seccion">
-              {{ $t("plataformaAdmin.correoAlertas.titulo") }}
-            </h2>
-            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("plataformaAdmin.correoAlertas.ayuda") }}
-            </p>
-            <div class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-              <div class="flex-1">
-                <label class="tu-label" for="correo-alertas">{{
-                  $t("plataformaAdmin.correoAlertas.correo")
-                }}</label>
-                <input
-                  id="correo-alertas"
-                  v-model="correoAlertas"
-                  class="tu-input"
-                  type="email"
-                  autocomplete="email"
-                />
-              </div>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="guardando === 'correo'"
-                :aria-busy="guardando === 'correo' || undefined"
-              >
-                {{ $t("plataformaAdmin.correoAlertas.guardar") }}
-              </button>
-            </div>
-          </form>
+            {{ $t("comun.reintentar") }}
+          </button>
         </div>
-
-        <!-- Pasarelas con que se cobra la renta del SaaS: cada una con su Guardar. -->
-        <div
-          v-show="apartadoConfig === 'pasarelas'"
-          class="mt-5"
-          data-prueba="config-pasarelas"
-        >
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataforma.pasarelas.subtitulo") }}
-          </p>
-          <div class="mt-3 grid gap-3 md:grid-cols-3">
-            <div v-for="p in pasarelas" :key="p.proveedor" class="tu-card p-4">
-              <div
-                v-if="p.disponible === false"
-                class="flex items-center justify-between gap-2"
-              >
-                <h3 class="font-medium">
-                  {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
-                </h3>
+        <template v-else>
+          <!-- Facturación: la cuenta de FacturAPI y a dónde llegan las alertas. -->
+          <div
+            v-show="apartadoConfig === 'facturacion'"
+            class="mt-5 space-y-5"
+            data-prueba="config-facturacion"
+          >
+            <div class="tu-card p-5">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h2 class="tu-titulo-seccion">
+                    {{ $t("plataforma.facturapi.titulo") }}
+                  </h2>
+                  <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                    {{ $t("plataforma.facturapi.subtitulo") }}
+                  </p>
+                </div>
                 <span
-                  class="tu-estado text-xs shrink-0"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ $t("pasarelasEstado.proximamente") }}</span
+                  class="tu-estado text-sm shrink-0"
+                  :style="{
+                    '--tono': facturapiConfigurada
+                      ? 'var(--exito)'
+                      : 'var(--texto-suave)',
+                  }"
+                  data-prueba="facturapi-estado"
                 >
+                  {{
+                    facturapiConfigurada
+                      ? $t("plataforma.facturapi.configurada")
+                      : $t("plataforma.facturapi.noConfigurada")
+                  }}
+                </span>
               </div>
-              <p
-                v-if="p.disponible === false"
-                class="mt-2 text-sm"
-                :style="{ color: 'var(--texto-suave)' }"
+              <form
+                class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end"
+                @submit.prevent="guardarLlave()"
               >
-                {{ $t("pasarelasEstado.noDisponible") }}
-              </p>
-              <template v-else>
-                <p
-                  v-if="p.activa && p.lista === false"
-                  class="mb-2 text-xs"
-                  role="status"
-                  style="color: var(--aviso)"
-                >
-                  {{ $t("pasarelasEstado.faltaLlave") }}
-                </p>
-                <div class="flex items-center justify-between gap-2">
-                  <h3 class="font-medium">
-                    {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
-                  </h3>
-                  <label class="flex items-center gap-1.5 text-xs">
-                    <input
-                      v-model="pasarelaDraft[p.proveedor].activa"
-                      type="checkbox"
-                    />
-                    {{ $t("plataforma.pasarelas.activa") }}
-                  </label>
-                </div>
-                <div class="mt-3">
-                  <label class="tu-label" :for="`modo-${p.proveedor}`">{{
-                    $t("plataforma.pasarelas.modo")
-                  }}</label>
-                  <select
-                    :id="`modo-${p.proveedor}`"
-                    v-model="pasarelaDraft[p.proveedor].modo"
-                    class="tu-input"
-                  >
-                    <option value="test">
-                      {{ $t("plataforma.pasarelas.test") }}
-                    </option>
-                    <option value="live">
-                      {{ $t("plataforma.pasarelas.live") }}
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-for="llave in LLAVES_PASARELA[p.proveedor] ?? []"
-                  :key="llave"
-                  class="mt-2"
-                >
-                  <label class="tu-label" :for="`${p.proveedor}-${llave}`">{{
-                    $t(`plataformaAdmin.llaves.${llave}`)
+                <div class="flex-1">
+                  <label class="tu-label" for="lk">{{
+                    $t("plataforma.facturapi.llave")
                   }}</label>
                   <input
-                    :id="`${p.proveedor}-${llave}`"
-                    v-model="pasarelaDraft[p.proveedor].llaves[llave]"
+                    id="lk"
+                    v-model="llaveInput"
                     class="tu-input"
                     type="password"
                     autocomplete="off"
-                    :placeholder="
-                      p.llaves_configuradas.includes(llave)
-                        ? $t('plataforma.pasarelas.configurada')
-                        : ''
-                    "
+                    placeholder="sk_live_…"
                   />
                 </div>
-                <!-- A dónde manda sus avisos la pasarela (se registra en su panel). -->
-                <div class="mt-2">
-                  <label class="tu-label" :for="`${p.proveedor}-webhook-url`">{{
-                    $t("plataforma.pasarelas.webhookUrl")
-                  }}</label>
-                  <input
-                    :id="`${p.proveedor}-webhook-url`"
-                    class="tu-input text-xs"
-                    readonly
-                    :value="`${apiUrl}/api/v1/webhooks/plataforma/${p.proveedor}`"
-                    data-prueba="webhook-url"
-                    @focus="($event.target as HTMLInputElement).select()"
-                  />
-                  <p
-                    v-if="p.proveedor === 'stripe'"
-                    class="mt-1 text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
-                    {{ $t("plataforma.pasarelas.webhookEventosStripe") }}
-                  </p>
-                </div>
-                <button
-                  class="tu-btn tu-btn-primario w-full mt-3"
-                  type="button"
-                  :disabled="guardando === p.proveedor"
-                  :aria-busy="guardando === p.proveedor || undefined"
-                  @click="guardarPasarela(p.proveedor)"
-                >
-                  {{ $t("plataforma.pasarelas.guardar") }}
-                </button>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <div
-          v-show="apartadoConfig === 'whatsapp'"
-          class="mt-5"
-          data-prueba="config-whatsapp"
-        >
-          <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
-        </div>
-
-        <!-- Documentos legales: lo publicado arriba; el responsable, plegado (se
-             escribe una vez); Guardar y Publicar, fijos al pie. -->
-        <div
-          v-show="apartadoConfig === 'legales'"
-          class="mt-5"
-          data-prueba="config-legales"
-        >
-          <form
-            class="tu-card p-5 grid gap-4"
-            @submit.prevent="guardarLegales()"
-          >
-            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("operacion.legales.ayuda") }}
-            </p>
-            <details
-              class="tu-avanzado"
-              :open="responsableAbierto"
-              data-prueba="legales-responsable"
-            >
-              <summary>
-                {{ $t("operacion.legales.responsable") }}
-                <span
-                  v-if="legales.responsable.nombre.trim() !== ''"
-                  class="font-normal"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >· {{ legales.responsable.nombre }}</span
-                >
-              </summary>
-              <fieldset class="grid gap-3 sm:grid-cols-2">
-                <legend class="sr-only">
-                  {{ $t("operacion.legales.responsable") }}
-                </legend>
-                <div>
-                  <label class="tu-label" for="lg-resp-nombre">{{
-                    $t("operacion.legales.nombre")
-                  }}</label>
-                  <input
-                    id="lg-resp-nombre"
-                    v-model="legales.responsable.nombre"
-                    class="tu-input"
-                  />
-                </div>
-                <div>
-                  <label class="tu-label" for="lg-resp-contacto">{{
-                    $t("operacion.legales.contacto")
-                  }}</label>
-                  <input
-                    id="lg-resp-contacto"
-                    v-model="legales.responsable.contacto"
-                    type="email"
-                    class="tu-input"
-                  />
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="tu-label" for="lg-resp-domicilio">{{
-                    $t("operacion.legales.domicilio")
-                  }}</label>
-                  <input
-                    id="lg-resp-domicilio"
-                    v-model="legales.responsable.domicilio"
-                    class="tu-input"
-                  />
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="tu-label" for="lg-resp-area">{{
-                    $t("operacion.legales.area")
-                  }}</label>
-                  <input
-                    id="lg-resp-area"
-                    v-model="legales.responsable.area"
-                    class="tu-input"
-                  />
-                </div>
-              </fieldset>
-            </details>
-            <!-- Cada documento con su versión publicada y su «Publicar» (un botón
-                 principal por zona); el pie guarda el borrador de los dos. -->
-            <div
-              v-for="doc in DOCUMENTOS_LEGALES"
-              :key="doc.tipo"
-              :data-prueba="`legales-doc-${doc.tipo}`"
-            >
-              <label class="tu-label" :for="doc.id">{{
-                $t(doc.etiqueta)
-              }}</label>
-              <p
-                v-if="doc.tipo === 'aviso_privacidad'"
-                class="text-xs mb-1"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ $t("operacion.legales.marcadores") }}
-              </p>
-              <textarea
-                :id="doc.id"
-                v-model="legales[doc.tipo]"
-                class="tu-input"
-                rows="6"
-              />
-              <div
-                class="mt-2 flex flex-wrap items-center justify-between gap-3"
-              >
-                <span
-                  class="tu-estado text-sm"
-                  :style="{
-                    '--tono': publicados[doc.tipo]
-                      ? 'var(--exito)'
-                      : 'var(--aviso)',
-                  }"
-                  >{{
-                    publicados[doc.tipo]
-                      ? $t("operacion.legales.version", {
-                          version: publicados[doc.tipo]!.version,
-                          fecha: fechaPublicado(publicados[doc.tipo]!),
-                        })
-                      : $t(doc.sinPublicar)
-                  }}</span
-                >
                 <button
                   class="tu-btn tu-btn-primario"
-                  type="button"
-                  :disabled="guardando !== null"
-                  :aria-busy="guardando === `publicar-${doc.tipo}` || undefined"
-                  :data-prueba="`legales-publicar-${doc.tipo}`"
-                  @click="publicarLegal(doc.tipo)"
+                  type="submit"
+                  :disabled="
+                    guardando === 'facturapi' || llaveInput.trim() === ''
+                  "
+                  :aria-busy="guardando === 'facturapi' || undefined"
                 >
-                  {{ $t(doc.publicar) }}
+                  {{ $t("plataforma.facturapi.guardar") }}
+                </button>
+                <!-- Quita la llave ya guardada: destructiva. -->
+                <button
+                  v-if="facturapiConfigurada"
+                  class="tu-btn tu-btn-peligro"
+                  type="button"
+                  data-prueba="quitar-facturapi"
+                  :disabled="guardando === 'facturapi'"
+                  @click="guardarLlave(true)"
+                >
+                  {{ $t("plataforma.facturapi.quitar") }}
+                </button>
+              </form>
+              <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("plataforma.facturapi.ayuda") }}
+              </p>
+            </div>
+
+            <!-- Correo del superadministrador: alertas y rentas vencidas. -->
+            <form
+              class="tu-card p-5"
+              data-prueba="correo-alertas"
+              @submit.prevent="guardarCorreoAlertas"
+            >
+              <h2 class="tu-titulo-seccion">
+                {{ $t("plataformaAdmin.correoAlertas.titulo") }}
+              </h2>
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("plataformaAdmin.correoAlertas.ayuda") }}
+              </p>
+              <div class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+                <div class="flex-1">
+                  <label class="tu-label" for="correo-alertas">{{
+                    $t("plataformaAdmin.correoAlertas.correo")
+                  }}</label>
+                  <input
+                    id="correo-alertas"
+                    v-model="correoAlertas"
+                    class="tu-input"
+                    type="email"
+                    autocomplete="email"
+                  />
+                </div>
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="submit"
+                  :disabled="guardando === 'correo'"
+                  :aria-busy="guardando === 'correo' || undefined"
+                >
+                  {{ $t("plataformaAdmin.correoAlertas.guardar") }}
                 </button>
               </div>
-            </div>
-            <!-- Guardar el borrador siempre a la vista al bajar por los textos. -->
-            <div class="tu-pie-acciones">
-              <button
-                class="tu-btn tu-btn-secundario"
-                type="submit"
-                :disabled="guardando !== null"
-                :aria-busy="guardando === 'legales' || undefined"
-                data-prueba="legales-guardar"
-              >
-                {{ $t("operacion.legales.guardarBorrador") }}
-              </button>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
 
-        <!-- Ventas, Banco de México y timbres (ADR 0107). -->
-        <div
-          v-show="apartadoConfig === 'comercial'"
-          class="mt-5"
-          data-prueba="config-comercial"
-        >
-          <ComercialPlataforma :api-url="apiUrl" :token="token" />
-        </div>
-
-        <!-- Wellhub y TotalPass: en qué países se ofrecen y los gimnasios que eligieron
-             a AgendaUno en Wellhub sin traer el código del negocio (ADR 0202). -->
-        <div
-          v-show="apartadoConfig === 'bienestar'"
-          class="mt-5 space-y-5"
-          data-prueba="config-bienestar"
-        >
-          <form
-            class="tu-card p-5"
-            data-prueba="paises-bienestar"
-            @submit.prevent="guardarPaisesBienestar"
+          <!-- Pasarelas con que se cobra la renta del SaaS: cada una con su Guardar. -->
+          <div
+            v-show="apartadoConfig === 'pasarelas'"
+            class="mt-5"
+            data-prueba="config-pasarelas"
           >
-            <h2 class="tu-titulo-seccion">
-              {{ $t("plataformaAdmin.paisesBienestar.titulo") }}
-            </h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("plataformaAdmin.paisesBienestar.ayuda") }}
+              {{ $t("plataforma.pasarelas.subtitulo") }}
             </p>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="tu-label" for="paises-wellhub">Wellhub</label>
-                <input
-                  id="paises-wellhub"
-                  v-model="paisesBienestar.wellhub"
-                  class="tu-input"
-                  autocomplete="off"
-                  placeholder="MX, CO"
-                />
-              </div>
-              <div>
-                <label class="tu-label" for="paises-totalpass">TotalPass</label>
-                <input
-                  id="paises-totalpass"
-                  v-model="paisesBienestar.totalpass"
-                  class="tu-input"
-                  autocomplete="off"
-                  placeholder="MX"
-                />
-              </div>
-            </div>
-            <div class="mt-3 flex justify-end">
-              <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="guardando === 'paises'"
-                :aria-busy="guardando === 'paises' || undefined"
+            <div class="mt-3 grid gap-3 md:grid-cols-3">
+              <div
+                v-for="p in pasarelas"
+                :key="p.proveedor"
+                class="tu-card p-4"
               >
-                {{ $t("plataformaAdmin.paisesBienestar.guardar") }}
-              </button>
+                <div
+                  v-if="p.disponible === false"
+                  class="flex items-center justify-between gap-2"
+                >
+                  <h3 class="font-medium">
+                    {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
+                  </h3>
+                  <span
+                    class="tu-estado text-xs shrink-0"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ $t("pasarelasEstado.proximamente") }}</span
+                  >
+                </div>
+                <p
+                  v-if="p.disponible === false"
+                  class="mt-2 text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("pasarelasEstado.noDisponible") }}
+                </p>
+                <template v-else>
+                  <p
+                    v-if="p.activa && p.lista === false"
+                    class="mb-2 text-xs"
+                    role="status"
+                    style="color: var(--aviso)"
+                  >
+                    {{ $t("pasarelasEstado.faltaLlave") }}
+                  </p>
+                  <div class="flex items-center justify-between gap-2">
+                    <h3 class="font-medium">
+                      {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
+                    </h3>
+                    <label class="flex items-center gap-1.5 text-xs">
+                      <input
+                        v-model="pasarelaDraft[p.proveedor].activa"
+                        type="checkbox"
+                      />
+                      {{ $t("plataforma.pasarelas.activa") }}
+                    </label>
+                  </div>
+                  <div class="mt-3">
+                    <label class="tu-label" :for="`modo-${p.proveedor}`">{{
+                      $t("plataforma.pasarelas.modo")
+                    }}</label>
+                    <select
+                      :id="`modo-${p.proveedor}`"
+                      v-model="pasarelaDraft[p.proveedor].modo"
+                      class="tu-input"
+                    >
+                      <option value="test">
+                        {{ $t("plataforma.pasarelas.test") }}
+                      </option>
+                      <option value="live">
+                        {{ $t("plataforma.pasarelas.live") }}
+                      </option>
+                    </select>
+                  </div>
+                  <div
+                    v-for="llave in LLAVES_PASARELA[p.proveedor] ?? []"
+                    :key="llave"
+                    class="mt-2"
+                  >
+                    <label class="tu-label" :for="`${p.proveedor}-${llave}`">{{
+                      $t(`plataformaAdmin.llaves.${llave}`)
+                    }}</label>
+                    <input
+                      :id="`${p.proveedor}-${llave}`"
+                      v-model="pasarelaDraft[p.proveedor].llaves[llave]"
+                      class="tu-input"
+                      type="password"
+                      autocomplete="off"
+                      :placeholder="
+                        p.llaves_configuradas.includes(llave)
+                          ? $t('plataforma.pasarelas.configurada')
+                          : ''
+                      "
+                    />
+                  </div>
+                  <!-- A dónde manda sus avisos la pasarela (se registra en su panel). -->
+                  <div class="mt-2">
+                    <label
+                      class="tu-label"
+                      :for="`${p.proveedor}-webhook-url`"
+                      >{{ $t("plataforma.pasarelas.webhookUrl") }}</label
+                    >
+                    <input
+                      :id="`${p.proveedor}-webhook-url`"
+                      class="tu-input text-xs"
+                      readonly
+                      :value="`${apiUrl}/api/v1/webhooks/plataforma/${p.proveedor}`"
+                      data-prueba="webhook-url"
+                      @focus="($event.target as HTMLInputElement).select()"
+                    />
+                    <p
+                      v-if="p.proveedor === 'stripe'"
+                      class="mt-1 text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{ $t("plataforma.pasarelas.webhookEventosStripe") }}
+                    </p>
+                  </div>
+                  <button
+                    class="tu-btn tu-btn-primario w-full mt-3"
+                    type="button"
+                    :disabled="guardando === p.proveedor"
+                    :aria-busy="guardando === p.proveedor || undefined"
+                    @click="guardarPasarela(p.proveedor)"
+                  >
+                    {{ $t("plataforma.pasarelas.guardar") }}
+                  </button>
+                </template>
+              </div>
             </div>
-          </form>
+          </div>
 
-          <SolicitudesWellhub :api-url="apiUrl" :token="token" />
-        </div>
+          <div
+            v-show="apartadoConfig === 'whatsapp'"
+            class="mt-5"
+            data-prueba="config-whatsapp"
+          >
+            <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
+          </div>
+
+          <!-- Documentos legales: lo publicado arriba; el responsable, plegado (se
+             escribe una vez); Guardar y Publicar, fijos al pie. -->
+          <div
+            v-show="apartadoConfig === 'legales'"
+            class="mt-5"
+            data-prueba="config-legales"
+          >
+            <form
+              class="tu-card p-5 grid gap-4"
+              @submit.prevent="guardarLegales()"
+            >
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("operacion.legales.ayuda") }}
+              </p>
+              <details
+                class="tu-avanzado"
+                :open="responsableAbierto"
+                data-prueba="legales-responsable"
+              >
+                <summary>
+                  {{ $t("operacion.legales.responsable") }}
+                  <span
+                    v-if="legales.responsable.nombre.trim() !== ''"
+                    class="font-normal"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >· {{ legales.responsable.nombre }}</span
+                  >
+                </summary>
+                <fieldset class="grid gap-3 sm:grid-cols-2">
+                  <legend class="sr-only">
+                    {{ $t("operacion.legales.responsable") }}
+                  </legend>
+                  <div>
+                    <label class="tu-label" for="lg-resp-nombre">{{
+                      $t("operacion.legales.nombre")
+                    }}</label>
+                    <input
+                      id="lg-resp-nombre"
+                      v-model="legales.responsable.nombre"
+                      class="tu-input"
+                    />
+                  </div>
+                  <div>
+                    <label class="tu-label" for="lg-resp-contacto">{{
+                      $t("operacion.legales.contacto")
+                    }}</label>
+                    <input
+                      id="lg-resp-contacto"
+                      v-model="legales.responsable.contacto"
+                      type="email"
+                      class="tu-input"
+                    />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="tu-label" for="lg-resp-domicilio">{{
+                      $t("operacion.legales.domicilio")
+                    }}</label>
+                    <input
+                      id="lg-resp-domicilio"
+                      v-model="legales.responsable.domicilio"
+                      class="tu-input"
+                    />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="tu-label" for="lg-resp-area">{{
+                      $t("operacion.legales.area")
+                    }}</label>
+                    <input
+                      id="lg-resp-area"
+                      v-model="legales.responsable.area"
+                      class="tu-input"
+                    />
+                  </div>
+                </fieldset>
+              </details>
+              <!-- Cada documento con su versión publicada y su «Publicar» (un botón
+                 principal por zona); el pie guarda el borrador de los dos. -->
+              <div
+                v-for="doc in DOCUMENTOS_LEGALES"
+                :key="doc.tipo"
+                :data-prueba="`legales-doc-${doc.tipo}`"
+              >
+                <label class="tu-label" :for="doc.id">{{
+                  $t(doc.etiqueta)
+                }}</label>
+                <p
+                  v-if="doc.tipo === 'aviso_privacidad'"
+                  class="text-xs mb-1"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("operacion.legales.marcadores") }}
+                </p>
+                <textarea
+                  :id="doc.id"
+                  v-model="legales[doc.tipo]"
+                  class="tu-input"
+                  rows="6"
+                />
+                <div
+                  class="mt-2 flex flex-wrap items-center justify-between gap-3"
+                >
+                  <span
+                    class="tu-estado text-sm"
+                    :style="{
+                      '--tono': publicados[doc.tipo]
+                        ? 'var(--exito)'
+                        : 'var(--aviso)',
+                    }"
+                    >{{
+                      publicados[doc.tipo]
+                        ? $t("operacion.legales.version", {
+                            version: publicados[doc.tipo]!.version,
+                            fecha: fechaPublicado(publicados[doc.tipo]!),
+                          })
+                        : $t(doc.sinPublicar)
+                    }}</span
+                  >
+                  <button
+                    class="tu-btn tu-btn-primario"
+                    type="button"
+                    :disabled="guardando !== null"
+                    :aria-busy="
+                      guardando === `publicar-${doc.tipo}` || undefined
+                    "
+                    :data-prueba="`legales-publicar-${doc.tipo}`"
+                    @click="publicarLegal(doc.tipo)"
+                  >
+                    {{ $t(doc.publicar) }}
+                  </button>
+                </div>
+              </div>
+              <!-- Guardar el borrador siempre a la vista al bajar por los textos. -->
+              <div class="tu-pie-acciones">
+                <button
+                  class="tu-btn tu-btn-secundario"
+                  type="submit"
+                  :disabled="guardando !== null"
+                  :aria-busy="guardando === 'legales' || undefined"
+                  data-prueba="legales-guardar"
+                >
+                  {{ $t("operacion.legales.guardarBorrador") }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Ventas, Banco de México y timbres (ADR 0107). -->
+          <div
+            v-show="apartadoConfig === 'comercial'"
+            class="mt-5"
+            data-prueba="config-comercial"
+          >
+            <ComercialPlataforma :api-url="apiUrl" :token="token" />
+          </div>
+
+          <!-- Wellhub y TotalPass: en qué países se ofrecen y los gimnasios que eligieron
+             a AgendaUno en Wellhub sin traer el código del negocio (ADR 0202). -->
+          <div
+            v-show="apartadoConfig === 'bienestar'"
+            class="mt-5 space-y-5"
+            data-prueba="config-bienestar"
+          >
+            <form
+              class="tu-card p-5"
+              data-prueba="paises-bienestar"
+              @submit.prevent="guardarPaisesBienestar"
+            >
+              <h2 class="tu-titulo-seccion">
+                {{ $t("plataformaAdmin.paisesBienestar.titulo") }}
+              </h2>
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("plataformaAdmin.paisesBienestar.ayuda") }}
+              </p>
+              <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="tu-label" for="paises-wellhub">Wellhub</label>
+                  <input
+                    id="paises-wellhub"
+                    v-model="paisesBienestar.wellhub"
+                    class="tu-input"
+                    autocomplete="off"
+                    placeholder="MX, CO"
+                  />
+                </div>
+                <div>
+                  <label class="tu-label" for="paises-totalpass"
+                    >TotalPass</label
+                  >
+                  <input
+                    id="paises-totalpass"
+                    v-model="paisesBienestar.totalpass"
+                    class="tu-input"
+                    autocomplete="off"
+                    placeholder="MX"
+                  />
+                </div>
+              </div>
+              <div class="mt-3 flex justify-end">
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="submit"
+                  :disabled="guardando === 'paises'"
+                  :aria-busy="guardando === 'paises' || undefined"
+                >
+                  {{ $t("plataformaAdmin.paisesBienestar.guardar") }}
+                </button>
+              </div>
+            </form>
+
+            <SolicitudesWellhub :api-url="apiUrl" :token="token" />
+          </div>
+        </template>
       </div>
 
       <!-- Ficha del estudio -->

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import axios from "axios";
 import { onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { PRODUCTOS, PRODUCTOS_LISTA, type Producto } from "@/lib/producto";
 
@@ -27,7 +27,7 @@ interface Interesado {
 }
 
 const { t } = useI18n();
-const cliente = axios.create({
+const cliente = crearClientePlataforma({
   baseURL: props.apiUrl,
   headers: { Accept: "application/json" },
 });
@@ -146,7 +146,7 @@ onMounted(() => void cargar());
       <template #acciones>
         <button
           type="button"
-          class="tu-btn tu-btn-peligro tu-btn-chico"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
           @click="cargar"
         >
           {{ t("comun.reintentar") }}

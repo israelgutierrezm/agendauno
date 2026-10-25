@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useToastStore } from "@/stores/toast";
@@ -46,7 +46,7 @@ interface Horario {
 const { t, locale } = useI18n();
 const toast = useToastStore();
 const cliente = () =>
-  axios.create({
+  crearClientePlataforma({
     baseURL: props.apiUrl,
     headers: {
       Accept: "application/json",

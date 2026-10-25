@@ -137,6 +137,11 @@ describe("horarios libres antes de guardar", () => {
     expect(w.get('[data-hora="10:30"]').attributes("aria-pressed")).toBe(
       "true",
     );
+    // La elegida se ve distinta de las demás.
+    expect(w.get('[data-hora="10:30"]').classes()).toContain("tu-btn-primario");
+    expect(w.get('[data-hora="10:00"]').classes()).toContain(
+      "tu-btn-secundario",
+    );
     expect(w.find('[data-prueba="aviso-horario"]').exists()).toBe(false);
   });
 

@@ -1,10 +1,23 @@
 import { mount, RouterLinkStub } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import es from "@/i18n/locales/es-MX";
 import configuracionInicial from "@/i18n/locales/configuracionInicial.es-MX";
 import PonEnMarcha, { type Quickstart } from "./PonEnMarcha.vue";
+
+// Quien la ve puede abrir todo, salvo Pasarelas (`pagos.configurar`): esa tarea se
+// lee sin enlace, porque el router lo regresaría a su inicio.
+const permitidos = vi.hoisted(() => ({ pagos: true }));
+vi.mock("@/stores/sesionTenant", () => ({
+  useSesionTenantStore: () => ({
+    suspendido: false,
+    modalidad: "citas",
+    estudio: null,
+    usuario: null,
+    puede: (p: string) => p !== "pagos.configurar" || permitidos.pagos,
+  }),
+}));
 
 /*
 | «Pon tu negocio en marcha» muestra los mismos pasos que la configuración guiada
@@ -140,5 +153,33 @@ describe("comprobado con los datos (H)", () => {
     expect(w.get('[data-prueba="comprobacion-servicios"]').text()).toContain(
       "Tienes servicios a la venta",
     );
+  });
+
+  it("una tarea que su rol no puede abrir se lee sin enlace", () => {
+    permitidos.pagos = false;
+    try {
+      const w = mount(PonEnMarcha, {
+        props: { quickstart },
+        global: {
+          plugins: [
+            createI18n({
+              legacy: false,
+              locale: "es",
+              missingWarn: false,
+              fallbackWarn: false,
+              messages: { es: { ...es, configuracionInicial } },
+            }),
+          ],
+          stubs: { RouterLink: RouterLinkStub },
+        },
+      });
+      const destinos = w
+        .findAllComponents(RouterLinkStub)
+        .map((l) => JSON.stringify(l.props("to")));
+      expect(destinos.some((d) => d.includes("pasarelas"))).toBe(false);
+      expect(destinos.some((d) => d.includes("onboarding"))).toBe(true);
+    } finally {
+      permitidos.pagos = true;
+    }
   });
 });

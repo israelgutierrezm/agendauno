@@ -149,7 +149,7 @@ describe("cobros: movimientos", () => {
     await flushPromises();
     await w
       .findAll("button")
-      .find((b) => b.text() === "Reembolsar")!
+      .find((b) => b.text() === "Reembolsar pago")!
       .trigger("click");
     const dialogo = w.get('[role="dialog"]');
     await dialogo.get("#rmt").setValue("Cobro doble");
@@ -190,7 +190,7 @@ describe("cobros: movimientos", () => {
 
     await w
       .findAll("button")
-      .find((b) => b.text() === "Reembolsar")!
+      .find((b) => b.text() === "Reembolsar pago")!
       .trigger("click");
     const dialogo = w.get('[role="dialog"]');
     expect(dialogo.get("#rm").attributes("max")).toBe("100");
@@ -434,6 +434,8 @@ describe("cobros: por cobrar", () => {
         sucursal: "Centro",
       },
     };
+    // Un negocio de citas: lo próximo se cobra al atenderlo.
+    mocks.esCitas = true;
     let pagada = false;
     mocks.get.mockImplementation((url: string) =>
       Promise.resolve({

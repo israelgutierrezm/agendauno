@@ -3,6 +3,9 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, type RouteLocationRaw } from "vue-router";
 
+import { puedeEntrar } from "@/lib/acceso";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
+
 /**
  * «Pon tu negocio en marcha» en el Inicio del dueño (R36): los MISMOS pasos que la
  * configuración guiada (cada «Ir» abre ese paso) y el mismo «listo para operar»
@@ -36,6 +39,7 @@ export interface Quickstart {
 }
 
 const props = defineProps<{ quickstart: Quickstart }>();
+const sesion = useSesionTenantStore();
 
 const requeridas = computed(() =>
   props.quickstart.tareas.filter((t) => t.requerido),
@@ -45,6 +49,12 @@ const opcionales = computed(() =>
 );
 const { t: traducir } = useI18n();
 // Un paso de la configuración se abre en el asistente, justo en ese paso.
+// Una tarea que lleva a una pantalla que su rol (o su plan) no abre no es enlace:
+// el router lo regresaría a su inicio sin decir nada.
+function sePuedeAbrir(tarea: Quickstart["tareas"][number]): boolean {
+  return tarea.ruta === "onboarding" || puedeEntrar(tarea.ruta, sesion);
+}
+
 function destino(tarea: Quickstart["tareas"][number]): RouteLocationRaw {
   return tarea.ruta === "onboarding"
     ? { name: "onboarding", query: { paso: tarea.clave } }
@@ -262,9 +272,13 @@ const avance = computed(() =>
             >{{ $t(`quickstart.tareas.${t.clave}`) }}
             <span class="sr-only">{{ $t("quickstart.hecho") }}</span></span
           >
-          <RouterLink v-else :to="destino(t)" class="tu-enlace">{{
-            $t(`quickstart.tareas.${t.clave}`)
-          }}</RouterLink>
+          <RouterLink
+            v-else-if="sePuedeAbrir(t)"
+            :to="destino(t)"
+            class="tu-enlace"
+            >{{ $t(`quickstart.tareas.${t.clave}`) }}</RouterLink
+          >
+          <span v-else>{{ $t(`quickstart.tareas.${t.clave}`) }}</span>
         </li>
       </ul>
     </div>

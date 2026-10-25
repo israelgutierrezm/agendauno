@@ -73,7 +73,8 @@ export function reglasDePlan(
 /**
  * La inscripción que se sumaría a esta venta (la pide al API para esa persona) y
  * las condiciones que hay que aceptar (plan con permanencia). `alCambiar` corre al
- * cambiar de persona o de plan, antes de pedirla.
+ * cambiar de persona o de plan, antes de pedirla. Mientras se consulta, o si no se
+ * pudo, no se cobra: el total que se confirma tiene que ser el que se cobra.
  */
 export function useCuotasDeVenta(
   base: Ref<string>,
@@ -82,33 +83,56 @@ export function useCuotasDeVenta(
   alCambiar: () => void = () => {},
 ) {
   const inscripcion = ref(0);
+  const consultandoCuotas = ref(false);
+  const errorCuotas = ref(false);
   const aceptaCondiciones = ref(false);
   const pideCondiciones = computed(
     () => (producto.value?.permanencia_meses ?? 0) > 0,
   );
   let pedido = 0;
+  async function consultarCuotas(): Promise<void> {
+    const mio = ++pedido;
+    inscripcion.value = 0;
+    errorCuotas.value = false;
+    const id = compradorId.value;
+    if (id === "" || !producto.value?.cobra_inscripcion) {
+      consultandoCuotas.value = false;
+      return;
+    }
+    consultandoCuotas.value = true;
+    try {
+      const { data } = await api.get<{ data: { inscripcion_minor: number } }>(
+        `${base.value}/miembros/${id}/cuotas`,
+      );
+      if (mio === pedido) {
+        inscripcion.value = data.data.inscripcion_minor;
+      }
+    } catch {
+      // Sin el dato no se sabe el total: se pide reintentar antes de cobrar.
+      if (mio === pedido) {
+        errorCuotas.value = true;
+      }
+    } finally {
+      if (mio === pedido) {
+        consultandoCuotas.value = false;
+      }
+    }
+  }
   watch(
     () => [compradorId.value, producto.value?.id] as const,
-    async ([id]) => {
-      const mio = ++pedido;
-      inscripcion.value = 0;
+    () => {
       aceptaCondiciones.value = false;
       alCambiar();
-      if (id === "" || !producto.value?.cobra_inscripcion) {
-        return;
-      }
-      try {
-        const { data } = await api.get<{ data: { inscripcion_minor: number } }>(
-          `${base.value}/miembros/${id}/cuotas`,
-        );
-        if (mio === pedido) {
-          inscripcion.value = data.data.inscripcion_minor;
-        }
-      } catch {
-        // Sin el dato, la orden la suma igual si toca: el recibo lo dirá.
-      }
+      void consultarCuotas();
     },
     { immediate: true },
   );
-  return { inscripcion, aceptaCondiciones, pideCondiciones };
+  return {
+    inscripcion,
+    consultandoCuotas,
+    errorCuotas,
+    reintentarCuotas: consultarCuotas,
+    aceptaCondiciones,
+    pideCondiciones,
+  };
 }

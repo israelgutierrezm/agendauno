@@ -74,6 +74,8 @@ async function cargar(): Promise<void> {
     );
     if (mio === pedido) {
       opciones.value = data.data;
+      // Una hora tocada del día anterior mientras cargaba no se envía con el nuevo.
+      elegido.value = "";
     }
   } catch (e) {
     if (mio === pedido) {
@@ -122,7 +124,18 @@ onMounted(cargar);
     role="group"
     :aria-label="$t('miReprogramar.titulo')"
   >
-    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
+    <AvisoTono v-if="error" tono="peligro" role="alert"
+      >{{ error }}
+      <template v-if="opciones === null" #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <template v-if="opciones">
       <p v-if="!opciones.puede" :style="{ color: 'var(--texto-suave)' }">
         {{ opciones.motivo }}
@@ -170,6 +183,7 @@ onMounted(cargar);
                 elegido === s.inicia ? 'tu-btn-primario' : 'tu-btn-secundario'
               "
               :aria-pressed="elegido === s.inicia"
+              :disabled="cargandoHuecos"
               @click="elegido = s.inicia"
             >
               {{ horaLocal(s.inicia) }}

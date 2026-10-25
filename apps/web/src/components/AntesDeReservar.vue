@@ -58,6 +58,8 @@ const props = defineProps<{
   ocupado?: boolean;
   /** Sin vista previa (falló): si se ofrece la lista de espera. */
   llena?: boolean;
+  /** El negocio cobra en línea: una clase de pago se paga aquí; si no, allá. */
+  pagoEnLinea?: boolean;
 }>();
 const emit = defineEmits<{
   confirmar: [esperar: boolean, lugar: number | null];
@@ -134,9 +136,12 @@ const consumo = computed(() => {
     return null;
   }
   if (a.de_pago) {
-    return t("portal.antesDeReservar.dePago", {
-      precio: dinero(a.de_pago.precio_minor, a.de_pago.moneda),
-    });
+    return t(
+      props.pagoEnLinea
+        ? "portal.antesDeReservar.dePago"
+        : "portal.antesDeReservar.dePagoEnNegocio",
+      { precio: dinero(a.de_pago.precio_minor, a.de_pago.moneda) },
+    );
   }
   if (a.resultado === "lista_espera") {
     return t("portal.antesDeReservar.listaEspera");
@@ -341,7 +346,9 @@ const motivo = computed(() => {
             antes.resultado === "lista_espera"
               ? $t("portal.antesDeReservar.confirmarEspera")
               : antes.de_pago
-                ? $t("portal.antesDeReservar.confirmarPago")
+                ? pagoEnLinea
+                  ? $t("portal.antesDeReservar.confirmarPago")
+                  : $t("portal.antesDeReservar.confirmarApartar")
                 : $t("portal.antesDeReservar.confirmar")
           }}
         </button>

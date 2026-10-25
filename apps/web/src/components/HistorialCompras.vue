@@ -98,6 +98,15 @@ onMounted(() => void cargar());
     <h2 class="px-5 pt-5 font-semibold">{{ $t("portal.pagos.historial") }}</h2>
     <AvisoTono v-if="error" tono="peligro" class="px-5 py-4" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar()"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <p
       v-else-if="cargando && ordenes.length === 0"

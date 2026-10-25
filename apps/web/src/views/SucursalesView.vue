@@ -339,6 +339,15 @@ async function guardar(): Promise<void> {
         .map((d) => ({ dia: d.dia, abre: d.abre, cierra: d.cierra })),
     };
     if (esNueva.value) {
+      // Sin organización todavía (se omitió el paso «Tu negocio» de la configuración
+      // inicial): se crea con el nombre del negocio, como lo hace ese paso.
+      if (orgId.value === "") {
+        const org = await api.post<{ data: { id: string } }>(
+          `${base.value}/organizaciones`,
+          { nombre: sesion.estudio?.nombre ?? cuerpo.nombre },
+        );
+        orgId.value = org.data.data.id;
+      }
       await api.post(
         `${base.value}/organizaciones/${orgId.value}/sucursales`,
         cuerpo,
@@ -420,6 +429,14 @@ onMounted(cargar);
         class="mt-6"
         icono="buscar"
         :titulo="$t('adminUsabilidad.sucursales.sinResultados')"
+      />
+      <!-- Sin organización aún: el mismo vacío; «Agregar sucursal» la crea. -->
+      <EstadoVacio
+        v-if="!error && organizaciones.length === 0"
+        class="mt-6"
+        icono="ubicacion"
+        data-prueba="sin-sucursales"
+        :titulo="$t('sedes.vacio')"
       />
       <div v-for="org in listado" :key="org.id" class="mt-6">
         <h2

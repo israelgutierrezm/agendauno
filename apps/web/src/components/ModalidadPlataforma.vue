@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import type { ModalidadServicio } from "@/lib/modalidad";
@@ -28,7 +28,7 @@ const emit = defineEmits<{ cambiada: [modalidad: ModalidadServicio] }>();
 
 const { t } = useI18n();
 const toast = useToastStore();
-const cliente = axios.create({
+const cliente = crearClientePlataforma({
   baseURL: props.apiUrl,
   headers: { Accept: "application/json" },
 });

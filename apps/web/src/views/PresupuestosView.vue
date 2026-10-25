@@ -745,7 +745,11 @@ onMounted(() => {
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('presupuestos.titulo')"
-      :total="meta?.total ?? lista.length"
+      :total="
+        cargando || (meta === null && error !== null)
+          ? undefined
+          : (meta?.total ?? lista.length)
+      "
     >
       <template v-if="puedeGestionar" #acciones>
         <button

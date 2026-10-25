@@ -131,15 +131,21 @@ function estado(i: ItemHistorial): { texto: string; tono: string } {
         tono: "var(--error)",
       };
     case "cancelada":
+      // Quién la canceló: la persona, el negocio o el sistema (venció sin pagarse).
       return i.cancelada_por === "cliente"
         ? {
             texto: t("portal.historial.estados.cancelaste"),
             tono: "var(--texto-suave)",
           }
-        : {
-            texto: t("portal.historial.estados.cancelada_negocio"),
-            tono: "var(--aviso)",
-          };
+        : i.cancelada_por === "sistema"
+          ? {
+              texto: t("portal.historial.estados.cancelada_sistema"),
+              tono: "var(--aviso)",
+            }
+          : {
+              texto: t("portal.historial.estados.cancelada_negocio"),
+              tono: "var(--aviso)",
+            };
     case "sin_pagar":
       return {
         texto: t("portal.historial.estados.sin_pagar"),
@@ -232,6 +238,15 @@ onMounted(cargar);
 
     <AvisoTono v-if="error" tono="peligro" class="px-5 pb-5" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar()"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <p
       v-else-if="cargando && items.length === 0"
