@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../../../core/network/participante_en_uso.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../data/participantes.dart';
 
 /// De quién es la cuenta que se ve (familias, ADR 0123): la suya o la de una
@@ -64,7 +65,9 @@ class SelectorParticipante extends ConsumerWidget {
             ),
             if (nombre != null)
               Text(
-                'Estás viendo la cuenta de $nombre: sus reservas, planes, pagos y documentos.',
+                'Estás viendo la cuenta de $nombre: sus '
+                '${(ref.watch(sesionProvider)?.esCitas ?? false) ? 'citas' : 'reservas'}, '
+                'planes, pagos y documentos.',
                 style: TextStyle(
                   fontSize: 13,
                   color: context.colores.textoSuave,
@@ -211,7 +214,9 @@ class PersonasACargoCard extends ConsumerWidget {
       builder: (contexto) => AlertDialog(
         title: const Text('Retirar autorización'),
         content: Text(
-          '¿Retirar tu autorización para ${p.nombre}? Ya no podrás ver ni reservar por esa persona; lo que ya está hecho se conserva.',
+          '¿Retirar tu autorización para ${p.nombre}? Ya no podrás ver ni '
+          '${(ref.read(sesionProvider)?.esCitas ?? false) ? 'agendar' : 'reservar'} '
+          'por esa persona; lo que ya está hecho se conserva.',
         ),
         actions: [
           TextButton(

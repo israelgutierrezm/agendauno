@@ -5,10 +5,10 @@ producción ni en las tiendas por sí solo.
 
 | Flujo | Cuándo | Qué hace |
 |---|---|---|
-| **CI** (`ci.yml`) | Cada PR y cada push a `main` | Revisa lo que cambió: API (avisos de seguridad de las dependencias con `composer audit`, Pint, PHPStan, Pest con MySQL, concurrencia), web (`npm audit` alto/crítico, lint, compilación, landings, pruebas), app (analyze, pruebas y los APK de los dos sabores) e imágenes (las cuatro, nginx, compose y el enrutamiento web → landings). En un PR solo corre lo de las carpetas que tocó; en `main`, todo. |
+| **CI** (`ci.yml`) | Cada PR y cada push a `main` | Revisa lo que cambió: API (avisos de seguridad de las dependencias con `composer audit`, Pint, PHPStan, Pest con MySQL, concurrencia), web (`npm audit` alto/crítico, lint, compilación, landings, pruebas), app (analyze, pruebas, los APK de los dos sabores y la marca blanca de ejemplo, que además comprueba que con el sabor de TurnoUno Gradle se niegue) e imágenes (las cuatro, nginx, compose y el enrutamiento web → landings). En un PR solo corre lo de las carpetas que tocó; en `main`, todo. |
 | **Imágenes** (`imagenes.yml`) | Push a `main`, etiquetas `v*` y a mano | Publica en GHCR `agendauno-api`, `agendauno-web`, `agendauno-landing-agendauno` y `agendauno-landing-turnouno` con la etiqueta del commit (y la `v*`). Inmutables: una etiqueta publicada no se reemplaza. |
 | **Desplegar** (`desplegar.yml`) | Solo a mano, con aprobación | Entra por SSH al servidor del entorno (`staging` o `produccion`) y corre `actualizar.sh` o `volver.sh` (todo o `--solo` un componente); después prueba desde fuera los dos dominios. |
-| **Apps móviles** (`apps-moviles.yml`) | Solo a mano | Compila el `.aab` firmado de AgendaUno o TurnoUno como artefacto. No lo sube a Play. |
+| **Apps móviles** (`apps-moviles.yml`) | Solo a mano | Android: compila el `.aab` firmado de AgendaUno o TurnoUno como artefacto (no lo sube a Play). iOS (`plataforma: ios`): compila sin firma en macOS y revisa id, nombre, ícono, solo iPhone y el manifiesto de privacidad (ADR 0208). |
 
 ## Detección de cambios
 
@@ -82,10 +82,12 @@ Un entorno por app: `android-agendauno` y `android-turnouno`, con:
   su app en el proyecto de Firebase (sin ellos, la app sale sin push).
 - Variable `GOOGLE_SERVER_CLIENT_ID` (entrar con Google).
 
-Actions → Apps móviles → Run workflow: la app y el número de compilación (mayor que el
-último subido a Play). El `.aab` queda como artefacto 30 días; se sube a Play Console a
-mano (requiere autorización). iOS: en una Mac con los esquemas de cada app
-(docs/MOBILE.md).
+Actions → Apps móviles → Run workflow: la app, la plataforma y el número de compilación
+(mayor que el último subido a Play). El `.aab` queda como artefacto 30 días; se sube a
+Play Console a mano (requiere autorización). Con `plataforma: ios` solo se comprueba que
+compile (sin firma ni secretos): firmar y subir a App Store Connect es en una Mac con los
+esquemas de cada app (docs/MOBILE.md). La marca blanca no se compila para iOS: el
+proyecto se niega (ADR 0208).
 
 ## Pendiente de credenciales
 

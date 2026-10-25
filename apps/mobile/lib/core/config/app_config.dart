@@ -64,8 +64,9 @@ class AppConfig {
   /// El nombre de la app (título, inicio de sesión, avisos): el de la marca blanca
   /// o el del producto.
   static const String nombreApp = marcaBlanca
-      ? String.fromEnvironment('APP_NOMBRE', defaultValue: negocioFijo)
+      ? (_nombreDefinido != '' ? _nombreDefinido : negocioFijo)
       : (ProductoApp.esTurnoUno ? 'TurnoUno' : 'AgendaUno');
+  static const String _nombreDefinido = String.fromEnvironment('APP_NOMBRE');
 
   /// Id de la app en Google Play: el `applicationId` de su sabor en
   /// android/app/build.gradle.kts (el de la marca blanca, `ANDROID_ID`).
@@ -79,4 +80,36 @@ class AppConfig {
   /// la pantalla de actualizar no ofrece abrir la tienda:
   ///   flutter build ipa --dart-define=APP_STORE_ID=1234567890
   static const String appStoreId = String.fromEnvironment('APP_STORE_ID');
+
+  /// El App Group de iOS que la app comparte con su widget de inicio
+  /// (ios/WIDGET.md): por omisión `group.` + el id de la app oficial; una app con
+  /// otro id (marca blanca, cuando tenga iOS) trae el suyo en `APP_GROUP_ID`.
+  static const String appGroupId = _grupoDefinido != ''
+      ? _grupoDefinido
+      : (ProductoApp.esTurnoUno
+            ? 'group.${ProductoApp.idAndroidTurnoUno}'
+            : 'group.${ProductoApp.idAndroidAgendaUno}');
+  static const String _grupoDefinido = String.fromEnvironment('APP_GROUP_ID');
+
+  /// El color de la marca blanca (`#RRGGBB`, opcional en su archivo): el del ícono
+  /// adaptativo de Android y el del tema mientras no hay sesión; con sesión manda
+  /// el `color_marca` del negocio. Vacío en las apps oficiales.
+  static const String colorMarca = marcaBlanca
+      ? String.fromEnvironment('COLOR_MARCA')
+      : '';
+
+  /// El dominio de la web de esta app (su aviso de privacidad, sus términos y el
+  /// aviso de cada negocio): la de `WEB_BASE_URL` o, por omisión, la de su API.
+  static Uri urlWeb(String ruta) =>
+      Uri.parse(webBaseUrl.replaceFirst(RegExp(r'/+$'), '') + ruta);
+
+  /// ¿La petición va a la API de esta app (mismo esquema, host y puerto)? Solo a
+  /// ella viajan el token de la sesión y la persona a cargo: no a la API del otro
+  /// producto (`enOtroProducto`) ni a ningún otro sitio.
+  static bool esDeLaApi(Uri uri) {
+    final api = Uri.parse(apiBaseUrl);
+    return uri.scheme == api.scheme &&
+        uri.host.toLowerCase() == api.host.toLowerCase() &&
+        uri.port == api.port;
+  }
 }

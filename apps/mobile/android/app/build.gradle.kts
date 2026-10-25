@@ -27,7 +27,23 @@ val dartDefines: Map<String, String> =
         }
         ?.toMap()
         ?: emptyMap()
-val negocioMarcaBlanca = dartDefines["NEGOCIO"].orEmpty()
+
+// Un --dart-define (sin espacios); vacío si no viene o viene vacío en el archivo.
+fun definido(clave: String): String = dartDefines[clave].orEmpty().trim()
+
+// La marca blanca (ADR 0111 y 0208): su negocio (el slug), su id, su nombre y, si lo
+// trae, el color de su ícono. Sus íconos van en
+// configuraciones/marca_blanca/<negocio>/android/res (docs/MOBILE.md).
+val negocioMarcaBlanca = definido("NEGOCIO")
+val negocioValido = Regex("^[a-z0-9-]+$").matches(negocioMarcaBlanca)
+val idMarcaBlanca = definido("ANDROID_ID")
+val nombreMarcaBlanca = definido("APP_NOMBRE")
+val colorMarca = definido("COLOR_MARCA")
+val recursosMarca = file("../../configuraciones/marca_blanca/$negocioMarcaBlanca/android/res")
+// COLOR_MARCA se vuelve el fondo del ícono adaptativo: un recurso generado que, como
+// los de la marca, reemplaza al de AgendaUno (src/main).
+val recursosColorMarca = layout.buildDirectory.dir("generated/marca_blanca/res").get().asFile
+val conColorMarca = negocioValido && Regex("^#[0-9a-fA-F]{6}$").matches(colorMarca)
 
 plugins {
     id("com.android.application")
@@ -60,8 +76,8 @@ android {
         create("agendauno") {
             dimension = "producto"
             // Una app de marca blanca de AgendaUno lleva su propio id y su nombre.
-            applicationId = dartDefines["ANDROID_ID"] ?: "com.agendauno.app"
-            manifestPlaceholders["appNombre"] = dartDefines["APP_NOMBRE"] ?: "AgendaUno"
+            applicationId = idMarcaBlanca.ifEmpty { "com.agendauno.app" }
+            manifestPlaceholders["appNombre"] = nombreMarcaBlanca.ifEmpty { "AgendaUno" }
         }
         create("turnouno") {
             dimension = "producto"
@@ -70,12 +86,23 @@ android {
         }
     }
 
-    // Los íconos y colores de una marca blanca (si los tiene) reemplazan a los de
-    // AgendaUno: configuraciones/marca_blanca/<negocio>/android/res.
-    if (negocioMarcaBlanca.isNotEmpty()) {
-        sourceSets.getByName("agendauno").res.srcDir(
-            "../../configuraciones/marca_blanca/$negocioMarcaBlanca/android/res",
+    // Los íconos y colores de una marca blanca reemplazan a los de AgendaUno:
+    // configuraciones/marca_blanca/<negocio>/android/res (con un NEGOCIO que no es un
+    // slug no se toma ninguna carpeta: la compilación se detiene abajo).
+    if (negocioValido) {
+        sourceSets.getByName("agendauno").res.srcDir(recursosMarca)
+    }
+    if (conColorMarca) {
+        File(recursosColorMarca, "values").mkdirs()
+        File(recursosColorMarca, "values/color_marca.xml").writeText(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Generado de COLOR_MARCA (configuraciones/marca_blanca/" +
+                "$negocioMarcaBlanca.json). -->\n" +
+                "<resources>\n" +
+                "    <color name=\"ic_launcher_background\">$colorMarca</color>\n" +
+                "</resources>\n",
         )
+        sourceSets.getByName("agendauno").res.srcDir(recursosColorMarca)
     }
 
     signingConfigs {
@@ -98,24 +125,100 @@ android {
     }
 }
 
-// La marca blanca es solo de AgendaUno y nunca con el id de una app oficial: se
-// detiene antes de compilar una app que no se podría (o no se debe) publicar.
+// La marca blanca es solo de AgendaUno, nunca con el id de una app oficial y siempre
+// con lo suyo completo: se detiene antes de compilar una app que no se podría (o no se
+// debe) publicar, y dice qué falta.
 gradle.taskGraph.whenReady {
+    val datosDeMarca =
+        listOf("ANDROID_ID", "APP_NOMBRE", "COLOR_MARCA").filter { definido(it).isNotEmpty() }
     if (negocioMarcaBlanca.isEmpty()) {
+        if (datosDeMarca.isNotEmpty()) {
+            throw GradleException(
+                "${datosDeMarca.joinToString()} sin NEGOCIO: una app de marca blanca se " +
+                    "compila con su archivo completo (--dart-define-from-file=" +
+                    "configuraciones/marca_blanca/<negocio>.json, docs/MOBILE.md).",
+            )
+        }
         return@whenReady
+    }
+    fun detener(motivo: String): Nothing =
+        throw GradleException(
+            "Marca blanca \"$negocioMarcaBlanca\": $motivo (docs/MOBILE.md, «Marca blanca»).",
+        )
+
+    if (!negocioValido) {
+        detener("NEGOCIO debe ser el slug del negocio: minúsculas, números y guiones")
     }
     // Lo que se pidió compilar (assembleTurnounoRelease…), no todo el grafo.
     if (gradle.startParameter.taskNames.any { it.contains("Turnouno", ignoreCase = true) }) {
-        throw GradleException(
-            "La marca blanca es solo de AgendaUno (ADR 0111): compílala con " +
-                "--flavor agendauno.",
+        detener("la marca blanca es solo de AgendaUno (ADR 0111): compílala con --flavor agendauno")
+    }
+    val producto = definido("PRODUCTO")
+    if (producto.isNotEmpty() && producto != "agendauno") {
+        detener("PRODUCTO=$producto: la marca blanca es solo de AgendaUno; quita PRODUCTO de su archivo")
+    }
+    if (idMarcaBlanca.isEmpty() ||
+        idMarcaBlanca == "com.agendauno.app" ||
+        idMarcaBlanca == "com.turnouno.app"
+    ) {
+        detener("necesita su propio ANDROID_ID en su archivo de configuración (configuraciones/marca_blanca/)")
+    }
+    if (nombreMarcaBlanca.isEmpty()) {
+        detener("falta APP_NOMBRE: su nombre en el teléfono")
+    }
+    if (colorMarca.isNotEmpty() && !conColorMarca) {
+        detener("COLOR_MARCA=$colorMarca no es un color #RRGGBB")
+    }
+    val colores = File(recursosMarca, "values/colors.xml")
+    val fondoEnColores =
+        colores.isFile && colores.readText().contains("name=\"ic_launcher_background\"")
+    if (conColorMarca && fondoEnColores) {
+        detener(
+            "el fondo del ícono viene dos veces (COLOR_MARCA y ic_launcher_background en " +
+                "values/colors.xml): deja uno",
         )
     }
-    val id = dartDefines["ANDROID_ID"].orEmpty()
-    if (id.isEmpty() || id == "com.agendauno.app" || id == "com.turnouno.app") {
-        throw GradleException(
-            "Una app de marca blanca necesita su propio ANDROID_ID en su archivo de " +
-                "configuración (configuraciones/marca_blanca/, docs/MOBILE.md).",
+
+    // La versión de release: con sus íconos completos (no los de AgendaUno) y su app
+    // en Firebase (sin ella, no le llegarían las notificaciones).
+    if (allTasks.none { it.name.contains("Release") }) {
+        return@whenReady
+    }
+    fun existe(carpeta: String, nombre: String) =
+        listOf("png", "webp").any { File(recursosMarca, "$carpeta/$nombre.$it").isFile }
+    val faltan = buildList {
+        for (densidad in listOf("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")) {
+            for (icono in listOf("ic_launcher", "ic_launcher_foreground", "ic_launcher_monochrome")) {
+                if (!existe("mipmap-$densidad", icono)) add("mipmap-$densidad/$icono.png")
+            }
+            if (!existe("drawable-$densidad", "ic_notificacion")) {
+                add("drawable-$densidad/ic_notificacion.png")
+            }
+        }
+        if (!fondoEnColores && !conColorMarca) {
+            add("values/colors.xml con el color ic_launcher_background (o COLOR_MARCA en su archivo)")
+        }
+    }
+    if (faltan.isNotEmpty()) {
+        detener(
+            "faltan sus recursos en configuraciones/marca_blanca/$negocioMarcaBlanca/" +
+                "android/res: ${faltan.joinToString()}",
+        )
+    }
+    val firebase = buildList {
+        if (definido("FIREBASE_ANDROID_APP_ID").isEmpty() && definido("FIREBASE_APP_ID").isEmpty()) {
+            add("FIREBASE_ANDROID_APP_ID")
+        }
+        if (definido("FIREBASE_ANDROID_API_KEY").isEmpty() && definido("FIREBASE_API_KEY").isEmpty()) {
+            add("FIREBASE_API_KEY")
+        }
+        if (definido("FIREBASE_SENDER_ID").isEmpty()) add("FIREBASE_SENDER_ID")
+        if (definido("FIREBASE_PROJECT_ID").isEmpty()) add("FIREBASE_PROJECT_ID")
+    }
+    if (firebase.isNotEmpty()) {
+        detener(
+            "faltan los datos de su app en Firebase (${firebase.joinToString()}): sin " +
+                "ellos no recibiría notificaciones",
         )
     }
 }

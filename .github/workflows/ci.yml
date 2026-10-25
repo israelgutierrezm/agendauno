@@ -203,6 +203,10 @@ jobs:
       # La misma suite compilada como TurnoUno (ADR 0133): sus valores por omisión
       # (citas, su nombre, su dominio) también se prueban.
       - run: flutter test --dart-define=PRODUCTO=turnouno
+      # Una app de marca blanca con el archivo de ejemplo (ADR 0111 y 0208): manda
+      # X-App-Negocio, no busca negocios en la app del otro producto y su acceso es
+      # el de su negocio. Sin el archivo, esta prueba se salta.
+      - run: flutter test test/marca_blanca_test.dart --dart-define-from-file=configuraciones/marca_blanca/ejemplo.json
 
   # Las dos apps oficiales (ADR 0111) compilan con su sabor: cada una es otra app en
   # las tiendas (id, nombre, ícono). Sin firma de release: debug basta para probarlo.
@@ -233,6 +237,63 @@ jobs:
 
       - run: flutter pub get
       - run: flutter build apk --debug --flavor ${{ matrix.sabor }}
+
+  # La marca blanca de ejemplo compila (su id, su nombre y el color de su ícono) y,
+  # con el sabor de TurnoUno, Gradle se niega con su motivo (ADR 0111 y 0208). En
+  # debug: los íconos propios y Firebase solo se exigen en release.
+  mobile-marca-blanca:
+    name: Mobile · APK marca blanca
+    runs-on: ubuntu-24.04
+    needs: mobile
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      ARCHIVO: configuraciones/marca_blanca/ejemplo.json
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.0'
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Compilar la de ejemplo
+        run: flutter build apk --debug --flavor agendauno --dart-define-from-file="$ARCHIVO"
+
+      - name: Su id y su nombre
+        run: |
+          set -euo pipefail
+          aapt2="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2"
+          datos="$("$aapt2" dump badging build/app/outputs/flutter-apk/app-agendauno-debug.apk)"
+          grep -q "^package: name='mx.ejemplo.estudio'" <<<"$datos" \
+            || { echo "::error::La marca blanca no salió con su ANDROID_ID."; exit 1; }
+          grep -q "^application-label:'Estudio Ejemplo'" <<<"$datos" \
+            || { echo "::error::La marca blanca no salió con su APP_NOMBRE."; exit 1; }
+
+      - name: Con el sabor de TurnoUno no compila
+        run: |
+          set -uo pipefail
+          if flutter build apk --debug --flavor turnouno --dart-define-from-file="$ARCHIVO" > turnouno.log 2>&1; then
+            cat turnouno.log
+            echo "::error::La marca blanca compiló con el sabor de TurnoUno."
+            exit 1
+          fi
+          if ! grep -q "solo de AgendaUno" turnouno.log; then
+            cat turnouno.log
+            echo "::error::La compilación falló, pero no por ser de TurnoUno."
+            exit 1
+          fi
+          echo "Gradle se negó, como debe: $(grep -m1 'solo de AgendaUno' turnouno.log)"
 
   imagenes:
     name: Docker · production images

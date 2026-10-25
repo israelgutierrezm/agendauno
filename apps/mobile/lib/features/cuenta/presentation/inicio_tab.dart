@@ -79,9 +79,9 @@ class InicioTab extends ConsumerWidget {
         // La tarjeta principal: siempre, con o sin reserva.
         TarjetaPrincipal(
           // Por lo que es: "Tu próxima cita" o "Tu próxima clase"; sin reserva,
-          // el término general.
+          // el término general (en citas, la cita).
           etiqueta: proxima == null
-              ? 'Tu próxima reserva'
+              ? (esCitas ? 'Tu próxima cita' : 'Tu próxima reserva')
               : (proxima.esCita ? 'Tu próxima cita' : 'Tu próxima $clase'),
           foto: fotoNegocio(sesion?.perfil),
           clima: clima,
@@ -124,7 +124,7 @@ class InicioTab extends ConsumerWidget {
                       BotonAgregarCalendario(
                         primario: true,
                         evento: 'reserva-${proxima.id}',
-                        titulo: proxima.oferta ?? 'Reserva',
+                        titulo: proxima.oferta ?? terminos.sesion,
                         inicio: DateTime.parse(proxima.iniciaEn!).toLocal(),
                         fin: proxima.terminaEn == null
                             ? null
@@ -215,7 +215,7 @@ class InicioTab extends ConsumerWidget {
               titulo: esCitas ? 'Mis citas' : 'Mis reservas',
               tono: TonosAcceso.reservas,
               valor: proximas.isEmpty
-                  ? 'Sin reservas próximas'
+                  ? (esCitas ? 'Sin $clases por ahora' : 'Sin reservas próximas')
                   : esCitas
                   ? 'Cambiar o cancelar'
                   : (proximas.length == 1

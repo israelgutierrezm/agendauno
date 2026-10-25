@@ -2,7 +2,8 @@
 
 `apps/mobile` — un solo código para las dos apps oficiales (ADR 0111): **AgendaUno**
 (`com.agendauno.app`, negocios de clases) y **TurnoUno** (`com.turnouno.app`, negocios
-de citas), para todos los roles. AgendaUno además queda lista para apps de marca blanca.
+de citas), para todos los roles. AgendaUno además queda lista para apps de marca blanca
+(solo Android por ahora, ADR 0208).
 
 ## Quién la usa
 
@@ -13,10 +14,23 @@ pantalla del rol activo:
 |---|---|---|
 | Alumno o cliente (`miembro`) | `CuentaScreen` | Inicio, reservar clases o agendar citas, reprogramar y cancelar, comprar planes, pagos y pago automático, pase QR, expediente y documentos, privacidad |
 | Quien imparte (`instructor`) | `InstructorScreen` | Sus clases y citas, pase de lista, su agenda |
-| Equipo (dueño, admin, recepción, roles propios) | `EquipoScreen` | Inicio del día y la agenda: pase de lista y, en citas, llegada, cobro en caja y cancelación, según sus permisos |
+| Equipo (dueño, admin, recepción, roles propios) | `EquipoScreen` | Inicio del día, la agenda, crear y reprogramar citas, escanear el pase QR, la caja y la bandeja de mensajes, según sus permisos |
 
-La app del equipo es la operación del día. Crear o reprogramar citas, agregar a una
-clase, escanear el pase QR y registrar Wellhub/TotalPass siguen en la web.
+La app del equipo es la operación del día:
+- **Agenda** (`features/agenda`): pase de lista y, en citas, llegada, cobro en caja y
+  cancelación.
+- **Crear y reprogramar citas**: «Nueva cita» guía con los horarios libres
+  (`NuevaCitaSheet`: cliente —se busca o se da de alta—, servicio, profesional, sede,
+  día y hora) y «Reprogramar» mueve una cita a otra hora o a otro profesional
+  (`ReprogramarCitaSheet`); el servidor revalida el horario.
+- **Escanear el pase QR** en la entrada (`features/acceso`), en los negocios que
+  controlan la entrada (acceso libre, ADR 0105).
+- **Caja de la sucursal** (`features/caja`, ADR 0175): abrirla con su fondo, retiros e
+  ingresos de efectivo y el cierre con conteo a ciegas.
+- **Bandeja** (`features/bandeja`, ADR 0200): WhatsApp, Instagram y Messenger.
+
+Siguen en la web: agregar a alguien a una clase desde la agenda, registrar las visitas
+de Wellhub/TotalPass y la administración (catálogo, reportes, configuración).
 
 **Cuenta del cliente** (`features/cuenta`, ADR 0133), como en la web:
 - Por pagar:
@@ -26,7 +40,8 @@ clase, escanear el pase QR y registrar Wellhub/TotalPass siguen en la web.
 - Historial de pagos, de 10 en 10.
 - La inscripción, antes de comprar.
 - Las fichas de datos (formularios) en el Expediente.
-- En citas, la pestaña dice «Citas».
+- En citas, la pestaña dice «Citas» y nada dice «reserva» ni «clase»: cancelar,
+  cambiar de horario, el Inicio, el calendario y el widget hablan de citas.
 
 **Pase de lista:** la lista de espera en su orden, «Ofrecer lugares» y aceptar el
 lugar ofrecido a nombre de la persona.
@@ -55,21 +70,31 @@ permisos los decide la API con el rol activo.
 
 ```
 lib/
-├── core/        config, red (Dio + bearer), almacenamiento seguro, tema, calendario
+├── core/        config, red (Dio + bearer), almacenamiento seguro, tema, calendario,
+│                avisos legales
 └── features/
     ├── auth/           login, elegir rol, sesión (sin registro: ADR 0093)
-    ├── cuenta/         la cuenta del alumno
-    ├── agenda/         agenda, cita, pase de lista
+    ├── cuenta/         la cuenta del alumno o cliente
+    ├── agenda/         agenda, cita (nueva, reprogramar, cobrar), pase de lista
+    ├── acceso/         escáner del pase QR en la entrada
+    ├── caja/           la caja de la sucursal
+    ├── bandeja/        mensajes de WhatsApp, Instagram y Messenger
     ├── instructor/     portal de quien imparte
     ├── inicio/         inicio del equipo
-    ├── perfil/         perfil, foto, cambiar de rol
-    └── notificaciones/ push
+    ├── perfil/         perfil, foto, datos fiscales, cambiar de rol
+    ├── notificaciones/ push
+    └── widget_inicio/  widget de la pantalla de inicio del cliente
 ```
 
 Dentro de cada feature: `data/` (repositorios y servicios de API), `application/`
 (controladores Riverpod con estado inmutable) y `presentation/` (pantallas con la
 menor lógica posible). La app no reimplementa reglas del negocio: pide a la API y
 muestra el motivo cuando se niega (`code` del error).
+
+**La sesión solo viaja a su API.** El interceptor de Dio pone el bearer y
+`X-Participante` solo si la petición va a la API configurada (mismo esquema, host y
+puerto que `API_BASE_URL`, `AppConfig.esDeLaApi`): la consulta a la API del otro
+producto (`enOtroProducto`) o cualquier otra URL salen sin ellos.
 
 ## Diseño: claro y oscuro (ADR 0147)
 
@@ -79,12 +104,20 @@ teléfono: claro u oscuro. Los colores salen de `context.colores`
 color pensado para fondo claro (un estado, un servicio) pasa por `par()` o `tinta()`
 para que en oscuro se aclare.
 
+Una app de marca blanca cambia el azul por el color de su negocio (`color_marca` de la
+sesión: el login y `/yo`; antes de entrar, `COLOR_MARCA` de su archivo). Como el azul,
+se oscurece en claro y se aclara en oscuro hasta leerse (4.5:1, `conMarca`). Las apps
+oficiales no lo usan.
+
 ## Clases o citas y el contrato de la agenda (ADR 0104)
 
 - **Modalidad:** cada negocio es solo de clases o solo de citas. La app la toma de la
   sesión (`estudio.modalidad` y `estudio.capacidades` del login y de `/yo`, en
   `Sesion.modalidad` y `Sesion.capacidades`); no la deduce del giro, del Inicio ni de
   las ofertas.
+- **Terminología:** la del negocio (`perfil_config.terminologia`). Si el servidor no la
+  manda, la de su modalidad (Cita / Cliente / Profesional en citas) y, sin sesión, la
+  de la app (`const Terminologia()`: la de citas en TurnoUno).
 - **Tipo de cada sesión:** `TipoSesion` (`lib/core/agenda/contrato_agenda.dart`) lee
   `tipo` (`clase` | `cita`). Uno desconocido o ausente es un error explícito
   (`TipoSesionDesconocido`), nunca una clase por omisión. Tocar una sesión abre lo de
@@ -99,7 +132,8 @@ para que en oscuro se aclare.
   `versionApp` (`lib/core/version/version_app.dart`), igual a la de `pubspec.yaml`
   (una prueba lo vigila); al subir una, se sube la otra. Si es más vieja, la app solo
   muestra «Actualiza AgendaUno para continuar». Se revisa al abrir, al entrar y al
-  volver a la app.
+  volver a la app. Es una sola para todas las apps, también las de marca blanca (ver
+  «Marca blanca»).
 
 ## Dos apps oficiales (ADR 0111)
 
@@ -109,10 +143,11 @@ Cada app es un sabor de Android (`productFlavors`, dimensión `producto`). Sin
 | | AgendaUno | TurnoUno |
 |---|---|---|
 | Sabor | `agendauno` | `turnouno` |
-| `applicationId` | `com.agendauno.app` | `com.turnouno.app` |
+| `applicationId` / bundle id | `com.agendauno.app` | `com.turnouno.app` |
 | Nombre en el teléfono | AgendaUno | TurnoUno |
 | API en release | `https://agendauno.mx` | `https://turnouno.mx` |
-| Ícono | isotipo (`android/app/src/main/res`) | provisional, su inicial (`android/app/src/turnouno/res`) |
+| Ícono Android | isotipo (`android/app/src/main/res`) | provisional, su inicial (`android/app/src/turnouno/res`) |
+| Ícono iOS | `AppIcon` | `AppIcon-TurnoUno` (provisional, hecho de su ícono de Android) |
 
 ```bash
 flutter run --flavor turnouno --dart-define=API_BASE_URL=http://10.0.2.2:8000
@@ -124,30 +159,55 @@ La app manda `X-App-Producto` en cada petición: la API no le abre negocios del 
 producto. Si alguien escribe la dirección de un negocio del otro producto, la app le
 dice cuál descargar.
 
-**iOS** (ADR 0133): el proyecto de Xcode ya trae los dos sabores, como Android.
+**iOS** (ADR 0133 y 0208): el proyecto de Xcode ya trae los dos sabores, como Android.
 - Configuraciones `Debug-agendauno`, `Release-agendauno` y `Profile-agendauno`, y las
   mismas con `-turnouno`, en el proyecto y en cada target.
 - Esquemas compartidos `agendauno` y `turnouno`.
-- En cada configuración, su `PRODUCT_BUNDLE_IDENTIFIER` (`com.agendauno.app` o
-  `com.turnouno.app`) y `APP_DISPLAY_NAME`, que es el nombre en el teléfono
-  (`CFBundleDisplayName` en `ios/Runner/Info.plist`).
+- En cada configuración del target `Runner`:
+  - `PRODUCT_BUNDLE_IDENTIFIER` (`com.agendauno.app` o `com.turnouno.app`) y
+    `APP_DISPLAY_NAME`, que es el nombre en el teléfono (`CFBundleDisplayName` en
+    `ios/Runner/Info.plist`);
+  - `ASSETCATALOG_COMPILER_APPICON_NAME`: `AppIcon` o `AppIcon-TurnoUno`;
+  - `FLAVOR` (`agendauno` o `turnouno`): archivar desde Xcode compila el Dart del
+    mismo producto que el esquema, aunque la última vez se usó el otro
+    (`Flutter/Generated.xcconfig` guarda el `--flavor` de la última compilación);
+  - `APP_GROUP_ID` (`group.com.agendauno.app` o `group.com.turnouno.app`), para el
+    widget (`ios/WIDGET.md`);
+  - `TARGETED_DEVICE_FAMILY = 1`: solo iPhone (no se publica para iPad).
 - El esquema `Runner` de siempre se queda como AgendaUno.
+- `ios/Runner/PrivacyInfo.xcprivacy`: el manifiesto de privacidad (ver «Privacidad y
+  documentos legales»).
+- La pantalla de arranque usa el fondo del sistema (`systemBackground`): en modo
+  oscuro no destella en blanco.
 
 ```bash
 flutter build ipa --flavor agendauno
 flutter build ipa --flavor turnouno
 ```
 
-Sin `--flavor`, `default-flavor` elige `agendauno` también en iOS.
-
-Falta probarlo en una Mac: aquí solo se compila Android. La primera vez en Xcode:
+Sin `--flavor`, `default-flavor` elige `agendauno` también en iOS. Aquí (Windows) no se
+compila iOS; el flujo manual «Apps móviles» con plataforma `ios` lo compila sin firmar
+en una Mac de GitHub y revisa el id, el nombre, el ícono y que sea solo para iPhone
+(`.github/workflows/apps-moviles.yml`). La primera vez en Xcode:
 1. elegir el equipo de Apple y la firma en cada configuración;
 2. registrar `com.turnouno.app` en el portal de Apple, con Push Notifications.
 
-Las apps de marca blanca son solo para Android por ahora: en iOS, el sabor
-`agendauno` lleva el id de la app oficial.
+## Privacidad y documentos legales
 
-## Marca blanca (solo AgendaUno, preparada, sin publicar)
+- **En la app:** el acceso, Mi perfil y la pestaña Cuenta del cliente enlazan el aviso
+  de privacidad y los términos de la plataforma, en la web del producto
+  (`https://<dominio>/aviso-de-privacidad` y `/terminos`; el dominio es el de
+  `WEB_BASE_URL`, por omisión el de la API). El cliente ve además el aviso de su negocio
+  (`/estudio/<slug>/aviso-de-privacidad`; si el negocio aún no lo publica, la página lo
+  dice), y el acceso de una marca blanca, el de su negocio. `core/legales/`.
+- **iOS:** `PrivacyInfo.xcprivacy` declara que la app no rastrea, los datos que
+  recolecta para funcionar (nombre, correo, teléfono, foto, fecha de nacimiento y
+  género, el token de push y los reportes de fallas) y el uso de `UserDefaults` (los
+  suyos y los del App Group del widget). La «Privacidad de la app» de cada ficha en
+  App Store Connect (y la «Seguridad de los datos» de Google Play) debe decir lo mismo;
+  si la app empieza a recolectar algo más, se agrega en los tres lugares.
+
+## Marca blanca (solo AgendaUno, solo Android, preparada, sin publicar)
 
 La app propia de un negocio de AgendaUno es el sabor `agendauno` con el archivo de ese
 negocio (ejemplo: `configuraciones/marca_blanca/ejemplo.json`):
@@ -157,17 +217,97 @@ flutter build appbundle --flavor agendauno \
   --dart-define-from-file=configuraciones/marca_blanca/<negocio>.json
 ```
 
-- `NEGOCIO` — el slug: la app abre directo en él (el acceso solo pide correo y
-  contraseña) y manda `X-App-Negocio`; la API solo le abre ese negocio.
-- `APP_NOMBRE` — su nombre en el teléfono y en la app.
-- `ANDROID_ID` — su `applicationId` propio (obligatorio: Gradle no compila una marca
-  blanca con el id de una app oficial ni con el sabor de TurnoUno).
-- `APP_STORE_ID`, `FIREBASE_*` — los de su ficha en el App Store y su app en Firebase.
-- Íconos: `configuraciones/marca_blanca/<negocio>/android/res` (mismos nombres que
-  `android/app/src/main/res`) reemplazan a los de AgendaUno.
+Abre directo en su negocio (el acceso solo pide correo y contraseña), manda
+`X-App-Negocio` (la API solo le abre ese negocio, y solo si es de AgendaUno), no
+consulta la app del otro producto y, si su negocio ya no está disponible, dice
+«Esta app no está disponible por ahora. Contacta a <nombre>.».
 
-Publicar una marca blanca requiere autorización (y la cuenta de desarrollador que
-corresponda).
+### Su archivo (`configuraciones/marca_blanca/<negocio>.json`)
+
+| Clave | Para qué | Obligatoria |
+|---|---|---|
+| `NEGOCIO` | El slug del negocio (`^[a-z0-9-]+$`) | Sí |
+| `APP_NOMBRE` | Su nombre en el teléfono, en el acceso y en los avisos | Sí, no vacío |
+| `ANDROID_ID` | Su `applicationId` (nunca el de una app oficial) | Sí |
+| `COLOR_MARCA` | `#RRGGBB`: el fondo de su ícono adaptativo y el tema antes de entrar | No |
+| `FIREBASE_ANDROID_APP_ID` (o `FIREBASE_APP_ID`), `FIREBASE_API_KEY` (o `FIREBASE_ANDROID_API_KEY`), `FIREBASE_SENDER_ID`, `FIREBASE_PROJECT_ID` | Su app Android en el proyecto de Firebase (push) | En release, sí |
+| `GOOGLE_SERVER_CLIENT_ID` | Entrar con Google (el cliente web, ver abajo) | No |
+
+No lleva `PRODUCTO` (o lleva `agendauno`): la marca blanca es solo de AgendaUno. Tampoco
+lleva claves de iOS (`APP_STORE_ID`, `FIREBASE_IOS_APP_ID`, `GOOGLE_IOS_CLIENT_ID`,
+`APP_GROUP_ID`): son de las apps oficiales mientras la marca blanca no tenga iOS (ver
+«Marca blanca en iOS»).
+
+Gradle (`android/app/build.gradle.kts`) se detiene, con lo que falta, si:
+- vienen `ANDROID_ID`, `APP_NOMBRE` o `COLOR_MARCA` sin `NEGOCIO`;
+- `NEGOCIO` no es un slug, el sabor es `turnouno`, `PRODUCTO` no es `agendauno`,
+  falta `ANDROID_ID` (o es el de una app oficial), `APP_NOMBRE` está vacío o
+  `COLOR_MARCA` no es `#RRGGBB`;
+- el fondo del ícono viene dos veces (`COLOR_MARCA` y `values/colors.xml`);
+- en release: falta cualquiera de sus íconos (abajo) o sus datos de Firebase.
+
+En debug basta el archivo: sin sus íconos, usa los de AgendaUno (así compila en el CI
+la de ejemplo).
+
+### Sus íconos (`configuraciones/marca_blanca/<negocio>/android/res`)
+
+Los mismos nombres que `android/app/src/main/res`; reemplazan a los de AgendaUno. En
+release se exigen todos (`.png` o `.webp`):
+
+| Archivo | Tamaños (mdpi · hdpi · xhdpi · xxhdpi · xxxhdpi) |
+|---|---|
+| `mipmap-<densidad>/ic_launcher.png` — el ícono completo (Android 7 y antes) | 48 · 72 · 96 · 144 · 192 px |
+| `mipmap-<densidad>/ic_launcher_foreground.png` — el frente del ícono adaptativo (el logotipo dentro de los 66 dp centrales de 108 dp, fondo transparente) | 108 · 162 · 216 · 324 · 432 px |
+| `mipmap-<densidad>/ic_launcher_monochrome.png` — la silueta para los íconos con tema (Android 13+) | 108 · 162 · 216 · 324 · 432 px |
+| `drawable-<densidad>/ic_notificacion.png` — la silueta blanca de la barra de estado (push) | 24 · 36 · 48 · 72 · 96 px |
+| `values/colors.xml` con `<color name="ic_launcher_background">#RRGGBB</color>` — o `COLOR_MARCA` en su archivo (uno de los dos) | — |
+
+`mipmap-anydpi-v26/ic_launcher.xml` (el ícono adaptativo) es el de AgendaUno y usa estos
+nombres: no hace falta copiarlo.
+
+### Publicarla (requiere autorización)
+
+1. **Su archivo y sus íconos**, arriba. Probarla con
+   `flutter run --flavor agendauno --dart-define-from-file=…`.
+2. **Firma:** cada marca blanca tiene su propia llave de subida (como en «Firma de
+   release»), guardada fuera del repositorio; `android/key.properties` apunta a la de la
+   app que se compila.
+3. **Google Play:** una app nueva en la cuenta de desarrollador que corresponda (la del
+   negocio o la de la plataforma, según el contrato), con su `ANDROID_ID`, su ficha, su
+   «Seguridad de los datos» (la misma que la app oficial) y la firma de apps de Google
+   Play.
+4. **Firebase:** registrar la app Android (`ANDROID_ID`) en el mismo proyecto de las
+   oficiales y poner su `FIREBASE_ANDROID_APP_ID` (y la llave, si es otra) en su
+   archivo. El servidor envía con la misma cuenta de servicio.
+5. **Entrar con Google (opcional):** en el proyecto de Google Cloud del cliente web, un
+   cliente OAuth de Android con su `ANDROID_ID` y la huella **SHA-1** de su firma (la
+   de la llave de firma de Play Console → Integridad de la app; para probar, la de
+   depuración); su id se agrega a `GOOGLE_CLIENT_IDS_APP` del servidor. En su archivo,
+   `GOOGLE_SERVER_CLIENT_ID` es el cliente web, el mismo de las apps oficiales
+   (`docs/GOOGLE_APP.md`).
+6. **APNs:** no aplica mientras la marca blanca no tenga iOS.
+7. **Versión mínima:** `app.version_minima` es una para todas las apps. Al subirla,
+   también las marcas blancas con una versión más vieja piden actualizarse (abren Play
+   con su `ANDROID_ID`). Antes de subirla, publicar la versión nueva de cada marca
+   blanca, o sus usuarios se quedan en «Actualiza … para continuar».
+
+### Marca blanca en iOS: no soportada
+
+`flutter build ipa --flavor agendauno --dart-define-from-file=<negocio>.json` saldría
+con el bundle id, el nombre y el ícono de AgendaUno. Para que eso no pase, el target
+`Runner` tiene una fase «Marca blanca (no en iOS)», antes de compilar el Dart: lee
+`DART_DEFINES` de `Flutter/Generated.xcconfig` y, si trae `NEGOCIO`, se detiene con un
+error claro.
+
+Para soportarla haría falta:
+- configuraciones de Xcode por marca blanca (o un `.xcconfig` generado de su archivo)
+  con su `PRODUCT_BUNDLE_IDENTIFIER`, `APP_DISPLAY_NAME`, `APP_GROUP_ID` y su
+  `AppIcon-<negocio>`;
+- su App ID, su App Group y su perfil en el portal de Apple, con Push Notifications, y
+  su llave APNs en Firebase;
+- su app iOS en Firebase (`FIREBASE_IOS_APP_ID`, `FIREBASE_IOS_BUNDLE_ID`), su ficha en
+  App Store Connect (`APP_STORE_ID`) y, para Google, su cliente iOS y su esquema de URL;
+- quitar o ajustar la fase que hoy la detiene.
 
 ## Configuración al compilar
 
@@ -180,9 +320,12 @@ flutter build appbundle --dart-define=API_BASE_URL=https://DOMINIO \
 - `API_BASE_URL` — la API. Por defecto `http://localhost:8000` en desarrollo y, en una
   compilación de release, la de su producto (`https://agendauno.mx` o
   `https://turnouno.mx`; nunca localhost por olvido).
-- `WEB_BASE_URL` — el sitio (fotos del inicio); por defecto, la misma que la API.
+- `WEB_BASE_URL` — el sitio (fotos del inicio, aviso de privacidad y términos); por
+  defecto, la misma que la API.
 - `APP_VERSION` — la versión que viaja en los errores de la app al monitoreo de la
   plataforma (ADR 0080); por defecto, la de `pubspec.yaml` (`versionApp`).
+- `APP_GROUP_ID` — el App Group de iOS del widget; por defecto `group.` + el id de la
+  app oficial.
 - Entrar con Google en la app: `GOOGLE_SERVER_CLIENT_ID` y, en iOS,
   `GOOGLE_IOS_CLIENT_ID` (ver `docs/GOOGLE_APP.md`). En iOS hace falta además el
   esquema de URL invertido del cliente en `ios/Runner/Info.plist`
@@ -194,21 +337,27 @@ flutter build appbundle --dart-define=API_BASE_URL=https://DOMINIO \
 La app funciona sin Firebase; solo no recibe push. Para activarlas (ADR 0025):
 
 1. Crear un proyecto en la consola de Firebase y registrar en él las apps Android
-   (`com.agendauno.app` y `com.turnouno.app`; después, las de marca blanca) y, si
-   aplica, las de iOS. Un solo proyecto: el servidor envía a todas con la misma
-   cuenta de servicio, y cada compilación lleva el `FIREBASE_APP_ID` de su app.
-2. Compilar la app con los datos del proyecto:
+   (`com.agendauno.app` y `com.turnouno.app`; después, las de marca blanca) y las de
+   iOS. Un solo proyecto: el servidor envía a todas con la misma cuenta de servicio.
+2. Compilar la app con los datos del proyecto. La app Android y la de iOS tienen cada
+   una su id (y a veces su llave); la app elige al correr las de su plataforma, así un
+   mismo juego de datos sirve para las dos:
 
    ```bash
    flutter build appbundle --dart-define=API_BASE_URL=https://DOMINIO \
-     --dart-define=FIREBASE_API_KEY=... --dart-define=FIREBASE_APP_ID=... \
-     --dart-define=FIREBASE_SENDER_ID=... --dart-define=FIREBASE_PROJECT_ID=...
+     --dart-define=FIREBASE_SENDER_ID=... --dart-define=FIREBASE_PROJECT_ID=... \
+     --dart-define=FIREBASE_ANDROID_APP_ID=... --dart-define=FIREBASE_IOS_APP_ID=... \
+     --dart-define=FIREBASE_API_KEY=... [--dart-define=FIREBASE_IOS_API_KEY=...] \
+     [--dart-define=FIREBASE_IOS_BUNDLE_ID=...]
    ```
 
-   En iOS se agrega `--dart-define=FIREBASE_IOS_BUNDLE_ID=...`. `FIREBASE_APP_ID` y
-   `FIREBASE_API_KEY` son distintos para Android e iOS: se compila una vez por
-   plataforma con los suyos.
-3. En el servidor, en `api.env`: `FCM_CREDENTIALS` (ruta al JSON de la cuenta de
+   `FIREBASE_ANDROID_API_KEY` / `FIREBASE_IOS_API_KEY` solo si la llave de una
+   plataforma es otra. `FIREBASE_APP_ID` (y `FIREBASE_API_KEY`) siguen valiendo para la
+   plataforma que no traiga los suyos: así se compilaba antes, una vez por plataforma
+   (`lib/core/config/firebase_config.dart`).
+3. En iOS, la llave APNs del equipo de Apple en Firebase; sin ella las notificaciones
+   no llegan a iPhone.
+4. En el servidor, en `api.env`: `FCM_CREDENTIALS` (ruta al JSON de la cuenta de
    servicio dentro del volumen `storage`, p. ej. `storage/credenciales/fcm.json`) y,
    opcional, `FCM_PROJECT_ID`.
 
@@ -252,10 +401,12 @@ pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila co
   Xcode). iOS mínimo: 15. En Xcode, la capacidad **Push Notifications** (ya está
   `Runner.entitlements` con `aps-environment`) y, en Firebase, la llave APNs del
   equipo de Apple; sin ella las notificaciones no llegan a iPhone.
-- Compilar y probar la versión de iOS en una Mac (aquí solo se compila Android),
-  con los esquemas de las dos apps (arriba): firma, `com.turnouno.app` en el portal
-  de Apple y sus íconos.
-- Logotipo e íconos definitivos de TurnoUno (hoy son provisionales: su inicial).
+- Compilar firmado y probar la versión de iOS en una Mac, con los esquemas de las dos
+  apps (arriba): firma y `com.turnouno.app` en el portal de Apple.
+- Llenar la «Privacidad de la app» de App Store Connect y la «Seguridad de los datos» de
+  Google Play igual que `PrivacyInfo.xcprivacy`.
+- Logotipo e íconos definitivos de TurnoUno (hoy son provisionales: su inicial; el de
+  iOS se hizo de su ícono de Android de 432 px y el de 1024 px se ve suave).
 - Íconos de las tiendas: hoy salen del isotipo de 192 px ampliado (el de 1024 px se
   ve suave y con el trazo cortado). Antes de publicar, generarlos desde el isotipo
   en vector o a 1024 px.
@@ -266,8 +417,12 @@ pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila co
 ```bash
 flutter analyze && flutter test
 flutter test --dart-define=PRODUCTO=turnouno
+flutter test test/marca_blanca_test.dart \
+  --dart-define-from-file=configuraciones/marca_blanca/ejemplo.json
 ```
 
 La suite no depende del producto con que se compila: CI la corre como AgendaUno y
 como TurnoUno (ADR 0133). Una prueba de clases dice `modalidad: Modalidad.clases`;
-sin ella, la sesión toma la de la app (citas en TurnoUno).
+sin ella, la sesión toma la de la app (citas en TurnoUno). `marca_blanca_test.dart`
+solo corre con el archivo de una marca blanca (sin él se salta); el CI también compila
+el APK de la de ejemplo y comprueba que con `--flavor turnouno` no compila.

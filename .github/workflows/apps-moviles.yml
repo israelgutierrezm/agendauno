@@ -9,8 +9,11 @@ name: Apps móviles
 # ANDROID_KEY_PASSWORD y, para las notificaciones, FIREBASE_API_KEY, FIREBASE_APP_ID,
 # FIREBASE_SENDER_ID y FIREBASE_PROJECT_ID. Variable opcional: GOOGLE_SERVER_CLIENT_ID.
 #
-# iOS se compila en una Mac (o un runner macos-*) cuando existan los esquemas de Xcode
-# de cada app (docs/MOBILE.md).
+# Con plataforma `ios` compila la app de iOS SIN FIRMAR en una Mac de GitHub (ADR
+# 0208): comprueba que el proyecto de Xcode compila con el esquema de esa app y que
+# sale con su id, su nombre, su ícono y solo para iPhone. No usa secretos ni entorno;
+# el .ipa firmado para el App Store se hace en una Mac con la cuenta de Apple
+# (docs/MOBILE.md).
 
 on:
   workflow_dispatch:
@@ -21,9 +24,14 @@ on:
         options: [agendauno, turnouno]
         required: true
       numero:
-        description: Número de compilación (versionCode; mayor que el último en Play)
+        description: Número de compilación (versionCode en Play, CFBundleVersion en iOS)
         type: string
         required: true
+      plataforma:
+        description: Plataforma (android, el .aab firmado; ios, una compilación sin firmar)
+        type: choice
+        options: [android, ios]
+        default: android
 
 permissions:
   contents: read
@@ -31,6 +39,7 @@ permissions:
 jobs:
   android:
     name: Android · ${{ inputs.app }}
+    if: inputs.plataforma == 'android'
     runs-on: ubuntu-24.04
     environment: android-${{ inputs.app }}
     defaults:
@@ -114,3 +123,65 @@ jobs:
       - name: Limpiar llave
         if: always()
         run: rm -f "$RUNNER_TEMP/subida.jks" android/key.properties
+
+  ios:
+    name: iOS · ${{ inputs.app }} (sin firmar)
+    if: inputs.plataforma == 'ios'
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      APP: ${{ inputs.app }}
+      NUMERO: ${{ inputs.numero }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Revisar datos
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$NUMERO" | grep -Eq '^[1-9][0-9]{0,8}$'; then
+            echo "::error::El número de compilación debe ser un entero positivo."
+            exit 1
+          fi
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.0'
+          cache: true
+
+      - run: flutter pub get
+
+      # El esquema y las configuraciones de la app (Release-agendauno o
+      # Release-turnouno): su id, su nombre, su ícono y su FLAVOR. Sin firma.
+      - name: Compilar (sin firmar)
+        run: |
+          set -euo pipefail
+          flutter build ios --release --no-codesign --flavor "$APP" --build-number "$NUMERO" \
+            --dart-define=APP_VERSION="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
+
+      # Lo que distingue a cada app en el App Store, leído de lo que se compiló.
+      - name: Revisar lo compilado
+        run: |
+          set -euo pipefail
+          plist=build/ios/iphoneos/Runner.app/Info.plist
+          leer() { /usr/libexec/PlistBuddy -c "Print :$1" "$plist"; }
+          case "$APP" in
+            agendauno) id=com.agendauno.app; nombre=AgendaUno; icono=AppIcon ;;
+            turnouno) id=com.turnouno.app; nombre=TurnoUno; icono=AppIcon-TurnoUno ;;
+          esac
+          test "$(leer CFBundleIdentifier)" = "$id" || { echo "::error::El id no es $id."; exit 1; }
+          test "$(leer CFBundleDisplayName)" = "$nombre" || { echo "::error::El nombre no es $nombre."; exit 1; }
+          test "$(leer CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" = "$icono" \
+            || { echo "::error::El ícono no es $icono."; exit 1; }
+          # Solo iPhone (TARGETED_DEVICE_FAMILY = 1): UIDeviceFamily = [1].
+          test "$(leer UIDeviceFamily:0)" = 1 || { echo "::error::No es para iPhone."; exit 1; }
+          if leer UIDeviceFamily:1 > /dev/null 2>&1; then
+            echo "::error::La app también se declara para iPad."
+            exit 1
+          fi
+          test -f build/ios/iphoneos/Runner.app/PrivacyInfo.xcprivacy \
+            || { echo "::error::Falta PrivacyInfo.xcprivacy en la app."; exit 1; }
+          echo "iOS $APP: $id, $nombre, $icono, solo iPhone, con manifiesto de privacidad."

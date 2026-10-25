@@ -38,15 +38,19 @@ final dioProvider = Provider<Dio>((ref) {
           options.headers['X-App-Negocio'] = AppConfig.negocioFijo;
         }
 
+        // Lo de la sesión solo viaja a la API de esta app: no a la del otro
+        // producto (`enOtroProducto`) ni a una URL de otro sitio.
+        final aLaApi = AppConfig.esDeLaApi(options.uri);
+
         // Autenticacion tenant-local por bearer (si hay sesion activa).
         final token = ref.read(authTokenProvider);
-        if (token != null) {
+        if (token != null && aLaApi) {
           options.headers['Authorization'] = 'Bearer $token';
         }
 
         // Actúa por una persona a su cargo (familias, ADR 0123): solo en su cuenta.
         final participante = ref.read(participanteEnUsoProvider);
-        if (participante != null && esDeLaCuenta(options.path)) {
+        if (participante != null && aLaApi && esDeLaCuenta(options.path)) {
           options.headers['X-Participante'] = participante;
         }
 

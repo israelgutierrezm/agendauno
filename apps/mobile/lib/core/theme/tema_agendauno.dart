@@ -98,9 +98,70 @@ class ColoresAgendaUno extends ThemeExtension<ColoresAgendaUno> {
     return (Color.alphaBlend(clara.withValues(alpha: 0.16), superficie), clara);
   }
 
+  /// Los mismos colores con el de una marca en lugar del azul (la app de marca
+  /// blanca, ADR 0208). Como el azul, debe leerse sobre las superficies y con su
+  /// letra encima (4.5:1 o más): en claro se oscurece y en oscuro se aclara lo que
+  /// haga falta.
+  ColoresAgendaUno conMarca(Color marca) {
+    final opaca = marca.withValues(alpha: 1);
+    final acentoMarca = _legible(opaca, superficie, aclarar: esOscuro);
+    return ColoresAgendaUno(
+      esOscuro: esOscuro,
+      acento: acentoMarca,
+      acentoContraste: acentoContraste,
+      acentoSuave: Color.alphaBlend(
+        acentoMarca.withValues(alpha: esOscuro ? 0.22 : 0.10),
+        superficie,
+      ),
+      fondo: fondo,
+      superficie: superficie,
+      superficie2: superficie2,
+      borde: borde,
+      texto: texto,
+      textoSuave: textoSuave,
+      exito: exito,
+      aviso: aviso,
+      error: error,
+    );
+  }
+
+  /// [color] con la luz justa para leerse sobre [fondo] (4.5:1): lo aclara o lo
+  /// oscurece poco a poco, sin cambiar su tono.
+  static Color _legible(Color color, Color fondo, {required bool aclarar}) {
+    var legible = color;
+    var hsl = HSLColor.fromColor(color);
+    for (var i = 0; i < 50 && contraste(legible, fondo) < 4.5; i++) {
+      final luz = hsl.lightness + (aclarar ? 0.02 : -0.02);
+      hsl = hsl.withLightness(luz.clamp(0.0, 1.0));
+      legible = hsl.toColor();
+    }
+    return legible;
+  }
+
+  /// El contraste entre dos colores (WCAG: de 1 a 21).
+  static double contraste(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    return la > lb ? (la + 0.05) / (lb + 0.05) : (lb + 0.05) / (la + 0.05);
+  }
+
+  /// Un color `#RRGGBB` (o `#RGB`, con o sin `#`); otro valor, null.
+  static Color? colorDe(String? hex) {
+    var valor = (hex ?? '').trim().replaceFirst('#', '');
+    if (RegExp(r'^[0-9a-fA-F]{3}$').hasMatch(valor)) {
+      valor = valor.split('').map((c) => '$c$c').join();
+    }
+    if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(valor)) {
+      return null;
+    }
+    return Color(0xFF000000 | int.parse(valor, radix: 16));
+  }
+
   @override
   ColoresAgendaUno copyWith({bool? esOscuro}) =>
-      (esOscuro ?? this.esOscuro) ? oscuros : claros;
+      esOscuro == null || esOscuro == this.esOscuro
+      ? this
+      : (esOscuro ? oscuros : claros);
 
   @override
   ColoresAgendaUno lerp(ColoresAgendaUno? other, double t) {
@@ -132,10 +193,19 @@ extension ColoresDelContexto on BuildContext {
       Theme.of(this).extension<ColoresAgendaUno>() ?? ColoresAgendaUno.claros;
 }
 
-/// El tema de la app, claro y oscuro, con el mismo diseño.
+/// El tema de la app, claro y oscuro, con el mismo diseño. Con [marca] (la app de
+/// marca blanca), su color en lugar del azul.
 abstract final class TemaAgendaUno {
-  static ThemeData claro() => _tema(ColoresAgendaUno.claros);
-  static ThemeData oscuro() => _tema(ColoresAgendaUno.oscuros);
+  static ThemeData claro({Color? marca}) => _tema(
+    marca == null
+        ? ColoresAgendaUno.claros
+        : ColoresAgendaUno.claros.conMarca(marca),
+  );
+  static ThemeData oscuro({Color? marca}) => _tema(
+    marca == null
+        ? ColoresAgendaUno.oscuros
+        : ColoresAgendaUno.oscuros.conMarca(marca),
+  );
 
   static ThemeData _tema(ColoresAgendaUno c) {
     final brillo = c.esOscuro ? Brightness.dark : Brightness.light;

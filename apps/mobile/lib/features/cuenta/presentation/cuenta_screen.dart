@@ -189,6 +189,8 @@ Future<bool> confirmarCancelacion(
   if (repo == null) {
     return false;
   }
+  // En un negocio de citas se cancela una cita, no una reserva (como en la web).
+  final esCitas = ref.read(sesionProvider)?.esCitas ?? false;
   EfectoCancelacion efecto;
   try {
     efecto = await repo.efectoDeCancelar(reservaId);
@@ -208,7 +210,7 @@ Future<bool> confirmarCancelacion(
   final confirmada = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Cancelar reserva'),
+      title: Text(esCitas ? 'Cancelar cita' : 'Cancelar reserva'),
       content: Text(efecto.mensaje),
       actions: [
         TextButton(
@@ -230,7 +232,7 @@ Future<bool> confirmarCancelacion(
   await hacerConAviso(
     context,
     () => ref.read(cuentaProvider.notifier).cancelar(reservaId),
-    exito: 'Reserva cancelada.',
+    exito: esCitas ? 'Cita cancelada.' : 'Reserva cancelada.',
   );
   return true;
 }

@@ -456,7 +456,11 @@ class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
                 key: const Key('entrar-en-linea'),
                 style: TextButton.styleFrom(padding: EdgeInsets.zero),
                 icon: const Icon(Icons.videocam_outlined, size: 18),
-                label: const Text('Entrar a la clase en línea'),
+                label: Text(
+                  r.esCita
+                      ? 'Entrar a la cita en línea'
+                      : 'Entrar a la clase en línea',
+                ),
                 onPressed: () => launchUrl(
                   Uri.parse(r.enlaceEnLinea!),
                   mode: LaunchMode.externalApplication,
@@ -525,7 +529,7 @@ class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
                 (r.estado == 'confirmada' || r.estado == 'pendiente_pago'))
               BotonAgregarCalendario(
                 evento: 'reserva-${r.id}',
-                titulo: r.oferta ?? 'Reserva',
+                titulo: r.oferta ?? (r.esCita ? 'Cita' : 'Reserva'),
                 inicio: inicio,
                 fin: fin,
                 lugar: r.sucursal,

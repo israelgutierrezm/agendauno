@@ -187,7 +187,7 @@ class ReservasTab extends ConsumerWidget {
           Padding(
             padding: EdgeInsets.only(top: 12),
             child: Text(
-              'Para ver todas tus reservas en el calendario del teléfono, conéctalo en Mi perfil.',
+              'Para ver todas tus $clases en el calendario del teléfono, conéctalo en Mi perfil.',
               style: TextStyle(color: context.colores.textoSuave, fontSize: 13),
             ),
           ),

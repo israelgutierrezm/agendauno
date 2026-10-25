@@ -15,8 +15,9 @@ Al terminar los pasos de abajo y la prueba, se quita «En Android».
 ## Lo que ya está listo
 
 - **Dart** (`lib/features/widget_inicio/`):
-  - `HomeWidget.setAppGroupId('group.<id de la app>')`: `group.com.agendauno.app` o
-    `group.com.turnouno.app`, según el sabor (`ProductoApp.actual`).
+  - `HomeWidget.setAppGroupId(AppConfig.appGroupId)`: el `--dart-define=APP_GROUP_ID`
+    o, por omisión, `group.com.agendauno.app` o `group.com.turnouno.app`, según el
+    sabor (`ProductoApp.actual`).
   - Guarda las claves de `ClavesWidget` (`au_negocio`, `au_proximas`,
     `au_plan_titulo`, `au_plan`, `au_vacio`, `au_accion`).
   - Pide redibujar el widget de `kind` `ProximoWidget`.
@@ -24,7 +25,12 @@ Al terminar los pasos de abajo y la prueba, se quita «En Android».
     pagar) y con un aviso push que llega con la app abierta. Al cerrar sesión, borra
     los datos.
 - **Swift**: `ios/ProximoWidget/ProximoWidget.swift` es el widget (WidgetKit). Todavía
-  no pertenece a ningún target.
+  no pertenece a ningún target. Sus textos fijos siguen al producto (`AppProducto` de
+  su Info.plist): «Mi próxima cita» en TurnoUno, «Mi próxima reserva» en AgendaUno,
+  como en Android.
+- **Target `Runner`** (ADR 0208): cada configuración ya tiene `APP_GROUP_ID`
+  (`group.com.agendauno.app` en las de AgendaUno y en `Debug`/`Release`/`Profile`,
+  `group.com.turnouno.app` en las `-turnouno`) y `FLAVOR`.
 
 ## Pasos en Xcode (una vez)
 
@@ -46,17 +52,23 @@ Al terminar los pasos de abajo y la prueba, se quita «En Android».
    - `PRODUCT_BUNDLE_IDENTIFIER`: `com.agendauno.app.ProximoWidget` (las
      `-agendauno`) o `com.turnouno.app.ProximoWidget` (las `-turnouno`).
    - Nuevo *User-Defined Setting* `APP_GROUP_ID`: `group.com.agendauno.app` o
-     `group.com.turnouno.app`.
+     `group.com.turnouno.app` (el mismo que `Runner` en esa configuración).
+   - Nuevo *User-Defined Setting* `FLAVOR`: `agendauno` o `turnouno` (como `Runner`).
    - `IPHONEOS_DEPLOYMENT_TARGET`: 15.0, como `Runner` (desde iOS 17 usa
      `containerBackground`; antes, el fondo del sistema).
-6. En el target `Runner`, el mismo `APP_GROUP_ID` en cada configuración.
+   - `TARGETED_DEVICE_FAMILY`: `1` (solo iPhone), como `Runner`.
+6. En el target `Runner`, revisar que cada configuración tenga su `APP_GROUP_ID` (ya
+   viene en el proyecto).
 7. *Signing & Capabilities*: agregar **App Groups** en `Runner` y en
    `ProximoWidget`, con `$(APP_GROUP_ID)`.
    - En los `.entitlements` queda así:
      `com.apple.security.application-groups` → `$(APP_GROUP_ID)`.
    - `Runner/Runner.entitlements` ya tiene `aps-environment`: se conserva.
-8. En el `Info.plist` de `ProximoWidget`, la llave `AppGroupId` (String) con
-   `$(APP_GROUP_ID)`. El widget la lee para abrir el mismo UserDefaults que la app.
+8. En el `Info.plist` de `ProximoWidget`:
+   - la llave `AppGroupId` (String) con `$(APP_GROUP_ID)`: el widget la lee para abrir
+     el mismo UserDefaults que la app;
+   - la llave `AppProducto` (String) con `$(FLAVOR)`: con `turnouno`, el widget dice
+     «cita» y no «reserva» ni «clase».
 9. *Build Phases* de `Runner`: si al compilar sale «Cycle inside Runner», mover
    *Embed Foundation Extensions* arriba de *Run Script* (*Thin Binary*).
 10. En el portal de Apple Developer:
@@ -72,7 +84,8 @@ flutter run --flavor agendauno   # y --flavor turnouno
 ```
 
 1. Entrar como cliente y abrir Mi cuenta.
-2. Agregar el widget «Mi próxima reserva» a la pantalla de inicio.
+2. Agregar el widget «Mi próxima reserva» («Mi próxima cita» en TurnoUno) a la
+   pantalla de inicio.
 3. Reservar o cancelar en la app: el widget cambia al momento.
 4. Con una clase ya terminada, el widget pasa solo a la siguiente.
 5. Al cerrar sesión, el widget pide abrir la app.
@@ -81,7 +94,9 @@ flutter run --flavor agendauno   # y --flavor turnouno
 
 - Si el App Group no está configurado, la app sigue igual: home_widget falla en
   silencio y el widget no muestra datos.
-- La marca blanca no tiene iOS por ahora (MOBILE.md): usa el id de la app oficial.
+- La marca blanca no tiene iOS por ahora (MOBILE.md, «Marca blanca en iOS»): su
+  compilación se detiene antes de compilar. Cuando lo tenga, llevará su propio
+  `APP_GROUP_ID` (el `--dart-define` y el de sus configuraciones de Xcode).
 - Con la app cerrada, un push no actualiza el widget: eso pediría leer la cuenta en
   segundo plano. Se actualiza en cuanto se abre la app.
 - El widget solo muestra lo que el cliente ya ve en su Inicio: la clase o el servicio,

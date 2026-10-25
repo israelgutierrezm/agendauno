@@ -50,15 +50,43 @@ class Capacidades {
 
 /// Terminología del negocio (p. ej. Cita / Cliente / Barbero), con plurales. La
 /// fija su giro y el administrador puede cambiarla (ADR 0049).
+///
+/// Sin la del servidor, la de los negocios de esta app (ADR 0111): Clase / Miembro /
+/// Instructor en AgendaUno y Cita / Cliente / Profesional en TurnoUno.
 class Terminologia {
   const Terminologia({
-    this.sesion = 'Clase',
-    this.miembro = 'Miembro',
-    this.instructor = 'Instructor',
+    this.sesion = _sesionPorOmision,
+    this.miembro = _miembroPorOmision,
+    this.instructor = _instructorPorOmision,
     this.sesionesPlural,
     this.miembrosPlural,
     this.instructoresPlural,
   });
+
+  /// La de un negocio de esa modalidad, cuando el servidor no manda la suya.
+  factory Terminologia.de(Modalidad modalidad) => switch (modalidad) {
+    Modalidad.clases => clases,
+    Modalidad.citas => citas,
+  };
+
+  static const clases = Terminologia(
+    sesion: 'Clase',
+    miembro: 'Miembro',
+    instructor: 'Instructor',
+  );
+  static const citas = Terminologia(
+    sesion: 'Cita',
+    miembro: 'Cliente',
+    instructor: 'Profesional',
+  );
+
+  static const _sesionPorOmision = ProductoApp.esTurnoUno ? 'Cita' : 'Clase';
+  static const _miembroPorOmision = ProductoApp.esTurnoUno
+      ? 'Cliente'
+      : 'Miembro';
+  static const _instructorPorOmision = ProductoApp.esTurnoUno
+      ? 'Profesional'
+      : 'Instructor';
 
   final String sesion;
   final String miembro;
@@ -103,14 +131,22 @@ class Terminologia {
     'instructores': instructores,
   };
 
-  factory Terminologia.desdeJson(Map<String, dynamic>? json) {
+  /// La que manda el servidor; lo que no traiga, el de un negocio de [modalidad]
+  /// (sin ella, el de esta app).
+  factory Terminologia.desdeJson(
+    Map<String, dynamic>? json, [
+    Modalidad? modalidad,
+  ]) {
+    final base = modalidad == null
+        ? const Terminologia()
+        : Terminologia.de(modalidad);
     if (json == null) {
-      return const Terminologia();
+      return base;
     }
     return Terminologia(
-      sesion: (json['sesion'] ?? 'Clase') as String,
-      miembro: (json['miembro'] ?? 'Miembro') as String,
-      instructor: (json['instructor'] ?? 'Instructor') as String,
+      sesion: (json['sesion'] ?? base.sesion) as String,
+      miembro: (json['miembro'] ?? base.miembro) as String,
+      instructor: (json['instructor'] ?? base.instructor) as String,
       sesionesPlural: json['sesiones'] as String?,
       miembrosPlural: json['miembros'] as String?,
       instructoresPlural: json['instructores'] as String?,
@@ -196,8 +232,9 @@ class Sesion {
     this.modalidad = Modalidad.porOmision,
     this._capacidades,
     this.versionMinima = versionMinimaDesconocida,
-    this.terminologia = const Terminologia(),
+    this._terminologia,
     this.estudioNombre,
+    this.colorMarca,
     this.perfil,
     this.moneda = 'MXN',
     this.desfaseNegocioMin,
@@ -296,7 +333,16 @@ class Sesion {
 
   /// ¿Esta app es más vieja que la que acepta el servidor?
   bool get debeActualizar => esMasVieja(versionApp, versionMinima);
-  final Terminologia terminologia;
+  final Terminologia? _terminologia;
+
+  /// Cómo nombra el negocio sus clases o citas, a su gente y a quien imparte; si el
+  /// servidor no la mandó, la de su modalidad (Cita / Cliente / Profesional en
+  /// citas).
+  Terminologia get terminologia => _terminologia ?? Terminologia.de(modalidad);
+
+  /// El color de la marca del negocio (`estudio.color_marca`, `#RRGGBB`): el del
+  /// tema en su app de marca blanca. Null si no lo tiene.
+  final String? colorMarca;
 
   /// Nombre del negocio y su giro (perfil: pole, barberia, spa…).
   final String? estudioNombre;
@@ -382,6 +428,7 @@ class Sesion {
     'version_minima': versionMinima,
     'terminologia': terminologia.aJson(),
     'estudio_nombre': estudioNombre,
+    'color_marca': colorMarca,
     'moneda': moneda,
     'desfase_negocio_min': desfaseNegocioMin,
     'pais': pais,
@@ -430,10 +477,9 @@ class Sesion {
       modalidad: Modalidad.desde(datos['modalidad']),
       capacidades: Capacidades.desdeJson(datos['capacidades']),
       versionMinima: _version(datos['version_minima']),
-      terminologia: Terminologia.desdeJson(
-        datos['terminologia'] as Map<String, dynamic>?,
-      ),
+      terminologia: _terminologiaDe(datos['terminologia'], datos['modalidad']),
       estudioNombre: datos['estudio_nombre'] as String?,
+      colorMarca: _color(datos['color_marca']),
       moneda: (datos['moneda'] ?? 'MXN') as String,
       desfaseNegocioMin: (datos['desfase_negocio_min'] as num?)?.toInt(),
       pais: _pais(datos['pais']),
@@ -485,10 +531,13 @@ class Sesion {
       modalidad: Modalidad.desde(estudio?['modalidad'] ?? config?['modalidad']),
       capacidades: Capacidades.desdeJson(estudio?['capacidades']),
       versionMinima: _version(app?['version_minima']),
-      terminologia: Terminologia.desdeJson(
-        config?['terminologia'] as Map<String, dynamic>?,
+      terminologia: _terminologiaDe(
+        config?['terminologia'],
+        estudio?['modalidad'] ?? config?['modalidad'],
       ),
       estudioNombre: estudio?['nombre'] as String?,
+      // El color de su marca (login y /yo): el tema de su app de marca blanca.
+      colorMarca: _color(estudio?['color_marca']),
       moneda: (estudio?['moneda'] ?? 'MXN') as String,
       desfaseNegocioMin: (estudio?['zona_desfase_min'] as num?)?.toInt(),
       pais: _pais(estudio?['pais']),
@@ -565,8 +614,11 @@ class Sesion {
     modalidad: modalidad,
     capacidades: _capacidades,
     versionMinima: versionMinima ?? this.versionMinima,
-    terminologia: terminologia,
+    terminologia: _terminologia,
     estudioNombre: estudioNombre,
+    colorMarca: estudio != null && estudio.containsKey('color_marca')
+        ? _color(estudio['color_marca'])
+        : colorMarca,
     moneda: moneda,
     desfaseNegocioMin:
         (estudio?['zona_desfase_min'] as num?)?.toInt() ?? desfaseNegocioMin,
@@ -583,6 +635,21 @@ class Sesion {
     accesoAbierto: accesoAbierto,
     facturaPosible: facturaPosible,
   );
+
+  /// La terminología que mandó el servidor (o la guardada); sin ella, null: la
+  /// sesión toma la de su modalidad.
+  static Terminologia? _terminologiaDe(Object? json, Object? modalidad) =>
+      json is Map<String, dynamic>
+      ? Terminologia.desdeJson(json, Modalidad.desde(modalidad))
+      : null;
+
+  /// Un color `#RRGGBB` (o `#RGB`) tal como vino; otro valor, null.
+  static String? _color(Object? valor) {
+    final color = valor is String ? valor.trim() : '';
+    return RegExp(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$').hasMatch(color)
+        ? color
+        : null;
+  }
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.
   static String _version(Object? valor) =>

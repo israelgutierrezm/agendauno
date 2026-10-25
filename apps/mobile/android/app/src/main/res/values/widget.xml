@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- El widget de inicio del cliente (WidgetProximo.kt). Los textos con datos los
-         pone la app; estos son los de cuando aún no hay nada guardado. -->
+         pone la app; estos son los de cuando aún no hay nada guardado. Son los de
+         AgendaUno (negocios de clases); los de TurnoUno (citas) están en
+         src/turnouno/res/values/widget.xml. -->
     <string name="widget_proximo_nombre">Mi próxima reserva</string>
-    <string name="widget_proximo_descripcion">Tu próxima reserva o cita y tu saldo.</string>
+    <string name="widget_proximo_descripcion">Tu próxima reserva y tu saldo.</string>
     <string name="widget_proximo_etiqueta">Tu próxima reserva</string>
     <string name="widget_proximo_vacio">Nada agendado por ahora</string>
     <string name="widget_proximo_sin_sesion">Abre la app para ver tu próxima reserva.</string>

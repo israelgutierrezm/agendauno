@@ -128,7 +128,8 @@ void main() {
     await tester.tap(find.text('Cancelar cita'));
     await tester.pumpAndSettle();
     expect(find.text('Se devolverá 1 crédito.'), findsOneWidget);
-    await tester.tap(find.text('Lo pidió el miembro'));
+    // Sin terminología del servidor, la de un negocio de citas: «cliente».
+    await tester.tap(find.text('Lo pidió el cliente'));
     await tester.pumpAndSettle();
     expect(
       find.text('Se cobrará 1 crédito (fuera de tiempo).'),

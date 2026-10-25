@@ -26,6 +26,21 @@ private enum Claves {
 private let grupoApp =
   Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String ?? "group.com.agendauno.app"
 
+/// El producto del sabor: `AppProducto` del Info.plist de la extensión (`$(FLAVOR)`:
+/// agendauno o turnouno). TurnoUno es de citas: el widget dice «cita», nunca
+/// «reserva» ni «clase» (los mismos textos que android/.../res/values*/widget.xml).
+private let esCitas =
+  (Bundle.main.object(forInfoDictionaryKey: "AppProducto") as? String) == "turnouno"
+
+private enum Textos {
+  static let nombre = esCitas ? "Mi próxima cita" : "Mi próxima reserva"
+  static let descripcion = esCitas ? "Tu próxima cita y tu bono." : "Tu próxima reserva y tu saldo."
+  static let sinSesion =
+    esCitas ? "Abre la app para ver tu próxima cita." : "Abre la app para ver tu próxima reserva."
+  static let etiquetaEjemplo = esCitas ? "Tu próxima cita" : "Tu próxima clase"
+  static let tituloEjemplo = esCitas ? "Cita" : "Clase"
+}
+
 /// Una reserva o cita como la guardó la app (solo lo que el cliente ya ve).
 struct ProximaWidget: Decodable {
   let etiqueta: String
@@ -81,8 +96,8 @@ struct ProveedorProximo: TimelineProvider {
       date: Date(),
       negocio: "Tu negocio",
       proxima: ProximaWidget(
-        etiqueta: "Tu próxima clase",
-        titulo: "Clase",
+        etiqueta: Textos.etiquetaEjemplo,
+        titulo: Textos.tituloEjemplo,
         cuando: "lun 1 ene · 09:00",
         donde: nil,
         aviso: nil,
@@ -138,7 +153,7 @@ struct ProximoVista: View {
           Text(plan).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
       } else {
-        Text("Abre la app para ver tu próxima reserva.").font(.headline).lineLimit(3)
+        Text(Textos.sinSesion).font(.headline).lineLimit(3)
         Spacer(minLength: 0)
       }
     }
@@ -168,8 +183,8 @@ struct ProximoWidget: Widget {
     StaticConfiguration(kind: kind, provider: ProveedorProximo()) { entrada in
       ProximoVista(entrada: entrada)
     }
-    .configurationDisplayName("Mi próxima reserva")
-    .description("Tu próxima reserva o cita y tu saldo.")
+    .configurationDisplayName(Textos.nombre)
+    .description(Textos.descripcion)
     .supportedFamilies([.systemSmall, .systemMedium])
   }
 }

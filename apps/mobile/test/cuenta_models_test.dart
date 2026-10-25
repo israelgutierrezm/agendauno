@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agendauno/core/config/producto_app.dart';
 import 'package:agendauno/core/formato.dart';
 import 'package:agendauno/features/auth/data/sesion.dart';
 import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
@@ -80,10 +81,10 @@ void main() {
     expect(s.bearer, '1|abc');
     expect(s.nombre, 'Ana');
     expect(s.rol, 'miembro');
-    // Sin perfil del estudio: clases con la terminología por defecto.
-    // Sin modalidad del servidor, la de la app (clases en AgendaUno).
+    // Sin perfil del estudio: la modalidad y la terminología de la app (clases en
+    // AgendaUno, citas en TurnoUno).
     expect(s.modalidad, Modalidad.porOmision);
-    expect(s.terminologia.sesion, 'Clase');
+    expect(s.terminologia.sesion, ProductoApp.esTurnoUno ? 'Cita' : 'Clase');
   });
 
   test('Sesion toma la modalidad y la terminología del perfil del estudio', () {

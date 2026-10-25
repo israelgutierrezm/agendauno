@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/calendario/logo_calendario.dart';
 import '../../../core/google/google_auth.dart';
+import '../../../core/legales/enlaces_legales.dart';
 import '../../../core/flechas_que_se_mueven.dart';
 import '../../../core/paises.dart';
 import '../../../core/theme/tema_agendauno.dart';
@@ -615,8 +616,11 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                       keyboardType: TextInputType.phone,
                       decoration: InputDecoration(
                         labelText: 'Celular',
+                        // Sus clases o sus citas, según el negocio (no las dos).
                         helperText:
-                            'Para avisarte de tus clases y citas (también por WhatsApp, si lo activas). '
+                            'Para avisarte de tus '
+                            '${sesion.terminologia.sesiones.toLowerCase()} '
+                            '(también por WhatsApp, si lo activas). '
                             '${Paises.ayudaCelular(pais: sesion.pais, lada: sesion.lada)}.',
                         helperMaxLines: 4,
                       ),
@@ -846,6 +850,13 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                 onTap: _guardando ? null : _cambiarRol,
               ),
             ),
+          const SizedBox(height: 8),
+          // El aviso de privacidad y los términos; el cliente, también el aviso de
+          // su negocio.
+          EnlacesLegales(
+            negocio: sesion.esMiembro ? sesion.slug : null,
+            nombreNegocio: sesion.estudioNombre,
+          ),
           const SizedBox(height: 8),
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: context.colores.error),

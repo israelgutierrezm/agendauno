@@ -43,6 +43,9 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   int? get _desfase =>
       widget.reserva.desfaseMin ?? ref.read(sesionProvider)?.desfaseNegocioMin;
 
+  /// Lo que se cambia: una cita o una reserva de clase.
+  String get _que => widget.reserva.esCita ? 'cita' : 'reserva';
+
   /// Hoy en el negocio.
   DateTime get _hoy {
     final ahora = HoraNegocio.enDesfase(DateTime.now(), _desfase);
@@ -173,12 +176,12 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (!opciones.puede)
-              Text(opciones.motivo ?? 'Esta reserva ya no se puede cambiar.')
+              Text(opciones.motivo ?? 'Esta $_que ya no se puede cambiar.')
             else ...[
               Text(
                 opciones.restantes == 1
-                    ? 'Te queda 1 cambio para esta reserva.'
-                    : 'Te quedan ${opciones.restantes} cambios para esta reserva.',
+                    ? 'Te queda 1 cambio para esta $_que.'
+                    : 'Te quedan ${opciones.restantes} cambios para esta $_que.',
                 style: TextStyle(color: context.colores.textoSuave),
               ),
               const SizedBox(height: 12),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/google/google_auth.dart';
+import '../../../core/legales/enlaces_legales.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../application/sesion_controller.dart';
 
@@ -52,10 +53,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   /// Lo que se dice si falla: un 404 aquí es que el negocio no existe (o ya no
-  /// opera); si no, la razón del servidor.
-  static String _mensaje(Object error, String porDefecto) =>
+  /// opera); si no, la razón del servidor. En una app de marca blanca no hay
+  /// dirección que revisar: su negocio no está disponible.
+  String _mensaje(Object error, String porDefecto) =>
       error is DioException && error.response?.statusCode == 404
-      ? 'No encontramos ese negocio. Revisa la dirección.'
+      ? (_fijo
+            ? 'Esta app no está disponible por ahora. Contacta a '
+                  '${widget.nombreApp}.'
+            : 'No encontramos ese negocio. Revisa la dirección.')
       : mensajeDeError(error, porDefecto: porDefecto);
 
   @override
@@ -323,6 +328,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     'invitación a tu correo.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  // Antes de dar sus datos: los avisos y los términos (y, en la app
+                  // de marca blanca, el aviso de su negocio).
+                  EnlacesLegales(
+                    negocio: _fijo ? widget.negocioFijo : null,
+                    nombreNegocio: _fijo ? widget.nombreApp : null,
                   ),
                 ],
               ),

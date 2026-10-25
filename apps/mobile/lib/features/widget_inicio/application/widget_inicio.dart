@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
-import '../../../core/config/producto_app.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/network/participante_en_uso.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../cuenta/data/cuenta_models.dart';
@@ -29,9 +29,9 @@ class AlmacenHomeWidget implements AlmacenWidget {
   /// El `kind` del widget de iOS.
   static const widgetIos = 'ProximoWidget';
 
-  /// El App Group de iOS de esta app: `group.` + su id (el de TurnoUno o el de
-  /// AgendaUno).
-  static String get grupoApp => 'group.${ProductoApp.actual.idAndroid}';
+  /// El App Group de iOS de esta app (`APP_GROUP_ID`; por omisión `group.` + el
+  /// id de la app oficial: el de TurnoUno o el de AgendaUno).
+  static const grupoApp = AppConfig.appGroupId;
 
   bool _grupoListo = false;
 

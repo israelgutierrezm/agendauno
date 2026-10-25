@@ -43,6 +43,18 @@ Future<void> main() async {
   );
 }
 
+/// El color del tema: en una app de marca blanca, el de su negocio (el que manda el
+/// servidor en la sesión o, antes de entrar, `COLOR_MARCA` de su archivo); en las
+/// apps oficiales, ninguno (el azul de siempre).
+Color? colorDeLaApp(
+  Sesion? sesion, {
+  bool marcaBlanca = AppConfig.marcaBlanca,
+  String porOmision = AppConfig.colorMarca,
+}) => marcaBlanca
+    ? ColoresAgendaUno.colorDe(sesion?.colorMarca) ??
+          ColoresAgendaUno.colorDe(porOmision)
+    : null;
+
 class AgendaUnoApp extends ConsumerStatefulWidget {
   const AgendaUnoApp({super.key});
 
@@ -179,9 +191,10 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       scaffoldMessengerKey: _avisos,
       navigatorKey: _navegador,
       // Un solo diseño, el del tema AgendaUno de la web (los temas a elegir son solo
-      // de la web), en claro y en oscuro: sigue el modo del teléfono.
-      theme: TemaAgendaUno.claro(),
-      darkTheme: TemaAgendaUno.oscuro(),
+      // de la web), en claro y en oscuro: sigue el modo del teléfono. Una app de
+      // marca blanca lleva el color de su negocio (ADR 0208).
+      theme: TemaAgendaUno.claro(marca: colorDeLaApp(sesion)),
+      darkTheme: TemaAgendaUno.oscuro(marca: colorDeLaApp(sesion)),
       themeMode: ThemeMode.system,
       // En español: los selectores de fecha y hora, sus botones y los textos del
       // sistema (sin esto salen en inglés).
