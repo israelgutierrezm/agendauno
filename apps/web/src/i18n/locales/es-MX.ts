@@ -1603,8 +1603,8 @@ export default {
     olvidar: "Olvidar",
     olvidarAria: "Olvidar acceso a {nombre}",
     buscarTitulo: "Busca otro negocio",
-    buscarPlaceholder: "Nombre del estudio, academia o gimnasio",
-    buscarPlaceholderCitas: "Nombre de la barbería, spa o consultorio",
+    buscarPlaceholder: "Nombre de tu estudio",
+    buscarPlaceholderCitas: "Nombre de tu negocio",
     selectorVacioClases:
       "Escribe el nombre de tu estudio, academia o gimnasio para acceder.",
     selectorVacioCitas:
@@ -1634,6 +1634,11 @@ export default {
     ayudaSlug:
       "Es la dirección web de tu negocio, por ejemplo: mi-negocio.agendauno.mx",
     panelTitulo: "Todo tu día, en una sola agenda.",
+    panelDescCitas:
+      "Organiza tus citas, recibe a tus clientes y cobra sin perder el ritmo del día.",
+    visualRegistroTitulo: "Dale espacio a lo que sigue.",
+    visualRegistroDesc:
+      "Tu negocio, tu equipo y tus reservas. Empieza a organizarlos en un mismo lugar.",
     panelDesc:
       "Mira lo que sigue, confirma asistencias y cobra sin perder el ritmo del día.",
     // El collage de cada producto (ADR 0131): clases en AgendaUno, citas en TurnoUno.
@@ -1648,10 +1653,10 @@ export default {
     collageCitas: {
       uno: "Corte y barba",
       unoDetalle: "12:30 · Marco · Confirmada",
-      dos: "Masaje relajante",
-      dosDetalle: "16:00 · 60 min · con Ana",
-      tres: "Consulta de nutrición",
-      tresDetalle: "18:00 · Confirmada",
+      dos: "Corte y peinado",
+      dosDetalle: "16:00 · con Sofía",
+      tres: "Masaje relajante",
+      tresDetalle: "18:00 · 60 min · Confirmada",
     },
     buscarReserva: "¿Buscas reservar? Encuentra tu negocio",
     sinCuentaCliente:

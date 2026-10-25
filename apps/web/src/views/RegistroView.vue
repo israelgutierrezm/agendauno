@@ -21,6 +21,7 @@ import { trackEvent, type AnalyticsProperties } from "@/lib/analytics";
 import { modoDePerfil, type Modo } from "@/marketing/modalidades";
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 import AvisoTono from "@/components/AvisoTono.vue";
+import ComposicionAcceso from "@/components/ComposicionAcceso.vue";
 import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -54,20 +55,6 @@ const { t } = useI18n();
 // TurnoUno los de citas; si aún no recibe registros, se muestra la lista de
 // interesados.
 const producto = productoActual();
-// El collage del producto (ADR 0131): una clase en AgendaUno, una cita en TurnoUno.
-const esTurnoUno = producto === "turnouno";
-const fotosRegistro = esTurnoUno
-  ? [
-      "/assets/landing/disciplinas/terapeutas-v1.webp",
-      "/assets/landing/disciplinas/barberia-v1.jpg",
-    ]
-  : [
-      "/assets/landing/disciplinas/pilates-v1.jpg",
-      "/assets/landing/disciplinas/yoga-v1.jpg",
-    ];
-const ejemploRegistro = esTurnoUno
-  ? "registro.ejemploCita"
-  : "registro.ejemploClase";
 const modoDelProducto: Modo = PRODUCTOS[producto].modalidad;
 const precios = usePreciosPublicos();
 const registroAbierto = computed(() => precios.datos.registro[producto]);
@@ -618,36 +605,9 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
       class="registro-layout"
       :class="{ 'registro-layout--creado': creado !== null }"
     >
-      <div v-if="creado === null" class="registro-visual" aria-hidden="true">
-        <div class="registro-collage">
-          <img
-            class="registro-foto registro-foto--terapia"
-            :src="fotosRegistro[0]"
-            alt=""
-            width="1122"
-            height="1402"
-            decoding="async"
-          />
-          <img
-            class="registro-foto registro-foto--yoga"
-            :src="fotosRegistro[1]"
-            alt=""
-            width="1122"
-            height="1402"
-            decoding="async"
-          />
-          <div class="registro-mini-cita">
-            <span class="registro-mini-cita-icono"
-              ><IconoNav nombre="hecho" :tam="20"
-            /></span>
-            <span>
-              <small>{{ $t(`${ejemploRegistro}.etiqueta`) }}</small>
-              <strong>{{ $t(`${ejemploRegistro}.titulo`) }}</strong>
-              <span>{{ $t(`${ejemploRegistro}.detalle`) }}</span>
-            </span>
-          </div>
-        </div>
-      </div>
+      <aside v-if="creado === null" class="registro-visual">
+        <ComposicionAcceso :producto="producto" registro />
+      </aside>
       <div class="registro-contenido">
         <template v-if="creado === null">
           <h1 class="tu-public-form-title">{{ $t("registro.titulo") }}</h1>
@@ -1265,9 +1225,9 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 
 <style scoped>
 .registro {
-  --registro-progreso: #24566b;
-  --registro-acento: #4f7f90;
-  --registro-enlace: #24566b;
+  --registro-progreso: var(--primario);
+  --registro-acento: var(--primario);
+  --registro-enlace: var(--enlace);
   --registro-suave: color-mix(
     in srgb,
     var(--registro-acento) 9%,
@@ -1354,98 +1314,21 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 }
 @media (min-width: 1024px) {
   .registro-layout:not(.registro-layout--creado) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
-    gap: clamp(2rem, 4vw, 4rem);
+    grid-template-columns: minmax(0, 1.14fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 3vw, 3rem);
+    align-items: start;
   }
   .registro-visual {
     display: grid;
-    align-items: center;
     min-width: 0;
-    min-height: 32rem;
-    background: radial-gradient(
-      ellipse at center,
-      var(--registro-suave),
-      transparent 70%
-    );
-  }
-  .registro-collage {
-    position: relative;
-    width: 100%;
-    height: clamp(25rem, 34vw, 31rem);
-  }
-  .registro-foto {
-    position: absolute;
-    width: 57%;
-    height: 80%;
-    object-fit: cover;
-    border: 0.4rem solid var(--superficie);
-    box-shadow: 0 1.4rem 3rem rgb(3 27 78 / 16%);
-  }
-  .registro-foto--terapia {
-    z-index: 2;
-    left: 2%;
-    bottom: 1%;
-    transform: rotate(-7deg);
-    border-radius: 2.7rem 1.4rem 3rem 1.7rem;
-    object-position: 45% center;
-  }
-  .registro-foto--yoga {
-    z-index: 1;
-    right: 2%;
-    top: 1%;
-    transform: rotate(6deg);
-    border-radius: 1.5rem 3rem 1.8rem 2.8rem;
-    object-position: center;
+    position: sticky;
+    top: 7rem;
+    padding-top: 1rem;
   }
 }
 .registro-opcional::placeholder {
   color: #707783;
   opacity: 1;
-}
-.registro-mini-cita {
-  position: absolute;
-  z-index: 3;
-  left: -0.5rem;
-  bottom: 8%;
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  width: min(85%, 18.5rem);
-  padding: 1rem 1.15rem;
-  border: 1px solid var(--borde);
-  border-radius: 1.35rem;
-  background: var(--superficie);
-  color: var(--texto);
-  box-shadow: 0 1rem 2.5rem rgb(3 27 78 / 18%);
-}
-.registro-mini-cita-icono {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 50%;
-  background: var(--primario);
-  color: #fff;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-.registro-mini-cita strong,
-.registro-mini-cita small,
-.registro-mini-cita span > span {
-  display: block;
-}
-.registro-mini-cita strong {
-  margin-block: 0.15rem;
-  font-size: 1rem;
-}
-.registro-mini-cita small {
-  font-size: 0.75rem;
-  color: var(--texto-suave);
-}
-.registro-mini-cita span > span {
-  font-size: 0.875rem;
-  color: var(--texto-suave);
 }
 .registro-wa-ok {
   display: inline-flex;

@@ -50,6 +50,9 @@ describe("«Lo nuevo» de cada modalidad", () => {
         // El ejemplo es decorativo, pero existe y no está vacío.
         const visual = tarjeta.get(".novedad-visual");
         expect(visual.attributes("aria-hidden")).toBe("true");
+        // El marco nunca hereda las clases de sus miniaturas absolutas.
+        expect(visual.classes()).toEqual(["novedad-visual"]);
+        expect(visual.attributes("data-visual")).toBeTruthy();
         expect(visual.text().length, clave).toBeGreaterThan(15);
       }
       // Un solo título de sección, con su énfasis.

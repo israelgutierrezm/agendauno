@@ -93,6 +93,7 @@ const acceso = computed(() =>
       }
     : { to: { name: "entrar" }, largo: "nav.entrar", corto: "nav.entrarCorto" },
 );
+const anio = new Date().getFullYear();
 defineEmits<{ alternarTema: [] }>();
 </script>
 
@@ -103,6 +104,7 @@ defineEmits<{ alternarTema: [] }>();
     :class="{
       'tu-marketing': !esRutaPublicaDeNegocio,
       'tu-public-business': esRutaPublicaDeNegocio,
+      'tu-public-shell--access': esAcceso,
     }"
   >
     <header v-if="esAcceso || !esRutaPublicaDeNegocio" class="tu-public-nav">
@@ -233,39 +235,33 @@ defineEmits<{ alternarTema: [] }>();
       <slot />
     </main>
 
-    <footer class="tu-public-footer text-sm">
-      <div class="tu-public-footer-inner mx-auto max-w-7xl px-4">
-        <div class="tu-public-footer-brand">
-          <!-- En la página de un negocio, la leyenda fija de la plataforma (ADR 0167):
-               no depende de ningún ajuste del negocio. -->
-          <HechoCon v-if="esRutaPublicaDeNegocio" />
-          <!-- En la página de un negocio que mide, también se cambia la elección. -->
-          <button
-            v-if="esRutaPublicaDeNegocio && pideConsentimiento()"
-            type="button"
-            class="tu-public-footer-link"
-            data-prueba="pie-configurar-cookies-negocio"
-            @click="configurarCookies"
-          >
-            Cookies y configuración
-          </button>
-          <span v-else>{{
-            "© " + new Date().getFullYear() + " " + marca
-          }}</span>
-          <p v-if="!esRutaPublicaDeNegocio" class="tu-public-footer-note">
-            {{
-              PRODUCTOS[producto].modalidad === "citas"
-                ? "Software para organizar citas."
-                : "Software para organizar clases."
-            }}
-            Cada negocio presta y administra sus propios servicios.
-          </p>
-        </div>
-        <nav
-          v-if="!esRutaPublicaDeNegocio"
-          class="tu-public-footer-links"
-          aria-label="Enlaces"
+    <!-- Página de un negocio: solo la leyenda fija de la plataforma (ADR 0167) y, si
+         el negocio mide, volver a elegir las cookies (ADR 0206). -->
+    <footer
+      v-if="esRutaPublicaDeNegocio"
+      class="tu-public-footer tu-public-footer--compacto text-sm"
+    >
+      <div class="tu-public-footer-fila">
+        <HechoCon />
+        <button
+          v-if="pideConsentimiento()"
+          type="button"
+          class="tu-public-footer-link"
+          data-prueba="pie-configurar-cookies-negocio"
+          @click="configurarCookies"
         >
+          Cookies y configuración
+        </button>
+      </div>
+    </footer>
+    <!-- Acceso: una sola línea, para no competir con el formulario. -->
+    <footer
+      v-else-if="esAcceso"
+      class="tu-public-footer tu-public-footer--compacto text-sm"
+    >
+      <div class="tu-public-footer-fila">
+        <span>{{ "© " + anio + " " + marca }}</span>
+        <nav class="tu-public-footer-links" aria-label="Enlaces">
           <RouterLink class="tu-public-footer-link" to="/aviso-de-privacidad">
             Aviso de privacidad
           </RouterLink>
@@ -279,7 +275,6 @@ defineEmits<{ alternarTema: [] }>();
           >
             Política de cookies
           </RouterLink>
-          <!-- Vuelve a abrir la barra de cookies con lo elegido (ADR 0206). -->
           <button
             v-if="pideConsentimiento()"
             type="button"
@@ -296,36 +291,143 @@ defineEmits<{ alternarTema: [] }>();
           >
             Soporte
           </a>
-          <RouterLink
-            v-if="!esRutaPublicaDeNegocio && demosActivas"
-            class="tu-public-footer-link"
-            :to="destinoDemo"
-            data-prueba="pie-demo"
-          >
-            {{ $t("demoAgendable.cta") }}
-          </RouterLink>
-          <RouterLink
-            v-if="!esRutaPublicaDeNegocio"
-            class="tu-public-footer-link"
-            :to="acceso.to"
-          >
-            {{ $t(acceso.largo) }}
-          </RouterLink>
-          <!-- Un producto que aún no recibe registros no tiene negocios que buscar. -->
-          <RouterLink
-            v-if="!esRutaPublicaDeNegocio && registroAbierto"
-            class="tu-public-footer-link"
-            :to="{ name: 'directorio' }"
-          >
-            {{ $t("nav.encontrarNegocio") }}
-          </RouterLink>
         </nav>
+      </div>
+    </footer>
+    <!-- Páginas del producto: marca y tres columnas (producto, ayuda, legal). -->
+    <footer v-else class="tu-public-footer text-sm">
+      <div class="tu-public-footer-inner">
+        <div class="tu-public-footer-brand">
+          <RouterLink :to="{ name: 'inicio' }" class="tu-public-footer-logo">
+            <LogoProducto
+              :producto="producto"
+              variante="horizontal"
+              :ancho="150"
+            />
+          </RouterLink>
+          <p class="tu-public-footer-note">
+            {{
+              PRODUCTOS[producto].modalidad === "citas"
+                ? "Software para organizar citas."
+                : "Software para organizar clases."
+            }}
+            Cada negocio presta y administra sus propios servicios.
+          </p>
+        </div>
+        <nav class="tu-public-footer-cols" aria-label="Enlaces">
+          <div class="tu-public-footer-col">
+            <p class="tu-public-footer-titulo">{{ marca }}</p>
+            <RouterLink
+              v-for="s in secciones"
+              :key="s.clave"
+              v-slot="{ href, navigate }"
+              :to="s.to"
+              custom
+            >
+              <a class="tu-public-footer-link" :href="href" @click="navigate">{{
+                $t(`nav.${s.clave}`)
+              }}</a>
+            </RouterLink>
+            <RouterLink
+              v-if="demosActivas"
+              class="tu-public-footer-link"
+              :to="destinoDemo"
+              data-prueba="pie-demo"
+            >
+              {{ $t("demoAgendable.cta") }}
+            </RouterLink>
+          </div>
+          <div class="tu-public-footer-col">
+            <p class="tu-public-footer-titulo">Ayuda</p>
+            <a
+              class="tu-public-footer-link"
+              :href="`mailto:${PRODUCTOS[producto].soporte.correo}`"
+              data-prueba="soporte"
+            >
+              Soporte
+            </a>
+            <RouterLink class="tu-public-footer-link" :to="acceso.to">
+              {{ $t(acceso.largo) }}
+            </RouterLink>
+            <!-- Un producto que aún no recibe registros no tiene negocios que buscar. -->
+            <RouterLink
+              v-if="registroAbierto"
+              class="tu-public-footer-link"
+              :to="{ name: 'directorio' }"
+            >
+              {{ $t("nav.encontrarNegocio") }}
+            </RouterLink>
+          </div>
+          <div class="tu-public-footer-col">
+            <p class="tu-public-footer-titulo">Legal</p>
+            <RouterLink class="tu-public-footer-link" to="/aviso-de-privacidad">
+              Aviso de privacidad
+            </RouterLink>
+            <RouterLink class="tu-public-footer-link" to="/terminos">
+              Términos y condiciones
+            </RouterLink>
+            <RouterLink
+              class="tu-public-footer-link"
+              to="/cookies"
+              data-prueba="pie-cookies"
+            >
+              Política de cookies
+            </RouterLink>
+            <!-- Vuelve a abrir la barra de cookies con lo elegido (ADR 0206). -->
+            <button
+              v-if="pideConsentimiento()"
+              type="button"
+              class="tu-public-footer-link"
+              data-prueba="pie-configurar-cookies"
+              @click="configurarCookies"
+            >
+              Cookies y configuración
+            </button>
+          </div>
+        </nav>
+      </div>
+      <div class="tu-public-footer-base">
+        <span>{{ "© " + anio + " " + marca }}</span>
       </div>
     </footer>
   </div>
 </template>
 
 <style>
+/* Acceso ocupa el alto disponible sin sumar otra ventana completa al encabezado
+   y al pie. Si el formulario crece (zoom, avisos o resultados), la página fluye. */
+.tu-public-shell--access {
+  min-height: 100svh;
+}
+.tu-public-shell--access > main {
+  display: grid;
+}
+.tu-public-shell--access .tu-public-footer-fila {
+  padding-block: 0.25rem;
+}
+/* En escritorio, el encabezado y el pie de acceso usan las mismas orillas que su
+   composición y su formulario (EntrarView, RegistroView). A la derecha queda lugar
+   para el botón del tema. */
+@media (min-width: 1024px) {
+  .tu-public-shell--access .tu-public-container {
+    width: 100%;
+    max-width: 104rem;
+    padding-left: clamp(1rem, 2.5vw, 2.5rem);
+    padding-right: 4rem;
+  }
+  .tu-public-shell--access .tu-public-footer-fila {
+    max-width: 104rem;
+    padding-inline: clamp(1rem, 2.5vw, 2.5rem);
+  }
+}
+.tu-public-shell--access .tu-public-footer-links {
+  gap: 0 1.25rem;
+}
+.tu-public-shell--access .tu-public-footer-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
 /* Navegación comercial persistente, con contenido centrado. */
 .tu-public-nav {
   position: sticky;
@@ -349,36 +451,89 @@ defineEmits<{ alternarTema: [] }>();
   border-top: 1px solid var(--borde);
 }
 .tu-public-footer-link {
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--texto-suave);
+  font: inherit;
   font-weight: 400;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
-.tu-public-footer-link:hover {
+.tu-public-footer-link:hover,
+.tu-public-footer-link:focus-visible {
+  color: var(--texto);
   text-decoration: underline;
 }
-.tu-public-footer-inner {
+/* Negocio y acceso: una línea que se parte en el teléfono. */
+.tu-public-footer-fila {
   display: flex;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 1.1rem clamp(1rem, 4vw, 3rem);
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 2rem;
-  padding-block: 2rem;
+  gap: 0.75rem 1.5rem;
+  font-size: 0.78rem;
+}
+.tu-public-footer--compacto .tu-public-footer-links {
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+/* Producto: la marca a la izquierda y tres columnas. */
+.tu-public-footer-inner {
+  display: grid;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: clamp(2.5rem, 5vw, 3.75rem) clamp(1.25rem, 4vw, 3rem) 2rem;
+  gap: 2.25rem;
 }
 .tu-public-footer-brand {
   display: grid;
-  gap: 0.75rem;
-  font-size: 0.75rem;
+  align-content: start;
+  gap: 1rem;
+}
+.tu-public-footer-logo {
+  justify-self: start;
 }
 .tu-public-footer-note {
-  max-width: 30rem;
-  line-height: 1.7;
+  max-width: 22rem;
+  font-size: 0.82rem;
+  line-height: 1.65;
 }
-.tu-public-footer-links {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1.25rem;
+.tu-public-footer-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 2rem 1.5rem;
+}
+.tu-public-footer-col {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 0.7rem;
+  font-size: 0.85rem;
+}
+.tu-public-footer-titulo {
+  margin-bottom: 0.15rem;
+  color: var(--texto);
   font-size: 0.8rem;
+  font-weight: 600;
+}
+.tu-public-footer-base {
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 1.1rem clamp(1.25rem, 4vw, 3rem) 1.4rem;
+  border-top: 1px solid var(--borde);
+  font-size: 0.75rem;
+}
+@media (min-width: 900px) {
+  .tu-public-footer-inner {
+    grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.8fr);
+    gap: 3rem;
+  }
 }
 .tu-public-theme {
   position: absolute;

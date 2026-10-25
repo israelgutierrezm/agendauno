@@ -72,6 +72,24 @@ function enlaces(vista: Awaited<ReturnType<typeof montar>>, selector: string) {
 }
 
 describe("encabezado público", () => {
+  it("compacta solo el acceso y conserva privacidad, términos y soporte", async () => {
+    const vista = await montar({ pagina: "entrar", esAcceso: true }, "/entrar");
+    expect(vista.classes()).toContain("tu-public-shell--access");
+    expect(vista.find(".tu-public-footer-note").exists()).toBe(false);
+    expect(vista.get('footer a[href="/aviso-de-privacidad"]').exists()).toBe(
+      true,
+    );
+    expect(vista.get('footer a[href="/terminos"]').exists()).toBe(true);
+    expect(
+      vista.get('footer [data-prueba="soporte"]').attributes("href"),
+    ).toMatch(/^mailto:/);
+    expect(vista.find('footer a[href="/entrar"]').exists()).toBe(false);
+    vista.unmount();
+    const registro = await montar({ pagina: "registro" }, "/registro");
+    expect(registro.classes()).not.toContain("tu-public-shell--access");
+    expect(registro.find(".tu-public-footer-note").exists()).toBe(true);
+    registro.unmount();
+  });
   it.each(["agendauno", "turnouno"] as const)(
     "%s: identifica la marca para aplicar su paleta en landing y acceso",
     async (producto) => {
@@ -234,6 +252,9 @@ describe("encabezado público", () => {
         const nombre = producto === "turnouno" ? "TurnoUno" : "AgendaUno";
         expect(leyenda.text()).toBe(`Hecho con ${nombre}`);
         expect(leyenda.attributes("href")).toMatch(/^https:\/\//);
+        // Solo la leyenda: ni el © de la plataforma ni sus columnas.
+        expect(vista.get("footer").text()).not.toContain("©");
+        expect(vista.find(".tu-public-footer-cols").exists()).toBe(false);
         vista.unmount();
       } finally {
         fijarProductoDeSesion(null);
@@ -248,6 +269,11 @@ describe("encabezado público", () => {
     expect(vista.get("footer").text()).toContain(
       "Cada negocio presta y administra sus propios servicios",
     );
+    // Producto, ayuda y legal en columnas, con las secciones de la portada.
+    expect(
+      vista.findAll(".tu-public-footer-titulo").map((t) => t.text()),
+    ).toEqual(["AgendaUno", "Ayuda", "Legal"]);
+    expect(vista.get('footer a[href="/#precios"]').text()).toBe(es.nav.precios);
     vista.unmount();
   });
   it("muestra el nuevo logo dentro de una barra compacta", async () => {

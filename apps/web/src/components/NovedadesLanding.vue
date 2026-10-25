@@ -300,7 +300,7 @@ const conNotaMexico = computed(() =>
         >
           <div
             class="novedad-visual"
-            :class="'nv-' + n.visual?.tipo"
+            :data-visual="n.visual?.tipo"
             aria-hidden="true"
           >
             <!-- Lista: una clase, una caja, un presupuesto, unas facturas… -->

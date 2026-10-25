@@ -416,7 +416,7 @@ function medirOtra(): void {
       class="tu-banda tu-ancla"
       :style="BANDA_SUPERFICIE"
     >
-      <div class="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-28">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
         <h2 class="tu-titulo reveal">
           {{
             registroAbierto

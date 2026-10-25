@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -19,6 +19,25 @@ const visible = computed(
   () =>
     pideConsentimiento() &&
     (medicion.preferencias === null || medicion.eligiendo),
+);
+// El botón con el color de acción de la página: el de la marca (rosa en AgendaUno,
+// turquesa en TurnoUno) o el del negocio; la barra vive fuera de su contenedor.
+const colorCta = ref<string | null>(null);
+function leerColorCta(): void {
+  const raiz = document.querySelector<HTMLElement>(
+    ".tu-public-business, .tu-marketing",
+  );
+  const color = raiz
+    ? getComputedStyle(raiz).getPropertyValue("--marketing-cta").trim()
+    : "";
+  colorCta.value = color !== "" ? color : null;
+}
+watch(
+  () => [visible.value, medicion.ambito] as const,
+  ([v]) => {
+    if (v) void nextTick(leerColorCta);
+  },
+  { immediate: true },
 );
 const detalle = ref(false);
 const analitica = ref(false);
@@ -56,6 +75,7 @@ const enlaceAviso = computed(() =>
   <section
     v-if="visible"
     class="am-barra"
+    :style="colorCta ? { '--am-cta': colorCta } : undefined"
     aria-labelledby="am-titulo"
     data-prueba="aviso-medicion"
   >
@@ -244,6 +264,13 @@ const enlaceAviso = computed(() =>
   align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+}
+.am-boton.tu-btn-primario {
+  background: var(--am-cta, var(--primario));
+  color: #fff;
+}
+.am-boton.tu-btn-primario:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--am-cta, var(--primario)) 88%, #000);
 }
 .am-boton {
   min-width: 11rem;

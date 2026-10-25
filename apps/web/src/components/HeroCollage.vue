@@ -83,31 +83,32 @@ defineProps<{
 .tu-hero-collage {
   position: relative;
   display: grid;
+  /* Del tamaño de antes: las fotos son lo primero que se ve de la landing. */
   height: clamp(32rem, 54vw, 41rem);
-  grid-template-columns: 0.9fr 1.08fr 0.9fr;
+  grid-template-columns: 0.85fr 1.25fr 0.85fr;
   align-items: center;
-  gap: 0.65rem;
-  overflow: hidden;
-  padding: 1rem;
-  border-radius: var(--radio-panel, 28px);
-  background:
-    radial-gradient(circle at 84% 18%, rgb(79 127 144 / 16%), transparent 32%),
-    linear-gradient(145deg, #e9edf1 0%, #eef4f5 52%, #e3edef 100%);
+  gap: 0.75rem;
+  padding: 1.5rem 0.6rem 3rem;
+  isolation: isolate;
 }
 .tu-hero-foto {
   position: relative;
-  height: 82%;
+  height: 72%;
+  transform: rotate(-7deg) translateY(1rem);
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 72%);
-  border-radius: 1.5rem;
-  background: #fff;
+  border: 5px solid var(--superficie);
+  border-radius: 1.4rem;
+  background: var(--superficie);
   box-shadow: 0 1.2rem 3.5rem rgb(36 51 70 / 13%);
 }
 .tu-hero-foto--2 {
-  height: 96%;
+  height: 100%;
+  z-index: 1;
+  transform: translateY(-0.8rem);
 }
 .tu-hero-foto--3 {
-  height: 76%;
+  height: 72%;
+  transform: rotate(7deg) translateY(1rem);
 }
 .tu-hero-foto img {
   display: block;
@@ -123,7 +124,7 @@ defineProps<{
 .tu-hero-foto > span {
   position: absolute;
   right: 0.55rem;
-  bottom: 0.55rem;
+  top: 0.55rem;
   left: 0.55rem;
   display: inline-flex;
   align-items: center;
@@ -140,17 +141,17 @@ defineProps<{
 .tu-hero-reserva {
   position: absolute;
   z-index: 3;
-  right: 1.4rem;
-  bottom: 1.4rem;
+  right: 14%;
+  bottom: 0.9rem;
   display: flex;
   max-width: 17rem;
   align-items: center;
   gap: 0.75rem;
   padding: 0.8rem 1rem;
-  border: 1px solid rgb(255 255 255 / 72%);
+  border: 1px solid var(--borde);
   border-radius: 1.15rem;
-  background: rgb(255 255 255 / 88%);
-  color: #17212e;
+  background: var(--superficie);
+  color: var(--texto);
   text-align: left;
   box-shadow: 0 1rem 2.8rem rgb(38 51 67 / 18%);
   backdrop-filter: blur(18px);
@@ -176,19 +177,8 @@ defineProps<{
 }
 .tu-hero-reserva small {
   margin-top: 0.1rem;
-  color: #5f6975;
+  color: var(--texto-suave);
   font-size: 0.7rem;
-}
-.tu-hero-foto--1 {
-  animation: tu-foto-flota 7s ease-in-out infinite alternate;
-}
-.tu-hero-foto--3 {
-  animation: tu-foto-flota 8s -3s ease-in-out infinite alternate-reverse;
-}
-@keyframes tu-foto-flota {
-  to {
-    transform: translateY(-0.65rem);
-  }
 }
 @keyframes tu-reserva-flota {
   50% {
@@ -221,15 +211,14 @@ defineProps<{
   .tu-hero-collage {
     height: 27rem;
     gap: 0.4rem;
-    padding: 0.6rem;
-    border-radius: 1.5rem;
+    padding: 1rem 0.5rem 3.2rem;
   }
   .tu-hero-foto {
     border-radius: 1.1rem;
   }
   .tu-hero-foto > span {
     right: 0.3rem;
-    bottom: 0.3rem;
+    top: 0.3rem;
     left: 0.3rem;
     padding: 0.38rem 0.3rem;
     font-size: 0.6rem;

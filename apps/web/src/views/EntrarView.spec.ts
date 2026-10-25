@@ -129,6 +129,33 @@ describe("acceso por negocio", () => {
     });
   });
 
+  it("conserva una etiqueta accesible y una ayuda breve en la búsqueda", () => {
+    const wrapper = montar();
+    expect(wrapper.get('label[for="buscar-negocio"]').text()).toBe(
+      es.entrar.buscarPlaceholder,
+    );
+    expect(wrapper.get("#buscar-negocio").attributes("placeholder")).toBe(
+      es.entrar.buscarPlaceholder,
+    );
+    expect(wrapper.findAll("h1")).toHaveLength(1);
+  });
+
+  it("separa olvidar un negocio del botón para entrar sin anidarlos", async () => {
+    recordarCinco();
+    const wrapper = montar();
+    await flushPromises();
+    const fila = wrapper.get(".tu-negocios-recientes > li");
+    expect(
+      fila.find(".tu-negocio-principal .tu-negocio-olvidar").exists(),
+    ).toBe(false);
+    expect(fila.get(".tu-negocio-olvidar").attributes("aria-label")).toContain(
+      "Estudio 4",
+    );
+    await fila.get(".tu-negocio-olvidar").trigger("click");
+    expect(wrapper.findAll(".tu-negocio-principal")).toHaveLength(4);
+    expect(wrapper.find("#email").exists()).toBe(false);
+  });
+
   it("un negocio del otro producto no se abre ni se recuerda: se dice dónde entrar", async () => {
     mocks.route.query = { estudio: "barberia" };
     mocks.get.mockResolvedValue({
@@ -156,27 +183,19 @@ describe("acceso por negocio", () => {
     recordarCinco();
     const wrapper = montar();
     expect(wrapper.findAll(".tu-negocio-principal")).toHaveLength(5);
-    expect(
-      wrapper
-        .findAll(".tu-login-collage > img")
-        .map((img) => img.attributes("src")),
-    ).toEqual([
-      "/assets/landing/disciplinas/pilates-v1.jpg",
-      "/assets/landing/disciplinas/pole-v1.jpg",
-      // Clases en AgendaUno (ADR 0131).
-      "/assets/landing/disciplinas/yoga-v1.jpg",
-    ]);
-    expect(wrapper.get(".tu-login-collage").attributes("aria-hidden")).toBe(
-      "true",
+    expect(wrapper.get(".acceso-escena-imagen").attributes("src")).toBe(
+      "/assets/landing/acceso-agendauno-v2.webp",
     );
-    expect(wrapper.findAll(".tu-login-actividad")).toHaveLength(3);
-    // En AgendaUno, el collage es de clases (ADR 0131).
-    expect(wrapper.get(".tu-login-actividad--barberia").text()).toContain(
+    expect(wrapper.get(".acceso-escena-imagen").attributes("alt")).toBe("");
+    expect(wrapper.get(".acceso-escena h2").text()).toBe(es.entrar.panelTitulo);
+    expect(wrapper.findAll(".acceso-escena-cita")).toHaveLength(3);
+    expect(
+      wrapper.get(".acceso-escena-ejemplos").attributes("aria-hidden"),
+    ).toBe("true");
+    expect(wrapper.get(".acceso-escena-cita--3").text()).toContain(
       "Yoga matutino",
     );
-    expect(wrapper.get(".tu-login-collage").text()).not.toContain(
-      "Corte y barba",
-    );
+    expect(wrapper.get(".acceso-escena").text()).not.toContain("Corte y barba");
     expect(wrapper.find(".tu-login-visual").exists()).toBe(true);
     expect(wrapper.find(".tu-login-visual .agendauno-logo").exists()).toBe(
       false,

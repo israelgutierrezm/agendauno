@@ -190,21 +190,29 @@ const enLista = computed(() =>
 .esta-animando .negocios-cursor {
   animation: cursor-teclado 1s step-end infinite;
 }
+/* Al inicio de la línea: a la derecha quedaba flotando tras el lugar que se aparta
+   para el negocio más largo. Es el único control, así que el orden de foco no cambia. */
 .negocios-control {
+  order: -1;
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 32px;
-  height: 36px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  width: 2rem;
+  height: 2rem;
+  margin-right: 0.4rem;
+  border: 1px solid var(--borde);
+  border-radius: 50%;
+  background: var(--superficie);
   color: var(--texto-suave);
   cursor: pointer;
 }
+.negocios-control svg {
+  width: 10px;
+  height: 10px;
+}
 .negocios-control:hover {
+  border-color: var(--texto-suave);
   color: var(--texto);
-  background: color-mix(in srgb, var(--texto) 6%, transparent);
 }
 .negocios-control:focus-visible {
   outline: 2px solid var(--exito);

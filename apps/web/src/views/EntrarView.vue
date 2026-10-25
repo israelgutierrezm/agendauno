@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AvisoTono from "@/components/AvisoTono.vue";
+import ComposicionAcceso from "@/components/ComposicionAcceso.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
 import axios from "axios";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
@@ -69,19 +70,6 @@ const { abierto: registroAbierto } = useRegistroDelProducto();
 // El collage habla del producto del dominio (ADR 0131): clases en AgendaUno, citas en
 // TurnoUno.
 const esTurnoUno = productoActual() === "turnouno";
-const fotosCollage = esTurnoUno
-  ? [
-      "/assets/landing/disciplinas/barberia-v1.jpg",
-      "/assets/landing/disciplinas/spa-v1.webp",
-      "/assets/landing/disciplinas/nutriologos-v1.webp",
-    ]
-  : [
-      "/assets/landing/disciplinas/pilates-v1.jpg",
-      "/assets/landing/disciplinas/pole-v1.jpg",
-      "/assets/landing/disciplinas/yoga-v1.jpg",
-    ];
-const collage = esTurnoUno ? "entrar.collageCitas" : "entrar.collageClases";
-
 // Un enlace directo o subdominio fija el tenant. En el dominio raíz primero se
 // elige un negocio: el usuario ya no tiene que recordar ni escribir su slug.
 const slug = ref(slugDeContexto() ?? String(route.query.estudio ?? ""));
@@ -262,7 +250,11 @@ async function cargarMarca(
   }
 }
 
+// Solo cuenta la respuesta de la última búsqueda: la carga inicial no pisa la que la
+// persona hizo mientras tanto.
+let ultimaBusqueda = 0;
 async function buscarNegocios(inicial = false): Promise<void> {
+  const esta = ++ultimaBusqueda;
   buscando.value = true;
   busquedaRealizada.value = !inicial;
   errorBusqueda.value = null;
@@ -276,11 +268,11 @@ async function buscarNegocios(inicial = false): Promise<void> {
       "/api/v1/directorio",
       { params },
     );
-    resultados.value = data.data.slice(0, 8);
+    if (esta === ultimaBusqueda) resultados.value = data.data.slice(0, 8);
   } catch (error) {
-    errorBusqueda.value = mensajeDeError(error);
+    if (esta === ultimaBusqueda) errorBusqueda.value = mensajeDeError(error);
   } finally {
-    buscando.value = false;
+    if (esta === ultimaBusqueda) buscando.value = false;
   }
 }
 
@@ -368,71 +360,8 @@ onMounted(async () => {
 
 <template>
   <div class="tu-login-shell">
-    <section class="tu-login-visual" aria-labelledby="login-beneficio">
-      <div class="tu-login-mensaje">
-        <p class="tu-login-etiqueta">{{ $t("entrar.etiqueta") }}</p>
-        <h2 id="login-beneficio">{{ $t("entrar.panelTitulo") }}</h2>
-        <p>{{ $t("entrar.panelDesc") }}</p>
-      </div>
-
-      <div class="tu-login-collage" aria-hidden="true">
-        <img :src="fotosCollage[0]" alt="" width="1122" height="1402" />
-        <img :src="fotosCollage[1]" alt="" width="1122" height="1402" />
-        <img
-          :src="fotosCollage[2]"
-          alt=""
-          width="1122"
-          height="1402"
-          decoding="async"
-        />
-        <div class="tu-login-actividad tu-login-actividad--cita">
-          <span class="tu-login-icono"
-            ><IconoNav nombre="hecho" :tam="14"
-          /></span>
-          <span>
-            <strong>{{ $t(`${collage}.uno`) }}</strong>
-            <small>{{ $t(`${collage}.unoDetalle`) }}</small>
-          </span>
-        </div>
-        <div class="tu-login-actividad tu-login-actividad--clase">
-          <span class="tu-login-icono tu-login-icono--clase"
-            ><IconoNav v-if="esTurnoUno" nombre="hecho" :tam="14" /><template
-              v-else
-              >7</template
-            ></span
-          >
-          <span>
-            <strong>{{ $t(`${collage}.dos`) }}</strong>
-            <small>{{ $t(`${collage}.dosDetalle`) }}</small>
-          </span>
-        </div>
-        <div class="tu-login-actividad tu-login-actividad--barberia">
-          <span class="tu-login-icono tu-login-icono--barberia">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-            >
-              <rect x="4" y="5" width="16" height="16" rx="3" />
-              <path d="M8 3v4m8-4v4M4 11h16m-11 5 2 2 4-4" />
-            </svg>
-          </span>
-          <span>
-            <strong>{{ $t(`${collage}.tres`) }}</strong>
-            <small>{{ $t(`${collage}.tresDetalle`) }}</small>
-          </span>
-        </div>
-      </div>
-
-      <RouterLink
-        v-if="registroAbierto"
-        class="tu-login-explorar"
-        :to="{ name: 'directorio' }"
-      >
-        {{ $t("entrar.buscarReserva") }}
-        <IconoNav nombre="flecha" :tam="16" />
-      </RouterLink>
+    <section class="tu-login-visual" :aria-label="$t('entrar.etiqueta')">
+      <ComposicionAcceso :producto="esTurnoUno ? 'turnouno' : 'agendauno'" />
     </section>
 
     <section class="tu-login-formulario">
@@ -446,7 +375,7 @@ onMounted(async () => {
             class="tu-login-logo-negocio"
             @error="logoFallido = true"
           />
-          <LogoProducto v-else variante="isotipo" :ancho="64" />
+          <LogoProducto v-else variante="isotipo" :ancho="48" />
         </div>
 
         <!-- La sesión guardada no se pudo confirmar (sin red, en mantenimiento): sigue
@@ -460,7 +389,7 @@ onMounted(async () => {
           <p>{{ sesion.avisoSinConfirmar }}</p>
           <button
             type="button"
-            class="tu-btn tu-btn-primario"
+            class="tu-btn tu-btn-secundario"
             :disabled="reintentando"
             @click="reintentarSesion"
           >
@@ -557,12 +486,18 @@ onMounted(async () => {
                 "
                 autocomplete="organization"
               />
+              <!-- La carga inicial de la lista no es una búsqueda: el botón sigue
+                   diciendo «Buscar» hasta que la persona busca. -->
               <button
                 class="tu-btn tu-btn-primario"
                 type="submit"
-                :disabled="buscando"
+                :disabled="buscando && busquedaRealizada"
               >
-                {{ buscando ? $t("entrar.buscando") : $t("entrar.buscar") }}
+                {{
+                  buscando && busquedaRealizada
+                    ? $t("entrar.buscando")
+                    : $t("entrar.buscar")
+                }}
               </button>
             </form>
 
@@ -657,7 +592,7 @@ onMounted(async () => {
             }}</RouterLink>
           </p>
 
-          <form class="tu-login-form mt-8 space-y-5" @submit.prevent="enviar">
+          <form class="tu-login-form" @submit.prevent="enviar">
             <div>
               <label class="tu-label" for="email">{{
                 $t("entrar.email")
@@ -775,6 +710,14 @@ onMounted(async () => {
           }}</RouterLink>
         </p>
       </div>
+      <RouterLink
+        v-if="registroAbierto"
+        class="tu-login-explorar"
+        :to="{ name: 'directorio' }"
+      >
+        {{ $t("entrar.buscarReserva") }}
+        <IconoNav nombre="flecha" :tam="16" />
+      </RouterLink>
     </section>
   </div>
   <PanelRoles
@@ -788,196 +731,74 @@ onMounted(async () => {
 <style scoped>
 .tu-login-shell {
   display: grid;
-  min-height: calc(100svh - 3.5rem);
+  min-width: 0;
+  width: 100%;
+  max-width: 84rem;
+  margin-inline: auto;
   background: var(--fondo);
 }
 .tu-login-visual {
-  position: relative;
   display: none;
-  min-height: calc(100svh - 3.5rem);
-  overflow: hidden;
-  padding: clamp(2rem, 4vw, 4.5rem);
-  background: linear-gradient(145deg, #e9edf5 0%, #edf7ff 54%, #e4fbff 100%);
-  color: #031b4e;
-}
-.tu-login-visual::after {
-  position: absolute;
-  right: -8rem;
-  bottom: -8rem;
-  width: 25rem;
-  height: 25rem;
-  border: 1px solid rgb(255 255 255 / 60%);
-  border-radius: 50%;
-  box-shadow: 0 0 0 4rem rgb(255 255 255 / 13%);
-  content: "";
-}
-.tu-login-mensaje {
-  position: relative;
-  z-index: 2;
-  max-width: 34rem;
-  margin-top: 0;
-}
-.tu-login-etiqueta {
-  color: var(--enlace);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-.tu-login-mensaje h2 {
-  margin-top: 0.9rem;
-  font-size: clamp(2.7rem, 4.4vw, 4.6rem);
-  font-weight: 720;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-}
-.tu-login-mensaje > p:last-child {
-  max-width: 29rem;
-  margin-top: 1.2rem;
-  color: #40506b;
-  font-size: 1.05rem;
-  line-height: 1.65;
-}
-.tu-login-collage {
-  position: relative;
-  z-index: 1;
-  width: min(100%, 38rem);
-  height: clamp(17rem, 32vh, 25rem);
-  margin-top: clamp(2rem, 5vh, 4rem);
-}
-/* Pirámide orgánica: una foto arriba y dos abajo, dentro del mismo alto.
-   Los avisos ocupan los tres huecos del triángulo, fuera de las fotografías. */
-.tu-login-collage > img {
-  position: absolute;
-  width: 31%;
-  height: 57%;
-  border: 0.3rem solid rgb(255 255 255 / 70%);
-  border-radius: 1.25rem;
-  object-fit: cover;
-  box-shadow: 0 1.25rem 3.25rem rgb(45 55 70 / 18%);
-}
-.tu-login-visual .tu-login-collage > img:first-child {
-  top: 0;
-  left: 34.5%;
-  border-radius: 42% 58% 45% 55% / 48% 44% 56% 52%;
-  object-position: center 20%;
-  transform: rotate(-2deg);
-}
-.tu-login-visual .tu-login-collage > img:nth-child(2) {
-  bottom: 0;
-  left: 1%;
-  border-radius: 38% 52% 42% 48% / 46% 40% 58% 52%;
-  object-position: 60% 25%;
-  transform: rotate(-3deg);
-}
-.tu-login-visual .tu-login-collage > img:nth-child(3) {
-  bottom: 0;
-  right: 1%;
-  border-radius: 54% 40% 48% 42% / 44% 48% 52% 56%;
-  object-position: 47% 20%;
-  transform: rotate(3deg);
-}
-.tu-login-actividad {
-  position: absolute;
-  z-index: 3;
-  display: flex;
-  align-items: center;
   min-width: 0;
-  gap: 0.4rem;
-  padding: 0.55rem 0.5rem;
-  border: 1px solid rgb(255 255 255 / 65%);
-  border-radius: 1.1rem;
-  background: rgb(255 255 255 / 88%);
-  box-shadow: 0 0.9rem 2.3rem rgb(37 47 61 / 17%);
-  backdrop-filter: blur(16px);
+  align-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
 }
-.tu-login-actividad--cita {
-  top: 6%;
-  left: 0;
-  width: 31%;
+.tu-login-visual :deep(.acceso-escena-mensaje h2) {
+  font-size: 4.6cqw;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  color: #263949;
 }
-.tu-login-actividad--clase {
-  bottom: 0;
-  left: 33.5%;
-  width: 33%;
-}
-.tu-login-actividad--barberia {
-  top: 9%;
-  right: 0;
-  width: 31%;
-}
-.tu-login-actividad > span:last-child {
-  min-width: 0;
-}
-.tu-login-actividad strong,
-.tu-login-actividad small {
-  display: block;
-}
-.tu-login-actividad strong {
-  font-size: 0.78rem;
-  line-height: 1.3;
-}
-.tu-login-actividad small {
-  margin-top: 0.12rem;
-  color: #657180;
-  font-size: 0.66rem;
-  line-height: 1.35;
-}
-.tu-login-icono {
-  display: grid;
-  width: 1.5rem;
-  height: 1.5rem;
-  flex: 0 0 auto;
-  place-content: center;
-  border-radius: 50%;
-  background: #198a4b;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 800;
-}
-.tu-login-icono--clase {
-  background: #1674cd;
-}
-.tu-login-icono--barberia {
-  background: #008c9e;
-}
-.tu-login-icono--barberia svg {
-  width: 1.15rem;
-  height: 1.15rem;
+.tu-login-visual :deep(.acceso-escena-cita strong) {
+  font-weight: 500;
+  color: #263949;
 }
 .tu-login-explorar {
-  position: absolute;
-  z-index: 2;
-  bottom: 2.2rem;
-  left: clamp(2rem, 4vw, 4.5rem);
   display: inline-flex;
+  justify-self: center;
   align-items: center;
   gap: 0.55rem;
-  color: #344252;
-  font-size: 0.85rem;
-  font-weight: 700;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  font-weight: 400;
   text-decoration: none;
+}
+.tu-login-explorar:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .tu-login-formulario {
   display: grid;
-  min-height: calc(100svh - 3.5rem);
   place-items: center;
-  padding: 3rem 1.25rem;
+  align-content: center;
+  gap: 0.5rem;
+  padding: 1.25rem;
 }
 .tu-login-formulario-inner {
-  width: min(100%, 32rem);
+  width: min(100%, 30rem);
+  padding: clamp(1.25rem, 2.4vw, 2.25rem);
+  border: 1px solid var(--borde);
+  border-radius: 18px;
+  background: var(--superficie);
+  box-shadow: 0 12px 36px -16px
+    color-mix(in srgb, var(--texto) 12%, transparent);
 }
 .tu-login-identidad {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   gap: 0.5rem;
 }
 .tu-login-logo-negocio {
-  width: 3.75rem;
-  height: 3.75rem;
-  border-radius: 1rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
   object-fit: contain;
   box-shadow: var(--sombra);
 }
@@ -985,29 +806,33 @@ onMounted(async () => {
   display: inline-grid;
   flex: 0 0 auto;
   place-content: center;
-  background: linear-gradient(145deg, #0070ff, #00a6d5);
-  color: #fff;
-  font-weight: 800;
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+  font-weight: 500;
 }
 .tu-login-titulo {
-  margin-top: 1.65rem;
-  font-size: clamp(2rem, 4vw, 2.65rem);
-  font-weight: 750;
-  letter-spacing: -0.035em;
-  line-height: 1.06;
+  margin: 0;
+  font-size: clamp(1.4rem, 1.9vw, 1.65rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+  color: var(--texto);
+  text-wrap: balance;
 }
 .tu-login-subtitulo {
-  margin-top: 0.7rem;
+  margin-top: 0.6rem;
+  font-size: 0.875rem;
   color: var(--texto-suave);
   line-height: 1.6;
 }
 .tu-selector-seccion {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
 }
 .tu-selector-seccion > h2,
 .tu-selector-cabecera h2 {
-  font-size: 0.9rem;
-  font-weight: 750;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--texto-suave);
 }
 .tu-selector-cabecera {
   display: flex;
@@ -1028,34 +853,31 @@ onMounted(async () => {
   list-style: none;
 }
 .tu-negocios-recientes > li {
-  position: relative;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   border: 1px solid var(--borde);
-  border-radius: 1rem;
+  border-radius: 12px;
   background: var(--superficie);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 .tu-negocios-recientes > li:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sombra-elevada);
+  background: var(--superficie-2);
 }
 @media (prefers-reduced-motion: reduce) {
   .tu-negocios-recientes > li {
-    transition: box-shadow 0.2s ease;
-  }
-  .tu-negocios-recientes > li:hover {
-    transform: none;
+    transition: none;
   }
 }
 .tu-negocio-principal,
 .tu-resultados-negocio button {
   display: flex;
   width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 0.8rem;
-  padding: 0.8rem 4.5rem 0.8rem 0.85rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 11px;
   border: 0;
   background: transparent;
   color: var(--texto);
@@ -1065,8 +887,9 @@ onMounted(async () => {
 .tu-negocio-principal > img,
 .tu-resultados-negocio img,
 .tu-negocio-iniciales {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
   border-radius: 0.8rem;
   object-fit: cover;
 }
@@ -1082,7 +905,8 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .tu-negocio-texto strong {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 .tu-negocio-texto small {
   margin-top: 0.12rem;
@@ -1090,15 +914,20 @@ onMounted(async () => {
   font-size: 0.75rem;
 }
 .tu-negocio-olvidar {
-  position: absolute;
-  top: 50%;
-  right: 2rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  margin-right: 0.25rem;
+  border-radius: 8px;
   border: 0;
   background: transparent;
   color: var(--texto-suave);
   cursor: pointer;
   font-size: 0.7rem;
-  transform: translateY(-50%);
+}
+.tu-login-shell button:focus-visible,
+.tu-login-shell a:focus-visible {
+  outline: 2px solid var(--enlace);
+  outline-offset: 3px;
 }
 .tu-negocio-olvidar:hover {
   color: var(--error);
@@ -1140,15 +969,24 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 1.25rem;
+  min-height: 44px;
+  margin-bottom: 0.5rem;
   border: 0;
   background: transparent;
-  color: var(--primario-fuerte);
+  color: var(--texto-suave);
   cursor: pointer;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 400;
+}
+.tu-login-cambiar:hover {
+  color: var(--texto);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .tu-login-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
   width: 100%;
 }
 .tu-login-separador {
@@ -1172,26 +1010,70 @@ onMounted(async () => {
   gap: 0.75rem;
   justify-items: start;
   margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
   padding: 0.85rem 1rem;
   border: 1px solid var(--borde);
-  border-inline-start: 4px solid var(--aviso);
+  border-inline-start: 2px solid var(--aviso);
   border-radius: 0.75rem;
   background: var(--aviso-suave);
-  font-size: 0.88rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 .tu-login-registro {
-  margin-top: 1.5rem;
-  font-size: 0.88rem;
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+.tu-login-registro[data-prueba="registrar-negocio"] {
+  border-top: 1px solid var(--borde);
+  padding-top: 1rem;
+}
+.tu-login-shell .tu-enlace {
+  font-weight: 400;
 }
 @media (min-width: 1024px) {
+  /* La composición toma todo el alto disponible (sin el encabezado ni el pie) y el
+     formulario, una columna fija a la derecha. */
   .tu-login-shell {
-    grid-template-columns: minmax(0, 1.08fr) minmax(27rem, 0.92fr);
+    grid-template-columns: minmax(0, 1fr) minmax(26rem, 30rem);
+    max-width: 104rem;
+    gap: clamp(1rem, 2.5vw, 3rem);
+    padding-inline: clamp(1rem, 2.5vw, 2.5rem);
   }
   .tu-login-visual {
-    display: block;
+    display: grid;
+    padding: 0.75rem 0;
+  }
+  .tu-login-visual :deep(.acceso-escena) {
+    /* Sin recortar las fotos: conserva su proporción y sus textos superpuestos, y
+       crece hasta el alto de la ventana (o el ancho de su columna). */
+    width: min(100%, calc((100svh - 9rem) * 1448 / 1086));
+    max-width: none;
+  }
+}
+@media (min-width: 1024px) and (max-height: 800px) {
+  .tu-login-formulario {
+    padding-block: 0.75rem;
+  }
+  .tu-login-formulario-inner {
+    padding-block: 1rem;
+  }
+  .tu-selector-seccion {
+    margin-top: 1.25rem;
+  }
+  .tu-login-registro {
+    margin-top: 1rem;
   }
 }
 @media (max-width: 520px) {
+  .tu-login-formulario {
+    padding: 1.25rem 0.75rem;
+    align-items: start;
+  }
+  .tu-login-formulario-inner {
+    padding: 1.25rem;
+    border-radius: 20px;
+  }
   .tu-selector-busqueda {
     grid-template-columns: 1fr;
   }
