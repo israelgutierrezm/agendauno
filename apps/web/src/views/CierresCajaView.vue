@@ -334,42 +334,59 @@ onMounted(() => void cargarCierres(1));
           }}
           · {{ $t("caja.fondoDe", { monto: dinero(detalle.fondo_minor) }) }}
         </p>
-        <table
+        <!-- En el teléfono, cada método como ficha (sin desbordar). -->
+        <div
           v-if="detalle.conteos.length > 0"
-          class="w-full text-sm tabular-nums"
+          class="relative tu-tabla-adaptable"
         >
-          <thead>
-            <tr :style="{ color: 'var(--texto-suave)' }">
-              <th class="text-left font-medium py-1">
-                {{ $t("caja.conteo.metodo") }}
-              </th>
-              <th class="text-right font-medium py-1">
-                {{ $t("caja.conteo.esperado") }}
-              </th>
-              <th class="text-right font-medium py-1">
-                {{ $t("caja.conteo.contado") }}
-              </th>
-              <th class="text-right font-medium py-1">
-                {{ $t("caja.conteo.diferencia") }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="c in detalle.conteos" :key="c.metodo">
-              <td class="py-1">{{ $t(`caja.metodos.${c.metodo}`) }}</td>
-              <td class="py-1 text-right">{{ dinero(c.esperado_minor) }}</td>
-              <td class="py-1 text-right">{{ dinero(c.contado_minor) }}</td>
-              <td
-                class="py-1 text-right"
-                :style="{
-                  color: c.diferencia_minor !== 0 ? 'var(--error)' : undefined,
-                }"
-              >
-                {{ conSigno(c.diferencia_minor) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          <table class="tu-tabla text-sm tabular-nums">
+            <thead>
+              <tr :style="{ color: 'var(--texto-suave)' }">
+                <th class="text-left font-medium py-1">
+                  {{ $t("caja.conteo.metodo") }}
+                </th>
+                <th class="text-right font-medium py-1">
+                  {{ $t("caja.conteo.esperado") }}
+                </th>
+                <th class="text-right font-medium py-1">
+                  {{ $t("caja.conteo.contado") }}
+                </th>
+                <th class="text-right font-medium py-1">
+                  {{ $t("caja.conteo.diferencia") }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in detalle.conteos" :key="c.metodo">
+                <td class="py-1" :data-etiqueta="$t('caja.conteo.metodo')">
+                  {{ $t(`caja.metodos.${c.metodo}`) }}
+                </td>
+                <td
+                  class="py-1 text-right"
+                  :data-etiqueta="$t('caja.conteo.esperado')"
+                >
+                  {{ dinero(c.esperado_minor) }}
+                </td>
+                <td
+                  class="py-1 text-right"
+                  :data-etiqueta="$t('caja.conteo.contado')"
+                >
+                  {{ dinero(c.contado_minor) }}
+                </td>
+                <td
+                  class="py-1 text-right"
+                  :style="{
+                    color:
+                      c.diferencia_minor !== 0 ? 'var(--error)' : undefined,
+                  }"
+                  :data-etiqueta="$t('caja.conteo.diferencia')"
+                >
+                  {{ conSigno(c.diferencia_minor) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <div v-if="detalle.motivo_diferencia">
           <p class="tu-label">{{ $t("caja.motivoDelCierre") }}</p>
           <p class="text-sm">{{ detalle.motivo_diferencia }}</p>

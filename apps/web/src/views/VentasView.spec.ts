@@ -345,3 +345,33 @@ describe("vender un plan", () => {
     expect(w.findAll('[data-prueba="plan"]').length).toBe(2);
   });
 });
+
+describe("con varias sucursales", () => {
+  it("con «Todas» en la barra no se cobra: se pide elegir la sucursal de la caja", async () => {
+    const conUsuario = sesion as typeof sesion & { usuario?: unknown };
+    conUsuario.usuario = {
+      ulid: "u1",
+      sucursales: [
+        { id: "s1", nombre: "Centro" },
+        { id: "s2", nombre: "Norte" },
+      ],
+    };
+    try {
+      const w = mount(VentasView, { global: { plugins: [i18n] } });
+      await flushPromises();
+      await w.findAll('[data-prueba="plan"]')[0]!.trigger("click");
+      const buscador = w.findComponent(BuscarPersona);
+      buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+      buscador.vm.$emit("update:modelValue", "m1");
+      await flushPromises();
+      expect(w.get('[data-prueba="elige-sucursal"]').text()).toContain(
+        "Elige la sucursal",
+      );
+      expect(
+        w.get('[data-prueba="cobrar-plan"]').attributes("disabled"),
+      ).toBeDefined();
+    } finally {
+      delete conUsuario.usuario;
+    }
+  });
+});

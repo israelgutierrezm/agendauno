@@ -23,6 +23,7 @@ import {
 } from "@/lib/ventaDePlan";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { SECCIONES, fechaLarga, seccionDe, type Plan } from "@/lib/planes";
+import { useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -165,6 +166,13 @@ function cuando(iso: string | null | undefined): string {
         },
   ).format(d);
 }
+
+// Con varias sucursales, el cobro entra en la caja de la elegida en la barra
+// (ADR 0175): con «Todas» no se sabe a cuál, así que se pide elegirla.
+const barraSucursales = useSucursales();
+const sinSucursalParaCobrar = computed(
+  () => barraSucursales.varias.value && barraSucursales.fija.value === null,
+);
 
 // `enSegundoPlano`: tras una venta se actualiza sin desmontar el formulario.
 async function cargar(enSegundoPlano = false): Promise<void> {
@@ -633,6 +641,15 @@ onMounted(cargar);
                 dinero(total, productoSel?.moneda ?? sesion.moneda)
               }}</span>
             </div>
+            <p
+              v-if="sinSucursalParaCobrar"
+              class="text-sm"
+              role="status"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="elige-sucursal"
+            >
+              {{ $t("sucursalOperativa.eligeParaCobrar") }}
+            </p>
             <button
               class="tu-btn tu-btn-primario w-full"
               type="submit"
@@ -640,6 +657,7 @@ onMounted(cargar);
               :aria-busy="vendiendo || undefined"
               :disabled="
                 vendiendo ||
+                sinSucursalParaCobrar ||
                 venta.compradorId === '' ||
                 venta.productoId === '' ||
                 consultandoCuotas ||

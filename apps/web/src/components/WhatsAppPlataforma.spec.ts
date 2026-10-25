@@ -158,9 +158,14 @@ describe("WhatsApp de la plataforma", () => {
     expect((w.get("#wa-webhook-url").element as HTMLInputElement).value).toBe(
       "http://api/api/v1/webhooks/whatsapp",
     );
-    expect((w.get("#wa-webhook-token").element as HTMLInputElement).value).toBe(
+    // El token es un secreto: oculto hasta que se pide verlo.
+    const token = w.get("#wa-webhook-token");
+    expect((token.element as HTMLInputElement).value).toBe(
       "token-de-verificacion",
     );
+    expect(token.attributes("type")).toBe("password");
+    await w.get('[data-prueba="wa-ver-token"]').trigger("click");
+    expect(w.get("#wa-webhook-token").attributes("type")).toBe("text");
 
     await w.get("#wa-app-secret").setValue("secreto");
     await w.get("form").trigger("submit");

@@ -6,6 +6,9 @@ export default {
   todas: "Todas las sucursales",
   // Leyenda en los formularios: dónde queda lo que se registra.
   seRegistraEn: "Se registra en {sucursal}",
+  // Con varias sucursales y «Todas» en la barra, un cobro no sabe a qué caja va.
+  eligeParaCobrar:
+    "Elige la sucursal en la barra de arriba para cobrar: el cobro entra en su caja.",
   ayuda:
     "Elige una sucursal y el panel la usa en la agenda, el mostrador y los formularios.",
   // Personal sin sucursal asignada (ADR 0098).

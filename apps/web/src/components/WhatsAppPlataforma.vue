@@ -77,6 +77,18 @@ const error = ref<string | null>(null);
 // El webhook se registra una vez en Meta: se abre solo si al cargar falta el App
 // Secret (no se pliega al guardar).
 const webhookAbierto = ref(false);
+// El token de verificación es un secreto: oculto hasta que se pide verlo o copiarlo.
+const verToken = ref(false);
+async function copiarToken(): Promise<void> {
+  const valor = config.value?.webhook?.token_verificacion ?? "";
+  try {
+    await navigator.clipboard.writeText(valor);
+    toast.exito(t("plataformaAdmin.whatsapp.tokenCopiado"));
+  } catch {
+    // Sin portapapeles (permiso o navegador): se muestra para copiarlo a mano.
+    verToken.value = true;
+  }
+}
 
 const conexion = computed<{ texto: string; tono: string }>(() =>
   config.value?.conectado
@@ -261,10 +273,36 @@ onMounted(cargar);
               <input
                 id="wa-webhook-token"
                 class="tu-input font-mono"
+                :type="verToken ? 'text' : 'password'"
                 :value="config.webhook.token_verificacion"
                 readonly
+                autocomplete="off"
+                data-prueba="wa-token"
                 @focus="($event.target as HTMLInputElement).select()"
               />
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
+                  :aria-pressed="verToken"
+                  data-prueba="wa-ver-token"
+                  @click="verToken = !verToken"
+                >
+                  {{
+                    verToken
+                      ? $t("plataformaAdmin.whatsapp.ocultarToken")
+                      : $t("plataformaAdmin.whatsapp.mostrarToken")
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
+                  data-prueba="wa-copiar-token"
+                  @click="copiarToken"
+                >
+                  {{ $t("plataformaAdmin.whatsapp.copiarToken") }}
+                </button>
+              </div>
             </div>
             <div>
               <label class="tu-label" for="wa-app-secret">{{

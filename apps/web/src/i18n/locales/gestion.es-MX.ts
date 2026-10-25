@@ -1031,6 +1031,11 @@ export const plataformaAdmin = {
       "En la app de Meta, en WhatsApp → Configuración, pega esta dirección y el token de verificación, y suscríbete a «messages». Así se sabe si cada mensaje se entregó, se leyó o falló, y a quien contesta se le responde solo con el contacto del negocio (si escribe BAJA, deja de recibir los avisos). El App Secret firma los avisos; sin él, en producción se rechazan.",
     webhookUrl: "Dirección (callback URL)",
     webhookToken: "Token de verificación",
+    // Oculto por omisión: se muestra o se copia para pegarlo en Meta.
+    mostrarToken: "Mostrar token",
+    ocultarToken: "Ocultar token",
+    copiarToken: "Copiar token",
+    tokenCopiado: "Token copiado.",
     appSecret: "App Secret de la app de Meta",
     duenos: "Con los dueños",
     duenosActivar: "Verificar el número de los dueños y mandarles avisos",
