@@ -21,13 +21,13 @@ negocio desde el servidor.
 
 ## Consentimiento
 
-- El aviso «Cookies y privacidad» (ADR 0206) sale al entrar a las páginas del producto,
+- La barra de cookies (ADR 0206) sale al pie al entrar a las páginas del producto,
   aunque aún no haya destinos, y en la página de un negocio solo si ese negocio mide:
-  aceptar todas, solo las necesarias o configurar **analítica** (GA4) y **publicidad**
-  (Meta y las señales de anuncios de Google). Enlaza la política de cookies (`/cookies`),
-  que se publica desde Plataforma → Legales.
-- Sin elegir no se carga nada. Después queda el botón **Cookies** para cambiarlo; la
-  elección también se cambia en `/cookies`.
+  un solo botón, **Aceptar**, y **Cookies y configuración** para elegir o rechazar
+  **analítica** (GA4) y **publicidad** (Meta y las señales de anuncios de Google). Enlaza
+  la política de cookies (`/cookies`), que se publica desde Plataforma → Legales.
+- Sin elegir no se carga nada. Después, **Cookies y configuración** en el pie de la
+  página la vuelve a abrir; la elección también se cambia en `/cookies`.
 - Retirar el permiso:
   - apaga GA4, revoca el píxel y borra sus cookies;
   - lo avisa al servidor, que borra los identificadores de lo ya registrado con ese

@@ -120,6 +120,24 @@ export function hayDestinos(d: DestinosPublicos | null): boolean {
   return d !== null && (d.ga4 !== null || d.meta !== null);
 }
 
+/**
+ * Si esta página pide la elección de cookies (ADR 0206): las del producto siempre; la
+ * de un negocio, solo si mide (sin destinos no hay nada opcional que autorizar).
+ */
+export function pideConsentimiento(): boolean {
+  return (
+    !medicion.pausada &&
+    medicion.ambito !== null &&
+    (medicion.ambito.startsWith("plataforma:") ||
+      hayDestinos(medicion.destinos))
+  );
+}
+
+/** «Cookies y configuración» del pie: vuelve a mostrar la barra con lo elegido. */
+export function configurarCookies(): void {
+  medicion.eligiendo = true;
+}
+
 /** Prefijo de las cookies de GA4 de un negocio: las suyas, no las de otro. */
 export function prefijoCookies(ambito: Ambito): string | null {
   if (!ambito.startsWith("negocio:")) return null;

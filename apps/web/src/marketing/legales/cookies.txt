@@ -8,9 +8,9 @@ Una cookie es un archivo pequeño que un sitio guarda en tu navegador. El almace
 
 2. Cómo eliges
 
-La primera vez que entras a nuestros sitios te mostramos el aviso «Cookies y privacidad» con tres opciones: aceptar todas, usar solo las necesarias o configurar por separado la analítica y la publicidad. Mientras no elijas, solo funcionan las necesarias: no se carga ninguna herramienta de medición ni de publicidad.
+La primera vez que entras a nuestros sitios te avisamos, en una barra al pie de la página, que usamos cookies. Con «Aceptar» autorizas las de analítica y publicidad. En «Cookies y configuración» eliges por separado la analítica y la publicidad, o no marcas ninguna para usar solo las necesarias. Mientras no aceptes, solo funcionan las necesarias: no se carga ninguna herramienta de medición ni de publicidad.
 
-Puedes cambiar tu elección cuando quieras con el botón «Cookies» que queda en la esquina de la página. Si retiras un permiso, apagamos esa herramienta, borramos sus cookies de este navegador y pedimos que se borren los identificadores ya registrados con él.
+Puedes cambiar tu elección cuando quieras en «Cookies y configuración», al pie de cada página, o en esta misma página. Si retiras un permiso, apagamos esa herramienta, borramos sus cookies de este navegador y pedimos que se borren los identificadores ya registrados con él.
 
 Cada marca y la página de cada negocio piden y guardan su propia elección: aceptar en AgendaUno no autoriza nada en TurnoUno ni en la página de un negocio.
 
@@ -48,7 +48,7 @@ Los videos que un negocio inserta en su página se cargan solo cuando los reprod
 
 8. Cómo borrarlas desde tu navegador
 
-Además del botón «Cookies», puedes bloquear o borrar las cookies y el almacenamiento desde la configuración de tu navegador. Si borras las necesarias tendrás que volver a iniciar sesión y es posible que algunas funciones no estén disponibles.
+Además de «Cookies y configuración», puedes bloquear o borrar las cookies y el almacenamiento desde la configuración de tu navegador. Si borras las necesarias tendrás que volver a iniciar sesión y es posible que algunas funciones no estén disponibles.
 
 9. Cambios a esta política
 

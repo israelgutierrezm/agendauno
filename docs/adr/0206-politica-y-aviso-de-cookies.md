@@ -27,10 +27,20 @@ Estado: Aceptado (2026-10-24).
   navegador para el sitio en que se abre (el producto o, en el subdominio de un
   negocio, ese negocio).
 - **El aviso de cookies sale al entrar** a las páginas del producto aunque todavía no
-  haya destinos encendidos: aceptar todas, solo las necesarias (con el mismo peso) o
-  configurar analítica y publicidad. Mientras no se elija, solo funcionan las
-  necesarias. En la página de un negocio solo aparece si ese negocio mide (sin
-  destinos no hay nada opcional que autorizar).
+  haya destinos encendidos, como el de Fitune: una barra oscura y algo translúcida al
+  pie, a todo lo ancho, con el título «Esta página web usa cookies», qué datos obtienen
+  y para qué, un solo botón («Aceptar») y el enlace «Cookies y configuración», donde se
+  elige o se rechaza la analítica y la publicidad. Mientras no se acepte, solo
+  funcionan las necesarias. En la página de un negocio solo aparece si ese negocio mide
+  (sin destinos no hay nada opcional que autorizar).
+- **«Cookies y configuración» queda en el pie** de las páginas públicas y vuelve a abrir
+  la barra con lo elegido (no hay botón flotante).
+- **Por qué basta con «Aceptar»:** la LFPDPPP y los lineamientos del aviso de privacidad
+  piden avisar, al entrar, que se usan cookies, qué datos obtienen, para qué y cómo
+  deshabilitarlas; no piden un botón de rechazo en la barra. Aquí además nada opcional
+  se carga sin aceptar (más estricto que el consentimiento tácito que admite la ley) y
+  rechazar está a un clic en «Cookies y configuración», en la barra, en el pie y en
+  `/cookies`.
 - **La verificación de producción** exige la política publicada, como el aviso y los
   términos.
 

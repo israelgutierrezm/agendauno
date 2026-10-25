@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 import HechoCon from "@/components/HechoCon.vue";
 import LogoProducto from "@/components/LogoProducto.vue";
 import { trackEvent } from "@/lib/analytics";
+import { configurarCookies, pideConsentimiento } from "@/lib/etiquetas";
 import { useDemosActivas } from "@/lib/demos";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
@@ -238,6 +239,16 @@ defineEmits<{ alternarTema: [] }>();
           <!-- En la página de un negocio, la leyenda fija de la plataforma (ADR 0167):
                no depende de ningún ajuste del negocio. -->
           <HechoCon v-if="esRutaPublicaDeNegocio" />
+          <!-- En la página de un negocio que mide, también se cambia la elección. -->
+          <button
+            v-if="esRutaPublicaDeNegocio && pideConsentimiento()"
+            type="button"
+            class="tu-public-footer-link"
+            data-prueba="pie-configurar-cookies-negocio"
+            @click="configurarCookies"
+          >
+            Cookies y configuración
+          </button>
           <span v-else>{{
             "© " + new Date().getFullYear() + " " + marca
           }}</span>
@@ -268,6 +279,16 @@ defineEmits<{ alternarTema: [] }>();
           >
             Política de cookies
           </RouterLink>
+          <!-- Vuelve a abrir la barra de cookies con lo elegido (ADR 0206). -->
+          <button
+            v-if="pideConsentimiento()"
+            type="button"
+            class="tu-public-footer-link"
+            data-prueba="pie-configurar-cookies"
+            @click="configurarCookies"
+          >
+            Cookies y configuración
+          </button>
           <a
             class="tu-public-footer-link"
             :href="`mailto:${PRODUCTOS[producto].soporte.correo}`"

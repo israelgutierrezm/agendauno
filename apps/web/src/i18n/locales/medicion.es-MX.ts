@@ -4,15 +4,16 @@
  */
 export default {
   aviso: {
-    titulo: "Cookies y privacidad",
+    titulo: "Esta página web usa cookies",
+    // LFPDPPP: se avisa al entrar qué se usa, qué datos obtiene, para qué y cómo
+    // deshabilitarlo. Le sigue el enlace «Cookies y configuración».
     textoPlataforma:
-      "Usamos cookies necesarias para que el sitio funcione. Con tu permiso, también de analítica y publicidad para saber cómo nos encuentras y mejorar nuestras campañas. Puedes cambiar tu elección cuando quieras.",
+      "Utilizamos cookies que obtienen datos de tu navegación para que el sitio funcione, analizar el tráfico y medir nuestras campañas. Acepta o elige cuáles en",
     textoNegocio:
-      "{negocio} usa cookies necesarias para que su página funcione y, con tu permiso, de medición para saber cómo lo encuentras y mejorar sus campañas. Puedes cambiar tu elección cuando quieras.",
+      "{negocio} utiliza cookies que obtienen datos de tu navegación para que su página funcione, analizar el tráfico y medir sus campañas. Acepta o elige cuáles en",
     esteNegocio: "Este negocio",
-    aceptar: "Aceptar todas",
-    rechazar: "Solo necesarias",
-    elegir: "Configurar",
+    aceptar: "Aceptar",
+    elegir: "Cookies y configuración",
     guardar: "Guardar mi elección",
     analitica: "Analítica",
     analiticaTexto:
@@ -21,10 +22,9 @@ export default {
     publicidadTexto:
       "Medir los resultados de los anuncios (Meta y Google) y mejorar las campañas.",
     necesarias:
-      "Las cookies necesarias siempre están activas: mantienen tu sesión, tu elección y la seguridad del sitio, y no miden nada.",
+      "Las cookies necesarias siempre están activas: mantienen tu sesión, tu elección y la seguridad del sitio, y no miden nada. Sin marcar nada, solo se usan esas.",
     avisoPrivacidad: "Aviso de privacidad",
     politicaCookies: "Política de cookies",
-    privacidad: "Cookies",
     cerrar: "Cerrar",
   },
   destinos: {

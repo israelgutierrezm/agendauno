@@ -111,7 +111,7 @@ Puedes revocar tu consentimiento o limitar el uso de tus datos con el mismo proc
 
 10. Cookies, almacenamiento local y tecnologías similares
 
-Usamos cookies y el almacenamiento de tu navegador para mantener tu sesión iniciada, recordar tu elección de cookies y tus preferencias, proteger los formularios con reCAPTCHA de Google y procesar pagos con la pasarela del negocio. Solo con tu permiso, que pedimos al entrar, usamos cookies de analítica (Google Analytics) y de publicidad (Meta y Google) para saber cómo nos encuentras y medir nuestras campañas. Puedes cambiar tu elección cuando quieras con el botón «Cookies» de la página. El detalle de cada cookie, para qué sirve y cuánto dura está en nuestra Política de cookies.
+Usamos cookies y el almacenamiento de tu navegador para mantener tu sesión iniciada, recordar tu elección de cookies y tus preferencias, proteger los formularios con reCAPTCHA de Google y procesar pagos con la pasarela del negocio. Solo con tu permiso, que pedimos al entrar, usamos cookies de analítica (Google Analytics) y de publicidad (Meta y Google) para saber cómo nos encuentras y medir nuestras campañas. Puedes cambiar tu elección cuando quieras en «Cookies y configuración», al pie de la página. El detalle de cada cookie, para qué sirve y cuánto dura está en nuestra Política de cookies.
 
 11. Cómo protegemos tus datos
 

@@ -6,9 +6,10 @@ import { i18n } from "@/i18n";
 import AvisoMedicion from "./AvisoMedicion.vue";
 
 /*
-| El aviso de cookies de las páginas públicas (ADR 0143 y 0206): en las del producto, al
-| entrar; en la de un negocio, solo si mide. Mientras no se haya elegido: aceptar todas,
-| solo las necesarias o configurar cada cosa; después, «Cookies» para cambiarlo.
+| La barra de cookies de las páginas públicas (ADR 0143 y 0206), como la de Fitune: al
+| pie; en las del producto, al entrar, y en la de un negocio, solo si mide. Un solo
+| botón, «Aceptar»; en «Cookies y configuración» se elige o se rechaza cada cosa, y el
+| mismo enlace del pie de página la vuelve a abrir con lo elegido.
 */
 
 const etiquetas = vi.hoisted(() => ({
@@ -31,8 +32,13 @@ vi.mock("@/lib/etiquetas", async () => {
   return {
     medicion,
     elegir: etiquetas.elegir,
-    hayDestinos: (d: { ga4: string | null; meta: string | null } | null) =>
-      d !== null && (d.ga4 !== null || d.meta !== null),
+    // La misma regla que lib/etiquetas.ts.
+    pideConsentimiento: () =>
+      !medicion.pausada &&
+      medicion.ambito !== null &&
+      (medicion.ambito.startsWith("plataforma:") ||
+        (medicion.destinos !== null &&
+          (medicion.destinos.ga4 !== null || medicion.destinos.meta !== null))),
   };
 });
 
@@ -56,27 +62,39 @@ beforeEach(() => {
   });
 });
 
-describe("aviso de medición", () => {
-  it("pregunta al entrar: aceptar todas, solo las necesarias o configurar, con su política", async () => {
+describe("barra de cookies", () => {
+  it("avisa al entrar qué se usa y para qué, con un solo botón: «Aceptar»", async () => {
     const w = montar();
-    expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(true);
-    expect(w.get('[data-prueba="am-politica"]').text()).toBe(
-      "Política de cookies",
+    const barra = w.get('[data-prueba="aviso-medicion"]');
+    expect(barra.text()).toContain("Esta página web usa cookies");
+    expect(barra.text()).toContain("obtienen datos de tu navegación");
+    expect(w.get('[data-prueba="am-elegir"]').text()).toBe(
+      "Cookies y configuración",
     );
-    expect(w.get('[data-prueba="am-rechazar"]').text()).toBe("Solo necesarias");
+    expect(w.findAll("button.tu-btn").map((b) => b.text())).toEqual([
+      "Aceptar",
+    ]);
 
-    await w.get('[data-prueba="am-rechazar"]').trigger("click");
-    expect(etiquetas.elegir).toHaveBeenLastCalledWith({
-      analitica: false,
-      publicidad: false,
-    });
     await w.get('[data-prueba="am-aceptar"]').trigger("click");
     expect(etiquetas.elegir).toHaveBeenLastCalledWith({
       analitica: true,
       publicidad: true,
     });
+  });
 
+  it("en «Cookies y configuración» se elige cada cosa o se rechazan todas, con su política", async () => {
+    const w = montar();
     await w.get('[data-prueba="am-elegir"]').trigger("click");
+    expect(w.get('[data-prueba="am-politica"]').text()).toBe(
+      "Política de cookies",
+    );
+    // Sin marcar nada: solo las necesarias.
+    await w.get('[data-prueba="am-guardar"]').trigger("click");
+    expect(etiquetas.elegir).toHaveBeenLastCalledWith({
+      analitica: false,
+      publicidad: false,
+    });
+
     await w.get('[data-prueba="am-analitica"]').setValue(true);
     await w.get('[data-prueba="am-guardar"]').trigger("click");
     expect(etiquetas.elegir).toHaveBeenLastCalledWith({
@@ -99,22 +117,18 @@ describe("aviso de medición", () => {
   });
 
   it("en una página que no se mide, no aparece", async () => {
-    const w = montar();
-
-    etiquetas.medicion.destinos = { ga4: "G-X1234", meta: null };
     etiquetas.medicion.pausada = true;
-    await nextTick();
+    const w = montar();
     expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(false);
-    expect(w.find('[data-prueba="am-privacidad"]').exists()).toBe(false);
   });
 
-  it("ya elegido, queda «Cookies» para cambiarlo con lo que había elegido", async () => {
+  it("ya elegido no estorba; el enlace del pie la vuelve a abrir con lo elegido", async () => {
     etiquetas.medicion.preferencias = { analitica: true, publicidad: false };
     const w = montar();
     expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(false);
-    expect(w.get('[data-prueba="am-privacidad"]').text()).toBe("Cookies");
 
-    await w.get('[data-prueba="am-privacidad"]').trigger("click");
+    etiquetas.medicion.eligiendo = true;
+    await nextTick();
     expect(
       (w.get('[data-prueba="am-analitica"]').element as HTMLInputElement)
         .checked,
@@ -123,5 +137,7 @@ describe("aviso de medición", () => {
       (w.get('[data-prueba="am-publicidad"]').element as HTMLInputElement)
         .checked,
     ).toBe(false);
+    await w.get('[data-prueba="am-cerrar"]').trigger("click");
+    expect(w.find('[data-prueba="aviso-medicion"]').exists()).toBe(false);
   });
 });
